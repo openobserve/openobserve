@@ -2801,6 +2801,7 @@ export default defineComponent({
       (tab) => {
         if (tab === "promql") {
           normalizePromqlMultiAlertFlag();
+          if (fv("query_condition.prom_rule_mode")) onPromRuleModeChange(true);
           if (fv("query_condition.aggregation.multi_alert")) {
             setFV("query_condition.aggregation.multi_alert", false);
           }

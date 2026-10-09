@@ -94,4 +94,16 @@ mod tests {
         assert_eq!(rpc.regions, vec!["us-east-1"]);
         assert_eq!(rpc.clusters, vec!["cluster-a"]);
     }
+    #[test]
+    fn rule_completeness_context_survives_metrics_request_conversion() {
+        let mut req = make_request();
+        let ordinary: cluster_rpc::MetricsQueryRequest = req.clone().into();
+        assert!(ordinary.search_event_context.is_none());
+        req.search_event_context = Some(config::meta::search::SearchEventContext {
+            promql_require_complete: true,
+            ..Default::default()
+        });
+        let rpc: cluster_rpc::MetricsQueryRequest = req.into();
+        assert!(rpc.search_event_context.unwrap().promql_require_complete);
+    }
 }

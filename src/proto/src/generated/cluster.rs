@@ -122,6 +122,8 @@ pub struct SearchEventContext {
     pub dashboard_folder_name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(string, optional, tag = "8")]
     pub alert_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(bool, tag = "9")]
+    pub promql_require_complete: bool,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileContentResponse {

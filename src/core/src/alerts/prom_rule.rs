@@ -81,41 +81,39 @@ fn rule_results(result: PromValue, at: i64, cap: usize) -> anyhow::Result<Trigge
             "PromQL rule expression must return an instant vector"
         ));
     };
-    let rows: Vec<Map<String, Value>> = series
-        .into_iter()
-        .map(|series| {
-            let mut row: Map<String, Value> = series
-                .labels
-                .iter()
-                .map(|l| (l.name.to_string(), Value::String(l.value.to_string())))
-                .collect();
-            let value = match series.sample.value {
-                v if v.is_nan() => "NaN".to_string(),
-                v if v == f64::INFINITY => "+Inf".to_string(),
-                v if v == f64::NEG_INFINITY => "-Inf".to_string(),
-                v => v.to_string(),
-            };
-            row.insert("_timestamp".into(), at.into());
-            row.insert("value".into(), value.into());
-            row
-        })
-        .collect();
-    let observations = rows
-        .iter()
-        .map(|row| {
-            GroupObservation::new(
-                config::meta::alerts::dispatch::promql_series_labels(row),
-                0.0,
-            )
-        })
-        .collect();
+    let mut rows = Vec::with_capacity(series.len());
+    let mut rule_series_rows = std::collections::HashMap::with_capacity(series.len());
+    let mut raw_values = std::collections::HashMap::with_capacity(series.len());
+    let mut observations = Vec::with_capacity(series.len());
+    for series in series {
+        let labels: std::collections::BTreeMap<String, String> = series
+            .labels
+            .iter()
+            .map(|l| (l.name.to_string(), l.value.to_string()))
+            .collect();
+        let key = config::meta::alerts::grouping::group_key(&labels);
+        let mut row: Map<String, Value> = labels
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone().into()))
+            .collect();
+        let value = match series.sample.value {
+            v if v.is_nan() => "NaN".to_string(),
+            v if v == f64::INFINITY => "+Inf".to_string(),
+            v if v == f64::NEG_INFINITY => "-Inf".to_string(),
+            v => v.to_string(),
+        };
+        raw_values.insert(key.clone(), value.clone());
+        observations.push(GroupObservation::new(labels, 0.0));
+        row.insert("_timestamp".into(), at.into());
+        row.insert("value".into(), value.into());
+        rule_series_rows.insert(key, row.clone());
+        rows.push(row);
+    }
     let mut classification = classify_groups_by(observations, |_| Some(AlertLevel::Critical), cap);
     for group in &mut classification.groups {
-        group.rule_value = rows
-            .iter()
-            .find(|row| config::meta::alerts::dispatch::promql_series_labels(row) == group.labels)
-            .and_then(|row| row.get("value").and_then(Value::as_str))
-            .map(str::to_string);
+        group.rule_value = raw_values
+            .get(&config::meta::alerts::grouping::group_key(&group.labels))
+            .cloned();
     }
     if matches!(
         classification.cap,
@@ -134,6 +132,7 @@ fn rule_results(result: PromValue, at: i64, cap: usize) -> anyhow::Result<Trigge
         level,
         data: level.map(|_| rows),
         rule_value,
+        rule_series_rows: Some(rule_series_rows),
         group_label,
         group_classification: Some(classification),
         ..Default::default()
@@ -254,6 +253,78 @@ mod tests {
         let mut cache = STREAM_SCHEMAS_LATEST.write().await;
         for name in ["a", "z", "unrelated"] {
             cache.remove(&key(name));
+        }
+    }
+    #[test]
+    fn rule_dispatch_keeps_legal_reserved_output_labels_as_distinct_identities() {
+        use config::meta::alerts::{
+            TriggerCondition,
+            dispatch::plan_dispatch,
+            grouping::{group_key, group_template_vars},
+            prom_rule::plan_rule_updates,
+        };
+        for label in ["value", "_timestamp"] {
+            let result = rule_results(
+                PromValue::Vector(
+                    [("a", f64::NAN), ("b", f64::INFINITY)]
+                        .into_iter()
+                        .map(|(value, sample)| InstantValue {
+                            labels: vec![std::sync::Arc::new(Label::new(label, value))],
+                            sample: Sample::new(0, sample),
+                        })
+                        .collect(),
+                ),
+                600,
+                10,
+            )
+            .unwrap();
+            let classification = result.group_classification.unwrap();
+            assert_eq!(classification.groups.len(), 2);
+            let payloads = result.rule_series_rows.unwrap();
+            assert_eq!(payloads.len(), 2);
+            let plan = plan_rule_updates(
+                "rule",
+                &classification,
+                &std::collections::HashMap::new(),
+                600,
+                0,
+            );
+            let states: std::collections::HashMap<_, _> = plan
+                .updates
+                .into_iter()
+                .filter_map(|u| u.state)
+                .map(|s| (s.group_key.clone(), s))
+                .collect();
+            let dispatch = plan_dispatch(
+                &classification,
+                &states,
+                &payloads,
+                &TriggerCondition::default(),
+                600,
+                0,
+            );
+            assert!(dispatch.inconsistent.is_empty());
+            assert_eq!(dispatch.items.len(), 2);
+            for item in dispatch.items {
+                assert_eq!(item.group_key, group_key(&item.labels));
+                let expected = if item.labels[label] == "a" {
+                    "NaN"
+                } else {
+                    "+Inf"
+                };
+                assert_eq!(item.row["value"], expected);
+                assert!(
+                    group_template_vars(&item.labels)
+                        .contains(&(format!("group.{label}"), item.labels[label].clone()))
+                );
+                assert!(
+                    states[&item.group_key]
+                        .group_labels
+                        .as_deref()
+                        .unwrap()
+                        .contains(label)
+                );
+            }
         }
     }
 }

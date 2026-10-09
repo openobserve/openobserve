@@ -434,6 +434,8 @@ pub struct TriggerEvalResults {
     pub actual_value: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rule_value: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_series_rows: Option<std::collections::HashMap<String, Map<String, Value>>>,
     /// Which group/series produced `actual_value` ("host=b,region=eu"), for
     /// grouped aggregation and PromQL alerts (T-9). `None` for count alerts —
     /// a row count has no group identity.

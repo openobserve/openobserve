@@ -911,6 +911,25 @@ describe("QueryConfig.vue", () => {
       expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(true);
     });
 
+    it.each(["custom", "sql"])("keeps rule mode valid after a %s tab round trip", async (tab) => {
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      wrapper.vm.localTab = tab;
+      await setQCProps({ tab });
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(false);
+      hostForm().setFieldValue("trigger_condition.threshold", 3);
+      hostForm().setFieldValue("trigger_condition.warning_threshold", 2);
+      wrapper.vm.localTab = "promql";
+      await setQCProps({ tab: "promql" });
+      await flushPromises();
+      const query = hostForm().state.values.query_condition;
+      expect(query.prom_rule_mode).toBe(true);
+      expect(query.promql_multi_alert).toBe(true);
+      expect(query.promql_condition).toBeNull();
+      expect(await submit()).toBe(true);
+    });
+
     it("passes with a complete promql condition (§4 restore)", async () => {
       hostForm().setFieldValue("query_condition.promql_condition", {
         operator: ">=",

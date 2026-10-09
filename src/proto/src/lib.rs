@@ -111,4 +111,26 @@ mod tests {
             new_stats
         );
     }
+    #[test]
+    fn rule_completeness_context_is_default_false_and_survives_protobuf_hops() {
+        use prost::Message;
+        let old = cluster_rpc::SearchEventContext::decode(&[][..]).unwrap();
+        assert!(!old.promql_require_complete);
+        let context = cluster_rpc::SearchEventContext {
+            promql_require_complete: true,
+            ..Default::default()
+        };
+        let request = cluster_rpc::MetricsQueryRequest {
+            search_event_context: Some(context),
+            ..Default::default()
+        };
+        let decoded =
+            cluster_rpc::MetricsQueryRequest::decode(request.encode_to_vec().as_slice()).unwrap();
+        assert!(
+            decoded
+                .search_event_context
+                .unwrap()
+                .promql_require_complete
+        );
+    }
 }
