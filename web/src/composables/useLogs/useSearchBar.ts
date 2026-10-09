@@ -86,31 +86,36 @@ export const useSearchBar = (t: TranslateFn) => {
 
   // `force` for the reloads that follow a create/update/delete; a plain call on
   // Logs entry is a cache hit.
-  const getSavedViews = async (force = false) => {
+  /** Resolves with the org's complete saved-views list, or undefined when the fetch failed. */
+  const getSavedViews = async (force = false): Promise<any[] | undefined> => {
     try {
       searchObj.loadingSavedView = true;
       const org = store.state.selectedOrganization.identifier;
-      (force
-        ? queryClient
-            .invalidateQueries({
-              queryKey: savedViewsQuery(org).queryKey,
-              exact: true,
-              refetchType: "none",
-            })
-            .then(() => queryClient.fetchQuery(savedViewsQuery(org)))
-        : queryClient.fetchQuery(savedViewsQuery(org))
+      return await (
+        force
+          ? queryClient
+              .invalidateQueries({
+                queryKey: savedViewsQuery(org).queryKey,
+                exact: true,
+                refetchType: "none",
+              })
+              .then(() => queryClient.fetchQuery(savedViewsQuery(org)))
+          : queryClient.fetchQuery(savedViewsQuery(org))
       )
         .then((views: any[]) => {
           searchObj.loadingSavedView = false;
           searchObj.data.savedViews = views.filter((v) => viewTypeOf(v) === "logs");
+          return views;
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;
           console.log(err);
+          return undefined;
         });
     } catch (e: any) {
       searchObj.loadingSavedView = false;
       console.log("Error while getting saved views", e);
+      return undefined;
     }
   };
 
