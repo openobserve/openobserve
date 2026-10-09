@@ -76,6 +76,18 @@ pub async fn get(db: &DatabaseConnection, org: &str, id: &str) -> Result<Option<
     Ok(Some(to_slo(model)?))
 }
 
+/// Whether another SLO in the folder already holds `name`, as the unique index would refuse.
+pub async fn name_taken(db: &DatabaseConnection, slo: &Slo) -> Result<bool, Error> {
+    Ok(slos::Entity::find()
+        .filter(slos::Column::Org.eq(&slo.org))
+        .filter(slos::Column::FolderId.eq(&slo.folder_id))
+        .filter(slos::Column::Name.eq(&slo.name))
+        .filter(slos::Column::Id.ne(&slo.id))
+        .one(db)
+        .await?
+        .is_some())
+}
+
 /// Every enabled SLO across all orgs — what the ingest scheduler enumerates.
 pub async fn list_enabled(db: &DatabaseConnection) -> Result<Vec<Slo>, Error> {
     slos::Entity::find()

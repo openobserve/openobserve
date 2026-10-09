@@ -25,6 +25,8 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
+#[cfg(feature = "enterprise")]
+use openobserve_core::background_access::StreamReadCheck;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -124,13 +126,20 @@ pub async fn save_pipeline(
     if !overwrite {
         pipeline.id = ider::generate();
     }
-    #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_pipeline(&user_email.user_id, &pipeline).await {
-        return resp;
-    }
     let pipeline_id = pipeline.id.to_string();
     let pipeline_name = pipeline.name.clone();
-    match pipeline::save_user_pipeline(pipeline).await {
+    #[cfg(feature = "enterprise")]
+    let saved = {
+        let org_id = pipeline.org.clone();
+        let check = StreamReadCheck {
+            org_id: &org_id,
+            user_id: &user_email.user_id,
+        };
+        pipeline::save_user_pipeline_checked(pipeline, Some(&check)).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let saved = pipeline::save_user_pipeline(pipeline).await;
+    match saved {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Pipeline created successfully")
                 .with_id(pipeline_id)
@@ -483,10 +492,15 @@ pub async fn update_pipeline(
     pipeline.org = org_id;
     let org_id = pipeline.org.clone();
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_pipeline(&user_email.user_id, &pipeline).await {
-        return resp;
-    }
-    match pipeline::update_user_pipeline(&org_id, pipeline).await {
+    let check = StreamReadCheck {
+        org_id: &org_id,
+        user_id: &user_email.user_id,
+    };
+    #[cfg(feature = "enterprise")]
+    let updated = pipeline::update_user_pipeline_checked(&org_id, pipeline, Some(&check)).await;
+    #[cfg(not(feature = "enterprise"))]
+    let updated = pipeline::update_user_pipeline(&org_id, pipeline).await;
+    match updated {
         Ok(()) => MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,
             "Pipeline updated successfully",
@@ -655,20 +669,6 @@ pub async fn enable_pipeline_bulk(
     })
 }
 
-/// A body the save's own validation refuses is left to it, so it answers its 400 first.
-#[cfg(feature = "enterprise")]
-async fn guard_pipeline(user_id: &str, pipeline: &Pipeline) -> Result<(), Response> {
-    let sources = async {
-        if !pipeline::passes_validation(pipeline) {
-            return Ok(None);
-        }
-        openobserve_core::background_access::pipeline_sources(pipeline)
-            .await
-            .map(Some)
-    };
-    openobserve_core::background_access::guard_loaded(&pipeline.org, user_id, sources).await
-}
-
 #[cfg(feature = "enterprise")]
 async fn enable_denial(org_id: &str, user_id: &str, id: &str) -> Option<String> {
     openobserve_core::background_access::loaded_denial_message(
@@ -778,11 +778,19 @@ mod tests {
         use openobserve_api_common::extractors::Headers;
         use openobserve_core::{
             auth::UserEmail,
-            authz::{TypedStream, fake_checker},
+            authz::{TypedStream, WriteCheck, fake_checker},
         };
         use serde_json::json;
 
         use super::super::*;
+
+        async fn guard_pipeline(user_id: &str, pipeline: &Pipeline) -> Result<(), Response> {
+            let check = StreamReadCheck {
+                org_id: &pipeline.org,
+                user_id,
+            };
+            check.check(pipeline).await
+        }
 
         fn user() -> String {
             format!("{}@example.com", config::ider::uuid())
@@ -860,17 +868,38 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn a_body_its_save_refuses_is_left_to_that_400() {
+        async fn a_body_its_save_refuses_gets_that_400_not_403() {
             fake_checker();
-            let caller = user();
             let mut invalid = pipeline("sp_org1", "", "secret");
             invalid.edges.clear();
-            assert!(guard_pipeline(&caller, &invalid).await.is_ok());
-            assert!(
-                guard_pipeline(&caller, &pipeline("sp_org1", "", "secret"))
+            let resp = save_pipeline(
+                Path("sp_org1".to_string()),
+                Query(HashMap::default()),
+                Headers(UserEmail { user_id: user() }),
+                Json(invalid),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        }
+
+        #[tokio::test]
+        async fn an_update_answers_its_own_404_or_409_before_the_stream_check() {
+            fake_checker();
+            let body = pipeline("sp_org1", "", "secret");
+            let main = Response::from(
+                pipeline::update_user_pipeline("sp_org1", body.clone())
                     .await
-                    .is_err()
-            );
+                    .unwrap_err(),
+            )
+            .status();
+            let resp = update_pipeline(
+                Path("sp_org1".to_string()),
+                Headers(UserEmail { user_id: user() }),
+                Json(body),
+            )
+            .await;
+            assert_ne!(main, StatusCode::FORBIDDEN);
+            assert_eq!(resp.status(), main);
         }
 
         #[tokio::test]

@@ -54,6 +54,8 @@ use infra::{
 use serde::Serialize;
 use svix_ksuid::Ksuid;
 
+use crate::authz::WriteCheck;
+
 /// Why a save was rejected.
 #[derive(Debug)]
 pub enum SloError {
@@ -80,6 +82,8 @@ pub enum SloError {
     /// The shared composite graph lock could not be acquired or released.
     TemporarilyUnavailable(String),
     Db(String),
+    /// The caller's write check refused, and already holds the response to send.
+    Refused(crate::authz::Refusal),
 }
 
 impl std::fmt::Display for SloError {
@@ -99,6 +103,7 @@ impl std::fmt::Display for SloError {
                 f,
                 "the destination folder already has an SLO with one of these names; nothing was moved"
             ),
+            Self::Refused(_) => write!(f, "refused before the write"),
         }
     }
 }
@@ -691,6 +696,21 @@ pub async fn alert_sli_preview(
 /// path: a fresh org has no folder rows at all until something is saved, and
 /// the handler defaults `folder_id` to `default` — so rejecting here would
 /// make the first SLO in a new org impossible to create.
+/// A taken name answers its 409 before the caller's check, as the write itself would.
+async fn checked_before_write(
+    db: &sea_orm::DatabaseConnection,
+    slo: &Slo,
+    check: &dyn WriteCheck<Slo>,
+) -> Result<(), SloError> {
+    if slos_table::name_taken(db, slo).await? {
+        return Err(SloError::DuplicateName(slo.name.clone()));
+    }
+    check
+        .check(slo)
+        .await
+        .map_err(|response| SloError::Refused(crate::authz::Refusal::new(response)))
+}
+
 async fn ensure_folder(org: &str, folder_id: &str) -> Result<(), SloError> {
     if folders::exists(org, folder_id, FolderType::Alerts).await? {
         return Ok(());
@@ -717,6 +737,14 @@ pub fn reservation(slo: &Slo) -> (i64, i64) {
 }
 
 pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
+    create_checked(slo, None).await
+}
+
+/// [`create`], running `check` after every check of its own and before the row is written.
+pub async fn create_checked(
+    slo: &mut Slo,
+    check: Option<&dyn WriteCheck<Slo>>,
+) -> Result<(), SloError> {
     let cfg = get_config();
     let db = get_orm_client_rw().await;
 
@@ -743,6 +771,14 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
     .await
     .map_err(|e| SloError::Budget(e.to_string()))?;
 
+    if let Some(check) = check
+        && let Err(e) = checked_before_write(db, slo, check).await
+    {
+        let now = now_micros() / 1_000_000;
+        let _ = slo_budget::retire(db, &slo.org, &slo.id, slo.definition_generation, now).await;
+        return Err(e);
+    }
+
     let now = now_micros() / 1_000_000;
     if let Err(e) = slos_table::create(db, slo, now, slo.owner.as_deref()).await {
         // Release what we just reserved, or a failed save would leak budget
@@ -760,6 +796,15 @@ pub async fn create(slo: &mut Slo) -> Result<(), SloError> {
 
 /// `editor` is recorded as the last editor; an omitted `slo.owner` keeps the stored one.
 pub async fn update(slo: &mut Slo, editor: Option<&str>) -> Result<(), SloError> {
+    update_checked(slo, editor, None).await
+}
+
+/// [`update`], running `check` after every check of its own and before the row is written.
+pub async fn update_checked(
+    slo: &mut Slo,
+    editor: Option<&str>,
+    check: Option<&dyn WriteCheck<Slo>>,
+) -> Result<(), SloError> {
     let db = get_orm_client_rw().await;
 
     validate(slo).await?;
@@ -771,6 +816,9 @@ pub async fn update(slo: &mut Slo, editor: Option<&str>) -> Result<(), SloError>
         .ok_or(SloError::NotFound)?;
     // The caller does not choose the generation; the diff does.
     slo.definition_generation = existing.definition_generation;
+    if let Some(check) = check {
+        checked_before_write(db, slo, check).await?;
+    }
 
     let (groups, rows) = reservation(slo);
     slo.groups_reserved = groups;
@@ -2871,5 +2919,55 @@ mod tests {
         let plan = plan_alert_cascade(&dependents);
         assert_eq!(plan.len(), 1, "the good alert must still be deleted");
         assert_eq!(plan[0].1, "fine");
+    }
+
+    struct Unreached;
+
+    #[async_trait::async_trait]
+    impl crate::authz::WriteCheck<Slo> for Unreached {
+        async fn check(&self, _: &Slo) -> Result<(), axum::response::Response> {
+            panic!("the write check must run only after every check of the save's own");
+        }
+    }
+
+    fn count_slo(folder_id: &str) -> Slo {
+        use config::meta::slo::{CountSource, SliConfig, SloDefinition};
+
+        Slo {
+            id: "slo-write-check".into(),
+            org: "write_check_org".into(),
+            folder_id: folder_id.into(),
+            name: "write check".into(),
+            description: String::new(),
+            definition: SloDefinition {
+                sli_config: SliConfig::Count {
+                    source: CountSource::PromQl {
+                        good: "increase(ok_total[5m])".into(),
+                        total: "increase(all_total[5m])".into(),
+                    },
+                },
+                group_by: None,
+                window_secs: 86_400,
+                slice_interval_secs: SLICE_300_SECS,
+            },
+            target: 99.0,
+            tags: Vec::new(),
+            enabled: true,
+            owner: None,
+            definition_generation: 0,
+            groups_estimate: None,
+            groups_reserved: 0,
+        }
+    }
+
+    #[tokio::test]
+    async fn the_save_s_own_errors_answer_before_the_write_check() {
+        let mut slo = count_slo("no_such_folder");
+        let created = create_checked(&mut slo, Some(&Unreached)).await;
+        assert!(!matches!(created, Ok(()) | Err(SloError::Refused(_))));
+
+        let mut missing = count_slo("no_such_folder");
+        let updated = update_checked(&mut missing, None, Some(&Unreached)).await;
+        assert!(!matches!(updated, Ok(()) | Err(SloError::Refused(_))));
     }
 }

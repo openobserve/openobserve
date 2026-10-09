@@ -30,9 +30,12 @@ use config::meta::slo::{Slo, SloStatusView};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
-#[cfg(feature = "enterprise")]
-use openobserve_core::background_access::{guard_loaded, guard_write, slo_sources};
 use openobserve_core::{auth::UserEmail, slo::service as slo_service};
+#[cfg(feature = "enterprise")]
+use openobserve_core::{
+    authz::WriteCheck,
+    background_access::{StreamReadCheck, guard_loaded, rbac_enforced},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -173,11 +176,20 @@ pub async fn create_slo(
         );
     }
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_slo(&slo, &user_email.user_id).await {
-        return resp;
-    }
-
-    match slo_service::create(&mut slo).await {
+    let created = {
+        let org_id = slo.org.clone();
+        let check = StreamReadCheck {
+            org_id: &org_id,
+            user_id: &user_email.user_id,
+        };
+        let check = rbac_enforced()
+            .await
+            .then_some(&check as &dyn WriteCheck<Slo>);
+        slo_service::create_checked(&mut slo, check).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let created = slo_service::create(&mut slo).await;
+    match created {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "SLO saved")
                 .with_id(slo.id.clone())
@@ -252,11 +264,20 @@ pub async fn update_slo(
     #[cfg(feature = "enterprise")]
     let editor = Some(user_email.user_id.clone());
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_slo(&slo, &user_email.user_id).await {
-        return resp;
-    }
-
-    match slo_service::update(&mut slo, editor.as_deref()).await {
+    let updated = {
+        let org_id = slo.org.clone();
+        let check = StreamReadCheck {
+            org_id: &org_id,
+            user_id: &user_email.user_id,
+        };
+        let check = rbac_enforced()
+            .await
+            .then_some(&check as &dyn WriteCheck<Slo>);
+        slo_service::update_checked(&mut slo, editor.as_deref(), check).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let updated = slo_service::update(&mut slo, editor.as_deref()).await;
+    match updated {
         Ok(()) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "SLO updated")
                 .with_id(slo.id.clone())
@@ -573,16 +594,6 @@ pub async fn preview_alert_sli(
     }
 }
 
-/// The save's own checks answer first, so a bad body is never reported as a refused read.
-#[cfg(feature = "enterprise")]
-async fn guard_slo(slo: &Slo, user_id: &str) -> Result<(), Response> {
-    if !openobserve_core::background_access::rbac_enforced().await {
-        return Ok(());
-    }
-    slo_service::validate(slo).await.map_err(save_error)?;
-    guard_write(&slo.org, user_id, &slo_sources(slo)).await
-}
-
 fn not_found() -> Response {
     MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "SLO not found".to_string())
         .into_response()
@@ -601,6 +612,10 @@ fn internal(e: anyhow::Error) -> Response {
 /// the rejection to show its working.
 fn save_error(e: openobserve_core::slo::service::SloError) -> Response {
     use openobserve_core::slo::service::SloError;
+    let e = match e {
+        SloError::Refused(refusal) => return refusal.into_response(),
+        e => e,
+    };
     let status = match &e {
         SloError::Validation(_) => StatusCode::BAD_REQUEST,
         SloError::Budget(_) => StatusCode::PAYLOAD_TOO_LARGE,
@@ -612,6 +627,7 @@ fn save_error(e: openobserve_core::slo::service::SloError) -> Response {
         SloError::FolderNotFound(_) => StatusCode::NOT_FOUND,
         SloError::TemporarilyUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
         SloError::Db(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        SloError::Refused(_) => StatusCode::FORBIDDEN,
     };
     if status == StatusCode::INTERNAL_SERVER_ERROR {
         tracing::error!("[slo] save failed: {e}");

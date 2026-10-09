@@ -29,6 +29,7 @@ use config::meta::{
 };
 
 use self::{db as pipeline, db::PipelineError};
+use crate::authz::{Refusal, WriteCheck};
 
 pub mod batch_execution;
 pub mod db;
@@ -79,6 +80,19 @@ fn default_source_org(pipeline: &mut Pipeline) {
     }
 }
 
+async fn run_check(
+    check: Option<&dyn WriteCheck<Pipeline>>,
+    pipeline: &Pipeline,
+) -> Result<(), PipelineError> {
+    match check {
+        Some(check) => check
+            .check(pipeline)
+            .await
+            .map_err(|response| PipelineError::Refused(Refusal::new(response))),
+        None => Ok(()),
+    }
+}
+
 /// Sources persisted before they were qualified carry an empty org, which means the
 /// pipeline's own org: without this they escape the guard forever.
 fn qualified_org<'a>(stream: &'a StreamParams, org: &'a str) -> &'a str {
@@ -89,15 +103,17 @@ fn qualified_org<'a>(stream: &'a StreamParams, org: &'a str) -> &'a str {
     }
 }
 
-/// Whether `pipeline` has an ID and passes the `validate()` its save and update run, on a copy.
-pub fn passes_validation(pipeline: &Pipeline) -> bool {
-    let mut copy = pipeline.clone();
-    default_source_org(&mut copy);
-    !copy.id.is_empty() && copy.validate().is_ok()
+#[tracing::instrument(skip(pipeline))]
+pub async fn save_pipeline(pipeline: Pipeline) -> Result<(), PipelineError> {
+    save_pipeline_checked(pipeline, None).await
 }
 
-#[tracing::instrument(skip(pipeline))]
-pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+/// [`save_pipeline`], running `check` after every check of its own and before any write.
+#[tracing::instrument(skip(pipeline, check))]
+pub async fn save_pipeline_checked(
+    mut pipeline: Pipeline,
+    check: Option<&dyn WriteCheck<Pipeline>>,
+) -> Result<(), PipelineError> {
     // check if id is missing
     if pipeline.id.is_empty() {
         return Err(PipelineError::InvalidPipeline(
@@ -132,6 +148,7 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
 
     // validate no JavaScript functions in pipeline
     validate_no_javascript_functions(&pipeline).await?;
+    run_check(check, &pipeline).await?;
 
     // Save DerivedStream details if there's any
     if let PipelineSource::Scheduled(derived_stream) = &mut pipeline.source {
@@ -159,7 +176,16 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
 }
 
 #[tracing::instrument(skip(pipeline))]
-pub async fn save_user_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+pub async fn save_user_pipeline(pipeline: Pipeline) -> Result<(), PipelineError> {
+    save_user_pipeline_checked(pipeline, None).await
+}
+
+/// [`save_user_pipeline`], running `check` after every check of its own and before any write.
+#[tracing::instrument(skip(pipeline, check))]
+pub async fn save_user_pipeline_checked(
+    mut pipeline: Pipeline,
+    check: Option<&dyn WriteCheck<Pipeline>>,
+) -> Result<(), PipelineError> {
     if let Ok(existing_pipeline) = pipeline::get_by_id(&pipeline.id).await
         && (existing_pipeline.org != pipeline.org || !existing_pipeline.is_user())
     {
@@ -167,11 +193,20 @@ pub async fn save_user_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineEr
     }
 
     pipeline.kind = PipelineKind::User;
-    save_pipeline(pipeline).await
+    save_pipeline_checked(pipeline, check).await
 }
 
 #[tracing::instrument(skip(pipeline))]
-pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+pub async fn update_pipeline(pipeline: Pipeline) -> Result<(), PipelineError> {
+    update_pipeline_checked(pipeline, None).await
+}
+
+/// [`update_pipeline`], running `check` after every check of its own and before any write.
+#[tracing::instrument(skip(pipeline, check))]
+pub async fn update_pipeline_checked(
+    mut pipeline: Pipeline,
+    check: Option<&dyn WriteCheck<Pipeline>>,
+) -> Result<(), PipelineError> {
     default_source_org(&mut pipeline);
 
     let Ok(mut existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
@@ -198,14 +233,17 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
     validate_no_javascript_functions(&pipeline).await?;
 
     // additional checks when the source is changed
-    let prev_source_stream = if existing_pipeline.source != pipeline.source {
-        // check if the new source exists in another pipeline
-        if pipeline::get_with_same_source_stream(&pipeline)
+    let source_changed = existing_pipeline.source != pipeline.source;
+    // check if the new source exists in another pipeline
+    if source_changed
+        && pipeline::get_with_same_source_stream(&pipeline)
             .await
             .is_ok()
-        {
-            return Err(PipelineError::StreamInUse);
-        }
+    {
+        return Err(PipelineError::StreamInUse);
+    }
+    run_check(check, &pipeline).await?;
+    let prev_source_stream = if source_changed {
         match existing_pipeline.source {
             // realtime: remove prev. src. stream_params from cache
             PipelineSource::Realtime(stream_params) => Some(stream_params),
@@ -254,13 +292,20 @@ pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError
 }
 
 #[tracing::instrument(skip(pipeline))]
-pub async fn update_user_pipeline(
+pub async fn update_user_pipeline(org_id: &str, pipeline: Pipeline) -> Result<(), PipelineError> {
+    update_user_pipeline_checked(org_id, pipeline, None).await
+}
+
+/// [`update_user_pipeline`], running `check` after every check of its own and before any write.
+#[tracing::instrument(skip(pipeline, check))]
+pub async fn update_user_pipeline_checked(
     org_id: &str,
     mut pipeline: Pipeline,
+    check: Option<&dyn WriteCheck<Pipeline>>,
 ) -> Result<(), PipelineError> {
     get_user_pipeline(org_id, &pipeline.id).await?;
     pipeline.kind = PipelineKind::User;
-    update_pipeline(pipeline).await
+    update_pipeline_checked(pipeline, check).await
 }
 
 #[tracing::instrument]
@@ -512,5 +557,40 @@ mod tests {
         pipeline.source = PipelineSource::Scheduled(DerivedStream::default());
 
         assert!(is_user_pipeline_visible(&pipeline, "test_org", None));
+    }
+
+    struct Unreached;
+
+    #[async_trait::async_trait]
+    impl crate::authz::WriteCheck<Pipeline> for Unreached {
+        async fn check(&self, _: &Pipeline) -> Result<(), axum::response::Response> {
+            panic!("the write check must run only after every check of the save's own");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_save_s_own_errors_answer_before_the_write_check() {
+        use super::{PipelineError, save_user_pipeline_checked, update_user_pipeline_checked};
+
+        let mut invalid: Pipeline = serde_json::from_value(serde_json::json!({
+            "pipeline_id": "write-check-pipeline",
+            "name": "",
+            "nodes": [],
+            "edges": []
+        }))
+        .unwrap();
+        invalid.org = "write_check_org".to_string();
+        let saved = save_user_pipeline_checked(invalid.clone(), Some(&Unreached)).await;
+        assert!(
+            matches!(saved, Err(PipelineError::InvalidPipeline(_))),
+            "{saved:?}"
+        );
+
+        let updated =
+            update_user_pipeline_checked("write_check_org", invalid, Some(&Unreached)).await;
+        assert!(
+            !matches!(updated, Ok(()) | Err(PipelineError::Refused(_))),
+            "{updated:?}"
+        );
     }
 }

@@ -529,7 +529,7 @@ pub async fn trigger_report(
     if let Err(resp) = guard_stored_report(
         &org_id,
         &user_email.user_id,
-        reports::get(&org_id, DEFAULT_FOLDER, &name),
+        sendable(reports::get(&org_id, DEFAULT_FOLDER, &name)),
         report_error_response,
     )
     .await
@@ -983,7 +983,7 @@ pub async fn trigger_report_v2(
     if let Err(resp) = guard_stored_report(
         &org_id,
         &user_email.user_id,
-        report_by_id(&org_id, &report_id),
+        sendable(report_by_id(&org_id, &report_id)),
         Response::from,
     )
     .await
@@ -1151,6 +1151,16 @@ async fn report_by_id(org_id: &str, report_id: &str) -> Result<Report, ReportErr
     reports::get_by_id(org_id, report_id)
         .await
         .map(|(_, report)| report)
+}
+
+/// The report `load` reads, once the send's own checks pass, so their error answers first.
+#[cfg(feature = "enterprise")]
+async fn sendable(
+    load: impl Future<Output = Result<Report, ReportError>>,
+) -> Result<Report, ReportError> {
+    let report = load.await?;
+    reports::check_send(&report).await?;
+    Ok(report)
 }
 
 #[cfg(feature = "enterprise")]
@@ -1331,5 +1341,36 @@ mod tests {
             status(ReportError::SendReportError(SendReportError::NoDashboards)),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_trigger_answers_the_send_s_own_check_before_the_stream_check() {
+        use config::meta::dashboards::reports::{Report, ReportDashboard};
+
+        openobserve_core::authz::fake_checker();
+        let report = Report {
+            org_id: "rt_org1".to_string(),
+            dashboards: vec![ReportDashboard {
+                dashboard: "rt_missing".to_string(),
+                folder: "default".to_string(),
+                tabs: vec!["t1".to_string()],
+                variables: Vec::new(),
+                timerange: Default::default(),
+                report_type: Default::default(),
+                email_attachment_type: Default::default(),
+                attachment_dimensions: None,
+            }],
+            ..Default::default()
+        };
+        let resp = super::guard_stored_report(
+            "rt_org1",
+            "denied@example.com",
+            super::sendable(std::future::ready(Ok(report))),
+            Response::from,
+        )
+        .await
+        .unwrap_err();
+        assert_ne!(resp.status(), StatusCode::FORBIDDEN);
     }
 }

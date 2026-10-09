@@ -184,6 +184,31 @@ pub trait StreamAccessChecker: Send + Sync {
     ) -> bool;
 }
 
+/// A refusal a save's error can carry: errors must be `Sync`, and a response body is not.
+pub struct Refusal(std::sync::Mutex<axum::response::Response>);
+
+impl Refusal {
+    pub fn new(response: axum::response::Response) -> Self {
+        Self(std::sync::Mutex::new(response))
+    }
+
+    pub fn into_response(self) -> axum::response::Response {
+        self.0.into_inner().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+impl std::fmt::Debug for Refusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Refusal")
+    }
+}
+
+/// A caller's last check on an object its save has already validated, run right before the write.
+#[async_trait::async_trait]
+pub trait WriteCheck<T: Sync>: Send + Sync {
+    async fn check(&self, object: &T) -> Result<(), axum::response::Response>;
+}
+
 #[cfg(all(feature = "enterprise", feature = "test-utils"))]
 #[derive(Default)]
 pub struct FakeStreamChecker {

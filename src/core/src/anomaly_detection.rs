@@ -1888,14 +1888,21 @@ fn validated_band_settings(
 }
 
 /// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
+fn validation_error(e: anyhow::Error) -> anyhow::Error {
+    // Idempotent: a rule that already marked itself must not be double-prefixed on its way
+    // out through create_config, which wraps every rule indiscriminately.
+    if e.to_string().starts_with("validation error: ") {
+        return e;
+    }
+    anyhow::anyhow!("validation error: {e}")
+}
+
 /// Normalizes and validates a create body; returns its normalized tags.
 fn checked_create_body(req: &mut CreateAnomalyConfigRequest) -> Result<Vec<String>> {
     req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
     validate_config_request(req).map_err(validation_error)?;
 
-    // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
-    // means the same thing on both. Kept typed, not stringified, so the API
-    // layer can downcast it to a 400.
+    // Feature 2 (PT-7): normalized as the alerts path does, kept typed so the API answers 400.
     config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)
 }
 
@@ -1928,10 +1935,7 @@ fn checked_update_body(
     req: &mut UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<()> {
-    // Normalized before the gates, as create does: `{}` and `null` persist as `[]`, so a gate
-    // comparing the raw value would read them as a change and re-litigate a grandfathered row
-    // over an edit that leaves the stored filters exactly as they were. Kept after the fetch
-    // so a request against a missing config still answers 404 rather than 400.
+    // Before the gates so `{}` and `null` read as the stored `[]`; after the fetch so 404 wins.
     req.filters = normalize_request_filters(req.filters.take()).map_err(validation_error)?;
 
     validated_intervals(req, existing).map_err(validation_error)?;
@@ -1950,15 +1954,6 @@ fn checked_update_body(
         validate_retrain_interval_days(days).map_err(validation_error)?;
     }
     validated_band_settings(req, existing).map_err(validation_error)
-}
-
-fn validation_error(e: anyhow::Error) -> anyhow::Error {
-    // Idempotent: a rule that already marked itself must not be double-prefixed on its way
-    // out through create_config, which wraps every rule indiscriminately.
-    if e.to_string().starts_with("validation error: ") {
-        return e;
-    }
-    anyhow::anyhow!("validation error: {e}")
 }
 
 /// Only `enabled` gates training: `alert_enabled` gates dispatch and `status` gates nothing.

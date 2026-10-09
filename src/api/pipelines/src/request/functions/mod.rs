@@ -24,6 +24,8 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
+#[cfg(feature = "enterprise")]
+use openobserve_core::background_access::StreamReadCheck;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -68,10 +70,17 @@ pub async fn save_function(
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_function(&org_id, &user_email.user_id, &transform).await {
-        return resp;
-    }
-    match openobserve_core::functions::save_function(org_id, transform).await {
+    let saved = {
+        let org = org_id.clone();
+        let check = StreamReadCheck {
+            org_id: &org,
+            user_id: &user_email.user_id,
+        };
+        openobserve_core::functions::save_function_checked(org_id, transform, Some(&check)).await
+    };
+    #[cfg(not(feature = "enterprise"))]
+    let saved = openobserve_core::functions::save_function(org_id, transform).await;
+    match saved {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -321,10 +330,21 @@ pub async fn update_function(
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
     #[cfg(feature = "enterprise")]
-    if let Err(resp) = guard_function(&org_id, &user_email.user_id, &transform).await {
-        return resp;
-    }
-    match openobserve_core::functions::update_function(&org_id, name, transform).await {
+    let check = StreamReadCheck {
+        org_id: &org_id,
+        user_id: &user_email.user_id,
+    };
+    #[cfg(feature = "enterprise")]
+    let updated = openobserve_core::functions::update_function_checked(
+        &org_id,
+        name,
+        transform,
+        Some(&check),
+    )
+    .await;
+    #[cfg(not(feature = "enterprise"))]
+    let updated = openobserve_core::functions::update_function(&org_id, name, transform).await;
+    match updated {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -415,19 +435,6 @@ pub async fn test_function(
     }
 }
 
-#[cfg(feature = "enterprise")]
-async fn guard_function(
-    org_id: &str,
-    user_id: &str,
-    transform: &Transform,
-) -> Result<(), Response> {
-    if transform.is_js() {
-        return Ok(());
-    }
-    openobserve_core::background_access::guard_vrl_function(org_id, user_id, &transform.function)
-        .await
-}
-
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "enterprise")]
@@ -439,11 +446,40 @@ mod tests {
         use openobserve_api_common::extractors::Headers;
         use openobserve_core::{
             auth::UserEmail,
-            authz::{TypedStream, fake_checker},
+            authz::{TypedStream, WriteCheck, fake_checker},
         };
         use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
 
         use super::super::*;
+
+        async fn guard_function(
+            org_id: &str,
+            user_id: &str,
+            transform: &Transform,
+        ) -> Result<(), Response> {
+            StreamReadCheck { org_id, user_id }.check(transform).await
+        }
+
+        #[tokio::test]
+        async fn an_empty_body_from_a_denied_user_gets_the_save_400() {
+            fake_checker();
+            let mut empty = vrl("sf_own_table");
+            empty.function = String::new();
+            let resp = save_function(
+                Path("sf_org1".to_string()),
+                Headers(UserEmail { user_id: user() }),
+                Json(empty.clone()),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+            let resp = update_function(
+                Path(("sf_org1".to_string(), "fn1".to_string())),
+                Headers(UserEmail { user_id: user() }),
+                Json(empty),
+            )
+            .await;
+            assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        }
 
         fn user() -> String {
             format!("{}@example.com", config::ider::uuid())

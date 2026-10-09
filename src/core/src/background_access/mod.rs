@@ -37,7 +37,42 @@ use {
 
 use crate::authz::QuerySource;
 #[cfg(feature = "enterprise")]
-use crate::authz::StreamAccessChecker;
+use crate::authz::{StreamAccessChecker, WriteCheck};
+
+/// The stream check a save runs through its write hook, after every check of the save's own.
+#[cfg(feature = "enterprise")]
+pub struct StreamReadCheck<'a> {
+    pub org_id: &'a str,
+    pub user_id: &'a str,
+}
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl WriteCheck<Pipeline> for StreamReadCheck<'_> {
+    async fn check(&self, pipeline: &Pipeline) -> Result<(), Response> {
+        let sources = async { pipeline_sources(pipeline).await.map(Some) };
+        guard_loaded(&pipeline.org, self.user_id, sources).await
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl WriteCheck<Slo> for StreamReadCheck<'_> {
+    async fn check(&self, slo: &Slo) -> Result<(), Response> {
+        guard_write(&slo.org, self.user_id, &slo_sources(slo)).await
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl WriteCheck<config::meta::function::Transform> for StreamReadCheck<'_> {
+    async fn check(&self, transform: &config::meta::function::Transform) -> Result<(), Response> {
+        if transform.is_js() {
+            return Ok(());
+        }
+        guard_vrl_function(self.org_id, self.user_id, &transform.function).await
+    }
+}
 
 /// Why a report save, enable or run was refused.
 #[cfg(feature = "enterprise")]
@@ -401,6 +436,7 @@ pub async fn guard_dashboard_update(
     }
     let stored = stored_dashboard(org_id, folder_id, dashboard_id).await?;
     crate::dashboards::check_update_hash(&stored, hash).map_err(Response::from)?;
+    crate::dashboards::checked_title(edited).map_err(Response::from)?;
     guard_stored_edit(org_id, user_id, dashboard_id, &stored, edited).await
 }
 
@@ -421,6 +457,7 @@ pub async fn guard_panel_add(
     let mut edited = stored.clone();
     crate::dashboards::insert_panel(&mut edited, tab_id, panel.clone()).map_err(Response::from)?;
     crate::dashboards::check_update_hash(&stored, Some(hash)).map_err(Response::from)?;
+    crate::dashboards::checked_title(&edited).map_err(Response::from)?;
     guard_stored_edit(org_id, user_id, dashboard_id, &stored, &edited).await
 }
 
@@ -444,6 +481,7 @@ pub async fn guard_panel_update(
     crate::dashboards::replace_panel(&mut edited, panel_id, tab_id, panel.clone())
         .map_err(Response::from)?;
     crate::dashboards::check_update_hash(&stored, Some(hash)).map_err(Response::from)?;
+    crate::dashboards::checked_title(&edited).map_err(Response::from)?;
     guard_stored_edit(org_id, user_id, dashboard_id, &stored, &edited).await
 }
 
@@ -517,6 +555,21 @@ pub async fn stored_alert_sources(
     Ok(crate::anomaly_detection::get_config(org_id, id)
         .await?
         .map(|config| anomaly_config_sources(org_id, &config)))
+}
+
+/// `None` for a missing or disabled config, which training and detection refuse on their own.
+#[cfg(feature = "enterprise")]
+pub async fn runnable_anomaly_sources(
+    org_id: &str,
+    anomaly_id: &str,
+) -> Result<Option<Vec<QuerySource>>, anyhow::Error> {
+    let Some(config) = crate::anomaly_detection::get_config(org_id, anomaly_id).await? else {
+        return Ok(None);
+    };
+    if config.get("enabled").and_then(serde_json::Value::as_bool) == Some(false) {
+        return Ok(None);
+    }
+    Ok(Some(anomaly_config_sources(org_id, &config)))
 }
 
 /// `custom_sql` replaces the stored one, as the update about to run would.
@@ -622,18 +675,14 @@ pub async fn denial_message(
         .map(|denied| crate::authz::stream_access_message(org_id, &denied))
 }
 
-/// A body that does not compile is left to the function save's own 400.
+/// A body whose tables cannot be read is left to the function save, which answers it.
 #[cfg(feature = "enterprise")]
 pub async fn guard_vrl_function(org_id: &str, user_id: &str, source: &str) -> Result<(), Response> {
-    use common::meta::http::HttpResponse as MetaHttpResponse;
-
     if !rbac_enforced().await {
         return Ok(());
     }
-    let tables = match transform::enrichment_tables_read(source, org_id) {
-        Ok(tables) => tables,
-        Err(_) if transform::compile_vrl_function(source, org_id).is_err() => return Ok(()),
-        Err(e) => return Err(MetaHttpResponse::internal_error(e.to_string())),
+    let Ok(tables) = transform::enrichment_tables_read(source, org_id) else {
+        return Ok(());
     };
     let sources: Vec<QuerySource> = tables
         .into_iter()
@@ -1519,6 +1568,28 @@ mod tests {
             message(resp).await,
             "Unauthorized Access: dashboards: f1/d1"
         );
+    }
+
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
+    #[tokio::test]
+    async fn a_dashboard_edit_answers_main_s_errors_before_the_stream_check() {
+        crate::authz::fake_checker();
+        let untitled = config::meta::dashboards::Dashboard::default();
+        let resp = guard_dashboard_update(
+            "o1",
+            "denied@example.com",
+            "default",
+            "missing_dashboard",
+            &untitled,
+            Some("1"),
+        )
+        .await
+        .unwrap_err();
+        assert_ne!(resp.status(), axum::http::StatusCode::FORBIDDEN);
+        assert!(matches!(
+            crate::dashboards::checked_title(&untitled),
+            Err(crate::dashboards::DashboardError::PutMissingTitle)
+        ));
     }
 
     #[cfg(feature = "enterprise")]

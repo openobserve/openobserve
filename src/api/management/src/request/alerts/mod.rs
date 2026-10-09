@@ -3781,7 +3781,7 @@ pub async fn retrain_alert(
     if let Err(resp) = openobserve_core::background_access::guard_loaded(
         &org_id,
         &user_email.user_id,
-        openobserve_core::background_access::anomaly_update_sources(&org_id, &alert_id_str, None),
+        openobserve_core::background_access::runnable_anomaly_sources(&org_id, &alert_id_str),
     )
     .await
     {

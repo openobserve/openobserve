@@ -733,11 +733,7 @@ async fn put(
         }
     }
 
-    let title = dashboard
-        .title()
-        .map(|t| t.trim().to_string())
-        .filter(|t| !t.is_empty())
-        .ok_or_else(|| DashboardError::PutMissingTitle)?;
+    let title = checked_title(&dashboard)?;
     dashboard.set_title(title);
 
     dashboard.set_dashboard_id(dashboard_id.to_owned());
@@ -880,50 +876,6 @@ pub async fn add_panel_to_dashboard(
     Ok((panel, new_hash, resolved_tab_id))
 }
 
-/// Updates a single panel in an existing dashboard by panel ID.
-///
-/// Preserves the existing layout if the incoming panel's layout is all zeros.
-/// Returns the updated panel, the new dashboard hash, and the resolved tab ID.
-#[tracing::instrument(skip(panel))]
-pub async fn update_panel_in_dashboard(
-    org_id: &str,
-    dashboard_id: &str,
-    folder_id: &str,
-    panel_id: &str,
-    hash: &str,
-    tab_id: Option<&str>,
-    panel: v8::Panel,
-) -> Result<(v8::Panel, String, String), DashboardError> {
-    let mut dashboard = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
-        .await?
-        .ok_or(DashboardError::DashboardNotFound)?;
-    let (panel, resolved_tab_id) = replace_panel(&mut dashboard, panel_id, tab_id, panel)?;
-
-    let saved = put(org_id, dashboard_id, folder_id, None, dashboard, Some(hash)).await?;
-    let new_hash = saved.hash.clone();
-
-    #[cfg(feature = "enterprise")]
-    if get_o2_config().super_cluster.enabled {
-        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
-            org_id, folder_id, saved,
-        )
-        .await;
-    }
-
-    Ok((panel, new_hash, resolved_tab_id))
-}
-
-/// Rejects an update whose hash is missing or does not match `existing`.
-pub fn check_update_hash(existing: &Dashboard, hash: Option<&str>) -> Result<(), DashboardError> {
-    let Some(Ok(hash_val)) = hash.map(|hash_str| hash_str.parse::<u64>()) else {
-        return Err(DashboardError::UpdateMissingHash);
-    };
-    if hash_val.to_string() != existing.hash {
-        return Err(DashboardError::UpdateConflictingHash);
-    }
-    Ok(())
-}
-
 /// Adds `panel` to `dashboard` as [`add_panel_to_dashboard`] stores it; returns it and its tab ID.
 pub fn insert_panel(
     dashboard: &mut Dashboard,
@@ -995,6 +947,39 @@ pub fn insert_panel(
     Ok((panel, resolved_tab_id))
 }
 
+/// Updates a single panel in an existing dashboard by panel ID.
+///
+/// Preserves the existing layout if the incoming panel's layout is all zeros.
+/// Returns the updated panel, the new dashboard hash, and the resolved tab ID.
+#[tracing::instrument(skip(panel))]
+pub async fn update_panel_in_dashboard(
+    org_id: &str,
+    dashboard_id: &str,
+    folder_id: &str,
+    panel_id: &str,
+    hash: &str,
+    tab_id: Option<&str>,
+    panel: v8::Panel,
+) -> Result<(v8::Panel, String, String), DashboardError> {
+    let mut dashboard = table::dashboards::get_from_folder(org_id, folder_id, dashboard_id)
+        .await?
+        .ok_or(DashboardError::DashboardNotFound)?;
+    let (panel, resolved_tab_id) = replace_panel(&mut dashboard, panel_id, tab_id, panel)?;
+
+    let saved = put(org_id, dashboard_id, folder_id, None, dashboard, Some(hash)).await?;
+    let new_hash = saved.hash.clone();
+
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().super_cluster.enabled {
+        let _ = o2_enterprise::enterprise::super_cluster::queue::dashboards_put(
+            org_id, folder_id, saved,
+        )
+        .await;
+    }
+
+    Ok((panel, new_hash, resolved_tab_id))
+}
+
 /// Replaces a panel as [`update_panel_in_dashboard`] stores it; returns it and its tab ID.
 pub fn replace_panel(
     dashboard: &mut Dashboard,
@@ -1039,6 +1024,26 @@ pub fn replace_panel(
 
     tab.panels[idx] = panel.clone();
     Ok((panel, resolved_tab_id))
+}
+
+/// The trimmed title a save stores, or the error it refuses an untitled dashboard with.
+pub fn checked_title(dashboard: &Dashboard) -> Result<String, DashboardError> {
+    dashboard
+        .title()
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .ok_or_else(|| DashboardError::PutMissingTitle)
+}
+
+/// Rejects an update whose hash is missing or does not match `existing`.
+pub fn check_update_hash(existing: &Dashboard, hash: Option<&str>) -> Result<(), DashboardError> {
+    let Some(Ok(hash_val)) = hash.map(|hash_str| hash_str.parse::<u64>()) else {
+        return Err(DashboardError::UpdateMissingHash);
+    };
+    if hash_val.to_string() != existing.hash {
+        return Err(DashboardError::UpdateConflictingHash);
+    }
+    Ok(())
 }
 
 /// Deletes a single panel from an existing dashboard by panel ID.

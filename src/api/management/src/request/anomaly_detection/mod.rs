@@ -29,6 +29,7 @@ use openobserve_core::auth::check_folder_write_permissions;
 #[cfg(feature = "enterprise")]
 use openobserve_core::background_access::{
     anomaly_sources, anomaly_update_sources, guard_loaded, guard_write, rbac_enforced,
+    runnable_anomaly_sources,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -136,7 +137,7 @@ async fn guard_stored(org_id: &str, anomaly_id: &str, user_id: &str) -> Option<R
     guard_loaded(
         org_id,
         user_id,
-        anomaly_update_sources(org_id, anomaly_id, None),
+        runnable_anomaly_sources(org_id, anomaly_id),
     )
     .await
     .err()
@@ -641,7 +642,7 @@ mod tests {
             )
         }
 
-        async fn stored_config(org: &str, id: &str) {
+        async fn stored_config(org: &str, id: &str, enabled: bool) {
             use infra::table::entity::anomaly_detection_config::{Entity, Model};
 
             let db = infra::db::get_orm_client_rw().await;
@@ -653,7 +654,7 @@ mod tests {
             db.execute(backend.build(&create)).await.unwrap();
             let model: Model = serde_json::from_value(json!({
                 "anomaly_id": id, "org_id": org, "stream_name": "secret",
-                "stream_type": "logs", "enabled": true, "name": "a1",
+                "stream_type": "logs", "enabled": enabled, "name": "a1",
                 "query_mode": "filters", "filters": [], "detection_function": "count(*)",
                 "histogram_interval": "5m", "schedule_interval": "1h",
                 "detection_window_seconds": 3600, "training_window_days": 7,
@@ -687,7 +688,7 @@ mod tests {
         async fn an_invalid_update_from_a_denied_user_gets_the_validation_400() {
             fake_checker();
             let id = config::ider::uuid();
-            stored_config("ad_org1", &id).await;
+            stored_config("ad_org1", &id, true).await;
             let req = UpdateAnomalyConfigRequest {
                 histogram_interval: Some("0m".to_string()),
                 ..Default::default()
@@ -697,6 +698,20 @@ mod tests {
             let (status, message) = status_and_message(resp).await;
             assert_eq!(status, StatusCode::BAD_REQUEST);
             assert!(message.contains("validation error"), "{message}");
+        }
+
+        #[tokio::test]
+        async fn detect_and_train_on_a_disabled_config_answer_before_the_stream_check() {
+            fake_checker();
+            let id = config::ider::uuid();
+            stored_config("ad_org1", &id, false).await;
+            let detected =
+                detect_anomalies(Path(("ad_org1".to_string(), id.clone())), denied_user()).await;
+            assert_ne!(detected.status(), StatusCode::FORBIDDEN);
+            let trained = train_model(Path(("ad_org1".to_string(), id)), denied_user()).await;
+            let (status, message) = status_and_message(trained).await;
+            assert_ne!(status, StatusCode::FORBIDDEN);
+            assert!(message.contains("disabled"), "{message}");
         }
     }
 }

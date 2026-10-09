@@ -82,8 +82,21 @@ pub async fn create_backfill(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
-    if let Err(response) =
-        ensure_readable_pipeline(&org_id, &pipeline_id, &user_email.user_id).await
+    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
+        return response;
+    }
+    if let Err(response) = guard_backfill(
+        &org_id,
+        &pipeline_id,
+        &user_email.user_id,
+        backfill::check_backfill_job(
+            &pipeline_id,
+            req.start_time,
+            req.end_time,
+            req.delete_before_backfill,
+        ),
+    )
+    .await
     {
         return response;
     }
@@ -343,12 +356,7 @@ pub async fn enable_backfill(
         .get("value")
         .and_then(|v| v.parse::<bool>().ok())
         .unwrap_or(false);
-    let ensured = if enable {
-        ensure_readable_pipeline(&org_id, &pipeline_id, &user_email.user_id).await
-    } else {
-        ensure_user_pipeline(&org_id, &pipeline_id).await
-    };
-    if let Err(response) = ensured {
+    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
         return response;
     }
 
@@ -371,6 +379,17 @@ pub async fn enable_backfill(
             );
             return MetaHttpResponse::not_found(e.to_string());
         }
+    }
+    if enable
+        && let Err(response) = guard_backfill(
+            &org_id,
+            &pipeline_id,
+            &user_email.user_id,
+            std::future::ready(Ok(())),
+        )
+        .await
+    {
+        return response;
     }
 
     log::info!(
@@ -576,9 +595,7 @@ pub async fn update_backfill(
     Headers(user_email): Headers<UserEmail>,
     Json(req): Json<BackfillRequest>,
 ) -> Response {
-    if let Err(response) =
-        ensure_readable_pipeline(&org_id, &pipeline_id, &user_email.user_id).await
-    {
+    if let Err(response) = ensure_user_pipeline(&org_id, &pipeline_id).await {
         return response;
     }
 
@@ -607,6 +624,17 @@ pub async fn update_backfill(
             );
             return MetaHttpResponse::not_found(e.to_string());
         }
+    }
+
+    if let Err(response) = guard_backfill(
+        &org_id,
+        &pipeline_id,
+        &user_email.user_id,
+        backfill::check_backfill_update(&org_id, &job_id, &req),
+    )
+    .await
+    {
+        return response;
     }
 
     log::info!(
@@ -671,16 +699,20 @@ pub async fn update_backfill(
     MetaHttpResponse::forbidden("Not Supported")
 }
 
-/// A backfill reruns its pipeline over past data, so it needs what the pipeline reads.
+/// A backfill reruns its pipeline over past data; `checks` are the job's own and answer first.
 #[cfg(feature = "enterprise")]
-async fn ensure_readable_pipeline(
+async fn guard_backfill(
     org_id: &str,
     pipeline_id: &str,
     user_id: &str,
+    checks: impl Future<Output = Result<(), anyhow::Error>>,
 ) -> Result<(), Response> {
     if !openobserve_core::background_access::rbac_enforced().await {
-        return ensure_user_pipeline(org_id, pipeline_id).await;
+        return Ok(());
     }
+    checks
+        .await
+        .map_err(|e| MetaHttpResponse::bad_request(e.to_string()))?;
     let pipeline = openobserve_core::pipeline::get_user_pipeline(org_id, pipeline_id)
         .await
         .map_err(Response::from)?;
@@ -724,5 +756,16 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("chunk_period_minutes"));
         assert!(obj.contains_key("delay_between_chunks_secs"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn the_job_s_own_check_answers_before_the_pipeline_is_read() {
+        openobserve_core::authz::fake_checker();
+        let failed = std::future::ready(Err(anyhow::anyhow!("start_time must be before end_time")));
+        let resp = guard_backfill("bf_org1", "no_such_pipeline", "denied@example.com", failed)
+            .await
+            .unwrap_err();
+        assert_eq!(resp.status(), axum::http::StatusCode::BAD_REQUEST);
     }
 }

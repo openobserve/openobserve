@@ -609,10 +609,7 @@ pub trait SendReport {
 impl SendReport for Report {
     /// Sends the report to subscribers
     async fn send_subscribers(&self) -> Result<(), SendReportError> {
-        if self.dashboards.is_empty() {
-            return Err(SendReportError::NoDashboards);
-        }
-        ensure_dashboards_readable(&self.org_id, &self.dashboards).await?;
+        check_send(self).await?;
 
         let cfg = get_config();
         let mut recipients = vec![];
@@ -779,6 +776,14 @@ pub enum GenerateReportError {
 
     #[error("span element indicator for data load not rendered yet")]
     DataLoadElementNotRendered,
+}
+
+/// The checks a send runs before it renders anything, so a caller can answer them first.
+pub async fn check_send(report: &Report) -> Result<(), SendReportError> {
+    if report.dashboards.is_empty() {
+        return Err(SendReportError::NoDashboards);
+    }
+    ensure_dashboards_readable(&report.org_id, &report.dashboards).await
 }
 
 async fn generate_report(
