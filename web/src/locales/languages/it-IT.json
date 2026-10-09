@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "Le azioni bloccate provengono da {scope}, impostato in {module}",
       "scopeAllOf": "Tutti i {module}",
       "scopeIncludesFuture": "Include le risorse create in seguito",
-      "scopeDowntimeHint": "Una cartella di periodi di inattività limita chi gestisce un periodo di inattività, non ciò che silenzia. Per silenziare Tutte le cartelle di un modulo, un utente deve avere il permesso di elencare ogni cartella di quel modulo. I chip e i banner di silenziamento possono nominare un periodo di inattività che l'utente non può elencare.",
+      "scopeDowntimeHint": "Una cartella di downtime limita chi gestisce un downtime, non ciò che silenzia. Per silenziare tutte le cartelle di un modulo, un utente deve disporre del diritto di elencare ogni cartella di quel modulo. I chip e i banner silenziati possono riportare il nome di un downtime che un utente non può elencare.",
       "grantedByWiderScope": "Concesso da un ambito più ampio",
       "grantedHereAndByWiderScope": "Concesso qui e da un ambito più ampio",
       "stillGrantedByWiderScope": "Rimosso qui, ancora concesso da un ambito più ampio",

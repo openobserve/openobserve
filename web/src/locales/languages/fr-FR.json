@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "Les actions verrouillées proviennent de {scope}, défini dans {module}",
       "scopeAllOf": "Tous les {module}",
       "scopeIncludesFuture": "Inclut les ressources créées ultérieurement",
-      "scopeDowntimeHint": "Un dossier de plages de maintenance limite qui gère une plage de maintenance, pas ce qu'elle met en sourdine. Pour mettre en sourdine Tous les dossiers d'un module, un utilisateur doit avoir le droit de lister chaque dossier de ce module. Les puces et bannières de sourdine peuvent nommer une plage de maintenance que l'utilisateur ne peut pas lister.",
+      "scopeDowntimeHint": "Un dossier d'indisponibilité limite qui gère une indisponibilité, et non ce qu'elle met en sourdine. Pour mettre en sourdine tous les dossiers d'un module, un utilisateur doit avoir le droit de lister chaque dossier de ce module. Les badges et bannières en sourdine peuvent nommer une indisponibilité qu'un utilisateur ne peut pas lister.",
       "grantedByWiderScope": "Accordé par une portée plus large",
       "grantedHereAndByWiderScope": "Accordé ici et par une portée plus large",
       "stillGrantedByWiderScope": "Supprimé ici, toujours accordé par une portée plus large",

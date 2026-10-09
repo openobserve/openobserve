@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "鎖定的動作來自 {scope}，於 {module} 設定",
       "scopeAllOf": "所有 {module}",
       "scopeIncludesFuture": "包含日後建立的資源",
-      "scopeDowntimeHint": "停機時段資料夾限制的是誰可以管理停機時段，而不是它靜音的內容。要靜音某個模組的所有資料夾，使用者需要有列出該模組每個資料夾的權限。靜音標記與橫幅可能會顯示使用者無法列出的停機時段名稱。",
+      "scopeDowntimeHint": "停機時段資料夾限制的是誰能管理該停機時段，而不是它會靜音什麼。若要靜音某個模組的所有資料夾，使用者需要擁有列出該模組每個資料夾的權限。已靜音的標籤和橫幅可能會顯示使用者無法列出的停機時段名稱。",
       "grantedByWiderScope": "由更廣泛的範圍授權",
       "grantedHereAndByWiderScope": "已在此處及更廣泛的範圍授權",
       "stillGrantedByWiderScope": "已在此處移除，仍由更廣泛的範圍授權",

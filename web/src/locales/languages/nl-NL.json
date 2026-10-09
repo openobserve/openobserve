@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "Vergrendelde acties komen van {scope}, ingesteld in {module}",
       "scopeAllOf": "Alle {module}",
       "scopeIncludesFuture": "Omvat ook resources die later worden aangemaakt",
-      "scopeDowntimeHint": "Een downtimemap bepaalt wie een downtime beheert, niet wat die dempt. Om Alle mappen van een module te dempen, heeft een gebruiker het recht nodig om elke map van die module weer te geven. Dempingslabels en banners kunnen een downtime noemen die een gebruiker niet kan weergeven.",
+      "scopeDowntimeHint": "Een downtime-map beperkt wie een downtime beheert, niet wat deze dempt. Om Alle mappen van een module te dempen, moet een gebruiker het recht hebben om elke map van die module weer te geven. Gedempte chips en banners kunnen een downtime vermelden die een gebruiker niet kan weergeven.",
       "grantedByWiderScope": "Toegekend door een ruimere scope",
       "grantedHereAndByWiderScope": "Hier toegekend en door een ruimere scope",
       "stillGrantedByWiderScope": "Hier verwijderd, nog steeds toegekend door een ruimere scope",

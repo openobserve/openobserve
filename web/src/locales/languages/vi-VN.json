@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "Các hành động bị khóa đến từ {scope}, được đặt trong {module}",
       "scopeAllOf": "Tất cả {module}",
       "scopeIncludesFuture": "Bao gồm tài nguyên được tạo sau này",
-      "scopeDowntimeHint": "Thư mục thời gian ngừng chỉ giới hạn ai quản lý thời gian ngừng, không giới hạn những gì nó tắt tiếng. Để tắt tiếng Tất cả thư mục của một mô-đun, người dùng cần quyền liệt kê mọi thư mục của mô-đun đó. Nhãn tắt tiếng và biểu ngữ có thể nêu tên một thời gian ngừng mà người dùng không thể liệt kê.",
+      "scopeDowntimeHint": "Thư mục thời gian tạm dừng giới hạn người quản lý một thời gian tạm dừng, chứ không giới hạn những gì nó tắt tiếng. Để tắt tiếng Tất cả thư mục của một mô-đun, người dùng cần có quyền liệt kê mọi thư mục của mô-đun đó. Các chip và banner bị tắt tiếng có thể hiển thị tên một thời gian tạm dừng mà người dùng không thể liệt kê.",
       "grantedByWiderScope": "Được cấp bởi phạm vi rộng hơn",
       "grantedHereAndByWiderScope": "Được cấp tại đây và bởi phạm vi rộng hơn",
       "stillGrantedByWiderScope": "Đã xóa tại đây, vẫn được cấp bởi phạm vi rộng hơn",

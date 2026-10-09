@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "Kilitli eylemler, {module} içinde ayarlanan {scope} kapsamından gelir",
       "scopeAllOf": "Tüm {module}",
       "scopeIncludesFuture": "Sonradan oluşturulan kaynakları içerir",
-      "scopeDowntimeHint": "Bir kesinti klasörü, neyin susturulacağını değil, kesintiyi kimin yöneteceğini sınırlar. Bir modülün Tüm klasörlerini susturmak için kullanıcının o modülün her klasörünü listeleme yetkisi olmalıdır. Susturma etiketleri ve başlıklar, kullanıcının listeleyemediği bir kesintiyi adlandırabilir.",
+      "scopeDowntimeHint": "Bir kesinti klasörü, bir kesintiyi kimin yöneteceğini sınırlar, neyi susturacağını değil. Bir modülün Tüm klasörlerini susturmak için, kullanıcının o modülün her klasörünü listeleme yetkisine sahip olması gerekir. Susturulmuş çipler ve banner'lar, kullanıcının listeleyemediği bir kesintiyi adlandırabilir.",
       "grantedByWiderScope": "Daha geniş bir kapsam tarafından verildi",
       "grantedHereAndByWiderScope": "Burada ve daha geniş bir kapsam tarafından verildi",
       "stillGrantedByWiderScope": "Burada kaldırıldı, hâlâ daha geniş bir kapsam tarafından veriliyor",

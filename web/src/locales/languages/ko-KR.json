@@ -2829,7 +2829,7 @@
       "scopeCoveredByParent": "잠긴 작업은 {module}에 설정된 {scope}에서 비롯됩니다",
       "scopeAllOf": "모든 {module}",
       "scopeIncludesFuture": "나중에 생성되는 리소스 포함",
-      "scopeDowntimeHint": "다운타임 폴더는 다운타임을 관리할 수 있는 사람을 제한할 뿐, 무엇을 음소거하는지는 제한하지 않습니다. 모듈의 모든 폴더를 음소거하려면 해당 모듈의 모든 폴더를 나열할 수 있는 권한이 필요합니다. 음소거 칩과 배너에는 사용자가 목록에서 볼 수 없는 다운타임 이름이 표시될 수 있습니다.",
+      "scopeDowntimeHint": "다운타임 폴더는 다운타임이 무엇을 음소거하는지가 아니라 누가 다운타임을 관리하는지를 제한합니다. 모듈의 모든 폴더를 음소거하려면 사용자에게 해당 모듈의 모든 폴더를 나열할 수 있는 권한이 필요합니다. 음소거된 칩과 배너는 사용자가 나열할 수 없는 다운타임을 가리킬 수 있습니다.",
       "grantedByWiderScope": "더 넓은 범위에서 부여됨",
       "grantedHereAndByWiderScope": "여기와 더 넓은 범위에서 부여됨",
       "stillGrantedByWiderScope": "여기서 제거됨, 더 넓은 범위에서 계속 부여됨",
