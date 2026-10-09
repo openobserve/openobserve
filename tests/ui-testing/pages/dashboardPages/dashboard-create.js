@@ -414,9 +414,15 @@ export default class DashboardCreate {
     // mid page-transition can land on a header that is being torn down and
     // silently no-op. Click, re-check the URL, and repeat with a fresh locator
     // lookup until we're on the list.
-    // Leaving add_panel with unsaved edits opens the "Leave without saving?" ConfirmDialog, answered with Leave below.
+    //
+    // Leaving add_panel with unsaved panel edits fires AddPanel.vue's
+    // onBeforeRouteLeave native window.confirm. Playwright auto-dismisses
+    // dialogs by default, and a dismissed confirm means next(false) — the
+    // route change is cancelled, so every back click no-ops and the loop
+    // burns all its attempts still sitting on add_panel. Accept the dialog
+    // for the duration of the navigation (same handling as
+    // dashboard-multi-sql.js discardPanel()).
     const LIST_URL = /\/dashboards(?:\?|$)/;
-    const leaveBtn = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
     const maxClicks = 4;
     let lastError;
 
@@ -428,16 +434,8 @@ export default class DashboardCreate {
 
         const backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
         try {
-          const fromEditor = this.page.url().includes("add_panel");
           await backBtn.waitFor({ state: "visible", timeout: 20000 });
           await backBtn.click({ timeout: 10000 });
-          if (fromEditor) {
-            await Promise.race([
-              this.page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 8000 }),
-              leaveBtn.waitFor({ state: "visible", timeout: 8000 }),
-            ]).catch(() => {});
-            if (await leaveBtn.isVisible().catch(() => false)) await leaveBtn.click();
-          }
         } catch (e) {
           // Header may be remounting between the editor and view pages — fall
           // through to the URL check and try again with a fresh lookup.

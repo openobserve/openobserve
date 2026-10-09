@@ -52,11 +52,9 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/utils/themeManager", () => ({ bootstrapTheme: vi.fn() }));
 
 const EXT = "chrome-extension://abcdefghijklmnop";
-const TAB_ID_KEY = "o2.dashboards.panelDraft.tabId";
 
 // main.ts boots the whole app on import, which can outlast the default hook timeout on a busy runner.
 beforeAll(async () => {
-  sessionStorage.setItem(TAB_ID_KEY, JSON.stringify({ id: "reloaded-tab", hiddenAt: Date.now() }));
   await import("./main");
   await vi.waitFor(() => expect(rumInit).toHaveBeenCalled(), { timeout: 20000 });
 }, 60000);
@@ -91,13 +89,5 @@ describe("main.ts RUM beforeSend", () => {
     };
     expect(beforeSend(event)).toBe(true);
     expect(event.view.url).toBe("https://cloud.openobserve.ai/web/cb#id_token=redacted");
-  });
-});
-
-describe("main.ts panel-draft tab id", () => {
-  it("claims the reload stash on every page, before a duplicated tab could copy it", async () => {
-    expect(sessionStorage.getItem(TAB_ID_KEY)).toBeNull();
-    const { getTabId } = await import("@/composables/dashboard/usePanelDraft");
-    expect(getTabId()).toBe("reloaded-tab");
   });
 });

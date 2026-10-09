@@ -22,7 +22,7 @@ import {
   setupTestDashboard,
 } from "./utils/dashCreation.js";
 
-const LEAVE_TITLE = "Leave without saving?";
+const UNSAVED_MESSAGE = "You have unsaved changes. Are you sure you want to leave?";
 
 const CLEANUP_BUDGET_MS = 90000;
 
@@ -81,13 +81,11 @@ async function openSavedPanelEditor(page, pm, panelName) {
   await waitForEditorSettled(page, pm);
 }
 
-const leaveDialog = (page) => page.locator('[data-test="confirm-dialog"]');
-
-/** Click Back and assert the editor closed without the leave dialog or a native confirm. */
-async function expectLeaveWithoutPrompt(page) {
+/** Click Discard and assert the editor closed without ever asking to confirm. */
+async function expectDiscardWithoutPrompt(page, pm) {
   const watcher = captureDialogs(page);
   try {
-    await page.locator('[data-test="dashboard-back-btn"]').click();
+    await pm.dashboardPanelActions.getPanelDiscardBtn().click();
     await page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 30000 });
   } finally {
     watcher.dispose();
@@ -98,14 +96,11 @@ async function expectLeaveWithoutPrompt(page) {
   ).toEqual([]);
 }
 
-/** Click Back, answer the O2 leave dialog with Leave, and return any native dialog messages. */
-async function expectLeavePrompts(page) {
-  const watcher = captureDialogs(page);
+/** Click Discard, accept the expected confirm, and return the dialog messages. */
+async function expectDiscardPrompts(page, pm) {
+  const watcher = captureDialogs(page, { accept: true });
   try {
-    await page.locator('[data-test="dashboard-back-btn"]').click();
-    await expect(leaveDialog(page)).toBeVisible({ timeout: 15000 });
-    await expect(leaveDialog(page)).toContainText(LEAVE_TITLE);
-    await leaveDialog(page).locator('[data-test="o-dialog-primary-btn"]').click();
+    await pm.dashboardPanelActions.getPanelDiscardBtn().click();
     await page.waitForURL((url) => !url.pathname.includes("add_panel"), { timeout: 30000 });
   } finally {
     watcher.dispose();
@@ -171,14 +166,14 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
   });
 
   test(
-    "reopening a saved panel and leaving without edits does not warn",
+    "reopening a saved panel and discarding without edits does not warn",
     { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P0"] },
     async ({ page }) => {
       const panelName = pm.dashboardPanelActions.generateUniquePanelName("unsaved");
       dashboardName = await createDashboardWithPanel(page, pm, panelName);
 
       await openSavedPanelEditor(page, pm, panelName);
-      await expectLeaveWithoutPrompt(page);
+      await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Editor closed with no confirm after a no-op edit session");
     }
   );
@@ -199,13 +194,13 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await fieldSearch.fill("kubernetes");
       await fieldSearch.fill("");
 
-      await expectLeaveWithoutPrompt(page);
+      await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Non-mutating interaction did not arm the unsaved warning");
     }
   );
 
   test(
-    "leaving after a real edit asks with the O2 dialog, never window.confirm, and leaves on Leave",
+    "discarding a real edit still warns and leaves the editor on accept",
     { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P0"] },
     async ({ page }) => {
       const panelName = pm.dashboardPanelActions.generateUniquePanelName("unsaved");
@@ -214,9 +209,12 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await openSavedPanelEditor(page, pm, panelName);
       await pm.chartTypeSelector.searchAndAddField("kubernetes_namespace_name", "b");
 
-      const messages = await expectLeavePrompts(page);
-      expect(messages, "the leave prompt is the O2 ConfirmDialog, not window.confirm").toEqual([]);
-      testLogger.info("Real edit raised the leave dialog");
+      const messages = await expectDiscardPrompts(page, pm);
+      expect(
+        messages,
+        "an actual panel edit must still raise the unsaved-changes confirm"
+      ).toContain(UNSAVED_MESSAGE);
+      testLogger.info("Real edit raised the unsaved-changes confirm");
     }
   );
 
@@ -232,13 +230,13 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await pm.dashboardPanelActions.addPanelName(panelName);
       await expect(pm.dashboardPanelActions.panelNameInput).toHaveValue(panelName);
 
-      await expectLeaveWithoutPrompt(page);
+      await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Reverted edit did not raise the unsaved-changes confirm");
     }
   );
 
   test(
-    "opening a brand-new panel editor and leaving immediately does not warn",
+    "opening a brand-new panel editor and discarding immediately does not warn",
     { tag: ["@dashboard-panel-unsaved-changes", "@all", "@dashboards", "@P1"] },
     async ({ page }) => {
       dashboardName = `Dashboard_Unsaved_${uniqueSuffix()}`;
@@ -248,7 +246,7 @@ test.describe("Dashboard panel editor unsaved-changes guard", () => {
       await page.waitForURL((url) => url.pathname.includes("add_panel"), { timeout: 30000 });
       await waitForEditorSettled(page, pm);
 
-      await expectLeaveWithoutPrompt(page);
+      await expectDiscardWithoutPrompt(page, pm);
       testLogger.info("Fresh editor closed without a confirm");
     }
   );

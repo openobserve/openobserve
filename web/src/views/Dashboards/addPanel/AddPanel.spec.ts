@@ -3,26 +3,12 @@ import { mount, shallowMount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import AddPanel from "./AddPanel.vue";
 import { createStore } from "vuex";
-import {
-  createRouter,
-  createWebHistory,
-  onBeforeRouteLeave,
-  useRoute,
-  useRouter,
-} from "vue-router";
+import { createRouter, createWebHistory, onBeforeRouteLeave, useRoute } from "vue-router";
 import { isEqual } from "lodash-es";
 import { addPanel, getDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
 import { createI18n } from "vue-i18n";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  panelDraftKey,
-  requestDraftRestore,
-  takeDraftRestore,
-} from "@/composables/dashboard/usePanelDraft";
-
-vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -4572,10 +4558,6 @@ describe("AddPanel.vue", () => {
   // (OForm stubbed); here we FULLY mount so the real <OForm> runs the schema and
   // prove the title gate actually blocks save when empty — an unwired `:schema`
   // would be caught here.
-  // Renders the page body, so the leave dialog and the draft offer exist under shallowMount.
-  const slotStub = { template: "<div><slot name='header' /><slot /><slot name='actions' /></div>" };
-  const panelEditorStub = { template: "<div />", methods: { initChartData: () => {} } };
-
   describe("Unsaved-changes prompt", () => {
     const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
     let leaveGuard: (to: any, from: any, next: any) => void;
@@ -4586,10 +4568,8 @@ describe("AddPanel.vue", () => {
       leaveGuard({ path: "/dashboards/view" }, { path: "/dashboards/add_panel" }, next);
       return next;
     };
-    const leaveDialog = () => wrapper.findComponent({ name: "ConfirmDialog" });
 
     beforeEach(async () => {
-      localStorage.clear();
       const lodash = await vi.importActual<typeof import("lodash-es")>("lodash-es");
       vi.mocked(isEqual).mockImplementation(lodash.isEqual);
       vi.mocked(getDashboard).mockResolvedValue({
@@ -4611,12 +4591,7 @@ describe("AddPanel.vue", () => {
             $route: { query: { dashboard: "test-dashboard" }, params: {} },
             $router: { push: vi.fn(), replace: vi.fn() },
           },
-          stubs: {
-            PanelEditor: panelEditorStub,
-            DateTimePickerDashboard: true,
-            QueryInspector: true,
-            OPageLayout: slotStub,
-          },
+          stubs: { PanelEditor: true, DateTimePickerDashboard: true, QueryInspector: true },
         },
         props: { metaData: null },
       });
@@ -4638,65 +4613,19 @@ describe("AddPanel.vue", () => {
 
       const next = leaveEditor();
 
-      expect(wrapper.vm.leaveDialogOpen).toBe(false);
-      expect(next).toHaveBeenCalledWith();
-    });
-
-    it("opens the O2 ConfirmDialog instead of window.confirm when the user edited the panel", async () => {
-      window.dispatchEvent(new Event("keydown"));
-      wrapper.vm.dashboardPanelData.data.title = "edited by the user";
-      await nextTick();
-
-      const next = leaveEditor();
-      await nextTick();
-
       expect(confirmSpy).not.toHaveBeenCalled();
-      expect(next).not.toHaveBeenCalled();
-      expect(leaveDialog().props()).toMatchObject({
-        modelValue: true,
-        title: "panel.draft.leaveTitle",
-        message: "panel.draft.leaveDraftKept",
-        okLabel: "panel.draft.leave",
-        cancelLabel: "panel.draft.keepEditing",
-      });
-    });
-
-    it("Keep editing stays on the editor", async () => {
-      window.dispatchEvent(new Event("keydown"));
-      wrapper.vm.dashboardPanelData.data.title = "edited by the user";
-      await nextTick();
-      const next = leaveEditor();
-
-      leaveDialog().vm.$emit("update:cancel");
-
-      expect(next).toHaveBeenCalledWith(false);
-      expect(wrapper.vm.leaveDialogOpen).toBe(false);
-    });
-
-    it("closing the dialog without an answer stays on the editor", async () => {
-      window.dispatchEvent(new Event("keydown"));
-      wrapper.vm.dashboardPanelData.data.title = "edited by the user";
-      await nextTick();
-      const next = leaveEditor();
-      await nextTick();
-
-      leaveDialog().vm.$emit("update:modelValue", false);
-      await nextTick();
-
-      expect(next).toHaveBeenCalledWith(false);
-    });
-
-    it("Leave navigates and keeps the latest edit as a draft", async () => {
-      window.dispatchEvent(new Event("keydown"));
-      wrapper.vm.dashboardPanelData.data.title = "edited by the user";
-      await nextTick();
-      const next = leaveEditor();
-
-      leaveDialog().vm.$emit("update:ok");
-
       expect(next).toHaveBeenCalledWith();
-      const raw = localStorage.getItem(panelDraftKey("test-org", "test-dashboard"));
-      expect(JSON.parse(raw!).panel.title).toBe("edited by the user");
+    });
+
+    it("prompts when the user edited the panel", async () => {
+      window.dispatchEvent(new Event("keydown"));
+      wrapper.vm.dashboardPanelData.data.title = "edited by the user";
+      await nextTick();
+
+      const next = leaveEditor();
+
+      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      expect(next).toHaveBeenCalledWith(false);
     });
 
     it("does not prompt when the user reverted their edit", async () => {
@@ -4710,250 +4639,7 @@ describe("AddPanel.vue", () => {
       const next = leaveEditor();
 
       expect(confirmSpy).not.toHaveBeenCalled();
-      expect(wrapper.vm.leaveDialogOpen).toBe(false);
       expect(next).toHaveBeenCalledWith();
-    });
-  });
-
-  describe("Panel draft", () => {
-    const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-    const key = () => panelDraftKey("test-org", "test-dashboard");
-    const seedDraft = (draft: Record<string, unknown> = {}) =>
-      localStorage.setItem(
-        key(),
-        JSON.stringify({
-          panel: { title: "Errors by level", type: "bar", queries: [{ fields: {} }] },
-          baseVersion: "h1",
-          variables: { "var-env": "prod" },
-          savedAt: Date.now() - 2 * 60 * 1000,
-          ...draft,
-        }),
-      );
-    let routerMock: any;
-
-    const mountEditor = async (hash?: string) => {
-      const lodash = await vi.importActual<typeof import("lodash-es")>("lodash-es");
-      vi.mocked(isEqual).mockImplementation(lodash.isEqual);
-      vi.mocked(useRoute).mockReturnValue({
-        path: "/dashboards/add_panel",
-        query: { dashboard: "test-dashboard", folder: "default", tab: "t1" },
-        params: {},
-      } as any);
-      const baseImpl = vi.mocked(useDashboardPanel).getMockImplementation()!;
-      vi.mocked(useDashboardPanel).mockImplementationOnce((...args: any[]) => {
-        const panel: any = (baseImpl as any)(...args);
-        return { ...panel, dashboardPanelData: reactive(panel.dashboardPanelData) };
-      });
-      const draftStore = createStore({
-        state: {
-          isAiChatEnabled: false,
-          selectedOrganization: { identifier: "test-org" },
-          theme: { dark: false },
-          zoConfig: { base_uri: "http://localhost:5080" },
-          organizationData: { allDashboardListHash: hash ? { "test-dashboard": hash } : {} },
-        },
-      });
-      wrapper = shallowMount(AddPanel, {
-        global: {
-          plugins: [draftStore, router, i18n],
-          config: { errorHandler: () => {} },
-          stubs: {
-            PanelEditor: panelEditorStub,
-            DateTimePickerDashboard: true,
-            QueryInspector: true,
-            OPageLayout: slotStub,
-            OBanner: slotStub,
-          },
-        },
-        props: { metaData: null },
-      });
-      routerMock = vi.mocked(useRouter).mock.results.at(-1)!.value;
-      await flush();
-      await flush();
-    };
-    const offer = () => wrapper.find('[data-test="dashboard-panel-draft-offer"]');
-
-    beforeEach(() => {
-      localStorage.clear();
-      vi.mocked(toast).mockClear();
-      vi.mocked(getDashboard).mockResolvedValue({
-        title: "d",
-        tabs: [{ tabId: "t1", panels: [] }],
-      });
-    });
-
-    afterEach(() => {
-      vi.useRealTimers();
-      vi.restoreAllMocks();
-      vi.mocked(isEqual).mockReset();
-      vi.mocked(getDashboard).mockReset();
-      vi.mocked(useRoute).mockReset();
-    });
-
-    it("autosaves the panel, base version, session variables and time 1 s after the last edit", async () => {
-      await mountEditor("h1");
-      vi.useFakeTimers();
-      window.dispatchEvent(new Event("keydown"));
-      wrapper.vm.dashboardPanelData.data.title = "Latency";
-      await nextTick();
-
-      vi.advanceTimersByTime(999);
-      expect(localStorage.getItem(key())).toBeNull();
-      vi.advanceTimersByTime(1);
-
-      const saved = JSON.parse(localStorage.getItem(key())!);
-      expect(saved.panel.title).toBe("Latency");
-      expect(saved.baseVersion).toBe("h1");
-      expect(saved.variables).toEqual({});
-      expect(typeof saved.savedAt).toBe("number");
-    });
-
-    it("offers a stored draft on a blank editor instead of restoring it", async () => {
-      seedDraft();
-      await mountEditor("h1");
-
-      expect(offer().exists()).toBe(true);
-      expect(offer().attributes("data-conflict")).toBe("false");
-      expect(wrapper.vm.draftOfferTitle).toBe("Errors by level");
-      expect(wrapper.vm.draftOfferAge).toBe("2 minutes ago");
-      expect(wrapper.vm.dashboardPanelData.data.title).toBe("");
-      expect(wrapper.find('[data-test="dashboard-panel-draft-conflict-note"]').exists()).toBe(
-        false,
-      );
-    });
-
-    it("Resume restores the panel and session variables and fires dashboard_panel_draft_resumed", async () => {
-      seedDraft();
-      await mountEditor("h1");
-      vi.mocked(analytics.track).mockClear();
-
-      await wrapper.vm.resumeDraft();
-
-      expect(wrapper.vm.dashboardPanelData.data.title).toBe("Errors by level");
-      expect(wrapper.vm.dashboardPanelData.data.type).toBe("bar");
-      expect(routerMock.replace).toHaveBeenCalledWith({
-        query: expect.objectContaining({ "var-env": "prod" }),
-      });
-      expect(analytics.track).toHaveBeenCalledWith("dashboard_panel_draft_resumed", {
-        is_new: true,
-        dashboard_changed: false,
-      });
-      expect(offer().exists()).toBe(false);
-    });
-
-    it("adds the conflict sentence when the dashboard moved since the draft", async () => {
-      seedDraft();
-      await mountEditor("h2");
-
-      expect(offer().attributes("data-conflict")).toBe("true");
-      expect(wrapper.find('[data-test="dashboard-panel-draft-conflict-note"]').exists()).toBe(true);
-    });
-
-    it("the offer's Discard removes the draft and keeps the blank editor", async () => {
-      seedDraft();
-      await mountEditor("h1");
-
-      wrapper.vm.discardDraftOffer();
-      await nextTick();
-
-      expect(localStorage.getItem(key())).toBeNull();
-      expect(offer().exists()).toBe(false);
-      expect(wrapper.vm.dashboardPanelData.data.title).toBe("");
-    });
-
-    it("silently removes a draft whose dashboard no longer exists", async () => {
-      seedDraft();
-      vi.mocked(getDashboard).mockRejectedValue({ response: { status: 404 } });
-      const error = vi.spyOn(console, "error").mockImplementation(() => {});
-      await mountEditor("h1");
-
-      expect(localStorage.getItem(key())).toBeNull();
-      expect(offer().exists()).toBe(false);
-      expect(toast).not.toHaveBeenCalled();
-      error.mockRestore();
-    });
-
-    it("Discard leaves without a dialog, deletes the draft and offers Undo for 5 s", async () => {
-      await mountEditor("h1");
-      window.dispatchEvent(new Event("keydown"));
-      wrapper.vm.dashboardPanelData.data.title = "Latency";
-      await nextTick();
-
-      await wrapper.vm.discardPanel();
-
-      expect(wrapper.vm.leaveDialogOpen).toBe(false);
-      expect(routerMock.push).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "/dashboards/view" }),
-      );
-      expect(localStorage.getItem(key())).toBeNull();
-      const options = vi.mocked(toast).mock.calls.at(-1)![0];
-      expect(options).toMatchObject({ message: "panel.draft.discarded", timeout: 5000 });
-
-      options.action!.handler();
-      expect(JSON.parse(localStorage.getItem(key())!).panel.title).toBe("Latency");
-      expect(routerMock.push).toHaveBeenLastCalledWith({
-        path: "/dashboards/add_panel",
-        query: { dashboard: "test-dashboard", folder: "default", tab: "t1" },
-      });
-      expect(takeDraftRestore(key())?.draft.panel.title).toBe("Latency");
-    });
-
-    it("a mount after Undo restores the draft instead of offering it", async () => {
-      requestDraftRestore({
-        key: key(),
-        draft: { panel: { title: "Undone" }, variables: {}, savedAt: Date.now() },
-      });
-      await mountEditor("h1");
-
-      expect(wrapper.vm.dashboardPanelData.data.title).toBe("Undone");
-      expect(offer().exists()).toBe(false);
-    });
-
-    it("a successful save removes the draft", async () => {
-      vi.mocked(addPanel).mockResolvedValue(undefined as any);
-      seedDraft();
-      await mountEditor("h1");
-      wrapper.vm.discardDraftOffer();
-      window.dispatchEvent(new Event("keydown"));
-      wrapper.vm.dashboardPanelData.data.title = "Latency";
-      await nextTick();
-      wrapper.vm.dashboardPanelData.data.id = "p1";
-
-      await wrapper.vm.savePanelChangesToDashboard("test-dashboard");
-
-      expect(localStorage.getItem(key())).toBeNull();
-    });
-
-    it("keeps the editor working with no draft, offer or error when storage throws", async () => {
-      seedDraft();
-      const getItem = vi.spyOn(Storage.prototype, "getItem");
-      vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-        throw new DOMException("quota", "QuotaExceededError");
-      });
-      const error = vi.spyOn(console, "error");
-      await mountEditor("h1");
-      window.dispatchEvent(new Event("keydown"));
-      wrapper.vm.dashboardPanelData.data.title = "Latency";
-      await nextTick();
-      vi.mocked(onBeforeRouteLeave).mock.calls.at(-1)![0](
-        { path: "/dashboards/view" } as any,
-        { path: "/dashboards/add_panel" } as any,
-        vi.fn(),
-      );
-      await nextTick();
-
-      expect(offer().exists()).toBe(false);
-      expect(
-        getItem.mock.calls.some(
-          ([k]) =>
-            String(k).startsWith("o2.dashboards.panelDraft.") && !String(k).endsWith("tabId"),
-        ),
-      ).toBe(false);
-      expect(wrapper.findComponent({ name: "ConfirmDialog" }).props("message")).toBe(
-        "panel.draft.leaveChangesLost",
-      );
-      expect(error).not.toHaveBeenCalled();
-      expect(toast).not.toHaveBeenCalled();
     });
   });
 

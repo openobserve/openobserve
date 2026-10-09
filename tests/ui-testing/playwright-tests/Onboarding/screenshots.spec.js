@@ -7,8 +7,6 @@ const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 const { GetStartedPage } = require('../../pages/generalPages/getStartedPage.js');
 const { FirstEventPage } = require('../../pages/generalPages/firstEventPage.js');
 const { EmptyPagesPage } = require('../../pages/generalPages/emptyPagesPage.js');
-import PageManager from '../../pages/page-manager.js';
-import { setupTestDashboard } from '../Dashboards/utils/dashCreation.js';
 
 const base = () => process.env.ZO_BASE_URL.replace(/\/$/, '');
 const apiBase = () => (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
@@ -48,17 +46,6 @@ async function openGuide(page, guidePath, orgId) {
 async function settle(page) {
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(800);
-}
-
-async function openNewPanel(page, pm) {
-    await pm.dashboardCreate.addPanel();
-    await page.waitForURL((url) => url.pathname.includes('add_panel'), { timeout: 30000 });
-    await pm.dashboardPanelActions.getPanelSaveBtn().waitFor({ state: 'visible', timeout: 30000 });
-}
-
-async function editTitle(page, pm, title) {
-    await pm.dashboardPanelActions.addPanelName(title);
-    await page.waitForTimeout(1500);
 }
 
 async function pinBillingState(page, { expiry, provider, usageDelayMs = 0 }) {
@@ -425,82 +412,6 @@ const SCREENS = [
         },
     },
     {
-        id: 'i1-add-panel-leave-dialog',
-        dashboard: true,
-        async run({ page, pm }) {
-            await openNewPanel(page, pm);
-            await editTitle(page, pm, 'Errors by level');
-            await page.locator('[data-test="dashboard-back-btn"]').click();
-            await expect(page.locator('[data-test="confirm-dialog"]')).toContainText('Your draft is kept on this browser for 7 days.');
-        },
-    },
-    {
-        id: 'i2-add-panel-discard-toast',
-        dashboard: true,
-        async run({ page, pm }) {
-            await openNewPanel(page, pm);
-            await editTitle(page, pm, 'Latency p95');
-            await pm.dashboardPanelActions.getPanelDiscardBtn().click();
-            await page.waitForURL((url) => !url.pathname.includes('add_panel'), { timeout: 30000 });
-            await expect(page.locator('[data-test="o-toast-action-btn"]')).toBeVisible();
-        },
-        noSettle: true,
-    },
-    {
-        id: 'i3-add-panel-leave-dialog-no-storage',
-        dashboard: true,
-        async init({ page }) {
-            await page.addInitScript(() => {
-                const set = Storage.prototype.setItem;
-                Storage.prototype.setItem = function (k, v) {
-                    if (String(k).startsWith('o2.dashboards.panelDraft')) throw new DOMException('QuotaExceededError', 'QuotaExceededError');
-                    return set.call(this, k, v);
-                };
-            });
-        },
-        async run({ page, pm }) {
-            await openNewPanel(page, pm);
-            await editTitle(page, pm, 'Errors by level');
-            await page.locator('[data-test="dashboard-back-btn"]').click();
-            await expect(page.locator('[data-test="confirm-dialog"]')).toContainText('Leave without saving?');
-            await expect(page.locator('[data-test="confirm-dialog"]')).not.toContainText('7 days');
-        },
-    },
-    {
-        id: 'j1-add-panel-draft-offer',
-        dashboard: true,
-        async run({ page, pm }) {
-            await openNewPanel(page, pm);
-            await editTitle(page, pm, 'Errors by level');
-            await page.locator('[data-test="dashboard-back-btn"]').click();
-            await page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
-            await page.waitForURL((url) => !url.pathname.includes('add_panel'), { timeout: 30000 });
-            await openNewPanel(page, pm);
-            await expect(page.locator('[data-test="dashboard-panel-draft-offer"]')).toHaveAttribute('data-conflict', 'false');
-        },
-    },
-    {
-        id: 'j2-add-panel-draft-conflict',
-        dashboard: true,
-        async run({ page, pm }) {
-            await openNewPanel(page, pm);
-            await editTitle(page, pm, 'Errors by level');
-            await page.locator('[data-test="dashboard-back-btn"]').click();
-            await page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
-            await page.waitForURL((url) => !url.pathname.includes('add_panel'), { timeout: 30000 });
-            // The draft's base version is moved, as a save from another tab would move the dashboard hash.
-            await page.evaluate(() => {
-                for (const k of Object.keys(localStorage).filter((x) => x.startsWith('o2.dashboards.panelDraft.') && !x.endsWith('.probe'))) {
-                    const d = JSON.parse(localStorage.getItem(k));
-                    if (d && typeof d === 'object') localStorage.setItem(k, JSON.stringify({ ...d, baseVersion: 'moved-elsewhere' }));
-                }
-            });
-            await openNewPanel(page, pm);
-            await expect(page.locator('[data-test="dashboard-panel-draft-offer"]')).toHaveAttribute('data-conflict', 'true');
-            await expect(page.locator('[data-test="dashboard-panel-draft-conflict-note"]')).toBeVisible();
-        },
-    },
-    {
         id: 'k1-setup-existing-org-token-picker',
         async run({ page, request }) {
             const orgId = getOrgIdentifier();
@@ -614,16 +525,11 @@ test.describe('Onboarding screens, light and dark', () => {
                     localStorage.setItem('theme', th);
                     if (email) sessionStorage.setItem(`connectDataSourcePromptShown:${email}`, 'true');
                 }, { th: theme, email: process.env.ZO_ROOT_USER_EMAIL });
-                if (screen.init) await screen.init({ page });
                 await navigateToBase(page);
                 const ctx = { page, request, orgId: getOrgIdentifier() };
                 if (screen.emptyOrg) ctx.orgId = await createOrg(page, `e2e_shot_${screen.id.slice(0, 2)}`);
                 if (screen.pick) {
                     await page.evaluate(([k, v]) => localStorage.setItem(k, v), [`o2.onboarding.firstSource.${ctx.orgId}`, screen.pick]);
-                }
-                if (screen.dashboard) {
-                    ctx.pm = new PageManager(page);
-                    await setupTestDashboard(page, ctx.pm, `Shot_${screen.id.slice(0, 2)}_${theme}_${Date.now()}`);
                 }
                 try {
                     await screen.run(ctx);

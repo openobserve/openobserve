@@ -6793,20 +6793,6 @@
     "showExemplarsHelp": "Draws trace samples on this chart for everyone who opens the dashboard. Viewers can still hide them from the panel header."
   },
   "panel": {
-    "draft": {
-      "leaveTitle": "Leave without saving?",
-      "leaveDraftKept": "Your draft is kept on this browser for 7 days. You can resume it the next time you open this panel.",
-      "leaveChangesLost": "Your changes to this panel will be lost.",
-      "keepEditing": "Keep editing",
-      "leave": "Leave",
-      "discarded": "Panel discarded",
-      "undo": "Undo",
-      "offer": "You have an unsaved panel from {time}: {title}.",
-      "untitled": "Untitled panel",
-      "conflict": "This dashboard changed since your draft.",
-      "resume": "Resume",
-      "discard": "Discard"
-    },
     "addPivotShort": "+P",
     "addBreakdownShort": "+B",
     "addZAxisShort": "+Z",
