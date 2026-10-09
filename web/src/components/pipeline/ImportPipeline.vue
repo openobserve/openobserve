@@ -1293,6 +1293,14 @@ export default defineComponent({
       return missing;
     };
 
+    /** The four keys the server reads, spelled and typed the way it expects. */
+    const bundledFunctionPayload = (fn: any, name: string) => ({
+      name,
+      function: String(fn.function).trim(),
+      params: typeof fn.params === "string" && fn.params.trim() ? fn.params : "row",
+      transType: parseInt(String(fn.transType ?? 0)),
+    });
+
     /**
      * Creates the functions this pipeline bundles and points its nodes at them.
      *
@@ -1303,14 +1311,6 @@ export default defineComponent({
      * Returns false when a function could not be resolved — the caller abandons the
      * pipeline rather than create it against the wrong logic.
      */
-    /** The four keys the server reads, spelled and typed the way it expects. */
-    const bundledFunctionPayload = (fn: any, name: string) => ({
-      name,
-      function: String(fn.function).trim(),
-      params: typeof fn.params === "string" && fn.params.trim() ? fn.params : "row",
-      transType: parseInt(String(fn.transType ?? 0)),
-    });
-
     const resolveBundledFunctions = async (input: any, index: any) => {
       const { byName, conflicting } = bundledFunctionsByName(input);
 
