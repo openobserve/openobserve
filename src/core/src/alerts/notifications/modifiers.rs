@@ -36,6 +36,13 @@ impl PreparedTemplate {
         }
         rendered
     }
+
+    fn protect(&mut self, output: String) {
+        // Opaque markers keep formatted and rejected expressions inert until substitution ends.
+        let marker = format!("\u{e000}{:032x}\u{e001}", rand::random::<u128>());
+        self.template.push_str(&marker);
+        self.replacements.push((marker, output));
+    }
 }
 
 pub(crate) fn prepare_modifiers(
@@ -46,25 +53,30 @@ pub(crate) fn prepare_modifiers(
 ) -> PreparedTemplate {
     let mut prepared = PreparedTemplate::plain(String::with_capacity(tpl.len()));
     let mut cursor = 0;
-    while let Some((start, end)) = next_placeholder(tpl, cursor) {
+    while let Some((start, end, closed)) = next_placeholder(tpl, cursor) {
         prepared.template.push_str(&tpl[cursor..start]);
-        let expression = &tpl[start + 1..end - 1];
-        let replacement = expression.split_once('|').and_then(|(field, function)| {
-            if field.is_empty() || tpl[..start].ends_with('{') || literal_field_exists(expression) {
-                return None;
-            }
-            format_modifier(&lookup(field)?, function)
-        });
-        if let Some(output) = replacement {
-            // Opaque markers keep formatted braces inert until substitution ends.
-            let marker = format!("\u{e000}{:032x}\u{e001}", rand::random::<u128>());
-            let output = if is_email {
-                output
+        let expression_end = if closed { end - 1 } else { end };
+        let expression = &tpl[start + 1..expression_end];
+        let literal = is_literal_placeholder(expression, &mut literal_field_exists)
+            || (!closed
+                && tpl[..end].ends_with('}')
+                && is_literal_placeholder(&tpl[start + 1..end - 1], &mut literal_field_exists));
+        if let Some((field, function)) = expression.split_once('|').filter(|_| !literal) {
+            let replacement = if closed
+                && !field.is_empty()
+                && !tpl[..start].ends_with('{')
+                && (!field.contains(':') || literal_field_exists(field))
+            {
+                lookup(field).and_then(|value| format_modifier(&value, function))
             } else {
-                super::custom::format_variable_value(output)
+                None
             };
-            prepared.template.push_str(&marker);
-            prepared.replacements.push((marker, output));
+            let output = match replacement {
+                Some(output) if !is_email => super::custom::format_variable_value(output),
+                Some(output) => output,
+                None => tpl[start..end].to_string(),
+            };
+            prepared.protect(output);
         } else {
             prepared.template.push_str(&tpl[start..end]);
         }
@@ -74,11 +86,12 @@ pub(crate) fn prepare_modifiers(
     prepared
 }
 
-fn next_placeholder(tpl: &str, cursor: usize) -> Option<(usize, usize)> {
+fn next_placeholder(tpl: &str, cursor: usize) -> Option<(usize, usize, bool)> {
     let mut start = None;
     let mut modifier = false;
     let mut quoted = false;
     let mut escaped = false;
+    let mut nested = 0usize;
     for (index, ch) in tpl[cursor..].char_indices() {
         let index = cursor + index;
         if quoted {
@@ -92,21 +105,35 @@ fn next_placeholder(tpl: &str, cursor: usize) -> Option<(usize, usize)> {
             continue;
         }
         match ch {
+            '{' if modifier => nested += 1,
             '{' => {
                 start = Some(index);
                 modifier = false;
             }
             '|' if start.is_some() => modifier = true,
             '"' if modifier => quoted = true,
+            '}' if nested > 0 => nested -= 1,
             '}' => {
                 if let Some(start) = start {
-                    return Some((start, index + 1));
+                    return Some((start, index + 1, true));
                 }
             }
             _ => {}
         }
     }
-    None
+    start
+        .filter(|_| modifier)
+        .map(|start| (start, tpl.len(), false))
+}
+
+fn is_literal_placeholder(
+    expression: &str,
+    literal_field_exists: &mut impl FnMut(&str) -> bool,
+) -> bool {
+    literal_field_exists(expression)
+        || expression.rsplit_once(':').is_some_and(|(field, length)| {
+            length.parse::<usize>().is_ok_and(|length| length > 0) && literal_field_exists(field)
+        })
 }
 
 fn format_modifier(input: &str, function: &str) -> Option<String> {

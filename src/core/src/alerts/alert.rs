@@ -8378,4 +8378,64 @@ mod modifier_tests {
             vec![Value::String(bad)]
         );
     }
+
+    #[test]
+    fn row_rejects_lengths_and_preserves_literal_field_names() {
+        let rows = vec![
+            serde_json::from_value(
+                json!({"bytes":1536,"metric:2":"1536","literal:2|humanSize":"literal value"}),
+            )
+            .unwrap(),
+        ];
+        let tpl = "{bytes:2|humanSize} {metric:2|humanSize} {literal:2|humanSize} {literal:2|humanSize:4} {bytes|humanSize} {alert_count:1|humanize}";
+        assert_eq!(
+            process_row_template(
+                "default",
+                tpl,
+                &Alert::default(),
+                RowTemplateType::String,
+                &rows
+            ),
+            vec![Value::String(
+                "{bytes:2|humanSize} 1.5 KiB literal value lite 1.5 KiB {alert_count:1|humanize}"
+                    .into()
+            )]
+        );
+    }
+
+    #[test]
+    fn row_rejected_modifiers_preserve_exact_source() {
+        let rows =
+            vec![serde_json::from_value(json!({"t":0,"host":"expanded","bad":"NaN"})).unwrap()];
+        for tpl in [
+            r#"{t|formatTimestamp("{host} %Q")}"#,
+            r#"{t|formatTimestamp("{host} %Y", "invalid-zone")}"#,
+            r#"{missing|formatTimestamp("{host} %Y")}"#,
+            r#"{bad|formatTimestamp("{host} %Y")}"#,
+            r#"{t|formatTimestamp("{host} %Y",)}"#,
+            r#"{t|formatTimestamp({host})}"#,
+            r#"{t|unknown("{host}")}"#,
+            r#"{t|formatTimestamp("{host} %Y)}"#,
+        ] {
+            for row_type in [RowTemplateType::String, RowTemplateType::Json] {
+                assert_eq!(
+                    process_row_template("default", tpl, &Alert::default(), row_type, &rows),
+                    vec![Value::String(tpl.into())]
+                );
+            }
+        }
+        let tpl = r#"{t|formatTimestamp("{host} %Q")} {host}"#;
+        assert_eq!(
+            process_row_template(
+                "default",
+                tpl,
+                &Alert::default(),
+                RowTemplateType::String,
+                &rows
+            ),
+            vec![Value::String(
+                r#"{t|formatTimestamp("{host} %Q")} expanded"#.into()
+            )]
+        );
+    }
 }

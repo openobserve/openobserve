@@ -792,4 +792,52 @@ mod golden {
             "91.23% 1Mi 1.235M 1m 1s"
         );
     }
+
+    #[test]
+    fn custom_rejects_lengths_and_preserves_literal_field_names() {
+        let ctx = NotificationContext {
+            alert_count: "1536".into(),
+            row_columns: vec![
+                ("bytes".into(), vec!["1536".into()]),
+                ("metric:2".into(), vec!["1536".into()]),
+                ("literal:2|humanSize".into(), vec!["literal value".into()]),
+            ],
+            ..Default::default()
+        };
+        let tpl = "{bytes:2|humanSize} {metric:2|humanSize} {literal:2|humanSize} {literal:2|humanSize:4} {bytes|humanSize} {alert_count:1|humanize}";
+        assert_eq!(
+            apply_custom_template(tpl, &ctx, false),
+            "{bytes:2|humanSize} 1.5 KiB literal value lite 1.5 KiB {alert_count:1|humanize}"
+        );
+    }
+
+    #[test]
+    fn custom_rejected_modifiers_preserve_exact_source() {
+        let ctx = NotificationContext {
+            row_columns: vec![
+                ("t".into(), vec!["0".into()]),
+                ("host".into(), vec!["expanded".into()]),
+                ("bad".into(), vec!["NaN".into()]),
+            ],
+            ..Default::default()
+        };
+        for tpl in [
+            r#"{t|formatTimestamp("{host} %Q")}"#,
+            r#"{t|formatTimestamp("{host} %Y", "invalid-zone")}"#,
+            r#"{missing|formatTimestamp("{host} %Y")}"#,
+            r#"{bad|formatTimestamp("{host} %Y")}"#,
+            r#"{t|formatTimestamp("{host} %Y",)}"#,
+            r#"{t|formatTimestamp({host})}"#,
+            r#"{t|unknown("{host}")}"#,
+            r#"{t|formatTimestamp("{host} %Y)}"#,
+        ] {
+            for is_email in [false, true] {
+                assert_eq!(apply_custom_template(tpl, &ctx, is_email), tpl);
+            }
+        }
+        assert_eq!(
+            apply_custom_template(r#"{t|formatTimestamp("{host} %Q")} {host}"#, &ctx, true),
+            r#"{t|formatTimestamp("{host} %Q")} expanded"#
+        );
+    }
 }
