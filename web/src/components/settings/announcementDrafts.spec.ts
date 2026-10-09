@@ -17,9 +17,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   authoredFromDraft,
-  configFromDrafts,
   draftFromAuthored,
   draftsFromConfig,
+  indexedDraftsFromConfig,
   emptyDraft,
   parseDurationMs,
   toLocalInput,
@@ -66,31 +66,62 @@ describe("draftFromAuthored", () => {
 
     expect(draft.message).toBe("Heads up");
     expect(draft.variant).toBe("info");
-    expect(draft.schedule).toBe("always");
+    expect(draft).toMatchObject({ start: "now", end: "never", links: [] });
     expect(draft.dismissible).toBe(true);
-    expect(draft.hasCta).toBe(false);
     expect(draft.orgs).toEqual([]);
   });
 
-  it("reads a duration-only banner as a duration schedule", () => {
-    const draft = draftFromAuthored({ message: "Back soon", duration: "90m" });
+  it("defaults the appearance to medium text and the variant's colours", () => {
+    const draft = draftFromAuthored({ message: "Heads up" });
 
-    expect(draft.schedule).toBe("duration");
-    expect(draft.duration).toBe("90m");
+    expect(draft.textSize).toBe("medium");
+    expect(draft.colorLight).toBe("");
+    expect(draft.colorDark).toBe("");
   });
 
-  it("resolves starts_at + duration into a window rather than losing half of it", () => {
-    // The form has no third control for that pair, but dropping the end would
-    // quietly turn a timed notice into a permanent one.
+  it("reads text size and colours, uppercasing the hex", () => {
+    const draft = draftFromAuthored({
+      message: "m",
+      text_size: "large",
+      colors: { light: "#1d4ed8", dark: "#93C5FD" },
+    });
+
+    expect(draft.textSize).toBe("large");
+    expect(draft.colorLight).toBe("#1D4ED8");
+    expect(draft.colorDark).toBe("#93C5FD");
+  });
+
+  it("falls back to defaults for an unknown size or a colour that is not a hex", () => {
+    const draft = draftFromAuthored({
+      message: "m",
+      text_size: "huge",
+      colors: { light: "red", dark: "#FFF" },
+    });
+
+    expect(draft.textSize).toBe("medium");
+    expect(draft.colorLight).toBe("");
+    expect(draft.colorDark).toBe("");
+  });
+
+  it("reads a duration-only banner as ending after a span", () => {
+    const draft = draftFromAuthored({ message: "Back soon", duration: "90m" });
+
+    expect(draft).toMatchObject({ start: "now", end: "after", duration: "90m" });
+  });
+
+  it("keeps starts_at + duration as a set start that ends after a span", () => {
     const draft = draftFromAuthored({
       message: "Maintenance",
       starts_at: toRfc3339("2026-08-12T02:00"),
       duration: "2h",
     });
 
-    expect(draft.schedule).toBe("window");
-    expect(draft.startsAt).toBe("2026-08-12T02:00");
-    expect(draft.endsAt).toBe("2026-08-12T04:00");
+    expect(draft).toMatchObject({
+      start: "at",
+      startsAt: "2026-08-12T02:00",
+      end: "after",
+      duration: "2h",
+    });
   });
 
   it("keeps an explicit id so an edit does not re-show a dismissed banner", () => {
@@ -101,16 +132,21 @@ describe("draftFromAuthored", () => {
     expect(draftFromAuthored({ message: "m", variant: "chartreuse" }).variant).toBe("info");
   });
 
-  it("picks up a CTA and its orgs", () => {
+  it("picks up link buttons from either field, and the orgs", () => {
     const draft = draftFromAuthored({
       message: "m",
-      cta: { text: "Docs", url: "https://example.com" },
+      ctas: [
+        { text: "Status", url: "https://s.io" },
+        { text: "Docs", url: "https://d.io" },
+      ],
       orgs: ["acme", 42 as unknown as string],
     });
 
-    expect(draft.hasCta).toBe(true);
-    expect(draft.ctaText).toBe("Docs");
+    expect(draft.links.map((link) => link.text)).toEqual(["Status", "Docs"]);
     expect(draft.orgs).toEqual(["acme"]);
+    expect(
+      draftFromAuthored({ message: "m", cta: { text: "Go", url: "https://g.io" } }).links,
+    ).toEqual([{ text: "Go", url: "https://g.io" }]);
   });
 });
 
@@ -128,6 +164,17 @@ describe("draftsFromConfig", () => {
 
     expect(drafts.map((d) => d.message)).toEqual(["keep"]);
   });
+
+  it("keeps each draft's stored index so an edit replaces the right entry", () => {
+    const entries = indexedDraftsFromConfig({
+      banners: [{ message: "  " }, { message: "second" }, null, { message: "fourth" }],
+    });
+
+    expect(entries.map((entry) => [entry.index, entry.draft.message])).toEqual([
+      [1, "second"],
+      [3, "fourth"],
+    ]);
+  });
 });
 
 describe("authoredFromDraft", () => {
@@ -137,18 +184,45 @@ describe("authoredFromDraft", () => {
     expect(authoredFromDraft(draft)).toEqual({ message: "Just this" });
   });
 
-  it("writes a duration only in duration mode", () => {
-    const draft = { ...emptyDraft(), message: "m", schedule: "duration" as const, duration: "1h" };
-
-    expect(authoredFromDraft(draft)).toEqual({ message: "m", duration: "1h" });
-  });
-
-  it("writes offset timestamps only in window mode", () => {
+  it("sends a duration as typed, for the server to pin to an absolute end", () => {
     const draft = {
       ...emptyDraft(),
       message: "m",
-      schedule: "window" as const,
+      end: "after" as const,
+      duration: "2h",
+    };
+
+    expect(authoredFromDraft(draft)).toEqual({ message: "m", duration: "2h" });
+  });
+
+  it("reopens a server-pinned duration as an end-only window", () => {
+    const draft = draftFromAuthored({
+      message: "m",
+      ends_at: "2026-08-12T03:30:00Z",
+    });
+
+    expect(draft).toMatchObject({ start: "now", end: "at" });
+    expect(draft.endsAt).toBe(toLocalInput("2026-08-12T03:30:00Z"));
+  });
+
+  it("writes nothing for an unparseable duration", () => {
+    const draft = {
+      ...emptyDraft(),
+      message: "m",
+      end: "after" as const,
+      duration: "x",
+    };
+
+    expect(authoredFromDraft(draft)).toEqual({ message: "m" });
+  });
+
+  it("writes only the times the chosen start and end use", () => {
+    const draft = {
+      ...emptyDraft(),
+      message: "m",
+      start: "at" as const,
       startsAt: "2026-08-12T02:00",
+      end: "at" as const,
       endsAt: "2026-08-12T04:00",
       // Left over from a previous choice — it must not leak into the payload.
       duration: "1h",
@@ -161,16 +235,20 @@ describe("authoredFromDraft", () => {
     expect(authored.ends_at).toMatch(/^2026-08-12T04:00:00[+-]\d{2}:\d{2}$/);
   });
 
-  it("omits a CTA that was toggled off", () => {
+  it("writes link buttons as ctas and drops half-filled rows", () => {
     const draft = {
       ...emptyDraft(),
       message: "m",
-      hasCta: false,
-      ctaText: "Docs",
-      ctaUrl: "https://example.com",
+      links: [
+        { text: " Status ", url: "https://s.io" },
+        { text: "", url: "https://x.io" },
+      ],
     };
 
-    expect(authoredFromDraft(draft).cta).toBeUndefined();
+    expect(authoredFromDraft(draft)).toEqual({
+      message: "m",
+      ctas: [{ text: "Status", url: "https://s.io" }],
+    });
   });
 
   it("writes dismissible only when it is false", () => {
@@ -181,25 +259,72 @@ describe("authoredFromDraft", () => {
   });
 });
 
+describe("authoredFromDraft appearance", () => {
+  it("omits a medium text size and empty colours", () => {
+    const authored = authoredFromDraft({ ...emptyDraft(), message: "m" });
+
+    expect(authored).not.toHaveProperty("text_size");
+    expect(authored).not.toHaveProperty("colors");
+  });
+
+  it("writes a non-default size and only the modes that have a colour", () => {
+    const authored = authoredFromDraft({
+      ...emptyDraft(),
+      message: "m",
+      textSize: "small",
+      colorLight: "#dbeafe",
+    });
+
+    expect(authored.text_size).toBe("small");
+    expect(authored.colors).toEqual({ light: "#DBEAFE" });
+  });
+
+  it("drops a colour that is not a hex rather than sending it", () => {
+    const authored = authoredFromDraft({
+      ...emptyDraft(),
+      message: "m",
+      colorDark: "blue",
+    });
+
+    expect(authored).not.toHaveProperty("colors");
+  });
+});
+
+const roundTrip = (config: unknown) => ({
+  banners: draftsFromConfig(config).map((draft) => authoredFromDraft(draft)),
+});
+
 describe("the form/JSON round trip", () => {
   it("returns the same config it was given", () => {
     const config = {
       banners: [
         { message: "Outage", variant: "critical", dismissible: false },
-        { message: "Webinar", variant: "promo", cta: { text: "Join", url: "https://x.dev" } },
+        {
+          message: "Webinar",
+          variant: "promo",
+          ctas: [{ text: "Join", url: "https://x.dev" }],
+        },
         { message: "Scoped", orgs: ["acme"] },
-        { message: "Timed", duration: "1h" },
+        {
+          message: "Styled",
+          text_size: "large",
+          colors: { light: "#1D4ED8", dark: "#93C5FD" },
+        },
+        {
+          message: "Dark only",
+          text_size: "small",
+          colors: { dark: "#14532D" },
+        },
       ],
     };
 
-    expect(configFromDrafts(draftsFromConfig(config))).toEqual(config);
+    expect(roundTrip(config)).toEqual(config);
   });
 
   it("survives a second trip unchanged", () => {
-    // Convergence matters: an author toggling between Form and JSON must not
-    // watch their config drift a little further on every switch.
-    const once = configFromDrafts(draftsFromConfig({ banners: [{ message: "Stable" }] }));
+    // A config must not drift a little further on every save.
+    const once = roundTrip({ banners: [{ message: "Stable" }] });
 
-    expect(configFromDrafts(draftsFromConfig(once))).toEqual(once);
+    expect(roundTrip(once)).toEqual(once);
   });
 });

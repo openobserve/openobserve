@@ -231,6 +231,15 @@ describe("SettingsIndex", () => {
       expect(domainTab.exists()).toBe(true);
       expect(orgManagementTab.exists()).toBe(true);
     });
+
+    it("should render the announcement banners tab for the meta org on enterprise", () => {
+      const wrapper = createWrapper();
+
+      const announcementsTab = wrapper.find('[data-test="announcement-banners-tab"]');
+
+      expect(announcementsTab.exists()).toBe(true);
+      expect(announcementsTab.attributes("data-name")).toBe("announcements");
+    });
   });
 
   describe("Tab management controls", () => {

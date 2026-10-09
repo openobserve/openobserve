@@ -282,7 +282,8 @@ pub async fn set_announcements_config(
         };
 
         let banner_count = resolved.banners.len();
-        if let Err(e) = storage::write(storage::envelope(&body, &resolved)).await {
+        let source = announcements::pin_durations(&body, &resolved);
+        if let Err(e) = storage::write(storage::envelope(&source, &resolved)).await {
             log::error!("Error saving announcement banners: {e}");
             return MetaHttpResponse::internal_error(e);
         }
