@@ -42,7 +42,7 @@ export function alertConditionText(alert: any): string {
   // PromQL keeps its threshold on `promql_condition`; the expression itself is
   // the query, so rendering the comparison stops this falling through to "—".
   if (qc?.type === "promql") {
-    if (qc.prom_rule_mode) return qc.promql || EMPTY;
+    if (qc.promql_rule_mode) return qc.promql || EMPTY;
     const pc = qc.promql_condition;
     return isBlank(pc?.value) ? EMPTY : `${pc.operator || ""} ${pc.value}`.trim();
   }
@@ -59,7 +59,7 @@ export function alertConditionText(alert: any): string {
 export function alertWarningConditionText(alert: any): string {
   const qc = queryConditionOf(alert);
   if (qc?.type === "promql") {
-    if (qc.prom_rule_mode) return qc.promql || EMPTY;
+    if (qc.promql_rule_mode) return qc.promql || EMPTY;
     return isBlank(qc.promql_warning_value)
       ? EMPTY
       : `${qc.promql_condition?.operator || ""} ${qc.promql_warning_value}`.trim();

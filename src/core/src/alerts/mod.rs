@@ -165,7 +165,7 @@ impl QueryConditionExt for QueryCondition {
                 return Ok(eval_results);
             }
             QueryType::PromQL => {
-                if self.prom_rule_mode {
+                if self.promql_rule_mode {
                     return prom_rule::evaluate(
                         self,
                         org_id,

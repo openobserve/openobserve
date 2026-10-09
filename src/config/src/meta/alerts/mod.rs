@@ -537,7 +537,7 @@ pub struct QueryCondition {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub promql_multi_alert: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub prom_rule_mode: bool,
+    pub promql_rule_mode: bool,
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
@@ -3117,16 +3117,21 @@ mod test {
         let query: QueryCondition =
             serde_json::from_value(serde_json::json!({"type":"promql","promql":"foo > 0"}))
                 .unwrap();
-        assert!(!query.prom_rule_mode);
+        assert!(!query.promql_rule_mode);
         let query = QueryCondition {
-            prom_rule_mode: true,
+            promql_rule_mode: true,
             promql_multi_alert: true,
             query_type: QueryType::PromQL,
             ..Default::default()
         };
-        let round_trip: QueryCondition =
-            serde_json::from_value(serde_json::to_value(&query).unwrap()).unwrap();
-        assert!(round_trip.prom_rule_mode);
+        let serialized = serde_json::to_value(&query).unwrap();
+        assert_eq!(
+            serialized.get("promql_rule_mode"),
+            Some(&serde_json::json!(true))
+        );
+        assert!(serialized.get("prom_rule_mode").is_none());
+        let round_trip: QueryCondition = serde_json::from_value(serialized).unwrap();
+        assert!(round_trip.promql_rule_mode);
         assert!(round_trip.promql_multi_alert);
     }
 }

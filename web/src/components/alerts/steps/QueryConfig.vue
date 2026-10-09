@@ -1570,7 +1570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex flex-col gap-1 px-3 py-2"
               >
                 <OFormSwitch
-                  name="query_condition.prom_rule_mode"
+                  name="query_condition.promql_rule_mode"
                   :label="t('alerts.promRuleMode')"
                   data-test="alert-prom-rule-mode"
                   @update:model-value="onPromRuleModeChange"
@@ -2609,7 +2609,7 @@ export default defineComponent({
     );
     const isPromqlMultiAlert = computed(() => promqlMultiAlertStore.value);
     const promRuleModeStore = form.useStore(
-      (s: any) => !!s.values?.query_condition?.prom_rule_mode,
+      (s: any) => !!s.values?.query_condition?.promql_rule_mode,
     );
     const isPromRuleMode = computed(() => promRuleModeStore.value);
     const onPromRuleModeChange = (enabled: unknown) => {
@@ -2643,7 +2643,7 @@ export default defineComponent({
     const THRESHOLD_FIELDS = [
       "query_condition.promql_condition",
       "query_condition.promql_multi_alert",
-      "query_condition.prom_rule_mode",
+      "query_condition.promql_rule_mode",
       "query_condition.promql_warning_value",
       "trigger_condition.threshold",
       "trigger_condition.operator",
@@ -2688,7 +2688,7 @@ export default defineComponent({
           H: 7,
         },
       );
-      setFV("query_condition.prom_rule_mode", false);
+      setFV("query_condition.promql_rule_mode", false);
       setFV("trigger_condition.period", FORECAST_PERIOD_MINUTES);
       if (frequencyMode.value === "minutes") {
         checkEveryFrequency.value = FORECAST_FREQUENCY_MINUTES;
@@ -2801,7 +2801,7 @@ export default defineComponent({
       (tab) => {
         if (tab === "promql") {
           normalizePromqlMultiAlertFlag();
-          if (fv("query_condition.prom_rule_mode")) onPromRuleModeChange(true);
+          if (fv("query_condition.promql_rule_mode")) onPromRuleModeChange(true);
           if (fv("query_condition.aggregation.multi_alert")) {
             setFV("query_condition.aggregation.multi_alert", false);
           }

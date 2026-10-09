@@ -264,7 +264,7 @@ export const makeAddAlertSchema = (
       // generic-form SLO authoring.
       if (
         isBlank(val.stream_name) &&
-        !(val.query_condition?.prom_rule_mode && val._meta?.tab === "promql")
+        !(val.query_condition?.promql_rule_mode && val._meta?.tab === "promql")
       ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

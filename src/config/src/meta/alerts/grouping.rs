@@ -184,7 +184,7 @@ pub fn validate_multi_alert(
     // because two of the rules are about what surrounds it: an alert with no
     // aggregation cannot have opted in at all, and multi-window comparison is
     // a sibling field.
-    if query.prom_rule_mode {
+    if query.promql_rule_mode {
         if query.query_type != super::QueryType::PromQL || !query.promql_multi_alert {
             return Err(MultiAlertError::RuleModeNeedsMultiAlert);
         }
@@ -291,7 +291,7 @@ fn validate_promql_multi_alert(
 
     // Without a condition there is no threshold to classify a series against,
     // so there is nothing to be per-group about.
-    if query.prom_rule_mode {
+    if query.promql_rule_mode {
         return Ok(());
     }
     let Some(condition) = query.promql_condition.as_ref() else {
@@ -4526,7 +4526,7 @@ mod tests {
         let mut query = crate::meta::alerts::QueryCondition {
             query_type: crate::meta::alerts::QueryType::PromQL,
             promql: Some("foo > 4".into()),
-            prom_rule_mode: true,
+            promql_rule_mode: true,
             promql_multi_alert: true,
             ..Default::default()
         };
@@ -4554,7 +4554,7 @@ mod tests {
             Err(MultiAlertError::RuleModeThresholdConflict)
         );
         query.promql_warning_value = None;
-        query.prom_rule_mode = false;
+        query.promql_rule_mode = false;
         assert_eq!(
             validate_multi_alert(&query, &tc, false),
             Err(MultiAlertError::PromqlConditionMissing)

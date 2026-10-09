@@ -22,7 +22,7 @@ pub struct Migration;
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for (table, column, boolean) in [
-            ("alerts", "query_prom_rule_mode", true),
+            ("alerts", "query_promql_rule_mode", true),
             ("alert_state_transitions", "rule_value", false),
         ] {
             if !manager.has_column(table, column).await? {
@@ -48,7 +48,7 @@ impl MigrationTrait for Migration {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         for (table, column) in [
             ("alert_state_transitions", "rule_value"),
-            ("alerts", "query_prom_rule_mode"),
+            ("alerts", "query_promql_rule_mode"),
         ] {
             manager
                 .alter_table(
@@ -86,7 +86,7 @@ mod tests {
         Migration.up(&manager).await.unwrap();
         assert!(
             manager
-                .has_column("alerts", "query_prom_rule_mode")
+                .has_column("alerts", "query_promql_rule_mode")
                 .await
                 .unwrap()
         );
@@ -99,13 +99,13 @@ mod tests {
         let row = db
             .query_one(sea_orm::Statement::from_string(
                 sea_orm::DatabaseBackend::Sqlite,
-                "SELECT query_prom_rule_mode FROM alerts WHERE id=1",
+                "SELECT query_promql_rule_mode FROM alerts WHERE id=1",
             ))
             .await
             .unwrap()
             .unwrap();
         assert_eq!(
-            row.try_get::<Option<bool>>("", "query_prom_rule_mode")
+            row.try_get::<Option<bool>>("", "query_promql_rule_mode")
                 .unwrap(),
             None
         );

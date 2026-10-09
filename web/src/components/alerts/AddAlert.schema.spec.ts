@@ -82,7 +82,7 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
       query_condition: {
         ...validScheduled().query_condition,
         type: "promql",
-        prom_rule_mode: true,
+        promql_rule_mode: true,
         promql_multi_alert: true,
         promql_condition: null,
       },
@@ -92,12 +92,12 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
       ...base,
       query_condition: { ...base.query_condition, promql_condition: { operator: ">", value: 5 } },
     };
-    expect(issuesByPath(conflicting)["query_condition.prom_rule_mode"]).toBeTruthy();
+    expect(issuesByPath(conflicting)["query_condition.promql_rule_mode"]).toBeTruthy();
     const single = {
       ...base,
       query_condition: { ...base.query_condition, promql_multi_alert: false },
     };
-    expect(issuesByPath(single)["query_condition.prom_rule_mode"]).toBeTruthy();
+    expect(issuesByPath(single)["query_condition.promql_rule_mode"]).toBeTruthy();
   });
 
   it("passes a complete valid scheduled alert", () => {

@@ -317,7 +317,7 @@ fn fate_for_alert(
     grace: i64,
 ) -> GroupFate {
     match group_fate(state, now, resolve_after, grace) {
-        GroupFate::Resolve if alert.query_condition.prom_rule_mode => GroupFate::Keep,
+        GroupFate::Resolve if alert.query_condition.promql_rule_mode => GroupFate::Keep,
         fate => fate,
     }
 }
@@ -427,7 +427,7 @@ mod tests {
             fate_for_alert(&alert, &state, 600_000_000, 300_000_000, 60_000_000),
             GroupFate::Resolve
         );
-        alert.query_condition.prom_rule_mode = true;
+        alert.query_condition.promql_rule_mode = true;
         assert_eq!(
             fate_for_alert(&alert, &state, 600_000_000, 300_000_000, 60_000_000),
             GroupFate::Keep

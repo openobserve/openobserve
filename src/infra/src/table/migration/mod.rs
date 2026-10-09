@@ -210,7 +210,7 @@ mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
 mod m20261008_000001_add_name_to_rum_pa_tombstones;
-mod m20261009_000001_add_prom_rule_mode;
+mod m20261009_000001_add_promql_rule_mode;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -528,7 +528,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261004_000001_create_query_history::Migration),
             Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
             Box::new(m20261008_000001_add_name_to_rum_pa_tombstones::Migration),
-            Box::new(m20261009_000001_add_prom_rule_mode::Migration),
+            Box::new(m20261009_000001_add_promql_rule_mode::Migration),
         ]
     }
 }
@@ -587,7 +587,7 @@ mod tests {
         (97, "m20261004_000001_create_query_history"),
         (98, "m20261007_000001_scope_alert_dedup_state_by_org"),
         (99, "m20261008_000001_add_name_to_rum_pa_tombstones"),
-        (100, "m20261009_000001_add_prom_rule_mode"),
+        (100, "m20261009_000001_add_promql_rule_mode"),
     ];
 
     #[test]
