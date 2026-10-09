@@ -39,17 +39,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </span>
 
-      <span v-if="banner.cta || dismissible" class="announcement-bar-actions">
-        <component
-          :is="preview ? 'span' : 'a'"
-          v-if="banner.cta"
-          v-bind="ctaAttrs"
-          class="announcement-bar-link"
-        >
-          {{ banner.cta.text }}
-        </component>
+      <span v-if="links.length || dismissible" class="announcement-bar-actions">
+        <template v-for="(link, position) in links" :key="position">
+          <span v-if="position" class="announcement-bar-sep" aria-hidden="true">|</span>
+          <component
+            :is="preview ? 'span' : 'a'"
+            v-bind="linkAttrs(link, position)"
+            class="announcement-bar-link"
+          >
+            {{ link.text }}
+          </component>
+        </template>
 
-        <span v-if="banner.cta && dismissible" class="announcement-bar-sep" aria-hidden="true">
+        <span v-if="links.length && dismissible" class="announcement-bar-sep" aria-hidden="true">
           |
         </span>
 
@@ -93,6 +95,7 @@ interface StripBanner {
   variant?: string;
   dismissible?: boolean;
   cta?: { text: string; url: string } | null;
+  ctas?: { text: string; url: string }[] | null;
   text_size?: string;
   colors?: BannerColors | null;
   icon?: string | null;
@@ -131,16 +134,18 @@ const testId = computed(() => {
 
 const messageHtml = computed(() => renderBannerMarkdown(props.banner.message));
 
-const ctaAttrs = computed(() =>
-  props.preview || !props.banner.cta
+// Older servers send only the single `cta`; newer ones send `ctas`, whose first entry it mirrors.
+const links = computed(() => props.banner.ctas ?? (props.banner.cta ? [props.banner.cta] : []));
+
+const linkAttrs = (link: { url: string }, position: number) =>
+  props.preview
     ? {}
     : {
-        href: props.banner.cta.url,
+        href: link.url,
         target: "_blank",
         rel: "noopener noreferrer",
-        "data-test": `announcement-banner-cta-${props.banner.id}`,
-      },
-);
+        "data-test": `announcement-banner-cta-${props.banner.id}-${position}`,
+      };
 
 const icon = computed(() => {
   if (isBannerIcon(props.banner.icon)) return materialIconName(props.banner.icon);

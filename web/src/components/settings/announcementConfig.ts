@@ -54,12 +54,10 @@ function withBanners(source: unknown, banners: unknown[]): AnnouncementConfig {
 
 /** Where a banner stands against the clock, from its authored schedule. */
 export function bannerStatus(draft: BannerDraft, nowMs: number): BannerStatus {
-  if (draft.schedule === "always") return "always";
-  // A legacy duration-only banner was anchored by the server at save time, which the client cannot see.
-  if (draft.schedule === "duration") return "live";
+  const start = draft.start === "at" ? instantMs(draft.startsAt) : null;
+  const end = draft.end === "at" ? instantMs(draft.endsAt) : null;
+  if (start == null && draft.end === "never") return "always";
 
-  const start = instantMs(draft.startsAt);
-  const end = instantMs(draft.endsAt);
   if (start != null && nowMs < start) return "scheduled";
   if (end != null && nowMs >= end) return "ended";
   return "live";
@@ -99,7 +97,7 @@ export function listStatuses(entries: IndexedDraft[], nowMs: number): Map<number
 
 /** Milliseconds until a live banner's end, or null when it has none. */
 export function remainingMs(draft: BannerDraft, nowMs: number): number | null {
-  if (draft.schedule !== "window" || bannerStatus(draft, nowMs) !== "live") return null;
+  if (draft.end !== "at" || bannerStatus(draft, nowMs) !== "live") return null;
   const end = instantMs(draft.endsAt);
   return end == null ? null : end - nowMs;
 }
@@ -132,7 +130,7 @@ export function formatStamp(value: string, withZone = false): string {
 
 /** Whether saving publishes the banner now, schedules it, or only stores it. */
 export function saveIntent(draft: BannerDraft, nowMs: number): SaveIntent {
-  if (draft.schedule === "duration") return parseDurationMs(draft.duration) ? "publish" : "save";
+  if (draft.end === "after" && !parseDurationMs(draft.duration)) return "save";
   const status = bannerStatus(draft, nowMs);
   if (status === "scheduled") return "schedule";
   return status === "ended" ? "save" : "publish";

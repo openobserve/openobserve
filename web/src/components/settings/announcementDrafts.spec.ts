@@ -66,9 +66,8 @@ describe("draftFromAuthored", () => {
 
     expect(draft.message).toBe("Heads up");
     expect(draft.variant).toBe("info");
-    expect(draft.schedule).toBe("always");
+    expect(draft).toMatchObject({ start: "now", end: "never", links: [] });
     expect(draft.dismissible).toBe(true);
-    expect(draft.hasCta).toBe(false);
     expect(draft.orgs).toEqual([]);
   });
 
@@ -104,25 +103,25 @@ describe("draftFromAuthored", () => {
     expect(draft.colorDark).toBe("");
   });
 
-  it("reads a duration-only banner as a duration schedule", () => {
+  it("reads a duration-only banner as ending after a span", () => {
     const draft = draftFromAuthored({ message: "Back soon", duration: "90m" });
 
-    expect(draft.schedule).toBe("duration");
-    expect(draft.duration).toBe("90m");
+    expect(draft).toMatchObject({ start: "now", end: "after", duration: "90m" });
   });
 
-  it("resolves starts_at + duration into a window rather than losing half of it", () => {
-    // The form has no third control for that pair, but dropping the end would
-    // quietly turn a timed notice into a permanent one.
+  it("keeps starts_at + duration as a set start that ends after a span", () => {
     const draft = draftFromAuthored({
       message: "Maintenance",
       starts_at: toRfc3339("2026-08-12T02:00"),
       duration: "2h",
     });
 
-    expect(draft.schedule).toBe("window");
-    expect(draft.startsAt).toBe("2026-08-12T02:00");
-    expect(draft.endsAt).toBe("2026-08-12T04:00");
+    expect(draft).toMatchObject({
+      start: "at",
+      startsAt: "2026-08-12T02:00",
+      end: "after",
+      duration: "2h",
+    });
   });
 
   it("keeps an explicit id so an edit does not re-show a dismissed banner", () => {
@@ -133,16 +132,21 @@ describe("draftFromAuthored", () => {
     expect(draftFromAuthored({ message: "m", variant: "chartreuse" }).variant).toBe("info");
   });
 
-  it("picks up a CTA and its orgs", () => {
+  it("picks up link buttons from either field, and the orgs", () => {
     const draft = draftFromAuthored({
       message: "m",
-      cta: { text: "Docs", url: "https://example.com" },
+      ctas: [
+        { text: "Status", url: "https://s.io" },
+        { text: "Docs", url: "https://d.io" },
+      ],
       orgs: ["acme", 42 as unknown as string],
     });
 
-    expect(draft.hasCta).toBe(true);
-    expect(draft.ctaText).toBe("Docs");
+    expect(draft.links.map((link) => link.text)).toEqual(["Status", "Docs"]);
     expect(draft.orgs).toEqual(["acme"]);
+    expect(
+      draftFromAuthored({ message: "m", cta: { text: "Go", url: "https://g.io" } }).links,
+    ).toEqual([{ text: "Go", url: "https://g.io" }]);
   });
 });
 
@@ -184,7 +188,7 @@ describe("authoredFromDraft", () => {
     const draft = {
       ...emptyDraft(),
       message: "m",
-      schedule: "duration" as const,
+      end: "after" as const,
       duration: "2h",
     };
 
@@ -197,8 +201,7 @@ describe("authoredFromDraft", () => {
       ends_at: "2026-08-12T03:30:00Z",
     });
 
-    expect(draft.schedule).toBe("window");
-    expect(draft.startsAt).toBe("");
+    expect(draft).toMatchObject({ start: "now", end: "at" });
     expect(draft.endsAt).toBe(toLocalInput("2026-08-12T03:30:00Z"));
   });
 
@@ -206,19 +209,20 @@ describe("authoredFromDraft", () => {
     const draft = {
       ...emptyDraft(),
       message: "m",
-      schedule: "duration" as const,
+      end: "after" as const,
       duration: "x",
     };
 
     expect(authoredFromDraft(draft)).toEqual({ message: "m" });
   });
 
-  it("writes offset timestamps only in window mode", () => {
+  it("writes only the times the chosen start and end use", () => {
     const draft = {
       ...emptyDraft(),
       message: "m",
-      schedule: "window" as const,
+      start: "at" as const,
       startsAt: "2026-08-12T02:00",
+      end: "at" as const,
       endsAt: "2026-08-12T04:00",
       // Left over from a previous choice — it must not leak into the payload.
       duration: "1h",
@@ -231,16 +235,20 @@ describe("authoredFromDraft", () => {
     expect(authored.ends_at).toMatch(/^2026-08-12T04:00:00[+-]\d{2}:\d{2}$/);
   });
 
-  it("omits a CTA that was toggled off", () => {
+  it("writes link buttons as ctas and drops half-filled rows", () => {
     const draft = {
       ...emptyDraft(),
       message: "m",
-      hasCta: false,
-      ctaText: "Docs",
-      ctaUrl: "https://example.com",
+      links: [
+        { text: " Status ", url: "https://s.io" },
+        { text: "", url: "https://x.io" },
+      ],
     };
 
-    expect(authoredFromDraft(draft).cta).toBeUndefined();
+    expect(authoredFromDraft(draft)).toEqual({
+      message: "m",
+      ctas: [{ text: "Status", url: "https://s.io" }],
+    });
   });
 
   it("writes dismissible only when it is false", () => {
@@ -294,7 +302,7 @@ describe("the form/JSON round trip", () => {
         {
           message: "Webinar",
           variant: "promo",
-          cta: { text: "Join", url: "https://x.dev" },
+          ctas: [{ text: "Join", url: "https://x.dev" }],
         },
         { message: "Scoped", orgs: ["acme"] },
         {

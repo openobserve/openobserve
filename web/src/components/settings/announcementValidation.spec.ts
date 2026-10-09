@@ -26,8 +26,16 @@ const draft = (overrides: Partial<BannerDraft> = {}): BannerDraft => ({
   ...overrides,
 });
 
-/** The fields the validator complained about. */
-const issuesFor = (value: BannerDraft): string[] => Object.keys(validateBanner(value, t));
+/** The fields the validator complained about, with link buttons as `links.N.field`. */
+const issuesFor = (value: BannerDraft): string[] => {
+  const { links, ...fields } = validateBanner(value, t);
+  return [
+    ...Object.keys(fields),
+    ...(links ?? []).flatMap((errors, position) =>
+      Object.keys(errors).map((field) => `links.${position}.${field}`),
+    ),
+  ];
+};
 
 describe("validateBanner", () => {
   it("accepts a banner with nothing but a message", () => {
@@ -39,25 +47,27 @@ describe("validateBanner", () => {
   });
 
   it("rejects a duration that is not a span", () => {
-    expect(issuesFor(draft({ message: "m", schedule: "duration", duration: "soon" }))).toContain(
+    expect(issuesFor(draft({ message: "m", end: "after", duration: "soon" }))).toContain(
       "duration",
     );
-    expect(issuesFor(draft({ message: "m", schedule: "duration", duration: "90m" }))).toEqual([]);
+    expect(issuesFor(draft({ message: "m", end: "after", duration: "90m" }))).toEqual([]);
   });
 
-  it("wants at least one end of a scheduled window", () => {
-    expect(issuesFor(draft({ message: "m", schedule: "window" }))).toContain("startsAt");
-    expect(
-      issuesFor(draft({ message: "m", schedule: "window", startsAt: "2026-08-12T02:00" })),
-    ).toEqual([]);
+  it("wants the times the chosen start and end use", () => {
+    expect(issuesFor(draft({ message: "m", start: "at" }))).toContain("startsAt");
+    expect(issuesFor(draft({ message: "m", end: "at" }))).toContain("endsAt");
+    expect(issuesFor(draft({ message: "m", start: "at", startsAt: "2026-08-12T02:00" }))).toEqual(
+      [],
+    );
   });
 
-  it("rejects a window that ends before it starts, as the server would", () => {
+  it("rejects an end before the start, as the server would", () => {
     const issues = issuesFor(
       draft({
         message: "m",
-        schedule: "window",
+        start: "at",
         startsAt: "2026-08-12T04:00",
+        end: "at",
         endsAt: "2026-08-12T02:00",
       }),
     );
@@ -65,35 +75,24 @@ describe("validateBanner", () => {
     expect(issues).toContain("endsAt");
   });
 
-  it("ignores schedule fields the chosen mode does not use", () => {
+  it("ignores schedule fields the chosen options do not use", () => {
     // A leftover bad duration from a previous choice must not block a save.
-    expect(issuesFor(draft({ message: "m", schedule: "always", duration: "nonsense" }))).toEqual(
-      [],
-    );
+    expect(issuesFor(draft({ message: "m", end: "never", duration: "nonsense" }))).toEqual([]);
   });
 
-  it("requires both halves of a CTA once it is turned on", () => {
-    const issues = issuesFor(draft({ message: "m", hasCta: true, ctaText: "", ctaUrl: "" }));
+  it("requires both halves of every link button", () => {
+    const issues = issuesFor(draft({ message: "m", links: [{ text: "", url: "" }] }));
 
-    expect(issues).toContain("ctaText");
-    expect(issues).toContain("ctaUrl");
+    expect(issues).toEqual(["links.0.text", "links.0.url"]);
   });
 
-  it("rejects a CTA link that is not http(s)", () => {
+  it("rejects a link that is not http(s)", () => {
     // The same rule the server enforces — a javascript: URL never reaches an anchor.
-    expect(
-      issuesFor(
-        draft({ message: "m", hasCta: true, ctaText: "Go", ctaUrl: "javascript:alert(1)" }),
-      ),
-    ).toContain("ctaUrl");
-
-    expect(
-      issuesFor(draft({ message: "m", hasCta: true, ctaText: "Go", ctaUrl: "https://x.dev" })),
-    ).toEqual([]);
-  });
-
-  it("ignores CTA fields while the CTA is off", () => {
-    expect(issuesFor(draft({ message: "m", hasCta: false, ctaUrl: "not-a-url" }))).toEqual([]);
+    const link = (url: string) => ({ text: "Go", url });
+    expect(issuesFor(draft({ message: "m", links: [link("javascript:alert(1)")] }))).toEqual([
+      "links.0.url",
+    ]);
+    expect(issuesFor(draft({ message: "m", links: [link("https://x.dev")] }))).toEqual([]);
   });
 
   it("accepts empty colours and six-digit hexes", () => {
@@ -110,11 +109,11 @@ describe("validateBanner", () => {
   });
 
   it("caps the button text at 30 characters", () => {
-    const cta = { hasCta: true, ctaUrl: "https://x.dev" };
+    const link = (text: string) => [{ text, url: "https://x.dev" }];
 
-    expect(issuesFor(draft({ message: "m", ...cta, ctaText: "x".repeat(30) }))).toEqual([]);
-    expect(issuesFor(draft({ message: "m", ...cta, ctaText: "x".repeat(31) }))).toEqual([
-      "ctaText",
+    expect(issuesFor(draft({ message: "m", links: link("x".repeat(30)) }))).toEqual([]);
+    expect(issuesFor(draft({ message: "m", links: link("x".repeat(31)) }))).toEqual([
+      "links.0.text",
     ]);
   });
 });

@@ -123,10 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="announcement-list-dot"
                   :class="`announcement-list-dot--${props.row.draft.variant}`"
                 />
-                {{
-                  styleNames.get(props.row.draft.styleId) ??
-                  t(`announcements.variants.${props.row.draft.variant}`)
-                }}
+                {{ severityLabel(props.row.draft) }}
               </span>
             </q-td>
           </template>
@@ -248,6 +245,7 @@ import {
   type ListStatus,
 } from "./announcementConfig";
 import {
+  hasCustomLook,
   indexedDraftsFromConfig,
   previewFromDraft,
   stylesFromConfig,
@@ -312,22 +310,26 @@ const columns = computed<QTableColumn[]>(() =>
     }),
 );
 
-const scheduleSummary = ({ schedule, startsAt, endsAt, duration }: BannerDraft) => {
-  if (schedule === "duration") return t("announcements.list.forDuration", { duration });
-  if (schedule === "window" && startsAt && endsAt) {
-    return t("announcements.list.between", {
-      from: formatStamp(startsAt),
-      to: formatStamp(endsAt, true),
-    });
+const scheduleSummary = ({ start, startsAt, end, duration, endsAt }: BannerDraft) => {
+  const from = start === "at" && startsAt ? formatStamp(startsAt) : "";
+  const to = end === "at" && endsAt ? formatStamp(endsAt, true) : "";
+
+  if (end === "after") {
+    return from
+      ? t("announcements.list.fromFor", { from, duration })
+      : t("announcements.list.forDuration", { duration });
   }
-  if (schedule === "window" && startsAt) {
-    return t("announcements.list.from", { from: formatStamp(startsAt, true) });
-  }
-  if (schedule === "window" && endsAt) {
-    return t("announcements.list.until", { to: formatStamp(endsAt, true) });
-  }
+  if (from && to) return t("announcements.list.between", { from, to });
+  if (from) return t("announcements.list.from", { from: formatStamp(startsAt, true) });
+  if (to) return t("announcements.list.until", { to });
   return t("announcements.list.always");
 };
+
+const severityLabel = (draft: BannerDraft) =>
+  styleNames.value.get(draft.styleId) ??
+  (hasCustomLook(draft)
+    ? t("announcements.editor.customStyle")
+    : t(`announcements.variants.${draft.variant}`));
 
 const audienceSummary = ({ orgs }: BannerDraft) =>
   orgs.length

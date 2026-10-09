@@ -28,50 +28,66 @@ import { parseDurationMs, type BannerDraft } from "./announcementDrafts";
 
 export const CTA_TEXT_MAX = 30;
 
-/** Field name → message. Empty means the draft is publishable. */
-export type BannerErrors = Partial<Record<keyof BannerDraft, string>>;
+export interface LinkErrors {
+  text?: string;
+  url?: string;
+}
 
-export function validateBanner(
-  draft: BannerDraft,
-  t: (_key: string, _params?: Record<string, unknown>) => string,
-): BannerErrors {
+/** Field name → message, with one entry per link button. Empty means the draft is publishable. */
+export type BannerErrors = Partial<Record<Exclude<keyof BannerDraft, "links">, string>> & {
+  links?: LinkErrors[];
+};
+
+type Translate = (_key: string, _params?: Record<string, unknown>) => string;
+
+function validateSchedule(draft: BannerDraft, t: Translate, errors: BannerErrors): void {
+  // Only the fields the chosen start and end use are checked — a leftover from a previous choice must not block a save.
+  if (draft.start === "at" && !draft.startsAt) {
+    errors.startsAt = t("announcements.editor.startRequired");
+  }
+  if (draft.end === "after" && !parseDurationMs(draft.duration ?? "")) {
+    errors.duration = t("announcements.editor.durationInvalid");
+  }
+  if (draft.end === "at") {
+    if (!draft.endsAt) {
+      errors.endsAt = t("announcements.editor.endRequired");
+      return;
+    }
+    const startMs =
+      draft.start === "at" && draft.startsAt ? new Date(draft.startsAt).getTime() : Date.now();
+    if (new Date(draft.endsAt).getTime() <= startMs) {
+      errors.endsAt = t("announcements.editor.windowBackwards");
+    }
+  }
+}
+
+function validateLinks(draft: BannerDraft, t: Translate): LinkErrors[] | undefined {
+  const errors = draft.links.map((link) => {
+    const found: LinkErrors = {};
+    if (!link.text.trim()) found.text = t("announcements.editor.ctaTextRequired");
+    else if (link.text.trim().length > CTA_TEXT_MAX) {
+      found.text = t("announcements.editor.ctaTextTooLong", { max: CTA_TEXT_MAX });
+    }
+    const url = link.url.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      found.url = t("announcements.editor.ctaUrlInvalid");
+    }
+    return found;
+  });
+  return errors.some((e) => e.text || e.url) ? errors : undefined;
+}
+
+export function validateBanner(draft: BannerDraft, t: Translate): BannerErrors {
   const errors: BannerErrors = {};
 
   if (!draft.message.trim()) {
     errors.message = t("announcements.editor.messageRequired");
   }
 
-  // Only the fields the chosen schedule actually uses are checked — a leftover
-  // bad duration from a previous choice must not block a save.
-  if (draft.schedule === "duration" && !parseDurationMs(draft.duration ?? "")) {
-    errors.duration = t("announcements.editor.durationInvalid");
-  }
+  validateSchedule(draft, t, errors);
 
-  if (draft.schedule === "window") {
-    if (!draft.startsAt && !draft.endsAt) {
-      errors.startsAt = t("announcements.editor.windowRequired");
-    }
-    // The API rejects a backwards window; catching it here saves a round trip.
-    if (
-      draft.startsAt &&
-      draft.endsAt &&
-      new Date(draft.endsAt).getTime() <= new Date(draft.startsAt).getTime()
-    ) {
-      errors.endsAt = t("announcements.editor.windowBackwards");
-    }
-  }
-
-  if (draft.hasCta) {
-    if (!draft.ctaText?.trim()) {
-      errors.ctaText = t("announcements.editor.ctaTextRequired");
-    } else if (draft.ctaText.trim().length > CTA_TEXT_MAX) {
-      errors.ctaText = t("announcements.editor.ctaTextTooLong", { max: CTA_TEXT_MAX });
-    }
-    const url = draft.ctaUrl?.trim() ?? "";
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      errors.ctaUrl = t("announcements.editor.ctaUrlInvalid");
-    }
-  }
+  const links = validateLinks(draft, t);
+  if (links) errors.links = links;
 
   if (draft.colorLight && !isHexColor(draft.colorLight)) {
     errors.colorLight = t("announcements.editor.colorInvalid");

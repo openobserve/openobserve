@@ -98,41 +98,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("announcements.editor.messageSection") }} *
           </div>
           <AnnouncementMessageField v-model="form.message" :error="errors.message" />
-          <q-toggle
-            v-model="form.hasCta"
-            class="announcement-editor-switch"
-            :label="t('announcements.editor.hasCta')"
-            data-test="announcement-editor-has-cta"
-          />
-          <div v-if="form.hasCta" class="announcement-editor-grid">
+          <span class="announcement-editor-label">{{ t("announcements.editor.links") }}</span>
+          <div
+            v-for="(link, position) in form.links"
+            :key="position"
+            class="announcement-editor-link-row"
+            :data-test="`announcement-editor-link-${position}`"
+          >
             <q-input
-              v-model="form.ctaText"
+              v-model="link.text"
               class="showLabelOnTop"
               stack-label
               borderless
               dense
               hide-bottom-space
               :maxlength="CTA_TEXT_MAX + 10"
-              :label="t('announcements.editor.ctaText')"
               :placeholder="t('announcements.editor.ctaTextPlaceholder')"
-              :error="!!errors.ctaText"
-              :error-message="errors.ctaText"
-              data-test="announcement-editor-cta-text"
+              :aria-label="t('announcements.editor.ctaText')"
+              :error="!!errors.links?.[position]?.text"
+              :error-message="errors.links?.[position]?.text"
+              :data-test="`announcement-editor-link-${position}-text`"
             />
             <q-input
-              v-model="form.ctaUrl"
+              v-model="link.url"
               class="showLabelOnTop"
               stack-label
               borderless
               dense
               hide-bottom-space
-              :label="t('announcements.editor.ctaUrl')"
               :placeholder="t('announcements.editor.ctaUrlPlaceholder')"
-              :error="!!errors.ctaUrl"
-              :error-message="errors.ctaUrl"
-              data-test="announcement-editor-cta-url"
+              :aria-label="t('announcements.editor.ctaUrl')"
+              :error="!!errors.links?.[position]?.url"
+              :error-message="errors.links?.[position]?.url"
+              :data-test="`announcement-editor-link-${position}-url`"
+            />
+            <q-btn
+              flat
+              dense
+              round
+              icon="delete"
+              color="negative"
+              :aria-label="t('announcements.editor.removeLink')"
+              :title="t('announcements.editor.removeLink')"
+              :data-test="`announcement-editor-link-${position}-remove`"
+              @click="form.links.splice(position, 1)"
             />
           </div>
+          <q-btn
+            v-if="form.links.length < MAX_LINKS"
+            no-caps
+            flat
+            dense
+            icon="add"
+            class="o2-secondary-button announcement-editor-add-link"
+            :label="t('announcements.editor.addLink')"
+            data-test="announcement-editor-add-link"
+            @click="form.links.push({ text: '', url: '' })"
+          />
         </section>
 
         <section class="announcement-editor-section">
@@ -150,48 +172,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="chooseStyle"
           />
           <span class="announcement-editor-hint" data-test="announcement-editor-variant-help">
-            {{
-              selectedStyle
-                ? t("announcements.editor.styleBehavesAs", {
-                    severity: t(`announcements.variants.${selectedStyle.base}`),
-                  })
-                : t(`announcements.variantHelp.${form.variant}`)
-            }}
+            {{ styleHelp }}
           </span>
-          <AnnouncementAppearanceField
-            v-model:text-size="form.textSize"
-            v-model:color-light="form.colorLight"
-            v-model:color-dark="form.colorDark"
-            v-model:icon="form.icon"
-            :errors="errors"
-          />
-          <div class="announcement-editor-style-actions">
+          <div
+            v-if="styleChoice === CUSTOM_STYLE"
+            class="announcement-editor-custom-look"
+            data-test="announcement-editor-custom-look"
+          >
+            <AnnouncementAppearanceField
+              v-model:text-size="form.textSize"
+              v-model:color-light="form.colorLight"
+              v-model:color-dark="form.colorDark"
+              v-model:icon="form.icon"
+              :errors="errors"
+            />
             <q-btn
               no-caps
               flat
               dense
               icon="bookmark_add"
-              class="o2-secondary-button"
+              class="o2-secondary-button announcement-editor-add-link"
               :label="t('announcements.editor.saveAsStyle')"
               data-test="announcement-editor-save-style"
               @click="openSaveStyle"
             />
-            <q-btn
-              v-if="selectedStyle"
-              no-caps
-              flat
-              dense
-              icon="delete"
-              color="negative"
-              :label="
-                t('announcements.editor.deleteStyle', {
-                  name: selectedStyle.name,
-                })
-              "
-              data-test="announcement-editor-delete-style"
-              @click="deleteStyleOpen = true"
-            />
           </div>
+          <q-btn
+            v-if="selectedStyle"
+            no-caps
+            flat
+            dense
+            icon="delete"
+            color="negative"
+            class="announcement-editor-add-link"
+            :label="t('announcements.editor.deleteStyle', { name: selectedStyle.name })"
+            data-test="announcement-editor-delete-style"
+            @click="deleteStyleOpen = true"
+          />
         </section>
 
         <section class="announcement-editor-section">
@@ -231,81 +248,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="announcement-editor-orgs"
           />
 
-          <span class="announcement-editor-label">{{
-            t("announcements.editor.scheduleLabel")
-          }}</span>
+          <span class="announcement-editor-label">{{ t("announcements.editor.starts") }}</span>
           <q-btn-toggle
-            v-model="form.schedule"
+            v-model="form.start"
             class="announcement-editor-toggle"
             toggle-color="primary"
             no-caps
             unelevated
-            :options="scheduleOptions"
-            data-test="announcement-editor-schedule"
+            :options="startOptions"
+            data-test="announcement-editor-start"
           />
-          <div v-if="form.schedule === 'duration'" class="announcement-editor-field">
-            <div class="announcement-editor-duration-row">
-              <q-input
-                v-model="form.duration"
-                class="showLabelOnTop announcement-editor-narrow"
-                stack-label
-                borderless
-                dense
-                hide-bottom-space
-                :label="t('announcements.editor.duration')"
-                :placeholder="t('announcements.editor.durationPlaceholder')"
-                :error="!!errors.duration"
-                :error-message="errors.duration"
-                data-test="announcement-editor-duration"
-              />
-              <q-btn
-                v-for="span in DURATION_PICKS"
-                :key="span"
-                no-caps
-                dense
-                unelevated
-                :outline="form.duration !== span"
-                color="primary"
-                :label="span"
-                :data-test="`announcement-editor-duration-${span}`"
-                @click="form.duration = span"
-              />
-            </div>
-            <span class="announcement-editor-hint">{{ durationHint }}</span>
+          <q-input
+            v-if="form.start === 'at'"
+            v-model="form.startsAt"
+            type="datetime-local"
+            class="showLabelOnTop announcement-editor-datetime"
+            stack-label
+            borderless
+            dense
+            hide-bottom-space
+            :aria-label="t('announcements.editor.starts')"
+            :error="!!errors.startsAt"
+            :error-message="errors.startsAt"
+            data-test="announcement-editor-starts-at"
+          />
+
+          <span class="announcement-editor-label">{{ t("announcements.editor.ends") }}</span>
+          <q-btn-toggle
+            v-model="form.end"
+            class="announcement-editor-toggle"
+            toggle-color="primary"
+            no-caps
+            unelevated
+            :options="endOptions"
+            data-test="announcement-editor-end"
+          />
+          <div v-if="form.end === 'after'" class="announcement-editor-duration-row">
+            <q-btn
+              v-for="span in DURATION_PICKS"
+              :key="span.value"
+              no-caps
+              dense
+              unelevated
+              :outline="form.duration !== span.value"
+              color="primary"
+              :label="span.label"
+              :data-test="`announcement-editor-duration-${span.value}`"
+              @click="form.duration = span.value"
+            />
+            <q-input
+              v-model="form.duration"
+              class="showLabelOnTop announcement-editor-narrow"
+              stack-label
+              borderless
+              dense
+              hide-bottom-space
+              :placeholder="t('announcements.editor.durationPlaceholder')"
+              :aria-label="t('announcements.editor.durationCustom')"
+              :error="!!errors.duration"
+              :error-message="errors.duration"
+              data-test="announcement-editor-duration"
+            />
           </div>
-          <div v-if="form.schedule === 'window'" class="announcement-editor-field">
-            <div class="announcement-editor-grid">
-              <q-input
-                v-model="form.startsAt"
-                type="datetime-local"
-                class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
-                hide-bottom-space
-                :label="t('announcements.editor.startsAt')"
-                :error="!!errors.startsAt"
-                :error-message="errors.startsAt"
-                data-test="announcement-editor-starts-at"
-              />
-              <q-input
-                v-model="form.endsAt"
-                type="datetime-local"
-                class="showLabelOnTop"
-                stack-label
-                borderless
-                dense
-                hide-bottom-space
-                :label="t('announcements.editor.endsAt')"
-                :error="!!errors.endsAt"
-                :error-message="errors.endsAt"
-                data-test="announcement-editor-ends-at"
-              />
-            </div>
-            <span class="announcement-editor-hint">
-              {{ t("announcements.editor.timezoneHint", { zone: timeZone }) }}
-            </span>
-          </div>
+          <q-input
+            v-if="form.end === 'at'"
+            v-model="form.endsAt"
+            type="datetime-local"
+            class="showLabelOnTop announcement-editor-datetime"
+            stack-label
+            borderless
+            dense
+            hide-bottom-space
+            :aria-label="t('announcements.editor.ends')"
+            :error="!!errors.endsAt"
+            :error-message="errors.endsAt"
+            data-test="announcement-editor-ends-at"
+          />
+          <span class="announcement-editor-hint" data-test="announcement-editor-schedule-summary">
+            {{ scheduleHint }}
+          </span>
 
           <q-toggle
             v-model="form.dismissible"
@@ -335,11 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("announcements.editor.saveStyleTitle") }}
           </div>
           <div class="announcement-editor-hint">
-            {{
-              t("announcements.editor.saveStyleHint", {
-                severity: t(`announcements.variants.${form.variant}`),
-              })
-            }}
+            {{ t("announcements.editor.saveStyleHint") }}
           </div>
           <q-input
             v-model="styleName"
@@ -470,8 +487,10 @@ import {
   upsertBanner,
 } from "./announcementConfig";
 import {
+  MAX_LINKS,
   VARIANTS,
   emptyDraft,
+  hasCustomLook,
   indexedDraftsFromConfig,
   newBannerId,
   parseDurationMs,
@@ -491,7 +510,7 @@ const VARIANT_ICONS: Record<string, string> = {
 };
 
 const STYLE_CHOICE_PREFIX = "style:";
-const DURATION_PICKS = ["1h", "4h", "1d", "1w"];
+const CUSTOM_STYLE = "custom";
 
 class BannerConflictError extends Error {}
 
@@ -564,9 +583,21 @@ const orgOptions = computed(() =>
 
 const selectedStyle = computed(() => styles.value.find((style) => style.id === form.styleId));
 
-const styleChoice = computed(() =>
-  selectedStyle.value ? `${STYLE_CHOICE_PREFIX}${selectedStyle.value.id}` : form.variant,
-);
+// View state: a Custom look that happens to match the defaults must still read as Custom.
+const styleChoice = ref<string>("info");
+
+const initialStyleChoice = (draft: BannerDraft) => {
+  if (styles.value.some((style) => style.id === draft.styleId)) {
+    return `${STYLE_CHOICE_PREFIX}${draft.styleId}`;
+  }
+  return hasCustomLook(draft) ? CUSTOM_STYLE : draft.variant;
+};
+
+const styleHelp = computed(() => {
+  if (styleChoice.value === CUSTOM_STYLE) return t("announcements.editor.customStyleHelp");
+  if (selectedStyle.value) return t("announcements.editor.savedStyleHelp");
+  return t(`announcements.variantHelp.${form.variant}`);
+});
 
 const styleOptions = computed(() => [
   ...VARIANTS.map((variant) => ({
@@ -577,17 +608,33 @@ const styleOptions = computed(() => [
   })),
   ...styles.value.map((style) => ({
     label: style.name,
-    icon: isBannerIcon(style.icon) ? materialIconName(style.icon) : VARIANT_ICONS[style.base],
+    icon: isBannerIcon(style.icon) ? materialIconName(style.icon) : VARIANT_ICONS.info,
     value: `${STYLE_CHOICE_PREFIX}${style.id}`,
     attrs: { "data-test": `announcement-editor-style-${style.id}` },
   })),
+  {
+    label: t("announcements.editor.customStyle"),
+    icon: "tune",
+    value: CUSTOM_STYLE,
+    attrs: { "data-test": "announcement-editor-style-custom" },
+  },
 ]);
 
-const scheduleOptions = computed(() =>
-  (["always", "duration", "window"] as const).map((schedule) => ({
-    label: t(`announcements.editor.schedule${schedule[0].toUpperCase()}${schedule.slice(1)}`),
-    value: schedule,
-    attrs: { "data-test": `announcement-editor-schedule-${schedule}` },
+const startOptions = computed(() => [
+  { label: t("announcements.editor.startNow"), value: "now" },
+  { label: t("announcements.editor.startAt"), value: "at" },
+]);
+
+const endOptions = computed(() => [
+  { label: t("announcements.editor.endNever"), value: "never" },
+  { label: t("announcements.editor.endAfter"), value: "after" },
+  { label: t("announcements.editor.endAt"), value: "at" },
+]);
+
+const DURATION_PICKS = computed(() =>
+  (["1h", "4h", "1d", "1w"] as const).map((value) => ({
+    value,
+    label: t(`announcements.editor.durations.${value}`),
   })),
 );
 
@@ -601,13 +648,18 @@ const hiddenByCritical = computed(() =>
   ),
 );
 
-const durationHint = computed(() => {
-  const ms = parseDurationMs(form.duration ?? "");
-  return ms
-    ? t("announcements.editor.durationEnds", {
-        time: formatStamp(new Date(Date.now() + ms).toISOString()),
-      })
-    : t("announcements.editor.durationHelp");
+/** One line saying when the banner will actually be up, so the two choices read as a sentence. */
+const scheduleHint = computed(() => {
+  const stamp = (ms: number) => formatStamp(new Date(ms).toISOString());
+  const startMs = form.start === "at" && form.startsAt ? new Date(form.startsAt).getTime() : null;
+  const from = startMs ? stamp(startMs) : t("announcements.editor.hintPublish");
+
+  let until = t("announcements.editor.hintRemoved");
+  const spanMs = form.end === "after" ? parseDurationMs(form.duration ?? "") : null;
+  if (spanMs) until = stamp((startMs ?? Date.now()) + spanMs);
+  if (form.end === "at" && form.endsAt) until = stamp(new Date(form.endsAt).getTime());
+
+  return t("announcements.editor.scheduleHint", { from, until, zone: timeZone });
 });
 
 const serverMessage = (error: any, fallback: string) =>
@@ -628,9 +680,17 @@ const setVariant = (variant: BannerVariantName) => {
 };
 
 const chooseStyle = (choice: string) => {
+  styleChoice.value = choice;
+  if (choice === CUSTOM_STYLE) {
+    // Starts from whatever is showing, so switching to Custom never makes the banner jump.
+    form.styleId = "";
+    setVariant("info");
+    return;
+  }
+
   const style = styles.value.find((s) => `${STYLE_CHOICE_PREFIX}${s.id}` === choice);
   if (style) {
-    setVariant(style.base);
+    setVariant("info");
     Object.assign(form, {
       icon: style.icon,
       textSize: style.textSize,
@@ -650,21 +710,6 @@ const chooseStyle = (choice: string) => {
   });
 };
 
-// A banner restyled after picking a saved style no longer matches it, so stop labelling it with that name.
-watch(
-  () => [form.icon, form.textSize, form.colorLight, form.colorDark],
-  () => {
-    const style = selectedStyle.value;
-    if (!style) return;
-    const same =
-      form.icon === style.icon &&
-      form.textSize === style.textSize &&
-      form.colorLight.toUpperCase() === style.colorLight &&
-      form.colorDark.toUpperCase() === style.colorDark;
-    if (!same) form.styleId = "";
-  },
-);
-
 const goToList = () => {
   router.push({
     name: "announcementBanners",
@@ -679,7 +724,12 @@ const discardAndLeave = () => {
 };
 
 const seedForm = (draft: BannerDraft) => {
-  Object.assign(form, { ...draft, orgs: [...draft.orgs] });
+  Object.assign(form, {
+    ...draft,
+    orgs: [...draft.orgs],
+    links: draft.links.map((link) => ({ ...link })),
+  });
+  styleChoice.value = initialStyleChoice(draft);
   audience.value = draft.orgs.length ? "some" : "all";
   resetDismissals.value = false;
   errors.value = {};
@@ -827,7 +877,6 @@ const saveStyle = async () => {
   const style: BannerStyle = {
     id: newBannerId("style"),
     name: styleName.value.trim(),
-    base: form.variant,
     icon: form.icon,
     textSize: form.textSize,
     colorLight: form.colorLight.toUpperCase(),
@@ -836,6 +885,7 @@ const saveStyle = async () => {
   try {
     await writeStyles((latest) => addStyle(latest, style));
     form.styleId = style.id;
+    styleChoice.value = `${STYLE_CHOICE_PREFIX}${style.id}`;
     saveStyleOpen.value = false;
     q.notify({
       type: "positive",
@@ -852,7 +902,9 @@ const deleteStyle = async () => {
   if (!style) return;
   try {
     await writeStyles((latest) => removeStyle(latest, style.id));
+    // The banner keeps the look it copied, now as its own custom look.
     form.styleId = "";
+    styleChoice.value = CUSTOM_STYLE;
     q.notify({
       type: "positive",
       message: t("announcements.editor.styleDeleted", { name: style.name }),
@@ -1062,10 +1114,28 @@ defineExpose({
   gap: 0.5rem;
 }
 
-.announcement-editor-style-actions {
+.announcement-editor-custom-look {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--o2-border-color, rgba(128, 128, 128, 0.3));
+  border-radius: 0.375rem;
+}
+
+.announcement-editor-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
   gap: 0.5rem;
+  align-items: start;
+}
+
+.announcement-editor-add-link {
+  align-self: flex-start;
+}
+
+.announcement-editor-datetime {
+  max-width: 16rem;
 }
 
 @media (max-width: 1023px) {

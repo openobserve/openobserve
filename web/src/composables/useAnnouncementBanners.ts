@@ -38,6 +38,7 @@ export interface Banner {
   ends_at?: number;
   dismissible: boolean;
   cta?: BannerCta;
+  ctas?: BannerCta[];
   text_size?: BannerTextSize;
   colors?: BannerColors;
   icon?: string;

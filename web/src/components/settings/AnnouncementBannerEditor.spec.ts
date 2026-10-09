@@ -161,7 +161,7 @@ describe("AnnouncementBannerEditor", () => {
     const wrapper = await mountEditor();
     Object.assign((wrapper.vm as any).form, {
       message: "Timed",
-      schedule: "duration",
+      end: "after",
       duration: "2h",
     });
 
@@ -286,13 +286,14 @@ describe("AnnouncementBannerEditor", () => {
 
     expect(label()).toBe("Publish now");
     Object.assign((wrapper.vm as any).form, {
-      schedule: "window",
+      start: "at",
       startsAt: local(86_400_000),
     });
     await flushPromises();
     expect(label()).toBe("Schedule");
     Object.assign((wrapper.vm as any).form, {
-      startsAt: "",
+      start: "now",
+      end: "at",
       endsAt: local(-86_400_000),
     });
     await flushPromises();
@@ -404,7 +405,6 @@ describe("AnnouncementBannerEditor", () => {
       {
         id: "style-1",
         name: "Release",
-        base: "promo",
         icon: "rocket-launch",
         text_size: "large",
         colors: { light: "#DBEAFE", dark: "#1E3A8A" },
@@ -420,8 +420,8 @@ describe("AnnouncementBannerEditor", () => {
 
     await (wrapper.vm as any).save();
 
+    expect(savedConfig().banners[2].variant).toBeUndefined();
     expect(savedConfig().banners[2]).toMatchObject({
-      variant: "promo",
       icon: "rocket-launch",
       text_size: "large",
       colors: { light: "#DBEAFE", dark: "#1E3A8A" },
@@ -430,23 +430,55 @@ describe("AnnouncementBannerEditor", () => {
     expect(savedConfig()).toMatchObject({ styles: STYLED.styles });
   });
 
-  it("drops the style label once the look is changed", async () => {
+  it("switching a saved style to Custom keeps its look but drops its name", async () => {
     getConfig.mockResolvedValue({ data: structuredClone(STYLED) });
     const wrapper = await mountEditor();
     (wrapper.vm as any).chooseStyle("style:style-1");
-    await flushPromises();
-    (wrapper.vm as any).form.icon = "info";
+    (wrapper.vm as any).chooseStyle("custom");
     await flushPromises();
 
-    expect((wrapper.vm as any).form.styleId).toBe("");
+    expect((wrapper.vm as any).form).toMatchObject({
+      styleId: "",
+      icon: "rocket-launch",
+      textSize: "large",
+    });
+  });
+
+  it("shows the look controls only for a custom style", async () => {
+    const wrapper = await mountEditor();
+    const look = '[data-test="announcement-editor-custom-look"]';
+    expect(wrapper.find(look).exists()).toBe(false);
+
+    (wrapper.vm as any).chooseStyle("custom");
+    await flushPromises();
+    expect(wrapper.find(look).exists()).toBe(true);
+  });
+
+  it("saves several link buttons, up to three", async () => {
+    const wrapper = await mountEditor();
+    (wrapper.vm as any).form.message = "m";
+    for (let i = 0; i < 3; i++) {
+      await wrapper.get('[data-test="announcement-editor-add-link"]').trigger("click");
+    }
+    expect(wrapper.find('[data-test="announcement-editor-add-link"]').exists()).toBe(false);
+    (wrapper.vm as any).form.links = [
+      { text: "Status", url: "https://s.io" },
+      { text: "Docs", url: "https://d.io" },
+    ];
+
+    await (wrapper.vm as any).save();
+
+    expect(savedConfig().banners[2].ctas).toEqual([
+      { text: "Status", url: "https://s.io" },
+      { text: "Docs", url: "https://d.io" },
+    ]);
   });
 
   it("saves the current look as a style without touching the banners", async () => {
     const wrapper = await mountEditor();
-    Object.assign((wrapper.vm as any).form, {
-      variant: "warning",
-      icon: "build",
-    });
+    (wrapper.vm as any).chooseStyle("custom");
+    (wrapper.vm as any).form.icon = "build";
+    await flushPromises();
     await wrapper.get('[data-test="announcement-editor-save-style"]').trigger("click");
     await flushPromises();
     const name = document.querySelector<HTMLInputElement>(
@@ -465,7 +497,6 @@ describe("AnnouncementBannerEditor", () => {
       {
         id: expect.stringMatching(/^style-/),
         name: "Maintenance",
-        base: "warning",
         icon: "build",
       },
     ]);

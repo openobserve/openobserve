@@ -46,13 +46,21 @@ describe("bannerStatus", () => {
     expect(bannerStatus(draft(), NOW)).toBe("always");
   });
 
-  it("reads a legacy duration-only banner as live", () => {
-    expect(bannerStatus(draft({ schedule: "duration", duration: "1h" }), NOW)).toBe("live");
+  it("reads a banner that ends after a span as live", () => {
+    expect(bannerStatus(draft({ end: "after", duration: "1h" }), NOW)).toBe("live");
   });
 
   it("places a window against the clock", () => {
     const window = (startsAt: string, endsAt: string) =>
-      bannerStatus(draft({ schedule: "window", startsAt, endsAt }), NOW);
+      bannerStatus(
+        draft({
+          start: startsAt ? "at" : "now",
+          startsAt,
+          end: endsAt ? "at" : "never",
+          endsAt,
+        }),
+        NOW,
+      );
 
     expect(window("2026-08-12T13:00", "2026-08-12T14:00")).toBe("scheduled");
     expect(window("2026-08-12T11:00", "2026-08-12T13:00")).toBe("live");
@@ -60,13 +68,12 @@ describe("bannerStatus", () => {
     expect(window("", "2026-08-12T13:00")).toBe("live");
     expect(window("", "2026-08-12T12:00")).toBe("ended");
     expect(window("2026-08-12T12:00", "")).toBe("live");
+    expect(window("", "")).toBe("always");
   });
 
   it("counts live and always-on banners as showing now", () => {
     expect(isShowingNow(draft(), NOW)).toBe(true);
-    expect(isShowingNow(draft({ schedule: "window", startsAt: "2026-08-13T00:00" }), NOW)).toBe(
-      false,
-    );
+    expect(isShowingNow(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW)).toBe(false);
   });
 });
 
@@ -101,11 +108,7 @@ describe("upsertBanner", () => {
   });
 
   it("sends a picked duration as typed", () => {
-    const next = upsertBanner(
-      { banners: [] },
-      null,
-      draft({ schedule: "duration", duration: "30m" }),
-    );
+    const next = upsertBanner({ banners: [] }, null, draft({ end: "after", duration: "30m" }));
 
     expect(next.banners[0]).toEqual({ message: "m", duration: "30m" });
   });
@@ -167,7 +170,7 @@ describe("listStatuses", () => {
       [
         entry(0, {
           variant: "critical",
-          schedule: "window",
+          end: "at",
           endsAt: "2026-08-12T11:00",
         }),
         entry(1, { variant: "promo" }),
@@ -185,7 +188,7 @@ describe("listStatuses", () => {
         entry(0, { variant: "critical" }),
         entry(1, {
           variant: "promo",
-          schedule: "window",
+          start: "at",
           startsAt: "2026-08-13T00:00",
         }),
       ],
@@ -198,13 +201,11 @@ describe("listStatuses", () => {
 
 describe("remainingMs and formatSpan", () => {
   it("measures the time left on a live window", () => {
-    const live = draft({ schedule: "window", endsAt: "2026-08-12T14:00" });
+    const live = draft({ end: "at", endsAt: "2026-08-12T14:00" });
 
     expect(remainingMs(live, NOW)).toBe(2 * 3_600_000);
     expect(remainingMs(draft(), NOW)).toBeNull();
-    expect(
-      remainingMs(draft({ schedule: "window", startsAt: "2026-08-13T00:00" }), NOW),
-    ).toBeNull();
+    expect(remainingMs(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW)).toBeNull();
   });
 
   it("formats spans compactly", () => {
@@ -229,14 +230,12 @@ describe("formatStamp", () => {
 describe("saveIntent", () => {
   it("publishes what will show on save", () => {
     expect(saveIntent(draft(), NOW)).toBe("publish");
-    expect(saveIntent(draft({ schedule: "duration", duration: "2h" }), NOW)).toBe("publish");
+    expect(saveIntent(draft({ end: "after", duration: "2h" }), NOW)).toBe("publish");
   });
 
   it("schedules a future start and only stores an ended window", () => {
-    expect(saveIntent(draft({ schedule: "window", startsAt: "2026-08-13T00:00" }), NOW)).toBe(
-      "schedule",
-    );
-    expect(saveIntent(draft({ schedule: "window", endsAt: "2026-08-12T11:00" }), NOW)).toBe("save");
+    expect(saveIntent(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW)).toBe("schedule");
+    expect(saveIntent(draft({ end: "at", endsAt: "2026-08-12T11:00" }), NOW)).toBe("save");
   });
 });
 
@@ -278,7 +277,6 @@ describe("saved styles", () => {
   const style = {
     id: "s1",
     name: "Release",
-    base: "promo" as const,
     icon: "rocket-launch",
     textSize: "large" as const,
     colorLight: "",
@@ -296,7 +294,6 @@ describe("saved styles", () => {
         {
           id: "s1",
           name: "Release",
-          base: "promo",
           icon: "rocket-launch",
           text_size: "large",
         },

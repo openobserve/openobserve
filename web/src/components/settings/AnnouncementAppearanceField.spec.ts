@@ -24,7 +24,7 @@ installQuasar();
 
 function mountField(colorLight = "", colorDark = "") {
   return mount(AnnouncementAppearanceField, {
-    props: { textSize: "medium", colorLight, colorDark, errors: {} },
+    props: { textSize: "medium", colorLight, colorDark, icon: "", errors: {} },
     global: { plugins: [i18n] },
   });
 }
@@ -81,7 +81,7 @@ describe("AnnouncementAppearanceField", () => {
 
   it("is one Tab stop that arrow keys move through, and Enter selects", async () => {
     const wrapper = mount(AnnouncementAppearanceField, {
-      props: { textSize: "medium", colorLight: "", colorDark: "", errors: {} },
+      props: { textSize: "medium", colorLight: "", colorDark: "", icon: "", errors: {} },
       global: { plugins: [i18n] },
       attachTo: document.body,
     });
