@@ -507,4 +507,79 @@ describe("sessionReplayChangeFormat", () => {
       expect(converter.convert(meta)).toEqual([meta]);
     });
   });
+
+  describe("snapshot()", () => {
+    const base = () =>
+      fullSnapshot([
+        [
+          ADD_NODE,
+          [null, "#document"],
+          [1, "HTML"],
+          [1, "BODY"],
+          [1, "DIV", ["id", "a"]],
+          [1, "#text", "one"],
+        ],
+        [SCROLL_POSITION, [0, 0, 40]],
+      ]);
+    const change = (timestamp: number, data: any[]) => ({ type: 12, timestamp, data });
+    const textOf = (node: any): string =>
+      node.type === 3 ? node.textContent : (node.childNodes ?? []).map(textOf).join("");
+
+    it("returns null before the first full snapshot", () => {
+      expect(createRecordConverter().snapshot()).toBeNull();
+    });
+
+    it("rebuilds the current tree after text, attribute, add and scroll changes", () => {
+      const converter = createRecordConverter();
+      converter.convert(base());
+      converter.convert(
+        change(1100, [
+          [TEXT, [4, "two"]],
+          [ATTRIBUTE, [3, ["class", "x"]]],
+          [ADD_NODE, [3, "SPAN"]],
+          [SCROLL_POSITION, [3, 0, 25]],
+        ]),
+      );
+      converter.convert({ type: 3, timestamp: 1200, data: { source: 5, id: 3, text: "typed" } });
+
+      const snap = converter.snapshot()!;
+      expect(textOf(snap.node)).toBe("two");
+      const body = snap.node.childNodes[0].childNodes[0];
+      const div = body.childNodes[0];
+      expect(div.attributes).toMatchObject({
+        id: "a",
+        class: "x",
+        rr_scrollTop: 25,
+        value: "typed",
+      });
+      expect(body.childNodes.map((n: any) => n.tagName)).toEqual(["div", "span"]);
+      expect(snap.initialOffset).toEqual({ left: 0, top: 40 });
+    });
+
+    it("returns a copy that later changes do not edit", () => {
+      const converter = createRecordConverter();
+      converter.convert(base());
+      const first = converter.snapshot()!;
+      converter.convert(change(1100, [[TEXT, [4, "two"]]]));
+      expect(textOf(first.node)).toBe("one");
+    });
+
+    it("forgets a removed subtree so later changes to its ids are ignored", () => {
+      const converter = createRecordConverter();
+      converter.convert(base());
+      converter.convert(change(1100, [[REMOVE_NODE, 3]]));
+      converter.convert(change(1200, [[TEXT, [4, "ghost"]]]));
+      expect(textOf(converter.snapshot()!.node)).toBe("");
+    });
+
+    it("counts changes in version()", () => {
+      const converter = createRecordConverter();
+      const v0 = converter.version();
+      converter.convert(base());
+      const v1 = converter.version();
+      converter.convert(change(1100, [[TEXT, [4, "two"]]]));
+      expect(v1).toBeGreaterThan(v0);
+      expect(converter.version()).toBeGreaterThan(v1);
+    });
+  });
 });
