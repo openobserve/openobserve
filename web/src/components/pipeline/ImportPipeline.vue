@@ -359,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 :class="{
                   'py-1.25 text-sm font-bold': true,
-                  'text-green': val.success && !val.warning,
+                  'text-status-success-text': val.success && !val.warning,
                   'text-status-warning-text': val.warning,
                   'text-status-negative': !val.success,
                 }"

@@ -1114,12 +1114,6 @@ class APICleanup {
     }
 
     /**
-     * Delete a single function in a specific organization
-     * @param {string} org - The organization identifier
-     * @param {string} functionName - The function name
-     * @returns {Promise<Object>} Deletion result
-     */
-    /**
      * Replace a function's body in place (PUT), leaving every pipeline that
      * calls it pointing at it.
      *
@@ -1145,6 +1139,12 @@ class APICleanup {
         return await response.json().catch(() => ({}));
     }
 
+    /**
+     * Delete a single function in a specific organization
+     * @param {string} org - The organization identifier
+     * @param {string} functionName - The function name
+     * @returns {Promise<Object>} Deletion result
+     */
     async deleteFunctionInOrg(org, functionName) {
         try {
             const response = await this._fetch(`${this.baseUrl}/api/${org}/functions/${functionName}`, {

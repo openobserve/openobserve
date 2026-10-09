@@ -1111,9 +1111,9 @@ describe("ImportPipeline.vue", () => {
       const classesAt = (i: number) =>
         wrapper.find(`[data-test="pipeline-import-creation-${i}-message"]`).classes();
 
-      expect(classesAt(0)).toContain("text-green");
+      expect(classesAt(0)).toContain("text-status-success-text");
       expect(classesAt(1)).toContain("text-status-warning-text");
-      expect(classesAt(1)).not.toContain("text-green");
+      expect(classesAt(1)).not.toContain("text-status-success-text");
       expect(classesAt(2)).toContain("text-status-negative");
     });
 
