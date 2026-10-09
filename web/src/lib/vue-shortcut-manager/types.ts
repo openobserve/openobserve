@@ -28,6 +28,8 @@ export interface Shortcut {
    * keystrokes from the user's typing.
    */
   allowInInput?: boolean;
+  /** Never fire while a text input has focus, even as a modifier combo, so the input keeps its own Ctrl+Z. */
+  skipInInput?: boolean;
 }
 
 /**

@@ -52,7 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="mt-2"
         :dashboardData="dashboardData"
         :viewOnly="viewOnly"
+        :layoutMode="layoutMode"
         @refresh="refreshDashboard"
+        @layoutChange="$emit('layoutChange')"
       />
 
       <!-- Tab-scoped Variables (for active tab, if using manager) -->
@@ -91,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
             :viewOnly="viewOnly"
+            :layoutMode="layoutMode"
             :data="panels[0] || {}"
             :dashboardId="dashboardData.dashboardId"
             :folderId="folderId"
@@ -130,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="panels.length > 0"
           ref="gridStackContainer"
           class="grid-stack m-0.5 bg-transparent"
-          :class="{ 'grid-interacting': isGridInteracting }"
+          :class="{ 'grid-interacting': isGridInteracting, 'layout-editing': isLayoutEditing }"
         >
           <div
             v-for="item in panels"
@@ -145,7 +148,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="grid-stack-item gridBackground rounded-default border-border-default! bg-transparent!"
             :class="{ 'panel-section-header': isSectionHeader(item) }"
           >
-            <div class="grid-stack-item-content">
+            <div
+              class="grid-stack-item-content"
+              :class="
+                isLayoutEditing && !isSectionHeader(item)
+                  ? 'outline-accent outline-1 -outline-offset-1 outline-dashed'
+                  : ''
+              "
+            >
               <!-- A section heading LABELS the panels below it — it is a layout element,
                    not a panel. Rendering it through PanelContainer gave it the full card
                    treatment (outer border, title bar with its own bottom rule, and an empty
@@ -182,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onDeletePanel="onDeletePanel"
                   @onViewPanel="onViewPanel"
                   :viewOnly="viewOnly"
+                  :layoutMode="layoutMode"
                   :data="item"
                   :dashboardId="dashboardData.dashboardId"
                   :folderId="folderId"
@@ -298,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <NoPanel
           @update:Panel="addPanelData"
           :view-only="viewOnly"
-          :hide-add-action="hideAddPanel"
+          :hide-add-action="hideAddPanel || isLayoutEditing"
         />
       </div>
     </div>
@@ -320,6 +331,7 @@ import {
   nextTick,
   reactive,
   inject,
+  type PropType,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
@@ -344,6 +356,7 @@ import "gridstack/dist/gridstack.min.css";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ViewPanel from "@/components/dashboards/viewPanel/ViewPanel.vue";
+import type { LayoutMode } from "@/components/dashboards/layoutMode";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
@@ -361,6 +374,7 @@ export default defineComponent({
     "searchRequestTraceIds",
     "variablesManagerReady",
     "sendToAiChat",
+    "layoutChange",
   ],
   props: {
     viewOnly: {},
@@ -422,6 +436,11 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    /** "live" drags and saves at once; "view" locks the layout; "edit" unlocks it and emits layoutChange instead of saving. */
+    layoutMode: {
+      type: String as PropType<LayoutMode>,
+      default: "live",
+    },
   },
 
   components: {
@@ -442,6 +461,7 @@ export default defineComponent({
     const gridStackContainer = ref(null);
     // True while a panel is being dragged or resized — drives the grid backdrop.
     const isGridInteracting = ref(false);
+    const isLayoutEditing = computed(() => props.layoutMode === "edit");
 
     // Initialize GridStack instance
     // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
@@ -820,6 +840,7 @@ export default defineComponent({
         );
 
         showPositiveNotification(t("dashboard.renderDashboardCharts.dashboardUpdatedSuccessfully"));
+        return true;
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
@@ -837,12 +858,15 @@ export default defineComponent({
           );
         }
 
-        // refresh dashboard
-        refreshDashboard();
-      } finally {
-        /* no cleanup needed */
+        // A reload swaps the dashboard object and ends the edit session, so edit mode keeps the draft for a retry.
+        if (props.layoutMode !== "edit") refreshDashboard();
+        return false;
       }
     });
+
+    const isGridStatic = computed(
+      () => !!props.viewOnly || saveDashboardData.isLoading.value || props.layoutMode === "view",
+    );
 
     //add panel
     const addPanelData = () => {
@@ -882,6 +906,8 @@ export default defineComponent({
             props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable resize in view-only
           disableDrag:
             props.viewOnly || saveDashboardData.isLoading.value || props.simplifiedPanelView, // Disable drag in view-only
+          // The layout lock goes through staticGrid, not disableDrag: setStatic(false) cannot lift disableDrag.
+          staticGrid: isGridStatic.value,
           acceptWidgets: false, // Don't accept external widgets
           removable: false, // Don't allow removal by dragging out
           animate: false, // Disable animations for better performance
@@ -908,7 +934,11 @@ export default defineComponent({
 
         if (items && items.length > 0) {
           updatePanelLayouts(items); // Update panel layout data
-          saveDashboardData.execute(); // Save changes to backend
+          if (props.layoutMode === "edit") {
+            emit("layoutChange");
+          } else if (props.layoutMode === "live") {
+            saveDashboardData.execute(); // Save changes to backend
+          }
         }
       });
 
@@ -954,6 +984,30 @@ export default defineComponent({
         }
       });
     };
+
+    const syncGridToLayout = () => {
+      const grid = gridStackInstance;
+      if (!grid) return;
+      const items = panels.value
+        .filter((panel) => grid.engine?.nodes?.some((node) => node.id === panel.id))
+        .map((panel) => ({
+          id: panel.id,
+          x: getPanelLayout(panel, "x"),
+          y: getPanelLayout(panel, "y"),
+          w: getPanelLayout(panel, "w"),
+          h: getPanelLayout(panel, "h"),
+        }));
+      gridStackUpdateInProgress = true;
+      try {
+        grid.load(items, false);
+        // Collisions may have pushed neighbours; the data must match what is on screen.
+        updatePanelLayouts(grid.engine?.nodes ?? []);
+      } finally {
+        gridStackUpdateInProgress = false;
+      }
+      window.dispatchEvent(new Event("resize"));
+    };
+
     // Optimized GridStack refresh function
     const refreshGridStack = async () => {
       if (!gridStackContainer.value) {
@@ -1149,20 +1203,23 @@ export default defineComponent({
       }
     };
 
-    // disable resize and drag for view only mode and when saving dashboard
-    // do it based on watcher on viewOnly and saveDashboardData.isLoading
+    // setStatic only toggles drag/resize, so locking or unlocking the layout never re-renders a chart.
     watch(
-      () => props.viewOnly || saveDashboardData.isLoading.value,
-      async (newValue) => {
-        if (gridStackInstance) {
-          gridStackInstance.setStatic(newValue === true);
-        }
+      isGridStatic,
+      (isStatic) => {
+        gridStackInstance?.setStatic(isStatic);
+      },
+      { immediate: true },
+    );
 
-        // If switching from viewOnly (print mode) to interactive, force a refresh
-        if (newValue === false) {
-          await nextTick();
-          await refreshGridStack();
-        }
+    watch(
+      () => [props.viewOnly, saveDashboardData.isLoading.value],
+      async ([viewOnly, saving], previous) => {
+        if (viewOnly || saving) return;
+        // The mount build must use makeWidget like every later rebuild, or overlapping layouts resolve differently.
+        if (props.layoutMode !== "live" && previous && !previous[0]) return;
+        await nextTick();
+        await refreshGridStack();
       },
       { immediate: true },
     );
@@ -1830,7 +1887,9 @@ export default defineComponent({
       currentVariablesDataRef,
       resetGridLayout,
       refreshGridStack,
+      syncGridToLayout,
       isGridInteracting,
+      isLayoutEditing,
       // New scoped variables properties
       variablesManager,
       globalVariables,
@@ -1938,7 +1997,7 @@ export default defineComponent({
 }
 
 /* GridStack theme overrides */
-.displayDiv :deep(.grid-stack .grid-stack-item .drag-allow) {
+.displayDiv :deep(.grid-stack:not(.grid-stack-static) .grid-stack-item .drag-allow) {
   cursor: move;
 }
 
@@ -2022,6 +2081,19 @@ export default defineComponent({
   right: 0.125rem;
   cursor: se-resize;
   transform: rotate(0deg) !important;
+}
+
+.displayDiv
+  :deep(.grid-stack.layout-editing .grid-stack-item > .ui-resizable-handle.ui-resizable-se) {
+  background-color: var(--color-accent);
+  -webkit-mask-size: 0.75rem 0.75rem;
+  mask-size: 0.75rem 0.75rem;
+}
+
+/* GridStack hides the handle until hover (ui-resizable-autohide); while editing every panel shows it. */
+.displayDiv
+  :deep(.grid-stack.layout-editing .grid-stack-item.ui-resizable-autohide > .ui-resizable-handle) {
+  display: block;
 }
 
 /* Ensure proper box-sizing */

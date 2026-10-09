@@ -18,6 +18,8 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
+import { GridStack } from "gridstack";
+import { updateDashboard } from "../../utils/commons";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -77,6 +79,8 @@ const mockGridStackInstance = {
   float: vi.fn(),
   setAnimation: vi.fn(),
   setStatic: vi.fn(),
+  load: vi.fn(),
+  engine: { nodes: [] as any[] },
 };
 
 vi.mock("gridstack", () => ({
@@ -88,8 +92,16 @@ vi.mock("gridstack", () => ({
 vi.mock("gridstack/dist/gridstack.min.css", () => ({}));
 
 // Mock composables
-const mockNotifications = { showPositiveNotification: vi.fn(), showErrorNotification: vi.fn() };
-const mockLoading = { isLoading: ref(false) };
+const mockNotifications = {
+  showPositiveNotification: vi.fn(),
+  showErrorNotification: vi.fn(),
+  showConfictErrorNotificationWithRefreshBtn: vi.fn(),
+};
+// `run` is the real save body handed to useLoading, so the save path can be driven directly.
+const mockLoading: { isLoading: any; execute: any; run?: () => Promise<boolean> } = {
+  isLoading: ref(false),
+  execute: vi.fn(),
+};
 const mockDebouncer = { setImmediateValue: vi.fn(), setDebounceValue: vi.fn() };
 
 vi.mock("@/composables/useNotifications", () => ({
@@ -97,7 +109,10 @@ vi.mock("@/composables/useNotifications", () => ({
 }));
 
 vi.mock("@/composables/useLoading", () => ({
-  useLoading: () => mockLoading,
+  useLoading: (fn: () => Promise<boolean>) => {
+    mockLoading.run = fn;
+    return mockLoading;
+  },
 }));
 
 vi.mock("../../utils/dashboard/useCustomDebouncer", () => ({
@@ -238,22 +253,145 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should handle GridStack change events for drag/drop", async () => {
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.exists()).toBe(true);
-    });
+    describe("layout modes", () => {
+      const dashboardWithPanel = () => ({
+        ...defaultProps.dashboardData,
+        tabs: [
+          {
+            tabId: "default",
+            name: "Default Tab",
+            panels: [
+              {
+                id: "panel-1",
+                title: "Panel 1",
+                type: "line",
+                layout: { x: 0, y: 0, w: 96, h: 18, i: "panel-1" },
+                queries: [],
+              },
+            ],
+          },
+        ],
+      });
 
-    it("should handle GridStack resize events", async () => {
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.exists()).toBe(true);
-    });
+      const lastChangeHandler = () => {
+        const calls = mockGridStackInstance.on.mock.calls.filter((c: any[]) => c[0] === "change");
+        return calls[calls.length - 1][1];
+      };
 
-    it("should update panel layouts when grid items change", async () => {
-      wrapper = createWrapper();
-      await nextTick();
-      expect(wrapper.exists()).toBe(true);
+      const mountWithPanel = async (props: Record<string, unknown> = {}) => {
+        wrapper = createWrapper({ dashboardData: dashboardWithPanel(), ...props });
+        await flushPromises();
+      };
+
+      const panelLayout = () => wrapper.props("dashboardData").tabs[0].panels[0].layout;
+
+      beforeEach(() => {
+        mockLoading.isLoading.value = false;
+        mockGridStackInstance.engine.nodes = [];
+      });
+
+      it("saves a drag at once in live mode", async () => {
+        await mountWithPanel();
+        lastChangeHandler()({}, [{ id: "panel-1", x: 10, y: 2, w: 50, h: 20 }]);
+
+        expect(panelLayout()).toMatchObject({ x: 10, y: 2, w: 50, h: 20 });
+        expect(mockLoading.execute).toHaveBeenCalledTimes(1);
+        expect(wrapper.emitted("layoutChange")).toBeUndefined();
+      });
+
+      it("neither saves nor emits a draft step in view mode", async () => {
+        await mountWithPanel({ layoutMode: "view" });
+        lastChangeHandler()({}, [{ id: "panel-1", x: 10, y: 2, w: 50, h: 20 }]);
+
+        expect(mockLoading.execute).not.toHaveBeenCalled();
+        expect(wrapper.emitted("layoutChange")).toBeUndefined();
+      });
+
+      it("writes a resize to the draft and emits layoutChange without saving in edit mode", async () => {
+        await mountWithPanel({ layoutMode: "edit" });
+        lastChangeHandler()({}, [{ id: "panel-1", x: 0, y: 0, w: 120, h: 30 }]);
+
+        expect(panelLayout()).toMatchObject({ w: 120, h: 30 });
+        expect(wrapper.emitted("layoutChange")).toHaveLength(1);
+        expect(mockLoading.execute).not.toHaveBeenCalled();
+      });
+
+      it("locks and unlocks the grid with setStatic only, never rebuilding it", async () => {
+        await mountWithPanel({ layoutMode: "view" });
+        expect(vi.mocked(GridStack.init).mock.calls.at(-1)?.[0]).toMatchObject({
+          staticGrid: true,
+        });
+        const initCount = vi.mocked(GridStack.init).mock.calls.length;
+        mockGridStackInstance.destroy.mockClear();
+
+        await wrapper.setProps({ layoutMode: "edit" });
+        await flushPromises();
+        expect(mockGridStackInstance.setStatic).toHaveBeenLastCalledWith(false);
+
+        await wrapper.setProps({ layoutMode: "view" });
+        await flushPromises();
+        expect(mockGridStackInstance.setStatic).toHaveBeenLastCalledWith(true);
+
+        expect(vi.mocked(GridStack.init).mock.calls.length).toBe(initCount);
+        expect(mockGridStackInstance.destroy).not.toHaveBeenCalled();
+      });
+
+      it.each(["view", "edit"] as const)(
+        "builds the %s-mode grid on mount through makeWidget, as the rebuild after a delete does",
+        async (layoutMode) => {
+          mockGridStackInstance.makeWidget.mockClear();
+          await mountWithPanel({ layoutMode });
+
+          expect(mockGridStackInstance.makeWidget).toHaveBeenCalledWith(
+            wrapper.find('[gs-id="panel-1"]').element,
+            expect.objectContaining({ id: "panel-1", x: 0, y: 0, w: 96, h: 18 }),
+          );
+        },
+      );
+
+      it("marks the grid for always-on resize handles only in edit mode", async () => {
+        await mountWithPanel({ layoutMode: "view" });
+        expect(wrapper.find(".grid-stack").classes()).not.toContain("layout-editing");
+
+        await wrapper.setProps({ layoutMode: "edit" });
+        expect(wrapper.find(".grid-stack").classes()).toContain("layout-editing");
+      });
+
+      it("does not rebuild a draft-mode grid when a save finishes", async () => {
+        await mountWithPanel({ layoutMode: "edit" });
+        mockGridStackInstance.destroy.mockClear();
+
+        mockLoading.isLoading.value = true;
+        await flushPromises();
+        mockLoading.isLoading.value = false;
+        await flushPromises();
+
+        expect(mockGridStackInstance.destroy).not.toHaveBeenCalled();
+      });
+
+      it("moves the widgets to the panel data and reads collisions back on syncGridToLayout", async () => {
+        await mountWithPanel({ layoutMode: "edit" });
+        mockGridStackInstance.engine.nodes = [{ id: "panel-1", x: 0, y: 6, w: 96, h: 18 }];
+
+        wrapper.vm.syncGridToLayout();
+
+        expect(mockGridStackInstance.load).toHaveBeenCalledWith(
+          [{ id: "panel-1", x: 0, y: 0, w: 96, h: 18 }],
+          false,
+        );
+        expect(panelLayout()).toMatchObject({ y: 6 });
+        expect(wrapper.emitted("layoutChange")).toBeUndefined();
+      });
+
+      it("passes the mode to the tab list and re-emits its reorder as a layout change", async () => {
+        await mountWithPanel({ layoutMode: "edit", showTabs: true });
+        const tabList = wrapper.findComponent({ name: "TabList" });
+
+        expect(tabList.props("layoutMode")).toBe("edit");
+        tabList.vm.$emit("layoutChange");
+
+        expect(wrapper.emitted("layoutChange")).toHaveLength(1);
+      });
     });
 
     it("should disable/enable grid based on viewOnly prop", async () => {
@@ -706,6 +844,55 @@ describe("RenderDashboardCharts", () => {
       (wrapper.vm as any).showViewPanel = true;
       await nextTick();
       expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
+    });
+  });
+
+  describe("saveDashboardData", () => {
+    it("returns true and confirms the save", async () => {
+      wrapper = createWrapper();
+      vi.mocked(updateDashboard).mockResolvedValueOnce(true);
+
+      await expect(mockLoading.run!()).resolves.toBe(true);
+      expect(mockNotifications.showPositiveNotification).toHaveBeenCalled();
+      expect(wrapper.emitted("refresh")).toBeUndefined();
+    });
+
+    it("returns false, shows the conflict toast and reloads on a 409", async () => {
+      wrapper = createWrapper();
+      vi.mocked(updateDashboard).mockRejectedValueOnce({
+        response: { status: 409, data: { message: "Dashboard was changed elsewhere" } },
+      });
+
+      await expect(mockLoading.run!()).resolves.toBe(false);
+      expect(mockNotifications.showConfictErrorNotificationWithRefreshBtn).toHaveBeenCalledWith(
+        "Dashboard was changed elsewhere",
+        expect.any(Function),
+      );
+      expect(wrapper.emitted("refresh")).toHaveLength(1);
+    });
+
+    it("returns false and shows an error on a network failure", async () => {
+      wrapper = createWrapper();
+      vi.mocked(updateDashboard).mockRejectedValueOnce(new Error("Network Error"));
+
+      await expect(mockLoading.run!()).resolves.toBe(false);
+      expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith("Network Error", {
+        timeout: 2000,
+      });
+    });
+
+    it.each([
+      [
+        "a 409",
+        { response: { status: 409, data: { message: "Dashboard was changed elsewhere" } } },
+      ],
+      ["a network failure", new Error("Network Error")],
+    ])("keeps the layout draft without reloading on %s in edit mode", async (_label, error) => {
+      wrapper = createWrapper({ layoutMode: "edit" });
+      vi.mocked(updateDashboard).mockRejectedValueOnce(error);
+
+      await expect(mockLoading.run!()).resolves.toBe(false);
+      expect(wrapper.emitted("refresh")).toBeUndefined();
     });
   });
 

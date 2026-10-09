@@ -86,6 +86,7 @@ export function useShortcuts(shortcuts: ShortcutInput[], scope?: string): void {
             handler: input.handler,
             whenFocused: input.whenFocused,
             allowInInput: def.allowInInput,
+            skipInInput: def.skipInInput,
           });
         });
       } else {
