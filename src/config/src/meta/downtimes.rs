@@ -306,6 +306,9 @@ pub struct CorrectionRef {
     pub downtime_id: String,
     pub name: String,
     pub status: DowntimeStatus,
+    /// False when the window holds no slice start, so it corrects no minute of this SLO.
+    #[serde(default = "default_true")]
+    pub applies: bool,
 }
 
 /// Query of `GET /v2/{org}/downtimes`.

@@ -156,6 +156,7 @@ pub async fn extend_range(
                 Expr::value(next_updated_at(model.updated_at, now)),
             )
             .col_expr(slo_backfill_jobs::Column::Kind, Expr::value(KIND_REMEASURE))
+            .col_expr(slo_backfill_jobs::Column::Attempts, Expr::value(0))
             .filter(slo_backfill_jobs::Column::SloId.eq(slo_id))
             .filter(slo_backfill_jobs::Column::DefinitionGeneration.eq(generation))
             .filter(slo_backfill_jobs::Column::UpdatedAt.eq(model.updated_at))
@@ -253,6 +254,33 @@ pub async fn mark_failed(
         now,
     )
     .await
+}
+
+/// Counts one failed finish and keeps the job's state; false if the row changed.
+pub async fn record_failed_attempt(
+    db: &DatabaseConnection,
+    slo_id: &str,
+    generation: i32,
+    error: &str,
+    expected_updated_at: i64,
+    now: i64,
+) -> Result<bool, Error> {
+    let res = slo_backfill_jobs::Entity::update_many()
+        .col_expr(
+            slo_backfill_jobs::Column::Attempts,
+            Expr::col(slo_backfill_jobs::Column::Attempts).add(1),
+        )
+        .col_expr(slo_backfill_jobs::Column::Error, Expr::value(error))
+        .col_expr(
+            slo_backfill_jobs::Column::UpdatedAt,
+            Expr::value(next_updated_at(expected_updated_at, now)),
+        )
+        .filter(slo_backfill_jobs::Column::SloId.eq(slo_id))
+        .filter(slo_backfill_jobs::Column::DefinitionGeneration.eq(generation))
+        .filter(slo_backfill_jobs::Column::UpdatedAt.eq(expected_updated_at))
+        .exec(db)
+        .await?;
+    Ok(res.rows_affected > 0)
 }
 
 pub async fn cancel(
@@ -645,6 +673,52 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!((rows[0].range_start, rows[0].range_end), (100, 900));
         assert_eq!(rows[0].state, STATE_QUEUED);
+    }
+
+    #[tokio::test]
+    async fn a_failed_attempt_counts_up_and_keeps_the_state() {
+        let db = db().await;
+        queue_remeasure(&db, SLO, 1, 300, 600, 100).await.unwrap();
+        let loaded = get(&db, SLO, 1).await.unwrap().unwrap();
+
+        assert!(
+            record_failed_attempt(&db, SLO, 1, "partial", loaded.updated_at, 100)
+                .await
+                .unwrap()
+        );
+        let j = get(&db, SLO, 1).await.unwrap().unwrap();
+        assert_eq!(j.attempts, 1);
+        assert_eq!(j.state, STATE_QUEUED);
+        assert_eq!(j.error.as_deref(), Some("partial"));
+        assert!(j.updated_at > loaded.updated_at);
+    }
+
+    #[tokio::test]
+    async fn a_stale_failed_attempt_counts_nothing() {
+        let db = db().await;
+        queue_remeasure(&db, SLO, 1, 300, 600, 100).await.unwrap();
+        let loaded = version(&db, SLO, 1).await;
+        queue_remeasure(&db, SLO, 1, 0, 900, 100).await.unwrap();
+        let requeued = get(&db, SLO, 1).await.unwrap().unwrap();
+
+        assert!(
+            !record_failed_attempt(&db, SLO, 1, "partial", loaded, 100)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get(&db, SLO, 1).await.unwrap().unwrap(), requeued);
+    }
+
+    #[tokio::test]
+    async fn a_new_remeasure_resets_the_attempts() {
+        let db = db().await;
+        queue_remeasure(&db, SLO, 1, 300, 600, 100).await.unwrap();
+        let loaded = version(&db, SLO, 1).await;
+        record_failed_attempt(&db, SLO, 1, "partial", loaded, 100)
+            .await
+            .unwrap();
+        queue_remeasure(&db, SLO, 1, 0, 900, 100).await.unwrap();
+        assert_eq!(get(&db, SLO, 1).await.unwrap().unwrap().attempts, 0);
     }
 
     #[test]

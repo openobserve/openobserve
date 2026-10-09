@@ -209,12 +209,14 @@ pub(crate) mod enterprise {
             ActiveDowntime, CorrectionRef, CorrectionWindow, Downtime, DowntimeStatus,
             SloCorrectionMode, TargetModule,
         },
-        slo::Slo,
+        slo::{Slo, window::align_up},
     };
     use o2_enterprise::enterprise::downtimes::{
         schedule,
         scope::{self, TargetItem},
     };
+
+    const MICROS: i64 = 1_000_000;
 
     pub(crate) fn item<'a>(
         id: &'a str,
@@ -275,7 +277,19 @@ pub(crate) mod enterprise {
         })
     }
 
-    /// `Exclude` windows sort first, so the honest mode wins where two overlap.
+    /// The span of slice starts `[start, end)` corrects, in micros; `None` when it holds none.
+    pub(crate) fn aligned_span(
+        start: i64,
+        end: i64,
+        slice_interval_secs: i64,
+    ) -> Option<(i64, i64)> {
+        let ceil_secs = |us: i64| us.div_euclid(MICROS) + i64::from(us.rem_euclid(MICROS) != 0);
+        let start = align_up(ceil_secs(start), slice_interval_secs);
+        let end = align_up(ceil_secs(end), slice_interval_secs);
+        (start < end).then_some((start * MICROS, end * MICROS))
+    }
+
+    /// Aligned to the SLO's slices, so a window inside one slice is dropped; `Exclude` sorts first.
     pub(crate) fn corrections_in(
         rows: &[Downtime],
         slo: &Slo,
@@ -284,6 +298,7 @@ pub(crate) mod enterprise {
         to: i64,
     ) -> Vec<CorrectionWindow> {
         let item = slo_item(slo, dims);
+        let interval = slo.definition.slice_interval_secs;
         let mut windows: Vec<CorrectionWindow> = rows
             .iter()
             .filter_map(|row| {
@@ -294,11 +309,14 @@ pub(crate) mod enterprise {
                 let mode = target.slo_mode.unwrap_or_default();
                 schedule::windows_between(&row.schedule, row.cancelled_at, from, to)
                     .into_iter()
-                    .map(move |w| CorrectionWindow {
-                        downtime_id: row.id.clone(),
-                        start: w.start,
-                        end: w.end,
-                        mode,
+                    .filter_map(move |w| {
+                        let (start, end) = aligned_span(w.start, w.end, interval)?;
+                        Some(CorrectionWindow {
+                            downtime_id: row.id.clone(),
+                            start,
+                            end,
+                            mode,
+                        })
                     })
             })
             .collect();
@@ -322,10 +340,20 @@ pub(crate) mod enterprise {
                         downtime_id: row.id.clone(),
                         name: row.name.clone(),
                         status,
+                        applies: applies_to(row, slo, now),
                     }
                 })
             })
             .collect()
+    }
+
+    /// Whether the current or next window holds a slice start; true when no window is known.
+    fn applies_to(row: &Downtime, slo: &Slo, now: i64) -> bool {
+        schedule::window_at(&row.schedule, now)
+            .or_else(|| schedule::next_window(&row.schedule, now))
+            .is_none_or(|w| {
+                aligned_span(w.start, w.end, slo.definition.slice_interval_secs).is_some()
+            })
     }
 
     fn covers(row: &Downtime, module: TargetModule, item: &TargetItem<'_>) -> bool {
@@ -533,13 +561,83 @@ mod tests {
         as_good.slo_mode = Some(SloCorrectionMode::CountAsGood);
         let rows = vec![row("d0", vec![as_good], 0, 2 * HOUR), cancelled];
 
-        let got = corrections_in(&rows, &slo(), &payments(), 2 * HOUR - 1, 10 * HOUR);
+        let got = corrections_in(
+            &rows,
+            &slo(),
+            &payments(),
+            2 * HOUR - 300_000_000,
+            10 * HOUR,
+        );
         assert_eq!(got.len(), 2);
         assert_eq!(got[0].downtime_id, "d1");
         assert_eq!(got[0].mode, SloCorrectionMode::Exclude);
-        assert_eq!((got[0].start, got[0].end), (2 * HOUR - 1, 3 * HOUR));
+        assert_eq!(
+            (got[0].start, got[0].end),
+            (2 * HOUR - 300_000_000, 3 * HOUR)
+        );
         assert_eq!(got[1].downtime_id, "d0");
         assert_eq!(got[1].mode, SloCorrectionMode::CountAsGood);
+    }
+
+    /// A slice is corrected when it starts inside the window, so the window is cut to those starts.
+    #[test]
+    fn corrections_are_aligned_to_the_slo_slices() {
+        let minute = 60_000_000;
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Slos)],
+            10 * HOUR + 10 * minute + 1,
+            11 * HOUR + 2 * minute,
+        )];
+        let got = corrections_in(&rows, &slo(), &payments(), 0, 24 * HOUR);
+        assert_eq!(
+            (got[0].start, got[0].end),
+            (10 * HOUR + 15 * minute, 11 * HOUR + 5 * minute)
+        );
+    }
+
+    #[test]
+    fn a_window_inside_one_slice_corrects_nothing() {
+        let minute = 60_000_000;
+        let mut hourly = slo();
+        hourly.definition.slice_interval_secs = 3_600;
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Slos)],
+            10 * HOUR + 10 * minute,
+            10 * HOUR + 40 * minute,
+        )];
+        assert!(corrections_in(&rows, &hourly, &payments(), 0, 24 * HOUR).is_empty());
+    }
+
+    #[test]
+    fn a_30_minute_window_on_an_hourly_slo_does_not_apply() {
+        let minute = 60_000_000;
+        let mut hourly = slo();
+        hourly.definition.slice_interval_secs = 3_600;
+        let rows = vec![
+            row(
+                "short",
+                vec![target(TargetModule::Slos)],
+                10 * HOUR + 10 * minute,
+                10 * HOUR + 40 * minute,
+            ),
+            row(
+                "hour",
+                vec![target(TargetModule::Slos)],
+                10 * HOUR,
+                11 * HOUR,
+            ),
+        ];
+        let refs = refs_in(&rows, &hourly, &payments(), 10 * HOUR + 20 * minute);
+        let applies: Vec<(&str, bool)> = refs
+            .iter()
+            .map(|r| (r.downtime_id.as_str(), r.applies))
+            .collect();
+        assert_eq!(applies, [("short", false), ("hour", true)]);
+
+        let scheduled = refs_in(&rows, &hourly, &payments(), 9 * HOUR);
+        assert!(!scheduled[0].applies, "a scheduled window is checked too");
     }
 
     #[test]

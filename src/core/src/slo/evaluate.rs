@@ -150,7 +150,7 @@ fn frozen(reason: UnobservedReason, group_key: &str, slo: &Slo) -> SloEvalResult
     }
 }
 
-fn evaluate_row(
+pub(super) fn evaluate_row(
     slo: &Slo,
     cond: &SloCondition,
     row: &infra::table::entity::slo_status::Model,
@@ -483,7 +483,13 @@ mod tests {
                     corrected_by: None,
                 })
                 .collect();
-            crate::slo::corrections::apply(&mut slices, &[window], SliType::Count, &params);
+            crate::slo::corrections::apply(
+                &mut slices,
+                &[window],
+                &Default::default(),
+                SliType::Count,
+                &params,
+            );
             let buf = burn::fold_trailing(
                 burn::TrailingSlices::new(),
                 slices.iter().map(|s| (s.slice_start, s.good, s.total)),

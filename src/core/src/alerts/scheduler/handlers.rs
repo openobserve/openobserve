@@ -6767,6 +6767,20 @@ async fn handle_slo_backfill_triggers(
             .await?;
             return Ok(());
         }
+        Ok(crate::slo::backfill::ChunkOutcome::Failed) => {
+            log::error!(
+                "[slo] backfill job of {}/{slo_id} failed {} times to finish; marked failed",
+                trigger.org,
+                crate::slo::backfill::MAX_FINISH_ATTEMPTS
+            );
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::SloBackfill,
+                &slo_id,
+            )
+            .await?;
+            return Ok(());
+        }
         Ok(crate::slo::backfill::ChunkOutcome::More) => {}
         // The trigger stays, so the next tick reloads the job that changed under this chunk.
         Ok(crate::slo::backfill::ChunkOutcome::Superseded) => {

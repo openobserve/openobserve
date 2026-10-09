@@ -38,6 +38,9 @@ use infra::{
 };
 use sea_orm::{DatabaseConnection, TransactionTrait};
 
+/// Failed finishes after which a job is marked FAILED instead of rescanning its window again.
+pub const MAX_FINISH_ATTEMPTS: i32 = 5;
+
 /// Whether the job has more work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChunkOutcome {
@@ -45,6 +48,8 @@ pub enum ChunkOutcome {
     Done,
     /// The job changed after this chunk loaded it, so nothing was recorded; the next tick reloads.
     Superseded,
+    /// The finish failed [MAX_FINISH_ATTEMPTS] times, so the job is FAILED and stops retrying.
+    Failed,
 }
 
 /// The next chunk to fill, walking **backwards** from the present.
@@ -86,6 +91,9 @@ pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
     if job.state == jobs::STATE_DONE || job.state == jobs::STATE_CANCELLED {
         return Ok(ChunkOutcome::Done);
     }
+    if job.state == jobs::STATE_FAILED {
+        return Ok(ChunkOutcome::Failed);
+    }
 
     let remeasure = job.kind == jobs::KIND_REMEASURE;
     let Some((start, end)) = next_chunk(
@@ -95,7 +103,7 @@ pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
         cfg.slo.backfill_chunk_secs,
         slo.definition.slice_interval_secs,
     ) else {
-        return finish(db, slo, remeasure, job.updated_at, now_secs()).await;
+        return finish(db, slo, &job, job.updated_at, now_secs()).await;
     };
 
     let written = if remeasure {
@@ -109,7 +117,7 @@ pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
         return Ok(ChunkOutcome::Superseded);
     };
     if start <= job.range_start {
-        return finish(db, slo, remeasure, version, now).await;
+        return finish(db, slo, &job, version, now).await;
     }
     Ok(ChunkOutcome::More)
 }
@@ -197,25 +205,69 @@ async fn record_chunk(
 async fn finish(
     db: &DatabaseConnection,
     slo: &Slo,
-    remeasure: bool,
+    job: &slo_backfill_jobs::Model,
     version: i64,
     now: i64,
 ) -> Result<ChunkOutcome, anyhow::Error> {
-    let rebuilt = if remeasure {
-        super::reconcile::rebuild(slo).await?
-    } else {
-        Vec::new()
-    };
-    let generation = slo.definition_generation;
-    let done = finish_job(db, &slo.id, generation, version, now, &rebuilt).await?;
-    Ok(if done {
-        ChunkOutcome::Done
-    } else {
-        ChunkOutcome::Superseded
-    })
+    match try_finish(db, slo, job.kind == jobs::KIND_REMEASURE, version, now).await {
+        Ok(true) => Ok(ChunkOutcome::Done),
+        Ok(false) => Ok(ChunkOutcome::Superseded),
+        Err(e) => record_failed_finish(db, job, version, now, e).await,
+    }
 }
 
-/// Marks the job done and writes the aggregate in one transaction, or neither if the job changed.
+async fn try_finish(
+    db: &DatabaseConnection,
+    slo: &Slo,
+    remeasure: bool,
+    version: i64,
+    now: i64,
+) -> Result<bool, anyhow::Error> {
+    let (rebuilt, burn) = if remeasure {
+        (
+            super::reconcile::rebuild(slo).await?,
+            super::job::rebuild_burn_cache(slo).await?,
+        )
+    } else {
+        (Vec::new(), None)
+    };
+    let generation = slo.definition_generation;
+    finish_job(
+        db,
+        &slo.id,
+        generation,
+        version,
+        now,
+        &rebuilt,
+        burn.as_ref(),
+    )
+    .await
+}
+
+/// Counts the failure; the error goes back to the lane, or the job is FAILED at the last attempt.
+async fn record_failed_finish(
+    db: &DatabaseConnection,
+    job: &slo_backfill_jobs::Model,
+    version: i64,
+    now: i64,
+    error: anyhow::Error,
+) -> Result<ChunkOutcome, anyhow::Error> {
+    let (slo_id, generation) = (&job.slo_id, job.definition_generation);
+    let message = error.to_string();
+    if !jobs::record_failed_attempt(db, slo_id, generation, &message, version, now).await? {
+        return Ok(ChunkOutcome::Superseded);
+    }
+    if job.attempts + 1 < MAX_FINISH_ATTEMPTS {
+        return Err(error);
+    }
+    let counted = jobs::next_updated_at(version, now);
+    if !jobs::mark_failed(db, slo_id, generation, &message, counted, now).await? {
+        return Ok(ChunkOutcome::Superseded);
+    }
+    Ok(ChunkOutcome::Failed)
+}
+
+/// Marks the job done and writes the aggregate and burn cache in one transaction, or none of them.
 async fn finish_job(
     db: &DatabaseConnection,
     slo_id: &str,
@@ -223,6 +275,7 @@ async fn finish_job(
     version: i64,
     now: i64,
     rebuilt: &[super::reconcile::Rebuilt],
+    burn: Option<&super::job::BurnRebuild>,
 ) -> Result<bool, anyhow::Error> {
     let txn = db.begin().await?;
     // The CAS update locks the job row, so a concurrent re-measure waits for this commit.
@@ -231,6 +284,11 @@ async fn finish_job(
         return Ok(false);
     }
     super::reconcile::write_rebuilt(&txn, slo_id, rebuilt).await?;
+    if let Some(burn) = burn
+        && !super::job::write_burn_rebuild(&txn, slo_id, generation, burn).await?
+    {
+        log::warn!("[slo] burn windows of {slo_id} kept changing during the re-measure finish");
+    }
     txn.commit().await?;
     Ok(true)
 }
@@ -510,7 +568,7 @@ mod tests {
             .unwrap();
         let requeued = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
 
-        let done = finish_job(&db, "slo1", 1, loaded.updated_at, 100, &rebuilt(15.0)).await;
+        let done = finish_job(&db, "slo1", 1, loaded.updated_at, 100, &rebuilt(15.0), None).await;
         assert!(!done.unwrap());
         assert_eq!(
             rollup_good(&db).await,
@@ -528,12 +586,307 @@ mod tests {
             .unwrap();
         let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
 
-        let done = finish_job(&db, "slo1", 1, loaded.updated_at, 100, &rebuilt(15.0)).await;
+        let done = finish_job(&db, "slo1", 1, loaded.updated_at, 100, &rebuilt(15.0), None).await;
         assert!(done.unwrap());
         assert_eq!(rollup_good(&db).await, Some(15.0));
         assert_eq!(
             jobs::get(&db, "slo1", 1).await.unwrap().unwrap().state,
             jobs::STATE_DONE
         );
+    }
+    // ---- the burn windows after a correction (4.1) --------------------------
+
+    const SLICE: i64 = 300;
+    const WM: i64 = 999_900;
+    const DURATIONS: [i64; 2] = [1_800, 3_600];
+
+    /// The last hour; the slices at `WM - 900` and `WM - 600` are bad unless corrected.
+    fn last_hour(corrected: bool) -> Vec<(i64, f64, f64)> {
+        (1..=12)
+            .map(|i| {
+                let start = WM - i * SLICE;
+                match (i, corrected) {
+                    (2 | 3, true) => (start, 0.0, 0.0),
+                    (2 | 3, false) => (start, 0.0, 100.0),
+                    _ => (start, 100.0, 100.0),
+                }
+            })
+            .collect()
+    }
+
+    fn burn_rebuild(corrected: bool) -> super::super::job::BurnRebuild {
+        super::super::job::BurnRebuild::from_slices(
+            last_hour(corrected),
+            WM,
+            DURATIONS.to_vec(),
+            SLICE,
+        )
+    }
+
+    fn burn_slo() -> Slo {
+        Slo {
+            id: "slo1".into(),
+            org: "default".into(),
+            folder_id: "default".into(),
+            name: "checkout".into(),
+            description: String::new(),
+            definition: config::meta::slo::SloDefinition {
+                sli_config: config::meta::slo::SliConfig::Count {
+                    source: config::meta::slo::CountSource::SingleQuery {
+                        stream: "logs".into(),
+                        stream_type: "logs".into(),
+                        scope: None,
+                        good_expr: "1=1".into(),
+                    },
+                },
+                group_by: None,
+                window_secs: 30 * DAY,
+                slice_interval_secs: SLICE,
+            },
+            target: 99.0,
+            tags: vec![],
+            enabled: true,
+            owner: None,
+            definition_generation: 1,
+            groups_estimate: None,
+            groups_reserved: 1,
+        }
+    }
+
+    /// The burn rate the next evaluation of a `(1h, 30m)` burn-rate alert reports.
+    async fn next_burn_rate(db: &DatabaseConnection) -> Option<f64> {
+        next_burn_rate_at(db, WM).await
+    }
+
+    async fn next_burn_rate_at(db: &DatabaseConnection, now: i64) -> Option<f64> {
+        use config::meta::{
+            alerts::Operator,
+            slo::condition::{SloAlertKind, SloCondition},
+        };
+
+        let row = slo_table::load_status(db, "slo1", "")
+            .await
+            .unwrap()
+            .unwrap();
+        let cond = SloCondition {
+            slo_id: "slo1".into(),
+            kind: SloAlertKind::BurnRate,
+            operator: Operator::GreaterThan,
+            critical: 14.4,
+            warning: Some(6.0),
+            long_window_secs: Some(3_600),
+            short_window_secs: Some(1_800),
+            multi_alert: false,
+        };
+        super::super::evaluate::evaluate_row(&burn_slo(), &cond, &row, now).actual_value
+    }
+
+    /// The incremental pass's state before any correction: the bad minutes are in the windows.
+    async fn measured_db() -> DatabaseConnection {
+        let db = jobs_db().await;
+        let (trailing, windows) = burn_rebuild(false).merged(Default::default(), WM);
+        slo_table::apply_status(
+            &db,
+            &slo_table::StatusWrite {
+                slo_id: "slo1".into(),
+                definition_generation: 1,
+                writer: config::meta::slo::slice::Writer::Incremental,
+                deltas: vec![],
+                watermark_end: Some(WM),
+                trailing_slices: Some(trailing),
+                burn_windows: Some(windows),
+                computed_at: WM,
+            },
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn finish_remeasure(db: &DatabaseConnection, corrected: bool) {
+        jobs::queue_remeasure(db, "slo1", 1, WM - 3_600, WM, 100)
+            .await
+            .unwrap();
+        let loaded = jobs::get(db, "slo1", 1).await.unwrap().unwrap();
+        let burn = burn_rebuild(corrected);
+        let done = finish_job(db, "slo1", 1, loaded.updated_at, 100, &[], Some(&burn)).await;
+        assert!(done.unwrap());
+    }
+
+    #[tokio::test]
+    async fn an_exclude_correction_lowers_the_burn_rate_and_a_cancel_raises_it_again() {
+        let db = measured_db().await;
+        let before = next_burn_rate(&db).await.unwrap();
+        assert!(before > 14.4, "the bad minutes page: burn {before}");
+
+        finish_remeasure(&db, true).await;
+        let corrected = next_burn_rate(&db).await.unwrap();
+        assert!(
+            corrected < before,
+            "burn {corrected} after the correction, {before} before"
+        );
+        assert_eq!(corrected, 0.0);
+
+        finish_remeasure(&db, false).await;
+        assert_eq!(next_burn_rate(&db).await, Some(before));
+    }
+
+    #[tokio::test]
+    async fn a_burn_rebuild_keeps_the_slice_a_later_pass_folded() {
+        let db = measured_db().await;
+        let mut later = burn_rebuild(false).trailing;
+        later.insert(WM, (0.0, 100.0));
+        let next = WM + SLICE;
+        slo_table::apply_status(
+            &db,
+            &slo_table::StatusWrite {
+                slo_id: "slo1".into(),
+                definition_generation: 1,
+                writer: config::meta::slo::slice::Writer::Incremental,
+                deltas: vec![],
+                watermark_end: Some(next),
+                trailing_slices: Some(config::meta::slo::burn::trailing_to_json(&later)),
+                burn_windows: None,
+                computed_at: next,
+            },
+        )
+        .await
+        .unwrap();
+
+        finish_remeasure(&db, true).await;
+        let row = slo_table::load_status(&db, "slo1", "")
+            .await
+            .unwrap()
+            .unwrap();
+        let buf = config::meta::slo::burn::parse_trailing(row.trailing_slices.as_ref());
+        assert_eq!(buf.get(&WM), Some(&(0.0, 100.0)), "the later pass's slice");
+        assert_eq!(
+            buf.get(&(WM - 2 * SLICE)),
+            Some(&(0.0, 0.0)),
+            "the correction"
+        );
+        let windows = row.burn_windows.unwrap();
+        assert_eq!(
+            windows["1800"]["total"], 400.0,
+            "windows end at the new watermark"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_burn_rebuild_from_another_generation_is_not_written() {
+        let db = measured_db().await;
+        slo_table::bump_generation(&db, "slo1", 2).await.unwrap();
+        jobs::queue_remeasure(&db, "slo1", 1, WM - 3_600, WM, 100)
+            .await
+            .unwrap();
+        let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+        let burn = burn_rebuild(true);
+        assert!(
+            finish_job(&db, "slo1", 1, loaded.updated_at, 100, &[], Some(&burn))
+                .await
+                .unwrap()
+        );
+        let row = slo_table::load_status(&db, "slo1", "")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.burn_windows, None,
+            "the new generation's row stays untouched"
+        );
+    }
+
+    /// The pass that runs after a correction folds its slice onto the corrected buffer it reads.
+    #[tokio::test]
+    async fn the_next_pass_keeps_a_correction_finished_before_its_write() {
+        let db = measured_db().await;
+        finish_remeasure(&db, true).await;
+
+        let next = WM + SLICE;
+        let result = super::super::ingest::PassResult {
+            slices: vec![config::meta::slo::slice::SliceRow {
+                slo_id: "slo1".into(),
+                definition_generation: 1,
+                group_key: String::new(),
+                slice_start: WM,
+                good: 100.0,
+                total: 100.0,
+                rev: next,
+                corrected_by: None,
+            }],
+            ..Default::default()
+        };
+        let outcome =
+            super::super::job::write_pass_status(&db, &burn_slo(), &result, next, &DURATIONS, next)
+                .await
+                .unwrap();
+        assert_eq!(outcome, slo_table::WriteOutcome::Applied);
+
+        let row = slo_table::load_status(&db, "slo1", "")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.watermark_end, Some(next));
+        let buf = config::meta::slo::burn::parse_trailing(row.trailing_slices.as_ref());
+        assert_eq!(
+            buf.get(&(WM - 2 * SLICE)),
+            Some(&(0.0, 0.0)),
+            "the correction stays"
+        );
+        assert_eq!(
+            buf.get(&(WM - 3 * SLICE)),
+            Some(&(0.0, 0.0)),
+            "the correction stays"
+        );
+        assert_eq!(buf.get(&WM), Some(&(100.0, 100.0)), "the pass's own slice");
+        let hour = &row.burn_windows.unwrap()["3600"];
+        assert_eq!(
+            (&hour["good"], &hour["total"]),
+            (&1000.0.into(), &1000.0.into())
+        );
+        assert_eq!(next_burn_rate_at(&db, next).await, Some(0.0));
+    }
+
+    // ---- a finish that keeps failing (4.5) ----------------------------------
+
+    #[tokio::test]
+    async fn a_reconcile_that_always_fails_ends_failed_after_five_attempts() {
+        let db = jobs_db().await;
+        jobs::queue_remeasure(&db, "slo1", 1, 300, 600, 100)
+            .await
+            .unwrap();
+        for attempt in 1..=MAX_FINISH_ATTEMPTS {
+            let job = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+            let failure = anyhow::anyhow!("partial result");
+            let outcome = record_failed_finish(&db, &job, job.updated_at, 100, failure).await;
+            let stored = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+            assert_eq!(stored.attempts, attempt);
+            if attempt < MAX_FINISH_ATTEMPTS {
+                assert!(outcome.is_err(), "attempt {attempt} must keep the trigger");
+                assert_ne!(stored.state, jobs::STATE_FAILED);
+            } else {
+                assert_eq!(outcome.unwrap(), ChunkOutcome::Failed);
+                assert_eq!(stored.state, jobs::STATE_FAILED);
+                assert_eq!(stored.error.as_deref(), Some("partial result"));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_failure_of_a_job_requeued_meanwhile_counts_nothing() {
+        let db = jobs_db().await;
+        jobs::queue_remeasure(&db, "slo1", 1, 300, 600, 100)
+            .await
+            .unwrap();
+        let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+        jobs::queue_remeasure(&db, "slo1", 1, 0, 900, 100)
+            .await
+            .unwrap();
+        let requeued = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+
+        let failure = anyhow::anyhow!("partial result");
+        let outcome = record_failed_finish(&db, &loaded, loaded.updated_at, 100, failure).await;
+        assert_eq!(outcome.unwrap(), ChunkOutcome::Superseded);
+        assert_eq!(jobs::get(&db, "slo1", 1).await.unwrap().unwrap(), requeued);
     }
 }

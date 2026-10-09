@@ -205,7 +205,7 @@ pub async fn create(
     let downtime = created(org, folder_id, &req, user_id, now_micros());
     db::downtimes::set(&downtime).await?;
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
-    remeasure_slos(None, &downtime);
+    remeasure_slos(None, &downtime).await;
     Ok(downtime)
 }
 
@@ -225,7 +225,7 @@ pub async fn update(
     if !before.same_coverage(&after) {
         forget_recorded_mutes(&after.id).await;
     }
-    remeasure_slos(Some(before), &after);
+    remeasure_slos(Some(&before), &after).await;
     Ok(after)
 }
 
@@ -239,7 +239,7 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
     }
     let after = cancelled(&before, user_id, now_micros());
     set_if_unchanged(&after, before.updated_at).await?;
-    remeasure_slos(Some(before), &after);
+    remeasure_slos(Some(&before), &after).await;
     Ok(after)
 }
 
@@ -628,25 +628,33 @@ async fn forget_recorded_mutes(id: &str) {
     }
 }
 
-/// Re-measures the slices a change touched on the SLO backfill lane (WP11).
-fn remeasure_slos(before: Option<Downtime>, after: &Downtime) {
-    let has_slos = |d: &Downtime| scope::target_for(&d.targets, TargetModule::Slos).is_some();
-    if !has_slos(after) && !before.as_ref().is_some_and(has_slos) {
+/// Queues the re-measures before the request answers, so a restart cannot drop them (WP11).
+async fn remeasure_slos(before: Option<&Downtime>, after: &Downtime) {
+    if !corrections_may_change(before, after) {
         return;
     }
-    let after = after.clone();
-    tokio::spawn(async move {
-        if let Err(e) =
-            crate::slo::corrections::remeasure_for_downtime(&after.org, before.as_ref(), &after)
-                .await
-        {
-            log::warn!(
-                "[DOWNTIMES] SLO re-measure for {}/{} failed: {e}",
-                after.org,
-                after.id
-            );
-        }
-    });
+    if let Err(e) = crate::slo::corrections::remeasure_for_downtime(&after.org, before, after).await
+    {
+        log::warn!(
+            "[DOWNTIMES] SLO re-measure for {}/{} failed: {e}",
+            after.org,
+            after.id
+        );
+    }
+}
+
+/// Only the schedule, the targets with their `slo_mode`, the condition and a cancel move a window.
+fn corrections_may_change(before: Option<&Downtime>, after: &Downtime) -> bool {
+    let has_slos = |d: &Downtime| scope::target_for(&d.targets, TargetModule::Slos).is_some();
+    if !has_slos(after) && !before.is_some_and(has_slos) {
+        return false;
+    }
+    before.is_none_or(|before| {
+        before.schedule != after.schedule
+            || before.targets != after.targets
+            || before.condition != after.condition
+            || before.cancelled_at != after.cancelled_at
+    })
 }
 
 fn matches_of(downtime: &Downtime, inventory: &Inventory) -> Matches {
@@ -1244,6 +1252,42 @@ mod tests {
     }
 
     #[test]
+    fn a_rename_moves_no_correction() {
+        let before = row(vec![TargetModule::Slos], 0, HOUR);
+        let after = Downtime {
+            name: "renamed".to_string(),
+            reason: Some("why".to_string()),
+            show_banner: false,
+            ..before.clone()
+        };
+        assert!(!corrections_may_change(Some(&before), &after));
+    }
+
+    #[test]
+    fn a_schedule_target_condition_or_cancel_edit_may_move_a_correction() {
+        let before = row(vec![TargetModule::Slos], 0, HOUR);
+        let mut schedule = before.clone();
+        schedule.schedule.ends_at = Some(2 * HOUR);
+        let mut mode = before.clone();
+        mode.targets[0].slo_mode = Some(config::meta::downtimes::SloCorrectionMode::CountAsGood);
+        let mut condition = before.clone();
+        condition.condition = Some(config::meta::downtimes::DimensionCondition::Pair {
+            key: "service".to_string(),
+            operator: PairOperator::Eq,
+            value: "payments".to_string(),
+        });
+        let mut cancel = before.clone();
+        cancel.cancelled_at = Some(HOUR / 2);
+        for after in [schedule, mode, condition, cancel] {
+            assert!(corrections_may_change(Some(&before), &after));
+        }
+        assert!(
+            corrections_may_change(None, &before),
+            "a new row is measured"
+        );
+    }
+
+    #[test]
     fn a_one_time_duration_is_set_from_its_span() {
         let mut once = row(vec![TargetModule::Alerts], 0, 2 * HOUR).schedule;
         once.duration_secs = 60;
@@ -1277,5 +1321,18 @@ mod tests {
         assert_eq!(cancelled(&before, "lin", 6).version, 5);
         let moved = moved(&before, "planned", "lin", 6);
         assert_eq!((moved.version, moved.folder_id.as_str()), (5, "planned"));
+    }
+
+    #[test]
+    fn a_row_without_an_slos_target_moves_no_correction() {
+        let before = row(vec![TargetModule::Alerts], 0, HOUR);
+        let mut after = before.clone();
+        after.schedule.ends_at = Some(2 * HOUR);
+        assert!(!corrections_may_change(Some(&before), &after));
+        let dropped = row(vec![TargetModule::Alerts], 0, HOUR);
+        assert!(corrections_may_change(
+            Some(&row(vec![TargetModule::Slos], 0, HOUR)),
+            &dropped
+        ));
     }
 }

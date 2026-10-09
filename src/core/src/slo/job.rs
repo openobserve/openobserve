@@ -71,6 +71,57 @@ pub enum PassOutcome {
     Fenced { expected: i32, found: i32 },
 }
 
+/// A rollup burn cache rebuilt from the slices after a re-measure, written as the job finishes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BurnRebuild {
+    /// The watermark the slices were read up to.
+    pub watermark_end: i64,
+    pub trailing: config::meta::slo::burn::TrailingSlices,
+    pub durations: Vec<i64>,
+    pub slice_interval_secs: i64,
+}
+
+impl BurnRebuild {
+    pub fn from_slices(
+        rollup: Vec<(i64, f64, f64)>,
+        watermark_end: i64,
+        durations: Vec<i64>,
+        slice_interval_secs: i64,
+    ) -> Self {
+        use config::meta::slo::burn;
+
+        let trailing = burn::fold_trailing(
+            burn::TrailingSlices::new(),
+            rollup,
+            watermark_end,
+            burn::retain_secs(&durations),
+        );
+        Self {
+            watermark_end,
+            trailing,
+            durations,
+            slice_interval_secs,
+        }
+    }
+
+    /// The trailing buffer and windows at `watermark_end`; slices a pass folded since stay.
+    pub fn merged(
+        &self,
+        stored: config::meta::slo::burn::TrailingSlices,
+        watermark_end: i64,
+    ) -> (serde_json::Value, serde_json::Value) {
+        let mut buf = self.trailing.clone();
+        buf.extend(stored.range(self.watermark_end..).map(|(k, v)| (*k, *v)));
+        fold_burn_cache(
+            buf,
+            std::iter::empty(),
+            watermark_end,
+            &self.durations,
+            self.slice_interval_secs,
+        )
+    }
+}
+
 /// Run one SLI ingest pass for `slo`.
 pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::Error> {
     let cfg = get_config();
@@ -159,6 +210,7 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
     super::corrections::apply(
         &mut result.slices,
         &windows,
+        &Default::default(),
         slo.definition.sli_config.sli_type(),
         &params,
     );
@@ -795,39 +847,70 @@ async fn commit_status(
 ) -> Result<slo_table::WriteOutcome, anyhow::Error> {
     // SQLite opens the read-only pool with read_only(true), and this path always writes.
     let db = get_orm_client_rw().await;
-    let deltas = group_deltas(&result.slices);
 
     // The burn-window cache (§6b.4c). Computed here rather than at alert time
     // so five alerts on one SLO cost zero extra scans (§6b.9). A failure to
     // build it must NOT fail the pass: the running aggregate is the primary
     // product, and a missing burn window freezes the burn-rate alerts (safe)
     // rather than losing the measurement (not).
-    let (trailing_slices, burn_windows) =
-        match build_burn_cache(db, slo, result, watermark_end).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::warn!(
-                    "[slo] could not build burn windows for {}: {e} — the pass still publishes",
-                    slo.id
-                );
-                (None, None)
-            }
-        };
+    let durations = match burn_durations(db, slo).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::warn!(
+                "[slo] could not build burn windows for {}: {e} — the pass still publishes",
+                slo.id
+            );
+            Vec::new()
+        }
+    };
+    write_pass_status(db, slo, result, watermark_end, &durations, now_secs).await
+}
 
-    Ok(slo_table::apply_status(
-        db,
-        &slo_table::StatusWrite {
-            slo_id: slo.id.clone(),
-            definition_generation: slo.definition_generation,
-            writer: config::meta::slo::slice::Writer::Incremental,
-            deltas,
-            watermark_end: Some(watermark_end),
-            trailing_slices,
-            burn_windows,
-            computed_at: now_secs,
-        },
-    )
-    .await?)
+/// The pass's status write, with the burn cache folded onto the rollup row it locks first.
+pub(super) async fn write_pass_status(
+    db: &sea_orm::DatabaseConnection,
+    slo: &Slo,
+    result: &PassResult,
+    watermark_end: i64,
+    durations: &[i64],
+    now_secs: i64,
+) -> Result<slo_table::WriteOutcome, anyhow::Error> {
+    use sea_orm::TransactionTrait;
+
+    let txn = db.begin().await?;
+    // Read under the row lock, so a re-measure's burn rebuild cannot land before the write.
+    let rollup = match slo_table::load_rollup_for_update(&txn, &slo.id).await {
+        Ok(row) => row,
+        Err(e) => {
+            let _ = txn.rollback().await;
+            return Err(e.into());
+        }
+    };
+    let (trailing_slices, burn_windows) =
+        build_burn_cache(slo, rollup.as_ref(), result, watermark_end, durations);
+    let write = slo_table::StatusWrite {
+        slo_id: slo.id.clone(),
+        definition_generation: slo.definition_generation,
+        writer: config::meta::slo::slice::Writer::Incremental,
+        deltas: group_deltas(&result.slices),
+        watermark_end: Some(watermark_end),
+        trailing_slices,
+        burn_windows,
+        computed_at: now_secs,
+    };
+    let outcome = match slo_table::apply_status_in_txn(&txn, &write).await {
+        Ok(outcome) => outcome,
+        Err(e) => {
+            let _ = txn.rollback().await;
+            return Err(e.into());
+        }
+    };
+    if matches!(outcome, slo_table::WriteOutcome::FencedByGeneration { .. }) {
+        let _ = txn.rollback().await;
+        return Ok(outcome);
+    }
+    txn.commit().await?;
+    Ok(outcome)
 }
 
 /// Build the trailing buffer and the burn-window aggregates for this pass.
@@ -838,31 +921,25 @@ async fn commit_status(
 ///
 /// Returns `(None, None)` when no enabled alert asks for a burn window — an
 /// SLO nobody alerts on burn-rate over pays nothing for the machinery.
-async fn build_burn_cache(
-    db: &sea_orm::DatabaseConnection,
+fn build_burn_cache(
     slo: &Slo,
+    rollup_row: Option<&infra::table::entity::slo_status::Model>,
     result: &PassResult,
     watermark_end: i64,
-) -> Result<(Option<serde_json::Value>, Option<serde_json::Value>), anyhow::Error> {
+    durations: &[i64],
+) -> (Option<serde_json::Value>, Option<serde_json::Value>) {
     use config::meta::slo::burn;
 
-    let cfg = get_config();
-    // `None`: the ingest pass must see EVERY enabled alert's pair. Excluding
-    // anything here would stop precomputing a window some alert still needs.
-    let pairs =
-        infra::table::alerts::list_slo_burn_window_pairs(db, &slo.org, &slo.id, None).await?;
-    let durations = burn::durations_for_pairs(&pairs, cfg.slo.max_burn_window_pairs as usize);
     if durations.is_empty() {
-        return Ok((None, None));
+        return (None, None);
     }
 
     // The previous buffer, from the rollup row. Absent on the first pass of a
     // generation, and absent (rather than fatal) if it cannot be parsed.
-    let prev = slo_table::load_status(db, &slo.id, "")
-        .await?
+    let prev = rollup_row
         .filter(|row| row.definition_generation == slo.definition_generation)
-        .and_then(|row| row.trailing_slices);
-    let buf = burn::parse_trailing(prev.as_ref());
+        .and_then(|row| row.trailing_slices.as_ref());
+    let buf = burn::parse_trailing(prev);
 
     // Only the rollup series feeds the buffer.
     let rollup = result
@@ -871,14 +948,44 @@ async fn build_burn_cache(
         .filter(|s| s.group_key.is_empty())
         .map(|s| (s.slice_start, s.good, s.total));
 
-    let buf = burn::fold_trailing(buf, rollup, watermark_end, burn::retain_secs(&durations));
-    let windows = burn::burn_windows_json(
-        &buf,
-        &durations,
+    let (trailing, windows) = fold_burn_cache(
+        buf,
+        rollup,
         watermark_end,
+        durations,
         slo.definition.slice_interval_secs,
     );
-    Ok((Some(burn::trailing_to_json(&buf)), Some(windows)))
+    (Some(trailing), Some(windows))
+}
+
+/// Every window duration an enabled burn-rate alert on the SLO reads.
+async fn burn_durations(
+    db: &sea_orm::DatabaseConnection,
+    slo: &Slo,
+) -> Result<Vec<i64>, anyhow::Error> {
+    // `None`: the ingest pass must see EVERY enabled alert's pair. Excluding
+    // anything here would stop precomputing a window some alert still needs.
+    let pairs =
+        infra::table::alerts::list_slo_burn_window_pairs(db, &slo.org, &slo.id, None).await?;
+    Ok(config::meta::slo::burn::durations_for_pairs(
+        &pairs,
+        get_config().slo.max_burn_window_pairs as usize,
+    ))
+}
+
+/// Folds rollup slices into `buf` and computes the windows ending at `watermark_end`.
+fn fold_burn_cache(
+    buf: config::meta::slo::burn::TrailingSlices,
+    rollup: impl IntoIterator<Item = (i64, f64, f64)>,
+    watermark_end: i64,
+    durations: &[i64],
+    slice_interval_secs: i64,
+) -> (serde_json::Value, serde_json::Value) {
+    use config::meta::slo::burn;
+
+    let buf = burn::fold_trailing(buf, rollup, watermark_end, burn::retain_secs(durations));
+    let windows = burn::burn_windows_json(&buf, durations, watermark_end, slice_interval_secs);
+    (burn::trailing_to_json(&buf), windows)
 }
 
 /// Measure an explicit `[start, end)` and publish it.
@@ -895,7 +1002,7 @@ pub async fn run_range(
     writer: config::meta::slo::slice::Writer,
 ) -> Result<usize, anyhow::Error> {
     let db = get_orm_client_rw().await;
-    let result = measure_range(slo, start, end, end).await?;
+    let result = measure_range(slo, start, end, end, &Default::default()).await?;
     if result.slices.is_empty() {
         return Ok(0);
     }
@@ -935,8 +1042,110 @@ pub async fn remeasure_range(slo: &Slo, start: i64, end: i64) -> Result<usize, a
             slo.org
         );
     }
+    // A cancelled or shrunk window leaves its filler rows behind unless they are written over.
+    let corrected_before = super::corrections::corrected_keys(slo, start, end).await?;
     let rev = now_micros() / 1_000_000;
-    Ok(measure_range(slo, start, end, rev).await?.slices.len())
+    Ok(measure_range(slo, start, end, rev, &corrected_before)
+        .await?
+        .slices
+        .len())
+}
+
+/// The rollup's burn cache rebuilt from the slices, for a re-measure's finish.
+pub async fn rebuild_burn_cache(slo: &Slo) -> Result<Option<BurnRebuild>, anyhow::Error> {
+    let db = get_orm_client_rw().await;
+    let Some(status) = slo_table::load_status(db, &slo.id, "").await? else {
+        return Ok(None);
+    };
+    let Some(watermark_end) = status.watermark_end else {
+        return Ok(None);
+    };
+    if status.definition_generation != slo.definition_generation {
+        return Ok(None);
+    }
+    let durations = burn_durations(db, slo).await?;
+    if durations.is_empty() {
+        return Ok(None);
+    }
+    let from = watermark_end - config::meta::slo::burn::retain_secs(&durations);
+    let sql = trailing_rollup_sql(
+        &slo.id,
+        slo.definition_generation,
+        from,
+        watermark_end,
+        super::reconcile::tombstones_possible(slo).await,
+    );
+    let hits = super::reconcile::search_slices(&slo.org, sql, from).await?;
+    let rollup: Vec<(i64, f64, f64)> = hits
+        .iter()
+        .filter_map(|h| {
+            Some((
+                h.get("slice_start").and_then(json::Value::as_i64)?,
+                h.get("good").and_then(json::Value::as_f64)?,
+                h.get("total").and_then(json::Value::as_f64)?,
+            ))
+        })
+        .collect();
+    Ok(Some(BurnRebuild::from_slices(
+        rollup,
+        watermark_end,
+        durations,
+        slo.definition.slice_interval_secs,
+    )))
+}
+
+/// Writes a rebuilt burn cache under the current watermark, keeping what the pass folded since.
+pub async fn write_burn_rebuild<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    slo_id: &str,
+    generation: i32,
+    rebuilt: &BurnRebuild,
+) -> Result<bool, anyhow::Error> {
+    // Locked like the pass's write, so neither writer folds onto a buffer the other replaced.
+    let Some(row) = slo_table::load_rollup_for_update(conn, slo_id).await? else {
+        return Ok(false);
+    };
+    let Some(watermark_end) = row.watermark_end else {
+        return Ok(false);
+    };
+    if row.definition_generation != generation || watermark_end < rebuilt.watermark_end {
+        return Ok(false);
+    }
+    let stored = config::meta::slo::burn::parse_trailing(row.trailing_slices.as_ref());
+    let (trailing, windows) = rebuilt.merged(stored, watermark_end);
+    Ok(
+        slo_table::replace_burn_cache(conn, slo_id, generation, watermark_end, trailing, windows)
+            .await?,
+    )
+}
+
+/// The latest rollup slice per start in `[from, to)`, minus withdrawn-correction tombstones.
+pub fn trailing_rollup_sql(
+    slo_id: &str,
+    generation: i32,
+    from: i64,
+    to: i64,
+    tombstones: bool,
+) -> String {
+    let (columns, measured) = if tombstones {
+        (
+            ", corrected_by",
+            format!(" AND {}", super::reconcile::MEASURED_SQL),
+        )
+    } else {
+        ("", String::new())
+    };
+    format!(
+        "SELECT slice_start, good, total FROM ( \
+           SELECT slice_start, good, total{columns}, \
+                  ROW_NUMBER() OVER (PARTITION BY slice_start ORDER BY rev DESC) AS zo_rn \
+           FROM {SLO_SLICES_STREAM} \
+           WHERE slo_id = '{slo_id}' \
+             AND definition_generation = {generation} \
+             AND group_key = '' \
+             AND slice_start >= {from} AND slice_start < {to} \
+         ) WHERE zo_rn = 1{measured}"
+    )
 }
 
 /// Fetch, build, fill, correct, roll up and write `[start, end)` under `rev`.
@@ -945,6 +1154,7 @@ async fn measure_range(
     start: i64,
     end: i64,
     rev: i64,
+    corrected_before: &std::collections::HashSet<super::corrections::SliceKey>,
 ) -> Result<PassResult, anyhow::Error> {
     let cfg = get_config();
     let group_by = slo.definition.group_by.clone().unwrap_or_default();
@@ -968,6 +1178,7 @@ async fn measure_range(
     super::corrections::apply(
         &mut result.slices,
         &windows,
+        corrected_before,
         slo.definition.sli_config.sli_type(),
         &params,
     );
@@ -2091,6 +2302,7 @@ mod downtime_correction_tests {
         let added = crate::slo::corrections::apply(
             &mut slices,
             &windows,
+            &Default::default(),
             SliType::TimeSlice,
             &pass_params(),
         );
@@ -2111,5 +2323,16 @@ mod downtime_correction_tests {
                 covered_slices_delta: 4,
             }]
         );
+    }
+    #[test]
+    fn the_trailing_read_drops_tombstones_only_where_the_column_exists() {
+        let with = trailing_rollup_sql("slo1", 1, 0, 3_600, true);
+        assert!(
+            with.contains("zo_rn = 1 AND (total > 0 OR corrected_by <> '')"),
+            "{with}"
+        );
+        let without = trailing_rollup_sql("slo1", 1, 0, 3_600, false);
+        assert!(!without.contains("corrected_by"), "{without}");
+        assert!(without.contains("group_key = ''"), "{without}");
     }
 }
