@@ -13301,4 +13301,67 @@ export class LogsPage {
         return request;
     }
 
+    /** The sidebar row for `field` must be listed. */
+    async expectFieldListItemVisible(field) {
+        await expect(
+            this.page.locator(this.fieldListItem(field)).first(),
+            `Field "${field}" must be listed in the sidebar`
+        ).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * How many interesting-field (ⓘ) toggles the sidebar renders for `field`.
+     * FieldRow renders one in the row itself and one in the hover-actions tray, both
+     * carrying the same data-test, so an eligible field counts more than one.
+     */
+    async countInterestingFieldButtons(field) {
+        await this.expectFieldListItemVisible(field);
+        return await this.page.locator(this.interestingFieldBtn(field)).count();
+    }
+
+    async expectInterestingFieldButtonOffered(field) {
+        const count = await this.countInterestingFieldButtons(field);
+        expect(count, `Field "${field}" must offer the interesting-field toggle`).toBeGreaterThan(0);
+    }
+
+    async expectNoInterestingFieldButton(field) {
+        const count = await this.countInterestingFieldButtons(field);
+        expect(count, `Field "${field}" must not offer the interesting-field toggle`).toBe(0);
+    }
+
+    /**
+     * Push `field` straight into searchObj.data.stream.interestingFieldList, which is
+     * how a list persisted by a build that still starred the field comes back. Throws
+     * if Vue state could not be reached, so a test can't pass on a silent no-op.
+     */
+    async forceInterestingFieldInState(field) {
+        const list = await this._mutateSearchObj((searchObj, name) => {
+            const fields = searchObj.data?.stream?.interestingFieldList;
+            if (!Array.isArray(fields)) return null;
+            if (!fields.includes(name)) fields.push(name);
+            return [...fields];
+        }, field);
+        if (!list?.includes(field)) {
+            throw new Error(`forceInterestingFieldInState: could not add "${field}" to interestingFieldList`);
+        }
+        testLogger.info(`interestingFieldList forced to: ${list.join(',')}`);
+        return list;
+    }
+
+    /** Reads searchObj.data.stream.interestingFieldList. */
+    async getInterestingFieldList() {
+        return await this._mutateSearchObj((searchObj) => [
+            ...(searchObj.data?.stream?.interestingFieldList || []),
+        ]);
+    }
+
+    /** The search must not have failed — asserts the error state is absent. */
+    async expectNoSearchError() {
+        const error = this.page.locator(this.errorMessage);
+        const text = (await error.isVisible().catch(() => false))
+            ? await error.textContent().catch(() => '')
+            : '';
+        await expect(error, `Search must not error (shown: "${text?.trim()}")`).toBeHidden();
+    }
+
 }

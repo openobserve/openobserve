@@ -738,20 +738,16 @@ export const useStreamFields = () => {
                     group: resolveFieldGroup(key, "Utf8", semanticIndex, dynamicPrefixes),
                     isSchemaField: false,
                     showValues: false,
-                    isInterestingField: searchObj.data.stream.interestingFieldList.includes(key)
-                      ? true
-                      : false,
+                    // Hit-only fields (a VRL function's output) are not schema-backed,
+                    // so they can never be part of the quick-mode SELECT. Never carry
+                    // one as interesting: an entry persisted by an older build would
+                    // otherwise be re-added to interestingFieldList on every extract,
+                    // and the query it builds fails with "Search field not found".
+                    isInterestingField: false,
                     streams: [],
                   };
                   schemaMaps.push(fieldObj);
 
-                  if (fieldObj.isInterestingField) {
-                    interestingSchemaMaps.push(fieldObj);
-                    if (!interestingFieldsMapping[stream.name])
-                      interestingFieldsMapping[stream.name] = [];
-                    interestingFieldsMapping[stream.name].push(fieldObj);
-                    interestingFieldsMap[fieldObj.name] = true;
-                  }
                   schemaFields.push(key);
                 }
               }

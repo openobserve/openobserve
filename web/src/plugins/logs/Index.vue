@@ -1477,9 +1477,12 @@ export default defineComponent({
             }
 
             if (searchObj.data.stream?.selectedStreamFields?.length > 0) {
-              const streamFieldNames: any = searchObj.data.stream.selectedStreamFields.map(
-                (item: any) => item.name,
-              );
+              // Skip VRL-derived fields (isSchemaField: false) — they are not
+              // selectable columns, so they must not survive into [FIELD_LIST].
+              // See the same filter in useSearchQuery.ts buildSearch().
+              const streamFieldNames: any = searchObj.data.stream.selectedStreamFields
+                .filter((item: any) => item.isSchemaField !== false)
+                .map((item: any) => item.name);
 
               for (let i = searchObj.data.stream.interestingFieldList.length - 1; i >= 0; i--) {
                 const fieldName = searchObj.data.stream.interestingFieldList[i];

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OFieldLabel :field="field" :show-type-icon="false" />
     <OButton
       :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-      v-if="showQuickMode && field.name !== timestampColumn"
+      v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
       :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
       variant="ghost-neutral"
       class="me-1 gap-0!"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
       <OButton
         :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
-        v-if="showQuickMode && field.name !== timestampColumn"
+        v-if="showQuickMode && isInterestingCandidate && field.name !== timestampColumn"
         variant="ghost-neutral"
         class="gap-0!"
         size="icon"
@@ -126,4 +126,12 @@ defineEmits<{
 }>();
 
 const isFieldSelected = computed(() => props.selectedFields.includes(props.field.name));
+
+// Quick mode turns the interesting fields into the query's SELECT list, so only a
+// schema-backed field can be one. A VRL function's output field is carried on the
+// result hits (isSchemaField: false) and does not exist when the SQL runs — the
+// backend applies the VRL afterwards — so offering the toggle on one would build a
+// query that fails with "Search field not found". Fields from the paths that assign
+// a raw stream schema carry no isSchemaField at all and stay eligible.
+const isInterestingCandidate = computed(() => props.field.isSchemaField !== false);
 </script>

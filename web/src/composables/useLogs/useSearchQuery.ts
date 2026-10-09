@@ -316,9 +316,15 @@ export const useSearchQuery = (t: TranslateFn) => {
         req["clusters"] = searchObj.meta.clusters;
       }
 
-      const streamFieldNames: any = searchObj.data.stream.selectedStreamFields.map(
-        (item: any) => item.name,
-      );
+      // A VRL function's output fields live in the result hits, not in the stream
+      // schema — extractFields() adds them to selectedStreamFields with
+      // isSchemaField: false. The backend applies the VRL after the SQL SELECT, so
+      // one of them in [FIELD_LIST] fails the whole query with "Search field not
+      // found". `!== false` keeps the paths that assign raw stream schema objects,
+      // which carry no isSchemaField at all (Index.vue, useSearchBar.ts).
+      const streamFieldNames: any = searchObj.data.stream.selectedStreamFields
+        .filter((item: any) => item.isSchemaField !== false)
+        .map((item: any) => item.name);
 
       // In read-only mode, create a filtered copy; in normal mode, mutate in place
       let interestingFields: string[];
