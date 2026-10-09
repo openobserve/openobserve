@@ -62,14 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon :name="module.icon" size="md" />
               </span>
               <span class="flex min-w-0 flex-1 flex-col">
-                <span
-                  class="text-text-heading group-hover:text-accent truncate text-sm font-semibold transition-colors"
+                <OTruncatedText
+                  class="text-text-heading group-hover:text-accent text-sm font-semibold transition-colors"
                 >
                   {{ module.label }}
-                </span>
-                <span class="text-text-secondary mt-0.5 line-clamp-2 text-xs leading-snug">
+                </OTruncatedText>
+                <OTruncatedText :lines="2" class="text-text-secondary mt-0.5 text-xs leading-snug">
                   {{ module.description }}
-                </span>
+                </OTruncatedText>
               </span>
               <OIcon
                 name="chevron-right"
@@ -120,6 +120,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 

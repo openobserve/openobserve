@@ -76,11 +76,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-specificity="{ row }">
-        <span class="flex flex-wrap gap-1">
+        <OTruncatedText class="flex flex-wrap gap-1" :tooltip="dimensionsText(row)">
           <OTag v-for="name in dimensionNames(row)" :key="name" variant="purple-outline" size="sm">
             {{ displayOf(name) }}
           </OTag>
-        </span>
+        </OTruncatedText>
       </template>
 
       <template #cell-caught="{ row }">
@@ -196,6 +196,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -330,6 +331,11 @@ function dimensionNames(rule: OwnershipRuleStats): string[] {
 /// rule is actually written against.
 function displayOf(name: string): I18nText {
   return raw(props.aliases.find((alias) => alias.id === name)?.display || name);
+}
+
+// The chips hold no separators in their text, so the cut-cell tooltip spells them out.
+function dimensionsText(rule: OwnershipRuleStats): I18nText {
+  return raw(dimensionNames(rule).map(displayOf).join(", "));
 }
 
 const HEALTH_TONES: Record<OwnershipRuleHealth, BadgeVariant> = {

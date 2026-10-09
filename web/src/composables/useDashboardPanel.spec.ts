@@ -221,6 +221,19 @@ describe("useDashboardPanel", () => {
       expect(panel.dashboardPanelData.data.title).toBe("");
     });
 
+    it("starts a new panel in auto axis label mode", () => {
+      panel.resetDashboardPanelData();
+      expect(panel.dashboardPanelData.data.config.axis_label_mode).toBe("auto");
+    });
+
+    it("puts a loaded panel without a mode into auto", async () => {
+      const config = { ...panel.dashboardPanelData.data.config };
+      delete config.axis_label_mode;
+      panel.dashboardPanelData.data.config = config;
+      await nextTick();
+      expect(panel.dashboardPanelData.data.config.axis_label_mode).toBe("auto");
+    });
+
     it("should generate labels from names", () => {
       expect(panel.generateLabelFromName("test_field")).toContain("Test");
       expect(panel.generateLabelFromName("simple")).toBe("Simple");
@@ -5662,7 +5675,7 @@ describe("useDashboardPanel", () => {
         panel.dashboardPanelData.data.queries[0].fields.x[
           panel.dashboardPanelData.data.queries[0].fields.x.length - 1
         ];
-      expect(field.label).toBe("custom_x_field");
+      expect(field.label).toBe("");
       expect(field.alias).toBe("custom_x_field");
 
       // Reset custom query
@@ -5680,7 +5693,7 @@ describe("useDashboardPanel", () => {
         panel.dashboardPanelData.data.queries[0].fields.breakdown[
           panel.dashboardPanelData.data.queries[0].fields.breakdown.length - 1
         ];
-      expect(field.label).toBe("custom_breakdown");
+      expect(field.label).toBe("");
       expect(field.alias).toBe("custom_breakdown");
 
       // Reset custom query

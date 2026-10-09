@@ -20,7 +20,6 @@ env:
   COLUMNS: 150
   ZO_ROOT_USER_EMAIL: root@example.com
   ZO_ROOT_USER_PASSWORD: Complexpass#123
-  ZO_EXT_AUTH_SALT: ci-only-ext-auth-salt-0123456789abcdef
   ZO_BASE_URL: http://localhost:5080/
   ZO_BASE_URL_SC: http://localhost:5080/
   WS_ZO_BASE_URL: ws://localhost:5080/
@@ -368,6 +367,11 @@ jobs:
           - label: sqlite_meta_invalid_utf8
             env: ""
             target: tests/regression/test_sqlite_invalid_utf8_meta_startup.py
+
+          # Cross-tenant gRPC ingest (o2-enterprise#2821); needs no server env, the listener is on by default.
+          - label: grpc_ingest_org_binding
+            env: ""
+            target: tests/regression/test_grpc_ingest_org_binding.py
     steps:
       - uses: actions/checkout@v5
 

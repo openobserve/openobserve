@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
+import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import i18n from "@/locales";
@@ -71,6 +72,7 @@ const mockGridStackInstance = {
   destroy: vi.fn(),
   removeAll: vi.fn(),
   makeWidget: vi.fn(),
+  batchUpdate: vi.fn(),
   getGridItems: vi.fn().mockReturnValue([]),
   float: vi.fn(),
   setAnimation: vi.fn(),
@@ -333,6 +335,36 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    it("registers and mounts a panel that joins an already-built tab", async () => {
+      const io = installFakeIntersectionObserver({ autoVisible: true });
+      try {
+        const panel = (id: string) => ({
+          id,
+          title: id,
+          type: "line",
+          layout: { x: 0, y: 0, w: 6, h: 4, i: id },
+          queries: [],
+        });
+        const dashboard = (ids: string[]) => ({
+          ...defaultProps.dashboardData,
+          tabs: [{ tabId: "default", name: "Default Tab", panels: ids.map(panel) }],
+        });
+        wrapper = createWrapper({ dashboardData: dashboard(["panel-a"]) });
+        await flushPromises();
+        await wrapper.setProps({ dashboardData: dashboard(["panel-a", "panel-b"]) });
+        await flushPromises();
+        await vi.waitFor(() => expect(wrapper.vm.shouldMountPanel("panel-b")).toBe(true));
+        // Unregistered, the item has no grid size and collapses at tablet and desktop widths.
+        const added = wrapper.find('[gs-id="panel-b"]').element;
+        expect(mockGridStackInstance.makeWidget).toHaveBeenCalledWith(
+          added,
+          expect.objectContaining({ id: "panel-b" }),
+        );
+      } finally {
+        io.restore();
+      }
+    });
+
     it("should pass correct props to PanelContainer components", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
@@ -495,9 +527,8 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    // Variables scope the ACTIVE tab, so rendering them above the strip made them
-    // read as page chrome and moved the tab bar whenever their height changed.
-    it("renders the global variables strip BELOW the tab list, not above it", () => {
+    // Global variables apply dashboard-wide, so the strip sits above the tab bar.
+    it("renders the global variables strip ABOVE the tab list, not below it", () => {
       wrapper = createWrapper({
         showTabs: true,
         dashboardData: {
@@ -515,7 +546,7 @@ describe("RenderDashboardCharts", () => {
 
       expect(tabsAt).toBeGreaterThan(-1);
       expect(varsAt).toBeGreaterThan(-1);
-      expect(tabsAt).toBeLessThan(varsAt);
+      expect(varsAt).toBeLessThan(tabsAt);
     });
   });
 

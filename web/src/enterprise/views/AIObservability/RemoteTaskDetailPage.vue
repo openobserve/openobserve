@@ -308,7 +308,7 @@
                 <span v-else class="text-text-secondary">{{ DASH }}</span>
               </template>
               <template #cell-endpoint="{ row }">
-                <span class="text-text-secondary line-clamp-1 font-mono text-xs">
+                <span class="text-text-secondary font-mono text-xs">
                   {{ row.endpoint }}
                 </span>
               </template>

@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { ToastProps, ToastEmits } from "./OToast.types";
 import { computed, ref, onUnmounted } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { pauseTimer, resumeTimer, isPageVisible } from "./useToast";
 import { ToastRoot, ToastTitle, ToastDescription, ToastClose } from "reka-ui";
@@ -266,11 +267,9 @@ onUnmounted(() => {
               class="flex items-baseline justify-between gap-2 text-xs"
             >
               <span class="text-toast-fg shrink-0 font-medium">{{ detail.label }}</span>
-              <span
-                class="text-toast-fg-secondary truncate text-right font-mono"
-                :title="detail.url"
-                >{{ detail.url }}</span
-              >
+              <OTruncatedText class="text-toast-fg-secondary text-right font-mono">{{
+                detail.url
+              }}</OTruncatedText>
             </li>
           </ul>
         </div>

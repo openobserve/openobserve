@@ -40,7 +40,6 @@ class _Server:
         env.update({
             "ZO_ROOT_USER_EMAIL": self.auth[0],
             "ZO_ROOT_USER_PASSWORD": self.auth[1],
-            "ZO_EXT_AUTH_SALT": "test-only-ext-auth-salt-0123456789",
             "ZO_HTTP_PORT": str(self.http_port),
             "ZO_GRPC_PORT": str(self.grpc_port),
             "ZO_DATA_DIR": str(self.data_dir),

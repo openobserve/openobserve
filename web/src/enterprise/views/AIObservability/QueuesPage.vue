@@ -88,11 +88,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-description="{ row }">
-          <span class="text-text-secondary line-clamp-1">{{ row.description || "—" }}</span>
+          <span class="text-text-secondary">{{ row.description || "—" }}</span>
         </template>
 
         <template #cell-scoreConfigs="{ row }">
-          <div v-if="row.scoreConfigs.length" class="flex flex-nowrap items-center gap-1">
+          <OTruncatedText
+            v-if="row.scoreConfigs.length"
+            as="div"
+            class="flex flex-nowrap items-center gap-1"
+            :tooltip="scorerListLabel(row.scoreConfigs)"
+          >
             <OTag
               v-for="cfg in row.scoreConfigs"
               :key="cfg.scoreConfigId"
@@ -102,14 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ scorerLabel(cfg) }}
             </OTag>
-          </div>
+          </OTruncatedText>
           <span v-else class="text-text-secondary">—</span>
         </template>
 
         <template #cell-targetDataset="{ row }">
           <span v-if="row.targetDatasetName" class="flex items-center gap-1.5">
             <OIcon name="table-chart" size="sm" class="text-text-secondary shrink-0" />
-            <span class="truncate">{{ row.targetDatasetName }}</span>
+            <OTruncatedText>{{ row.targetDatasetName }}</OTruncatedText>
           </span>
           <span v-else class="text-text-secondary">—</span>
         </template>
@@ -233,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`ai-queues-create-config-${cfg.scoreConfigId}`"
               >
                 <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
-                <strong class="min-w-0 flex-1 truncate font-mono">{{ cfg.name }}</strong>
+                <OTruncatedText as="strong" class="flex-1 font-mono">{{ cfg.name }}</OTruncatedText>
                 <OTag type="evalDataType" :value="cfg.dataType" class="shrink-0" />
                 <OIcon name="keep-outline" size="sm" class="text-text-secondary shrink-0">
                   <OTooltip :content="t('aiObservability.queues.create.pin')" />
@@ -374,6 +379,7 @@ import llmQueuesService, {
 } from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import { makeQueueFormSchema, type QueueForm, type QueueBoundConfig } from "./QueueForm.schema";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIQueuesPage" });
 
@@ -645,6 +651,11 @@ function configForId(id: string): LlmScoreConfigOption | undefined {
  *  the whole label is raw rather than a composed translation. */
 function scorerLabel(cfg: { name: string; version: number }) {
   return raw(`${cfg.name} v${cfg.version}`);
+}
+
+// The chips hold no separators in their text, so the cut-cell tooltip spells them out.
+function scorerListLabel(cfgs: { name: string; version: number }[]) {
+  return raw(cfgs.map((cfg) => `${cfg.name} v${cfg.version}`).join(", "));
 }
 
 function versionOptions(configId: string) {

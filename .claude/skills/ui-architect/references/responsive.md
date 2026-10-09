@@ -245,7 +245,19 @@ the same recipe so it never takes two rows of chrome:
 - `OBanner inline-actions` keeps its message at least 12rem wide below md and wraps
   the actions under it; do not stack them by hand.
 - Full-viewport shells use `h-dvh`, never `100vh` (mobile browser chrome overlaps it).
-- Long chips and IDs: `max-md:max-w-full max-md:truncate` on the text, not on the row.
+- Long chips and IDs: cut the text, not the row — `<OTruncatedText class="max-md:max-w-full">`, which keeps the full value on hover. A bare `max-md:truncate` cuts it on phones with no way to read the rest.
+- **No horizontal page scroll does not mean nothing is clipped.** An
+  `overflow-hidden` ancestor swallows the overflow silently: "Counted up to
+  12:45:00; we're 19 m…" lost its tail at 768 while `scrollWidth === innerWidth`.
+  Probe text whose rect runs past its cell or container, not just the page width.
+- A `shrink-0` note beside a truncating sentence in a `justify-between` row runs
+  off the edge on narrow screens. Let the row wrap below lg
+  (`max-lg:flex-wrap max-lg:gap-y-0.5`) so the note takes its own line; `flex-wrap`
+  only moves it when it does not fit, so wide screens are unchanged.
+- **Right-aligned `whitespace-nowrap` text clips on the LEFT.** A secondary line
+  in a numeric cell ("p50 5.79ms · p99 27.84ms") read "i0 5.79ms". Size the column
+  for it, or set secondary lines in the proportional font with `tabular-nums` —
+  monospace is far wider at the same size.
 
 ## Forms and settings rows
 
@@ -284,6 +296,50 @@ the same recipe so it never takes two rows of chrome:
   desktop choice on first load.
 - **Compact labels must stay correct**: shortening a date range may drop the year only
   when both ends share it.
+- **An absolute range is the longest thing in a header.** "2026/10/04 02:29:41 –
+  2026/10/04 05:29:42" pushed a page's actions under its title at 768–1023 while the
+  relative "Past 3 Hours" fit. While an absolute range is selected, compact the
+  secondary header actions below lg (icon-only refresh, hide last-refreshed) — the
+  same treatment they already get below md.
+- **A badge on a tiny tile eats the title.** A stale badge, even icon-only, turned a
+  100px stat tile's "Nodes" into "N…". Hide decorative badges under a container width
+  (`@max-[8rem]/panelbar:hidden`) when something else on the screen already carries
+  the message (a dimmed body, a page banner).
+- **A segmented toggle in a toolbar costs a whole phone row.** "vs previous / vs
+  yesterday" pushed the date picker and refresh to their own line; `mobile-dropdown`
+  on the `OToggleGroup` took the toolbar from four rows to three. Every view toggle
+  in a toolbar gets it ("Who's stuck / Who's blocking", "Group by query pair /
+  Every event").
+- **Two page edges double every side margin.** `OPageLayout` insets its body, and
+  the dashboard renderer (`RenderDashboardCharts`) insets itself again, so tabs and
+  panels sat 24px in from a header that sat at 12px. A body that owns its inset
+  takes `bleed` — the dashboard view page already does — and the page's other faces
+  (setup, empty, a filter row) then carry their own `px-page-edge`.
+- **An `OEmptyState` in a scroll pane clips itself.** Its root is
+  `overflow-hidden`; as a flex child of a `flex-col overflow-y-auto` pane it shrinks
+  to the pane and cuts off its own list and actions instead of letting the pane
+  scroll. Give it `shrink-0`, and centre with `justify-center-safe` on the pane.
+- **Six tiles to a row leave a title ~110px.** "DaemonSets unavailable" was cut at
+  1280, every Health title at 1024 and "Contain…" at 768. Panel titles wrap to two
+  lines below lg (`max-lg:line-clamp-2 max-lg:whitespace-normal`); a page whose
+  stat tiles sit six to a row lets them wrap at every width **and reserves two
+  lines** (`min-h-[2lh]`), or a row with one wrapped title puts its values at two
+  heights. Check 1024 — the narrowest desktop tile — not only 1280.
+- **A one-line disclosure is not a full-width bar.** "38 panels hidden" stretched
+  across 1,000px with its chevron at the far edge. Size the trigger to its label and
+  put its info control right beside it; the opened list is a card below, capped at
+  `max-w-3xl`.
+- **A label/status line must break the same way on every row.** `flex-wrap
+  justify-between` put the status at the right on short rows and under the label on
+  long ones. Use `flex items-baseline gap-x-3 max-md:flex-col` with the label
+  `min-w-0 md:flex-1` and the status `nowrap`: right-aligned on every row from md,
+  stacked on every row below it.
+- **Content slotted above the panels needs its own gap.** The dashboard filter row
+  and a "panels hidden" button touched (0px) because the slot had padding only
+  below; give it the gap on the side that meets the filter row.
+- **A status screen should fit without scrolling** at 1366×768 and 375×812 when it
+  is collapsed: one line per item, details opened per item (copy-and-values.md
+  § One line per item).
 
 ## Verification
 
@@ -292,9 +348,20 @@ the same recipe so it never takes two rows of chrome:
 2. At 1280 compare against main side by side — header height, toolbar order, column
    widths, popup positions. Identical is the bar.
 3. Useful in-page probes (`javascript_tool`): elements with `overflow: hidden` whose
-   `scrollWidth/scrollHeight` exceed their client size (clipping); the number of distinct
+   `scrollWidth/scrollHeight` exceed their client size (clipping); text whose rect runs
+   past its table cell (right-aligned cells clip on the left); the number of distinct
    row tops in the header + toolbar band before the content (chrome rows — aim for one,
    two at most); popup `getBoundingClientRect()` against `innerWidth/innerHeight`.
+   Sort the overflowing elements into **clipped** (no ellipsis — a bug) and
+   **ellipsised** (`text-overflow: ellipsis` or a line clamp — read each one: is it a
+   title or header that should fit?), and list the `overflow-x: auto` containers that
+   actually scroll. Run it on every tab at 375 / 768 / 1024 / 1280.
+   - Load a window in which **every source reports**, or the panels a stale source
+     hides are never checked; then a stale and an empty window for those states.
+   - The pane's tab clicks are unreliable under viewport emulation: switch tabs
+     with `router.push` (or the tab's own handler) from `javascript_tool`.
+   - A shared component you changed (a panel bar, a table renderer) is checked on a
+     **regular** page that uses it at ≥1024 too, against main: unchanged is the bar.
 4. `cd web && npm run lint && npm run type-check:app`, plus the specs of every library
    component you changed. Specs run with a desktop `matchMedia` (min-width queries match),
    so a mobile branch needs its own test that stubs `matchMedia` to not match.

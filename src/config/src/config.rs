@@ -38,9 +38,10 @@ use sha256::digest;
 use crate::{
     meta::{
         cluster,
+        meta_store::MetaStore,
         stream::{QueryPartitionStrategy, StreamType},
     },
-    utils::sysinfo,
+    utils::{str::redact_dsn, sysinfo},
 };
 
 pub type FxIndexMap<K, V> = indexmap::IndexMap<K, V, ahash::RandomState>;
@@ -94,7 +95,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 95: add band settings to anomaly_detection_config.
 // 96: create rum_pa_named_events, rum_pa_funnels and rum_pa_tombstones.
 // 97: create query_history.
-pub const DB_SCHEMA_VERSION: u64 = 97;
+// 98: key alert_dedup_state by (org_id, fingerprint).
+// 99: add name to rum_pa_tombstones.
+pub const DB_SCHEMA_VERSION: u64 = 99;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -411,6 +414,9 @@ pub static NATS_KV_WATCH_MODULES: Lazy<HashSet<String>> = Lazy::new(|| {
 pub static CONFIG: Lazy<ArcSwap<Config>> = Lazy::new(|| ArcSwap::from(Arc::new(init())));
 static INSTANCE_ID: Lazy<RwHashMap<String, String>> = Lazy::new(Default::default);
 static STORED_GRPC_TOKEN: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+static STORED_EXT_AUTH_SALT: Lazy<ArcSwap<String>> = Lazy::new(Default::default);
+/// Installs older than the stored salt hash with this value: rotating it breaks their logins.
+pub const LEGACY_EXT_AUTH_SALT: &str = "openobserve";
 
 pub fn get_config() -> Arc<Config> {
     CONFIG.load().clone()
@@ -574,6 +580,30 @@ pub fn cache_stored_grpc_token(token: &str) {
 
 pub fn get_stored_grpc_token() -> String {
     STORED_GRPC_TOKEN.load().to_string()
+}
+
+/// Caches the ext auth salt stored in the meta db; empty means none is stored.
+pub fn cache_stored_ext_auth_salt(salt: &str) {
+    STORED_EXT_AUTH_SALT.store(Arc::new(salt.to_owned()));
+}
+
+pub fn get_stored_ext_auth_salt() -> String {
+    STORED_EXT_AUTH_SALT.load().to_string()
+}
+
+pub fn get_ext_auth_salt() -> String {
+    select_ext_auth_salt(
+        &get_config().auth.ext_auth_salt,
+        &get_stored_ext_auth_salt(),
+    )
+}
+
+fn select_ext_auth_salt(env_salt: &str, stored_salt: &str) -> String {
+    [env_salt, stored_salt]
+        .into_iter()
+        .find(|s| !s.is_empty())
+        .unwrap_or(LEGACY_EXT_AUTH_SALT)
+        .to_string()
 }
 
 pub fn calculate_config_file_hash(path: &PathBuf) -> Result<String, anyhow::Error> {
@@ -1487,8 +1517,8 @@ pub struct Auth {
     pub cookie_same_site_lax: bool,
     #[env_config(name = "ZO_COOKIE_SECURE_ONLY", default = false)]
     pub cookie_secure_only: bool,
-    /// Secret for presigned and ext-token logins; a new install refuses to start with the default.
-    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
+    /// Empty: a new install generates one and stores it in the meta db.
+    #[env_config(name = "ZO_EXT_AUTH_SALT", default = "")]
     pub ext_auth_salt: String,
     #[env_config(
         name = "ZO_ALERT_CHART_SIGNING_KEY",
@@ -1737,12 +1767,6 @@ pub struct Search {
         help = "Enable pushdown filter"
     )]
     pub feature_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
-        default = false,
-        help = "Enable pushdown filter for metrics queries"
-    )]
-    pub feature_metrics_pushdown_filter_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
@@ -4055,50 +4079,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check queue store
     check_queue_store_config(cfg)?;
 
-    // format metadata storage
-    if cfg.common.meta_store.is_empty() {
-        if cfg.common.local_mode {
-            cfg.common.meta_store = "sqlite".to_string();
-        } else {
-            cfg.common.meta_store = "nats".to_string();
-        }
-    }
-    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
-    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
-        return Err(anyhow::anyhow!(
-            "Meta store only supports postgres in cluster mode."
-        ));
-    }
-    if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
-        let c = &cfg.common;
-        if c.meta_postgres_host.is_empty()
-            || c.meta_postgres_user.is_empty()
-            || c.meta_postgres_password.is_empty()
-            || c.meta_postgres_dbname.is_empty()
-        {
-            return Err(anyhow::anyhow!(
-                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
-                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
-                 ZO_META_POSTGRES_DBNAME"
-            ));
-        }
-        // Compose the DSN from the individual vars. User, password and dbname are
-        // percent-encoded so credentials with special characters survive the round
-        // trip — sqlx percent-decodes them again when it parses the DSN.
-        let dsn = format!(
-            "postgres://{}:{}@{}:{}/{}",
-            urlencoding::encode(&c.meta_postgres_user),
-            urlencoding::encode(&c.meta_postgres_password),
-            c.meta_postgres_host,
-            c.meta_postgres_port,
-            urlencoding::encode(&c.meta_postgres_dbname),
-        );
-        cfg.common.meta_postgres_dsn = dsn;
-    }
-
-    if cfg.common.meta_store.starts_with("mysql") {
-        return Err(anyhow::anyhow!("We don't support MySQL anymore."));
-    }
+    check_cluster_coordinator_config(cfg)?;
+    check_meta_store_config(cfg)?;
 
     // check meta partition mode
     if cfg.common.meta_partition_mode != "manual" {
@@ -4215,6 +4197,73 @@ fn check_queue_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 cfg.common.memory_queue_max_size
             )
         })?;
+    Ok(())
+}
+
+fn check_cluster_coordinator_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.common.cluster_coordinator.is_empty() {
+        cfg.common.cluster_coordinator = "nats".to_string();
+    }
+    // local mode never reads the coordinator, so a stale value there must not block startup
+    if cfg.common.local_mode {
+        return Ok(());
+    }
+    // any other value makes node registration return Ok without ever joining the cluster
+    if !cfg.common.cluster_coordinator.eq_ignore_ascii_case("nats") {
+        return Err(anyhow::anyhow!(
+            "ZO_CLUSTER_COORDINATOR={} is not supported, cluster mode only supports nats.",
+            redact_dsn(&cfg.common.cluster_coordinator)
+        ));
+    }
+    cfg.common.cluster_coordinator = "nats".to_string();
+    Ok(())
+}
+
+fn check_meta_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // format metadata storage
+    if cfg.common.meta_store.is_empty() {
+        if cfg.common.local_mode {
+            cfg.common.meta_store = "sqlite".to_string();
+        } else {
+            cfg.common.meta_store = "nats".to_string();
+        }
+    }
+    cfg.common
+        .meta_store
+        .parse::<MetaStore>()
+        .map_err(|e| anyhow::anyhow!("ZO_META_STORE: {e}"))?;
+    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
+    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
+        return Err(anyhow::anyhow!(
+            "Meta store only supports postgres in cluster mode."
+        ));
+    }
+    if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
+        let c = &cfg.common;
+        if c.meta_postgres_host.is_empty()
+            || c.meta_postgres_user.is_empty()
+            || c.meta_postgres_password.is_empty()
+            || c.meta_postgres_dbname.is_empty()
+        {
+            return Err(anyhow::anyhow!(
+                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
+                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
+                 ZO_META_POSTGRES_DBNAME"
+            ));
+        }
+        // Compose the DSN from the individual vars. User, password and dbname are
+        // percent-encoded so credentials with special characters survive the round
+        // trip — sqlx percent-decodes them again when it parses the DSN.
+        let dsn = format!(
+            "postgres://{}:{}@{}:{}/{}",
+            urlencoding::encode(&c.meta_postgres_user),
+            urlencoding::encode(&c.meta_postgres_password),
+            c.meta_postgres_host,
+            c.meta_postgres_port,
+            urlencoding::encode(&c.meta_postgres_dbname),
+        );
+        cfg.common.meta_postgres_dsn = dsn;
+    }
     Ok(())
 }
 
@@ -6019,6 +6068,70 @@ mod tests {
         assert_eq!(cfg.common.memory_queue_max_size, 32 * 1024 * 1024);
     }
 
+    fn meta_store_cfg(local_mode: bool, meta_store: &str) -> Config {
+        let mut cfg = Config::default();
+        cfg.common.local_mode = local_mode;
+        cfg.common.meta_store = meta_store.to_string();
+        cfg.common.meta_postgres_dsn = "postgres://o2:secret@db:5432/o2".to_string();
+        cfg
+    }
+
+    #[test]
+    fn test_check_meta_store_config_accepts_supported_stores() {
+        let mut cfg = meta_store_cfg(true, "");
+        check_meta_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.meta_store, "sqlite");
+
+        let mut cfg = meta_store_cfg(false, "PostgreSQL");
+        check_meta_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.meta_store, "postgresql");
+    }
+
+    #[test]
+    fn test_check_meta_store_config_rejects_what_used_to_fall_back_to_sqlite() {
+        for (local_mode, value) in [(true, "mongodb"), (true, "postgre"), (false, "postgresx")] {
+            let mut cfg = meta_store_cfg(local_mode, value);
+            let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+            assert!(err.starts_with("ZO_META_STORE: invalid value"), "{err}");
+            assert!(err.contains(value), "{err}");
+        }
+        let mut cfg = meta_store_cfg(false, "postgres://o2:secret@db:5432/o2");
+        let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+        assert!(
+            !err.contains("secret"),
+            "a DSN password reached the error: {err}"
+        );
+        let mut cfg = meta_store_cfg(true, "mysql");
+        let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+        assert!(err.contains("no longer supported"), "{err}");
+    }
+
+    #[test]
+    fn test_check_cluster_coordinator_config_requires_nats_in_cluster_mode() {
+        for value in ["", "nats", "NATS"] {
+            let mut cfg = Config::default();
+            cfg.common.cluster_coordinator = value.to_string();
+            check_cluster_coordinator_config(&mut cfg).unwrap();
+            assert_eq!(cfg.common.cluster_coordinator, "nats");
+        }
+        for value in ["etcd", "sqlite", "nats://o2:secret@nats:4222"] {
+            let mut cfg = Config::default();
+            cfg.common.cluster_coordinator = value.to_string();
+            let err = check_cluster_coordinator_config(&mut cfg)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("only supports nats"), "{err}");
+            assert!(
+                !err.contains("secret"),
+                "a DSN password reached the error: {err}"
+            );
+        }
+        let mut cfg = Config::default();
+        cfg.common.local_mode = true;
+        cfg.common.cluster_coordinator = "etcd".to_string();
+        check_cluster_coordinator_config(&mut cfg).unwrap();
+    }
+
     #[test]
     #[allow(deprecated)]
     fn test_check_compact_config_defaults() {
@@ -6366,5 +6479,12 @@ mod tests {
         let p = std::path::Path::new(r"C:\data\openobserve");
         let result = deverbatim(p);
         assert_eq!(result, r"C:\data\openobserve");
+    }
+
+    #[test]
+    fn test_select_ext_auth_salt_prefers_env_then_stored_then_legacy() {
+        assert_eq!(select_ext_auth_salt("env", "stored"), "env");
+        assert_eq!(select_ext_auth_salt("", "stored"), "stored");
+        assert_eq!(select_ext_auth_salt("", ""), LEGACY_EXT_AUTH_SALT);
     }
 }

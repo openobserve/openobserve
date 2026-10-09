@@ -29,8 +29,8 @@ class FunctionsFormValidationPage {
 
     // ==================== AddEnrichmentTable locators ====================
 
-    // Add form root
-    this.enrichmentPage = page.locator('[data-test="add-enrichment-table-page"]');
+    // Add form dialog root
+    this.enrichmentPage = page.locator('[data-test="add-enrichment-table-dialog"]');
 
     // Name field (OInput)
     this.enrichmentNameField = page.locator('[data-test="add-enrichment-table-name-field"]');
@@ -47,10 +47,9 @@ class FunctionsFormValidationPage {
     // Source toggle (OOptionGroup — file vs url)
     this.enrichmentSourceGroup = page.locator('[data-test="add-enrichment-table-source"]');
 
-    // Footer buttons
-    this.enrichmentSaveButton = page.locator('[data-test="add-enrichment-table-save-btn"]');
-    this.enrichmentCancelButton = page.locator('[data-test="add-enrichment-table-cancel-btn"]');
-    this.enrichmentBackButton = page.locator('[data-test="add-enrichment-table-back-btn"]');
+    // Dialog footer buttons
+    this.enrichmentSaveButton = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-primary-btn"]');
+    this.enrichmentCancelButton = page.locator('[data-test="add-enrichment-table-dialog"] [data-test="o-dialog-secondary-btn"]');
 
     // Add enrichment button on list page
     this.enrichmentAddButton = page.locator('[data-test="enrichment-tables-add-btn"]');

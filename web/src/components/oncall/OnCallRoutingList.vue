@@ -195,10 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
 
           <span class="flex min-w-0 flex-1 flex-col">
-            <span
-              class="truncate text-sm font-medium"
+            <OTruncatedText
+              class="text-sm font-medium"
               :class="defaultTeamId ? 'text-text-heading' : 'text-status-error-text'"
-              :title="defaultTeamId ? teamNameOf(defaultTeamId) : undefined"
               data-test="oncall-routing-catch-all-team"
             >
               {{
@@ -206,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ? t("oncall.routingElseGoesTo", { team: teamNameOf(defaultTeamId) })
                   : t("oncall.routingElseNobody")
               }}
-            </span>
+            </OTruncatedText>
             <OText variant="meta">{{ t("oncall.routingEverythingElseHint") }}</OText>
           </span>
 
@@ -325,9 +324,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`oncall-routing-signal-${signal.id}`"
         >
           <span class="flex min-w-0 flex-1 flex-col gap-0.5 max-md:basis-full">
-            <span class="text-text-heading truncate text-sm font-medium">{{
+            <OTruncatedText class="text-text-heading text-sm font-medium">{{
               titleOf(signal)
-            }}</span>
+            }}</OTruncatedText>
             <!-- The routable subset only: it is what a claim writes, and the
                  full evidence stays a hover away for whoever identifies it. -->
             <span class="flex flex-wrap gap-1.5" :title="fullPathOf(signal)">
@@ -337,6 +336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :dim-key="String(name)"
                 :key-label="displayOf(String(name))"
                 :value="value"
+                :value-tooltip="false"
               />
             </span>
           </span>
@@ -440,6 +440,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";

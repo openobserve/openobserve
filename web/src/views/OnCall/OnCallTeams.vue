@@ -77,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            had to leave the list to learn who catches everything it can't
            place. -->
       <template #cell-name="{ row }">
-        <span class="flex items-center gap-2">
-          <span>{{ row.name }}</span>
+        <span class="flex min-w-0 items-center gap-2">
+          <OTruncatedText>{{ row.name }}</OTruncatedText>
           <OTag
             v-if="row.id === defaultTeamId"
             variant="primary-soft"
@@ -294,6 +294,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";

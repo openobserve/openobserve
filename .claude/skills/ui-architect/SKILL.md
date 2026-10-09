@@ -1,62 +1,6 @@
 ---
 name: ui-architect
-description: >-
-  Authoring guardrails for building ANY new frontend UI in the OpenObserve web
-  app (web/) — new views, pages, panels, dialogs, feature components, or edits
-  to existing ones. Enforce seven house rules the moment you write Vue/template
-  markup: (1) use OPageHeader for every page/module header, (2) build UI from
-  O2 library components in web/src/lib — never bare HTML controls when an O2
-  equivalent exists, (3) NEVER write px — always rem, including inside Tailwind class
-  arbitrary values ([320px] is banned; 1rem = 16px, so px/16 = rem and px/4 = the
-  Tailwind step). px is allowed ONLY where it is the genuinely correct unit —
-  hairlines, shadow/ring widths, query conditions, IntersectionObserver rootMargin,
-  zero inside calc()/clamp(), user-facing copy, canvas/email consumers — and there it
-  MUST carry an eslint-disable-next-line local/no-hardcoded-px with a `-- <reason>` at
-  the site, never a side-file exemption (in a <style> block the directive goes inside
-  the block as a CSS comment). The local/no-hardcoded-px rule runs in CI, so an
-  unannotated px fails the build and cannot reach main;
-  and corner radius uses only the two-tier scale rounded-default
-  (4px controls) / rounded-surface (12px surfaces) / rounded-full — never
-  rounded-[..] or the retired rounded-sm/md/lg/xl, (4) no scoped-CSS blocks and no
-  inline style="", (5) never hardcode colors/sizes and never reach a token by raw
-  var() in a component — use the modern registered --color-* design tokens through
-  their utility class (bg-x/text-x), register a new --color-* token if one is
-  missing; the legacy --o2-* token vocabulary is BANNED (never write var(--o2-*),
-  never define one, never add a .body--dark block — migrate any --o2-* you touch to
-  its --color-* equivalent); all of this is CI-enforced and fails the build,
-  (6) no hardcoded user-facing text — every label, title, placeholder, and
-  message comes from i18n (useI18nTyped t(), never useI18n from vue-i18n, which
-  is banned) with keys added to web/src/locales/languages/en-US.json; text-carrying
-  props/fields are typed I18nText and i18n keys stored as data are typed I18nKey,
-  and the ONLY opt-out for a genuinely non-translatable string is raw() — never an
-  eslint-disable, (7) every page is responsive — phones and tablets adapt through
-  max-md:/max-lg: variants and useBreakpoint() while the laptop (≥lg) view stays
-  identical; headers, toolbars and stat strips keep one row, filter toggles collapse
-  to dropdowns (mobile-dropdown), secondary header actions go to #actions-overflow,
-  side panels become drawers that open from their own row, row actions fold into a
-  kebab, and popups fit the viewport. It also settles the recurring
-  structural decisions: use OTable for any tabular data, follow the
-  TanStack Query layering for server data (a declared queryOptions() per read
-  on its module's staleTime tier, mutationOptions() writes that invalidate,
-  refresh buttons that force every read on the view, no Vuex copies), choose the
-  right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
-  view) by the weight of the interaction, and build every validated form with
-  OForm + a colocated Zod schema (single-source-of-truth name-bound fields, no
-  v-model/ref mirrors, automatic submit/loading, correct field-array keys).
-  Trigger this whenever the user asks to create, add, build, scaffold, lay out,
-  validate, or restyle any screen, component, header, table, list, dialog,
-  drawer, form, field, or panel in the web frontend, asks to make any of them
-  work on mobile / phone / tablet / small screens (responsive), or asks where a
-  form/table/fetch should live, how to cache or refresh server data, how to validate a form, how to add a keyboard
-  shortcut, how to build a new reusable/common O2 component when nothing existing
-  fits (create one in web/src/lib instead of assembling divs and classes),
-  whether something belongs in a dialog or a drawer, or where a new page should be
-  listed in navigation — the left-rail menu, a Settings/IAM sub-menu, or a
-  hover-flyout — how to register its route, and how to gate it for cloud /
-  enterprise / RBAC — even if they don't mention
-  these rules by name. If you are
-  about to type <template>, a page title, a hex color, a px value, or
-  <style scoped>, this skill applies.
+description: ALWAYS use this skill for ANY change to the OpenObserve web UI (web/) — even a single-line UI modification.
 ---
 
 # UI Architect — Frontend UI Guardrails (OpenObserve `web/`)
@@ -568,6 +512,7 @@ and each domain has its own reference below.
 | --- | --- | --- |
 | **Server data (fetch & cache)** | Every read is a declared `queryOptions()` in `services/<domain>.queries.ts` (reuse the existing one if the list is already declared), keyed with `orgKey`, on its **module's** `staleTime` tier from `cachePolicy.ts`; components `useQuery` it (rows as a `computed`) — never `http`/axios, never a Vuex copy of a server list. Writes are `mutationOptions()` with `meta.invalidates`. A user refresh forces **every** read on the view; mount, paging and search read the cache. | [data-fetching](references/data-fetching.md) |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
+| **Cut text ("…")** | **`<OTruncatedText>` wherever you'd write `truncate` / `line-clamp-*`** — it shows the full text in a tooltip only while the text is actually cut. **`:tooltip="false"`** for secrets (tokens, keys, webhook/signed URLs) and for text the user can already read in full another way (printed below, expand, a side panel). In `OTable` cells plain text needs nothing — the table's shared tooltip handles it; turn it off per column (`meta.cellOverflowTooltip: false`) for secrets or per table (`:cell-overflow-tooltip="false"`) where Wrap / row expansion is the reveal. **Never repeat the visible text in a `title` or `OTooltip`.** | [core-display](references/core-display.md#otruncatedtext) · [core-controls-table](references/core-controls-table.md#cut-cell-text--the-shared-tooltip) |
 | **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY in two cases: chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit (convert once the schema renderer forwards clicks), or a chart needing a fixed grid that keeps empty rows/columns, or box-selection mapping from category indices back to values, which the dashboard converters cannot express (e.g. `TracesLatencyHeatmap.vue`). Annotate the site with a one-line why. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
@@ -636,6 +581,38 @@ confirm*, a sensible value for every field the user has no opinion about, and a
 preview instead of a wizard step. Do not hit the budget by hiding required
 fields behind "Advanced" — that moves the click, it does not remove it.
 
+## Copy and values — read the screen with real data
+
+Lint proves a string is translated; it cannot prove the sentence it produces is
+English, that a number means what its label claims, or that a blank is not a
+zero. Before a screen is done, read it with real data in every state (loading,
+never set up, stopped, partly there, failed, populated). The recurring defects:
+
+- **Casing reaches past your template** — shared component copy and `en-US.json`
+  values are sentence case too; a library never forces caps.
+- **An interpolated slot takes a noun phrase or a value**, never another
+  sentence; every `{count}` message is a plural called with the count.
+- **Say it once, by the label on screen** — no chip and text repeating each
+  other, no two headings for one thing, no help text naming a control by a word
+  the control does not show.
+- **Names, not ids; what differs, first** — an org label, not its identifier; the
+  database name, not the host every row shares.
+- **Minute-precision times, whole-number counts, `—` for unknown, skeleton (never
+  `0`) while loading; one failure look** (`#error` → load-error with Retry).
+- **Warning icons only on problems; a page publishes only its own facts** into
+  any state its sibling tabs share.
+- **Density: a screen states, the reader opens the rest** — explanatory copy opens
+  from an "About …" info popover beside its control instead of a paragraph or a
+  truncated sentence; a banner is one line (what + since when + action); a list
+  shows one line per item and each item opens on its own; one entity is one row;
+  a column header carries no qualifier (it goes in `meta.headerTooltip`); "All
+  clear" is never followed by "0 of 0".
+- **Rewording a shared key rewords every screen using it** — search its callers and
+  add a new key instead; every new key gets all 16 locales.
+
+Full rules, each with the bug it came from:
+[references/copy-and-values.md](references/copy-and-values.md).
+
 ## Pick a component
 
 The **scenario → component** index and the per-file catalog (what each `O*` is,
@@ -679,6 +656,12 @@ considering the UI done:
       from `<div>` + utility classes. Classes are for layout only.
 - [ ] Tabular data uses `OTable` with `OTableColumnDef[]` columns; server mode
       only for backend-paginated data.
+- [ ] **Cut text is `OTruncatedText`** — no bare `truncate` / `line-clamp-*`, and no
+      `title` / `OTooltip` that only repeats the visible text. `:tooltip="false"`
+      on secrets and on text readable another way (shown below, expand, side
+      panel). In tables: secret column → `meta.cellOverflowTooltip: false`, a
+      Wrap/expansion table → `:cell-overflow-tooltip="false"`, and a cell with
+      several tags/badges gives its own joined tooltip text.
 - [ ] **Every data chart goes through `PanelSchemaRenderer`** (panel schema) — no
       `echarts.init` / `<v-chart>` / ApexCharts / D3 / hand-rolled `<canvas>`/`<svg>`
       plot in a feature page. Low-level `panels/ChartRenderer.vue` only as the
@@ -823,6 +806,32 @@ considering the UI done:
       to their trigger's row (or come from `OPageLayout #sidebar` / `FolderList`);
       inline row actions are `max-md:hidden` with a `md:hidden` kebab mirroring them
       (`<data-test>-menu`); no hover-only affordance without `max-md:opacity-100`.
+- [ ] **Copy and values read right with real data** — sentence case in the
+      rendered screen (shared copy included); interpolated slots read as a
+      sentence; every `{count}` is a plural; controls named by their visible
+      label; nothing said twice; labels instead of ids; times to the minute,
+      counts without decimals, `—` for unknown. See
+      [copy-and-values](references/copy-and-values.md).
+- [ ] **Every state was seen with real data** — loading (skeletons, never `0`),
+      never set up, stopped/stale, partly there, failed (`#error` → load-error
+      with Retry, never the raw red bar) and populated — in light and dark.
+- [ ] **Nothing is clipped, not just nothing scrolls** — text runs past no cell
+      or container at 375 / 768 / 1024 / 1280 (an `overflow-hidden` ancestor hides
+      it from a page-width check); right-aligned cells checked on their left edge;
+      every ellipsis read (a cut title or header is a bug, a cut SQL statement is not).
+- [ ] **Nothing is sparse or doubled** — the page edge is applied once (`bleed`
+      when the body insets itself); a one-line disclosure is sized to its label with
+      its info control beside it, not a full-width bar; the primary table column has
+      an explicit `size`; a status screen fits 1366×768 and 375 collapsed; tiles that
+      sit six to a row wrap and keep two title lines so their values line up.
+- [ ] **Same job, same component** — refresh is `ORefreshButton`, an explainer is
+      the `OPopover` info recipe, an expandable row is `OCollapsible`, a toolbar view
+      toggle is `OToggleGroup mobile-dropdown`; never a hand-built `<button>`. See
+      [conventions § The same affordance](references/conventions.md).
+- [ ] **A UI pass changes UI only** — no new capability in a shared engine; a shared
+      component's visual change is gated below lg or on a flag only your page sets,
+      and a regular page using it is unchanged at ≥1024. See
+      [conventions § A UI pass changes UI only](references/conventions.md).
 - [ ] **Comments are one line, or none** — the *why* of a non-obvious constraint,
       never layout narration ("< md this wraps"), a re-telling of the code, or the
       history of the PR that added it (no ticket ids, "review finding", "as

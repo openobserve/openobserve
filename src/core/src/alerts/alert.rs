@@ -80,6 +80,7 @@ use crate::{
             custom::{VarValue, process_variable_replace},
             derive_channel_format,
             format::ChannelFormat,
+            modifiers::{PreparedTemplate, prepare_modifiers},
             platform::{self, platform_of},
             render,
             render::slack as slack_render,
@@ -2150,6 +2151,23 @@ pub fn manual_trigger_row(alert: &Alert) -> Map<String, Value> {
     row
 }
 
+/// Puts an incident notification failure, which the destination send never saw, before its errors.
+pub(crate) fn with_incident_notify_error(
+    error_message: String,
+    incident_error: Option<String>,
+) -> String {
+    match incident_error {
+        None => error_message,
+        Some(incident_error) if error_message.trim().is_empty() => incident_error,
+        Some(incident_error) => format!("{incident_error}; {error_message}"),
+    }
+}
+
+/// Whether a send tried any destination or workflow; an `Err` is a failed delivery, so it counts.
+pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -> bool {
+    result.as_ref().map_or(true, |outcome| outcome.attempted)
+}
+
 /// Triggers an alert.
 /// ExistingAlertRepeated is suppressed by design and notifies nobody, so treating it as
 /// "notified" would skip every destination and leave the trigger silent.
@@ -2179,7 +2197,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let incident_notified = if alert.creates_incident
+    let (incident_notified, incident_notify_error) = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
@@ -2197,35 +2215,38 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         )
         .await
         {
-            Ok(Some(outcome)) => {
+            Ok(Some(correlated)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
                 );
-                incident_path_notified(&outcome)
+                (
+                    incident_path_notified(&correlated.outcome),
+                    correlated.notify_error,
+                )
             }
             Ok(None) => {
                 log::debug!(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                false
+                (false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                false
+                (false, None)
             }
         }
     } else {
-        false
+        (false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let incident_notified = false;
+    let (incident_notified, incident_notify_error) = (false, None);
 
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_id_{trace_id}");
@@ -2259,9 +2280,9 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             None,
         )
         .await?;
-    let (success_message, err_message) = (outcome.success_message, outcome.error_message);
+    let err_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
-    Ok((success_message, err_message))
+    Ok((outcome.success_message, err_message))
 }
 
 pub async fn trigger_by_name(
@@ -2281,7 +2302,7 @@ pub async fn trigger_by_name(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let incident_notified = if alert.creates_incident
+    let (incident_notified, incident_notify_error) = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
@@ -2299,35 +2320,38 @@ pub async fn trigger_by_name(
         )
         .await
         {
-            Ok(Some(outcome)) => {
+            Ok(Some(correlated)) => {
                 log::info!(
                     "Manual trigger for alert {org_id}/{} correlated to incident {} (service: {})",
                     alert.name,
-                    outcome.incident_id(),
-                    outcome.service_name(),
+                    correlated.outcome.incident_id(),
+                    correlated.outcome.service_name(),
                 );
-                incident_path_notified(&outcome)
+                (
+                    incident_path_notified(&correlated.outcome),
+                    correlated.notify_error,
+                )
             }
             Ok(None) => {
                 log::debug!(
                     "No incident correlation for manually triggered alert {org_id}/{}",
                     alert.name
                 );
-                false
+                (false, None)
             }
             Err(e) => {
                 log::error!(
                     "Error correlating manual trigger to incident, falling back to direct notification: {e}"
                 );
-                false
+                (false, None)
             }
         }
     } else {
-        false
+        (false, None)
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let incident_notified = false;
+    let (incident_notified, incident_notify_error) = (false, None);
 
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_name_{trace_id}");
@@ -2354,9 +2378,9 @@ pub async fn trigger_by_name(
             None,
         )
         .await?;
-    let (success_message, err_message) = (outcome.success_message, outcome.error_message);
+    let err_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
-    Ok((success_message, err_message))
+    Ok((outcome.success_message, err_message))
 }
 
 /// Per-destination result of one notification attempt.
@@ -2372,6 +2396,8 @@ pub struct NotificationOutcome {
     /// Destination names that failed on this attempt, for any reason
     /// (fetch error, missing template, bad content spec, transport error).
     pub failed: Vec<String>,
+    /// False when no destination or workflow was dispatched, e.g. an alert wired to nothing.
+    pub attempted: bool,
     pub success_message: String,
     pub error_message: String,
 }
@@ -2803,6 +2829,8 @@ impl AlertExt for Alert {
         // themselves all failed. T11's retry logic keys off this return
         // value, so the change is called out rather than left implicit.
         let attempted = self.destinations.len() - no_of_skipped;
+        outcome.attempted =
+            attempted > 0 || (cfg!(feature = "enterprise") && !self.workflows.is_empty());
         if attempted > 0 && no_of_error == attempted {
             Err(AlertError::SendNotificationError {
                 error_message: outcome.error_message,
@@ -3536,7 +3564,49 @@ async fn send_sns_notification(
 
 fn process_row_template(
     org_name: &str,
-    tpl: &String,
+    tpl: &str,
+    alert: &Alert,
+    row_type: RowTemplateType,
+    rows: &[Map<String, Value>],
+) -> Vec<Value> {
+    let mut fields = std::collections::HashMap::<String, Vec<Value>>::new();
+    let templates = (0..rows.len())
+        .map(|index| {
+            prepare_modifiers(
+                tpl,
+                |field| {
+                    let placeholder = format!("{{{field}}}");
+                    let values = fields.entry(field.to_string()).or_insert_with(|| {
+                        process_row_templates_plain(
+                            org_name,
+                            &(0..rows.len())
+                                .map(|_| PreparedTemplate::plain(placeholder.clone()))
+                                .collect::<Vec<_>>(),
+                            alert,
+                            RowTemplateType::String,
+                            rows,
+                        )
+                    });
+                    let value = values[index].as_str()?;
+                    (value != placeholder).then(|| value.to_string())
+                },
+                |field| {
+                    rows[index].contains_key(field)
+                        || alert
+                            .context_attributes
+                            .as_ref()
+                            .is_some_and(|attrs| attrs.contains_key(field))
+                },
+                false,
+            )
+        })
+        .collect::<Vec<_>>();
+    process_row_templates_plain(org_name, &templates, alert, row_type, rows)
+}
+
+fn process_row_templates_plain(
+    org_name: &str,
+    templates: &[PreparedTemplate],
     alert: &Alert,
     row_type: RowTemplateType,
     rows: &[Map<String, Value>],
@@ -3552,8 +3622,8 @@ fn process_row_template(
     // For JSON row template type, try to parse the template as JSON
     let is_json_template = row_type == RowTemplateType::Json;
 
-    for row in rows.iter() {
-        let mut resp = tpl.to_string();
+    for (row, tpl) in rows.iter().zip(templates) {
+        let mut resp = tpl.template.clone();
         let mut alert_start_time = 0;
         let mut alert_end_time = 0;
         for (key, value) in row.iter() {
@@ -3649,6 +3719,8 @@ fn process_row_template(
                 process_variable_replace(&mut resp, key, &VarValue::Str(value), false);
             }
         }
+
+        resp = tpl.finish(resp);
 
         // If this is a JSON row template, try to parse it as JSON
         if is_json_template {
@@ -4602,8 +4674,8 @@ mod send_path_tests {
     #[cfg(feature = "enterprise")]
     use super::incident_path_notified;
     use super::{
-        NotificationOutcome, all_workflows_failed, choose_template, send_discord_with_attachment,
-        send_http_notification,
+        Alert, AlertError, AlertExt, NotificationOutcome, all_workflows_failed, choose_template,
+        send_attempted, send_discord_with_attachment, send_http_notification,
     };
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
@@ -4615,6 +4687,48 @@ mod send_path_tests {
         assert!(all_workflows_failed(0, 1, 1));
         assert!(!all_workflows_failed(0, 1, 0));
         assert!(!all_workflows_failed(1, 1, 1));
+    }
+
+    #[test]
+    fn a_failed_send_counts_as_attempted_and_an_empty_one_does_not() {
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(send_attempted(&failed));
+        assert!(!send_attempted(&Ok(NotificationOutcome::default())));
+        let sent = Ok(NotificationOutcome {
+            attempted: true,
+            ..Default::default()
+        });
+        assert!(send_attempted(&sent));
+    }
+
+    #[tokio::test]
+    async fn a_send_with_nothing_left_to_dispatch_attempts_nothing() {
+        let mut alert = Alert::default();
+        let unwired = alert
+            .send_notification("t", &[], 0, None, 0, None, None, None, &[], None)
+            .await
+            .expect("nothing to send is not an error");
+        assert!(!unwired.attempted);
+
+        alert.destinations = vec!["slack".to_string()];
+        let ledgered = alert
+            .send_notification(
+                "t",
+                &[],
+                0,
+                None,
+                0,
+                None,
+                None,
+                None,
+                &alert.destinations,
+                None,
+            )
+            .await
+            .expect("every destination already delivered is not an error");
+        assert!(!ledgered.attempted);
     }
 
     fn tpl(name: &str) -> Template {
@@ -4668,6 +4782,7 @@ mod send_path_tests {
         let outcome = NotificationOutcome {
             succeeded: vec!["slack".into()],
             failed: vec!["pagerduty".into()],
+            attempted: true,
             success_message: " destination slack sent;".into(),
             error_message: " Error sending notification for destination pagerduty err: boom;"
                 .into(),
@@ -4826,6 +4941,22 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn test_with_incident_notify_error() {
+        assert_eq!(
+            with_incident_notify_error("dest err".to_string(), None),
+            "dest err"
+        );
+        assert_eq!(
+            with_incident_notify_error(" ".to_string(), Some("slack: 500".to_string())),
+            "slack: 500"
+        );
+        assert_eq!(
+            with_incident_notify_error("wf err".to_string(), Some("slack: 500".to_string())),
+            "slack: 500; wf err"
+        );
+    }
 
     /// Calls the production predicate, not a copy of it: a resolve updates the record the firing
     /// opened, so the firing body must have somewhere to carry the correlation key.
@@ -7229,7 +7360,7 @@ mod tests {
 
         let out = process_row_template(
             "default",
-            &STREAM_TPL.to_string(),
+            STREAM_TPL,
             &alert,
             RowTemplateType::String,
             &[row],
@@ -8210,4 +8341,209 @@ fn collapse_slo_evals(evals: &[crate::slo::evaluate::SloEvalResult]) -> SloColla
         return SloCollapse::Frozen;
     }
     SloCollapse::Healthy
+}
+
+#[cfg(test)]
+mod modifier_tests {
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn row_numeric_modifiers_numbers_strings_and_precedence() {
+        let rows = vec![
+            serde_json::from_value(json!({
+                "ratio": 0.9123, "bytes": "1048576", "rate": 1234567,
+                "latency": "3661.9", "alert_count": 1200, "pipe|humanize": "literal",
+                "message": "abc\"def", "payload": "{ratio|humanizePercentage}"
+            }))
+            .unwrap(),
+            serde_json::from_value(json!({
+                "ratio": "0.5", "bytes": 1024, "rate": "2000", "latency": 0.25,
+                "message": "second"
+            }))
+            .unwrap(),
+        ];
+        let mut alert = Alert::default();
+        alert.context_attributes = Some([(String::from("rate"), String::from("10"))].into());
+        let tpl = r#"{"ratio":"{ratio|humanizePercentage}","bytes":"{bytes|humanize1024}","rate":"{rate|humanize}","latency":"{latency|humanizeDuration}","count":"{alert_count|humanize}","pipe":"{pipe|humanize}","message":"{message:4}","payload":"{payload}"}"#.to_string();
+        let rendered = process_row_template("default", &tpl, &alert, RowTemplateType::Json, &rows);
+        assert_eq!(
+            rendered[0],
+            json!({"ratio":"91.23%", "bytes":"1Mi", "rate":"1.235M", "latency":"1h 1m 1s", "count":"1.2k", "pipe":"literal", "message":"abc\"", "payload":"{ratio|humanizePercentage}"})
+        );
+        assert_eq!(rendered[1]["count"], "2");
+        assert_eq!(rendered[1]["ratio"], "50%");
+        assert_eq!(rendered[1]["bytes"], "1ki");
+        assert_eq!(rendered[1]["rate"], "2k");
+        assert_eq!(rendered[1]["latency"], "250ms");
+    }
+
+    #[test]
+    fn row_modifiers_fallback_special_values_and_injection() {
+        let rows = vec![serde_json::from_value(json!({"bad": "oops", "nan": "NaN", "inf": "+Inf", "negative_inf": "-Inf", "payload": "{alert_count|humanizePercentage}"})).unwrap()];
+        let tpl = "{bad|humanize} {missing|humanize} {nan|humanize} {inf|humanizeDuration} {negative_inf|humanizePercentage} {alert_count|unknown} {alert_count|humanize:2} {payload}".to_string();
+        let rendered = process_row_template(
+            "default",
+            &tpl,
+            &Alert::default(),
+            RowTemplateType::String,
+            &rows,
+        );
+        assert_eq!(rendered, vec![Value::String("{bad|humanize} {missing|humanize} NaN +Inf -Inf% {alert_count|unknown} {alert_count|humanize:2} {alert_count|humanizePercentage}".into())]);
+        let ctx = NotificationContext {
+            alert_count: "1".into(),
+            rows_tpl_val: rendered,
+            ..Default::default()
+        };
+        let embedded = apply_custom_template("{rows} {alert_count|humanizePercentage}", &ctx, true);
+        assert!(embedded.ends_with("{alert_count|humanizePercentage} 100%"));
+    }
+
+    #[test]
+    fn row_timestamp_and_size_modifiers() {
+        let rows = vec![serde_json::from_value(json!({"t":1700000000123456_i64,"seconds":"-0.1","bytes":1536,"payload":"{t|formatTimestampMicros}","host":"expanded"})).unwrap()];
+        let tpl = r#"{"timestamp":"{t|formatTimestampMicros}","seconds":"{seconds|formatTimestamp}","size":"{bytes|humanSize}","custom":"{t|formatTimestampMicros("{host} %Y%m%d%H%M%S%z \"quoted\"", "Asia/Shanghai")}","payload":"{payload}"}"#.to_string();
+        let output = process_row_template(
+            "default",
+            &tpl,
+            &Alert::default(),
+            RowTemplateType::Json,
+            &rows,
+        );
+        assert_eq!(
+            output[0],
+            json!({
+                "timestamp":"2023-11-14T22:13:20.123456Z", "seconds":"1969-12-31T23:59:59.900Z",
+                "size":"1.5 KiB", "custom":"{host} 20231115061320+0800 \"quoted\"", "payload":"{t|formatTimestampMicros}"
+            })
+        );
+        let bad = r#"{seconds|formatTimestamp("%Q")} {t|formatTimestampMicros("%Y", "+25:00")} {bytes|humanSize()}"#.to_string();
+        assert_eq!(
+            process_row_template(
+                "default",
+                &bad,
+                &Alert::default(),
+                RowTemplateType::String,
+                &rows
+            ),
+            vec![Value::String(bad)]
+        );
+    }
+
+    #[test]
+    fn row_rejects_lengths_and_preserves_literal_field_names() {
+        let rows = vec![
+            serde_json::from_value(
+                json!({"bytes":1536,"metric:2":"1536","literal:2|humanSize":"literal value"}),
+            )
+            .unwrap(),
+        ];
+        let tpl = "{bytes:2|humanSize} {metric:2|humanSize} {literal:2|humanSize} {literal:2|humanSize:4} {bytes|humanSize} {alert_count:1|humanize}";
+        assert_eq!(
+            process_row_template(
+                "default",
+                tpl,
+                &Alert::default(),
+                RowTemplateType::String,
+                &rows
+            ),
+            vec![Value::String(
+                "{bytes:2|humanSize} 1.5 KiB literal value lite 1.5 KiB {alert_count:1|humanize}"
+                    .into()
+            )]
+        );
+    }
+
+    #[test]
+    fn row_rejected_modifiers_preserve_exact_source() {
+        let rows =
+            vec![serde_json::from_value(json!({"t":0,"host":"expanded","bad":"NaN"})).unwrap()];
+        for tpl in [
+            r#"{t|formatTimestamp("{host} %Q")}"#,
+            r#"{t|formatTimestamp("{host} %Y", "invalid-zone")}"#,
+            r#"{missing|formatTimestamp("{host} %Y")}"#,
+            r#"{bad|formatTimestamp("{host} %Y")}"#,
+            r#"{t|formatTimestamp("{host} %Y",)}"#,
+            r#"{t|formatTimestamp({host})}"#,
+            r#"{t|unknown("{host}")}"#,
+        ] {
+            for row_type in [RowTemplateType::String, RowTemplateType::Json] {
+                assert_eq!(
+                    process_row_template("default", tpl, &Alert::default(), row_type, &rows),
+                    vec![Value::String(tpl.into())]
+                );
+            }
+        }
+        for (tpl, expected) in [
+            (
+                r#"{t|formatTimestamp("{host} %Q")} {host}"#,
+                r#"{t|formatTimestamp("{host} %Q")} expanded"#,
+            ),
+            (
+                r#"{t|formatTimestamp("{host} %Y)} {host} {t|formatTimestamp("%Y")}"#,
+                r#"{t|formatTimestamp("expanded %Y)} expanded 1970"#,
+            ),
+            (
+                "{t|formatTimestamp fired on {host} at {t}",
+                "{t|formatTimestamp fired on expanded at 0",
+            ),
+        ] {
+            assert_eq!(
+                process_row_template(
+                    "default",
+                    tpl,
+                    &Alert::default(),
+                    RowTemplateType::String,
+                    &rows
+                ),
+                vec![Value::String(expected.into())]
+            );
+        }
+    }
+
+    #[test]
+    fn row_json_pipes_and_links_preserve_placeholders() {
+        let rows = vec![serde_json::from_value(json!({"bytes":1536})).unwrap()];
+        for prefix in ["a|b", "<https://example.com|View>"] {
+            let tpl = format!(
+                r#"{{"text":"{prefix}","count":"{{alert_count}}","size":"{{bytes|humanSize}}","invalid":"{{bytes:2|humanSize}}","unknown":"{{bytes|unknown}}"}}"#
+            );
+            assert_eq!(
+                process_row_template(
+                    "default",
+                    &tpl,
+                    &Alert::default(),
+                    RowTemplateType::Json,
+                    &rows
+                ),
+                vec![
+                    json!({"text":prefix,"count":"1","size":"1.5 KiB","invalid":"{bytes:2|humanSize}","unknown":"{bytes|unknown}"})
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn row_nested_json_pipes_quotes_and_newlines() {
+        let rows = vec![serde_json::from_value(json!({"ratio":0.9123,"host":"web\"1"})).unwrap()];
+        let tpl = r#"{
+            "text": "a|b \"quoted\"",
+            "nested": { "link": "<https://example.com|View>",
+                "host": "{host}", "ratio": "{ratio|humanizePercentage}",
+                "fallback": "{missing|humanSize}" }
+        }"#;
+        assert_eq!(
+            process_row_template(
+                "default",
+                tpl,
+                &Alert::default(),
+                RowTemplateType::Json,
+                &rows
+            ),
+            vec![json!({
+                "text":"a|b \"quoted\"", "nested":{"link":"<https://example.com|View>","host":"web\"1","ratio":"91.23%","fallback":"{missing|humanSize}"}
+            })]
+        );
+    }
 }

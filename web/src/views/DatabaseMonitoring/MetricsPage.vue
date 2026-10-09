@@ -93,9 +93,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="shrink-0"
                   data-test="dbm-metrics-load-breakdown"
                 />
-                <span class="text-text-secondary min-w-0 truncate text-xs">{{
-                  t("dbm.metrics.load.hint")
-                }}</span>
+                <!-- How to read the chart is reference, so it opens on demand instead of truncating beside the title. -->
+                <OPopover
+                  v-model:open="loadHintOpen"
+                  side="bottom"
+                  align="start"
+                  :aria-label="t('dbm.metrics.load.about')"
+                >
+                  <template #trigger>
+                    <OButton
+                      variant="ghost"
+                      size="xs"
+                      icon-left="info-outline"
+                      data-test="dbm-metrics-load-hint-trigger"
+                    >
+                      <span class="max-md:sr-only">{{ t("dbm.metrics.load.about") }}</span>
+                    </OButton>
+                  </template>
+                  <p
+                    class="w-96 max-w-[calc(100vw-1.5rem)] p-3 leading-5"
+                    data-test="dbm-metrics-load-hint"
+                  >
+                    <OText variant="meta">{{ t("dbm.metrics.load.hint") }}</OText>
+                  </p>
+                </OPopover>
               </template>
               <template #actions>
                 <OButton
@@ -345,6 +366,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OText from "@/lib/core/Typography/OText.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
@@ -516,6 +539,7 @@ const hasMetricStreams = computed(
 
 /** Which dimension the load chart stacks by — the Datadog-style slicer. */
 const loadBreakdown = ref<DbmLoadBreakdown>("waitEvent");
+const loadHintOpen = ref(false);
 
 const breakdownOptions = computed<SelectOption[]>(() =>
   DBM_LOAD_BREAKDOWNS.map((dim) => ({

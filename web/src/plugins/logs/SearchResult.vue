@@ -484,6 +484,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="getColumns || []"
                   :data="searchObj.data.queryResults?.hits || []"
                   :wrap="searchObj.meta.toggleSourceWrap"
+                  :cell-overflow-tooltip="false"
                   :loading="isResultsSkeleton"
                   :streaming="isResultsStreaming"
                   :row-key="logsRowKey"

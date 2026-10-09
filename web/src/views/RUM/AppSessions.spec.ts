@@ -260,13 +260,20 @@ describe("AppSessions.vue", () => {
       expect(wrapper.find('[data-test="syntax-guide"]').exists()).toBe(true);
     });
 
-    it("should render the disabled state when session replay is not enabled", async () => {
-      await wrapper.setProps({ isSessionReplayEnabled: false });
+    it("should render the disabled state when neither RUM nor session replay is enabled", async () => {
+      await wrapper.setProps({ isRumEnabled: false, isSessionReplayEnabled: false });
 
       expect(wrapper.find(".enable-rum").exists()).toBe(true);
       expect(wrapper.text()).toContain(
         "Discover Session Replay to Understand User Interactions in Detail",
       );
+    });
+
+    it("should render the sessions list when RUM is enabled even without session replay", async () => {
+      await wrapper.setProps({ isRumEnabled: true, isSessionReplayEnabled: false });
+
+      expect(wrapper.find(".enable-rum").exists()).toBe(false);
+      expect(wrapper.find(".sessions_page").exists()).toBe(true);
     });
 
     it("should set loading on OTable when data is being fetched", async () => {
@@ -508,9 +515,11 @@ describe("AppSessions.vue", () => {
       expect(mockSessionState.data.editorValue).toBe("env='staging'");
     });
 
-    it("should pass the session-row base filter to the sidebar", () => {
+    // Sessions are listed regardless of replay availability — the base filter no longer
+    // depends on session_has_replay, which only drives the per-row play icon now.
+    it("should pass an unconditional base filter to the sidebar", () => {
       const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
-      expect(fieldList.props("baseFilter")).toBe("session_has_replay IS NOT NULL");
+      expect(fieldList.props("baseFilter")).toBe("1 = 1");
     });
 
     // The base filter used to be concatenated into `query`, which made the
@@ -521,7 +530,7 @@ describe("AppSessions.vue", () => {
       expect(fieldList.props("query")).not.toContain("session_has_replay");
     });
 
-    it("falls back to an always-false filter instead of referencing session_has_replay when the org's schema lacks it (o2-enterprise#2799)", async () => {
+    it("falls back to a constant has_replay instead of referencing session_has_replay when the org's schema lacks it (o2-enterprise#2799)", async () => {
       // getStream was destructured at setup, so reconfigure the same mock instance, not a new vi.fn().
       mockStreams.getStream.mockResolvedValueOnce({
         schema: mockStreamData.schema.filter((f) => f.name !== "session_has_replay"),
@@ -530,9 +539,6 @@ describe("AppSessions.vue", () => {
       wrapper.vm.schemaMapping = {};
       await wrapper.vm.getStreamFields();
       await nextTick();
-
-      const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
-      expect(fieldList.props("baseFilter")).toBe("1 = 0");
 
       vi.mocked(searchService.search).mockClear();
       const capturedSqls: string[] = [];
@@ -544,7 +550,8 @@ describe("AppSessions.vue", () => {
       await flushPromises();
       await flushPromises();
       const mainQuerySql = capturedSqls.find((sql) => sql.includes('FROM "_rumdata"'));
-      expect(mainQuerySql).toContain("WHERE 1 = 0");
+      expect(mainQuerySql).toContain("WHERE 1 = 1");
+      expect(mainQuerySql).toContain("0 AS has_replay");
       expect(mainQuerySql).not.toContain("session_has_replay");
     });
   });
@@ -794,6 +801,32 @@ describe("AppSessions.vue", () => {
       });
 
       expect(newWrapper.props("isSessionReplayEnabled")).toBe(false);
+      newWrapper.unmount();
+    });
+
+    it("should default isRumEnabled to false", async () => {
+      const newWrapper = mount(AppSessions, {
+        global: {
+          plugins: [store, router, i18n],
+          stubs: {
+            OButton: { template: "<button><slot /></button>" },
+            OSplitter: {
+              template: '<div><slot name="before" /><slot name="after" /></div>',
+            },
+            OIcon: { template: "<span></span>" },
+            OTable: { template: "<div></div>" },
+            DateTime: { template: "<div></div>" },
+            SyntaxGuide: { template: "<div></div>" },
+            QueryEditor: { template: "<div></div>" },
+            SearchFieldList: { template: "<div></div>" },
+            FrustrationBadge: { template: "<div></div>" },
+            SessionLocationColumn: { template: "<div></div>" },
+            NoData: { template: "<div></div>" },
+          },
+        },
+      });
+
+      expect(newWrapper.props("isRumEnabled")).toBe(false);
       newWrapper.unmount();
     });
   });
@@ -1121,6 +1154,101 @@ describe("AppSessions.vue", () => {
       expect(mainQuerySql).toContain("min(source) as source");
 
       // Restore the default fixture response for any tests that run after.
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: {
+          hits: [
+            {
+              session_id: "session1",
+              zo_sql_timestamp: 1672531200000,
+              start_time: 1672531000,
+              end_time: 1672531300,
+              source: "web",
+              user_agent_user_agent_family: "Chrome",
+              user_agent_os_family: "Windows",
+              ip: "192.168.1.1",
+              error_count: 2,
+              user_email: "test@example.com",
+              country: "US",
+              city: "New York",
+              country_iso_code: "us",
+            },
+          ],
+        },
+      });
+    });
+
+    it("renders sessions from _rumdata alone and skips the _sessionreplay query when none have replay", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        if (params?.query?.query?.sql?.includes('FROM "_rumdata"')) {
+          return {
+            data: {
+              hits: [{ session_id: "no-replay-1", zo_sql_timestamp: 1672531200000, source: "web" }],
+            },
+          };
+        }
+        // Any call reaching _sessionreplay here is the bug this test guards against.
+        throw new Error("_sessionreplay query should not have been issued");
+      });
+
+      wrapper.vm.getSessions();
+      await flushPromises();
+      await flushPromises();
+
+      expect(wrapper.vm.rows).toEqual([
+        expect.objectContaining({ session_id: "no-replay-1", has_replay: false }),
+      ]);
+
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: {
+          hits: [
+            {
+              session_id: "session1",
+              zo_sql_timestamp: 1672531200000,
+              start_time: 1672531000,
+              end_time: 1672531300,
+              source: "web",
+              user_agent_user_agent_family: "Chrome",
+              user_agent_os_family: "Windows",
+              ip: "192.168.1.1",
+              error_count: 2,
+              user_email: "test@example.com",
+              country: "US",
+              city: "New York",
+              country_iso_code: "us",
+            },
+          ],
+        },
+      });
+    });
+
+    it("queries _sessionreplay only for the session IDs that actually have replay", async () => {
+      vi.mocked(searchService.search).mockClear();
+      const capturedSqls: string[] = [];
+      vi.mocked(searchService.search).mockImplementation(async (params: any) => {
+        const sql = params?.query?.query?.sql ?? "";
+        capturedSqls.push(sql);
+        if (sql.includes('FROM "_rumdata"')) {
+          return {
+            data: {
+              hits: [
+                { session_id: "replay-1", zo_sql_timestamp: 1672531200000, has_replay: 1 },
+                { session_id: "plain-1", zo_sql_timestamp: 1672531200000, has_replay: 0 },
+              ],
+            },
+          };
+        }
+        return { data: { hits: [] } };
+      });
+
+      wrapper.vm.getSessions();
+      await flushPromises();
+      await flushPromises();
+
+      const replayQuerySql = capturedSqls.find((sql) => sql.includes('FROM "_sessionreplay"'));
+      expect(replayQuerySql).toContain("'replay-1'");
+      expect(replayQuerySql).not.toContain("'plain-1'");
+
       vi.mocked(searchService.search).mockResolvedValue({
         data: {
           hits: [

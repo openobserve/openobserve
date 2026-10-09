@@ -34,6 +34,31 @@ function basisOf(compact: boolean) {
 }
 
 describe("OStatStrip", () => {
+  describe("loading", () => {
+    it("holds a skeleton in place of each value until the first load lands", async () => {
+      const wrapper = mount(OStatStrip, { props: { items, loading: true } });
+      expect(wrapper.findAll('[data-test="o-stat-card-value-skeleton"]')).toHaveLength(2);
+      expect(wrapper.text()).not.toContain("128");
+      await wrapper.setProps({ loading: false });
+      expect(wrapper.find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("128");
+    });
+
+    it("covers a page whose loading flag only turns on once its fetch starts", async () => {
+      const wrapper = mount(OStatStrip, { props: { items, loading: false } });
+      await wrapper.setProps({ loading: true });
+      expect(wrapper.findAll('[data-test="o-stat-card-value-skeleton"]')).toHaveLength(2);
+    });
+
+    it("keeps the last values through a refresh instead of flickering", async () => {
+      const wrapper = mount(OStatStrip, { props: { items, loading: true } });
+      await wrapper.setProps({ loading: false });
+      await wrapper.setProps({ loading: true });
+      expect(wrapper.find('[data-test="o-stat-card-value-skeleton"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("128");
+    });
+  });
+
   // A five-tile filter strip wraps to two rows at the default basis, which is
   // sized for long labels.
   it("narrows the wrap threshold when compact", () => {
@@ -140,8 +165,9 @@ describe("OStatStrip", () => {
     it("tooltips the glyph with subTooltip, falling back to sub", () => {
       const tip = (item: Record<string, unknown>) =>
         mountCard({ sub: raw("From traces"), subIcon: "account-tree", ...item })
-          .findComponent({ name: "OTooltip" })
-          .props("content");
+          .findAllComponents({ name: "OTooltip" })
+          .find((t) => t.element.closest?.('[data-test="o-stat-card-sub-icon"]'))
+          ?.props("content");
       expect(tip({ subTooltip: raw("Measured from your traces") })).toBe(
         "Measured from your traces",
       );

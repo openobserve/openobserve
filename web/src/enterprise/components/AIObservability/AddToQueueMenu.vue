@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onSelect(queue)"
           >
             <span class="flex min-w-0 flex-col">
-              <span class="truncate font-medium">{{ raw(queue.name) }}</span>
+              <OTruncatedText class="font-medium">{{ raw(queue.name) }}</OTruncatedText>
               <span class="text-text-secondary text-2xs">
                 {{
                   accepts(queue)
@@ -134,6 +134,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import type { ButtonSize, ButtonVariant } from "@/lib/core/Button/OButton.types";
 import type { DiscoveryScope } from "@/services/llm-discovery.service";
 import type { LlmQueue } from "@/services/llm-queues.service";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AddToQueueMenu" });
 

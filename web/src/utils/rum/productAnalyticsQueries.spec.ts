@@ -50,10 +50,13 @@ import {
   stepPredicateRaw,
   urlPrefilter,
   type AnalyticsScope,
+  type BuildOpts,
+  type PathsDef,
   type RegexPass,
 } from "@/utils/rum/productAnalyticsQueries";
 import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
 import * as PROVEN from "@/utils/rum/__fixtures__/productAnalyticsProvenSql";
+import * as PATHS from "@/utils/rum/__fixtures__/productAnalyticsPathsSql";
 import * as QUERIES from "@/utils/rum/productAnalyticsQueries";
 import * as SEQ from "@/utils/rum/__fixtures__/productAnalyticsSequenceSql";
 
@@ -131,6 +134,15 @@ const norm = (sql: string, s: AnalyticsScope, sample: 1 | 2 | 4 | 8 | 16 = 1): s
     out = out.split(clickKeyExpr(col)).join(`{CK(${col})}`);
   return out.split(String(CS)).join("{cs}");
 };
+
+// Strips the drawer's NULL user_label wherever it sits, so the rest can be compared with the pre-#2851 SQL.
+const dropColumn = (sql: string, col: string): string =>
+  sql.replace(new RegExp(`,\\s*${col}`, "g"), "").replace(new RegExp(`${col},\\s*`, "g"), "");
+const withoutNullLabel = (sql: string): string =>
+  dropColumn(
+    dropColumn(sql, String.raw`CAST\(NULL AS VARCHAR\) AS user_label\b`),
+    String.raw`\buser_label\b`,
+  );
 
 const scope = (patch: Partial<AnalyticsScope> = {}): AnalyticsScope => ({
   app: "web",
@@ -998,13 +1010,15 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
     );
   });
 
-  it("Q15 equals the proven shape for a depth-2 branch (AC-26)", () => {
+  it("R5: Q15 equals the proven shape for a depth-2 branch plus a NULL user_label (AC-26)", () => {
     const sql = branchSessionsSql(s, null, def, "s1 = 'x' AND s2 = 'y'", 2, 0, opts);
     const errorsApart = PROVEN.Q15_BRANCH.replace(
       "LAG(key) OVER (PARTITION BY sid ORDER BY t, key) AS pk",
       "LAG(key) OVER (PARTITION BY sid, CASE WHEN ty = 'error' THEN 1 ELSE 0 END ORDER BY t, key) AS pk",
     );
-    expect(norm(sql, s)).toBe(norm(errorsApart, s));
+    expect(sql).toContain("CAST(NULL AS VARCHAR) AS user_label");
+    expect(sql.split("\n").at(-1)!.split(" FROM ")[0]).toMatch(/\buser_label\b/);
+    expect(norm(withoutNullLabel(sql), s)).toBe(norm(errorsApart, s));
     expect(branchSessionsSql(s, null, def, "TRUE", 0, 1, opts)).toContain(
       "SELECT sid, t0 AS step_t",
     );
@@ -1070,6 +1084,288 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
     expect(branchSessionsSql(s, null, def, "TRUE", 1, 0, { events: [], sample: 2 })).toContain(
       "md5(session_id)",
     );
+  });
+});
+
+describe("paths drawer user label (o2-enterprise#2851)", () => {
+  const s = scope({
+    schema: {
+      action_id: true,
+      usr_email: true,
+      session_has_replay: true,
+      action_target_name: true,
+    },
+  });
+  const id = { field: "usr_email" as const, excluded: ["bot@x.com"] };
+  const u = identityExpr(id);
+  const events: NamedEvent[] = [
+    {
+      id: "ev",
+      app: "web",
+      name: "E",
+      rules: [{ t: "view", op: "prefix", value: "/web/l" }],
+      version: 1,
+      createdBy: "",
+      createdAt: 0,
+      updatedBy: "",
+      updatedAt: 0,
+    },
+  ];
+  const opts = { events, sample: 1 as const };
+  const base = {
+    anchor: { kind: "p" as const, key: "/web/logs" },
+    direction: "next" as const,
+    depth: 3,
+    include: "all" as const,
+    cohort: null,
+  };
+  const funnel = {
+    steps: [
+      { kind: "p" as const, key: "/a" },
+      { kind: "c" as const, key: "b" },
+    ],
+    unit: "sessions" as const,
+    window: "session" as const,
+    breakdown: null,
+  };
+  const anchors = {
+    page: base,
+    click: { ...base, anchor: { kind: "c" as const, key: "menu-link-/logs-item" } },
+    event: { ...base, anchor: { kind: "e" as const, key: "ev" } },
+  };
+  const cohorts = {
+    sessions: { ...base, anchor: null, cohort: { funnel, stepIndex: 1, side: "dropped" as const } },
+    users: {
+      ...base,
+      anchor: null,
+      cohort: {
+        funnel: { ...funnel, unit: "users" as const, window: "1d" as const },
+        stepIndex: 1,
+        side: "dropped" as const,
+      },
+    },
+  };
+  const all = { ...anchors, ...cohorts };
+  const branch = (i: typeof id | null, d: PathsDef, o: BuildOpts = opts) =>
+    branchSessionsSql(s, i, d, "TRUE", 1, 0, o);
+  const projection = (sql: string) => sql.split("\n").at(-1)!.split(" FROM ")[0];
+  const escRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const mask = (sql: string) =>
+    sql.replace(/'(?:[^']|'')*'/g, (m) => `'${"x".repeat(m.length - 2)}'`);
+  const unwrap = (x: string): string => {
+    const t = x.trim();
+    const m = mask(t);
+    if (!m.startsWith("(")) return t;
+    let depth = 0;
+    for (let i = 0; i < m.length; i++) {
+      depth += m[i] === "(" ? 1 : m[i] === ")" ? -1 : 0;
+      if (depth === 0) return i === m.length - 1 ? unwrap(t.slice(1, -1)) : t;
+    }
+    return t;
+  };
+  const splitTop = (x: string, sep: string): string[] => {
+    const m = mask(x);
+    const out: string[] = [];
+    let depth = 0;
+    let from = 0;
+    for (let i = 0; i < m.length; i++) {
+      if (depth === 0 && m.startsWith(sep, i)) {
+        out.push(x.slice(from, i));
+        from = i + sep.length;
+        i += sep.length - 1;
+        continue;
+      }
+      depth += m[i] === "(" ? 1 : m[i] === ")" ? -1 : 0;
+    }
+    out.push(x.slice(from));
+    return out;
+  };
+  const whereClauses = (sql: string): { at: number; text: string }[] => {
+    const m = mask(sql);
+    const out: { at: number; text: string }[] = [];
+    for (const w of m.matchAll(/\bWHERE /g)) {
+      const start = w.index! + 6;
+      let depth = 0;
+      let i = start;
+      for (; i < m.length; i++) {
+        depth += m[i] === "(" ? 1 : m[i] === ")" ? -1 : 0;
+        if (depth < 0 || (depth === 0 && /^ (?:GROUP BY|ORDER BY|LIMIT) /.test(m.slice(i, i + 10))))
+          break;
+      }
+      out.push({ at: w.index!, text: sql.slice(start, i) });
+    }
+    return out;
+  };
+  const scanClause = (sql: string) =>
+    whereClauses(sql).find((w) => sql.slice(0, w.at).endsWith('FROM "_rumdata" '));
+  const outsideUidSelect = (sql: string, at: number): boolean => {
+    const m = mask(sql);
+    const uid = m.lastIndexOf(`${UID} AS uid`, at);
+    if (uid < 0) return false;
+    let depth = 0;
+    for (const ch of m.slice(uid, at)) {
+      depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
+      if (depth < 0) return true;
+    }
+    return false;
+  };
+  const rowFilters = (sql: string) => {
+    const d = sql.indexOf("\nd AS (");
+    const scan = scanClause(sql);
+    return whereClauses(sql).filter((w) => w.at < d && w.at !== scan?.at);
+  };
+  const conjuncts = (text: string): string[] | null =>
+    splitTop(text, " OR ").length > 1 ? null : splitTop(text, " AND ").map(unwrap);
+  const identityAdmitted = (sql: string, scopeSql: string, idExpr: string): boolean => {
+    const scan = scanClause(sql);
+    if (!scan || !scan.text.startsWith(`${scopeSql} AND `)) return false;
+    const rest = scan.text.slice(scopeSql.length + 5);
+    if (unwrap(rest) === rest.trim() || splitTop(scan.text, " OR ").length > 1) return false;
+    return splitTop(unwrap(rest), " OR ").some((p) => p.trim() === `${idExpr} IS NOT NULL`);
+  };
+  // Identity-only rows must be dropped after the uid window and before d, or a NULL key breaks the LAG dedup.
+  const pathRowFilterProblem = (sql: string, types: string): string | null => {
+    const e = escRe(types);
+    const flag = new RegExp(
+      `CASE WHEN (?:${e}|\\(${e}\\)) THEN 1(?: ELSE 0)? END\\)? AS (\\w+)`,
+    ).exec(sql);
+    if (!flag) return "the Sankey row predicate is not kept as a per-row flag";
+    const test = new RegExp(`^${flag[1]} (?:= 1|> 0|IS NOT NULL)$`);
+    const ok = rowFilters(sql).some(
+      (w) => conjuncts(w.text)?.some((c) => test.test(c)) && outsideUidSelect(sql, w.at),
+    );
+    return ok ? null : "no WHERE drops non-path rows outside the uid window and before d";
+  };
+  const CLICK_COL = "(?:k|atn)";
+  const NON_EMPTY = `(?:COALESCE\\(${CLICK_COL}, ''\\) <> ''|${CLICK_COL} <> ''|NULLIF\\(${CLICK_COL}, ''\\) IS NOT NULL|LENGTH\\(${CLICK_COL}\\) > 0)`;
+  const EMPTY_GUARD = new RegExp(
+    [
+      `^${NON_EMPTY}$`,
+      `^ty <> 'action' OR ${NON_EMPTY}$`,
+      `^NOT \\(ty = 'action' AND \\((?:${CLICK_COL} = '' OR ${CLICK_COL} IS NULL|${CLICK_COL} IS NULL OR ${CLICK_COL} = '')\\)\\)$`,
+      `^NOT \\(ty = 'action' AND COALESCE\\(${CLICK_COL}, ''\\) = ''\\)$`,
+    ].join("|"),
+  );
+  const hasEmptyClickGuard = (sql: string): boolean =>
+    rowFilters(sql).some((w) => conjuncts(w.text)?.some((c) => EMPTY_GUARD.test(c)));
+  const pathWhereClauses = (sql: string): string[] => rowFilters(sql).map((w) => w.text);
+  const UID =
+    "FIRST_VALUE(u0) OVER (PARTITION BY sid ORDER BY CASE WHEN u0 IS NULL THEN 1 ELSE 0 END, ut)";
+
+  it.each(Object.entries(anchors))(
+    "R1: the %s-anchored drawer selects user_label, with or without an identity",
+    (_, d) => {
+      expect(projection(branch(null, d))).toMatch(/\buser_label\b/);
+      expect(projection(branch(id, d))).toMatch(/\buser_label\b/);
+    },
+  );
+
+  it.each(Object.entries(cohorts))(
+    "R2: the %s-unit funnel-cohort drawer selects user_label, with or without an identity",
+    (_, d) => {
+      expect(projection(branch(null, d))).toMatch(/\buser_label\b/);
+      expect(projection(branch(id, d))).toMatch(/\buser_label\b/);
+    },
+  );
+
+  it.each(Object.entries(all))(
+    "R3: the %s drawer labels a session with its first non-excluded identity value",
+    (_, d) => {
+      const sql = branch(id, d);
+      expect(sql).toContain(
+        `first_value(${u} ORDER BY CASE WHEN ${u} IS NULL THEN 1 ELSE 0 END, date) AS u0`,
+      );
+      expect(sql).toContain(`MIN(CASE WHEN ${u} IS NOT NULL THEN date END) AS ut`);
+      expect(sql).toContain("IN ('bot@x.com') THEN NULL");
+      expect(sql).toContain(`${UID} AS uid`);
+      expect(sql).toContain("MAX(uid) AS user_label");
+      expect(sql).not.toContain("CAST(NULL AS VARCHAR) AS user_label");
+    },
+  );
+
+  it.each(["all", "pages", "clicks"] as const)(
+    "R4: an anchored drawer under include %s also reads identity from rows outside the path filter",
+    (include) => {
+      for (const d of Object.values(anchors)) {
+        expect(identityAdmitted(branch(id, { ...d, include }), scopeClause(s), u)).toBe(true);
+      }
+    },
+  );
+
+  it.each(Object.entries(all))(
+    "R5: without an identity the %s drawer labels every session NULL and reads no identity",
+    (_, d) => {
+      const sql = branch(null, d);
+      expect(sql).toContain("CAST(NULL AS VARCHAR) AS user_label");
+      expect(sql).not.toContain("usr_email");
+      expect(sql).not.toContain(UID);
+    },
+  );
+
+  it("R5: without an identity the cohort drawer is unchanged apart from user_label", () => {
+    const sql = branchSessionsSql(s, null, cohorts.sessions, "s1 = 'x'", 1, 0, opts);
+    expect(norm(withoutNullLabel(sql), s)).toBe(norm(PATHS.BRANCH_COHORT_SESSIONS, s));
+  });
+
+  for (const [name, d] of Object.entries(anchors)) {
+    it.each(["all", "pages", "clicks"] as const)(
+      `R6: identity-only rows of the ${name}-anchored drawer under include %s never become path steps`,
+      (include) => {
+        const dd = { ...d, include };
+        const head = `${scopeClause(s)} AND `;
+        const plain = scanClause(branch(null, dd))?.text ?? "";
+        expect(plain.startsWith(head)).toBe(true);
+        expect(pathRowFilterProblem(branch(id, dd), plain.slice(head.length))).toBeNull();
+      },
+    );
+  }
+
+  it("R6: drawer sampling still applies with an identity", () => {
+    for (const d of [anchors.page, cohorts.sessions]) {
+      expect(branch(id, d, { events, sample: 2 })).toContain(scopeClause(s, 2));
+    }
+  });
+
+  it.each(Object.entries(all))(
+    "R7: the %s Sankey query is byte-identical to its pre-#2851 output",
+    (name, d) => {
+      const fixture: Record<string, string> = {
+        page: PATHS.PATHS_ANCHOR_PAGE,
+        click: PATHS.PATHS_ANCHOR_CLICK,
+        event: PATHS.PATHS_ANCHOR_EVENT,
+        sessions: PATHS.PATHS_COHORT_SESSIONS,
+        users: PATHS.PATHS_COHORT_USERS,
+      };
+      expect(norm(pathsSql(s, id, d, opts), s)).toBe(norm(fixture[name], s));
+    },
+  );
+
+  it.each(Object.entries(anchors))(
+    "R7: the %s-anchored Sankey query ignores the identity",
+    (_, d) => {
+      expect(pathsSql(s, id, d, opts)).toBe(pathsSql(s, null, d, opts));
+    },
+  );
+
+  it.each(Object.entries(all))(
+    "R8: the %s drawer with an identity reads _rumdata once, join-free",
+    (_, d) => {
+      expect(() => assertJoinFree(branch(id, d))).not.toThrow();
+      expect(() => assertJoinFree(branch(id, d, { events, sample: 4 }))).not.toThrow();
+    },
+  );
+
+  it("R9: a sessions-unit cohort drawer never turns an identity-only, unnamed click into a c: step", () => {
+    const sql = branch(id, cohorts.sessions);
+    expect(sql).toContain(UID);
+    expect(hasEmptyClickGuard(sql)).toBe(true);
+  });
+
+  it("R6: the users-unit cohort drawer filters path rows exactly as the Sankey does", () => {
+    const flow = pathWhereClauses(pathsSql(s, id, cohorts.users, opts)).map((w) =>
+      w.replace("ty IN ('view', 'action')", "(ty IN ('view', 'action') OR ty = 'error')"),
+    );
+    expect(pathWhereClauses(branch(id, cohorts.users))).toEqual(flow);
   });
 });
 

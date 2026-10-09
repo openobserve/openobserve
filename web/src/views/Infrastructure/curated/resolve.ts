@@ -1103,7 +1103,11 @@ function buildPanel(
   if (stale) {
     config.curated_badge = {
       key: stale.noDataYet ? "infra.curated.staleNoDataBadge" : "infra.curated.staleBadge",
-      date: timestampToTimezoneDate(Math.floor(stale.lastSeenUs / 1000), timezone),
+      date: timestampToTimezoneDate(
+        Math.floor(stale.lastSeenUs / 1000),
+        timezone,
+        "yyyy-MM-dd HH:mm",
+      ),
       // lastSeenUs travels so the CONSUMER computes elapsed time at render time.
       // Baking the count here froze it at build time, so the badge counted from
       // one clock while the page banner counted from another and they drifted apart.
@@ -1119,7 +1123,9 @@ function buildPanel(
     // Rides the SAME gate: a green "all clear" on a stale collector would assert
     // something the page cannot know, so it is stamped only where the no-data
     // verdict itself is trustworthy.
-    if (!stale && section?.emptyMeansHealthy) config.curated_empty_means_healthy = true;
+    if (!stale && (panel.def.emptyMeansHealthy ?? section?.emptyMeansHealthy)) {
+      config.curated_empty_means_healthy = true;
+    }
   }
   return {
     id: panel.id,
@@ -1208,17 +1214,13 @@ function buildVariable(
     return resolved ? [{ name, resolved }] : [];
   });
 
-  // The sections this picker applies to, declared on the variable the way the
-  // dashboards model declares `tabs` — read as a reactive filter at render time
-  // so switching tabs never rebuilds this object. Scope stays "global": an
-  // all-sentinel variable at tab scope is skipped by setTabVisibility and would
-  // never fetch its options at all.
-  const curatedTabs = manifest.sections
+  // Tab-scoped on the sections that declare it, so the picker renders below the tab
+  // bar and each tab keeps its own selection.
+  const tabs = manifest.sections
     .filter((section) => (section.scopedBy ?? []).includes(def.name))
     .map((section) => section.id);
 
   return {
-    curatedTabs,
     curatedPickerLabel: picker.label,
     name: def.name,
     label: def.labelKey ? "" : picker.label,
@@ -1230,7 +1232,8 @@ function buildVariable(
     ...(def.multiSelect
       ? { selectAllValueForMultiSelect: def.defaultFirstValue ? "first" : "all" }
       : {}),
-    scope: "global",
+    scope: "tabs",
+    tabs,
     omitWhenValuesEmpty: def.omitWhenValuesEmpty === true,
     // Consumed by VariablesValueSelector; stored dashboards never carry them, so they stay invisible outside curated pages.
     curatedOmitWhenValuesEmpty: def.omitWhenValuesEmpty === true,

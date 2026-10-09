@@ -48,6 +48,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { unboundPlaceholders } from "@/components/synthetics/variables/placeholders";
@@ -612,9 +613,9 @@ const hasAdvancedChanges = computed(
           <span class="text-text-heading text-sm font-medium">
             {{ t("synthetics.journey.groupAdvancedLabel") }}
           </span>
-          <span class="text-text-secondary truncate text-xs">
+          <OTruncatedText class="text-text-secondary text-xs">
             {{ t("synthetics.journey.groupAdvancedCaption") }}
-          </span>
+          </OTruncatedText>
         </span>
       </template>
 
@@ -714,9 +715,9 @@ const hasAdvancedChanges = computed(
                       aria-hidden="true"
                     />
                   </OTooltip>
-                  <span class="text-text-body min-w-0 truncate font-mono text-xs">
+                  <OTruncatedText class="text-text-body font-mono text-xs">
                     {{ settleResponseLabel(response) }}
-                  </span>
+                  </OTruncatedText>
                 </div>
 
                 <p

@@ -56,6 +56,7 @@ import {
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import { modesWithContent } from "@/utils/alerts/alertCondition";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
@@ -957,7 +958,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const isSyncingStreamFromSql = ref(false);
 
   const debouncedSyncStreamFromSql = debounce(async (sql: string) => {
-    if (!sql || !parser || isSyncingStreamFromSql.value) return;
+    // An edit keeps its stream: the field is locked and the backend never updates it.
+    if (!sql || !parser || isSyncingStreamFromSql.value || beingUpdated.value) return;
     // parse() is exponential in paren nesting depth — skip a pathologically
     // nested query rather than freeze the tab. Losing this convenience sync
     // is fine; the user can still pick the stream from the dropdown.
@@ -967,9 +969,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
       if (fromStream && fromStream !== formData.value.stream_name) {
         isSyncingStreamFromSql.value = true;
-        setF("stream_name", fromStream);
-        await updateStreamFields(fromStream);
-        isSyncingStreamFromSql.value = false;
+        try {
+          setF("stream_name", fromStream);
+          await updateStreamFields(fromStream);
+        } finally {
+          // updateStreamFields throws for a stream that does not exist; a flag
+          // left set would skip every later sync.
+          isSyncingStreamFromSql.value = false;
+        }
       }
     } catch {
       // ignore parse errors while user is mid-typing
@@ -2135,6 +2142,75 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
   };
 
+  // ── Save-mode dialog ──────────────────────────────────────────────────────
+  // Only the selected query mode runs. When another runnable mode also holds
+  // content (or the selected one is empty while another is not), Save asks
+  // which mode the alert uses. Scheduled alerts only: Realtime runs Builder
+  // only, and anomaly/composite alerts have no query mode.
+  const queryModesWithContent = computed(() => {
+    const modes = modesWithContent({
+      sql: formData.value.query_condition?.sql,
+      promql: formData.value.query_condition?.promql,
+      conditions: formData.value.query_condition?.conditions,
+      streamType: formData.value.stream_type,
+    });
+    // An aggregation with no filters is still a Builder query, but only when
+    // Builder is selected: a new metrics alert's default avg is not content.
+    if (
+      (formData.value.query_condition?.type || "custom") === "custom" &&
+      isAggregationEnabled.value &&
+      !modes.includes("custom")
+    )
+      modes.unshift("custom");
+    return modes;
+  });
+  const saveModeChoices = computed(() => {
+    if (formData.value.is_real_time !== "false") return null;
+    const selected = formData.value.query_condition?.type || "custom";
+    const choices = (["custom", "sql", "promql"] as const).filter(
+      (mode) => mode === selected || queryModesWithContent.value.includes(mode),
+    );
+    return choices.length > 1 ? choices : null;
+  });
+  const saveModeDialogOpen = ref(false);
+  const saveModePick = ref<"custom" | "sql" | "promql">("custom");
+  // The user's last pick, so a save that fails validation does not ask again.
+  const confirmedSaveMode = ref<"custom" | "sql" | "promql" | null>(null);
+
+  // True while the dialog's own Save submits, so performSave does not ask again.
+  let savingPickedMode = false;
+
+  // Opens the dialog instead of saving. performSave calls it, so every submit
+  // asks: the footer Save button, and Enter in the name field (OInlineEdit
+  // calls form.requestSubmit(), which never goes through handleSave).
+  const askForSaveMode = () => {
+    if (savingPickedMode || !saveModeChoices.value) return false;
+    const selected = formData.value.query_condition?.type || "custom";
+    const selectedHasContent = queryModesWithContent.value.includes(selected);
+    if (selected === confirmedSaveMode.value && selectedHasContent) return false;
+    saveModePick.value = selected;
+    saveModeDialogOpen.value = true;
+    return true;
+  };
+
+  // The schema picks its rules from `_meta.tab`, which QueryConfig only syncs
+  // through watchers, so set it here too and let them settle before submitting.
+  // The guard stops a second click while the dialog plays its exit animation.
+  const saveWithPickedMode = async () => {
+    if (!saveModeDialogOpen.value) return;
+    saveModeDialogOpen.value = false;
+    confirmedSaveMode.value = saveModePick.value;
+    setF("query_condition.type", saveModePick.value);
+    setF("_meta.tab", saveModePick.value);
+    await nextTick();
+    savingPickedMode = true;
+    try {
+      await handleSave();
+    } finally {
+      savingPickedMode = false;
+    }
+  };
+
   // Imperative pre-save gates RE-HOMED from QueryConfig.validate(), which returns
   // true early in DESCENDANT mode — so its non-schema query-text gates (empty
   // SQL / empty PromQL / aggregate-column toast) no longer fire. Re-home them
@@ -2449,6 +2525,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       await saveAnomalyDetection();
       return;
     }
+    if (askForSaveMode()) return;
     await onSubmit();
   };
 
@@ -2506,6 +2583,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // response shape, etc.) rather than showing NaN.
       data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
+      // The saved type is the user's earlier answer; ask again only on a switch.
+      confirmedSaveMode.value = data.query_condition?.type ?? null;
 
       if (data.query_condition?.promql_condition) {
         if (!data.query_condition.promql_condition.column) {
@@ -3268,6 +3347,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     saveAlertJson,
     applyAlertPrefill,
     handleSave,
+    queryModesWithContent,
+    saveModeChoices,
+    saveModeDialogOpen,
+    saveModePick,
+    saveWithPickedMode,
     onSubmit,
     saveAnomalyDetection,
     previewAlert,
