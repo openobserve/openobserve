@@ -74,6 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </template>
+        <!-- "0 of 0" under "All clear" reads as a broken table, so a healthy empty triage table drops the count. -->
+        <template
+          v-else-if="panelConfig.curated_empty_means_healthy && filteredTableRows.length === 0"
+          #bottom
+        >
+          <span />
+        </template>
       </TableRenderer>
     </div>
   </div>

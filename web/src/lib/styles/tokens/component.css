@@ -776,6 +776,7 @@
   /* Row height tokens: change these to resize all OTable rows globally. */
   --table-row-height-dense: 2.375rem; /* 38px */
   --table-row-height-normal: 2.75rem; /* 44px */
+  --table-row-height-compact: 1.5625rem; /* 25px */
 
   /* ── Chart panel bar ───────────────────────────────────────
      The title strip at the top of every chart panel (dashboard panels via
@@ -942,6 +943,8 @@
   /* Notification count badge ring on the nav rail — a fixed dark ring that
      separates the badge from whatever it overlaps. */
   --color-menu-badge-ring: var(--color-grey-900);
+  /* Active and hover rail labels need a darker step than --color-accent to clear 4.5:1 on the light tile. */
+  --color-nav-label-accent: var(--color-primary-700);
 
   /* Inline progress/duration bar fill (synthetics run timings). */
   --color-progress-track-fill: var(--color-primary-400);
@@ -1285,6 +1288,7 @@
   --color-thread-avatar-bg: var(--color-thread-avatar-bg);
   --color-thread-accent-strong: var(--color-thread-accent-strong);
   --color-menu-badge-ring: var(--color-menu-badge-ring);
+  --color-nav-label-accent: var(--color-nav-label-accent);
   --color-progress-track-fill: var(--color-progress-track-fill);
 
   /* Ingestion empty-state card icon accents */

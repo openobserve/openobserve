@@ -126,10 +126,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span class="ms-2 min-w-0 flex-1 text-left">
-              <span class="block truncate text-sm font-medium">{{
+              <OTruncatedText class="block text-sm font-medium">{{
                 t("components.predefinedThemes.customColor")
-              }}</span>
-              <span class="text-text-secondary block truncate text-xs">
+              }}</OTruncatedText>
+              <OTruncatedText class="text-text-secondary block text-xs">
                 {{
                   isCustomThemeApplied(mode)
                     ? mode === "light"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : customDarkColor
                     : t("components.predefinedThemes.pickAnyBrandHex")
                 }}
-              </span>
+              </OTruncatedText>
             </span>
             <OTag
               v-if="isCustomThemeApplied(mode)"
@@ -187,6 +187,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";

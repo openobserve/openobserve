@@ -56,6 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :total-count-exact="!truncated"
         data-test="dbm-blocked-table"
       >
+        <template #error="{ message }">
+          <OEmptyState
+            preset="load-error"
+            :description="raw(message)"
+            data-test="dbm-blocked-error"
+            @action="onRefresh()"
+          />
+        </template>
         <template #toolbar>
           <DbmTableToolbar
             v-model:search="search"
@@ -75,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroup
               v-model="perspective"
               class="shrink-0"
+              mobile-dropdown
               data-test="dbm-blocked-perspective"
             >
               <OToggleGroupItem
@@ -183,33 +192,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ row.pill.label }}
                 </span>
-                <span v-if="row.pillNote" class="text-text-secondary truncate text-xs">
+                <OTruncatedText v-if="row.pillNote" class="text-text-secondary text-xs">
                   {{ row.pillNote }}
-                </span>
+                </OTruncatedText>
               </div>
 
-              <span class="text-text-code min-w-0 truncate font-mono text-xs">
-                <OTooltip v-if="row.query" :content="raw(row.query)" />
+              <OTruncatedText class="text-text-code font-mono text-xs">
                 {{ raw(row.query ?? "—") }}
-              </span>
+              </OTruncatedText>
 
-              <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
+              <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
                 <OTag type="dbSystem" :value="row.db_system" size="xs" />
-                <template v-if="row.application">
+                <template v-if="row.application || row.db_instance || row.waitingOnPid != null">
                   <span class="opacity-45">·</span>
-                  <span class="text-text-secondary font-medium">{{ raw(row.application) }}</span>
-                </template>
-                <template v-if="row.db_instance">
-                  <span class="opacity-45">·</span>
-                  <span>{{ raw(row.db_instance) }}</span>
-                </template>
-                <template v-if="row.waitingOnPid != null">
-                  <span class="opacity-45">·</span>
-                  <span>{{ t("dbm.blocked.waitingOn", { pid: row.waitingOnPid }) }}</span>
+                  <OTruncatedText
+                    :tooltip="
+                      raw(
+                        [
+                          row.application,
+                          row.db_instance,
+                          row.waitingOnPid != null
+                            ? t('dbm.blocked.waitingOn', { pid: row.waitingOnPid })
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · '),
+                      )
+                    "
+                  >
+                    <span v-if="row.application" class="text-text-secondary font-medium">{{
+                      raw(row.application)
+                    }}</span>
+                    <template v-if="row.db_instance">
+                      <span v-if="row.application" class="px-1 opacity-45">·</span>
+                      <span>{{ raw(row.db_instance) }}</span>
+                    </template>
+                    <template v-if="row.waitingOnPid != null">
+                      <span v-if="row.application || row.db_instance" class="px-1 opacity-45"
+                        >·</span
+                      >
+                      <span>{{ t("dbm.blocked.waitingOn", { pid: row.waitingOnPid }) }}</span>
+                    </template>
+                  </OTruncatedText>
                 </template>
                 <span
                   v-if="row.longestWait"
-                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ms-0.5 px-1 py-px font-semibold"
+                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ms-0.5 shrink-0 px-1 py-px font-semibold"
                 >
                   {{ t("dbm.blocked.longestWait") }}
                 </span>
@@ -239,33 +267,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              stays underneath, for the DBA who wants to look it up. -->
         <template #cell-waitingFor="{ row }">
           <div class="flex flex-col items-end leading-tight">
-            <span v-if="row.waitEventLabel" class="text-text-body text-xs">
+            <OTruncatedText v-if="row.waitEventLabel" class="text-text-body max-w-full text-xs">
               {{ row.waitEventLabel }}
-            </span>
-            <span
+            </OTruncatedText>
+            <OTruncatedText
               v-else-if="row.waitEventRaw"
-              class="text-text-body font-mono text-xs"
+              class="text-text-body max-w-full font-mono text-xs"
               data-test="dbm-blocked-wait-event-raw"
             >
               {{ raw(row.waitEventRaw) }}
-            </span>
+            </OTruncatedText>
             <span v-else class="text-text-muted text-xs">{{ raw("—") }}</span>
-            <span
+            <OTruncatedText
               v-if="row.waitEventLabel && row.waitEventRaw"
-              class="text-text-secondary text-3xs font-mono"
+              class="text-text-secondary text-3xs max-w-full font-mono"
             >
-              <OTooltip :content="raw(row.waitEventRaw)" />
               {{ raw(row.waitEventRaw) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
         <!-- The direct blocker, plus how far the real culprit is. -->
         <template #cell-heldUpBy="{ row }">
           <div class="flex flex-col items-end leading-tight">
-            <span class="text-text-body truncate text-xs">
+            <OTruncatedText class="text-text-body max-w-full text-xs">
               {{ raw(row.blockerApplication ?? "—") }}
-            </span>
+            </OTruncatedText>
             <span class="text-text-muted text-3xs flex items-center justify-end gap-1">
               <span v-if="row.blockerPid != null">
                 {{ t("dbm.deadlocks.detail.pid", { pid: row.blockerPid }) }}
@@ -281,8 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-application="{ row }">
-          <span class="text-text-body block truncate font-mono text-xs">
-            <OTooltip v-if="row.application" :content="raw(row.application)" />
+          <span class="text-text-body font-mono text-xs">
             {{ raw(row.application ?? "—") }}
           </span>
         </template>
@@ -431,7 +457,9 @@ import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import DbmTableToolbar from "@/components/dbm/DbmTableToolbar.vue";
 import DbmTerminateSql from "@/components/dbm/DbmTerminateSql.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -700,6 +728,8 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           id: "query",
           accessorKey: "query",
           header: t("dbm.blocked.columns.sessionQuery"),
+          // Unsized, it took an even share and cut the statement after a few words.
+          size: 420,
           enableSorting: false,
         },
         {
@@ -748,6 +778,7 @@ const columns = computed<OTableColumnDef<BlockedRow>[]>(() =>
           id: "query",
           accessorKey: "query",
           header: t("dbm.blocked.columns.stuckQuery"),
+          size: 420,
           enableSorting: false,
         },
         {
@@ -892,14 +923,18 @@ const footerLine = computed<I18nText | null>(() => {
   // "All N waits lead back to one session" cannot be said over a capped read —
   // the waits we could not read may well lead somewhere else.
   if (rootPids.value.length !== 1 || truncated.value) return null;
-  return t("dbm.blocked.footer.allLeadBack", {
-    waits: t(
-      isLiveWindow.value ? "dbm.blocked.waitingCount" : "dbm.blocked.waitingCountPast",
-      { count: waitingCount.value },
-      waitingCount.value,
-    ),
-    pid: rootPids.value[0],
-  });
+  return t(
+    "dbm.blocked.footer.allLeadBack",
+    {
+      waits: t(
+        isLiveWindow.value ? "dbm.blocked.waitingCount" : "dbm.blocked.waitingCountPast",
+        { count: waitingCount.value },
+        waitingCount.value,
+      ),
+      pid: rootPids.value[0],
+    },
+    waitingCount.value,
+  );
 });
 
 const footerDetail = computed<I18nText>(() => {

@@ -76,26 +76,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Label + pool subtext -->
       <template #cell-name="{ row }">
         <div class="flex min-w-0 flex-col">
-          <span class="truncate font-medium">{{ (row as any).label }}</span>
-          <span class="text-text-muted truncate text-xs">{{ (row as any).pool }}</span>
+          <OTruncatedText class="font-medium">{{ (row as any).label }}</OTruncatedText>
+          <OTruncatedText class="text-text-muted text-xs">{{ (row as any).pool }}</OTruncatedText>
         </div>
       </template>
 
       <!-- Agents: live/total count (a location is a pool of interchangeable
            agents). Names/health are on the detail page; shown here on hover. -->
       <template #cell-agents="{ row }">
-        <div class="flex min-w-0 flex-col" :title="agentSubtext(row as any) || ''">
+        <div class="flex min-w-0 flex-col">
           <!-- 0/0 would read as "no agents installed"; this region simply has
                no count to give. -->
-          <span v-if="liveStatus(row as SyntheticLocation) === 'unknown'" class="text-text-muted"
+          <span
+            v-if="liveStatus(row as SyntheticLocation) === 'unknown'"
+            class="text-text-muted"
+            :title="agentSubtext(row as any) || ''"
             >—</span
           >
-          <span v-else class="truncate"
+          <span v-else class="truncate" :title="agentSubtext(row as any) || ''"
             >{{ (row as any).live_agents ?? 0
             }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span
           >
-          <span v-if="(row as any).version" class="text-text-muted truncate text-xs"
-            >{{ t("synthetics.versionPrefix") }}{{ (row as any).version }}</span
+          <OTruncatedText v-if="(row as any).version" class="text-text-muted text-xs"
+            >{{ t("synthetics.versionPrefix") }}{{ (row as any).version }}</OTruncatedText
           >
         </div>
       </template>
@@ -224,6 +227,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

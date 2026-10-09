@@ -1346,6 +1346,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a language pill's label is painted on the translucent pill",
   },
   {
+    fg: "--color-nav-label-accent",
+    bg: "--color-tabs-hover-bg",
+    category: "text",
+    why: "the hover label is painted on the tile's hover tint, which is darker than the page",
+    themes: ["light"],
+  },
+  {
     fg: "--color-lang-vrl-text",
     bg: "--color-lang-vrl-bg",
     under: ["--color-surface-base"],

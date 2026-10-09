@@ -184,7 +184,7 @@ const selectedHeaderNames = computed(() => Object.keys(selectedDestination.value
 const toOption = (d: any) => ({
   label: d.name,
   value: d.name,
-  subLabel: d.url && d.url.length > 70 ? d.url.slice(0, 70) + "..." : d.url,
+  subLabel: d.url,
   subLabelInline: true,
 });
 
