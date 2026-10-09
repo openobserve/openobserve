@@ -324,6 +324,45 @@ describe("AlertSettings — Creates Incident toggle visibility", () => {
   });
 });
 
+describe("AlertSettings — incident title preview", () => {
+  const original = config.isEnterprise;
+  afterEach(() => {
+    config.isEnterprise = original;
+  });
+
+  it("fills placeholders from alert fields and the sample row, keeping unknown ones", () => {
+    config.isEnterprise = "true";
+    const host = mount(
+      defineComponent({
+        components: { OForm, AlertSettings },
+        setup: () => ({
+          schema: parentSchema,
+          defaultValues: {
+            trigger_condition: { silence: 10, period: 10 },
+            destinations: [] as string[],
+            creates_incident: true,
+          },
+          formData: makeFormData({
+            creates_incident: true,
+            name: "HighErrors",
+            incident_title_template: "{alert_name}: {service} on {host}",
+          }),
+          sampleRow: { service: "checkout" },
+        }),
+        template: `
+          <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+            <AlertSettings :form-data="formData" is-real-time="false" :destinations="[]" :sample-row="sampleRow" />
+          </OForm>
+        `,
+      }),
+      { global: { plugins: [makeStore({ incidents_enabled: true }), i18n] } },
+    );
+    expect(host.find('[data-test="alert-incident-title-preview"]').text()).toContain(
+      "HighErrors: checkout on {host}",
+    );
+  });
+});
+
 // ── silence: blank must FAIL, but 0 must PASS ───────────────────────────────
 // The rule is zero-safe (0 minutes of silence is legal), which is exactly why it
 // cannot use `z.coerce.number()`: `Number("") === 0` would sail through

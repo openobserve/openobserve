@@ -11,6 +11,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import {
   renderTemplate,
+  segmentClass,
   buildPreviewContext,
   type PreviewSegment,
   type AlertFormFacts,
@@ -88,17 +89,6 @@ function bodyOf(name: string): string {
 
 function segmentsFor(name: string): PreviewSegment[] {
   return renderTemplate(bodyOf(name), ctx.value);
-}
-
-// segClass maps a segment kind to its visual style class.
-function segClass(kind: string) {
-  return kind === "live"
-    ? "text-text-heading font-semibold"
-    : kind === "sample"
-      ? "text-text-secondary italic underline decoration-dashed"
-      : kind === "opaque"
-        ? "rounded-default bg-surface-subtle-hover text-text-body px-1"
-        : "text-text-body";
 }
 
 // ── CURRENT snapshot, frozen when the drawer opens ──────────────────
@@ -355,7 +345,7 @@ defineExpose({ applyTemplate, previewTemplate });
               data-test="help-preview-box"
               class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             ><template v-for="(s, i) in currentSegments" :key="i"
-                ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
               ></pre>
             <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
@@ -386,7 +376,7 @@ defineExpose({ applyTemplate, previewTemplate });
                   data-test="help-destination-preview"
                   class="rounded-surface border-border-subtle bg-surface-panel text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
                 ><template v-for="(s, i) in d.segments" :key="i"
-                    ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                    ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
                   ></pre>
                 <p v-else class="text-text-secondary m-0 text-xs italic">
                   {{ t("alerts.alertSettings.helpDestinationNoTemplate") }}
@@ -416,7 +406,7 @@ defineExpose({ applyTemplate, previewTemplate });
               data-test="help-preview-box"
               class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
             ><template v-for="(s, i) in previewSegments" :key="i"
-                ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+                ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
               ></pre>
             <p v-else class="text-text-secondary m-0 italic">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
@@ -662,7 +652,7 @@ defineExpose({ applyTemplate, previewTemplate });
             data-test="help-preview-box"
             class="rounded-surface border-border-default bg-surface-subtle text-text-body m-0 border p-3 font-mono text-xs leading-[1.6] break-words whitespace-pre-wrap"
           ><template v-for="(s, i) in rowSegments" :key="i"
-              ><span :class="segClass(s.kind)">{{ s.text }}</span></template
+              ><span :class="segmentClass(s.kind)">{{ s.text }}</span></template
             ></pre>
           <p v-else class="text-text-secondary m-0 italic" data-test="help-row-preview-empty">
             {{ t("alerts.alertSettings.helpRowTemplatePreviewEmpty") }}

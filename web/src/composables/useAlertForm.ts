@@ -197,6 +197,7 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    incident_title_template: "",
     // Off by default: a recovery is a new outbound message class, so it is opted into.
     notify_on_recovery: false,
     recovery_destinations: [],

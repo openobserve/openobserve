@@ -220,6 +220,12 @@ pub struct Alert {
     #[schema(example = "https://wiki.example.com/runbooks/checkout")]
     pub runbook_url: Option<String>,
 
+    /// Title for incidents this alert opens. `{var}` placeholders fill from the
+    /// triggering row and alert fields; any unresolved one keeps the generated title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "{service_name} errors on {host}")]
+    pub incident_title_template: Option<String>,
+
     /// Whether a scheduler job exists for this alert (runtime status, not a
     /// stored field). Populated on the composite detail path; omitted otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -633,6 +639,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             tags: alert.tags,
             oncall_team: alert.oncall_team,
             runbook_url: alert.runbook_url,
+            incident_title_template: alert.incident_title_template,
             scheduler_job_present: None,
             pending_period_sec: alert.pending_period_sec,
             notify_on_recovery: alert.notify_on_recovery,
@@ -841,6 +848,9 @@ impl From<Alert> for meta_alerts::alert::Alert {
         // Same empty-string-is-absent rule: a form clears a text input by
         // sending "", and a stored "" would render as a link to nowhere.
         alert.runbook_url = value.runbook_url.filter(|u| !u.trim().is_empty());
+        alert.incident_title_template = value
+            .incident_title_template
+            .filter(|t| !t.trim().is_empty());
         alert.pending_period_sec = value.pending_period_sec;
         alert.notify_on_recovery = value.notify_on_recovery;
         alert.recovery_destinations = value.recovery_destinations;

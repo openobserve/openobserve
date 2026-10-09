@@ -219,6 +219,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .unwrap_or_default();
         alert.oncall_team = value.oncall_team;
         alert.runbook_url = value.runbook_url;
+        alert.incident_title_template = value.incident_title_template;
 
         alert.pending_period_sec = value.pending_period_sec;
         // NULL predates the feature, which is the same as off / no hold.
@@ -1031,6 +1032,7 @@ fn update_mutable_fields(
     alert_am.slo_id = Set(slo_id);
     alert_am.oncall_team = Set(alert.oncall_team.clone());
     alert_am.runbook_url = Set(alert.runbook_url.clone());
+    alert_am.incident_title_template = Set(alert.incident_title_template.clone());
     alert_am.query_vrl_function = Set(query_vrl_function);
     alert_am.query_search_event_type = Set(query_search_event_type);
     alert_am.query_multi_time_range = Set(query_multi_time_range);
@@ -1129,6 +1131,7 @@ pub(super) mod tests {
             slo_id: None,
             oncall_team: None,
             runbook_url: None,
+            incident_title_template: None,
             query_slo_condition: None,
             trigger_frequency_type: 1, // Seconds
             trigger_frequency_seconds: 300,

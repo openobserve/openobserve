@@ -73,6 +73,8 @@ pub struct CorrelationSubject {
     /// carry `alert.priority` mapped through `determine_severity`, when set.
     /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
+    /// Rendered custom title; `None` → enterprise `generate_title`.
+    pub title: Option<String>,
 }
 
 /// An alert's incident correlation, and why its incident notification missed a destination.
@@ -657,6 +659,12 @@ pub async fn correlate_alert_to_incident(
             .ok()
     });
 
+    let org_name = crate::common::infra::config::ORGANIZATIONS
+        .read()
+        .await
+        .get(&alert.org_id)
+        .map_or_else(|| alert.org_id.clone(), |org| org.name.clone());
+
     // Build the correlation subject for the internal alert path.
     let subject = CorrelationSubject {
         id: alert.get_unique_key(),
@@ -665,6 +673,13 @@ pub async fn correlate_alert_to_incident(
         kind: AlertKind::Internal,
         base_destinations: alert.destinations.clone(),
         severity,
+        title: super::incident_title::render(
+            alert,
+            &org_name,
+            result_row,
+            &[&labels, &group_values],
+            triggered_at,
+        ),
     };
 
     // Find or create incident
@@ -880,6 +895,7 @@ pub async fn correlate_external_event(
         kind: AlertKind::External,
         base_destinations,
         severity: Some(external.severity.parse().unwrap_or(IncidentSeverity::P3)),
+        title: None,
     };
 
     let triggered_at = external.last_seen_at;
@@ -1214,8 +1230,9 @@ async fn create_new_incident(
         }
     };
 
-    let title =
-        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values);
+    let title = subject.title.clone().unwrap_or_else(|| {
+        o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values)
+    });
 
     let incident = infra::table::alert_incidents::create(
         org_id,
