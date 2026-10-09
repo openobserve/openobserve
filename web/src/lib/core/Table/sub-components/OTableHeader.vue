@@ -51,6 +51,7 @@ const props = defineProps<{
   pivotRowColumns?: any[];
   stickyColTotals?: boolean;
   dense?: boolean;
+  compact?: boolean;
   /** Show the per-column value-filter dropdown on filterable columns. */
   enableColumnFilter?: boolean;
   /** Show the per-column "format this column" icon on formattable columns. */
@@ -549,7 +550,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
           'table-head',
-          dense ? 'h-8' : 'h-9',
+          compact ? 'h-6' : dense ? 'h-8' : 'h-9',
           'border-table-header-border border-b',
           'group',
           // Sortable's `filter` selector — this header can't start a drag, so it
@@ -913,7 +914,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         @mouseenter="noteCutHeaderName(header, $event)"
         :class="[
           `${headerPaddingClass(header)} text-table-header-text relative text-left text-xs font-medium select-none`,
-          dense ? 'group h-8' : 'group h-9',
+          compact ? 'group h-6' : dense ? 'group h-8' : 'group h-9',
           'border-table-header-border border-b',
           header.column.getIsPinned?.() ? 'bg-table-header-bg' : '',
           (header.column.columnDef.meta as any)?.headerClass ?? '',
