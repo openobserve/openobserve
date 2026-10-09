@@ -721,13 +721,18 @@ import {
 } from "@/utils/streamPersist";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { fieldSearchPredicate, type NoFtsFieldSubmission } from "./LogsNoFtsFieldSearch.schema";
-import { isAuthoredStatement, renderPlan } from "@/utils/query/freeTextFilter";
+import {
+  isAuthoredStatement,
+  renderPlan,
+  preserveFilterComments,
+} from "@/utils/query/freeTextFilter";
 import {
   buildFilterContext,
   rewrittenFilter,
   markFreeTextBlocked,
   noFtsStreams,
   noFtsRecoveryStreams,
+  noFtsRecoveryTerm as recoveryTerm,
   planStreamsFilter,
   recoveryCardsFor,
   searchTextReplacement,
@@ -1758,10 +1763,16 @@ export default defineComponent({
           const toggleCtx = buildFilterContext(searchObj, store.state.zoConfig);
           const togglePlan = planStreamsFilter(currentQuery.trim(), toggleStreams, toggleCtx);
           const textWhere =
-            togglePlan.kind === "freeText"
-              ? toggleStreams.map((stream) =>
-                  renderPlan(togglePlan, toggleCtx.targets[stream], toggleCtx.knownFields),
-                )
+            togglePlan.kind === "freeText" ||
+            (togglePlan.kind === "sql" && togglePlan.filter !== currentQuery.trim())
+              ? toggleStreams.map((stream) => {
+                  const rendered = renderPlan(
+                    togglePlan,
+                    toggleCtx.targets[stream],
+                    toggleCtx.knownFields,
+                  );
+                  return rendered === null ? null : preserveFilterComments(currentQuery, rendered);
+                })
               : null;
           if (textWhere?.some((where) => where === null)) {
             // A no-FTS arm would fail or be dropped, so the toggle is refused (AC6.3).
@@ -2077,7 +2088,10 @@ export default defineComponent({
       const stream = searchObj.data.stream.selectedStream?.[0];
       const ctx = buildFilterContext(searchObj, store.state.zoConfig);
       const plan = stream ? planStreamsFilter(raw.trim(), [stream], ctx) : null;
-      if (!stream || plan?.kind !== "freeText") return { where: raw, freeText: false };
+      if (!stream || !plan) return { where: raw, freeText: false };
+      if (plan.kind !== "freeText") {
+        return { where: plan.filter, freeText: plan.filter !== raw.trim() };
+      }
       const target = ctx.targets[stream];
       return {
         where: target ? (renderPlan(plan, target, ctx.knownFields) ?? "") : "",
@@ -2098,16 +2112,10 @@ export default defineComponent({
       noFtsRecoveryStreams(
         searchObj,
         searchObj.data.freeTextBlocked?.streams ?? searchObj.data.freeTextExcluded ?? [],
+        store.state.zoConfig,
       ),
     );
-    const noFtsRecoveryTerm = computed(() => {
-      const plan = planStreamsFilter(
-        searchObj.data.query.trim(),
-        searchObj.data.stream.selectedStream,
-        buildFilterContext(searchObj, store.state.zoConfig),
-      );
-      return plan.kind === "freeText" ? plan.units.join(" ") : searchObj.data.query;
-    });
+    const noFtsRecoveryTerm = computed(() => recoveryTerm(searchObj, store.state.zoConfig));
     const onNoFtsClearRun = () => runRecoveryFilter("");
     const onNoFtsFieldSearch = async (values: NoFtsFieldSubmission) => {
       const predicate = fieldSearchPredicate(values, noFtsRecoverySchemas.value);

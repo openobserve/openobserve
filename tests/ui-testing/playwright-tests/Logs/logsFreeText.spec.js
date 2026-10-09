@@ -236,13 +236,14 @@ test.describe('Logs bare-word search (item 1)', () => {
     const searches = await open(page, NOFTS, 'timeout');
     await page.locator(runBtn).click();
 
-    await expect(page.locator(panel)).toContainText(`Word search is not configured for ${NOFTS}`, { timeout: 30000 });
+    await expect(page.locator(panel)).toContainText(`Full-text search fields are not configured for ${NOFTS}`, { timeout: 30000 });
     expect(searches.hits()).toHaveLength(0);
     await page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
     const alertItem = page.locator('[data-test="logs-create-alert-btn"]');
     await expect(alertItem).toBeDisabled();
     await page.keyboard.press('Escape');
 
+    await expect(page.locator('[data-test="logs-no-fts-configure-btn"]')).toContainText('Configure full-text search fields');
     await page.locator('[data-test="logs-no-fts-configure-btn"]').click();
     await expect.poll(() => new URL(page.url()).pathname).toContain('/streams');
     expect(new URL(page.url()).searchParams.get('dialog')).toBe(NOFTS);
@@ -270,7 +271,7 @@ test.describe('Logs bare-word search (item 1)', () => {
     expect(sql).not.toContain(`"${NOFTS}"`);
     const banner = page.locator('[data-test="logs-missing-stream-banner"]');
     await expect(banner).toContainText(NOFTS, { timeout: 30000 });
-    await expect(banner).toContainText('was skipped because word search is not configured');
+    await expect(banner).toContainText('was skipped because it has no full-text search fields configured');
     await expect(page.locator('[data-test="logs-search-filter-error-message"]')).toHaveCount(0);
   });
 

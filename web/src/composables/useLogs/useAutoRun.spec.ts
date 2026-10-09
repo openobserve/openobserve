@@ -479,6 +479,28 @@ describe("J4 debounce and coalescing", () => {
 });
 
 describe("dirty editor (AC4.4)", () => {
+  it("a Run stopped by validation records the baseline without claiming new results", () => {
+    const h = makeHarness();
+    h.engine.requestRun("run");
+    h.completeLast();
+    const previous = h.store.meta.executed;
+    h.executors.logs.mockImplementationOnce(() => undefined);
+    h.live.query = "nosuch=1";
+    h.engine.markEditorDirty();
+    h.engine.requestRun("run");
+    expect(h.engine.isRunDirty()).toBe(false);
+    expect(h.store.meta.editorDirty).toBe(false);
+    expect(h.store.meta.runPending).toBe(false);
+    expect(h.store.meta.executed).toBe(previous);
+    expect(h.engine.isResultsStale()).toBe(true);
+    h.live.query = "nosuch=2";
+    h.engine.markEditorDirty();
+    expect(h.engine.isRunDirty()).toBe(true);
+    h.live.query = "nosuch=1";
+    expect(h.engine.reconcileEditorDirty()).toBe(true);
+    expect(h.engine.isRunDirty()).toBe(false);
+  });
+
   it("a trigger while dirty does not run and shows the pending dot", () => {
     const h = makeHarness();
     h.engine.markEditorDirty();

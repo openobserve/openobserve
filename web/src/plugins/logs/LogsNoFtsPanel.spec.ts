@@ -34,14 +34,25 @@ const mountPanel = (streams: { name: string; hasTextFields: boolean }[], props =
   });
 
 describe("LogsNoFtsPanel (J3 with scan mode off)", () => {
+  it("describes whole-query replacement without empty quotes", () => {
+    const wrapper = mountPanel([{ name: "nofts", hasTextFields: true }], { term: "" });
+    expect(wrapper.text()).not.toContain("“”");
+    expect(wrapper.text()).toContain("clear the whole query");
+    expect(wrapper.text()).toContain("keeping excluded words");
+    wrapper.unmount();
+  });
+
   it("names the stream and offers all three recovery actions (AC-C1.1)", async () => {
     const wrapper = mountPanel([{ name: "nofts_b", hasTextFields: true }]);
     const panel = wrapper.find('[data-test="logs-no-fts-panel"]');
 
-    expect(panel.text()).toContain("Word search is not configured for nofts_b");
-    expect(panel.text()).toContain("Search a field value");
+    expect(panel.text()).toContain("Full-text search fields are not configured for nofts_b");
+    expect(panel.text()).toContain("Search field values");
     expect(wrapper.find('[data-test="logs-no-fts-search-fields-btn"]').exists()).toBe(true);
 
+    expect(wrapper.get('[data-test="logs-no-fts-configure-btn"]').text()).toContain(
+      "Configure full-text search fields",
+    );
     await wrapper.find('[data-test="logs-no-fts-configure-btn"]').trigger("click");
     expect(wrapper.emitted("configure")).toEqual([["nofts_b"]]);
   });
@@ -73,7 +84,7 @@ describe("LogsNoFtsPanel (J3 with scan mode off)", () => {
       const card = wrapper.get('[data-test="logs-no-fts-configure-btn"]');
       expect(card.attributes("aria-disabled")).toBeUndefined();
       expect(wrapper.text()).not.toContain("You need permission to edit stream settings.");
-      expect(wrapper.text()).toContain("Makes word search fast for this stream.");
+      expect(wrapper.text()).toContain("Makes full-text search fast for this stream.");
       await card.trigger("click");
       expect(wrapper.emitted("configure")).toEqual([["nofts_b"]]);
       expect(lookup).not.toHaveBeenCalled();

@@ -2207,7 +2207,7 @@ export default defineComponent({
       () =>
         !!searchObj.meta.runPending ||
         !!searchObj.meta.editorDirty ||
-        (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isResultsStale()),
+        (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isRunDirty()),
     );
     const showRunQueryPending = computed(
       () =>

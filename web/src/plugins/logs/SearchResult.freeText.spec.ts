@@ -68,10 +68,15 @@ describe("SearchResult missing-stream banner (item 1 AC4.1)", () => {
 
     const banner = wrapper.find('[data-test="logs-missing-stream-banner"]');
     expect(banner.text()).toContain("nofts_b");
-    expect(banner.text()).toContain("nofts_b was skipped because word search is not configured.");
+    expect(banner.text()).toContain(
+      "nofts_b was skipped because it has no full-text search fields configured.",
+    );
     expect(banner.text()).toContain("These results are from fts_a only.");
     expect(banner.text()).not.toContain("Not searched:");
 
+    expect(banner.get('[data-test="logs-no-fts-configure-btn"]').text()).toContain(
+      "Configure full-text search fields",
+    );
     await banner.find('[data-test="logs-no-fts-configure-btn"]').trigger("click");
     expect(pushMock).toHaveBeenCalledWith("/streams?dialog=nofts_b");
   });

@@ -123,7 +123,7 @@ describe("freeTextFilter", () => {
       ["error OR -debug", "match_all('error') OR NOT match_all('debug')"],
       ["NOT -debug", "NOT NOT match_all('debug')"],
       ["limit 50", "match_all('limit') AND match_all('50')"],
-      ["-'quoted'", "match_all('-''quoted''')"],
+      ["-'quoted'", "NOT match_all('quoted')"],
       ['"connection refused"', "match_all('connection refused')"],
       ["'connection refused'", "match_all('connection refused')"],
       ["timeout error", "match_all('timeout') AND match_all('error')"],
@@ -322,6 +322,65 @@ describe("freeTextFilter", () => {
       const plan = planFilter(raw, FIELDS);
       expect(plan).toEqual({ kind: "unclassified", filter: raw });
       expect(renderPlan(plan, FTS, KNOWN)).toBe(legacyWhere(raw, KNOWN));
+    });
+
+    it.each([
+      ['-"connection refused"', "NOT match_all('connection refused')"],
+      ["-'connection refused'", "NOT match_all('connection refused')"],
+      ["-'debug'", "NOT match_all('debug')"],
+      ["-ошибка", "NOT match_all('ошибка')"],
+      ["-über", "NOT match_all('über')"],
+      ["-500", "match_all('-500')"],
+      ["ERR-42", "match_all('ERR-42')"],
+      ["error--timeout", "match_all('error--timeout')"],
+      ["error---timeout", "match_all('error---timeout')"],
+      ["Weird---Hyphen", "match_all('Weird---Hyphen')"],
+      ["ошибка----сервер", "match_all('ошибка----сервер')"],
+    ])("renders exclusion or literal %s", (raw, expected) => {
+      expect(renderFts(raw)).toBe(expected);
+    });
+
+    it("classifies a 50,000-dash word in under a second", () => {
+      const raw = `error${"-".repeat(50_000)}timeout`;
+      const start = performance.now();
+      const plan = planFilter(raw, FIELDS);
+      const elapsed = performance.now() - start;
+      expect(plan).toMatchObject({ kind: "freeText", units: [raw] });
+      expect(elapsed).toBeLessThan(1000);
+    });
+
+    it.each([
+      ["error--timeout", "match_all('error--timeout')"],
+      ["error---timeout", "match_all('error---timeout')"],
+      ["Weird---Hyphen", "match_all('Weird---Hyphen')"],
+      ["ошибка----сервер", "match_all('ошибка----сервер')"],
+      ["error --- note\ntimeout", "match_all('error') AND match_all('timeout')"],
+      ["error--- timeout", "match_all('error')"],
+      ["error -- note", "match_all('error')"],
+      ["--- note\nerror", "match_all('error')"],
+    ])("preserves round-3 dash classification: %s", (raw, expected) => {
+      expect(renderFts(raw)).toBe(expected);
+    });
+
+    it.each(['-"level"', "-'level'", "-level", "-a", "-'a'", "-"])(
+      "keeps field-like and ineligible excluded units unchanged: %s",
+      (raw) => expect(planFilter(raw, FIELDS).kind).not.toBe("freeText"),
+    );
+
+    it.each(['-"connection refused"', "-'connection refused'", "-ошибка", "-über"])(
+      "renders exclusions in a predicate mix: %s",
+      (raw) =>
+        expect(planFilter(`${raw} AND code=500`, FIELDS)).toEqual({
+          kind: "sql",
+          filter: `${renderFts(raw)} AND code=500`,
+        }),
+    );
+
+    it("applies configured token limits to Unicode exclusions", () => {
+      expect(planFilter("-über", FIELDS, { tokenLimits: { min: 4, max: 64 } })).toEqual({
+        kind: "sql",
+        filter: "-über",
+      });
     });
 
     it("reads -timeout as exclusion", () => {
@@ -646,12 +705,34 @@ describe("freeTextFilter", () => {
       });
     });
 
-    it("ignores UDS and reads the full schema", () => {
+    it("requires a full-text field inside the user-defined schema", () => {
       const s = stream({
         schema: [utf8("body"), utf8("level")],
-        settings: { defined_schema_fields: ["level"] } as StreamWithSchema["settings"],
+        settings: { defined_schema_fields: ["level"] },
       });
+      expect(streamTextTarget(s, ["body"], undefined)).toEqual({
+        mode: "blocked",
+        candidates: ["body", "level"],
+      });
+      s.settings = { defined_schema_fields: ["level", "body"] };
       expect(streamTextTarget(s, ["body"], undefined)).toEqual({ mode: "fts", fields: ["body"] });
+    });
+
+    it.each([500, 7])("restricts UDS at the backend limit %i but bypasses it above", (limit) => {
+      const defined = Array.from({ length: limit }, (_, i) => `field_${i}`);
+      const s = stream({
+        schema: [utf8("body"), ...defined.map(utf8)],
+        settings: { defined_schema_fields: defined },
+      });
+      expect(streamTextTarget(s, ["body"], undefined, undefined, limit).mode).toBe("blocked");
+      s.settings = { defined_schema_fields: [...defined, "extra"] };
+      expect(streamTextTarget(s, ["body"], undefined, undefined, limit)).toEqual({
+        mode: "fts",
+        fields: ["body"],
+      });
+      if (limit === 500) {
+        expect(streamTextTarget(s, ["body"], undefined).mode).toBe("fts");
+      }
     });
 
     it("blocks on empty default_fts_keys and no explicit keys", () => {

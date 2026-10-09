@@ -8,7 +8,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { resetFreeTextSchemasForTests } from "@/composables/useLogs/freeTextSearch";
-import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
+import { readLogsSignature, resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
 
 const { sent, streams } = vi.hoisted(() => ({
   sent: [] as {
@@ -103,6 +103,7 @@ beforeEach(async () => {
   sent.length = 0;
 });
 afterEach(() => {
+  streams.splice(2);
   wrapper?.unmount();
   vi.restoreAllMocks();
   resetLogsAutoRunForTests();
@@ -110,6 +111,104 @@ afterEach(() => {
 });
 
 describe("Index no-FTS recovery requests", { timeout: 30000 }, () => {
+  it.each([
+    ["-refused", ""],
+    ["debug -message", "debug"],
+    ['-"connection refused"', ""],
+  ])("field recovery never prefills an exclusion from %s", async (query, value) => {
+    wrapper.vm.searchObj.data.query = query;
+    await wrapper.get('[data-test="logs-no-fts-search-fields-btn"]').trigger("click");
+    expect(wrapper.findComponent(OForm).vm.form.state.values.value).toBe(value);
+    expect(sent).toHaveLength(0);
+  });
+
+  it.each(["debug -message", "-refused", "-debug -info"])(
+    "sends the complete previewed field filter for %s",
+    async (query) => {
+      wrapper.vm.searchObj.data.query = query;
+      await wrapper.get('[data-test="logs-no-fts-search-fields-btn"]').trigger("click");
+      const preview = wrapper.get('[data-test="logs-no-fts-preview"]').text();
+      expect(preview).toContain("NOT (message IS NOT NULL AND str_match_ignore_case(message,");
+      await wrapper.get('[data-test="logs-no-fts-field-form"]').trigger("submit");
+      await vi.waitFor(() => expect(results()).toHaveLength(1));
+      expect(wrapper.vm.searchObj.data.query).toBe(preview);
+      expect(results()[0].queryReq.query.sql.replace(/"message"/g, "message")).toContain(preview);
+    },
+  );
+
+  it("a validation-blocked Run clears the button's dirty state until the next edit", async () => {
+    const state = wrapper.vm.searchObj;
+    state.data.stream.selectedStream = ["nofts", "fts"];
+    state.data.freeTextBlocked = null;
+    state.meta.executed = {
+      generation: 0,
+      signature: readLogsSignature(state),
+      req: {},
+      complete: true,
+    };
+    state.data.query = "nosuch=1";
+    state.data.editorValue = "nosuch=1";
+    wrapper.vm.autoRun.engine.markEditorDirty();
+    await flushPromises();
+    expect(wrapper.vm.searchBarRef.showRunQueryPending).toBe(true);
+    wrapper.vm.searchBarRef.handleRunQueryFn();
+    await flushPromises();
+    expect(sent).toHaveLength(0);
+    expect(state.data.filterErrMsg).not.toBe("");
+    expect(wrapper.vm.searchBarRef.showRunQueryPending).toBe(false);
+    state.data.query = "nosuch=2";
+    state.data.editorValue = "nosuch=2";
+    wrapper.vm.autoRun.engine.markEditorDirty();
+    await flushPromises();
+    expect(wrapper.vm.searchBarRef.showRunQueryPending).toBe(true);
+  });
+
+  it("blocks text on a user-defined schema without any full-text field", async () => {
+    const state = wrapper.vm.searchObj;
+    streams.push({
+      ...streams[1],
+      name: "uds",
+      settings: { ...streams[1].settings, defined_schema_fields: ["_timestamp"] },
+    });
+    state.data.streamResults = { list: streams };
+    state.data.stream.selectedStream = ["uds"];
+    state.data.query = "row";
+    state.data.editorValue = "row";
+    wrapper.vm.searchBarRef.handleRunQueryFn();
+    await flushPromises();
+    expect(sent).toHaveLength(0);
+    expect(state.data.freeTextBlocked?.streams).toEqual(["uds"]);
+  });
+
+  it("defaults UDS recovery to an allowed field", async () => {
+    const state = wrapper.vm.searchObj;
+    streams.push({
+      name: "uds",
+      schema: [
+        { name: "_timestamp", type: "Int64" },
+        { name: "extra", type: "Utf8" },
+        { name: "level", type: "Utf8" },
+        { name: "log", type: "Utf8" },
+      ],
+      settings: { defined_schema_fields: ["level"] },
+    });
+    state.data.streamResults = { list: streams };
+    state.data.stream.selectedStream = ["uds"];
+    state.data.query = "error";
+    state.data.freeTextBlocked = { ...state.data.freeTextBlocked, streams: ["uds"] };
+    await flushPromises();
+    expect(wrapper.vm.noFtsRecoverySchemas[0].schema.map((field) => field.name)).toEqual([
+      "_timestamp",
+      "level",
+    ]);
+    await wrapper.get('[data-test="logs-no-fts-search-fields-btn"]').trigger("click");
+    expect(wrapper.findComponent(OForm).vm.form.state.values.field).toBe("level");
+    const preview = wrapper.get('[data-test="logs-no-fts-preview"]').text();
+    await wrapper.get('[data-test="logs-no-fts-field-form"]').trigger("submit");
+    await vi.waitFor(() => expect(results()).toHaveLength(1));
+    expect(results()[0].queryReq.query.sql.replace(/"level"/g, "level")).toContain(preview);
+  });
+
   it("open, edit and cancel issue zero requests and restore the triggering card", async () => {
     const trigger = wrapper.get('[data-test="logs-no-fts-search-fields-btn"]');
     await trigger.trigger("click");

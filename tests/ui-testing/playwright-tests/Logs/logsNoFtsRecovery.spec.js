@@ -50,7 +50,8 @@ test.describe('No-FTS recovery C1', () => {
 
   test('open, edit and cancel send zero searches; submit runs exactly the preview with quotes (AC-C1.1, C1.2)', async ({ page }) => {
     const requests = await open(page);
-    await expect(page.locator(panel)).toContainText(`Word search is not configured for ${NOFTS}`);
+    await expect(page.locator(panel)).toContainText(`Full-text search fields are not configured for ${NOFTS}`);
+    await expect(page.locator('[data-test="logs-no-fts-configure-btn"]')).toContainText('Configure full-text search fields');
     await expect(page.locator('[data-test="logs-no-fts-clear-run-btn"]')).toBeVisible();
     await page.locator('[data-test="logs-no-fts-search-fields-btn"]').click();
     await select(page, 'field', 'msg_text');

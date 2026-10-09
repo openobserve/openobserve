@@ -167,6 +167,7 @@ export interface AutoRunMeta {
   nlDetected?: boolean;
   editorDirty?: boolean;
   executed?: ExecutedRecord | null;
+  lastRunAttempt?: Pick<ExecutedRecord, "generation" | "signature"> | null;
   pendingExecution?: ExecutedRecord | null;
   executedPatterns?: PatternsRecord | null;
   executedPanel?: PanelRecord | null;
@@ -775,6 +776,9 @@ export function createAutoRun(deps: AutoRunDeps) {
   }
 
   function dispatch(gen: Generation, input: ExecuteInput): RequestRunResult {
+    if (gen.surface === "logs" && input.op === "full") {
+      meta.lastRunAttempt = { generation: gen.id, signature: cloneJson(input.signature) };
+    }
     if (input.op !== "histogram") {
       recordConsent(input.signature);
       meta.autoRunBlocked = null;
@@ -1086,7 +1090,7 @@ export function createAutoRun(deps: AutoRunDeps) {
       if (!panel || panel.surface !== mode) return false;
       return deps.readPanelConfigSignature?.(mode) === panel.configSignature;
     }
-    const ran = meta.executed ?? meta.pendingExecution;
+    const ran = meta.lastRunAttempt ?? meta.executed ?? meta.pendingExecution;
     return sameSignature(deps.readSignature(), ran?.signature);
   }
 
@@ -1096,6 +1100,10 @@ export function createAutoRun(deps: AutoRunDeps) {
     meta.editorDirty = false;
     meta.runPending = false;
     return true;
+  }
+
+  function isRunDirty(): boolean {
+    return meta.lastRunAttempt ? !liveMatchesLastRun() : isResultsStale();
   }
 
   function isResultsStale(): boolean {
@@ -1245,6 +1253,9 @@ export function createAutoRun(deps: AutoRunDeps) {
     if (!gen || !isCurrent(generationId)) return false;
     const time: TimeSelection = { type: "absolute", startUs: bounds.startUs, endUs: bounds.endUs };
     gen.signature = { ...gen.signature, time };
+    if (meta.lastRunAttempt?.generation === gen.id) {
+      meta.lastRunAttempt.signature = cloneJson(gen.signature);
+    }
     let republish = false;
     for (const record of [meta.pendingExecution, meta.executed]) {
       if (!record || record.generation !== gen.id) continue;
@@ -1272,6 +1283,9 @@ export function createAutoRun(deps: AutoRunDeps) {
     const gen = generations.get(generationId);
     if (!gen || !isCurrent(generationId)) return false;
     gen.signature = { ...gen.signature, query };
+    if (meta.lastRunAttempt?.generation === gen.id) {
+      meta.lastRunAttempt.signature = cloneJson(gen.signature);
+    }
     let republish = false;
     for (const record of [meta.pendingExecution, meta.executed]) {
       if (!record || record.generation !== gen.id) continue;
@@ -1360,6 +1374,7 @@ export function createAutoRun(deps: AutoRunDeps) {
   }
 
   function invalidateExecuted(reason: string): void {
+    meta.lastRunAttempt = null;
     meta.executed = null;
     meta.pendingExecution = null;
     invalidation = reason;
@@ -1368,6 +1383,7 @@ export function createAutoRun(deps: AutoRunDeps) {
   }
 
   function resetScope(cause: "saved-view" | "url" | "reapply" | "job" | "org"): void {
+    meta.lastRunAttempt = null;
     cancelGeneration(null, { cause: cause === "org" ? "org" : "reset" });
     meta.executed = null;
     meta.pendingExecution = null;
@@ -1455,6 +1471,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     reconcileEditorDirty,
     syncBlockedScope,
     isResultsStale,
+    isRunDirty,
     staleReason,
     canPersistOrShare,
     beginHits,

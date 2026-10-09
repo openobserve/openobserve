@@ -16,6 +16,8 @@
 import {
   freeTextRanges,
   phrasePlan,
+  preserveFilterComments,
+  type PlanNode,
   planFilter,
   quoteFreeTextPhrase,
   renderPlan,
@@ -79,6 +81,7 @@ export interface FreeTextSearchObj {
 }
 
 export interface FreeTextZoConfig {
+  quick_mode_num_fields?: number;
   default_fts_keys?: string[];
   inverted_index_min_token_length?: unknown;
   inverted_index_max_token_length?: unknown;
@@ -122,7 +125,13 @@ export function buildFilterContext(
       if (field?.name) fieldNames.add(field.name);
     }
     // Scan consent is recorded only by the scan card, which stays off until spike S1 sets its guard.
-    targets[name] = streamTextTarget(entry, zoConfig?.default_fts_keys ?? [], undefined);
+    targets[name] = streamTextTarget(
+      entry,
+      zoConfig?.default_fts_keys ?? [],
+      undefined,
+      undefined,
+      zoConfig?.quick_mode_num_fields,
+    );
   }
   return {
     fieldNames,
@@ -197,10 +206,13 @@ export function rewrittenFilter(
     );
     // Text that renders per stream (a no-FTS arm is skipped) keeps that meaning only as typed.
     const [first] = rendered;
-    return first != null && rendered.every((where) => where === first) ? first : null;
+    return first != null && rendered.every((where) => where === first)
+      ? preserveFilterComments(raw, first)
+      : null;
   }
   if (plan.kind !== "sql" || plan.filter === raw) return null;
-  return renderPlan(plan, BLOCKED_TARGET, ctx.knownFields);
+  const rendered = renderPlan(plan, BLOCKED_TARGET, ctx.knownFields);
+  return rendered === null ? null : preserveFilterComments(raw, rendered);
 }
 
 /** Per-stream WHERE for side requests such as field values; null unless the filter is pure text. */
@@ -217,7 +229,7 @@ export function freeTextWhereByStream(
   return new Map(
     streams.map((stream) => [
       stream,
-      renderPlan(plan, ctx.targets[stream] ?? BLOCKED_TARGET, ctx.knownFields) ?? "",
+      renderPlan(plan, ctx.targets[stream] ?? BLOCKED_TARGET, ctx.knownFields) ?? "FALSE",
     ]),
   );
 }
@@ -270,11 +282,52 @@ export function noFtsStreams(
   });
 }
 
+export function noFtsRecoveryTerm(
+  searchObj: FreeTextSearchObj,
+  zoConfig: FreeTextZoConfig | null | undefined,
+): string {
+  const plan = planFilter(searchObj.data.query.trim(), new Set(), {
+    targetMode: "blocked",
+    allTargetsFts: false,
+    tokenLimits: tokenLimitsFromConfig(zoConfig),
+  });
+  if (plan.kind !== "freeText") return "";
+  function firstPositive(node: PlanNode, excluded = false): string | null {
+    if (node.k === "text") return excluded ? null : node.value;
+    if (node.k === "sql") return null;
+    if (node.k === "not") return firstPositive(node.child, !excluded);
+    if (node.k === "group") return firstPositive(node.child, excluded);
+    for (const child of node.children) {
+      const value = firstPositive(child, excluded);
+      if (value !== null) return value;
+    }
+    return null;
+  }
+  return firstPositive(plan.root) ?? "";
+}
+
 export function noFtsRecoveryStreams(
   searchObj: FreeTextSearchObj,
   names: string[] = searchObj.data.freeTextBlocked?.streams ?? [],
-): { name: string; schema: SchemaField[] }[] {
-  return names.map((name) => ({ name, schema: streamEntry(searchObj, name)?.schema ?? [] }));
+  zoConfig?: FreeTextZoConfig | null,
+): { name: string; schema: SchemaField[]; recoveryRoot?: PlanNode }[] {
+  const plan = planFilter(searchObj.data.query.trim(), new Set(), {
+    targetMode: "blocked",
+    allTargetsFts: false,
+    tokenLimits: tokenLimitsFromConfig(zoConfig),
+  });
+  return names.map((name) => {
+    const entry = streamEntry(searchObj, name);
+    const defined = entry?.settings?.defined_schema_fields;
+    const restricted =
+      Array.isArray(defined) &&
+      defined.length > 0 &&
+      defined.length <= (zoConfig?.quick_mode_num_fields ?? 500);
+    const schema = (entry?.schema ?? []).filter(
+      (field) => !restricted || defined.includes(field.name) || field.name === "_timestamp",
+    );
+    return { name, schema, recoveryRoot: plan.kind === "freeText" ? plan.root : undefined };
+  });
 }
 
 /** Post-error cards for a filter-mode run: Run as, else Search text. */

@@ -29,6 +29,7 @@ export interface TransientSearchKey {
 export const ITEM2_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "meta.executed", mode: "reset", owner: "item2", defaultValue: () => null },
   { path: "meta.pendingExecution", mode: "reset", owner: "item2", defaultValue: () => null },
+  { path: "meta.lastRunAttempt", mode: "reset", owner: "item2", defaultValue: () => null },
   { path: "meta.executedPatterns", mode: "reset", owner: "item2", defaultValue: () => null },
   { path: "meta.executedPanel", mode: "reset", owner: "item2", defaultValue: () => null },
   { path: "meta.autoRunBlocked", mode: "reset", owner: "item2", defaultValue: () => null },

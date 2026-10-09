@@ -97,6 +97,7 @@ describe("registry", () => {
     for (const path of [
       "meta.executed",
       "meta.pendingExecution",
+      "meta.lastRunAttempt",
       "meta.executedPatterns",
       "meta.executedPanel",
       "meta.autoRunBlocked",
@@ -174,6 +175,19 @@ describe("registry", () => {
 });
 
 describe("save hook (getSearchObj)", () => {
+  it("the validation-blocked Run baseline is stripped on save and reset on restore", () => {
+    const live = liveSearchObj(true);
+    const attempt = { generation: 8, signature: { query: "nosuch=1" } };
+    setPath(live, "meta.lastRunAttempt", attempt);
+    const saved = prepareSearchForSave(JSON.parse(JSON.stringify(live)), live);
+    expect(hasPath(saved, "meta.lastRunAttempt")).toBe(false);
+    applyView(live, { meta: { lastRunAttempt: attempt } });
+    expect(getPath(live, "meta.lastRunAttempt")).toBeNull();
+    setPath(live, "meta.lastRunAttempt", attempt);
+    resetTransient(live);
+    expect(getPath(live, "meta.lastRunAttempt")).toBeNull();
+  });
+
   it("cancellation is stripped on save and cleared on view apply and snapshot restore", () => {
     const live = liveSearchObj(true);
     setPath(live, "meta.runCancelled", { logs: true });

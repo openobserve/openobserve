@@ -116,8 +116,8 @@ const PREDICATE_OPERATORS = new Set([
 
 export type Token =
   | { t: "word"; text: string }
-  | { t: "squote"; text: string }
-  | { t: "dquote"; text: string }
+  | { t: "squote"; text: string; negated?: boolean }
+  | { t: "dquote"; text: string; negated?: boolean }
   | { t: "op"; text: string }
   | { t: "kw"; text: string }
   | { t: "lparen" }
@@ -166,6 +166,7 @@ export interface PatternAssociationRef {
 
 export interface StreamTextSettings {
   full_text_search_keys?: string[];
+  defined_schema_fields?: string[];
   index_original_data?: boolean;
   index_all_values?: boolean;
   pattern_associations?: PatternAssociationRef[];
@@ -294,11 +295,23 @@ export function renderPlan(
   return renderNode(plan.root, target);
 }
 
+export function preserveFilterComments(raw: string, rendered: string): string {
+  const missing: string[] = [];
+  const remaining = filterComments(rendered);
+  for (const comment of filterComments(raw)) {
+    const at = remaining.indexOf(comment);
+    if (at < 0) missing.push(comment);
+    else remaining.splice(at, 1);
+  }
+  return missing.length ? `${missing.join("\n")}\n${rendered}` : rendered;
+}
+
 export function streamTextTarget(
   stream: StreamWithSchema,
   defaultFtsKeys: string[],
   scanConsent: string[] | undefined,
   maxScanFields: number = FREE_TEXT_SCAN_MAX_FIELDS,
+  quickModeNumFields: number = 500,
 ): TextSearchTarget {
   const rawSchema = [
     ...asArray<SchemaField>(stream?.schema),
@@ -312,7 +325,12 @@ export function streamTextTarget(
     ...(settings.index_original_data ? ["_original"] : []),
     ...(settings.index_all_values ? ["_all_values"] : []),
   ]);
-  const fts = ftsKeys.filter((key) => stringFields.has(key));
+  const definedFields = asStringArray(settings.defined_schema_fields);
+  const restrictDefinedFields =
+    definedFields.length > 0 && definedFields.length <= quickModeNumFields;
+  const fts = ftsKeys.filter(
+    (key) => stringFields.has(key) && (!restrictDefinedFields || definedFields.includes(key)),
+  );
   if (fts.length > 0) return { mode: "fts", fields: fts };
 
   const candidates = scanCandidates(rawSchema, settings);
@@ -506,6 +524,52 @@ function sqlString(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+function filterComments(raw: string): string[] {
+  const comments: string[] = [];
+  let i = 0;
+  let quoteAllowed = true;
+  while (i < raw.length) {
+    if (/\s/.test(raw[i])) {
+      i++;
+      quoteAllowed = true;
+      continue;
+    }
+    let end: number;
+    if (isLineComment(raw, i)) {
+      const newline = raw.indexOf("\n", i);
+      end = newline < 0 ? raw.length : newline;
+    } else if (raw.startsWith("/*", i)) {
+      const close = raw.indexOf("*/", i + 2);
+      end = close < 0 ? raw.length : close + 2;
+    } else {
+      const lexed = lexOne(raw, i, quoteAllowed);
+      if (!lexed) break;
+      i = lexed.end;
+      quoteAllowed = lexed.tok.t === "lparen" || lexed.tok.t === "op";
+      continue;
+    }
+    comments.push(raw.slice(i, end));
+    i = end;
+    quoteAllowed = true;
+  }
+  return comments;
+}
+
+function isExcludedToken(tok: Token): boolean {
+  return tok.t === "word"
+    ? /^-\p{L}/u.test(tok.text)
+    : (tok.t === "squote" || tok.t === "dquote") && tok.negated === true;
+}
+
+function isLineComment(raw: string, i: number): boolean {
+  if (!raw.startsWith("--", i)) return false;
+  let start = i;
+  let end = i + 2;
+  while (raw[start - 1] === "-") start--;
+  while (raw[end] === "-") end++;
+  return !(/[\p{L}\p{N}_]/u.test(raw[start - 1] ?? "") && /[\p{L}\p{N}_]/u.test(raw[end] ?? ""));
+}
+
 function lex(raw: string): Lexed[] | null {
   const tokens: Lexed[] = [];
   let i = 0;
@@ -532,7 +596,7 @@ function skipTrivia(raw: string, i: number): number | null {
   while (j < raw.length) {
     if (/\s/.test(raw[j])) {
       j++;
-    } else if (raw.startsWith("--", j)) {
+    } else if (isLineComment(raw, j)) {
       const newline = raw.indexOf("\n", j);
       j = newline < 0 ? raw.length : newline;
     } else if (raw.startsWith("/*", j)) {
@@ -548,6 +612,12 @@ function skipTrivia(raw: string, i: number): number | null {
 
 function lexOne(raw: string, i: number, quoteAllowed: boolean): Lexed | null {
   const c = raw[i];
+  if (c === "-" && quoteAllowed && (raw[i + 1] === "'" || raw[i + 1] === '"')) {
+    const quoted = lexQuoted(raw, i + 1);
+    return quoted && (quoted.tok.t === "squote" || quoted.tok.t === "dquote")
+      ? { ...quoted, start: i, tok: { ...quoted.tok, negated: true } }
+      : null;
+  }
   if ((c === "'" || c === '"') && quoteAllowed) return lexQuoted(raw, i);
   if (c === "(") return { tok: { t: "lparen" }, start: i, end: i + 1 };
   if (c === ")") return { tok: { t: "rparen" }, start: i, end: i + 1 };
@@ -580,6 +650,12 @@ function lexQuoted(raw: string, i: number): Lexed | null {
 function lexWord(raw: string, i: number): Lexed {
   let j = i + 1;
   while (j < raw.length && !endsWord(raw, j)) {
+    if (raw[j] === "-") {
+      do {
+        j++;
+      } while (raw[j] === "-");
+      continue;
+    }
     const quoted = startsValueLiteral(raw, j) ? lexQuoted(raw, j) : null;
     j = quoted ? quoted.end : j + 1;
   }
@@ -597,7 +673,7 @@ function endsWord(raw: string, j: number): boolean {
   const c = raw[j];
   if (/\s/.test(c) || c === "(" || c === ")" || c === "," || ONE_CHAR_OPS.has(c)) return true;
   const two = raw.slice(j, j + 2);
-  return TWO_CHAR_OPS.has(two) || two === "--" || two === "/*";
+  return TWO_CHAR_OPS.has(two) || isLineComment(raw, j) || two === "/*";
 }
 
 function isSpaceDelimited(raw: string, i: number): boolean {
@@ -705,11 +781,14 @@ function isPureTextToken(
     case "rparen":
       return true;
     case "word":
-      return !isFieldLikeWord(/^-[A-Za-z]/.test(tok.text) ? tok.text.slice(1) : tok.text, names);
+      return !isFieldLikeWord(isExcludedToken(tok) ? tok.text.slice(1) : tok.text, names);
     case "dquote":
-      return !names.has(tok.text) && !gluedToNextOperand(lexed, next);
+      return (
+        !(tok.negated ? isFieldLikeWord(tok.text, names) : names.has(tok.text)) &&
+        !gluedToNextOperand(lexed, next)
+      );
     case "squote":
-      return !gluedToNextOperand(lexed, next);
+      return !(tok.negated && isFieldLikeWord(tok.text, names)) && !gluedToNextOperand(lexed, next);
     case "opaque":
       return isMatchAllCall(lexed);
     default:
@@ -790,8 +869,11 @@ function parsePrimary(tokens: Lexed[], state: { pos: number }): PlanNode | null 
     state.pos++;
     return { k: "group", child };
   }
-  if (tok.t === "word" && /^-[A-Za-z]/.test(tok.text)) {
-    return { k: "not", child: { k: "text", value: tok.text.slice(1) } };
+  if ((tok.t === "word" || tok.t === "squote" || tok.t === "dquote") && isExcludedToken(tok)) {
+    return {
+      k: "not",
+      child: { k: "text", value: tok.t === "word" ? tok.text.slice(1) : tok.text },
+    };
   }
   if (tok.t === "word" || tok.t === "squote" || tok.t === "dquote")
     return { k: "text", value: tok.text };
@@ -921,8 +1003,10 @@ function mixTextUnit(lexed: Lexed, next: Lexed | undefined, state: MixState): Pl
   if (tok.t !== "word" && tok.t !== "squote" && tok.t !== "dquote") return null;
   if (tok.t !== "word" && gluedToNextOperand(lexed, next)) return null;
   if (tok.t === "dquote" && state.names.has(tok.text)) return null;
-  const negated = tok.t === "word" && /^-[A-Za-z]/.test(tok.text);
-  const value = negated ? tok.text.slice(1) : tok.text;
+  if (isExcludedToken(tok) && tok.t !== "word" && isFieldLikeWord(tok.text, state.names))
+    return null;
+  const negated = isExcludedToken(tok);
+  const value = negated && tok.t === "word" ? tok.text.slice(1) : tok.text;
   if (tok.t === "word" && (NUMERIC_LITERAL.test(value) || isFieldLikeWord(value, state.names)))
     return null;
   if (value === "" || !hasIndexToken(value, state.limits)) return null;

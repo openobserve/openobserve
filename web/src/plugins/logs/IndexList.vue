@@ -1058,12 +1058,19 @@ export default defineComponent({
         }
 
         const textWhere = freeTextWhereByStream(searchObj, store.state.zoConfig);
+        if (textWhere && streams.every((stream: string) => textWhere.get(stream) === "FALSE")) {
+          fieldValues.value[name]["isLoading"] = false;
+          fieldValues.value[name]["errMsg"] = streams
+            .map((stream: string) => t("search.noFtsRecovery.skipped", { stream }))
+            .join(" ");
+        }
         for (const selectedStream of streams) {
           if (streams.length > 1) {
             query_context = "select * from [INDEX_NAME]";
           }
           if (textWhere) {
             const where = textWhere.get(selectedStream) ?? "";
+            if (where === "FALSE") continue;
             query_context = `SELECT * FROM "[INDEX_NAME]"${where ? ` WHERE ${where}` : ""}`;
           }
           if (
