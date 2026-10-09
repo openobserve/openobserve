@@ -195,6 +195,43 @@ describe("createMultiViewDecoder", () => {
     expect(fullSnapshots(events).map((e) => e.timestamp)).toEqual([1000, 2100]);
   });
 
+  it("does not rebuild a background view when the next view of the same tab opens within the grace", () => {
+    const decoder = createMultiViewDecoder();
+    const { events } = decoder.push(
+      [
+        segment("A", 0, opening(1000, "A")),
+        segment("B", 0, [...opening(2000, "B"), viewEnd(3000)]),
+        segment("C", 0, opening(3001, "C")),
+      ],
+      Infinity,
+    );
+    const after = decoder.switches().filter((s) => s.at >= 3000);
+    expect(after).toMatchObject([
+      { viewId: "C", reason: "snapshot", rebuilt: false, fromEnded: true },
+    ]);
+    expect(fullSnapshots(events).filter((e) => e.timestamp === 3000)).toEqual([]);
+  });
+
+  it("hands over to the background view once the grace passes with no successor", () => {
+    const decoder = createMultiViewDecoder();
+    decoder.push(
+      [
+        segment("A", 0, opening(1000, "A")),
+        segment("B", 0, [...opening(2000, "B"), viewEnd(3000)]),
+      ],
+      3500,
+    );
+    expect(decoder.switches().map((s) => s.viewId)).toEqual(["A", "B"]);
+    decoder.push([segment("A", 1, [text(5000, "A2")])], Infinity);
+    expect(decoder.switches().at(-1)).toMatchObject({
+      at: 5000,
+      viewId: "A",
+      reason: "handover",
+      rebuilt: true,
+      fromEnded: true,
+    });
+  });
+
   it("replays views that follow each other in one tab without rebuilds", () => {
     const decoder = createMultiViewDecoder();
     decoder.push(

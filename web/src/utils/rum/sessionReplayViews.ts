@@ -22,6 +22,8 @@ const META = 4;
 const CUSTOM = 5;
 const FOCUS = 6;
 const VIEW_END = 7;
+// A successor view in the same tab snapshots within milliseconds of the old view ending.
+const HANDOVER_GRACE_MS = 1000;
 const SOURCE_MOUSE_MOVE = 1;
 const SOURCE_MOUSE_INTERACTION = 2;
 // MouseDown, Click, ContextMenu, DblClick, TouchStart: a page cannot produce these without a person.
@@ -119,6 +121,7 @@ export function createMultiViewDecoder(): MultiViewDecoder {
   const switchLog: ReplaySwitch[] = [];
   const stale: StaleSpan[] = [];
   let active: string | null = null;
+  let pendingHandOver: { at: number } | null = null;
   let sawConcurrent = false;
   let clockStarted = false;
   let lastClock = -Infinity;
@@ -203,6 +206,7 @@ export function createMultiViewDecoder(): MultiViewDecoder {
     const fromEnded = !previous || previous.ended;
     if (!fromEnded) sawConcurrent = true;
     active = view.viewId;
+    pendingHandOver = null;
     switchLog.push({
       at,
       viewId: view.viewId,
@@ -248,6 +252,11 @@ export function createMultiViewDecoder(): MultiViewDecoder {
       if (!next || candidate.lastSeenAt > next.lastSeenAt) next = candidate;
     }
     return next ? rebuild(next, at, "handover") : [];
+  }
+
+  function resolveHandOver(at: number): any[] {
+    pendingHandOver = null;
+    return handOver(at);
   }
 
   function logMissing(view: ViewTrack, at: number) {
@@ -319,7 +328,7 @@ export function createMultiViewDecoder(): MultiViewDecoder {
       view.converter = null;
       view.preamble = [];
       view.rebuilt = null;
-      if (view.viewId === active) out.push(...handOver(record.timestamp));
+      if (view.viewId === active) pendingHandOver = { at: record.timestamp };
     }
     return 0;
   }
@@ -380,6 +389,8 @@ export function createMultiViewDecoder(): MultiViewDecoder {
     let skippedRecords = 0;
     for (let key = nextKey(watermark); key !== null; key = nextKey(watermark)) {
       const item = take(key);
+      if (pendingHandOver && item.at > pendingHandOver.at + HANDOVER_GRACE_MS)
+        out.push(...resolveHandOver(item.at));
       if (item.at > lastDecodedAt) lastDecodedAt = item.at;
       if (item.kind === "skip") {
         if (key === ALL_VIEWS) views.forEach((view) => openStale(view, item.at));
@@ -388,6 +399,7 @@ export function createMultiViewDecoder(): MultiViewDecoder {
       }
       skippedRecords += step(viewFor(key), item, out);
     }
+    if (pendingHandOver && watermark === Infinity) out.push(...resolveHandOver(pendingHandOver.at));
     addClock(out, earliest, watermark);
     return { events: out, skippedRecords };
   }
