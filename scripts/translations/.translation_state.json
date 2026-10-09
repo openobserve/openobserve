@@ -2202,6 +2202,7 @@
     "countAnomalyDetection": "a1223bc8d82a5173",
     "countCompositeAlert": "4502d18cb5dcc5d8",
     "countDestinations": "124a72586a12ab90",
+    "countDowntime": "20e7e11d1e0112dd",
     "countIncidentIntegration": "7e70aef22e421de8",
     "countOncallPolicy": "537bc7a755773028",
     "countOncallTeamChannel": "fcce7a09b096a168",
@@ -3249,6 +3250,7 @@
         "duplicate": "02cdaabfca805d6a",
         "edit": "464c4ffd019e1e96",
         "endNow": "adf7eccb9562dfc7",
+        "extend": "496a37e3a10b9755",
         "more": "f8d46c2570e70736",
         "moveToFolder": "91d631e150a39784",
         "muteForHour": "991443d657e1425d"
@@ -3256,6 +3258,12 @@
       "allFolders": "226fd0e51f770b0b",
       "allFoldersTooltip": "26ab27ec8eb6fb82",
       "autoName": {
+        "all": {
+          "alerts": "2ead279c901d5b24",
+          "anomaly_detections": "12be9cc50e1846dc",
+          "slos": "65918fb54f483e8f",
+          "synthetics": "53668a29191ec7da"
+        },
         "daily": "6f31304cdfd0a3a6",
         "once": "200651a8b2d5912f",
         "onceOn": "5d984d828da9096f",
@@ -3276,6 +3284,9 @@
         "endsIn": "e3f5f47cba745f88",
         "endsInMinutes": "d27784cde45dbfb3",
         "endsInUnderMinute": "89c26da748360a68",
+        "firstEndsIn": "4426c705d88473a7",
+        "firstEndsInMinutes": "a1aedbd917b68cee",
+        "firstEndsInUnderMinute": "243caa9b0d62c666",
         "preview": "324b134f57c70c72",
         "previewMessage": "4d171441614a497f",
         "showBanner": "a0aadf239daf32df",
@@ -3303,6 +3314,8 @@
       },
       "confirmCancel": {
         "bulkMessage": "60d844aa8e405faf",
+        "confirm": "8b96b7d5b52eb086",
+        "keep": "02650c8fee8a0034",
         "message": "04f1f5c6087f69b5",
         "title": "1e83e5d555d4c816"
       },
@@ -3310,11 +3323,18 @@
         "message": "97caf93ccdae9977",
         "title": "4dbee51e2f61627a"
       },
+      "confirmEndNow": {
+        "keep": "154949dbda2aa4ee",
+        "message": "ae2007fef3d5c18d",
+        "ok": "adf7eccb9562dfc7",
+        "title": "8b334dd1f9510dfd"
+      },
       "copyOf": "3d050ae2d5dce9e2",
       "corrected": "eae618cf3750c786",
       "correctedBy": "bc8dc94b765d2ab1",
       "detail": {
         "affected": "ec13ab31fa56f546",
+        "backToList": "7906410d8d99435c",
         "banner": "b7f4d98f98d51f8e",
         "bannerOff": "0e36b3598800ed29",
         "bannerOn": "7ed5a29b16f8c7e6",
@@ -3333,6 +3353,8 @@
         "nextWindow": "a34f4badd0f164ae",
         "noSuppressed": "e1167a0d116e7a81",
         "noTarget": "4b33d955f9a8e928",
+        "notFoundDescription": "0d01e9170c73286d",
+        "notFoundTitle": "f2439bef305161f7",
         "occurrences": "6c58d39cec6d77d2",
         "overview": "d4b1ea5708dd5329",
         "sectionCount": "534026895b04bd45",
@@ -3348,6 +3370,15 @@
       },
       "editTitle": "cfc2b21f0c45e190",
       "endsLabel": "b7a7513cd632f8a3",
+      "extend": {
+        "confirmUntil": "690456e9eb98fd77",
+        "dialogTitle": "e021a5a9e84bd4de",
+        "endAfterCurrent": "7f1ffb10f74c672c",
+        "followUp": "272c39e44abf882c",
+        "menu": "62ccf29b7b8fa2d2",
+        "newEnd": "f912cddaf06b6b08",
+        "notActive": "cfd20a4ba832b5f0"
+      },
       "filterAll": "a52ace420f2175d0",
       "filterOnce": "ddd7eb99b3575ba4",
       "filterRecurring": "c0c06e547b1b55e1",
@@ -3359,6 +3390,7 @@
         "appliesTo": "6687458beee57a58",
         "cancel": "19766ed6ccb2f4a3",
         "cardCaption": "e6b6a06a6c7a08c2",
+        "checkSchedule": "028493139bd6e7ef",
         "editMode": "cfc2b21f0c45e190",
         "itemOption": "f42e5528f7e57da5",
         "itemsHint": "ce436920ecd4c10c",
@@ -3426,6 +3458,8 @@
         "endsIn": "fcd6155d5bfd1023",
         "exclude": "b8d23549534c5189",
         "fileIn": "3f41a5921c2d84a2",
+        "firingMuted": "390d295ccd85b699",
+        "firingMutedTooltip": "a822693833bb0415",
         "menu": "c6fbfb2045dbb234",
         "muteFor": "e1536152577fc598",
         "muted": "bf23559e4c1d3e1a",
@@ -3459,15 +3493,79 @@
         "intro": "711510f1db8e6c49",
         "matchedNow": "dac4356c321e9613",
         "outro": "54ff7c2a8df84805",
-        "title": "2d1aceb041aac8d1"
+        "title": "2d1aceb041aac8d1",
+        "titleOne": {
+          "alerts": "964452cbdf79d03c",
+          "anomaly_detections": "4199da9a414ddd8e",
+          "slos": "164014acfe372d7b",
+          "synthetics": "9d18595cabbed056"
+        },
+        "window": "3821ac247d6f6913"
       },
       "newDowntime": "9ac8385c2016de16",
       "newTitle": "9ac8385c2016de16",
       "nextLabel": "c6c1c9a9c8543f1e",
+      "notify": {
+        "caption": "acfc3dd57675c82d",
+        "destinations": "72eb63f032e47e34",
+        "events": {
+          "cancelled": "f85f95dc4eb251a4",
+          "cancelledHelp": "d01cac5a93e637f5",
+          "ended": "866e3f08ac4997ab",
+          "endedHelp": "a3c7966b8c7e8468",
+          "ending_soon": "e1a42c73cde70002",
+          "ending_soonHelp": "ba03badd2504dc53",
+          "extended": "d3b637b34bcee97b",
+          "extendedHelp": "fc59d77e5ac7735c",
+          "started": "5fd61c66df5d29bc",
+          "startedHelp": "d82cc56f2c1eb890"
+        },
+        "lead": "b615206b6c30e676",
+        "leadHelp": "6cf2909c369f818d",
+        "log": {
+          "destinations": "72eb63f032e47e34",
+          "empty": "7822537e59cf15cd",
+          "event": "4e1f49a9c8ae8a15",
+          "events": {
+            "cancelled": "d353a99eb4556847",
+            "ended": "7cdc804e6996997d",
+            "ending_soon": "584cf74c33fbf689",
+            "extended": "97b165f2f4e4ca54",
+            "started": "ecbc89cd37a03734"
+          },
+          "ok": "c16bc82bf1f04ede",
+          "pending": "e595f17fac1d8384",
+          "result": "6e7d50e84f4731ef",
+          "time": "33b93476cf597a33"
+        },
+        "regionNote": "f5ed2e60103bf71c",
+        "summary": {
+          "cancelled": "8add00b6023aedd3",
+          "ended": "70a8b18249455a09",
+          "endingSoon": "3092ca0ea8b2d0a0",
+          "extended": "87d13880323aa9c1",
+          "none": "8e4c3adb76279932",
+          "sentence": "588f7196ea82ef51",
+          "started": "b9486c7446183877"
+        },
+        "tab": "788011833a5a0f22",
+        "test": {
+          "failed": "557f16c3c32eca01",
+          "send": "22d7b11d40c98b51",
+          "sent": "c2250e7ed00f3376"
+        },
+        "title": "f4e2b7734cb9eb5a",
+        "validation": {
+          "eventRequired": "a00292a8f3334fa9",
+          "leadInvalid": "80cb65c2d61c1320",
+          "tooMany": "0f5c86778e1d01a8"
+        }
+      },
       "oneTime": "ddd7eb99b3575ba4",
       "preview": {
         "andMore": "1a2612705dd79784",
         "failed": "eabd4ce51b31ceca",
+        "finishCondition": "dba8d9186a95c8dc",
         "fireTime": "9ffb4b9d42e1dead",
         "noMatch": "782a2819bed11cda",
         "showAll": "739278fd42f862d7",
@@ -3481,16 +3579,23 @@
         "footer": "b237ec336c28d269",
         "fromRegistry": "090b22de22c1cc48",
         "fromSearch": "571555b1c76a84aa",
+        "fromValues": "0e04d3e365c8fec4",
+        "items": "fb8e7a1a3cb7b25d",
         "lastSeen": "21fd79c7de52e1cf",
         "load": "0834d3c481792921",
         "loadFailed": "5b93b635d84e129a",
         "needsEq": "a10bf1f00e8cc7fe",
+        "noValues": "e65cd4655961fa39",
+        "notSeen": "5366b0bf1c3a68ef",
+        "partial": "47cb4ce27c491c52",
         "refineBy": "e6e354bab807c9eb",
         "streams": "bfd297afbf9e7430",
         "tooMany": "e9d557f93756aa7f"
       },
       "schedule": {
         "dailySentence": "66de77c309efe205",
+        "fromNoEnd": "3c66035ce1832c87",
+        "fromUntil": "72722a4a51229dac",
         "onceSentence": "afe78d183505636c",
         "weeklySentence": "c5129b953bb604b5",
         "windowRange": "4c9994e9d20628f5"
@@ -3510,6 +3615,7 @@
         "startDate": "8169693101a4536c",
         "startTime": "babe9dda85036fe4",
         "startsAt": "faca355ff059d331",
+        "startsOn": "642efcf146d12253",
         "timezone": "4ceca1d52cede44d",
         "until": "a07f9029151d9729",
         "untilPlaceholder": "6c43e8399a11d714",
@@ -3539,12 +3645,14 @@
       },
       "sloCorrections": {
         "item": "6092824c2221f9d1",
+        "shorterThanSlice": "b57f3450f4f65f03",
         "title": "5f89642d51b55773"
       },
       "stats": {
         "active": "92340695899bd2d8",
         "cancelled": "d353a99eb4556847",
         "ended": "7cdc804e6996997d",
+        "endedEarly": "e5788800949e2d4b",
         "recurring": "c0c06e547b1b55e1",
         "scheduled": "4724f344c1c0e4a1",
         "total": "c9b3c38247f744e1"
@@ -3555,6 +3663,7 @@
         "asGood": "44b1f98a69bf000a",
         "chip": "a83b2dfc38903aff",
         "condition": "596d40a4ed24c02a",
+        "moreTargets": "ecadd87ff0e5d0aa",
         "nFolders": "78817f6f060fbcd3",
         "nItems": "736ad44ae2e3ff21",
         "oneFolder": "3580adda4cac85b1",
@@ -3572,6 +3681,16 @@
         "title": "8e76a94ac8320d51",
         "whatHappens": "70fbb54bd5e6ff77",
         "window": "19734a1b58cabc22"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "a8b1ad111a575a71",
+          "muted": "93e35cb5a9ee9a88",
+          "mutedHelp": "863972b6ae1c5c6c",
+          "none": "1d1827745b69f605",
+          "noneHelp": "32e4187072a3f23c",
+          "summary": "812f3018948c6ae7"
+        }
       },
       "thisFolder": "ab7db04c96526507",
       "thisFolderTooltip": "68f67542bf19e9ea",
@@ -3593,12 +3712,16 @@
         "pairKey": "8bc8d9cbdab52f53",
         "pairOperator": "c21e78625efae96e",
         "pairValue": "d173a1e1be4a69fb",
+        "startDateRequired": "45b7f811a47b4731",
         "startRequired": "9239343743437cf9",
         "startTimeRequired": "76bff3e8f5489b42",
         "tagsRequired": "2ba02e3a957fdd15",
         "timezoneRequired": "d93e8be03fbc7096",
         "tooDeep": "58e6544a95805305",
+        "tooManyFolders": "f02e3ac4ff364c69",
+        "tooManyIds": "8029ede589c9a568",
         "tooManyPairs": "94defd0f155e5dae",
+        "tooManyTags": "b2406bf479c15337",
         "untilAfterStart": "b733d94c0bf498e9",
         "weekdaysRequired": "56f423871f48777c",
         "windowTooLong": "fed4b750a6b10414",
@@ -5479,6 +5602,7 @@
         "active": "92340695899bd2d8",
         "cancelled": "d353a99eb4556847",
         "ended": "7cdc804e6996997d",
+        "endedEarly": "e5788800949e2d4b",
         "scheduled": "4724f344c1c0e4a1"
       },
       "enrichmentJobStatus": {
@@ -9481,6 +9605,7 @@
       "rumPresetSeeded": "f9b03957a5cad1c5",
       "scopeAllOf": "c600e6cbe1bf6ad6",
       "scopeCoveredByParent": "f8e7e0b7e085d5a1",
+      "scopeDowntimeHint": "c721bd450619f2c5",
       "scopeEveryStream": "d60410af0eae5a3a",
       "scopeEveryStreamHint": "620ee9401c968689",
       "scopeIncludesFuture": "26c2ee5269db2d08",
@@ -20431,6 +20556,9 @@
       "created": "1618d16b727812c6",
       "deleteFailed": "e1002fbe55d51364",
       "deleted": "58c3961b3d7538f7",
+      "extendFailed": "dca1772452d1059a",
+      "extended": "14f080c8e5ab88d0",
+      "extendedFollowUp": "0ee62b1e0263e140",
       "itemsDropped": "802d6f7bb964f3fb",
       "muteFailed": "ad98d850b7e3521e",
       "muted": "776a13adfdfb580d",
