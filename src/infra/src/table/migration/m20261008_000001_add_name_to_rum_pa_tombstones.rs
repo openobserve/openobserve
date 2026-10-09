@@ -15,12 +15,27 @@
 
 use sea_orm_migration::prelude::*;
 
+const TABLE: &str = "rum_pa_tombstones";
+const COLUMN: &str = "name";
+
 #[derive(DeriveMigrationName)]
 pub struct Migration;
+
+#[derive(DeriveIden)]
+enum RumPaTombstones {
+    Table,
+    Name,
+}
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // A has_column guard: add_column_if_not_exists renders IF NOT EXISTS, which Sqlite
+        // ignores, so a bare re-run (tests replay this migration directly, bypassing the
+        // applied-migrations table) would otherwise fail with "duplicate column name".
+        if manager.has_column(TABLE, COLUMN).await? {
+            return Ok(());
+        }
         manager
             .alter_table(
                 Table::alter()
@@ -32,6 +47,10 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Symmetric with up(): a down on a schema that never got the column must not error.
+        if !manager.has_column(TABLE, COLUMN).await? {
+            return Ok(());
+        }
         manager
             .alter_table(
                 Table::alter()
@@ -41,12 +60,6 @@ impl MigrationTrait for Migration {
             )
             .await
     }
-}
-
-#[derive(DeriveIden)]
-enum RumPaTombstones {
-    Table,
-    Name,
 }
 
 #[cfg(test)]
@@ -94,6 +107,30 @@ mod tests {
         )
         .await
         .unwrap();
+        Migration.down(&manager).await.unwrap();
+        assert_eq!(
+            columns(&db).await,
+            ["kind", "id", "org_id", "version", "deleted_at"]
+        );
+    }
+
+    /// A second `up()` (as happens when a test process is retried against a persistent store)
+    /// must not fail with "duplicate column name".
+    #[tokio::test]
+    async fn up_and_down_are_each_idempotent() {
+        let db = sqlite().await;
+        let manager = SchemaManager::new(&db);
+        m20261003_000001_create_rum_pa_tables::Migration
+            .up(&manager)
+            .await
+            .unwrap();
+        Migration.up(&manager).await.unwrap();
+        Migration.up(&manager).await.unwrap();
+        assert_eq!(
+            columns(&db).await,
+            ["kind", "id", "org_id", "version", "deleted_at", "name"]
+        );
+        Migration.down(&manager).await.unwrap();
         Migration.down(&manager).await.unwrap();
         assert_eq!(
             columns(&db).await,

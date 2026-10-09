@@ -754,7 +754,7 @@ mod tests {
             ids_of(&query)
         };
         assert_eq!(parse(&format!("?ids={A},{B},{A}")), [A, B]);
-        assert_eq!(parse(&format!("?ids={A}, {B} ,short,")), [A, B]);
+        assert_eq!(parse(&format!("?ids={A},%20{B}%20,short,")), [A, B]);
         assert!(parse("").is_empty());
         assert!(parse("?ids=").is_empty());
         let missing: IdsQ = Ok(Query(IdsQuery::default()));
