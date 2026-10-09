@@ -601,6 +601,8 @@ const setupSession = async () => {
   const decoder = createMultiViewDecoder();
   const consumed = props.segments.length;
   session.value = convertSegments(props.segments.slice(0, consumed), decoder);
+  // A push held wholly behind the watermark yields only a clock record; rrweb-player needs a snapshot, so retry on the next change with a fresh decoder.
+  if (!session.value.some((event: any) => event.type === 2)) return;
 
   session.value.every((segment: any) => {
     if (segment.data.height && segment.data.width) {
