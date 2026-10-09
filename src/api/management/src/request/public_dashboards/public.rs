@@ -52,7 +52,7 @@ static READ_RPM: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::defa
 
 #[derive(Deserialize)]
 pub struct DataParams {
-    range: String,
+    range: Option<String>,
 }
 
 enum Servable {
@@ -117,7 +117,7 @@ pub async fn data(
     if rate_limited(ip.map(|e| e.0)) {
         return with_headers(too_many_requests());
     }
-    with_headers(serve_data(&slug, &params.range).await)
+    with_headers(serve_data(&slug, params.range.as_deref()).await)
 }
 
 async fn serve_config(slug: &str) -> Response {
@@ -166,7 +166,7 @@ async fn serve_config(slug: &str) -> Response {
     .into_response()
 }
 
-async fn serve_data(slug: &str, range_key: &str) -> Response {
+async fn serve_data(slug: &str, range_key: Option<&str>) -> Response {
     let pd = match resolve(slug).await {
         Servable::Ok(pd) => pd,
         Servable::Unavailable => return unavailable(),
@@ -174,12 +174,13 @@ async fn serve_data(slug: &str, range_key: &str) -> Response {
         Servable::NotFound => return StatusCode::NOT_FOUND.into_response(),
         Servable::Error => return server_error(),
     };
+    let range_key = range_key.map_or_else(|| default_range_key(&pd), str::to_string);
     // Only an offered range is ever built, so any other key would answer "preparing" forever.
-    if !offers_range(&pd, range_key) {
+    if !offers_range(&pd, &range_key) {
         return StatusCode::NOT_FOUND.into_response();
     }
     let conn = get_orm_client_ro().await;
-    match table::get_snapshot(conn, &pd.id, range_key).await {
+    match table::get_snapshot(conn, &pd.id, &range_key).await {
         Ok(Some(snap)) => match serde_json::from_str::<serde_json::Value>(&snap.data) {
             Ok(v) => Json(v).into_response(),
             Err(_) => (StatusCode::ACCEPTED, "preparing").into_response(),
@@ -190,6 +191,13 @@ async fn serve_data(slug: &str, range_key: &str) -> Response {
             server_error()
         }
     }
+}
+
+/// The range a request without `range` gets: the link's default, as the page opens on.
+fn default_range_key(pd: &Model) -> String {
+    openobserve_core::public_dashboards::time_ranges(pd)
+        .default
+        .key()
 }
 
 fn offers_range(pd: &Model, range_key: &str) -> bool {
@@ -498,6 +506,23 @@ mod tests {
         assert!(!offers_range(&pd, "r86400"));
         assert!(!offers_range(&pd, "a10-21"));
         assert!(!offers_range(&link(), "r3600"));
+    }
+
+    #[test]
+    fn a_request_without_a_range_gets_the_default() {
+        let ranges = r#"[{"type":"relative","secs":3600},{"type":"relative","secs":86400}]"#;
+        let with_default = Model {
+            time_ranges: Some(ranges.into()),
+            default_range_key: Some("r86400".into()),
+            ..link()
+        };
+        assert_eq!(default_range_key(&with_default), "r86400");
+        let without_default = Model {
+            time_ranges: Some(ranges.into()),
+            default_range_key: None,
+            ..link()
+        };
+        assert_eq!(default_range_key(&without_default), "r3600");
     }
 
     #[test]
