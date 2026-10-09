@@ -113,11 +113,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-else-if="listsModules || (row.node.has_entities && row.node.childName)"
             class="flex min-w-0 items-center gap-1"
           >
+            <!-- Pulled back by its own padding, so the name lines up with the column title and plain rows. -->
             <OButton
               variant="ghost-primary"
               size="sm"
               icon-right="chevron-right"
-              class="min-w-0"
+              class="-ms-3 min-w-0"
               :data-test="`edit-role-module-pane-open-${row.node.name}`"
               @click="emit('open', row.node)"
             >
@@ -202,6 +203,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import ModulePaneBulkHeader from "@/components/iam/roles/ModulePaneBulkHeader.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -287,12 +289,12 @@ const columns = computed<OTableColumnDef[]>(() => [
     size: COL.name,
     meta: { align: "left", autoWidth: true },
   },
-  { id: "AllowAll", header: actionHeader(t("iam.all")), size: 72, meta: { align: "left" } },
-  { id: "AllowList", header: actionHeader(t("iam.list")), size: 72, meta: { align: "left" } },
-  { id: "AllowGet", header: actionHeader(t("iam.get")), size: 72, meta: { align: "left" } },
-  { id: "AllowPost", header: actionHeader(t("iam.create")), size: 90, meta: { align: "left" } },
-  { id: "AllowPut", header: actionHeader(t("iam.update")), size: 90, meta: { align: "left" } },
-  { id: "AllowDelete", header: actionHeader(t("iam.delete")), size: 90, meta: { align: "left" } },
+  actionColumn("AllowAll", t("iam.all"), 72),
+  actionColumn("AllowList", t("iam.list"), 72),
+  actionColumn("AllowGet", t("iam.get"), 72),
+  actionColumn("AllowPost", t("iam.create"), 90),
+  actionColumn("AllowPut", t("iam.update"), 90),
+  actionColumn("AllowDelete", t("iam.delete"), 90),
 ]);
 
 // Index is the position in the full scope list, which is the depth inheritance is measured against.
@@ -494,22 +496,20 @@ const toggleBulk = (action: string) => {
     .forEach((node) => change(node, action, newValue));
 };
 
-// A render function, so the box re-reads the grants each time the header draws; the column id is the action.
-const actionHeader = (label: I18nText) => {
-  if (!props.listsModules) return label;
-  const hint = t("iam.editRole.bulkSelectColumn", { action: label });
-  // The table truncates header content, which clips anything outside the box; the padding leaves room for the focus ring.
-  return ({ column }: { column: { id: string } }) =>
-    h("div", { class: "flex items-center gap-1.5 py-1 ps-1" }, [
-      h(OCheckbox, {
-        modelValue: bulkState(column.id),
-        disabled: props.loading || !bulkRows(column.id).length,
-        ariaLabel: hint,
-        title: hint,
-        "data-test": `edit-role-module-pane-bulk-${column.id}`,
-        "onUpdate:modelValue": () => toggleBulk(column.id),
-      }),
-      h("span", label),
-    ]);
-};
+// The column API takes a component, not a slot, so the header is mounted here; FlexRender re-runs it as grants change.
+const actionColumn = (action: string, label: I18nText, size: number): OTableColumnDef => ({
+  id: action,
+  header: props.listsModules
+    ? () =>
+        h(ModulePaneBulkHeader, {
+          action,
+          label,
+          state: bulkState(action),
+          disabled: props.loading || !bulkRows(action).length,
+          onToggle: () => toggleBulk(action),
+        })
+    : label,
+  size,
+  meta: { align: "left" },
+});
 </script>

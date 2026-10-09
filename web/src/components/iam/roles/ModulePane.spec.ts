@@ -714,6 +714,40 @@ describe("ModulePane - column select all", () => {
     );
   });
 
+  // A header tick must never stage a grant whose box the row does not show.
+  it("locks the header box when no listed module offers the action", async () => {
+    const settings = makeNode("settings");
+    settings.permission.AllowList.show = false;
+    const wrapper = await mountBulk([settings]);
+
+    await bulkBox(wrapper, "AllowList").trigger("click");
+
+    expect(bulkBox(wrapper, "AllowList").attributes("disabled")).toBeDefined();
+    expect(wrapper.emitted("change")).toBeUndefined();
+  });
+
+  // The link's own padding would push the name past the column title and the plain rows.
+  it.each([
+    [
+      "a module row",
+      () => mountBulk([makeNode("logs")]),
+      '[data-test="edit-role-module-pane-open-logs"]',
+    ],
+    [
+      "a folder row",
+      () =>
+        mountPane(
+          [makeScope("dfolder", [], ["dfolder"])],
+          [{ ...makeNode("sre", [], "dfolder"), has_entities: true, childName: "dashboard" }],
+        ),
+      '[data-test="edit-role-module-pane-open-sre"]',
+    ],
+  ])("pulls the name link back by its padding on %s", async (_, mountRow, selector) => {
+    const wrapper = await mountRow();
+
+    expect(wrapper.find(selector).classes()).toContain("-ms-3");
+  });
+
   // Every row is a module, so even one with no items (Search Jobs) opens like the rest.
   it("offers to open every module row, with or without items", async () => {
     const searchJobs = makeNode("search_jobs");
