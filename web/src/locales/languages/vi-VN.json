@@ -8925,6 +8925,8 @@
       "allFolders": "Tất cả thư mục",
       "thisFolderTooltip": "Tìm kiếm trong thư mục đã chọn",
       "allFoldersTooltip": "Tìm kiếm trong mọi thư mục",
+      "noFolder": "Không có thư mục nào để bạn lưu thời gian ngừng hoạt động",
+      "truncated": "Đang hiển thị {shown} thời gian ngừng hoạt động đầu tiên trên tổng số {total}",
       "stats": {
         "active": "Đang hoạt động",
         "scheduled": "Đã lên lịch",

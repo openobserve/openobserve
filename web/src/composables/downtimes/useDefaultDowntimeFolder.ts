@@ -52,10 +52,11 @@ export function useDefaultDowntimeFolder(
   const remember = (id: string) => rememberDowntimeFolder(orgId.value, id);
 
   /**
-   * The folder to file in, after the permitted list answered. A preset mute runs with no
-   * dialog, so it must not guess "default" while the list is still loading.
+   * The folder to file in, after the permitted list answered, or `null` when the user may use
+   * none. A preset mute runs with no dialog, so it must not guess "default" while the list is
+   * still loading.
    */
-  const resolve = async (): Promise<string> => {
+  const resolve = async (): Promise<string | null> => {
     let listed = folders.data.value;
     if (listed === undefined && !folders.isError.value) {
       try {

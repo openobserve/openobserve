@@ -96,6 +96,10 @@ export interface ScheduleFormValues {
   weekdays: number[];
   until_date: string;
   timezone: string;
+  /** A loaded recurring row's `starts_at`, kept while `start_date` and `timezone` are unchanged so a mid-day start survives an edit. */
+  starts_at: number | null;
+  /** The zone `starts_at` was loaded in. */
+  starts_at_timezone: string | null;
 }
 
 export interface NotifyFormValues extends Record<NotificationEvent, boolean> {
@@ -183,6 +187,8 @@ export function defaultDowntimeValues(nowMs: number, timezone: string): Downtime
       weekdays: [],
       until_date: "",
       timezone,
+      starts_at: null,
+      starts_at_timezone: null,
     },
     reason: "",
     show_banner: true,
@@ -288,6 +294,14 @@ export function buildCondition(values: DowntimeFormValues) {
   return builderToCondition(values.condition) ?? undefined;
 }
 
+/** A recurring row starts at the loaded `starts_at` while its day and zone are unchanged, else at 00:00 of `start_date`. */
+const recurringStartsAt = (s: ScheduleFormValues): number => {
+  const loaded = s.starts_at;
+  const sameZone = loaded !== null && s.starts_at_timezone === s.timezone;
+  if (sameZone && utcMicrosToLocal(loaded, s.timezone).date === s.start_date) return loaded;
+  return localToUtcMicros(s.start_date, "00:00", s.timezone) ?? 0;
+};
+
 export function buildSchedule(s: ScheduleFormValues): DowntimeSchedule {
   if (s.repeat === "none") {
     const startsAt = localToUtcMicros(s.start_date, s.start_time, s.timezone) ?? 0;
@@ -303,7 +317,7 @@ export function buildSchedule(s: ScheduleFormValues): DowntimeSchedule {
   }
   return {
     repeat: s.repeat,
-    starts_at: localToUtcMicros(s.start_date, "00:00", s.timezone) ?? 0,
+    starts_at: recurringStartsAt(s),
     ends_at: s.until_date ? localToUtcMicros(s.until_date, "23:59", s.timezone) : null,
     timezone: s.timezone,
     start_time_local: s.start_time,
@@ -373,6 +387,8 @@ const scheduleValues = (s: DowntimeSchedule): ScheduleFormValues => {
     weekdays: [...s.weekdays],
     until_date: once ? "" : end.date,
     timezone: canonicalTimezone(s.timezone),
+    starts_at: once ? null : s.starts_at,
+    starts_at_timezone: once ? null : canonicalTimezone(s.timezone),
   };
 };
 

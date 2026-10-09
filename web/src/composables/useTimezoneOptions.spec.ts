@@ -21,7 +21,7 @@ const run = (config?: Parameters<typeof useTimezoneOptions>[0]) => {
 describe("useTimezoneOptions", () => {
   it("leads with UTC and lists each zone once", () => {
     const { timezoneOptions, zones } = run();
-    expect(timezoneOptions.value[0]).toEqual({ label: "UTC", value: "UTC" });
+    expect(timezoneOptions.value[0]).toMatchObject({ label: "UTC", value: "UTC" });
     expect(new Set(zones).size).toBe(zones.length);
   });
 
@@ -39,6 +39,14 @@ describe("useTimezoneOptions", () => {
       .mockReturnValue(["Asia/Calcutta", "Asia/Kolkata", "Europe/Kiev"]);
     const { zones } = run();
     expect(zones).toEqual(["UTC", "Asia/Kolkata", "Europe/Kyiv"]);
+    spy.mockRestore();
+  });
+
+  it("lets a search for the legacy name find the canonical zone", () => {
+    const spy = vi.spyOn(Intl, "supportedValuesOf").mockReturnValue(["Asia/Calcutta"]);
+    const { timezoneOptions } = run();
+    const kolkata = timezoneOptions.value.find((o) => o.value === "Asia/Kolkata");
+    expect(kolkata?.searchText?.toLowerCase()).toContain("calcutta");
     spy.mockRestore();
   });
 });

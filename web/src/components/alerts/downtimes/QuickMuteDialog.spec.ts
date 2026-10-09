@@ -1,9 +1,25 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { flushPromises, mount } from "@vue/test-utils";
+import { createStore } from "vuex";
 import { gt } from "@/types/i18n";
-import { buildQuickMuteRequest, groupSelection, presetSeconds } from "@/utils/downtimes/quickMute";
+import common from "@/services/common";
+import downtimes from "@/services/downtimes";
+import { queryClient } from "@/composables/query/queryClient";
+import QuickMuteDialog from "./QuickMuteDialog.vue";
+import {
+  QUICK_MUTE_PRESETS,
+  buildQuickMuteRequest,
+  groupSelection,
+  presetSeconds,
+} from "@/utils/downtimes/quickMute";
 import { makeQuickMuteSchema, quickMuteEndsAt, type QuickMuteForm } from "./QuickMuteDialog.schema";
+
+vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
+vi.mock("@/services/common", () => ({ default: { list_Folders: vi.fn() } }));
+vi.mock("@/services/downtimes", () => ({ default: { quickMute: vi.fn(), create: vi.fn() } }));
+vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const NOW = Date.parse("2026-09-17T14:10:00Z") * 1000;
 
@@ -65,7 +81,11 @@ describe("quick mute request body", () => {
 });
 
 describe("quick mute form", () => {
-  const schema = makeQuickMuteSchema(gt, "UTC", () => NOW);
+  const schema = makeQuickMuteSchema(
+    gt,
+    () => "UTC",
+    () => NOW,
+  );
   const values = (over: Partial<QuickMuteForm>): QuickMuteForm => ({
     preset: "custom",
     end_date: "2026-09-17",
@@ -86,8 +106,48 @@ describe("quick mute form", () => {
     expect(past.error?.issues[0].message).toBe("The end must be after the start.");
   });
 
+  it("accepts exactly the offered presets and Custom", () => {
+    for (const { key } of QUICK_MUTE_PRESETS) {
+      expect(schema.safeParse(values({ preset: key })).success).toBe(true);
+    }
+    expect(schema.safeParse(values({ preset: "8h" as QuickMuteForm["preset"] })).success).toBe(
+      false,
+    );
+  });
+
   it("refuses a custom end more than 7 days away", () => {
     const far = schema.safeParse(values({ end_date: "2026-09-30" }));
     expect(far.error?.issues[0].message).toBe("A window can last at most 7 days.");
+  });
+});
+
+describe("quick mute with no folder to file in", () => {
+  it("says so and disables Mute when the permitted folder list is empty", async () => {
+    queryClient.clear();
+    vi.mocked(common.list_Folders).mockResolvedValue({ data: { list: [] } } as never);
+    const store = createStore({
+      state: {
+        timezone: "UTC",
+        selectedOrganization: { identifier: "acme" },
+        zoConfig: { downtimes_enabled: true },
+      },
+    });
+    const wrapper = mount(QuickMuteDialog, {
+      props: { open: false, selection: [{ module: "alerts", ids: ["a1"] }] },
+      global: { plugins: [store] },
+      attachTo: document.body,
+    });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+    await vi.waitFor(() =>
+      expect(document.body.querySelector('[data-test="quick-mute-no-folder"]')).not.toBeNull(),
+    );
+    expect(document.body.textContent).toContain("No folder you can file a downtime in");
+    const mute = document.body.querySelector<HTMLButtonElement>(
+      '[data-test="o-dialog-primary-btn"]',
+    );
+    expect(mute?.disabled).toBe(true);
+    expect(downtimes.create).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 });

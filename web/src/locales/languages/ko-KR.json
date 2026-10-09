@@ -8925,6 +8925,8 @@
       "allFolders": "모든 폴더",
       "thisFolderTooltip": "선택한 폴더에서 검색",
       "allFoldersTooltip": "모든 폴더에서 검색",
+      "noFolder": "다운타임을 저장할 수 있는 폴더가 없습니다",
+      "truncated": "다운타임 {total}개 중 처음 {shown}개를 표시합니다",
       "stats": {
         "active": "활성",
         "scheduled": "예약됨",

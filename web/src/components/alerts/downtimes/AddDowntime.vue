@@ -91,6 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm-action"
                 type="submit"
                 :loading="isSubmitting"
+                :disabled="noFolder"
                 data-test="add-downtime-save"
                 @click="onSaveClick"
               >
@@ -100,6 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OPageHeader>
       </template>
+
+      <div v-if="noFolder" class="shrink-0 px-3 pt-2">
+        <OBanner
+          variant="warning"
+          dense
+          :content="t('alerts.downtimes.noFolder')"
+          data-test="add-downtime-no-folder"
+        />
+      </div>
 
       <div v-if="editStatus === 'active'" class="shrink-0 px-3 pt-2">
         <OBanner
@@ -425,7 +435,7 @@ const explicitFolder = String(route.query.folder_id ?? "");
 
 const initialValues = (): DowntimeFormValues => {
   const base = defaultDowntimeValues(Date.now(), browserZone);
-  const folderId = explicitFolder || folderDefault.folderId.value;
+  const folderId = explicitFolder || folderDefault.folderId.value || "";
   return applyPrefill(
     { ...base, folder_id: folderId },
     {
@@ -575,9 +585,12 @@ const setFolder = (value: string) => form.setFieldValue("folder_id", value || "d
 
 // The folder list can answer after mount; follow it until the user or a loaded row sets one.
 watch(folderDefault.folderId, (next, prev) => {
-  if (explicitFolder || sourceId.value || folderId.value !== prev) return;
-  form.setFieldValue("folder_id", next);
+  if (explicitFolder || sourceId.value || folderId.value !== (prev ?? "")) return;
+  form.setFieldValue("folder_id", next ?? "");
 });
+
+// The permitted folder list answered empty, so a new downtime has nowhere to be filed.
+const noFolder = computed(() => !isEdit.value && folderDefault.folderId.value === null);
 
 // Edit and Duplicate load the saved row once; the condition builder remounts on it.
 const resetToken = ref(0);

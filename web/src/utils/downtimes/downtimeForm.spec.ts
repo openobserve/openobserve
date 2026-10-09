@@ -156,6 +156,51 @@ describe("buildDowntimeRequest", () => {
     expect(s.repeat).toBe("none");
   });
 
+  it("keeps a mid-day starts_at of a recurring row through a form round trip", () => {
+    const midDay = Date.parse("2026-09-17T13:00:00Z") * 1000;
+    const row: Downtime = {
+      ...flow1,
+      schedule: {
+        repeat: "daily",
+        starts_at: midDay,
+        ends_at: null,
+        timezone: "UTC",
+        start_time_local: "09:00",
+        duration_secs: 3600,
+        weekdays: [],
+      },
+    };
+    const values = downtimeToFormValues(row);
+    expect(buildDowntimeRequest(values).schedule.starts_at).toBe(midDay);
+    const moved = { ...values, schedule: { ...values.schedule, start_date: "2026-09-20" } };
+    expect(buildDowntimeRequest(moved).schedule.starts_at).toBe(
+      Date.parse("2026-09-20T00:00:00Z") * 1000,
+    );
+  });
+
+  it("rebuilds starts_at in a new zone whether or not the zone moves the local date", () => {
+    const midDay = Date.parse("2026-10-01T13:00:00Z") * 1000;
+    const row: Downtime = {
+      ...flow1,
+      schedule: {
+        repeat: "daily",
+        starts_at: midDay,
+        ends_at: null,
+        timezone: "UTC",
+        start_time_local: "09:00",
+        duration_secs: 3600,
+        weekdays: [],
+      },
+    };
+    const values = downtimeToFormValues(row);
+    const inZone = (timezone: string) =>
+      buildDowntimeRequest({ ...values, schedule: { ...values.schedule, timezone } }).schedule
+        .starts_at;
+    // Kolkata keeps 2026-10-01 as the local date of the instant, Auckland moves it to 2026-10-02.
+    expect(inZone("Asia/Kolkata")).toBe(Date.parse("2026-09-30T18:30:00Z") * 1000);
+    expect(inZone("Pacific/Auckland")).toBe(Date.parse("2026-09-30T11:00:00Z") * 1000);
+  });
+
   it("drops blank names and reasons so the backend generates a name", () => {
     const body = buildDowntimeRequest(defaultDowntimeValues(NOW, "UTC"));
     expect(body).not.toHaveProperty("name");

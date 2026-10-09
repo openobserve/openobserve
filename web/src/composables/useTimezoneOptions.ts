@@ -15,11 +15,13 @@
 
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { browserTimezone, canonicalTimezone } from "@/utils/timezoneAliases";
+import { browserTimezone, canonicalTimezone, timezoneSearchText } from "@/utils/timezoneAliases";
 
 export type TimezoneOption = {
   label: I18nText;
   value: string;
+  /** The zone's legacy names, so a search for `Calcutta` still finds `Asia/Kolkata`. */
+  searchText?: string;
 };
 
 export interface UseTimezoneOptionsConfig {
@@ -48,7 +50,7 @@ export function useTimezoneOptions(config: UseTimezoneOptionsConfig = {}) {
     zones.map((tz) =>
       tz === browserTimeValue
         ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-        : { label: raw(tz), value: tz },
+        : { label: raw(tz), value: tz, searchText: timezoneSearchText(tz) },
     ),
   );
 

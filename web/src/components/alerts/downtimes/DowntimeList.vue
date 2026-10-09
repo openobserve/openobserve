@@ -86,6 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     default-key="total"
                     @select="onStatSelect"
                   />
+                  <OBanner
+                    v-if="truncatedNotice"
+                    class="mt-1.5"
+                    variant="info"
+                    dense
+                    :content="truncatedNotice"
+                    data-test="downtime-list-truncated"
+                  />
                 </div>
               </template>
 
@@ -224,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-when="{ row }">
                 <span v-if="whenOf(row)" class="inline-flex items-center gap-1 text-xs">
                   <span class="text-text-secondary">{{ whenOf(row)?.label }}</span>
-                  <OTimeCell :value="whenOf(row)?.at" unit="us" :timezone="store.state.timezone" />
+                  <OTimeCell :value="whenOf(row)?.at" unit="us" :timezone="viewerZone" />
                 </span>
                 <span v-else class="text-text-muted">—</span>
               </template>
@@ -504,7 +512,7 @@ import {
   deleteDowntimeMutation,
   downtimesListQuery,
 } from "@/services/downtimes.queries";
-import type { DowntimeListItem, TargetModule } from "@/services/downtimes";
+import type { DowntimeCounts, DowntimeListItem, TargetModule } from "@/services/downtimes";
 import { getFoldersListByType } from "@/utils/commons";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -522,6 +530,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -536,6 +545,8 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
+import { DEFAULT_DOWNTIME_FOLDER } from "@/utils/downtimes/folderDefault";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
@@ -564,6 +575,7 @@ const RAIL_COLORS: Record<DowntimeListItem["status"], string> = {
 
 const { t } = useI18nTyped();
 const store = useStore();
+const viewerZone = useViewerTimezone();
 const route = useRoute();
 const router = useRouter();
 const orgId = useOrgId();
@@ -583,6 +595,8 @@ const downtimeFoldersList = useQuery(() =>
 );
 
 const allRows = computed<DowntimeListItem[]>(() => listQuery.data.value?.items ?? []);
+// The org holds more rows than one page carried, so the client counts would be short.
+const truncated = computed(() => listQuery.data.value?.truncated === true);
 const loading = listQuery.isPending;
 const fetching = listQuery.isFetching;
 const lastUpdatedAt = listQuery.dataUpdatedAt;
@@ -621,7 +635,9 @@ const downtimeFolderName = (id: string) => folderNameIn(downtimeFoldersList.data
 // the choice in the URL; FolderList's own fallback to "default" is ignored until then.
 const folderDefault = useDefaultDowntimeFolder({ rememberLast: false });
 const landed = ref(!!route.query.folder);
-const activeFolderId = ref<string>((route.query.folder as string) || folderDefault.folderId.value);
+// With no permitted folder the page keeps landing on "default", as before the list answered.
+const landingFolder = () => folderDefault.folderId.value ?? DEFAULT_DOWNTIME_FOLDER;
+const activeFolderId = ref<string>((route.query.folder as string) || landingFolder());
 
 const showFolder = (folderId: string) => {
   activeFolderId.value = folderId;
@@ -635,7 +651,7 @@ watch(
   (ready) => {
     if (!ready || landed.value) return;
     landed.value = true;
-    showFolder(folderDefault.folderId.value);
+    showFolder(landingFolder());
   },
   { immediate: true },
 );
@@ -728,17 +744,40 @@ const isFiltered = computed(
 );
 
 // ── Summary strip ───────────────────────────────────────────────────────────
+// The tiles count `folderRows`, which holds every listed row unfiltered only on the banner's all-folders status link.
+const orgWideTiles = computed(
+  () =>
+    searchAcrossFolders.value &&
+    statFilter.value !== null &&
+    !search.value.trim() &&
+    typeFilter.value === "all",
+);
+
+// The server counts the whole org, so a cut list takes them only where the tiles cover the whole org too.
+const serverCounts = computed(() =>
+  truncated.value && orgWideTiles.value ? listQuery.data.value : undefined,
+);
+
+const truncatedNotice = computed<I18nText | null>(() => {
+  const data = listQuery.data.value;
+  return truncated.value && data
+    ? t("alerts.downtimes.truncated", { shown: data.items.length, total: data.total })
+    : null;
+});
+
 const summaryStats = computed<StatItem[]>(() => {
   const rows = folderRows.value;
-  const hasData = rows.length > 0;
-  const count = (pred: (r: DowntimeListItem) => boolean) =>
-    hasData ? rows.filter(pred).length : "—";
-  const share = hasData ? rows.length : undefined;
+  const server = serverCounts.value;
+  const hasData = rows.length > 0 || !!server;
+  const count = (key: keyof DowntimeCounts, pred: (r: DowntimeListItem) => boolean) =>
+    server ? (server.counts?.[key] ?? 0) : hasData ? rows.filter(pred).length : "—";
+  const total = server ? server.total : rows.length;
+  const share = hasData ? total : undefined;
   return [
     {
       key: "active",
       label: t("alerts.downtimes.stats.active"),
-      value: count((r) => r.status === "active"),
+      value: count("active", (r) => r.status === "active"),
       icon: "notifications-paused",
       tone: "warning",
       max: share,
@@ -747,7 +786,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "scheduled",
       label: t("alerts.downtimes.stats.scheduled"),
-      value: count((r) => r.status === "scheduled"),
+      value: count("scheduled", (r) => r.status === "scheduled"),
       icon: "schedule",
       tone: "blue",
       max: share,
@@ -756,7 +795,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "recurring",
       label: t("alerts.downtimes.stats.recurring"),
-      value: count((r) => r.schedule.repeat !== "none"),
+      value: count("recurring", (r) => r.schedule.repeat !== "none"),
       icon: "repeat",
       tone: "neutral",
       max: share,
@@ -765,7 +804,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "ended",
       label: t("alerts.downtimes.stats.ended"),
-      value: count((r) => r.status === "ended"),
+      value: count("ended", (r) => r.status === "ended"),
       icon: "check-circle",
       tone: "neutral",
       max: share,
@@ -774,7 +813,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "ended_early",
       label: t("alerts.downtimes.stats.endedEarly"),
-      value: count((r) => r.status === "ended_early"),
+      value: count("ended_early", (r) => r.status === "ended_early"),
       icon: "stop-circle",
       tone: "neutral",
       max: share,
@@ -783,7 +822,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "cancelled",
       label: t("alerts.downtimes.stats.cancelled"),
-      value: count((r) => r.status === "cancelled"),
+      value: count("cancelled", (r) => r.status === "cancelled"),
       icon: "cancel",
       tone: "neutral",
       max: share,
@@ -792,7 +831,7 @@ const summaryStats = computed<StatItem[]>(() => {
     {
       key: "total",
       label: t("alerts.downtimes.stats.total"),
-      value: hasData ? rows.length : "—",
+      value: hasData ? total : "—",
       icon: "format-list-bulleted",
       tone: "primary",
       dataTest: "downtime-summary-total",

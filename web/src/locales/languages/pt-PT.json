@@ -8925,6 +8925,8 @@
       "allFolders": "Todas as pastas",
       "thisFolderTooltip": "Pesquisar na pasta selecionada",
       "allFoldersTooltip": "Pesquisar em todas as pastas",
+      "noFolder": "Nenhuma pasta onde possa guardar um período de inatividade",
+      "truncated": "A mostrar os primeiros {shown} de {total} períodos de inatividade",
       "stats": {
         "active": "Ativas",
         "scheduled": "Agendadas",

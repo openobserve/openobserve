@@ -633,6 +633,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useLocalTimezone } from "@/utils/zincutils";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
+import { canonicalTimezone } from "@/utils/timezoneAliases";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
 import dashboardService from "@/services/dashboards";
@@ -1141,7 +1142,10 @@ const customFrequencyOptions = computed(() => [
   { label: t("reports.frequencyUnits.months"), value: "months" },
 ]);
 
-const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
+// The options hold canonical names, so a legacy zone such as `Asia/Calcutta` is renamed to match one.
+const currentTimezone = canonicalTimezone(
+  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone,
+);
 const timezone = ref(currentTimezone);
 
 const { timezoneOptions: timezoneSelectOptions } = useTimezoneOptions({ browserEntry: true });
@@ -1373,7 +1377,7 @@ const setupEditingReport = async (report: any) => {
   const scheduleDate = dateInReportTz.toFormat("yyyy-MM-dd");
   // HH:MM
   const scheduleTime = dateInReportTz.toFormat("HH:mm");
-  const scheduleTimezone = report.timezone;
+  const scheduleTimezone = canonicalTimezone(report.timezone);
 
   // edit reports always open on the "Schedule Later" tab (form-owned now).
   const timeTab = "scheduleLater";

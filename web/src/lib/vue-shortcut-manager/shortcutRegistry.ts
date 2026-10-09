@@ -66,6 +66,7 @@ export interface ShortcutCapabilities {
   modelPricingEnabled: boolean;
   rbacEnabled: boolean;
   aiEnabled: boolean;
+  downtimesEnabled: boolean;
 }
 
 export interface ShortcutModule {
@@ -90,6 +91,7 @@ const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlin
 const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
 const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
 const aiChat = (c: ShortcutCapabilities) => c.isEnterprise && c.aiEnabled;
+const downtimes = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.downtimesEnabled;
 // Cluster-scoped admin surfaces only render inside the _meta org.
 const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
 const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
@@ -799,7 +801,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.downtimes",
     scope: "downtimes",
-    visible: enterpriseOrCloud,
+    visible: downtimes,
     shortcuts: [
       { id: "downtimesCreate", key: "n", descriptionKey: "shortcuts.actions.downtimesCreate" },
       { id: "downtimesRefresh", key: "r", descriptionKey: "shortcuts.actions.downtimesRefresh" },

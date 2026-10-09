@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="title"
     :form-id="FORM_ID"
     :primary-button-label="primaryLabel"
+    :primary-button-disabled="noFolder"
     :secondary-button-label="t('alerts.downtimes.form.cancel')"
     data-test="quick-mute-dialog"
     @update:open="emit('update:open', $event)"
@@ -69,7 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ endsIn }}
       </p>
 
-      <div class="flex flex-wrap items-center gap-1 text-sm" data-test="quick-mute-folder">
+      <OBanner
+        v-if="noFolder"
+        variant="warning"
+        dense
+        :content="t('alerts.downtimes.noFolder')"
+        data-test="quick-mute-no-folder"
+      />
+      <div v-else class="flex flex-wrap items-center gap-1 text-sm" data-test="quick-mute-folder">
         <span class="text-text-secondary">{{ t("alerts.downtimes.mute.fileIn") }}</span>
         <InlineSelectFolderDropdown
           variant="inline"
@@ -111,6 +119,7 @@ import {
   type QuickMuteForm,
 } from "./QuickMuteDialog.schema";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -143,11 +152,14 @@ const { mute, timezone, defaultFolderId } = useQuickMute();
 
 const nowMicros = () => Date.now() * 1000;
 
+// The permitted folder list answered empty, so there is nowhere to file the mute.
+const noFolder = computed(() => defaultFolderId.value === null);
+
 const form = useOForm<QuickMuteForm>({
-  defaultValues: quickMuteDefaults(Date.now(), timezone, defaultFolderId.value),
-  schema: makeQuickMuteSchema(t, timezone, nowMicros),
+  defaultValues: quickMuteDefaults(Date.now(), timezone.value, defaultFolderId.value ?? ""),
+  schema: makeQuickMuteSchema(t, () => timezone.value, nowMicros),
   onSubmit: async (values) => {
-    const endsAt = quickMuteEndsAt(values, nowMicros(), timezone);
+    const endsAt = quickMuteEndsAt(values, nowMicros(), timezone.value);
     if (endsAt === null) return;
     const id = await mute(props.selection, endsAt, values.reason, values.folder_id);
     if (!id) return;
@@ -167,11 +179,11 @@ const title = computed(() => {
 const values = form.useStore((s) => s.values);
 const preset = computed(() => values.value.preset);
 
-const endsAt = computed(() => quickMuteEndsAt(values.value, nowMicros(), timezone));
+const endsAt = computed(() => quickMuteEndsAt(values.value, nowMicros(), timezone.value));
 
 const primaryLabel = computed(() => {
   if (endsAt.value === null) return t("alerts.downtimes.mute.confirm");
-  const until = utcMicrosToLocal(endsAt.value, timezone).time;
+  const until = utcMicrosToLocal(endsAt.value, timezone.value).time;
   return t("alerts.downtimes.mute.confirmUntil", { time: until });
 });
 
@@ -185,7 +197,7 @@ const endsIn = computed(() => {
 // A preset fills the end, so switching to Custom starts from it.
 watch(preset, (value) => {
   if (value === "custom") return;
-  const end = utcMicrosToLocal(nowMicros() + presetSeconds(value) * 1_000_000, timezone);
+  const end = utcMicrosToLocal(nowMicros() + presetSeconds(value) * 1_000_000, timezone.value);
   form.setFieldValue("end_date", end.date);
   form.setFieldValue("end_time", end.time);
 });
@@ -193,12 +205,14 @@ watch(preset, (value) => {
 watch(
   () => props.open,
   (isOpen) => {
-    if (isOpen) form.reset(quickMuteDefaults(Date.now(), timezone, defaultFolderId.value));
+    if (isOpen) {
+      form.reset(quickMuteDefaults(Date.now(), timezone.value, defaultFolderId.value ?? ""));
+    }
   },
 );
 
 // The folder list can answer after the dialog opened; follow it until the user picks one.
 watch(defaultFolderId, (next, prev) => {
-  if (values.value.folder_id === prev) form.setFieldValue("folder_id", next);
+  if (values.value.folder_id === (prev ?? "")) form.setFieldValue("folder_id", next ?? "");
 });
 </script>

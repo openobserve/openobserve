@@ -8925,6 +8925,8 @@
       "allFolders": "Все папки",
       "thisFolderTooltip": "Поиск в выбранной папке",
       "allFoldersTooltip": "Поиск во всех папках",
+      "noFolder": "Нет папки, в которую вы можете поместить простой",
+      "truncated": "Показаны первые {shown} из {total} простоев",
       "stats": {
         "active": "Активные",
         "scheduled": "Запланированные",

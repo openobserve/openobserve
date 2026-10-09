@@ -108,7 +108,10 @@ describe("AddDowntime", () => {
   beforeEach(() => {
     queryClient.clear();
     vi.mocked(common.list_Folders).mockImplementation(
-      () => Promise.resolve({ data: { list: [] } }) as any,
+      (_org: string, type: string) =>
+        Promise.resolve({
+          data: { list: type === "downtimes" ? [{ folderId: "default", name: "default" }] : [] },
+        }) as any,
     );
     vi.mocked(downtimes.preview).mockResolvedValue({ data: EMPTY_PREVIEW } as any);
     vi.mocked(downtimes.create).mockResolvedValue({ data: { id: "2f9K" } } as any);
@@ -187,6 +190,21 @@ describe("AddDowntime", () => {
     await dialogButton("primary");
     const [, body] = vi.mocked(downtimes.create).mock.calls[0];
     expect(body.folder_id).toBe("payments");
+    wrapper.unmount();
+  });
+
+  it("says there is no folder to file in and disables Save when the user may use none", async () => {
+    vi.mocked(common.list_Folders).mockImplementation(
+      () => Promise.resolve({ data: { list: [] } }) as any,
+    );
+    const { wrapper } = await mountPage();
+    expect(wrapper.get('[data-test="add-downtime-no-folder"]').text()).toContain(
+      "No folder you can file a downtime in",
+    );
+    expect(wrapper.get('[data-test="add-downtime-save"]').attributes("disabled")).toBeDefined();
+    await seeSchedule(wrapper);
+    await save(wrapper);
+    expect(downtimes.create).not.toHaveBeenCalled();
     wrapper.unmount();
   });
 

@@ -119,7 +119,8 @@ export function currentOrNextWindow(s: DowntimeSchedule, nowMicros: number): Dow
     const day = addDays(today, offset);
     if (!occursOn(s, day)) continue;
     const start = localToUtcMicros(day, s.start_time_local, s.timezone);
-    if (start === null) continue;
+    // The server skips an occurrence that starts before `starts_at`, e.g. 09:00 on a day that starts at 13:00.
+    if (start === null || start < s.starts_at) continue;
     const end = start + s.duration_secs * MICROS;
     if (end > nowMicros) return { start, end };
   }
@@ -142,7 +143,7 @@ export function recentWindows(
     const day = addDays(today, offset);
     if (!occursOn(s, day)) continue;
     const start = localToUtcMicros(day, s.start_time_local, s.timezone);
-    if (start === null) continue;
+    if (start === null || start < s.starts_at) continue;
     const end = start + s.duration_secs * MICROS;
     if (end <= nowMicros) found.push({ start, end });
   }

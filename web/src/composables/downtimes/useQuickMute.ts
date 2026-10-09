@@ -26,7 +26,7 @@ import {
   selectionCount,
   type QuickMuteSelection,
 } from "@/utils/downtimes/quickMute";
-import { browserTimezone } from "@/utils/timezoneAliases";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
 /** Creates a quick mute and confirms it with a toast that links to the new downtime. */
 export function useQuickMute() {
@@ -34,7 +34,7 @@ export function useQuickMute() {
   const orgId = useOrgId();
   const router = useRouter();
   const mutation = useMutation(() => quickMuteMutation(orgId.value));
-  const timezone = browserTimezone();
+  const timezone = useViewerTimezone();
   // Every Alerts and Synthetics list mounts this through its Mute action.
   const defaultFolder = useDefaultDowntimeFolder({ prefetch: false });
 
@@ -44,26 +44,24 @@ export function useQuickMute() {
     reason?: string,
     folder?: string,
   ): Promise<string | null> => {
-    const folderId = folder ?? (await defaultFolder.resolve());
+    const folderId = folder || (await defaultFolder.resolve());
+    if (!folderId) {
+      toast({ variant: "error", message: t("alerts.downtimes.noFolder") });
+      return null;
+    }
+    const zone = timezone.value;
     const count = selectionCount(selection);
     const startsAt = Date.now() * 1000;
-    const body = buildQuickMuteRequest(
-      selection,
-      startsAt,
-      endsAtMicros,
-      timezone,
-      reason,
-      folderId,
-    );
+    const body = buildQuickMuteRequest(selection, startsAt, endsAtMicros, zone, reason, folderId);
     try {
       const created = await mutation.mutateAsync(body);
       defaultFolder.remember(folderId);
-      const until = formatInTimeZone(new Date(endsAtMicros / 1000), timezone, "HH:mm");
+      const until = formatInTimeZone(new Date(endsAtMicros / 1000), zone, "HH:mm");
       toast({
         variant: "success",
         message: t(
           "toastMessages.downtimes.muted",
-          { count, time: `${until} ${timezone}`, folder: body.folder_id },
+          { count, time: `${until} ${zone}`, folder: body.folder_id },
           count,
         ),
         action: {

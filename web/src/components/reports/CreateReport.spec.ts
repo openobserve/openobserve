@@ -643,6 +643,21 @@ describe("CreateReport", () => {
       expect(vi.mocked(reports.updateReport)).toHaveBeenCalled();
     });
 
+    it("selects Asia/Kolkata for a stored Asia/Calcutta, and finds it by the old name", async () => {
+      vi.mocked(reports.getReport).mockResolvedValueOnce({
+        data: { ...MOCK_REPORT, timezone: "Asia/Calcutta" },
+      } as any);
+      const { wrapper: w } = mountComponent({ name: "legacy-zone-report" });
+      await flushPromises();
+      expect((w.vm as any).form.state.values.timezone).toBe("Asia/Kolkata");
+      const options = (w.vm as any).timezoneSelectOptions as {
+        value: string;
+        searchText?: string;
+      }[];
+      expect(options.find((o) => o.value === "Asia/Kolkata")?.searchText).toContain("Calcutta");
+      w.unmount();
+    });
+
     it("should handle getReport non-403 error without crashing", async () => {
       vi.mocked(reports.getReport).mockRejectedValueOnce({
         response: { status: 500, data: { message: "error" } },

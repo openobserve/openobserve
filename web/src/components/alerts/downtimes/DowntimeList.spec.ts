@@ -22,6 +22,7 @@ import downtimes from "@/services/downtimes";
 import type { DowntimeListItem, DowntimeListResponse } from "@/services/downtimes";
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 
 // The route guard opens this page only with downtimes on.
 vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
@@ -172,6 +173,66 @@ describe("DowntimeList", () => {
     await flushPromises();
     expect(downtimes.list).toHaveBeenCalledTimes(2);
     expect(activeCount()).toContain("1");
+    wrapper.unmount();
+  });
+
+  it("shows the When column in the app's zone, the zone every downtime view uses", async () => {
+    store.state.timezone = "Pacific/Chatham";
+    vi.mocked(downtimes.list).mockResolvedValue(page([row()]) as never);
+    const wrapper = await mountList();
+    await vi.waitFor(() => expect(wrapper.findAllComponents(OTimeCell).length).toBeGreaterThan(0));
+    const cells = wrapper.findAllComponents(OTimeCell);
+    expect(cells.every((c) => c.props("timezone") === "Pacific/Chatham")).toBe(true);
+    store.state.timezone = "UTC";
+    wrapper.unmount();
+  });
+
+  const cutList = () =>
+    vi.mocked(downtimes.list).mockResolvedValue({
+      data: {
+        items: [
+          row({ id: "a1", folder_id: "team-a", status: "active" }),
+          row({ id: "a2", folder_id: "team-a", status: "active" }),
+          row({ id: "a3", folder_id: "team-a", status: "active" }),
+          row({ id: "d1", folder_id: "default", status: "active" }),
+        ],
+        total: 600,
+        counts: {
+          active: 120,
+          scheduled: 300,
+          recurring: 50,
+          ended: 100,
+          cancelled: 80,
+          ended_early: 0,
+        },
+      },
+    } as never);
+
+  it("says when the list is cut and keeps a folder's tiles on the rows it shows", async () => {
+    cutList();
+    const wrapper = await mountList({ folder: "team-a" });
+    expect(wrapper.get('[data-test="downtime-list-truncated"]').text()).toContain(
+      "Showing the first 4 of 600 downtimes",
+    );
+    expect(wrapper.get('[data-test="downtime-summary-active"]').text()).toContain("3");
+    expect(wrapper.get('[data-test="downtime-summary-active"]').text()).not.toContain("120");
+    expect(wrapper.get('[data-test="downtime-summary-total"]').text()).toContain("3");
+    expect(wrapper.get('[data-test="downtime-summary-total"]').text()).not.toContain("600");
+    wrapper.unmount();
+  });
+
+  it("takes the tiles from the server counts when a cut list is viewed across the org", async () => {
+    cutList();
+    const wrapper = await mountList({ scope: "all", status: "active" });
+    expect(wrapper.get('[data-test="downtime-summary-active"]').text()).toContain("120");
+    expect(wrapper.get('[data-test="downtime-summary-total"]').text()).toContain("600");
+    wrapper.unmount();
+  });
+
+  it("shows no cut notice when one page holds the org", async () => {
+    vi.mocked(downtimes.list).mockResolvedValue(page([row()]) as never);
+    const wrapper = await mountList();
+    expect(wrapper.find('[data-test="downtime-list-truncated"]').exists()).toBe(false);
     wrapper.unmount();
   });
 

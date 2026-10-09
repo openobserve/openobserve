@@ -8925,6 +8925,8 @@
       "allFolders": "Wszystkie foldery",
       "thisFolderTooltip": "Szukaj w wybranym folderze",
       "allFoldersTooltip": "Szukaj w każdym folderze",
+      "noFolder": "Brak folderu, w którym możesz zapisać przestój",
+      "truncated": "Wyświetlanie pierwszych {shown} z {total} przestojów",
       "stats": {
         "active": "Aktywne",
         "scheduled": "Zaplanowane",

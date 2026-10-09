@@ -8920,6 +8920,8 @@
       "allFolders": "所有資料夾",
       "thisFolderTooltip": "在選取的資料夾中搜尋",
       "allFoldersTooltip": "在每個資料夾中搜尋",
+      "noFolder": "沒有可用於存放停機時間的資料夾",
+      "truncated": "顯示 {total} 個停機時間中的前 {shown} 個",
       "stats": {
         "active": "作用中",
         "scheduled": "已排程",

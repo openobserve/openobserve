@@ -16,7 +16,11 @@ describe("preferredDowntimeFolder", () => {
   it("falls back to default, then to the first permitted folder", () => {
     expect(preferredDowntimeFolder(["default", "ops"], null)).toBe("default");
     expect(preferredDowntimeFolder(["payments", "ops"], null)).toBe("payments");
-    expect(preferredDowntimeFolder([], null)).toBe("default");
+  });
+
+  it("names no folder when the user may use none, rather than a default that answers 403", () => {
+    expect(preferredDowntimeFolder([], null)).toBeNull();
+    expect(preferredDowntimeFolder([], "payments")).toBeNull();
   });
 
   it("uses the last folder, else default, before the list has answered", () => {

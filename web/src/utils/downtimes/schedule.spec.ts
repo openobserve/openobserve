@@ -92,6 +92,26 @@ describe("currentOrNextWindow", () => {
     });
   });
 
+  it("skips an occurrence that starts before a mid-day starts_at, as the server does", () => {
+    const daily: DowntimeSchedule = {
+      ...weekly,
+      repeat: "daily",
+      timezone: "UTC",
+      starts_at: micros("2026-09-17T13:00:00Z"),
+      start_time_local: "09:00",
+      duration_secs: 3600,
+      weekdays: [],
+    };
+    expect(currentOrNextWindow(daily, micros("2026-09-17T06:00:00Z"))).toEqual({
+      start: micros("2026-09-18T09:00:00Z"),
+      end: micros("2026-09-18T10:00:00Z"),
+    });
+    expect(recentWindows(daily, micros("2026-09-19T12:00:00Z"), 5).map((w) => w.start)).toEqual([
+      micros("2026-09-18T09:00:00Z"),
+      micros("2026-09-19T09:00:00Z"),
+    ]);
+  });
+
   it("returns a one-time window until it ends", () => {
     const once: DowntimeSchedule = {
       repeat: "none",

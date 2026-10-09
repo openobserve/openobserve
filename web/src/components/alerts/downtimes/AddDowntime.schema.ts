@@ -80,6 +80,8 @@ const scheduleSchema = z.object({
   weekdays: z.array(z.number()),
   until_date: z.string(),
   timezone: z.string(),
+  starts_at: z.number().nullable(),
+  starts_at_timezone: z.string().nullable(),
 });
 
 const capIssues = (

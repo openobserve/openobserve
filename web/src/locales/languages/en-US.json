@@ -8925,6 +8925,8 @@
       "allFolders": "All folders",
       "thisFolderTooltip": "Search in the selected folder",
       "allFoldersTooltip": "Search in every folder",
+      "noFolder": "No folder you can file a downtime in",
+      "truncated": "Showing the first {shown} of {total} downtimes",
       "stats": {
         "active": "Active",
         "scheduled": "Scheduled",

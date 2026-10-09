@@ -8925,6 +8925,8 @@
       "allFolders": "Alle Ordner",
       "thisFolderTooltip": "Im ausgewählten Ordner suchen",
       "allFoldersTooltip": "In jedem Ordner suchen",
+      "noFolder": "Kein Ordner, in dem Sie eine Ausfallzeit ablegen können",
+      "truncated": "Die ersten {shown} von {total} Ausfallzeiten werden angezeigt",
       "stats": {
         "active": "Aktiv",
         "scheduled": "Geplant",

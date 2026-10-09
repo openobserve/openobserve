@@ -22,6 +22,7 @@ import downtimes from "@/services/downtimes";
 import type { DowntimeDetail as DowntimeDetailData } from "@/services/downtimes";
 import alerts from "@/services/alerts";
 import { queryClient } from "@/composables/query/queryClient";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 
 vi.mock("@/services/downtimes", () => ({
   default: {
@@ -154,6 +155,31 @@ describe("DowntimeDetail", () => {
       "default",
       expect.objectContaining({ downtime_id: "dt-1", status: "suppressed" }),
     );
+    wrapper.unmount();
+  });
+
+  it("shows suppressed times in the app's zone, the zone every downtime view uses", async () => {
+    store.state.timezone = "Pacific/Chatham";
+    vi.mocked(downtimes.get).mockResolvedValue({ data: detail } as never);
+    vi.mocked(alerts.getHistory).mockResolvedValue({
+      data: {
+        total: 1,
+        from: 0,
+        size: 500,
+        hits: [
+          { timestamp: NOW_MICROS - 60_000_000, alert_name: "kafka-lag", status: "suppressed" },
+        ],
+      },
+    } as never);
+    const { wrapper } = await mountDetail();
+    await wrapper.get('[data-test="downtime-detail-tab-suppressed"]').trigger("mousedown", {
+      button: 0,
+    });
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.findAllComponents(OTimeCell).length).toBeGreaterThan(0));
+    const zones = wrapper.findAllComponents(OTimeCell).map((c) => c.props("timezone"));
+    expect(zones.every((z) => z === "Pacific/Chatham")).toBe(true);
+    store.state.timezone = "UTC";
     wrapper.unmount();
   });
 

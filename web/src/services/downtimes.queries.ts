@@ -57,10 +57,24 @@ export interface DowntimeTestResult {
 /** The API caps an org at 500 downtimes, so one page holds the whole list. */
 export const DOWNTIME_LIST_PAGE_SIZE = 500;
 
+/** The list as the pages read it: `truncated` when the org holds more rows than one page carried. */
+export interface DowntimeListResult extends DowntimeListResponse {
+  truncated: boolean;
+}
+
 const EMPTY_LIST: DowntimeListResponse = {
   items: [],
   total: 0,
   counts: { active: 0, scheduled: 0, recurring: 0, ended: 0, cancelled: 0, ended_early: 0 },
+};
+
+/** The response with its defaults filled in and the truncation flag set. */
+export const toListResult = (
+  data: Partial<DowntimeListResponse> | undefined,
+): DowntimeListResult => {
+  const items = data?.items ?? [];
+  const merged = { ...EMPTY_LIST, ...data, items };
+  return { ...merged, truncated: merged.total > items.length };
 };
 
 /** The nearest future window start or end among the rows, in microseconds; the instant a status flips. */
@@ -78,11 +92,10 @@ export const nextListBoundary = (
 export const downtimesListQuery = (org: string) =>
   queryOptions({
     queryKey: downtimeKeys.list(org),
-    queryFn: async (): Promise<DowntimeListResponse> => {
-      const data = (await downtimes.list(org, { page: 1, page_size: DOWNTIME_LIST_PAGE_SIZE }))
-        .data;
-      return { ...EMPTY_LIST, ...data, items: data?.items ?? [] };
-    },
+    queryFn: async (): Promise<DowntimeListResult> =>
+      toListResult(
+        (await downtimes.list(org, { page: 1, page_size: DOWNTIME_LIST_PAGE_SIZE })).data,
+      ),
     staleTime: LIVE_STALE_TIME,
   });
 
@@ -90,16 +103,16 @@ export const downtimesListQuery = (org: string) =>
 export const downtimesLookupQuery = (org: string) =>
   queryOptions({
     queryKey: downtimeKeys.lookup(org),
-    queryFn: async (): Promise<DowntimeListResponse> => {
-      const data = (
-        await downtimes.list(
-          org,
-          { page: 1, page_size: DOWNTIME_LIST_PAGE_SIZE },
-          { skipAccessToast: true },
-        )
-      ).data;
-      return { ...EMPTY_LIST, ...data, items: data?.items ?? [] };
-    },
+    queryFn: async (): Promise<DowntimeListResult> =>
+      toListResult(
+        (
+          await downtimes.list(
+            org,
+            { page: 1, page_size: DOWNTIME_LIST_PAGE_SIZE },
+            { skipAccessToast: true },
+          )
+        ).data,
+      ),
     staleTime: LIVE_STALE_TIME,
   });
 

@@ -1804,6 +1804,7 @@ import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
+import { browserTimezone, canonicalTimezone, timezoneSearchText } from "@/utils/timezoneAliases";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
@@ -2914,8 +2915,18 @@ export default defineComponent({
       filteredTimezones.value.map((tz: string) =>
         tz === browserTime
           ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-          : { label: raw(tz), value: tz },
+          : { label: raw(tz), value: tz, searchText: timezoneSearchText(tz) },
       ),
+    );
+
+    // The options hold canonical names, so a loaded legacy zone such as `Asia/Calcutta` is renamed to match one.
+    watch(
+      cronTimezone,
+      (zone) => {
+        const canonical = canonicalTimezone(zone);
+        if (canonical !== zone) cronTimezone.value = canonical;
+      },
+      { immediate: true },
     );
 
     const validateCron = () => {
@@ -2971,7 +2982,7 @@ export default defineComponent({
           // Entering cron mode is where a timezone first gets SAVED (parity:
           // pre-migration seeded it here, not at mount).
           if (!cronTimezone.value) {
-            cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            cronTimezone.value = browserTimezone();
           }
         }
         validateCron();
@@ -3022,7 +3033,7 @@ export default defineComponent({
       // "Browser Time (<zone>)" is a display-only shortcut; persist the resolved
       // IANA zone so trigger_condition.timezone stays a value the backend can
       // parse (storing the raw label produces a NaN tz_offset).
-      cronTimezone.value = resolveBrowserTimezone(value);
+      cronTimezone.value = canonicalTimezone(resolveBrowserTimezone(value));
       validateCron();
       emitTriggerUpdate();
     };

@@ -8925,6 +8925,8 @@
       "allFolders": "Todas las carpetas",
       "thisFolderTooltip": "Buscar en la carpeta seleccionada",
       "allFoldersTooltip": "Buscar en todas las carpetas",
+      "noFolder": "No hay ninguna carpeta en la que pueda guardar un tiempo de inactividad",
+      "truncated": "Se muestran los primeros {shown} de {total} tiempos de inactividad",
       "stats": {
         "active": "Activo",
         "scheduled": "Programado",

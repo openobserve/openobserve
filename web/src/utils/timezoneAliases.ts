@@ -51,6 +51,16 @@ const TIMEZONE_ALIASES: Record<string, string> = {
 /** The current tz-database name for `zone`, so one zone never shows under two names. */
 export const canonicalTimezone = (zone: string): string => TIMEZONE_ALIASES[zone] ?? zone;
 
+/** The legacy names that map to `zone`, so a search for an old name still finds it. */
+export const timezoneAliasesOf = (zone: string): string[] =>
+  Object.keys(TIMEZONE_ALIASES).filter((legacy) => TIMEZONE_ALIASES[legacy] === zone);
+
+/** What a zone picker searches: the zone and its legacy names, or `undefined` when it has none. */
+export const timezoneSearchText = (zone: string): string | undefined => {
+  const aliases = timezoneAliasesOf(zone);
+  return aliases.length ? [zone, ...aliases].join(" ") : undefined;
+};
+
 /** The browser's zone under its canonical name, `UTC` when the browser reports none. */
 export const browserTimezone = (): string =>
   canonicalTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");

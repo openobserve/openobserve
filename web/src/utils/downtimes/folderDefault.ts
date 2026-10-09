@@ -36,15 +36,16 @@ export function rememberDowntimeFolder(org: string, folderId: string): void {
 
 /**
  * Where a new downtime is filed: the last used folder while it is still listed, else
- * "default" when listed, else the first listed folder. The list holds only the folders the
- * user may use, so a folder-scoped user never lands on a folder that answers 403.
+ * "default" when listed, else the first listed folder, else `null` when the user may use none.
+ * The list holds only the folders the user may use, so a folder-scoped user never lands on a
+ * folder that answers 403.
  */
 export function preferredDowntimeFolder(
   listed: string[] | undefined,
   lastUsed: string | null,
-): string {
+): string | null {
   if (!listed) return lastUsed || DEFAULT_DOWNTIME_FOLDER;
   if (lastUsed && listed.includes(lastUsed)) return lastUsed;
   if (listed.includes(DEFAULT_DOWNTIME_FOLDER)) return DEFAULT_DOWNTIME_FOLDER;
-  return listed[0] ?? DEFAULT_DOWNTIME_FOLDER;
+  return listed[0] ?? null;
 }

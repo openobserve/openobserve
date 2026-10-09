@@ -422,7 +422,7 @@ import { useNowMicros } from "@/composables/downtimes/useNowMicros";
 import { isExtendable } from "@/utils/downtimes/extend";
 import { isEditable } from "@/utils/downtimes/listOrder";
 import { suppressedPage } from "@/utils/downtimes/suppressed";
-import { browserTimezone } from "@/utils/timezoneAliases";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 
 type DetailTab = "overview" | "affected" | "suppressed" | "notifications";
 
@@ -438,7 +438,7 @@ const { toast } = useToast();
 const id = computed(() => String(route.params.id ?? ""));
 const folderParam = computed(() => String(route.query.folder ?? "") || undefined);
 const activeTab = ref<DetailTab>("overview");
-const viewerZone = browserTimezone();
+const viewerZone = useViewerTimezone();
 const nowMicros = useNowMicros();
 // The suppressed history is read once for the window the page opened on.
 const openedAtMicros = nowMicros.value;

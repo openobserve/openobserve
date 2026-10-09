@@ -514,7 +514,7 @@ import { slosQuery } from "@/services/slos.queries";
 // stays off the query layer and calls the endpoint directly.
 import sloService from "@/services/slos";
 import { computed, onMounted, ref, nextTick, watch } from "vue";
-import config from "@/aws-exports";
+import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -1009,12 +1009,7 @@ function goToNew() {
   router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
 }
 
-// Enterprise or cloud plus `downtimes_enabled`, the rule of the downtimes route guard.
-const downtimesEnabled = computed(
-  () =>
-    (config.isEnterprise == "true" || config.isCloud == "true") &&
-    store.state.zoConfig?.downtimes_enabled === true,
-);
+const downtimesEnabled = useDowntimesEnabled();
 
 const activeCorrections = (row: SloListItem) =>
   (row.status?.corrections ?? []).filter((c) => c.status === "active");

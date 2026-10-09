@@ -39,6 +39,7 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useCountdown } from "@/composables/downtimes/useCountdown";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { formatDuration, formatWindowTime } from "@/utils/downtimes/schedule";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -53,7 +54,7 @@ const props = withDefaults(
 );
 
 const { t } = useI18nTyped();
-const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const viewerZone = useViewerTimezone();
 
 // The banner's skew-corrected clock, so chip and banner end at the same instant.
 const { remainingSecs } = useCountdown(() => props.downtime.ends_at, serverNowMs);

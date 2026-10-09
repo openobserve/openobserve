@@ -20,6 +20,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, BrowserCheckSchedule } from "@/types/synthetics";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
+import { browserTimezone, canonicalTimezone, timezoneSearchText } from "@/utils/timezoneAliases";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -75,13 +76,7 @@ const frequencyPreset = computed<FrequencyPreset>({
   set: (v: FrequencyPreset) => {
     if (v === "cron") {
       const patch: Partial<BrowserCheckSchedule> = { type: "cron", isCustomFrequency: false };
-      if (!props.check.schedule.timezone) {
-        try {
-          patch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        } catch {
-          patch.timezone = "UTC";
-        }
-      }
+      if (!props.check.schedule.timezone) patch.timezone = browserTimezone();
       updateSchedule(patch);
     } else if (v === "custom") {
       const cur = props.check.schedule;
@@ -147,20 +142,18 @@ watch(
 const { browserTz, browserTimeValue, zones } = useTimezoneOptions({ browserEntry: true });
 
 // The browser entry's value is persisted and parsed back, so it stays English.
-const timezoneOptions: { label: I18nText; value: string }[] = zones.map((tz) =>
-  tz === browserTimeValue
-    ? { label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }), value: tz }
-    : { label: raw(tz), value: tz },
+const timezoneOptions: { label: I18nText; value: string; searchText?: string }[] = zones.map(
+  (tz) =>
+    tz === browserTimeValue
+      ? { label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }), value: tz }
+      : { label: raw(tz), value: tz, searchText: timezoneSearchText(tz) },
 );
 
+// The options hold canonical names, so a stored legacy zone such as `Asia/Calcutta` still selects one.
 const timezone = computed({
   get: () => {
-    if (props.check.schedule.timezone) return props.check.schedule.timezone;
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch {
-      return "UTC";
-    }
+    const stored = props.check.schedule.timezone;
+    return stored ? canonicalTimezone(stored) : browserTimezone();
   },
   set: (v: string | number | boolean | null | undefined) =>
     updateSchedule({ timezone: v != null ? String(v) : "UTC" }),
@@ -192,13 +185,7 @@ const startType = computed({
   get: () => props.check.schedule.startType ?? "now",
   set: (v: string) => {
     const patch: Partial<BrowserCheckSchedule> = { startType: v as "now" | "later" };
-    if (v === "later" && !props.check.schedule.timezone) {
-      try {
-        patch.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      } catch {
-        patch.timezone = "UTC";
-      }
-    }
+    if (v === "later" && !props.check.schedule.timezone) patch.timezone = browserTimezone();
     updateSchedule(patch);
   },
 });

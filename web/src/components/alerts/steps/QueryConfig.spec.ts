@@ -351,6 +351,34 @@ describe("QueryConfig.vue", () => {
       await nextTick();
       expect(wrapper.vm.cronTimezone).toBe("America/Los_Angeles");
     });
+
+    it("selects Asia/Kolkata for a loaded Asia/Calcutta, and finds it by the old name", async () => {
+      host.unmount();
+      const { h } = mountHost(
+        {},
+        {
+          trigger_condition: {
+            ...hostDefaults().trigger_condition,
+            frequency_type: "cron",
+            cron: "0 */5 * * * *",
+            timezone: "Asia/Calcutta",
+          },
+        },
+      );
+      host = h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.timezone")).toBe("Asia/Kolkata");
+      const options = wrapper.vm.timezoneSelectOptions as { value: string; searchText?: string }[];
+      expect(options.find((o) => o.value === "Asia/Kolkata")?.searchText).toContain("Calcutta");
+      expect(options.some((o) => o.value === "Asia/Calcutta")).toBe(false);
+    });
+
+    it("onCronTimezoneChange stores a legacy zone under its canonical name", async () => {
+      wrapper.vm.onCronTimezoneChange("Asia/Calcutta");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("Asia/Kolkata");
+    });
   });
 
   describe("Initialization", () => {

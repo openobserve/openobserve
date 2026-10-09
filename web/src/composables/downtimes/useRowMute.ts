@@ -15,10 +15,10 @@
 
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
-import config from "@/aws-exports";
 import type { TargetModule } from "@/services/downtimes";
 import { groupSelection, type QuickMuteSelection } from "@/utils/downtimes/quickMute";
 import { useQuickMute } from "./useQuickMute";
+import { useDowntimesEnabled } from "./useDowntimesEnabled";
 
 /** The Mute entries of a list: presets create at once, Until… opens the dialog. */
 export function useRowMute<T>(moduleOf: (row: T) => TargetModule, idOf: (row: T) => string) {
@@ -26,13 +26,8 @@ export function useRowMute<T>(moduleOf: (row: T) => TargetModule, idOf: (row: T)
   // Muting reads the org from the store, so a storeless leaf mount gets no mute action at all.
   const quick = store?.state ? useQuickMute() : null;
 
-  // Enterprise or cloud plus `downtimes_enabled`, the rule of the route guard and the nav gate.
-  const downtimesEnabled = computed(
-    () =>
-      !!quick &&
-      (config.isEnterprise == "true" || config.isCloud == "true") &&
-      store?.state?.zoConfig?.downtimes_enabled === true,
-  );
+  const featureEnabled = useDowntimesEnabled();
+  const downtimesEnabled = computed(() => !!quick && featureEnabled.value);
 
   const muteDialogOpen = ref(false);
   const muteSelection = ref<QuickMuteSelection[]>([]);

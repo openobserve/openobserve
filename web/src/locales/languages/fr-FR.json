@@ -8925,6 +8925,8 @@
       "allFolders": "Tous les dossiers",
       "thisFolderTooltip": "Rechercher dans le dossier sélectionné",
       "allFoldersTooltip": "Rechercher dans tous les dossiers",
+      "noFolder": "Aucun dossier dans lequel vous pouvez classer une période d'arrêt",
+      "truncated": "Affichage des {shown} premières périodes d'arrêt sur {total}",
       "stats": {
         "active": "Actives",
         "scheduled": "Planifiées",

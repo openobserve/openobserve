@@ -21,7 +21,11 @@ import {
   localToUtcMicros,
   utcMicrosToLocal,
 } from "@/utils/downtimes/schedule";
-import { presetSeconds, type QuickMutePreset } from "@/utils/downtimes/quickMute";
+import {
+  QUICK_MUTE_PRESETS,
+  presetSeconds,
+  type QuickMutePreset,
+} from "@/utils/downtimes/quickMute";
 
 export interface QuickMuteForm extends Record<string, unknown> {
   preset: QuickMutePreset | "custom";
@@ -37,10 +41,16 @@ export function quickMuteEndsAt(v: QuickMuteForm, nowMicros: number, tz: string)
   return localToUtcMicros(v.end_date, v.end_time, tz);
 }
 
-export const makeQuickMuteSchema = (t: TranslateFn, tz: string, now: () => number) =>
+// The toggle offers Custom plus the presets, so the schema accepts exactly those keys.
+const PRESET_KEYS: [QuickMuteForm["preset"], ...QuickMuteForm["preset"][]] = [
+  "custom",
+  ...QUICK_MUTE_PRESETS.map((p) => p.key),
+];
+
+export const makeQuickMuteSchema = (t: TranslateFn, tz: () => string, now: () => number) =>
   z
     .object({
-      preset: z.enum(["30m", "1h", "2h", "4h", "custom"]),
+      preset: z.enum(PRESET_KEYS),
       end_date: z.string(),
       end_time: z.string(),
       reason: z.string(),
@@ -50,7 +60,7 @@ export const makeQuickMuteSchema = (t: TranslateFn, tz: string, now: () => numbe
       const v = raw as QuickMuteForm;
       if (v.preset !== "custom") return;
       const nowMicros = now();
-      const ends = quickMuteEndsAt(v, nowMicros, tz);
+      const ends = quickMuteEndsAt(v, nowMicros, tz());
       const secs = ends === null ? null : (ends - nowMicros) / 1_000_000;
       const message =
         secs === null
