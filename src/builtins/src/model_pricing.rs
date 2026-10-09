@@ -234,6 +234,69 @@ mod tests {
         }
     }
 
+    /// Pins the JSON shape of a service-tier entry (OpenAI Flex) in `llm_pricing.json`.
+    #[test]
+    fn test_parse_built_in_entry_with_rules() {
+        use config::meta::model_pricing::RuleOp;
+
+        let json = r#"[
+          {
+            "name": "GPT-6 Sol",
+            "provider": "OpenAI",
+            "description": "OpenAI GPT-6 Sol",
+            "match_pattern": "(?i)gpt-6-sol",
+            "tiers": [
+              {
+                "name": "Default",
+                "prices": { "input": 2e-06, "output": 1e-05 }
+              },
+              {
+                "name": "Extended Context (272k+)",
+                "condition": { "usage_key": "input", "operator": "gte", "value": 272000 },
+                "prices": { "input": 4e-06, "output": 1.5e-05 }
+              },
+              {
+                "name": "Flex",
+                "rules": [
+                  {
+                    "keys": ["openai.response.service_tier", "openai.request.service_tier"],
+                    "op": "in",
+                    "values": ["flex"]
+                  }
+                ],
+                "prices": { "input": 1e-06, "output": 5e-06 }
+              },
+              {
+                "name": "Flex · Extended Context (272k+)",
+                "condition": { "usage_key": "input", "operator": "gte", "value": 272000 },
+                "rules": [
+                  {
+                    "keys": ["openai.response.service_tier", "openai.request.service_tier"],
+                    "op": "in",
+                    "values": ["flex"]
+                  }
+                ],
+                "prices": { "input": 2e-06, "output": 7.5e-06 }
+              }
+            ]
+          }
+        ]"#;
+
+        let entries: Vec<BuiltInModelPricingEntry> = serde_json::from_str(json).unwrap();
+        let tiers = &entries[0].tiers;
+        assert_eq!(tiers.len(), 4);
+
+        // Plain tiers come first so binaries that predate `rules` still pick the standard rates.
+        assert!(tiers[0].is_default());
+        assert!(tiers[1].rules.is_empty() && tiers[1].condition.is_some());
+
+        assert_eq!(tiers[2].rules[0].op, RuleOp::In);
+        assert_eq!(tiers[2].rules[0].keys[0], "openai.response.service_tier");
+        assert_eq!(tiers[2].rules[0].values, vec!["flex"]);
+        assert!(tiers[2].condition.is_none());
+        assert_eq!(tiers[3].restriction_count(), 2);
+    }
+
     #[test]
     fn test_sync_result_fields() {
         let r = SyncResult {

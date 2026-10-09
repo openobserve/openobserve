@@ -678,6 +678,171 @@ describe("ModelPricingEditor.vue", () => {
     });
   });
 
+  describe("Schema validation: attribute rules", () => {
+    const schema = makeModelPricingSchema(i18n.global.t as any);
+    // Isolate the rule issues (path tiers[1].rules[0].<field>).
+    const ruleIssue = (rule: Record<string, any>, field: string) => {
+      const res = schema.safeParse({
+        name: "X",
+        match_pattern: "gpt",
+        tiers: [
+          { name: "Default", condition: null, prices: [{ key: "input", value: 1 }] },
+          { name: "Flex", condition: null, rules: [rule], prices: [] },
+        ],
+      });
+      return res.success
+        ? ""
+        : (res.error.issues.find(
+            (iss: any) =>
+              iss.path[0] === "tiers" && iss.path[2] === "rules" && iss.path[4] === field,
+          )?.message ?? "");
+    };
+
+    it("accepts a set rule with a key and values", () => {
+      const rule = { keys: "openai.response.service_tier", op: "in", values: "flex", value: 0 };
+      expect(ruleIssue(rule, "keys")).toBe("");
+      expect(ruleIssue(rule, "values")).toBe("");
+      expect(ruleIssue(rule, "value")).toBe("");
+    });
+
+    it("requires at least one attribute key", () => {
+      expect(ruleIssue({ keys: " , ", op: "in", values: "flex", value: 0 }, "keys")).toContain(
+        "attribute key",
+      );
+    });
+
+    it("requires values for a set operator", () => {
+      expect(
+        ruleIssue({ keys: "service_tier", op: "not_in", values: "", value: 0 }, "values"),
+      ).toContain("at least one value");
+    });
+
+    it("rejects a non-numeric threshold for a comparison operator", () => {
+      expect(
+        ruleIssue({ keys: "usage.input", op: "gt", values: "", value: "abc" }, "value"),
+      ).not.toBe("");
+      expect(ruleIssue({ keys: "usage.input", op: "gt", values: "", value: 1000 }, "value")).toBe(
+        "",
+      );
+    });
+
+    it("needs neither values nor a threshold for a presence operator", () => {
+      const rule = { keys: "service_tier", op: "exists", values: "", value: 0 };
+      expect(ruleIssue(rule, "values")).toBe("");
+      expect(ruleIssue(rule, "value")).toBe("");
+    });
+  });
+
+  describe("Attribute rules (service tier pricing)", () => {
+    it("splits comma-separated keys and values into arrays at submit", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 2)] }),
+        tier({
+          name: "Flex",
+          condition: null,
+          prices: [row("input", 1)],
+          rules: [
+            {
+              keys: "openai.response.service_tier, openai.request.service_tier",
+              op: "in",
+              values: "flex, Flex ",
+              value: 0,
+            },
+            { keys: "usage.input", op: "gt", values: "", value: 272000 },
+            { keys: "gen_ai.request.speed", op: "exists", values: "", value: 0 },
+          ],
+        }),
+      ]);
+      await nextTick();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      const payload = mockService.create.mock.calls[0][1];
+      expect(payload.tiers[0].rules).toEqual([]);
+      expect(payload.tiers[1].rules).toEqual([
+        {
+          keys: ["openai.response.service_tier", "openai.request.service_tier"],
+          op: "in",
+          values: ["flex", "Flex"],
+        },
+        { keys: ["usage.input"], op: "gt", value: 272000 },
+        { keys: ["gen_ai.request.speed"], op: "exists" },
+      ]);
+      // A rule-only tier carries no usage condition.
+      expect(payload.tiers[1].condition).toBeNull();
+    });
+
+    it("addRule / removeRule mutate the form-owned tier", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Flex", condition: null, prices: [row("input", 2)] }),
+      ]);
+      await nextTick();
+
+      (wrapper.vm as any).addRule(1);
+      await nextTick();
+      let tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[1].rules).toEqual([
+        {
+          keys: "openai.response.service_tier, openai.request.service_tier",
+          op: "in",
+          values: "flex",
+          value: 0,
+        },
+      ]);
+      expect(wrapper.find('[data-test="model-pricing-tier-rules-1"]').exists()).toBe(true);
+
+      (wrapper.vm as any).removeRule(1, 0);
+      await nextTick();
+      tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[1].rules).toEqual([]);
+    });
+
+    it("hydrates a rule-only tier from the API without inventing a condition", async () => {
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "gpt",
+          name: "GPT-6 Sol",
+          match_pattern: "(?i)gpt-6-sol",
+          enabled: true,
+          tiers: [
+            { name: "Default", condition: null, prices: { input: 0.000002 } },
+            {
+              name: "Flex",
+              condition: null,
+              rules: [
+                {
+                  keys: ["openai.response.service_tier", "openai.request.service_tier"],
+                  op: "in",
+                  values: ["flex"],
+                },
+              ],
+              prices: { input: 0.000001 },
+            },
+          ],
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "gpt" } });
+      await flushPromises();
+
+      const tiers = getForm(wrapper).state.values.tiers;
+      expect(tiers[0].rules).toEqual([]);
+      expect(tiers[1].condition).toBeNull();
+      expect(tiers[1].rules).toEqual([
+        {
+          keys: "openai.response.service_tier, openai.request.service_tier",
+          op: "in",
+          values: "flex",
+          value: 0,
+        },
+      ]);
+    });
+  });
+
   describe("Schema validation (real OForm)", () => {
     it("blocks submit and calls neither create nor update when name/pattern are empty", async () => {
       const wrapper = createWrapper();
@@ -1074,9 +1239,16 @@ describe("ModelPricingEditor.vue", () => {
       // EXACT tier shape — only {condition, name, prices, utc_windows}; NO
       // draftKey/draftValue leak
       const t0 = payload.tiers[0];
-      expect(Object.keys(t0).sort()).toEqual(["condition", "name", "prices", "utc_windows"]);
+      expect(Object.keys(t0).sort()).toEqual([
+        "condition",
+        "name",
+        "prices",
+        "rules",
+        "utc_windows",
+      ]);
       expect(t0.condition).toBeNull(); // default (first) tier
       expect(t0.utc_windows).toEqual([]); // default tier is never time-restricted
+      expect(t0.rules).toEqual([]); // nor rule-restricted
       expect(typeof t0.name).toBe("string");
 
       // prices is a per-token MAP of numbers (committed row + committed draft)
