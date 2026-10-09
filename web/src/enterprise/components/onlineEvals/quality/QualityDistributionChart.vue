@@ -1,151 +1,131 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
-  <div ref="chartEl" class="h-full min-h-50 w-full" data-test="quality-distribution-chart" />
+  <div class="h-full min-h-0 w-full" data-test="quality-distribution-chart">
+    <!-- ChartRenderer, not PanelSchemaRenderer: only it forwards the bar click that filters the scores. -->
+    <ChartRenderer :data="{ options }" @click="onBarClick" />
+  </div>
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
-import * as echarts from "echarts";
+import { useI18nTyped } from "@/types/i18n";
 import { chartColor } from "@/utils/chartTheme";
-import { CHART_THRESHOLD_COLOR } from "@/utils/dashboard/colorPalette";
-import type { DistributionBucket } from "../composables/useQualityDetailCharts";
-import { withChartFont } from "@/utils/fonts";
-const { t } = useI18nTyped();
+import { escapeHtml } from "@/utils/html";
+import type { QualityDistributionBucket } from "@/services/online-evals.service";
+import { bucketLabel, bucketSelected, type QualityChartFilter } from "../utils/qualityFormat";
+
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+);
 
 const props = defineProps<{
-  buckets: DistributionBucket[];
-  threshold: { value: number; direction: "gte" | "lte" } | null;
-  legendHealthy: I18nText;
-  legendUnhealthy: string;
+  buckets: QualityDistributionBucket[];
+  filter: QualityChartFilter | null;
 }>();
 
-const chartEl = ref<HTMLElement | null>(null);
-let chart: echarts.ECharts | null = null;
+const emit = defineEmits<{
+  (e: "select", bucket: QualityDistributionBucket, shift: boolean): void;
+}>();
+
+const { t } = useI18nTyped();
 const store = useStore();
 
-function buildOption(): echarts.EChartsOption {
+const classified = computed(() => props.buckets.some((bucket) => bucket.unhealthy != null));
+
+const options = computed(() => {
+  // Read the theme so token colors re-resolve when it flips.
+  void store.state.theme;
   const text = chartColor("--color-text-secondary");
   const grid = chartColor("--color-border-subtle");
-  const labels = props.buckets.map((b) => b.label);
-
-  const seriesData = props.buckets.map((b) => ({
-    value: b.count,
-    itemStyle: {
-      color: b.healthy ? "rgba(46, 125, 50, 0.85)" : "rgba(178, 84, 0, 0.85)",
-    },
-  }));
-
-  const series: echarts.SeriesOption[] = [
-    {
-      name: t("onlineEvals.count"),
-      type: "bar",
-      data: seriesData,
-      barCategoryGap: "8%",
-      label: {
-        show: true,
-        position: "top",
-        color: text,
-        fontSize: 10,
-      },
-    },
-  ];
-
-  if (props.threshold) {
-    const sign = props.threshold.direction === "gte" ? ">=" : "<=";
-    const thresholdLabel = t("onlineEvals.quality.detail.markLineHealthy", {
-      direction: sign,
-      value: props.threshold.value,
-    });
-    series.push({
-      name: thresholdLabel,
-      type: "line",
-      data: [],
-      markLine: {
-        silent: true,
-        symbol: "none",
-        label: {
-          formatter: thresholdLabel,
-          color: CHART_THRESHOLD_COLOR,
-          fontSize: 10,
-          position: "insideEndTop",
+  const point = (value: number, bucket: QualityDistributionBucket) => ({
+    value,
+    itemStyle: { opacity: bucketSelected(props.filter, bucket) ? 1 : 0.3 },
+  });
+  const countLabel = {
+    show: true,
+    position: "top",
+    color: text,
+    fontSize: 10,
+    formatter: (p: any) => props.buckets[p.dataIndex]?.count || "",
+  };
+  const series = classified.value
+    ? [
+        {
+          name: t("onlineEvals.quality.detail.legendHealthy"),
+          type: "bar",
+          stack: "scores",
+          color: chartColor("--color-service-health-healthy"),
+          data: props.buckets.map((b) => point(b.count - (b.unhealthy ?? 0), b)),
         },
-        lineStyle: { color: CHART_THRESHOLD_COLOR, type: "dashed", width: 1.2 },
-        data: [{ xAxis: thresholdBucketIndex() }],
-      },
-    });
-  }
-
+        {
+          name: t("onlineEvals.quality.detail.legendUnhealthy"),
+          type: "bar",
+          stack: "scores",
+          color: chartColor("--color-service-health-critical"),
+          label: countLabel,
+          data: props.buckets.map((b) => point(b.unhealthy ?? 0, b)),
+        },
+      ]
+    : [
+        {
+          name: t("onlineEvals.quality.detail.legendScores"),
+          type: "bar",
+          color: chartColor("--color-chart-series-1"),
+          label: countLabel,
+          data: props.buckets.map((b) => point(b.count, b)),
+        },
+      ];
   return {
-    grid: { left: 40, right: 16, top: 28, bottom: 28 },
-    tooltip: { trigger: "axis", confine: true },
-    legend: {
-      right: 0,
-      top: 0,
-      itemWidth: 12,
-      itemHeight: 8,
-      textStyle: { color: text, fontSize: 11 },
-      data: [
-        {
-          name: props.legendHealthy,
-          icon: "rect",
-          itemStyle: { color: "rgba(46, 125, 50, 0.85)" } as any,
-        },
-        {
-          name: props.legendUnhealthy,
-          icon: "rect",
-          itemStyle: { color: "rgba(178, 84, 0, 0.85)" } as any,
-        },
-      ],
+    grid: { left: 8, right: 8, top: 20, bottom: 4, containLabel: true },
+    tooltip: {
+      trigger: "axis",
+      axisPointer: { type: "shadow" },
+      formatter: (params: any[]) => {
+        const bucket = props.buckets[params?.[0]?.dataIndex];
+        if (!bucket) return "";
+        const detail = classified.value
+          ? t("onlineEvals.quality.detail.chartTooltip", {
+              count: bucket.count,
+              unhealthy: bucket.unhealthy ?? 0,
+            })
+          : t("onlineEvals.quality.detail.chartTooltipCount", { count: bucket.count });
+        return `${escapeHtml(bucketLabel(bucket))}<br/>${escapeHtml(detail)}`;
+      },
     },
     xAxis: {
       type: "category",
-      data: labels,
-      axisLine: { lineStyle: { color: grid } },
+      data: props.buckets.map(bucketLabel),
       axisLabel: { color: text, fontSize: 10 },
-      splitLine: { show: false },
+      axisLine: { lineStyle: { color: grid } },
     },
     yAxis: {
       type: "value",
-      axisLine: { show: false },
+      minInterval: 1,
       axisLabel: { color: text, fontSize: 10 },
       splitLine: { lineStyle: { color: grid } },
     },
     series,
   };
-}
-
-function thresholdBucketIndex(): number {
-  if (!props.threshold) return -1;
-  const target = props.threshold.value;
-  const idx = props.buckets.findIndex((b) => target >= b.rangeStart && target <= b.rangeEnd);
-  return idx >= 0 ? idx : -1;
-}
-
-function render() {
-  if (!chart) return;
-  chart.setOption(withChartFont(buildOption()), true);
-}
-
-onMounted(() => {
-  if (!chartEl.value) return;
-  chart = echarts.init(chartEl.value, undefined, { renderer: "canvas" });
-  render();
 });
 
-watch(
-  () => [props.buckets, props.threshold, store.state.theme],
-  () => render(),
-  { deep: true },
-);
-
-const resizeObserver = new ResizeObserver(() => chart?.resize());
-onMounted(() => {
-  if (chartEl.value) resizeObserver.observe(chartEl.value);
-});
-onBeforeUnmount(() => {
-  resizeObserver.disconnect();
-  chart?.dispose();
-  chart = null;
-});
+function onBarClick(params: any) {
+  const bucket = props.buckets[params?.dataIndex];
+  if (bucket) emit("select", bucket, !!params?.event?.event?.shiftKey);
+}
 </script>

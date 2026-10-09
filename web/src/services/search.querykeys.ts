@@ -27,3 +27,10 @@ export const traceDagKeys = {
   detail: (org: string, streamName: string, traceId: string, startTime: number, endTime: number) =>
     orgKey(org, "traces", "dag", traceId, streamName, startTime, endTime),
 };
+
+/** One entry per trace: the window only helps the server find it, so it is not part of the key. */
+export const traceDetailsKeys = {
+  all: (org: string) => orgKey(org, "traces", "details"),
+  detail: (org: string, streamName: string, traceId: string) =>
+    orgKey(org, "traces", "details", streamName, traceId),
+};

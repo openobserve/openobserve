@@ -15,7 +15,7 @@
 
 import { queryOptions } from "@tanstack/vue-query";
 import search from "./search";
-import { traceDagKeys } from "./search.querykeys";
+import { traceDagKeys, traceDetailsKeys } from "./search.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const traceDagQuery = (
@@ -31,5 +31,29 @@ export const traceDagQuery = (
       (await search.getTraceDAG(org, streamName, traceId, startTime, endTime)).data,
     // Memory only, and it expires: a trace still receiving spans would otherwise
     // keep serving the partial DAG, and this tab has no refresh control.
+    staleTime: MEDIUM_STALE_TIME,
+  });
+
+/** A trace's spans, read from a window in microseconds that holds the trace. */
+export const traceDetailsQuery = (
+  org: string,
+  streamName: string,
+  traceId: string,
+  startTime: number,
+  endTime: number,
+) =>
+  queryOptions({
+    queryKey: traceDetailsKeys.detail(org, streamName, traceId),
+    queryFn: async (): Promise<Record<string, unknown>[]> =>
+      (
+        await search.get_trace_details({
+          org_identifier: org,
+          stream_name: streamName,
+          trace_id: traceId,
+          start_time: startTime,
+          end_time: endTime,
+          hint_ts: startTime + Math.floor((endTime - startTime) / 2),
+        })
+      ).data?.hits ?? [],
     staleTime: MEDIUM_STALE_TIME,
   });
