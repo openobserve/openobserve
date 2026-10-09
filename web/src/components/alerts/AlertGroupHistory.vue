@@ -111,7 +111,7 @@
 
       <template #cell-value="{ row }">
         <span class="text-compact text-text-secondary font-mono">
-          {{ formatValue(row.value) }}
+          {{ row.rule_value ?? formatValue(row.value) }}
         </span>
       </template>
 

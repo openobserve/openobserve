@@ -57,6 +57,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
+    require_complete: bool,
 ) -> Result<Vec<ScanContext>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
@@ -82,6 +83,7 @@ pub(crate) async fn create_context(
         time_range,
         matchers,
         label_selector,
+        require_complete,
     )
     .await?;
 
@@ -144,9 +146,15 @@ async fn get_wal_batches(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
+    require_complete: bool,
 ) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>)> {
     let cfg = get_config();
     let nodes = get_cached_online_ingester_nodes().await;
+    if require_complete && nodes.as_ref().is_none_or(|nodes| nodes.is_empty()) {
+        return Err(DataFusionError::Execution(
+            "Incomplete PromQL WAL query: no ingester available".into(),
+        ));
+    }
     if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
         return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
     }
@@ -166,6 +174,7 @@ async fn get_wal_batches(
                 .gt_eq(lit(start))
                 .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
+        Err(e) if require_complete => return Err(e),
         Err(_) => {
             return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
         }
@@ -212,15 +221,7 @@ async fn get_wal_batches(
 
     // run datafusion
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
-    let mut visit = ScanStatsVisitor::new();
-    let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-    let (batches, stats, ..) = if let Err(e) = ret {
-        log::error!("[trace_id {trace_id}] promql->wal->search: datafusion collect error: {e}");
-        Err(e)
-    } else {
-        log::info!("[trace_id {trace_id}] promql->wal->search: datafusion collect done");
-        ret.map(|data| (data, visit.scan_stats, visit.partial_err))
-    }?;
+    let (batches, stats) = finish_wal_collect(ret, physical_plan.as_ref(), require_complete)?;
 
     if batches.is_empty() {
         return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
@@ -244,6 +245,23 @@ async fn get_wal_batches(
     Ok((stats, new_batches, schema))
 }
 
+fn finish_wal_collect(
+    ret: Result<Vec<RecordBatch>>,
+    physical_plan: &dyn datafusion::physical_plan::ExecutionPlan,
+    require_complete: bool,
+) -> Result<(Vec<RecordBatch>, ScanStats)> {
+    let batches = ret?;
+    let mut visit = ScanStatsVisitor::new();
+    visit_execution_plan(physical_plan, &mut visit)?;
+    if require_complete && !visit.partial_err.is_empty() {
+        return Err(DataFusionError::Execution(format!(
+            "Incomplete PromQL WAL query: {}",
+            visit.partial_err
+        )));
+    }
+    Ok((batches, visit.scan_stats))
+}
+
 #[cfg(test)]
 mod tests {
     use datafusion::{
@@ -253,6 +271,30 @@ mod tests {
     use search::datafusion::distributed_plan::NewEmptyExecVisitor;
 
     use super::*;
+
+    #[derive(Debug)]
+    struct FailedIngester;
+
+    impl config::meta::cluster::NodeInfo for FailedIngester {
+        fn is_querier(&self) -> bool {
+            false
+        }
+        fn is_ingester(&self) -> bool {
+            true
+        }
+        fn get_grpc_addr(&self) -> String {
+            ":invalid-flight-uri".into()
+        }
+        fn get_auth_token(&self) -> String {
+            "fixture-token".into()
+        }
+        fn get_name(&self) -> String {
+            "failed-ingester".into()
+        }
+        fn is_local(&self) -> bool {
+            false
+        }
+    }
 
     #[tokio::test]
     async fn test_remote_metric_table_preserves_stream_name_in_physical_plan() -> Result<()> {
@@ -280,5 +322,54 @@ mod tests {
             assert_eq!(decoded_table_ref, TableReference::bare(stream_name));
         }
         Ok(())
+    }
+    #[tokio::test]
+    async fn rule_wal_rejects_below_cap_remote_partial_results_while_threshold_mode_stays_lenient()
+    {
+        use datafusion::physical_plan::empty::EmptyExec;
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "value",
+            DataType::Float64,
+            false,
+        )]));
+        let remote = Arc::new(
+            RemoteScanExec::new(
+                Arc::new(EmptyExec::new(schema.clone())),
+                RemoteScanNode {
+                    nodes: vec![Arc::new(FailedIngester)],
+                    ..Default::default()
+                },
+            )
+            .unwrap(),
+        );
+        let ctx = SessionContext::new();
+        let batches = datafusion::physical_plan::collect(remote.clone(), ctx.task_ctx())
+            .await
+            .unwrap();
+        assert!(batches.is_empty());
+        assert!(!remote.partial_err.lock().is_empty());
+        let error = finish_wal_collect(Ok(batches.clone()), remote.as_ref(), true).unwrap_err();
+        assert!(error.to_string().contains("Incomplete PromQL WAL query"));
+        assert!(
+            finish_wal_collect(Ok(batches), remote.as_ref(), false)
+                .unwrap()
+                .0
+                .is_empty()
+        );
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![Arc::new(datafusion::arrow::array::Float64Array::from(
+                vec![1.0],
+            ))],
+        )
+        .unwrap();
+        assert!(finish_wal_collect(Ok(vec![batch.clone()]), remote.as_ref(), true).is_err());
+        assert_eq!(
+            finish_wal_collect(Ok(vec![batch]), remote.as_ref(), false)
+                .unwrap()
+                .0[0]
+                .num_rows(),
+            1
+        );
     }
 }

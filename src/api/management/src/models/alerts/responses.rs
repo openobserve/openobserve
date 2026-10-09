@@ -409,6 +409,8 @@ pub struct AlertGroupTransitionItem {
     /// a group that vanished has no reading, and rendering 0 would be a lie.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rule_value: Option<String>,
 }
 
 /// HTTP response body for `ListAlertGroupTransitions`.

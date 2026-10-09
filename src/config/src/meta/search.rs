@@ -1133,6 +1133,8 @@ pub struct ValuesEventContext {
 #[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct SearchEventContext {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub promql_require_complete: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub alert_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -1214,6 +1216,7 @@ impl SearchEventContext {
 impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
     fn from(proto_sec: proto::cluster_rpc::SearchEventContext) -> Self {
         Self {
+            promql_require_complete: proto_sec.promql_require_complete,
             alert_key: proto_sec.alert_key,
             alert_name: proto_sec.alert_name,
             derived_stream_key: proto_sec.derived_stream_key,
@@ -1229,6 +1232,7 @@ impl From<proto::cluster_rpc::SearchEventContext> for SearchEventContext {
 impl From<SearchEventContext> for proto::cluster_rpc::SearchEventContext {
     fn from(sec: SearchEventContext) -> Self {
         Self {
+            promql_require_complete: sec.promql_require_complete,
             alert_key: sec.alert_key,
             alert_name: sec.alert_name,
             derived_stream_key: sec.derived_stream_key,

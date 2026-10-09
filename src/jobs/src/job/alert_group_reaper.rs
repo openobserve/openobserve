@@ -276,7 +276,8 @@ async fn sweep_alert(
             .trigger_condition
             .group_resolve_threshold_micros(state.last_seen.unwrap_or(now), k);
 
-        match group_fate(state, now, resolve_after, grace) {
+        let fate = fate_for_alert(alert, state, now, resolve_after, grace);
+        match fate {
             GroupFate::Keep => {}
             GroupFate::Resolve => {
                 let update = resolve_group_update(alert_id, &state.group_key, state, now);
@@ -308,6 +309,19 @@ async fn sweep_alert(
 /// layer — `multi_alert_enabled()` covers both the aggregation opt-in and the
 /// PromQL per-series opt-in; checking only `aggregation.multi_alert` here
 /// would make this sweep wipe a per-series alert's state rows every pass.
+fn fate_for_alert(
+    alert: &Alert,
+    state: &AlertState,
+    now: i64,
+    resolve_after: i64,
+    grace: i64,
+) -> GroupFate {
+    match group_fate(state, now, resolve_after, grace) {
+        GroupFate::Resolve if alert.query_condition.promql_rule_mode => GroupFate::Keep,
+        fate => fate,
+    }
+}
+
 fn still_multi(alert: Option<&Alert>) -> bool {
     alert.is_some_and(|a| a.query_condition.multi_alert_enabled())
 }
@@ -328,7 +342,7 @@ async fn cached_alerts_by_id() -> HashMap<String, Alert> {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::alerts::QueryType;
+    use config::meta::{alerts::QueryType, self_reporting::usage::RunOutcome};
 
     use super::*;
 
@@ -395,5 +409,28 @@ mod tests {
             "eu-central",
             &["eu-central".to_string()]
         ));
+    }
+    #[test]
+    fn rule_mode_cannot_time_resolve_a_series_during_query_gaps() {
+        let mut alert = Alert::default();
+        let state = config::meta::alerts::state::apply_outcome(
+            "rule",
+            "host=a",
+            None,
+            RunOutcome::Firing,
+            Some(config::meta::alerts::level::AlertLevel::Critical),
+            0,
+        )
+        .state
+        .unwrap();
+        assert_eq!(
+            fate_for_alert(&alert, &state, 600_000_000, 300_000_000, 60_000_000),
+            GroupFate::Resolve
+        );
+        alert.query_condition.promql_rule_mode = true;
+        assert_eq!(
+            fate_for_alert(&alert, &state, 600_000_000, 300_000_000, 60_000_000),
+            GroupFate::Keep
+        );
     }
 }

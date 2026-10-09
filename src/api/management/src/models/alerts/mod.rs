@@ -436,6 +436,8 @@ pub struct QueryCondition {
     /// `by (…)` clause.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub promql_multi_alert: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub promql_rule_mode: bool,
 
     /// Aggregation configuration for "custom" query type.
     pub aggregation: Option<Aggregation>,
@@ -688,6 +690,7 @@ impl From<meta_alerts::QueryCondition> for QueryCondition {
             promql_condition: value.promql_condition.map(|pc| pc.into()),
             promql_warning_value: value.promql_warning_value,
             promql_multi_alert: value.promql_multi_alert,
+            promql_rule_mode: value.promql_rule_mode,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -845,6 +848,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.notify_on_recovery = value.notify_on_recovery;
         alert.recovery_destinations = value.recovery_destinations;
         alert.keep_firing_for = value.keep_firing_for.max(0);
+        alert.normalize_promql_rule_mode();
 
         alert
     }
@@ -898,6 +902,7 @@ impl From<QueryCondition> for meta_alerts::QueryCondition {
             promql_condition: value.promql_condition.map(|pc| pc.into()),
             promql_warning_value: value.promql_warning_value,
             promql_multi_alert: value.promql_multi_alert,
+            promql_rule_mode: value.promql_rule_mode,
             aggregation: value.aggregation.map(|a| a.into()),
             vrl_function: value.vrl_function,
             search_event_type: value.search_event_type.map(|t| t.into()),
@@ -1518,6 +1523,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1544,6 +1550,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: true,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1569,6 +1576,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: None,
             search_event_type: None,
@@ -1600,6 +1608,7 @@ mod tests {
             promql_condition: None,
             promql_warning_value: None,
             promql_multi_alert: false,
+            promql_rule_mode: false,
             aggregation: None,
             vrl_function: Some("fn".to_string()),
             search_event_type: None,
@@ -1786,5 +1795,46 @@ mod tests {
             meta_alerts::TriggerCondition::from(trigger).frequency,
             i64::MAX
         );
+    }
+    #[test]
+    fn rule_pending_is_normalized_at_the_api_boundary() {
+        for pending in [0, 240] {
+            let api: Alert = serde_json::from_value(serde_json::json!({
+                "query_condition": {
+                    "type": "promql",
+                    "promql": "up",
+                    "promql_rule_mode": true,
+                    "promql_multi_alert": false
+                },
+                "pending_period_sec": pending
+            }))
+            .unwrap();
+            let meta = meta_alerts::alert::Alert::from(api);
+            assert_eq!(meta.query_condition.promql_multi_alert, pending > 0);
+            let response = Alert::from((meta, None));
+            assert_eq!(response.query_condition.promql_multi_alert, pending > 0);
+        }
+    }
+
+    #[test]
+    fn test_promql_rule_mode_survives_api_conversion() {
+        let meta = meta_alerts::QueryCondition {
+            promql_rule_mode: true,
+            promql_multi_alert: true,
+            query_type: meta_alerts::QueryType::PromQL,
+            ..Default::default()
+        };
+        let api = QueryCondition::from(meta);
+        assert!(api.promql_rule_mode);
+        let serialized = serde_json::to_value(&api).unwrap();
+        assert_eq!(
+            serialized.get("promql_rule_mode"),
+            Some(&serde_json::json!(true))
+        );
+        assert!(serialized.get("prom_rule_mode").is_none());
+        let api: QueryCondition = serde_json::from_value(serialized).unwrap();
+        let meta = meta_alerts::QueryCondition::from(api);
+        assert!(meta.promql_rule_mode);
+        assert!(meta.promql_condition.is_none());
     }
 }

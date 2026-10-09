@@ -59,6 +59,7 @@ struct GroupPlan {
 struct StorageProvider {
     trace_id: String,
     need_wal: bool,
+    require_complete: bool,
 }
 
 #[async_trait]
@@ -100,6 +101,7 @@ impl TableProvider for StorageProvider {
                 time_range,
                 matchers,
                 label_selector,
+                self.require_complete,
             )
             .await?;
             for ctx in wal_ctx_list {
@@ -409,6 +411,10 @@ pub async fn search_inner(
         StorageProvider {
             trace_id: trace_id.to_string(),
             need_wal: req.need_wal,
+            require_complete: req
+                .search_event_context
+                .as_ref()
+                .is_some_and(|c| c.promql_require_complete),
         },
         query.label_selector.clone(),
     );

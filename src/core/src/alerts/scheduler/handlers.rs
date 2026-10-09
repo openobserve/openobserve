@@ -82,6 +82,7 @@ async fn persist_alert_run_state(
     outcome: &RunOutcome,
     level: Option<config::meta::alerts::level::AlertLevel>,
     grouped: Option<&config::meta::alerts::grouping::GroupClassification>,
+    rule_value: Option<&str>,
     episode: &config::meta::alerts::recovery::EpisodeInput,
 ) -> bool {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
@@ -105,13 +106,23 @@ async fn persist_alert_run_state(
             }
         };
         let at = now_micros();
-        let plan = config::meta::alerts::grouping::plan_group_updates(
-            alert_id,
-            classification,
-            &prev,
-            at,
-            alert.pending_period_sec,
-        );
+        let plan = if alert.query_condition.promql_rule_mode {
+            config::meta::alerts::prom_rule::plan_rule_updates(
+                alert_id,
+                classification,
+                &prev,
+                at,
+                alert.pending_period_sec,
+            )
+        } else {
+            config::meta::alerts::grouping::plan_group_updates(
+                alert_id,
+                classification,
+                &prev,
+                at,
+                alert.pending_period_sec,
+            )
+        };
         if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
@@ -169,14 +180,25 @@ async fn persist_alert_run_state(
     // the same evaluation, and two `now_micros()` calls would let the coverage
     // record and the freshness clock disagree about when it happened.
     let now = now_micros();
-    let mut update = apply_outcome(
-        alert_id,
-        ROLLUP_GROUP_KEY,
-        prev.as_ref(),
-        outcome.clone(),
-        level,
-        now,
-    );
+    let mut update = if alert.query_condition.promql_rule_mode {
+        config::meta::alerts::prom_rule::apply_rule_rollup_outcome(
+            alert_id,
+            prev.as_ref(),
+            outcome.clone(),
+            level,
+            now,
+            rule_value,
+        )
+    } else {
+        apply_outcome(
+            alert_id,
+            ROLLUP_GROUP_KEY,
+            prev.as_ref(),
+            outcome.clone(),
+            level,
+            now,
+        )
+    };
 
     // Emitted only once `persist` committed, or consumers hear of an unrecorded recovery.
     let recovered = update.state.as_mut().and_then(|state| {
@@ -350,6 +372,12 @@ async fn dispatch_per_group(
     trace_id: &str,
     classification: Option<&config::meta::alerts::grouping::GroupClassification>,
     records: &[config::utils::json::Map<String, config::utils::json::Value>],
+    rule_series_rows: Option<
+        &std::collections::HashMap<
+            String,
+            config::utils::json::Map<String, config::utils::json::Value>,
+        >,
+    >,
     rows_end_time: i64,
     rollup_level: Option<config::meta::alerts::level::AlertLevel>,
     start_time: Option<i64>,
@@ -382,6 +410,7 @@ async fn dispatch_per_group(
         &rollup_outcome,
         rollup_level,
         Some(classification),
+        None,
         &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
     )
     .await
@@ -436,7 +465,9 @@ async fn dispatch_per_group(
         );
     }
 
-    let rows = if is_promql {
+    let rows = if let Some(rows) = rule_series_rows {
+        rows.clone()
+    } else if is_promql {
         config::meta::alerts::dispatch::rows_by_series_key(records)
     } else {
         rows_by_group_key(records, &group_by)
@@ -489,7 +520,7 @@ async fn dispatch_per_group(
                 start_time,
                 triggered_at,
                 Some(item.level),
-                Some(item.actual_value),
+                (!alert.query_condition.promql_rule_mode).then_some(item.actual_value),
                 // M-4: this group's labels become `{group.*}`, substituted
                 // last so a label value containing `{...}` cannot expand.
                 Some(&item.labels),
@@ -2588,6 +2619,7 @@ async fn handle_alert_triggers(
                 &trigger_data_stream.status,
                 None,
                 None,
+                None,
                 &config::meta::alerts::recovery::EpisodeInput::undelivered(alert.keep_firing_for),
             )
             .await;
@@ -2647,6 +2679,7 @@ async fn handle_alert_triggers(
     // not in `trigger_condition` — reporting the count-path operator and
     // threshold here would describe a comparison that never happened.
     trigger_data_stream.actual_value = trigger_results.actual_value;
+    trigger_data_stream.rule_value = trigger_results.rule_value.clone();
     trigger_data_stream.group_label = trigger_results.group_label.clone();
     trigger_data_stream.value_is_lower_bound = trigger_results.value_is_lower_bound.then_some(true);
     // One function per family, so a new family cannot be added to evaluation
@@ -2661,6 +2694,10 @@ async fn handle_alert_triggers(
         config::meta::alerts::level::AlertLevel::Warning => ctx_warning.unwrap_or(ctx_critical),
         _ => ctx_critical,
     });
+    if alert.query_condition.promql_rule_mode {
+        trigger_data_stream.threshold_operator = None;
+        trigger_data_stream.threshold_value = None;
+    }
     trigger_data_stream.level = eval_level.map(|l| l.to_i32());
     trigger_data_stream.query_took = trigger_results.query_took;
     log::debug!(
@@ -2899,6 +2936,7 @@ async fn handle_alert_triggers(
                                 &trigger_data_stream.status,
                                 eval_level,
                                 trigger_results.group_classification.as_ref(),
+                                trigger_results.rule_value.as_deref(),
                                 &config::meta::alerts::recovery::EpisodeInput::undelivered(
                                     alert.keep_firing_for,
                                 ),
@@ -2938,6 +2976,7 @@ async fn handle_alert_triggers(
                                     &trigger_data_stream.status,
                                     eval_level,
                                     trigger_results.group_classification.as_ref(),
+                                    trigger_results.rule_value.as_deref(),
                                     &config::meta::alerts::recovery::EpisodeInput::undelivered(
                                         alert.keep_firing_for,
                                     ),
@@ -2980,6 +3019,7 @@ async fn handle_alert_triggers(
                         &trigger_data_stream.status,
                         eval_level,
                         trigger_results.group_classification.as_ref(),
+                        trigger_results.rule_value.as_deref(),
                         &config::meta::alerts::recovery::EpisodeInput::undelivered(
                             alert.keep_firing_for,
                         ),
@@ -3115,6 +3155,7 @@ async fn handle_alert_triggers(
                         &trigger_data_stream.status,
                         eval_level,
                         trigger_results.group_classification.as_ref(),
+                        trigger_results.rule_value.as_deref(),
                         &config::meta::alerts::recovery::EpisodeInput::undelivered(
                             alert.keep_firing_for,
                         ),
@@ -3178,6 +3219,7 @@ async fn handle_alert_triggers(
                                 &trigger_data_stream.status,
                                 eval_level,
                                 trigger_results.group_classification.as_ref(),
+                                trigger_results.rule_value.as_deref(),
                                 &config::meta::alerts::recovery::EpisodeInput::undelivered(
                                     alert.keep_firing_for,
                                 ),
@@ -3335,6 +3377,7 @@ async fn handle_alert_triggers(
                 &scheduler_trace_id,
                 trigger_results.group_classification.as_ref(),
                 &data,
+                trigger_results.rule_series_rows.as_ref(),
                 trigger_results.end_time,
                 eval_level,
                 Some(start_time),
@@ -3395,6 +3438,7 @@ async fn handle_alert_triggers(
                     &outcome,
                     eval_level,
                     None,
+                    trigger_results.rule_value.as_deref(),
                     &config::meta::alerts::recovery::EpisodeInput::undelivered(
                         alert.keep_firing_for,
                     ),
@@ -3718,6 +3762,7 @@ async fn handle_alert_triggers(
                 .unwrap_or(&trigger_data_stream.status),
             eval_level,
             trigger_results.group_classification.as_ref(),
+            trigger_results.rule_value.as_deref(),
             &config::meta::alerts::recovery::EpisodeInput {
                 delivered: episode_delivered,
                 incident_id: episode_incident_id,

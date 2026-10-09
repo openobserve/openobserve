@@ -262,7 +262,10 @@ export const makeAddAlertSchema = (
       // page, never in this form, so every alert this schema validates does
       // have a stream. Re-adding an exemption would quietly re-open
       // generic-form SLO authoring.
-      if (isBlank(val.stream_name)) {
+      if (
+        isBlank(val.stream_name) &&
+        !(val.query_condition?.promql_rule_mode && val._meta?.tab === "promql")
+      ) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["stream_name"],

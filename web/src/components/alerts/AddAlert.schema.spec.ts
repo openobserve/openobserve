@@ -74,6 +74,34 @@ const issuesByPath = (value: any): Record<string, string[]> => {
 };
 
 describe("addAlertSchema (composed orchestrator schema)", () => {
+  it("accepts explicit rule mode without stream or numeric thresholds", () => {
+    const base = validScheduled({
+      stream_name: "",
+      stream_type: "metrics",
+      _meta: defaultAddAlertMeta({ tab: "promql" }),
+      query_condition: {
+        ...validScheduled().query_condition,
+        type: "promql",
+        promql_rule_mode: true,
+        promql_multi_alert: true,
+        promql_condition: null,
+      },
+    });
+    expect(addAlertSchema.safeParse(base).success).toBe(true);
+    const conflicting = {
+      ...base,
+      query_condition: { ...base.query_condition, promql_condition: { operator: ">", value: 5 } },
+    };
+    expect(issuesByPath(conflicting)["query_condition.promql_rule_mode"]).toBeTruthy();
+    const single = {
+      ...base,
+      query_condition: { ...base.query_condition, promql_multi_alert: false },
+    };
+    expect(addAlertSchema.safeParse(single).success).toBe(true);
+    const pendingSingle = { ...single, pending_period_sec: 4 };
+    expect(issuesByPath(pendingSingle)["query_condition.promql_rule_mode"]).toBeTruthy();
+  });
+
   it("passes a complete valid scheduled alert", () => {
     expect(addAlertSchema.safeParse(validScheduled()).success).toBe(true);
   });
