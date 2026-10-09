@@ -79,10 +79,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div
         id="date-time-menu"
-        class="date-time-dialog z-10001 max-h-(--reka-popper-available-height,37.5rem) w-81.25 overflow-y-auto"
+        class="date-time-dialog z-10001 flex max-h-[calc(var(--reka-popper-available-height,37.5rem)-0.75rem)] w-81.25 flex-col overflow-hidden"
         @keydown.capture="onPickerKeydown"
       >
-        <div class="flex items-center gap-1 px-3 py-2">
+        <div class="flex shrink-0 items-center gap-1 px-3 py-2">
           <div v-if="!disableRelative" class="flex flex-1 gap-1">
             <OButton
               data-test="date-time-relative-tab"
@@ -125,12 +125,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OTooltip>
         </div>
-        <OSeparator />
-        <div class="overflow-y-visible">
-          <OTabPanels v-model="selectedType" animated>
+        <OSeparator class="shrink-0" />
+        <div class="flex min-h-0 flex-1 flex-col">
+          <!-- Only the presets scroll so the tabs, timezone and Apply stay reachable on short screens. -->
+          <OTabPanels v-model="selectedType" animated scroll="y" grow class="min-h-0">
             <OTabPanel v-if="!disableRelative" name="relative">
               <div class="date-time-table relative flex flex-col">
-                <div class="border-border-default border-b px-3 py-2">
+                <div
+                  class="border-border-default bg-dropdown-bg sticky top-0 z-1 border-b px-3 py-2"
+                >
                   <OSearchInput
                     v-model="relativeSearchTerm"
                     data-test="date-time-relative-search"
@@ -325,7 +328,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTabPanel>
           </OTabPanels>
         </div>
-        <div v-if="!hideRelativeTimezone" class="pe-3">
+        <div v-if="!hideRelativeTimezone" class="shrink-0 pe-3">
           <OSelect
             data-test="datetime-timezone-select"
             v-model="timezone"
@@ -338,7 +341,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mx-[0.4rem] my-2"
           />
         </div>
-        <div v-if="!autoApply" class="border-border-default flex items-center border-t px-3 py-2">
+        <div
+          v-if="!autoApply"
+          class="border-border-default flex shrink-0 items-center border-t px-3 py-2"
+        >
           <div class="flex-1" />
           <OButton
             data-test="date-time-apply-btn"
