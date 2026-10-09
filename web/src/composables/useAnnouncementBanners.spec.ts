@@ -37,7 +37,7 @@ vi.mock("vuex", () => ({
   useStore: () => mockStore,
 }));
 
-import { useAnnouncementBanners } from "./useAnnouncementBanners";
+import { bannerBoundaryTick, serverNowMs, useAnnouncementBanners } from "./useAnnouncementBanners";
 import { queryClient } from "@/composables/query/queryClient";
 import { announcementKeys } from "@/services/announcements.querykeys";
 import { downtimeKeys } from "@/services/downtimes.querykeys";
@@ -183,6 +183,58 @@ describe("useAnnouncementBanners", () => {
     // the 3-minute poll interval.
     await vi.advanceTimersByTimeAsync(1_100);
     expect(getActive).toHaveBeenCalledTimes(2);
+    dispose();
+  });
+
+  it("clears a downtime banner whose window ends in two seconds", async () => {
+    const endsAt = BROWSER_NOW_MICROS + 2_000_000;
+    const live = banner({ id: "downtime:d1:1", ends_at: endsAt });
+    respondWith([live], { next_boundary: endsAt });
+
+    const { banners, dispose } = await mountComposable();
+    expect(banners.value).toHaveLength(1);
+
+    // The refetch at the boundary answers with the banner gone.
+    respondWith([], { now: endsAt + 1_000_000 });
+    await vi.advanceTimersByTimeAsync(3_100);
+
+    expect(getActive).toHaveBeenCalledTimes(2);
+    expect(banners.value).toHaveLength(0);
+    dispose();
+  });
+
+  it("clears the banner at its end even when the refetch at the boundary fails", async () => {
+    const endsAt = BROWSER_NOW_MICROS + 2_000_000;
+    respondWith([banner({ id: "downtime:d1:1", ends_at: endsAt })]);
+
+    const { banners, dispose } = await mountComposable();
+    expect(banners.value).toHaveLength(1);
+
+    getActive.mockRejectedValue(new Error("network down"));
+    await vi.advanceTimersByTimeAsync(3_100);
+
+    expect(banners.value).toHaveLength(0);
+    dispose();
+  });
+
+  it("ticks the shared boundary signal when a boundary passes", async () => {
+    const startsAt = BROWSER_NOW_MICROS + 2_000_000;
+    respondWith([], { next_boundary: startsAt });
+    const before = bannerBoundaryTick.value;
+
+    const { dispose } = await mountComposable();
+    await vi.advanceTimersByTimeAsync(3_100);
+
+    expect(bannerBoundaryTick.value).toBe(before + 1);
+    dispose();
+  });
+
+  it("shares the measured server clock with every caller", async () => {
+    respondWith([], { now: BROWSER_NOW_MICROS + 5 * MINUTE_MICROS });
+
+    const { dispose } = await mountComposable();
+
+    expect(serverNowMs()).toBe(BROWSER_NOW_MS + 5 * 60 * 1000);
     dispose();
   });
 

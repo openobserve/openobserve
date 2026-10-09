@@ -15,29 +15,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex min-w-0 flex-wrap items-center gap-1" :data-test="dataTest">
+  <div
+    :class="[
+      'flex min-w-0 items-center gap-1',
+      maxChips == null ? 'flex-wrap' : 'flex-nowrap overflow-hidden',
+    ]"
+    :data-test="dataTest"
+  >
     <OTag
-      v-if="conditionText"
+      v-for="chip in visibleChips"
+      :key="chip.key"
       type="downtimeTarget"
-      value="condition"
-      :label="conditionText"
-      :data-test="`${dataTest}-condition`"
+      :value="chip.value"
+      :label="chip.label"
+      :class="maxChips == null ? '' : 'min-w-0 shrink'"
+      :data-test="`${dataTest}-${chip.key}`"
     />
     <OTag
-      v-for="chip in chips"
-      :key="chip.module"
-      type="downtimeTarget"
-      :value="chip.module"
-      :label="t('alerts.downtimes.summary.chip', { module: chip.label, text: chip.text })"
-      :data-test="`${dataTest}-${chip.module}`"
-    />
+      v-if="hiddenChips.length"
+      type="countChip"
+      value="neutral"
+      class="shrink-0"
+      :data-test="`${dataTest}-more`"
+    >
+      {{ t("alerts.downtimes.summary.moreTargets", { count: hiddenChips.length }) }}
+      <OTooltip>
+        <template #content>
+          <div class="flex flex-col gap-1">
+            <span v-for="chip in hiddenChips" :key="chip.key">{{ chip.label }}</span>
+          </div>
+        </template>
+      </OTooltip>
+    </OTag>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { DimensionCondition, DowntimeTarget } from "@/services/downtimes";
 import {
   conditionSummary,
@@ -46,25 +63,49 @@ import {
   type FolderNameFn,
 } from "@/utils/downtimes/targetSummary";
 
+interface Chip {
+  key: string;
+  value: string;
+  label: I18nText;
+}
+
 const props = withDefaults(
   defineProps<{
     condition?: DimensionCondition | null;
     targets: DowntimeTarget[];
     folderName?: FolderNameFn;
+    /** One row of at most this many chips, the rest behind "+N"; unset wraps every chip. */
+    maxChips?: number;
     dataTest?: string;
   }>(),
-  { condition: null, folderName: undefined, dataTest: "downtime-targets" },
+  { condition: null, folderName: undefined, maxChips: undefined, dataTest: "downtime-targets" },
 );
 
 const { t } = useI18nTyped();
 
 const hasIdentityTarget = computed(() => props.targets.some((tg) => tg.module !== "synthetics"));
 
-const conditionText = computed(() =>
-  hasIdentityTarget.value ? conditionSummary(props.condition, t) : null,
+const chips = computed<Chip[]>(() => {
+  const condition = hasIdentityTarget.value ? conditionSummary(props.condition, t) : null;
+  const targets = sortedTargets(props.targets).map((target) => {
+    const chip = targetSummary(target, t, props.folderName);
+    return {
+      key: chip.module,
+      value: chip.module,
+      label: t("alerts.downtimes.summary.chip", { module: chip.label, text: chip.text }),
+    };
+  });
+  return condition
+    ? [{ key: "condition", value: "condition", label: condition }, ...targets]
+    : targets;
+});
+
+// "+1" saves no room over the chip it hides, so a row that overflows by one shows it.
+const visibleChips = computed(() =>
+  props.maxChips == null || chips.value.length <= props.maxChips + 1
+    ? chips.value
+    : chips.value.slice(0, props.maxChips),
 );
 
-const chips = computed(() =>
-  sortedTargets(props.targets).map((target) => targetSummary(target, t, props.folderName)),
-);
+const hiddenChips = computed(() => chips.value.slice(visibleChips.value.length));
 </script>

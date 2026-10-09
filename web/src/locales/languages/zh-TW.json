@@ -8856,7 +8856,8 @@
         "tags": "標籤 {tags}",
         "nItems": "{count} 個項目 | {count} 個項目",
         "asGood": "視為良好",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} 天",
@@ -9156,7 +9157,10 @@
         "source": "來源",
         "wouldHaveNotified": "原本會通知",
         "noSuppressed": "尚未抑制任何內容",
-        "muteHourName": "{name} · 靜音 1 小時"
+        "muteHourName": "{name} · 靜音 1 小時",
+        "notFoundTitle": "找不到停機時段",
+        "notFoundDescription": "它可能已被刪除，或連結指向其他組織。",
+        "backToList": "返回停機時段"
       },
       "mute": {
         "title": {
@@ -9185,7 +9189,9 @@
         "bulk": "靜音",
         "muted": "已靜音 · {duration} 後結束",
         "mutedTooltip": "由 {name} 靜音至 {end}",
-        "exclude": "排除時間範圍…"
+        "exclude": "排除時間範圍…",
+        "firingMuted": "觸發中 · 已靜音",
+        "firingMutedTooltip": "仍在觸發。通知已被 {name} 靜音。"
       },
       "corrected": "已修正",
       "correctedBy": "分數由 {names} 修正",
@@ -9211,7 +9217,8 @@
       },
       "sloCorrections": {
         "title": "狀態修正：",
-        "item": "{name}（{status}）"
+        "item": "{name}（{status}）",
+        "shorterThanSlice": "短於 SLO 的切片，未校正任何分鐘"
       }
     }
   },

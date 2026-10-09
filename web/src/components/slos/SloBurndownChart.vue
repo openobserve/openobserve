@@ -388,9 +388,15 @@ const bucketSecs = computed(() => bucketSecsFor(props.windowSecs, props.sliceInt
 /** Corrected runs as category-axis index pairs, for the band on the budget chart. */
 const correctedAreas = computed(() => {
   const indexOf = new Map(points.value.map((p, i) => [p.ts, i]));
+  const last = Math.max(points.value.length - 1, 0);
+  const closeAt = (end: number) => {
+    const i = points.value.findIndex((p) => p.ts >= end);
+    return i < 0 ? last : i;
+  };
+  // The band closes on the first bucket after the run, so a one-bucket run still has width.
   return correctedRanges(points.value, bucketSecs.value).map(([start, end]) => [
     { xAxis: indexOf.get(start) ?? 0, name: t("slos.chart.corrected") },
-    { xAxis: indexOf.get(end - bucketSecs.value) ?? 0 },
+    { xAxis: closeAt(end) },
   ]);
 });
 
@@ -400,7 +406,6 @@ const budgetOptions = computed(() => {
   const danger = resolveToken("--color-severity-error-color", "#ea1a17");
   const axisColor = resolveToken("--color-text-secondary", "#6b7280");
   const gridColor = resolveToken("--color-border-default", "#e5e7eb");
-  const correctedFill = resolveToken("--color-surface-subtle", "#f3f4f6");
 
   return {
     ...baseOptions(
@@ -462,8 +467,14 @@ const budgetOptions = computed(() => {
         markArea: {
           silent: true,
           animation: false,
-          itemStyle: { color: correctedFill },
-          label: { position: "insideTop", color: axisColor, fontSize: 10 },
+          itemStyle: {
+            color: accent,
+            opacity: 0.12,
+            borderColor: accent,
+            borderWidth: 1,
+            borderType: "dashed",
+          },
+          label: { position: "insideTop", color: accent, fontSize: 10, distance: 6 },
           data: correctedAreas.value,
         },
       },

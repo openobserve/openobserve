@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { defineComponent, h } from "vue";
 import { mount } from "@vue/test-utils";
 import { useTimezoneOptions } from "./useTimezoneOptions";
@@ -31,5 +31,14 @@ describe("useTimezoneOptions", () => {
     expect(timezoneOptions.value[0].value).toBe(browserTimeValue);
     expect(timezoneOptions.value[0].label).toContain(browserTz);
     expect(timezoneOptions.value[1].value).toBe("UTC");
+  });
+
+  it("lists a zone ICU reports under a legacy name once, under its canonical name", () => {
+    const spy = vi
+      .spyOn(Intl, "supportedValuesOf")
+      .mockReturnValue(["Asia/Calcutta", "Asia/Kolkata", "Europe/Kiev"]);
+    const { zones } = run();
+    expect(zones).toEqual(["UTC", "Asia/Kolkata", "Europe/Kyiv"]);
+    spy.mockRestore();
   });
 });

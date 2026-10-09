@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     persistent
     :title="title"
-    :sub-title="t('alerts.downtimes.mute.subtitle')"
     :form-id="FORM_ID"
     :primary-button-label="primaryLabel"
     :secondary-button-label="t('alerts.downtimes.form.cancel')"
@@ -29,6 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="emit('update:open', false)"
   >
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
+      <p class="text-text-secondary text-sm wrap-break-word" data-test="quick-mute-help">
+        {{ t("alerts.downtimes.mute.subtitle") }}
+      </p>
       <OFormToggleGroup
         name="preset"
         :label="t('alerts.downtimes.mute.muteFor')"

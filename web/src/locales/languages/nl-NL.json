@@ -8861,7 +8861,8 @@
         "tags": "tag {tags}",
         "nItems": "{count} item | {count} items",
         "asGood": "als goed",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} d",
@@ -9161,7 +9162,10 @@
         "source": "Bron",
         "wouldHaveNotified": "Zou hebben gemeld",
         "noSuppressed": "Er is nog niets onderdrukt",
-        "muteHourName": "{name} · 1 u dempen"
+        "muteHourName": "{name} · 1 u dempen",
+        "notFoundTitle": "Downtime niet gevonden",
+        "notFoundDescription": "Mogelijk is deze verwijderd, of verwijst de link naar een andere organisatie.",
+        "backToList": "Terug naar downtimes"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Demp",
         "muted": "Gedempt · eindigt over {duration}",
         "mutedTooltip": "Gedempt door {name} tot {end}",
-        "exclude": "Een venster uitsluiten…"
+        "exclude": "Een venster uitsluiten…",
+        "firingMuted": "Actief · gedempt",
+        "firingMutedTooltip": "Nog steeds actief. Meldingen worden gedempt door {name}."
       },
       "corrected": "Gecorrigeerd",
       "correctedBy": "Score gecorrigeerd door {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Statuscorrecties:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "korter dan het interval van de SLO, geen minuten gecorrigeerd"
       }
     }
   },

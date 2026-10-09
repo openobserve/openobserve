@@ -183,6 +183,8 @@ export interface CorrectionRef {
   downtime_id: string;
   name: string;
   status: DowntimeStatus;
+  /** `false` when the window is shorter than the SLO's slice and corrects no minutes. */
+  applies?: boolean;
 }
 
 export interface DowntimeListParams {

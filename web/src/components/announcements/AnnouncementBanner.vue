@@ -23,16 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :icon="bannerIcon(banner)"
     :data-test="`announcement-banner-${banner.variant}`"
   >
-    {{ banner.message }}
-
-    <template v-if="isDowntime(banner) && banner.ends_at != null" #meta>
+    <div
+      v-if="isDowntime(banner) && banner.ends_at != null"
+      class="flex items-center gap-3 max-sm:flex-col max-sm:items-start max-sm:gap-0.5"
+      :data-test="`announcement-banner-body-${banner.id}`"
+    >
+      <span class="min-w-0 flex-1">{{ banner.message }}</span>
       <DowntimeCountdown
+        class="shrink-0"
         :ends-at="banner.ends_at"
         :now="serverNowMs"
         :first="bannerRowCount(banner.id) > 1"
         :data-test="`announcement-banner-countdown-${banner.id}`"
       />
-    </template>
+    </div>
+    <template v-else>{{ banner.message }}</template>
 
     <template v-if="banner.counts?.length" #footer>
       <div class="flex flex-wrap gap-1" :data-test="`announcement-banner-counts-${banner.id}`">
@@ -49,7 +54,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="banner.cta || banner.dismissible" #actions>
       <div class="flex flex-wrap items-center gap-3">
         <OButton
-          v-if="banner.cta"
+          v-if="banner.cta && isInApp(banner.cta.url)"
+          variant="banner-dismiss"
+          size="sm"
+          :data-test="`announcement-banner-cta-${banner.id}`"
+          @click="openInApp(banner.cta.url)"
+        >
+          {{ banner.cta.text }}
+        </OButton>
+        <OButton
+          v-else-if="banner.cta"
           as="a"
           :href="banner.cta.url"
           target="_blank"
@@ -78,6 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { useStore } from "vuex";
 
 import { useAnnouncementBanners, type Banner } from "@/composables/useAnnouncementBanners";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -87,11 +103,29 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { useI18nTyped } from "@/types/i18n";
 
+const IN_APP_PREFIX = "/web/";
+
 const { t } = useI18nTyped();
+const router = useRouter();
+const store = useStore();
 const { banners, dismiss, start, serverNowMs } = useAnnouncementBanners();
 
 // Generated per org and per window by the announcements endpoint (D19).
 const isDowntime = (banner: Banner) => banner.id.startsWith("downtime:");
+
+// A link into this app opens in place on the current org; anything else is external.
+const isInApp = (url: string) => url.startsWith(IN_APP_PREFIX);
+
+const openInApp = (url: string) => {
+  const parsed = new URL(url, window.location.origin);
+  void router.push({
+    path: parsed.pathname.slice(IN_APP_PREFIX.length - 1),
+    query: {
+      ...Object.fromEntries(parsed.searchParams),
+      org_identifier: store.state.selectedOrganization?.identifier,
+    },
+  });
+};
 
 /** Our severities are operator-facing; OBanner's variants are visual. */
 const bannerVariant = (banner: Banner) => {

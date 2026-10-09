@@ -8861,7 +8861,8 @@
         "tags": "thẻ {tags}",
         "nItems": "{count} mục | {count} mục",
         "asGood": "coi như tốt",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} ngày",
@@ -9161,7 +9162,10 @@
         "source": "Nguồn",
         "wouldHaveNotified": "Lẽ ra đã thông báo",
         "noSuppressed": "Chưa có gì bị tạm chặn",
-        "muteHourName": "{name} · tắt thông báo 1 giờ"
+        "muteHourName": "{name} · tắt thông báo 1 giờ",
+        "notFoundTitle": "Không tìm thấy thời gian ngừng",
+        "notFoundDescription": "Có thể nó đã bị xóa, hoặc liên kết trỏ đến một tổ chức khác.",
+        "backToList": "Quay lại danh sách thời gian ngừng"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Tắt thông báo",
         "muted": "Đã tắt thông báo · kết thúc sau {duration}",
         "mutedTooltip": "Đã tắt thông báo bởi {name} đến {end}",
-        "exclude": "Loại trừ một khoảng thời gian…"
+        "exclude": "Loại trừ một khoảng thời gian…",
+        "firingMuted": "Đang kích hoạt · đã tắt tiếng",
+        "firingMutedTooltip": "Vẫn đang kích hoạt. Thông báo đã bị {name} tắt tiếng."
       },
       "corrected": "Đã hiệu chỉnh",
       "correctedBy": "Điểm được hiệu chỉnh bởi {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Hiệu chỉnh trạng thái:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "ngắn hơn lát cắt của SLO, không có phút nào được hiệu chỉnh"
       }
     }
   },

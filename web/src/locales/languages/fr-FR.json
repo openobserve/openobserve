@@ -8861,7 +8861,8 @@
         "tags": "tag {tags}",
         "nItems": "{count} élément | {count} éléments",
         "asGood": "comme bon",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} j",
@@ -9161,7 +9162,10 @@
         "source": "Source",
         "wouldHaveNotified": "Aurait notifié",
         "noSuppressed": "Rien n'a encore été supprimé",
-        "muteHourName": "{name} · sourdine 1 h"
+        "muteHourName": "{name} · sourdine 1 h",
+        "notFoundTitle": "Période d'arrêt introuvable",
+        "notFoundDescription": "Elle a peut-être été supprimée, ou le lien pointe vers une autre organisation.",
+        "backToList": "Retour aux périodes d'arrêt"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Mettre en sourdine",
         "muted": "En sourdine · se termine dans {duration}",
         "mutedTooltip": "Mis en sourdine par {name} jusqu'à {end}",
-        "exclude": "Exclure une fenêtre…"
+        "exclude": "Exclure une fenêtre…",
+        "firingMuted": "Déclenchée · en sourdine",
+        "firingMutedTooltip": "Toujours déclenchée. Les notifications sont mises en sourdine par {name}."
       },
       "corrected": "Corrigé",
       "correctedBy": "Score corrigé par {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Corrections de statut :",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "plus court que l'intervalle du SLO, aucune minute corrigée"
       }
     }
   },

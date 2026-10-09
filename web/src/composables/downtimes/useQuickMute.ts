@@ -26,6 +26,7 @@ import {
   selectionCount,
   type QuickMuteSelection,
 } from "@/utils/downtimes/quickMute";
+import { browserTimezone } from "@/utils/timezoneAliases";
 
 /** Creates a quick mute and confirms it with a toast that links to the new downtime. */
 export function useQuickMute() {
@@ -33,7 +34,7 @@ export function useQuickMute() {
   const orgId = useOrgId();
   const router = useRouter();
   const mutation = useMutation(() => quickMuteMutation(orgId.value));
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const timezone = browserTimezone();
   const defaultFolder = useDefaultDowntimeFolder();
 
   const mute = async (

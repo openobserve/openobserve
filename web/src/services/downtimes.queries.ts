@@ -17,6 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import downtimes from "./downtimes";
 import type {
   DowntimeDetail,
+  DowntimeListItem,
   DowntimeListResponse,
   DowntimeRequest,
   ExtendDowntimeRequest,
@@ -41,6 +42,18 @@ const EMPTY_LIST: DowntimeListResponse = {
   items: [],
   total: 0,
   counts: { active: 0, scheduled: 0, recurring: 0, ended: 0, cancelled: 0, ended_early: 0 },
+};
+
+/** The nearest future window start or end among the rows, in microseconds; the instant a status flips. */
+export const nextListBoundary = (
+  items: readonly DowntimeListItem[],
+  nowMicros: number,
+): number | undefined => {
+  const edges = items
+    .filter((row) => row.status !== "cancelled")
+    .flatMap((row) => [row.next_window?.start, row.current_window?.end])
+    .filter((at): at is number => typeof at === "number" && at > nowMicros);
+  return edges.length ? Math.min(...edges) : undefined;
 };
 
 export const downtimesListQuery = (org: string) =>

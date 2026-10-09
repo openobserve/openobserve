@@ -17,10 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <span
     v-if="remainingSecs !== null && remainingSecs > 0"
-    class="inline-flex shrink-0"
+    class="inline-flex min-w-12 shrink-4"
     :data-test="dataTest"
   >
-    <OTag type="downtimeStatus" value="active" :label="label" />
+    <OTag type="downtimeStatus" value="active" class="max-w-full min-w-0">
+      <span class="truncate">{{ label }}</span>
+    </OTag>
     <OTooltip
       :content="
         t('alerts.downtimes.mute.mutedTooltip', {
@@ -37,6 +39,7 @@ import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { ActiveDowntime } from "@/services/downtimes";
 import { useCountdown } from "@/composables/downtimes/useCountdown";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { formatDuration, formatWindowTime } from "@/utils/downtimes/schedule";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -52,7 +55,8 @@ const props = withDefaults(
 const { t } = useI18nTyped();
 const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
-const { remainingSecs } = useCountdown(() => props.downtime.ends_at);
+// The banner's skew-corrected clock, so chip and banner end at the same instant.
+const { remainingSecs } = useCountdown(() => props.downtime.ends_at, serverNowMs);
 
 // Rounded up to the minute, so the chip never says "0 min" while it is still muted.
 const label = computed(() =>

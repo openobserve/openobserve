@@ -8861,7 +8861,8 @@
         "tags": "etiket {tags}",
         "nItems": "{count} öğe | {count} öğe",
         "asGood": "iyi olarak",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} g",
@@ -9161,7 +9162,10 @@
         "source": "Kaynak",
         "wouldHaveNotified": "Bildirim gönderilirdi",
         "noSuppressed": "Henüz hiçbir şey bastırılmadı",
-        "muteHourName": "{name} · 1 sa sustur"
+        "muteHourName": "{name} · 1 sa sustur",
+        "notFoundTitle": "Kesinti süresi bulunamadı",
+        "notFoundDescription": "Silinmiş olabilir veya bağlantı başka bir kuruluşu gösteriyor olabilir.",
+        "backToList": "Kesinti sürelerine dön"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Sustur",
         "muted": "Susturuldu · {duration} içinde bitiyor",
         "mutedTooltip": "{name} tarafından {end} zamanına kadar susturuldu",
-        "exclude": "Bir zaman aralığını hariç tut…"
+        "exclude": "Bir zaman aralığını hariç tut…",
+        "firingMuted": "Tetikleniyor · sessize alındı",
+        "firingMutedTooltip": "Hâlâ tetikleniyor. Bildirimler {name} tarafından sessize alındı."
       },
       "corrected": "Düzeltildi",
       "correctedBy": "Puan {names} tarafından düzeltildi",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Durum düzeltmeleri:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "SLO diliminden kısa, hiçbir dakika düzeltilmedi"
       }
     }
   },

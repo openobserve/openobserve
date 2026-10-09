@@ -17,6 +17,7 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 import type { DowntimeSchedule, DowntimeWindow } from "@/services/downtimes";
+import { canonicalTimezone } from "@/utils/timezoneAliases";
 
 export const MIN_DURATION_SECS = 60;
 export const MAX_DURATION_SECS = 7 * 24 * 3600;
@@ -191,13 +192,13 @@ export function scheduleSentence(s: DowntimeSchedule, t: TranslateFn, locale?: s
     return t("alerts.downtimes.schedule.onceSentence", {
       start: formatWindowTime(s.starts_at, s.timezone, locale),
       end: s.ends_at ? formatWindowTime(s.ends_at, s.timezone, locale) : "",
-      zone: s.timezone,
+      zone: canonicalTimezone(s.timezone),
     });
   }
   const params = {
     time: s.start_time_local ?? "",
     duration: formatDuration(s.duration_secs, t),
-    zone: s.timezone,
+    zone: canonicalTimezone(s.timezone),
     days: weekdayNames(s.weekdays, locale),
   };
   return s.repeat === "daily"

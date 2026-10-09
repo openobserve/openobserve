@@ -8861,7 +8861,8 @@
         "tags": "Tag {tags}",
         "nItems": "{count} Element | {count} Elemente",
         "asGood": "als gut",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} T",
@@ -9161,7 +9162,10 @@
         "source": "Quelle",
         "wouldHaveNotified": "Hätte benachrichtigt",
         "noSuppressed": "Bisher wurde nichts unterdrückt",
-        "muteHourName": "{name} · 1 h stumm"
+        "muteHourName": "{name} · 1 h stumm",
+        "notFoundTitle": "Ausfallzeit nicht gefunden",
+        "notFoundDescription": "Sie wurde möglicherweise gelöscht, oder der Link verweist auf eine andere Organisation.",
+        "backToList": "Zurück zu den Ausfallzeiten"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Stummschalten",
         "muted": "Stummgeschaltet · endet in {duration}",
         "mutedTooltip": "Stummgeschaltet von {name} bis {end}",
-        "exclude": "Zeitfenster ausschließen…"
+        "exclude": "Zeitfenster ausschließen…",
+        "firingMuted": "Ausgelöst · stummgeschaltet",
+        "firingMutedTooltip": "Löst weiterhin aus. Benachrichtigungen sind durch {name} stummgeschaltet."
       },
       "corrected": "Korrigiert",
       "correctedBy": "Bewertung korrigiert durch {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Statuskorrekturen:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "kürzer als das Intervall des SLO, keine Minuten korrigiert"
       }
     }
   },

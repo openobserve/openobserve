@@ -484,7 +484,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   whatever outcome it last recorded, so showing it would display
                   "Firing" forever on something that is not running.
                 -->
-                <OTooltip v-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
+                <OTooltip
+                  v-if="showRunOutcome(row) && isMutedFiring(row)"
+                  :content="
+                    t('alerts.downtimes.mute.firingMutedTooltip', {
+                      name: row.active_downtime.name,
+                    })
+                  "
+                >
+                  <OTag
+                    variant="default-soft"
+                    icon="notifications-paused"
+                    size="sm"
+                    :label="t('alerts.downtimes.mute.firingMuted')"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
+                <OTooltip v-else-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
                   <OTag
                     type="alertState"
                     :value="row.last_outcome"
@@ -970,7 +986,7 @@ import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import { isFiringOutcome, outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
@@ -1376,6 +1392,10 @@ export default defineComponent({
     // advertise "Firing" indefinitely.
     const showRunOutcome = (row: any): boolean =>
       shouldShowRunOutcome(row?.enabled, row?.last_outcome);
+
+    // A firing that an active downtime keeps quiet: the state stays Firing, only the badge goes quiet.
+    const isMutedFiring = (row: { active_downtime?: unknown; last_outcome?: unknown }): boolean =>
+      !!row.active_downtime && isFiringOutcome(row.last_outcome);
 
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
@@ -3836,6 +3856,7 @@ export default defineComponent({
       splitterModel,
       alertStateLoadingMap,
       showRunOutcome,
+      isMutedFiring,
       runOutcomeTooltip,
       toggleAlertState,
       templates,

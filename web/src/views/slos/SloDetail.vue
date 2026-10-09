@@ -124,21 +124,28 @@
       >
         <span class="inline-flex flex-wrap items-center gap-1">
           <span>{{ t("alerts.downtimes.sloCorrections.title") }}</span>
-          <OButton
-            v-for="c in corrections"
-            :key="c.downtime_id"
-            variant="ghost-primary"
-            size="xs"
-            :data-test="`slos-slodetail-correction-${c.downtime_id}`"
-            @click="openDowntime(c.downtime_id)"
-          >
-            {{
-              t("alerts.downtimes.sloCorrections.item", {
-                name: c.name,
-                status: t(`components.badge.downtimeStatus.${c.status}`),
-              })
-            }}
-          </OButton>
+          <template v-for="c in corrections" :key="c.downtime_id">
+            <OButton
+              variant="ghost-primary"
+              size="xs"
+              :data-test="`slos-slodetail-correction-${c.downtime_id}`"
+              @click="openDowntime(c.downtime_id)"
+            >
+              {{
+                t("alerts.downtimes.sloCorrections.item", {
+                  name: c.name,
+                  status: t(`components.badge.downtimeStatus.${c.status}`),
+                })
+              }}
+            </OButton>
+            <span
+              v-if="c.applies === false"
+              class="text-text-secondary text-xs"
+              :data-test="`slos-slodetail-correction-${c.downtime_id}-inert`"
+            >
+              {{ t("alerts.downtimes.sloCorrections.shorterThanSlice") }}
+            </span>
+          </template>
         </span>
       </OBanner>
 

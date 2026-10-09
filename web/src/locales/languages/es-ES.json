@@ -8861,7 +8861,8 @@
         "tags": "etiqueta {tags}",
         "nItems": "{count} elemento | {count} elementos",
         "asGood": "como bueno",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} d",
@@ -9161,7 +9162,10 @@
         "source": "Origen",
         "wouldHaveNotified": "Habría notificado",
         "noSuppressed": "Aún no se ha suprimido nada",
-        "muteHourName": "{name} · silenciar 1 h"
+        "muteHourName": "{name} · silenciar 1 h",
+        "notFoundTitle": "No se encontró el periodo de inactividad",
+        "notFoundDescription": "Puede que se haya eliminado o que el enlace apunte a otra organización.",
+        "backToList": "Volver a los periodos de inactividad"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Silenciar",
         "muted": "Silenciado · finaliza en {duration}",
         "mutedTooltip": "Silenciado por {name} hasta {end}",
-        "exclude": "Excluir una ventana…"
+        "exclude": "Excluir una ventana…",
+        "firingMuted": "Disparando · silenciada",
+        "firingMutedTooltip": "Sigue disparándose. {name} silencia las notificaciones."
       },
       "corrected": "Corregido",
       "correctedBy": "Puntuación corregida por {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Correcciones de estado:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "más corto que el intervalo del SLO, no se corrigió ningún minuto"
       }
     }
   },

@@ -366,6 +366,7 @@ import DowntimeTargetCard from "./DowntimeTargetCard.vue";
 import DowntimeScheduleFields from "./DowntimeScheduleFields.vue";
 import DowntimePreviewPane from "./DowntimePreviewPane.vue";
 import DowntimeSummary from "./DowntimeSummary.vue";
+import { browserTimezone } from "@/utils/timezoneAliases";
 
 type DowntimeTab = "targets" | "schedule" | "advanced";
 
@@ -388,7 +389,7 @@ const queryList = (value: unknown): string[] =>
     .map((v) => String(v ?? "").trim())
     .filter(Boolean);
 
-const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const browserZone = browserTimezone();
 const prefillModule = MODULE_ORDER.find((m) => m === route.query.module);
 
 // A new downtime without a folder in the URL is filed where the user may create one.

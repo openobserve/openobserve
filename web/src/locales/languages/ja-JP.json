@@ -8861,7 +8861,8 @@
         "tags": "タグ {tags}",
         "nItems": "{count} 項目 | {count} 項目",
         "asGood": "良好として",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} 日",
@@ -9161,7 +9162,10 @@
         "source": "ソース",
         "wouldHaveNotified": "通知されていたはず",
         "noSuppressed": "まだ何も抑制されていません",
-        "muteHourName": "{name} · 1 時間ミュート"
+        "muteHourName": "{name} · 1 時間ミュート",
+        "notFoundTitle": "ダウンタイムが見つかりません",
+        "notFoundDescription": "削除されたか、リンクが別の組織を指している可能性があります。",
+        "backToList": "ダウンタイム一覧に戻る"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "ミュート",
         "muted": "ミュート中 · {duration} 後に終了",
         "mutedTooltip": "{name} により {end} までミュート",
-        "exclude": "ウィンドウを除外…"
+        "exclude": "ウィンドウを除外…",
+        "firingMuted": "発火中 · ミュート",
+        "firingMutedTooltip": "発火は継続中です。通知は {name} によりミュートされています。"
       },
       "corrected": "修正済み",
       "correctedBy": "スコアは {names} により修正",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "ステータスの修正:",
-        "item": "{name}（{status}）"
+        "item": "{name}（{status}）",
+        "shorterThanSlice": "SLO のスライスより短いため、補正された分はありません"
       }
     }
   },

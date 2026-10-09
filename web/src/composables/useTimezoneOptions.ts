@@ -15,6 +15,7 @@
 
 import { computed } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { browserTimezone, canonicalTimezone } from "@/utils/timezoneAliases";
 
 export type TimezoneOption = {
   label: I18nText;
@@ -27,14 +28,16 @@ export interface UseTimezoneOptionsConfig {
 }
 
 const supportedZones = (): string[] =>
-  typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+  typeof Intl.supportedValuesOf === "function"
+    ? Intl.supportedValuesOf("timeZone").map(canonicalTimezone)
+    : [];
 
 /** The IANA zones for a timezone select: optional browser entry, then UTC, then the rest. */
 export function useTimezoneOptions(config: UseTimezoneOptionsConfig = {}) {
   const { t } = useI18nTyped();
-  const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  // Not translated: stored reports hold this exact shape and resolveBrowserTimezone parses it.
-  const browserTimeValue = `Browser Time (${browserTz})`;
+  const browserTz = browserTimezone();
+  // Not translated, and on the raw zone: stored reports hold this exact shape and resolveBrowserTimezone parses it.
+  const browserTimeValue = `Browser Time (${Intl.DateTimeFormat().resolvedOptions().timeZone})`;
 
   const zones = [
     ...(config.browserEntry ? [browserTimeValue] : []),

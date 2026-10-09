@@ -143,4 +143,19 @@ describe("SloDetail — status corrections", () => {
     );
     wrapper.unmount();
   });
+
+  it("says a correction shorter than the slice corrects no minutes", async () => {
+    const wrapper = await mountDetail({
+      ...healthy,
+      corrections: [
+        { downtime_id: "dt-1", name: "Blip", status: "ended", applies: false },
+        { downtime_id: "dt-2", name: "Kafka upgrade", status: "active", applies: true },
+      ],
+    });
+    const inert = wrapper.find('[data-test="slos-slodetail-correction-dt-1-inert"]');
+    expect(inert.exists()).toBe(true);
+    expect(inert.text()).toContain("shorter than the SLO's slice, no minutes corrected");
+    expect(wrapper.find('[data-test="slos-slodetail-correction-dt-2-inert"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
 });

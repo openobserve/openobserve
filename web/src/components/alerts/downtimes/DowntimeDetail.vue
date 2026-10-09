@@ -102,6 +102,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OContent class="flex min-h-0 flex-1 flex-col gap-4 overflow-auto py-3">
       <div v-if="!downtime" class="relative min-h-40" data-test="downtime-detail-loading">
         <OEmptyState v-if="forbidden" preset="no-access" size="block" />
+        <OEmptyState
+          v-else-if="notFound"
+          size="block"
+          illustration="no-results"
+          :title="t('alerts.downtimes.detail.notFoundTitle')"
+          :description="t('alerts.downtimes.detail.notFoundDescription')"
+          :action-label="t('alerts.downtimes.detail.backToList')"
+          data-test="downtime-detail-not-found"
+          @action="goBack"
+        />
+        <OEmptyState
+          v-else-if="detailQuery.isError.value"
+          preset="load-error"
+          size="block"
+          data-test="downtime-detail-error"
+          @action="detailQuery.refetch()"
+        />
         <OInnerLoading v-else :showing="detailQuery.isPending.value" size="sm" />
       </div>
 
@@ -222,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="suppressedRows"
           :columns="suppressedColumns"
           row-key="key"
-          :loading="historyQuery.isPending.value"
+          :loading="historyQuery.isLoading.value"
           :fill-height="false"
           :show-global-filter="false"
           :page-size="20"
@@ -324,6 +341,8 @@ import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
 import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
 import { isExtendable } from "@/utils/downtimes/extend";
 import { isEditable } from "@/utils/downtimes/listOrder";
+import { suppressedPage } from "@/utils/downtimes/suppressed";
+import { browserTimezone } from "@/utils/timezoneAliases";
 
 type DetailTab = "overview" | "affected" | "suppressed";
 
@@ -339,7 +358,7 @@ const { toast } = useToast();
 const id = computed(() => String(route.params.id ?? ""));
 const folderParam = computed(() => String(route.query.folder ?? "") || undefined);
 const activeTab = ref<DetailTab>("overview");
-const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const viewerZone = browserTimezone();
 const nowMicros = Date.now() * 1000;
 
 const detailQuery = useQuery(() =>
@@ -348,10 +367,12 @@ const detailQuery = useQuery(() =>
   }),
 );
 const downtime = computed(() => detailQuery.data.value ?? null);
-const forbidden = computed(() => {
-  const e: any = detailQuery.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
+const errorStatus = computed(() => {
+  const e = detailQuery.error.value as { status?: number; response?: { status?: number } } | null;
+  return e?.response?.status ?? e?.status;
 });
+const forbidden = computed(() => errorStatus.value === 403);
+const notFound = computed(() => errorStatus.value === 404);
 
 const downtimeFolders = useQuery(() =>
   Object.assign(foldersQuery(orgId.value, "downtimes"), { enabled: !!orgId.value }),
@@ -487,8 +508,10 @@ const affectedColumns = computed<OTableColumnDef<PreviewMatch>[]>(() => [
 ]);
 
 // ── Suppressed ──────────────────────────────────────────────────────────────
+const historyPage = computed(() => suppressedPage(historyQuery.data.value));
+
 const suppressedRows = computed(() =>
-  ((historyQuery.data.value as { hits?: any[] } | undefined)?.hits ?? []).map((hit, index) => ({
+  historyPage.value.hits.map((hit, index) => ({
     key: `${hit.timestamp}-${index}`,
     source: hit.alert_name,
     timestamp: hit.timestamp,
@@ -496,9 +519,7 @@ const suppressedRows = computed(() =>
   })),
 );
 
-const suppressedTotal = computed(
-  () => (historyQuery.data.value as { total?: number } | undefined)?.total ?? 0,
-);
+const suppressedTotal = computed(() => historyPage.value.total);
 
 const suppressedColumns = computed<OTableColumnDef[]>(() => [
   {

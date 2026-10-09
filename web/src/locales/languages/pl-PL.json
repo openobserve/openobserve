@@ -8861,7 +8861,8 @@
         "tags": "tag {tags}",
         "nItems": "{count} element | {count} elementów",
         "asGood": "jako dobre",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} d",
@@ -9161,7 +9162,10 @@
         "source": "Źródło",
         "wouldHaveNotified": "Wysłałoby powiadomienie",
         "noSuppressed": "Nic nie zostało jeszcze wyciszone",
-        "muteHourName": "{name} · wyciszenie 1 godz."
+        "muteHourName": "{name} · wyciszenie 1 godz.",
+        "notFoundTitle": "Nie znaleziono przestoju",
+        "notFoundDescription": "Mógł zostać usunięty albo link wskazuje inną organizację.",
+        "backToList": "Wróć do przestojów"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Wycisz",
         "muted": "Wyciszone · kończy się za {duration}",
         "mutedTooltip": "Wyciszone przez {name} do {end}",
-        "exclude": "Wyklucz okno…"
+        "exclude": "Wyklucz okno…",
+        "firingMuted": "Wyzwolony · wyciszony",
+        "firingMutedTooltip": "Nadal się wyzwala. Powiadomienia wycisza {name}."
       },
       "corrected": "Skorygowane",
       "correctedBy": "Ocena skorygowana przez {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Korekty statusu:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "krótszy niż przedział SLO, nie skorygowano żadnych minut"
       }
     }
   },

@@ -210,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :condition="row.condition"
                   :targets="row.targets"
                   :folder-name="targetFolderName"
+                  :max-chips="2"
                   :data-test="`downtime-list-${row.id}-targets`"
                 />
               </template>
@@ -380,7 +381,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #empty>
-                <div data-test="downtime-list-empty" class="h-full">
+                <div v-if="loadFailed" data-test="downtime-list-error" class="h-full">
+                  <OEmptyState size="hero" preset="load-error" @action="refreshAll" />
+                </div>
+                <div v-else data-test="downtime-list-empty" class="h-full">
                   <OEmptyState
                     v-if="!loading"
                     size="hero"
@@ -519,6 +523,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import { useDefaultDowntimeFolder } from "@/composables/downtimes/useDefaultDowntimeFolder";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
+import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
 import DowntimeTargetsCell from "./DowntimeTargetsCell.vue";
 import ExtendDowntimeDialog from "./ExtendDowntimeDialog.vue";
 import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
@@ -566,6 +571,15 @@ const forbidden = computed(() => {
   const e: any = listQuery.error.value;
   return e?.status === 403 || e?.response?.status === 403;
 });
+
+// A failed load must not read as "no downtimes yet" with a Create button.
+const loadFailed = computed(() => listQuery.isError.value && !forbidden.value);
+
+useListBoundaryRefetch(
+  () => listQuery.data.value?.items,
+  () => listQuery.dataUpdatedAt.value,
+  () => listQuery.refetch(),
+);
 
 const cancelMutation = useMutation(() => cancelDowntimeMutation(orgId.value));
 const deleteMutation = useMutation(() => deleteDowntimeMutation(orgId.value));
@@ -617,6 +631,28 @@ const statFilter = ref<StatKey | null>(
   ) ?? null,
 );
 const selectedIds = ref<string[]>([]);
+
+// The banner link can land here while the page is open, so each URL value drives its filter on change.
+watch(
+  () => route.query.status,
+  (status) => {
+    const fromUrl = (["active", "scheduled", "recurring", "ended", "cancelled"] as const).find(
+      (v) => v === status,
+    );
+    if (fromUrl) statFilter.value = fromUrl;
+  },
+);
+watch(
+  () => route.query.scope,
+  (scope) => {
+    searchAcrossFolders.value = scope === "all";
+  },
+);
+
+watch(searchAcrossFolders, (across) => {
+  if ((route.query.scope === "all") === across) return;
+  void router.replace({ query: { ...route.query, scope: across ? "all" : undefined } });
+});
 
 watch([typeFilter, statFilter], ([repeat, status]) => {
   router.replace({
@@ -789,14 +825,15 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     header: t("alerts.downtimes.columns.targets"),
     cell: " ",
     hideable: true,
-    size: 320,
+    size: 240,
+    maxSize: 320,
   },
   {
     id: "schedule",
     header: t("alerts.downtimes.columns.schedule"),
     cell: " ",
     hideable: true,
-    size: 280,
+    size: 220,
   },
   {
     id: "when",
@@ -812,7 +849,7 @@ const columns = computed<OTableColumnDef<DowntimeListItem>[]>(() => [
     header: t("alerts.downtimes.columns.matched"),
     cell: " ",
     hideable: true,
-    size: 200,
+    size: 160,
   },
   {
     id: "folder_id",

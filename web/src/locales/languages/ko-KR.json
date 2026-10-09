@@ -8861,7 +8861,8 @@
         "tags": "태그 {tags}",
         "nItems": "{count} 항목 | {count} 항목",
         "asGood": "정상으로 처리",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count}일",
@@ -9161,7 +9162,10 @@
         "source": "소스",
         "wouldHaveNotified": "알림이 전송되었을 항목",
         "noSuppressed": "아직 억제된 항목이 없습니다",
-        "muteHourName": "{name} · 1시간 음소거"
+        "muteHourName": "{name} · 1시간 음소거",
+        "notFoundTitle": "다운타임을 찾을 수 없습니다",
+        "notFoundDescription": "삭제되었거나 링크가 다른 조직을 가리키고 있을 수 있습니다.",
+        "backToList": "다운타임 목록으로 돌아가기"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "음소거",
         "muted": "음소거됨 · {duration} 후 종료",
         "mutedTooltip": "{name}이(가) {end}까지 음소거함",
-        "exclude": "제외할 기간…"
+        "exclude": "제외할 기간…",
+        "firingMuted": "발생 중 · 음소거됨",
+        "firingMutedTooltip": "여전히 발생 중입니다. {name}에 의해 알림이 음소거되었습니다."
       },
       "corrected": "수정됨",
       "correctedBy": "{names}이(가) 점수 수정",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "상태 수정:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "SLO 슬라이스보다 짧아 보정된 시간이 없습니다"
       }
     }
   },

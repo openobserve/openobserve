@@ -8861,7 +8861,8 @@
         "tags": "tag {tags}",
         "nItems": "{count} item | {count} items",
         "asGood": "as good",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} d",
@@ -9161,7 +9162,10 @@
         "source": "Source",
         "wouldHaveNotified": "Would have notified",
         "noSuppressed": "Nothing has been suppressed yet",
-        "muteHourName": "{name} · mute 1 h"
+        "muteHourName": "{name} · mute 1 h",
+        "notFoundTitle": "Downtime not found",
+        "notFoundDescription": "It may have been deleted, or the link points to another organization.",
+        "backToList": "Back to downtimes"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Mute",
         "muted": "Muted · ends in {duration}",
         "mutedTooltip": "Muted by {name} until {end}",
-        "exclude": "Exclude a window…"
+        "exclude": "Exclude a window…",
+        "firingMuted": "Firing · muted",
+        "firingMutedTooltip": "Still firing. Notifications are muted by {name}."
       },
       "corrected": "Corrected",
       "correctedBy": "Score corrected by {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Status corrections:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "shorter than the SLO's slice, no minutes corrected"
       }
     }
   },

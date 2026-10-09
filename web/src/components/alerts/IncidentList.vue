@@ -131,19 +131,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-title="{ row }">
-          <div class="flex items-center gap-1">
-            <span>
+          <div class="flex min-w-0 items-center gap-1">
+            <OTruncatedText class="min-w-0">
               {{ row.title || formatDimensions(row.group_values) }}
-            </span>
+            </OTruncatedText>
             <OTag
               v-if="row.muted_by_downtime_id"
               type="downtimeStatus"
               value="active"
-              :label="
-                t('alerts.downtimes.incident.mutedBy', { name: nameOf(row.muted_by_downtime_id) })
-              "
+              class="max-w-60 min-w-12 shrink-4"
               data-test="incident-list-muted"
-            />
+            >
+              <span class="truncate">{{
+                t("alerts.downtimes.incident.mutedBy", { name: nameOf(row.muted_by_downtime_id) })
+              }}</span>
+              <OTooltip
+                :content="
+                  t('alerts.downtimes.incident.mutedBy', {
+                    name: nameOf(row.muted_by_downtime_id),
+                  })
+                "
+              />
+            </OTag>
           </div>
         </template>
         <template #cell-dimensions="{ row }">
@@ -312,6 +321,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -338,6 +348,7 @@ export default defineComponent({
     ORefreshButton,
     OSearchInput,
     OTooltip,
+    OTruncatedText,
     OIcon,
     OTable,
     OTag,

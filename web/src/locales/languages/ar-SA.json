@@ -8861,7 +8861,8 @@
         "tags": "وسم {tags}",
         "nItems": "{count} عنصر | {count} عناصر",
         "asGood": "كجيد",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} يوم",
@@ -9161,7 +9162,10 @@
         "source": "المصدر",
         "wouldHaveNotified": "كان سيرسل إشعارًا",
         "noSuppressed": "لم يتم كتم أي شيء بعد",
-        "muteHourName": "{name} · كتم لمدة ساعة"
+        "muteHourName": "{name} · كتم لمدة ساعة",
+        "notFoundTitle": "لم يتم العثور على فترة التوقف",
+        "notFoundDescription": "ربما تم حذفها، أو أن الرابط يشير إلى مؤسسة أخرى.",
+        "backToList": "العودة إلى فترات التوقف"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "كتم",
         "muted": "مكتوم · ينتهي خلال {duration}",
         "mutedTooltip": "مكتوم بواسطة {name} حتى {end}",
-        "exclude": "استبعاد نافذة…"
+        "exclude": "استبعاد نافذة…",
+        "firingMuted": "قيد الإطلاق · مكتوم",
+        "firingMutedTooltip": "لا يزال قيد الإطلاق. الإشعارات مكتومة بواسطة {name}."
       },
       "corrected": "تم التصحيح",
       "correctedBy": "تم تصحيح النتيجة بواسطة {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "تصحيحات الحالة:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "أقصر من شريحة SLO، لم يتم تصحيح أي دقائق"
       }
     }
   },

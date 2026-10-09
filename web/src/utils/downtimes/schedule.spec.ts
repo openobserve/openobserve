@@ -151,6 +151,16 @@ describe("scheduleSentence", () => {
       "Once · Thu 17 Sep, 14:10 to Thu 17 Sep, 16:10 · UTC",
     );
   });
+
+  it("names a stored legacy zone by its canonical name", () => {
+    expect(
+      scheduleSentence(
+        { ...weekly, repeat: "daily", weekdays: [], timezone: "Asia/Calcutta" },
+        gt,
+        "en-US",
+      ),
+    ).toBe("Daily · 02:00 for 1 h 30 min · Asia/Kolkata");
+  });
 });
 
 describe("recentWindows", () => {

@@ -8861,7 +8861,8 @@
         "tags": "тег {tags}",
         "nItems": "{count} элемент | {count} элементов",
         "asGood": "как успешные",
-        "chip": "{module} · {text}"
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
       },
       "duration": {
         "days": "{count} д",
@@ -9161,7 +9162,10 @@
         "source": "Источник",
         "wouldHaveNotified": "Отправило бы уведомления",
         "noSuppressed": "Пока ничего не было подавлено",
-        "muteHourName": "{name} · отключение уведомлений на 1 ч"
+        "muteHourName": "{name} · отключение уведомлений на 1 ч",
+        "notFoundTitle": "Период простоя не найден",
+        "notFoundDescription": "Возможно, он был удалён, или ссылка ведёт в другую организацию.",
+        "backToList": "Назад к периодам простоя"
       },
       "mute": {
         "title": {
@@ -9190,7 +9194,9 @@
         "bulk": "Отключить",
         "muted": "Отключено · завершится через {duration}",
         "mutedTooltip": "Отключено пользователем {name} до {end}",
-        "exclude": "Исключить окно…"
+        "exclude": "Исключить окно…",
+        "firingMuted": "Срабатывает · без уведомлений",
+        "firingMutedTooltip": "Всё ещё срабатывает. Уведомления отключены периодом {name}."
       },
       "corrected": "Скорректировано",
       "correctedBy": "Оценка скорректирована: {names}",
@@ -9216,7 +9222,8 @@
       },
       "sloCorrections": {
         "title": "Корректировки статуса:",
-        "item": "{name} ({status})"
+        "item": "{name} ({status})",
+        "shorterThanSlice": "короче интервала SLO, ни одна минута не скорректирована"
       }
     }
   },
