@@ -382,5 +382,3 @@ npm install --global @cyclonedx/cyclonedx-npm
 cd web
 cyclonedx-npm > sbom.json
 ```
-
-See [numeric functions in alert templates](ALERT_TEMPLATES.md) for notification formatting syntax and examples.
