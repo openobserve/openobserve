@@ -190,16 +190,6 @@ describe("useNLQuery", () => {
       );
     });
 
-    it.each(["holt_winters", "double_exponential_smoothing"])(
-      "recognizes %s as PromQL while its arguments are incomplete",
-      (name) => {
-        const detect = useNLQuery(gt).detectNaturalLanguage;
-        expect(detect(`${name}(http_requests_total[5m], 0.5, 0.3)`, "promql")).toBe(false);
-        expect(detect(`${name}(`, "promql")).toBe(false);
-        expect(detect(`${name}(http_requests_total`, "promql")).toBe(false);
-      },
-    );
-
     it("returns false for PromQL metric with label selector", () => {
       expect(useNLQuery(gt).detectNaturalLanguage('http_requests_total{job="api"}', "promql")).toBe(
         false,

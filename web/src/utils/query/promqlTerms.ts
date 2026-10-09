@@ -311,11 +311,6 @@ export const FUNCTION_TERMS: PromqlTerm[] = [
     info: raw("Calculate smoothed value of input series"),
   },
   {
-    label: "holt_winters",
-    detail: "function",
-    info: raw("Calculate smoothed value of input series (alias of double_exponential_smoothing)"),
-  },
-  {
     label: "hour",
     detail: "function",
     info: raw("Return the hour of the day for provided timestamps"),
