@@ -1368,6 +1368,8 @@ describe("VideoPlayer", () => {
     });
 
     it("holds records at or after the watermark until it moves", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
       playerSpies.addEvent.mockClear();
       const wrapper = mountComponent({ watermark: T + 5000 });
       await flushPromises();
@@ -1380,6 +1382,8 @@ describe("VideoPlayer", () => {
         ],
       });
       await flushPromises();
+      const built = (rrwebPlayerMock as any).mock.calls[0][0].props.events;
+      expect(built.some((e: any) => e.timestamp === T + 9000)).toBe(false);
       expect(playerSpies.addEvent).not.toHaveBeenCalledWith(
         expect.objectContaining({ timestamp: T + 9000 }),
       );
@@ -1388,6 +1392,26 @@ describe("VideoPlayer", () => {
       expect(playerSpies.addEvent).toHaveBeenCalledWith(
         expect.objectContaining({ timestamp: T + 9000 }),
       );
+      wrapper.unmount();
+    });
+
+    it("builds no player while every record is held, then builds once the watermark moves", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+      const errorSpy = vi.spyOn(console, "error");
+      errorSpy.mockClear();
+      const wrapper = mountComponent({ watermark: T });
+      await flushPromises();
+      await wrapper.setProps({ segments: [seg("A", 0, opening(T, "A"))] });
+      await flushPromises();
+      expect(rrwebPlayerMock).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+      await wrapper.setProps({ watermark: Infinity });
+      await flushPromises();
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+      const built = (rrwebPlayerMock as any).mock.calls[0][0].props.events;
+      expect(built.filter((e: any) => e.type === 2)).toHaveLength(1);
+      errorSpy.mockRestore();
       wrapper.unmount();
     });
 
