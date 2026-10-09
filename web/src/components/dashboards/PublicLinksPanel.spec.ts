@@ -655,12 +655,32 @@ describe("PublicLinksPanel", () => {
     );
   });
 
-  it("shows the no-permission view on a 403 and no actions", async () => {
+  it("shows the no-permission view on a 403, still offering a new link", async () => {
     vi.mocked(admin.list).mockRejectedValue({ response: { status: 403 } });
     const w = build();
     await flushPromises();
     expect(has(w, "dashboards-public-links-panel-no-permission")).toBe(true);
+    expect(w.find('[data-test="dashboards-public-links-panel-no-permission"]').text()).toContain(
+      "New public link",
+    );
     expect(w.find(".drawer-primary-label").text()).toBe("");
+  });
+
+  it("lets a user who may create but not list publish a link", async () => {
+    vi.mocked(admin.list).mockRejectedValue({ response: { status: 403 } });
+    vi.mocked(admin.create).mockResolvedValue({ data: link({ slug: "created-slug" }) } as never);
+    const w = build({ variablesConfig: undefined });
+    await flushPromises();
+    await w
+      .findComponent('[data-test="dashboards-public-links-panel-no-permission"]')
+      .vm.$emit("action");
+    await flushPromises();
+    (
+      w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+    ).form.setFieldValue("name", "Create only");
+    await submit(w);
+    expect(admin.create).toHaveBeenCalledTimes(1);
+    expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
   });
 
   describe("query-based variables", () => {

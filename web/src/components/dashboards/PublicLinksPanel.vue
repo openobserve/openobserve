@@ -29,17 +29,18 @@
   >
     <template #header>
       <div class="flex min-w-0 items-center gap-2">
-        <OButton
+        <!-- Same tile as OPageHeader's back button, which it offers only as a page-header prop. -->
+        <button
           v-if="showBack"
-          variant="secondary"
-          size="icon-sm"
-          icon-left="chevron-left"
+          type="button"
+          class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
           :aria-label="t('dashboard.publicLinks.backToLinks')"
           data-test="dashboards-public-links-panel-back-btn"
           @click="goBack"
         >
+          <OIcon name="chevron-left" size="md" />
           <OTooltip side="bottom" :content="t('dashboard.publicLinks.backToLinks')" />
-        </OButton>
+        </button>
         <span
           v-else
           class="rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
@@ -52,13 +53,15 @@
         </span>
       </div>
     </template>
-    <div
-      v-if="forbidden"
-      class="text-text-secondary py-2 text-sm"
+    <!-- Listing and creating are separate grants, so a refused list doesn't mean a refused create. -->
+    <OEmptyState
+      v-if="forbidden && currentView === 'list'"
+      preset="no-access"
+      :description="t('dashboard.publicDashboard.noPublishPermission')"
+      :action-label="t('dashboard.publicLinks.newLink')"
       data-test="dashboards-public-links-panel-no-permission"
-    >
-      {{ t("dashboard.publicDashboard.noPublishPermission") }}
-    </div>
+      @action="openForm(null)"
+    />
 
     <OEmptyState
       v-else-if="loadFailed"
@@ -730,12 +733,10 @@ const drawerTitle = computed<I18nText>(() =>
     : t("dashboard.publicLinks.panelTitle"),
 );
 
-const showBack = computed(
-  () => !forbidden.value && !loadFailed.value && currentView.value !== "list",
-);
+const showBack = computed(() => !loadFailed.value && currentView.value !== "list");
 
 const primaryLabel = computed<I18nText | undefined>(() => {
-  if (forbidden.value || loadFailed.value) return undefined;
+  if (loadFailed.value) return undefined;
   if (currentView.value === "form") {
     return editing.value
       ? t("dashboard.publicLinks.saveChanges")
