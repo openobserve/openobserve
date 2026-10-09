@@ -15,16 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-md">
-    <div class="password-policy-title">{{ t("settings.passwordPolicy") }}</div>
-    <div class="password-policy-description">
-      {{ t("settings.passwordPolicyDesc") }}
+  <div class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden">
+    <div
+      class="tw:shrink-0 q-px-md q-pt-md"
+      data-test="settings-password-policy-header"
+    >
+      <div class="password-policy-title">
+        {{ t("settings.passwordPolicy") }}
+      </div>
+      <div class="password-policy-description">
+        {{ t("settings.passwordPolicyDesc") }}
+      </div>
     </div>
 
     <div
       v-if="loading"
       data-test="password-policy-loading"
-      class="tw:py-8 tw:text-center"
+      class="tw:flex-1 tw:flex tw:items-center tw:justify-center"
     >
       <q-spinner size="24px" />
     </div>
@@ -62,82 +69,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <q-form v-else ref="formRef" @submit="save">
-      <template v-for="section in sections" :key="section.title">
-        <GroupHeader
-          :title="section.title"
-          :show-icon="false"
-          class="tw:mt-4"
-        />
-        <template v-for="row in section.rows" :key="row.path">
+    <q-form
+      v-else
+      ref="formRef"
+      class="password-policy-form tw:flex-1 tw:min-h-0 tw:flex tw:flex-col"
+      @submit="save"
+    >
+      <div
+        class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto q-px-md tw:pb-3"
+        data-test="settings-password-policy-body"
+      >
+        <template v-for="section in gridSections" :key="section.testId">
+          <GroupHeader
+            :title="section.title"
+            :show-icon="false"
+            class="tw:mt-4"
+          />
           <div
-            v-if="!row.hidden?.()"
-            class="password-policy-row"
-            :data-test="`settings-password-policy-${row.testId}`"
+            class="password-policy-grid"
+            :data-test="`settings-password-policy-section-${section.testId}`"
           >
-            <span class="password-policy-label">{{ row.label }}</span>
-            <q-toggle
-              v-if="row.kind === 'toggle'"
-              class="o2-toggle-button-lg -tw:ml-4"
-              size="lg"
-              :model-value="get(row.path)"
-              :disable="row.disabled?.()"
-              @update:model-value="(v: boolean) => onToggle(row.path, v)"
-            />
-            <q-select
-              v-else-if="row.kind === 'select'"
-              :model-value="get(row.path)"
-              :options="backoffOptions"
-              emit-value
-              map-options
-              dense
-              outlined
-              :disable="row.disabled?.()"
-              class="tw:w-48"
-              @update:model-value="(v: string) => set(row.path, v)"
-            />
-            <q-input
-              v-else
-              :model-value="get(row.path)"
-              :type="row.kind === 'text' ? 'text' : 'number'"
-              :placeholder="row.placeholder"
-              dense
-              outlined
-              hide-bottom-space
-              :disable="row.disabled?.()"
-              :rules="row.rules"
-              class="tw:w-48"
-              @update:model-value="
-                (v: string | number | null) => set(row.path, v)
-              "
-            />
-            <span class="password-policy-description">{{
-              row.description
-            }}</span>
+            <div
+              v-for="pair in section.pairs"
+              :key="pair.rows[0].path"
+              class="password-policy-pair"
+              :class="{ 'password-policy-pair--last': pair.last }"
+            >
+              <div
+                v-for="row in pair.rows"
+                :key="row.path"
+                class="password-policy-row"
+                :data-test="`settings-password-policy-${row.testId}`"
+              >
+                <div class="password-policy-text">
+                  <span class="password-policy-label">{{ row.label }}</span>
+                  <span class="password-policy-description">{{
+                    row.description
+                  }}</span>
+                </div>
+                <q-toggle
+                  v-if="row.kind === 'toggle'"
+                  class="o2-toggle-button-lg -tw:ml-4"
+                  size="lg"
+                  :model-value="get(row.path)"
+                  :disable="row.disabled?.()"
+                  @update:model-value="(v: boolean) => onToggle(row.path, v)"
+                />
+                <q-select
+                  v-else-if="row.kind === 'select'"
+                  :model-value="get(row.path)"
+                  :options="backoffOptions"
+                  emit-value
+                  map-options
+                  dense
+                  outlined
+                  :disable="row.disabled?.()"
+                  class="tw:w-48"
+                  @update:model-value="(v: string) => set(row.path, v)"
+                />
+                <q-input
+                  v-else
+                  :model-value="get(row.path)"
+                  :type="row.kind === 'text' ? 'text' : 'number'"
+                  :placeholder="row.placeholder"
+                  dense
+                  outlined
+                  hide-bottom-space
+                  :disable="row.disabled?.()"
+                  :rules="row.rules"
+                  class="tw:w-48"
+                  @update:model-value="
+                    (v: string | number | null) => set(row.path, v)
+                  "
+                />
+              </div>
+            </div>
+            <p
+              v-for="note in section.notes"
+              :key="note.testId"
+              class="password-policy-description tw:py-3 tw:mb-0!"
+              :data-test="`settings-password-policy-${note.testId}`"
+            >
+              {{ note.text }}
+            </p>
           </div>
         </template>
-        <p
-          v-for="note in section.notes?.() ?? []"
-          :key="note.testId"
-          class="password-policy-description tw:py-3"
-          :data-test="`settings-password-policy-${note.testId}`"
+
+        <!-- Standing, not one-off: a warning shown once is one the next administrator never sees. -->
+        <q-banner
+          v-if="form.apply_to_root"
+          dense
+          class="bg-red-1 text-negative tw:my-3 tw:rounded"
+          data-test="settings-password-policy-root-warning"
         >
-          {{ note.text }}
-        </p>
-      </template>
+          <template #avatar><q-icon name="warning" /></template>
+          {{ t("passwordPolicy.rootWarning") }}
+        </q-banner>
+      </div>
 
-      <!-- Standing, not one-off: a warning shown once is one the next administrator never sees. -->
-      <q-banner
-        v-if="form.apply_to_root"
-        dense
-        class="bg-red-1 text-negative tw:my-3 tw:rounded"
-        data-test="settings-password-policy-root-warning"
+      <div
+        class="password-policy-footer tw:shrink-0 tw:flex tw:justify-end tw:gap-2 q-px-md tw:py-3"
+        data-test="settings-password-policy-footer"
       >
-        <template #avatar><q-icon name="warning" /></template>
-        {{ t("passwordPolicy.rootWarning") }}
-      </q-banner>
-
-      <div class="tw:flex tw:justify-end tw:gap-2 tw:py-3">
         <q-btn
           data-test="settings-password-policy-cancel-btn"
           outline
@@ -229,9 +262,22 @@ interface Row {
 }
 
 interface Section {
+  testId: string;
   title: string;
   rows: Row[];
   notes?: () => { testId: string; text: string }[];
+}
+
+interface GridPair {
+  rows: Row[];
+  last: boolean;
+}
+
+interface GridSection {
+  testId: string;
+  title: string;
+  pairs: GridPair[];
+  notes: { testId: string; text: string }[];
 }
 
 const DAY_MS = 86_400_000;
@@ -335,6 +381,7 @@ const lockoutOn = () => num(form.value.lockout.threshold) > 0;
 // Only the server's four cross-field rules are mirrored; no floor is enforced because the API accepts a weak policy.
 const sections = computed<Section[]>(() => [
   {
+    testId: "complexity",
     title: t("passwordPolicy.complexity"),
     rows: [
       {
@@ -383,6 +430,7 @@ const sections = computed<Section[]>(() => [
     ],
   },
   {
+    testId: "rotation",
     title: t("passwordPolicy.rotation"),
     rows: [
       {
@@ -414,6 +462,7 @@ const sections = computed<Section[]>(() => [
         : [],
   },
   {
+    testId: "reuse",
     title: t("passwordPolicy.reuse"),
     rows: [
       {
@@ -441,6 +490,7 @@ const sections = computed<Section[]>(() => [
     ],
   },
   {
+    testId: "lockout",
     title: t("passwordPolicy.lockout"),
     rows: [
       {
@@ -496,6 +546,7 @@ const sections = computed<Section[]>(() => [
         : [],
   },
   {
+    testId: "session",
     title: t("passwordPolicy.sessionEnforcement"),
     rows: [
       {
@@ -517,6 +568,27 @@ const sections = computed<Section[]>(() => [
     ],
   },
 ]);
+
+// The section border closes the grid, so its last row draws no border of its own unless a note follows it.
+const gridSections = computed<GridSection[]>(() =>
+  sections.value.map((section) => {
+    const rows = section.rows.filter((row) => !row.hidden?.());
+    const notes = section.notes?.() ?? [];
+    const pairs: GridPair[] = [];
+    for (let index = 0; index < rows.length; index += 2) {
+      pairs.push({
+        rows: rows.slice(index, index + 2),
+        last: !notes.length && index + 2 >= rows.length,
+      });
+    }
+    return {
+      testId: section.testId,
+      title: section.title,
+      pairs,
+      notes,
+    };
+  }),
+);
 
 const backoffOptions = computed(() => [
   { label: t("passwordPolicy.backoffExponential"), value: "exponential" },
@@ -643,13 +715,47 @@ onMounted(loadPolicy);
   line-height: 24px;
 }
 
+// The page sits beside the settings menu, so the column switch follows the form's width, not the viewport's.
+.password-policy-form {
+  container-type: inline-size;
+  container-name: password-policy;
+}
+
+.password-policy-grid {
+  border-bottom: 1px solid var(--o2-border-color);
+}
+
+.password-policy-pair {
+  display: grid;
+  grid-template-columns: 45% 45%;
+  column-gap: 10%;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--o2-border-color) 64%, transparent);
+}
+
+.password-policy-pair--last {
+  border-bottom: none;
+}
+
 .password-policy-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 2fr;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) 12rem;
+  column-gap: 1rem;
   align-items: center;
+  min-width: 0;
   padding: 0.75rem 0;
-  border-bottom: 1px solid var(--o2-border-color);
+}
+
+.password-policy-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+// The body scrolls under the footer, so the footer needs its own edge.
+.password-policy-footer {
+  border-top: 1px solid var(--o2-border-color);
 }
 
 .password-policy-label {
@@ -660,5 +766,18 @@ onMounted(loadPolicy);
 .password-policy-description {
   font-size: 13px;
   opacity: 0.7;
+  overflow-wrap: anywhere;
+}
+
+@container password-policy (max-width: 896px) {
+  .password-policy-pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  // One column stacks a row's two policies, so the first needs its own separator.
+  .password-policy-row:not(:last-child) {
+    border-bottom: 1px solid
+      color-mix(in srgb, var(--o2-border-color) 64%, transparent);
+  }
 }
 </style>
