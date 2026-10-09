@@ -3986,16 +3986,20 @@ async fn build_notification_context(
     };
     let alert_url = if alert.query_condition.query_type == QueryType::PromQL {
         if let Some(promql) = &alert.query_condition.promql {
-            let condition = alert.query_condition.promql_condition.as_ref().unwrap();
-            alert_query = format!(
-                "({}) {} {}",
-                promql,
-                match condition.operator {
-                    Operator::EqualTo => "==".to_string(),
-                    _ => condition.operator.to_string(),
-                },
-                to_float(&condition.value)
-            );
+            if alert.query_condition.prom_rule_mode {
+                alert_query = promql.clone();
+            } else {
+                let condition = alert.query_condition.promql_condition.as_ref().unwrap();
+                alert_query = format!(
+                    "({}) {} {}",
+                    promql,
+                    match condition.operator {
+                        Operator::EqualTo => "==".to_string(),
+                        _ => condition.operator.to_string(),
+                    },
+                    to_float(&condition.value)
+                );
+            }
         }
         // http://localhost:5080/web/metrics?stream=zo_http_response_time_bucket&from=1705248000000000&to=1705334340000000&query=em9faHR0cF9yZXNwb25zZV90aW1lX2J1Y2tldHt9&org_identifier=default
         format!(
@@ -8611,9 +8615,14 @@ mod rule_notification_tests {
     async fn rule_notifications_preserve_strings_and_render_empty_thresholds() {
         let mut alert = Alert::default();
         alert.query_condition.prom_rule_mode = true;
+        alert.query_condition.query_type = QueryType::PromQL;
+        alert.query_condition.promql_multi_alert = true;
+        alert.query_condition.promql = Some("rate(foo[5m]) > 4".into());
+        alert.stream_type = StreamType::Metrics;
+        alert.stream_name = "foo".into();
         for value in ["NaN", "+Inf", "-Inf", "0.125"] {
             let rows = vec![Map::from_iter([("value".into(), json!(value))])];
-            let options = ProcessTemplateOptions {
+            let options = || ProcessTemplateOptions {
                 rows_end_time: 0,
                 start_time: None,
                 evaluation_timestamp: 0,
@@ -8623,8 +8632,28 @@ mod rule_notification_tests {
                 episode_id: None,
                 resolved: false,
             };
+            let context =
+                build_notification_context("org", &alert, &rows, &[], options(), None).await;
+            let url = if let Some((_, suffix)) = context.alert_url.split_once("/web/short/") {
+                let id = suffix.split('?').next().unwrap();
+                short_url::retrieve(&alert.org_id, id).await.unwrap()
+            } else {
+                context.alert_url
+            };
+            assert!(url.contains("/web/metrics?"));
+            let query = url
+                .split_once("&query=")
+                .unwrap()
+                .1
+                .split('&')
+                .next()
+                .unwrap();
+            assert_eq!(
+                base64::decode_url(&query.replace("%2B", "+")).unwrap(),
+                "rate(foo[5m]) > 4"
+            );
             let result = process_dest_template("org", r#"{"value":"{value}","observed":"{alert_agg_value}","threshold":"{alert_threshold}"}"#,
-                &alert, &rows, &[], options, &hashbrown::HashMap::new(), None).await;
+                &alert, &rows, &[], options(), &hashbrown::HashMap::new(), None).await;
             let parsed: Value = serde_json::from_str(&result).unwrap();
             assert_eq!(parsed["value"], value);
             assert_eq!(parsed["observed"], value);

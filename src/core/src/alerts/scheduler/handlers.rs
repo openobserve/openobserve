@@ -360,6 +360,12 @@ async fn dispatch_per_group(
     trace_id: &str,
     classification: Option<&config::meta::alerts::grouping::GroupClassification>,
     records: &[config::utils::json::Map<String, config::utils::json::Value>],
+    rule_series_rows: Option<
+        &std::collections::HashMap<
+            String,
+            config::utils::json::Map<String, config::utils::json::Value>,
+        >,
+    >,
     rows_end_time: i64,
     rollup_level: Option<config::meta::alerts::level::AlertLevel>,
     start_time: Option<i64>,
@@ -446,7 +452,9 @@ async fn dispatch_per_group(
         );
     }
 
-    let rows = if is_promql {
+    let rows = if let Some(rows) = rule_series_rows {
+        rows.clone()
+    } else if is_promql {
         config::meta::alerts::dispatch::rows_by_series_key(records)
     } else {
         rows_by_group_key(records, &group_by)
@@ -3350,6 +3358,7 @@ async fn handle_alert_triggers(
                 &scheduler_trace_id,
                 trigger_results.group_classification.as_ref(),
                 &data,
+                trigger_results.rule_series_rows.as_ref(),
                 trigger_results.end_time,
                 eval_level,
                 Some(start_time),
