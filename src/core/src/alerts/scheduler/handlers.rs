@@ -1057,12 +1057,12 @@ async fn handle_composite_alert_trigger(
             let rows = [notification_row];
 
             #[cfg(feature = "enterprise")]
-            let incident_handled = if notification_alert.creates_incident
+            let (incident_handled, incident_notify_error) = if notification_alert.creates_incident
                 && o2_enterprise::enterprise::common::config::get_config()
                     .incidents
                     .enabled
             {
-                crate::alerts::incidents::correlate_alert_to_incident(
+                match crate::alerts::incidents::correlate_alert_to_incident(
                     &notification_alert,
                     &rows[0],
                     &rows,
@@ -1070,20 +1070,23 @@ async fn handle_composite_alert_trigger(
                     Some(evaluated.level),
                 )
                 .await
-                .map(|outcome| outcome.is_some())
-                .unwrap_or_else(|error| {
-                    log::error!(
-                        "[COMPOSITE_ALERT] incident correlation failed for {}/{}: {error}",
-                        trigger.org,
-                        definition.definition.id
-                    );
-                    false
-                })
+                {
+                    Ok(Some(correlated)) => (true, correlated.notify_error),
+                    Ok(None) => (false, None),
+                    Err(error) => {
+                        log::error!(
+                            "[COMPOSITE_ALERT] incident correlation failed for {}/{}: {error}",
+                            trigger.org,
+                            definition.definition.id
+                        );
+                        (false, None)
+                    }
+                }
             } else {
-                false
+                (false, None)
             };
             #[cfg(not(feature = "enterprise"))]
-            let incident_handled = false;
+            let (incident_handled, incident_notify_error) = (false, None);
 
             #[cfg(feature = "enterprise")]
             {
@@ -1116,7 +1119,7 @@ async fn handle_composite_alert_trigger(
                     )
                     .await
             };
-            delivery_error = composite_delivery_error(&delivery_result);
+            delivery_error = composite_delivery_error(&delivery_result, incident_notify_error);
             match delivery_result {
                 Ok(outcome) if outcome.failed.is_empty() => {
                     scheduled_data.notified_destinations.clear();
@@ -1265,12 +1268,22 @@ fn should_dispatch_after_incident(
     !incident_destinations_handled || has_workflows
 }
 
-/// Why a composite's send left something undelivered; a partial send is retried but still failed.
-fn composite_delivery_error(delivery: &Result<NotificationOutcome, AlertError>) -> Option<String> {
-    match delivery {
+/// Why a composite's send, or its incident's notification, left a destination unnotified.
+fn composite_delivery_error(
+    delivery: &Result<NotificationOutcome, AlertError>,
+    incident_notify_error: Option<String>,
+) -> Option<String> {
+    let delivery_error = match delivery {
         Ok(outcome) if outcome.failed.is_empty() => None,
         Ok(outcome) => Some(outcome.error_message.trim().to_owned()),
         Err(error) => Some(format!("error sending notification for alert: {error}")),
+    };
+    match incident_notify_error {
+        None => delivery_error,
+        incident_error => Some(crate::alerts::alert::with_incident_notify_error(
+            delivery_error.unwrap_or_default(),
+            incident_error,
+        )),
     }
 }
 
@@ -7545,7 +7558,7 @@ mod tests {
             succeeded: vec!["slack".to_string()],
             ..Default::default()
         });
-        assert_eq!(composite_delivery_error(&delivered), None);
+        assert_eq!(composite_delivery_error(&delivered, None), None);
 
         let partial = Ok(NotificationOutcome {
             succeeded: vec!["slack".to_string()],
@@ -7554,7 +7567,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(
-            composite_delivery_error(&partial).as_deref(),
+            composite_delivery_error(&partial, None).as_deref(),
             Some("pagerduty timed out")
         );
 
@@ -7562,8 +7575,29 @@ mod tests {
             error_message: "http 500".to_string(),
         });
         assert!(
-            composite_delivery_error(&failed)
+            composite_delivery_error(&failed, None)
                 .is_some_and(|error| error.starts_with("error sending notification for alert:"))
+        );
+    }
+
+    #[test]
+    fn test_composite_delivery_error_reports_a_failed_incident_notification() {
+        let incident_error = || Some("slack: http 500".to_string());
+
+        let nothing_else_sent = Ok(NotificationOutcome::default());
+        assert_eq!(
+            composite_delivery_error(&nothing_else_sent, incident_error()).as_deref(),
+            Some("slack: http 500")
+        );
+
+        let workflow_failed = Ok(NotificationOutcome {
+            failed: vec!["workflow".to_string()],
+            error_message: "workflow timed out".to_string(),
+            ..Default::default()
+        });
+        assert_eq!(
+            composite_delivery_error(&workflow_failed, incident_error()).as_deref(),
+            Some("slack: http 500; workflow timed out")
         );
     }
 
