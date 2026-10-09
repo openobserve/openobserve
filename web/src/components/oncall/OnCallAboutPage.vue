@@ -101,12 +101,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODescriptionItem>
 
         <ODescriptionItem v-if="subjectStream" :label="t('oncall.subjectStream')">
-          <span
-            class="block truncate"
-            :title="subjectStream"
-            data-test="oncall-about-subject-stream"
-            >{{ raw(subjectStream) }}</span
-          >
+          <OTruncatedText class="block" data-test="oncall-about-subject-stream">{{
+            raw(subjectStream)
+          }}</OTruncatedText>
         </ODescriptionItem>
 
         <ODescriptionItem v-if="cause" :label="t('oncall.resolveCause')">
@@ -124,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="rounded-default border-border-default bg-surface-panel flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
           >
             <router-link
-              class="text-accent min-w-0 flex-1 truncate font-mono"
+              class="text-accent min-w-0 flex-1 font-mono"
               :to="{
                 name: 'incidentDetail',
                 params: { id: incidentId },
@@ -132,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               data-test="oncall-about-incident-link"
             >
-              {{ raw(incidentId) }}
+              <OTruncatedText class="block">{{ raw(incidentId) }}</OTruncatedText>
             </router-link>
             <OButton
               variant="ghost"
@@ -159,11 +156,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  list's search box. -->
             <router-link
               v-if="alertEditRoute"
-              class="text-accent min-w-0 flex-1 truncate font-mono"
+              class="text-accent min-w-0 flex-1 font-mono"
               :to="alertEditRoute"
               data-test="oncall-about-subject-link"
             >
-              {{ raw(sourceId) }}
+              <OTruncatedText class="block">{{ raw(sourceId) }}</OTruncatedText>
             </router-link>
             <span v-else class="text-text-body min-w-0 flex-1 truncate font-mono">
               {{ raw(sourceId) }}
@@ -192,6 +189,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import type { ResolutionCause, SubjectType } from "@/ts/interfaces/oncall";

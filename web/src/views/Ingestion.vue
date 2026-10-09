@@ -209,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="min-h-0 flex-1">
       <router-view
-        :title="ingestTabType"
         :currOrgIdentifier="currentOrgIdentifier"
         :currUserEmail="currentUserEmail"
         @copy-to-clipboard-fn="copyToClipboardFn"

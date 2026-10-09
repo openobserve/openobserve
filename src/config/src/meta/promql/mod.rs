@@ -82,6 +82,8 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
+/// Prometheus' staleness-marker NaN; an ordinary NaN is not stale.
+pub const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///
@@ -106,6 +108,12 @@ pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
 #[inline]
 pub fn is_metrics_hash_excluded_label(name: &str) -> bool {
     METRICS_HASH_EXCLUDED_LABELS.contains(&name)
+}
+
+/// Whether `value` is the Prometheus staleness marker; any other NaN is not one.
+#[inline]
+pub fn is_stale_marker(value: f64) -> bool {
+    value.to_bits() == STALE_NAN_BITS
 }
 
 pub fn get_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
@@ -352,6 +360,12 @@ pub struct RequestLabelValues {
 
 #[derive(Debug, Deserialize)]
 pub struct RequestFormatQuery {
+    pub query: String,
+}
+
+/// The PromQL query to parse into a syntax tree.
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct RequestParseTree {
     pub query: String,
 }
 

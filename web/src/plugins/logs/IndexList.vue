@@ -83,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full justify-start"
               @click="quickSelectStream(stream.value)"
             >
-              <span class="min-w-0 flex-1 truncate text-left">{{ stream.label }}</span>
-              <OTooltip :content="raw(stream.label)" side="right" align="center" />
+              <OTruncatedText class="flex-1 text-left">{{ stream.label }}</OTruncatedText>
             </OButton>
             <span
               v-if="streamList.length > quickPickStreams.length"
@@ -287,6 +286,7 @@ import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -317,6 +317,7 @@ export default defineComponent({
     OSelect,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OEmptyState,
     OSkeleton,
   },

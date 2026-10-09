@@ -16,6 +16,10 @@
 import http from "./http";
 import analytics from "./product_analytics";
 
+/** The page a saved view belongs to. A view stored before the field existed is a logs view. */
+export const viewTypeOf = (view: { view_type?: string | null }): string =>
+  view?.view_type || "logs";
+
 const savedViews = {
   get: (org_identifier: string) => {
     const url = `/api/${org_identifier}/savedviews`;

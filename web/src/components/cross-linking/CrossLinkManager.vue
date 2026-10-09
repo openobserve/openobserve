@@ -31,22 +31,23 @@
         <div class="flex items-start justify-between">
           <div class="min-w-0 flex-1">
             <!-- Name -->
-            <div
-              class="text-text-heading truncate text-sm font-bold font-medium"
-              :title="link.name"
+            <OTruncatedText
+              as="div"
+              class="text-text-heading text-sm font-bold font-medium"
+              :tooltip="raw(link.name)"
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}
               <OTag v-if="link._source" type="crossLinkSource" :value="link._source" class="ms-1" />
-            </div>
+            </OTruncatedText>
             <!-- URL -->
-            <div
-              class="text-text-muted mt-1 truncate text-xs"
-              :title="link.url"
+            <OTruncatedText
+              as="div"
+              class="text-text-muted mt-1 text-xs"
               :data-test="`cross-link-item-url-${idx}`"
             >
               {{ link.url }}
-            </div>
+            </OTruncatedText>
             <!-- Fields -->
             <div v-if="link.fields?.length" class="mt-1 flex flex-wrap gap-1">
               <OTag
@@ -56,7 +57,7 @@
                 class="max-w-50"
                 :data-test="`cross-link-field-chip-${fIdx}`"
               >
-                <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
+                <OTruncatedText class="text-xs">{{ field.name }}</OTruncatedText>
               </OTag>
             </div>
           </div>
@@ -104,6 +105,7 @@ import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface CrossLink {
   name: string;
@@ -114,7 +116,7 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkManager",
-  components: { CrossLinkDialog, OButton, OTag },
+  components: { CrossLinkDialog, OButton, OTag, OTruncatedText },
   props: {
     modelValue: {
       type: Array as PropType<CrossLink[]>,

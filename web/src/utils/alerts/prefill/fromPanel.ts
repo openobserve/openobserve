@@ -26,9 +26,13 @@
 import {
   ALERT_PREFILL_VERSION,
   type AlertPrefill,
+  type AlertPrefillQueryChoice,
+  type AlertPrefillStreamCandidate,
   type AlertPrefillWarning,
 } from "@/ts/interfaces/alertPrefill";
 import { sanitizeAlertNamePart, periodMinutesFromRange, warn } from "../alertPrefill";
+import { formulaRefs, isFormulaQuery, queryRefs } from "@/utils/dashboard/promql/formula";
+import { selectorMetricNames } from "@/utils/dashboard/exemplars/exemplarPlacement";
 
 /** Panel types whose shape has no meaningful row count to alert on. */
 const UNSUPPORTED_PANEL_TYPES = ["markdown", "html", "geomap", "sankey"];
@@ -39,15 +43,26 @@ export interface PanelPrefillInput {
   panelType?: string;
   queries?: any[];
   queryType?: string;
-  /** Query with dashboard variables already substituted — preferred over queries[0].query. */
+  /** The panel query to alert on; the first when absent. */
+  queryIndex?: number;
+  /** Offered in the confirm dialog when the user has to pick the query. */
+  queryChoices?: AlertPrefillQueryChoice[];
+  /** The chosen query with dashboard variables already substituted — preferred over its raw text. */
   executedQuery?: string;
+  /** The panel's executed metadata, which gives a formula's inputs their resolved text. */
+  metadataQueries?: any[];
   timeRange?: {
     value_type?: string;
     relative_value?: number;
     relative_period?: string;
     startTime?: number;
     endTime?: number;
+    /** A rendered panel's window. */
+    start_time?: Date | null;
+    end_time?: Date | null;
   };
+  /** Wall-clock time in ms; a Date-pair window ending this close to it was a relative range. */
+  now?: number;
   /** Threshold picked off the chart (context-menu flow). */
   threshold?: number;
   condition?: "above" | "below";
@@ -56,9 +71,31 @@ export interface PanelPrefillInput {
   timezone?: string;
 }
 
+/** Microseconds since the epoch exceed this; milliseconds do not until the year 5138. */
+const MIN_EPOCH_MICROS = 1e14;
+
+/** A rendered window ending within this of now was a relative ("last N") range. */
+const ROLLING_END_TOLERANCE_MICROS = 5 * 60_000_000;
+
+// Dashboards build these Dates from µs epochs, the Explorer from ms.
+export const dateToMicros = (date: Date): number => {
+  const value = date.getTime();
+  return value > MIN_EPOCH_MICROS ? value : value * 1000;
+};
+
 /** The dashboard time range uses its own vocabulary; map it onto the shared one. */
-const toPrefillRange = (timeRange: PanelPrefillInput["timeRange"]) => {
+const toPrefillRange = (timeRange: PanelPrefillInput["timeRange"], nowMs: number) => {
   if (!timeRange) return null;
+
+  if (timeRange.start_time instanceof Date && timeRange.end_time instanceof Date) {
+    const startTime = dateToMicros(timeRange.start_time);
+    const endTime = dateToMicros(timeRange.end_time);
+    if (Math.abs(nowMs * 1000 - endTime) <= ROLLING_END_TOLERANCE_MICROS && endTime > startTime) {
+      const minutes = Math.max(1, Math.round((endTime - startTime) / 60_000_000));
+      return { type: "relative" as const, relativeTimePeriod: `${minutes}m` };
+    }
+    return { type: "absolute" as const, startTime, endTime };
+  }
 
   if (timeRange.value_type === "relative") {
     const value = timeRange.relative_value || 15;
@@ -145,12 +182,69 @@ const conditionsFromFilters = (fields: any, makeId: () => string) => {
   };
 };
 
+// Quoted strings are matched first so a `#` inside a label value survives.
+const withoutComments = (text = ""): string =>
+  text.replace(
+    /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`[^`]*`)|#[^\n]*/g,
+    (_, quoted) => quoted ?? "",
+  );
+
+/** The metrics a formula's inputs read, once each; an alert needs one of them as its stream. */
+const formulaInputStreams = (
+  queries: any[],
+  formula: string,
+  metadataQueries: any[] | undefined,
+): AlertPrefillStreamCandidate[] => {
+  const referenced = new Set(formulaRefs(formula));
+  const letters = queryRefs(queries);
+  // A code-mode query's `fields.stream` is the editor's inherited pick, not what its text reads.
+  const metricsOf = (query: any, i: number): string[] =>
+    query?.customQuery === false
+      ? [query?.fields?.stream].filter(Boolean)
+      : selectorMetricNames(
+          withoutComments(executedPanelQuery(metadataQueries, i) || query?.query),
+        );
+  const names = queries.flatMap((query, i) => {
+    const letter = letters[i];
+    if (!letter || !referenced.has(letter) || isFormulaQuery(query)) return [];
+    return metricsOf(query, i);
+  });
+  return [...new Set(names)].map((name) => ({ name, type: "metrics" }));
+};
+
+/** The executed text of a panel query's current-period window; shifted windows follow the primaries. */
+export const executedPanelQuery = (
+  metadataQueries: any[] | undefined,
+  panelQueryIndex: number,
+): string | undefined => {
+  const primary = metadataQueries?.find(
+    (entry: any) =>
+      entry?.panelQueryIndex === panelQueryIndex && !Number(entry?.timeRangeGap?.seconds),
+  );
+  return (primary ?? metadataQueries?.[panelQueryIndex])?.query || undefined;
+};
+
+/** The confirm dialog's choice of query, one per visible panel query. */
+export const panelQueryChoices = (
+  queries: any[],
+  metadataQueries: any[] | undefined,
+  visibleIndexes: number[] = queries.map((_, index) => index),
+): AlertPrefillQueryChoice[] =>
+  visibleIndexes.map((index) => ({
+    index,
+    tabName: queries[index]?.tabName,
+    legend: queries[index]?.config?.promql_legend || undefined,
+    ref: queries[index]?.config?.ref || undefined,
+    query: executedPanelQuery(metadataQueries, index) ?? queries[index]?.query ?? "",
+  }));
+
 export const buildPrefillFromPanel = (
   input: PanelPrefillInput,
   makeId: () => string = () => Math.random().toString(36).slice(2),
 ): AlertPrefill => {
   const warnings: AlertPrefillWarning[] = [];
-  const query = input.queries?.[0];
+  const queryIndex = input.queryIndex ?? 0;
+  const query = input.queries?.[queryIndex];
 
   if (input.panelType && UNSUPPORTED_PANEL_TYPES.includes(input.panelType)) {
     warnings.push(warn("unsupportedPanelType", "warning", { type: input.panelType }));
@@ -161,10 +255,18 @@ export const buildPrefillFromPanel = (
   }
 
   const isPromql = input.queryType === "promql";
+  const inputStreams =
+    isPromql && isFormulaQuery(query)
+      ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
+      : [];
   const sourceQuery = input.executedQuery || query?.query || "";
+  // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
+  if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {
+    warnings.push(warn("unresolvedQuery", "blocking"));
+  }
 
   const { minutes, warnings: rangeWarnings } = periodMinutesFromRange(
-    toPrefillRange(input.timeRange),
+    toPrefillRange(input.timeRange, input.now ?? Date.now()),
   );
   warnings.push(...rangeWarnings);
 
@@ -188,7 +290,8 @@ export const buildPrefillFromPanel = (
     sourceLabel: input.panelTitle || "panel",
     name: `Alert_from_${sanitizeAlertNamePart(input.panelTitle, "panel")}`,
     streamType: query?.fields?.stream_type || (isPromql ? "metrics" : "logs"),
-    streamName: query?.fields?.stream || "",
+    streamName: inputStreams[0]?.name ?? (query?.fields?.stream || ""),
+    ...(inputStreams.length > 1 ? { streamCandidates: inputStreams } : {}),
     queryType: isPromql ? "promql" : "sql",
     vrlFunction: query?.vrlFunctionQuery || null,
     aggregation,
@@ -200,6 +303,7 @@ export const buildPrefillFromPanel = (
       panelId: input.panelId,
       panelType: input.panelType,
     },
+    ...(input.queryChoices ? { queryChoices: input.queryChoices, queryIndex } : {}),
   };
 
   if (isPromql) {

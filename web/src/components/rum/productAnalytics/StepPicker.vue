@@ -31,7 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @open="load"
     @search="onSearch"
     @update:model-value="onPick"
-  />
+  >
+    <template #empty>
+      <span v-if="failed" :data-test="`${dataTest}-empty-error`">{{
+        t("rum.analytics.picker.loadFailed")
+      }}</span>
+      <span v-else>{{ t("components.select.noOptionsFound") }}</span>
+    </template>
+  </OSelect>
 </template>
 
 <script setup lang="ts">
@@ -130,6 +137,7 @@ const load = async () => {
 
 // The server is asked only when the first rows did not already hold every key.
 const onSearch = async (term: string) => {
+  failed.value = false;
   if (!term || rows.value.length < FULL_LIST) return;
   const scope = pa.scopeKey.value;
   loading.value = true;

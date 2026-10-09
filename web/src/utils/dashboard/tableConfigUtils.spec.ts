@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { RE2JS } from "re2js";
 import {
   OVERRIDE_CONFIG_TYPES,
   parseRegexPattern,
+  valueMappingPatternError,
   buildValueMappingCache,
   lookupValueMapping,
   lookupValueMappingFull,
@@ -178,6 +180,115 @@ describe("tableConfigUtils", () => {
       ]);
       expect(lookupValueMapping(5, cache)).toBe("low"); // finds the text
       expect(lookupValueMappingFull(5, cache, "color")?.color).toBe("#ff0000");
+    });
+  });
+
+  describe("value-mapping regex safety", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("matches a backtracking-prone pattern on a 1024-character value in linear time", () => {
+      const cache = buildValueMappingCache([
+        { type: "regex", pattern: "(a|aa)+$", text: "alt" },
+        { type: "regex", pattern: "(.*){12}!", text: "fixed" },
+        { type: "regex", pattern: "^(a+)+$", text: "nested" },
+      ]);
+      const start = performance.now();
+
+      expect(lookupValueMappingFull("a".repeat(1023) + "!", cache)?.text).toBe("fixed");
+      expect(lookupValueMappingFull("b".repeat(1024), cache)).toBeNull();
+      expect(performance.now() - start).toBeLessThan(500);
+    });
+
+    it("accepts and matches common email, host, version, path and pod-name patterns", () => {
+      const cases: [string, string, string][] = [
+        ["^[\\w.+-]+@([\\w-]+\\.)+[a-z]{2,}$", "ops@mail.example.com", "ops@example"],
+        ["^[a-z0-9-]+(\\.[a-z0-9-]+)*$", "api.eu-1.example.com", "api..example"],
+        ["^v?\\d+(\\.\\d+)*$", "v1.20.3", "v1.x"],
+        ["^(/[^/]+)+$", "/api/v1/logs", "/api//logs"],
+        ["^([a-z0-9]+-)+[a-z0-9]{5}$", "ingester-7f9c4-abcde", "ingester"],
+        ["^(\\d{1,3}\\.){3}\\d{1,3}$", "10.0.12.7", "10.0.12"],
+      ];
+      for (const [pattern, hit, miss] of cases) {
+        const cache = buildValueMappingCache([{ type: "regex", pattern, text: "hit" }]);
+        expect(lookupValueMapping(hit, cache)).toBe("hit");
+        expect(lookupValueMapping(miss, cache)).toBeNull();
+        expect(valueMappingPatternError(pattern)).toBeNull();
+      }
+    });
+
+    it("refuses lookaround and backreferences, which the linear-time engine cannot run", () => {
+      for (const pattern of ["^(?=.*err).*$", "(?<!x)err", "err(?!or)", "(a)\\1", "/(?=a)a/i"]) {
+        expect(valueMappingPatternError(pattern)).toBe("unsupported");
+      }
+    });
+
+    it("never matches an unsupported pattern at render and warns once per pattern", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const mappings = [{ type: "regex", pattern: "^(?=.*err).*$", text: "lookahead" }];
+
+      for (let i = 0; i < 3; i++) {
+        expect(lookupValueMapping("server error", buildValueMappingCache(mappings))).toBeNull();
+      }
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps legacy /pattern/flags mappings working", () => {
+      expect(valueMappingPatternError("/^err/i")).toBeNull();
+      const cache = buildValueMappingCache([
+        { type: "regex", pattern: "/^ERR/i", text: "error" },
+        { type: "regex", pattern: "/^warn.end$/s", text: "warn" },
+        { type: "regex", pattern: "/^line2$/m", text: "multi" },
+        { type: "regex", pattern: "/\\/api\\/(?<ver>v\\d)/", text: "api" },
+      ]);
+
+      expect(lookupValueMapping("err_500", cache)).toBe("error");
+      expect(lookupValueMapping("warn\nend", cache)).toBe("warn");
+      expect(lookupValueMapping("line1\nline2", cache)).toBe("multi");
+      expect(lookupValueMapping("GET /api/v2/x", cache)).toBe("api");
+    });
+
+    it("rejects a pattern longer than 256 characters at save and skips it at render", () => {
+      const long = `${"a".repeat(300)}|^err`;
+
+      expect(valueMappingPatternError("a".repeat(256))).toBeNull();
+      expect(valueMappingPatternError(long)).toBe("tooLong");
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      expect(
+        lookupValueMapping(
+          "err_500",
+          buildValueMappingCache([{ type: "regex", pattern: long, text: "long" }]),
+        ),
+      ).toBeNull();
+    });
+
+    it("does not run a regex against a value longer than 1024 characters", () => {
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "^a", text: "a-prefixed" }]);
+
+      expect(lookupValueMapping("a".repeat(1024), cache)).toBe("a-prefixed");
+      expect(lookupValueMapping("a".repeat(1025), cache)).toBeNull();
+    });
+
+    it("compiles each pattern when the cache is built, not per lookup", () => {
+      const compile = vi.spyOn(RE2JS, "compile");
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "^err", text: "error" }]);
+      const afterBuild = compile.mock.calls.length;
+
+      for (let i = 0; i < 50; i++) lookupValueMapping(`err_${i}`, cache);
+
+      expect(afterBuild).toBe(1);
+      expect(compile.mock.calls.length).toBe(afterBuild);
+    });
+
+    it("gives the same answer on every lookup for a pattern with the g flag", () => {
+      const cache = buildValueMappingCache([{ type: "regex", pattern: "/err/g", text: "error" }]);
+
+      expect([1, 2, 3].map(() => lookupValueMapping("err", cache))).toEqual([
+        "error",
+        "error",
+        "error",
+      ]);
     });
   });
 

@@ -117,6 +117,23 @@ describe("ThemeSwitcher", () => {
     });
   });
 
+  describe("accessible name (AC-9)", () => {
+    it("names the button with its tooltip text before any hover", async () => {
+      wrapper = mountComponent();
+      await wrapper.vm.$nextTick();
+
+      const button = wrapper.find('[data-test="navbar-theme-toggle-btn"]');
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
+      expect(button.attributes("aria-label")).toBe("Switch to Dark Mode");
+      expect(button.attributes("aria-label")).toBe(tooltip.props("content"));
+
+      wrapper.vm.toggleDarkMode();
+      await wrapper.vm.$nextTick();
+      expect(button.attributes("aria-label")).toBe("Switch to Light Mode");
+      expect(button.attributes("aria-label")).toBe(tooltip.props("content"));
+    });
+  });
+
   describe("normal operation", () => {
     it("should load saved theme from localStorage", () => {
       localStorageMock.getItem.mockReturnValue("dark");

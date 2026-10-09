@@ -93,11 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
-            <span
-              class="min-w-0 flex-1 overflow-hidden text-sm font-semibold text-ellipsis whitespace-nowrap group-hover:pe-7"
-            >
+            <OTruncatedText class="flex-1 text-sm font-semibold group-hover:pe-7">
               {{ getFieldLabel(col.field) || t("dashboard.columnFormattingPick") }}
-            </span>
+            </OTruncatedText>
             <OButton
               variant="ghost"
               size="icon-xs"
@@ -239,6 +237,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ColumnFormatControls from "./ColumnFormatControls.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   type ColumnOverrideUI,
   emptyColumnOverride,
@@ -261,6 +260,7 @@ const TableRenderer = defineAsyncComponent(
 export default defineComponent({
   name: "OverrideConfigPopup",
   components: {
+    OTruncatedText,
     OButton,
     OIcon,
     ODialog,

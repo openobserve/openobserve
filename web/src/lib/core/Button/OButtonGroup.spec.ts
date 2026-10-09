@@ -44,6 +44,18 @@ describe("OButtonGroup", () => {
     expect(wrapper.classes().join(" ")).toContain("divide-y");
   });
 
+  // --- Border collapse between bordered children ---
+
+  it("collapses the start border of every child after the first when horizontal", () => {
+    const wrapper = mount(OButtonGroup);
+    expect(wrapper.classes()).toContain("[&>*:not(:first-child)]:border-s-0");
+  });
+
+  it('collapses the top border of every child after the first when orientation="vertical"', () => {
+    const wrapper = mount(OButtonGroup, { props: { orientation: "vertical" } });
+    expect(wrapper.classes()).toContain("[&>*:not(:first-child)]:border-t-0");
+  });
+
   // --- Integration: OButton children ---
 
   it("renders OButton children inside the group", () => {

@@ -88,18 +88,15 @@ pub(super) async fn load_metrics_index_file(
         },
     };
     let limit = cache_limit();
-    let cached = {
+    let lookup = {
         let mut cache = INDEX_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         cache.trim(limit);
-        cache.get(&key)
+        cache.lookup(&key)
     };
-    let entry = if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(&labels.requested))
-        .transpose()
-        .map_err(|error| DataFusionError::External(error.into()))?
-        .is_some_and(|missing| missing.is_empty())
-    {
+    let (cached, complete) = lookup
+        .classify(&labels.requested)
+        .map_err(|error| DataFusionError::External(error.into()))?;
+    let entry = if complete {
         cached.unwrap()
     } else {
         let loaded =
@@ -536,16 +533,28 @@ mod tests {
         for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
             let (batch, file, bytes) = fixture(format).await;
             store(&file, Some(bytes)).await;
-            for (op, value, expected) in [
-                (MatchOp::Equal, "a", vec![Range { start: 0, end: 3 }]),
-                (MatchOp::Equal, "", vec![Range { start: 5, end: 6 }]),
-                (MatchOp::NotEqual, "a", vec![Range { start: 5, end: 6 }]),
-                (MatchOp::Re(".*".parse().unwrap()), ".*", vec![0..3, 5..6]),
-                (MatchOp::Equal, "unmatched", vec![]),
+            for (matcher, expected) in [
+                (
+                    Matcher::new(MatchOp::Equal, "path", "a"),
+                    vec![Range { start: 0, end: 3 }],
+                ),
+                (
+                    Matcher::new(MatchOp::Equal, "path", ""),
+                    vec![Range { start: 5, end: 6 }],
+                ),
+                (
+                    Matcher::new(MatchOp::NotEqual, "path", "a"),
+                    vec![Range { start: 5, end: 6 }],
+                ),
+                (
+                    parsed_matchers(r#"m{path=~".*"}"#).matchers.remove(0),
+                    vec![0..3, 5..6],
+                ),
+                (Matcher::new(MatchOp::Equal, "path", "unmatched"), vec![]),
             ] {
                 let mut files = vec![file.clone()];
-                let case = format!("{format:?} {op:?} {value}");
-                let matchers = Matchers::new(vec![Matcher::new(op, "path", value)]);
+                let case = format!("{format:?} {matcher:?}");
+                let matchers = Matchers::new(vec![matcher]);
                 let (_, exact) =
                     crate::search("prune", &mut files, batch.schema().as_ref(), &matchers, 1)
                         .await
@@ -653,5 +662,14 @@ mod tests {
                 assert!(files[0].selection.is_none());
             }
         }
+    }
+
+    fn parsed_matchers(query: &str) -> Matchers {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        selector.matchers
     }
 }

@@ -47,6 +47,7 @@ import { isPositionalSelector } from "@/utils/synthetics/locatorStability";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -198,9 +199,9 @@ function apply() {
           <OBadge variant="default" size="sm">
             {{ t(`synthetics.journey.locatorKind.${part.kind}`) }}
           </OBadge>
-          <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">
+          <OTruncatedText class="text-text-body flex-1 font-mono text-xs">
             {{ part.value }}
-          </span>
+          </OTruncatedText>
           <span class="text-text-muted text-2xs shrink-0">{{ matchedLabel(part) }}</span>
         </div>
       </section>

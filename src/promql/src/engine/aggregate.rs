@@ -182,6 +182,10 @@ fn fused_agg_shape(expr: &PromExpr) -> Option<FusedAggShape<'_>> {
             };
             let range_arg: &PromExpr = range_arg;
             let range_func = functions::fusable_range_func(func.name)?;
+            // the fold sees offset-shifted sample times, which only the call path moves back
+            if range_func.returns_sample_time() && functions::sample_time_offset(range_arg) != 0 {
+                return None;
+            }
             let selector = match range_arg {
                 PromExpr::MatrixSelector(MatrixSelector { vs, range }) => Some((vs, Some(*range))),
                 _ => None,
@@ -208,6 +212,9 @@ mod tests {
     use promql_parser::parser::{AggregateExpr, parse};
 
     use super::*;
+
+    const SECOND: i64 = 1_000_000;
+    const BASE: i64 = 1_640_995_200;
 
     #[tokio::test]
     async fn test_numeric_aggregation_dispatch() {
@@ -358,5 +365,139 @@ mod tests {
             Some(("last_over_time".to_string(), false, Some(None)))
         );
         assert_eq!(shape("topk(3, abs(m))"), None);
+    }
+
+    /// `n` series `{instance="<i>", job="api"|"db"}` whose values differ at every step.
+    fn requests(n: usize) -> String {
+        (0..n)
+            .map(|i| {
+                let job = if i % 2 == 0 { "api" } else { "db" };
+                format!(
+                    r#"label_replace(label_replace(vector((time() - {BASE}) * {i}), "instance", "{i}", "", ""), "job", "{job}", "", "")"#
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" or ")
+    }
+
+    async fn eval(query: &str) -> datafusion::error::Result<Value> {
+        use crate::{engine::tests::*, exec::PromqlContext};
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            EvalContext::new(
+                BASE * SECOND,
+                (BASE + 120) * SECOND,
+                60 * SECOND,
+                "test".into(),
+            ),
+        );
+        engine.exec_expr(&parse(query).unwrap()).await
+    }
+
+    /// The `instance` of every series with a sample at each step; asserts each kept its `job`.
+    async fn selected(query: &str) -> Vec<std::collections::BTreeSet<String>> {
+        let mut steps = vec![std::collections::BTreeSet::new(); 3];
+        let value = eval(query).await.unwrap();
+        let Value::Matrix(matrix) = value else {
+            assert!(matches!(value, Value::None), "{query}: {value:?}");
+            return steps;
+        };
+        for series in matrix {
+            assert!(!series.labels.get_value("job").is_empty(), "{query}");
+            for sample in series.samples {
+                let step = ((sample.timestamp / SECOND - BASE) / 60) as usize;
+                assert!(steps[step].insert(series.labels.get_value("instance")));
+            }
+        }
+        steps
+    }
+
+    #[tokio::test]
+    async fn test_limitk_picks_the_same_series_at_every_step() {
+        let input = requests(6);
+        let picked = selected(&format!("limitk(2, {input})")).await;
+        assert_eq!(picked[0].len(), 2);
+        assert!(picked.iter().all(|step| *step == picked[0]), "{picked:?}");
+        assert_eq!(selected(&format!("limitk(2, {input})")).await, picked);
+        // the series a larger k adds is the next one by hash
+        let more = selected(&format!("limitk(3, {input})")).await;
+        assert!(picked[0].is_subset(&more[0]));
+        let next = more[0].difference(&picked[0]).next().unwrap().clone();
+        let gone = picked[0].iter().next().unwrap().clone();
+        // `gone` has no sample at the first step, so `next` stands in for it there
+        let gap = format!(
+            r#"({input}) unless on (instance) label_replace(vector(time()) == {BASE}, "instance", "{gone}", "", "")"#
+        );
+        let with_gap = selected(&format!("limitk(2, {gap})")).await;
+        let mut expected_first = picked[0].clone();
+        expected_first.remove(&gone);
+        expected_first.insert(next);
+        assert_eq!(with_gap[0], expected_first);
+        assert_eq!(with_gap[1], picked[0]);
+        assert_eq!(with_gap[2], picked[0]);
+    }
+
+    #[tokio::test]
+    async fn test_limitk_by_keeps_one_series_per_group_with_its_labels() {
+        let picked = selected(&format!("limitk by (job) (1, {})", requests(6))).await;
+        for step in &picked {
+            assert_eq!(step.len(), 2, "{picked:?}");
+            let jobs: Vec<_> = step
+                .iter()
+                .map(|instance| instance.parse::<usize>().unwrap() % 2)
+                .collect();
+            assert!(jobs.contains(&0) && jobs.contains(&1), "{picked:?}");
+        }
+        assert!(picked.iter().all(|step| *step == picked[0]));
+    }
+
+    #[tokio::test]
+    async fn test_limit_ratio_selects_a_stable_subset() {
+        let input = requests(20);
+        let all = selected(&input).await;
+        for ratio in ["1", "2", "-1", "-1.5"] {
+            assert_eq!(
+                selected(&format!("limit_ratio({ratio}, {input})")).await,
+                all,
+                "{ratio}"
+            );
+        }
+        let none = selected(&format!("limit_ratio(0, {input})")).await;
+        assert!(none.iter().all(|step| step.is_empty()));
+        let low = selected(&format!("limit_ratio(0.3, {input})")).await;
+        let high = selected(&format!("limit_ratio(-0.7, {input})")).await;
+        for step in 0..3 {
+            assert!(low[step].is_disjoint(&high[step]), "{low:?} {high:?}");
+            let union: std::collections::BTreeSet<_> =
+                low[step].union(&high[step]).cloned().collect();
+            assert_eq!(union, all[step]);
+            assert_eq!(low[step], low[0]);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_limit_parameters_must_be_numbers() {
+        for (query, message) in [
+            ("limitk(NaN, vector(1))", "NaN"),
+            ("limit_ratio(NaN, vector(1))", "NaN"),
+            ("limitk(1e300, vector(1))", "overflows int64"),
+            (
+                "limitk((time() - 1640995260) * 1e300, vector(1))",
+                "underflows int64",
+            ),
+        ] {
+            let err = eval(query).await.unwrap_err().to_string();
+            assert!(err.contains(message), "{query}: {err}");
+        }
+        // a k below 1 at every step returns before the range checks, as upstream
+        assert!(matches!(
+            eval("limitk(-1e300, vector(1))").await,
+            Ok(Value::None)
+        ));
     }
 }

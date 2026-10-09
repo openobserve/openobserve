@@ -58,3 +58,35 @@ export function spanWindowUs(
   if (!Number.isFinite(startNs) || !Number.isFinite(endNs)) return null;
   return { start: Math.floor(startNs / 1000), end: Math.ceil(endNs / 1000) };
 }
+
+/** The padded server-arrival window (µs) spanned by `_rumdata` hits carrying `_first_ts`/`_last_ts`. */
+export function arrivalTraceWindowUs(
+  hits: Array<{ _first_ts?: unknown; _last_ts?: unknown }>,
+): { start: number; end: number } | null {
+  let first = Infinity;
+  let last = -Infinity;
+  for (const hit of hits) {
+    const start = toFiniteNumber(hit?._first_ts);
+    const end = toFiniteNumber(hit?._last_ts);
+    if (start !== null && start > 0 && start < first) first = start;
+    if (end !== null && end > 0 && end > last) last = end;
+  }
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return null;
+  return { start: first - TRACE_RANGE_PADDING_US, end: last + TRACE_RANGE_PADDING_US };
+}
+
+type RumSpanMarkers = { rum_event_type?: unknown; _is_collapsed_group?: unknown };
+
+/** A RUM view or collapsed group row: it frames the trace rather than taking part. */
+export function isRumContextSpan(span: RumSpanMarkers | null | undefined): boolean {
+  return span?.rum_event_type === "view" || span?._is_collapsed_group === true;
+}
+
+/** Spans the waterfall axis fits: non-context spans, or all spans if none remain. */
+export function waterfallAxisSpans<T extends RumSpanMarkers & SpanTimes>(
+  spans: ReadonlyArray<T> | null | undefined,
+): ReadonlyArray<T> {
+  if (!spans) return [];
+  const participants = spans.filter((span) => !isRumContextSpan(span));
+  return participants.length ? participants : spans;
+}

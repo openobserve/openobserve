@@ -18,7 +18,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::{NAME_LABEL, value::*};
+use config::meta::promql::{NAME_LABEL, is_stale_marker, value::*};
 use datafusion::error::{DataFusionError, Result};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -198,7 +198,10 @@ impl Engine {
                     None
                 };
 
-                if let Some(sample) = match_sample {
+                // a stale newest sample ends the series here
+                if let Some(sample) = match_sample
+                    && !is_stale_marker(sample.value)
+                {
                     selected_samples.push(Sample::new(eval_ts, output.project(sample)));
                 }
             }

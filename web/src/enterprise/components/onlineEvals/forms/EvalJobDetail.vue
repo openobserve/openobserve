@@ -383,15 +383,11 @@
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
@@ -435,15 +431,11 @@
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">

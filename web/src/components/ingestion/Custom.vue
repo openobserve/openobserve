@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="h-full overflow-hidden">
       <router-view
-        :title="tabs"
         :currOrgIdentifier="currOrgIdentifier"
         :currUserEmail="currentUserEmail"
         @copy-to-clipboard-fn="copyToClipboardFn"

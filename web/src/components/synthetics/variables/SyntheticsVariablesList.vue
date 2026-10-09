@@ -106,13 +106,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="synthetics-variable-value-empty"
           >{{ t("synthetics.variables.valueEmpty") }}</OBadge
         >
-        <span
-          v-else
-          class="truncate font-mono"
-          :title="row.value"
-          data-test="synthetics-variable-plain-value"
-          >{{ row.value }}</span
-        >
+        <span v-else class="font-mono" data-test="synthetics-variable-plain-value">{{
+          row.value
+        }}</span>
       </template>
 
       <template #cell-used_by_checks="{ row }">

@@ -351,4 +351,21 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
     expect(wrapper.vm.spanList.length).toBe(0);
     expect(analytics.track).not.toHaveBeenCalledWith("trace_details_loaded", expect.anything());
   });
+
+  // Regression: a page-long RUM view root must not set the waterfall's axis.
+  it("fits the waterfall axis to the trace, not to a long-lived RUM view", async () => {
+    const rows = makeRumRows({});
+    const view = rows.find((row) => row.type === "view")!;
+    view.date = 1_755_853_746_000 - 10 * 60_000; // opened ten minutes earlier
+    view.view_time_spent = 25 * 60 * 1e9; // and left open for 25 minutes
+    await mountBridge(rows);
+
+    await vi.waitFor(() => expect(wrapper.vm.baseTracePosition.durationUs).toBeGreaterThan(0), {
+      timeout: 5000,
+    });
+    expect(wrapper.vm.baseTracePosition.startTimeUs).toBe(TRACE_START_US);
+    expect(wrapper.vm.baseTracePosition.durationUs).toBe(TRACE_END_US - TRACE_START_US);
+    // The flame graph keeps the full extent.
+    expect(wrapper.vm.traceTree[0].lowestStartTime).toBe(TRACE_START_US - 10 * ONE_MINUTE_US);
+  });
 });

@@ -31,6 +31,11 @@ describe("OCodeBlock", () => {
     copyMock.mockResolvedValue(true);
   });
 
+  it("insets the code only when padded", () => {
+    expect(mountBlock({ code: "x" }).find("pre").classes()).not.toContain("px-3");
+    expect(mountBlock({ code: "x", padded: true }).find("pre").classes()).toContain("px-3");
+  });
+
   it("renders the code and the language label", () => {
     const wrapper = mountBlock({ code: "echo hello", lang: "bash" });
     expect(wrapper.text()).toContain("echo hello");

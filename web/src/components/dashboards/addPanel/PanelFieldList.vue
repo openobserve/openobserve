@@ -63,7 +63,6 @@
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
-            :title="currentStream ?? undefined"
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
@@ -75,9 +74,8 @@
       <template #group-header="{ row }">
         <div
           class="-ms-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
-          :title="row.groupName"
         >
-          <div class="min-w-0 flex-1">{{ row.groupName }}</div>
+          <OTruncatedText as="div" class="flex-1">{{ row.groupName }}</OTruncatedText>
         </div>
       </template>
 
@@ -419,6 +417,7 @@ import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 
 const props = defineProps<{

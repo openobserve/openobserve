@@ -290,7 +290,7 @@ pub async fn list_user_pipelines(
         .collect())
 }
 
-fn is_user_pipeline_visible(
+pub(crate) fn is_user_pipeline_visible(
     pipeline: &Pipeline,
     org_id: &str,
     permitted: Option<&Vec<String>>,

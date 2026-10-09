@@ -110,11 +110,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-compact="isMobile"
           @trigger="onRefreshTick"
         />
-        <!-- Labeled Refresh button. In Visualize it re-runs the chart's query;
-             in Explore/Workspace it refreshes the grid — so its
-             disabled/loading state follows the grid only there. -->
+        <!-- Only an explicit Run writes query history; Refresh does not. -->
+        <template v-if="mode === 'visualize'">
+          <QueryHistoryDrawer @load="onHistoryLoad" />
+          <OButton
+            variant="primary"
+            size="sm-toolbar"
+            icon-left="play-arrow"
+            data-test="metrics-explorer-run"
+            @click="onVisualizeRun"
+          >
+            <span class="max-md:hidden">{{ t("metrics.runQuery") }}</span>
+            <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+          </OButton>
+        </template>
         <OButton
-          variant="primary"
+          :variant="mode === 'visualize' ? 'outline' : 'primary'"
           size="sm-toolbar"
           icon-left="refresh"
           :disabled="isGridMode && (refreshing || grid.loading.value)"
@@ -170,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- EXPLORE + FAVOURITES — the same browse grid. Favourites is that grid
          narrowed to the metrics you ♥'d, so the body is identical bar the facet
          panel (Explore only): the right column is the search row + grid. -->
-    <div v-if="isGridMode" class="flex min-h-0 flex-1 max-md:flex-col">
+    <div v-if="isGridMode && !detailOpen" class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Facet panel — EXPLORE only. It is an editing control (filter by
            prefix/suffix/type); Workspace is a read-only lens viewer, so it shows
            just the grid (with the Views rail), no facets. -->
@@ -388,6 +399,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OToggleGroup>
 
+          <ExplorerSavedViews
+            v-model:active-view-id="activeViewId"
+            v-model:active-view-state="activeViewState"
+            :state="viewState"
+            @apply="onApplyView"
+            @clear="onClearView"
+            @saved="onViewSaved"
+          />
+
           <!-- Convert to dashboard: each favourite becomes a panel. FAVOURITES
                only, where they are what's on screen. -->
           <OButton
@@ -507,7 +527,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :preview="grid.previews.value[card.name]"
                 :queries="queriesFor(card)"
                 :index="row.index * columns + offset"
-                :is-favorite="grid.favorites.value.includes(card.name)"
                 :time-range="grid.timeRange.value"
                 :exemplars-eligible="grid.exemplarEligible(card)"
                 :exemplars-on="grid.exemplarsEnabled(card.name)"
@@ -518,9 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @visible="onCardVisible"
                 @hidden="onCardHidden"
                 @refresh="grid.refreshCard"
-                @select="onSelect"
-                @configure="onConfigure"
-                @toggle-favorite="grid.toggleFavorite($event.name)"
+                @open-detail="openDetail"
                 @zoom="onCardZoom"
               />
             </div>
@@ -545,6 +562,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- The grid stays paused while this replaces it; the page's filters apply here too. -->
+    <MetricDetailView
+      v-else-if="detailOpen"
+      :key="detailMetric ?? ''"
+      :card="detailCard"
+      :metric-name="detailMetric ?? ''"
+      :loading="detailLoading"
+      :tab="detailTab"
+      :breakdown-label="breakdownLabel"
+      :compare="compareOffset"
+      :forecast="forecastMethod"
+      :forecast-horizon="forecastHorizon"
+      :step-seconds="detailCard ? grid.detailStepFor(detailCard) : 0"
+      :overview="detailOverview"
+      :panel-queries="detailPanelQueries"
+      :chart-of="chartOf"
+      :is-favorite="!!detailMetric && grid.favorites.value.includes(detailMetric)"
+      :all-cards="grid.cards.value"
+      :labels-by-stream="grid.labelsByStream.value"
+      :ensure-schemas="grid.ensureSchemas"
+      :prefix-of="grid.prefixOf"
+      :family-of="grid.familyOf"
+      :filters="grid.labelFilters.value"
+      :inapplicable-filters="detailCard ? grid.inapplicableLabelFilters(detailCard) : []"
+      :is-label-eligible="grid.isLabelEligible"
+      :time-range="grid.timeRange.value"
+      :rate-window="detailCard ? grid.rateWindowFor(detailCard) : ''"
+      :panel-rate-window="panelRateWindowFor(detailMetric ?? '')"
+      :nan-guard="!!(detailMetric && grid.previews.value[detailMetric]?.nanGuardApplied)"
+      :color="detailColor"
+      :color-of="colorOf"
+      :run-query="runDetailPreview"
+      :exemplars-eligible="!!detailCard && grid.exemplarEligible(detailCard)"
+      :exemplars-on="!!detailMetric && grid.exemplarsEnabled(detailMetric)"
+      :exemplars-swaps-variant="!!detailCard && grid.exemplarSwapsVariant(detailCard)"
+      :exemplars="detailMetric ? grid.exemplarStateOf(detailMetric) : undefined"
+      @close="closeDetail"
+      @open-visualize="onDetailOpenVisualize"
+      @toggle-favorite="detailMetric && grid.toggleFavorite(detailMetric)"
+      @configure="detailCard && onConfigure(detailCard)"
+      @toggle-exemplars="detailCard && grid.toggleExemplars(detailCard)"
+      @retry-exemplars="detailCard && grid.retryExemplars(detailCard)"
+      @update:tab="onDetailTab"
+      @update:breakdown-label="onBreakdownLabel"
+      @update:compare="compareOffset = $event"
+      @update:forecast="onForecastMethod"
+      @update:forecast-horizon="forecastHorizon = $event"
+      @open-related="onOpenRelated"
+      @add-filter="onBreakdownAddFilter"
+    />
+
     <!-- VISUALIZE mode — the query-driven workspace. Mounts the constrained
          pageType="metrics" PanelEditor (same engine as the metrics editor route),
          where the user writes PromQL and builds a chart. Keyed on mode so it
@@ -557,6 +625,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :selected-date-time="visualizeDateTime"
       :seed="visualizeSeed"
       @seed-consumed="visualizeSeed = null"
+      @update:time-range="onVisualizeTimeRange"
+      @run="onVisualizeRun"
     />
 
     <FunctionConfigDialog
@@ -616,11 +686,16 @@ import AddToDashboard from "../AddToDashboard.vue";
 import PrefixFilterPanel from "./PrefixFilterPanel.vue";
 import LabelFilterBar from "./LabelFilterBar.vue";
 import FunctionConfigDialog from "./FunctionConfigDialog.vue";
+import MetricDetailView from "./MetricDetailView.vue";
+import ExplorerSavedViews from "./ExplorerSavedViews.vue";
+import QueryHistoryDrawer from "../QueryHistoryDrawer.vue";
 
 import useMetricsExplorerGrid, {
   PAGE_SIZE_INCREMENT,
   type LabelFilter,
+  type QueryWindow,
 } from "@/composables/metrics/useMetricsExplorerGrid";
+import { PreviewCancelledError } from "@/composables/metrics/useMetricsPreviewQueue";
 import { buildPanelDataForCard } from "@/utils/metrics/metricsHandoff";
 import {
   getMetricsConfig,
@@ -633,13 +708,19 @@ import {
   EXPLORER_FILTER_PARAM_KEYS,
   explorerFiltersToQuery,
   queryToExplorerFilters,
+  type CompareOffset,
+  type DetailTab,
 } from "@/utils/metrics/explorerUrlState";
+import type { ForecastHorizon, ForecastMethod } from "@/utils/metrics/forecast";
 import {
   queryParamsToSelectedDate,
   selectedDateToQueryParams,
   refreshLabelToInterval,
   refreshIntervalToLabel,
+  type SelectedDate,
 } from "@/utils/dashboard/urlTimeParams";
+import { pickerSavedDate } from "@/utils/metrics/queryHistory";
+import type { ExplorerViewState } from "@/utils/metrics/explorerSavedView";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import analytics from "@/services/product_analytics";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -690,6 +771,9 @@ export default defineComponent({
     PrefixFilterPanel,
     LabelFilterBar,
     FunctionConfigDialog,
+    MetricDetailView,
+    ExplorerSavedViews,
+    QueryHistoryDrawer,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -702,7 +786,7 @@ export default defineComponent({
     const dateTimePickerRef = ref<any>(null);
     const refreshInterval = ref(0);
     /** A factory, not a literal: the route watcher resets to this too. */
-    const defaultSelectedDate = () => ({
+    const defaultSelectedDate = (): SelectedDate => ({
       valueType: "relative",
       startTime: null,
       endTime: null,
@@ -807,13 +891,25 @@ export default defineComponent({
     // Explore and Workspace share the grid + facet body (Workspace adds a views
     // rail); only Visualize swaps to the query workspace.
     const isGridMode = computed(() => mode.value === "explore" || mode.value === "workspace");
+
+    // Not a mode, so the grid's mode survives and closing returns to the grid that was showing.
+    const detailMetric = ref<string | null>(null);
+    const detailTab = ref<DetailTab | null>(null);
+    const breakdownLabel = ref<string | null>(null);
+    const compareOffset = ref<CompareOffset | null>(null);
+    const forecastMethod = ref<ForecastMethod | null>(null);
+    const forecastHorizon = ref<ForecastHorizon | null>(null);
+    const detailOpen = computed(() => isGridMode.value && !!detailMetric.value);
+
     const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
       if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
       // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
       // `paused` in sync, but it runs after the DOM has begun tearing the grid
       // down — and the teardown's own "card visible" events would already have
       // fired a query each. Setting it here closes that window.
-      grid.paused.value = v === "visualize";
+      // Visualize has no detail view; one left set would reopen on the way back.
+      if (v === "visualize") closeDetail();
+      grid.paused.value = v === "visualize" || !!detailMetric.value;
       mode.value = v;
     };
 
@@ -841,12 +937,9 @@ export default defineComponent({
       { immediate: true },
     );
 
-    // Pause the grid whenever it is not on screen (Visualize). The grid sweeps
-    // its slice whenever the slice changes — and switching modes changes it (the
-    // pinned-only narrowing flips). Unpaused, that sweep re-queries every card
-    // for a grid the user just navigated away from.
+    // Paused whenever off screen: a mode switch changes the slice, and its sweep re-queries every card.
     watch(
-      isGridMode,
+      () => isGridMode.value && !detailMetric.value,
       (on) => {
         grid.paused.value = !on;
       },
@@ -1203,10 +1296,16 @@ export default defineComponent({
 
     /* ---------------------------------------------------- Select handoff */
 
-    // The panel-schema data a card hands to Visualize on "Open" — carries the
-    // metric's TYPE-BASED operation so Visualize opens on the card's own query.
+    // The panel-schema data the detail view hands to Visualize on "Open in
+    // Visualize" — carries the metric's TYPE-BASED operation so Visualize opens
+    // on the card's own query.
     // Consumed once by MetricsVisualize, then cleared.
     const visualizeSeed = ref<Record<string, any> | null>(null);
+    const seedVisualizeFromUrl = (q: Record<string, any>) => {
+      if (!q.metrics_data) return;
+      const blob = decodeMetricsConfig(q.metrics_data);
+      if (blob?.data) visualizeSeed.value = blob.data;
+    };
 
     // The mounted Visualize pane — the toolbar's refresh drives its runQuery in
     // visualize mode.
@@ -1238,6 +1337,10 @@ export default defineComponent({
       return url.href;
     });
 
+    /** The rate window a panel built from `name`'s card rates over: see `onSelect` for why widened cards keep theirs. */
+    const panelRateWindowFor = (name: string) =>
+      grid.previews.value[name]?.widenedRateWindow ?? PANEL_RATE_WINDOW;
+
     const onSelect = (card: MetricCardModel) => {
       // Resolved for a PANEL, not for the card: the rate window goes over as
       // `$__rate_interval` rather than the concrete window the card charted, so
@@ -1255,9 +1358,8 @@ export default defineComponent({
       // instead. It IS frozen to the card's range, but frozen-and-charting
       // beats adaptive-and-blank, and it keeps the drill-in contract: the
       // editor opens on what the card actually shows.
-      const widenedRateWindow = grid.previews.value[card.name]?.widenedRateWindow;
       const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
-        rateWindow: widenedRateWindow ?? PANEL_RATE_WINDOW,
+        rateWindow: panelRateWindowFor(card.name),
         percentileWindow: PANEL_PERCENTILE_WINDOW,
       });
       if (!resolved) return;
@@ -1275,6 +1377,157 @@ export default defineComponent({
       // Through setMode so the grid is paused synchronously before it unmounts —
       // otherwise its teardown fires a first-time query per card on the way out.
       setMode("visualize");
+    };
+
+    const detailCard = computed(() =>
+      detailMetric.value
+        ? (grid.cards.value.find((c) => c.name === detailMetric.value) ?? null)
+        : null,
+    );
+
+    // Stream loading omits schemas, which Breakdown and Related both need.
+    const detailSchemasPending = ref(false);
+    let detailSchemaGeneration = 0;
+    watch(
+      detailMetric,
+      async (name) => {
+        if (!name) return;
+        const generation = ++detailSchemaGeneration;
+        detailSchemasPending.value = true;
+        try {
+          await grid.ensureSchemas();
+        } finally {
+          if (generation === detailSchemaGeneration) detailSchemasPending.value = false;
+        }
+      },
+      { immediate: true },
+    );
+    // Only the first load: a manual refresh must not remount the open view behind a spinner.
+    const detailLoading = computed(
+      () => (grid.loading.value && !grid.cards.value.length) || detailSchemasPending.value,
+    );
+
+    /** A card's current query, its ⚙ override and any NaN-guard / widening included. */
+    const chartOf = (card: MetricCardModel) => {
+      const preview = grid.previews.value[card.name];
+      const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
+        applyNanGuard: preview?.nanGuardApplied,
+        rateWindow: preview?.widenedRateWindow ?? undefined,
+      });
+      const chartType = resolved?.chartType ?? card.chartType;
+      const previewable = !card.unsupported && resolved?.variant?.previewable !== false;
+      return {
+        queries: previewable ? (resolved?.queries ?? []) : [],
+        chartType,
+        unit: resolved?.unit ?? card.unit,
+        bucketUnit: chartType === "heatmap" ? (defaults?.bucketUnit ?? null) : null,
+        footerLabel: resolved?.footerLabel || card.footerLabel,
+      };
+    };
+
+    const detailOverview = computed(() =>
+      detailCard.value
+        ? chartOf(detailCard.value)
+        : { queries: [], chartType: "line", unit: "", bucketUnit: null },
+    );
+
+    /** The overview's queries at the panel's rate window: see `onSelect`. */
+    const detailPanelQueries = computed(() => {
+      const card = detailCard.value;
+      if (!card || !detailOverview.value.queries.length) return [];
+      return (
+        grid.effectiveVariant(card, undefined, {
+          rateWindow: panelRateWindowFor(card.name),
+          applyNanGuard: grid.previews.value[card.name]?.nanGuardApplied,
+        }).resolved?.queries ?? []
+      );
+    });
+
+    /** Indexed in the whole sorted list, of which the page is a prefix, so off-page metrics match too. */
+    const colorOf = (name: string) => {
+      const index = grid.sortedCards.value.findIndex((c) => c.name === name);
+      return cardColorForIndex(Math.max(0, index), isDark.value);
+    };
+
+    const detailColor = computed(() => colorOf(detailMetric.value ?? ""));
+
+    const runDetailPreview = async (
+      expr: string,
+      signal: AbortSignal,
+      card = detailCard.value,
+      opts?: { maxSeries?: number; window?: QueryWindow; instantAt?: number },
+    ) => {
+      if (!card) return null;
+      // An unpreviewed card has no widening or NaN-guard decision yet, so a sparse counter charts "No data".
+      if (!grid.previews.value[card.name]) await grid.requestPreview(card);
+      // Abandoned, or made stale by the preview (the chart reloads on its new query, aborting `signal`).
+      if (signal.aborted) throw new PreviewCancelledError(expr);
+      try {
+        return await grid.runDetailQuery(expr, card, signal, opts);
+      } finally {
+        // The card's unmount, or a refresh, cancels an exemplar fetch in flight and drops its
+        // state. Asked once the overview has settled, after that cancellation has landed.
+        // By name: a refresh rebuilds every card as a new object mid-query.
+        if (!signal.aborted && card.name === detailMetric.value) grid.ensureExemplars(card);
+      }
+    };
+
+    const showDetail = (name: string) => {
+      // Paused synchronously, before the grid unmounts — see `setMode`.
+      grid.paused.value = true;
+      detailMetric.value = name;
+      detailTab.value = null;
+      breakdownLabel.value = null;
+    };
+
+    const openDetail = (card: MetricCardModel) => {
+      showDetail(card.name);
+      track("metrics_explorer_detail_opened", { card_kind: card.cardKind });
+    };
+
+    const closeDetail = () => {
+      detailMetric.value = null;
+      detailTab.value = null;
+      breakdownLabel.value = null;
+      compareOffset.value = null;
+      forecastMethod.value = null;
+      forecastHorizon.value = null;
+    };
+
+    // A horizon left behind by a forecast turned off would linger in the URL.
+    const onForecastMethod = (method: ForecastMethod | null) => {
+      forecastMethod.value = method;
+      if (!method) forecastHorizon.value = null;
+    };
+
+    const onDetailTab = (tab: string | number) => {
+      if (tab === "breakdown" || tab === "related" || tab === "used_in") detailTab.value = tab;
+    };
+
+    const onBreakdownLabel = (label: string | null) => {
+      breakdownLabel.value = label;
+      if (label)
+        track("metrics_explorer_breakdown_label_selected", {
+          card_kind: detailCard.value?.cardKind,
+        });
+    };
+
+    const onOpenRelated = (name: string) => {
+      track("metrics_explorer_related_opened", { card_kind: detailCard.value?.cardKind });
+      showDetail(name);
+    };
+
+    const onBreakdownAddFilter = async (filter: LabelFilter) => {
+      track("metrics_explorer_breakdown_filter_added", { operator: filter.operator ?? "=" });
+      await onAddLabelFilter(filter);
+    };
+
+    /** "Open in Visualize" seeds the editor with this metric's chart. */
+    const onDetailOpenVisualize = () => {
+      const card = detailCard.value;
+      if (!card) return;
+      closeDetail();
+      onSelect(card);
     };
 
     /* --------------------------------------------------------------- URL */
@@ -1295,15 +1548,20 @@ export default defineComponent({
       if (f.sortBy) grid.sortBy.value = f.sortBy;
       if (f.viewMode) grid.viewMode.value = f.viewMode;
       if (f.mode) mode.value = f.mode;
+      if (f.metric && f.mode !== "visualize") {
+        detailMetric.value = f.metric;
+        detailTab.value = f.tab ?? null;
+        breakdownLabel.value = f.breakdownLabel ?? null;
+        compareOffset.value = f.compare ?? null;
+        forecastMethod.value = f.forecast ?? null;
+        forecastHorizon.value = f.forecastHorizon ?? null;
+      }
 
       // Rehydrate the built chart on refresh / a shared Visualize link: decode
       // the URL blob into a seed so MetricsVisualize opens on it (its own mount
       // consumes `visualizeSeed`, exactly as a card drill-in does) instead of a
       // blank canvas. Only in Visualize — the blob is meaningless to the grid.
-      if (f.mode === "visualize" && q.metrics_data) {
-        const blob = decodeMetricsConfig(q.metrics_data);
-        if (blob?.data) visualizeSeed.value = blob.data;
-      }
+      if (f.mode === "visualize") seedVisualizeFromUrl(q);
 
       if (f.labelFilters) {
         grid.labelFilters.value = f.labelFilters;
@@ -1339,6 +1597,13 @@ export default defineComponent({
         sortBy: grid.sortBy.value,
         viewMode: grid.viewMode.value,
         mode: mode.value,
+        // Visualize has no detail view; without `metric` its tab keys drop too.
+        metric: mode.value === "visualize" ? null : detailMetric.value,
+        tab: detailTab.value,
+        breakdownLabel: breakdownLabel.value,
+        compare: compareOffset.value,
+        forecast: forecastMethod.value,
+        forecastHorizon: forecastHorizon.value,
       });
       const time: any = selectedDateToQueryParams(selectedDate.value);
       // The default window is recoverable from its absence, like the filters.
@@ -1346,6 +1611,41 @@ export default defineComponent({
       if (refreshInterval.value) query.refresh = refreshIntervalToLabel(refreshInterval.value);
       return query;
     };
+
+    // The menu saves this slice, allow-listed again on its side.
+    const viewState = computed(() => managedFromState());
+    // Here, not in the menu: it unmounts under the detail view and Visualize.
+    const activeViewId = ref<string | null>(null);
+    const activeViewState = ref<ExplorerViewState | null>(null);
+
+    // Applying is a navigation: the route watcher below applies the state.
+    const onApplyView = (query: ExplorerViewState) => {
+      router
+        .push({
+          name: "metrics",
+          query: { org_identifier: store.state.selectedOrganization?.identifier, ...query },
+        })
+        .catch(() => {});
+      track("metrics_explorer_view_applied", { key_count: Object.keys(query).length });
+    };
+
+    // A bare URL is a fresh visit: the route watcher resets every absent key to its default.
+    // Auto-refresh is not part of a view, so it survives the clear.
+    const onClearView = () => {
+      const { refresh } = route.query;
+      router
+        .push({
+          name: "metrics",
+          query: {
+            org_identifier: store.state.selectedOrganization?.identifier,
+            ...(refresh ? { refresh } : {}),
+          },
+        })
+        .catch(() => {});
+    };
+
+    const onViewSaved = (action: "created" | "updated") =>
+      track("metrics_explorer_view_saved", { action });
 
     /* -------------------------------------------- convert to dashboard */
 
@@ -1367,9 +1667,8 @@ export default defineComponent({
         // Same rule as the drill-in: a card that only charted through a widened
         // window must hand the panel that concrete window, or the dashboard is
         // born with a permanently blank panel for a metric the card charts.
-        const widenedRateWindow = grid.previews.value[name]?.widenedRateWindow;
         const { defaults, resolved } = grid.effectiveVariant(card, undefined, {
-          rateWindow: widenedRateWindow ?? PANEL_RATE_WINDOW,
+          rateWindow: panelRateWindowFor(name),
           percentileWindow: PANEL_PERCENTILE_WINDOW,
         });
         if (!resolved) continue;
@@ -1405,7 +1704,9 @@ export default defineComponent({
       // `explore` serializes to an ABSENT key, so compare against "" — not
       // `undefined` vs "explore", which would read as a change on every sync.
       const modeChanged = String(query.mode ?? "") !== String(route.query.mode ?? "");
-      const navigate = modeChanged ? router.push : router.replace;
+      // Changing the detail metric gets its own Back step; its tab and breakdown label replace.
+      const metricChanged = String(query.metric ?? "") !== String(route.query.metric ?? "");
+      const navigate = modeChanged || metricChanged ? router.push : router.replace;
       navigate.call(router, { query }).catch(() => {});
     };
 
@@ -1423,6 +1724,12 @@ export default defineComponent({
         grid.sortBy.value,
         grid.viewMode.value,
         mode.value,
+        detailMetric.value,
+        detailTab.value,
+        breakdownLabel.value,
+        compareOffset.value,
+        forecastMethod.value,
+        forecastHorizon.value,
         selectedDate.value,
         refreshInterval.value,
       ],
@@ -1445,6 +1752,20 @@ export default defineComponent({
       debouncedSyncVisualizeUrl,
     );
 
+    /** Applies the detail-view keys; absence clears them, which is how Back closes it. */
+    const applyDetailKeys = (f: ReturnType<typeof queryToExplorerFilters>) => {
+      // Visualize has no detail view: its keys in a Visualize URL are ignored.
+      const detail: Partial<typeof f> = f.mode === "visualize" ? {} : f;
+      // Before the grid unmounts, for the same reason `setMode` pauses first.
+      if (detail.metric) grid.paused.value = true;
+      detailMetric.value = detail.metric ?? null;
+      detailTab.value = detail.tab ?? null;
+      breakdownLabel.value = detail.breakdownLabel ?? null;
+      compareOffset.value = detail.compare ?? null;
+      forecastMethod.value = detail.forecast ?? null;
+      forecastHorizon.value = detail.forecastHorizon ?? null;
+    };
+
     // URL -> state, for the navigations the mount-time apply cannot see:
     // clicking sidebar "Metrics" while filtered (a bare URL must CLEAR the
     // filters), and back/forward between two /metrics?… entries. Unlike the
@@ -1453,62 +1774,72 @@ export default defineComponent({
     // against what the current state serializes to: our own router.replace
     // round-trips through this watcher, and re-applying identical state would
     // fire the filter watchers (page reset, slice sweep) for nothing.
-    watch(
-      () => route.query,
-      () => {
-        // Leaving the page fires this once with the next route's query.
-        if (route.name !== "metrics") return;
+    const onRouteQueryChange = () => {
+      // Leaving the page fires this once with the next route's query.
+      if (route.name !== "metrics") return;
 
-        const incoming: Record<string, string> = {};
-        for (const key of MANAGED_PARAM_KEYS) {
-          const v = (route.query as Record<string, any>)[key];
-          if (v != null) incoming[key] = String(v);
-        }
-        const current: Record<string, string> = {};
-        for (const [key, v] of Object.entries(managedFromState())) {
-          current[key] = String(v);
-        }
-        if (isEqual(incoming, current)) return;
+      const incoming: Record<string, string> = {};
+      for (const key of MANAGED_PARAM_KEYS) {
+        const v = (route.query as Record<string, any>)[key];
+        if (v != null) incoming[key] = String(v);
+      }
+      const current: Record<string, string> = {};
+      for (const [key, v] of Object.entries(managedFromState())) {
+        current[key] = String(v);
+      }
+      if (isEqual(incoming, current)) return;
 
-        // A MODE-only change (Explore <-> Visualize <-> Workspace) is not grid
-        // state: switching tabs must not re-apply the filters. Re-assigning them
-        // hands the grid brand-new Set/array identities, and its watchers answer
-        // an identical-but-new value by re-querying EVERY card — ~40 requests just
-        // for clicking a card's Open. Sync the mode and leave the grid alone.
-        const withoutMode = (o: Record<string, string>) => {
-          const { mode: _m, ...rest } = o;
-          return rest;
-        };
-        if (isEqual(withoutMode(incoming), withoutMode(current))) {
-          mode.value = (incoming.mode as "explore" | "visualize" | "workspace") ?? "explore";
-          return;
-        }
+      // Mode/detail-only changes skip the filters: new Set/array identities re-query every card.
+      const withoutPageKeys = (o: Record<string, string>) => {
+        const {
+          mode: _m,
+          metric: _x,
+          tab: _t,
+          breakdown_label: _b,
+          compare: _c,
+          forecast: _f,
+          forecast_h: _h,
+          ...rest
+        } = o;
+        return rest;
+      };
+      const q = route.query as Record<string, any>;
+      const f = queryToExplorerFilters(q);
+      // Back/Forward into Visualize remounts it, which would open blank without the URL's chart.
+      if (f.mode === "visualize" && mode.value !== "visualize") seedVisualizeFromUrl(q);
+      if (isEqual(withoutPageKeys(incoming), withoutPageKeys(current))) {
+        mode.value = (incoming.mode as "explore" | "visualize" | "workspace") ?? "explore";
+        applyDetailKeys(f);
+        return;
+      }
 
-        const q = route.query as Record<string, any>;
-        const f = queryToExplorerFilters(q);
-        grid.searchTerm.value = f.searchTerm ?? "";
-        grid.selectedPrefixes.value = f.selectedPrefixes ?? new Set();
-        grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
-        grid.selectedTypes.value = f.selectedTypes ?? new Set();
-        grid.labelFilters.value = f.labelFilters ?? [];
-        grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
-        grid.sortBy.value = f.sortBy ?? "a-z";
-        grid.viewMode.value = f.viewMode ?? "grid";
-        // Setting mode last lets the isWorkspace watcher set showFavoritesOnly.
-        mode.value = f.mode ?? "explore";
-        if (f.labelFilters?.length) grid.ensureSchemas();
+      grid.searchTerm.value = f.searchTerm ?? "";
+      grid.selectedPrefixes.value = f.selectedPrefixes ?? new Set();
+      grid.selectedSuffixes.value = f.selectedSuffixes ?? new Set();
+      grid.selectedTypes.value = f.selectedTypes ?? new Set();
+      grid.labelFilters.value = f.labelFilters ?? [];
+      grid.hideEmptyPanels.value = f.hideEmptyPanels ?? true;
+      grid.sortBy.value = f.sortBy ?? "a-z";
+      grid.viewMode.value = f.viewMode ?? "grid";
+      // Setting mode last lets the isWorkspace watcher set showFavoritesOnly.
+      mode.value = f.mode ?? "explore";
+      applyDetailKeys(f);
+      if (f.labelFilters?.length) grid.ensureSchemas();
 
-        selectedDate.value =
-          q.period || (q.from && q.to) ? queryParamsToSelectedDate(q) : defaultSelectedDate();
-        refreshInterval.value =
-          q.refresh != null
-            ? refreshLabelToInterval(
-                q.refresh,
-                store.state?.zoConfig?.min_auto_refresh_interval || 0,
-              )
-            : 0;
-      },
-    );
+      const nextDate =
+        q.period || (q.from && q.to) ? queryParamsToSelectedDate(q) : defaultSelectedDate();
+      if (
+        !isEqual(selectedDateToQueryParams(nextDate), selectedDateToQueryParams(selectedDate.value))
+      ) {
+        setPickerDate(nextDate);
+        onDateChange();
+      }
+      refreshInterval.value =
+        q.refresh != null
+          ? refreshLabelToInterval(q.refresh, store.state?.zoConfig?.min_auto_refresh_interval || 0)
+          : 0;
+    };
+    watch(() => route.query, onRouteQueryChange);
 
     /* ------------------------------------------------------------- time */
 
@@ -1527,7 +1858,7 @@ export default defineComponent({
       // Not while the grid is off screen. Leaving Explore unmounts the grid, and
       // the virtualizer's teardown briefly reports rows as "visible" on the way
       // out — each one would fire a FIRST-time query for a card the user will
-      // never see (~40 requests just for clicking a card's Open).
+      // never see (~40 requests just for clicking a card's Drill down).
       if (grid.paused.value) return;
       grid.requestPreview(card);
     };
@@ -1550,6 +1881,12 @@ export default defineComponent({
       // The rendered objects, not the ones `onScreen` captured: a refresh's stream reload rebuilds every card.
       const live = visibleCards.value.filter((c) => onScreen.has(c.name));
       return Promise.all(live.map((card) => grid.requestPreview(card, opts)));
+    };
+
+    // The picker reads its v-model only on mount, so an outside range change must move it too.
+    const setPickerDate = (date: SelectedDate) => {
+      selectedDate.value = date;
+      dateTimePickerRef.value?.setSavedDate?.(pickerSavedDate(date));
     };
 
     const syncTimeRange = (opts?: { keepPreviews?: boolean }) => {
@@ -1577,7 +1914,8 @@ export default defineComponent({
       // whole slice where it stands.
       await Promise.all([
         requestOnScreen({ skipCache: true }),
-        grid.sweepSlice({ skipCache: true }),
+        // Not while the detail view covers the grid: it is paused.
+        detailOpen.value ? undefined : grid.sweepSlice({ skipCache: true }),
       ]);
     };
 
@@ -1671,7 +2009,7 @@ export default defineComponent({
           // An auto-refresh tick sweeps too, but without `skipCache` — it picks
           // up cards the user has not reached yet and leaves the known-empty ones
           // alone, so a tick cannot reshuffle the grid under the cursor.
-          grid.sweepSlice({ skipCache: manual }),
+          detailOpen.value ? undefined : grid.sweepSlice({ skipCache: manual }),
         ]);
       } finally {
         refreshing.value = false;
@@ -1680,6 +2018,20 @@ export default defineComponent({
 
     /** The auto-refresh timer. Keeps the no-data set; see onRefresh. */
     const onRefreshTick = () => onRefresh({ manual: false });
+
+    /** An explicit Run in Visualize — the only Visualize run that writes history. */
+    const onVisualizeRun = () => visualizeRef.value?.onUserRun?.(selectedDate.value);
+
+    const onHistoryLoad = (entry: { metricsData: string; timeRange: SelectedDate }) => {
+      visualizeRef.value?.applyPanelData?.(entry.metricsData, entry.timeRange);
+      track("metrics_explorer_history_loaded");
+    };
+
+    // The grid is paused under Visualize, so it re-queries the new window only once back on screen.
+    const onVisualizeTimeRange = (date: SelectedDate) => {
+      setPickerDate(date);
+      syncTimeRange();
+    };
 
     watch(refreshInterval, (value) => grid.setRefreshInterval(value));
 
@@ -1776,10 +2128,10 @@ export default defineComponent({
     // scope come from the "metrics" group in shortcutRegistry.ts.
     useShortcuts([
       {
-        // ⌘/Ctrl+Enter — run the query. In Visualize this re-runs the chart;
-        // in Explore/Workspace it refreshes the grid (there is no single query).
+        // ⌘/Ctrl+Enter: an explicit Run in Visualize; elsewhere a grid refresh (there is no single query).
         id: "metricsRunQuery",
-        handler: () => onRefresh({ manual: true }),
+        handler: () =>
+          mode.value === "visualize" ? onVisualizeRun() : onRefresh({ manual: true }),
       },
       {
         id: "metricsRefresh",
@@ -1887,9 +2239,34 @@ export default defineComponent({
       onApplyOverride,
       onRestoreOverride,
       openConvertToDashboard,
+      panelRateWindowFor,
       convertPanels,
       convertDialogOpen,
       onSelect,
+      detailMetric,
+      detailTab,
+      breakdownLabel,
+      compareOffset,
+      forecastMethod,
+      forecastHorizon,
+      onForecastMethod,
+      detailOpen,
+      detailCard,
+      detailLoading,
+      detailOverview,
+      detailPanelQueries,
+      chartOf,
+      colorOf,
+      detailColor,
+      runDetailPreview,
+      openDetail,
+      closeDetail,
+      onDetailTab,
+      onBreakdownLabel,
+      onOpenRelated,
+      onBreakdownAddFilter,
+      onDetailOpenVisualize,
+      onRouteQueryChange,
       visualizeSeed,
       visualizeRef,
       visualizeDateTime,
@@ -1901,6 +2278,15 @@ export default defineComponent({
       onCardZoom,
       onRefresh,
       refreshing,
+      viewState,
+      activeViewId,
+      activeViewState,
+      onApplyView,
+      onClearView,
+      onViewSaved,
+      onVisualizeRun,
+      onHistoryLoad,
+      onVisualizeTimeRange,
     };
   },
 });

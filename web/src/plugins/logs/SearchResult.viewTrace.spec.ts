@@ -80,7 +80,6 @@ const mountSearchResult = async () => {
         CellActions: true,
         O2AIContextAddBtn: true,
         PatternDetailsDialog: true,
-        TracesAnalysisDashboard: true,
         ODrawer: true,
         OContextMenu: oContextMenuStub,
         OTable: oTableStub,

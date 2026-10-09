@@ -67,8 +67,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
+              @apply-saved-view="onApplySavedView"
               @service-graph-refresh="serviceGraphRef?.refresh()"
               @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
+              @drill-down="searchResultRef?.openComparison()"
             />
           </div>
         </template>
@@ -103,8 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="activeTab === 'search'"
               id="tracesThirdLevel"
-              class="traces-search-result-container relative-position h-full"
+              class="traces-search-result-container relative-position relative h-full"
             >
+              <!-- Drill down teleports into this; it covers the results so their scroll and brush state survive. -->
+              <div id="traces-drill-down-page" class="absolute inset-0 z-20 hidden has-[>*]:flex" />
               <!-- Note: Splitter max-height to be dynamically calculated with JS -->
               <OSplitter
                 v-model="searchObj.config.splitterModel"
@@ -153,74 +157,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="text-sm">{{ t("traces.fetchingTraces") }}</span>
                     </div>
                     <div
-                      v-else-if="
-                        searchObj.data.errorMsg !== '' &&
-                        parseInt(searchObj.data.errorCode) !== 0 &&
-                        searchObj.loading == false
-                      "
+                      v-else-if="searchObj.data.errorMsg !== '' && !searchObj.loading"
+                      data-test="traces-search-error-message"
                       class="bg-card-glass-bg h-full"
                     >
-                      <div class="pt-8 text-center">
-                        <!-- Actual error case -->
-                        <div data-test="traces-search-error-message" class="pt-4 text-xl">
-                          {{ t("traces.errorRetrievingTraces") }}
-                          <OButton
-                            v-if="searchObj.data.errorDetail || searchObj?.data?.errorMsg"
-                            @click="toggleErrorDetails"
-                            variant="outline"
-                            size="sm-action"
-                            data-test="traces-search-error-details-btn"
-                            >{{ t("search.histogramErrorBtnLabel") }}</OButton
-                          >
-                        </div>
-                        <!-- Collapsible error detail — shown below results when toggled -->
-                        <div class="text-center">
-                          <div class="my-none px-8! text-base!">
-                            <span v-if="disableMoreErrorDetails">
-                              <SanitizedHtmlRenderer
-                                data-test="traces-search-detail-error-message"
-                                :htmlContent="searchObj?.data?.errorMsg"
-                                class="pt-4"
-                              />
-                              <div
-                                v-if="searchObj?.data?.errorDetail"
-                                class="error-display__message text-text-secondary! pt-4!"
-                              >
-                                {{ searchObj.data.errorDetail }}
-                              </div>
-                            </span>
-                          </div>
-                        </div>
-                        <!-- FTS not configured -->
-                        <div
-                          data-test="traces-search-error-20003"
-                          v-if="parseInt(searchObj.data.errorCode) == 20003"
-                        >
-                          <OButton
-                            variant="primary"
-                            size="sm-action"
-                            :to="'/streams?dialog=' + searchObj.data.stream.selectedStream.label"
-                            as="RouterLink"
-                            >{{ t("traces.index.clickHere") }}</OButton
-                          >
-                          {{ t("traces.configureFullTextSearch") }}
-                        </div>
-                        <span class="text-sm">{{ searchObj.data.additionalErrorMsg }}</span>
-                      </div>
-                    </div>
-                    <div
-                      v-else-if="
-                        searchObj.data.errorMsg !== '' &&
-                        parseInt(searchObj.data.errorCode) == 0 &&
-                        !searchObj.loading
-                      "
-                      data-test="traces-search-error-text"
-                      class="bg-card-glass-bg h-full py-10 text-center text-xl"
-                    >
-                      <SanitizedHtmlRenderer
-                        data-test="traces-search-detail-error-message"
-                        :htmlContent="searchObj?.data?.errorMsg"
-                        class="pt-4"
+                      <QueryErrorState
+                        :error-code="tracesErrorCode"
+                        :error-msg="searchObj.data.errorMsg"
+                        :error-detail="searchObj.data.errorDetail"
+                        :ai-enabled="isAiEnabled"
+                        :resource-name="searchObj.data.stream.selectedStream.value"
+                        size="hero"
+                        @ask-ai="onAskAiTracing"
+                        @configure-resource="onConfigureTracesStream"
                       />
                     </div>
                     <div v-else-if="!isStreamSelected" class="max-lg:h-full">
@@ -256,7 +205,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @update:scroll="getMoreData"
                         @update:sort="runQueryOnSort"
                         @shareLink="(range: any) => copyTracesUrl(t, range)"
-                        @metrics:filters-updated="onMetricsFiltersUpdated"
+                        @metrics:editor-filter-set="onMetricsEditorFilterSet"
+                        @metrics:editor-filter-run="onMetricsEditorFilterRun"
                         @run-query="searchData"
                         @remove-filter="onRemoveTracesFilter"
                         @jump-to-stream-data="onJumpToTracesStreamData"
@@ -363,14 +313,15 @@ import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { isRangeSelectionCurrent } from "@/plugins/traces/metrics/latencyHeatmap";
 import { isLLMTrace } from "@/utils/llmUtils";
-import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
@@ -380,12 +331,20 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
+interface TracesSavedView {
+  version?: number;
+  stream: { label: string; value: string };
+  editorValue: string;
+  datetime: { type: string; relativeTimePeriod: string; startTime: number; endTime: number };
+  searchMode: "spans" | "traces";
+  sortBy: string;
+  sortOrder: string;
+  selectedFields?: string[];
+}
+
 const SearchBar = defineAsyncComponent(() => import("./SearchBar.vue"));
 const IndexList = defineAsyncComponent(() => import("./IndexList.vue"));
 const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
-const SanitizedHtmlRenderer = defineAsyncComponent(
-  () => import("@/components/SanitizedHtmlRenderer.vue"),
-);
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
 
@@ -429,8 +388,7 @@ const correlationFilters = useCorrelationFilters({
 });
 correlationFilters.watchQuery();
 
-let refreshIntervalID = 0;
-const searchResultRef = ref(null);
+const searchResultRef = ref<any>(null);
 const searchBarRef = ref(null);
 const serviceGraphRef = ref<any>(null);
 const servicesCatalogRef = ref<any>(null);
@@ -473,10 +431,6 @@ watch(
   { immediate: true },
 );
 const { showErrorNotification } = useNotifications();
-const disableMoreErrorDetails = ref(false);
-const toggleErrorDetails = () => {
-  disableMoreErrorDetails.value = !disableMoreErrorDetails.value;
-};
 const indexListRef = ref(null);
 const { getStreams, getStream } = useStreams(t);
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
@@ -501,6 +455,8 @@ let currentSearchTraceId: string | null = null;
 let currentCountTraceId: string | null = null;
 // The processed WHERE clause from the last buildSearch() call — used for the count query
 let builtWhereClause = "";
+// Paging must keep page 1's filter, so later editor edits never mix into it.
+let submittedFilter = "";
 // A page's stream can open with an empty batch, so only an actual write may end the replace phase.
 const tracesRequestState: Record<string, { hasWritten: boolean }> = {};
 
@@ -639,17 +595,39 @@ const getDefaultRequest = () => {
   };
 };
 
-function buildSearch() {
+function resolveSearchWindow(reuseLastWindow: boolean) {
+  const lastQuery = searchObj.data.queryPayload?.query;
+  const datetime = searchObj.data.datetime;
+  // An unsearched box or brush moves the picker with the editor, so a sort takes that window, never the old one.
+  const pickerMoved =
+    datetime.startTime !== lastQuery?.start_time || datetime.endTime !== lastQuery?.end_time;
+  if (reuseLastWindow && !pickerMoved && lastQuery?.start_time && lastQuery?.end_time) {
+    return { startTime: lastQuery.start_time, endTime: lastQuery.end_time };
+  }
+  if (datetime.type !== "relative") return cloneDeep(datetime);
+
+  const timestamps: any = getConsumableRelativeTime(datetime.relativeTimePeriod);
+  // The charts and side panels read datetime start/end, so they must match the window this request uses.
+  if (
+    timestamps?.startTime &&
+    timestamps?.endTime &&
+    timestamps.startTime != "Invalid Date" &&
+    timestamps.endTime != "Invalid Date"
+  ) {
+    datetime.startTime = timestamps.startTime;
+    datetime.endTime = timestamps.endTime;
+  }
+  return timestamps;
+}
+
+function buildSearch(reuseLastWindow = false) {
   try {
     let query = searchObj.data.editorValue.trim();
     var req = getDefaultRequest();
     req.query.from = searchObj.data.resultGrid.currentPage * searchObj.meta.resultGrid.rowsPerPage;
     req.query.size = parseInt(searchObj.meta.resultGrid.rowsPerPage, 10);
 
-    let timestamps: any =
-      searchObj.data.datetime.type === "relative"
-        ? getConsumableRelativeTime(searchObj.data.datetime.relativeTimePeriod)
-        : cloneDeep(searchObj.data.datetime);
+    const timestamps: any = resolveSearchWindow(reuseLastWindow);
 
     req.query.start_time = timestamps.startTime;
     req.query.end_time = timestamps.endTime;
@@ -797,6 +775,36 @@ const updateFieldValues = (data) => {
   });
 };
 
+// The whole editor value is the where clause; a "|" split is quote-unaware and would cut match_all('a | b').
+function buildEditorFilter() {
+  const streamName = searchObj.data.stream.selectedStream.value;
+  let filter = searchObj.data.editorValue.trim();
+  const filterParseResult = parseDurationWhereClause(filter, tracesParser.value, streamName);
+  if (typeof filterParseResult === "string") {
+    filter = filterParseResult;
+  }
+  return parseSpanKindWhereClause(filter, tracesParser.value, streamName);
+}
+
+// Every new search and sort (stream, mode, editor) rebuilds its filter in getQueryData, so the selection is checked there.
+const dropStaleSelection = () => {
+  const filters = searchObj.meta.metricsRangeFilters;
+  let dropped = false;
+  for (const [id, entry] of filters) {
+    const current = isRangeSelectionCurrent(entry, {
+      startTime: searchObj.data.datetime.startTime,
+      endTime: searchObj.data.datetime.endTime,
+      stream: searchObj.data.stream.selectedStream.value,
+      searchMode: searchObj.meta.searchMode,
+      editorText: searchObj.data.editorValue,
+    });
+    if (current) continue;
+    filters.delete(id);
+    dropped = true;
+  }
+  if (dropped) searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
+};
+
 async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
@@ -820,7 +828,7 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     let queryReq;
 
     if (!isPagination) {
-      queryReq = buildSearch();
+      queryReq = buildSearch(isSort);
       searchObj.data.queryPayload = queryReq;
       // Reset hits for a fresh search
       searchObj.data.queryResults = {
@@ -845,28 +853,12 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
-    // Filters are already in editorValue (set by metrics dashboard brush selections).
-    // Mirror buildSearch: the whole editor value is the where clause. Never split on
-    // "|" — the split is quote-unaware and would truncate a term such as
-    // match_all('text | error') before it reaches parseDurationWhereClause.
-    let filter = searchObj.data.editorValue.trim();
-    const filterParseResult = parseDurationWhereClause(
-      filter,
-      tracesParser.value,
-      searchObj.data.stream.selectedStream.value,
-    );
-    if (typeof filterParseResult === "string") {
-      filter = filterParseResult;
+    // A search or sort reads the editor and the resolved window; a page fetch keeps page 1's, so its selection still holds.
+    if (!isPagination) {
+      submittedFilter = buildEditorFilter();
+      dropStaleSelection();
     }
-
-    // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
-    filter = parseSpanKindWhereClause(
-      filter,
-      tracesParser.value,
-      searchObj.data.stream.selectedStream.value,
-    );
-
-    const combinedFilter = filter;
+    const combinedFilter = submittedFilter;
 
     if (!isPagination && !isSort) searchResultRef?.value?.getDashboardData();
 
@@ -1359,7 +1351,6 @@ onBeforeMount(async () => {
 
 onDeactivated(() => {
   cleanupContextProvider();
-  clearInterval(refreshIntervalID);
 });
 
 onUnmounted(() => {
@@ -1484,25 +1475,18 @@ const setHistogramDate = async (date: any) => {
   searchBarRef.value.dateTimeRef.setCustomDate("absolute", date);
 };
 
-// Handler for metrics dashboard brush selection filters
-// Simply replace the query editor content with metrics filters
-// User can manually add their own filters before clicking "Run Query"
-const onMetricsFiltersUpdated = (filters: string[]) => {
-  const allFilters = [...filters];
-  // Add error filter only if span_status='ERROR' is currently active and not already present
-  if (showErrorOnly.value && !allFilters.includes("span_status = 'ERROR'")) {
-    allFilters.push("span_status = 'ERROR'");
-  }
-  // Apply each filter term independently so replace-or-append works per field.
-  // applyFilters owns the single trigger: it emits `searchdata` (one search) only
-  // in live mode. The brush also sets a time range programmatically, which the
-  // DateTime picker stamps userChangedValue=false, so it never adds a competing
-  // search — this filter apply is the sole trigger.
-  if (searchBarRef.value?.applyFilters) {
-    searchBarRef.value.applyFilters(allFilters);
-  } else {
-    console.warn("SearchBar not ready for filter application");
-  }
+// A selection replaces the whole editor text; the programmatic date change never searches, so this is the one search.
+const onMetricsEditorFilterSet = (text: string) => {
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) searchData();
+};
+
+// A comparison filter is an explicit apply from a page the search closes, so it searches in manual mode too.
+const onMetricsEditorFilterRun = (text: string) => {
+  searchObj.data.editorValue = text;
+  searchBarRef.value?.setEditorValue?.(text);
+  searchData();
 };
 
 // Handler for Error Only toggle — only adds/removes span_status condition,
@@ -1561,9 +1545,8 @@ watch(
 // Handler for Reset Filters button
 // Clears all filters including brush selections
 const onFiltersReset = () => {
-  // Brush selections already cleared in SearchBar.vue
-  // metricsRangeFilters.clear() was called
-  // No additional action needed here
+  // SearchBar already cleared the map; a later baseline-only Drill down must use the current range.
+  searchResultRef.value?.metricsDashboardRef?.clearOriginalTimeRange();
 };
 
 const isStreamSelected = computed(() => {
@@ -1625,6 +1608,12 @@ const onPickTracesStream = (streamName: string) => {
 const isAiEnabled = computed(
   () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
 );
+
+// HTTP statuses (< 10000) carry no app meaning, so they fall back to the generic state that offers Ask AI.
+const tracesErrorCode = computed(() => {
+  const code = Number(searchObj.data.errorCode) || 0;
+  return code < 10000 ? 0 : code;
+});
 
 // Authoritative doc time range for the selected stream, captured from
 // getStream(force) in extractFields. Drives the empty-state "jump to latest
@@ -1709,6 +1698,11 @@ const onAskAiTracing = () => {
     ),
     false,
   );
+};
+
+const onConfigureTracesStream = () => {
+  const stream = searchObj.data.stream.selectedStream?.value;
+  if (stream) router.push(`/streams?dialog=${stream}`);
 };
 
 // "Ask AI" from the no-streams empty state: open the AI chat asking how to
@@ -1863,10 +1857,6 @@ const searchData = () => {
 
   if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
 
-  // Clear brush selections when running query
-  // The filters are now part of the query, so brush selections should be cleared
-  searchObj.meta.metricsRangeFilters.clear();
-
   runQueryFn();
 
   analytics.track("Button Click", {
@@ -1883,21 +1873,87 @@ const searchData = () => {
 };
 
 const getMoreData = () => {
-  if (searchObj.meta.refreshInterval == 0) {
-    getQueryData(true);
+  getQueryData(true);
 
-    analytics.track("Button Click", {
-      button: "Get More Data",
-      user_org: store.state.selectedOrganization.identifier,
-      user_id: store.state.userInfo.email,
-      stream_name: searchObj.data.stream.selectedStream.value,
-      page: "Search Logs",
-    });
-  }
+  analytics.track("Button Click", {
+    button: "Get More Data",
+    user_org: store.state.selectedOrganization.identifier,
+    user_id: store.state.userInfo.email,
+    stream_name: searchObj.data.stream.selectedStream.value,
+    page: "Search Logs",
+  });
 };
 
 const onChangeStream = async () => {
   await extractFields();
+  runQueryFn();
+};
+
+const syncSavedViewDateTime = async (datetime: TracesSavedView["datetime"]) => {
+  const picker = searchBarRef.value?.dateTimeRef;
+  if (!picker) return;
+  // The picker's date watcher emits after its programmatic marker resets, so the flag mutes it instead.
+  store.dispatch("setSavedViewFlag", true);
+  try {
+    if (datetime.type === "relative") picker.setRelativeTime(datetime.relativeTimePeriod);
+    else picker.setAbsoluteTime(datetime.startTime, datetime.endTime);
+    picker.setDateType(datetime.type);
+    await nextTick();
+  } finally {
+    store.dispatch("setSavedViewFlag", false);
+  }
+};
+
+let savedViewApplySeq = 0;
+const onApplySavedView = async (view: TracesSavedView) => {
+  const seq = ++savedViewApplySeq;
+  if (view.version !== undefined && view.version !== 1) {
+    toast({ variant: "error", message: t("search.errorWhileApplyingSavedView") });
+    return;
+  }
+  const streamName = view.stream?.value;
+  const streamChanged = streamName !== searchObj.data.stream.selectedStream.value;
+  if (
+    streamChanged &&
+    !searchObj.data.stream.streamLists.some((s: any) => s.value === streamName)
+  ) {
+    toast({
+      variant: "warning",
+      message: t("traces.savedViewStreamMissing", { stream: streamName }),
+    });
+    return;
+  }
+  if (streamChanged) {
+    searchObj.data.stream.selectedStream = { label: streamName, value: streamName };
+    // Not onChangeStream: it runs a search of its own before the view is restored.
+    await extractFields();
+    if (seq !== savedViewApplySeq) return;
+  }
+
+  searchObj.meta.searchMode = view.searchMode;
+  searchObj.data.datetime = { ...searchObj.data.datetime, ...view.datetime };
+  await syncSavedViewDateTime(view.datetime);
+  if (seq !== savedViewApplySeq) return;
+  searchObj.data.editorValue = view.editorValue;
+  searchBarRef.value?.setEditorValue?.(view.editorValue);
+  searchObj.meta.resultGrid.sortBy = view.sortBy;
+  searchObj.meta.resultGrid.sortOrder = view.sortOrder;
+
+  // A zero-hit search never rebuilds the columns, so the view's columns are applied here.
+  searchObj.data.stream.selectedFields = [...(view.selectedFields ?? [])];
+  rebuildColumns();
+  updatedLocalLogFilterField(view.searchMode);
+
+  // getUrlQueryParams copies trace_id/span_id from the route, which would reopen a trace.
+  const query = { ...router.currentRoute.value.query, tab: view.searchMode };
+  delete query.trace_id;
+  delete query.span_id;
+  await router.replace({ query });
+  if (seq !== savedViewApplySeq) return;
+
+  if (view.editorValue && searchObj.data.stream.selectedStreamFields.length) {
+    restoreFilters(view.editorValue);
+  }
   runQueryFn();
 };
 

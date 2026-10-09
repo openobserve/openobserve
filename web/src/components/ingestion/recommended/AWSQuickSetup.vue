@@ -286,10 +286,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ param.key }}
                   </div>
                   <div class="flex flex-1 items-center gap-1 overflow-hidden">
-                    <span
-                      class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                    <OTruncatedText
+                      :tooltip="param.key === 'OpenObserveAccessKey' ? false : undefined"
+                      class="flex-1"
                       :class="paramValTextClass"
-                      >{{ param.value }}</span
+                      >{{ param.value }}</OTruncatedText
                     >
                     <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
                       <OIcon name="content-copy" size="sm" />
@@ -333,6 +334,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import analytics from "@/services/product_analytics";
@@ -351,6 +353,7 @@ export default defineComponent({
     OButton,
     OSelect,
     OTooltip,
+    OTruncatedText,
     OCheckbox,
     OIcon,
     OTag,

@@ -237,6 +237,9 @@ import {
   shouldPaywallRoute,
   isEmptyDataExempt,
 } from "../utils/zincutils";
+import { isPaywalledDestination } from "@/utils/auth";
+import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
+import { runBeforeAppReloadHooks } from "@/utils/beforeAppReload";
 
 import {
   ref,
@@ -379,7 +382,8 @@ export default defineComponent({
         },
       });
     },
-    changeLanguage(item: { code: string; label: string }) {
+    async changeLanguage(item: { code: string; label: string }) {
+      await runBeforeAppReloadHooks();
       setLanguage(item.code);
       window.location.reload();
     },
@@ -389,6 +393,8 @@ export default defineComponent({
     const { isDark } = useTheme();
     const router: any = useRouter();
     const { t } = useI18nTyped();
+    // Once, here: the mixin calls inject() and onMounted(), which outside setup() warn and do nothing.
+    const layoutMixin = mainLayoutMixin.setup();
     const miniMode = ref(false);
     const { isMobile, lgUp } = useBreakpoint();
     // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
@@ -752,7 +758,7 @@ export default defineComponent({
         getConfig();
       } else {
         if (config.isCloud == "false") {
-          linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+          linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
           filterMenus();
         }
         menuReady.value = true;
@@ -885,7 +891,7 @@ export default defineComponent({
 
       linksList.value.splice(insertAt, 0, {
         title: t("menu.profiles"),
-        icon: "account-tree",
+        icon: "memory",
         link: "/profiles",
         name: "profiles",
       });
@@ -922,7 +928,7 @@ export default defineComponent({
 
     // additional links based on environment and conditions
     if (config.isCloud == "true") {
-      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+      linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
       filterMenus();
     } else {
       const streamsIndex = linksList.value.findIndex((l) => l.name === "streams");
@@ -938,8 +944,8 @@ export default defineComponent({
     //orgIdentifier query param exists then clear the localstorage and store.
     if (store.state.selectedOrganization != null) {
       if (
-        mainLayoutMixin.setup().customOrganization != undefined &&
-        mainLayoutMixin.setup().customOrganization != store.state.selectedOrganization?.identifier
+        layoutMixin.customOrganization != undefined &&
+        layoutMixin.customOrganization != store.state.selectedOrganization?.identifier
       ) {
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
@@ -1202,6 +1208,7 @@ export default defineComponent({
         claim_parser_function: "",
         org_storage_enabled: false,
         domain_org_mappings: [],
+        red_insights_enabled: true,
       };
 
       try {
@@ -1246,6 +1253,8 @@ export default defineComponent({
           org_storage_enabled:
             orgSettings?.data?.data?.org_storage_enabled ?? defaultSettings.org_storage_enabled,
           domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
+          red_insights_enabled:
+            orgSettings?.data?.data?.red_insights_enabled ?? defaultSettings.red_insights_enabled,
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
@@ -1258,6 +1267,13 @@ export default defineComponent({
             router.currentRoute.value.name,
           )
         ) {
+          // Name the page only when its own guard would block it; Home has none, so it gets the generic copy.
+          const current = router.currentRoute.value;
+          notifyTrialBlocked(
+            isPaywalledDestination(orgSettings?.data?.data?.free_trial_expiry, current)
+              ? current
+              : {},
+          );
           router.push({
             name: "plans",
             query: {
@@ -1314,7 +1330,7 @@ export default defineComponent({
         .then(async (data: any) => {
           const res = { data };
           if (config.isCloud == "false") {
-            linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
+            linksList.value = layoutMixin.leftNavigationLinks(linksList, t);
           }
 
           store.dispatch("setConfig", res.data);
@@ -1363,7 +1379,7 @@ export default defineComponent({
     };
 
     if (config.isCloud == "true") {
-      mainLayoutMixin.setup().getDefaultOrganization(store);
+      layoutMixin.getDefaultOrganization(store);
     }
 
     const setRumUser = () => {
@@ -1528,6 +1544,7 @@ export default defineComponent({
       isDark,
       t,
       raw,
+      layoutMixin,
       router,
       store,
       config,
@@ -1596,7 +1613,7 @@ export default defineComponent({
   },
   watch: {
     forceFetchOrganization() {
-      mainLayoutMixin.setup().getDefaultOrganization(this.store);
+      this.layoutMixin.getDefaultOrganization(this.store);
     },
     changeOrganization: {
       handler() {

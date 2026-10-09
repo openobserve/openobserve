@@ -427,6 +427,25 @@ describe("useEnterpriseRoutes.ts", () => {
     });
   });
 
+  // My on-call and Policies are URL-only, so their routes must keep resolving.
+  describe("on-call URL-only routes (AC-15)", () => {
+    beforeEach(async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "false";
+      config.default.isEnterprise = "true";
+    });
+
+    it.each([
+      ["oncall/me", "onCallMine"],
+      ["oncall/policies", "onCallPolicies"],
+    ])("keeps %s resolvable by URL as %s", (path, name) => {
+      const routes = useEnterpriseRoutes();
+      const route = routes.find((r: any) => r.path === path);
+      expect(route?.name).toBe(name);
+      expect(typeof route?.component).not.toBe("undefined");
+    });
+  });
+
   describe("Both Cloud and Enterprise Configuration", () => {
     beforeEach(async () => {
       const config = await import("@/aws-exports");

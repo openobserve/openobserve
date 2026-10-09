@@ -15,7 +15,7 @@
 
 use std::time::Duration;
 
-use config::{meta::promql::value::Sample, utils::sort::sort_float};
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
 
@@ -27,7 +27,13 @@ impl RangeFunc for MinOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        samples.iter().map(|s| s.value).min_by(sort_float)
+        samples.iter().map(|s| s.value).reduce(|min, value| {
+            if value < min || min.is_nan() {
+                value
+            } else {
+                min
+            }
+        })
     }
 }
 
@@ -100,5 +106,18 @@ mod tests {
             }
             _ => panic!("Expected Matrix result"),
         }
+    }
+
+    #[test]
+    fn test_min_over_time_ignores_nan_unless_all_nan() {
+        let func = MinOverTimeFunc;
+        let samples = [
+            Sample::new(1, 5.0),
+            Sample::new(2, f64::NAN),
+            Sample::new(3, 3.0),
+        ];
+        assert_eq!(func.exec(&samples, 3, &Duration::ZERO), Some(3.0));
+        let samples = [Sample::new(1, f64::NAN), Sample::new(2, f64::NAN)];
+        assert!(func.exec(&samples, 2, &Duration::ZERO).unwrap().is_nan());
     }
 }

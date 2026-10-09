@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="session-detail-user-id"
         >
           <OIcon name="person" size="xs" class="text-text-secondary flex-shrink-0" />
-          <span class="max-w-64 truncate text-sm">{{ detail.userId }}</span>
+          <OTruncatedText class="max-w-64 text-sm">{{ detail.userId }}</OTruncatedText>
         </span>
       </template>
 
@@ -228,11 +228,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                room to render crisply and anchors each metric without crowding
                the label/value text. -->
                 <div class="flex items-center justify-between gap-2">
-                  <div
-                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+                  <OTruncatedText
+                    as="div"
+                    class="text-2xs text-text-secondary leading-normal font-semibold"
                   >
                     {{ card.label }}
-                  </div>
+                  </OTruncatedText>
                   <span
                     class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
                   >
@@ -460,17 +461,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ originalTurnIndex(trace.traceId) + 1 }}
                         </span>
                         <div class="flex min-w-0 flex-col gap-[0.15rem]">
-                          <div class="text-compact text-text-heading truncate font-semibold">
+                          <OTruncatedText
+                            as="div"
+                            :tooltip="false"
+                            class="text-compact text-text-heading font-semibold"
+                          >
                             {{ trace.turnUserMessage || "—" }}
-                          </div>
-                          <div
-                            class="truncate text-xs"
+                          </OTruncatedText>
+                          <OTruncatedText
+                            as="div"
+                            :tooltip="false"
+                            class="text-xs"
                             :class="
                               trace.status === 'error' ? 'text-error-500' : 'text-text-secondary'
                             "
                           >
                             {{ secondaryLine(trace) }}
-                          </div>
+                          </OTruncatedText>
                         </div>
                         <div class="flex min-w-0 flex-col gap-[0.2rem]">
                           <span
@@ -734,10 +741,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ i + 1 }}
                       </span>
-                      <span
-                        class="text-text-heading min-w-0 flex-1 truncate text-xs font-semibold"
-                        :title="row.name"
-                      >
+                      <span class="text-text-heading min-w-0 flex-1 truncate text-xs font-semibold">
                         {{ row.name }}
                       </span>
                       <span
@@ -927,6 +931,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

@@ -297,7 +297,13 @@ export const shouldShowTimeShift = (
     ["area", "bar", "line", "h-bar", "h-stacked", "scatter", "area-stacked", "stacked"].includes(
       dashboardPanelData.data.type,
     ) &&
-    !promqlMode &&
+    // A time shift needs a time range to shift; an instant query has none.
+    !(
+      promqlMode &&
+      (dashboardPanelData.data.queries ?? []).some(
+        (query: any) => query?.config?.query_type === "instant",
+      )
+    ) &&
     dashboardPanelDataPageKey !== "logs"
   );
 };

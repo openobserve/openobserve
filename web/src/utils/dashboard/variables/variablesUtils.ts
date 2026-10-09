@@ -321,7 +321,7 @@ export const getVariablesReferencedInQueries = (
   // ad hoc filters are not considered as dependent filters as they are globally applied
   const candidates = variables.filter((it: any) => it.type != "dynamic_filters");
   const referenced = getReferencedVariableNames(
-    (queries ?? []).map((q: any) => q?.query),
+    (queries ?? []).flatMap((q: any) => [q?.query, q?.config?.formula]),
     candidates.map((it: any) => it.name),
   );
   return candidates.filter((it: any) => referenced.has(it.name));

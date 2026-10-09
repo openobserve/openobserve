@@ -65,6 +65,9 @@ mod pipeline_error_cleanup;
 mod prompt_webhook_delivery;
 mod promql;
 mod promql_self_consume;
+mod query_history_reaper;
+#[cfg(feature = "enterprise")]
+mod red_insights;
 mod scheduler;
 #[cfg(feature = "enterprise")]
 mod service_graph;
@@ -561,7 +564,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
-    tokio::task::spawn(db::system_settings::watch());
     tokio::task::spawn(db::model_pricing::watch());
     tokio::task::spawn(openobserve_core::prompts::watch_invalidation());
     tokio::task::spawn(db::alerts::templates::watch());
@@ -628,9 +630,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("prom cluster leader cache failed");
 
+    // Queue changes during hydration so the snapshot cannot overwrite newer events.
+    let system_settings_watcher = db::system_settings::create_watcher().await?;
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
+    tokio::task::spawn(system_settings_watcher);
+
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
 
     if config::get_config().common.model_pricing_enabled {
         db::model_pricing::cache()
@@ -1099,6 +1107,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
             .disabled
     {
         tokio::task::spawn(anomaly_claim_supervisor());
+        // Here because create_config does not check the anomaly kill switch itself.
+        tokio::task::spawn(red_insights::run());
     }
     // Every node that serves writes publishes them, not only the scheduler.
     openobserve_synthetics::service::start_publish_queue();
@@ -1244,6 +1254,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // gated: retention deletes do not replicate, so every region reaps its own
     // copy or it grows without bound.
     alert_eval_ledger_reaper::run();
+    query_history_reaper::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget

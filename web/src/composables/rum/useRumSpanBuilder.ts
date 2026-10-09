@@ -38,6 +38,19 @@ const BROWSER_REQUEST_LAG_US = 300_000_000;
 // A page view outlives any trace started from it, so its rows are found around the request.
 const PAGE_VIEW_WINDOW_US = 3_600_000_000;
 
+// Only a browser request can own a parent id that no span in the trace owns.
+export const hasDanglingParent = (spans: any[]): boolean => {
+  const ownedIds = new Set<string>();
+  for (const span of spans) {
+    if (span?.span_id) ownedIds.add(String(span.span_id));
+  }
+  for (const span of spans) {
+    const parentId = span?.reference_parent_span_id;
+    if (parentId && !ownedIds.has(String(parentId))) return true;
+  }
+  return false;
+};
+
 export default function useRumSpanBuilder(
   logStreams: Ref<string[]>,
   searchObj: any,
@@ -153,19 +166,6 @@ export default function useRumSpanBuilder(
       console.error("Error fetching view events:", error);
       return [];
     }
-  };
-
-  // Only a browser request can own a parent id that no span in the trace owns.
-  const hasDanglingParent = (spans: any[]): boolean => {
-    const ownedIds = new Set<string>();
-    for (const span of spans) {
-      if (span?.span_id) ownedIds.add(String(span.span_id));
-    }
-    for (const span of spans) {
-      const parentId = span?.reference_parent_span_id;
-      if (parentId && !ownedIds.has(String(parentId))) return true;
-    }
-    return false;
   };
 
   const parseActionIds = (actionId: unknown): string[] => {

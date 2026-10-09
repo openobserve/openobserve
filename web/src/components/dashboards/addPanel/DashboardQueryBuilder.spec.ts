@@ -1417,6 +1417,74 @@ describe("DashboardQueryBuilder", () => {
       });
     });
 
+    it("keeps a query switched in from code mode until the first builder edit", async () => {
+      const text = 'sum by (job)(rate(http_requests_total{code=~"5.."}[5m]))';
+      const written = slot(text);
+      written.customQuery = true;
+      promqlPanel([written]);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      const query = live().data.queries[0];
+      query.fields.promql_labels = [{ label: "code", op: "=~", value: "5.." }] as any;
+      query.fields.promql_operations = [
+        { id: "rate", params: ["5m"] },
+        { id: "sum", params: [["job"]] },
+      ] as any;
+      query.customQuery = false;
+      await flushPromises();
+
+      expect(query.query).toBe(text);
+
+      wrapper.vm.promqlBuilderQuery.operations[1].params = [["job", "instance"]];
+      await flushPromises();
+
+      expect(query.query).toBe(
+        'sum by (job, instance) (rate(http_requests_total{code=~"5.."}[5m]))',
+      );
+
+      try {
+        wrapper.unmount();
+      } catch {
+        // jsdom cannot unmount the builder subtree a post-mount flip renders; not under test.
+      }
+      wrapper = null as any;
+    });
+
+    it("keeps each tab's switched-in text across tab switches", async () => {
+      const text = 'sum by (job)(rate(http_requests_total{code=~"5.."}[5m]))';
+      const written = slot(text);
+      written.customQuery = true;
+      const other = slot("rate(http_requests_total{}[1m])");
+      other.fields.promql_operations = [{ id: "rate", params: ["1m"] }] as any;
+      promqlPanel([written, other]);
+
+      wrapper = createWrapper();
+      await flushPromises();
+      const first = live().data.queries[0];
+      first.fields.promql_labels = [{ label: "code", op: "=~", value: "5.." }] as any;
+      first.fields.promql_operations = [
+        { id: "rate", params: ["5m"] },
+        { id: "sum", params: [["job"]] },
+      ] as any;
+      first.customQuery = false;
+      await flushPromises();
+
+      live().layout.currentQueryIndex = 1;
+      await flushPromises();
+      live().layout.currentQueryIndex = 0;
+      await flushPromises();
+
+      expect(first.query).toBe(text);
+
+      try {
+        wrapper.unmount();
+      } catch {
+        // jsdom cannot unmount the builder subtree a post-mount flip renders; not under test.
+      }
+      wrapper = null as any;
+    });
+
     it("never rewrites a tab that already has a query", async () => {
       const written = 'sum(rate(http_requests_total{code="500"}[1h]))';
       promqlPanel([slot("sum(rate(http_requests_total{}[5m]))"), slot(written)], 1);

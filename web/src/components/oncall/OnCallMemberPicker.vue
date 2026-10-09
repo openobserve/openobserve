@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OAvatar :value="email" size="sm" />
           </span>
         </span>
-        <span class="truncate text-sm">{{ summary }}</span>
+        <OTruncatedText class="text-sm">{{ summary }}</OTruncatedText>
       </span>
     </template>
   </OSelect>
@@ -58,6 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import type { I18nText } from "@/types/i18n";

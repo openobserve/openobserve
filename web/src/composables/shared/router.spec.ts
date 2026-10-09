@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { createMemoryHistory, createRouter } from "vue-router";
 import useRoutes from "./router";
+import store from "@/stores";
+import { routeGuard } from "@/utils/zincutils";
+import { isPaywalledDestination, shouldPaywallRoute } from "@/utils/auth";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
@@ -1807,6 +1810,7 @@ describe("useRoutes (router.ts)", () => {
     it.each([
       ["infraHosts", "infra/hosts"],
       ["infraKubernetes", "infra/kubernetes"],
+      ["infraKubernetes2", "infra/kubernetes-2"],
     ])("registers %s at path %s", (name, path) => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, name as string);
@@ -1814,17 +1818,20 @@ describe("useRoutes (router.ts)", () => {
       expect(route.path).toBe(path);
     });
 
-    it.each(["infraHosts", "infraKubernetes"])("%s beforeEnter calls routeGuard", async (name) => {
-      const { routeGuard } = await import("@/utils/zincutils");
-      vi.mocked(routeGuard as any).mockClear();
-      const { homeChildRoutes } = useRoutes();
-      const route = findRoute(homeChildRoutes, name);
-      const mockTo = {};
-      const mockFrom = {};
-      const mockNext = vi.fn();
-      route.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
-    });
+    it.each(["infraHosts", "infraKubernetes", "infraKubernetes2"])(
+      "%s beforeEnter calls routeGuard",
+      async (name) => {
+        const { routeGuard } = await import("@/utils/zincutils");
+        vi.mocked(routeGuard as any).mockClear();
+        const { homeChildRoutes } = useRoutes();
+        const route = findRoute(homeChildRoutes, name);
+        const mockTo = {};
+        const mockFrom = {};
+        const mockNext = vi.fn();
+        route.beforeEnter(mockTo, mockFrom, mockNext);
+        expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+      },
+    );
 
     it("passes the workload prop to the kubernetes page", () => {
       const { homeChildRoutes } = useRoutes();
@@ -1841,13 +1848,23 @@ describe("useRoutes (router.ts)", () => {
       expect(homeChildRoutes.find((r: any) => r.path === "infra/aws")).toBeUndefined();
     });
 
-    it("keeps exactly the infra workload routes that have a curated pack", () => {
+    it("keeps exactly the curated infra workload routes plus Kubernetes 2", () => {
       const { homeChildRoutes } = useRoutes();
       const infraWorkloads = homeChildRoutes
         .filter((r: any) => typeof r.path === "string" && /^infra\/(?!databases)/.test(r.path))
         .map((r: any) => r.path)
         .sort();
-      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes"]);
+      expect(infraWorkloads).toEqual(["infra/hosts", "infra/kubernetes", "infra/kubernetes-2"]);
+    });
+
+    it("registers Kubernetes 2 right after Kubernetes, lazily loading its own page", () => {
+      const { homeChildRoutes } = useRoutes();
+      const index = homeChildRoutes.findIndex((r: any) => r.name === "infraKubernetes");
+      const route = homeChildRoutes[index + 1] as any;
+      expect(route.name).toBe("infraKubernetes2");
+      expect(route.meta?.titleKey).toBe("menu.kubernetes2");
+      expect(route.props).toBeUndefined();
+      expect(String(route.component)).toMatch(/kubernetes2\/KubernetesPage\.vue/);
     });
 
     // The curated-page migration (design §8.1) swaps only the `component` on these
@@ -2271,6 +2288,121 @@ describe("useRoutes (router.ts)", () => {
       for (const titleKey of titleKeys) {
         expect(enTitle(titleKey), `no en-US message for "${titleKey}"`).toBeTypeOf("string");
       }
+    });
+  });
+
+  // custom_hide_menus removes a tile, never a route.
+  describe("hidden menus never block routes (AC-28)", () => {
+    const buildRouter = () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          ...parentRoutes,
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+    };
+
+    it("resolves and enters /streams with custom_hide_menus=streams", async () => {
+      const previous = store.state.zoConfig?.custom_hide_menus;
+      store.state.zoConfig = { ...(store.state.zoConfig ?? {}), custom_hide_menus: "streams" };
+      try {
+        const router = buildRouter();
+        expect(router.resolve("/streams").name).toBe("logstreams");
+        await router.push("/streams");
+        expect(router.currentRoute.value.name).toBe("logstreams");
+      } finally {
+        store.state.zoConfig = { ...store.state.zoConfig, custom_hide_menus: previous };
+      }
+    });
+  });
+
+  // the paywall predicate treats a matched beforeEnter as proof that routeGuard runs there.
+  describe("paywall guard proxy (A-27)", () => {
+    const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
+
+    const flatten = (routes: any[], prefix = ""): any[] =>
+      routes.flatMap((r) => {
+        const path = r.path.startsWith("/") ? r.path : `${prefix}/${r.path}`.replace(/\/+/g, "/");
+        return [{ ...r, fullPath: path }, ...(r.children ? flatten(r.children, path) : [])];
+      });
+
+    // Runs the chain the way vue-router does on entering from outside: every record's beforeEnter, parent first.
+    const chainReachesRouteGuard = (resolved: any): boolean => {
+      vi.mocked(routeGuard).mockClear();
+      let to = resolved;
+      for (let hop = 0; hop < 3; hop++) {
+        let redirect: any = null;
+        for (const record of to.matched) {
+          if (typeof record.beforeEnter !== "function") continue;
+          record.beforeEnter(to, {}, (arg?: any) => {
+            if (arg && typeof arg === "object" && arg.name) redirect = arg;
+          });
+          if (redirect) break;
+        }
+        if (vi.mocked(routeGuard).mock.calls.length) return true;
+        // Only a self-redirect (traces canonicalising its tab query) is followed; a different route is a feature gate.
+        if (!redirect || redirect.name !== to.name) return false;
+        to = { ...to, query: redirect.query ?? to.query };
+      }
+      return false;
+    };
+
+    let previousZoConfig: any;
+
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      config.isCloud = "true";
+      previousZoConfig = store.state.zoConfig;
+      store.state.zoConfig = { ...(store.state.zoConfig ?? {}), database_monitoring_enabled: true };
+    });
+
+    afterEach(() => {
+      store.state.zoConfig = previousZoConfig;
+    });
+
+    it("mutes a home child route exactly when its guard chain reaches routeGuard and the paywall applies", () => {
+      const { parentRoutes, homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          ...parentRoutes,
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+      const candidates = flatten(homeChildRoutes).filter(
+        (r) => r.name && r !== catchAll && !r.fullPath.includes(":"),
+      );
+      expect(candidates.length).toBeGreaterThan(30);
+
+      const mismatches = candidates
+        .map((r) => {
+          const resolved = router.resolve({
+            path: r.fullPath,
+            query: { org_identifier: "default" },
+          });
+          const muted = isPaywalledDestination(EXPIRED_MICROS, resolved);
+          const blocked =
+            chainReachesRouteGuard(resolved) && shouldPaywallRoute(EXPIRED_MICROS, resolved.name);
+          return muted === blocked
+            ? null
+            : `${String(resolved.name)}: muted=${muted} blocked=${blocked}`;
+        })
+        .filter((line): line is string => line !== null);
+      expect(mismatches).toEqual([]);
     });
   });
 });

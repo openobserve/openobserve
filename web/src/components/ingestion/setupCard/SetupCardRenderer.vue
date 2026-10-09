@@ -928,7 +928,7 @@ function fireConfetti() {
         >
           <div class="acc-body">
             <div v-for="(r, i) in extras.troubleshooting" :key="i" class="ts-row">
-              <div class="ts-q"><OIcon name="warning" size="sm" /> {{ r.q }}</div>
+              <div class="ts-q"><OIcon name="help-outline" size="sm" /> {{ r.q }}</div>
               <div class="ts-a" v-html="inlineMd(r.a)"></div>
             </div>
           </div>
@@ -1423,7 +1423,7 @@ function fireConfetti() {
 }
 
 .ts-q :deep(svg) {
-  color: var(--warn);
+  color: var(--text-3);
   flex: none;
   /* eslint-disable-next-line local/no-hardcoded-px -- 1px optical nudge, not layout — a single device pixel of alignment that must not scale with text */
   margin-top: 1px;

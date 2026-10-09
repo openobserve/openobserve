@@ -26,6 +26,8 @@ import {
   looksLikeAgentInjection,
   buildTraceGroup,
   buildTurnDetail,
+  spanTimeBounds,
+  maxOf,
 } from "./threadView.utils";
 
 // ===========================================================================
@@ -1161,5 +1163,55 @@ describe("buildTurnDetail", () => {
       otherCalls: 0,
       otherOps: [],
     });
+  });
+});
+
+describe("spanTimeBounds / maxOf", () => {
+  it("returns the earliest start and latest end, skipping missing or invalid times", () => {
+    expect(
+      spanTimeBounds([
+        { start_time: 30, end_time: 90 },
+        { start_time: "10", end_time: 50 },
+        { start_time: undefined, end_time: 120 },
+        { start_time: Number.NaN, end_time: "x" },
+      ]),
+    ).toEqual({ startNs: 10, endNs: 120 });
+  });
+
+  it("returns null when no span carries a start or an end", () => {
+    expect(spanTimeBounds([])).toBeNull();
+    expect(spanTimeBounds([{ start_time: 5 }])).toBeNull();
+    expect(spanTimeBounds([{ end_time: 5 }])).toBeNull();
+  });
+
+  it("maxOf matches Math.max for small inputs", () => {
+    expect(maxOf([3, 9, 2])).toBe(9);
+    expect(maxOf([])).toBe(-Infinity);
+    expect(maxOf([], 0)).toBe(0);
+    expect(maxOf([-4], 0)).toBe(0);
+  });
+
+  it("handles 200,000 spans without a RangeError", () => {
+    const spans = Array.from({ length: 200_000 }, (_, i) => ({
+      start_time: 1_000 + i,
+      end_time: 2_000 + i * 2,
+      depth: i % 7,
+    }));
+    expect(spanTimeBounds(spans)).toEqual({ startNs: 1_000, endNs: 2_000 + 199_999 * 2 });
+    expect(maxOf(spans.map((s) => s.depth))).toBe(6);
+  });
+
+  it("buildTraceGroup computes the total duration over 200,000 spans", () => {
+    const spans: any[] = Array.from({ length: 200_000 }, (_, i) =>
+      makeSpan({ span_id: `s${i}`, start_time: 1_000 + i, end_time: 1_500 + i }),
+    );
+    spans[0] = makeSpan({
+      span_id: "turn-1",
+      gen_ai_operation_name: "chat",
+      gen_ai_input_messages: JSON.stringify([{ role: "user", content: "x" }]),
+      start_time: 1_000,
+      end_time: 1_500,
+    });
+    expect(buildTraceGroup(spans)!.totalDurationNs).toBe(1_500 + 199_999 - 1_000);
   });
 });

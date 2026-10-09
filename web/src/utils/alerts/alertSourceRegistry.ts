@@ -88,6 +88,14 @@ export const ALERT_SOURCES: Record<string, AlertSourceDefinition> = {
     defaultThreshold: "matching-rows",
     showQueryPreview: true,
   },
+  explorer: {
+    id: "explorer",
+    labelKey: "alerts.prefill.sources.explorer.label",
+    toastKey: "alerts.prefill.sources.explorer.toast",
+    icon: "shield-alert-outline",
+    defaultThreshold: "matching-rows",
+    showQueryPreview: true,
+  },
   dbm: {
     id: "dbm",
     labelKey: "alerts.prefill.sources.dbm.label",

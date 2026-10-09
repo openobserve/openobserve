@@ -2,6 +2,7 @@
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -40,9 +41,9 @@ const formatTime = (timestamp: string) => new Date(timestamp).toLocaleString();
       >
         <div class="flex w-full items-center justify-between">
           <div class="flex-1 overflow-hidden">
-            <div class="text-compact truncate">
+            <OTruncatedText as="div" class="text-compact">
               {{ chat.title }}
-            </div>
+            </OTruncatedText>
             <div class="text-2xs text-text-secondary">
               {{ formatTime(chat.timestamp) }}
             </div>

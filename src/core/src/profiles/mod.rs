@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+mod attributes;
+mod otlp_json_compat;
+pub mod query;
+mod validation;
+
 use std::{collections::HashMap, io::BufReader, sync::Arc};
 
 use axum::{http, response::Response as HttpResponse};
@@ -42,6 +47,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use schema::check_for_schema;
 
+use self::attributes::resolve_any_value_string;
 use crate::{
     common::meta::{
         authz::Authz,
@@ -54,13 +60,10 @@ use crate::{
     },
 };
 
-mod otlp_json_compat;
-pub mod query;
-
-/// Transport-neutral failure from profile ingestion. HTTP and gRPC map this
-/// separately so a gate/circuit-breaker reject is not acknowledged as success.
+/// Ingestion failures retain their meaning across HTTP and gRPC.
 #[derive(Debug)]
 pub enum ProfilesExportError {
+    InvalidArgument(String),
     TrialPeriodExpired(String),
     Unavailable(String),
     Internal(anyhow::Error),
@@ -69,7 +72,9 @@ pub enum ProfilesExportError {
 impl std::fmt::Display for ProfilesExportError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => write!(f, "{msg}"),
+            Self::InvalidArgument(msg) | Self::TrialPeriodExpired(msg) | Self::Unavailable(msg) => {
+                write!(f, "{msg}")
+            }
             Self::Internal(err) => write!(f, "{err}"),
         }
     }
@@ -122,10 +127,17 @@ fn map_otlp_handler_error(
         OtlpRequestType::HttpProtobuf => "protobuf",
         OtlpRequestType::Grpc => "grpc",
     };
-    log::error!(
+    let level = if matches!(&err, ProfilesExportError::InvalidArgument(_)) {
+        log::Level::Warn
+    } else {
+        log::Level::Error
+    };
+    log::log!(
+        level,
         "[PROFILES:OTLP] Error while handling {kind} request: org_id: {org_id}, error: {err}"
     );
     let (status, rpc_code, msg) = match err {
+        ProfilesExportError::InvalidArgument(msg) => (http::StatusCode::BAD_REQUEST, 3, msg),
         ProfilesExportError::TrialPeriodExpired(msg) => {
             (http::StatusCode::TOO_MANY_REQUESTS, 8, msg) // RESOURCE_EXHAUSTED
         }
@@ -236,7 +248,7 @@ pub async fn otlp_json(
         }
     };
     otlp_json_compat::normalize(&mut body_json);
-    let request = match serde_json::from_value::<ExportProfilesServiceRequest>(body_json) {
+    let request = match otlp_json_compat::deserialize(body_json) {
         Ok(req) => req,
         Err(e) => {
             log::error!("[PROFILES:OTLP] Invalid json: org_id: {org_id}, error: {e}");
@@ -279,6 +291,8 @@ pub async fn handle_otlp_request(
         }
         return Err(ingestion_gate_error(e));
     }
+
+    validation::validate(&request).map_err(ProfilesExportError::InvalidArgument)?;
 
     let start = std::time::Instant::now();
     let started_at = now_micros();
@@ -1074,30 +1088,6 @@ fn resolve_key_value_string(
     resolve_any_value_string(attr.value.as_ref(), dictionary)
 }
 
-fn resolve_any_value_string(
-    value: Option<&opentelemetry_proto::tonic::common::v1::AnyValue>,
-    dictionary: Option<&ProfilesDictionary>,
-) -> Option<String> {
-    let value = value?;
-    match value.value.as_ref() {
-        Some(opentelemetry_proto::tonic::common::v1::any_value::Value::StringValueStrindex(
-            index,
-        )) => lookup_string(
-            dictionary.map(|d| d.string_table.as_slice()).unwrap_or(&[]),
-            *index,
-        ),
-        _ => {
-            let normalized = crate::ingestion::grpc::get_val_with_type_retained(&Some(value));
-            let string_value = config::utils::json::get_string_value(&normalized);
-            if string_value.is_empty() {
-                None
-            } else {
-                Some(string_value)
-            }
-        }
-    }
-}
-
 fn resource_attr_tag_key(otel_key: &str) -> String {
     if let Some((_, alias)) = TAG_RESOURCE_ATTR_ALIASES
         .iter()
@@ -1890,6 +1880,129 @@ mod tests {
     }
 
     #[test]
+    fn collector_empty_attribute_wire_sentinel_survives_record_extraction() {
+        let mut dictionary = ProfilesDictionary::decode(&[0x32, 0x02, 0x12, 0x00][..]).unwrap();
+        dictionary.string_table = vec!["".into(), "context".into(), "worker-1".into()];
+        dictionary.attribute_table.push(KeyValueAndUnit {
+            key_strindex: 1,
+            value: Some(AnyValue {
+                value: Some(any_value::Value::StringValueStrindex(2)),
+            }),
+            ..Default::default()
+        });
+        let request = ExportProfilesServiceRequest {
+            dictionary: Some(dictionary),
+            resource_profiles: vec![ResourceProfiles {
+                scope_profiles: vec![ScopeProfiles {
+                    profiles: vec![Profile {
+                        samples: vec![Sample {
+                            attribute_indices: vec![1],
+                            values: vec![7],
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }],
+        };
+        let request =
+            ExportProfilesServiceRequest::decode(request.encode_to_vec().as_slice()).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["context"], "worker-1");
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
+    fn omitted_empty_collection_values_survive_record_extraction() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "empty.array", "empty.kv", "nested"],
+                "attributeTable": [{"value": {}},
+                    {"keyStrindex": 1, "value": {"arrayValue": {}}},
+                    {"keyStrindex": 2, "value": {"kvlistValue": {}}},
+                    {"keyStrindex": 3, "value": {"arrayValue": {"values": [{"arrayValue": {}}, {"kvlistValue": {}}]}}}
+                ]
+            },
+            "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1, 2, 3], "values": [7]}]}]}]}]
+        });
+        otlp_json_compat::normalize(&mut payload);
+        let request = otlp_json_compat::deserialize(payload).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["empty_array"], "[]");
+        assert_eq!(records[0]["empty_kv"], "{}");
+        assert_eq!(records[0]["nested"], "[[],{}]");
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
+    fn nested_json_string_references_survive_record_extraction() {
+        let mut payload = json::json!({
+            "dictionary": {
+                "stringTable": ["", "sample.array", "sample.kv", "worker-1", "label"],
+                "attributeTable": [{"value": {}},
+                    {"keyStrindex": 1, "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}},
+                    {"keyStrindex": 2, "value": {"kvlistValue": {"values": [{"keyStrindex": 4, "value": {"stringValueStrindex": 3}}]}}}
+                ]
+            },
+            "resourceProfiles": [{
+                "resource": {"attributes": [{"key": "context.array", "value": {"arrayValue": {"values": [{"stringValueStrindex": 3}]}}}]},
+                "scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1, 2], "values": [7]}]}]}]
+            }]
+        });
+        otlp_json_compat::normalize(&mut payload);
+        let request = otlp_json_compat::deserialize(payload).unwrap();
+        validation::validate(&request).unwrap();
+        let resource = &request.resource_profiles[0];
+        let scope = &resource.scope_profiles[0];
+        let (records, rejected) = build_sample_records(
+            "default",
+            "default",
+            resource,
+            scope,
+            &scope.profiles[0],
+            request.dictionary.as_ref(),
+            i64::MIN,
+            i64::MAX,
+        );
+        assert_eq!(rejected, 0);
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0]["sample_array"], r#"["worker-1"]"#);
+        assert_eq!(records[0]["sample_kv"], r#"{"label":"worker-1"}"#);
+        assert_eq!(records[0]["context_array"], r#"["worker-1"]"#);
+        assert_eq!(records[0]["value"], 7);
+    }
+
+    #[test]
     fn resource_attr_tag_key_uses_aliases_and_dot_replace() {
         assert_eq!(resource_attr_tag_key("k8s.pod.name"), "k8s_pod_name");
         assert_eq!(resource_attr_tag_key("cloud.region"), "cloud_region");
@@ -2286,6 +2399,56 @@ mod tests {
         let resource =
             ingestion_gate_error(infra::errors::Error::ResourceError("disk full".into()));
         assert!(matches!(resource, ProfilesExportError::Unavailable(_)));
+    }
+
+    #[tokio::test]
+    async fn malformed_dictionary_returns_http_400_with_otlp_status() {
+        use crate::common::meta::otlp::GoogleRpcStatus;
+
+        for index in [-1, 99] {
+            let mut payload = json::json!({
+                "dictionary": {
+                    "stringTable": ["", "thread.name"],
+                    "attributeTable": [{}, {"keyStrindex": 1, "value": {"stringValueStrindex": index}}]
+                },
+                "resourceProfiles": [{"scopeProfiles": [{"profiles": [{"samples": [{"attributeIndices": [1], "values": [1]}]}]}]}]
+            });
+            otlp_json_compat::normalize(&mut payload);
+            let request = otlp_json_compat::deserialize(payload).unwrap();
+            let message = validation::validate(&request).unwrap_err();
+            assert!(message.contains(&format!(
+                "dictionary.attribute_table[1].value.string_value_strindex: index {index}"
+            )));
+            for req_type in [OtlpRequestType::HttpJson, OtlpRequestType::HttpProtobuf] {
+                let response = map_otlp_handler_error(
+                    "default",
+                    req_type,
+                    ProfilesExportError::InvalidArgument(message.clone()),
+                );
+                assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+                let expected_type = if req_type == OtlpRequestType::HttpJson {
+                    CONTENT_TYPE_JSON
+                } else {
+                    CONTENT_TYPE_PROTO
+                };
+                assert_eq!(
+                    response.headers().get(http::header::CONTENT_TYPE).unwrap(),
+                    expected_type
+                );
+                let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                if req_type == OtlpRequestType::HttpJson {
+                    let status: json::Value = json::from_slice(&body).unwrap();
+                    assert_eq!(status["code"], 3);
+                    assert_eq!(status["message"], message);
+                } else {
+                    let status = GoogleRpcStatus::decode(body).unwrap();
+                    assert_eq!(status.code, 3);
+                    assert_eq!(status.message, message);
+                }
+            }
+        }
     }
 
     #[test]

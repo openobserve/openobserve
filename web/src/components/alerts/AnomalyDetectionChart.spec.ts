@@ -137,6 +137,19 @@ describe("AnomalyDetectionChart", () => {
       );
     });
 
+    it("formats a traces duration percentile in time units", async () => {
+      const yLabel = async (alert: Record<string, any>) => {
+        wrapper?.unmount();
+        wrapper = await mountChart({ ...ANOMALY, stream_type: "traces", ...alert });
+        return metricOptions(wrapper).yAxis.axisLabel.formatter(938_661);
+      };
+      expect(await yLabel({ detection_function: "p95(duration)" })).toBe("939ms");
+      expect(await yLabel({ detection_function: "count(*)" })).toBe("939K");
+      expect(await yLabel({ query_mode: "custom_sql", detection_function: "p95(duration)" })).toBe(
+        "939K",
+      );
+    });
+
     it("renders the band chart once the rows arrive", async () => {
       wrapper = await mountChart();
       expect(wrapper.find('[data-test="alerts-anomalydetectionchart-metric-chart"]').exists()).toBe(

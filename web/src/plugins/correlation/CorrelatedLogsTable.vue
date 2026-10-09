@@ -196,6 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="pagedResults"
             :columns="tableColumns"
             :wrap="wrapTableCells"
+            :cell-overflow-tooltip="false"
             :loading="isLoading"
             :row-key="correlatedRowKey"
             :default-columns="false"

@@ -44,10 +44,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="depKindColor(node)"
     />
 
-    <span class="text-compact min-w-0 flex-1 truncate">
+    <OTruncatedText class="text-compact flex-1">
       {{ node.name }}
-      <OTooltip side="top" :content="raw(node.name)" />
-    </span>
+    </OTruncatedText>
 
     <OTag v-if="node.missing" type="countChip" value="error" class="shrink-0">
       {{ t("alert_dependencies.missingTag") }}
@@ -85,11 +84,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { depKindIcon, depKindColor } from "@/composables/alerts/useDependencyGraph";
 import type { DepNode } from "@/composables/alerts/useDependencyGraph";

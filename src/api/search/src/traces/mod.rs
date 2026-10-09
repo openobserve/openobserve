@@ -30,6 +30,7 @@ use config::{
             default_use_cache,
         },
         stream::StreamType,
+        traces::session::{quote_identifier, quote_sql_string},
     },
     metrics,
     utils::{json, time::now_micros},
@@ -426,13 +427,7 @@ pub async fn get_latest_traces(
     let query_sql = if let Some(ref validated) = validated_schema {
         build_llm_trace_query(&stream_name, validated, &extra_trace_selects)
     } else {
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            {extra_trace_selects} \
-            FROM \"{stream_name}\""
-        )
+        build_trace_query(&stream_name, &extra_trace_selects)
     };
     let sql_order_expr = match sort_by.as_str() {
         "duration" => format!("zo_sql_duration {sort_order}"),
@@ -661,7 +656,7 @@ pub async fn get_latest_traces(
     // Q2b: per-(trace_id, service_name) breakdown, only for multi-service traces.
     if !multi_service_tids.is_empty() {
         // Trace IDs come from DB rows and must be validated before interpolating into SQL.
-        let multi_ids_str = multi_service_tids
+        let multi_ids = multi_service_tids
             .iter()
             .map(|tid| {
                 tid.chars()
@@ -669,8 +664,7 @@ pub async fn get_latest_traces(
                     .collect::<String>()
             })
             .filter(|tid| !tid.is_empty())
-            .collect::<Vec<String>>()
-            .join("','");
+            .collect::<Vec<String>>();
         // max(infer_service_type) over a COALESCE group is the group's inferred type
         // ("database"/"queue"/...) for inferred entities and NULL for instrumented
         // services, which the UI uses to render inferred nodes with a dotted style.
@@ -679,11 +673,11 @@ pub async fn get_latest_traces(
         } else {
             ""
         };
-        let svc_sql = format!(
-            "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
-             count(*) AS svc_count, max(duration) AS svc_duration \
-             FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
-             GROUP BY trace_id, {service_key_expr}"
+        let svc_sql = build_service_breakdown_query(
+            &stream_name,
+            service_key_expr,
+            svc_type_select,
+            &multi_ids,
         );
         req.query.sql = svc_sql;
         req.query.from = 0;
@@ -834,6 +828,7 @@ fn build_llm_trace_query(
     validated: &schema_compat::ValidatedLlmSchema,
     extra_selects: &str,
 ) -> String {
+    let stream_ident = quote_identifier(stream_name);
     let first_msg_clause = if validated.has_gen_ai {
         if validated.has_input_messages {
             format!(
@@ -867,7 +862,7 @@ fn build_llm_trace_query(
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {extra_selects} \
-            FROM \"{stream_name}\""
+            FROM {stream_ident}"
         )
     } else {
         let total_tokens_expr = if validated.has_total_tokens {
@@ -886,9 +881,46 @@ fn build_llm_trace_query(
             array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
             {first_msg_clause} as gen_ai_input_messages, \
             {extra_selects} \
-            FROM \"{stream_name}\""
+            FROM {stream_ident}"
         )
     }
+}
+
+/// Q1 trace aggregation for streams without a validated LLM schema.
+fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
+    format!(
+        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
+        min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+        (max(end_time) - min(start_time)) as zo_sql_duration, \
+        {extra_selects} \
+        FROM {}",
+        quote_identifier(stream_name)
+    )
+}
+
+/// Q2b per-(trace, service) breakdown.
+fn build_service_breakdown_query(
+    stream_name: &str,
+    service_key_expr: &str,
+    svc_type_select: &str,
+    trace_ids: &[String],
+) -> String {
+    let trace_ids_sql = trace_ids
+        .iter()
+        .map(|id| quote_sql_string(id))
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
+         count(*) AS svc_count, max(duration) AS svc_duration \
+         FROM {} WHERE trace_id IN ({trace_ids_sql}) \
+         GROUP BY trace_id, {service_key_expr}",
+        quote_identifier(stream_name)
+    )
+}
+
+fn build_partition_query(stream_name: &str) -> String {
+    format!("SELECT * FROM {}", quote_identifier(stream_name))
 }
 
 /// GetLatestTracesStream — HTTP/2 streaming variant of GetLatestTraces
@@ -1229,13 +1261,7 @@ async fn process_latest_traces_stream(
     let query_sql_base = if let Some(ref validated) = validated_schema {
         build_llm_trace_query(&stream_name, validated, &extra_trace_selects)
     } else {
-        format!(
-            "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
-            min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-            (max(end_time) - min(start_time)) as zo_sql_duration, \
-            {extra_trace_selects} \
-            FROM \"{stream_name}\""
-        )
+        build_trace_query(&stream_name, &extra_trace_selects)
     };
     let query_sql = if filter.is_empty() {
         format!("{query_sql_base} GROUP BY trace_id ORDER BY {sql_order_expr}")
@@ -1278,7 +1304,7 @@ async fn process_latest_traces_stream(
 
     // Get time partitions
     let partition_req = SearchPartitionRequest {
-        sql: format!("SELECT * FROM \"{stream_name}\""),
+        sql: build_partition_query(&stream_name),
         start_time,
         end_time,
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -1849,7 +1875,7 @@ async fn run_q2_for_traces(
     };
 
     if !multi_service_tids.is_empty() {
-        let multi_ids_str = multi_service_tids
+        let multi_ids = multi_service_tids
             .iter()
             .map(|tid| {
                 tid.chars()
@@ -1857,18 +1883,17 @@ async fn run_q2_for_traces(
                     .collect::<String>()
             })
             .filter(|tid| !tid.is_empty())
-            .collect::<Vec<String>>()
-            .join("','");
+            .collect::<Vec<String>>();
         let svc_type_select = if has_infer {
             ", max(infer_service_type) AS service_type"
         } else {
             ""
         };
-        let svc_sql = format!(
-            "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
-             count(*) AS svc_count, max(duration) AS svc_duration \
-             FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
-             GROUP BY trace_id, {service_key_expr}"
+        let svc_sql = build_service_breakdown_query(
+            stream_name,
+            service_key_expr,
+            svc_type_select,
+            &multi_ids,
         );
         let mut req3 = base_req.clone();
         req3.query.sql = svc_sql;
@@ -2063,5 +2088,76 @@ mod tests {
         assert_eq!(body["code"], 3);
         let message = body["message"].as_str().unwrap();
         assert!(message.contains(CONTENT_TYPE_JSON) && message.contains(CONTENT_TYPE_PROTO));
+    }
+
+    #[test]
+    fn test_build_llm_trace_query_quotes_stream_name() {
+        for has_gen_ai in [true, false] {
+            let validated = schema_compat::ValidatedLlmSchema::fallback(has_gen_ai);
+            let sql = build_llm_trace_query("default", &validated, "count(*) AS span_count");
+            assert!(sql.ends_with("FROM \"default\""), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_build_llm_trace_query_escapes_quote_in_stream_name() {
+        for has_gen_ai in [true, false] {
+            let validated = schema_compat::ValidatedLlmSchema::fallback(has_gen_ai);
+            let sql = build_llm_trace_query("evil\" x", &validated, "count(*) AS span_count");
+            assert!(sql.ends_with("FROM \"evil\"\" x\""), "{sql}");
+        }
+    }
+
+    #[test]
+    fn test_trace_builders_quote_stream_name() {
+        assert!(
+            build_trace_query("default", "count(*) AS span_count")
+                .ends_with("count(*) AS span_count FROM \"default\"")
+        );
+        assert_eq!(
+            build_service_breakdown_query(
+                "default",
+                "service_name",
+                "",
+                &["a".to_string(), "b".to_string()]
+            ),
+            "SELECT trace_id, service_name AS service_name, count(*) AS svc_count, \
+             max(duration) AS svc_duration FROM \"default\" WHERE trace_id IN ('a','b') \
+             GROUP BY trace_id, service_name"
+        );
+        assert_eq!(
+            build_partition_query("default"),
+            "SELECT * FROM \"default\""
+        );
+    }
+
+    #[test]
+    fn test_build_trace_query_escapes_quote_in_stream_name() {
+        let sql = build_trace_query("evil\" x", "count(*) AS span_count");
+        assert!(sql.ends_with("FROM \"evil\"\" x\""), "{sql}");
+    }
+
+    #[test]
+    fn test_build_service_breakdown_query_escapes_quote_in_stream_name() {
+        let sql = build_service_breakdown_query("evil\" x", "service_name", "", &["a".to_string()]);
+        assert!(sql.contains("FROM \"evil\"\" x\" WHERE"), "{sql}");
+    }
+
+    #[test]
+    fn test_build_service_breakdown_query_quotes_trace_ids() {
+        let ids = ["a".to_string(), "x') OR ('1'='1".to_string()];
+        let sql = build_service_breakdown_query("default", "service_name", "", &ids);
+        assert!(
+            sql.contains("WHERE trace_id IN ('a','x'') OR (''1''=''1') GROUP BY"),
+            "{sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_partition_query_escapes_quote_in_stream_name() {
+        assert_eq!(
+            build_partition_query("evil\" x"),
+            "SELECT * FROM \"evil\"\" x\""
+        );
     }
 }

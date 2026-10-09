@@ -26,6 +26,7 @@ import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ProtocolRunSummarySkeleton from "./ProtocolRunSummarySkeleton.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
@@ -275,9 +276,9 @@ const showAssertions = computed(() => run.value?.type === "http" && assertionRow
             variant="default"
             size="sm"
             icon="link"
-            class="max-w-60 truncate"
+            class="max-w-60 min-w-0"
           >
-            {{ run.target }}
+            <OTruncatedText>{{ run.target }}</OTruncatedText>
           </OBadge>
         </template>
       </OPageHeader>

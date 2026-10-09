@@ -149,14 +149,14 @@
                   : t("onlineEvals.provider.testFailed")
               }}
             </OTag>
-            <span
+            <OTruncatedText
               v-if="testMessage"
-              class="truncate text-xs"
+              :lines="2"
+              class="text-xs"
               :class="testState === 'failed' ? 'text-status-error-text' : 'text-text-secondary'"
-              :title="testMessage"
             >
               {{ testMessage }}
-            </span>
+            </OTruncatedText>
           </template>
         </div>
 
@@ -201,6 +201,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";

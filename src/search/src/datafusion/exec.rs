@@ -19,9 +19,8 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL},
         search::{Session as SearchSession, StorageType},
-        stream::{FileKey, StreamType},
+        stream::FileKey,
     },
     utils::schema_ext::SchemaExt,
 };
@@ -71,7 +70,6 @@ pub const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 fn create_session_config(
     sort_order: FileSortOrder,
     target_partitions: usize,
-    stream_type: Option<StreamType>,
 ) -> Result<SessionConfig> {
     let cfg = get_config();
     let target_partitions = if target_partitions == 0 {
@@ -97,11 +95,7 @@ fn create_session_config(
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
     config.options_mut().execution.parquet.pushdown_filters =
-        if matches!(stream_type, Some(StreamType::Metrics)) {
-            cfg.search.feature_metrics_pushdown_filter_enabled
-        } else {
-            cfg.search.feature_pushdown_filter_enabled
-        };
+        cfg.search.feature_pushdown_filter_enabled;
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
     // any declared order: chain non-overlapping files into ordered partitions instead of sorting
@@ -204,7 +198,6 @@ pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<R
 pub struct DataFusionContextBuilder<'a> {
     trace_id: &'a str,
     work_group: Option<String>,
-    stream_type: Option<StreamType>,
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
@@ -222,7 +215,6 @@ impl<'a> DataFusionContextBuilder<'a> {
         Self {
             trace_id: "",
             work_group: None,
-            stream_type: None,
             analyzer_rules: vec![],
             optimizer_rules: vec![],
             physical_optimizer_rules: vec![],
@@ -237,11 +229,6 @@ impl<'a> DataFusionContextBuilder<'a> {
 
     pub fn work_group(mut self, work_group: Option<String>) -> Self {
         self.work_group = work_group;
-        self
-    }
-
-    pub fn stream_type(mut self, stream_type: StreamType) -> Self {
-        self.stream_type = Some(stream_type);
         self
     }
 
@@ -287,8 +274,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         )
         .await?;
 
-        let session_config =
-            create_session_config(self.sort_order, target_partitions, self.stream_type)?;
+        let session_config = create_session_config(self.sort_order, target_partitions)?;
         let runtime_env = Arc::new(create_runtime_env(self.trace_id, memory_size).await?);
         let mut builder = SessionStateBuilder::new()
             .with_config(session_config)
@@ -536,7 +522,6 @@ pub async fn metrics_session_context(
     DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
-        .stream_type(StreamType::Metrics)
         .sort_order(sort_order)
         .build(session.target_partitions)
         .await
@@ -551,7 +536,6 @@ pub async fn register_metrics_table(
     files: Vec<FileKey>,
     sort_order: FileSortOrder,
 ) -> Result<()> {
-    let schema = metrics_query_schema(schema);
     let tables = TableBuilder::new()
         .sort_order(sort_order)
         .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
@@ -559,38 +543,6 @@ pub async fn register_metrics_table(
         .await?;
     ctx.register_table(table_name, Arc::new(NewUnionTable::new(schema, tables)))?;
     Ok(())
-}
-
-fn metrics_query_schema(schema: Arc<Schema>) -> Arc<Schema> {
-    metrics_query_schema_with_utf8_view(schema, get_config().common.utf8_view_enabled)
-}
-
-fn metrics_query_schema_with_utf8_view(
-    schema: Arc<Schema>,
-    utf8_view_enabled: bool,
-) -> Arc<Schema> {
-    if !utf8_view_enabled {
-        return schema;
-    }
-
-    let fields = schema
-        .fields()
-        .iter()
-        .map(|field| {
-            if matches!(field.data_type(), DataType::Utf8 | DataType::LargeUtf8)
-                && field.name() != HASH_LABEL
-                && field.name() != EXEMPLARS_LABEL
-            {
-                Arc::new(
-                    Field::new(field.name(), DataType::Utf8View, field.is_nullable())
-                        .with_metadata(field.metadata().clone()),
-                )
-            } else {
-                field.clone()
-            }
-        })
-        .collect::<Vec<_>>();
-    Arc::new(Schema::new(fields).with_metadata(schema.metadata().clone()))
 }
 
 /// Create a datafusion table from a list of files and a schema
@@ -861,59 +813,9 @@ mod tests {
         ]))
     }
 
-    #[test]
-    fn test_metrics_query_schema_uses_views_for_labels_only() {
-        let mut metadata = std::collections::HashMap::new();
-        metadata.insert("source".to_string(), "metrics".to_string());
-        let schema = Arc::new(
-            Schema::new(vec![
-                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-                Field::new(HASH_LABEL, DataType::Utf8, false),
-                Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
-                Field::new("path", DataType::Utf8, true),
-                Field::new("large_label", DataType::LargeUtf8, true),
-            ])
-            .with_metadata(metadata.clone()),
-        );
-
-        let converted = metrics_query_schema_with_utf8_view(schema, true);
-
-        assert_eq!(
-            converted.field_with_name(HASH_LABEL).unwrap().data_type(),
-            &DataType::Utf8
-        );
-        assert_eq!(
-            converted
-                .field_with_name(EXEMPLARS_LABEL)
-                .unwrap()
-                .data_type(),
-            &DataType::Utf8
-        );
-        assert_eq!(
-            converted.field_with_name("path").unwrap().data_type(),
-            &DataType::Utf8View
-        );
-        assert_eq!(
-            converted
-                .field_with_name("large_label")
-                .unwrap()
-                .data_type(),
-            &DataType::Utf8View
-        );
-        assert_eq!(converted.metadata(), &metadata);
-    }
-
-    #[test]
-    fn test_metrics_query_schema_can_disable_views() {
-        let schema = create_test_schema();
-        let unchanged = metrics_query_schema_with_utf8_view(Arc::clone(&schema), false);
-
-        assert!(Arc::ptr_eq(&schema, &unchanged));
-    }
-
     #[tokio::test]
     async fn test_create_session_config_default() -> Result<()> {
-        let config = create_session_config(FileSortOrder::None, 0, None)?;
+        let config = create_session_config(FileSortOrder::None, 0)?;
 
         // Test default configurations
         assert_eq!(
@@ -948,21 +850,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_create_session_config_for_metrics() -> Result<()> {
-        let config = create_session_config(FileSortOrder::None, 0, Some(StreamType::Metrics))?;
-
-        assert_eq!(
-            config.options().execution.parquet.pushdown_filters,
-            get_config().search.feature_metrics_pushdown_filter_enabled
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_create_session_config_with_partitions() -> Result<()> {
         let target_partitions = 8;
-        let config = create_session_config(FileSortOrder::TimestampDesc, target_partitions, None)?;
+        let config = create_session_config(FileSortOrder::TimestampDesc, target_partitions)?;
 
         let expected_partitions = std::cmp::max(
             get_config().limit.datafusion_min_partition_num,
@@ -984,7 +874,7 @@ mod tests {
             FileSortOrder::TimestampDesc,
             FileSortOrder::HashTimestampAsc,
         ] {
-            let config = create_session_config(order, 4, None)?;
+            let config = create_session_config(order, 4)?;
             assert!(config.options().execution.split_file_groups_by_statistics);
         }
         Ok(())
@@ -1600,8 +1490,8 @@ mod tests {
         #[tokio::test]
         async fn test_session_config_bloom_filter_settings() -> Result<()> {
             // Test bloom filter configurations
-            let config1 = create_session_config(FileSortOrder::None, 4, None)?;
-            let config2 = create_session_config(FileSortOrder::TimestampDesc, 4, None)?;
+            let config1 = create_session_config(FileSortOrder::None, 4)?;
+            let config2 = create_session_config(FileSortOrder::TimestampDesc, 4)?;
 
             // Both should be valid configurations
             assert!(config1.options().execution.target_partitions > 0);
@@ -1613,7 +1503,7 @@ mod tests {
         #[tokio::test]
         async fn test_session_config_partition_bounds() -> Result<()> {
             // Test minimum partition enforcement
-            let config = create_session_config(FileSortOrder::None, 1, None)?; // Very small number
+            let config = create_session_config(FileSortOrder::None, 1)?; // Very small number
 
             let actual_partitions = config.options().execution.target_partitions;
             assert!(actual_partitions >= get_config().limit.datafusion_min_partition_num);

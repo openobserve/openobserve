@@ -161,6 +161,7 @@ import { useI18nTyped } from "@/types/i18n";
 import useResizer from "@/composables/useResizer";
 import { type EnrichedSpan } from "@/ts/interfaces/traces/span.types";
 import { formatDuration } from "@/composables/traces/useTraceProcessing";
+import { maxOf } from "@/plugins/traces/threadView.utils";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { escapeHtml } from "@/utils/html";
 import {
@@ -373,7 +374,10 @@ const GRID_RIGHT = 10;
 const totalSpans = computed(() => props.spans.length);
 
 const maxDepth = computed(() => {
-  return Math.max(...props.spans.map((s) => s.depth), 0);
+  return maxOf(
+    props.spans.map((s) => s.depth),
+    0,
+  );
 });
 
 const hasData = computed(() => {
@@ -423,32 +427,33 @@ const computeVisualRows = (
   const rowMap = new Map<string, number>();
   let maxRow = 0;
 
-  // Recursively place a span at the first non-overlapping row >= minRow,
-  // then place its children starting at chosenRow + 1.
-  const place = (span: EnrichedSpan, minRow: number): void => {
-    const spanStart = span.startOffsetMs;
-    const spanEnd = span.startOffsetMs + span.durationMs;
-    let candidate = minRow;
+  // First free row >= minRow, children from that row + 1, depth first; a stack, so trace depth never bounds the call stack.
+  const place = (root: EnrichedSpan, rootMinRow: number): void => {
+    const stack: [EnrichedSpan, number][] = [[root, rootMinRow]];
+    while (stack.length) {
+      const [span, minRow] = stack.pop()!;
+      const spanStart = span.startOffsetMs;
+      const spanEnd = span.startOffsetMs + span.durationMs;
+      let candidate = minRow;
 
-    while (true) {
-      const occupants = rowOccupancy[candidate];
-      if (!occupants) break;
-      const overlaps = occupants.some((o) => spanStart < o.end && o.start < spanEnd);
-      if (!overlaps) break;
-      candidate++;
-    }
+      while (true) {
+        const occupants = rowOccupancy[candidate];
+        if (!occupants) break;
+        const overlaps = occupants.some((o) => spanStart < o.end && o.start < spanEnd);
+        if (!overlaps) break;
+        candidate++;
+      }
 
-    rowMap.set(span.span_id, candidate);
-    if (!rowOccupancy[candidate]) rowOccupancy[candidate] = [];
-    rowOccupancy[candidate].push({ start: spanStart, end: spanEnd });
-    if (candidate > maxRow) maxRow = candidate;
+      rowMap.set(span.span_id, candidate);
+      if (!rowOccupancy[candidate]) rowOccupancy[candidate] = [];
+      rowOccupancy[candidate].push({ start: spanStart, end: spanEnd });
+      if (candidate > maxRow) maxRow = candidate;
 
-    // Children always start directly below this span's visual row.
-    const children = (childrenMap.get(span.span_id) ?? []).sort(
-      (a, b) => a.startOffsetMs - b.startOffsetMs,
-    );
-    for (const child of children) {
-      place(child, candidate + 1);
+      // Children always start directly below this span's visual row; pushed in reverse so the first is placed first.
+      const children = (childrenMap.get(span.span_id) ?? []).sort(
+        (a, b) => a.startOffsetMs - b.startOffsetMs,
+      );
+      for (let i = children.length - 1; i >= 0; i--) stack.push([children[i], candidate + 1]);
     }
   };
 

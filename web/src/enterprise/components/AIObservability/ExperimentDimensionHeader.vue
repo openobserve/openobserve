@@ -9,7 +9,7 @@
 -->
 <template>
   <div class="flex min-w-0 items-center gap-2" :data-test="`ai-experiment-dim-header-${key}`">
-    <span class="min-w-0 truncate" :title="raw(String(label))">{{ label }}</span>
+    <OTruncatedText>{{ label }}</OTruncatedText>
     <!-- Silence here reads as a rendering bug. A dimension with no comparison
          policy is never judged in any direction, so it has no counts to show —
          and that is a fact about the scorer's setup, not a gap in the data. -->
@@ -39,9 +39,10 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import {
   dimensionIdentity,

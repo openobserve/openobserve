@@ -9,6 +9,7 @@ import userService from "@/services/users";
 import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
+import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
 
 export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
 
@@ -110,6 +111,14 @@ export const shouldPaywallRoute = (expiry: unknown, routeName: unknown): boolean
   isTrialExpired(expiry) &&
   trialPaywallAllowedPath.indexOf(routeName as string) === -1;
 
+// Muted only where routeGuard would redirect: vue-router runs every entering record's beforeEnter, not just the leaf's.
+export const isPaywalledDestination = (
+  expiry: unknown,
+  route: { name?: unknown; matched: ReadonlyArray<{ beforeEnter?: unknown }> },
+): boolean =>
+  route.matched.some((record) => Boolean(record.beforeEnter)) &&
+  shouldPaywallRoute(expiry, route.name);
+
 // Org-setup and data-producing surfaces declare their empty-data exemption per route, in meta.
 export const isEmptyDataExempt = (route: { meta?: RouteMeta | Record<string, unknown> }): boolean =>
   route.meta?.allowOnEmptyData === true;
@@ -122,6 +131,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       to.name,
     )
   ) {
+    notifyTrialBlocked(to);
     next({
       name: "plans",
       query: {

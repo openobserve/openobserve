@@ -46,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
     >
       <template #trigger>
-        <span
-          class="text-select-text flex-1 truncate text-start text-xs leading-4 font-semibold"
+        <OTruncatedText
+          class="text-select-text flex-1 text-start text-xs leading-4 font-semibold"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
-          >{{ displayValue }}</span
+          >{{ displayValue }}</OTruncatedText
         >
       </template>
       <template #before-options>
@@ -139,10 +139,11 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  components: { OSeparator, OSelect, OCheckbox, OSpinner, OTooltip },
+  components: { OTruncatedText, OSeparator, OSelect, OCheckbox, OSpinner, OTooltip },
   props: {
     modelValue: { type: null, default: undefined },
     variableItem: { type: Object, default: undefined },

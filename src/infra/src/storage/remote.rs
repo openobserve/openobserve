@@ -30,7 +30,6 @@ use crate::storage::CONCURRENT_REQUESTS;
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";
 
-#[derive(Debug)]
 pub struct StorageConfig {
     pub name: String,          // ZO_S3_ACCOUNTS
     pub provider: String,      // ZO_S3_PROVIDER
@@ -40,6 +39,21 @@ pub struct StorageConfig {
     pub secret_key: String,    // ZO_S3_SECRET_KEY
     pub bucket_name: String,   // ZO_S3_BUCKET_NAME
     pub bucket_prefix: String, // ZO_S3_BUCKET_PREFIX
+}
+
+impl std::fmt::Debug for StorageConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StorageConfig")
+            .field("name", &self.name)
+            .field("provider", &self.provider)
+            .field("server_url", &self.server_url)
+            .field("region_name", &self.region_name)
+            .field("access_key", &"[REDACTED]")
+            .field("secret_key", &"[REDACTED]")
+            .field("bucket_name", &self.bucket_name)
+            .field("bucket_prefix", &self.bucket_prefix)
+            .finish()
+    }
 }
 
 pub struct Remote {
@@ -392,6 +406,24 @@ mod tests {
     use object_store::local::LocalFileSystem;
 
     use super::*;
+
+    #[test]
+    fn storage_config_debug_redacts_keys() {
+        let config = StorageConfig {
+            name: "acct".to_string(),
+            provider: "s3".to_string(),
+            server_url: "http://minio".to_string(),
+            region_name: "us-east-1".to_string(),
+            access_key: "AKIA-ACCESS-SECRET".to_string(),
+            secret_key: "SECRET-KEY-VALUE".to_string(),
+            bucket_name: "bucket".to_string(),
+            bucket_prefix: "prefix/".to_string(),
+        };
+        let printed = format!("{config:?}");
+        assert!(!printed.contains("AKIA-ACCESS-SECRET"), "{printed}");
+        assert!(!printed.contains("SECRET-KEY-VALUE"), "{printed}");
+        assert!(printed.contains("bucket") && printed.contains("http://minio"));
+    }
 
     fn make_remote(prefix: &str) -> Remote {
         Remote {

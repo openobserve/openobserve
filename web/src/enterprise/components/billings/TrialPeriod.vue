@@ -23,8 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Warning icon -->
     <OIcon name="warning" size="sm" class="text-status-warning-text shrink-0" />
 
-    <!-- Message + subtitle on one line -->
-    <p class="m-0 min-w-0 flex-1 truncate text-sm">
+    <p class="m-0 min-w-0 flex-1 text-sm">
       <strong class="font-semibold">{{ getTrialPeriodMessage() }}</strong>
       <span class="mx-1 opacity-60">·</span>
       <span>{{ t("billing.upgradeToPlanMessage") }}</span>

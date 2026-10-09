@@ -949,3 +949,30 @@ describe("useSearchQuery › buildSearch › LIMIT in filter mode", () => {
     expect(buildSearch()).not.toBeNull();
   });
 });
+
+describe("useSearchQuery › getQueryReq › highlightQuery", () => {
+  let getQueryReq: ReturnType<typeof useSearchQuery>["getQueryReq"];
+
+  beforeEach(() => {
+    mockState = createMockState();
+    (mockState.searchObj.data.stream as any).streamLists = [{ name: "my-stream" }];
+    vi.clearAllMocks();
+    ({ getQueryReq } = useSearchQuery(gt));
+  });
+
+  // str_match and re_match highlight case-sensitively, so the query must keep its case.
+  it("should keep the query case in quick/builder mode", () => {
+    mockState.searchObj.data.query = "str_match(body, ERROR) AND re_match(body, ^Error)";
+    getQueryReq(false);
+    expect((mockState.searchObj.data as any).highlightQuery).toBe(
+      "str_match(body, ERROR) AND re_match(body, ^Error)",
+    );
+  });
+
+  it("should keep the WHERE clause case in SQL mode", () => {
+    mockState.searchObj.meta.sqlMode = true;
+    mockState.searchObj.data.query = 'SELECT * FROM "my-stream" WHERE str_match(body, WARN)';
+    getQueryReq(false);
+    expect((mockState.searchObj.data as any).highlightQuery).toBe(" str_match(body, WARN)");
+  });
+});

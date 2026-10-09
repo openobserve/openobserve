@@ -53,6 +53,11 @@ pub fn random_bytes(n: usize) -> Vec<u8> {
     buf
 }
 
+/// Hex-encode `n` cryptographically random bytes.
+pub fn random_hex(n: usize) -> String {
+    hex::encode(random_bytes(n))
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
