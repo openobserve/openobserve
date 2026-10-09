@@ -294,9 +294,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             {{ t("modelPricing.localTimeHint", { range: tierWindowsLocal(tier) }) }}
                           </div>
                           <div
-                            v-if="!tier.condition && !tier.utc_windows?.length"
-                            class="text-2xs opacity-70"
+                            v-for="(rule, rIdx) in tier.rules ?? []"
+                            :key="rIdx"
+                            class="text-2xs font-mono opacity-70"
                           >
+                            {{ formatTierRule(rule) }}
+                          </div>
+                          <div v-if="isUnrestrictedTier(tier)" class="text-2xs opacity-70">
                             {{ t("modelPricing.tierAlwaysActive") }}
                           </div>
                           <table class="mt-0.5 w-full border-collapse">
@@ -559,9 +563,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <UtcHoursBar :windows="tier.utc_windows" />
                   </div>
                   <div
-                    v-if="!tier.condition && !tier.utc_windows?.length"
-                    class="text-2xs mt-0.5 opacity-55"
+                    v-for="(rule, rIdx) in tier.rules ?? []"
+                    :key="rIdx"
+                    class="mt-0.5"
+                    data-test="model-pricing-drawer-tier-rule"
                   >
+                    <OCode>{{ formatTierRule(rule) }}</OCode>
+                  </div>
+                  <div v-if="isUnrestrictedTier(tier)" class="text-2xs mt-0.5 opacity-55">
                     {{ t("modelPricing.tierAlwaysActive") }}
                   </div>
                 </div>
@@ -654,7 +663,12 @@ import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { operatorSymbol, formatUtcWindows, formatUtcWindowsInTz } from "@/utils/formatters";
+import {
+  operatorSymbol,
+  formatTierRule,
+  formatUtcWindows,
+  formatUtcWindowsInTz,
+} from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -872,10 +886,14 @@ function formatPerMillion(pricePerToken: number | undefined | null): string {
   return `$${perMillion.toFixed(2)}`;
 }
 
-// Mirrors the backend fallback rule: the default tier is the one restricted by
-// neither a usage condition nor a UTC time window (peak / off-peak pricing).
+/** Mirrors the backend: a tier with no usage condition, UTC window or attribute rule. */
+function isUnrestrictedTier(tier: any): boolean {
+  return !tier?.condition && !tier?.utc_windows?.length && !tier?.rules?.length;
+}
+
+// Mirrors the backend fallback rule: the default tier is the unrestricted one.
 function getDefaultTier(model: any) {
-  const fallback = model.tiers?.find((t: any) => !t.condition && !t.utc_windows?.length);
+  const fallback = model.tiers?.find(isUnrestrictedTier);
   return fallback || model.tiers?.[0];
 }
 
