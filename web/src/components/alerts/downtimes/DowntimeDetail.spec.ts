@@ -157,6 +157,22 @@ describe("DowntimeDetail", () => {
     wrapper.unmount();
   });
 
+  it("reloads the status when the open window ends, without a refresh", async () => {
+    const endsSoon = Date.now() * 1000 + 300_000;
+    vi.mocked(downtimes.get)
+      .mockResolvedValueOnce({
+        data: { ...detail, current_window: { start: NOW_MICROS, end: endsSoon } },
+      } as never)
+      .mockResolvedValue({
+        data: { ...detail, status: "ended", current_window: null },
+      } as never);
+
+    const { wrapper } = await mountDetail();
+    expect(downtimes.get).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(downtimes.get).toHaveBeenCalledTimes(2), { timeout: 5_000 });
+    wrapper.unmount();
+  });
+
   it("shows a not-found state on a 404", async () => {
     vi.mocked(downtimes.get).mockRejectedValue({ response: { status: 404 } });
 

@@ -17,8 +17,8 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
+        Arc, LazyLock,
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 
@@ -29,7 +29,7 @@ use config::{
     cluster::{LOCAL_NODE, LOCAL_NODE_ID},
     ider::SnowflakeIdGenerator,
     meta::{
-        alerts::alert::Alert,
+        alerts::{TriggerCondition, alert::Alert},
         promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
@@ -42,6 +42,7 @@ use config::{
         time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
     },
 };
+use dashmap::{DashMap, mapref::entry::Entry};
 use db::{
     self,
     alerts::{alert::scheduler_key, realtime_triggers::REALTIME_ALERT_TRIGGERS},
@@ -77,6 +78,12 @@ pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 /// Global atomic counter for round-robin distribution of requests across memory table buckets.
 /// This ensures even distribution of ingestion load across multiple buckets in axum.
 static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+/// `org/alert -> until`, taken before the downtime check so concurrent requests run it once.
+static REALTIME_FLOOR_CLAIMS: LazyLock<DashMap<String, (i64, u64)>> = LazyLock::new(DashMap::new);
+
+/// Tells claims of one key apart, so a request releases only its own.
+static REALTIME_FLOOR_TOKENS: AtomicU64 = AtomicU64::new(0);
 
 /// Memoizes the write partition per time bucket while no partition key is enabled.
 pub struct PartitionMemo<'a> {
@@ -184,10 +191,7 @@ pub async fn get_stream_alerts(
             .filter(|alert| alert.enabled && alert.is_real_time)
             .filter(|alert| {
                 let key = format!("{}/{}", stream.org_id, alert.id.as_ref().unwrap());
-                match triggers_cache.get(&key) {
-                    Some(v) => !v.is_silenced,
-                    None => true,
-                }
+                realtime_alert_is_live(triggers_cache.get(&key))
             })
             .collect::<Vec<_>>();
         if alerts.is_empty() {
@@ -235,7 +239,27 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.org_id,
             alert.name
         );
-        if let Some(downtime) = realtime_downtime(alert, val, now).await {
+        // Only an org with an alert downtime pays for the identity work the claim guards.
+        let floor_key = format!("{}/{module_key}", alert.org_id);
+        let floor_claim = if crate::alerts::downtimes::any_for(
+            &alert.org_id,
+            config::meta::downtimes::TargetModule::Alerts,
+        ) {
+            let Some(token) =
+                claim_realtime_floor(&floor_key, now, TriggerCondition::min_silence_micros())
+            else {
+                log::debug!(
+                    "Realtime alert {}/{} already evaluated inside its floor on this node",
+                    alert.org_id,
+                    alert.name
+                );
+                continue;
+            };
+            Some(token)
+        } else {
+            None
+        };
+        let delivered = if let Some(downtime) = realtime_downtime(alert, val, now).await {
             log::info!(
                 "Realtime alert {}/{} suppressed by downtime {}",
                 alert.org_id,
@@ -247,48 +271,28 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                 "alerts",
                 downtime.id,
             );
-            #[cfg(feature = "enterprise")]
-            record_realtime_mute(alert, &trigger_data_stream).await;
-            trigger_data_stream.end_time = Utc::now().timestamp_micros();
-            trigger_usage_reports.push(trigger_data_stream);
-            continue;
-        }
-        let outcome = alert
-            .send_notification(&trace_id, val, now, None, now, None, None, None, &[], None)
-            .await;
-        record_realtime_delivery(&mut trigger_data_stream, &outcome);
-        #[cfg(feature = "enterprise")]
-        record_realtime_mute(alert, &trigger_data_stream).await;
-        match outcome {
-            Err(e) => {
+            false
+        } else {
+            let outcome = alert
+                .send_notification(&trace_id, val, now, None, now, None, None, None, &[], None)
+                .await;
+            record_realtime_delivery(&mut trigger_data_stream, &outcome);
+            if let Err(e) = &outcome {
                 log::error!("Failed to send notification: {e}");
             }
-            Ok(_) => {
-                // enforce a minimum silence floor so a high-volume stream cannot
-                // fire (and write to the db) once per matching request
-                let silence_micros = alert.trigger_condition.effective_silence_micros();
-                if silence_micros > 0 {
-                    log::debug!(
-                        "Realtime alert {}/{}/{}/{} triggered successfully, hence applying silence period",
-                        alert.org_id,
-                        alert.stream_type,
-                        alert.stream_name,
-                        alert.name
-                    );
-
-                    let next_run_at = Utc::now().timestamp_micros() + silence_micros;
-                    // After the notification is sent successfully, we need to update
-                    // the silence period of the trigger
-                    if let Err(e) = db::scheduler::update_trigger(
-                        silenced_realtime_trigger(&alert.org_id, module_key, next_run_at, now),
-                        false,
-                        "",
-                    )
-                    .await
-                    {
-                        log::error!("Failed to update trigger: {e}");
-                    }
-                    trigger_data_stream.next_run_at = next_run_at;
+            outcome.is_ok()
+        };
+        #[cfg(feature = "enterprise")]
+        record_realtime_mute(alert, &trigger_data_stream).await;
+        match realtime_silence_micros(alert, &trigger_data_stream, delivered) {
+            Some(silence_micros) => {
+                trigger_data_stream.next_run_at =
+                    apply_realtime_silence(alert, module_key, silence_micros, now).await;
+            }
+            // A failed send keeps no floor, so the next matching request retries it.
+            None => {
+                if let Some(token) = floor_claim {
+                    release_realtime_floor(&floor_key, token);
                 }
             }
         }
@@ -970,6 +974,68 @@ fn realtime_last_downtime(run: &TriggerData) -> Option<&str> {
     }
 }
 
+/// The token of the one caller that may evaluate `key` until `now + floor_micros` on this node.
+fn claim_realtime_floor(key: &str, now: i64, floor_micros: i64) -> Option<u64> {
+    let token = REALTIME_FLOOR_TOKENS.fetch_add(1, Ordering::Relaxed);
+    match REALTIME_FLOOR_CLAIMS.entry(key.to_string()) {
+        Entry::Occupied(held) if held.get().0 > now => None,
+        Entry::Occupied(mut expired) => {
+            expired.insert((now + floor_micros, token));
+            Some(token)
+        }
+        Entry::Vacant(free) => {
+            free.insert((now + floor_micros, token));
+            Some(token)
+        }
+    }
+}
+
+/// Drops the claim only while `token` still holds it, never a later request's.
+fn release_realtime_floor(key: &str, token: u64) {
+    REALTIME_FLOOR_CLAIMS.remove_if(key, |_, (_, held)| *held == token);
+}
+
+/// A realtime alert is evaluated unless its trigger is inside a silence.
+fn realtime_alert_is_live(trigger: Option<&db::scheduler::Trigger>) -> bool {
+    trigger.is_none_or(|t| !t.is_silenced)
+}
+
+/// A suppressed run keeps the rate-limit floor only, so the first firing after the window pages.
+fn realtime_silence_micros(alert: &Alert, run: &TriggerData, delivered: bool) -> Option<i64> {
+    match run.status {
+        RunOutcome::Suppressed => Some(TriggerCondition::min_silence_micros()),
+        _ if delivered => Some(alert.trigger_condition.effective_silence_micros()),
+        _ => None,
+    }
+}
+
+/// Silences the trigger for `silence_micros` and returns the wakeup time it wrote.
+async fn apply_realtime_silence(
+    alert: &Alert,
+    module_key: String,
+    silence_micros: i64,
+    fired_at: i64,
+) -> i64 {
+    log::debug!(
+        "Realtime alert {}/{}/{}/{} silenced for {silence_micros}us",
+        alert.org_id,
+        alert.stream_type,
+        alert.stream_name,
+        alert.name
+    );
+    let next_run_at = Utc::now().timestamp_micros() + silence_micros;
+    if let Err(e) = db::scheduler::update_trigger(
+        silenced_realtime_trigger(&alert.org_id, module_key, next_run_at, fired_at),
+        false,
+        "",
+    )
+    .await
+    {
+        log::error!("Failed to update trigger: {e}");
+    }
+    next_run_at
+}
+
 fn silenced_realtime_trigger(
     org: &str,
     module_key: String,
@@ -1081,6 +1147,65 @@ mod tests {
         assert_eq!(trigger.next_run_at, 2_000);
         let data: ScheduledTriggerData = json::from_str(&trigger.data).unwrap();
         assert_eq!(data.last_satisfied_at, Some(1_000));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_overlapping_requests_inside_the_floor_record_one_suppressed_row() {
+        let key = "org1/overlapping-floor";
+        let floor = TriggerCondition::min_silence_micros();
+        // The coordinator never answers here, so only the claim stands between the requests.
+        let runs = (0..16).map(|_| {
+            tokio::spawn(async move {
+                tokio::task::yield_now().await;
+                claim_realtime_floor(key, 1_000_000, floor).is_some()
+            })
+        });
+        let admitted = futures::future::join_all(runs)
+            .await
+            .into_iter()
+            .filter(|claimed| *claimed.as_ref().unwrap())
+            .count();
+        assert_eq!(admitted, 1, "one Suppressed row per floor period");
+        assert!(claim_realtime_floor(key, 1_000_000 + floor - 1, floor).is_none());
+        assert!(claim_realtime_floor(key, 1_000_000 + floor, floor).is_some());
+    }
+
+    #[test]
+    fn test_a_failed_send_releases_the_floor() {
+        let key = "org1/released-floor";
+        let floor = TriggerCondition::min_silence_micros();
+        let token = claim_realtime_floor(key, 0, floor).unwrap();
+        release_realtime_floor(key, token);
+        assert!(claim_realtime_floor(key, 1, floor).is_some());
+    }
+
+    #[test]
+    fn test_a_slow_failed_request_cannot_release_a_newer_claim() {
+        let key = "org1/slow-failed-floor";
+        let floor = TriggerCondition::min_silence_micros();
+        let a = claim_realtime_floor(key, 0, floor).unwrap();
+        // A outlives its floor, so B takes the expired claim before A fails.
+        let b = claim_realtime_floor(key, floor, floor).unwrap();
+        release_realtime_floor(key, a);
+        assert!(claim_realtime_floor(key, floor + 1, floor).is_none());
+        release_realtime_floor(key, b);
+        assert!(claim_realtime_floor(key, floor + 2, floor).is_some());
+    }
+
+    #[test]
+    fn test_only_a_send_or_a_suppression_silences_a_realtime_alert() {
+        let mut alert = Alert::default();
+        alert.trigger_condition.silence = 60;
+        let failed = TriggerData {
+            status: RunOutcome::NotifyFailed,
+            ..Default::default()
+        };
+        assert_eq!(realtime_silence_micros(&alert, &failed, false), None);
+        assert_eq!(
+            realtime_silence_micros(&alert, &failed, true),
+            Some(3_600_000_000)
+        );
+        assert!(realtime_alert_is_live(None));
     }
 
     #[test]

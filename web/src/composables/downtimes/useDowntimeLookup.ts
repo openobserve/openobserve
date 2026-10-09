@@ -16,9 +16,9 @@
 import { computed, toValue, type MaybeRefOrGetter } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useStore } from "vuex";
-import config from "@/aws-exports";
-import { downtimesListQuery } from "@/services/downtimes.queries";
+import { downtimesLookupQuery } from "@/services/downtimes.queries";
 import type { DowntimeListItem } from "@/services/downtimes";
+import { useDowntimesEnabled } from "./useDowntimesEnabled";
 
 /** Names and windows of downtimes by id, for surfaces that only carry `muted_by_downtime_id`. */
 export function useDowntimeLookup(needed: MaybeRefOrGetter<boolean>) {
@@ -30,14 +30,10 @@ export function useDowntimeLookup(needed: MaybeRefOrGetter<boolean>) {
   // Read directly rather than through useOrgId, so a storeless mount stays inert.
   const orgId = computed(() => store?.state?.selectedOrganization?.identifier ?? "");
 
-  const downtimesEnabled = computed(
-    () =>
-      (config.isEnterprise == "true" || config.isCloud == "true") &&
-      store?.state?.zoConfig?.downtimes_enabled === true,
-  );
+  const downtimesEnabled = useDowntimesEnabled();
 
   const list = useQuery(() =>
-    Object.assign(downtimesListQuery(orgId.value), {
+    Object.assign(downtimesLookupQuery(orgId.value), {
       enabled: !!orgId.value && downtimesEnabled.value && toValue(needed),
     }),
   );

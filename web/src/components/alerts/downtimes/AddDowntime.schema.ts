@@ -20,7 +20,10 @@ import { builderToCondition } from "@/utils/downtimes/conditionBridge";
 import { conditionError } from "@/utils/downtimes/conditionRules";
 import {
   ALL_FOLDERS,
+  MAX_FOLDERS_PER_TARGET,
+  MAX_IDS_PER_TARGET,
   MAX_NOTIFY_DESTINATIONS,
+  MAX_TAGS_PER_TARGET,
   NOTIFICATION_EVENTS,
   hasIdentity,
   type DowntimeFormValues,
@@ -79,6 +82,35 @@ const scheduleSchema = z.object({
   timezone: z.string(),
 });
 
+const capIssues = (
+  m: TargetModule,
+  tv: DowntimeFormValues["targets"][TargetModule],
+  at: (field: string) => (string | number)[],
+  t: TranslateFn,
+): Issue[] => {
+  const issues: Issue[] = [];
+  const folders = tv.folders.filter((f) => f !== ALL_FOLDERS).length;
+  if (folders > MAX_FOLDERS_PER_TARGET) {
+    issues.push({
+      path: at("folders"),
+      message: t("alerts.downtimes.validation.tooManyFolders", { max: MAX_FOLDERS_PER_TARGET }),
+    });
+  }
+  if (m === "synthetics" && tv.tags_open && tv.tags.length > MAX_TAGS_PER_TARGET) {
+    issues.push({
+      path: at("tags"),
+      message: t("alerts.downtimes.validation.tooManyTags", { max: MAX_TAGS_PER_TARGET }),
+    });
+  }
+  if (tv.ids_open && tv.ids.length > MAX_IDS_PER_TARGET) {
+    issues.push({
+      path: at("ids"),
+      message: t("alerts.downtimes.validation.tooManyIds", { max: MAX_IDS_PER_TARGET }),
+    });
+  }
+  return issues;
+};
+
 const targetIssues = (
   v: DowntimeFormValues,
   t: TranslateFn,
@@ -108,7 +140,7 @@ const targetIssues = (
     if (tv.ids_open && outside) {
       issues.push({ path: at("ids"), message: t("alerts.downtimes.validation.idOutsideFolders") });
     }
-    return issues;
+    return [...issues, ...capIssues(m, tv, at, t)];
   });
 
 const conditionIssues = (v: DowntimeFormValues, t: TranslateFn): Issue[] => {

@@ -92,6 +92,14 @@ struct ParallelCorrelationResult {
     correlation_reason: String,
 }
 
+/// What a firing does to the downtime mute of the incident it joins.
+#[derive(Debug, PartialEq)]
+enum MuteChange<'a> {
+    Keep,
+    Unmute(&'a str),
+    Retarget { from: &'a str, to: &'a str },
+}
+
 /// Extract semantic dimensions using configured distinguish_by groups only
 /// This replaces the current fallback that uses ALL labels
 #[cfg(feature = "enterprise")]
@@ -1301,8 +1309,13 @@ async fn unmute_for_firing(
     incident: &infra::table::entity::alert_incidents::Model,
     muted_by: Option<&str>,
 ) -> bool {
-    let (None, Some(downtime_id)) = (muted_by, incident.muted_by_downtime_id.as_deref()) else {
-        return false;
+    let downtime_id = match mute_change(muted_by, incident.muted_by_downtime_id.as_deref()) {
+        MuteChange::Keep => return false,
+        MuteChange::Retarget { from, to } => {
+            retarget_mute(org_id, &incident.id, from, to).await;
+            return false;
+        }
+        MuteChange::Unmute(downtime_id) => downtime_id,
     };
     match infra::table::alert_incidents::clear_muted_by_downtime_id(
         org_id,
@@ -1322,10 +1335,7 @@ async fn unmute_for_firing(
         }
     }
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-        && !config::get_config().common.local_mode
+    if publishes_unmute()
         && let Err(e) =
             o2_enterprise::enterprise::super_cluster::queue::incidents_unmute(org_id, &incident.id)
                 .await
@@ -1337,6 +1347,43 @@ async fn unmute_for_firing(
         incident.id
     );
     true
+}
+
+/// A firing outside every window un-mutes; one muted by another downtime moves the mute to it.
+fn mute_change<'a>(muted_by: Option<&'a str>, recorded: Option<&'a str>) -> MuteChange<'a> {
+    match (muted_by, recorded) {
+        (None, Some(recorded)) => MuteChange::Unmute(recorded),
+        (Some(current), Some(recorded)) if current != recorded => MuteChange::Retarget {
+            from: recorded,
+            to: current,
+        },
+        _ => MuteChange::Keep,
+    }
+}
+
+/// A region that is not upgraded cannot read the Unmute byte, so it is sent only with the flag on.
+#[cfg(feature = "enterprise")]
+fn publishes_unmute() -> bool {
+    let o2 = o2_enterprise::enterprise::common::config::get_config();
+    o2.super_cluster.enabled && o2.downtimes.enabled && !config::get_config().common.local_mode
+}
+
+/// The chip and the resolved comment name the downtime that mutes the incident now.
+async fn retarget_mute(org_id: &str, incident_id: &str, from: &str, to: &str) {
+    match infra::table::alert_incidents::retarget_muted_by_downtime_id(
+        org_id,
+        incident_id,
+        from,
+        to,
+    )
+    .await
+    {
+        Ok(true) => log::info!(
+            "[incidents] Incident {incident_id} now muted by downtime {to} instead of {from}"
+        ),
+        Ok(false) => {}
+        Err(e) => log::error!("[incidents] could not re-mute incident {incident_id} by {to}: {e}"),
+    }
 }
 
 /// An un-muted incident runs as a fresh one: workflows, RCA, then the page and "opened".
@@ -3464,9 +3511,19 @@ mod tests {
         assert_eq!(escalated_severity("P2", None, None), None);
     }
 
-    #[tokio::test]
-    async fn a_suppressed_firing_never_unmutes() {
-        assert!(!unmute_for_firing("default", &incident(Some("dt-1")), Some("dt-2")).await);
+    #[test]
+    fn a_suppressed_firing_never_unmutes_and_names_the_downtime_that_mutes_it_now() {
+        assert_eq!(
+            mute_change(Some("dt-2"), Some("dt-1")),
+            MuteChange::Retarget {
+                from: "dt-1",
+                to: "dt-2"
+            }
+        );
+        assert_eq!(mute_change(Some("dt-1"), Some("dt-1")), MuteChange::Keep);
+        assert_eq!(mute_change(Some("dt-1"), None), MuteChange::Keep);
+        assert_eq!(mute_change(None, Some("dt-1")), MuteChange::Unmute("dt-1"));
+        assert_eq!(mute_change(None, None), MuteChange::Keep);
     }
 
     #[tokio::test]

@@ -361,10 +361,38 @@ pub async fn clear_muted_by_downtime_id_with<C: ConnectionTrait>(
     id: &str,
     downtime_id: &str,
 ) -> Result<bool, errors::Error> {
+    replace_muted_by_downtime_id_with(conn, org_id, id, downtime_id, None).await
+}
+
+/// Names the downtime that mutes the incident now, only while it still names `downtime_id`.
+pub async fn retarget_muted_by_downtime_id(
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+    current: &str,
+) -> Result<bool, errors::Error> {
+    replace_muted_by_downtime_id_with(
+        get_orm_client_rw().await,
+        org_id,
+        id,
+        downtime_id,
+        Some(current),
+    )
+    .await
+}
+
+/// Compare-and-set of the mute from `downtime_id` to `next`; `true` when this call changed it.
+pub async fn replace_muted_by_downtime_id_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    downtime_id: &str,
+    next: Option<&str>,
+) -> Result<bool, errors::Error> {
     let res = alert_incidents::Entity::update_many()
         .col_expr(
             alert_incidents::Column::MutedByDowntimeId,
-            Expr::value(Option::<String>::None),
+            Expr::value(next.map(str::to_string)),
         )
         .col_expr(
             alert_incidents::Column::UpdatedAt,
@@ -973,6 +1001,28 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(row.muted_by_downtime_id, None);
+    }
+
+    #[tokio::test]
+    async fn a_second_downtime_takes_over_the_mute_of_the_first() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        assert!(
+            replace_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-1", Some("dt-2"))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !replace_muted_by_downtime_id_with(&db, "acme", &incident.id, "dt-1", Some("dt-3"))
+                .await
+                .unwrap()
+        );
+        let row = alert_incidents::Entity::find_by_id(incident.id.clone())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.muted_by_downtime_id.as_deref(), Some("dt-2"));
     }
 
     #[tokio::test]

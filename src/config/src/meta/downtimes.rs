@@ -144,6 +144,7 @@ pub struct DowntimeSchedule {
     pub repeat: Repeat,
     /// Microseconds UTC.
     pub starts_at: i64,
+    /// Microseconds UTC; a recurring row reads only its local date, an inclusive last day.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ends_at: Option<i64>,
     pub timezone: String,

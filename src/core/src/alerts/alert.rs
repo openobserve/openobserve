@@ -356,6 +356,28 @@ pub enum AlertError {
     MultiAlertGroupingError(String),
 }
 
+/// What a manual trigger did: sent, with its messages, or held by an active downtime.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ManualTrigger {
+    Sent {
+        success_message: String,
+        error_message: String,
+    },
+    Suppressed(config::meta::downtimes::ActiveDowntime),
+}
+
+impl ManualTrigger {
+    /// The message the trigger route answers with.
+    pub fn response_message(&self) -> String {
+        match self {
+            Self::Sent { .. } => "Alert triggered".to_string(),
+            Self::Suppressed(downtime) => {
+                format!("Alert suppressed by downtime {}", downtime.name)
+            }
+        }
+    }
+}
+
 pub async fn save(
     org_id: &str,
     stream_name: &str,
@@ -2200,11 +2222,15 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
-) -> Result<(String, String), AlertError> {
-    let Some((_, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
+) -> Result<ManualTrigger, AlertError> {
+    let Some((_folder, alert)) = db::alerts::alert::get_by_id(conn, org_id, alert_id).await? else {
         return Err(AlertError::AlertNotFound);
     };
     let now = Utc::now().timestamp_micros();
+    #[cfg(feature = "enterprise")]
+    if let Some(downtime) = suppressed_manual_trigger(&alert, &_folder.folder_id, now).await {
+        return Ok(ManualTrigger::Suppressed(downtime));
+    }
 
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
@@ -2293,9 +2319,12 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             None,
         )
         .await?;
-    let err_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
+    let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
-    Ok((outcome.success_message, err_message))
+    Ok(ManualTrigger::Sent {
+        success_message: outcome.success_message,
+        error_message,
+    })
 }
 
 pub async fn trigger_by_name(
@@ -2303,14 +2332,21 @@ pub async fn trigger_by_name(
     stream_type: StreamType,
     stream_name: &str,
     name: &str,
-) -> Result<(String, String), AlertError> {
-    let alert = match db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name).await {
-        Ok(Some(alert)) => alert,
-        _ => {
-            return Err(AlertError::AlertNotFound);
-        }
-    };
+) -> Result<ManualTrigger, AlertError> {
+    let (_folder, alert) =
+        match db::alerts::alert::get_by_name_with_folder(org_id, stream_type, stream_name, name)
+            .await
+        {
+            Ok(Some(found)) => found,
+            _ => {
+                return Err(AlertError::AlertNotFound);
+            }
+        };
     let now = Utc::now().timestamp_micros();
+    #[cfg(feature = "enterprise")]
+    if let Some(downtime) = suppressed_manual_trigger(&alert, &_folder.folder_id, now).await {
+        return Ok(ManualTrigger::Suppressed(downtime));
+    }
 
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
@@ -2392,9 +2428,42 @@ pub async fn trigger_by_name(
             None,
         )
         .await?;
-    let err_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
+    let error_message = with_incident_notify_error(outcome.error_message, incident_notify_error);
 
-    Ok((outcome.success_message, err_message))
+    Ok(ManualTrigger::Sent {
+        success_message: outcome.success_message,
+        error_message,
+    })
+}
+
+/// A manual trigger inside a window is suppressed like a scheduled run: no page, no un-mute.
+#[cfg(feature = "enterprise")]
+async fn suppressed_manual_trigger(
+    alert: &Alert,
+    folder_id: &str,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    let rows = [manual_trigger_row(alert)];
+    let downtime =
+        crate::alerts::scheduler::handlers::downtime_decision(alert, folder_id, Some(&rows), now)
+            .await?;
+    log::info!(
+        "Manual trigger of alert {}/{} suppressed by downtime {}",
+        alert.org_id,
+        alert.name,
+        downtime.id
+    );
+    crate::alerts::scheduler::handlers::correlate_muted_incident(
+        "manual_trigger",
+        alert,
+        &rows,
+        now,
+        None,
+        &downtime,
+    )
+    .await;
+    count_suppressed_run(&alert.org_id, "alerts");
+    Some(downtime)
 }
 
 /// Per-destination result of one notification attempt.
@@ -7787,6 +7856,25 @@ mod tests {
         alert.stream_type = StreamType::Logs;
         alert.workflows = workflows;
         alert
+    }
+
+    #[test]
+    fn a_suppressed_manual_trigger_answers_with_the_downtime_name() {
+        let suppressed = ManualTrigger::Suppressed(config::meta::downtimes::ActiveDowntime {
+            id: "dt-1".to_string(),
+            name: "db upgrade".to_string(),
+            ends_at: 0,
+            incident_mode: Default::default(),
+        });
+        assert_eq!(
+            suppressed.response_message(),
+            "Alert suppressed by downtime db upgrade"
+        );
+        let sent = ManualTrigger::Sent {
+            success_message: String::new(),
+            error_message: String::new(),
+        };
+        assert_eq!(sent.response_message(), "Alert triggered");
     }
 
     #[test]

@@ -404,6 +404,8 @@ import DowntimeScheduleBand from "./DowntimeScheduleBand.vue";
 import ExtendDowntimeDialog from "./ExtendDowntimeDialog.vue";
 import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
 import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
+import { useListBoundaryRefetch } from "@/composables/downtimes/useListBoundaryRefetch";
+import { useNowMicros } from "@/composables/downtimes/useNowMicros";
 import { isExtendable } from "@/utils/downtimes/extend";
 import { isEditable } from "@/utils/downtimes/listOrder";
 import { suppressedPage } from "@/utils/downtimes/suppressed";
@@ -424,7 +426,9 @@ const id = computed(() => String(route.params.id ?? ""));
 const folderParam = computed(() => String(route.query.folder ?? "") || undefined);
 const activeTab = ref<DetailTab>("overview");
 const viewerZone = browserTimezone();
-const nowMicros = Date.now() * 1000;
+const nowMicros = useNowMicros();
+// The suppressed history is read once for the window the page opened on.
+const openedAtMicros = nowMicros.value;
 
 const detailQuery = useQuery(() =>
   Object.assign(downtimeDetailQuery(orgId.value, id.value, folderParam.value), {
@@ -432,6 +436,12 @@ const detailQuery = useQuery(() =>
   }),
 );
 const downtime = computed(() => detailQuery.data.value ?? null);
+// The server decides the status, so the page reloads it when the window opens or closes.
+useListBoundaryRefetch(
+  () => (downtime.value ? [downtime.value] : []),
+  () => detailQuery.dataUpdatedAt.value,
+  () => detailQuery.refetch(),
+);
 const errorStatus = computed(() => {
   const e = detailQuery.error.value as { status?: number; response?: { status?: number } } | null;
   return e?.response?.status ?? e?.status;
@@ -452,8 +462,8 @@ const syntheticFolders = useQuery(() =>
 const historyQuery = useQuery(() =>
   Object.assign(
     alertHistoryQuery(orgId.value, {
-      start_time: nowMicros - HISTORY_DAYS * 24 * HOUR_MICROS,
-      end_time: nowMicros,
+      start_time: openedAtMicros - HISTORY_DAYS * 24 * HOUR_MICROS,
+      end_time: openedAtMicros,
       from: 0,
       size: 500,
       downtime_id: id.value,
@@ -507,12 +517,12 @@ const missingModules = computed(() =>
 );
 
 const pastWindows = computed(() =>
-  downtime.value ? recentWindows(downtime.value.schedule, nowMicros, 3) : [],
+  downtime.value ? recentWindows(downtime.value.schedule, nowMicros.value, 3) : [],
 );
 
 const nextWindow = computed(() =>
   downtime.value && !isCalledOff(downtime.value)
-    ? (downtime.value.next_window ?? currentOrNextWindow(downtime.value.schedule, nowMicros))
+    ? (downtime.value.next_window ?? currentOrNextWindow(downtime.value.schedule, nowMicros.value))
     : null,
 );
 

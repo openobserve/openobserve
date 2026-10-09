@@ -11,6 +11,12 @@ import { queryClient } from "@/composables/query/queryClient";
 import { isoWeekday, utcMicrosToLocal } from "@/utils/downtimes/schedule";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 
+// The route guard opens this page only with downtimes on.
+vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
+  const { computed } = await import("vue");
+  return { useDowntimesEnabled: () => computed(() => true) };
+});
+
 vi.mock("@/services/downtimes", () => ({
   default: {
     list: vi.fn(),

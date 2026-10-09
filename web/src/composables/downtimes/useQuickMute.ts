@@ -35,7 +35,8 @@ export function useQuickMute() {
   const router = useRouter();
   const mutation = useMutation(() => quickMuteMutation(orgId.value));
   const timezone = browserTimezone();
-  const defaultFolder = useDefaultDowntimeFolder();
+  // Every Alerts and Synthetics list mounts this through its Mute action.
+  const defaultFolder = useDefaultDowntimeFolder({ prefetch: false });
 
   const mute = async (
     selection: QuickMuteSelection[],

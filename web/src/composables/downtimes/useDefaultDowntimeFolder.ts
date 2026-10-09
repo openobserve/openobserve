@@ -16,6 +16,7 @@
 import { computed } from "vue";
 import { useQuery, useQueryClient } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
+import { useDowntimesEnabled } from "@/composables/downtimes/useDowntimesEnabled";
 import { permittedFoldersQuery } from "@/services/common.queries";
 import {
   preferredDowntimeFolder,
@@ -24,12 +25,18 @@ import {
 } from "@/utils/downtimes/folderDefault";
 
 /** The folder a new downtime is filed in, resolved from the folders this user may use. */
-export function useDefaultDowntimeFolder(options: { rememberLast?: boolean } = {}) {
-  const { rememberLast = true } = options;
+export function useDefaultDowntimeFolder(
+  options: { rememberLast?: boolean; prefetch?: boolean } = {},
+) {
+  const { rememberLast = true, prefetch = true } = options;
   const orgId = useOrgId();
   const queryClient = useQueryClient();
+  const downtimesEnabled = useDowntimesEnabled();
+  // Without `prefetch` the list is read by `resolve`, so a page that never mutes asks nothing.
   const folders = useQuery(() =>
-    Object.assign(permittedFoldersQuery(orgId.value, "downtimes"), { enabled: !!orgId.value }),
+    Object.assign(permittedFoldersQuery(orgId.value, "downtimes"), {
+      enabled: !!orgId.value && downtimesEnabled.value && prefetch,
+    }),
   );
 
   /** False until the folder list answered, so nothing is sent against a guessed folder. */

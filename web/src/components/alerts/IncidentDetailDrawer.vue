@@ -1581,7 +1581,6 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { downtimeOf, nameOf } = useDowntimeLookup(true);
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
@@ -1617,6 +1616,10 @@ export default defineComponent({
     // Backend also returns a top-level correlation_reason not declared on IncidentWithAlerts.
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
+    );
+    // The downtimes list is read only to name the downtime that mutes this incident.
+    const { downtimeOf, nameOf } = useDowntimeLookup(
+      () => !!incidentDetails.value?.muted_by_downtime_id,
     );
 
     const viewerZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { AxiosRequestConfig } from "axios";
 import http from "./http";
 
 export type TargetModule = "alerts" | "anomaly_detections" | "synthetics" | "slos";
@@ -250,8 +251,8 @@ const one = (org: string, id: string) => `${base(org)}/${encodeURIComponent(id)}
 const inFolder = (folder?: string) => (folder ? { params: { folder } } : {});
 
 const downtimes = {
-  list: (org: string, params: DowntimeListParams = {}) =>
-    http().get<DowntimeListResponse>(base(org), { params }),
+  list: (org: string, params: DowntimeListParams = {}, options: AxiosRequestConfig = {}) =>
+    http().get<DowntimeListResponse>(base(org), { ...options, params }),
   get: (org: string, id: string, folder?: string) =>
     http().get<DowntimeDetail>(one(org, id), inFolder(folder)),
   create: (org: string, body: DowntimeRequest) =>

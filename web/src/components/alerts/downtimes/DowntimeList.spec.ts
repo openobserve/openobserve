@@ -23,6 +23,12 @@ import type { DowntimeListItem, DowntimeListResponse } from "@/services/downtime
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
 
+// The route guard opens this page only with downtimes on.
+vi.mock("@/composables/downtimes/useDowntimesEnabled", async () => {
+  const { computed } = await import("vue");
+  return { useDowntimesEnabled: () => computed(() => true) };
+});
+
 vi.mock("@/services/downtimes", () => ({
   default: {
     list: vi.fn(),

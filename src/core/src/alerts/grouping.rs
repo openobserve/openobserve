@@ -330,27 +330,11 @@ pub fn refused_row(trigger_data: &TriggerData) -> TriggerData {
     }
 }
 
-/// Sends a batch, then publishes its members' rows at once so a sent page never loses them.
-/// A member a downtime now covers leaves first, with its own `Suppressed` row, so it gets
-/// exactly one row and does not count towards the group size.
+/// Sends a batch and publishes its members' rows; false when nothing was delivered.
 #[cfg(feature = "enterprise")]
-pub async fn flush_batch(trace_id: &str, mut batch: PendingBatch) -> bool {
-    drop_muted_entries(&mut batch).await;
-    if batch.alerts.is_empty() {
-        return true;
-    }
-    let mut rows = flush_rows(&batch);
-    let delivered = match send_grouped_notification(trace_id, batch).await {
-        Ok(()) => true,
-        Err(e) => {
-            stamp_flush_error(&mut rows, &e);
-            false
-        }
-    };
-    for row in rows {
-        usage_reporting::publish_triggers_usage(row);
-    }
-    delivered
+pub async fn flush_batch(trace_id: &str, batch: PendingBatch) -> bool {
+    let decisions = entry_decisions(&batch).await;
+    flush_decided(trace_id, batch, decisions).await
 }
 
 #[cfg(feature = "enterprise")]
@@ -564,21 +548,60 @@ pub async fn send_grouped_notification(
     }
 }
 
-/// Checked per entry at flush time: a window can open while the batch waits.
+/// A member muted at its own evaluation leaves with a `Suppressed` row and does not count.
 #[cfg(feature = "enterprise")]
-async fn drop_muted_entries(batch: &mut PendingBatch) {
+async fn flush_decided(
+    trace_id: &str,
+    mut batch: PendingBatch,
+    decisions: Vec<Option<config::meta::downtimes::ActiveDowntime>>,
+) -> bool {
+    drop_muted_entries(&mut batch, decisions);
+    if batch.alerts.is_empty() {
+        return false;
+    }
+    let mut rows = flush_rows(&batch);
+    let delivered = match send_grouped_notification(trace_id, batch).await {
+        Ok(()) => true,
+        Err(e) => {
+            stamp_flush_error(&mut rows, &e);
+            false
+        }
+    };
+    for row in rows {
+        usage_reporting::publish_triggers_usage(row);
+    }
+    delivered
+}
+
+/// Judged at each entry's own timestamp, so a firing admitted before a window is still sent.
+#[cfg(feature = "enterprise")]
+async fn entry_decisions(
+    batch: &PendingBatch,
+) -> Vec<Option<config::meta::downtimes::ActiveDowntime>> {
     if !crate::alerts::downtimes::any_for(
         &batch.org_id,
         config::meta::downtimes::TargetModule::Alerts,
     ) {
-        return;
+        return vec![None; batch.alerts.len()];
     }
-    // The silence started at enqueue, so a dropped entry can delay the next send by it.
-    let now = Utc::now().timestamp_micros();
     let mut decisions = Vec::with_capacity(batch.alerts.len());
-    for entry in &batch.alerts {
-        decisions.push(entry_downtime(entry, now).await);
+    for (entry, at) in batch.alerts.iter().zip(judged_at(batch)) {
+        decisions.push(entry_downtime(entry, at).await);
     }
+    decisions
+}
+
+/// The instant each entry is judged at: its own evaluation, never the flush.
+#[cfg(feature = "enterprise")]
+fn judged_at(batch: &PendingBatch) -> Vec<i64> {
+    batch.alerts.iter().map(|entry| entry.timestamp).collect()
+}
+
+#[cfg(feature = "enterprise")]
+fn drop_muted_entries(
+    batch: &mut PendingBatch,
+    decisions: Vec<Option<config::meta::downtimes::ActiveDowntime>>,
+) {
     for (entry, downtime) in take_muted(batch, decisions) {
         log::info!(
             "[alert_grouping_worker] alert {}/{} dropped from its batch by downtime {}",
@@ -622,20 +645,20 @@ fn split_muted<T>(
 #[cfg(feature = "enterprise")]
 async fn entry_downtime(
     entry: &BatchedAlert,
-    now: i64,
+    at: i64,
 ) -> Option<config::meta::downtimes::ActiveDowntime> {
     let alert_id = entry.alert.id.as_ref()?.to_string();
     let (folder, _) =
         crate::db::alerts::alert::get_alert_from_cache(&entry.alert.org_id, &alert_id).await?;
     let identity =
-        crate::alerts::scheduler::handlers::downtime_identities(&entry.alert, &entry.rows).await;
+        crate::alerts::scheduler::handlers::downtime_identity(&entry.alert, &entry.rows).await;
     crate::alerts::scheduler::handlers::muted_in_every_group(&identity, |dims| {
         crate::alerts::downtimes::active_for_alert(
             &entry.alert.org_id,
             &alert_id,
             &folder.folder_id,
             dims,
-            now,
+            at,
         )
     })
 }
@@ -980,6 +1003,41 @@ mod tests {
         let (kept, muted) = split_muted(vec!["a"], vec![Some(downtime("dt-1"))]);
         assert!(kept.is_empty(), "an emptied batch sends nothing");
         assert_eq!(muted.len(), 1);
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn queued_batch(fp: &str, org: &str, timestamps: &[i64]) -> PendingBatch {
+        for (i, _) in timestamps.iter().enumerate() {
+            admit(fp, org, 10, evaluation_row(&format!("a/{i}")));
+        }
+        let mut batch = PENDING_BATCHES.remove(&batch_key(org, fp)).unwrap().1;
+        for (entry, at) in batch.alerts.iter_mut().zip(timestamps) {
+            entry.timestamp = *at;
+        }
+        batch
+    }
+
+    // Dropping an entry publishes its row, and the usage queue starts on a Tokio runtime.
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_entry_queued_before_the_window_stays_in_the_batch_at_flush() {
+        let window_opens = 100;
+        let mut batch = queued_batch("grouping_test_before_window", "org-before", &[50, 150]);
+        let decisions = judged_at(&batch)
+            .into_iter()
+            .map(|at| (at >= window_opens).then(|| downtime("dt-1")))
+            .collect();
+        drop_muted_entries(&mut batch, decisions);
+        let kept: Vec<_> = batch.alerts.iter().map(|e| e.timestamp).collect();
+        assert_eq!(kept, [50]);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_emptied_batch_records_no_delivery() {
+        let batch = queued_batch("grouping_test_emptied", "org-emptied", &[150, 160]);
+        let decisions = vec![Some(downtime("dt-1")), Some(downtime("dt-1"))];
+        assert!(!flush_decided("t", batch, decisions).await);
     }
 
     #[cfg(feature = "enterprise")]

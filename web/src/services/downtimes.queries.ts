@@ -85,6 +85,23 @@ export const downtimesListQuery = (org: string) =>
     staleTime: LIVE_STALE_TIME,
   });
 
+/** The list for surfaces that only name a muting downtime: a 403 there shows no access toast. */
+export const downtimesLookupQuery = (org: string) =>
+  queryOptions({
+    queryKey: downtimeKeys.lookup(org),
+    queryFn: async (): Promise<DowntimeListResponse> => {
+      const data = (
+        await downtimes.list(
+          org,
+          { page: 1, page_size: DOWNTIME_LIST_PAGE_SIZE },
+          { skipAccessToast: true },
+        )
+      ).data;
+      return { ...EMPTY_LIST, ...data, items: data?.items ?? [] };
+    },
+    staleTime: LIVE_STALE_TIME,
+  });
+
 export const downtimeDetailQuery = (org: string, id: string, folder?: string) =>
   queryOptions({
     queryKey: downtimeKeys.detail(org, id),

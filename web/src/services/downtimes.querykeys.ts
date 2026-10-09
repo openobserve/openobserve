@@ -19,6 +19,8 @@ import { orgKey } from "@/composables/query/keys";
 export const downtimeKeys = {
   all: (org: string) => orgKey(org, "downtimes"),
   list: (org: string) => orgKey(org, "downtimes", "list"),
+  // Under `list`, so every write that refreshes the list refreshes the lookup too.
+  lookup: (org: string) => orgKey(org, "downtimes", "list", "lookup"),
   detail: (org: string, id: string) => orgKey(org, "downtimes", "detail", id),
   preview: (org: string, body: unknown) => orgKey(org, "downtimes", "preview", body),
   resources: (org: string, body: unknown) => orgKey(org, "downtimes", "resources", body),

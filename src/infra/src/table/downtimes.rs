@@ -362,6 +362,50 @@ pub async fn delete_at_least_with<C: ConnectionTrait>(
         "downtime {org}/{id} kept changing during its delete"
     )))
 }
+
+/// A tombstone for a row this region never saw, so a Put that arrives after its Delete stays out.
+pub async fn insert_tombstone_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    folder_pk: &str,
+    version: i64,
+    deleted_at: i64,
+) -> Result<(), errors::Error> {
+    let tombstone = ActiveModel {
+        id: Set(id.to_string()),
+        org: Set(org.to_string()),
+        folder_id: Set(folder_pk.to_string()),
+        name: Set(id.to_string()),
+        reason: Set(None),
+        condition: Set(None),
+        targets: Set(serde_json::json!([])),
+        show_banner: Set(false),
+        repeat: Set(Repeat::None.to_i16()),
+        starts_at: Set(deleted_at),
+        ends_at: Set(Some(deleted_at)),
+        timezone: Set("UTC".to_string()),
+        start_time_local: Set(None),
+        duration_secs: Set(0),
+        weekdays: Set(None),
+        cancelled_at: Set(None),
+        cancelled_by: Set(None),
+        deleted_at: Set(Some(deleted_at)),
+        notifications: Set(None),
+        origin_region: Set(None),
+        version: Set(version),
+        created_by: Set(String::new()),
+        created_at: Set(deleted_at),
+        updated_by: Set(String::new()),
+        updated_at: Set(deleted_at),
+    };
+    Entity::insert(tombstone)
+        .on_conflict(OnConflict::column(Column::Id).do_nothing().to_owned())
+        .exec_without_returning(conn)
+        .await?;
+    Ok(())
+}
+
 pub async fn delete_ended_before_with<C: ConnectionTrait>(
     conn: &C,
     cutoff: i64,

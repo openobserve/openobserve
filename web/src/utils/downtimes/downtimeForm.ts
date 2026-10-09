@@ -71,6 +71,11 @@ export const NOTIFICATION_EVENTS: NotificationEvent[] = [
 export const DEFAULT_LEAD_SECS = 600;
 export const MAX_NOTIFY_DESTINATIONS = 10;
 
+/** The per-target caps of the backend `validate_target`, checked here as field errors. */
+export const MAX_FOLDERS_PER_TARGET = 50;
+export const MAX_TAGS_PER_TARGET = 16;
+export const MAX_IDS_PER_TARGET = 200;
+
 export interface TargetFormValues {
   folders: string[];
   tags_open: boolean;

@@ -418,16 +418,24 @@ pub async fn banners_for_org(
         .filter_map(|row| schedule::window_at(&row.schedule, now).map(|w| (*row, w)))
         .collect();
     let mut active = Vec::with_capacity(windows.len());
-    if !windows.is_empty() {
-        let inventory = inventory::cached(org).await?;
-        for (row, window) in windows {
-            let matches = match_counts_with(row, &inventory);
-            active.push(ActiveWindow {
-                row,
-                window,
-                matches,
-            });
-        }
+    // The org inventory is read only for a row whose counts are not cached at its version.
+    let mut inventory = None;
+    for (row, window) in windows {
+        let matches = match cached_matches(row) {
+            Some(matches) => matches,
+            None => {
+                let inventory = match &inventory {
+                    Some(inventory) => Arc::clone(inventory),
+                    None => inventory.insert(inventory::cached(org).await?).clone(),
+                };
+                match_counts_with(row, &inventory)
+            }
+        };
+        active.push(ActiveWindow {
+            row,
+            window,
+            matches,
+        });
     }
     Ok((
         combined_banner(&active).into_iter().collect(),
@@ -963,15 +971,7 @@ fn matches_of(downtime: &Downtime, inventory: &Inventory) -> Matches {
 }
 
 fn match_counts_with(downtime: &Downtime, inventory: &Inventory) -> Arc<Matches> {
-    let cached = MATCH_COUNTS
-        .read()
-        .unwrap_or_else(|e| e.into_inner())
-        .get(&downtime.id)
-        .filter(|(version, at, _)| {
-            *version == downtime.updated_at && at.elapsed() < MATCH_COUNTS_TTL
-        })
-        .map(|(_, _, matches)| matches.clone());
-    if let Some(matches) = cached {
+    if let Some(matches) = cached_matches(downtime) {
         return matches;
     }
     let matches = Arc::new(matches_of(downtime, inventory));
@@ -983,6 +983,18 @@ fn match_counts_with(downtime: &Downtime, inventory: &Inventory) -> Arc<Matches>
         (downtime.updated_at, Instant::now(), matches.clone()),
     );
     matches
+}
+
+/// The counts cached for this row version, while they are fresh.
+fn cached_matches(downtime: &Downtime) -> Option<Arc<Matches>> {
+    MATCH_COUNTS
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(&downtime.id)
+        .filter(|(version, at, _)| {
+            *version == downtime.updated_at && at.elapsed() < MATCH_COUNTS_TTL
+        })
+        .map(|(_, _, matches)| matches.clone())
 }
 
 fn counts_of(matches: &Matches) -> MatchCounts {
@@ -1186,6 +1198,17 @@ mod tests {
             updated_by: "lin".to_string(),
             updated_at: 0,
         }
+    }
+
+    #[test]
+    fn banner_counts_come_from_the_cache_until_the_row_changes() {
+        let mut d = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        d.id = "banner-cache".to_string();
+        assert!(cached_matches(&d).is_none());
+        let counted = match_counts_with(&d, &Inventory::default());
+        assert!(Arc::ptr_eq(&cached_matches(&d).unwrap(), &counted));
+        d.updated_at += 1;
+        assert!(cached_matches(&d).is_none(), "an edit recounts");
     }
 
     #[test]

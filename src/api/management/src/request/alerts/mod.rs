@@ -3503,7 +3503,7 @@ pub async fn trigger_alert(
     };
     let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
-        Ok(_) => MetaHttpResponse::ok("Alert triggered"),
+        Ok(triggered) => MetaHttpResponse::ok(triggered.response_message()),
         Err(AlertError::AlertNotFound) => {
             if let Some(_composite) =
                 openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())

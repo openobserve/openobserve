@@ -363,7 +363,6 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
-    const { nameOf } = useDowntimeLookup(true);
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
@@ -405,6 +404,10 @@ export default defineComponent({
     // keeps the filter computeds and the table's row-model rebuild off the
     // reactivity hot path — the difference is very visible at a few hundred rows.
     const allIncidents = shallowRef<Incident[]>([]);
+    // The downtimes list is read only to name a muted row's downtime.
+    const { nameOf } = useDowntimeLookup(() =>
+      allIncidents.value.some((incident) => !!incident.muted_by_downtime_id),
+    );
     const searchQuery = ref("");
     // Primary filter groups the lifecycle like other list pages: Active covers
     // both open and acknowledged (still needs attention), Resolved is done.

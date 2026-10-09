@@ -62,11 +62,58 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
             }
             Ok(())
         }
-        DowntimeMessage::Delete { org, id, version } => {
-            table::downtimes::delete_at_least(&org, &id, version).await?;
+        DowntimeMessage::Delete {
+            org,
+            id,
+            version,
+            deleted_at,
+        } => {
+            let client = infra::db::get_orm_client_rw().await;
+            if deleted_at > 0
+                && table::downtimes::version_with(client, &org, &id)
+                    .await?
+                    .is_none()
+            {
+                table::folders::get_or_create(&org, default_folder(), FolderType::Downtimes)
+                    .await?;
+            }
+            apply_delete(client, &org, &id, version, deleted_at).await?;
             coordinator::downtimes::emit_delete_event(&org, &id).await
         }
     }
+}
+
+/// A Delete that overtakes its Put leaves a tombstone, so the late Put cannot make the row live.
+async fn apply_delete<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    version: i64,
+    deleted_at: i64,
+) -> Result<()> {
+    if table::downtimes::delete_at_least_with(conn, org, id, version)
+        .await?
+        .is_some()
+        || deleted_at <= 0
+    {
+        return Ok(());
+    }
+    let folder = table::folders::get_model(conn, org, DEFAULT_FOLDER, FolderType::Downtimes)
+        .await?
+        .ok_or_else(|| {
+            Error::Message(format!(
+                "[DOWNTIMES] no default downtime folder in {org} for the tombstone of {id}"
+            ))
+        })?;
+    table::downtimes::insert_tombstone_with(conn, org, id, &folder.id, version, deleted_at).await?;
+    // A Put that raced the insert and is older than this Delete is tombstoned as well.
+    if let Some(stored) = table::downtimes::version_with(conn, org, id).await?
+        && !stored.deleted
+        && stored.version < version
+    {
+        table::downtimes::delete_at_least_with(conn, org, id, version).await?;
+    }
+    Ok(())
 }
 
 /// Writes the put unless the stored row is newer; `Some(coverage changed)` if it wrote.
@@ -152,14 +199,17 @@ async fn local_folder_id(downtime: &Downtime) -> Result<String> {
         downtime.org,
         downtime.id
     );
-    let default = Folder {
+    table::folders::get_or_create(&downtime.org, default_folder(), FolderType::Downtimes).await?;
+    Ok(DEFAULT_FOLDER.to_owned())
+}
+
+fn default_folder() -> Folder {
+    Folder {
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: DEFAULT_FOLDER.to_owned(),
         description: DEFAULT_FOLDER.to_owned(),
         icon: None,
-    };
-    table::folders::get_or_create(&downtime.org, default, FolderType::Downtimes).await?;
-    Ok(DEFAULT_FOLDER.to_owned())
+    }
 }
 
 #[cfg(test)]
@@ -326,6 +376,35 @@ mod tests {
         assert_eq!(apply_put(&db, &versioned(3, i64::MAX)).await.unwrap(), None);
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn a_delete_before_its_put_leaves_no_live_row() {
+        let db = db().await;
+        apply_delete(&db, "acme", "d1", 2, 1_000).await.unwrap();
+        assert_eq!(apply_put(&db, &versioned(1, 500)).await.unwrap(), None);
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            None
+        );
+        assert_eq!(deleted_at(&db).await, 1_000);
+        // A later edit from another region still restores it, as with any tombstone.
+        assert_eq!(
+            apply_put(&db, &versioned(3, 2_000)).await.unwrap(),
+            Some(false)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_delete_without_deleted_at_leaves_a_missing_row_missing() {
+        let db = db().await;
+        apply_delete(&db, "acme", "d1", 0, 0).await.unwrap();
+        assert_eq!(
+            table::downtimes::version_with(&db, "acme", "d1")
+                .await
+                .unwrap(),
             None
         );
     }

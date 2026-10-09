@@ -85,7 +85,13 @@ pub async fn delete(org: &str, id: &str) -> Result<(), anyhow::Error> {
     coordinator::emit_delete_event(org, id).await?;
     remove_cached(org, id);
     #[cfg(feature = "enterprise")]
-    super_cluster::emit_delete(org, id, version.unwrap_or_default()).await;
+    super_cluster::emit_delete(
+        org,
+        id,
+        version.unwrap_or_default(),
+        config::utils::time::now_micros(),
+    )
+    .await;
     #[cfg(not(feature = "enterprise"))]
     let _ = version;
     Ok(())
@@ -97,9 +103,9 @@ pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
     let ids = table::delete_by_org(org).await?;
     for id in &ids {
         coordinator::emit_delete_event(org, id).await?;
-        // Org deletion removes the rows outright, so there is no tombstone version to send.
+        // Org deletion removes the rows outright, so no region may keep a tombstone for them.
         #[cfg(feature = "enterprise")]
-        super_cluster::emit_delete(org, id, 0).await;
+        super_cluster::emit_delete(org, id, 0, 0).await;
     }
     remove_org(org);
     for row in &rows {
@@ -276,11 +282,11 @@ mod super_cluster {
         }
     }
 
-    pub(super) async fn emit_delete(org: &str, id: &str, version: i64) {
+    pub(super) async fn emit_delete(org: &str, id: &str, version: i64, deleted_at: i64) {
         if !enabled() {
             return;
         }
-        if let Err(e) = queue::downtimes_delete(org, id, version).await {
+        if let Err(e) = queue::downtimes_delete(org, id, version, deleted_at).await {
             log::error!("[DOWNTIMES] super cluster delete {org}/{id} failed: {e}");
         }
     }

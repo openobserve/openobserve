@@ -41,6 +41,39 @@ describe("AddDowntime schema", () => {
     );
   });
 
+  it("names the backend caps on the field that breaks them", () => {
+    const v = valid();
+    v.modules = ["alerts", "synthetics"];
+    v.targets.alerts.folders = Array.from({ length: 51 }, (_, i) => `f${i}`);
+    v.targets.alerts.ids_open = true;
+    v.targets.alerts.ids = Array.from({ length: 201 }, (_, i) => `a${i}`);
+    v.targets.synthetics.tags_open = true;
+    v.targets.synthetics.tags = Array.from({ length: 17 }, (_, i) => `t:${i}`);
+    const errors = errorsOf(v);
+    expect(errors["targets.alerts.folders"]).toBe("Choose at most 50 folders, or All folders.");
+    expect(errors["targets.alerts.ids"]).toBe("Pick at most 200 items.");
+    expect(errors["targets.synthetics.tags"]).toBe("Add at most 16 tags.");
+
+    v.targets.alerts.folders = Array.from({ length: 50 }, (_, i) => `f${i}`);
+    v.targets.alerts.ids = v.targets.alerts.ids.slice(0, 200);
+    v.targets.synthetics.tags = v.targets.synthetics.tags.slice(0, 16);
+    const atCap = errorsOf(v);
+    expect(atCap["targets.alerts.folders"]).toBeUndefined();
+    expect(atCap["targets.alerts.ids"]).toBeUndefined();
+    expect(atCap["targets.synthetics.tags"]).toBeUndefined();
+  });
+
+  it("names the condition caps of 32 pairs and depth 3", () => {
+    const pair = { type: "pair" as const, key: "service", operator: "=" as const, value: "p" };
+    const v = valid();
+    v.condition = conditionToBuilder({
+      type: "group",
+      op: "and",
+      items: Array.from({ length: 33 }, () => pair),
+    });
+    expect(errorsOf(v).condition).toBe("A condition can hold at most 32 pairs.");
+  });
+
   it("rejects a condition made only of != rows", () => {
     const v = valid();
     v.condition = conditionToBuilder({
