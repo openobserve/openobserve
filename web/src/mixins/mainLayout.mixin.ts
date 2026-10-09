@@ -48,8 +48,9 @@ const MainLayoutOpenSourceMixin = {
             UserObj: any;
             label: string;
           }) => {
+            // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
             const optiondata: any = {
-              label: data.label,
+              label: data.name,
               id: data.id,
               identifier: data.identifier,
               user_email: store.state.userInfo.email,
@@ -68,7 +69,7 @@ const MainLayoutOpenSourceMixin = {
               useLocalOrganization(selectedOrg.value);
               store.dispatch("setSelectedOrganization", selectedOrg.value);
             }
-            return optiondata;
+            return { ...optiondata, label: data.label };
           },
         );
       });

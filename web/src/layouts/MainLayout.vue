@@ -1079,8 +1079,9 @@ export default defineComponent({
                 status: string;
                 label: string;
               }) => {
+                // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
                 const optiondata: any = {
-                  label: data.label,
+                  label: data.name,
                   id: data.id,
                   identifier: data.identifier,
                   user_email: store.state.userInfo.email,
@@ -1137,7 +1138,8 @@ export default defineComponent({
                   tempDefaultOrg = optiondata;
                 }
 
-                return optiondata;
+                // Disambiguated label only for the dropdown entry — optiondata itself keeps the real name.
+                return { ...optiondata, label: data.label };
               },
             )
             .sort((a: any, b: any) => a.label.localeCompare(b.label));
@@ -1152,7 +1154,7 @@ export default defineComponent({
         if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations.length > 0) {
           let data = withDisambiguatedOrgLabels(store.state.organizations)[0];
           let optiondata = {
-            label: data.label,
+            label: data.name,
             id: data.id,
             identifier: data.identifier,
             user_email: store.state.userInfo.email,

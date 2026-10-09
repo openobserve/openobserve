@@ -411,6 +411,7 @@ pub async fn get_admins_for_orgs(
         return Ok(vec![]);
     }
     let client = get_orm_client_ro().await;
+    // Ordered so a multi-admin org deterministically resolves to the same owner (lowest email).
     let records = Entity::find()
         .filter(Column::OrgId.is_in(org_ids.to_vec()))
         .filter(Column::Role.eq(UserRole::Admin as i16))
@@ -419,6 +420,8 @@ pub async fn get_admins_for_orgs(
         .column(Column::OrgId)
         .column(users::Column::Email)
         .column(users::Column::FirstName)
+        .order_by_asc(Column::OrgId)
+        .order_by_asc(users::Column::Email)
         .into_model::<OrgAdminContact>()
         .all(client)
         .await

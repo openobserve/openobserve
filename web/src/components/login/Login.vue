@@ -416,8 +416,9 @@ export default defineComponent({
                           status: any;
                           label: string;
                         }) => {
+                          // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
                           let optiondata: any = {
-                            label: data.label,
+                            label: data.name,
                             id: data.id,
                             identifier: data.identifier,
                             user_email: store.state.userInfo.email,
@@ -451,7 +452,7 @@ export default defineComponent({
                             tempDefaultOrg = optiondata;
                           }
 
-                          return optiondata;
+                          return { ...optiondata, label: data.label };
                         },
                       );
 
