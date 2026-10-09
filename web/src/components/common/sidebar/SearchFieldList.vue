@@ -25,9 +25,9 @@
             :data-test="`search-field-list-group-${row.group}-header`"
             @click="toggleGroup(row.group)"
           >
-            <div class="min-w-0 flex-1 truncate">
+            <OTruncatedText as="div" class="flex-1">
               {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
-            </div>
+            </OTruncatedText>
             <OButton
               v-if="(groupFieldCount[row.group] ?? 0) > 0"
               variant="ghost"
@@ -208,6 +208,7 @@ import FieldValuesPanel from "@/components/common/FieldValuesPanel.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";

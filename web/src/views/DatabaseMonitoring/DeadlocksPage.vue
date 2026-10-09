@@ -196,16 +196,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("dbm.deadlocks.detail.noQueryCaptured") }}
               </span>
             </div>
-            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate">
+            <div class="text-text-secondary text-3xs flex min-w-0 items-center gap-1">
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <template v-if="row.db_instance">
                 <span class="opacity-45">·</span>
-                <span>{{ raw(row.db_instance) }}</span>
+                <OTruncatedText>{{ raw(row.db_instance) }}</OTruncatedText>
               </template>
               <span
                 v-for="chip in row.chips"
                 :key="chip.id"
-                class="rounded-default text-3xs ms-0.5 px-1 py-px font-semibold"
+                class="rounded-default text-3xs ms-0.5 shrink-0 px-1 py-px font-semibold"
                 :class="chip.tone"
               >
                 {{ chip.label }}
@@ -216,14 +216,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-applications="{ row }">
           <div class="flex flex-col items-end leading-tight">
-            <span
+            <OTruncatedText
               v-for="(app, index) in row.applications.slice(0, 2)"
               :key="app"
-              class="truncate font-mono text-xs"
+              class="max-w-full font-mono text-xs"
               :class="index === 0 ? 'text-text-body' : 'text-text-muted'"
             >
               {{ raw(app) }}
-            </span>
+            </OTruncatedText>
             <span v-if="!row.applications.length" class="text-text-muted">{{ raw("—") }}</span>
           </div>
         </template>
@@ -233,9 +233,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-heading text-compact font-mono font-medium tabular-nums">
               {{ row.objects.length || raw("—") }}
             </span>
-            <span class="text-text-secondary text-3xs truncate">{{
+            <OTruncatedText class="text-text-secondary text-3xs max-w-full">{{
               raw(row.objects[0] ?? "")
-            }}</span>
+            }}</OTruncatedText>
           </div>
         </template>
 
@@ -445,6 +445,7 @@ import DbmLockEmptyState, {
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

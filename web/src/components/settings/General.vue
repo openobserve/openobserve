@@ -214,16 +214,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else class="flex items-center">
-            <span class="w-47.5 truncate text-center"
+            <OTruncatedText class="w-47.5 text-center"
               >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
-              <OTooltip
-                v-if="store.state.zoConfig.custom_logo_text.length > 20"
-                side="top"
-                align="center"
-                max-width="15.625rem"
-                :content="store.state.zoConfig.custom_logo_text"
-              />
-            </span>
+            </OTruncatedText>
             <OButton
               data-test="settings_ent_logo_custom_text_edit_btn"
               :loading="loadingState"
@@ -613,6 +606,7 @@ import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import AnnouncementBanners from "./AnnouncementBanners.vue";
@@ -647,6 +641,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OInput,
     OFile,
     OForm,

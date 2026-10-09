@@ -19,7 +19,8 @@ export interface DomainOrgMapping {
   domain: string;
   org_id: string;
   base_role: DomainOrgBaseRole;
-  user_group?: string;
+  role_claim_name?: string;
+  create_missing_roles?: boolean;
 }
 
 export const makeDomainOrgMappingSchema = (t: (_key: string) => string) =>
@@ -32,8 +33,9 @@ export const makeDomainOrgMappingSchema = (t: (_key: string) => string) =>
       .refine((v) => isValidDomain(v), { message: t("settings.invalidDomain") }),
     org_id: z.string().min(1, t("settings.domainOrgMappings.organizationRequired")),
     base_role: z.enum(DOMAIN_ORG_BASE_ROLES),
-    // "" is the cleared state of the group select; normalized away at submit.
-    user_group: z.string().optional(),
+    // "" is the cleared state of the input; normalized away at submit.
+    role_claim_name: z.string().optional(),
+    create_missing_roles: z.boolean(),
   });
 
 export type DomainOrgMappingForm = z.infer<ReturnType<typeof makeDomainOrgMappingSchema>>;
@@ -42,5 +44,6 @@ export const domainOrgMappingDefaults = (): DomainOrgMappingForm => ({
   domain: "",
   org_id: "",
   base_role: "admin",
-  user_group: "",
+  role_claim_name: "",
+  create_missing_roles: false,
 });
