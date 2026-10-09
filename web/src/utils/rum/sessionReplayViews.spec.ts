@@ -60,6 +60,11 @@ const scroll = (timestamp: number) => ({
   timestamp,
   data: { source: 3, id: 3, x: 0, y: 10 },
 });
+const input = (timestamp: number) => ({
+  type: 3,
+  timestamp,
+  data: { source: 5, id: 3, text: "typed", isChecked: false },
+});
 const mouseMove = (timestamp: number) => ({
   type: 3,
   timestamp,
@@ -436,5 +441,214 @@ describe("createMultiViewDecoder", () => {
         .map((s) => s.viewId)
         .sort(),
     ).toEqual(["A", "B"]);
+  });
+
+  describe("implicit view ends from the manifest", () => {
+    const pageLoads = () => [
+      segment("A", 0, [...opening(1000, "A"), text(1300, "a-last")]),
+      segment("B", 0, opening(2000, "B")),
+    ];
+
+    it("treats a view past its last manifest row as ended, so the next page load is not concurrent", () => {
+      const decoder = createMultiViewDecoder();
+      decoder.setViewEnds(
+        new Map([
+          ["A", 1300],
+          ["B", 2000],
+        ]),
+      );
+      decoder.push(pageLoads(), 2600);
+      expect(decoder.switches().at(-1)).toMatchObject({
+        viewId: "B",
+        reason: "snapshot",
+        fromEnded: true,
+      });
+      expect(decoder.concurrent()).toBe(false);
+
+      const { events } = decoder.push([segment("A", 1, [interaction(2600, CLICK)])], Infinity);
+      expect(decoder.switches().map((s) => s.viewId)).toEqual(["A", "B"]);
+      expect(fullSnapshots(events)).toEqual([]);
+    });
+
+    it("without known ends (a live session) a page load without ViewEnd still looks concurrent", () => {
+      const decoder = createMultiViewDecoder();
+      decoder.push(pageLoads(), Infinity);
+      expect(decoder.switches().at(-1)).toMatchObject({ viewId: "B", fromEnded: false });
+      expect(decoder.concurrent()).toBe(true);
+    });
+
+    it("counts a known end equal to the next snapshot's time as ended", () => {
+      const decoder = createMultiViewDecoder();
+      decoder.setViewEnds(new Map([["A", 2000]]));
+      decoder.push(
+        [segment("A", 0, opening(1000, "A")), segment("B", 0, opening(2000, "B", false))],
+        Infinity,
+      );
+      expect(decoder.switches().at(-1)).toMatchObject({ viewId: "B", fromEnded: true });
+      expect(decoder.concurrent()).toBe(false);
+    });
+
+    it("hands over after the grace when the shown view passes its known end", () => {
+      const decoder = createMultiViewDecoder();
+      decoder.setViewEnds(
+        new Map([
+          ["A", 2000],
+          ["B", 4000],
+        ]),
+      );
+      const { events } = decoder.push(
+        [
+          segment("A", 0, [...opening(1000, "A"), text(2000, "a-last")]),
+          segment("B", 0, [...opening(1500, "B", false), text(4000, "b-later")]),
+        ],
+        Infinity,
+      );
+      expect(decoder.switches()).toMatchObject([
+        { viewId: "A" },
+        { at: 4000, viewId: "B", reason: "handover", rebuilt: true, fromEnded: true },
+      ]);
+      expect(decoder.concurrent()).toBe(false);
+      expect(fullSnapshots(events).map((e) => e.timestamp)).toEqual([1000, 4000]);
+    });
+  });
+
+  it("a bfcache restore stamped before the old view's ViewEnd is not counted as concurrent", () => {
+    const decoder = createMultiViewDecoder();
+    decoder.push(
+      [segment("A", 0, [...opening(0, "A"), viewEnd(1003)]), segment("B", 0, opening(1000, "B"))],
+      Infinity,
+    );
+    expect(decoder.switches().at(-1)).toMatchObject({ viewId: "B", fromEnded: true });
+    expect(decoder.concurrent()).toBe(false);
+  });
+
+  it("stamps an end-of-push hand-over after the clock an earlier push emitted", () => {
+    const decoder = createMultiViewDecoder();
+    const first = decoder.push(
+      [
+        segment("A", 0, [...opening(1000, "A"), viewEnd(2000)]),
+        segment("B", 0, opening(1500, "B", false)),
+      ],
+      5000,
+    );
+    expect(first.events.at(-1)).toMatchObject({ type: 5, timestamp: 4999 });
+    const second = decoder.push([], Infinity);
+    const handOver = decoder.switches().at(-1)!;
+    expect(handOver).toMatchObject({ viewId: "B", reason: "handover" });
+    expect(handOver.at).toBeGreaterThan(4999);
+    expect(fullSnapshots(second.events).map((e) => e.timestamp)).toEqual([handOver.at]);
+  });
+
+  it("a skip marker without a view id does not open a span on a view that already ended", () => {
+    const decoder = createMultiViewDecoder();
+    decoder.push(
+      [
+        segment("A", 0, [...opening(1000, "A"), viewEnd(1500)]),
+        segment("B", 0, opening(1100, "B")),
+        { skipped: true, segmentId: "s", start: 2000, end: 2500 },
+      ],
+      Infinity,
+    );
+    expect(decoder.staleSpans().map((s) => s.viewId)).toEqual(["B"]);
+  });
+
+  describe("presence signals that return to a view", () => {
+    const returnOn = (trigger: any) => {
+      const decoder = createMultiViewDecoder();
+      decoder.push(
+        [
+          segment("A", 0, opening(1000, "A")),
+          segment("B", 0, opening(2000, "B")),
+          segment("A", 1, [trigger]),
+        ],
+        Infinity,
+      );
+      return decoder.switches().at(-1);
+    };
+
+    it("returns on Focus with has_focus true", () => {
+      expect(returnOn(focus(3000, true))).toMatchObject({ viewId: "A", reason: "focus" });
+    });
+
+    it("returns on Scroll in a focused view", () => {
+      expect(returnOn(scroll(3000))).toMatchObject({ viewId: "A", reason: "activity" });
+    });
+
+    it("returns on Input in a focused view", () => {
+      expect(returnOn(input(3000))).toMatchObject({ viewId: "A", reason: "activity" });
+    });
+
+    it.each([1, 3, 4, 7])("returns on MouseInteraction type %i", (kind) => {
+      expect(returnOn(interaction(3000, kind))).toMatchObject({ viewId: "A", reason: "activity" });
+    });
+
+    it.each([0, 5, 6, 9])("does not return on MouseInteraction type %i", (kind) => {
+      expect(returnOn(interaction(3000, kind))).toMatchObject({ viewId: "B" });
+    });
+  });
+
+  describe("hand-over grace", () => {
+    it("keeps a pending hand-over across a finite watermark and lets the successor take it", () => {
+      const decoder = createMultiViewDecoder();
+      decoder.push(
+        [
+          segment("A", 0, opening(1000, "A")),
+          segment("B", 0, [...opening(2000, "B"), viewEnd(3000)]),
+        ],
+        3200,
+      );
+      const { events } = decoder.push([segment("C", 0, opening(3300, "C"))], Infinity);
+      expect(decoder.switches().filter((s) => s.at >= 3000)).toMatchObject([
+        { viewId: "C", reason: "snapshot", rebuilt: false, fromEnded: true },
+      ]);
+      expect(fullSnapshots(events).map((e) => e.timestamp)).toEqual([3300]);
+    });
+
+    it("a presence return inside the grace cancels the pending hand-over", () => {
+      const decoder = createMultiViewDecoder();
+      decoder.push(
+        [
+          segment("A", 0, opening(1000, "A")),
+          segment("B", 0, [...opening(2000, "B"), viewEnd(3000)]),
+          segment("A", 1, [interaction(3500, CLICK), text(6000, "later")]),
+        ],
+        Infinity,
+      );
+      expect(decoder.switches().filter((s) => s.at >= 3000)).toMatchObject([
+        { at: 3500, viewId: "A", reason: "activity", fromEnded: true },
+      ]);
+    });
+
+    it("a successor snapshot after the grace takes over directly when no other view is open", () => {
+      const decoder = createMultiViewDecoder();
+      const { events } = decoder.push(
+        [
+          segment("A", 0, [...opening(1000, "A"), viewEnd(2000)]),
+          segment("C", 0, opening(4000, "C")),
+        ],
+        Infinity,
+      );
+      expect(decoder.switches()).toMatchObject([
+        { viewId: "A" },
+        { at: 4000, viewId: "C", reason: "snapshot", rebuilt: false, fromEnded: true },
+      ]);
+      expect(fullSnapshots(events).map((e) => e.timestamp)).toEqual([1000, 4000]);
+    });
+
+    it("a successor snapshot after the grace follows the hand-over to an open view", () => {
+      const decoder = createMultiViewDecoder();
+      decoder.push(
+        [
+          segment("A", 0, opening(1000, "A", false)),
+          segment("B", 0, [...opening(2000, "B"), viewEnd(3000)]),
+          segment("C", 0, opening(4500, "C")),
+        ],
+        Infinity,
+      );
+      expect(decoder.switches().filter((s) => s.at >= 3000)).toMatchObject([
+        { at: 4500, viewId: "A", reason: "handover", fromEnded: true },
+        { at: 4500, viewId: "C", reason: "snapshot", fromEnded: false },
+      ]);
+    });
   });
 });
