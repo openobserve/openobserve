@@ -18,6 +18,7 @@ import {
   dedupManifest,
   trimBeforeReplayStart,
   findTargetIndex,
+  replayWatermark,
   segmentId,
   selectInitialWindow,
   snapshotStarts,
@@ -225,6 +226,25 @@ describe("sessionReplayManifest", () => {
       const window = selectInitialWindow(rows, 21)!;
       expect(window.anchorIndex).toBe(1);
       expect(window.movedForViews).toBe(false);
+    });
+  });
+  describe("replayWatermark", () => {
+    const rows = [
+      { start: 0, end: 5 },
+      { start: 10, end: 15 },
+      { start: 20, end: 25 },
+    ];
+
+    it("is the start of the next row the run has not taken", () => {
+      expect(replayWatermark(rows, 0, false)).toBe(10);
+    });
+
+    it("is the last row's start while live once the run holds every row", () => {
+      expect(replayWatermark(rows, 2, true)).toBe(20);
+    });
+
+    it("is unbounded once the run holds every row of a finished session", () => {
+      expect(replayWatermark(rows, 2, false)).toBe(Number.POSITIVE_INFINITY);
     });
   });
 });

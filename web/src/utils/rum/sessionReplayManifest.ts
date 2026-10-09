@@ -147,6 +147,18 @@ function earliestAliveViewSnapshot(
   return earliest;
 }
 
+/** Every row after the run starts at or after this, so the replay decoder never sees an earlier record later. */
+export function replayWatermark(
+  rows: ManifestEntry[],
+  appendedThroughIndex: number,
+  live: boolean,
+): number {
+  const next = appendedThroughIndex + 1;
+  if (next < rows.length) return Number(rows[next].start);
+  if (live && rows.length) return Number(rows[rows.length - 1].start);
+  return Number.POSITIVE_INFINITY;
+}
+
 /** Starts of the segments that can anchor a cold player, used by the seek planner. */
 export function snapshotStarts(manifest: ManifestEntry[]): number[] {
   return manifest.filter(hasFullSnapshot).map((entry) => entry.start);
