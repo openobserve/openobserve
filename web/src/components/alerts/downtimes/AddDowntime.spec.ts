@@ -215,6 +215,7 @@ describe("AddDowntime", () => {
     expect(section.text()).toContain("Notify");
     expect(section.text()).toContain("Before it ends");
     expect(wrapper.find('[data-test="downtime-notify-lead"]').exists()).toBe(false);
+    await seeSchedule(wrapper);
     await save(wrapper);
     await dialogButton("primary");
     const [, body] = vi.mocked(downtimes.create).mock.calls[0];
@@ -227,6 +228,7 @@ describe("AddDowntime", () => {
     wrapper.findComponent(AlertDestinationsField).vm.$emit("update:destinations", ["slack-oncall"]);
     await flushPromises();
     expect(wrapper.find('[data-test="downtime-notify-lead"]').exists()).toBe(true);
+    await seeSchedule(wrapper);
     await save(wrapper);
     await dialogButton("primary");
     const [, body] = vi.mocked(downtimes.create).mock.calls[0];
