@@ -228,6 +228,69 @@ describe("mutation endpoints return response.data directly", () => {
   });
 });
 
+describe("quality APIs", () => {
+  it("quality.list sends snake_case params with whole-µs times and drops empty optionals", async () => {
+    mockGet.mockResolvedValue({ data: { list: [{ configId: "c1" }] } });
+    const result = await onlineEvalsService.quality.list("acme", {
+      start_time: 1791112620869676.5,
+      end_time: 1791199020869676,
+      agent_env: "prod",
+      agent_name: "",
+      agent_id: undefined,
+    });
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/quality", {
+      params: { start_time: 1791112620869676, end_time: 1791199020869676, agent_env: "prod" },
+    });
+    expect(result).toEqual([{ configId: "c1" }]);
+  });
+
+  it("quality.scores hits the per-config path with the filter and page params", async () => {
+    const page = { average: null, distribution: [], list: [], total: 0, from: 10, size: 10 };
+    mockGet.mockResolvedValue({ data: page });
+    const result = await onlineEvalsService.quality.scores("acme", "7512827247535849473", {
+      start_time: 1,
+      end_time: 2,
+      scope: "trace",
+      unhealthy_only: true,
+      bucket_from: 3,
+      bucket_to: 5,
+      value: undefined,
+      from: 10,
+      size: 10,
+    });
+    expect(mockGet).toHaveBeenCalledWith("/api/acme/score_configs/7512827247535849473/quality", {
+      params: {
+        start_time: 1,
+        end_time: 2,
+        scope: "trace",
+        unhealthy_only: true,
+        bucket_from: 3,
+        bucket_to: 5,
+        from: 10,
+        size: 10,
+      },
+    });
+    expect(result).toBe(page);
+  });
+
+  it("quality.failedRuns counts error and timeout runs on _evaluator with the agent filter", async () => {
+    mockPost.mockResolvedValue({ data: { hits: [{ failed_runs: 12 }] } });
+    const count = await onlineEvalsService.quality.failedRuns("acme", {
+      startTime: 10,
+      endTime: 20,
+      agentWhere: "attributes_target_agent_id = 'a1'",
+      base64: false,
+    });
+    expect(count).toBe(12);
+    const [url, body] = mockPost.mock.calls[0];
+    expect(url).toContain("/api/acme/_search?type=traces");
+    expect(body.query).toMatchObject({ start_time: 10, end_time: 20, size: 1 });
+    expect(body.query.sql).toBe(
+      `SELECT COUNT(*) AS failed_runs FROM "_evaluator" WHERE (attributes_status IN ('error', 'timeout')) AND (attributes_target_agent_id = 'a1')`,
+    );
+  });
+});
+
 describe("jobs.create analytics", () => {
   beforeEach(() => vi.mocked(analytics.track).mockClear());
 
