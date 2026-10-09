@@ -8842,6 +8842,16 @@
         "synthetics": "合成モニタリング",
         "slos": "SLOs"
       },
+      "target": {
+        "incidentMode": {
+          "label": "ウィンドウ中のインシデントは",
+          "muted": "作成してミュート (デフォルト)",
+          "mutedHelp": "インシデントは通常どおり作成されますが、ウィンドウ終了まで誰にも通知されません。",
+          "none": "作成しない",
+          "noneHelp": "ウィンドウ中はインシデントを作成しません。終了後の最初の発火で作成され、通知されます。",
+          "summary": "インシデントなし"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} 件の {key} | {count} 件の {key}",
         "condition": "条件",

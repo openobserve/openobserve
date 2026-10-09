@@ -8842,6 +8842,16 @@
         "synthetics": "合成监控",
         "slos": "SLO"
       },
+      "target": {
+        "incidentMode": {
+          "label": "在窗口期间，事件将",
+          "muted": "创建并静音（默认）",
+          "mutedHelp": "事件照常创建，但在窗口结束前不通知任何人。",
+          "none": "不创建",
+          "noneHelp": "窗口期间不创建事件；窗口结束后的首次触发会创建事件并发送通知。",
+          "summary": "不创建事件"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} 个 {key} | {count} 个 {key}",
         "condition": "条件",

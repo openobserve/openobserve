@@ -8842,6 +8842,16 @@
         "synthetics": "Sintéticos",
         "slos": "SLOs"
       },
+      "target": {
+        "incidentMode": {
+          "label": "Durante la ventana, los incidentes se",
+          "muted": "Crean y silencian (predeterminado)",
+          "mutedHelp": "Los incidentes se abren como siempre, pero no notifican a nadie hasta que termina la ventana.",
+          "none": "No se crean",
+          "noneHelp": "No se abre ningún incidente durante la ventana; el primer disparo posterior abre uno y notifica.",
+          "summary": "sin incidentes"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}s",
         "condition": "condición",

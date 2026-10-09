@@ -8842,6 +8842,16 @@
         "synthetics": "Synthetics",
         "slos": "SLOs"
       },
+      "target": {
+        "incidentMode": {
+          "label": "Während des Fensters werden Vorfälle",
+          "muted": "Erstellt und stummgeschaltet (Standard)",
+          "mutedHelp": "Vorfälle werden wie gewohnt geöffnet, benachrichtigen aber niemanden bis zum Ende des Fensters.",
+          "none": "Nicht erstellt",
+          "noneHelp": "Während des Fensters wird kein Vorfall geöffnet; die erste Auslösung danach öffnet einen und benachrichtigt.",
+          "summary": "keine Vorfälle"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}",
         "condition": "Bedingung",

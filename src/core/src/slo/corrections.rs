@@ -894,6 +894,7 @@ mod tests {
                     tags: vec![],
                     ids: vec![],
                     slo_mode: None,
+                    incident_mode: Default::default(),
                 }],
                 schedule: DowntimeSchedule {
                     repeat: Repeat::None,

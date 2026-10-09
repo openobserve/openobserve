@@ -136,6 +136,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </div>
 
+    <div
+      v-if="module === 'alerts'"
+      class="flex flex-col gap-1.5"
+      data-test="downtime-target-alerts-incident-mode-block"
+    >
+      <span class="text-text-label text-xs font-medium">
+        {{ t("alerts.downtimes.target.incidentMode.label") }}
+      </span>
+      <OFormRadioGroup
+        name="targets.alerts.incident_mode"
+        :label="t('alerts.downtimes.target.incidentMode.label')"
+        data-test="downtime-target-alerts-incident-mode"
+      >
+        <ORadio
+          v-for="option in INCIDENT_MODE_OPTIONS"
+          :key="option.value"
+          :value="option.value"
+          size="sm"
+          :data-test="`downtime-target-alerts-incident-mode-${option.value}`"
+        >
+          <template #label>
+            <span class="flex flex-col gap-0.5">
+              <span>{{ t(option.label) }}</span>
+              <span class="text-text-secondary text-xs font-normal">{{ t(option.help) }}</span>
+            </span>
+          </template>
+        </ORadio>
+      </OFormRadioGroup>
+    </div>
+
     <div v-if="module === 'slos'" class="flex flex-col gap-1">
       <OFormToggleGroup
         name="targets.slos.slo_mode"
@@ -179,7 +209,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { optionalFoldersQuery } from "@/services/common.queries";
-import type { TargetModule } from "@/services/downtimes";
+import type { IncidentMode, TargetModule } from "@/services/downtimes";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { useToast } from "@/lib/feedback/Toast/useToast";
@@ -195,6 +225,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
 
 const MATCH_KEYS: Record<TargetModule, I18nKey> = {
   alerts: "alerts.downtimes.form.matches.alerts",
@@ -202,6 +234,19 @@ const MATCH_KEYS: Record<TargetModule, I18nKey> = {
   synthetics: "alerts.downtimes.form.matches.synthetics",
   slos: "alerts.downtimes.form.matches.slos",
 };
+
+const INCIDENT_MODE_OPTIONS: { value: IncidentMode; label: I18nKey; help: I18nKey }[] = [
+  {
+    value: "muted",
+    label: "alerts.downtimes.target.incidentMode.muted",
+    help: "alerts.downtimes.target.incidentMode.mutedHelp",
+  },
+  {
+    value: "none",
+    label: "alerts.downtimes.target.incidentMode.none",
+    help: "alerts.downtimes.target.incidentMode.noneHelp",
+  },
+];
 
 const props = withDefaults(
   defineProps<{

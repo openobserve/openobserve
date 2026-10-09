@@ -279,11 +279,23 @@ pub async fn update_status(
     id: &str,
     status: &str,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = get_orm_client_rw().await;
+    update_status_with(get_orm_client_rw().await, org_id, id, status).await
+}
+
+/// [`update_status`] on a given connection; a resolve ends the downtime mute.
+pub async fn update_status_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    status: &str,
+) -> Result<alert_incidents::Model, errors::Error> {
     let now = chrono::Utc::now().timestamp_micros();
 
-    let incident = get(org_id, id)
-        .await?
+    let incident = alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .one(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
     let mut active: alert_incidents::ActiveModel = incident.into();
@@ -292,10 +304,12 @@ pub async fn update_status(
 
     if status == "resolved" {
         active.resolved_at = Set(Some(now));
+        // A manual reopen must run as a live incident, not stay muted forever.
+        active.muted_by_downtime_id = Set(None);
     }
 
     active
-        .update(client)
+        .update(conn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -981,6 +995,31 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(row.muted_by_downtime_id.as_deref(), Some("dt-1"));
+    }
+
+    #[tokio::test]
+    async fn a_resolve_clears_the_mute_so_a_manual_reopen_is_live() {
+        let db = incidents_db().await;
+        let incident = muted_incident(&db, "dt-1").await;
+        let ack = update_status_with(&db, "acme", &incident.id, "acknowledged")
+            .await
+            .unwrap();
+        assert_eq!(ack.muted_by_downtime_id.as_deref(), Some("dt-1"));
+        let resolved = update_status_with(&db, "acme", &incident.id, "resolved")
+            .await
+            .unwrap();
+        assert_eq!(resolved.muted_by_downtime_id, None);
+        assert!(resolved.resolved_at.is_some());
+        let reopened = update_status_with(&db, "acme", &incident.id, "open")
+            .await
+            .unwrap();
+        assert_eq!(reopened.status, "open");
+        assert_eq!(reopened.muted_by_downtime_id, None);
+        assert!(
+            update_status_with(&db, "other", &incident.id, "resolved")
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]

@@ -20,6 +20,7 @@ import type {
   DowntimeRequest,
   DowntimeSchedule,
   DowntimeTarget,
+  IncidentMode,
   Repeat,
   SloCorrectionMode,
   TargetModule,
@@ -49,6 +50,7 @@ export interface TargetFormValues {
   ids_open: boolean;
   ids: string[];
   slo_mode: SloCorrectionMode;
+  incident_mode: IncidentMode;
 }
 
 export interface ScheduleFormValues {
@@ -90,6 +92,7 @@ const emptyTarget = (): TargetFormValues => ({
   ids_open: false,
   ids: [],
   slo_mode: "exclude",
+  incident_mode: "muted",
 });
 
 export const hasIdentity = (module: TargetModule): boolean => module !== "synthetics";
@@ -177,6 +180,8 @@ const buildTarget = (module: TargetModule, tv: TargetFormValues): DowntimeTarget
   if (module === "synthetics" && tv.tags_open && tv.tags.length) target.tags = [...tv.tags];
   if (tv.ids_open && tv.ids.length) target.ids = [...tv.ids];
   if (module === "slos") target.slo_mode = tv.slo_mode;
+  // The server omits the default, so sending only `none` keeps a saved row and its edit equal.
+  if (module === "alerts" && tv.incident_mode === "none") target.incident_mode = "none";
   return target;
 };
 
@@ -259,6 +264,7 @@ const targetValues = (target: DowntimeTarget | undefined): TargetFormValues => {
     ids_open: !!target.ids?.length,
     ids: [...(target.ids ?? [])],
     slo_mode: target.slo_mode ?? "exclude",
+    incident_mode: target.incident_mode ?? "muted",
   };
 };
 

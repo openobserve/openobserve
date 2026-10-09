@@ -8842,6 +8842,16 @@
         "synthetics": "Synthetics",
         "slos": "SLO"
       },
+      "target": {
+        "incidentMode": {
+          "label": "기간 동안 인시던트는",
+          "muted": "생성 후 음소거 (기본값)",
+          "mutedHelp": "인시던트는 평소처럼 열리지만 기간이 끝날 때까지 아무에게도 알리지 않습니다.",
+          "none": "생성 안 함",
+          "noneHelp": "기간 동안 인시던트가 열리지 않으며, 기간 이후 첫 발생 시 인시던트를 열고 알립니다.",
+          "summary": "인시던트 없음"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}",
         "condition": "조건",

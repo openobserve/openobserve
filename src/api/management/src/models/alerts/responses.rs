@@ -729,6 +729,7 @@ fn still_active(
         id: row.id.clone(),
         name: row.name.clone(),
         ends_at: window.end,
+        incident_mode: Default::default(),
     })
 }
 

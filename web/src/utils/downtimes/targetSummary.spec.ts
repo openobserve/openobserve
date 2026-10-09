@@ -92,6 +92,19 @@ describe("targetSummary", () => {
     ).toBe("all folders");
   });
 
+  it("says no incidents only for an alerts target whose incident mode is none", () => {
+    expect(
+      targetSummary({ module: "alerts", folders: { kind: "all" }, incident_mode: "none" }, gt).text,
+    ).toBe("all folders · no incidents");
+    expect(
+      targetSummary({ module: "alerts", folders: { kind: "all" }, incident_mode: "muted" }, gt)
+        .text,
+    ).toBe("all folders");
+    expect(targetSummary({ module: "alerts", folders: { kind: "all" } }, gt).text).toBe(
+      "all folders",
+    );
+  });
+
   it("orders targets as the Applies to strip does", () => {
     const sorted = sortedTargets([
       { module: "slos", folders: { kind: "all" } },

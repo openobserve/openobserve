@@ -50,6 +50,7 @@ const targetSchema = z.object({
   ids_open: z.boolean(),
   ids: z.array(z.string()),
   slo_mode: z.enum(["exclude", "count_as_good"]),
+  incident_mode: z.enum(["muted", "none"]),
 });
 
 const scheduleSchema = z.object({

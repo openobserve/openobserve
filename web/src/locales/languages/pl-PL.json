@@ -8842,6 +8842,16 @@
         "synthetics": "Syntetyki",
         "slos": "SLO"
       },
+      "target": {
+        "incidentMode": {
+          "label": "W trakcie okna incydenty są",
+          "muted": "Tworzone i wyciszane (domyślnie)",
+          "mutedHelp": "Incydenty otwierają się jak zwykle, ale nikogo nie powiadamiają do końca okna.",
+          "none": "Nie są tworzone",
+          "noneHelp": "W trakcie okna nie otwiera się żaden incydent; pierwsze wyzwolenie po nim otwiera incydent i powiadamia.",
+          "summary": "bez incydentów"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}",
         "condition": "warunek",

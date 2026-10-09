@@ -8842,6 +8842,16 @@
         "synthetics": "Synthetics",
         "slos": "SLO's"
       },
+      "target": {
+        "incidentMode": {
+          "label": "Tijdens het venster worden incidenten",
+          "muted": "Aangemaakt en gedempt (standaard)",
+          "mutedHelp": "Incidenten openen zoals gewoonlijk, maar melden niemand iets tot het venster eindigt.",
+          "none": "Niet aangemaakt",
+          "noneHelp": "Tijdens het venster opent geen incident; de eerste melding daarna opent er een en waarschuwt.",
+          "summary": "geen incidenten"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}s",
         "condition": "voorwaarde",

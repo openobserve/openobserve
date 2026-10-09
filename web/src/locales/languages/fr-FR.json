@@ -8842,6 +8842,16 @@
         "synthetics": "Synthétiques",
         "slos": "SLO"
       },
+      "target": {
+        "incidentMode": {
+          "label": "Pendant la fenêtre, les incidents sont",
+          "muted": "Créés et mis en sourdine (par défaut)",
+          "mutedHelp": "Les incidents s'ouvrent normalement mais ne notifient personne avant la fin de la fenêtre.",
+          "none": "Non créés",
+          "noneHelp": "Aucun incident n'est ouvert pendant la fenêtre ; le premier déclenchement après en ouvre un et notifie.",
+          "summary": "aucun incident"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}s",
         "condition": "condition",

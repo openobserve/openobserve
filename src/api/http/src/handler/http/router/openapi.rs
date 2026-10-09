@@ -457,6 +457,7 @@ use crate::{
             config::meta::downtimes::DowntimeWindow,
             config::meta::downtimes::ResourceValue,
             config::meta::downtimes::SloCorrectionMode,
+            config::meta::downtimes::IncidentMode,
             config::meta::downtimes::PreviewMatch,
             config::meta::downtimes::ActiveDowntime,
             config::meta::downtimes::CorrectionRef,

@@ -8842,6 +8842,16 @@
         "synthetics": "Sintéticos",
         "slos": "SLOs"
       },
+      "target": {
+        "incidentMode": {
+          "label": "Durante a janela, os incidentes são",
+          "muted": "Criados e silenciados (predefinição)",
+          "mutedHelp": "Os incidentes abrem normalmente, mas não notificam ninguém até ao fim da janela.",
+          "none": "Não criados",
+          "noneHelp": "Nenhum incidente é aberto durante a janela; o primeiro disparo depois dela abre um e notifica.",
+          "summary": "sem incidentes"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}s",
         "condition": "condição",

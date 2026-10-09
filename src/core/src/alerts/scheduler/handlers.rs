@@ -2507,11 +2507,10 @@ async fn correlate_muted_incident(
     let Some(first_row) = rows.first() else {
         return;
     };
-    if !alert.creates_incident
-        || !o2_enterprise::enterprise::common::config::get_config()
-            .incidents
-            .enabled
-    {
+    let incidents_enabled = o2_enterprise::enterprise::common::config::get_config()
+        .incidents
+        .enabled;
+    if !correlates_muted_firing(alert.creates_incident, incidents_enabled, downtime) {
         return;
     }
     if let Err(e) = crate::alerts::incidents::correlate_alert_to_incident(
@@ -2552,6 +2551,65 @@ fn holds_pending(
         }
         _ => false,
     }
+}
+
+/// A muted multi-alert correlates only the groups whose own downtime keeps incidents.
+#[cfg(feature = "enterprise")]
+async fn muted_incident_rows(
+    alert: &config::meta::alerts::alert::Alert,
+    folder_id: &str,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    now: i64,
+    decision: &config::meta::downtimes::ActiveDowntime,
+) -> Option<(
+    Vec<config::utils::json::Map<String, config::utils::json::Value>>,
+    config::meta::downtimes::ActiveDowntime,
+)> {
+    // A plain alert's decision is its first row's, and an SLO alert has one identity.
+    if !alert.query_condition.multi_alert_enabled() || alert.query_condition.slo_condition.is_some()
+    {
+        return keep_muted_incident_rows(rows, |_| Some(decision.clone()));
+    }
+    let by_group = group_downtimes(alert, folder_id, rows, now).await;
+    let group_by = alert_group_by(alert);
+    keep_muted_incident_rows(rows, |row| {
+        by_group
+            .get(&downtime_row_key(alert, &group_by, row))
+            .cloned()
+    })
+}
+
+/// The rows whose downtime is `muted`, with the first such row's downtime for the incident.
+#[cfg(feature = "enterprise")]
+fn keep_muted_incident_rows(
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    row_downtime: impl Fn(
+        &config::utils::json::Map<String, config::utils::json::Value>,
+    ) -> Option<config::meta::downtimes::ActiveDowntime>,
+) -> Option<(
+    Vec<config::utils::json::Map<String, config::utils::json::Value>>,
+    config::meta::downtimes::ActiveDowntime,
+)> {
+    let mut downtime = None;
+    let mut kept = Vec::new();
+    for row in rows {
+        let Some(row_downtime) = row_downtime(row).filter(|d| d.incident_mode.is_muted()) else {
+            continue;
+        };
+        downtime.get_or_insert(row_downtime);
+        kept.push(row.clone());
+    }
+    downtime.map(|downtime| (kept, downtime))
+}
+
+/// Incident mode `none` leaves the window's firings Suppressed with no incident to join later.
+#[cfg(feature = "enterprise")]
+fn correlates_muted_firing(
+    creates_incident: bool,
+    incidents_enabled: bool,
+    downtime: &config::meta::downtimes::ActiveDowntime,
+) -> bool {
+    creates_incident && incidents_enabled && downtime.incident_mode.is_muted()
 }
 
 /// D6: only a delivered firing opens the silence, so the run after a downtime delivers.
@@ -3370,16 +3428,18 @@ async fn handle_alert_triggers(
     let payload_empty = trigger_results.data.as_ref().is_none_or(|d| d.is_empty());
 
     #[cfg(feature = "enterprise")]
-    if let Some(downtime) = downtime.as_ref()
+    if let Some(decision) = downtime.as_ref()
         && let Some(rows) = trigger_results.data.as_deref()
+        && let Some((rows, downtime)) =
+            muted_incident_rows(&alert, &folder_id, rows, now, decision).await
     {
         correlate_muted_incident(
             &scheduler_trace_id,
             &alert,
-            rows,
+            &rows,
             triggered_at,
             eval_level,
-            downtime,
+            &downtime,
         )
         .await;
     }
@@ -8206,6 +8266,7 @@ mod tests {
             id: id.to_string(),
             name: id.to_string(),
             ends_at: 1,
+            incident_mode: Default::default(),
         };
         let identity = [group("a"), group("b")];
         let only_a = muted_in_every_group(&identity, |dims| {
@@ -8217,6 +8278,43 @@ mod tests {
         });
         assert_eq!(both.map(|d| d.id).as_deref(), Some("d1"));
         assert!(muted_in_every_group(&[], |_| Some(downtime("d1"))).is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn incident_mode_none_correlates_no_muted_firing() {
+        use config::meta::downtimes::{ActiveDowntime, IncidentMode};
+        let downtime = |incident_mode| ActiveDowntime {
+            id: "dt-1".to_string(),
+            name: "Deploy".to_string(),
+            ends_at: 1,
+            incident_mode,
+        };
+        assert!(correlates_muted_firing(
+            true,
+            true,
+            &downtime(IncidentMode::Muted)
+        ));
+        assert!(!correlates_muted_firing(
+            true,
+            true,
+            &downtime(IncidentMode::None)
+        ));
+        assert!(!correlates_muted_firing(
+            false,
+            true,
+            &downtime(IncidentMode::Muted)
+        ));
+        assert!(!correlates_muted_firing(
+            true,
+            false,
+            &downtime(IncidentMode::Muted)
+        ));
+        assert_eq!(
+            IncidentMode::default(),
+            IncidentMode::Muted,
+            "an Alerts target without the field keeps today's muted incident"
+        );
     }
 
     #[cfg(feature = "enterprise")]
@@ -8382,6 +8480,7 @@ mod tests {
                     id: format!("dt-{service}"),
                     name: service.clone(),
                     ends_at: 1,
+                    incident_mode: Default::default(),
                 })
         })
         .map(|d| d.id)
@@ -8464,13 +8563,8 @@ mod tests {
         assert_eq!(run_downtime(&alert, &rows, &["payments"]), None);
     }
 
-    /// `dispatch_per_group` and `unmuted_group_rows` look a row's group up under this key.
     #[cfg(feature = "enterprise")]
-    #[test]
-    fn every_multi_alert_row_finds_its_group_identity() {
-        let mut promql = config::meta::alerts::alert::Alert::default();
-        promql.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
-        promql.query_condition.promql_multi_alert = true;
+    fn sql_multi_alert() -> config::meta::alerts::alert::Alert {
         let mut sql = config::meta::alerts::alert::Alert::default();
         sql.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
             group_by: Some(vec!["service".to_string()]),
@@ -8484,6 +8578,17 @@ mod tests {
             warning_value: None,
             multi_alert: true,
         });
+        sql
+    }
+
+    /// `dispatch_per_group` and `unmuted_group_rows` look a row's group up under this key.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn every_multi_alert_row_finds_its_group_identity() {
+        let mut promql = config::meta::alerts::alert::Alert::default();
+        promql.query_condition.query_type = config::meta::alerts::QueryType::PromQL;
+        promql.query_condition.promql_multi_alert = true;
+        let sql = sql_multi_alert();
         let rows = [service_row("payments", 1), service_row("checkout", 2)];
         for alert in [&promql, &sql] {
             let identities: HashMap<String, HashMap<String, String>> =
@@ -8499,6 +8604,80 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Result order opposite to group-key order must not hand one group's mode to another.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn each_muted_group_correlates_under_its_own_incident_mode() {
+        use config::meta::downtimes::{ActiveDowntime, IncidentMode};
+        let alert = sql_multi_alert();
+        let group_by = alert_group_by(&alert);
+        let mut rows = [service_row("payments", 1), service_row("checkout", 2)];
+        let key = |row: &config::utils::json::Map<String, json::Value>| {
+            downtime_row_key(&alert, &group_by, row)
+        };
+        if key(&rows[0]) < key(&rows[1]) {
+            rows.swap(0, 1);
+        }
+        let keys: Vec<String> = identities_by_key(&alert, &rows, &service_groups())
+            .into_iter()
+            .map(|(key, _)| key)
+            .collect();
+        assert_eq!(
+            keys[0],
+            key(&rows[1]),
+            "the first result row is the last group"
+        );
+        let first = rows[0]["service"].as_str().unwrap().to_string();
+        let downtime = |service: &str, incident_mode| ActiveDowntime {
+            id: format!("dt-{service}"),
+            name: service.to_string(),
+            ends_at: 1,
+            incident_mode,
+        };
+        let modes = |first_mode, other_mode| {
+            let first = first.clone();
+            move |row: &config::utils::json::Map<String, json::Value>| {
+                let service = row["service"].as_str().unwrap();
+                let mode = if service == first {
+                    first_mode
+                } else {
+                    other_mode
+                };
+                Some(downtime(service, mode))
+            }
+        };
+        let other = rows[1]["service"].as_str().unwrap();
+
+        let (kept, chosen) =
+            keep_muted_incident_rows(&rows, modes(IncidentMode::None, IncidentMode::Muted))
+                .unwrap();
+        assert_eq!(
+            kept,
+            vec![rows[1].clone()],
+            "the none group opens no incident"
+        );
+        assert_eq!(chosen.id, format!("dt-{other}"));
+
+        let (kept, chosen) =
+            keep_muted_incident_rows(&rows, modes(IncidentMode::Muted, IncidentMode::None))
+                .unwrap();
+        assert_eq!(
+            kept,
+            vec![rows[0].clone()],
+            "the muted group still correlates"
+        );
+        assert_eq!(chosen.id, format!("dt-{first}"));
+
+        assert!(
+            keep_muted_incident_rows(&rows, modes(IncidentMode::None, IncidentMode::None))
+                .is_none()
+        );
+        let (kept, _) =
+            keep_muted_incident_rows(&rows, modes(IncidentMode::Muted, IncidentMode::Muted))
+                .unwrap();
+        assert_eq!(kept.len(), 2);
     }
 
     #[cfg(feature = "enterprise")]

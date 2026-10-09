@@ -962,6 +962,7 @@ mod tests {
             id: id.to_string(),
             name: id.to_string(),
             ends_at: 0,
+            incident_mode: Default::default(),
         }
     }
 

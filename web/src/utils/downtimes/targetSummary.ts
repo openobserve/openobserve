@@ -116,6 +116,9 @@ export function targetSummary(
   if (target.module === "slos" && target.slo_mode === "count_as_good") {
     parts.push(t("alerts.downtimes.summary.asGood"));
   }
+  if (target.module === "alerts" && target.incident_mode === "none") {
+    parts.push(t("alerts.downtimes.target.incidentMode.summary"));
+  }
   return {
     module: target.module,
     icon: MODULE_ICONS[target.module],

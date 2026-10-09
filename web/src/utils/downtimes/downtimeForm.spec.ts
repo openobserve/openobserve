@@ -97,6 +97,35 @@ describe("buildDowntimeRequest", () => {
     expect(slo).toEqual({ module: "slos", folders: { kind: "all" }, slo_mode: "count_as_good" });
   });
 
+  it("defaults the alerts incident mode to muted and sends it only when none", () => {
+    const values = defaultDowntimeValues(NOW, "UTC");
+    expect(values.targets.alerts.incident_mode).toBe("muted");
+    expect(buildDowntimeRequest(values).targets[0]).toEqual({
+      module: "alerts",
+      folders: { kind: "all" },
+    });
+    values.targets.alerts.incident_mode = "none";
+    expect(buildDowntimeRequest(values).targets[0]).toEqual({
+      module: "alerts",
+      folders: { kind: "all" },
+      incident_mode: "none",
+    });
+    values.modules = ["anomaly_detections"];
+    values.targets.anomaly_detections.incident_mode = "none";
+    expect(buildDowntimeRequest(values).targets[0].incident_mode).toBeUndefined();
+  });
+
+  it("reads a saved row without the incident mode as muted and keeps none on edit", () => {
+    expect(downtimeToFormValues(flow1).targets.alerts.incident_mode).toBe("muted");
+    const none: Downtime = {
+      ...flow1,
+      targets: [{ module: "alerts", folders: { kind: "all" }, incident_mode: "none" }],
+    };
+    const values = downtimeToFormValues(none);
+    expect(values.targets.alerts.incident_mode).toBe("none");
+    expect(buildDowntimeRequest(values).targets).toEqual(none.targets);
+  });
+
   it("keeps the condition in the form but sends none when only synthetics is chosen", () => {
     const values = downtimeToFormValues(flow1);
     values.modules = ["synthetics"];

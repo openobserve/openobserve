@@ -1496,6 +1496,82 @@ async fn create_new_incident(
     })
 }
 
+/// A repeat at a more urgent level raises the severity; the alert's own priority beats the level.
+async fn escalate_severity(
+    org_id: &str,
+    incident: &infra::table::entity::alert_incidents::Model,
+    subject: &CorrelationSubject,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+) -> Result<bool, anyhow::Error> {
+    let Some((current_severity, new_severity)) =
+        escalated_severity(&incident.severity, subject.severity, eval_level)
+    else {
+        return Ok(false);
+    };
+    infra::table::alert_incidents::update_severity(org_id, &incident.id, &new_severity.to_string())
+        .await?;
+    if let Err(e) = infra::table::incident_events::append(
+        org_id,
+        &incident.id,
+        IncidentEvent::severity_upgrade(
+            current_severity,
+            new_severity,
+            format!("alert '{}' escalated to {}", subject.name, new_severity),
+        ),
+    )
+    .await
+    {
+        log::error!(
+            "[Incidents] Failed to record severity-upgrade event for incident {org_id}/{}: {e}",
+            incident.id
+        );
+    }
+    log::info!(
+        "[Incidents] Incident {} escalated {current_severity} -> {new_severity} by alert '{}'",
+        incident.id,
+        subject.name
+    );
+    Ok(true)
+}
+
+/// The current and the raised severity when the firing's level is more urgent than the incident.
+fn escalated_severity(
+    current: &str,
+    subject_severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+) -> Option<(
+    config::meta::alerts::incidents::IncidentSeverity,
+    config::meta::alerts::incidents::IncidentSeverity,
+)> {
+    use config::meta::alerts::incidents::IncidentSeverity;
+    let level_severity = subject_severity.or_else(|| {
+        eval_level.and_then(|l| match l {
+            config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
+            config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
+            _ => None,
+        })
+    });
+    // P1 is most urgent; higher urgency = escalation.
+    let urgency = |s: IncidentSeverity| match s {
+        IncidentSeverity::P1 => 4u8,
+        IncidentSeverity::P2 => 3,
+        IncidentSeverity::P3 => 2,
+        IncidentSeverity::P4 => 1,
+    };
+    let new_severity = level_severity?;
+    let current_severity = current.parse::<IncidentSeverity>().ok()?;
+    (urgency(new_severity) > urgency(current_severity)).then_some((current_severity, new_severity))
+}
+
+/// A suppressed firing, or one that joins a still-muted incident, starts no workflow and no page.
+fn firing_is_muted(
+    muted_by: Option<&str>,
+    incident: &infra::table::entity::alert_incidents::Model,
+    reopened: bool,
+) -> bool {
+    muted_by.is_some() || (incident.muted_by_downtime_id.is_some() && !reopened)
+}
+
 /// Find an existing open incident or create a new one
 #[allow(clippy::too_many_arguments)]
 async fn find_or_create_incident(
@@ -1570,68 +1646,15 @@ async fn find_or_create_incident(
                 triggered_at,
             );
             if reopened {
+                // Recomputed from the un-muting firing, so "opened" carries the right level.
+                escalate_severity(org_id, &incident, subject, eval_level).await?;
                 return Ok(reopened_after_mute(org_id, incident.id, service_name).await);
             }
 
-            // T-8/§7.1: a repeat at HIGHER severity is an ESCALATION, not a
-            // repeat. A Warning-created P3 incident must upgrade to P2 and
-            // notify when the alert re-fires at Critical — the scheduler's
-            // silence layer explicitly let this delivery through, and
-            // suppressing it here would lose the only page for the
-            // escalation.
-            //
-            // B-29: `subject.severity` (alert.priority, when set) is the same
-            // precedence signal `create_new_incident` uses and takes the same
-            // priority here — otherwise a P1 alert repeating against an
-            // incident it didn't create could be capped at the eval_level
-            // default (P2) instead of escalating to the priority it's
-            // actually configured for.
-            use config::meta::alerts::incidents::{IncidentEvent, IncidentSeverity};
-            let level_severity = subject.severity.or_else(|| {
-                eval_level.and_then(|l| match l {
-                    config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
-                    config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
-                    _ => None,
-                })
-            });
-            // P1 is most urgent; higher urgency = escalation.
-            let urgency = |s: IncidentSeverity| match s {
-                IncidentSeverity::P1 => 4u8,
-                IncidentSeverity::P2 => 3,
-                IncidentSeverity::P3 => 2,
-                IncidentSeverity::P4 => 1,
-            };
-            if let Some(new_severity) = level_severity
-                && let Ok(current_severity) = incident.severity.parse::<IncidentSeverity>()
-                && urgency(new_severity) > urgency(current_severity)
+            // A muted firing must not raise the severity silently; the un-muting firing does it.
+            if !firing_is_muted(muted_by, &incident, reopened)
+                && escalate_severity(org_id, &incident, subject, eval_level).await?
             {
-                infra::table::alert_incidents::update_severity(
-                    org_id,
-                    &incident.id,
-                    &new_severity.to_string(),
-                )
-                .await?;
-                if let Err(e) = infra::table::incident_events::append(
-                    org_id,
-                    &incident.id,
-                    IncidentEvent::severity_upgrade(
-                        current_severity,
-                        new_severity,
-                        format!("alert '{}' escalated to {}", subject.name, new_severity),
-                    ),
-                )
-                .await
-                {
-                    log::error!(
-                        "[Incidents] Failed to record severity-upgrade event for incident {org_id}/{}: {e}",
-                        incident.id
-                    );
-                }
-                log::info!(
-                    "[Incidents] Incident {} escalated {current_severity} -> {new_severity} by alert '{}'",
-                    incident.id,
-                    subject.name
-                );
                 return Ok(IncidentCorrelationOutcome::SeverityEscalated {
                     incident_id: incident.id,
                     service_name: service_name.to_string(),
@@ -1738,13 +1761,14 @@ async fn find_or_create_incident(
                 )
                 .await?;
 
-                if let Err(e) = crate::incidents::append_event(
+                if let Err(e) = append_event_unless_muted(
                     org_id,
                     &existing.id,
                     config::meta::alerts::incidents::IncidentEvent::dimensions_upgraded(
                         old_key_type_str,
                         new_key_type_str,
                     ),
+                    firing_is_muted(muted_by, &existing, reopened),
                 )
                 .await
                 {
@@ -1794,6 +1818,7 @@ async fn find_or_create_incident(
                 triggered_at,
             );
             if reopened {
+                escalate_severity(org_id, &existing, subject, eval_level).await?;
                 return Ok(reopened_after_mute(org_id, existing.id, service_name).await);
             }
 
@@ -2851,6 +2876,11 @@ pub async fn update_status_as(
     // timestamp land on the row itself (not just the event log) and a
     // second/concurrent acknowledge can't silently overwrite the first
     // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
+    let muted_before = status == "resolved"
+        && infra::table::alert_incidents::get(org_id, incident_id)
+            .await?
+            .is_some_and(|m| m.muted_by_downtime_id.is_some());
     let updated = if status == "acknowledged" {
         infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
             .await?
@@ -2859,7 +2889,10 @@ pub async fn update_status_as(
         infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
     };
 
-    let muted = status_change_is_muted(quiet, updated.muted_by_downtime_id.as_deref());
+    let muted = status_change_is_muted(
+        quiet || muted_before,
+        updated.muted_by_downtime_id.as_deref(),
+    );
     // Every resolution path lands here, so closing the record once covers all of them.
     #[cfg(feature = "enterprise")]
     if status == "resolved"
@@ -3013,13 +3046,15 @@ pub async fn record_auto_resolved(org_id: &str, incident_id: &str) -> Result<(),
         .await
         .ok()
         .flatten()
-        .map_or(downtime_id, |d| d.name);
+        .map_or_else(|| downtime_id.clone(), |d| d.name);
     infra::table::incident_events::append(
         org_id,
         incident_id,
         IncidentEvent::comment("system", format!("Resolved while muted by {name}")),
     )
     .await?;
+    infra::table::alert_incidents::clear_muted_by_downtime_id(org_id, incident_id, &downtime_id)
+        .await?;
     Ok(())
 }
 
@@ -3401,6 +3436,32 @@ mod tests {
             updated_at: 1,
             muted_by_downtime_id: muted_by.map(str::to_string),
         }
+    }
+
+    #[test]
+    fn a_muted_firing_escalates_nothing_and_the_unmuting_firing_does() {
+        use config::meta::alerts::{incidents::IncidentSeverity, level::AlertLevel};
+        let mut opened_at_p3 = incident(Some("dt-1"));
+        opened_at_p3.severity = "P3".to_string();
+        assert!(firing_is_muted(Some("dt-1"), &opened_at_p3, false));
+        assert!(firing_is_muted(None, &opened_at_p3, false));
+        assert!(!firing_is_muted(None, &opened_at_p3, true));
+        assert!(firing_is_muted(Some("dt-1"), &incident(None), false));
+        assert!(!firing_is_muted(None, &incident(None), false));
+        assert_eq!(
+            escalated_severity(&opened_at_p3.severity, None, Some(AlertLevel::Critical)),
+            Some((IncidentSeverity::P3, IncidentSeverity::P2)),
+            "the opened message after the window carries P2"
+        );
+        assert_eq!(
+            escalated_severity("P3", None, Some(AlertLevel::Warning)),
+            None
+        );
+        assert_eq!(
+            escalated_severity("P2", Some(IncidentSeverity::P1), Some(AlertLevel::Warning)),
+            Some((IncidentSeverity::P2, IncidentSeverity::P1))
+        );
+        assert_eq!(escalated_severity("P2", None, None), None);
     }
 
     #[tokio::test]

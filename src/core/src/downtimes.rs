@@ -862,6 +862,7 @@ mod tests {
                     tags: vec![],
                     ids: vec![],
                     slo_mode: None,
+                    incident_mode: Default::default(),
                 })
                 .collect(),
             schedule: DowntimeSchedule {
@@ -1173,6 +1174,7 @@ mod tests {
             tags: vec![],
             ids: vec![],
             slo_mode: None,
+            incident_mode: Default::default(),
         };
         let valid = PreviewRequest {
             condition: None,

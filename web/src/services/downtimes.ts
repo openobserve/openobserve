@@ -21,6 +21,7 @@ export type Repeat = "none" | "daily" | "weekly";
 export type LogicalOp = "and" | "or";
 export type PairOperator = "=" | "!=";
 export type SloCorrectionMode = "exclude" | "count_as_good";
+export type IncidentMode = "muted" | "none";
 
 export type TargetFolders = { kind: "all" } | { kind: "some"; folder_ids: string[] };
 
@@ -34,6 +35,8 @@ export interface DowntimeTarget {
   tags?: string[];
   ids?: string[];
   slo_mode?: SloCorrectionMode;
+  /** Alerts only; absent reads as `muted`. */
+  incident_mode?: IncidentMode;
 }
 
 export interface DowntimeSchedule {

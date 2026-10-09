@@ -73,6 +73,9 @@ pub struct DowntimeTarget {
     /// Read only when `module == Slos` (D10).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub slo_mode: Option<SloCorrectionMode>,
+    /// Read only when `module == Alerts`; a row saved before the field reads as `Muted`.
+    #[serde(default, skip_serializing_if = "IncidentMode::is_muted")]
+    pub incident_mode: IncidentMode,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -254,6 +257,21 @@ pub enum SloCorrectionMode {
     CountAsGood,
 }
 
+/// What a suppressed alert firing does to incidents during the window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum IncidentMode {
+    #[default]
+    Muted,
+    None,
+}
+
+impl IncidentMode {
+    pub fn is_muted(&self) -> bool {
+        matches!(self, Self::Muted)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CorrectionWindow {
     pub downtime_id: String,
@@ -299,6 +317,8 @@ pub struct ActiveDowntime {
     pub id: String,
     pub name: String,
     pub ends_at: i64,
+    #[serde(default, skip_serializing_if = "IncidentMode::is_muted")]
+    pub incident_mode: IncidentMode,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -398,6 +418,7 @@ mod tests {
                 tags: vec![],
                 ids: vec![],
                 slo_mode: None,
+                incident_mode: Default::default(),
             }],
             schedule: DowntimeSchedule {
                 repeat: Repeat::None,
@@ -451,6 +472,7 @@ mod tests {
                     tags: vec!["service:payments".to_string()],
                     ids: vec!["syn_41".to_string()],
                     slo_mode: None,
+                    incident_mode: Default::default(),
                 },
                 DowntimeTarget {
                     module: TargetModule::Slos,
@@ -458,6 +480,7 @@ mod tests {
                     tags: vec![],
                     ids: vec![],
                     slo_mode: Some(SloCorrectionMode::CountAsGood),
+                    incident_mode: Default::default(),
                 },
             ],
             schedule: DowntimeSchedule {
@@ -651,5 +674,31 @@ mod tests {
         let mut other_module = before.clone();
         other_module.targets[0].module = TargetModule::Synthetics;
         assert!(!before.same_coverage(&other_module));
+    }
+
+    #[test]
+    fn an_alerts_target_without_the_incident_mode_reads_as_muted() {
+        let old: DowntimeTarget =
+            serde_json::from_str(r#"{ "module": "alerts", "folders": { "kind": "all" } }"#)
+                .unwrap();
+        assert_eq!(old.incident_mode, IncidentMode::Muted);
+        let json = serde_json::to_value(&old).unwrap();
+        assert!(
+            json.get("incident_mode").is_none(),
+            "the default is not written"
+        );
+
+        let none: DowntimeTarget = serde_json::from_str(
+            r#"{ "module": "alerts", "folders": { "kind": "all" }, "incident_mode": "none" }"#,
+        )
+        .unwrap();
+        assert_eq!(none.incident_mode, IncidentMode::None);
+        let json = serde_json::to_value(&none).unwrap();
+        assert_eq!(json["incident_mode"], "none");
+        assert_eq!(
+            serde_json::from_value::<DowntimeTarget>(json).unwrap(),
+            none
+        );
+        assert_eq!(serde_json::to_value(IncidentMode::Muted).unwrap(), "muted");
     }
 }

@@ -249,10 +249,12 @@ pub(crate) mod enterprise {
             .filter(|row| row.cancelled_at.is_none())
             .find_map(|row| {
                 let window = schedule::window_at(&row.schedule, now)?;
-                covers(row, module, item).then(|| ActiveDowntime {
+                let target = scope::target_for(&row.targets, module)?;
+                scope::matches(target, row.condition.as_ref(), item).then(|| ActiveDowntime {
                     id: row.id.clone(),
                     name: row.name.clone(),
                     ends_at: window.end,
+                    incident_mode: target.incident_mode,
                 })
             })
     }
@@ -270,10 +272,12 @@ pub(crate) mod enterprise {
                 && scope::target_for(&row.targets, module).is_some()
         })?;
         let window = schedule::window_at(&row.schedule, at)?;
+        let target = scope::target_for(&row.targets, module)?;
         Some(ActiveDowntime {
             id: row.id.clone(),
             name: row.name.clone(),
             ends_at: window.end,
+            incident_mode: target.incident_mode,
         })
     }
 
@@ -370,8 +374,8 @@ pub(crate) mod enterprise {
 mod tests {
     use config::meta::{
         downtimes::{
-            DimensionCondition, Downtime, DowntimeSchedule, DowntimeTarget, PairOperator, Repeat,
-            SloCorrectionMode, TargetFolders, TargetModule,
+            DimensionCondition, Downtime, DowntimeSchedule, DowntimeTarget, IncidentMode,
+            PairOperator, Repeat, SloCorrectionMode, TargetFolders, TargetModule,
         },
         slo::{CountSource, SliConfig, SloDefinition},
     };
@@ -387,6 +391,7 @@ mod tests {
             tags: vec![],
             ids: vec![],
             slo_mode: None,
+            incident_mode: Default::default(),
         }
     }
 
@@ -522,6 +527,26 @@ mod tests {
         let mut cancelled = rows.clone();
         cancelled[0].cancelled_at = Some(10 * HOUR);
         assert!(active_by_id_in(&cancelled, TargetModule::Alerts, "d1", 11 * HOUR).is_none());
+    }
+
+    #[test]
+    fn active_in_carries_the_incident_mode_of_the_alerts_target() {
+        let dims = payments();
+        let alert = item("a1", "default", &dims, &[]);
+        let muted = row("d1", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let hit = active_in(&[muted], TargetModule::Alerts, &alert, 1).unwrap();
+        assert_eq!(hit.incident_mode, IncidentMode::Muted);
+        let none = row(
+            "d2",
+            vec![DowntimeTarget {
+                incident_mode: IncidentMode::None,
+                ..target(TargetModule::Alerts)
+            }],
+            0,
+            HOUR,
+        );
+        let hit = active_in(&[none], TargetModule::Alerts, &alert, 1).unwrap();
+        assert_eq!(hit.incident_mode, IncidentMode::None);
     }
 
     #[test]

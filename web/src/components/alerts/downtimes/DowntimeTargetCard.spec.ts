@@ -34,7 +34,7 @@ vi.mock("@/services/common", async (importOriginal) => {
   };
 });
 
-const mountCard = (module: "alerts" | "synthetics" = "alerts", idsOpen = true) => {
+const mountCard = (module: "alerts" | "synthetics" | "slos" = "alerts", idsOpen = true) => {
   let form!: ReturnType<typeof useOForm<any>>;
   const Host = defineComponent({
     setup() {
@@ -83,6 +83,31 @@ describe("DowntimeTargetCard", () => {
     expect(wrapper.text()).not.toContain("You don't have access to alert folders.");
     expect(wrapper.find('[data-test="downtime-target-alerts-add-items"]').exists()).toBe(true);
     wrapper.unmount();
+  });
+
+  it("offers the incident mode on the alerts card only, muted by default", async () => {
+    const { wrapper, form } = mountCard("alerts", false);
+    await flushPromises();
+    const muted = wrapper.find('[data-test="downtime-target-alerts-incident-mode-muted"]');
+    const none = wrapper.find('[data-test="downtime-target-alerts-incident-mode-none"]');
+    expect(muted.attributes("data-state")).toBe("checked");
+    expect(none.attributes("data-state")).toBe("unchecked");
+    expect(wrapper.text()).toContain("During the window, incidents are");
+    expect(wrapper.text()).toContain("Created and muted (default)");
+    expect(wrapper.text()).toContain("Not created");
+    await none.trigger("click");
+    await flushPromises();
+    expect(form().state.values.targets.alerts.incident_mode).toBe("none");
+    wrapper.unmount();
+
+    for (const module of ["synthetics", "slos"] as const) {
+      const other = mountCard(module, false);
+      await flushPromises();
+      expect(
+        other.wrapper.find('[data-test="downtime-target-alerts-incident-mode-block"]').exists(),
+      ).toBe(false);
+      other.wrapper.unmount();
+    }
   });
 
   it("disables the folder picker with a hint when the module's folders answer 403", async () => {

@@ -8842,6 +8842,16 @@
         "synthetics": "Synthetics",
         "slos": "SLO"
       },
+      "target": {
+        "incidentMode": {
+          "label": "Durante la finestra, gli incidenti sono",
+          "muted": "Creati e silenziati (predefinito)",
+          "mutedHelp": "Gli incidenti si aprono normalmente ma non notificano nessuno fino alla fine della finestra.",
+          "none": "Non creati",
+          "noneHelp": "Nessun incidente viene aperto durante la finestra; il primo allarme successivo ne apre uno e notifica.",
+          "summary": "nessun incidente"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}",
         "condition": "condizione",

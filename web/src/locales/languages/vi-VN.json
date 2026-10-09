@@ -8842,6 +8842,16 @@
         "synthetics": "Synthetics",
         "slos": "SLO"
       },
+      "target": {
+        "incidentMode": {
+          "label": "Trong khung thời gian, sự cố được",
+          "muted": "Tạo và tắt tiếng (mặc định)",
+          "mutedHelp": "Sự cố vẫn mở như bình thường nhưng không thông báo cho ai cho đến khi khung thời gian kết thúc.",
+          "none": "Không tạo",
+          "noneHelp": "Không mở sự cố nào trong khung thời gian; lần kích hoạt đầu tiên sau đó sẽ mở sự cố và gửi thông báo.",
+          "summary": "không có sự cố"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}",
         "condition": "điều kiện",

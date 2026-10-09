@@ -8842,6 +8842,16 @@
         "synthetics": "Sentetikler",
         "slos": "SLO'lar"
       },
+      "target": {
+        "incidentMode": {
+          "label": "Pencere boyunca olaylar",
+          "muted": "Oluşturulur ve sessize alınır (varsayılan)",
+          "mutedHelp": "Olaylar her zamanki gibi açılır ancak pencere bitene kadar kimseye bildirim gönderilmez.",
+          "none": "Oluşturulmaz",
+          "noneHelp": "Pencere boyunca olay açılmaz; pencereden sonraki ilk tetikleme bir olay açar ve bildirim gönderir.",
+          "summary": "olay yok"
+        }
+      },
       "summary": {
         "valuesOfKey": "{count} {key} | {count} {key}",
         "condition": "koşul",
