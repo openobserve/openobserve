@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, shallowMount, flushPromises, type VueWrapper } from "@vue/test-utils";
+import { config, mount, shallowMount, flushPromises, type VueWrapper } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -51,6 +51,9 @@ const CONFIG = {
   built_at: 1_700_000_000_000_000,
   refresh_secs: 30,
 };
+
+// Shallow mounts stub OEmptyState; this stub keeps its title readable in the page text.
+config.global.stubs.OEmptyState = { props: ["title"], template: "<div>{{ title }}</div>" };
 
 const buildWrapper = () =>
   shallowMount(PublicDashboard, { global: { plugins: [i18n], provide: { store } } });

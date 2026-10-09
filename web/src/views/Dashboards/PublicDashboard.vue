@@ -36,9 +36,7 @@
       class="flex min-h-[60vh] flex-col items-center justify-center px-4"
       data-test="dashboards-public-dashboard-error"
     >
-      <div class="text-text-secondary max-w-md text-center text-sm">
-        {{ errorMessage }}
-      </div>
+      <OEmptyState size="hero" :illustration="errorIllustration" :title="errorMessage" />
     </div>
 
     <template v-else>
@@ -139,6 +137,8 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -336,6 +336,16 @@ const ERROR_MESSAGES: Partial<Record<ViewState, () => I18nText>> = {
   offline: () => t("dashboard.publicDashboard.offline"),
 };
 const errorMessage = computed<I18nText | null>(() => ERROR_MESSAGES[state.value]?.() ?? null);
+const ERROR_ILLUSTRATIONS: Partial<Record<ViewState, IllustrationName>> = {
+  notfound: "lock",
+  expired: "hourglass",
+  unavailable: "schedule",
+  ratelimited: "hourglass",
+  offline: "broken-panel",
+};
+const errorIllustration = computed<IllustrationName>(
+  () => ERROR_ILLUSTRATIONS[state.value] ?? "broken-panel",
+);
 
 // Only 404 and 410 are final; a paused link, a rate limit or a network error can clear up.
 const errorState = (e: unknown): ViewState => {
