@@ -50,12 +50,36 @@ export const tierWindowSchema = z.object({
   end: z.string(),
 });
 
+/** Rule operators that compare against a list of values rather than a number. */
+export const SET_RULE_OPS = ["in", "not_in"];
+/** Rule operators that only check whether the attribute is present. */
+export const PRESENCE_RULE_OPS = ["exists", "not_exists"];
+
+// One span-attribute rule. `keys` and `values` are comma-separated in the form
+// and split into the API's arrays at submit.
+export const tierRuleSchema = z.object({
+  keys: z.string(),
+  op: z.string(),
+  values: z.string(),
+  value: z.coerce.number(),
+});
+
+/** Split a comma-separated form field into trimmed, non-empty entries. */
+export function splitList(value: string): string[] {
+  return String(value ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
 export const tierSchema = z.object({
   name: z.string(),
   // null for the default (first) tier; an object for conditional tiers.
   condition: tierConditionSchema.nullable().optional(),
   // Recurring UTC hours this tier is limited to. Empty = always active.
   utc_windows: z.array(tierWindowSchema).default([]),
+  // Span-attribute rules (service tier, speed, region) the tier is limited to.
+  rules: z.array(tierRuleSchema).default([]),
   prices: z.array(priceRowSchema).default([]),
   // Staging "add price" row — non-validated form state, auto-committed at submit.
   draftKey: z.string().optional().default(""),
@@ -179,10 +203,30 @@ export const makeModelPricingSchema = (
             });
           }
         });
+
+        // Attribute rules: a key is always required and set operators need values, or
+        // the rule can never match. The threshold field coerces to a number itself.
+        (tier.rules ?? []).forEach((rule, r) => {
+          if (!splitList(rule.keys).length) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tiers", i, "rules", r, "keys"],
+              message: t("modelPricing.ruleKeyRequired", { name: tierLabel }),
+            });
+          }
+          if (SET_RULE_OPS.includes(rule.op) && !splitList(rule.values).length) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tiers", i, "rules", r, "values"],
+              message: t("modelPricing.ruleValuesRequired", { name: tierLabel }),
+            });
+          }
+        });
       });
     });
 
 export type ModelPricingForm = z.infer<ReturnType<typeof makeModelPricingSchema>>;
 export type ModelPricingTier = z.infer<typeof tierSchema>;
 export type ModelPricingTierWindow = z.infer<typeof tierWindowSchema>;
+export type ModelPricingTierRule = z.infer<typeof tierRuleSchema>;
 export type ModelPricingPriceRow = z.infer<typeof priceRowSchema>;

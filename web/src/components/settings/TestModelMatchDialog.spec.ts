@@ -427,6 +427,94 @@ describe("TestModelMatchDialog", () => {
       expect(sentTs).toBeCloseTo(Date.now() * 1000, -7);
     });
 
+    it("sends non-blank span attributes and skips rows without a key", async () => {
+      mockTest.mockResolvedValue({ data: { matched: null } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      (wrapper.vm as any).addAttribute();
+      (wrapper.vm as any).addAttribute();
+      (wrapper.vm as any).testAttributes[0].key = " openai.response.service_tier ";
+      (wrapper.vm as any).testAttributes[0].value = "flex ";
+      (wrapper.vm as any).testAttributes[1].value = "orphan";
+      await nextTick();
+
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+
+      expect(mockTest.mock.calls[0][1].attributes).toEqual({
+        "openai.response.service_tier": "flex",
+      });
+    });
+
+    it("sends no attributes field when every row is blank", async () => {
+      mockTest.mockResolvedValue({ data: { matched: null } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      (wrapper.vm as any).addAttribute();
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect(mockTest.mock.calls[0][1].attributes).toBeUndefined();
+    });
+
+    it("re-runs a shown result when an attribute changes", async () => {
+      mockTest.mockResolvedValue({ data: { matched: null } });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+      expect(mockTest).toHaveBeenCalledTimes(1);
+
+      (wrapper.vm as any).addAttribute();
+      (wrapper.vm as any).testAttributes[0].key = "openai.response.service_tier";
+      (wrapper.vm as any).testAttributes[0].value = "flex";
+      await nextTick();
+      await flushPromises();
+      expect(mockTest).toHaveBeenCalledTimes(2);
+      expect(mockTest.mock.calls[1][1].attributes).toEqual({
+        "openai.response.service_tier": "flex",
+      });
+    });
+
+    it("shows the matched tier's attribute rules", async () => {
+      mockTest.mockResolvedValue({
+        data: {
+          matched: {
+            name: "GPT-6 Sol",
+            source: "built_in",
+            tiers: [
+              { name: "Default", prices: { input: 0.000002 } },
+              {
+                name: "Flex",
+                rules: [
+                  {
+                    keys: ["openai.response.service_tier", "openai.request.service_tier"],
+                    op: "in",
+                    values: ["flex"],
+                  },
+                ],
+                prices: { input: 0.000001 },
+              },
+            ],
+          },
+          tier: "Flex",
+          costs: {},
+          total_cost: 0,
+        },
+      });
+      wrapper = mountDialog({ modelValue: true });
+      (wrapper.vm as any).testModelName = "gpt-6-sol";
+      await nextTick();
+      await (wrapper.vm as any).runTest();
+      await flushPromises();
+
+      const rule = wrapper.find('[data-test="test-match-tier-rule"]');
+      expect(rule.exists()).toBe(true);
+      expect(rule.text()).toBe("openai.response.service_tier in flex");
+      expect(wrapper.text()).not.toContain(i18n.global.t("modelPricing.defaultPricingTier"));
+    });
+
     it("stores the API response on testResult after success", async () => {
       const payload = {
         matched: { name: "gpt-4", source: "org" },
