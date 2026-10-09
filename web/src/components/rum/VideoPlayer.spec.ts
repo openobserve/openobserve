@@ -1443,6 +1443,45 @@ describe("VideoPlayer", () => {
       expect(rebuiltA[0].data).toBe(rebuiltA[1].data);
       wrapper.unmount();
     });
+
+    it("shows the Showing chip only for sessions with concurrent views", async () => {
+      const single = mountComponent();
+      await flushPromises();
+      await single.setProps({ segments: [seg("A", 0, opening(T, "A"))] });
+      await flushPromises();
+      expect(single.find('[data-test="video-player-showing"]').exists()).toBe(false);
+      single.unmount();
+
+      const multi = mountComponent();
+      await flushPromises();
+      await multi.setProps({
+        segments: [seg("A", 0, opening(T, "A")), seg("B", 0, opening(T + 1000, "B"))],
+      });
+      await flushPromises();
+      const chip = multi.find('[data-test="video-player-showing"]');
+      expect(chip.exists()).toBe(true);
+      expect(chip.text()).toContain("https://app.test/A");
+      multi.unmount();
+    });
+
+    it("emits a gap notice while the shown view is stale", async () => {
+      playerSpies.getCurrentTime.mockReturnValue(5000);
+      const wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.setProps({
+        segments: [
+          seg("A", 0, opening(T, "A")),
+          seg("A", 2, [{ type: 12, timestamp: T + 3000, data: [] }]),
+        ],
+      });
+      await flushPromises();
+      (wrapper.vm as any).playerState.startTime = T;
+      (wrapper.vm as any).playerState.actualTime = 5000;
+      await flushPromises();
+      const notices = wrapper.emitted("tab-notice") ?? [];
+      expect(String(notices.at(-1)?.[0])).toContain("gap from");
+      wrapper.unmount();
+    });
   });
 
   describe("Error and empty states", () => {
