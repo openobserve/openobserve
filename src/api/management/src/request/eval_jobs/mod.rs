@@ -264,10 +264,15 @@ pub async fn activate_eval_job(
     Path((org_id, job_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // without RBAC there is no checked snapshot to race, so the plain transition never answers 409
     #[cfg(feature = "enterprise")]
-    let transitioned = match checked_stored_job(&org_id, &user_email.user_id, &job_id).await {
-        Ok(job) => eval_jobs::transition_checked(&org_id, job, "active").await,
-        Err(resp) => return resp,
+    let transitioned = if openobserve_core::background_access::rbac_enforced().await {
+        match checked_stored_job(&org_id, &user_email.user_id, &job_id).await {
+            Ok(job) => eval_jobs::transition_checked(&org_id, job, "active").await,
+            Err(resp) => return resp,
+        }
+    } else {
+        eval_jobs::transition_status(&org_id, &job_id, "active").await
     };
     #[cfg(not(feature = "enterprise"))]
     let transitioned = eval_jobs::transition_status(&org_id, &job_id, "active").await;
@@ -341,10 +346,15 @@ pub async fn resume_eval_job(
     Path((org_id, job_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    // without RBAC there is no checked snapshot to race, so the plain transition never answers 409
     #[cfg(feature = "enterprise")]
-    let transitioned = match checked_stored_job(&org_id, &user_email.user_id, &job_id).await {
-        Ok(job) => eval_jobs::transition_checked(&org_id, job, "active").await,
-        Err(resp) => return resp,
+    let transitioned = if openobserve_core::background_access::rbac_enforced().await {
+        match checked_stored_job(&org_id, &user_email.user_id, &job_id).await {
+            Ok(job) => eval_jobs::transition_checked(&org_id, job, "active").await,
+            Err(resp) => return resp,
+        }
+    } else {
+        eval_jobs::transition_status(&org_id, &job_id, "active").await
     };
     #[cfg(not(feature = "enterprise"))]
     let transitioned = eval_jobs::transition_status(&org_id, &job_id, "active").await;

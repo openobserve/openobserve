@@ -117,6 +117,9 @@ pub enum Denial {
         org_id: String,
         source: String,
         error: String,
+        /// An uncompilable VRL may later read another org's enrichment table, so no admin skips
+        /// it.
+        from_vrl: bool,
     },
 }
 
@@ -146,11 +149,18 @@ impl ResolvedSources {
         }
     }
 
-    fn push_unparseable(&mut self, org_id: &str, source: &str, error: impl ToString) {
+    fn push_unparseable(
+        &mut self,
+        org_id: &str,
+        source: &str,
+        error: impl ToString,
+        from_vrl: bool,
+    ) {
         let denial = Denial::Unparseable {
             org_id: org_id.to_string(),
             source: source_label(source),
             error: source_label(&error.to_string()),
+            from_vrl,
         };
         if !self.unparseable.contains(&denial) {
             self.unparseable.push(denial);
@@ -594,7 +604,7 @@ pub fn resolve_query_sources(sources: &[QuerySource]) -> ResolvedSources {
                 source,
                 error,
             } => {
-                resolved.push_unparseable(org_id, source, error);
+                resolved.push_unparseable(org_id, source, error, false);
             }
         }
     }
@@ -714,7 +724,9 @@ pub async fn authorize_with(
             .unparseable
             .into_iter()
             .filter(|denial| match denial {
-                Denial::Unparseable { org_id, .. } => !admin_orgs.contains(org_id.as_str()),
+                Denial::Unparseable {
+                    org_id, from_vrl, ..
+                } => *from_vrl || !admin_orgs.contains(org_id.as_str()),
                 _ => true,
             }),
     );
@@ -846,7 +858,7 @@ fn resolve_sql(resolved: &mut ResolvedSources, org_id: &str, sql: &str, default_
     let tables = match resolve_sql_tables(sql) {
         Ok(tables) => tables,
         Err(e) => {
-            resolved.push_unparseable(org_id, sql, e);
+            resolved.push_unparseable(org_id, sql, e, false);
             return;
         }
     };
@@ -869,7 +881,7 @@ fn resolve_sql(resolved: &mut ResolvedSources, org_id: &str, sql: &str, default_
                 }
             }
         }
-        Err(e) => resolved.push_unparseable(org_id, sql, e),
+        Err(e) => resolved.push_unparseable(org_id, sql, e, false),
     }
 }
 
@@ -882,13 +894,13 @@ fn resolve_promql(resolved: &mut ResolvedSources, org_id: &str, query: &str) {
     let ast = match parsed {
         Ok(ast) => ast,
         Err(e) => {
-            resolved.push_unparseable(org_id, query, e);
+            resolved.push_unparseable(org_id, query, e, false);
             return;
         }
     };
     let mut visitor = MetricNameVisitor::new();
     if let Err(e) = walk_expr(&mut visitor, &ast) {
-        resolved.push_unparseable(org_id, query, e);
+        resolved.push_unparseable(org_id, query, e, false);
         return;
     }
     let mut names: Vec<String> = visitor.into_names().into_iter().collect();
@@ -915,7 +927,7 @@ fn resolve_vrl(resolved: &mut ResolvedSources, org_id: &str, source: &str) {
                 });
             }
         }
-        Err(e) => resolved.push_unparseable(org_id, source, e),
+        Err(e) => resolved.push_unparseable(org_id, source, e, true),
     }
 }
 
@@ -1130,6 +1142,26 @@ mod tests {
                 .len(),
             2
         );
+    }
+
+    #[tokio::test]
+    async fn uncompilable_vrl_is_refused_even_for_an_admin_of_its_own_org() {
+        let sources = [QuerySource::Vrl {
+            org_id: "o1".to_string(),
+            source: ".x = get_enrichment_table_record(".to_string(),
+        }];
+        let admin = FakeChecker::default().admin("u1", "o1");
+        let denied = authorize_with(&admin, "u1", &sources).await.unwrap_err();
+        assert!(matches!(
+            denied.denials.as_slice(),
+            [Denial::Unparseable { from_vrl: true, .. }]
+        ));
+
+        let rbac_off = FakeChecker {
+            rbac_off: true,
+            ..FakeChecker::default().admin("u1", "o1")
+        };
+        assert!(authorize_with(&rbac_off, "u1", &sources).await.is_ok());
     }
 
     #[tokio::test]

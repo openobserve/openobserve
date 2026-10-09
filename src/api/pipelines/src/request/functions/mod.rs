@@ -489,6 +489,7 @@ mod tests {
 
         #[tokio::test]
         async fn function_denied_enrichment_table_is_refused() {
+            fake_checker();
             let key = add_table("sf_org1", "sf_own_table");
             let caller = user();
             let resp = save_function(

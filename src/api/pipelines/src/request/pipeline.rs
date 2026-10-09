@@ -825,6 +825,7 @@ mod tests {
 
         #[tokio::test]
         async fn pipeline_denied_source_is_refused() {
+            fake_checker();
             let caller = user();
             let resp = save_pipeline(
                 Path("sp_org1".to_string()),
@@ -845,6 +846,7 @@ mod tests {
 
         #[tokio::test]
         async fn pipeline_cross_org_source_needs_read() {
+            fake_checker();
             let caller = user();
             let cross = pipeline("sp_org1", "sp_org2", "b_stream");
             let resp = guard_pipeline(&caller, &cross).await.unwrap_err();
