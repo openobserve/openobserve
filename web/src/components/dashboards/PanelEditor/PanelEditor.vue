@@ -124,6 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         variant="primary"
                         size="xs"
                         :disabled="!!addToDashboardDisabledReason"
+                        focusable-unavailable
                         @click="emit('addToDashboard')"
                         :title="
                           addToDashboardDisabledReason ? undefined : t('search.addToDashboard')
@@ -134,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-if="addToDashboardDisabledReason"
                           :content="addToDashboardDisabledReason"
                         />
+                        <template #unavailable-reason>{{ addToDashboardDisabledReason }}</template>
                       </OButton>
                     </div>
                   </div>

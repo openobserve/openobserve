@@ -345,15 +345,12 @@ test.describe("Share Link Test Cases", () => {
 
     testLogger.info('Testing SQL query preservation via share link redirect');
 
-    // Step 1: Select stream
     await pm.logsPage.selectStream(TEST_STREAM);
     await page.waitForTimeout(2000);
 
-    // Step 2: Enable SQL mode
     await pm.logsPage.enableSqlModeIfNeeded();
     await page.waitForTimeout(1000);
 
-    // Typing would append to SQL mode's pre-filled query, so it is replaced.
     const sql = `SELECT * FROM "${TEST_STREAM}" LIMIT 50`;
     await pm.logsPage.clearAndFillQueryEditor(sql);
     expect(await pm.logsPage.getQueryEditorText()).toBe(sql);
@@ -364,7 +361,6 @@ test.describe("Share Link Test Cases", () => {
     });
     await expect(page.locator('[data-test="logs-search-bar-share-link-btn"]')).toBeEnabled({ timeout: 30000 });
 
-    // Step 5: Capture original state
     const originalUrl = await pm.logsPage.getCurrentUrl();
     testLogger.info('Original URL with query', { url: originalUrl });
 
@@ -372,16 +368,13 @@ test.describe("Share Link Test Cases", () => {
     expect(originalUrl).toContain(TEST_STREAM);
     expect(originalUrl).toContain('sql_mode=true');
 
-    // Step 6: Click share link and get URL
     const sharedUrl = await pm.logsPage.clickShareLinkAndGetUrl();
     testLogger.info('Shared URL', { url: sharedUrl });
 
-    // Step 7: Navigate to shared URL
     await page.goto(sharedUrl);
     await pm.logsPage.waitForRedirectComplete();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // Step 8: Verify we're back on logs page with state
     const redirectedUrl = await pm.logsPage.getCurrentUrl();
     expect(redirectedUrl).toContain('logs');
     expect(redirectedUrl).toContain('stream');
@@ -457,7 +450,6 @@ test.describe("Share Link Test Cases", () => {
   // Bug #9788 test should be moved to RegressionSet/logs-regression.spec.js or similar
 });
 
-// J-C4 (no stream role) needs ENT RBAC and lives in the ENT suite.
 const path = require('path');
 const { ingestRows } = require('../utils/auto-run-helpers.js');
 const { getAuthHeaders } = require('../utils/cloud-auth.js');
@@ -467,10 +459,8 @@ const LINE_STREAM = 'line_logs';
 const OTHER_STREAM = 'other_logs';
 const WIDE_STREAM = 'wide_logs';
 const ORIG_STREAM = 'orig_logs';
-// Set by J-C17, applied by J-C28 (the describe is serial).
 let savedViewName = null;
 const AUTH_FILE = path.join(__dirname, '..', 'utils', 'auth', 'user.json');
-// Fixed for the whole run, so every journey knows exactly which µs each special row has.
 const BASE_US = (Date.now() - 4 * 60 * 1000) * 1000;
 const T_UNIQUE = BASE_US + 9000;
 const T_DUP = BASE_US + 8000;
@@ -618,7 +608,6 @@ function lineLinkPath(stream, ts, extra = {}) {
 }
 
 test.describe('Line links (4c Part C)', () => {
-  // CI's 600 s retention/stats interval yields no stream stats within setup, and J-C12 needs an unshipped cache fix.
   test.skip(!!process.env.CI, 'Line links need stream stats and the J-C12 cache fix that CI does not have; run locally');
   test.describe.configure({ mode: 'serial' });
 
@@ -628,7 +617,6 @@ test.describe('Line links (4c Part C)', () => {
       { _timestamp: BASE_US, level: 'info', message: 'other-0' },
       { _timestamp: BASE_US - 1000, level: 'info', message: 'other-1' },
     ]);
-    // A stream that keeps original data, so its rows carry _o2_id and a link can name the row exactly.
     await ingestRows(request, LINK_ORG, ORIG_STREAM, [{ _timestamp: BASE_US - 1000, message: 'seed' }]);
     const settings = await request.put(`${process.env.ZO_BASE_URL}/api/${LINK_ORG}/streams/${ORIG_STREAM}/settings?type=logs`, {
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -639,7 +627,6 @@ test.describe('Line links (4c Part C)', () => {
     const wide = { _timestamp: T_UNIQUE, message: 'wide-line' };
     for (let i = 0; i < 505; i += 1) wide[`f_${i}`] = `v${i}`;
     await ingestRows(request, LINK_ORG, WIDE_STREAM, [wide]);
-    // Ingested rows become searchable once the WAL flushes; wait on the search, not on time.
     const searchable = async (stream) => {
       const response = await request.post(`${process.env.ZO_BASE_URL}/api/${LINK_ORG}/_search?type=logs`, {
         headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -655,7 +642,6 @@ test.describe('Line links (4c Part C)', () => {
       });
       return response.ok() ? (await response.json()).hits.length : 0;
     };
-    // The page reads through the streaming endpoint, which plans from stream stats that land a little later.
     const streamable = async (stream) => {
       const now = Date.now() * 1000;
       const response = await request.post(
@@ -675,7 +661,6 @@ test.describe('Line links (4c Part C)', () => {
     for (const stream of [LINE_STREAM, OTHER_STREAM, WIDE_STREAM, ORIG_STREAM]) {
       await expect.poll(() => streamable(stream), poll).toBe(true);
     }
-    // The page's partition plan reads the stream stats, so wait until every stream has them.
     const statsReady = async () => {
       const response = await request.get(`${process.env.ZO_BASE_URL}/api/${LINK_ORG}/streams?type=logs`, {
         headers: getAuthHeaders(),
@@ -804,7 +789,6 @@ test.describe('Line links (4c Part C)', () => {
     await page.goto(lineLinkPath('no_such_stream', T_UNIQUE));
     await expect(page.locator(lineBanner)).toHaveAttribute('data-state', 'stream_missing', { timeout: 60000 });
     await expect(page.locator(lineBanner)).toContainText('no_such_stream');
-    // J-C20 needs a stale org mid-switch, so the mounted Index test "a link for another org resolves nothing" covers it.
     expect(resolves.every((r) => r.url.includes(`/api/${LINK_ORG}/`))).toBe(true);
   });
 
@@ -896,7 +880,6 @@ test.describe('Line links (4c Part C)', () => {
     await expect(page.locator(`${lineTable} .o2-log-permalink-row`)).toHaveCount(1, { timeout: 60000 });
     await page.unroute('**/_search_stream?*');
     await expect(page.locator(gridDrawer)).toBeVisible();
-    // A later Run closes it and drops log_*; the modal drawer covers the button, so the click is dispatched to it.
     const runButton = page.locator('[data-test="logs-search-bar-refresh-btn"]');
     await expect(runButton).toContainText('Run query', { timeout: 60000 });
     await runButton.dispatchEvent('click');
@@ -965,7 +948,6 @@ test.describe('Line links (4c Part C)', () => {
   });
 
   test('J-C23: a stream wider than the quick-mode field count copies a timestamp link and says why', async ({ page, request }) => {
-    // A 20 s window: one partition. Over 15 minutes a wide stream sometimes renders "No events" on main too (recorded).
     await runStream(page, WIDE_STREAM, {
       period: null,
       from: String(floorSecond(T_UNIQUE) - 10_000_000),
@@ -1151,7 +1133,6 @@ test.describe('Line links (4c Part C)', () => {
       if (!(query.size === 0 && query.track_total_hits)) hits.push(query);
     });
     await runStream(page, LINE_STREAM);
-    // The URL load may run first; the Run click's request is the one on screen.
     const shown = hits[hits.length - 1];
     const pm = new PageManager(page);
     const shared = paramsOf(await expandLink(request, await pm.logsPage.clickShareLinkAndGetUrl()));

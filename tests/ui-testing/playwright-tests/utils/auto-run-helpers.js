@@ -23,7 +23,6 @@ function apiBase() {
   return url.endsWith('/') ? url.slice(0, -1) : url;
 }
 
-/** Classifies a search request the way the spec defines it (§9): hits, histogram or page count. */
 function classifySearch(request) {
   const url = request.url();
   if (request.method() !== 'POST' || !/\/_search(_multi)?_stream\b/.test(url)) return null;
@@ -34,13 +33,11 @@ function classifySearch(request) {
   } catch {
     body = {};
   }
-  // Single-stream requests wrap the query in {query:{…}}; multi-stream sends it directly.
   const query = body && typeof body.query === 'object' && !Array.isArray(body.query) ? body.query : body;
   if (query.size === 0 && query.track_total_hits) return 'pageCount';
   return 'hits';
 }
 
-/** Records every classified search request the page sends. */
 function trackSearches(page) {
   const sent = [];
   page.on('request', (request) => {
@@ -73,7 +70,6 @@ async function ingestRows(request, org, stream, rows) {
   }
 }
 
-/** Polls /streams until the stream has persisted stats (needs short file retention and stats intervals). */
 async function waitForStats(request, org, stream, timeoutMs = 180000) {
   const headers = getAuthHeaders();
   const deadline = Date.now() + timeoutMs;
@@ -89,7 +85,6 @@ async function waitForStats(request, org, stream, timeoutMs = 180000) {
   throw new Error(`no stats for ${org}/${stream} within ${timeoutMs} ms`);
 }
 
-/** The client estimate (P3) for a window ending now, in MB. */
 function estimateMb(entry, windowUs, retentionDays = 0) {
   const now = Date.now() * 1000;
   const min = Number(entry.stats.doc_time_min);

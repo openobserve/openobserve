@@ -55,7 +55,6 @@ export const useSearchStream = (t: TranslateFn) => {
 
   const { searchObj, resetQueryData } = searchState();
 
-  // Responses of a replaced or cancelled generation never reach the UI (AC4.1).
   const onData = (payload: any, response: any) => {
     const autoRun = useLogsAutoRun();
     if (!autoRun.isPayloadCurrent(payload)) return;
@@ -99,7 +98,6 @@ export const useSearchStream = (t: TranslateFn) => {
         return;
       }
 
-      // 2. Execute the search through the connection manager
       connectionManager.getDataThroughStream(
         queryReq,
         isPagination,

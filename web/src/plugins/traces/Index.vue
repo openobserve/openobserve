@@ -281,7 +281,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t("traces.index.changeStreamMessage") }}</p>
     </ODialog>
-    <!-- Outside the results, which an error state replaces exactly when a failed page is announced. -->
     <div class="sr-only" aria-live="polite" aria-atomic="true" data-test="traces-row-nav-live">
       {{ tracesRowNavAnnouncement }}
     </div>
@@ -840,7 +839,6 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
     }
-    // Rows are bound by position, so a new result set must not inherit the old selection (4a §3.4).
     if (!isPagination) resetTraceRowSelection();
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
@@ -1114,7 +1112,6 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     searchObj.loading = false;
     searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
-    // This catch never reaches the request's own error callback, so a bound crossing resolves here.
     if (boundTraceId) noteTracesPageLoad(boundTraceId, "error");
   }
 }
@@ -1373,11 +1370,9 @@ function generateHistogramData() {
   // }
 }
 
-// Auto Run switched off by the user (#14760): selection still restores, execution waits for Run.
 const isAutoRunOff = () => !!store.state.zoConfig?.auto_query_enabled && !searchObj.meta.liveMode;
 
 async function loadPageData() {
-  // A stream from the URL is a shared link: it keeps loading its results whatever the toggle says.
   const streamFromUrl = typeof router.currentRoute.value.query.stream === "string";
   searchObj.loadingStream = true;
   if (!searchObj.data?.queryResults?.hits?.length) searchObj.data.resultGrid.currentPage = 0;

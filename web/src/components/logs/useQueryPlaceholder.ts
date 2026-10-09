@@ -31,7 +31,6 @@ interface Options {
   noStreamText?: string;
   /** When true, all example queries containing match_all() are omitted (e.g. traces page). */
   excludeMatchAll?: boolean;
-  /** Logs only: filter mode searches bare words, so its examples lead with them. */
   freeText?: boolean;
 }
 
@@ -245,7 +244,6 @@ export function useQueryPlaceholder(
   return { placeholder, examples };
 }
 
-// A text+field example always carries an explicit AND match_all, since an implicit mix is sent as SQL and errors.
 function freeTextExamples(
   fieldFilter: string | null,
   term: string,

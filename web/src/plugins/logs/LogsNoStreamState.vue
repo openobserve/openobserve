@@ -77,10 +77,8 @@ import DOMPurify from "dompurify";
 
 const props = withDefaults(
   defineProps<{
-    /** Org identifier — used to look up recently used streams from localStorage. */
     orgId: string;
     streamType?: string;
-    /** Auto Run is on: picking a stream runs it, so the copy drops "press Run query". */
     autoRun?: boolean;
   }>(),
   { streamType: "logs", autoRun: false },
@@ -93,7 +91,6 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-// The last selection set for this org and stream type, up to 3 names.
 const recentStreams = computed<string[]>(() => {
   if (!props.orgId) return [];
   return restoreLogsSelectedStreams(props.orgId, props.streamType).slice(0, 3);

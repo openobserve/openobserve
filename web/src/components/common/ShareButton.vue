@@ -17,14 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OButton
     :data-test="dataTest"
+    :aria-label="t('search.shareLink')"
     :class="buttonClass"
     :variant="variant"
     :size="size"
     :loading="isLoading"
     :disabled="disabled || !url || isWebUrlNotConfigured"
+    :focusable-unavailable="disabled && !!tooltip"
     @click="handleShareClick"
     icon-left="share"
   >
+    <template #unavailable-reason>{{ tooltip }}</template>
     <span v-if="showLabel" class="ms-1">{{ t("search.shareLink") }}</span>
     <OTooltip v-if="isWebUrlNotConfigured">
       <template #content

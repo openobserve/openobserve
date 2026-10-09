@@ -19,32 +19,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="border-border-default relative h-full w-full border-t"
     data-test="logs-build-query-page"
   >
-    <div
+    <OBanner
       v-if="freeTextNotice"
-      class="bg-status-info-bg text-status-info-text flex items-center gap-2 px-3 py-2 text-xs"
+      variant="info"
+      icon="info"
+      dense
       data-test="logs-build-free-text-notice"
     >
-      <OIcon name="info" size="sm" />
-      <span>{{ t("search.freeTextBuildNotice") }}</span>
-    </div>
-    <div
+      {{ t("search.freeTextBuildNotice") }}
+    </OBanner>
+    <OBanner
       v-if="parserLoadFailed || retryingParser"
+      variant="error-soft"
+      icon="error-outline"
       role="alert"
-      class="bg-status-error-bg text-status-error-text flex items-center gap-2 px-3 py-2 text-xs"
+      dense
       data-test="logs-build-parser-error"
     >
-      <OIcon name="error-outline" size="sm" />
-      <span class="min-w-0 flex-1">{{ t("logs.buildQueryPage.parserLoadFailed") }}</span>
-      <OButton
-        variant="outline"
-        size="xs"
-        data-test="logs-build-parser-retry"
-        :loading="retryingParser"
-        @click="retryParser"
-        >{{ t("logs.buildQueryPage.retryParser") }}</OButton
-      >
-    </div>
-    <!-- PanelEditor with BUILD_PRESET -->
+      {{ t("logs.buildQueryPage.parserLoadFailed") }}
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="xs"
+          data-test="logs-build-parser-retry"
+          :loading="retryingParser"
+          @click="retryParser"
+          >{{ t("common.retry") }}</OButton
+        >
+      </template>
+    </OBanner>
     <PanelEditor
       ref="panelEditorRef"
       pageType="build"
@@ -80,7 +83,7 @@ import {
 } from "@/utils/query/sqlQueryParser";
 import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
 import { parseWhereClauseToFilterChecked } from "@/utils/query/sqlUtils";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useNotifications from "@/composables/useNotifications";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -153,7 +156,6 @@ interface Props {
   isSqlMode?: boolean;
   /** Raw WHERE clause text from non-SQL mode */
   whereClause?: string;
-  /** The WHERE was rendered from a text search, so dropping any part of it would widen the query. */
   freeTextFilter?: boolean;
 }
 
@@ -188,14 +190,11 @@ const router = useRouter();
 const panelEditorRef = ref<any>(null);
 const showAddToDashboardDialog = ref(false);
 const freeTextNotice = ref(false);
-// The filter could not be read into the builder, so every run would be unfiltered until a retry loads the parser.
 const parserLoadFailed = ref(false);
 const retryingParser = ref(false);
 const needsFilterInit = () =>
   !props.isSqlMode && (!!props.whereClause?.trim() || props.freeTextFilter);
-// Until the search bar's filter is in the builder, the panel holds the stream with no WHERE.
 const filterInitPending = ref(needsFilterInit());
-// The editor's own interim queries carry no text search; synced back, they would erase the user's filter.
 const holdGeneratedQuery = ref(!props.isSqlMode && props.freeTextFilter);
 
 // Get dashboard panel data for build page
@@ -207,14 +206,12 @@ const {
   validatePanel,
 } = useDashboardPanelData("build", t);
 
-// A builder run before the filter lands, or while the text search cannot be held, runs unfiltered (AC6.6).
 const runBlocked = computed(
   () =>
     filterInitPending.value ||
     parserLoadFailed.value ||
     (freeTextNotice.value && !dashboardPanelData.data.queries[0]?.customQuery),
 );
-// A newer initialisation owns the panel; an older one resuming after an await must not write to it.
 let initSeq = 0;
 
 const { showErrorNotification } = useNotifications();
@@ -358,7 +355,6 @@ const initializeFromQuery = async () => {
   // When SQL mode is OFF, always use builder mode with histogram/count fields
   // and carry over the WHERE clause as a filter
   if (!props.isSqlMode) {
-    // Read before any await, since the parent re-derives both from the search bar text.
     const whereClause = props.whereClause;
     const freeTextFilter = props.freeTextFilter;
     if (props.selectedStream) {
@@ -389,7 +385,6 @@ const initializeFromQuery = async () => {
       }
       const { filter, complete } = parsed;
       if (seq !== initSeq) return;
-      // A text search the builder cannot hold would otherwise run unfiltered (AC6.6).
       if (freeTextFilter && (!whereClause?.trim() || !complete)) {
         freeTextNotice.value = true;
         filterInitPending.value = false;
@@ -547,7 +542,6 @@ const handleChartApiError = (error: any) => {
 };
 
 const autoRun = useLogsAutoRun();
-// G1: Add to dashboard follows the Build panel's own completed run (J7).
 const addToDashboardReason = computed(() => autoRun.persistReason("build", "add-to-dashboard"));
 
 const onAddToDashboard = () => {
@@ -607,7 +601,6 @@ const retryParser = async () => {
 };
 
 const onQueryGenerated = (query: string) => {
-  // Until the filter is in the builder, a generated query lacks it and would erase it from the search bar.
   if (holdGeneratedQuery.value || filterInitPending.value || freeTextNotice.value) return;
   if (parserLoadFailed.value) return;
   // Forward the generated query to parent (Index.vue -> SearchBar)
@@ -642,13 +635,13 @@ onMounted(() => {
  */
 const runQuery = async (withoutCache?: boolean, generationId?: number): Promise<boolean> => {
   if (runBlocked.value) return false;
-  // Build's own runs (init, apply) open their generation here; Run passes the one it opened.
   const panelGenerationId =
     generationId ?? autoRun.openPanelRun(() => panelEditorRef.value?.cancelRunningQuery?.());
-  // A re-initialisation can start during the awaits below and empty the filter again.
   const abandon = () => {
-    // The caller closes a generation it passed in; one opened here has nobody else to close it.
-    if (generationId == null && autoRun.hasPanelRun(panelGenerationId)) {
+    if (
+      (generationId === null || generationId === undefined) &&
+      autoRun.hasPanelRun(panelGenerationId)
+    ) {
       autoRun.endPanelRun(false);
     }
     return false;
@@ -674,7 +667,6 @@ const runQuery = async (withoutCache?: boolean, generationId?: number): Promise<
   }
 
   panelEditorRef.value?.runQuery(withoutCache);
-  // The editor copied its config synchronously above; that copy is what this run certifies.
   autoRun.markPanelDispatched(panelGenerationId);
   return true;
 };

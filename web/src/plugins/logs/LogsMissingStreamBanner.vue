@@ -15,18 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="px-page-edge bg-status-warning-bg flex flex-col gap-2 py-2 text-xs"
-    data-test="logs-missing-stream-banner"
-    :class="noFtsStreams.length ? 'text-text-heading' : 'text-status-warning-text'"
-  >
+  <OBanner variant="warning" icon="warning" dense data-test="logs-missing-stream-banner">
     <div
       class="flex flex-wrap items-center gap-2"
       :data-test="noFtsStreams.length ? 'logs-no-fts-mixed-banner' : undefined"
     >
-      <OIcon v-if="!noFtsStreams.length" name="warning" size="sm" />
       <div v-if="noFtsStreams.length" class="flex w-full items-start gap-2">
-        <OIcon name="warning" size="sm" />
         <div class="flex min-w-0 flex-col gap-1">
           <span v-for="stream in noFtsStreams" :key="stream" class="font-semibold">{{
             t("search.noFtsRecovery.skipped", { stream })
@@ -39,55 +33,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <span v-else>{{ message }}</span>
-      <template v-if="noFtsStreams.length">
-        <OButton
-          variant="outline"
-          size="chip"
-          data-test="logs-no-fts-search-fields-btn"
-          @click="openFieldSearch"
-          >{{ t("search.noFtsRecovery.searchField") }}</OButton
-        >
-        <OButton
-          variant="outline"
-          size="chip"
-          data-test="logs-no-fts-clear-run-btn"
-          @click="emit('clear-run')"
-          >{{ t("search.noFtsRecovery.clearRun") }}</OButton
-        >
-        <OButton
-          variant="outline"
-          size="chip"
-          data-test="logs-no-fts-configure-btn"
-          :aria-disabled="!canConfigure || undefined"
-          :class="
-            !canConfigure &&
-            'text-text-disabled! hover:border-button-outline-border! cursor-not-allowed! hover:bg-transparent!'
-          "
-          :aria-describedby="!canConfigure ? permissionId : undefined"
-          @click="openSettings"
-          >{{ t("search.freeTextSetField") }}</OButton
-        >
-        <span v-if="!canConfigure" :id="permissionId">{{
-          t("search.noFtsRecovery.editPermission")
-        }}</span>
-      </template>
     </div>
-    <LogsNoFtsFieldSearch
-      v-if="fieldSearchOpen"
-      :streams="recoveryStreams"
-      :selected-streams="selectedStreams"
-      :term="term"
-      @cancel="closeFieldSearch"
-      @submit="(values) => emit('field-search', values)"
-    />
-  </div>
+    <template v-if="noFtsStreams.length" #actions>
+      <div class="flex w-full flex-col gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <OButton
+            variant="outline"
+            size="chip"
+            data-test="logs-no-fts-search-fields-btn"
+            @click="openFieldSearch"
+            >{{ t("search.noFtsRecovery.searchField") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="chip"
+            data-test="logs-no-fts-clear-run-btn"
+            @click="emit('clear-run')"
+            >{{ t("search.noFtsRecovery.clearRun") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="chip"
+            data-test="logs-no-fts-configure-btn"
+            :disabled="!canConfigure"
+            focusable-unavailable
+            :description-id="permissionId"
+            @click="openSettings"
+            >{{ t("search.freeTextSetField") }}</OButton
+          >
+          <span v-if="!canConfigure" :id="permissionId">{{
+            t("search.noFtsRecovery.editPermission")
+          }}</span>
+        </div>
+        <LogsNoFtsFieldSearch
+          v-if="fieldSearchOpen"
+          :streams="recoveryStreams"
+          :selected-streams="selectedStreams"
+          :term="term"
+          @cancel="closeFieldSearch"
+          @submit="(values) => emit('field-search', values)"
+        />
+      </div>
+    </template>
+  </OBanner>
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { toRef, useId } from "vue";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import LogsNoFtsFieldSearch from "./LogsNoFtsFieldSearch.vue";
 import { useNoFtsRecovery } from "./useNoFtsRecovery";
@@ -95,7 +91,7 @@ import type { NoFtsRecoveryStream, NoFtsFieldSubmission } from "./LogsNoFtsField
 
 const props = withDefaults(
   defineProps<{
-    message: string;
+    message: I18nText;
     noFtsStreams: string[];
     configureDenied?: boolean;
     term?: string;
@@ -113,7 +109,6 @@ const { canConfigure, fieldSearchOpen, openFieldSearch, closeFieldSearch } = use
 );
 const permissionId = `${useId()}-configure-reason`;
 
-// Routes only; the stream settings dialog owns the write.
 const openSettings = () => {
   const stream = props.noFtsStreams[0];
   if (stream && canConfigure.value) router.push(`/streams?dialog=${stream}`);

@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Item 4a: J/K row navigation on the Logs results (J1-J5, J8). One stream of 130 rows, page size 50, so 3 pages.
 const {
   test,
   expect,
@@ -44,7 +43,6 @@ const urlFor = () =>
   `/web/logs?org_identifier=${ORG}&stream=${STREAM}&stream_type=logs&period=15m&refresh=0` +
   `&sql_mode=false&quick_mode=false&show_histogram=false&query=${b64("")}`;
 
-/** The `from` offset of a hits request; page N asks for (N-1) * 50. */
 function fromOf(request) {
   try {
     const body = JSON.parse(request.postData() || "{}");
@@ -78,7 +76,6 @@ async function apiTotal(request) {
   return (await response.json()).total;
 }
 
-/** Opens the stream, runs it, and waits until page 1 has its 50 rows and the results have settled. */
 async function openResults(page) {
   await navigateToBase(page);
   await page.evaluate(() => {
@@ -103,7 +100,6 @@ async function openResults(page) {
   ).toHaveCount(0, {
     timeout: 60000,
   });
-  // Nothing focused, as after a fresh run: J must work from the body.
   await page.evaluate(
     () =>
       document.activeElement instanceof HTMLElement &&
@@ -112,7 +108,6 @@ async function openResults(page) {
   return searches;
 }
 
-/** The unique `jk-<n>` message rendered in a results row. */
 async function rowMessage(logs, n) {
   const text = await logs.logResultsRow(n).innerText();
   const match = /jk-\d+/.exec(text);
@@ -129,16 +124,13 @@ async function drawerShows(page, message) {
   );
 }
 
-/** Steps with J/K until the drawer shows hit `n` of the current page. */
 async function openRow(page, logs, n) {
   await logs.logResultsRow(n).scrollIntoViewIfNeeded();
   await logs.logResultsRow(n).click();
   await drawerShows(page, await rowMessage(logs, n));
 }
 
-/** Runs axe (WCAG 2 A/AA) on the given selectors; violations carry the node and the first failure reason. */
 async function axeScan(page, selectors, excluded = []) {
-  // Mid-animation colours blend with the scrim, which axe reports as low contrast.
   await page.waitForFunction(() =>
     document
       .getAnimations()
@@ -284,14 +276,12 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       await expect.poll(() => searches.hits().length).toBe(before + 1);
       await expect(page.locator(logs.logDetailDialog)).toBeVisible();
       await drawerShows(page, "jk-79");
-      // A page of the same query reuses the schema page 1 loaded (user report 2026-10-07).
       await expect(page.locator(logs.logDetailDialog)).toContainText(
         "Log 1 of 50 · Page 2",
       );
       expect(searches.all().filter((r) => r.type === "hits")).toHaveLength(
         before + 1,
       );
-      // Field extraction runs after the rows render; an idle network means any schema read has been sent.
       await page.waitForLoadState("networkidle");
       expect(schemaReads).toEqual([]);
       await expect(page.locator(`${pager} [aria-current="page"]`)).toHaveText(
@@ -320,7 +310,6 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       const searches = await openResults(page);
       await openRow(page, logs, 47);
       const before = searches.hits().length;
-      // Repeated keydowns on a held key carry `repeat: true`.
       await page.keyboard.down("j");
       await page.keyboard.down("j");
       await page.keyboard.down("j");
@@ -455,7 +444,6 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       ).toHaveCount(0, {
         timeout: 60000,
       });
-      // Field extraction runs after the rows render; an idle network means any schema read has been sent.
       await page.waitForLoadState("networkidle");
       expect(schemaReads).toEqual([]);
       await page.evaluate(
@@ -597,7 +585,6 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       await openResults(page);
       await page.addScriptTag({ path: require.resolve("axe-core/axe.min.js") });
 
-      // Drawer open on row 1: the drawer with its key hints, the live regions and the highlighted row.
       await logs.pressLogRowKey("j");
       await logs.pressLogRowKey("j");
       await expect(page.locator(logs.logsDetailNavLive)).toHaveText(
@@ -610,7 +597,6 @@ test.describe("Logs J/K navigation (item 4a)", () => {
           logs.logsRowNavLive,
           `${table} [data-active-row]`,
         ],
-        // On main too, not from 4a: the footer select has no name, its label and tab labels miss AA contrast.
         [
           `${logs.logDetailDialog} .select-noof-records`,
           `${logs.logDetailDialog} label`,
@@ -620,7 +606,6 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       expect(drawerScan.passes).toBeGreaterThan(0);
       expect(drawerScan.violations).toEqual([]);
 
-      // Drawer closed: the focused, highlighted row.
       await page.keyboard.press("Escape");
       await expect(logs.logResultsRow(1)).toBeFocused();
       const rowScan = await axeScan(page, [
@@ -630,7 +615,6 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       expect(rowScan.passes).toBeGreaterThan(0);
       expect(rowScan.violations).toEqual([]);
 
-      // The cheatsheet with the new rows.
       await page.keyboard.press("Shift+?");
       await expect(
         page.locator('[data-test="shortcut-cheatsheet-row-logsNextRow"]'),
@@ -639,7 +623,6 @@ test.describe("Logs J/K navigation (item 4a)", () => {
         '[role="dialog"]:has([data-test="shortcut-cheatsheet-row-logsNextRow"])',
       ]);
       expect(sheetScan.passes).toBeGreaterThan(0);
-      // On main too, not from 4a: ODialog's scroll body has no tab stop; accent titles and the footer hint miss AA contrast.
       const preexisting = {
         "scrollable-region-focusable": /^\.px-dialog-content-px /,
         "color-contrast":

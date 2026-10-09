@@ -31,7 +31,6 @@ const props = defineProps<{
   bordered?: boolean;
   striped?: boolean;
   rowClass?: string | ((row: any) => string);
-  /** `row.index` of the current row; only the matching row gets `is-active`. */
   activeRowIndex?: number | null;
   rowStyleFn?: (row: any) => Record<string, any>;
   loading?: boolean;
@@ -155,7 +154,11 @@ function getRowForIndex(index: number) {
 }
 
 function isActiveRow(row: Row<any> | undefined): boolean {
-  return props.activeRowIndex != null && row?.index === props.activeRowIndex;
+  return (
+    props.activeRowIndex !== null &&
+    props.activeRowIndex !== undefined &&
+    row?.index === props.activeRowIndex
+  );
 }
 
 /** Get the TanStack Row from a draggable model item (plain data). */

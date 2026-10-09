@@ -19,7 +19,7 @@ import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import searchService from "@/services/search";
 import shortURLService from "@/services/short_url";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
@@ -37,10 +37,8 @@ import {
   type ResolveResult,
 } from "@/utils/logs/logPermalink";
 
-/** The fallback popover's URL when the clipboard refused it (C6 "Clipboard under a user gesture"). */
 export const lineLinkPopover = shallowRef<{ url: string; source: LineLinkSource } | null>(null);
 
-/** True while a copy waits for its resolve and short link; the controls show busy and ignore clicks. */
 export const lineLinkBusy = ref(false);
 
 const SCOPE_CHANGED = "line-link-scope-changed";
@@ -64,8 +62,7 @@ interface ExecutedLike {
   req?: { encoding?: string; query?: { sql?: string; query_fn?: string | null } };
 }
 
-/** Writes the URL in the click's own user gesture; rejects when the browser has no promise-capable clipboard. */
-export function writeUrlToClipboard(url: Promise<string>): Promise<void> {
+function writeUrlToClipboard(url: Promise<string>): Promise<void> {
   const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
   const Item = (globalThis as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
   if (!clipboard?.write || typeof Item !== "function" || globalThis.isSecureContext === false) {
@@ -84,7 +81,6 @@ export function closeLineLinkPopover(): void {
   lineLinkPopover.value = null;
 }
 
-/** Copy link to a log line (4c C3/C4/C6): G1 and eligibility gates, the copy-time resolve, short link, clipboard. */
 export function useLogLineLink() {
   const store = useStore();
   const { t } = useI18nTyped();
@@ -105,12 +101,11 @@ export function useLogLineLink() {
   const functionActive = (): boolean => {
     const record = executed();
     if (record?.req?.query) return !!record.req.query.query_fn;
-    return searchObj.data.tempFunctionContent != "" && !!searchObj.meta.showTransformEditor;
+    return searchObj.data.tempFunctionContent !== "" && !!searchObj.meta.showTransformEditor;
   };
 
   const sqlMode = (): boolean => executed()?.signature?.sqlMode ?? !!searchObj.meta.sqlMode;
 
-  /** Disabled-with-reason when G1 fails, then the C3 eligibility reasons; hidden in Visualize and Patterns. */
   const lineLinkState = (row: unknown): LineLinkState => {
     const viewMode = searchObj.meta.logsVisualizeToggle ?? "logs";
     const eligibility = lineLinkEligibility({
@@ -126,7 +121,7 @@ export function useLogLineLink() {
     const g1 = autoRun.persistReason("logs", "copy-line-link");
     if (g1) return { kind: "disabled", reason: g1 };
     if (eligibility.kind === "disabled") {
-      return { kind: "disabled", reason: t(eligibility.reasonKey as I18nKey) };
+      return { kind: "disabled", reason: t(eligibility.reasonKey) };
     }
     return { kind: "enabled" };
   };
@@ -216,7 +211,6 @@ export function useLogLineLink() {
     if (scopeKey() !== key) throw new Error(SCOPE_CHANGED);
   };
 
-  /** Builds the line link: resolve (C4), decide exact vs timestamp, then shorten. */
   const buildLineLink = async (row: LogRow): Promise<LineLinkResult> => {
     const stream = lineStreamOf(row, [...(searchObj.data.stream.selectedStream ?? [])]);
     const ts = readRowTimestamp(row, timestampColumn());
@@ -227,7 +221,6 @@ export function useLogLineLink() {
       quickModeNumFields: store.state.zoConfig?.quick_mode_num_fields,
       quickModeForceEnabled: store.state.zoConfig?.quick_mode_force_enabled,
     });
-    // Everything the link names is read before the first await, so a switch mid-copy cannot mix into it.
     const scope = scopeKey();
     const org = String(store.state.selectedOrganization.identifier);
     const decideInput = {
@@ -272,7 +265,7 @@ export function useLogLineLink() {
     if (result.decision.kind === "timestamp") {
       const key = result.lookupFailed
         ? "search.linePermalink.toastLookupFailed"
-        : (result.decision.toastKey as I18nKey);
+        : result.decision.toastKey;
       toast({ variant: "warning", message: t(key) });
       return;
     }
@@ -286,7 +279,6 @@ export function useLogLineLink() {
     });
   };
 
-  /** The click handler: the clipboard write starts synchronously so Safari and Chromium keep the user gesture. */
   const copyLineLink = (row: unknown, source: LineLinkSource): Promise<void> => {
     if (lineLinkBusy.value || !hasRow(row)) return Promise.resolve();
     if (lineLinkState(row).kind !== "enabled") return Promise.resolve();
@@ -319,7 +311,6 @@ export function useLogLineLink() {
   return { lineLinkState, copyLineLink, buildLineLink };
 }
 
-/** Test hook. */
 export function resetLineLinkForTests(): void {
   lineLinkPopover.value = null;
   lineLinkBusy.value = false;

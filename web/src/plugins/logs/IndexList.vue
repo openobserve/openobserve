@@ -452,7 +452,6 @@ export default defineComponent({
       searchObj.data.stream.selectedStream = [];
       searchObj.data.stream.selectedStreamFields = [];
       saveLogsStreamType(org, newType);
-      // A later type, stream or org pick owns the selection; this list response is stale.
       const isCurrent = () =>
         token === currentSelectionToken() &&
         searchObj.data.stream.streamType === newType &&
@@ -973,7 +972,7 @@ export default defineComponent({
         let whereClause = "";
         let queries: any = {};
         searchObj.data.filterErrMsg = "";
-        searchObj.data.missingStreamMessage = "";
+        searchObj.data.missingStreamMessage = raw("");
         searchObj.data.stream.missingStreamMultiStreamFilter = [];
         if (searchObj.meta.sqlMode == true && query.trim().length) {
           const parsedSQL: any = fnParsedSQL(query);

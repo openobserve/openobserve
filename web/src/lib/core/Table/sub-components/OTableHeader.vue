@@ -248,7 +248,6 @@ function headerAlignClass(header: any): string {
   return "";
 }
 
-// On the <th> (columnheader), where ARIA allows aria-sort; a button may not carry it.
 function headerAriaSort(header: any): "ascending" | "descending" | "none" | undefined {
   if (!props.sortingEnabled || !(header.column.columnDef.meta as any)?.sortable) return undefined;
   const direction = props.getSortIcon?.(header.id);
@@ -688,8 +687,6 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
                   {{ headerSubLabel(header) }}
                 </OTruncatedText>
               </span>
-              <!-- Sort icons — `shrink-0` so they're never clipped even when the
-                 header title truncates. -->
               <span
                 v-if="sortingEnabled && (header.column.columnDef.meta as any)?.sortable"
                 class="flex shrink-0 items-center"

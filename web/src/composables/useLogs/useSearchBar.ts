@@ -46,7 +46,6 @@ import {
 } from "@/composables/useLogs/logsRowNav";
 import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
 
-// Moved on every selection change, so a slower schema response for an earlier pick never wins (P1).
 let selectionToken = 0;
 
 export const bumpSelectionToken = (): number => ++selectionToken;
@@ -59,9 +58,7 @@ export interface StreamChangeOptions {
 
 export interface QueryDataOptions {
   generationId?: number;
-  /** Same query re-sent (page size): its results reuse the stream schemas already loaded. */
   reuseSchema?: boolean;
-  /** The permalink-init token on the initial-load search only (4c C5 step 6); any other query ends the permalink. */
   origin?: string;
 }
 
@@ -83,7 +80,6 @@ export const useSearchBar = (t: TranslateFn) => {
 
   const { extractFields } = useStreamFields();
 
-  // Binds the page store and search object to the engine while inside a setup.
   useLogsAutoRun();
 
   const getFunctions = async () => {
@@ -312,11 +308,9 @@ export const useSearchBar = (t: TranslateFn) => {
       searchObj.loading = false;
       searchObj.loadingProgressPercentage = 0;
 
-      // A stream switch replaces the scope, so the in-flight run and anything pending stop here.
       autoRun.engine.cancelGeneration(null, { cause: "reset" });
       if (!editorOrigin) autoRun.engine.clearEditorDirty();
 
-      // Reset query results; the executed record goes with them, so nothing reads as current.
       autoRun.invalidateExecuted("stream");
       searchObj.data.queryResults = { hits: [] };
       searchObj.data.freeTextBlocked = null;
@@ -423,7 +417,6 @@ export const useSearchBar = (t: TranslateFn) => {
     }
   };
 
-  // QOSS=false legacy run: unguarded, but still under a generation so Cancel and replacement reach it.
   const handleQueryData = async () => {
     try {
       searchObj.data.tempFunctionLoading = false;
@@ -458,7 +451,6 @@ export const useSearchBar = (t: TranslateFn) => {
 
       // searchObj.data.histogram.chartParams.title = "";
       searchObjDebug["queryDataStartTime"] = performance.now();
-      // Rows are keyed by index, so a new result set must not inherit the old open row (4a §3.2.5).
       if (!isPagination) resetRowSelection(searchObj);
       closeDrawerForQuery(searchObj, isPagination);
       searchObj.meta.searchApplied = true;
@@ -889,7 +881,6 @@ export const useSearchBar = (t: TranslateFn) => {
     }
   };
 
-  // The single cancel path: browser streams of the current generations, plus the ENT server cancel (P2).
   const cancelQuery = async (): Promise<boolean> => {
     useLogsAutoRun().engine.cancelGeneration(null, { cause: "user" });
     searchObj.data.isOperationCancelled = false;

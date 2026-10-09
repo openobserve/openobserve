@@ -15,7 +15,6 @@
 
 import { resolveSeverityFieldValue, type KnownLogSeverityLevel } from "@/utils/logs/statusParser";
 
-// [row key, field whose tier rules apply]; camel-case aliases come from SQL projections and dashboards.
 const SOURCE_EVENT_SEVERITY_FIELDS: ReadonlyArray<readonly [string, string]> = [
   ["severity_text", "severity_text"],
   ["severityText", "severity_text"],
@@ -90,7 +89,6 @@ export function normalizeSeverity(raw: string | number | null | undefined): stri
   return null;
 }
 
-/** Pull the best-available tier 1-2 severity field from a log row, in the correlation vocabulary. */
 export function extractSeverity(row: Record<string, any> | null | undefined): string | null {
   if (!row) return null;
   for (const [alias, field] of SOURCE_EVENT_SEVERITY_FIELDS) {

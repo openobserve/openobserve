@@ -301,20 +301,15 @@ export interface LogSeverity {
   level: LogSeverityLevel;
   source: LogSeveritySource;
   field: string | null;
-  /** True when the executed request may have dropped a level field this row lacks. */
   notFetched: boolean;
 }
 
-/** Full stored schema of one stream, as the projection guard needs it. */
 export interface SeverityStreamSchema {
   fields: ReadonlySet<string>;
-  /** User-defined schema fields when the server applies them, else null. */
   udsFields: ReadonlySet<string> | null;
-  /** True when a wildcard request on this stream may return only part of its fields. */
   serverMayTruncate: boolean;
 }
 
-/** Per-request input of the projection guard. */
 export interface SeverityProjection {
   projectedFields: ReadonlySet<string> | "all";
   schemaFor: (row: Record<string, unknown>) => SeverityStreamSchema | null;
@@ -330,7 +325,6 @@ export interface SeverityProjectionInput {
   sqlMode: boolean;
   quickMode: boolean;
   interestingFields: readonly string[];
-  /** Output names of the SQL select list; "all" for a wildcard; null when unparseable. */
   sqlColumns: ReadonlySet<string> | "all" | null;
   streams: readonly SeverityProjectionStream[];
   selectedStreams: readonly string[];
@@ -343,10 +337,6 @@ interface SeverityMemoEntry {
   generation: number;
   projection: SeverityProjection | undefined;
   result: LogSeverity;
-}
-
-export interface SeveritySqlPredicateOptions {
-  includeTiers?: ReadonlyArray<1 | 2 | 3 | 4>;
 }
 
 export const SEVERITY_TIER1_FIELDS = [
@@ -374,12 +364,10 @@ export const SEVERITY_HTTP_FIELDS = [
 
 export const SEVERITY_MESSAGE_FIELDS = ["message", "msg", "body", "log", "content"] as const;
 
-/** Only this many leading characters of a message are scanned (A6). */
 export const SEVERITY_MESSAGE_SCAN_CHARS = 512;
 
 const SYSLOG_SEVERITY_FIELDS: ReadonlySet<string> = new Set(["syslog_severity", "syslog.severity"]);
 
-// A Map, so row values such as "constructor" or "__proto__" never hit inherited properties.
 const SEVERITY_STRING_ALIASES: ReadonlyMap<string, KnownLogSeverityLevel> = new Map([
   ["emergency", "emergency"],
   ["emerg", "emergency"],
@@ -405,7 +393,6 @@ const SEVERITY_STRING_ALIASES: ReadonlyMap<string, KnownLogSeverityLevel> = new 
   ["success", "ok"],
 ]);
 
-// OTel short names carry a 2-4 suffix (WARN2, ERROR3); only these bases take one.
 const OTEL_SHORT_NAME_BASES: readonly string[] = [
   "trace",
   "debug",
@@ -416,7 +403,6 @@ const OTEL_SHORT_NAME_BASES: readonly string[] = [
 ];
 const OTEL_SHORT_NAME_DIGITS: readonly string[] = ["2", "3", "4"];
 
-// Index = syslog severity; 0 is emergency only on the syslog fields.
 const SYSLOG_LEVELS: readonly KnownLogSeverityLevel[] = [
   "emergency",
   "alert",
@@ -474,7 +460,6 @@ const GLOG_LEVELS: Readonly<Record<string, KnownLogSeverityLevel>> = {
   F: "emergency",
 };
 
-// The optional quote after the key also reads JSON bodies such as {"level":"info"}.
 const KEY_VALUE_LEVEL_RE = /\b(?:level|lvl|severity|loglevel)"?\s*[=:]\s*"?([A-Za-z]+)/i;
 const BRACKETED_LEVEL_RE =
   /[[<(]\s*(EMERG(?:ENCY)?|FATAL|PANIC|ALERT|CRIT(?:ICAL)?|ERROR|ERR|WARN(?:ING)?|NOTICE|INFO|DEBUG|TRACE)\s*[\]>)]/i;
@@ -488,7 +473,6 @@ const STACK_TRACE_RES: readonly RegExp[] = [
   /^\S+(?:Exception|Error): /,
 ];
 
-/** Every tier-5 regex, exported so the ReDoS test can time each one directly. */
 export const SEVERITY_MESSAGE_REGEXES: readonly RegExp[] = [
   KEY_VALUE_LEVEL_RE,
   BRACKETED_LEVEL_RE,
@@ -521,19 +505,6 @@ const SEVERITY_INDICATOR_COLORS: Readonly<Record<KnownLogSeverityLevel, string>>
   ok: "var(--color-log-severity-ok-indicator)",
 };
 
-const ALL_KNOWN_LEVELS: readonly KnownLogSeverityLevel[] = [
-  "emergency",
-  "alert",
-  "critical",
-  "error",
-  "warning",
-  "notice",
-  "info",
-  "debug",
-  "trace",
-  "ok",
-];
-
 const GUARDED_FIELDS: readonly string[] = [
   ...new Set<string>([...SEVERITY_TIER1_FIELDS, ...SEVERITY_TIER2_FIELDS, ...SEVERITY_HTTP_FIELDS]),
 ];
@@ -552,30 +523,25 @@ const NOT_FETCHED_SEVERITY: LogSeverity = Object.freeze({
   notFetched: true,
 });
 
-// Reactive so rendered rows re-resolve when a schema load or the inference flag invalidates the memo.
 const severityGeneration = shallowRef(0);
 let severityInferenceEnabled = true;
 
 const severityMemo = new WeakMap<object, SeverityMemoEntry>();
 
-/** Invalidates memoised severities; call whenever a stream schema is replaced. */
 export function bumpSeveritySchemaGeneration(): void {
   severityGeneration.value += 1;
 }
 
-/** Current schema generation; reading it inside a render re-renders on a bump. */
 export function severitySchemaGeneration(): number {
   return severityGeneration.value;
 }
 
-/** Turns tier-5 message inference on or off (the `ZO_UI_LOGS_SEVERITY_INFERENCE` kill switch). */
 export function setSeverityInferenceEnabled(enabled: boolean): void {
   if (severityInferenceEnabled === enabled) return;
   severityInferenceEnabled = enabled;
   bumpSeveritySchemaGeneration();
 }
 
-/** Resolves a row's severity by the A4 tiers, memoised per row object, schema generation and projection. */
 export function resolveLogSeverity(row: unknown, projection?: SeverityProjection): LogSeverity {
   if (!row || typeof row !== "object") return UNKNOWN_SEVERITY;
   const key = toRaw(row) as object;
@@ -589,7 +555,6 @@ export function resolveLogSeverity(row: unknown, projection?: SeverityProjection
   return result;
 }
 
-/** Resolves one value as if it were the value of `field`, using that field's tier rules. */
 export function resolveSeverityFieldValue(
   field: string,
   value: unknown,
@@ -614,7 +579,6 @@ export function resolveSeverityFieldValue(
   return null;
 }
 
-/** Infers a level from the first 512 characters of a message, conservative rules only. */
 export function inferSeverityFromMessage(text: string): KnownLogSeverityLevel | null {
   const head = text.slice(0, SEVERITY_MESSAGE_SCAN_CHARS);
   for (const rule of MESSAGE_RULES) {
@@ -624,18 +588,15 @@ export function inferSeverityFromMessage(text: string): KnownLogSeverityLevel | 
   return null;
 }
 
-/** Spine/border colour: the level's solid token for every source, transparent for unknown. */
 export function severityIndicatorColor(severity: LogSeverity): string {
   if (severity.level === "unknown") return "transparent";
   return SEVERITY_INDICATOR_COLORS[severity.level];
 }
 
-/** Row classes carrying the resolved level and its source (test hook). */
 export function severityRowClass(severity: LogSeverity): string {
   return `o2-log-level-${severity.level} o2-log-level-src-${severity.source}`;
 }
 
-/** Every lowercase string that tier-1 string handling maps to one of `levels`. */
 export function severityStringValues(levels: readonly LogSeverityLevel[]): string[] {
   const wanted = new Set(levels);
   const values: string[] = [];
@@ -649,36 +610,6 @@ export function severityStringValues(levels: readonly LogSeverityLevel[]): strin
   return values;
 }
 
-/** SQL boolean of the on-screen precedence: true when the first recognised level field is in `levels`. */
-export function severitySqlPredicate(
-  fieldsPresent: readonly string[],
-  levels: readonly LogSeverityLevel[],
-  options: SeveritySqlPredicateOptions = {},
-): string {
-  const tiers = new Set(options.includeTiers ?? [1]);
-  const present = new Set(fieldsPresent.map((f) => f.toLowerCase()));
-  const branches: string[] = [];
-  if (tiers.has(1)) {
-    for (const field of SEVERITY_TIER1_FIELDS) {
-      if (present.has(field)) branches.push(...tier1SqlBranches(field, levels));
-    }
-  }
-  if (tiers.has(2)) {
-    for (const field of SEVERITY_TIER2_FIELDS) {
-      if (present.has(field)) branches.push(bandSqlBranch(field, OTEL_NUMBER_BANDS, levels));
-    }
-  }
-  if (tiers.has(3) && present.has("status")) branches.push(statusStringSqlBranch(levels));
-  if (tiers.has(4)) {
-    for (const field of SEVERITY_HTTP_FIELDS) {
-      if (present.has(field)) branches.push(...httpSqlBranches(field, levels));
-    }
-  }
-  if (branches.length === 0) return "false";
-  return `(CASE ${branches.join(" ")} ELSE false END)`;
-}
-
-/** Builds the per-request projection guard input from the executed search state. */
 export function buildSeverityProjection(input: SeverityProjectionInput): SeverityProjection {
   const schemas = new Map<string, SeverityStreamSchema>();
   for (const stream of input.streams) {
@@ -702,7 +633,6 @@ export function buildSeverityProjection(input: SeverityProjectionInput): Severit
   };
 }
 
-/** Output names of a parsed SQL select list: "all" for a wildcard, null when the list is unreadable. */
 export function sqlSelectOutputNames(columns: unknown): ReadonlySet<string> | "all" | null {
   if (columns === "*") return "all";
   if (!Array.isArray(columns)) return null;
@@ -717,7 +647,7 @@ export function sqlSelectOutputNames(columns: unknown): ReadonlySet<string> | "a
     }
     if (expr?.type !== "column_ref") continue;
     const name = typeof expr.column === "string" ? expr.column : expr.column?.expr?.value;
-    if (name != null) names.add(String(name).replace(/^"|"$/g, ""));
+    if (name !== null && name !== undefined) names.add(String(name).replace(/^"|"$/g, ""));
   }
   return names;
 }
@@ -747,7 +677,6 @@ function computeLogSeverity(
     const text = row[field];
     if (typeof text !== "string" || text.trim() === "") continue;
     const level = inferSeverityFromMessage(text);
-    // An unknown row still names the text field it scanned, for the drawer's evidence line.
     return level
       ? { level, source: "message", field, notFetched: false }
       : { level: "unknown", source: "none", field, notFetched: false };
@@ -834,94 +763,4 @@ function httpLevel(field: string, value: unknown): KnownLogSeverityLevel | null 
   const band = HTTP_STATUS_BANDS.find((b) => n >= b.min && n <= b.max);
   if (band) return band.level;
   return field === "status" ? syslogLevel(n, false) : null;
-}
-
-function sqlQuoteIdentifier(field: string): string {
-  return `"${field.replace(/"/g, '""')}"`;
-}
-
-function sqlStringList(values: readonly string[]): string {
-  return values.map((v) => `'${v.replace(/'/g, "''")}'`).join(", ");
-}
-
-function sqlText(field: string): string {
-  return `lower(trim(CAST(${sqlQuoteIdentifier(field)} AS VARCHAR)))`;
-}
-
-function sqlInteger(field: string): string {
-  return `try_cast(trim(CAST(${sqlQuoteIdentifier(field)} AS VARCHAR)) AS BIGINT)`;
-}
-
-function sqlInList(expr: string, values: readonly (string | number)[]): string {
-  if (values.length === 0) return "false";
-  const list = values.map((v) => (typeof v === "number" ? String(v) : sqlStringList([v])));
-  return `${expr} IN (${list.join(", ")})`;
-}
-
-function tier1NumberLevels(field: string): Array<{ n: number; level: KnownLogSeverityLevel }> {
-  const out: Array<{ n: number; level: KnownLogSeverityLevel }> = [];
-  const syslog = SYSLOG_SEVERITY_FIELDS.has(field);
-  for (let n = syslog ? 0 : 1; n <= 7; n++) out.push({ n, level: SYSLOG_LEVELS[n] });
-  if (!syslog) {
-    for (const [n, level] of Object.entries(PINO_LEVELS)) out.push({ n: Number(n), level });
-  }
-  return out;
-}
-
-function tier1SqlBranches(field: string, levels: readonly LogSeverityLevel[]): string[] {
-  const numbers = tier1NumberLevels(field);
-  const num = sqlInteger(field);
-  const text = sqlText(field);
-  const wantedNumbers = numbers.filter((x) => levels.includes(x.level)).map((x) => x.n);
-  const allStrings = sqlStringList(severityStringValues(ALL_KNOWN_LEVELS));
-  return [
-    `WHEN ${sqlInList(
-      num,
-      numbers.map((x) => x.n),
-    )} THEN ${sqlInList(num, wantedNumbers)}`,
-    `WHEN ${num} IS NULL AND ${text} IN (${allStrings}) THEN ${sqlInList(text, severityStringValues(levels))}`,
-  ];
-}
-
-function bandSqlBranch(
-  field: string,
-  bands: ReadonlyArray<{ min: number; max: number; level: KnownLogSeverityLevel }>,
-  levels: readonly LogSeverityLevel[],
-): string {
-  const num = sqlInteger(field);
-  const lo = Math.min(...bands.map((b) => b.min));
-  const hi = Math.max(...bands.map((b) => b.max));
-  return `WHEN ${num} BETWEEN ${lo} AND ${hi} THEN ${bandsInLevels(num, bands, levels)}`;
-}
-
-function bandsInLevels(
-  num: string,
-  bands: ReadonlyArray<{ min: number; max: number; level: KnownLogSeverityLevel }>,
-  levels: readonly LogSeverityLevel[],
-): string {
-  const wanted = bands.filter((b) => levels.includes(b.level));
-  if (wanted.length === 0) return "false";
-  return `(${wanted.map((b) => `${num} BETWEEN ${b.min} AND ${b.max}`).join(" OR ")})`;
-}
-
-function statusStringSqlBranch(levels: readonly LogSeverityLevel[]): string {
-  const text = sqlText("status");
-  const all = sqlStringList(severityStringValues(ALL_KNOWN_LEVELS));
-  return `WHEN ${sqlInteger("status")} IS NULL AND ${text} IN (${all}) THEN ${sqlInList(text, severityStringValues(levels))}`;
-}
-
-function httpSqlBranches(field: string, levels: readonly LogSeverityLevel[]): string[] {
-  const branches = [bandSqlBranch(field, HTTP_STATUS_BANDS, levels)];
-  if (field !== "status") return branches;
-  const num = sqlInteger(field);
-  const wanted = SYSLOG_LEVELS.map((level, n) => ({ n, level })).filter(
-    (x) => x.n >= 1 && levels.includes(x.level),
-  );
-  branches.push(
-    `WHEN ${num} BETWEEN 1 AND 7 THEN ${sqlInList(
-      num,
-      wanted.map((x) => x.n),
-    )}`,
-  );
-  return branches;
 }

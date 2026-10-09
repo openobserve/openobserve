@@ -201,7 +201,6 @@ export const formatCount = (value: number): string => {
   return String(value);
 };
 
-// Series values are raw breakdown-field values, so they resolve through that field's row rules (WARN2, 500, level=50).
 const getSemanticColor = (
   label: unknown,
   isDarkTheme: boolean,

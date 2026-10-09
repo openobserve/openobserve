@@ -217,9 +217,11 @@ export default defineComponent({
       type: Function as PropType<(field: string) => Promise<string[]>>,
       default: null,
     },
-    /** Character ranges searched as free text, decorated with a hover naming the searched fields. */
     freeTextDecorations: {
-      type: Object as PropType<{ ranges: { start: number; end: number }[]; hover: string } | null>,
+      type: Object as PropType<{
+        ranges: { start: number; end: number }[];
+        hover: I18nText;
+      } | null>,
       default: null,
     },
   },
@@ -243,7 +245,6 @@ export default defineComponent({
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
     let editorObj: any = null;
-    // Set around every edit the editor makes itself, so only keystrokes emit `user-edit`.
     let programmatic = false;
     const asProgrammatic = (edit: () => void) => {
       const previous = programmatic;
@@ -612,7 +613,6 @@ export default defineComponent({
       commitPendingChange = () => commitModelChange.flush();
 
       editorObj.onDidChangeModelContent((e: any) => {
-        // Non-debounced: the auto-run scheduler must see a keystroke before any pending run fires (AC4.4).
         if (!e?.isFlush && !programmatic) emit("user-edit");
         commitModelChange(e);
       });
@@ -878,7 +878,6 @@ export default defineComponent({
       }
     };
 
-    // A single undoable edit, so Cmd+Z brings back the text it replaced.
     const replaceValue = (value: string) => {
       const model = editorObj?.getModel?.();
       if (!model) return setValue(value);
@@ -1327,7 +1326,6 @@ export default defineComponent({
   text-decoration-color: var(--color-status-negative);
 }
 
-/* Set by deltaDecorations inside Monaco's DOM, so only :deep() reaches it. */
 .logs-query-editor :deep(.o2-free-text-term) {
   background-color: var(--color-surface-accent-hover);
   border-bottom: 0.0625rem dashed var(--color-accent);

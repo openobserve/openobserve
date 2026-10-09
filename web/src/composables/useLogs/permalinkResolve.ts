@@ -38,7 +38,7 @@ import {
   type ActivePermalink,
 } from "@/composables/useLogs/useLogPermalink";
 
-export const PERMALINK_TIE_HEAVY_KEY = "search.linePermalink.bannerAmbiguousTieHeavy";
+const PERMALINK_TIE_HEAVY_KEY = "search.linePermalink.bannerAmbiguousTieHeavy";
 
 export interface ResolveContext {
   regions?: string[];
@@ -48,7 +48,6 @@ export interface ResolveContext {
   retentionDays?: (stream: string) => number | null;
 }
 
-/** Initial load only (C5 step 2): parses `log_*` and mints the init origin; null when the URL carries no line or page. */
 export function beginPermalinkFromUrl(query: Record<string, unknown>, org: string): string | null {
   resetPermalinkState();
   const parsed = parsePermalinkQuery(query);
@@ -71,7 +70,6 @@ export function beginPermalinkFromUrl(query: Record<string, unknown>, org: strin
   return token;
 }
 
-/** Runs the 1 µs resolve (C4) for the active permalink and applies its outcome; stale or aborted runs change nothing. */
 export async function resolveActivePermalink(context: ResolveContext = {}): Promise<void> {
   const active = activePermalink.value;
   if (!active) return;
@@ -132,7 +130,6 @@ export async function resolveActivePermalink(context: ResolveContext = {}): Prom
     outcome.state === "found" && outcome.record ? drawerRecord(outcome.record, prepared) : null;
 }
 
-/** Banner Retry (J-C14): re-runs the resolve once for the same link. */
 export function retryPermalinkResolve(context: ResolveContext = {}): Promise<void> {
   const active = activePermalink.value;
   if (!active) return Promise.resolve();
@@ -145,12 +142,10 @@ export function retryPermalinkResolve(context: ResolveContext = {}): Promise<voi
   });
 }
 
-/** The record as the drawer shows it: `_stream_name` set on a multi-stream page so Search-around routes to the line's stream. */
 function drawerRecord(record: LogRow, active: ActivePermalink): LogRow {
   return active.multiStream ? { ...record, _stream_name: active.link.stream } : { ...record };
 }
 
-// A timestamp link that only hit the size cap is the S-C3 tie-heavy case: ambiguous with the rows highlighted.
 function adaptTieHeavy(
   outcome: PermalinkOutcome,
   link: LineLink,
@@ -168,6 +163,7 @@ function adaptTieHeavy(
     severity: "info",
     messageKey: hasId ? LOG_LINK_I18N.bannerAmbiguous : PERMALINK_TIE_HEAVY_KEY,
     messageParams: { count: `${RESOLVE_SIZE.toLocaleString()}+` },
+    pluralCount: RESOLVE_SIZE,
     actionKey: LOG_LINK_I18N.actionShowLines,
   };
 }

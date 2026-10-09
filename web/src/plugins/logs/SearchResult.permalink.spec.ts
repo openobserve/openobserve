@@ -206,14 +206,18 @@ describe("line link open (mounted, 4c C5)", { timeout: 30000 }, () => {
     await vi.waitFor(() => expect(drawerText()).toContain("payment declined id=7f3"));
     expect(drawerText()).not.toContain("card expired");
     expect(banner()?.getAttribute("data-state")).toBe("found");
-    expect(q('[data-test="log-detail-next-detail-btn"]')?.hasAttribute("disabled")).toBe(true);
+    expect(
+      q('[data-test="log-detail-next-detail-btn"]')?.getAttribute("aria-disabled") === "true",
+    ).toBe(true);
 
     await deliverPage([filler(0), twin, line, filler(1)]);
     await vi.waitFor(() => expect(row(2)?.classList.contains("o2-log-permalink-row")).toBe(true));
     expect(row(2)?.getAttribute("aria-current")).toBe("true");
     expect(document.querySelectorAll(".o2-log-permalink-row")).toHaveLength(1);
     expect(gridDrawer()).not.toBeNull();
-    expect(q('[data-test="log-detail-next-detail-btn"]')?.hasAttribute("disabled")).toBe(false);
+    expect(
+      q('[data-test="log-detail-next-detail-btn"]')?.getAttribute("aria-disabled") === "true",
+    ).toBe(false);
   });
 
   it("the init search sent after the drawer opened keeps it open; a later user search closes it (C5 step 5)", async () => {
@@ -269,7 +273,9 @@ describe("line link open (mounted, 4c C5)", { timeout: 30000 }, () => {
     await vi.waitFor(() => expect(drawerText()).toContain("payment declined id=7f3"));
     const wrapperResult = wrapper.findComponent(SearchResult).vm;
     expect(wrapperResult.navDisabledReason).toBe("notInPage");
-    expect(q('[data-test="log-detail-previous-detail-btn"]')?.hasAttribute("disabled")).toBe(true);
+    expect(
+      q('[data-test="log-detail-previous-detail-btn"]')?.getAttribute("aria-disabled") === "true",
+    ).toBe(true);
     expect(document.querySelectorAll(".o2-log-permalink-row")).toHaveLength(0);
   });
 
@@ -313,7 +319,9 @@ describe("line link open (mounted, 4c C5)", { timeout: 30000 }, () => {
     await resolveActivePermalink();
     await vi.waitFor(() => expect(pageDrawer()).not.toBeNull());
     expect(drawerText()).toContain("payment declined id=7f3");
-    expect(q('[data-test="log-detail-next-detail-btn"]')?.hasAttribute("disabled")).toBe(true);
+    expect(
+      q('[data-test="log-detail-next-detail-btn"]')?.getAttribute("aria-disabled") === "true",
+    ).toBe(true);
     expect(q('[data-test="log-detail-copy-line-link-btn"]')?.getAttribute("aria-disabled")).toBe(
       "true",
     );

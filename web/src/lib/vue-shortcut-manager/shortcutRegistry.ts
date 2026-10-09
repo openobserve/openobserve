@@ -258,7 +258,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       },
       { id: "logsNextRow", key: "j", descriptionKey: "shortcuts.actions.logsNextRow" },
       { id: "logsPrevRow", key: "k", descriptionKey: "shortcuts.actions.logsPrevRow" },
-      // Display-only: OTable's row keys (useTableRowShortcuts) and the drawer's Escape handle these.
       {
         id: "logsRowFocusMove",
         display: "↑ / ↓",
@@ -438,7 +437,6 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       },
       { id: "tracesNextRow", key: "j", descriptionKey: "shortcuts.actions.tracesNextRow" },
       { id: "tracesPrevRow", key: "k", descriptionKey: "shortcuts.actions.tracesPrevRow" },
-      // Display-only: Enter on a focused OTable row is handled by useTableRowShortcuts.
       { id: "tracesRowOpen", display: "enter", descriptionKey: "shortcuts.actions.tracesRowOpen" },
     ],
   },

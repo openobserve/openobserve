@@ -985,6 +985,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { announceInto } from "@/utils/announceInto";
 import {
   defineComponent,
   ref,
@@ -1293,7 +1294,6 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    // False while an embedding host shows another tab, so J/K go back to the host.
     shortcutsActive: {
       type: Boolean,
       default: true,
@@ -3364,13 +3364,7 @@ export default defineComponent({
 
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
     const spanNavAnnouncement = ref("");
-    // Cleared first so a repeated message ("Last span" twice) is announced again.
-    const announceSpanNav = (message: string) => {
-      spanNavAnnouncement.value = "";
-      nextTick(() => {
-        spanNavAnnouncement.value = message;
-      });
-    };
+    const announceSpanNav = (message: string) => announceInto(spanNavAnnouncement, message);
     const spanAncestors = (spanId: string): string[] =>
       ancestorChain(
         spanId,
@@ -3406,8 +3400,6 @@ export default defineComponent({
 
     useShortcuts(
       [
-        // `traceNextSpan` registers j + ↓, `tracePrevSpan` registers k + ↑
-        // (both bindings live in the registry under `keys`).
         { id: "traceNextSpan", handler: () => stepSpan(1) },
         { id: "tracePrevSpan", handler: () => stepSpan(-1) },
       ],

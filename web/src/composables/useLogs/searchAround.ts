@@ -70,7 +70,6 @@ export const useSearchAround = () => {
    * ```
    */
   const searchAroundData = (params: SearchAroundParams): void => {
-    // An explicit run of a different population: its own generation, and no grid record while it shows.
     const generation = autoRun.engine.newGeneration({
       lane: "grid",
       kind: "explicit",
@@ -92,7 +91,6 @@ export const useSearchAround = () => {
       // The _around endpoint is single-stream, so multi-stream hits use their own _stream_name.
       const isMultiStream = searchObj.data.stream.selectedStream.length > 1;
       const hitStreamName: string = isMultiStream ? (params.body?.[STREAM_NAME_FIELD] ?? "") : "";
-      // The _around endpoint runs SELECT * on the stream whatever select list is sent.
       const severityRequest: SeverityRequestSnapshot = {
         sqlMode: true,
         quickMode: false,
@@ -173,7 +171,6 @@ export const useSearchAround = () => {
       addTraceId(traceId);
       autoRun.engine.registerTrace(generation.id, traceId, "hits");
       autoRun.engine.beginHits(traceId);
-      // A plain HTTP call is not in the streaming transport's trace map, so cancel needs its own abort.
       const controller = new AbortController();
       autoRun.engine.registerAbort(generation.id, controller);
 

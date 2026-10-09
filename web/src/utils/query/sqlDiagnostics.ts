@@ -1185,14 +1185,12 @@ function extractSemanticError(text: string): { field: string; message: string } 
   return null;
 }
 
-/** A sqlparser failure, which the server may report with only the HTTP status instead of 20001. */
-export function isSqlSyntaxErrorText(text: string): boolean {
+function isSqlSyntaxErrorText(text: string): boolean {
   return (
     /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) || /ParserError|sql parser error/i.test(text)
   );
 }
 
-// The search stream reports only the HTTP status, so the code is read back from the server's message.
 const QUERY_ERROR_MESSAGES: [RegExp, number][] = [
   [/Search SQL not valid/i, 20001],
   [/Search field not found/i, 20004],
@@ -1201,7 +1199,6 @@ const QUERY_ERROR_MESSAGES: [RegExp, number][] = [
   [/Search SQL execute error/i, 20008],
 ];
 
-/** The 2000x query-error code a server message stands for, or null for any other error. */
 export function queryErrorCodeFromText(text: string): number | null {
   if (isSqlSyntaxErrorText(text)) return 20001;
   return QUERY_ERROR_MESSAGES.find(([pattern]) => pattern.test(text))?.[1] ?? null;

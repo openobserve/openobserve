@@ -35,7 +35,6 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
-// The grid's own producer and transport, so the assertion is on what Run sends.
 const GridRunner = defineComponent({
   template: "<div />",
   setup() {
@@ -55,7 +54,6 @@ const GridRunner = defineComponent({
   },
 });
 
-// Drives the real updateQueryValue: filter text flips to SQL mode only when it reads as a statement.
 describe("SearchBar — SQL auto-flip (item 1, spec 6.4)", () => {
   let wrapper: VueWrapper<any>;
 
@@ -106,7 +104,6 @@ describe("SearchBar — SQL auto-flip (item 1, spec 6.4)", () => {
       'SELECT _timestamp + 1 AS t FROM "logs"',
       '-- note\nSELECT 1 FROM "logs"',
     ]) {
-      // The previous flip selects the stream, and updateQueryValue ignores edits while that loads.
       wrapper.vm.searchObj.loadingStream = false;
       wrapper.vm.searchObj.meta.sqlMode = false;
       wrapper.vm.updateQueryValue(sql);

@@ -582,7 +582,6 @@ describe("TraceDetails", () => {
       _start_time_ns: String(base + offsetMs * 1_000_000),
       _end_time_ns: String(base + (offsetMs + 50) * 1_000_000),
     });
-    // R → A (A1, A2), B
     const spans = [
       span("R", "", 0, "GET /root"),
       span("A", "R", 1, "op-a"),

@@ -76,7 +76,6 @@ const SCAN: TextSearchTarget = { mode: "scan", fields: ["msg_text", "detail"] };
 const BLOCKED: TextSearchTarget = { mode: "blocked", candidates: ["msg_text"] };
 const LONG_TOKEN = "a".repeat(65);
 
-// Today's handleNonSqlMode WHERE body, copied verbatim as the byte-identity reference.
 const legacyWhere = (query: string, knownFields: ReadonlySet<string>): string => {
   let whereClause = query.trim();
   whereClause = whereClause

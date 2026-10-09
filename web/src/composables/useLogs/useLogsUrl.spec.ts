@@ -28,7 +28,6 @@ import {
   recordShownSearch,
   resetLogsUrlForTests,
   routeHasLineLink,
-  setLogsHistoryStateProvider,
   shownEntryFor,
   shownSearch,
   urlWriteMode,
@@ -238,16 +237,10 @@ describe("useLogsUrl (4c C7b)", () => {
     it("writes through the bound router with the history context, and skips an identical query", async () => {
       const router = makeRouter({ stream: "app" });
       bindLogsUrlRouter(router as any);
-      setLogsHistoryStateProvider(() => ({
-        zoomStack: [1],
-        returnPreset: "15m",
-        stackId: "s",
-        level: 1,
-      }));
       await writeLogsUrl("replace", { stream: "app", page: 2 });
       expect(router.replace).toHaveBeenCalledWith({
         query: { stream: "app", page: 2 },
-        state: { zoomStack: [1], returnPreset: "15m", stackId: "s", level: 1 },
+        state: { zoomStack: [], returnPreset: null, stackId: null, level: 0 },
       });
       await writeLogsUrl("push", { stream: "app", page: "2" });
       expect(router.push).not.toHaveBeenCalled();

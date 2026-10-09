@@ -209,7 +209,7 @@ export const useSearchResponseHandler = () => {
     }
 
     refreshPagination(true);
-    // A page of the executed query has the schema its first page loaded; refetching it is the reported bug.
+    // An executed query page reuses the schema loaded for its first page.
     await processPostPaginationData(
       isPagination || !!(payload as { reuseSchema?: boolean }).reuseSchema,
     );

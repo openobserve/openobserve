@@ -62,7 +62,6 @@ export interface PanelConfigReader {
   (surface: "visualize" | "build"): unknown;
 }
 
-/** Browser abort and ENT server cancel, registered by the transport (useSearchConnection). */
 export interface AutoRunTransport {
   abortTrace: (traceId: string, orgId: string) => void;
   serverCancel?: (orgId: string, traceIds: string[]) => Promise<unknown>;
@@ -76,7 +75,6 @@ const MODES: Record<string, SearchMode> = {
   build: "build",
 };
 
-// User refinements end a shared line even when Auto Run is off; time is noted by the picker, which knows a user pick from a restore.
 const SCOPE_CHANGE_REASONS = new Set<RunReason>([
   "stream",
   "filter",
@@ -92,7 +90,6 @@ const ROLE_BY_TYPE: Record<string, "hits" | "histogram" | "pageCount" | "other">
 };
 
 let instance: ReturnType<typeof createLogsAutoRun> | null = null;
-// Captured from the first component setup; the module never imports the store itself.
 let appStore: Store<any> | null = null;
 let transport: AutoRunTransport | null = null;
 let logsSearchObj: SearchObject | null = null;
@@ -102,7 +99,6 @@ function noopExecutor(): void {
 }
 
 function storeProxy(searchObj: () => SearchObject): AutoRunStore {
-  // searchObj.meta and .data are replaced wholesale on keep-alive restore, so every access re-reads them.
   const meta = new Proxy({} as AutoRunStore["meta"], {
     get: (_t, key) => (searchObj().meta as Record<PropertyKey, unknown>)[key],
     set: (_t, key, value) => {
@@ -131,11 +127,10 @@ export function setAutoRunTransport(next: AutoRunTransport): void {
   transport = next;
 }
 
-export function searchModeOf(toggle: string | undefined): SearchMode {
+function searchModeOf(toggle: string | undefined): SearchMode {
   return MODES[toggle ?? "logs"] ?? "logs";
 }
 
-// A saved view round-trips arrays as {0: "a"} objects, and a view may lack them entirely.
 function toList(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String);
   if (value && typeof value === "object") return Object.values(value).map(String);
@@ -164,26 +159,23 @@ export function readLogsSignature(searchObj: SearchObject): LogsSignature {
     transformContent: data.tempFunctionContent ?? "",
     showTransformEditor: !!meta.showTransformEditor,
     quickMode: !!meta.quickMode,
-    // The field list only shapes the generated SQL; typed SQL carries its own select list.
     quickModeFields: meta.sqlMode ? [] : toList(data.stream?.interestingFieldList),
     regions: superCluster ? toList(meta.regions) : [],
     clusters: superCluster ? toList(meta.clusters) : [],
     refreshInterval: Number(meta.refreshInterval ?? 0),
     sortOrder: "desc",
     definedSchemas: String(meta.useUserDefinedSchemas ?? ""),
-    // Absent while empty, so signatures recorded before any scan consent keep their key.
     freeTextScan: Object.keys(scan).length ? scan : undefined,
   });
 }
 
-/** Streams a signature reads: the SQL's physical sources in SQL mode, else the selection. */
 export function scopeStreams(signature: LogsSignature): { names: string[]; resolved: boolean } {
   if (!signature.sqlMode) return { names: signature.streams, resolved: true };
   const parsed = sqlSources(signature.query);
   return { names: parsed.sources, resolved: parsed.resolved };
 }
 
-export function signatureWindow(signature: LogsSignature, nowUs: number): WindowUs {
+function signatureWindow(signature: LogsSignature, nowUs: number): WindowUs {
   if (signature.time.type === "absolute") {
     return { startUs: signature.time.startUs, endUs: signature.time.endUs };
   }
@@ -218,11 +210,9 @@ function createLogsAutoRun() {
   let rearm: (() => void) | null = null;
   let panelConfigReader: PanelConfigReader | null = null;
   let skipClearResults = false;
-  // Reactive so the grid's paging lock follows it; cleared by the next grid dispatch.
   const searchAroundShown = ref(false);
 
   const traceGeneration = new Map<string, number>();
-  // Stop on a text-field scan bumps this; responses dispatched before it never render.
   let freeTextScanEpoch = 0;
   const generationEpoch = new Map<number, number>();
   const pendingLaunches = new Map<number, number>();
@@ -246,7 +236,6 @@ function createLogsAutoRun() {
     },
     abortTrace: (traceId) => {
       transport?.abortTrace(traceId, searchObj().organizationIdentifier);
-      // A browser abort fires no error callback, so the crossing bound to this request resolves here.
       notePageCancelled(searchObj(), traceId);
       const data = searchObj().data;
       data.searchRequestTraceIds = (data.searchRequestTraceIds ?? []).filter(
@@ -317,10 +306,9 @@ function createLogsAutoRun() {
     engine.settleGeneration(generationId);
   }
 
-  /** Registers a transport payload on its generation; false means the generation is gone and nothing may be sent. */
   function bindPayload(payload: TransportPayload): boolean {
     const generationId = payload.generationId;
-    if (generationId == null) return true;
+    if (generationId === null || generationId === undefined) return true;
     const role = ROLE_BY_TYPE[payload.type] ?? "other";
     if (!engine.registerTrace(generationId, payload.traceId, role)) return false;
     traceGeneration.set(payload.traceId, generationId);
@@ -338,12 +326,11 @@ function createLogsAutoRun() {
 
   function isPayloadCurrent(payload: TransportPayload): boolean {
     const generationId = generationOf(payload);
-    if (generationId == null) return true;
+    if (generationId === null || generationId === undefined) return true;
     const epoch = generationEpoch.get(generationId) ?? freeTextScanEpoch;
     return epoch === freeTextScanEpoch && engine.isCurrent(generationId);
   }
 
-  /** Stop on one stream's text-field scan: drops its consent and every row the scan produced (AC3.6). */
   function stopFreeTextScan(stream: string): void {
     freeTextScanEpoch += 1;
     engine.cancelGeneration(null, { cause: "user" });
@@ -359,7 +346,7 @@ function createLogsAutoRun() {
 
   function onPayloadData(payload: TransportPayload, responseType: string | undefined): void {
     const generationId = generationOf(payload);
-    if (generationId == null || payload.type !== "search") return;
+    if (generationId === null || generationId === undefined || payload.type !== "search") return;
     if (responseType === "search_response_hits" || responseType === "search_response_metadata") {
       engine.recordChunk(generationId);
     }
@@ -367,31 +354,28 @@ function createLogsAutoRun() {
 
   function onPayloadComplete(payload: TransportPayload): void {
     const generationId = generationOf(payload);
-    if (generationId == null) return;
+    if (generationId === null || generationId === undefined) return;
     if (payload.type === "search") engine.recordComplete(generationId, payload.traceId);
   }
 
   function onPayloadError(payload: TransportPayload): void {
     const generationId = generationOf(payload);
-    if (generationId == null) return;
+    if (generationId === null || generationId === undefined) return;
     if (payload.type === "search") engine.recordFailure(generationId, payload.traceId);
     finishPayload(payload);
   }
 
-  /** Closes a payload after its terminal handler ran (and launched any follow-up). */
   function finishPayload(payload: TransportPayload): void {
     const generationId = generationOf(payload);
     traceGeneration.delete(payload.traceId);
-    if (generationId == null) return;
+    if (generationId === null || generationId === undefined) return;
     if (payload.type === "search") hitsDone.add(generationId);
     maybeSettle(generationId);
   }
 
-  /** Keeps a generation open until a follow-up launch (histogram, page count) has been sent or skipped. */
   function trackLaunch(generationId: number | null | undefined, launch: unknown): void {
-    if (generationId == null) return;
+    if (generationId === null || generationId === undefined) return;
     pendingLaunches.set(generationId, (pendingLaunches.get(generationId) ?? 0) + 1);
-    // The trailing macrotask covers page-count launches, which are queued with setTimeout(0).
     Promise.resolve(launch)
       .catch(() => undefined)
       .then(() => new Promise((resolve) => setTimeout(resolve, 0)))
@@ -404,7 +388,6 @@ function createLogsAutoRun() {
       });
   }
 
-  /** Called by an executor once its synchronous dispatch is done; settles a generation that sent nothing. */
   function finishDispatch(generationId: number, opts: { hitsDone?: boolean } = {}): void {
     if (opts.hitsDone || !hasOpenTrace(generationId)) hitsDone.add(generationId);
     maybeSettle(generationId);
@@ -431,7 +414,7 @@ function createLogsAutoRun() {
     bounds: { startUs: number; endUs: number },
   ): void {
     const id = generationId ?? engine.currentGeneration("grid")?.id;
-    if (id == null) return;
+    if (id === null || id === undefined) return;
     engine.recordWindowMove(id, bounds);
   }
 
@@ -448,7 +431,6 @@ function createLogsAutoRun() {
     options: RequestRunOptions = {},
   ): RequestRunResult | "unchanged" {
     if (SCOPE_CHANGE_REASONS.has(reason)) noteUserScopeChange();
-    // Without a readable list or a selection there is nothing to estimate or run, e.g. the picker's mount emit.
     const stream = searchObj().data.stream;
     if (
       REASON_KIND[reason] !== "explicit" &&
@@ -460,17 +442,15 @@ function createLogsAutoRun() {
     return engine.requestRun(reason, options);
   }
 
-  // Reasons come from the engine's `t`, which is gt(), so they are already translated text.
   function persistReason(
     surface: PersistSurface,
     action?: PersistAction,
     options: { allowNotRun?: boolean } = {},
   ): I18nText | null {
-    // The engine's search-around flag is plain state; this ref makes callers' computeds recompute when it flips.
     if (surface === "logs" && searchAroundShown.value)
       return gt("search.autoRunSearchAroundActive");
     const decision = engine.canPersistOrShare(surface, action, options);
-    return decision.ok ? null : (decision.reason as I18nText);
+    return decision.ok ? null : decision.reason;
   }
 
   let panelRun: {
@@ -487,20 +467,17 @@ function createLogsAutoRun() {
     return panelConfigSignature(panelConfigReader(surface), readLogsSignature(searchObj()));
   }
 
-  /** Starts the panel record lifecycle for a Visualize or Build run (J7 "Surface records"). */
   function beginPanelRun(generationId: number, abort?: () => void): void {
     engine.recordPanelDispatch(generationId);
     if (abort) engine.registerAbort(generationId, abort);
     panelRun = { generationId, started: false, failed: false, dispatched: null };
   }
 
-  /** Freezes the inputs the panel was handed, so edits made while it loads are never certified. */
   function markPanelDispatched(generationId: number): void {
     if (panelRun?.generationId !== generationId || panelRun.dispatched !== null) return;
     panelRun.dispatched = currentPanelSignature();
   }
 
-  /** Opens a panel generation for a run that did not come through requestRun (Build's own runs). */
   function openPanelRun(abort?: () => void): number {
     const generation = engine.newGeneration({
       lane: "grid",
@@ -527,12 +504,10 @@ function createLogsAutoRun() {
     engine.settleGeneration(run.generationId);
   }
 
-  /** Fed by the panels' shared loading state; a run counts once it has started and stopped. */
   function panelLoadingChanged(loading: boolean, hasErrors: boolean): void {
     if (!panelRun) return;
     if (loading) {
       panelRun.started = true;
-      // Runs without an explicit dispatch mark are frozen when their load starts.
       markPanelDispatched(panelRun.generationId);
       return;
     }
@@ -590,11 +565,9 @@ function createLogsAutoRun() {
 
 export type LogsAutoRun = ReturnType<typeof createLogsAutoRun>;
 
-/** The one auto-run engine for the Logs page, bound to the logs search singleton. */
 export function useLogsAutoRun(): LogsAutoRun {
   if (getCurrentInstance()) {
     appStore = appStore ?? useStore() ?? null;
-    // The logs singleton's root never changes in the app; re-read in setup so specs can swap it.
     logsSearchObj = searchState().searchObj as SearchObject;
   }
   logsSearchObj = logsSearchObj ?? (searchState().searchObj as SearchObject);
@@ -602,7 +575,6 @@ export function useLogsAutoRun(): LogsAutoRun {
   return instance;
 }
 
-/** Test hook: drops the singleton (and its captured store) so each spec starts fresh. */
 export function resetLogsAutoRunForTests(store: Store<any> | null = null): void {
   instance = null;
   appStore = store;

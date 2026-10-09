@@ -56,7 +56,6 @@ vi.mock("@/lib/feedback/Toast/useToast", async () => {
   return { ...actual, toast: toastMock };
 });
 
-// Field extraction fetches schemas; the apply path only needs it to resolve.
 vi.mock("@/composables/useLogs/useStreamFields", async () => {
   const actual = await vi.importActual<any>("@/composables/useLogs/useStreamFields");
   return {
@@ -65,7 +64,6 @@ vi.mock("@/composables/useLogs/useStreamFields", async () => {
   };
 });
 
-// The apply path re-reads the stream list; a fixed readable list keeps it off the network.
 vi.mock("@/composables/useStreams", async () => {
   const actual = await vi.importActual<any>("@/composables/useStreams");
   return {
@@ -78,7 +76,6 @@ vi.mock("@/composables/useStreams", async () => {
   };
 });
 
-// A light in-memory router: the app router lazy-loads real pages on navigation.
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [{ path: "/logs", name: "logs", component: { template: "<div />" } }],
@@ -141,7 +138,6 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
     return { searchObj, logs };
   };
 
-  // The record a completed run leaves behind: its signature is the live one.
   const markExecuted = () => {
     wrapper!.vm.searchObj.meta.executed = {
       generation: 1,
@@ -150,8 +146,6 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
       complete: true,
     };
   };
-
-  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   beforeEach(() => {
     resetLogsAutoRunForTests();
@@ -166,6 +160,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
     (config as any).isEnterprise = originalIsEnterprise;
     config.isCloud = originalIsCloud;
     store.state.zoConfig = originalZoConfig;
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -489,12 +484,13 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
   describe("J4 trigger sites dispatch through requestRun", () => {
     it("coalesces three facet includes inside 300 ms into one filter run (AC4.2)", async () => {
       const { searchObj, logs } = await setup();
+      vi.useFakeTimers();
       for (const term of ["a='1'", "b='2'", "c='3'"]) {
         searchObj.data.stream.addToFilter = term;
         await flushPromises();
       }
       expect(logs).not.toHaveBeenCalled();
-      await wait(350);
+      await vi.advanceTimersByTimeAsync(350);
       expect(logs).toHaveBeenCalledTimes(1);
       expect(logs.mock.calls[0][0]).toMatchObject({ reason: "filter", kind: "refinement" });
       expect(searchObj.data.query).toContain("c='3'");
@@ -502,11 +498,12 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
 
     it("merges typed-but-uncommitted text into a facet rewrite and never auto-runs it (AC4.4)", async () => {
       const { searchObj, logs } = await setup();
+      vi.useFakeTimers();
       wrapper!.vm.queryEditorRef = { getValue: () => "status=500", setValue: vi.fn() };
       wrapper!.vm.onEditorUserEdit();
       searchObj.data.stream.addToFilter = "level='error'";
       await flushPromises();
-      await wait(350);
+      await vi.advanceTimersByTimeAsync(350);
       expect(searchObj.data.query).toContain("status=500");
       expect(searchObj.data.query).toContain("level='error'");
       expect(logs).not.toHaveBeenCalled();
@@ -515,6 +512,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
 
     it("runs a relative time change with Auto Run on, and not with it off (D1)", async () => {
       const { logs } = await setup({ liveMode: false });
+      vi.useFakeTimers();
       await wrapper!.vm.updateDateTime({
         valueType: "relative",
         relativeTimePeriod: "1h",
@@ -522,7 +520,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         endTime: 2,
         userChangedValue: true,
       });
-      await wait(10);
+      await vi.advanceTimersByTimeAsync(10);
       expect(logs).not.toHaveBeenCalled();
 
       wrapper!.vm.searchObj.meta.liveMode = true;
@@ -533,7 +531,7 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
         endTime: 2,
         userChangedValue: true,
       });
-      await wait(10);
+      await vi.advanceTimersByTimeAsync(10);
       expect(logs).toHaveBeenCalledTimes(1);
       expect(logs.mock.calls[0][0]).toMatchObject({ reason: "time" });
     });
@@ -567,15 +565,18 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
 
     it("does not run a function applied while a saved view loads", async () => {
       const { logs } = await setup();
+      vi.useFakeTimers();
       const functionRuns = () =>
         logs.mock.calls.filter((call: any[]) => call[0].reasons.includes("function")).length;
       store.state.savedViewFlag = true;
       wrapper!.vm.populateFunctionImplementation({ name: "f", function: ".a = 1" }, false);
-      await wait(350);
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(350);
       expect(functionRuns()).toBe(0);
       store.state.savedViewFlag = false;
       wrapper!.vm.populateFunctionImplementation({ name: "f", function: ".a = 2" }, false);
-      await vi.waitFor(() => expect(functionRuns()).toBe(1), { timeout: 3000 });
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(2500);
       expect(functionRuns()).toBe(1);
     });
 

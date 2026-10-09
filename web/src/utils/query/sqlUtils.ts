@@ -55,7 +55,6 @@ const importSqlParser = async () => {
       parser = await sqlParser();
       return parser;
     })();
-    // A cached rejection would make every retry fail without trying the chunk again.
     parserImportPromise.catch(() => {
       parserImportPromise = null;
     });
@@ -1317,14 +1316,12 @@ export const parseWhereClauseToFilter = async (
   }
 };
 
-/** parseWhereClauseToFilter plus whether every predicate survived; a dropped one would widen the query. */
 export const parseWhereClauseToFilterChecked = async (
   whereClauseText: string,
 ): Promise<{ filter: Awaited<ReturnType<typeof parseWhereClauseToFilter>>; complete: boolean }> => {
   if (!whereClauseText?.trim()) {
     return { filter: await parseWhereClauseToFilter(whereClauseText), complete: true };
   }
-  // Rejects when the parser chunk cannot load: an empty filter from a missing parser would run unfiltered.
   await importSqlParser();
   const filter = await parseWhereClauseToFilter(whereClauseText);
   try {

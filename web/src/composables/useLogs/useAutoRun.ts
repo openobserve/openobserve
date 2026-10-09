@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import {
   evaluateScanPolicy,
   periodToMicros,
@@ -236,11 +238,13 @@ export interface ExecutedRecordedEvent {
 }
 
 export interface FreeTextGateFlags {
-  blockedReason: string | null;
-  scanReason: string | null;
+  blockedReason: I18nText | null;
+  scanReason: I18nText | null;
 }
 
-export type PersistDecision = { ok: true } | { ok: false; reason: string };
+export type PersistReasonCode =
+  "search-around" | "free-text-blocked" | "needs-run" | "free-text-scan";
+type PersistDecision = { ok: true } | { ok: false; reason: I18nText; code: PersistReasonCode };
 
 export interface AutoRunTimers {
   setTimeout: (fn: () => void, ms: number) => unknown;
@@ -256,7 +260,6 @@ export interface AutoRunDeps {
   estimate: (signature: LogsSignature) => ScanEstimate;
   executors: RunExecutors;
   abortTrace: (traceId: string) => void;
-  /** ENT only: fire-and-forget `delete_running_queries`; omit in OSS. */
   serverCancel?: (orgId: string, traceIds: string[]) => Promise<unknown>;
   pickNarrowPreset?: (signature: LogsSignature, estimate: ScanEstimate) => NarrowCandidate | null;
   getRefreshInterval?: () => number;
@@ -265,7 +268,7 @@ export interface AutoRunDeps {
   rearmRefresh?: () => void;
   readPanelConfigSignature?: (surface: "visualize" | "build") => string | null;
   getFreeTextFlags?: () => FreeTextGateFlags;
-  t?: (key: string) => string;
+  t?: (key: string) => I18nText;
   log?: (message: string, error?: unknown) => void;
   now?: () => number;
   timers?: AutoRunTimers;
@@ -273,7 +276,6 @@ export interface AutoRunDeps {
 
 export interface RequestRunOptions {
   origin?: string;
-  /** Overrides the mode-derived operation, e.g. a saved view that always reloads the grid. */
   op?: RunOperation;
 }
 
@@ -301,7 +303,7 @@ interface ExecuteInput {
   useConsent: boolean;
 }
 
-export const AUTO_RUN_I18N = {
+const AUTO_RUN_I18N = {
   persistNeedsRun: "search.autoRunPersistNeedsRun",
   searchAroundActive: "search.autoRunSearchAroundActive",
   staleTooltip: "search.autoRunStaleTooltip",
@@ -367,7 +369,6 @@ const OP_RANK: Record<RunOperation, number> = {
   patterns: 2,
 };
 
-// Scope-replacing entry points never ride on an earlier consent (U-1 (a)).
 const CONSENT_IGNORING_REASONS = new Set<RunReason>(["url", "activation", "visualize-restore"]);
 
 const DIRTY_CLEARING_REASONS = new Set<RunReason>(["run", "saved-view", "explicit"]);
@@ -428,7 +429,7 @@ export function isGuardActive(config: AutoRunConfig): boolean {
   return !!config.auto_query_enabled && Number(config.auto_query_max_scan_mb ?? 0) > 0;
 }
 
-export function guardThresholdMb(config: AutoRunConfig): number {
+function guardThresholdMb(config: AutoRunConfig): number {
   return Number(config.auto_query_max_scan_mb ?? 0);
 }
 
@@ -498,7 +499,7 @@ export function sameSignature(
   return signatureKey(a) === signatureKey(b);
 }
 
-export function sameSignatureIgnoringSort(a: LogsSignature, b: LogsSignature): boolean {
+function sameSignatureIgnoringSort(a: LogsSignature, b: LogsSignature): boolean {
   return sameSignature({ ...a, effectiveSortOrder: "desc" }, { ...b, effectiveSortOrder: "desc" });
 }
 
@@ -545,7 +546,7 @@ export function createAutoRun(deps: AutoRunDeps) {
     setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms),
     clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
   };
-  const translate = (key: string) => (deps.t ? deps.t(key) : key);
+  const translate = (key: string): I18nText => (deps.t ? deps.t(key) : raw(key));
   const log = (message: string, error?: unknown) => deps.log?.(message, error);
 
   let nextGenerationId = 1;
@@ -753,7 +754,6 @@ export function createAutoRun(deps: AutoRunDeps) {
     const gen = generations.get(generationId);
     if (!gen || gen.settled) return;
     gen.settled = true;
-    // Work registered up to now has finished; later children stay cancellable.
     gen.traces = [];
     gen.aborts = [];
     if (current[gen.lane] !== gen) generations.delete(gen.id);
@@ -804,7 +804,6 @@ export function createAutoRun(deps: AutoRunDeps) {
       failGeneration(gen, error);
       return "failed";
     }
-    // Resolution is not settlement: executors return before their streams finish.
     if (result && typeof (result as Promise<unknown>).then === "function") {
       (result as Promise<unknown>).catch((error) => failGeneration(gen, error));
     }
@@ -849,7 +848,6 @@ export function createAutoRun(deps: AutoRunDeps) {
     const report = (error: unknown) => log("autoRun: attached histogram failed", error);
     try {
       const result = deps.executors.histogram(ctx);
-      // A child failure never fails or settles the page that owns it.
       if (result && typeof (result as Promise<unknown>).then === "function") {
         (result as Promise<unknown>).catch(report);
       }
@@ -1094,7 +1092,6 @@ export function createAutoRun(deps: AutoRunDeps) {
     return sameSignature(deps.readSignature(), ran?.signature);
   }
 
-  /** Clears the edit flag once the inputs equal the last run's again, so an edit undone by hand is not dirty. */
   function reconcileEditorDirty(): boolean {
     if (!meta.editorDirty || !liveMatchesLastRun()) return false;
     meta.editorDirty = false;
@@ -1142,15 +1139,19 @@ export function createAutoRun(deps: AutoRunDeps) {
     options: { allowNotRun?: boolean } = {},
   ): PersistDecision {
     if (surface === "logs" && invalidation === "search-around") {
-      return { ok: false, reason: translate(AUTO_RUN_I18N.searchAroundActive) };
+      return {
+        ok: false,
+        code: "search-around",
+        reason: translate(AUTO_RUN_I18N.searchAroundActive),
+      };
     }
-    // Blocked text has no SQL at all, so its reason outranks "run the query first".
     const flags = deps.getFreeTextFlags?.();
-    if (flags?.blockedReason) return { ok: false, reason: flags.blockedReason };
+    if (flags?.blockedReason)
+      return { ok: false, code: "free-text-blocked", reason: flags.blockedReason };
     if (!options.allowNotRun && !surfacePersistOk(surface))
-      return { ok: false, reason: translate(AUTO_RUN_I18N.persistNeedsRun) };
+      return { ok: false, code: "needs-run", reason: translate(AUTO_RUN_I18N.persistNeedsRun) };
     if (flags?.scanReason && action && SCAN_GATED_ACTIONS.has(action)) {
-      return { ok: false, reason: flags.scanReason };
+      return { ok: false, code: "free-text-scan", reason: flags.scanReason };
     }
     return { ok: true };
   }
@@ -1278,7 +1279,6 @@ export function createAutoRun(deps: AutoRunDeps) {
     return true;
   }
 
-  /** Relabels a run with the filter text the editor now shows for it, so that rewrite never reads as an edit. */
   function recordQueryRewrite(generationId: number, query: string): boolean {
     const gen = generations.get(generationId);
     if (!gen || !isCurrent(generationId)) return false;

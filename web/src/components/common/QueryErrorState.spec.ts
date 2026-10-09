@@ -18,7 +18,7 @@ import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const SEARCH_CARD = '[data-test="query-error-search-text-card"]';
 const RUN_CARD = '[data-test="query-error-run-suggestion-card"]';
@@ -112,22 +112,20 @@ describe("QueryErrorState free-text cards", () => {
     expect(wrapper.find('[data-test="query-error-fix-query-btn"]').exists()).toBe(true);
   });
 
-  it("truncates a long label at 40 characters and keeps the full text in the tooltip (L-05)", () => {
+  it("delegates a long label to OTruncatedText while retaining the full search value", () => {
     const text = "connection reset by peer while reading the response body";
     const wrapper = mountState({ errorCode: 20001, freeTextCandidate: text });
-    expect(wrapper.find(SEARCH_CARD).text()).toContain(
-      `Search text for "${text.slice(0, 40).trimEnd()}…"`,
-    );
-    const tooltip = wrapper.findComponent(OTooltip);
-    expect(tooltip.props("content")).toBe(text);
-    expect(tooltip.props("disabled")).toBe(false);
+    const label = wrapper.findComponent(OTruncatedText);
+    expect(label.exists()).toBe(true);
+    expect(label.text()).toBe(`Search text for "${text}"`);
+    wrapper.find(SEARCH_CARD).trigger("click");
+    expect(wrapper.emitted("search-text")?.[0]).toEqual([text]);
   });
 
-  it("does not truncate or show a tooltip at 40 characters", () => {
-    const text = "a".repeat(40);
+  it("preserves the full short search label", () => {
+    const text = "timeout";
     const wrapper = mountState({ errorCode: 20001, freeTextCandidate: text });
-    expect(wrapper.find(SEARCH_CARD).text()).toContain(`Search text for "${text}"`);
-    expect(wrapper.findComponent(OTooltip).props("disabled")).toBe(true);
+    expect(wrapper.findComponent(OTruncatedText).text()).toBe(`Search text for "${text}"`);
   });
 
   it("emits the trimmed candidate and the suggestion on click (L-21)", async () => {

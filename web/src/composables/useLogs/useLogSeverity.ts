@@ -27,18 +27,15 @@ import {
   type SeverityProjection,
 } from "@/utils/logs/statusParser";
 
-/** The `/config` fields the severity guard reads; absent on backends that predate them. */
 export interface SeverityZoConfig {
   quick_mode_num_fields?: number;
   quick_mode_force_enabled?: boolean;
   ui_logs_severity_inference?: boolean;
 }
 
-// Server defaults of ZO_QUICK_MODE_NUM_FIELDS / ZO_QUICK_MODE_FORCE_ENABLED, used until /config exposes them.
 const DEFAULT_QUICK_MODE_NUM_FIELDS = 500;
 const DEFAULT_QUICK_MODE_FORCE_ENABLED = true;
 
-/** Guard inputs of one search, taken when it is dispatched so later editor changes cannot alter them. */
 export interface SeverityRequestSnapshot {
   sqlMode: boolean;
   quickMode: boolean;
@@ -48,9 +45,7 @@ export interface SeverityRequestSnapshot {
 }
 
 let executedRequest: SeverityRequestSnapshot | null = null;
-// Results written outside getQueryReq (search-around) carry their own request, keyed by the raw hits array.
 const boundRequests = new WeakMap<object, SeverityRequestSnapshot>();
-// Used only when no dispatch was recorded (e.g. a search job); keyed by the hits array of that run.
 let fallbackRequest: { hits: unknown; request: SeverityRequestSnapshot } | null = null;
 let cachedProjection: {
   request: SeverityRequestSnapshot;
@@ -73,17 +68,14 @@ export function captureSeverityRequest(
   };
 }
 
-/** Records the dispatched request; every row of its results is guarded by it. */
 export function recordSeverityRequest(request: SeverityRequestSnapshot | null): void {
   executedRequest = request;
 }
 
-/** Ties a hits array that bypassed getQueryReq to the request that produced it. */
 export function bindSeverityRequest(hits: unknown, request: SeverityRequestSnapshot): void {
   if (hits && typeof hits === "object") boundRequests.set(toRaw(hits), request);
 }
 
-/** Severity of logs-page rows, with the projection guard derived from the executed search. */
 export default function useLogSeverity() {
   const store = useStore();
   const { searchObj } = searchState();
@@ -101,7 +93,6 @@ export default function useLogSeverity() {
     return fallbackRequest.request;
   };
 
-  // A schema bump refreshes only the stream schemas; the request half stays the dispatched one.
   const currentProjection = (): SeverityProjection => {
     const request = requestForResults();
     const generation = severitySchemaGeneration();

@@ -342,7 +342,6 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   "row-click": [row: any];
   "page-change": [page: number];
-  /** A J/K page crossing; unlike `page-change` it keeps the selection. */
   "cross-page": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
@@ -590,7 +589,6 @@ const selectRow = (index: number, count = props.hits.length, page = props.curren
   nextTick(() => {
     const row = rowElement(index);
     row?.scrollIntoView({ block: "nearest" });
-    // Focus is what lets the existing OTable Enter key open this row.
     row?.focus({ preventScroll: true });
   });
   announcePosition(index, count, page);
@@ -602,11 +600,10 @@ const clearSelection = () => {
   navigation().pendingPageSelection = null;
 };
 
-const edgeMessage = (edge: "first" | "last", _direction: 1 | -1) => {
+const edgeMessage = (edge: "first" | "last") => {
   return edge === "last" ? t("traces.rowNav.lastResult") : t("traces.rowNav.firstResult");
 };
 
-/** One J/K step on the list; the selection moves without leaving the page. */
 const stepTraceRow = (direction: 1 | -1, isRepeat = false) => {
   if (props.loading || navigation().pendingPageSelection || isOtherDialogOpen()) return;
   if (!props.hits.length) return;
@@ -632,10 +629,9 @@ const stepTraceRow = (direction: 1 | -1, isRepeat = false) => {
     };
     announce(t("traces.rowNav.loadingPage", { page: target.page }));
     emit("cross-page", target.page);
-    // The dispatch is synchronous, so a still-unbound crossing here was never sent.
     if (navigation().pendingPageSelection?.requestId === null) failCrossing(target.page);
   } else if (target.kind === "edge") {
-    announce(edgeMessage(target.edge, direction));
+    announce(edgeMessage(target.edge));
   }
 };
 
@@ -650,7 +646,6 @@ const resolveCrossing = (pending: PendingPageSelection, load: PageLoad) => {
     return;
   }
   navigation().pendingPageSelection = null;
-  // Index writes the page's hits before its completion, but this list's props only catch up a flush later.
   const count = (searchObj.data.queryResults?.hits ?? []).length;
   if (!count) {
     clearSelection();
@@ -660,7 +655,6 @@ const resolveCrossing = (pending: PendingPageSelection, load: PageLoad) => {
   selectRow(pending.position === "first" ? 0 : count - 1, count, pending.page);
 };
 
-// Sync: a failed page sets the error that replaces this list, so a deferred watcher would never run.
 watch(
   () => searchObj.data.resultGrid.pageLoad,
   (load) => {
@@ -670,7 +664,6 @@ watch(
   { flush: "sync" },
 );
 
-// Best effort (spike S6): Back from trace detail keeps the hits, so the opened row is selected again.
 onMounted(() => {
   const id = navigation().lastOpenedId;
   if (!id) return;

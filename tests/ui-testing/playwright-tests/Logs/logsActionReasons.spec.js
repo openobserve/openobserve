@@ -22,7 +22,6 @@ const notes = {
   'search-download-submenu-trigger': 'Downloads the shown results, not your edit',
   'logs-search-bar-download-custom-range-btn': 'Uses the query that last ran, not your edit',
 };
-// Generated Reka IDs vary between mounts, so match the exact base nodes by stable selectors.
 const baseAxeNodes = [
   { id: 'aria-allowed-attr', target: '[role="menu"] div[aria-haspopup="menu"]:has(> [data-cy="syntax-guide-button"])' },
   { id: 'aria-required-children', target: '[role="menu"]:has([data-test="logs-search-bar-menu-create-saved-view-btn"])' },

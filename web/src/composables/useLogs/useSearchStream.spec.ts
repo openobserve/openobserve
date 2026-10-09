@@ -143,7 +143,6 @@ describe("useSearchStream — page crossing signals (4a §3.2.2)", () => {
       position: "first",
       requestId: "old",
     };
-    // The connection's builder records each pagination request through the real helper.
     connection.buildWebSocketPayload.mockImplementationOnce(() => {
       notePageRequest(searchObj as any, "new");
       return { traceId: "new" };

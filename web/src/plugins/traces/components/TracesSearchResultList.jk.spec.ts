@@ -26,7 +26,6 @@ import { tracesRowNavAnnouncement } from "@/plugins/traces/composables/tracesRow
 
 const state = vi.hoisted(() => ({ searchObj: null as any }));
 
-// Reactive like the real traces searchObj, so the highlight re-renders when the selection moves.
 vi.mock("@/composables/useTraces", async () => {
   const { reactive } = await import("vue");
   state.searchObj = reactive({
@@ -56,7 +55,6 @@ vi.mock("@/composables/useTraces", async () => {
 
 import TracesSearchResultList from "./TracesSearchResultList.vue";
 
-// Mirrors traces Index + SearchResult: hits come from the shared searchObj, an error replaces the list, and the page renders the live region.
 const Host = defineComponent({
   props: { listProps: { type: Object, required: true } },
   setup(props) {
@@ -115,7 +113,6 @@ describe("TracesSearchResultList J/K (mounted with the real OTable)", () => {
     let crossings: number[];
 
     beforeEach(() => {
-      // jsdom has no scrollIntoView; the browser's is a no-op for this assertion.
       HTMLElement.prototype.scrollIntoView = vi.fn();
       crossings = [];
       state.searchObj.meta.refreshInterval = 0;
@@ -132,8 +129,6 @@ describe("TracesSearchResultList J/K (mounted with the real OTable)", () => {
       tracesRowNavAnnouncement.value = "";
     });
 
-    // The parent's cross-page handler sends the page request synchronously, like traces Index.vue.
-    // jsdom has no layout, so the delegated scroller reports a size for the virtualizer to fill.
     const scroller = () => {
       const el = document.createElement("div");
       el.getBoundingClientRect = () =>
@@ -182,7 +177,6 @@ describe("TracesSearchResultList J/K (mounted with the real OTable)", () => {
       await flushPromises();
     };
 
-    // The worker can deliver the last hits and the completion together, so nothing re-renders between them.
     const completePage = (requestId: string, hits: any[]) => {
       state.searchObj.data.queryResults.hits = hits;
       recordPageLoad(state.searchObj.data.resultGrid, { requestId, ok: true, reason: "done" });
@@ -270,7 +264,6 @@ describe("TracesSearchResultList J/K (mounted with the real OTable)", () => {
       expect(navigation().pendingPageSelection).toBeNull();
       expect(navigation().selectionActive).toBe(false);
       await vi.waitFor(() => expect(region()).toBe("Couldn't load page 2"));
-      // Not stuck: focus is still on the last row, so the next J tries the crossing again.
       await step(1);
       expect(crossings).toEqual([2, 2]);
     });

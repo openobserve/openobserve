@@ -117,7 +117,8 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,
           is_ui_histogram: true,
         };
-        if (generationId != null) payload.generationId = generationId;
+        if (generationId !== null && generationId !== undefined)
+          payload.generationId = generationId;
 
         initializeSearchConnection(payload);
 
@@ -302,7 +303,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     }
 
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
-    if (generationId != null) payload.generationId = generationId;
+    if (generationId !== null && generationId !== undefined) payload.generationId = generationId;
 
     if (callbacks) {
       payload.onData = callbacks.onData;

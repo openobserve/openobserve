@@ -368,7 +368,6 @@ describe("buildPatternSetSqlQuery", () => {
   });
 });
 
-// Pins today's buckets: Patterns keep the legacy parser, unaffected by the grid's severity resolver.
 describe("pattern severity buckets", () => {
   it.each([
     ["trace", "debug"],

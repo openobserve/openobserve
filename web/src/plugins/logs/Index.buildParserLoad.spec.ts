@@ -32,7 +32,6 @@ const { panelRuns, panelQueries, sentRequests, parserLoad } = vi.hoisted(() => (
   parserLoad: { fail: true, attempts: 0 },
 }));
 
-// The lazily loaded SQL parser chunk fails to load while `parserLoad.fail` is set, as on a flaky network.
 vi.mock("@/composables/useParser", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/composables/useParser")>();
   return {
@@ -46,13 +45,11 @@ vi.mock("@/composables/useParser", async (importOriginal) => {
   };
 });
 
-// The Build panel's only request path; every call is a chart search.
 vi.mock("@/components/dashboards/PanelEditor/PanelEditor.vue", () => ({
   default: {
     name: "PanelEditor",
     template: '<div data-test="panel-editor" />',
     emits: ["queryGenerated"],
-    // The real editor emits its interim builder query as soon as it mounts, before any filter is set.
     mounted(this: any) {
       this.$emit(
         "queryGenerated",
@@ -101,7 +98,6 @@ const ftsStream = {
   settings: { full_text_search_keys: ["body"] },
 };
 
-// Mounting the whole page is slow on a loaded machine, so the budget is per test, not global.
 describe(
   "Logs Index — Build when the SQL parser cannot load (U3 open item, L-25)",
   { timeout: 30000 },

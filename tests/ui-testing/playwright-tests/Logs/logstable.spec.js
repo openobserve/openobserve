@@ -606,7 +606,6 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
   }, async ({ page }) => {
     testLogger.info('Testing severity color mapping for all severity levels');
 
-    // severity 0 is not a level on `severity`, so those rows resolve from `level: "emergency"`.
     const expectedColorByLevel = {
       emergency: '#e53935', // severity 0 → level field
       alert:     '#ea580c', // severity 1
@@ -654,7 +653,6 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
       verified.add(level);
     }
 
-    // All 8 levels must render, each from an explicit field (solid spine).
     expect(verified.size).toBe(Object.keys(expectedColorByLevel).length);
     testLogger.info(`Successfully verified all ${verified.size} severity levels`);
   });
@@ -672,7 +670,6 @@ test.describe("Severity Color Mapping Tests - Issue #9439", () => {
     await context.close();
   });
 });
-// 4c Part A journeys: one fixture row per journey, all in one stream (also J-A7: a mixed stream).
 test.describe("Severity inference journeys (4c Part A)", () => {
   const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
   let pageManager;
@@ -732,7 +729,6 @@ test.describe("Severity inference journeys (4c Part A)", () => {
     await pageManager.logsPage.selectRelative1Hour();
     await pageManager.logsPage.ensureQuickModeState(false);
     await pageManager.logsPage.clickSearchBarRefreshButton();
-    // The grid shows `message` by default; the tag column makes every journey row findable.
     await pageManager.logsPage.fillIndexFieldSearchInput('tag');
     await pageManager.logsPage.hoverOnFieldExpandButton('tag');
     await pageManager.logsPage.clickAddFieldToTableButton('tag');

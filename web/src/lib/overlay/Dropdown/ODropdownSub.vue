@@ -29,7 +29,6 @@ const contentZIndex = computed(() => 6000 + Math.max(drawerDepth, dialogDepth) *
 const parentRegistry = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
 let closeRegistration: ((skipGrace?: boolean) => void) | null = null;
 
-// The parent must ignore focus moving into the submenu's portal.
 watch(
   internalOpen,
   (open) => {
@@ -68,7 +67,6 @@ function onPointerDownOutside(event: Event) {
 
 function onKeydown(event: KeyboardEvent) {
   if (event.key !== "Escape") return;
-  // Reka's default Escape closes the root; keep the parent actions reachable.
   event.preventDefault();
   event.stopPropagation();
   onOpenChange(false);

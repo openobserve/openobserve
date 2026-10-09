@@ -229,7 +229,6 @@ export default defineComponent({
     provide("hoveredSeriesState", hoveredSeriesState);
 
     const autoRun = useLogsAutoRun();
-    // G1: Add to dashboard follows this panel's own completed run (J7, F21).
     const addToDashboardReason = computed(() =>
       autoRun.persistReason("visualize", "add-to-dashboard"),
     );

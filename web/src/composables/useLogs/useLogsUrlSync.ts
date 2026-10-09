@@ -29,18 +29,15 @@ import {
 } from "@/composables/useLogs/useLogsUrl";
 
 export interface LogsUrlSyncOptions {
-  /** The panel config a Visualize or Build record serialises into `visualization_data` / `build_data`. */
   panelData?: (surface: "visualize" | "build") => unknown;
 }
 
-/** The Logs page's URL timing (4c C7b): publishes recorded runs, offers the shared page, and cleans `log_*` on Back. */
 export function useLogsUrlSync(options: LogsUrlSyncOptions = {}) {
   const router = useRouter();
   const { searchObj } = searchState();
   const autoRun = useLogsAutoRun();
   const { updateUrlQueryParams, patchUrlViewState } = logsUtils();
 
-  // The address bar names a run once its first results arrive, never at dispatch.
   const stopShownSearch = autoRun.engine.onExecutedRecorded((event) => {
     if (router.currentRoute.value.name !== "logs") return;
     const patch = recordShownSearch(event, {
@@ -55,7 +52,6 @@ export function useLogsUrlSync(options: LogsUrlSyncOptions = {}) {
     void updateUrlQueryParams(panel, build, patch ? "replace" : "auto");
   });
 
-  // "Go to page N" is offered only after the link's own first run completed (C7).
   const stopSharedPageNotice = onHitsComplete((payload) => {
     if (payload.type !== "search" || payload.isPagination || sharedPage.value === null) return;
     const generationId = (payload as { generationId?: number }).generationId;
@@ -67,7 +63,6 @@ export function useLogsUrlSync(options: LogsUrlSyncOptions = {}) {
     sharedPageNotice.value = { page, lastPage: null };
   });
 
-  // Part C's own Back hook: an entry carrying log_* with no open permalink is cleaned with a replace (C5 step 8).
   watch(
     () => router.currentRoute.value.query,
     (query) => {
@@ -76,7 +71,6 @@ export function useLogsUrlSync(options: LogsUrlSyncOptions = {}) {
     },
   );
 
-  // `columns` is view state: picking, removing or reordering a column patches the address bar.
   watch(
     () => [
       JSON.stringify(searchObj.data.stream.selectedFields ?? []),

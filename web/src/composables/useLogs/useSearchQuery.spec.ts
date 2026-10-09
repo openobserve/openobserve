@@ -924,7 +924,6 @@ describe("useSearchQuery › handleMultiStream _stream_name filter", () => {
     fnUnparsedSQLMock.mockImplementation((ast: any) => parser.sqlify(ast));
   });
 
-  // Rewritten arms keep the generated statement's keyword case; only the WHERE goes through the parser.
   const armFor = (sql: string, stream: string) =>
     sql
       .split(" UNION ALL BY NAME ")
@@ -1102,7 +1101,6 @@ describe("useSearchQuery › getQueryReq records the severity guard of the dispa
 });
 
 describe("useSearchQuery › getQueryReq signature contract (AC5.2)", () => {
-  // Every request field must be covered by the executed signature, or be explicitly ignored.
   const SIGNATURE_FIELDS_BY_REQUEST_FIELD: Record<string, string[]> = {
     sql: ["query", "sqlMode", "streams", "quickModeFields", "definedSchemas"],
     quick_mode: ["quickMode"],
@@ -1111,7 +1109,6 @@ describe("useSearchQuery › getQueryReq signature contract (AC5.2)", () => {
     regions: ["regions"],
     clusters: ["clusters"],
   };
-  // Resolved bounds, paging and transport encoding are recorded per execution, not part of the scope.
   const IGNORED = new Set([
     "from",
     "size",

@@ -57,7 +57,6 @@ class FakeClipboardItem {
   constructor(public items: Record<string, Promise<Blob>>) {}
 }
 
-// jsdom's Blob has no text(), so the clipboard payload is read the way a browser would hand it over.
 const writtenUrl = async () => {
   const item = clipboard.write.mock.calls[0][0][0] as FakeClipboardItem;
   const blob = await item.items["text/plain"];
@@ -304,7 +303,6 @@ describe("useLogLineLink (4c C3, C4, C6)", () => {
         store.state.zoConfig.web_url = "https://o2.example";
         switchTo("org-a", ["app"]);
         markRun();
-        // A real clipboard consumes the payload promise and rejects when it rejects.
         clipboard.write.mockImplementation(async ([item]: FakeClipboardItem[]) => {
           await item.items["text/plain"];
         });

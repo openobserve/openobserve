@@ -78,8 +78,56 @@ describe("DetailTable Copy link (4c C6)", () => {
     wrapper = mountTable();
     await flushPromises();
     expect(button()?.getAttribute("aria-disabled")).toBe("true");
-    expect(button()?.hasAttribute("disabled")).toBe(true);
+    expect(button()?.hasAttribute("disabled")).toBe(false);
+    const reasonId = button()?.getAttribute("aria-describedby");
+    expect(document.getElementById(reasonId!)?.textContent).toContain(link.state.reason);
+    button()!.click();
+    expect(link.copy).not.toHaveBeenCalled();
     expect(wrapper.vm.lineLinkTooltip).toBe("Turn off the function to link a single line");
+  });
+
+  it("keeps Copy link focusable while a page loads and explains the loading state", async () => {
+    wrapper = mountTable({ pageLoading: true, pageLoadingPage: 2 });
+    await flushPromises();
+    const control = button()!;
+    expect(control.hasAttribute("disabled")).toBe(false);
+    expect(control.getAttribute("aria-disabled")).toBe("true");
+    control.focus();
+    expect(document.activeElement).toBe(control);
+    expect(document.getElementById(control.getAttribute("aria-describedby")!)?.textContent).toBe(
+      "Loading page 2…",
+    );
+    control.click();
+    expect(link.copy).not.toHaveBeenCalled();
+    await wrapper.setProps({ pageLoading: false });
+    control.click();
+    expect(link.copy).toHaveBeenCalledWith(row, "drawer");
+  });
+
+  it.each([
+    [{ currentIndex: 0, totalLength: 3 }, "previous", "First result"],
+    [{ currentIndex: 2, totalLength: 3 }, "next", "Last result"],
+    [{ pageLoading: true, pageLoadingPage: 2 }, "previous", "Loading page 2…"],
+    [{ pageLoading: true, pageLoadingPage: 2 }, "next", "Loading page 2…"],
+    [
+      { totalLength: 3, pageEdgeReason: "Exit search-around to run a new query" },
+      "previous",
+      "Exit search-around to run a new query",
+    ],
+  ])("describes unavailable navigation: %s %s", async (props, direction, reason) => {
+    wrapper = mountTable(props);
+    await flushPromises();
+    const control = document.querySelector<HTMLButtonElement>(
+      `[data-test="log-detail-${direction}-detail-btn"]`,
+    )!;
+    expect(control.hasAttribute("disabled")).toBe(false);
+    expect(control.getAttribute("aria-disabled")).toBe("true");
+    expect(document.getElementById(control.getAttribute("aria-describedby")!)?.textContent).toBe(
+      reason,
+    );
+    control.click();
+    expect(wrapper.emitted("showNextDetail")).toBeUndefined();
+    expect(wrapper.emitted("showPrevDetail")).toBeUndefined();
   });
 
   it("is not shown when embedded, nor where the action is hidden (Visualize, Patterns)", async () => {

@@ -257,7 +257,6 @@ afterEach(() => {
 
 describe("predicates", () => {
   it.each([
-    // aqe, liveMode, nlDetected, nlpMode, expected
     [false, false, false, false, false],
     [false, true, false, false, false], // D1: stale oo_toggle_auto_run=true with AQE off
     [true, false, false, false, false],
@@ -1267,6 +1266,7 @@ describe("executed record and staleness", () => {
     expect(h.engine.canPersistOrShare("logs")).toEqual({
       ok: false,
       reason: "t:search.autoRunSearchAroundActive",
+      code: "search-around",
     });
     h.engine.requestRun("run");
     h.completeLast();
@@ -1282,6 +1282,7 @@ describe("executed record and staleness", () => {
     expect(h.engine.canPersistOrShare("logs")).toEqual({
       ok: false,
       reason: "t:search.autoRunPersistNeedsRun",
+      code: "needs-run",
     });
     h.live.streams = ["app2"];
     h.engine.requestRun("explicit", { origin: "scan-stop" });
@@ -1592,6 +1593,7 @@ describe("canPersistOrShare (G1 matrix)", () => {
       expect(h.engine.canPersistOrShare(surface)).toEqual({
         ok: false,
         reason: "t:search.autoRunPersistNeedsRun",
+        code: "needs-run",
       });
     }
   });
@@ -1631,6 +1633,7 @@ describe("canPersistOrShare (G1 matrix)", () => {
       expect(h.engine.canPersistOrShare("logs", action)).toEqual({
         ok: false,
         reason: "scan-reason",
+        code: "free-text-scan",
       });
     }
     for (const action of ["save-view", "share-link", "copy-line-link"] as const) {
@@ -1644,11 +1647,13 @@ describe("canPersistOrShare (G1 matrix)", () => {
     expect(h.engine.canPersistOrShare("logs", "save-view")).toEqual({
       ok: false,
       reason: "blocked-reason",
+      code: "free-text-blocked",
     });
     h.freeText.blockedReason = null;
     expect(h.engine.canPersistOrShare("logs", "save-view")).toEqual({
       ok: false,
       reason: "t:search.autoRunPersistNeedsRun",
+      code: "needs-run",
     });
     h.freeText.blockedReason = "blocked-reason";
     h.engine.requestRun("run");
@@ -1656,6 +1661,7 @@ describe("canPersistOrShare (G1 matrix)", () => {
     expect(h.engine.canPersistOrShare("logs", "save-view")).toEqual({
       ok: false,
       reason: "blocked-reason",
+      code: "free-text-blocked",
     });
   });
 

@@ -118,7 +118,6 @@ const props = withDefaults(
     variant?: "menu-item" | "button" | "toolbar" | "icon";
     /** Non-null disables the control and is shown as the tooltip reason. */
     disabledReason?: I18nText | null;
-    /** Informational line for an enabled control, such as which query it will use. */
     note?: I18nText | null;
     /** Folder the alert lands in. */
     folder?: string;

@@ -419,7 +419,6 @@ export default defineComponent({
       navigation.pendingPageSelection = null;
     };
 
-    // Rows are bound by position, so only a J/K crossing may keep a selection across pages (4a §3.4).
     function changePage(page: number, options: { fromCrossing?: boolean } = {}) {
       if (searchObj.loading) return;
       if (!options.fromCrossing) resetRowSelection();

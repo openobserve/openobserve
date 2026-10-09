@@ -175,7 +175,7 @@ export const usePagination = () => {
               searchObj.data.queryResults.partitionDetail.partitions[0].start_time =
                 res.data.new_start_time;
             }
-            if (searchObj.meta.jobId == "") {
+            if (searchObj.meta.jobId === "") {
               useLogsAutoRun().recordWindowMove(null, {
                 startUs: Number(res.data.new_start_time),
                 endUs: Number(res.data.new_end_time),

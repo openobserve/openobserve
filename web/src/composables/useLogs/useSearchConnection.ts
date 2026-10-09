@@ -97,7 +97,6 @@ export const useSearchConnection = (t: TranslateFn) => {
 
   const initializeSearchConnection = (payload: any): string | Promise<void> | null => {
     if (!useLogsAutoRun().bindPayload(payload)) {
-      // A follow-up of a replaced or cancelled generation: nothing is sent.
       if (payload.type === "histogram" || payload.type === "pageCount") {
         searchObj.loadingHistogram = false;
       }
@@ -220,7 +219,8 @@ export const useSearchConnection = (t: TranslateFn) => {
         searchObj.meta.clearCache,
       );
 
-      if (generationId != null) (payload as { generationId?: number }).generationId = generationId;
+      if (generationId !== null && generationId !== undefined)
+        (payload as { generationId?: number }).generationId = generationId;
       if (options.reuseSchema) (payload as { reuseSchema?: boolean }).reuseSchema = true;
 
       // Add callbacks to payload
@@ -242,7 +242,12 @@ export const useSearchConnection = (t: TranslateFn) => {
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {
-        if (generationId != null && !useLogsAutoRun().engine.isCurrent(generationId)) return;
+        if (
+          generationId !== null &&
+          generationId !== undefined &&
+          !useLogsAutoRun().engine.isCurrent(generationId)
+        )
+          return;
         throw new Error(`Failed to initialize ${searchObj.communicationMethod} connection`);
       }
 

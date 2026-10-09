@@ -21,7 +21,6 @@ export interface TransientSearchKey {
   path: string;
   mode: TransientKeyMode;
   owner: string;
-  /** Fresh default for `reset` and `replace` keys; a `reset` key without one is deleted. */
   defaultValue?: () => unknown;
   normaliseOnSave?: (clone: PlainObject, live: PlainObject) => void;
 }
@@ -39,12 +38,10 @@ export const ITEM2_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "meta.runCancelled", mode: "reset", owner: "item2", defaultValue: () => ({}) },
   { path: "meta.editorDirty", mode: "reset", owner: "item2", defaultValue: () => false },
   { path: "meta.nlDetected", mode: "reset", owner: "item2", defaultValue: () => false },
-  // A preference: resetting it from constants.ts would flip a default-on session off.
   { path: "meta.liveMode", mode: "strip-only", owner: "item2" },
   { path: "data.customDownloadQueryObj", mode: "reset", owner: "item2" },
 ];
 
-// Scan consent is saved with a view on purpose, but applying a view replaces it instead of merging.
 export const ITEM1_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "data.freeTextBlocked", mode: "reset", owner: "item1", defaultValue: () => null },
   { path: "data.freeTextExcluded", mode: "reset", owner: "item1", defaultValue: () => [] },
@@ -52,7 +49,6 @@ export const ITEM1_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "meta.freeTextScan", mode: "replace", owner: "item1", defaultValue: () => ({}) },
 ];
 
-// The open drawer and its row are page-local; a view or a restore must never reopen them.
 export const ITEM4A_TRANSIENT_KEYS: TransientSearchKey[] = [
   { path: "meta.showDetailTab", mode: "reset", owner: "item4a", defaultValue: () => false },
   {
@@ -131,21 +127,6 @@ export function deletePath(obj: PlainObject, path: string): void {
   if (parent) delete parent[leaf];
 }
 
-export function registerTransientSearchKeys(entries: TransientSearchKey[]): () => void {
-  for (const entry of entries) {
-    const index = TRANSIENT_SEARCH_KEYS.findIndex((existing) => existing.path === entry.path);
-    if (index >= 0) TRANSIENT_SEARCH_KEYS.splice(index, 1, entry);
-    else TRANSIENT_SEARCH_KEYS.push(entry);
-  }
-  return () => entries.forEach((entry) => unregisterTransientSearchKey(entry.path));
-}
-
-export function unregisterTransientSearchKey(path: string): void {
-  const index = TRANSIENT_SEARCH_KEYS.findIndex((existing) => existing.path === path);
-  if (index >= 0) TRANSIENT_SEARCH_KEYS.splice(index, 1);
-}
-
-/** `save` drops `reset` and `strip-only` keys (`replace` keys are saved on purpose); `strip-only` drops only those. */
 export function stripTransient<T extends PlainObject>(
   obj: T,
   scope: "save" | "strip-only" = "save",
@@ -166,7 +147,6 @@ export function prepareSearchForSave<T extends PlainObject>(clone: T, live: Plai
   return normaliseOnSave(stripTransient(clone, "save"), live);
 }
 
-/** `replace` keys are only touched when `incoming` is given, i.e. at a view apply. */
 export function resetTransient<T extends PlainObject>(target: T, incoming?: PlainObject): T {
   for (const entry of TRANSIENT_SEARCH_KEYS) {
     if (entry.mode === "reset") {

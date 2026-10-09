@@ -79,6 +79,7 @@ const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> 
         <span><slot /></span>
         <OText
           :id="reasonId"
+          aria-hidden="true"
           :data-test="reasonId"
           as="span"
           variant="meta"

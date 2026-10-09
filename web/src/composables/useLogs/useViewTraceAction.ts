@@ -115,7 +115,6 @@ export default function useViewTraceAction(t: TranslateFn, searchObj: SearchObje
   };
 }
 
-/** The trace-details route View Trace opens for a log record: ±15 min around its timestamp. */
 export function traceDetailsLocation(
   log: Record<string, any>,
   state: {
@@ -140,7 +139,6 @@ export function traceDetailsLocation(
       trace_id: log[settings.trace_id_field_name],
       reload: "true",
     },
-    // On the location, not in `query`, so the trace page opens without a span filter.
     span_id: log[settings.span_id_field_name],
   };
 }

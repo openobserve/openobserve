@@ -13,15 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { nextTick, ref } from "vue";
+import { ref } from "vue";
 
-/** Text of `traces-row-nav-live`; rendered by the traces page, so a failure that swaps the results for an error state is still announced. */
+import { announceInto } from "@/utils/announceInto";
+
 export const tracesRowNavAnnouncement = ref("");
 
-// Re-setting the same text is not re-announced, so the region is emptied first.
 export function announceTracesRowNav(message: string): void {
-  tracesRowNavAnnouncement.value = "";
-  nextTick(() => {
-    tracesRowNavAnnouncement.value = message;
-  });
+  announceInto(tracesRowNavAnnouncement, message);
 }
