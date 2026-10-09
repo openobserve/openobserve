@@ -27,6 +27,7 @@ export interface SegmentWindow {
   targetIndex: number;
   from: number;
   to: number;
+  movedForViews: boolean;
 }
 
 export interface ManifestSummary {
@@ -111,12 +112,39 @@ export function selectInitialWindow(
   }
   if (anchorIndex === -1) anchorIndex = 0;
 
+  const viewAnchor = earliestAliveViewSnapshot(manifest, target, targetIndex);
+  const chosen = viewAnchor !== null && viewAnchor < anchorIndex ? viewAnchor : anchorIndex;
+
   return {
-    anchorIndex,
+    anchorIndex: chosen,
     targetIndex,
-    from: manifest[anchorIndex].start,
+    from: manifest[chosen].start,
     to: manifest[targetIndex].start,
+    movedForViews: chosen !== anchorIndex,
   };
+}
+
+// A view open at the target can become the shown tab, and it decodes only from its own full snapshot.
+function earliestAliveViewSnapshot(
+  manifest: ManifestEntry[],
+  target: number,
+  targetIndex: number,
+): number | null {
+  const lastEnd = new Map<string, number>();
+  const firstSnapshot = new Map<string, number>();
+  manifest.forEach((row, i) => {
+    if (typeof row.view_id !== "string") return;
+    lastEnd.set(row.view_id, Math.max(lastEnd.get(row.view_id) ?? -Infinity, Number(row.end)));
+    if (i <= targetIndex && hasFullSnapshot(row) && !firstSnapshot.has(row.view_id)) {
+      firstSnapshot.set(row.view_id, i);
+    }
+  });
+  let earliest: number | null = null;
+  firstSnapshot.forEach((index, viewId) => {
+    if ((lastEnd.get(viewId) ?? -Infinity) < target) return;
+    if (earliest === null || index < earliest) earliest = index;
+  });
+  return earliest;
 }
 
 /** Starts of the segments that can anchor a cold player, used by the seek planner. */
