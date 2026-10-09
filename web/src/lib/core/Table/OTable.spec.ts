@@ -1709,6 +1709,37 @@ describe("OTable", () => {
       const tableEl = wrapper.find('[data-test="o2-table"]');
       expect(tableEl.attributes("style")).toContain("2.25rem");
     });
+
+    it("uses the compact row token and unpadded cells when compact is true", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns(), compact: true },
+      });
+      const tableEl = wrapper.find('[data-test="o2-table"]');
+      expect(tableEl.attributes("style")).toContain("var(--table-row-height-compact, 1.5625rem)");
+      const cell = wrapper.find('td[data-test^="o2-table-cell-"]');
+      expect(cell.classes()).toContain("px-0");
+      expect(cell.classes()).not.toContain("px-2");
+      expect(wrapper.find('th[data-test^="o2-table-th-"]').classes()).toContain("h-6");
+    });
+
+    it("keeps padded cells and the default header height without compact", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+      });
+      expect(wrapper.find('td[data-test^="o2-table-cell-"]').classes()).toContain("px-2");
+      expect(wrapper.find('th[data-test^="o2-table-th-"]').classes()).toContain("h-8");
+    });
+
+    it("draws the pager hairline by default and drops it with paginationBordered false", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(5), columns: makeColumns(), pageSize: 2 },
+      });
+      const pager = () => wrapper.find('[data-test="o2-table-pagination-bottom"]');
+      expect(pager().classes()).toContain("border-t");
+
+      await wrapper.setProps({ paginationBordered: false });
+      expect(pager().classes()).not.toContain("border-t");
+    });
   });
 
   // ── Pagination: none ───────────────────────────────────────

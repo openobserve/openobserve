@@ -571,3 +571,191 @@ describe("ModulePane - empty states wait for the load", () => {
     expect(wrapper.find('[data-test="edit-role-module-pane-no-resources"]').exists()).toBe(true);
   });
 });
+
+describe("ModulePane - column select all", () => {
+  const ALL_MODULES = [raw("All Modules")];
+
+  const bulkBox = (wrapper: any, action: string) =>
+    wrapper.find(`[data-test="edit-role-module-pane-bulk-${action}"] button[role="checkbox"]`);
+
+  const mountBulk = (entities: any[]) =>
+    mountPane([], entities, ALL_MODULES, { listsModules: true });
+
+  const emittedRows = (wrapper: any) =>
+    (wrapper.emitted("change") ?? []).map(([change]: any) => [change.row.name, change.newValue]);
+
+  it("reads unticked, mixed and ticked from the rows it covers", async () => {
+    const none = await mountBulk([makeNode("logs"), makeNode("alert")]);
+    const some = await mountBulk([makeNode("logs", ["AllowList"]), makeNode("alert")]);
+    const all = await mountBulk([
+      makeNode("logs", ["AllowList"]),
+      makeNode("alert", ["AllowList"]),
+    ]);
+
+    expect(bulkBox(none, "AllowList").attributes("aria-checked")).toBe("false");
+    expect(bulkBox(some, "AllowList").attributes("aria-checked")).toBe("mixed");
+    expect(bulkBox(all, "AllowList").attributes("aria-checked")).toBe("true");
+    expect(bulkBox(none, "AllowList").attributes("aria-label")).toBe(
+      String(i18n.global.t("iam.editRole.bulkSelectColumn", { action: i18n.global.t("iam.list") })),
+    );
+  });
+
+  // A row that hides the action has no box to show the grant, so the header must not stage one.
+  it("ticks the action once on each unticked row that offers it", async () => {
+    const settings = makeNode("settings");
+    settings.permission.AllowList.show = false;
+    const wrapper = await mountBulk([
+      makeNode("logs"),
+      makeNode("alert", ["AllowList"]),
+      settings,
+      makeNode("role"),
+    ]);
+
+    await bulkBox(wrapper, "AllowList").trigger("click");
+
+    expect(emittedRows(wrapper)).toEqual([
+      ["logs", true],
+      ["role", true],
+    ]);
+    expect(wrapper.emitted("change")![0][0]).toMatchObject({ permission: "AllowList" });
+  });
+
+  it("unticks every row once all of them hold the action", async () => {
+    const wrapper = await mountBulk([
+      makeNode("logs", ["AllowGet"]),
+      makeNode("alert", ["AllowGet"]),
+    ]);
+
+    await bulkBox(wrapper, "AllowGet").trigger("click");
+
+    expect(emittedRows(wrapper)).toEqual([
+      ["logs", false],
+      ["alert", false],
+    ]);
+  });
+
+  it("reaches only the rows the search keeps", async () => {
+    const wrapper = await mountBulk([makeNode("logs"), makeNode("alert"), makeNode("logs_cache")]);
+
+    await wrapper.find('[data-test="edit-role-module-pane-search"] input').setValue("logs");
+    await bulkBox(wrapper, "AllowList").trigger("click");
+
+    expect(emittedRows(wrapper)).toEqual([
+      ["logs", true],
+      ["logs_cache", true],
+    ]);
+  });
+
+  it("reaches rows on later pages, not just the one on screen", async () => {
+    const entities = Array.from({ length: 30 }, (_, i) => makeNode(`module_${i}`));
+    const wrapper = await mountBulk(entities);
+
+    await bulkBox(wrapper, "AllowList").trigger("click");
+
+    expect(wrapper.emitted("change")).toHaveLength(30);
+  });
+
+  it("offers no header box outside the All Modules view", async () => {
+    const wrapper = await mountPane([makeScope("metrics")], [makeNode("cpu")]);
+
+    expect(wrapper.find('[data-test^="edit-role-module-pane-bulk-"]').exists()).toBe(false);
+  });
+
+  it("locks the header box while the role loads", async () => {
+    const wrapper = await mountPane([], [makeNode("logs")], ALL_MODULES, {
+      listsModules: true,
+      loading: true,
+    });
+
+    expect(bulkBox(wrapper, "AllowList").attributes("disabled")).toBeDefined();
+  });
+
+  it("locks the header box once the search leaves no module", async () => {
+    const wrapper = await mountBulk([makeNode("logs")]);
+
+    await wrapper.find('[data-test="edit-role-module-pane-search"] input').setValue("nothing");
+
+    expect(bulkBox(wrapper, "AllowList").attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-match"]').text()).toContain(
+      String(i18n.global.t("iam.editRole.noModuleMatch")),
+    );
+  });
+
+  it("words the column and the search for modules, not resources", async () => {
+    const wrapper = await mountBulk([makeNode("logs")]);
+
+    expect(wrapper.text()).toContain(String(i18n.global.t("iam.editRole.moduleColumn")));
+    expect(
+      wrapper.find('[data-test="edit-role-module-pane-search"] input').attributes("placeholder"),
+    ).toBe(String(i18n.global.t("iam.editRole.filterModules")));
+  });
+
+  // All Modules can open before the grants load; its rows never change, so the order must follow the load.
+  it("moves granted modules to the top once the load ends", async () => {
+    const alert = makeNode("alert");
+    const wrapper = await mountPane([], [makeNode("logs"), alert], ALL_MODULES, {
+      listsModules: true,
+      loading: true,
+    });
+
+    alert.permission.AllowList.value = true;
+    await wrapper.setProps({ loading: false });
+
+    // The table swaps its loading body for rows asynchronously, so wait for the rows rather than one tick.
+    const order = () =>
+      wrapper
+        .findAll('[data-test^="edit-role-module-pane-open-"]')
+        .map((row) => row.attributes("data-test"));
+    await vi.waitFor(() =>
+      expect(order()).toEqual([
+        "edit-role-module-pane-open-alert",
+        "edit-role-module-pane-open-logs",
+      ]),
+    );
+  });
+
+  // A header tick must never stage a grant whose box the row does not show.
+  it("locks the header box when no listed module offers the action", async () => {
+    const settings = makeNode("settings");
+    settings.permission.AllowList.show = false;
+    const wrapper = await mountBulk([settings]);
+
+    await bulkBox(wrapper, "AllowList").trigger("click");
+
+    expect(bulkBox(wrapper, "AllowList").attributes("disabled")).toBeDefined();
+    expect(wrapper.emitted("change")).toBeUndefined();
+  });
+
+  // The link's own padding would push the name past the column title and the plain rows.
+  it.each([
+    [
+      "a module row",
+      () => mountBulk([makeNode("logs")]),
+      '[data-test="edit-role-module-pane-open-logs"]',
+    ],
+    [
+      "a folder row",
+      () =>
+        mountPane(
+          [makeScope("dfolder", [], ["dfolder"])],
+          [{ ...makeNode("sre", [], "dfolder"), has_entities: true, childName: "dashboard" }],
+        ),
+      '[data-test="edit-role-module-pane-open-sre"]',
+    ],
+  ])("pulls the name link back by its padding on %s", async (_, mountRow, selector) => {
+    const wrapper = await mountRow();
+
+    expect(wrapper.find(selector).classes()).toContain("-ms-3");
+  });
+
+  // Every row is a module, so even one with no items (Search Jobs) opens like the rest.
+  it("offers to open every module row, with or without items", async () => {
+    const searchJobs = makeNode("search_jobs");
+    const wrapper = await mountBulk([makeNode("logs"), searchJobs]);
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-open-logs"]').exists()).toBe(true);
+    await wrapper.find('[data-test="edit-role-module-pane-open-search_jobs"]').trigger("click");
+
+    expect(wrapper.emitted("open")?.at(-1)?.[0]).toStrictEqual(searchJobs);
+  });
+});

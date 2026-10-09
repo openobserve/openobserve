@@ -103,22 +103,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-if="!eventsHeld || chartSeries.length" class="h-64 w-full px-2 pb-2">
+      <!-- v-if (not v-show): an unresolved event series must not mount the renderer at all. -->
       <OSkeleton
         v-if="eventsGate === 'loading'"
         class="h-full w-full"
         data-test="rum-analytics-trends-loading"
       />
-      <PanelSchemaRenderer
-        v-else
-        :key="rendererKey"
-        class="h-full w-full"
-        :panelSchema="panelSchema"
-        :selectedTimeObj="selectedTimeObj"
-        :variablesData="{}"
-        :forceLoad="true"
-        searchType="RUM"
-        :allowAnnotationsAPI="false"
-      />
+      <template v-else>
+        <OSkeleton
+          v-if="chartLoading"
+          class="h-full w-full"
+          data-test="rum-analytics-trends-loading"
+        />
+        <PanelSchemaRenderer
+          v-show="!chartLoading"
+          :key="rendererKey"
+          class="h-full w-full"
+          :panelSchema="panelSchema"
+          :selectedTimeObj="selectedTimeObj"
+          :variablesData="{}"
+          :forceLoad="true"
+          searchType="RUM"
+          :allowAnnotationsAPI="false"
+          @loading-state-change="chartLoading = $event"
+        />
+      </template>
     </div>
     <AddToDashboard
       v-if="dashboardOpen"
@@ -169,6 +178,7 @@ const props = defineProps<{
   eventsStatus: NamedEventsStatus;
   range: { startUs: number; endUs: number };
   timezone: string;
+  deletedNames?: Readonly<Record<string, string>>;
 }>();
 const emit = defineEmits<{ "update:series": [StepRef[]]; "retry-events": [] }>();
 const { t } = useI18nTyped();
@@ -229,6 +239,7 @@ const panelSchema = computed(() =>
     interval.value,
     props.timezone,
     t,
+    props.deletedNames,
   ),
 );
 
@@ -249,11 +260,17 @@ const rendererKey = computed(() =>
   ]),
 );
 
+// `forceLoad` makes `loading` a reliable skeleton signal; a rendererKey change must re-arm it.
+const chartLoading = ref(true);
+watch(rendererKey, () => {
+  chartLoading.value = true;
+});
+
 // With no list to name it, an event's id is opaque, so it gets a neutral name until the list is ready.
 const labelOf = (s: StepRef): I18nText =>
   eventsGate.value !== "ready" && s.kind === "e" && !props.events.some((e) => e.id === s.key)
     ? t("rum.analytics.events.unloadedName")
-    : raw(stepLabel(s, props.events));
+    : raw(stepLabel(s, props.events, props.deletedNames));
 
 const seriesId = (s: StepRef) => `${s.kind}:${s.key}`;
 
