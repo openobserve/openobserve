@@ -39,6 +39,10 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn stream_access_audit(
     Path(org_id): Path<String>,
@@ -73,6 +77,10 @@ pub async fn stream_access_audit(
     responses(
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "list"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
 )]
 pub async fn stream_access_audit(
     Path(_org_id): Path<String>,

@@ -78,6 +78,7 @@ pub enum QuerySource {
         dashboard_id: String,
     },
     Unparseable {
+        org_id: String,
         source: String,
         error: String,
     },
@@ -108,8 +109,15 @@ impl TypedStream {
 pub enum Denial {
     Stream(TypedStream),
     CipherKey(String),
-    Dashboard { folder: String, id: String },
-    Unparseable { source: String, error: String },
+    Dashboard {
+        folder: String,
+        id: String,
+    },
+    Unparseable {
+        org_id: String,
+        source: String,
+        error: String,
+    },
 }
 
 #[cfg(any(feature = "enterprise", test))]
@@ -138,8 +146,9 @@ impl ResolvedSources {
         }
     }
 
-    fn push_unparseable(&mut self, source: &str, error: impl ToString) {
+    fn push_unparseable(&mut self, org_id: &str, source: &str, error: impl ToString) {
         let denial = Denial::Unparseable {
+            org_id: org_id.to_string(),
             source: source_label(source),
             error: source_label(&error.to_string()),
         };
@@ -152,6 +161,7 @@ impl ResolvedSources {
 #[cfg(any(feature = "enterprise", test))]
 #[async_trait::async_trait]
 pub trait StreamAccessChecker: Send + Sync {
+    async fn enforces_rbac(&self) -> bool;
     async fn is_root(&self, user_id: &str) -> bool;
     async fn is_root_or_admin(&self, org_id: &str, user_id: &str) -> bool;
     async fn can_read_stream(&self, user_id: &str, stream: &TypedStream) -> bool;
@@ -211,6 +221,10 @@ impl FakeStreamChecker {
 #[cfg(all(feature = "enterprise", feature = "test-utils"))]
 #[async_trait::async_trait]
 impl StreamAccessChecker for FakeStreamChecker {
+    async fn enforces_rbac(&self) -> bool {
+        true
+    }
+
     async fn is_root(&self, user_id: &str) -> bool {
         self.roots
             .read()
@@ -254,6 +268,10 @@ struct OpenFgaStreamChecker;
 #[cfg(feature = "enterprise")]
 #[async_trait::async_trait]
 impl StreamAccessChecker for OpenFgaStreamChecker {
+    async fn enforces_rbac(&self) -> bool {
+        rbac_enforced().await
+    }
+
     async fn is_root(&self, user_id: &str) -> bool {
         is_root_user(user_id)
     }
@@ -525,6 +543,12 @@ pub async fn list_objects_for_user(
     db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
 }
 
+/// Off or lifted RBAC allows every read, as [`check_permissions`] answers.
+#[cfg(feature = "enterprise")]
+pub async fn rbac_enforced() -> bool {
+    o2_openfga::config::get_config().enabled && !report_failure_lifts_rbac().await
+}
+
 /// Never before the first usage report: an unloaded license also reads as a reporting failure.
 #[cfg(feature = "enterprise")]
 pub async fn report_failure_lifts_rbac() -> bool {
@@ -565,8 +589,12 @@ pub fn resolve_query_sources(sources: &[QuerySource]) -> ResolvedSources {
                     resolved.dashboards.push(entry);
                 }
             }
-            QuerySource::Unparseable { source, error } => {
-                resolved.push_unparseable(source, error);
+            QuerySource::Unparseable {
+                org_id,
+                source,
+                error,
+            } => {
+                resolved.push_unparseable(org_id, source, error);
             }
         }
     }
@@ -588,7 +616,16 @@ pub fn source_orgs(resolved: &ResolvedSources) -> Vec<String> {
         .iter()
         .map(|s| &s.org_id)
         .chain(resolved.cipher_keys.iter().map(|(org, _)| org))
-        .chain(resolved.dashboards.iter().map(|(org, ..)| org));
+        .chain(resolved.dashboards.iter().map(|(org, ..)| org))
+        .chain(
+            resolved
+                .unparseable
+                .iter()
+                .filter_map(|denial| match denial {
+                    Denial::Unparseable { org_id, .. } => Some(org_id),
+                    _ => None,
+                }),
+        );
     for org in all {
         if !orgs.contains(org) {
             orgs.push(org.clone());
@@ -606,7 +643,7 @@ pub async fn authorize_with(
 ) -> Result<(), StreamAccessDenied> {
     use futures::future::join_all;
 
-    if checker.is_root(user_id).await {
+    if !checker.enforces_rbac().await || checker.is_root(user_id).await {
         return Ok(());
     }
     let resolved = resolve_query_sources(sources);
@@ -672,7 +709,15 @@ pub async fn authorize_with(
                 id: id.clone(),
             }),
     );
-    denials.extend(resolved.unparseable);
+    denials.extend(
+        resolved
+            .unparseable
+            .into_iter()
+            .filter(|denial| match denial {
+                Denial::Unparseable { org_id, .. } => !admin_orgs.contains(org_id.as_str()),
+                _ => true,
+            }),
+    );
     if denials.is_empty() {
         Ok(())
     } else {
@@ -730,7 +775,7 @@ pub fn stream_access_message(request_org: &str, denied: &StreamAccessDenied) -> 
             Denial::Stream(s) => streams.push(s.display(request_org)),
             Denial::CipherKey(key) => keys.push(key.clone()),
             Denial::Dashboard { folder, id } => dashboards.push(format!("{folder}/{id}")),
-            Denial::Unparseable { source, error } => {
+            Denial::Unparseable { source, error, .. } => {
                 unparseable.push(format!("{source} ({error})"))
             }
         }
@@ -801,7 +846,7 @@ fn resolve_sql(resolved: &mut ResolvedSources, org_id: &str, sql: &str, default_
     let tables = match resolve_sql_tables(sql) {
         Ok(tables) => tables,
         Err(e) => {
-            resolved.push_unparseable(sql, e);
+            resolved.push_unparseable(org_id, sql, e);
             return;
         }
     };
@@ -824,7 +869,7 @@ fn resolve_sql(resolved: &mut ResolvedSources, org_id: &str, sql: &str, default_
                 }
             }
         }
-        Err(e) => resolved.push_unparseable(sql, e),
+        Err(e) => resolved.push_unparseable(org_id, sql, e),
     }
 }
 
@@ -832,16 +877,18 @@ fn resolve_sql(resolved: &mut ResolvedSources, org_id: &str, sql: &str, default_
 fn resolve_promql(resolved: &mut ResolvedSources, org_id: &str, query: &str) {
     use promql::ast::{name_visitor::MetricNameVisitor, visitor::walk_expr};
 
-    let ast = match promql_parser::parser::parse(query) {
+    // the engine's parser registers holt_winters; the raw retry still names refused queries
+    let parsed = promql::parse(query).or_else(|_| promql_parser::parser::parse(query));
+    let ast = match parsed {
         Ok(ast) => ast,
         Err(e) => {
-            resolved.push_unparseable(query, e);
+            resolved.push_unparseable(org_id, query, e);
             return;
         }
     };
     let mut visitor = MetricNameVisitor::new();
     if let Err(e) = walk_expr(&mut visitor, &ast) {
-        resolved.push_unparseable(query, e);
+        resolved.push_unparseable(org_id, query, e);
         return;
     }
     let mut names: Vec<String> = visitor.into_names().into_iter().collect();
@@ -868,7 +915,7 @@ fn resolve_vrl(resolved: &mut ResolvedSources, org_id: &str, source: &str) {
                 });
             }
         }
-        Err(e) => resolved.push_unparseable(source, e),
+        Err(e) => resolved.push_unparseable(org_id, source, e),
     }
 }
 
@@ -902,6 +949,7 @@ mod tests {
 
     #[derive(Default)]
     struct FakeChecker {
+        rbac_off: bool,
         roots: HashSet<String>,
         admins: HashSet<(String, String)>,
         readable: HashSet<(String, String)>,
@@ -921,6 +969,10 @@ mod tests {
 
     #[async_trait::async_trait]
     impl StreamAccessChecker for FakeChecker {
+        async fn enforces_rbac(&self) -> bool {
+            !self.rbac_off
+        }
+
         async fn is_root(&self, user_id: &str) -> bool {
             self.roots.contains(user_id)
         }
@@ -1048,15 +1100,88 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unparseable_source_is_denied_even_for_an_admin() {
-        let checker = FakeChecker::default().admin("u1", "o1");
-        let denied = authorize_with(&checker, "u1", &[sql("o1", "not sql at all")])
+    async fn unparseable_source_passes_only_an_admin_of_its_own_org() {
+        let sources = [
+            sql("o1", "not sql at all"),
+            QuerySource::Unparseable {
+                org_id: "o1".to_string(),
+                source: "$s".to_string(),
+                error: "unresolved variable s in stream position".to_string(),
+            },
+        ];
+        let admin = FakeChecker::default().admin("u1", "o1");
+        assert!(authorize_with(&admin, "u1", &sources).await.is_ok());
+
+        let other_org_admin = FakeChecker::default().admin("u1", "o2");
+        let denied = authorize_with(&other_org_admin, "u1", &sources)
             .await
             .unwrap_err();
         assert!(matches!(
             denied.denials.as_slice(),
-            [Denial::Unparseable { .. }]
+            [Denial::Unparseable { .. }, Denial::Unparseable { .. }]
         ));
+
+        let member = FakeChecker::default().reads("u1", "o1/logs/app");
+        assert_eq!(
+            authorize_with(&member, "u1", &sources)
+                .await
+                .unwrap_err()
+                .denials
+                .len(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn rbac_off_allows_what_rbac_on_denies() {
+        let sources = [
+            stream("o1", StreamType::Logs, "secret"),
+            stream("o2", StreamType::EnrichmentTables, "foreign_table"),
+            sql("o1", "SELECT decrypt(body, 'vault_key') FROM app"),
+            sql("o1", "not sql at all"),
+            QuerySource::Dashboard {
+                org_id: "o1".to_string(),
+                folder: "f1".to_string(),
+                dashboard_id: "d1".to_string(),
+            },
+        ];
+        let rbac_on = FakeChecker::default();
+        assert!(
+            authorize_with(&rbac_on, "non_member", &sources)
+                .await
+                .is_err()
+        );
+
+        let rbac_off = FakeChecker {
+            rbac_off: true,
+            ..FakeChecker::default()
+        };
+        assert!(
+            authorize_with(&rbac_off, "non_member", &sources)
+                .await
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn holt_winters_resolves_without_an_earlier_engine_parse() {
+        const CHILD: &str = "O2_AUTHZ_FRESH_PARSE_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let status = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "authz::tests::holt_winters_resolves_without_an_earlier_engine_parse",
+                    "--exact",
+                    "--test-threads=1",
+                ])
+                .env(CHILD, "1")
+                .status()
+                .unwrap();
+            assert!(status.success(), "fresh-process run failed: {status}");
+            return;
+        }
+        let resolved = resolve_query_sources(&[promql("o1", "holt_winters(cpu[5m], 0.5, 0.3)")]);
+        assert!(resolved.unparseable.is_empty(), "{resolved:?}");
+        assert_eq!(names(&resolved), vec!["metrics/cpu"]);
     }
 
     #[tokio::test]
@@ -1129,6 +1254,7 @@ mod tests {
                     dashboard_id: "d1".to_string(),
                 },
                 QuerySource::Unparseable {
+                    org_id: "o1".to_string(),
                     source: "SELECT * FROM \"$s\"".to_string(),
                     error: "unresolved variable s in stream position".to_string(),
                 },

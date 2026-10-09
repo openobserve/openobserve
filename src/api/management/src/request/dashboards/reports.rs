@@ -1043,6 +1043,9 @@ async fn force_owner_and_guard(
 
 #[cfg(feature = "enterprise")]
 async fn guard_report(org_id: &str, user_id: &str, report: &Report) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
     let sources = report_sources(org_id, report)
         .await
         .map_err(Response::from)?;

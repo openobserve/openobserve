@@ -102,13 +102,21 @@ pub fn panel_query_sources(
         let filled_resolved = resolve(&filled);
         if !filled_resolved.unparseable.is_empty() {
             return vec![QuerySource::Unparseable {
+                org_id: org_id.to_string(),
                 source: text.to_string(),
                 error: "query does not parse with its variables substituted".to_string(),
             }];
         }
         (sub, resolved) = (filled, filled_resolved);
     }
-    stream_position_sources(text, lang, numeric, values, &sub, &resolved, make)
+    let (mut sources, unfilled) =
+        stream_position_sources(text, lang, numeric, values, &sub, &resolved, make);
+    sources.extend(unfilled.into_iter().map(|var| QuerySource::Unparseable {
+        org_id: org_id.to_string(),
+        source: text.to_string(),
+        error: format!("unresolved variable {var} in stream position"),
+    }));
+    sources
 }
 
 /// The error names the first variable `values` cannot fill.
@@ -123,6 +131,7 @@ pub(crate) fn fill_stream_name(
     }
 }
 
+/// Also returns the stream-position variables that no value fills.
 fn stream_position_sources(
     text: &str,
     lang: QueryLanguage,
@@ -131,14 +140,14 @@ fn stream_position_sources(
     sub: &Substituted,
     resolved: &ResolvedSources,
     make: impl Fn(String) -> QuerySource,
-) -> Vec<QuerySource> {
+) -> (Vec<QuerySource>, Vec<String>) {
     let stream_vars: BTreeSet<String> = resolved
         .resource_texts
         .iter()
         .flat_map(|text| sub.variables_in(text))
         .collect();
     if stream_vars.is_empty() {
-        return vec![make(sub.text.clone())];
+        return (vec![make(sub.text.clone())], Vec::new());
     }
     let missing: Vec<&String> = stream_vars
         .iter()
@@ -149,9 +158,12 @@ fn stream_position_sources(
             .iter()
             .filter_map(|var| values.get(var).map(|v| (var.clone(), v.clone())))
             .collect();
-        return vec![make(substitute(text, lang, numeric, &fill).text)];
+        return (
+            vec![make(substitute(text, lang, numeric, &fill).text)],
+            Vec::new(),
+        );
     }
-    let mut out: Vec<QuerySource> = resolved
+    let streams: Vec<QuerySource> = resolved
         .streams
         .iter()
         .filter(|s| !SENTINEL.is_match(&s.name))
@@ -161,11 +173,7 @@ fn stream_position_sources(
             name: s.name.clone(),
         })
         .collect();
-    out.extend(missing.into_iter().map(|var| QuerySource::Unparseable {
-        source: text.to_string(),
-        error: format!("unresolved variable {var} in stream position"),
-    }));
-    out
+    (streams, missing.into_iter().cloned().collect())
 }
 
 fn substitute(

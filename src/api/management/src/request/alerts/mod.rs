@@ -4693,6 +4693,7 @@ mod tests {
 
         #[tokio::test]
         async fn custom_and_promql_alerts_are_refused_on_their_streams() {
+            fake_checker();
             let caller = user();
             let (status, body) = create(
                 "sa_org1",
@@ -4770,6 +4771,18 @@ mod tests {
             let root = user();
             fake_checker().grant_root(&root);
             assert!(guard_write("sa_org1", &root, &foreign).await.is_ok());
+        }
+
+        #[tokio::test]
+        async fn undecodable_vrl_adds_no_source_so_the_save_answers_its_own_400() {
+            let caller = user();
+            fake_checker().grant_read(&caller, &logs("sa_org1", "app"));
+            let mut alert = MetaAlert::default();
+            alert.stream_name = "app".to_string();
+            alert.query_condition.query_type = config::meta::alerts::QueryType::Custom;
+            alert.query_condition.vrl_function = Some("%%%".to_string());
+            let sources = openobserve_core::background_access::alert_sources("sa_org1", &alert);
+            assert!(guard_write("sa_org1", &caller, &sources).await.is_ok());
         }
 
         #[tokio::test]

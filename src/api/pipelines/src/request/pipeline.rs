@@ -656,6 +656,9 @@ pub async fn enable_pipeline_bulk(
 
 #[cfg(feature = "enterprise")]
 async fn guard_pipeline(user_id: &str, pipeline: &Pipeline) -> Result<(), Response> {
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
     let sources = openobserve_core::background_access::pipeline_sources(pipeline)
         .await
         .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;

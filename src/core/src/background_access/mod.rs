@@ -238,6 +238,13 @@ pub fn panel_sources(
         if let Some(text) = query.get("query").and_then(|q| q.as_str()) {
             sources.extend(panel_query_sources(org_id, text, lang, stream_type, values));
         }
+        let vrl = query.get("vrlFunctionQuery").and_then(|v| v.as_str());
+        if let Some(vrl) = vrl.map(str::trim).filter(|v| !v.is_empty()) {
+            sources.push(QuerySource::Vrl {
+                org_id: org_id.to_string(),
+                source: vrl.to_string(),
+            });
+        }
         if let Some(source) =
             fields.and_then(|f| named_stream_source(org_id, f, stream_type, values))
         {
@@ -396,6 +403,9 @@ pub async fn guard_dashboard_edit(
 ) -> Result<(), Response> {
     use common::meta::http::HttpResponse as MetaHttpResponse;
 
+    if !rbac_enforced().await {
+        return Ok(());
+    }
     let reports = enabled_report_variables(org_id, dashboard_id)
         .await
         .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;
@@ -525,6 +535,12 @@ pub async fn stored_slo(org_id: &str, slo_id: &str) -> Result<Option<Slo>, anyho
     Ok(infra::table::slos::get(client, org_id, slo_id).await?)
 }
 
+/// Off or lifted RBAC skips every save-time check, so a failed source load refuses nothing.
+#[cfg(feature = "enterprise")]
+pub async fn rbac_enforced() -> bool {
+    crate::authz::active_checker().enforces_rbac().await
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn is_org_admin(org_id: &str, user_id: &str) -> bool {
     let checker = crate::authz::active_checker();
@@ -563,6 +579,9 @@ pub async fn guard_loaded(
 ) -> Result<(), Response> {
     use common::meta::http::HttpResponse as MetaHttpResponse;
 
+    if !rbac_enforced().await {
+        return Ok(());
+    }
     match loaded {
         Ok(Some(sources)) => guard_write(org_id, user_id, &sources).await,
         Ok(None) => Ok(()),
@@ -577,6 +596,9 @@ pub async fn loaded_denial_message(
     user_id: &str,
     loaded: Result<Option<Vec<QuerySource>>, anyhow::Error>,
 ) -> Option<String> {
+    if !rbac_enforced().await {
+        return None;
+    }
     match loaded {
         Ok(Some(sources)) => denial_message(org_id, user_id, &sources).await,
         Ok(None) => None,
@@ -604,6 +626,9 @@ pub async fn denial_message(
 pub async fn guard_vrl_function(org_id: &str, user_id: &str, source: &str) -> Result<(), Response> {
     use common::meta::http::HttpResponse as MetaHttpResponse;
 
+    if !rbac_enforced().await {
+        return Ok(());
+    }
     let tables = match transform::enrichment_tables_read(source, org_id) {
         Ok(tables) => tables,
         Err(_) if transform::compile_vrl_function(source, org_id).is_err() => return Ok(()),
@@ -654,10 +679,8 @@ fn query_condition_sources(
                 org_id: org_id.to_string(),
                 source,
             }),
-            Err(e) => sources.push(QuerySource::Unparseable {
-                source: "vrl_function".to_string(),
-                error: e.to_string(),
-            }),
+            // undecodable VRL runs nowhere, so it reads nothing; the save answers its 400
+            Err(_) => {}
         }
     }
     sources
@@ -749,6 +772,7 @@ fn named_stream_source(
             name,
         },
         Err(variable) => QuerySource::Unparseable {
+            org_id: org_id.to_string(),
             source: name.to_string(),
             error: format!("unresolved variable {variable} in stream position"),
         },
@@ -761,7 +785,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::authz::{Denial, resolve_query_sources};
+    use crate::authz::resolve_query_sources;
 
     fn resolved_names(sources: &[QuerySource]) -> Vec<String> {
         resolve_query_sources(sources)
@@ -832,14 +856,11 @@ mod tests {
     }
 
     #[test]
-    fn alert_vrl_that_is_not_base64_is_unparseable() {
+    fn alert_vrl_that_is_not_base64_reads_nothing() {
         let mut alert = alert(QueryType::Custom);
+        let plain = alert_sources("o1", &alert);
         alert.query_condition.vrl_function = Some("%%%".to_string());
-        let resolved = resolve_query_sources(&alert_sources("o1", &alert));
-        assert!(matches!(
-            resolved.unparseable.as_slice(),
-            [Denial::Unparseable { .. }]
-        ));
+        assert_eq!(alert_sources("o1", &alert), plain);
     }
 
     #[test]
@@ -973,6 +994,62 @@ mod tests {
     }
 
     #[test]
+    fn panel_vrl_reads_tables_global_skipped_then_own_org_then_default() {
+        use std::sync::Arc;
+
+        use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
+
+        let table = |org: &str, name: &str| StreamTable {
+            org_id: org.to_string(),
+            stream_name: name.to_string(),
+            data: Arc::new(vec![]),
+        };
+        let keys = [
+            ("panel_vrl_org", "pv_shared"),
+            (config::DEFAULT_ORG, "pv_shared"),
+            (config::DEFAULT_ORG, "pv_default_only"),
+        ]
+        .map(|(org, name)| {
+            let key = format!("{org}/enrichment_tables/{name}");
+            ENRICHMENT_TABLES.insert(key.clone(), table(org, name));
+            key
+        });
+        transform::register_global_enrichment_table("pv_global", table("global", "pv_global"));
+        let vrl = r#"
+            a = get_enrichment_table_record!("pv_shared", {"k": .k})
+            b = get_enrichment_table_record!("pv_default_only", {"k": .k})
+            c = get_enrichment_table_record!("pv_global", {"k": .k})
+            .
+        "#;
+        let panel = json!({"queryType": "sql", "queries": [
+            {"query": "SELECT * FROM app", "vrlFunctionQuery": vrl},
+            {"query": "SELECT * FROM app", "vrlFunctionQuery": "  "},
+        ]});
+        let sources = panel_sources("panel_vrl_org", &panel, &HashMap::new());
+        let names = resolved_names(&sources);
+        transform::remove_global_enrichment_table("pv_global");
+        for key in keys {
+            ENRICHMENT_TABLES.remove(&key);
+        }
+
+        assert_eq!(
+            sources
+                .iter()
+                .filter(|s| matches!(s, QuerySource::Vrl { .. }))
+                .count(),
+            1
+        );
+        assert_eq!(
+            names,
+            vec![
+                "panel_vrl_org/logs/app",
+                "panel_vrl_org/enrichment_tables/pv_shared",
+                "default/enrichment_tables/pv_default_only",
+            ]
+        );
+    }
+
+    #[test]
     fn v1_dashboards_keep_panels_at_the_top_level() {
         let dashboard = json!({"panels": [{"queries": [{"query": "SELECT * FROM flat"}]}]});
         assert_eq!(
@@ -981,9 +1058,10 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
     async fn a_failed_load_refuses_and_a_missing_object_checks_nothing() {
+        crate::authz::fake_checker();
         let failed = || Err(anyhow::anyhow!("replica unavailable"));
         let resp = guard_loaded("o1", "u@example.com", failed())
             .await

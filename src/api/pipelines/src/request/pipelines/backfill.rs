@@ -683,6 +683,9 @@ async fn ensure_readable_pipeline(
     let pipeline = openobserve_core::pipeline::get_user_pipeline(org_id, pipeline_id)
         .await
         .map_err(Response::from)?;
+    if !openobserve_core::background_access::rbac_enforced().await {
+        return Ok(());
+    }
     let sources = openobserve_core::background_access::pipeline_sources(&pipeline)
         .await
         .map_err(|e| MetaHttpResponse::internal_error(e.to_string()))?;

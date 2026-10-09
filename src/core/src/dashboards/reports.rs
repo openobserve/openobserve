@@ -1047,7 +1047,6 @@ fn all_dashboards_readable(results: &[bool]) -> bool {
     results.iter().all(|readable| *readable)
 }
 
-/// Anchors a report to the org it was addressed to, rejecting a body that names a different one.
 async fn get_by_id_on(
     conn: &sea_orm::DatabaseConnection,
     org_id: &str,
@@ -1060,6 +1059,7 @@ async fn get_by_id_on(
     }
 }
 
+/// Anchors a report to the org it was addressed to, rejecting a body that names a different one.
 fn bind_to_path_org(report: &mut Report, org_id: &str) -> Result<(), ReportError> {
     if !report.org_id.is_empty() && report.org_id != org_id {
         return Err(ReportError::OrgMismatch);

@@ -135,6 +135,10 @@ impl MemoChecker {
 
 #[async_trait::async_trait]
 impl StreamAccessChecker for MemoChecker {
+    async fn enforces_rbac(&self) -> bool {
+        self.inner.enforces_rbac().await
+    }
+
     async fn is_root(&self, user_id: &str) -> bool {
         let key = user_id.to_string();
         if let Some(hit) = cached(&self.roots, &key) {
@@ -438,6 +442,7 @@ async fn report_audit_sources(
         Ok(sources) => Ok(sources),
         Err(e @ super::ReportSourceError::DashboardMissing { .. }) => {
             Ok(vec![QuerySource::Unparseable {
+                org_id: org_id.to_string(),
                 source: format!("report {}", report.name),
                 error: e.to_string(),
             }])
@@ -661,6 +666,7 @@ mod tests {
                 "broken",
                 Some(Some(owner)),
                 vec![QuerySource::Unparseable {
+                    org_id: org.to_string(),
                     source: "custom_sql".to_string(),
                     error: "bad".to_string(),
                 }],
@@ -809,6 +815,7 @@ mod tests {
         assert_eq!(
             report_audit_sources("audit_org", &report).await.unwrap(),
             vec![QuerySource::Unparseable {
+                org_id: "audit_org".to_string(),
                 source: "report weekly".to_string(),
                 error: "dashboard audit_no_folder/audit_gone of the report not found".to_string(),
             }]

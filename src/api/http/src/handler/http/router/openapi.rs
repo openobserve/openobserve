@@ -910,6 +910,17 @@ mod tests {
     }
 
     #[test]
+    fn stream_access_audit_is_rate_limited_and_hidden_from_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = spec
+            .pointer("/paths/~1api~1v2~1{org_id}~1background_objects~1stream_access_audit/get")
+            .expect("the stream access audit is documented");
+        assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts");
+        assert_eq!(op["x-o2-ratelimit"]["operation"], "list");
+        assert_eq!(op["x-o2-mcp"]["enabled"], false);
+    }
+
+    #[test]
     fn prompt_paths_are_absent_from_oss_openapi() {
         let api = ApiDoc::openapi();
         let prompt_paths = api
