@@ -713,6 +713,7 @@ async fn collect_keys<E: std::fmt::Display>(
 ) -> Result<Vec<String>> {
     let mut messages = std::pin::pin!(messages);
     let mut keys = Vec::new();
+    let mut complete = false;
     while let Some((subject, pending)) = messages
         .try_next()
         .await
@@ -725,8 +726,15 @@ async fn collect_keys<E: std::fmt::Display>(
             None => log::warn!("[NATS:keys] bucket {bucket}, skipping undecodable key: {key}"),
         }
         if pending == Some(0) {
+            complete = true;
             break;
         }
+    }
+    // the stream only ends on its own when the subscription closes, so the listing is partial
+    if !complete {
+        return Err(Error::Message(format!(
+            "[NATS:keys] bucket {bucket}, stream ended before the last key"
+        )));
     }
     keys.sort();
     keys.dedup();
@@ -1048,6 +1056,12 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.to_string().contains("consumer deleted"), "{err}");
+
+        let messages = futures::stream::iter(vec![Ok::<_, &str>((subject("/nodes/new"), Some(1)))]);
+        let err = collect_keys(messages, "nodes", "$KV.nodes.", "/nodes/")
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("before the last key"), "{err}");
 
         let messages = futures::stream::iter(vec![
             Ok::<_, &str>((subject("/nodes/new"), Some(1))),
