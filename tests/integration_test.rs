@@ -986,7 +986,7 @@ mod tests {
 
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
-                                "password": "Abcd12345",
+                                "password": "Abcd12345!Zyxwv",
                                 "role": "admin"
                             }"#;
         let (status, body) = make_request(
@@ -1007,7 +1007,7 @@ mod tests {
         let auth = setup();
         let body_str = r#"{
                                 "email": "nonadmin@example.com",
-                                "new_password": "12345678",
+                                "new_password": "Newpass12!",
                                 "change_password": true
                             }"#;
         let app = init_test_router();
@@ -1099,7 +1099,7 @@ mod tests {
             // Add the user
             let body_str = r#"{
                 "email": "admin@example.com",
-                "password": "Abcd12345",
+                "password": "Abcd12345!Zyxwv",
                 "role": "admin"
             }"#;
 

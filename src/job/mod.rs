@@ -377,6 +377,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 "Please set root user email-id & password using ZO_ROOT_USER_EMAIL & ZO_ROOT_USER_PASSWORD environment variables. This can also indicate an invalid email ID. Email ID must comply with ([a-z0-9_+]([a-z0-9_+.-]*[a-z0-9_+])?)@([a-z0-9]+([\\-\\.]{{1}}[a-z0-9]+)*\\.[a-z]{{2,6}})"
             );
         }
+        // Deliberately the static rule, not the configured policy: this branch only runs when no
+        // root user exists, so no policy can exist either and the effective one would be the
+        // permissive default. Using it here would weaken the bootstrap credential, not align it.
+        if let Err(msg) =
+            config::utils::password::validate_password_strength(&cfg.auth.root_user_password)
+        {
+            panic!("ZO_ROOT_USER_PASSWORD is too weak: {msg}");
+        }
         let _ = crate::service::organization::check_and_create_org_without_ofga(DEFAULT_ORG).await;
         if let Err(e) = users::create_root_user(
             DEFAULT_ORG,
@@ -429,6 +437,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // watch org users
     tokio::task::spawn(db::user::watch());
+    // Only the policy-tightening sweep publishes to this key, so without the feature the watcher
+    // would hold a coordinator watch open forever for an event that cannot happen.
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(db::user::watch_bulk_refresh());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::organization::watch());
 

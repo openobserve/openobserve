@@ -92,6 +92,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-class="tab_content"
                 />
                 <q-route-tab
+                  v-if="config.isEnterprise == 'true' && isMetaOrg"
+                  data-test="password-policy-tab"
+                  name="password_policy"
+                  :to="{
+                    name: 'passwordPolicy',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  icon="lock"
+                  :label="t('settings.passwordPolicy')"
+                  content-class="tab_content"
+                />
+                <q-route-tab
                   data-test="alert-destinations-tab"
                   name="alert_destinations"
                   :to="{
@@ -325,7 +339,7 @@ export default defineComponent({
         }
 
       }
-      else if (router.currentRoute.value.name === "license") {
+      else if (["license", "passwordPolicy"].includes(router.currentRoute.value.name)) {
         if(!isMetaOrg.value || config.isEnterprise === "false") {
           settingsTab.value = "general";
           router.push({

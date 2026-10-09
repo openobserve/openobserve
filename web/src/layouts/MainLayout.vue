@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Operator-authored announcement bars (enterprise) -->
         <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
+        <PasswordExpiryBanner v-if="config.isEnterprise === 'true'" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
@@ -226,6 +227,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
+import PasswordExpiryBanner from "@/components/common/PasswordExpiryBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 
 let mainLayoutMixin: any = null;
@@ -243,6 +245,7 @@ export default defineComponent({
     Header,
     WebinarBanner,
     AnnouncementBanner,
+    PasswordExpiryBanner,
     "keep-alive": KeepAlive,
     "q-page": QPage,
     "q-page-container": QPageContainer,
