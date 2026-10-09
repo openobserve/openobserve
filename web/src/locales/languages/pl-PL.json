@@ -9082,7 +9082,12 @@
         "fromRegistry": "z rejestru usług",
         "fromSearch": "z danych z ostatnich 24 godzin",
         "apply": "Zastosuj",
-        "loadFailed": "Nie udało się wczytać zasobów"
+        "loadFailed": "Nie udało się wczytać zasobów",
+        "notSeen": "Nie widziano w ostatniej godzinie.",
+        "partial": "Niektóre źródła nie odpowiedziały.",
+        "items": "Elementy",
+        "fromValues": "z alertów, rejestru usług i danych z ostatniej godziny",
+        "noValues": "Nie widziano jeszcze wartości dla tego wymiaru."
       },
       "scheduleForm": {
         "once": "Jednorazowo",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} alert ustala swoją tożsamość w momencie wyzwolenia | {count} alertów ustala swoją tożsamość w momencie wyzwolenia",
         "undecidable": "Nie da się ich rozróżnić po {key}",
         "showAll": "Pokaż pełną listę",
-        "showLess": "Pokaż mniej"
+        "showLess": "Pokaż mniej",
+        "finishCondition": "Dokończ warunek, aby zobaczyć podgląd."
       },
       "muteAllDialog": {
         "title": "Wyciszyć całe moduły?",

@@ -9082,7 +9082,12 @@
         "fromRegistry": "depuis le registre des services",
         "fromSearch": "à partir des données des dernières 24 heures",
         "apply": "Appliquer",
-        "loadFailed": "Impossible de charger les ressources"
+        "loadFailed": "Impossible de charger les ressources",
+        "notSeen": "Non vu au cours de la dernière heure.",
+        "partial": "Certaines sources n'ont pas répondu.",
+        "items": "Éléments",
+        "fromValues": "des alertes, du registre des services et des données de la dernière heure",
+        "noValues": "Aucune valeur vue pour cette dimension pour l'instant."
       },
       "scheduleForm": {
         "once": "Une fois",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} alerte résout son identité au moment du déclenchement | {count} alertes résolvent leur identité au moment du déclenchement",
         "undecidable": "Impossible de les distinguer par {key}",
         "showAll": "Afficher la liste complète",
-        "showLess": "Afficher moins"
+        "showLess": "Afficher moins",
+        "finishCondition": "Terminez la condition pour voir un aperçu."
       },
       "muteAllDialog": {
         "title": "Mettre en sourdine des modules entiers ?",

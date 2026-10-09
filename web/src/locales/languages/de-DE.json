@@ -9082,7 +9082,12 @@
         "fromRegistry": "aus der Dienstregistrierung",
         "fromSearch": "aus den Daten der letzten 24 Stunden",
         "apply": "Übernehmen",
-        "loadFailed": "Die Ressourcen konnten nicht geladen werden"
+        "loadFailed": "Die Ressourcen konnten nicht geladen werden",
+        "notSeen": "In der letzten Stunde nicht gesehen.",
+        "partial": "Einige Quellen haben nicht geantwortet.",
+        "items": "Elemente",
+        "fromValues": "aus Warnmeldungen, der Service-Registry und den Daten der letzten Stunde",
+        "noValues": "Für diese Dimension wurden noch keine Werte gesehen."
       },
       "scheduleForm": {
         "once": "Einmalig",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} Warnmeldung ermittelt ihre Identität zum Auslösezeitpunkt | {count} Warnmeldungen ermitteln ihre Identität zum Auslösezeitpunkt",
         "undecidable": "Kann nicht anhand von {key} unterschieden werden",
         "showAll": "Vollständige Liste anzeigen",
-        "showLess": "Weniger anzeigen"
+        "showLess": "Weniger anzeigen",
+        "finishCondition": "Vervollständigen Sie die Bedingung, um eine Vorschau zu sehen."
       },
       "muteAllDialog": {
         "title": "Ganze Module stummschalten?",

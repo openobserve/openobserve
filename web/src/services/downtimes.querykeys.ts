@@ -22,4 +22,6 @@ export const downtimeKeys = {
   detail: (org: string, id: string) => orgKey(org, "downtimes", "detail", id),
   preview: (org: string, body: unknown) => orgKey(org, "downtimes", "preview", body),
   resources: (org: string, body: unknown) => orgKey(org, "downtimes", "resources", body),
+  values: (org: string, key: string, prefix: string, pairsHash: string, folder?: string) =>
+    orgKey(org, "downtimes", "values", { key, prefix, pairsHash, folder }),
 };

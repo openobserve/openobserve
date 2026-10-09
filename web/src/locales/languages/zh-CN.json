@@ -9082,7 +9082,12 @@
         "fromRegistry": "来自服务注册表",
         "fromSearch": "来自最近 24 小时的数据",
         "apply": "应用",
-        "loadFailed": "无法加载资源"
+        "loadFailed": "无法加载资源",
+        "notSeen": "过去一小时内未出现。",
+        "partial": "部分来源未响应。",
+        "items": "项目",
+        "fromValues": "来自告警、服务注册表和过去一小时的数据",
+        "noValues": "此维度尚未出现任何值。"
       },
       "scheduleForm": {
         "once": "单次",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} 个告警在触发时确定其身份 | {count} 个告警在触发时确定其身份",
         "undecidable": "无法通过 {key} 区分",
         "showAll": "显示完整列表",
-        "showLess": "收起"
+        "showLess": "收起",
+        "finishCondition": "完成条件后即可查看预览。"
       },
       "muteAllDialog": {
         "title": "静默整个模块？",

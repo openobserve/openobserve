@@ -9077,7 +9077,12 @@
         "fromRegistry": "來自服務登錄檔",
         "fromSearch": "來自過去 24 小時的資料",
         "apply": "套用",
-        "loadFailed": "無法載入資源"
+        "loadFailed": "無法載入資源",
+        "notSeen": "過去一小時內未出現。",
+        "partial": "部分來源未回應。",
+        "items": "項目",
+        "fromValues": "來自告警、服務登錄和過去一小時的資料",
+        "noValues": "此維度尚未出現任何值。"
       },
       "scheduleForm": {
         "once": "單次",
@@ -9108,7 +9113,8 @@
         "fireTime": "{count} 個警示在觸發時才確定其身分 | {count} 個警示在觸發時才確定其身分",
         "undecidable": "無法依 {key} 區分",
         "showAll": "顯示完整清單",
-        "showLess": "顯示較少"
+        "showLess": "顯示較少",
+        "finishCondition": "完成條件後即可查看預覽。"
       },
       "muteAllDialog": {
         "title": "要將整個模組靜音嗎？",

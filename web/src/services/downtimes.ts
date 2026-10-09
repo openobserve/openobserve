@@ -173,6 +173,28 @@ export interface ResourcesResponse {
   source: "registry" | "search" | string;
 }
 
+export interface ValuesRequest {
+  /** A semantic group id. */
+  key: string;
+  /** Case-insensitive prefix; empty lists the top values. */
+  prefix: string;
+  condition?: DimensionCondition | null;
+}
+
+export interface ValueSuggestion {
+  value: string;
+  source: "inventory" | "registry" | "search";
+  /** Alerts, anomaly detections and SLOs whose identity carries this value. */
+  items: number;
+  last_seen?: number;
+}
+
+export interface ValuesResponse {
+  values: ValueSuggestion[];
+  /** A source timed out; the list is what answered in time. */
+  partial: boolean;
+}
+
 export interface ActiveDowntime {
   id: string;
   name: string;
@@ -228,6 +250,8 @@ const downtimes = {
     http().post<PreviewResponse>(`${base(org)}/preview`, body, inFolder(folder)),
   resources: (org: string, body: ResourcesRequest, folder?: string) =>
     http().post<ResourcesResponse>(`${base(org)}/resources`, body, inFolder(folder)),
+  values: (org: string, body: ValuesRequest, folder?: string) =>
+    http().post<ValuesResponse>(`${base(org)}/values`, body, inFolder(folder)),
 };
 
 export default downtimes;

@@ -9082,7 +9082,12 @@
         "fromRegistry": "do registro de serviços",
         "fromSearch": "das últimas 24 horas de dados",
         "apply": "Aplicar",
-        "loadFailed": "Não foi possível carregar os recursos"
+        "loadFailed": "Não foi possível carregar os recursos",
+        "notSeen": "Não visto na última hora.",
+        "partial": "Algumas fontes não responderam.",
+        "items": "Itens",
+        "fromValues": "de alertas, do registo de serviços e dos dados da última hora",
+        "noValues": "Ainda não foram vistos valores para esta dimensão."
       },
       "scheduleForm": {
         "once": "Uma vez",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} alerta resolve sua identidade no momento do disparo | {count} alertas resolvem sua identidade no momento do disparo",
         "undecidable": "Não é possível diferenciá-los por {key}",
         "showAll": "Mostrar a lista completa",
-        "showLess": "Mostrar menos"
+        "showLess": "Mostrar menos",
+        "finishCondition": "Conclua a condição para ver uma pré-visualização."
       },
       "muteAllDialog": {
         "title": "Silenciar módulos inteiros?",

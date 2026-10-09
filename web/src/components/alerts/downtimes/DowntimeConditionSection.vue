@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, watch } from "vue";
+import { computed, inject, provide, ref, watch } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
@@ -107,6 +107,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import DowntimeResourcePicker from "./DowntimeResourcePicker.vue";
+import { CONDITION_VALUE_SUGGEST_KEY } from "@/components/alerts/conditionOperators";
+import { useDowntimeValueSuggest } from "@/composables/downtimes/useDowntimeValueSuggest";
 
 const props = withDefaults(
   defineProps<{
@@ -129,6 +131,14 @@ const errors = form.useStore(
 );
 const conditionError = computed(() =>
   errors.value.length ? raw(String(firstFieldError(errors.value as never[]))) : null,
+);
+
+provide(
+  CONDITION_VALUE_SUGGEST_KEY,
+  useDowntimeValueSuggest(
+    orgId,
+    computed(() => downtimeFolder.value || undefined),
+  ),
 );
 
 const semanticGroups = useQuery(() =>

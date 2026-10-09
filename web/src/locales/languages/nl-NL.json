@@ -9082,7 +9082,12 @@
         "fromRegistry": "uit het serviceregister",
         "fromSearch": "uit de gegevens van de laatste 24 uur",
         "apply": "Toepassen",
-        "loadFailed": "Kon de resources niet laden"
+        "loadFailed": "Kon de resources niet laden",
+        "notSeen": "Niet gezien in het afgelopen uur.",
+        "partial": "Sommige bronnen gaven geen antwoord.",
+        "items": "Items",
+        "fromValues": "uit waarschuwingen, het serviceregister en de gegevens van het afgelopen uur",
+        "noValues": "Nog geen waarden gezien voor deze dimensie."
       },
       "scheduleForm": {
         "once": "Eenmalig",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} alarm bepaalt zijn identiteit op het moment van afgaan | {count} alarmen bepalen hun identiteit op het moment van afgaan",
         "undecidable": "Niet te onderscheiden op basis van {key}",
         "showAll": "Toon de volledige lijst",
-        "showLess": "Toon minder"
+        "showLess": "Toon minder",
+        "finishCondition": "Maak de voorwaarde af om een voorbeeld te zien."
       },
       "muteAllDialog": {
         "title": "Hele modules dempen?",

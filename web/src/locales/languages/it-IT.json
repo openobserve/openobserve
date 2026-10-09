@@ -9082,7 +9082,12 @@
         "fromRegistry": "dal registro dei servizi",
         "fromSearch": "dalle ultime 24 ore di dati",
         "apply": "Applica",
-        "loadFailed": "Impossibile caricare le risorse"
+        "loadFailed": "Impossibile caricare le risorse",
+        "notSeen": "Non visto nell'ultima ora.",
+        "partial": "Alcune fonti non hanno risposto.",
+        "items": "Elementi",
+        "fromValues": "dagli avvisi, dal registro dei servizi e dai dati dell'ultima ora",
+        "noValues": "Nessun valore ancora visto per questa dimensione."
       },
       "scheduleForm": {
         "once": "Una volta",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} avviso determina la propria identità al momento dell'attivazione | {count} avvisi determinano la propria identità al momento dell'attivazione",
         "undecidable": "Non è possibile distinguerli tramite {key}",
         "showAll": "Mostra l'elenco completo",
-        "showLess": "Mostra meno"
+        "showLess": "Mostra meno",
+        "finishCondition": "Completa la condizione per vedere un'anteprima."
       },
       "muteAllDialog": {
         "title": "Silenziare interi moduli?",

@@ -251,6 +251,37 @@ pub struct ResourcesResponse {
     pub source: String,
 }
 
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+pub struct ValuesRequest {
+    /// A semantic group id, as `refine_by` in `ResourcesRequest`.
+    pub key: String,
+    /// Case-insensitive prefix; empty lists the top values.
+    #[serde(default)]
+    pub prefix: String,
+    /// The condition typed so far; only its And-spine pairs narrow the sources.
+    #[serde(default)]
+    pub condition: Option<DimensionCondition>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ValueSuggestion {
+    pub value: String,
+    /// `inventory`, `registry` or `search`.
+    pub source: String,
+    /// Alerts, anomaly detections and SLOs whose identity carries this value.
+    pub items: usize,
+    /// Newest sighting in microseconds, when a source knows one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_seen: Option<i64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ValuesResponse {
+    pub values: Vec<ValueSuggestion>,
+    /// True when a source timed out; the list is what answered in time.
+    pub partial: bool,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SloCorrectionMode {

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import { keepPreviousData, mutationOptions, queryOptions } from "@tanstack/vue-query";
 import downtimes from "./downtimes";
 import type {
   DowntimeDetail,
@@ -26,6 +26,7 @@ import type {
   PreviewResponse,
   ResourcesRequest,
   ResourcesResponse,
+  ValuesResponse,
 } from "./downtimes";
 import { downtimeKeys } from "./downtimes.querykeys";
 import { alertKeys } from "./alerts.querykeys";
@@ -88,6 +89,56 @@ export const downtimeResourcesQuery = (org: string, body: ResourcesRequest, fold
     queryFn: async (): Promise<ResourcesResponse> =>
       (await downtimes.resources(org, body, folder)).data,
     staleTime: LIVE_STALE_TIME,
+  });
+
+export interface ValuePair {
+  key: string;
+  value: string;
+}
+
+/** Order-free, so the same pairs in another row order hit the same cache entry. */
+export const pairsHash = (pairs: ValuePair[]): string =>
+  JSON.stringify(
+    [...pairs]
+      .map((p) => [p.key, p.value])
+      .sort((a, b) => a[0].localeCompare(b[0]) || a[1].localeCompare(b[1])),
+  );
+
+/** Suggested values of one dimension, narrowed by the `=` pairs typed so far. */
+export const downtimeValuesQuery = (
+  org: string,
+  key: string,
+  prefix: string,
+  pairs: ValuePair[],
+  folder?: string,
+) =>
+  queryOptions({
+    queryKey: downtimeKeys.values(org, key, prefix, pairsHash(pairs), folder),
+    queryFn: async (): Promise<ValuesResponse> =>
+      (
+        await downtimes.values(
+          org,
+          {
+            key,
+            prefix,
+            condition: pairs.length
+              ? {
+                  type: "group",
+                  op: "and",
+                  items: pairs.map((p) => ({
+                    type: "pair",
+                    key: p.key,
+                    operator: "=",
+                    value: p.value,
+                  })),
+                }
+              : null,
+          },
+          folder,
+        )
+      ).data,
+    staleTime: LIVE_STALE_TIME,
+    placeholderData: keepPreviousData,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

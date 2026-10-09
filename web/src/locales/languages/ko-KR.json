@@ -9082,7 +9082,12 @@
         "fromRegistry": "서비스 레지스트리에서",
         "fromSearch": "최근 24시간 데이터에서",
         "apply": "적용",
-        "loadFailed": "리소스를 불러오지 못했습니다"
+        "loadFailed": "리소스를 불러오지 못했습니다",
+        "notSeen": "지난 1시간 동안 확인되지 않았습니다.",
+        "partial": "일부 소스가 응답하지 않았습니다.",
+        "items": "항목",
+        "fromValues": "알림, 서비스 레지스트리 및 지난 1시간 데이터에서",
+        "noValues": "이 차원의 값이 아직 확인되지 않았습니다."
       },
       "scheduleForm": {
         "once": "1회",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count}개 알림이 발생 시점에 ID를 결정합니다 | {count}개 알림이 발생 시점에 ID를 결정합니다",
         "undecidable": "{key}(으)로 구분할 수 없습니다",
         "showAll": "전체 목록 보기",
-        "showLess": "간단히 보기"
+        "showLess": "간단히 보기",
+        "finishCondition": "미리 보기를 보려면 조건을 완성하세요."
       },
       "muteAllDialog": {
         "title": "모듈 전체를 음소거할까요?",

@@ -21,6 +21,7 @@ vi.mock("@/services/downtimes", () => ({
     move: vi.fn(),
     preview: vi.fn(),
     resources: vi.fn(),
+    values: vi.fn(() => Promise.resolve({ data: { values: [], partial: false } })),
   },
 }));
 
@@ -172,6 +173,31 @@ describe("AddDowntime", () => {
     await dialogButton("primary");
     const [, body] = vi.mocked(downtimes.create).mock.calls[0];
     expect(body.folder_id).toBe("payments");
+    wrapper.unmount();
+  });
+
+  it("keeps the last preview and asks to finish the condition while a row is incomplete", async () => {
+    vi.mocked(downtimes.preview).mockResolvedValue({
+      data: {
+        ...EMPTY_PREVIEW,
+        alerts: [{ id: "a1", name: "payments-api-errors" }],
+        alerts_total: 1,
+      },
+    } as any);
+    const { wrapper } = await mountPage();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await flushPromises();
+    expect(wrapper.text()).toContain("payments-api-errors");
+    const calls = vi.mocked(downtimes.preview).mock.calls.length;
+    await wrapper.get('[data-test="downtime-condition-add"]').trigger("click");
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-downtime-preview-incomplete"]').text()).toBe(
+      "Finish the condition to see a preview.",
+    );
+    expect(wrapper.text()).toContain("payments-api-errors");
+    expect(vi.mocked(downtimes.preview).mock.calls.length).toBe(calls);
     wrapper.unmount();
   });
 

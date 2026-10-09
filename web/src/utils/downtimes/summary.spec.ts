@@ -3,7 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { DowntimeRequest } from "@/services/downtimes";
-import { summarySentence } from "./summary";
+import { completePairs, summarySentence } from "./summary";
 
 const flow1: DowntimeRequest = {
   folder_id: "planned-maintenance",
@@ -75,5 +75,24 @@ describe("summarySentence", () => {
     expect(summarySentence(request, gt, undefined, "en-US")).toMatch(
       /no alert or check is muted\. SLOs count the window as good time\.$/,
     );
+  });
+  it("leaves a row still being typed out of the sentence", () => {
+    const request: DowntimeRequest = {
+      ...flow1,
+      condition: {
+        type: "group",
+        op: "and",
+        items: [
+          { type: "pair", key: "service", operator: "=", value: "payments" },
+          { type: "pair", key: "host", operator: "=", value: "" },
+          { type: "pair", key: "", operator: "=", value: "" },
+        ],
+      },
+      targets: [{ module: "alerts", folders: { kind: "all" } }],
+    };
+    expect(summarySentence(request, gt, undefined, "en-US")).toContain(
+      "alerts with service=payments stop notifying.",
+    );
+    expect(completePairs({ type: "pair", key: "host", operator: "=", value: "" })).toBeNull();
   });
 });

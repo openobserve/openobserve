@@ -16,6 +16,7 @@
 import type { I18nKey, I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 import type {
+  DimensionCondition,
   DowntimeRequest,
   DowntimeSchedule,
   DowntimeTarget,
@@ -103,6 +104,18 @@ const sloClause = (
     : t("alerts.downtimes.sentence.sloExcluded", { slos });
 };
 
+/** A row still being typed says nothing yet, so it is left out of the sentence. */
+export function completePairs(
+  condition: DimensionCondition | undefined | null,
+): DimensionCondition | null {
+  if (!condition) return null;
+  if (condition.type === "pair") return condition.key && condition.value ? condition : null;
+  const items = condition.items
+    .map(completePairs)
+    .filter((c): c is DimensionCondition => c !== null);
+  return items.length ? { ...condition, items } : null;
+}
+
 /** The Summary pane's plain sentence, in the style of AlertSummary. */
 export function summarySentence(
   request: Pick<DowntimeRequest, "condition" | "targets" | "schedule">,
@@ -110,7 +123,7 @@ export function summarySentence(
   folderName?: FolderNameFn,
   locale?: string,
 ): I18nText {
-  const conditionText = conditionSummary(request.condition, t);
+  const conditionText = conditionSummary(completePairs(request.condition), t);
   const who = sortedTargets(request.targets)
     .filter((tg) => tg.module !== "slos")
     .map((tg) => targetPhrase(tg, conditionText, t, folderName));

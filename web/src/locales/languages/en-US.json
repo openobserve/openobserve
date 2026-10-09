@@ -9082,7 +9082,12 @@
         "fromRegistry": "from the service registry",
         "fromSearch": "from the last 24 hours of data",
         "apply": "Apply",
-        "loadFailed": "Could not load the resources"
+        "loadFailed": "Could not load the resources",
+        "notSeen": "Not seen in the last hour.",
+        "partial": "Some sources did not answer.",
+        "items": "Items",
+        "fromValues": "from alerts, the service registry and the last hour of data",
+        "noValues": "No values seen for this dimension yet."
       },
       "scheduleForm": {
         "once": "Once",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} alert resolves its identity at fire time | {count} alerts resolve their identity at fire time",
         "undecidable": "Cannot be told apart by {key}",
         "showAll": "Show the full list",
-        "showLess": "Show less"
+        "showLess": "Show less",
+        "finishCondition": "Finish the condition to see a preview."
       },
       "muteAllDialog": {
         "title": "Mute whole modules?",

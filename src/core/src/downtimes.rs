@@ -20,6 +20,7 @@ pub mod inventory;
 pub mod listing;
 pub mod matching;
 pub mod resources;
+pub mod values;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -34,7 +35,7 @@ use config::{
             DowntimeRequest, DowntimeSchedule, DowntimeStatus, DowntimeWindow,
             ExtendDowntimeRequest, ExtendDowntimeResponse, MoveDowntimesRequest, PreviewMatch,
             PreviewRequest, PreviewResponse, Repeat, ResourcesRequest, ResourcesResponse,
-            TargetModule,
+            TargetModule, ValuesRequest, ValuesResponse,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
@@ -360,6 +361,15 @@ pub async fn resources(
 ) -> Result<ResourcesResponse, DowntimeError> {
     ensure_enabled()?;
     resources::resources(org, user_id, req).await
+}
+
+pub async fn values(
+    org: &str,
+    user_id: &str,
+    req: &ValuesRequest,
+) -> Result<ValuesResponse, DowntimeError> {
+    ensure_enabled()?;
+    values::values(org, user_id, req).await
 }
 
 /// Counts of what a downtime covers today, cached for a minute per row version.

@@ -9082,7 +9082,12 @@
         "fromRegistry": "hizmet kayıt defterinden",
         "fromSearch": "son 24 saatlik veriden",
         "apply": "Uygula",
-        "loadFailed": "Kaynaklar yüklenemedi"
+        "loadFailed": "Kaynaklar yüklenemedi",
+        "notSeen": "Son bir saatte görülmedi.",
+        "partial": "Bazı kaynaklar yanıt vermedi.",
+        "items": "Öğeler",
+        "fromValues": "uyarılardan, hizmet kayıt defterinden ve son bir saatin verilerinden",
+        "noValues": "Bu boyut için henüz değer görülmedi."
       },
       "scheduleForm": {
         "once": "Bir kez",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} uyarı kimliğini tetiklenme anında belirler | {count} uyarı kimliğini tetiklenme anında belirler",
         "undecidable": "{key} ile ayırt edilemiyor",
         "showAll": "Tam listeyi göster",
-        "showLess": "Daha az göster"
+        "showLess": "Daha az göster",
+        "finishCondition": "Önizlemeyi görmek için koşulu tamamlayın."
       },
       "muteAllDialog": {
         "title": "Tüm modüller sessize alınsın mı?",

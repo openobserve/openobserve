@@ -9082,7 +9082,12 @@
         "fromRegistry": "サービスレジストリから",
         "fromSearch": "直近 24 時間のデータから",
         "apply": "適用",
-        "loadFailed": "リソースを読み込めませんでした"
+        "loadFailed": "リソースを読み込めませんでした",
+        "notSeen": "過去 1 時間に確認されていません。",
+        "partial": "一部のソースが応答しませんでした。",
+        "items": "項目",
+        "fromValues": "アラート、サービスレジストリ、過去 1 時間のデータから",
+        "noValues": "このディメンションの値はまだ確認されていません。"
       },
       "scheduleForm": {
         "once": "1 回",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} 件のアラートは発火時に識別子が確定します | {count} 件のアラートは発火時に識別子が確定します",
         "undecidable": "{key} では区別できません",
         "showAll": "全リストを表示",
-        "showLess": "表示を減らす"
+        "showLess": "表示を減らす",
+        "finishCondition": "プレビューを表示するには条件を完成させてください。"
       },
       "muteAllDialog": {
         "title": "モジュール全体をミュートしますか？",

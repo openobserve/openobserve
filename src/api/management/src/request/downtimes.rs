@@ -23,7 +23,8 @@ use axum::{
 use config::meta::downtimes::{
     CreateDowntimeResponse, Downtime, DowntimeDetail, DowntimeRequest, ExtendDowntimeRequest,
     ExtendDowntimeResponse, ListDowntimesQuery, ListDowntimesResponse, MoveDowntimesRequest,
-    PreviewRequest, PreviewResponse, ResourcesRequest, ResourcesResponse,
+    PreviewRequest, PreviewResponse, ResourcesRequest, ResourcesResponse, ValuesRequest,
+    ValuesResponse,
 };
 use openobserve_api_common::extractors::Headers;
 use serde::Deserialize;
@@ -184,6 +185,40 @@ pub async fn downtime_resources(
     #[cfg(feature = "enterprise")]
     {
         respond(openobserve_core::downtimes::resources(&org_id, &user_email.user_id, &req).await)
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, user_email, req);
+        not_supported()
+    }
+}
+
+/// DowntimeValues
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/downtimes/values",
+    context_path = "/api",
+    tag = "Downtimes",
+    operation_id = "DowntimeValues",
+    summary = "Suggested values of a dimension",
+    description = "Values of one dimension for the condition value box and the resource picker, from the alerts, anomaly detections and SLOs, the service registry and, for a non-priority dimension, a one-hour search. `partial` is true when the search did not answer within 2 s.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = ValuesRequest, description = "The dimension, the typed prefix and the condition so far", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = ValuesResponse),
+        (status = 400, description = "Invalid request", content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden or not enabled", content_type = "application/json", body = ()),
+    ),
+)]
+pub async fn downtime_values(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<ValuesRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        respond(openobserve_core::downtimes::values(&org_id, &user_email.user_id, &req).await)
     }
     #[cfg(not(feature = "enterprise"))]
     {

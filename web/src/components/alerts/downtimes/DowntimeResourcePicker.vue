@@ -21,12 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("alerts.downtimes.resources.refineBy") }}
       </span>
       <OSelect
-        v-model="refineBy"
+        :model-value="refineBy"
         class="w-44"
         size="sm"
         :options="dimensionOptions"
-        :searchable="false"
+        searchable
         data-test="downtime-resource-picker-dimension"
+        @update:model-value="pickDimension"
       />
       <OButton
         variant="outline"
@@ -51,13 +52,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="downtime-resource-picker-too-many"
     />
 
+    <p
+      v-else-if="canLoad && !response && suggestionsSettled && rows.length === 0"
+      class="text-text-secondary text-xs"
+      data-test="downtime-resource-picker-empty"
+    >
+      {{ t("alerts.downtimes.resources.noValues") }}
+    </p>
+
     <div
-      v-else-if="response"
+      v-else-if="canLoad && rows.length > 0"
       class="border-border-default rounded-surface flex flex-col overflow-hidden border"
     >
       <OTable
         v-model:selected-ids="selected"
-        :data="response.values"
+        :data="rows"
         :columns="columns"
         row-key="value"
         selection="multiple"
@@ -68,12 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="downtime-resource-picker-table"
       >
         <template #cell-last_seen="{ row }">
-          <OTimeCell :value="row.last_seen" unit="us" />
+          <OTimeCell v-if="row.last_seen" :value="row.last_seen" unit="us" />
         </template>
         <template #cell-streams="{ row }">
           <div class="flex flex-wrap gap-1">
             <OTag
-              v-for="stream in row.streams"
+              v-for="stream in row.streams ?? []"
               :key="stream"
               type="exampleChip"
               value="dim"
@@ -84,19 +93,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTable>
       <div class="border-border-default flex items-center justify-between gap-2 border-t px-3 py-2">
         <span class="text-text-secondary text-xs" data-test="downtime-resource-picker-footer">
-          {{
-            t("alerts.downtimes.resources.footer", {
-              selected: selected.length,
-              total: response.total,
-              source:
-                response.source === "registry"
-                  ? t("alerts.downtimes.resources.fromRegistry")
-                  : t("alerts.downtimes.resources.fromSearch"),
-            })
-          }}
+          {{ footer }}
         </span>
         <div class="flex gap-2">
           <OButton
+            v-if="response"
             variant="outline"
             size="sm-action"
             data-test="downtime-resource-picker-cancel"
@@ -125,9 +126,9 @@ import { useQuery } from "@tanstack/vue-query";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { queryClient } from "@/composables/query/queryClient";
-import { identityConfigQuery } from "@/services/service_streams.queries";
-import { downtimeResourcesQuery } from "@/services/downtimes.queries";
-import type { DimensionCondition, ResourcesResponse, ResourceValue } from "@/services/downtimes";
+import { dimensionAnalyticsQuery, semanticGroupsQuery } from "@/services/service_streams.queries";
+import { downtimeResourcesQuery, downtimeValuesQuery } from "@/services/downtimes.queries";
+import type { DimensionCondition, ResourcesResponse } from "@/services/downtimes";
 import { andEqPairs } from "@/utils/downtimes/conditionBridge";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -140,7 +141,15 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
 const MAX_VALUES = 500;
-const FALLBACK_DIMENSIONS = ["host", "pod", "instance", "k8s-node-name"];
+const DEFAULT_DIMENSION = "host";
+
+/** One pickable value: a suggestion carries `items`, a loaded resource carries `streams`. */
+interface PickerRow {
+  value: string;
+  items?: number;
+  last_seen?: number;
+  streams?: string[];
+}
 
 const props = defineProps<{
   condition: DimensionCondition | null;
@@ -156,36 +165,112 @@ const { t } = useI18nTyped();
 const { toast } = useToast();
 const orgId = useOrgId();
 
-const identityConfig = useQuery(() =>
-  Object.assign(identityConfigQuery(orgId.value), { enabled: !!orgId.value }),
+const semanticGroups = useQuery(() =>
+  Object.assign(semanticGroupsQuery(orgId.value), { enabled: !!orgId.value }),
 );
-
-const dimensions = computed(() => {
-  const fromSets = (identityConfig.data.value?.sets ?? []).flatMap((s) => s.distinguish_by);
-  return [...new Set(fromSets.length ? fromSets : FALLBACK_DIMENSIONS)];
-});
 
 const dimensionOptions = computed<SelectOption[]>(() =>
-  dimensions.value.map((d) => ({ label: raw(d), value: d })),
+  (semanticGroups.data.value ?? []).map((g) => ({ label: raw(g.display || g.id), value: g.id })),
 );
 
+const hasHost = computed(() => dimensionOptions.value.some((o) => o.value === DEFAULT_DIMENSION));
+
+// The registry's ranking is only needed when the org has no `host` group.
+const analytics = useQuery(() =>
+  Object.assign(dimensionAnalyticsQuery(orgId.value), {
+    enabled: !!orgId.value && !!semanticGroups.data.value && !hasHost.value,
+  }),
+);
+
+const defaultDimension = computed(() => {
+  const known = new Set(dimensionOptions.value.map((o) => String(o.value)));
+  if (known.has(DEFAULT_DIMENSION)) return DEFAULT_DIMENSION;
+  const priority = analytics.data.value?.recommended_priority_dimensions ?? [];
+  return priority.find((d) => known.has(d)) ?? String(dimensionOptions.value[0]?.value ?? "");
+});
+
 const refineBy = ref<string>("");
+const userPicked = ref(false);
 watch(
-  dimensions,
-  (list) => {
-    if (!list.includes(refineBy.value)) refineBy.value = list[0] ?? "";
+  defaultDimension,
+  (next) => {
+    if (!userPicked.value) refineBy.value = next;
   },
   { immediate: true },
 );
 
-const canLoad = computed(() => !!refineBy.value && andEqPairs(props.condition).length > 0);
+const pickDimension = (value: unknown) => {
+  userPicked.value = true;
+  refineBy.value = String(value ?? "");
+  close();
+};
+
+const pairs = computed(() => andEqPairs(props.condition).filter((p) => p.value !== ""));
+const canLoad = computed(() => !!refineBy.value && pairs.value.length > 0);
+
+const suggestions = useQuery(() =>
+  Object.assign(
+    downtimeValuesQuery(
+      orgId.value,
+      refineBy.value,
+      "",
+      pairs.value.filter((p) => p.key !== refineBy.value),
+      props.folder,
+    ),
+    { enabled: !!orgId.value && canLoad.value },
+  ),
+);
+const suggestionsSettled = computed(
+  () => suggestions.isSuccess.value && !suggestions.isFetching.value,
+);
+// Kept-previous rows belong to the last dimension or condition, so they are never pickable.
+const suggestionRows = computed(() =>
+  suggestions.isPlaceholderData.value ? [] : (suggestions.data.value?.values ?? []),
+);
 
 const loading = ref(false);
 const response = ref<ResourcesResponse | null>(null);
 const selected = ref<string[]>([]);
 
-const columns = computed<OTableColumnDef<ResourceValue>[]>(() => [
+const rows = computed<PickerRow[]>(() => response.value?.values ?? suggestionRows.value);
+
+// A selection names values of one dimension under one condition; a new context drops it.
+watch(
+  () => JSON.stringify([refineBy.value, pairs.value]),
+  () => close(),
+);
+
+const footer = computed(() => {
+  if (response.value) {
+    return t("alerts.downtimes.resources.footer", {
+      selected: selected.value.length,
+      total: response.value.total,
+      source:
+        response.value.source === "registry"
+          ? t("alerts.downtimes.resources.fromRegistry")
+          : t("alerts.downtimes.resources.fromSearch"),
+    });
+  }
+  const footerText = t("alerts.downtimes.resources.footer", {
+    selected: selected.value.length,
+    total: rows.value.length,
+    source: t("alerts.downtimes.resources.fromValues"),
+  });
+  return suggestions.data.value?.partial
+    ? raw(`${footerText} ${t("alerts.downtimes.resources.partial")}`)
+    : footerText;
+});
+
+const columns = computed<OTableColumnDef<PickerRow>[]>(() => [
   { id: "value", accessorKey: "value", header: raw(refineBy.value), size: 160 },
+  response.value
+    ? { id: "streams", header: t("alerts.downtimes.resources.streams"), cell: " ", size: 240 }
+    : {
+        id: "items",
+        accessorKey: "items",
+        header: t("alerts.downtimes.resources.items"),
+        size: 80,
+      },
   {
     id: "last_seen",
     accessorKey: "last_seen",
@@ -193,7 +278,6 @@ const columns = computed<OTableColumnDef<ResourceValue>[]>(() => [
     cell: " ",
     size: 130,
   },
-  { id: "streams", header: t("alerts.downtimes.resources.streams"), cell: " ", size: 240 },
 ]);
 
 const load = async () => {

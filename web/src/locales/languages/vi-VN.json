@@ -9082,7 +9082,12 @@
         "fromRegistry": "từ sổ đăng ký dịch vụ",
         "fromSearch": "từ dữ liệu 24 giờ qua",
         "apply": "Áp dụng",
-        "loadFailed": "Không thể tải tài nguyên"
+        "loadFailed": "Không thể tải tài nguyên",
+        "notSeen": "Không thấy trong một giờ qua.",
+        "partial": "Một số nguồn không phản hồi.",
+        "items": "Mục",
+        "fromValues": "từ cảnh báo, sổ đăng ký dịch vụ và dữ liệu của một giờ qua",
+        "noValues": "Chưa thấy giá trị nào cho chiều này."
       },
       "scheduleForm": {
         "once": "Một lần",
@@ -9113,7 +9118,8 @@
         "fireTime": "{count} cảnh báo xác định danh tính tại thời điểm kích hoạt | {count} cảnh báo xác định danh tính tại thời điểm kích hoạt",
         "undecidable": "Không thể phân biệt bằng {key}",
         "showAll": "Hiển thị danh sách đầy đủ",
-        "showLess": "Thu gọn"
+        "showLess": "Thu gọn",
+        "finishCondition": "Hoàn tất điều kiện để xem bản xem trước."
       },
       "muteAllDialog": {
         "title": "Tắt thông báo cho toàn bộ mô-đun?",

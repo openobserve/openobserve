@@ -261,6 +261,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-sm font-medium">{{ t("alerts.downtimes.preview.title") }}</span>
             </div>
             <div class="min-h-0 flex-1 overflow-auto">
+              <p
+                v-if="conditionIncomplete"
+                class="text-text-secondary px-3 pt-2 text-xs"
+                data-test="add-downtime-preview-incomplete"
+              >
+                {{ t("alerts.downtimes.preview.finishCondition") }}
+              </p>
               <DowntimePreviewPane
                 :modules="values.modules"
                 :preview="previewQuery.data.value ?? null"
@@ -674,11 +681,16 @@ const onSaveClick = (event: MouseEvent) => {
 const previewBody = ref<PreviewRequest | null>(null);
 let previewTimer: ReturnType<typeof setTimeout> | undefined;
 
+// A half-typed row keeps the last preview instead of blanking it.
+const conditionIncomplete = computed(() => {
+  const condition = buildCondition(values.value);
+  return !!condition && conditionError(condition) !== null;
+});
+
 const previewInput = computed((): PreviewRequest | null => {
   const targets = buildTargets(values.value);
   if (targets.length === 0) return null;
   const condition = buildCondition(values.value);
-  if (condition && conditionError(condition)) return null;
   return condition ? { condition, targets } : { targets };
 });
 
@@ -686,6 +698,7 @@ watch(
   () => JSON.stringify(previewInput.value),
   () => {
     clearTimeout(previewTimer);
+    if (conditionIncomplete.value) return;
     previewTimer = setTimeout(() => {
       previewBody.value = previewInput.value;
     }, PREVIEW_DEBOUNCE_MS);
