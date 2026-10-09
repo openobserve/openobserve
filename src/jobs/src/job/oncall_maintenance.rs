@@ -271,6 +271,8 @@ async fn warn_about(
             channel: config::meta::oncall::Channel::Email,
             // A warning that a page would not arrive is not a page, so there is nothing to ack.
             ack_url: None,
+            phone: None,
+            voice_ack_url: None,
         };
         if let Err(e) = notify::EmailNotifier.send(&addressed, &rendered).await {
             log::warn!("[ONCALL_COVERAGE] could not warn {recipient} about {org_id}: {e}");

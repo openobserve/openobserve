@@ -96,6 +96,7 @@ export default defineComponent({
       domainManagement: "domain_management",
       passwordPolicy: "password_policy",
       pipelineDestinations: "pipeline_destinations",
+      telephonySettings: "telephony",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
       modelPricingEditor: "model_pricing",
@@ -264,6 +265,17 @@ export default defineComponent({
           to: { name: "pipelineDestinations", query: { org_identifier: org } },
           visible: isEnt,
           dataTest: "pipeline-destinations-tab",
+          group: "Destinations",
+        },
+        {
+          key: "telephony",
+          label: t("telephony.title"),
+          description: t("telephony.subtitle"),
+          icon: "call",
+          to: { name: "telephonySettings", query: { org_identifier: org } },
+          // The route guard's rule: only an explicit `oncall_enabled: false` closes it.
+          visible: isEnt && z.oncall_enabled !== false,
+          dataTest: "telephony-settings-tab",
           group: "Destinations",
         },
         {

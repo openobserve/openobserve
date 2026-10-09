@@ -17,12 +17,13 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallPolicyEditor from "@/components/oncall/OnCallPolicyEditor.vue";
+import { resetOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { __resetOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
-import type { OnCallPolicy } from "@/ts/interfaces/oncall";
+import type { Contact, OnCallPolicy } from "@/ts/interfaces/oncall";
 
 vi.mock("@/services/oncall", () => ({
   default: {
@@ -32,9 +33,13 @@ vi.mock("@/services/oncall", () => ({
     getRoutingConfig: vi.fn(),
     getTeamChannel: vi.fn(),
     setTeamChannel: vi.fn(),
+    getContact: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_destination", () => ({ default: { list: vi.fn() } }));
+
+const push = vi.fn();
+vi.mock("vue-router", () => ({ useRouter: () => ({ push }) }));
 
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
@@ -59,8 +64,8 @@ const stubs = {
   },
   OCheckbox: {
     name: "OCheckbox",
-    props: ["modelValue", "label"],
-    template: `<label><input type="checkbox" :checked="modelValue" />{{ label }}</label>`,
+    props: ["modelValue", "label", "disabled"],
+    template: `<label><input type="checkbox" :checked="modelValue" :disabled="disabled" />{{ label }}</label>`,
   },
   /// Delivery and AI triage are tabs now. These stubs render every tab's
   /// label and every panel's body regardless of which is "active" — that
@@ -95,6 +100,15 @@ const policy: OnCallPolicy = {
   ],
 };
 
+function contact(provider: boolean): Contact {
+  return {
+    unverified: [],
+    phone_is_pageable: false,
+    phone_provider_available: provider,
+    press4_available: false,
+  };
+}
+
 function render() {
   return mount(OnCallPolicyEditor, {
     props: { teamId: "team_1", policy, open: true, rotations: ROTATIONS },
@@ -113,16 +127,117 @@ describe("OnCallPolicyEditor", () => {
     // The catch-all is cached module-wide so one screen reads it once;
     // without this it survives into the next test.
     __resetOnCallRoutingConfig();
+    resetOnCallPermissions();
     vi.clearAllMocks();
     service.setPolicy.mockResolvedValue({ data: {} } as any);
+    service.getContact.mockResolvedValue({ data: contact(true) } as any);
   });
 
-  it("offers the deliverable channels", async () => {
+  it("offers the deliverable channels in the order Email, SMS, Voice call, Chat / webhook", async () => {
     const wrapper = render();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="oncall-policy-channel-1-email"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-policy-channel-1-webhook"]').exists()).toBe(true);
+    const ticks = wrapper
+      .findAll('[data-test^="oncall-policy-channel-1-"]')
+      .map((el) => [el.attributes("data-test"), el.text()]);
+    expect(ticks).toEqual([
+      ["oncall-policy-channel-1-email", "Email"],
+      ["oncall-policy-channel-1-sms", "SMS"],
+      ["oncall-policy-channel-1-voice", "Voice call"],
+      ["oncall-policy-channel-1-webhook", "Chat / webhook"],
+    ]);
+    expect(wrapper.find('[data-test="oncall-policy-channels-hint"]').text()).toBe(
+      "Everyone paged at P1 gets the same set. Texts and calls go to people with a verified phone.",
+    );
+  });
+
+  /// U4, D13: said as soon as the tick changes; Save still goes to the server.
+  describe("SMS and Voice without Email", () => {
+    const tick = async (wrapper: ReturnType<typeof render>, channel: string, on: boolean) => {
+      wrapper
+        .findComponent(`[data-test="oncall-policy-channel-1-${channel}"]`)
+        .vm.$emit("update:modelValue", on);
+      await flushPromises();
+    };
+    const error = (wrapper: ReturnType<typeof render>) =>
+      wrapper.find('[data-test="oncall-policy-phone-without-email"]');
+
+    it("says Email is needed the moment Email is unticked under SMS", async () => {
+      const wrapper = render();
+      await flushPromises();
+      await tick(wrapper, "sms", true);
+      expect(error(wrapper).exists()).toBe(false);
+
+      await tick(wrapper, "email", false);
+      expect(error(wrapper).text()).toBe(
+        "Texts and calls need Email too: people without a phone would get nothing.",
+      );
+
+      await wrapper.find('[data-test="oncall-policy-save"]').trigger("click");
+      await flushPromises();
+      expect(service.setPolicy).toHaveBeenCalled();
+    });
+
+    it("stays quiet on a priority with no steps, which the server accepts", async () => {
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: { teamId: "team_1", policy, open: true, priority: 4 },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+      wrapper
+        .findComponent('[data-test="oncall-policy-channel-4-sms"]')
+        .vm.$emit("update:modelValue", true);
+      await flushPromises();
+
+      expect(error(wrapper).exists()).toBe(false);
+    });
+  });
+
+  /// U4: info, not a block; read from the caller's own contact, never `GET /telephony`.
+  describe("the no-provider note", () => {
+    const note = (wrapper: ReturnType<typeof render>) =>
+      wrapper.find('[data-test="oncall-policy-no-provider"]');
+
+    it("shows with a Telephony link when the org has no phone provider, and keeps the ticks", async () => {
+      service.getContact.mockResolvedValue({ data: contact(false) } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(note(wrapper).text()).toContain(
+        "No phone provider is connected, so SMS and Voice are skipped and these pages go by email.",
+      );
+      expect(
+        wrapper.find('[data-test="oncall-policy-channel-1-sms"] input').attributes("disabled"),
+      ).toBeUndefined();
+
+      await wrapper.find('[data-test="oncall-policy-telephony-link"]').trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        name: "telephonySettings",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    });
+
+    it("stays away when a provider is connected", async () => {
+      const wrapper = render();
+      await flushPromises();
+      expect(note(wrapper).exists()).toBe(false);
+    });
+  });
+
+  /// A10: rendered for everyone; the server's 403 is what closes them.
+  it("latches the ticks and Save disabled after a 403 on save", async () => {
+    service.setPolicy.mockRejectedValue({ response: { status: 403, data: {} } });
+    const wrapper = render();
+    await flushPromises();
+    const sms = () => wrapper.find('[data-test="oncall-policy-channel-1-sms"] input');
+    const save = () => wrapper.find('[data-test="oncall-policy-save"]');
+    expect(sms().attributes("disabled")).toBeUndefined();
+
+    await save().trigger("click");
+    await flushPromises();
+
+    expect(sms().attributes("disabled")).toBeDefined();
+    expect(save().attributes("disabled")).toBeDefined();
   });
 
   it("shows a non-paging priority as paging nobody", async () => {

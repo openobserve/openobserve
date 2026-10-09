@@ -779,6 +779,11 @@ pub fn basic_routes() -> Router {
             "/api/v2/{org_id}/oncall/ack",
             get(oncall::ack_page).post(oncall::acknowledge),
         );
+        // Unauthenticated like the email link: the signed token in the path is the credential.
+        router = router.route(
+            "/api/v2/{org_id}/oncall/ack/voice/{token}",
+            post(oncall::voice_ack),
+        );
     }
 
     // External alert source webhooks — token-authenticated inside the handler itself
@@ -1731,209 +1736,7 @@ pub fn service_routes() -> Router {
 
     #[cfg(feature = "enterprise")]
     if get_o2_config().oncall.enabled {
-        router = router
-            .route(
-                "/{org_id}/oncall/teams",
-                get(oncall::list_teams).post(oncall::create_team),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}",
-                get(oncall::get_team)
-                    .put(oncall::update_team)
-                    .delete(oncall::delete_team),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/members",
-                get(oncall::list_members)
-                    .post(oncall::add_member)
-                    .delete(oncall::remove_member),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/schedule",
-                get(oncall::get_schedule).put(oncall::set_schedule),
-            )
-            .route(
-                "/{org_id}/oncall/schedule-presets",
-                get(oncall::list_schedule_presets),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
-                post(oncall::apply_schedule_preset),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/on-call",
-                get(oncall::who_is_on_call),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/overrides",
-                get(oncall::list_overrides).post(oncall::create_override),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
-                delete(oncall::delete_override),
-            )
-            // Org-scoped, not hung off a team: somebody on two teams is away from both.
-            .route(
-                "/{org_id}/oncall/unavailability",
-                get(oncall::list_unavailability).post(oncall::create_unavailability),
-            )
-            .route(
-                "/{org_id}/oncall/unavailability/{unavailability_id}",
-                delete(oncall::delete_unavailability),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
-                get(oncall::get_resolved_schedule),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/policy",
-                get(oncall::get_policy).put(oncall::set_policy),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/channel",
-                get(oncall::get_team_channel).put(oncall::set_team_channel),
-            )
-            // Derived on every read, never stored: a saved list argues with the config beside it.
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/reachability",
-                get(oncall::get_team_reachability),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/config-risks",
-                get(oncall::list_team_config_risks),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/overview",
-                get(oncall::get_team_overview),
-            )
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/load",
-                get(oncall::get_team_load),
-            )
-            // A dry run: must stay free of side effects, `test-page` is what actually delivers.
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/escalation-preview",
-                get(oncall::get_escalation_preview),
-            )
-            .route("/{org_id}/oncall/responses", get(oncall::list_responses))
-            .route(
-                "/{org_id}/oncall/responses/{response_id}",
-                get(oncall::get_response),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/resolve",
-                post(oncall::resolve_response),
-            )
-            .route(
-                "/{org_id}/oncall/ownership",
-                get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
-            )
-            // A sibling of the list: the counts cost a grouped read the routing path must not pay.
-            .route(
-                "/{org_id}/oncall/ownership/stats",
-                get(oncall::list_ownership_rule_stats),
-            )
-            .route(
-                "/{org_id}/oncall/ownership/{rule_id}",
-                put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/notes",
-                post(oncall::add_note),
-            )
-            .route(
-                "/{org_id}/oncall/incidents/{incident_id}/responses",
-                get(oncall::list_responses_for_incident),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/escalation",
-                get(oncall::get_escalation_progress),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/prior-causes",
-                get(oncall::get_prior_causes),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/report",
-                get(oncall::get_response_report),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/acknowledge",
-                post(oncall::acknowledge_response),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/snooze",
-                post(oncall::snooze_response),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/handoff",
-                post(oncall::handoff_response),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/history",
-                get(oncall::get_response_history),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/deliveries",
-                get(oncall::list_deliveries),
-            )
-            .route(
-                "/{org_id}/oncall/routing/config",
-                get(oncall::get_routing_config).put(oncall::set_routing_config),
-            )
-            .route(
-                "/{org_id}/oncall/routing/preview",
-                post(oncall::preview_routing),
-            )
-            .route(
-                "/{org_id}/oncall/unrouted",
-                get(oncall::list_unrouted_signals),
-            )
-            .route(
-                "/{org_id}/oncall/unrouted/{signal_id}",
-                delete(oncall::dismiss_unrouted_signal),
-            )
-            .route(
-                "/{org_id}/oncall/coverage-gaps",
-                get(oncall::list_coverage_gaps),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/promote",
-                post(oncall::promote_to_incident),
-            )
-            // Storage only: no SMS or voice transport exists, so nothing saved here can page.
-            .route(
-                "/{org_id}/oncall/contacts/{user_email}",
-                get(oncall::get_contact)
-                    .put(oncall::set_contact)
-                    .delete(oncall::delete_contact),
-            )
-            .route(
-                "/{org_id}/oncall/my/deliveries",
-                get(oncall::list_my_deliveries),
-            )
-            .route(
-                "/{org_id}/oncall/my/deliveries/read",
-                post(oncall::mark_deliveries_read),
-            )
-            .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
-            .route(
-                "/{org_id}/oncall/analytics/causes",
-                get(oncall::cause_analytics),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
-                post(oncall::confirm_recovery),
-            )
-            .route(
-                "/{org_id}/oncall/responses/{response_id}/escalate",
-                post(oncall::escalate_response),
-            )
-            // Goes down the real dispatch path but must leave no response record behind.
-            .route(
-                "/{org_id}/oncall/teams/{team_id}/test-page",
-                post(oncall::send_test_page),
-            );
+        router = oncall_routes(router);
     }
 
     #[cfg(feature = "cloud")]
@@ -2087,6 +1890,228 @@ pub fn service_routes() -> Router {
                 response
             }
         }))
+}
+
+/// On-call management routes; the caller mounts them only when on-call is enabled.
+#[cfg(feature = "enterprise")]
+fn oncall_routes(router: Router) -> Router {
+    router
+        .route(
+            "/{org_id}/oncall/teams",
+            get(oncall::list_teams).post(oncall::create_team),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}",
+            get(oncall::get_team)
+                .put(oncall::update_team)
+                .delete(oncall::delete_team),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/members",
+            get(oncall::list_members)
+                .post(oncall::add_member)
+                .delete(oncall::remove_member),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/schedule",
+            get(oncall::get_schedule).put(oncall::set_schedule),
+        )
+        .route(
+            "/{org_id}/oncall/schedule-presets",
+            get(oncall::list_schedule_presets),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
+            post(oncall::apply_schedule_preset),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/on-call",
+            get(oncall::who_is_on_call),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/overrides",
+            get(oncall::list_overrides).post(oncall::create_override),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
+            delete(oncall::delete_override),
+        )
+        // Org-scoped, not hung off a team: somebody on two teams is away from both.
+        .route(
+            "/{org_id}/oncall/unavailability",
+            get(oncall::list_unavailability).post(oncall::create_unavailability),
+        )
+        .route(
+            "/{org_id}/oncall/unavailability/{unavailability_id}",
+            delete(oncall::delete_unavailability),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
+            get(oncall::get_resolved_schedule),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/policy",
+            get(oncall::get_policy).put(oncall::set_policy),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/channel",
+            get(oncall::get_team_channel).put(oncall::set_team_channel),
+        )
+        // Derived on every read, never stored: a saved list argues with the config beside it.
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/reachability",
+            get(oncall::get_team_reachability),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/config-risks",
+            get(oncall::list_team_config_risks),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/overview",
+            get(oncall::get_team_overview),
+        )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/load",
+            get(oncall::get_team_load),
+        )
+        // A dry run: must stay free of side effects, `test-page` is what actually delivers.
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/escalation-preview",
+            get(oncall::get_escalation_preview),
+        )
+        .route("/{org_id}/oncall/responses", get(oncall::list_responses))
+        .route(
+            "/{org_id}/oncall/responses/{response_id}",
+            get(oncall::get_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/resolve",
+            post(oncall::resolve_response),
+        )
+        .route(
+            "/{org_id}/oncall/ownership",
+            get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
+        )
+        // A sibling of the list: the counts cost a grouped read the routing path must not pay.
+        .route(
+            "/{org_id}/oncall/ownership/stats",
+            get(oncall::list_ownership_rule_stats),
+        )
+        .route(
+            "/{org_id}/oncall/ownership/{rule_id}",
+            put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/notes",
+            post(oncall::add_note),
+        )
+        .route(
+            "/{org_id}/oncall/incidents/{incident_id}/responses",
+            get(oncall::list_responses_for_incident),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/escalation",
+            get(oncall::get_escalation_progress),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/prior-causes",
+            get(oncall::get_prior_causes),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/report",
+            get(oncall::get_response_report),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/acknowledge",
+            post(oncall::acknowledge_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/snooze",
+            post(oncall::snooze_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/handoff",
+            post(oncall::handoff_response),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/history",
+            get(oncall::get_response_history),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/deliveries",
+            get(oncall::list_deliveries),
+        )
+        .route(
+            "/{org_id}/oncall/routing/config",
+            get(oncall::get_routing_config).put(oncall::set_routing_config),
+        )
+        .route(
+            "/{org_id}/oncall/routing/preview",
+            post(oncall::preview_routing),
+        )
+        .route(
+            "/{org_id}/oncall/unrouted",
+            get(oncall::list_unrouted_signals),
+        )
+        .route(
+            "/{org_id}/oncall/unrouted/{signal_id}",
+            delete(oncall::dismiss_unrouted_signal),
+        )
+        .route(
+            "/{org_id}/oncall/coverage-gaps",
+            get(oncall::list_coverage_gaps),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/promote",
+            post(oncall::promote_to_incident),
+        )
+        // A saved phone pages only after the code texted to it is confirmed below.
+        .route(
+            "/{org_id}/oncall/contacts/{user_email}",
+            get(oncall::get_contact)
+                .put(oncall::set_contact)
+                .delete(oncall::delete_contact),
+        )
+        .route(
+            "/{org_id}/oncall/contacts/{user_email}/verify",
+            post(oncall::send_contact_code),
+        )
+        .route(
+            "/{org_id}/oncall/contacts/{user_email}/verify/confirm",
+            post(oncall::confirm_contact_code),
+        )
+        .route(
+            "/{org_id}/oncall/my/deliveries",
+            get(oncall::list_my_deliveries),
+        )
+        .route(
+            "/{org_id}/oncall/my/deliveries/read",
+            post(oncall::mark_deliveries_read),
+        )
+        .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
+        .route(
+            "/{org_id}/oncall/analytics/causes",
+            get(oncall::cause_analytics),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
+            post(oncall::confirm_recovery),
+        )
+        .route(
+            "/{org_id}/oncall/responses/{response_id}/escalate",
+            post(oncall::escalate_response),
+        )
+        // Goes down the real dispatch path but must leave no response record behind.
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/test-page",
+            post(oncall::send_test_page),
+        )
+        .route(
+            "/{org_id}/telephony",
+            get(oncall::get_telephony)
+                .put(oncall::put_telephony)
+                .delete(oncall::delete_telephony),
+        )
 }
 
 /// Create other service routes (AWS, GCP, RUM)

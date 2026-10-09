@@ -937,12 +937,16 @@ pub fn update_channels(channels: &[Channel]) -> Vec<Channel> {
         .collect()
 }
 
-/// The channel set a downgraded firing is notified on. No channel this build
-/// can send wakes a sleeping person, so there is nothing quieter to drop to —
-/// and a downgrade may make a page quieter, never make it disappear. Kept as
-/// the seam for when an interrupting channel lands.
+/// The channel set a downgraded firing is notified on: SMS and voice dropped, order kept. [pure]
 pub fn quieter_channels(channels: &[Channel]) -> Vec<Channel> {
-    channels.to_vec()
+    channels
+        .iter()
+        .copied()
+        .filter(|c| match c {
+            Channel::Email | Channel::Webhook => true,
+            Channel::Sms | Channel::Voice => false,
+        })
+        .collect()
 }
 
 /// The line every message on a promoted page carries. Never dropped from the
@@ -1037,7 +1041,7 @@ pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> V
 /// update — which is why the update is ledger-deduped and the edit is not.
 pub fn updates_in_place(channel: Channel) -> bool {
     match channel {
-        Channel::Email | Channel::Webhook => false,
+        Channel::Email | Channel::Webhook | Channel::Sms | Channel::Voice => false,
     }
 }
 
@@ -3213,19 +3217,40 @@ mod tests {
         );
     }
 
-    /// §3's `Downgrade` branch. "Quieter" must never become "silent" — §2.1a's
-    /// asymmetry is that nothing a verdict says may cost somebody a page. No
-    /// channel here wakes a sleeping person, so every set comes back unchanged.
+    /// D12: a verdict follow-up never re-fires SMS or voice.
     #[test]
-    fn test_a_downgrade_never_silences_a_rung() {
-        for set in [
-            vec![Channel::Email],
-            vec![Channel::Webhook],
-            vec![Channel::Email, Channel::Webhook],
+    fn test_a_verdict_update_never_rides_sms_or_voice() {
+        assert_eq!(
+            update_channels(&[
+                Channel::Email,
+                Channel::Sms,
+                Channel::Voice,
+                Channel::Webhook
+            ]),
+            vec![Channel::Email]
+        );
+    }
+
+    /// D11: a downgraded page drops the channels that wake a person and keeps the rest in order.
+    #[test]
+    fn test_a_downgrade_drops_only_the_waking_channels() {
+        for (input, expected) in [
+            (vec![Channel::Email], vec![Channel::Email]),
+            (vec![Channel::Sms], vec![]),
+            (vec![Channel::Voice], vec![]),
+            (vec![Channel::Webhook], vec![Channel::Webhook]),
+            (
+                vec![
+                    Channel::Webhook,
+                    Channel::Sms,
+                    Channel::Email,
+                    Channel::Voice,
+                ],
+                vec![Channel::Webhook, Channel::Email],
+            ),
         ] {
-            assert_eq!(quieter_channels(&set), set);
+            assert_eq!(quieter_channels(&input), expected, "{input:?}");
         }
-        assert!(quieter_channels(&[]).is_empty(), "nothing in, nothing out");
     }
 
     /// §5.3: the promotion reason is never dropped from the template. It is the
@@ -3348,7 +3373,12 @@ mod tests {
     /// follow-up update, not the edit, is what has to be deduped.
     #[test]
     fn test_no_channel_this_build_sends_can_revise_what_it_already_sent() {
-        for c in [Channel::Email, Channel::Webhook] {
+        for c in [
+            Channel::Email,
+            Channel::Webhook,
+            Channel::Sms,
+            Channel::Voice,
+        ] {
             assert!(
                 !updates_in_place(c),
                 "{c} cannot take a finding back once it has gone"

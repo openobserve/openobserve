@@ -220,6 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="xs"
         class="ms-auto"
         :loading="sending"
+        :disabled="!canConfigure"
         data-test="oncall-simulator-send-test"
         @click="emit('send-test', { team_id: preview.team_id, priority })"
       >
@@ -287,6 +288,8 @@ const props = withDefaults(
     /** Hosted inside a surface that already frames and names it — a drawer, a
      *  dialog — so it drops its own card and title. */
     embedded?: boolean;
+    /** False once a configuration write was refused for this org (A10). */
+    canConfigure?: boolean;
   }>(),
   {
     preview: null,
@@ -297,6 +300,7 @@ const props = withDefaults(
     loading: false,
     sending: false,
     embedded: false,
+    canConfigure: true,
   },
 );
 

@@ -43,6 +43,8 @@ pub enum Channel {
     Email,
     /// An existing alert Destination — Slack, Teams, or any HTTP endpoint.
     Webhook,
+    Sms,
+    Voice,
 }
 
 impl Channel {
@@ -50,6 +52,8 @@ impl Channel {
     pub fn to_i32(&self) -> i32 {
         match self {
             Self::Email => 1,
+            Self::Sms => 3,
+            Self::Voice => 4,
             Self::Webhook => 7,
         }
     }
@@ -57,6 +61,8 @@ impl Channel {
     pub fn from_i32(v: i32) -> Option<Self> {
         match v {
             1 => Some(Self::Email),
+            3 => Some(Self::Sms),
+            4 => Some(Self::Voice),
             7 => Some(Self::Webhook),
             _ => None,
         }
@@ -65,85 +71,74 @@ impl Channel {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Email => "email",
+            Self::Sms => "sms",
+            Self::Voice => "voice",
             Self::Webhook => "webhook",
         }
     }
 
     /// Every channel a page can reach a person on.
     pub fn deliverable() -> Vec<Self> {
-        vec![Self::Email, Self::Webhook]
+        vec![Self::Email, Self::Sms, Self::Voice, Self::Webhook]
     }
 }
 
-/// 03 §6's fallback chain, in the order it is evaluated.
-///
-/// The chain stops at the first success, so the order decides which channel is
-/// tried first. When a provider lands, its channel goes in at the position its
-/// urgency earns.
-pub const FALLBACK_ORDER: [Channel; 2] = [Channel::Email, Channel::Webhook];
+/// The order a plan lists channels in; it orders and de-duplicates, and decides nothing else.
+pub const CHANNEL_ORDER: [Channel; 4] = [
+    Channel::Email,
+    Channel::Sms,
+    Channel::Voice,
+    Channel::Webhook,
+];
 
-/// The channels one responder is tried on, in order, for a rung.
-///
-/// §6: "on a single-node deployment with just SMTP configured, the chain
-/// collapses to email and everything still works" — the baseline, not a
-/// degenerate case.
-pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
-    FALLBACK_ORDER
-        .into_iter()
-        .filter(|c| channels.contains(c))
-        .collect()
-}
-
-/// Whether a channel talks to a room rather than to a person (G8).
-///
-/// The fallback chain answers "have we reached this human yet", and stopping at
-/// the first success is right for that. It is the wrong question for a chat
-/// room: a team ticking email and chat means "wake the on-call, and put it in
-/// the channel", but the chain read that as "post only if the email bounced".
-///
-/// So the two kinds are separated by what they address, not by how loud they
-/// are. A webhook resolves to a destination the whole team watches; email
-/// resolves to one person's inbox.
+/// Whether a channel talks to a room the whole team watches rather than to one person (G8).
 pub fn is_broadcast(channel: Channel) -> bool {
     match channel {
         Channel::Webhook => true,
-        Channel::Email => false,
+        Channel::Email | Channel::Sms | Channel::Voice => false,
     }
 }
 
-/// How one rung's channel set splits into "try until somebody answers" and
-/// "always post".
+/// One rung's channels, split into those sent to each person and those posted once per rung.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChannelPlan {
-    /// Tried per recipient, in [`FALLBACK_ORDER`], stopping at the first
-    /// success — the chain built deliberately for reaching a person.
-    pub chain: Vec<Channel>,
-    /// Sent once per rung, whatever the chain did.
-    ///
-    /// Per rung and not per recipient: a rung fanning out to six people used to
-    /// post six identical messages into one room.
+    /// Sent to every recipient, each channel independently of the others.
+    pub personal: Vec<Channel>,
+    /// Posted once per rung, not once per recipient.
     pub broadcast: Vec<Channel>,
 }
 
 impl ChannelPlan {
     /// Whether this rung can reach anybody at all.
     pub fn is_empty(&self) -> bool {
-        self.chain.is_empty() && self.broadcast.is_empty()
+        self.personal.is_empty() && self.broadcast.is_empty()
     }
 }
 
-/// Split a rung's channels into the person-reaching chain and the broadcasts.
+/// Splits a rung's channels into personal and broadcast, each in [`CHANNEL_ORDER`]. [pure]
 pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
+    let (broadcast, personal) = CHANNEL_ORDER
+        .into_iter()
+        .filter(|c| channels.contains(c))
+        .partition(|c| is_broadcast(*c));
     ChannelPlan {
-        chain: fallback_chain(channels)
-            .into_iter()
-            .filter(|c| !is_broadcast(*c))
-            .collect(),
-        broadcast: FALLBACK_ORDER
-            .into_iter()
-            .filter(|c| is_broadcast(*c) && channels.contains(c))
-            .collect(),
+        personal,
+        broadcast,
     }
+}
+
+/// One person's channels: Email always, Sms and Voice only with a pageable phone and an account.
+/// [pure]
+pub fn personal_channels(channels: &[Channel], pageable: bool, account: bool) -> Vec<Channel> {
+    channels
+        .iter()
+        .copied()
+        .filter(|c| match c {
+            Channel::Email => true,
+            Channel::Sms | Channel::Voice => pageable && account,
+            Channel::Webhook => false,
+        })
+        .collect()
 }
 
 // ── Where a team's channel lives (Change 1) ──────────────────────────────────
@@ -238,9 +233,11 @@ pub fn impacted_ladder(steps: &[LadderStep]) -> Vec<LadderStep> {
 
 // ── Retries and the circuit breaker (03 §9) ──────────────────────────────────
 
-/// Attempts one channel gets before the chain moves on. §9's "max 3 attempts
-/// per channel, then move down the fallback chain".
+/// Attempts one (person, channel) send gets before it counts as failed (§9).
 pub const MAX_SEND_ATTEMPTS: u32 = 3;
+
+/// The time limit on one (person, channel) send, retries included (§10).
+pub const SEND_LIMIT_MICROS: i64 = 15 * 1_000_000;
 
 /// How long to wait before trying the same channel again, or `None` when the
 /// channel is spent. §9's 1 s → 2 s → 4 s. Pure and in microseconds so the
@@ -275,6 +272,8 @@ pub struct ChannelBreaker {
     attempts: Vec<(i64, bool)>,
     /// When it tripped, if it is open.
     opened_at: Option<i64>,
+    /// When the half-open probe was admitted; a slot this old is dead and free again.
+    probe_at: Option<i64>,
 }
 
 impl ChannelBreaker {
@@ -282,22 +281,27 @@ impl ChannelBreaker {
         Self::default()
     }
 
-    /// Whether a send may be attempted now. An open breaker admits exactly one
-    /// probe once the cool-down has passed — half-open — because the
-    /// alternative is a channel that never recovers until the process restarts.
-    pub fn allows(&self, now: i64) -> bool {
-        match self.opened_at {
-            None => true,
-            Some(at) => now - at >= BREAKER_OPEN_MICROS,
+    /// Whether this send may go; past the cool-down only the first caller probes. [no-fail]
+    pub fn admit(&mut self, now: i64) -> Admission {
+        let Some(at) = self.opened_at else {
+            return Admission::Send;
+        };
+        let live_probe = self.probe_at.is_some_and(|p| now - p < BREAKER_OPEN_MICROS);
+        if live_probe || now - at < BREAKER_OPEN_MICROS {
+            return Admission::Refuse;
         }
+        self.probe_at = Some(now);
+        Admission::Probe
     }
 
-    pub fn is_open(&self, now: i64) -> bool {
-        !self.allows(now)
+    /// Hands back an admitted probe slot whose send says nothing about the channel. [no-fail]
+    pub fn release(&mut self) {
+        self.probe_at = None;
     }
 
     /// Folds one attempt's outcome in.
     pub fn record(&mut self, now: i64, delivered: bool) {
+        self.probe_at = None;
         // A success ends the story: the channel works, so open state and past failures are moot.
         if delivered {
             self.attempts.clear();
@@ -318,6 +322,17 @@ impl ChannelBreaker {
             self.opened_at = Some(now);
         }
     }
+}
+
+/// What [`ChannelBreaker::admit`] lets a send do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Admission {
+    /// The breaker is closed.
+    Send,
+    /// The half-open probe; only this send may call [`ChannelBreaker::release`].
+    Probe,
+    /// The breaker is open, or another send holds a live probe slot.
+    Refuse,
 }
 
 /// One rung: when it fires, and everyone it pages.
@@ -386,6 +401,8 @@ pub enum PolicyError {
     DuplicatePriority(AlertPriority),
     /// A priority that pages has to page somewhere.
     NoChannels(AlertPriority),
+    /// D13: a paging priority with Sms or Voice must also page by Email.
+    PersonalWithoutEmail(AlertPriority),
 }
 
 /// What the engine should do right now.
@@ -432,9 +449,7 @@ impl EscalationPolicy {
     /// P4 and P5 page nobody: they are recorded and shown, and the agent still
     /// investigates them.
     ///
-    /// Every paging priority defaults to Email. When SMS and voice land, THIS
-    /// is the function that changes — the defaults must never promise a channel
-    /// that does not send.
+    /// P1 and P2 default to Email, SMS and voice, P3 to Email; stored policies keep their channels.
     pub fn default_for_team(
         id: impl Into<String>,
         org_id: impl Into<String>,
@@ -476,7 +491,7 @@ impl EscalationPolicy {
                         LadderStep::new(5 * m, deeper()),
                         LadderStep::new(15 * m, deeper()),
                     ],
-                    channels: vec![Channel::Email],
+                    channels: vec![Channel::Email, Channel::Sms, Channel::Voice],
                 },
                 PriorityRung {
                     priority: P2,
@@ -489,7 +504,7 @@ impl EscalationPolicy {
                     .into_iter()
                     .flatten()
                     .collect(),
-                    channels: vec![Channel::Email],
+                    channels: vec![Channel::Email, Channel::Sms, Channel::Voice],
                 },
                 PriorityRung {
                     priority: P3,
@@ -597,6 +612,13 @@ impl EscalationPolicy {
             }
             if !rung.steps.is_empty() && rung.channels.is_empty() {
                 return Err(PolicyError::NoChannels(rung.priority));
+            }
+            let phone = rung
+                .channels
+                .iter()
+                .any(|c| matches!(c, Channel::Sms | Channel::Voice));
+            if !rung.steps.is_empty() && phone && !rung.channels.contains(&Channel::Email) {
+                return Err(PolicyError::PersonalWithoutEmail(rung.priority));
             }
             let mut seen_delay = std::collections::HashSet::new();
             for step in &rung.steps {
@@ -761,6 +783,12 @@ impl std::fmt::Display for PolicyError {
             Self::NoChannels(p) => {
                 write!(f, "priority `{p}` pages somebody but has no channels")
             }
+            Self::PersonalWithoutEmail(p) => {
+                write!(
+                    f,
+                    "priority `{p}` pages by SMS or voice, so it must also page by email"
+                )
+            }
         }
     }
 }
@@ -789,14 +817,21 @@ mod tests {
 
     #[test]
     fn test_channel_storage_ids_are_pinned() {
-        let all = [(Channel::Email, 1), (Channel::Webhook, 7)];
-        for (c, want) in all {
+        let all = [
+            (Channel::Email, 1, "email"),
+            (Channel::Sms, 3, "sms"),
+            (Channel::Voice, 4, "voice"),
+            (Channel::Webhook, 7, "webhook"),
+        ];
+        for (c, want, name) in all {
             assert_eq!(c.to_i32(), want, "{c} moved");
             assert_eq!(Channel::from_i32(want), Some(c));
+            assert_eq!(c.as_str(), name);
+            assert_eq!(serde_json::to_string(&c).unwrap(), format!("\"{name}\""));
         }
-        assert_eq!(Channel::from_i32(0), None);
-        assert_eq!(Channel::from_i32(8), None);
-        assert_eq!(Channel::Webhook.to_i32(), 7);
+        for unused in [0, 2, 5, 6, 8] {
+            assert_eq!(Channel::from_i32(unused), None, "{unused} is not a channel");
+        }
     }
 
     #[test]
@@ -811,6 +846,40 @@ mod tests {
             AlertPriority::P5,
         ] {
             assert!(p.rung(pr).is_some(), "{pr} has no configuration");
+        }
+    }
+
+    /// D14: new teams are woken by phone at P1 and P2; the whole-team fallback stays Email only.
+    #[test]
+    fn test_default_channels_per_priority() {
+        use Channel::*;
+        let defaults: &[(AlertPriority, &[Channel])] = &[
+            (AlertPriority::P1, &[Email, Sms, Voice]),
+            (AlertPriority::P2, &[Email, Sms, Voice]),
+            (AlertPriority::P3, &[Email]),
+            (AlertPriority::P4, &[]),
+            (AlertPriority::P5, &[]),
+        ];
+        let fallback: &[(AlertPriority, &[Channel])] = &[
+            (AlertPriority::P1, &[Email]),
+            (AlertPriority::P2, &[Email]),
+            (AlertPriority::P3, &[Email]),
+            (AlertPriority::P4, &[]),
+            (AlertPriority::P5, &[]),
+        ];
+        let cases = [
+            ("default_for_team", policy(), defaults),
+            (
+                "whole_team_fallback",
+                EscalationPolicy::whole_team_fallback("pol_1", "default", "team_1"),
+                fallback,
+            ),
+        ];
+        for (name, p, table) in cases {
+            p.validate().unwrap();
+            for (pr, want) in table {
+                assert_eq!(p.rung(*pr).unwrap().channels, *want, "{name} {pr}");
+            }
         }
     }
 
@@ -1223,7 +1292,12 @@ mod tests {
     fn test_every_channel_in_the_vocabulary_can_be_delivered() {
         assert_eq!(
             Channel::deliverable(),
-            vec![Channel::Email, Channel::Webhook]
+            vec![
+                Channel::Email,
+                Channel::Sms,
+                Channel::Voice,
+                Channel::Webhook
+            ]
         );
     }
 
@@ -1246,33 +1320,80 @@ mod tests {
         assert_eq!(back, p);
     }
 
-    // ── The fallback chain (03 §6/§9) ───────────────────────────────────────
+    // ── Personal and broadcast channels (D2, D3, D13) ───────────────────────
 
-    /// §9: the chain is evaluated in order and stops at the first success, so
-    /// the order is the whole decision. Email before webhook, because the person
-    /// is the target and the team channel is the fallback.
+    /// Storage order must not decide the plan's order, and a channel ticked twice is sent once.
     #[test]
-    fn test_the_chain_is_ordered_and_only_holds_channels_that_send() {
+    fn test_the_plan_is_ordered_and_deduplicated() {
+        let plan = channel_plan(&[
+            Channel::Webhook,
+            Channel::Voice,
+            Channel::Email,
+            Channel::Sms,
+            Channel::Email,
+        ]);
         assert_eq!(
-            fallback_chain(&[Channel::Webhook, Channel::Email]),
-            vec![Channel::Email, Channel::Webhook],
-            "the policy's storage order must not decide who is tried first"
+            plan.personal,
+            vec![Channel::Email, Channel::Sms, Channel::Voice]
         );
-        assert!(fallback_chain(&[]).is_empty());
+        assert_eq!(plan.broadcast, vec![Channel::Webhook]);
     }
 
-    /// §6's baseline: "on a single-node deployment with just SMTP configured,
-    /// the chain collapses to email and everything still works".
+    /// §6's baseline: with just SMTP configured, the plan is email and everything still works.
     #[test]
-    fn test_the_chain_collapses_to_email_on_an_smtp_only_deployment() {
-        assert_eq!(fallback_chain(&[Channel::Email]), vec![Channel::Email]);
+    fn test_the_plan_collapses_to_email_on_an_smtp_only_deployment() {
+        let plan = channel_plan(&[Channel::Email]);
+        assert_eq!(plan.personal, vec![Channel::Email]);
+        assert!(plan.broadcast.is_empty());
     }
 
-    /// The order is the whole decision, so it is pinned rather than left to
-    /// whatever order the variants happen to be declared in.
     #[test]
-    fn test_the_published_order_is_the_one_the_design_names() {
-        assert_eq!(FALLBACK_ORDER, [Channel::Email, Channel::Webhook]);
+    fn test_personal_channels_keep_phone_only_when_pageable_and_an_account_resolved() {
+        let all = [
+            Channel::Email,
+            Channel::Sms,
+            Channel::Voice,
+            Channel::Webhook,
+        ];
+        let email = vec![Channel::Email];
+        let phone = vec![Channel::Email, Channel::Sms, Channel::Voice];
+        let cases: &[(&[Channel], bool, bool, Vec<Channel>)] = &[
+            (&all, true, true, phone.clone()),
+            (&all, true, false, email.clone()),
+            (&all, false, true, email.clone()),
+            (&all, false, false, email.clone()),
+            (&[Channel::Voice], true, true, vec![Channel::Voice]),
+            (&[Channel::Voice], false, true, vec![]),
+            (&[Channel::Webhook], true, true, vec![]),
+            (&[], true, true, vec![]),
+        ];
+        for (ticked, pageable, account, want) in cases {
+            assert_eq!(
+                &personal_channels(ticked, *pageable, *account),
+                want,
+                "ticked {ticked:?}, pageable {pageable}, account {account}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_a_paging_priority_with_a_phone_channel_must_also_page_by_email() {
+        let cases: &[(&[Channel], Result<(), PolicyError>)] = &[
+            (
+                &[Channel::Sms, Channel::Voice],
+                Err(PolicyError::PersonalWithoutEmail(AlertPriority::P1)),
+            ),
+            (
+                &[Channel::Voice],
+                Err(PolicyError::PersonalWithoutEmail(AlertPriority::P1)),
+            ),
+            (&[Channel::Email, Channel::Sms], Ok(())),
+        ];
+        for (channels, want) in cases {
+            let mut p = policy();
+            p.rungs[0].channels = channels.to_vec();
+            assert_eq!(&p.validate(), want, "{channels:?}");
+        }
     }
 
     // ── Retries and the breaker (03 §9) ─────────────────────────────────────
@@ -1286,7 +1407,7 @@ mod tests {
         assert_eq!(
             retry_delay_micros(3),
             None,
-            "three attempts, then the chain moves on"
+            "three attempts, then the send has failed"
         );
         assert_eq!(retry_delay_micros(9), None);
         // Nothing has failed yet, so there is nothing to wait for.
@@ -1301,11 +1422,17 @@ mod tests {
         let mut b = ChannelBreaker::new();
         for i in 0..(BREAKER_MIN_ATTEMPTS as i64 - 1) {
             b.record(i, false);
-            assert!(b.allows(i), "opened after {} failures", i + 1);
+            assert_eq!(
+                b.admit(i),
+                Admission::Send,
+                "opened after {} failures",
+                i + 1
+            );
         }
         b.record(BREAKER_MIN_ATTEMPTS as i64, false);
-        assert!(
-            b.is_open(BREAKER_MIN_ATTEMPTS as i64),
+        assert_eq!(
+            b.admit(BREAKER_MIN_ATTEMPTS as i64),
+            Admission::Refuse,
             "a channel failing every attempt has to stop being tried"
         );
     }
@@ -1319,18 +1446,18 @@ mod tests {
             b.record(i, false);
         }
         let opened = BREAKER_MIN_ATTEMPTS as i64 - 1;
-        assert!(!b.allows(opened + BREAKER_OPEN_MICROS - 1));
-        assert!(b.allows(opened + BREAKER_OPEN_MICROS), "half-open probe");
+        assert_eq!(b.admit(opened + BREAKER_OPEN_MICROS - 1), Admission::Refuse);
+        assert_eq!(b.admit(opened + BREAKER_OPEN_MICROS), Admission::Probe);
 
         // The probe fails: another full cool-down, not a probe per rung.
         let probe = opened + BREAKER_OPEN_MICROS;
         b.record(probe, false);
-        assert!(!b.allows(probe + 1));
-        assert!(b.allows(probe + BREAKER_OPEN_MICROS));
+        assert_eq!(b.admit(probe + 1), Admission::Refuse);
+        assert_eq!(b.admit(probe + BREAKER_OPEN_MICROS), Admission::Probe);
 
         // And a success is the end of it.
         b.record(probe + BREAKER_OPEN_MICROS, true);
-        assert!(b.allows(probe + BREAKER_OPEN_MICROS));
+        assert_eq!(b.admit(probe + BREAKER_OPEN_MICROS), Admission::Send);
         assert_eq!(
             b,
             ChannelBreaker::new(),
@@ -1346,11 +1473,93 @@ mod tests {
         for i in 0..10 {
             let at = i * BREAKER_WINDOW_MICROS * 2;
             b.record(at, false);
-            assert!(
-                b.allows(at),
+            assert_eq!(
+                b.admit(at),
+                Admission::Send,
                 "an hourly failure is not a hard-down provider"
             );
         }
+    }
+
+    /// D8: half-open lets one caller probe; `record` ends the probe and a lost one expires.
+    #[test]
+    fn test_admit_lets_one_probe_through_a_half_open_breaker() {
+        let open = |at: i64| {
+            let mut b = ChannelBreaker::new();
+            for i in 0..BREAKER_MIN_ATTEMPTS as i64 {
+                b.record(at + i, false);
+            }
+            b
+        };
+        let opened = BREAKER_MIN_ATTEMPTS as i64 - 1;
+        let half_open = opened + BREAKER_OPEN_MICROS;
+        let probing = || {
+            let mut b = open(0);
+            assert_eq!(b.admit(half_open), Admission::Probe);
+            b
+        };
+        let after = |delivered: bool| {
+            let mut b = probing();
+            b.record(half_open, delivered);
+            b
+        };
+        use Admission::{Probe, Refuse, Send};
+        let cases: [(&str, ChannelBreaker, i64, Admission); 9] = [
+            ("closed", ChannelBreaker::new(), 0, Send),
+            ("open, inside the cool-down", open(0), half_open - 1, Refuse),
+            ("half-open, first caller", open(0), half_open, Probe),
+            ("half-open, second caller", probing(), half_open, Refuse),
+            (
+                "live probe slot",
+                probing(),
+                half_open + BREAKER_OPEN_MICROS - 1,
+                Refuse,
+            ),
+            (
+                "dead probe slot",
+                probing(),
+                half_open + BREAKER_OPEN_MICROS,
+                Probe,
+            ),
+            ("probe succeeded", after(true), half_open + 1, Send),
+            (
+                "probe failed, cool-down again",
+                after(false),
+                half_open + 1,
+                Refuse,
+            ),
+            (
+                "probe failed, next cool-down passed",
+                after(false),
+                half_open + BREAKER_OPEN_MICROS,
+                Probe,
+            ),
+        ];
+        for (name, mut b, now, want) in cases {
+            assert_eq!(b.admit(now), want, "{name}");
+        }
+    }
+
+    /// A probe that records nothing hands its slot back instead of blocking the channel for good.
+    #[test]
+    fn test_release_frees_the_probe_slot_without_closing_the_breaker() {
+        let mut b = ChannelBreaker::new();
+        for i in 0..BREAKER_MIN_ATTEMPTS as i64 {
+            b.record(i, false);
+        }
+        let half_open = BREAKER_MIN_ATTEMPTS as i64 - 1 + BREAKER_OPEN_MICROS;
+        let before = b.clone();
+        assert_eq!(b.admit(half_open), Admission::Probe);
+        b.release();
+        assert_eq!(
+            b, before,
+            "release records no attempt and keeps the breaker open"
+        );
+        assert_eq!(
+            b.admit(half_open),
+            Admission::Probe,
+            "the slot is free again"
+        );
     }
 
     /// The engine's loop with dispatching replaced by a fixed outcome: which
@@ -1531,42 +1740,15 @@ mod tests {
         }
     }
 
-    // ── Broadcast beside the chain (G8) ─────────────────────────────────────
+    // ── Broadcast beside the personal sends (G8) ────────────────────────────
 
-    /// The bug, stated: a team that ticks email **and** chat wants both, and
-    /// the fallback chain gave them chat only when email failed.
+    /// A team that ticks email and chat wants both, not chat only when email failed.
     #[test]
     fn test_chat_fires_alongside_email_rather_than_only_on_its_failure() {
         let plan = channel_plan(&[Channel::Email, Channel::Webhook]);
-        assert_eq!(
-            plan.chain,
-            vec![Channel::Email],
-            "the person is reached once"
-        );
-        assert_eq!(
-            plan.broadcast,
-            vec![Channel::Webhook],
-            "and the room is posted to regardless of what the chain did"
-        );
-        assert!(!plan.is_empty());
-    }
-
-    /// The half that was built deliberately and must not be lost: reaching one
-    /// person is still a chain, in fallback order, stopping at the first
-    /// success.
-    #[test]
-    fn test_a_person_reaching_chain_keeps_its_order_and_its_membership() {
-        let plan = channel_plan(&[Channel::Webhook, Channel::Email]);
-        assert_eq!(
-            plan.chain,
-            vec![Channel::Email],
-            "only the person-reaching channels, in FALLBACK_ORDER"
-        );
-        assert!(
-            plan.chain.iter().all(|c| !is_broadcast(*c)),
-            "a room is not a link in a chain that asks whether a human answered"
-        );
+        assert_eq!(plan.personal, vec![Channel::Email]);
         assert_eq!(plan.broadcast, vec![Channel::Webhook]);
+        assert!(!plan.is_empty());
     }
 
     /// A room is addressed by the rung, a person by their address. Getting this
@@ -1574,7 +1756,9 @@ mod tests {
     #[test]
     fn test_only_the_room_channels_are_broadcasts() {
         assert!(is_broadcast(Channel::Webhook));
-        assert!(!is_broadcast(Channel::Email), "email reaches one person");
+        for personal in [Channel::Email, Channel::Sms, Channel::Voice] {
+            assert!(!is_broadcast(personal), "{personal} reaches one person");
+        }
     }
 
     /// A rung that pages nobody must not look like it had a plan.

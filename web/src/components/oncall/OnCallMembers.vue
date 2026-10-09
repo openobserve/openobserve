@@ -109,6 +109,7 @@
           :email="row.user_email"
           :channels="row.reach?.channels ?? []"
           :would-land="row.reach?.would_a_page_land ?? true"
+          :own="row.user_email.toLowerCase() === selfEmail"
         />
       </template>
 
@@ -541,6 +542,7 @@ interface MemberRow extends OnCallTeamMember {
 
 const STATE_RANK: Record<MemberState, number> = { on_call: 0, next: 1, rostered: 2, idle: 3 };
 
+const selfEmail = computed(() => String(store.state.userInfo?.email ?? "").toLowerCase());
 const holders = computed(() => new Set(props.onCallNow.map((s) => s.user_email.toLowerCase())));
 const nextHolders = computed(
   () =>
