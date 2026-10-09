@@ -315,6 +315,8 @@ import {
   selectInitialWindow,
   snapshotStarts,
   summarizeManifest,
+  splitIntoTracks,
+  pickTrack,
   type ManifestEntry,
   type ManifestSummary,
 } from "@/utils/rum/sessionReplayManifest";
@@ -350,6 +352,7 @@ import {
   errorLogKey,
   eventKey,
   isSessionLive,
+  keepTrackRows,
   mergeManifestTail,
   raiseUpperTs,
   shouldStopLive,
@@ -453,6 +456,8 @@ let cancelled = false;
 let loader: LoaderState = createLoaderState(0);
 let segmentIds: string[] = [];
 let indexById = new Map<string, number>();
+let seenRows: ManifestEntry[] = [];
+let followedView: string | null = null;
 const bodyStore = new Map<string, any>();
 // Segments the player stepped past as skip markers stay gaps in this run even if a retry fetches them later.
 const skipAppended = new Set<number>();
@@ -465,6 +470,7 @@ let watchdog: ReturnType<typeof setInterval> | null = null;
 let upperTs = 0;
 const isLive = ref(false);
 const lateRows = ref(false);
+const otherTabs = ref(false);
 let liveTimer: ReturnType<typeof setTimeout> | null = null;
 let livePolling = false;
 let lastNewIdAtMs = 0;
@@ -549,9 +555,11 @@ const sessionStartMs = computed(
     Number(sessionState.data.selectedSession?.start_time) || Number(manifest.value[0]?.start) || 0,
 );
 
-// Session ms of the first full snapshot; nothing before it can be drawn, so seeks there land on it.
+// Session ms of the played tab's first full snapshot; nothing before it can be drawn, so seeks there land on it.
 const replayStartOffsetMs = computed(() => {
-  const replayStart = Number(sessionState.data.selectedSession?.replay_start);
+  const replayStart =
+    Number(snapshotStarts(manifest.value)[0]) ||
+    Number(sessionState.data.selectedSession?.replay_start);
   return replayStart > 0 ? Math.max(0, replayStart - sessionStartMs.value) : 0;
 });
 
@@ -637,11 +645,11 @@ const playerBindings = computed(() => ({
   retryAttempt: retryAttempt.value,
 }));
 
-// One line over the player: a seek before the loaded window, else a manifest cut short.
 const segmentNotice = computed(() => {
   if (unreachableSeek.value) return t("rum.sessionReplaySeekBehindWindow");
   if (manifestSummary.value?.truncated)
     return t("rum.sessionReplayTruncated", { count: manifestSummary.value.segmentCount });
+  if (otherTabs.value) return t("rum.sessionReplayOtherTabs");
   return "";
 });
 
@@ -1051,6 +1059,9 @@ const resetLoader = () => {
   playerLoadedEndMs.value = null;
   playerTakenCount.value = 0;
   unreachableSeek.value = false;
+  seenRows = [];
+  followedView = null;
+  otherTabs.value = false;
   bumpLoader();
 };
 
@@ -1062,6 +1073,29 @@ const adoptManifest = (rows: ManifestEntry[], complete: boolean) => {
   segmentIds = rows.map(segmentId);
   indexById = new Map(segmentIds.map((id, i) => [id, i]));
   bumpLoader();
+};
+
+// Mobile records one app at a time; a browser session can hold several tabs, and a player run can hold only one.
+const adoptTrack = (rows: ManifestEntry[]): ManifestEntry[] => {
+  if (isMobileReplay.value) return rows;
+  const tracks = splitIntoTracks(rows);
+  // New segments of a live session arrive from the tab still recording, so that tab is the one to watch.
+  const liveTarget = isLive.value ? sessionEndMs.value : null;
+  const track = pickTrack(tracks, eventRelativeMs() > 0 ? initialTarget() : liveTarget);
+  if (!track) return rows;
+  seenRows = rows;
+  followedView = track.views[track.views.length - 1].id;
+  otherTabs.value = tracks.length > 1;
+  return track.rows;
+};
+
+const keepOwnRows = (rows: ManifestEntry[]): ManifestEntry[] => {
+  if (followedView === null) return rows;
+  seenRows = dedupManifest([...seenRows, ...rows]);
+  const kept = keepTrackRows(seenRows, followedView);
+  followedView = kept.current;
+  if (kept.otherTab) otherTabs.value = true;
+  return kept.rows;
 };
 
 // A live poll only appends, so every index the loader and the run already hold stays valid.
@@ -1220,9 +1254,11 @@ const getSessionSegments = async () => {
     );
     if (cancelled) return;
     retryAttempt.value = 0;
-    const rows = trimBeforeReplayStart(
-      dedupManifest(hits as ManifestEntry[]),
-      sessionState.data.selectedSession?.replay_start,
+    const rows = adoptTrack(
+      trimBeforeReplayStart(
+        dedupManifest(hits as ManifestEntry[]),
+        sessionState.data.selectedSession?.replay_start,
+      ),
     );
     adoptManifest(rows, complete);
     if (!rows.length) {
@@ -1386,9 +1422,8 @@ const pollManifest = async () => {
   if (cancelled || !isLive.value) return;
   upperTs = raiseUpperTs(upperTs, hits, timestampField());
   // The open dropped rows before the first full snapshot, so a poll that returns them again must drop them too.
-  const rows = trimBeforeReplayStart(
-    hits as ManifestEntry[],
-    sessionState.data.selectedSession?.replay_start,
+  const rows = keepOwnRows(
+    trimBeforeReplayStart(hits as ManifestEntry[], sessionState.data.selectedSession?.replay_start),
   );
   const { appended, late } = mergeManifestTail(manifest.value, rows, indexById);
   if (late) lateRows.value = true;

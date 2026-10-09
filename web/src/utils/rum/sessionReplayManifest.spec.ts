@@ -16,6 +16,8 @@
 import { describe, it, expect } from "vitest";
 import {
   dedupManifest,
+  pickTrack,
+  splitIntoTracks,
   trimBeforeReplayStart,
   findTargetIndex,
   segmentId,
@@ -31,6 +33,13 @@ const manifest = [
   { start: 4000, end: 4999, has_full_snapshot: true, records_count: 7 },
   { start: 5000, end: 5999, has_full_snapshot: false, records_count: 1 },
 ];
+
+const viewRow = (view_id: string, start: number, end: number, extra: Record<string, any> = {}) => ({
+  start,
+  end,
+  view_id,
+  ...extra,
+});
 
 describe("sessionReplayManifest", () => {
   describe("findTargetIndex", () => {
@@ -155,6 +164,91 @@ describe("sessionReplayManifest", () => {
         { start: 3, end: 4, records_count: 1 },
       ];
       expect(dedupManifest(rows).map((r) => r.start)).toEqual([3, 1]);
+    });
+  });
+
+  describe("splitIntoTracks", () => {
+    // Segment spans of the two-tab recording behind #15171: the tabs alternate every five seconds.
+    const twoTabs = [
+      viewRow("a", 0, 4890, { has_full_snapshot: true }),
+      viewRow("b", 3060, 7560, { has_full_snapshot: true }),
+      viewRow("a", 5590, 10490),
+      viewRow("b", 8460, 12960),
+      viewRow("a", 11200, 16090),
+    ];
+
+    it("puts views that overlap in time on separate tracks, each in manifest order", () => {
+      const tracks = splitIntoTracks(twoTabs);
+      expect(tracks.map((track) => track.views.map((view) => view.id))).toEqual([["a"], ["b"]]);
+      expect(tracks[0].rows.map((row) => row.start)).toEqual([0, 5590, 11200]);
+      expect(tracks[1].rows.map((row) => row.start)).toEqual([3060, 8460]);
+    });
+
+    it("keeps the pages of one tab, one after another, on a single track", () => {
+      const rows = [
+        viewRow("orders", 0, 8400),
+        viewRow("dashboard", 8600, 14000),
+        viewRow("orders-again", 14600, 20200),
+      ];
+      const tracks = splitIntoTracks(rows);
+      expect(tracks).toHaveLength(1);
+      expect(tracks[0].rows).toEqual(rows);
+    });
+
+    it("keeps a view that starts exactly when the previous one ended on the same track", () => {
+      expect(splitIntoTracks([viewRow("a", 0, 1000), viewRow("b", 1000, 2000)])).toHaveLength(1);
+    });
+
+    it("continues the track that ended last when more than one is free", () => {
+      const rows = [viewRow("a", 0, 1000), viewRow("b", 500, 3000), viewRow("c", 4000, 5000)];
+      const tracks = splitIntoTracks(rows);
+      expect(tracks.map((track) => track.views.map((view) => view.id))).toEqual([
+        ["a"],
+        ["b", "c"],
+      ]);
+    });
+
+    it("keeps rows from a schema without view columns on one track, unchanged", () => {
+      const tracks = splitIntoTracks(manifest);
+      expect(tracks).toHaveLength(1);
+      expect(tracks[0].rows).toEqual(manifest);
+    });
+  });
+
+  describe("pickTrack", () => {
+    const tracks = splitIntoTracks([
+      viewRow("a", 0, 4000, { records_count: 3 }),
+      viewRow("b", 2000, 9000, { records_count: 9 }),
+      viewRow("c", 5000, 6000, { records_count: 1 }),
+    ]);
+
+    it("picks the track with the most recorded activity when there is no target", () => {
+      expect(pickTrack(tracks, null)?.views[0].id).toBe("b");
+    });
+
+    it("picks the only track recording at the target", () => {
+      expect(pickTrack(tracks, 1000)?.views[0].id).toBe("a");
+    });
+
+    it("breaks a tie at the target by recorded activity", () => {
+      expect(pickTrack(tracks, 3000)?.views[0].id).toBe("b");
+    });
+
+    it("picks the track recording just before an uncovered target, else the busiest", () => {
+      const apart = splitIntoTracks([
+        viewRow("a", 1000, 2000, { records_count: 9 }),
+        viewRow("b", 1500, 4000, { records_count: 1 }),
+      ]);
+      expect(pickTrack(apart, 5000)?.views[0].id).toBe("b");
+      expect(pickTrack(apart, 500)?.views[0].id).toBe("a");
+    });
+
+    it("passes over a track with no full snapshot to start from", () => {
+      const blind = splitIntoTracks([
+        viewRow("a", 0, 4000, { records_count: 9 }),
+        viewRow("b", 2000, 9000, { records_count: 1, has_full_snapshot: true }),
+      ]);
+      expect(pickTrack(blind, null)?.views[0].id).toBe("b");
     });
   });
 

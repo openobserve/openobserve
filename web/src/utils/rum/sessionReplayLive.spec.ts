@@ -21,6 +21,7 @@ import {
   errorLogKey,
   eventKey,
   isSessionLive,
+  keepTrackRows,
   mergeManifestTail,
   raiseUpperTs,
   shouldStopLive,
@@ -85,6 +86,63 @@ describe("mergeManifestTail", () => {
       appended: [],
       late: false,
     });
+  });
+});
+
+describe("keepTrackRows", () => {
+  const view = (id: string, start: number, extra: Record<string, any> = {}) =>
+    row(start, start + 999, { view_id: id, ...extra });
+  const tabA = [view("a", 0, { has_full_snapshot: true }), view("a", 1000)];
+
+  it("follows the tab onto its next view, from that view's full snapshot", () => {
+    const seen = [...tabA, view("c", 2000, { has_full_snapshot: true }), view("c", 3000)];
+
+    const { rows, current, otherTab } = keepTrackRows(seen, "a");
+
+    expect(rows.map((r) => r.start)).toEqual([0, 1000, 2000, 3000]);
+    expect(current).toBe("c");
+    expect(otherTab).toBe(false);
+  });
+
+  it("waits for a new view's full snapshot before moving to it", () => {
+    const { rows, current } = keepTrackRows([...tabA, view("c", 3000)], "a");
+
+    expect(rows.map((r) => r.start)).toEqual([0, 1000]);
+    expect(current).toBe("a");
+  });
+
+  it("says a tab is left out once a view it moved past records again", () => {
+    const opened = [...tabA, view("b", 2500, { has_full_snapshot: true })];
+    const moved = keepTrackRows(opened, "a");
+
+    const { rows, current, otherTab } = keepTrackRows([...opened, view("a", 4000)], moved.current);
+
+    expect(moved.current).toBe("b");
+    expect(rows.map((r) => r.start)).toEqual([2500]);
+    expect(current).toBe("b");
+    expect(otherTab).toBe(true);
+  });
+
+  it("puts a new view on the tab a reload would, not on the followed one", () => {
+    // "b" overlaps "a", so it is another tab; "c" continues "b", the tab that ended last.
+    const seen = [
+      ...tabA,
+      view("b", 500, { has_full_snapshot: true }),
+      view("b", 1500),
+      view("c", 3000, { has_full_snapshot: true }),
+    ];
+
+    const { rows, current, otherTab } = keepTrackRows(seen, "a");
+
+    expect(rows.map((r) => r.start)).toEqual([0, 1000]);
+    expect(current).toBe("a");
+    expect(otherTab).toBe(true);
+  });
+
+  it("keeps every row of a schema without view columns", () => {
+    const plain = [row(0, 999, { has_full_snapshot: true }), row(1000), row(2000)];
+
+    expect(keepTrackRows(plain, "").rows.map((r) => r.start)).toEqual([0, 1000, 2000]);
   });
 });
 

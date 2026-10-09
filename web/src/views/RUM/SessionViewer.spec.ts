@@ -1103,6 +1103,67 @@ describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
     wrapper.unmount();
   });
 
+  describe("a session recorded in more than one browser tab", () => {
+    const otherTabsNotice =
+      "This session was recorded in more than one browser tab. Showing one of them.";
+    // Tabs "a" and "b" alternate segments, so their views overlap; "a" records more.
+    const tabRows = manyRows(4).map((row, i) => ({
+      ...row,
+      has_full_snapshot: i < 2,
+      records_count: i % 2 ? 1 : 4,
+      view_id: i % 2 ? "b" : "a",
+      index_in_view: Math.floor(i / 2),
+    }));
+
+    beforeEach(() => {
+      replaySchema.fields = { ...replaySchema.fields, view_id: true, index_in_view: true };
+    });
+
+    it("loads and feeds one tab only, and says the other is left out", async () => {
+      resetStreaming(rowsResponder(tabRows));
+      const wrapper = await mountLoaded();
+      const vm = wrapper.vm as any;
+
+      expect(vm.manifest.map((row: any) => row.view_id)).toEqual(["a", "a"]);
+      expect(vm.segments.map((segment: any) => segment.records[0].timestamp)).toEqual([
+        S,
+        S + 2000,
+      ]);
+      expect(vm.segmentNotice).toBe(otherTabsNotice);
+      wrapper.unmount();
+    });
+
+    it("opens the tab that was recording at a deep link's moment", async () => {
+      resetStreaming(rowsResponder(tabRows));
+      const wrapper = await mountLoaded({ event_time: String(S + 3500) });
+
+      expect((wrapper.vm as any).manifest.map((row: any) => row.view_id)).toEqual(["b", "b"]);
+      wrapper.unmount();
+    });
+
+    it("lands a seek before the played tab's first snapshot on it, without the reopen notice", async () => {
+      resetStreaming(rowsResponder(tabRows));
+      const wrapper = await mountLoaded({ event_time: String(S + 3500) });
+      const vm = wrapper.vm as any;
+
+      vm.requestSeek(500);
+
+      expect(vm.pendingSeekMs).toBe(1000);
+      expect(vm.segmentNotice).toBe(otherTabsNotice);
+      wrapper.unmount();
+    });
+
+    it("plays a single-tab session as before, with no notice", async () => {
+      resetStreaming(rowsResponder(tabRows.filter((row) => row.view_id === "a")));
+      const wrapper = await mountLoaded();
+      const vm = wrapper.vm as any;
+
+      expect(vm.manifest).toHaveLength(2);
+      expect(vm.segmentNotice).toBe("");
+      wrapper.unmount();
+    });
+  });
+
   // The bodies query now also selects records_count, the key column the loader matches on.
   it("fetches only the window from the anchor snapshot through the target", async () => {
     const wrapper = await mountLoaded();
@@ -2290,6 +2351,58 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     expect(vm.lateRows).toBe(false);
     expect(lateNotice(wrapper).exists()).toBe(false);
     wrapper.unmount();
+  });
+
+  describe("more than one browser tab", () => {
+    const viewRows = (view_id: string) =>
+      [0, 1, 2].map((i) => liveRow(i, { view_id, index_in_view: i }));
+
+    beforeEach(() => {
+      replaySchema.fields = { ...replaySchema.fields, view_id: true, index_in_view: true };
+    });
+
+    it("never appends or fetches a row of another tab, and says the tab is left out", async () => {
+      server.rows = viewRows("a");
+      const wrapper = await mountLive();
+      const vm = wrapper.vm as any;
+      const bodiesBefore = bodySqls().length;
+
+      server.rows.push(
+        liveRow(3, { start: L + 2500, view_id: "b", index_in_view: 0, has_full_snapshot: true }),
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(vm.manifest).toHaveLength(3);
+      expect(bodySqls()).toHaveLength(bodiesBefore);
+      expect(vm.segments).toHaveLength(3);
+      expect(vm.segmentNotice).toContain("more than one browser tab");
+      wrapper.unmount();
+    });
+
+    it("follows the tab onto its next page once the current one has ended", async () => {
+      server.rows = viewRows("a");
+      const wrapper = await mountLive();
+      const vm = wrapper.vm as any;
+
+      server.rows.push(liveRow(4, { view_id: "c", index_in_view: 0, has_full_snapshot: true }));
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(vm.manifest).toHaveLength(4);
+      expect(vm.segments).toHaveLength(4);
+      expect(vm.segmentNotice).toBe("");
+      wrapper.unmount();
+    });
+
+    it("follows the tab still recording, not a busier one that has finished", async () => {
+      server.rows = [
+        ...viewRows("a"),
+        liveRow(1, { end: L + 6000, view_id: "b", index_in_view: 0, has_full_snapshot: true }),
+      ];
+      const wrapper = await mountLive();
+
+      expect((wrapper.vm as any).manifest.map((row: any) => row.view_id)).toEqual(["b"]);
+      wrapper.unmount();
+    });
   });
 
   it("does nothing for a known row a poll returns again", async () => {

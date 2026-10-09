@@ -35,16 +35,33 @@ export interface ManifestSummary {
   truncated: boolean;
 }
 
+export interface ReplayView {
+  id: string;
+  start: number;
+  end: number;
+}
+
+/** Views that never overlap in time, so one player run can hold them all. */
+export interface ReplayTrack {
+  views: ReplayView[];
+  rows: ManifestEntry[];
+}
+
 // has_full_snapshot arrives as a boolean from the schema but as a string from older ingest paths.
 export function hasFullSnapshot(entry: ManifestEntry): boolean {
   return entry.has_full_snapshot === true || entry.has_full_snapshot === "true";
+}
+
+/** The view a row belongs to; rows from a schema without the view columns all share one. */
+export function viewKey(entry: ManifestEntry): string {
+  return entry.view_id ?? "";
 }
 
 /** Identity of one stored segment; rows from a schema without the view columns fall back to span and record count. */
 export function segmentId(entry: ManifestEntry): string {
   const base = `${entry.start}|${entry.end}|${Number(entry.records_count) || 0}`;
   if (entry.view_id === undefined) return base;
-  return `${entry.view_id ?? ""}|${Number(entry.index_in_view) || 0}|${base}`;
+  return `${viewKey(entry)}|${Number(entry.index_in_view) || 0}|${base}`;
 }
 
 // A retried upload or a tie at a page edge returns the same segment twice, and decoding it twice corrupts the converter.
@@ -68,8 +85,8 @@ export function compareManifestOrder(a: ManifestEntry, b: ManifestEntry): number
   if (byEnd) return byEnd;
   const byIndex = (Number(a.index_in_view) || 0) - (Number(b.index_in_view) || 0);
   if (byIndex) return byIndex;
-  const viewA = a.view_id ?? "";
-  const viewB = b.view_id ?? "";
+  const viewA = viewKey(a);
+  const viewB = viewKey(b);
   return viewA < viewB ? -1 : viewA > viewB ? 1 : 0;
 }
 
@@ -81,6 +98,40 @@ export function trimBeforeReplayStart(
   const floor = Number(replayStart);
   if (!(floor > 0)) return rows;
   return rows.filter((row) => Number(row.start) >= floor);
+}
+
+// Each browser tab numbers its nodes from 0, so views that overlap in time can never share one player run.
+export function splitIntoTracks(rows: ManifestEntry[]): ReplayTrack[] {
+  const tracks: ReplayTrack[] = [];
+  for (const { rows: viewRows, ...view } of groupByView(rows)) {
+    // Of the tracks already free, the one that ended last is the likeliest to be the same tab.
+    let free: ReplayTrack | undefined;
+    for (const track of tracks) {
+      const end = track.views[track.views.length - 1].end;
+      if (end <= view.start && (!free || end > free.views[free.views.length - 1].end)) {
+        free = track;
+      }
+    }
+    if (free) {
+      free.views.push(view);
+      free.rows.push(...viewRows);
+    } else {
+      tracks.push({ views: [view], rows: [...viewRows] });
+    }
+  }
+  return tracks;
+}
+
+// With no tab id to go on, the tab recording at the target, else the one recording just before it, is the likeliest to hold it.
+export function pickTrack(tracks: ReplayTrack[], target: number | null): ReplayTrack | undefined {
+  // A track with no full snapshot cannot start playing, so it is picked only when no track has one.
+  const playable = tracks.filter((track) => track.rows.some(hasFullSnapshot));
+  const pool = playable.length ? playable : tracks;
+  if (target === null) return busiest(pool);
+  const covering = pool.filter((track) =>
+    track.views.some((view) => view.start <= target && target <= view.end),
+  );
+  return busiest(covering) ?? endedLastBefore(pool, target) ?? busiest(pool);
 }
 
 /** Index of the segment holding `target`, or the last one starting at or before it. */
@@ -131,4 +182,47 @@ export function summarizeManifest(manifest: ManifestEntry[], complete: boolean):
     recordCount: manifest.reduce((total, entry) => total + (Number(entry.records_count) || 0), 0),
     truncated: !complete,
   };
+}
+
+function groupByView(rows: ManifestEntry[]): (ReplayView & { rows: ManifestEntry[] })[] {
+  const views = new Map<string, ReplayView & { rows: ManifestEntry[] }>();
+  for (const row of rows) {
+    const id = viewKey(row);
+    const view = views.get(id);
+    if (!view) {
+      views.set(id, { id, start: Number(row.start), end: Number(row.end), rows: [row] });
+      continue;
+    }
+    view.start = Math.min(view.start, Number(row.start));
+    view.end = Math.max(view.end, Number(row.end));
+    view.rows.push(row);
+  }
+  return [...views.values()].sort((a, b) => a.start - b.start || (a.id < b.id ? -1 : 1));
+}
+
+function busiest(tracks: ReplayTrack[]): ReplayTrack | undefined {
+  let best: ReplayTrack | undefined;
+  let bestRecords = -1;
+  for (const track of tracks) {
+    const records = summarizeManifest(track.rows, true).recordCount;
+    if (records > bestRecords) {
+      best = track;
+      bestRecords = records;
+    }
+  }
+  return best;
+}
+
+function endedLastBefore(tracks: ReplayTrack[], target: number): ReplayTrack | undefined {
+  let best: ReplayTrack | undefined;
+  let bestEnd = -Infinity;
+  for (const track of tracks) {
+    for (const view of track.views) {
+      if (view.end < target && view.end > bestEnd) {
+        best = track;
+        bestEnd = view.end;
+      }
+    }
+  }
+  return best;
 }
