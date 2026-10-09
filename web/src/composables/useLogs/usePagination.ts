@@ -457,7 +457,7 @@ export const usePagination = () => {
     updateFieldValues();
 
     //extract fields from query response
-    await extractFields();
+    await extractFields({ silent: true });
 
     //update grid columns
     updateGridColumns();

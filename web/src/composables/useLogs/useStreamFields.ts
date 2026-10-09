@@ -133,11 +133,63 @@ export const useStreamFields = () => {
     }
   };
 
-  const extractFields = async () => {
+  // Keys that can appear on a hit but never represent a real field, so a new
+  // one of these must never be mistaken for a newly-introduced query column.
+  const DYNAMIC_FIELD_SCAN_EXCLUDED_KEYS = new Set([
+    "_o2_id",
+    "_original",
+    "_all_values",
+    "_stream_name",
+  ]);
+
+  // Mirrors the "new field from hits" detection extractFields() itself does
+  // below, but cheaply and up front, so a silent call can bail before paying
+  // for the full rebuild when nothing the sidebar doesn't already know about
+  // showed up in this batch.
+  const hitsIntroduceNewField = (hits: any[], knownFields: any[]): boolean => {
+    if (!hits?.length) return false;
+    const knownFieldNames = new Set(knownFields.map((f: any) => f.name));
+    for (const hit of hits) {
+      for (const key of Object.keys(hit)) {
+        if (DYNAMIC_FIELD_SCAN_EXCLUDED_KEYS.has(key)) continue;
+        if (!knownFieldNames.has(key)) return true;
+      }
+    }
+    return false;
+  };
+
+  const extractFields = async (options: { silent?: boolean } = {}) => {
+    const { silent = false } = options;
+
+    // Silent calls come from live query-response handling (once per partition/
+    // page/WS chunk), not a user action like switching streams or toggling a
+    // setting. Most chunks of the same query repeat the same fields, so skip
+    // the full rebuild — and the loading flicker it would cause — unless this
+    // batch actually introduces a field the sidebar doesn't already show
+    // (e.g. one added by a VRL function or a query-introduced column).
+    if (silent && searchObj.data.stream.selectedStreamFields?.length) {
+      const singleStreamNoUDS =
+        searchObj.data.stream.selectedStream.length === 1 &&
+        (!store.state.zoConfig.user_defined_schemas_enabled ||
+          !searchObj.meta.hasUserDefinedSchemas);
+
+      if (
+        singleStreamNoUDS &&
+        !hitsIntroduceNewField(
+          searchObj.data.queryResults?.hits ?? [],
+          searchObj.data.stream.selectedStreamFields,
+        )
+      ) {
+        return;
+      }
+    }
+
     schemaRequestToken.value++;
     const capturedToken = schemaRequestToken.value;
-    searchObj.loadingStream = true;
-    await nextTick();
+    if (!silent) {
+      searchObj.loadingStream = true;
+      await nextTick();
+    }
     try {
       searchObjDebug["extractFieldsStartTime"] = performance.now();
       searchObjDebug["extractFieldsWithAPI"] = "";
@@ -855,9 +907,13 @@ export const useStreamFields = () => {
       correlationFilters.restore();
 
       searchObjDebug["extractFieldsEndTime"] = performance.now();
-      searchObj.loadingStream = false;
+      if (!silent) {
+        searchObj.loadingStream = false;
+      }
     } catch (e: any) {
-      searchObj.loadingStream = false;
+      if (!silent) {
+        searchObj.loadingStream = false;
+      }
       console.log("Error while extracting fields.", e);
       notificationMsg.value = t("search.errorWhileExtractingStreamFields");
     }
