@@ -85,9 +85,8 @@ impl SanitizedValue {
     /// The row's `value` cell: `Some(None)` is a stale marker's NULL, `None` writes no row.
     pub fn row_value(self) -> Option<Option<f64>> {
         // only a marker depends on the flag, so ordinary samples skip the config load
-        let markers = matches!(self, Self::Stale)
-            && config::get_config().prom.staleness_markers_enabled
-            && infra::cluster::staleness_markers_supported();
+        let markers =
+            matches!(self, Self::Stale) && config::get_config().prom.staleness_markers_enabled;
         self.row_value_with(markers)
     }
 

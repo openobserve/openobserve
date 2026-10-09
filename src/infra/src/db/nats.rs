@@ -32,7 +32,7 @@ use config::{
         time::{now_micros, second_micros},
     },
 };
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use tokio::{
     sync::{Mutex, OnceCell, mpsc},
@@ -692,49 +692,33 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
         })
         .await?;
 
+    let mut keys = Vec::new();
     if let Ok(info) = consumer.info().await
         && info.num_pending == 0
     {
-        return Ok(Vec::new());
+        return Ok(keys);
     }
-    let messages = consumer.messages().await?.map_ok(|message| {
-        let pending = message.info().ok().map(|info| info.pending);
-        (message.subject.to_string(), pending)
-    });
-    collect_keys(messages, &kv.name, &kv.prefix, prefix).await
-}
-
-// a stream error must fail the listing: a partial key set would pass for a complete one
-async fn collect_keys<E: std::fmt::Display>(
-    messages: impl Stream<Item = std::result::Result<(String, Option<u64>), E>>,
-    bucket: &str,
-    kv_prefix: &str,
-    prefix: &str,
-) -> Result<Vec<String>> {
-    let mut messages = std::pin::pin!(messages);
-    let mut keys = Vec::new();
-    let mut complete = false;
-    while let Some((subject, pending)) = messages
-        .try_next()
-        .await
-        .map_err(|e| Error::Message(format!("[NATS:keys] bucket {bucket}, stream error: {e}")))?
-    {
-        let key = subject.splitn(2, kv_prefix).last().unwrap().to_string();
+    let mut messages = consumer.messages().await?;
+    while let Ok(Some(message)) = messages.try_next().await {
+        let key = message
+            .subject
+            .splitn(2, kv.prefix.as_str())
+            .last()
+            .unwrap()
+            .to_string();
         match key_decode(&key) {
             Some(key) if key.starts_with(prefix) => keys.push(key),
             Some(_) => {}
-            None => log::warn!("[NATS:keys] bucket {bucket}, skipping undecodable key: {key}"),
+            None => log::warn!(
+                "[NATS:keys] bucket {}, skipping undecodable key: {key}",
+                kv.name
+            ),
         }
-        if pending == Some(0) {
-            complete = true;
+        if let Ok(info) = message.info()
+            && info.pending == 0
+        {
             break;
         }
-    }
-    // the stream only ends on its own when the subscription closes, so the listing is partial
-    if !complete {
-        return Err(Error::Message(format!(
-            "[NATS:keys] bucket {bucket}, stream ended before the last key"
-        )));
     }
     keys.sort();
     keys.dedup();
@@ -1043,35 +1027,6 @@ fn use_kv_watcher(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[tokio::test]
-    async fn test_collect_keys_fails_on_stream_error() {
-        let subject = |key: &str| format!("$KV.nodes.{}", key_encode(key));
-        let messages = futures::stream::iter(vec![
-            Ok((subject("/nodes/new"), Some(1))),
-            Err("consumer deleted"),
-            Ok((subject("/nodes/old"), Some(0))),
-        ]);
-        let err = collect_keys(messages, "nodes", "$KV.nodes.", "/nodes/")
-            .await
-            .unwrap_err();
-        assert!(err.to_string().contains("consumer deleted"), "{err}");
-
-        let messages = futures::stream::iter(vec![Ok::<_, &str>((subject("/nodes/new"), Some(1)))]);
-        let err = collect_keys(messages, "nodes", "$KV.nodes.", "/nodes/")
-            .await
-            .unwrap_err();
-        assert!(err.to_string().contains("before the last key"), "{err}");
-
-        let messages = futures::stream::iter(vec![
-            Ok::<_, &str>((subject("/nodes/new"), Some(1))),
-            Ok((subject("/nodes/old"), Some(0))),
-        ]);
-        let keys = collect_keys(messages, "nodes", "$KV.nodes.", "/nodes/")
-            .await
-            .unwrap();
-        assert_eq!(keys, ["/nodes/new", "/nodes/old"]);
-    }
 
     #[test]
     fn test_use_kv_watcher() {

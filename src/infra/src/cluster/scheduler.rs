@@ -109,7 +109,6 @@ mod tests {
                 tcp_conns_resets: 1,
             },
             version: config::VERSION.to_string(),
-            staleness_markers: true,
         }
     }
 

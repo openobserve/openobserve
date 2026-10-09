@@ -3460,7 +3460,7 @@ pub struct Prometheus {
     #[env_config(
         name = "ZO_METRICS_STALENESS_MARKERS_ENABLED",
         default = true,
-        help = "Allow Prometheus staleness markers: ingesters store them once every node in the cluster supports them, and PromQL ends a series at its marker. Off drops markers on ingest and ignores stored ones on read. Rolling back to a release without marker support after markers have been written is unsupported."
+        help = "Store Prometheus staleness markers and end a series at its marker in PromQL. Off drops markers on ingest and ignores stored ones on read. Before a rolling upgrade, disable this throughout the deployment until every node and participating region has been upgraded. Rollback to unsupported versions is unsafe after markers have been stored, even if this is later disabled."
     )]
     pub staleness_markers_enabled: bool,
 }

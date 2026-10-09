@@ -58,7 +58,6 @@ pub async fn register_and_keep_alive() -> Result<()> {
             .build()
             .unwrap();
         loop {
-            refresh_staleness_markers_supported().await;
             let cfg = get_config();
             let ttl_keep_alive = std::cmp::max(1, (cfg.limit.node_heartbeat_ttl / 2) as u64);
             tokio::time::sleep(tokio::time::Duration::from_secs(ttl_keep_alive)).await;

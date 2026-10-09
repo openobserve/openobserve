@@ -945,7 +945,6 @@ mod tests {
             status: NodeStatus::Online,
             metrics: Default::default(),
             version: String::new(),
-            staleness_markers: true,
         }
     }
 

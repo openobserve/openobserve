@@ -161,7 +161,6 @@ async fn register() -> Result<()> {
         broadcasted: false,
         metrics: Default::default(),
         version: config::VERSION.to_string(),
-        staleness_markers: true,
     };
     let val = json::to_vec(&node).unwrap();
 
@@ -234,7 +233,6 @@ pub(crate) async fn set_status(status: NodeStatus) -> Result<()> {
             broadcasted: false,
             metrics: Default::default(),
             version: config::VERSION.to_string(),
-            staleness_markers: true,
         },
     };
 

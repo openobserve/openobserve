@@ -94,6 +94,8 @@ Then open [http://localhost:5080](http://localhost:5080) and log in with the cre
 
 For other installation methods, see the [quickstart documentation](https://openobserve.ai/docs/quickstart). For clustered deployments, see the [High Availability deployment guide](https://openobserve.ai/docs/ha_deployment/).
 
+Before upgrading an existing deployment, read the [upgrade instructions](UPGRADING.md), including the metrics staleness marker warning.
+
 ## Product Tour
 
 OpenObserve ships with a powerful, unified web UI for every signal — logs, traces, metrics, dashboards, RUM, alerts, incidents, pipelines, and AI observability.
