@@ -29,6 +29,11 @@ export interface FunnelRef {
   id: string;
   name: string;
 }
+/** A deleted named event's id and the name it had when it was deleted. */
+export interface NamedEventRef {
+  id: string;
+  name: string;
+}
 type Versioned<T> = T & { version: number };
 type Rows = AxiosResponse<{ list: unknown[] }>;
 
@@ -60,6 +65,11 @@ const rumProductAnalytics = {
     id: string,
   ): Promise<AxiosResponse<{ list: FunnelRef[] }>> =>
     http().get(`${events(org, id)}/funnels`, inApp(app)),
+  deletedEventNames: (
+    org: string,
+    ids: readonly string[],
+  ): Promise<AxiosResponse<{ list: NamedEventRef[] }>> =>
+    http().get(`${events(org)}/deleted_names`, { params: { ids: ids.join(",") } }),
   listFunnels: (org: string, app: string): Promise<Rows> => http().get(funnels(org), inApp(app)),
   getFunnel: (org: string, app: string, id: string): Promise<AxiosResponse<unknown>> =>
     http().get(funnels(org, id), inApp(app)),
