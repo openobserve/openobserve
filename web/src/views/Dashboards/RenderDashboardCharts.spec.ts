@@ -527,9 +527,8 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    // Variables scope the ACTIVE tab, so rendering them above the strip made them
-    // read as page chrome and moved the tab bar whenever their height changed.
-    it("renders the global variables strip BELOW the tab list, not above it", () => {
+    // Global variables apply dashboard-wide, so the strip sits above the tab bar.
+    it("renders the global variables strip ABOVE the tab list, not below it", () => {
       wrapper = createWrapper({
         showTabs: true,
         dashboardData: {
@@ -547,7 +546,7 @@ describe("RenderDashboardCharts", () => {
 
       expect(tabsAt).toBeGreaterThan(-1);
       expect(varsAt).toBeGreaterThan(-1);
-      expect(tabsAt).toBeLessThan(varsAt);
+      expect(varsAt).toBeLessThan(tabsAt);
     });
   });
 
