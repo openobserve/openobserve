@@ -167,6 +167,16 @@ pub struct OrgDetails {
     pub user_obj: OrgUser,
     #[serde(default)]
     pub plan: i32,
+    /// The org admin/owner's email — used by the frontend to disambiguate
+    /// two orgs that share a display name (e.g. two orgs both named
+    /// "default"). Empty when no admin could be resolved (e.g. root-user
+    /// view of a stale org).
+    #[serde(default)]
+    pub owner_email: String,
+    /// The org admin/owner's first name, when set; the frontend falls back
+    /// to the local part of `owner_email` when this is empty.
+    #[serde(default)]
+    pub owner_first_name: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -915,6 +925,8 @@ mod tests {
             org_type: "basic".to_string(),
             user_obj: user,
             plan: 0,
+            owner_email: "admin1@example.com".to_string(),
+            owner_first_name: "Admin".to_string(),
         };
 
         let response = OrganizationResponse {
