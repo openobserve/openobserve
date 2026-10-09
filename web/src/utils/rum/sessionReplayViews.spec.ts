@@ -267,12 +267,119 @@ describe("createMultiViewDecoder", () => {
 
   it("ignores records of a view after its ViewEnd", () => {
     const decoder = createMultiViewDecoder();
-    expect(() =>
-      decoder.push(
+    let first: any[] = [];
+    expect(() => {
+      first = decoder.push(
         [segment("A", 0, [...opening(1000, "A"), viewEnd(2000), text(2100, "late")])],
         Infinity,
-      ),
-    ).not.toThrow();
+      ).events;
+    }).not.toThrow();
+    expect(withoutClock(first).some((e) => e.timestamp === 2100)).toBe(false);
     expect(withoutClock(decoder.push([], Infinity).events)).toEqual([]);
+  });
+
+  it("splitting the push at the watermark gives the same events as one push", () => {
+    const segments = [
+      segment("A", 0, [...opening(1000, "A"), text(1500, "a1"), text(2800, "a2")]),
+      segment("B", 0, [...opening(2000, "B"), text(2500, "b1")]),
+      segment("A", 1, [interaction(3000, CLICK), text(3500, "a3")]),
+    ];
+    const whole = withoutClock(createMultiViewDecoder().push(segments, Infinity).events);
+
+    const split = createMultiViewDecoder();
+    const first = split.push(segments.slice(0, 2), segments[2].start);
+    const second = split.push(segments.slice(2), Infinity);
+    expect(withoutClock([...first.events, ...second.events])).toEqual(whole);
+  });
+
+  it("an idle shown view still advances the clock to the watermark", () => {
+    const decoder = createMultiViewDecoder();
+    const { events } = decoder.push(
+      [
+        segment("A", 0, opening(1000, "A")),
+        segment("B", 0, [...opening(1200, "B", false), text(8000, "busy")]),
+      ],
+      10000,
+    );
+    expect(events.at(-1)).toMatchObject({
+      type: 5,
+      timestamp: 9999,
+      data: { tag: LOADED_THROUGH_TAG },
+    });
+  });
+
+  it("emits no clock record when the events already reach the loaded end", () => {
+    const decoder = createMultiViewDecoder();
+    const { events } = decoder.push([segment("A", 0, opening(1000, "A"))], Infinity);
+    expect(events.some((e) => e.data?.tag === LOADED_THROUGH_TAG)).toBe(false);
+  });
+
+  it("single view equals the legacy single-converter output", async () => {
+    const { createRecordConverter, dropChangesBeforeFirstSnapshot } =
+      await import("./sessionReplayChangeFormat");
+    const segments = [
+      { records: [text(900, "orphan"), ...opening(1000, "A"), text(1500, "x")] },
+      { records: [text(2000, "y"), interaction(2100, CLICK)] },
+    ];
+    const legacy = createRecordConverter();
+    const expected = segments.flatMap((s, i) =>
+      (i === 0 ? dropChangesBeforeFirstSnapshot(s.records) : s.records).flatMap((r: any) =>
+        legacy.convert(r),
+      ),
+    );
+    expect(withoutClock(createMultiViewDecoder().push(segments, Infinity).events)).toEqual(
+      expected,
+    );
+  });
+
+  it("marks a view stale from a missing index until its next snapshot", () => {
+    const decoder = createMultiViewDecoder();
+    const { events } = decoder.push(
+      [segment("A", 0, opening(1000, "A")), segment("A", 2, [text(3000, "after-gap")])],
+      Infinity,
+    );
+    expect(decoder.staleSpans()).toEqual([{ viewId: "A", from: 3000, to: null }]);
+    expect(withoutClock(events).some((e) => e.timestamp === 3000)).toBe(false);
+  });
+
+  it("does not open a stale span for a view that already ended", () => {
+    const decoder = createMultiViewDecoder();
+    decoder.push(
+      [
+        segment("A", 0, [...opening(1000, "A"), viewEnd(2000)]),
+        segment("A", 3, [text(3000, "after-end")]),
+      ],
+      Infinity,
+    );
+    expect(decoder.staleSpans()).toEqual([]);
+  });
+
+  it("a skip marker with a view id marks only that view, without one marks every view", () => {
+    const one = createMultiViewDecoder();
+    one.push(
+      [
+        segment("A", 0, opening(1000, "A")),
+        segment("B", 0, opening(1100, "B")),
+        { skipped: true, segmentId: "s", start: 2000, end: 2500, viewId: "A" },
+      ],
+      Infinity,
+    );
+    expect(one.staleSpans().map((s) => s.viewId)).toEqual(["A"]);
+
+    const all = createMultiViewDecoder();
+    all.push(
+      [
+        segment("A", 0, opening(1000, "A")),
+        segment("B", 0, opening(1100, "B")),
+        { skipped: true, segmentId: "s", start: 2000, end: 2500 },
+      ],
+      Infinity,
+    );
+    expect(
+      all
+        .staleSpans()
+        .map((s) => s.viewId)
+        .sort(),
+    ).toEqual(["A", "B"]);
   });
 });

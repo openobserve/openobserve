@@ -294,9 +294,9 @@ export function createMultiViewDecoder(): MultiViewDecoder {
   }
 
   function step(view: ViewTrack, item: Extract<QueueItem, { kind: "record" }>, out: any[]): number {
-    checkIndex(view, item);
     const converter = view.converter;
     if (view.ended || !converter) return 0;
+    checkIndex(view, item);
     const { record } = item;
     // The rebuild must come before the trigger is decoded, or its removals apply to a tree that already lost them.
     onPresence(view, record, out);
