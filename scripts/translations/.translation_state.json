@@ -9036,6 +9036,8 @@
     "editRole": {
       "actionNotApplicable": "7b9e03393881f946",
       "all": "a52ace420f2175d0",
+      "allModulesTitle": "7bd30494297e0f94",
+      "bulkSelectColumn": "917098c49df7353d",
       "childResource": "916cd7c979a0b3e2",
       "clearFilter": "910bda6aed78b23e",
       "collapseModuleGroup": "35044c06f245c5fe",
@@ -9059,6 +9061,7 @@
         "title": "470e7ee2a5795561"
       },
       "loadFailed": "ace3a6e578ff57eb",
+      "moduleColumn": "f148224ae44fb843",
       "moduleGrantedCount": "5973332663ba05f6",
       "moduleGroupAccess": "ec5ba0abb717da87",
       "moduleGroupAi": "11fb682be0a0233d",
