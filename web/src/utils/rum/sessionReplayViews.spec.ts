@@ -292,6 +292,24 @@ describe("createMultiViewDecoder", () => {
     expect(withoutClock([...first.events, ...second.events])).toEqual(whole);
   });
 
+  it("holds records at or after the watermark until a later push releases them", () => {
+    const segments = [
+      segment("A", 0, [...opening(1000, "A"), text(1500, "a1"), text(2800, "a2")]),
+      segment("B", 0, [...opening(2000, "B"), text(2500, "b1")]),
+      segment("A", 1, [interaction(3000, CLICK), text(3500, "a3")]),
+    ];
+    const whole = withoutClock(createMultiViewDecoder().push(segments, Infinity).events);
+
+    const decoder = createMultiViewDecoder();
+    const first = decoder.push(segments, 3000);
+    expect(withoutClock(first.events).some((e) => e.timestamp >= 3000)).toBe(false);
+    expect(decoder.switches().some((sw) => sw.at === 3000)).toBe(false);
+
+    const second = decoder.push([], Infinity);
+    expect(fullSnapshots(second.events).some((e) => e.timestamp === 3000)).toBe(true);
+    expect(withoutClock([...first.events, ...second.events])).toEqual(whole);
+  });
+
   it("an idle shown view still advances the clock to the watermark", () => {
     const decoder = createMultiViewDecoder();
     const { events } = decoder.push(
