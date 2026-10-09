@@ -27,6 +27,9 @@ use infra::{
 use o2_enterprise::enterprise::super_cluster::queue::{DowntimeMessage, Message};
 use sea_orm::ConnectionTrait;
 
+/// Compare-and-swap rounds before a replicated write gives up on a row that keeps changing.
+const WRITE_ATTEMPTS: usize = 8;
+
 /// How a replicated put orders against the stored row.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum PutOrder {
@@ -42,6 +45,14 @@ impl PutOrder {
     fn applies(self) -> bool {
         matches!(self, Self::Apply | Self::Conflict { apply: true })
     }
+}
+
+/// A put checked against the row it read; it writes only while that row is unchanged.
+#[derive(Debug)]
+struct PlannedPut {
+    stored: Option<RowVersion>,
+    downtime: Downtime,
+    coverage_changed: bool,
 }
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
@@ -77,54 +88,105 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 table::folders::get_or_create(&org, default_folder(), FolderType::Downtimes)
                     .await?;
             }
-            apply_delete(client, &org, &id, version, deleted_at).await?;
+            if !apply_delete(client, &org, &id, version, deleted_at).await? {
+                return Ok(());
+            }
             coordinator::downtimes::emit_delete_event(&org, &id).await
         }
     }
 }
 
-/// A Delete that overtakes its Put leaves a tombstone, so the late Put cannot make the row live.
+/// Tombstones at the Delete's own version and time unless the stored row is newer; true if written.
 async fn apply_delete<C: ConnectionTrait>(
     conn: &C,
     org: &str,
     id: &str,
     version: i64,
     deleted_at: i64,
-) -> Result<()> {
-    if table::downtimes::delete_at_least_with(conn, org, id, version)
-        .await?
-        .is_some()
-        || deleted_at <= 0
-    {
-        return Ok(());
+) -> Result<bool> {
+    // An org deletion, or a region that predates the fields, sends no order, so it deletes locally.
+    if version <= 0 || deleted_at <= 0 {
+        return Ok(table::downtimes::delete_with(conn, org, id)
+            .await?
+            .is_some());
     }
-    let folder = table::folders::get_model(conn, org, DEFAULT_FOLDER, FolderType::Downtimes)
-        .await?
-        .ok_or_else(|| {
-            Error::Message(format!(
-                "[DOWNTIMES] no default downtime folder in {org} for the tombstone of {id}"
-            ))
-        })?;
-    table::downtimes::insert_tombstone_with(conn, org, id, &folder.id, version, deleted_at).await?;
-    // A Put that raced the insert and is older than this Delete is tombstoned as well.
-    if let Some(stored) = table::downtimes::version_with(conn, org, id).await?
-        && !stored.deleted
-        && stored.version < version
-    {
-        table::downtimes::delete_at_least_with(conn, org, id, version).await?;
+    for _ in 0..WRITE_ATTEMPTS {
+        let written = match table::downtimes::version_with(conn, org, id).await? {
+            None => {
+                let folder = default_folder_pk(conn, org, id).await?;
+                table::downtimes::insert_tombstone_with(conn, org, id, &folder, version, deleted_at)
+                    .await?
+            }
+            Some(stored) if !delete_applies(stored, version, deleted_at) => {
+                log::info!(
+                    "[DOWNTIMES] skipping a stale delete of {org}/{id} (version {version} vs stored {stored:?})"
+                );
+                return Ok(false);
+            }
+            Some(stored) => {
+                table::downtimes::tombstone_if_stored_with(
+                    conn, org, id, stored, version, deleted_at,
+                )
+                .await?
+            }
+        };
+        if written {
+            return Ok(true);
+        }
     }
-    Ok(())
+    Err(Error::Message(format!(
+        "[DOWNTIMES] {org}/{id} kept changing during a replicated delete"
+    )))
 }
 
 /// Writes the put unless the stored row is newer; `Some(coverage changed)` if it wrote.
 async fn apply_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<Option<bool>> {
+    for _ in 0..WRITE_ATTEMPTS {
+        let Some(planned) = plan_put(conn, downtime).await? else {
+            return Ok(None);
+        };
+        if write_put(conn, &planned).await? {
+            return Ok(Some(planned.coverage_changed));
+        }
+    }
+    Err(Error::Message(format!(
+        "[DOWNTIMES] {}/{} kept changing during a replicated put",
+        downtime.org, downtime.id
+    )))
+}
+
+/// Orders the put against the stored row; `None` if the stored row wins.
+async fn plan_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<Option<PlannedPut>> {
     let stored = table::downtimes::version_with(conn, &downtime.org, &downtime.id).await?;
     // The queue neither orders nor deduplicates, so an older Put must not undo a newer edit.
     let order = stored.map_or(PutOrder::Apply, |stored| {
         put_order(stored, downtime.version, downtime.updated_at)
     });
-    if let PutOrder::Conflict { apply } = order {
-        log::warn!(
+    log_order(order, downtime, stored);
+    if !order.applies() {
+        return Ok(None);
+    }
+    let before = table::downtimes::get_with(conn, &downtime.org, &downtime.id).await?;
+    let mut downtime = downtime.clone();
+    if let Some(before) = &before {
+        downtime.origin_region = before.origin_region.clone();
+    }
+    let coverage_changed = before.is_some_and(|before| !before.same_coverage(&downtime));
+    Ok(Some(PlannedPut {
+        stored,
+        downtime,
+        coverage_changed,
+    }))
+}
+
+/// False when another write moved the row after [plan_put] read it.
+async fn write_put<C: ConnectionTrait>(conn: &C, planned: &PlannedPut) -> Result<bool> {
+    table::downtimes::put_if_stored_with(conn, &planned.downtime, planned.stored).await
+}
+
+fn log_order(order: PutOrder, downtime: &Downtime, stored: Option<RowVersion>) {
+    match order {
+        PutOrder::Conflict { apply } => log::warn!(
             "[DOWNTIMES] two regions wrote version {} of {}/{}; keeping the later updated_at ({})",
             downtime.version,
             downtime.org,
@@ -134,27 +196,17 @@ async fn apply_put<C: ConnectionTrait>(conn: &C, downtime: &Downtime) -> Result<
             } else {
                 "the stored row"
             }
-        );
-    }
-    if !order.applies() {
-        log::info!(
+        ),
+        PutOrder::Stale => log::info!(
             "[DOWNTIMES] skipping a stale put of {}/{} (version {}, updated_at {} vs stored {:?})",
             downtime.org,
             downtime.id,
             downtime.version,
             downtime.updated_at,
             stored
-        );
-        return Ok(None);
+        ),
+        PutOrder::Apply => {}
     }
-    let before = table::downtimes::get_with(conn, &downtime.org, &downtime.id).await?;
-    let mut downtime = downtime.clone();
-    if let Some(before) = &before {
-        downtime.origin_region = before.origin_region.clone();
-    }
-    let coverage_changed = before.is_some_and(|before| !before.same_coverage(&downtime));
-    table::downtimes::put_with(conn, &downtime).await?;
-    Ok(Some(coverage_changed))
 }
 
 /// Version first, since region clocks differ; equal versions from two regions fall to `updated_at`.
@@ -175,6 +227,16 @@ fn put_order(stored: RowVersion, version: i64, updated_at: i64) -> PutOrder {
                 (true, false) => PutOrder::Stale,
             }
         }
+    }
+}
+
+/// The mirror of [put_order]: a tombstone wins a tie unless the live row is strictly later.
+fn delete_applies(stored: RowVersion, version: i64, deleted_at: i64) -> bool {
+    match version.cmp(&stored.version) {
+        std::cmp::Ordering::Less => false,
+        std::cmp::Ordering::Greater => true,
+        std::cmp::Ordering::Equal if stored.deleted => deleted_at > stored.updated_at,
+        std::cmp::Ordering::Equal => deleted_at >= stored.updated_at,
     }
 }
 
@@ -201,6 +263,17 @@ async fn local_folder_id(downtime: &Downtime) -> Result<String> {
     );
     table::folders::get_or_create(&downtime.org, default_folder(), FolderType::Downtimes).await?;
     Ok(DEFAULT_FOLDER.to_owned())
+}
+
+async fn default_folder_pk<C: ConnectionTrait>(conn: &C, org: &str, id: &str) -> Result<String> {
+    let folder = table::folders::get_model(conn, org, DEFAULT_FOLDER, FolderType::Downtimes)
+        .await?
+        .ok_or_else(|| {
+            Error::Message(format!(
+                "[DOWNTIMES] no default downtime folder in {org} for the tombstone of {id}"
+            ))
+        })?;
+    Ok(folder.id)
 }
 
 fn default_folder() -> Folder {
@@ -336,10 +409,7 @@ mod tests {
         let db = db().await;
         // This region saw version 1 only; the deleting region wrote 2 and 3, then deleted at 4.
         apply_put(&db, &versioned(1, 10)).await.unwrap();
-        let tombstone = table::downtimes::delete_at_least_with(&db, "acme", "d1", 4)
-            .await
-            .unwrap();
-        assert_eq!(tombstone, Some(4));
+        assert!(apply_delete(&db, "acme", "d1", 4, 40).await.unwrap());
         assert_eq!(apply_put(&db, &versioned(3, 30)).await.unwrap(), None);
         assert_eq!(apply_put(&db, &versioned(2, 20)).await.unwrap(), None);
         assert_eq!(
@@ -348,12 +418,12 @@ mod tests {
         );
         // A Delete from a region that predates the field (version 0) still bumps locally.
         apply_put(&db, &versioned(5, 50)).await.unwrap();
-        assert_eq!(
-            table::downtimes::delete_at_least_with(&db, "acme", "d1", 0)
-                .await
-                .unwrap(),
-            Some(6)
-        );
+        assert!(apply_delete(&db, "acme", "d1", 0, 0).await.unwrap());
+        let stored = table::downtimes::version_with(&db, "acme", "d1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!((stored.version, stored.deleted), (6, true));
     }
 
     #[tokio::test]
@@ -364,15 +434,11 @@ mod tests {
         assert_eq!(
             table::downtimes::delete_with(&db, "acme", "d1")
                 .await
-                .unwrap(),
+                .unwrap()
+                .map(|t| t.version),
             Some(2)
         );
-        assert_eq!(
-            table::downtimes::delete_at_least_with(&db, "acme", "d1", 4)
-                .await
-                .unwrap(),
-            Some(4)
-        );
+        assert!(apply_delete(&db, "acme", "d1", 4, 40).await.unwrap());
         assert_eq!(apply_put(&db, &versioned(3, i64::MAX)).await.unwrap(), None);
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
@@ -501,5 +567,121 @@ mod tests {
             .unwrap();
         assert_eq!(stored.origin_region.as_deref(), Some("us-east"));
         assert_eq!(stored.updated_at, 20);
+    }
+
+    #[tokio::test]
+    async fn a_redelivered_delete_after_a_restoring_put_leaves_the_row_live() {
+        let db = db().await;
+        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        assert!(apply_delete(&db, "acme", "d1", 2, 20).await.unwrap());
+        let restored = versioned(3, 30);
+        assert_eq!(apply_put(&db, &restored).await.unwrap(), Some(false));
+
+        assert!(!apply_delete(&db, "acme", "d1", 2, 20).await.unwrap());
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            Some(restored)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_replicated_delete_keeps_its_own_version_and_time() {
+        let db = db().await;
+        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        assert!(apply_delete(&db, "acme", "d1", 4, 5_000).await.unwrap());
+        let tombstone = RowVersion {
+            version: 4,
+            updated_at: 5_000,
+            deleted: true,
+        };
+        assert_eq!(
+            table::downtimes::version_with(&db, "acme", "d1")
+                .await
+                .unwrap(),
+            Some(tombstone)
+        );
+        // A redelivery, and an older Delete, leave the tombstone as it is.
+        assert!(!apply_delete(&db, "acme", "d1", 4, 5_000).await.unwrap());
+        assert!(!apply_delete(&db, "acme", "d1", 3, 9_000).await.unwrap());
+        assert_eq!(
+            table::downtimes::version_with(&db, "acme", "d1")
+                .await
+                .unwrap(),
+            Some(tombstone)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_local_delete_between_the_read_and_the_write_of_a_put_stands() {
+        let db = db().await;
+        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        let incoming = versioned(2, 20);
+        let planned = plan_put(&db, &incoming).await.unwrap().unwrap();
+
+        table::downtimes::delete_with(&db, "acme", "d1")
+            .await
+            .unwrap();
+        assert!(!write_put(&db, &planned).await.unwrap());
+        // The local tombstone is version 2 too, and it is later, so the put is stale on its retry.
+        assert_eq!(apply_put(&db, &incoming).await.unwrap(), None);
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn a_local_edit_between_the_read_and_the_write_of_a_put_stands() {
+        let db = db().await;
+        apply_put(&db, &versioned(1, 10)).await.unwrap();
+        let incoming = versioned(2, 20);
+        let planned = plan_put(&db, &incoming).await.unwrap().unwrap();
+
+        let mut local = versioned(3, 30);
+        local.name = "local edit".to_string();
+        assert!(
+            table::downtimes::put_if_unchanged_with(&db, &local, 10)
+                .await
+                .unwrap()
+        );
+        assert!(!write_put(&db, &planned).await.unwrap());
+        assert_eq!(apply_put(&db, &incoming).await.unwrap(), None);
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            Some(local)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_put_planned_against_a_missing_row_loses_to_a_delete_that_lands_first() {
+        let db = db().await;
+        let incoming = versioned(1, 10);
+        let planned = plan_put(&db, &incoming).await.unwrap().unwrap();
+
+        assert!(apply_delete(&db, "acme", "d1", 2, 20).await.unwrap());
+        assert!(!write_put(&db, &planned).await.unwrap());
+        assert_eq!(apply_put(&db, &incoming).await.unwrap(), None);
+        assert_eq!(deleted_at(&db).await, 20);
+    }
+
+    #[test]
+    fn delete_applies_mirrors_the_put_order() {
+        let row = |version, updated_at, deleted| RowVersion {
+            version,
+            updated_at,
+            deleted,
+        };
+        assert!(!delete_applies(row(3, 100, false), 2, 900));
+        assert!(delete_applies(row(3, 100, false), 4, 1));
+        // A tie keeps whichever is later, the tombstone on equal times, as put_order does.
+        assert!(delete_applies(row(2, 100, false), 2, 100));
+        assert!(!delete_applies(row(2, 100, false), 2, 99));
+        assert!(!delete_applies(row(2, 100, true), 2, 100));
+        assert!(delete_applies(row(2, 100, true), 2, 101));
+        for (stored_at, incoming_at) in [(100, 99), (100, 100), (100, 101)] {
+            let live_after_delete = !delete_applies(row(2, stored_at, false), 2, incoming_at);
+            let live_after_put = put_order(row(2, incoming_at, true), 2, stored_at).applies();
+            assert_eq!(live_after_delete, live_after_put);
+        }
     }
 }

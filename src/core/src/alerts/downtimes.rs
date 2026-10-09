@@ -344,7 +344,7 @@ pub(crate) mod enterprise {
                         downtime_id: row.id.clone(),
                         name: row.name.clone(),
                         status,
-                        applies: applies_to(row, slo, now),
+                        applies: applies_to(row, slo.definition.slice_interval_secs, now),
                     }
                 })
             })
@@ -352,12 +352,10 @@ pub(crate) mod enterprise {
     }
 
     /// Whether the current or next window holds a slice start; true when no window is known.
-    fn applies_to(row: &Downtime, slo: &Slo, now: i64) -> bool {
+    pub(crate) fn applies_to(row: &Downtime, slice_interval_secs: i64, now: i64) -> bool {
         schedule::window_at(&row.schedule, now)
             .or_else(|| schedule::next_window(&row.schedule, now))
-            .is_none_or(|w| {
-                aligned_span(w.start, w.end, slo.definition.slice_interval_secs).is_some()
-            })
+            .is_none_or(|w| aligned_span(w.start, w.end, slice_interval_secs).is_some())
     }
 
     fn covers(row: &Downtime, module: TargetModule, item: &TargetItem<'_>) -> bool {

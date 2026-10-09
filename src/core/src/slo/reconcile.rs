@@ -54,34 +54,44 @@ pub struct Rebuilt {
     pub covered_slices: i32,
 }
 
+/// A rebuild with the watermark it read up to, so a guarded write can tell if a pass moved it.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Rebuild {
+    pub watermark_end: Option<i64>,
+    pub rows: Vec<Rebuilt>,
+}
+
 /// Rebuild every group's aggregate for one SLO and write the results.
 pub async fn reconcile(slo: &Slo) -> Result<Vec<Rebuilt>, anyhow::Error> {
-    let rows = rebuild(slo).await?;
+    let rows = rebuild(slo).await?.rows;
     write_rebuilt(get_orm_client_rw().await, &slo.id, &rows).await?;
     Ok(rows)
 }
 
 /// The figures [reconcile] would write, read without writing, so a caller can write them guarded.
-pub async fn rebuild(slo: &Slo) -> Result<Vec<Rebuilt>, anyhow::Error> {
+pub async fn rebuild(slo: &Slo) -> Result<Rebuild, anyhow::Error> {
     let db = get_orm_client_rw().await;
 
     let Some(status) = slo_table::load_status(db, &slo.id, "").await? else {
-        return Ok(Vec::new());
+        return Ok(Rebuild::default());
     };
     // Nothing has been measured under this generation yet, so there is no
     // cache to repair — and no watermark to bound the read by.
     let Some(watermark) = status.watermark_end else {
-        return Ok(Vec::new());
+        return Ok(Rebuild::default());
     };
     // A rebuild computed under a superseded generation would write the old
     // definition's arithmetic into the new epoch. Reconciliation is exactly
     // where that mistake is easy to make: it looks like a pure repair.
     if status.definition_generation != slo.definition_generation {
-        return Ok(Vec::new());
+        return Ok(Rebuild::default());
     }
 
     let (from, to) = read_window(watermark, slo.definition.window_secs);
-    read_aggregate(slo, from, to).await
+    Ok(Rebuild {
+        watermark_end: Some(watermark),
+        rows: read_aggregate(slo, from, to).await?,
+    })
 }
 
 pub async fn write_rebuilt<C: ConnectionTrait>(

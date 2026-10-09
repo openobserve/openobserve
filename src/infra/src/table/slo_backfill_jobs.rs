@@ -42,8 +42,17 @@ pub const KIND_REMEASURE: &str = "remeasure";
 /// Retries of [extend_range] when another writer changed the row between its read and write.
 const EXTEND_ATTEMPTS: usize = 5;
 
-pub async fn get(
-    db: &DatabaseConnection,
+/// One SLO's re-measure, queued in the transaction of the downtime write that needs it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Remeasure {
+    pub slo_id: String,
+    pub generation: i32,
+    pub range_start: i64,
+    pub range_end: i64,
+}
+
+pub async fn get<C: ConnectionTrait>(
+    db: &C,
     slo_id: &str,
     generation: i32,
 ) -> Result<Option<slo_backfill_jobs::Model>, Error> {
@@ -87,8 +96,8 @@ pub async fn queue(
 }
 
 /// Queue a re-measure of `[range_start, range_end)`, widening the generation's job if one exists.
-pub async fn queue_remeasure(
-    db: &DatabaseConnection,
+pub async fn queue_remeasure<C: ConnectionTrait>(
+    db: &C,
     slo_id: &str,
     generation: i32,
     range_start: i64,
@@ -125,9 +134,21 @@ pub async fn queue_remeasure(
     Ok(())
 }
 
+/// Queues each re-measure; inside the caller's transaction, a failure queues none of them.
+pub async fn queue_remeasures<C: ConnectionTrait>(
+    db: &C,
+    remeasures: &[Remeasure],
+    now: i64,
+) -> Result<(), Error> {
+    for r in remeasures {
+        queue_remeasure(db, &r.slo_id, r.generation, r.range_start, r.range_end, now).await?;
+    }
+    Ok(())
+}
+
 /// Makes the job a re-measure of the range and restarts its walk; an unfinished job is widened.
-pub async fn extend_range(
-    db: &DatabaseConnection,
+pub async fn extend_range<C: ConnectionTrait>(
+    db: &C,
     slo_id: &str,
     generation: i32,
     range_start: i64,

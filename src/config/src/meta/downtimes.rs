@@ -421,6 +421,9 @@ pub struct PreviewMatch {
     pub matched_by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub missing: Option<String>,
+    /// SLOs on the detail page: false when the current or next window holds no slice start.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub applies: Option<bool>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, ToSchema)]
@@ -869,6 +872,7 @@ mod tests {
             folder_id: "default".to_string(),
             matched_by: None,
             missing: Some("host".to_string()),
+            applies: None,
         };
         let json = serde_json::to_value(m).unwrap();
         assert!(json.get("matched_by").is_none());

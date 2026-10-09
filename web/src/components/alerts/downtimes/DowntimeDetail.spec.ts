@@ -157,6 +157,42 @@ describe("DowntimeDetail", () => {
     wrapper.unmount();
   });
 
+  it("notes an SLO whose window holds no slice start, and no other", async () => {
+    const slo = (id: string, applies?: boolean) => ({
+      id,
+      name: `${id}-name`,
+      folder_id: "default",
+      ...(applies === undefined ? {} : { applies }),
+    });
+    vi.mocked(downtimes.get).mockResolvedValue({
+      data: {
+        ...detail,
+        targets: [{ module: "slos", folders: { kind: "all" } }],
+        matched_alerts: 0,
+        matched_slos: 3,
+        affected: {
+          ...detail.affected,
+          slos: [slo("hourly", false), slo("minutely", true), slo("unknown")],
+        },
+      },
+    } as never);
+
+    const { wrapper } = await mountDetail();
+    await wrapper
+      .get('[data-test="downtime-detail-tab-affected"]')
+      .trigger("mousedown", { button: 0 });
+    await flushPromises();
+
+    const section = '[data-test="downtime-detail-affected-slos"]';
+    await vi.waitFor(() => expect(wrapper.get(section).text()).toContain("hourly-name"));
+    const inert = (id: string) =>
+      wrapper.find(`[data-test="downtime-detail-affected-slos-${id}-inert"]`);
+    expect(inert("hourly").text()).toContain("shorter than the SLO's slice");
+    expect(inert("minutely").exists()).toBe(false);
+    expect(inert("unknown").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("reloads the status when the open window ends, without a refresh", async () => {
     const endsSoon = Date.now() * 1000 + 300_000;
     vi.mocked(downtimes.get)

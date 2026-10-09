@@ -1053,7 +1053,14 @@ pub async fn remeasure_range(slo: &Slo, start: i64, end: i64) -> Result<usize, a
 
 /// The rollup's burn cache rebuilt from the slices, for a re-measure's finish.
 pub async fn rebuild_burn_cache(slo: &Slo) -> Result<Option<BurnRebuild>, anyhow::Error> {
-    let db = get_orm_client_rw().await;
+    rebuild_burn_cache_with(get_orm_client_rw().await, slo).await
+}
+
+/// [rebuild_burn_cache] on `db`; an unreadable alert list skips the cache, as a pass does.
+pub async fn rebuild_burn_cache_with(
+    db: &sea_orm::DatabaseConnection,
+    slo: &Slo,
+) -> Result<Option<BurnRebuild>, anyhow::Error> {
     let Some(status) = slo_table::load_status(db, &slo.id, "").await? else {
         return Ok(None);
     };
@@ -1063,7 +1070,16 @@ pub async fn rebuild_burn_cache(slo: &Slo) -> Result<Option<BurnRebuild>, anyhow
     if status.definition_generation != slo.definition_generation {
         return Ok(None);
     }
-    let durations = burn_durations(db, slo).await?;
+    let durations = match burn_durations(db, slo).await {
+        Ok(durations) => durations,
+        Err(e) => {
+            log::warn!(
+                "[slo] could not read the burn windows of {} for its re-measure finish: {e}",
+                slo.id
+            );
+            return Ok(None);
+        }
+    };
     if durations.is_empty() {
         return Ok(None);
     }

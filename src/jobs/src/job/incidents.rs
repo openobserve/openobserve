@@ -100,13 +100,17 @@ async fn auto_resolve_stale_incidents() -> Result<(), anyhow::Error> {
         );
 
         // Emit Resolved events for each auto-resolved incident
-        for (org_id, incident_id) in &resolved_ids {
-            if let Err(e) =
-                openobserve_core::alerts::incidents::record_auto_resolved(org_id, incident_id).await
+        for resolved in &resolved_ids {
+            if let Err(e) = openobserve_core::alerts::incidents::record_auto_resolved(
+                &resolved.org_id,
+                &resolved.incident_id,
+                resolved.muted_by_downtime_id.as_deref(),
+            )
+            .await
             {
                 log::warn!(
                     "[INCIDENTS::JOB] Failed to record auto-resolve event for {}: {e}",
-                    incident_id
+                    resolved.incident_id
                 );
             }
         }

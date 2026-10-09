@@ -22,19 +22,22 @@ use std::{
 
 use common::meta::authz::Authz;
 use config::meta::downtimes::Downtime;
-use infra::{coordinator::downtimes as coordinator, table::downtimes as table};
+use infra::{
+    coordinator::downtimes as coordinator,
+    table::{
+        downtimes::{self as table, Guard},
+        slo_backfill_jobs::Remeasure,
+    },
+};
 
 /// `org -> rows`. Replaced whole per org, so a reader never sees a partial org.
 static DOWNTIMES: LazyLock<RwLock<HashMap<String, Arc<Vec<Downtime>>>>> =
     LazyLock::new(Default::default);
 
-/// Writes the row, tells this region's nodes, then the other regions.
-pub async fn set(downtime: &Downtime) -> Result<(), anyhow::Error> {
-    table::put(downtime).await?;
-    coordinator::emit_put_event(&downtime.org, &downtime.id).await?;
+/// Writes the row with its SLO re-measures, tells this region's nodes, then the other regions.
+pub async fn set(downtime: &Downtime, remeasures: &[Remeasure]) -> Result<(), anyhow::Error> {
+    write(downtime, Guard::None, remeasures).await?;
     reload_org(&downtime.org).await?;
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_put(downtime).await;
     Ok(())
 }
 
@@ -42,8 +45,9 @@ pub async fn set(downtime: &Downtime) -> Result<(), anyhow::Error> {
 pub async fn set_if_unchanged(
     downtime: &Downtime,
     expected_updated_at: i64,
+    remeasures: &[Remeasure],
 ) -> Result<bool, anyhow::Error> {
-    if !write_if_unchanged(downtime, expected_updated_at).await? {
+    if !write(downtime, Guard::Unchanged(expected_updated_at), remeasures).await? {
         return Ok(false);
     }
     reload_org(&downtime.org).await?;
@@ -55,13 +59,7 @@ pub async fn write_if_unchanged(
     downtime: &Downtime,
     expected_updated_at: i64,
 ) -> Result<bool, anyhow::Error> {
-    if !table::put_if_unchanged(downtime, expected_updated_at).await? {
-        return Ok(false);
-    }
-    coordinator::emit_put_event(&downtime.org, &downtime.id).await?;
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_put(downtime).await;
-    Ok(true)
+    write(downtime, Guard::Unchanged(expected_updated_at), &[]).await
 }
 
 /// [set] for a follow-up row, written only while `parent_id` still has `expected_updated_at`.
@@ -69,31 +67,34 @@ pub async fn set_if_parent_unchanged(
     downtime: &Downtime,
     parent_id: &str,
     expected_updated_at: i64,
+    remeasures: &[Remeasure],
 ) -> Result<bool, anyhow::Error> {
-    if !table::insert_if_parent_unchanged(downtime, parent_id, expected_updated_at).await? {
+    let guard = Guard::ParentUnchanged {
+        parent_id,
+        updated_at: expected_updated_at,
+    };
+    if !write(downtime, guard, remeasures).await? {
         return Ok(false);
     }
-    coordinator::emit_put_event(&downtime.org, &downtime.id).await?;
     reload_org(&downtime.org).await?;
-    #[cfg(feature = "enterprise")]
-    super_cluster::emit_put(downtime).await;
     Ok(true)
 }
 
 pub async fn delete(org: &str, id: &str) -> Result<(), anyhow::Error> {
-    let version = table::delete(org, id).await?;
+    let tombstone = table::delete(org, id).await?;
     coordinator::emit_delete_event(org, id).await?;
     remove_cached(org, id);
+    // Other regions order by the tombstone's own version and time, so both travel as written.
     #[cfg(feature = "enterprise")]
-    super_cluster::emit_delete(
-        org,
-        id,
-        version.unwrap_or_default(),
-        config::utils::time::now_micros(),
-    )
-    .await;
+    {
+        let (version, deleted_at) = tombstone.map_or_else(
+            || (0, config::utils::time::now_micros()),
+            |t| (t.version, t.updated_at),
+        );
+        super_cluster::emit_delete(org, id, version, deleted_at).await;
+    }
     #[cfg(not(feature = "enterprise"))]
-    let _ = version;
+    let _ = tombstone;
     Ok(())
 }
 
@@ -118,8 +119,7 @@ pub async fn delete_by_org(org: &str) -> Result<(), anyhow::Error> {
 pub async fn delete_ended_before(cutoff: i64) -> Result<u64, anyhow::Error> {
     let ended = table::list_ended_before(cutoff).await?;
     let removed = table::delete_ended_before(cutoff).await?;
-    // The listed rows carry the folder the OpenFGA tuple hangs off; the cache of this node
-    // need not hold them (a fresh node, or the flag off here), so it is not the source.
+    // The listed rows, not this node's cache, carry the folder each OpenFGA tuple hangs off.
     for row in &ended {
         coordinator::emit_delete_event(&row.org, &row.id).await?;
         crate::authz::remove_ownership(&row.org, "downtimes", ownership(row)).await;
@@ -149,10 +149,6 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     coordinator::watch_events(on_put, on_delete).await
 }
 
-/// Writes the folder ownership tuple of every cached row in one batched write; rows created
-/// before the RBAC fix lack it, and OpenFGA ignores a tuple that already exists, so a rerun
-/// writes nothing new. The error of the write is returned, so the caller sets its done flag
-/// only after every tuple landed.
 #[cfg(feature = "enterprise")]
 pub async fn backfill_ownership() -> Result<usize, anyhow::Error> {
     let tuples = ownership_backfill(&all_cached());
@@ -204,6 +200,21 @@ pub async fn reload_org(org: &str) -> Result<(), anyhow::Error> {
     let rows = table::list(org, None).await?;
     replace_org(org, rows);
     Ok(())
+}
+
+/// The table write, then this region's nodes, then the other regions; false if `guard` failed.
+async fn write(
+    downtime: &Downtime,
+    guard: Guard<'_>,
+    remeasures: &[Remeasure],
+) -> Result<bool, anyhow::Error> {
+    if !table::write(downtime, guard, remeasures).await? {
+        return Ok(false);
+    }
+    coordinator::emit_put_event(&downtime.org, &downtime.id).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_put(downtime).await;
+    Ok(true)
 }
 
 async fn on_put(org: String, _id: String) -> Result<(), anyhow::Error> {

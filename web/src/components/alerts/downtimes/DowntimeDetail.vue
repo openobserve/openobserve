@@ -226,6 +226,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size="20"
             :page-size-options="[20, 50, 100]"
           >
+            <template #cell-name="{ row }">
+              <div class="flex min-w-0 items-center gap-2">
+                <OTruncatedText class="font-medium">{{ row.name }}</OTruncatedText>
+                <span
+                  v-if="section.module === 'slos' && row.applies === false"
+                  class="text-text-secondary shrink-0 text-xs"
+                  :data-test="`downtime-detail-affected-slos-${row.id}-inert`"
+                >
+                  {{ t("alerts.downtimes.sloCorrections.shorterThanSlice") }}
+                </span>
+              </div>
+            </template>
             <template #cell-matched_by="{ row }">
               <span v-if="matchedByText(row)">{{ matchedByText(row) }}</span>
               <span v-else class="text-text-muted">—</span>
@@ -393,6 +405,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

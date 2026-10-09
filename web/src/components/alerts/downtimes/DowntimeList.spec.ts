@@ -229,4 +229,25 @@ describe("DowntimeList", () => {
     expect(total()).toContain("1");
     wrapper.unmount();
   });
+
+  it("filters to the ended-early rows when the URL changes to that status after mount", async () => {
+    vi.mocked(downtimes.list).mockResolvedValue(
+      page([
+        row({ id: "dt-1", status: "active" }),
+        row({ id: "dt-2", status: "ended_early" }),
+      ]) as never,
+    );
+    const wrapper = await mountList();
+    const shown = (id: string) => wrapper.find(`[data-test="downtime-list-${id}-name"]`).exists();
+    await vi.waitFor(() => expect(shown("dt-1")).toBe(true));
+    expect(shown("dt-2")).toBe(true);
+
+    await wrapper.router.push({
+      query: { ...wrapper.router.currentRoute.value.query, status: "ended_early" },
+    });
+    await flushPromises();
+    expect(shown("dt-1")).toBe(false);
+    expect(shown("dt-2")).toBe(true);
+    wrapper.unmount();
+  });
 });

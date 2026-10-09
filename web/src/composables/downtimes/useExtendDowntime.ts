@@ -21,6 +21,7 @@ import { useOrgId } from "@/composables/query";
 import { extendDowntimeMutation } from "@/services/downtimes.queries";
 import type { Downtime, ExtendDowntimeRequest, ExtendDowntimeResponse } from "@/services/downtimes";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { dbmHttpError } from "@/utils/dbm/format";
 
 /** Extends a downtime and confirms with the new end, or with a link to the follow-up it created. */
 export function useExtendDowntime() {
@@ -62,10 +63,11 @@ export function useExtendDowntime() {
         toast({ variant: "success", message: t("toastMessages.downtimes.extended", { time }) });
       }
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const { serverMessage } = dbmHttpError(err);
       toast({
         variant: "error",
-        message: raw(err?.response?.data?.message) || t("toastMessages.downtimes.extendFailed"),
+        message: serverMessage ? raw(serverMessage) : t("toastMessages.downtimes.extendFailed"),
       });
       return null;
     }

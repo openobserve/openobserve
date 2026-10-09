@@ -138,6 +138,7 @@ fn slo_item(slo: &Slo, groups: &[FieldAlias], alerts: &[(Folder, Alert)]) -> Ite
         } else {
             "query"
         },
+        slice_interval_secs: slo.definition.slice_interval_secs,
     }
 }
 

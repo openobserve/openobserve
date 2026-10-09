@@ -544,10 +544,15 @@ import ExtendDowntimeMenu from "./ExtendDowntimeMenu.vue";
 import MuteMenuItems from "./MuteMenuItems.vue";
 import { useExtendDowntime } from "@/composables/downtimes/useExtendDowntime";
 import { isExtendable } from "@/utils/downtimes/extend";
-import { isEditable, isFinished, sortDowntimeRows } from "@/utils/downtimes/listOrder";
+import {
+  isEditable,
+  isFinished,
+  sortDowntimeRows,
+  statKeyOf,
+  type StatKey,
+} from "@/utils/downtimes/listOrder";
 
 type TypeFilter = "all" | "once" | "recurring";
-type StatKey = "active" | "scheduled" | "recurring" | "ended" | "ended_early" | "cancelled";
 
 const RAIL_COLORS: Record<DowntimeListItem["status"], string> = {
   active: "var(--color-warning-500)",
@@ -639,20 +644,14 @@ const searchAcrossFolders = ref(route.query.scope === "all");
 const typeFilter = ref<TypeFilter>(
   (["once", "recurring"] as const).find((v) => v === route.query.repeat) ?? "all",
 );
-const statFilter = ref<StatKey | null>(
-  (["active", "scheduled", "recurring", "ended", "ended_early", "cancelled"] as const).find(
-    (v) => v === route.query.status,
-  ) ?? null,
-);
+const statFilter = ref<StatKey | null>(statKeyOf(route.query.status));
 const selectedIds = ref<string[]>([]);
 
 // The banner link can land here while the page is open, so each URL value drives its filter on change.
 watch(
   () => route.query.status,
   (status) => {
-    const fromUrl = (["active", "scheduled", "recurring", "ended", "cancelled"] as const).find(
-      (v) => v === status,
-    );
+    const fromUrl = statKeyOf(status);
     if (fromUrl) statFilter.value = fromUrl;
   },
 );

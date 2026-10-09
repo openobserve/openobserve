@@ -38,6 +38,8 @@ pub struct Item {
     pub measured: HashMap<String, String>,
     /// SLOs only: `"query"` or `"source_alert"`.
     pub measured_by: &'static str,
+    /// SLOs only: the slice a correction window must hold a start of.
+    pub slice_interval_secs: i64,
 }
 
 impl Item {
@@ -57,6 +59,7 @@ impl Item {
             folder_id: self.folder_id.clone(),
             matched_by: None,
             missing: None,
+            applies: None,
         }
     }
 }

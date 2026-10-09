@@ -129,6 +129,8 @@ export interface PreviewMatch {
   folder_id: string;
   matched_by?: string;
   missing?: string;
+  /** SLOs on the detail page: false when the window holds no slice start. */
+  applies?: boolean;
 }
 
 export interface DowntimeAffected {

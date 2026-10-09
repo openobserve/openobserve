@@ -46,8 +46,8 @@ use o2_enterprise::enterprise::{
     announcements::meta::{Banner, BannerCount, BannerCta, BannerVariant},
     common::config::get_config as get_o2_config,
     downtimes::{
-        MAX_NAME_LEN, MAX_NOTIFY_DESTINATIONS, banner_message, generated_name, schedule, scope,
-        validate, validate_notifications,
+        MAX_NAME_LEN, MAX_NOTIFY_DESTINATIONS, MIN_ENDING_SOON_LEAD_SECS, banner_message,
+        generated_name, schedule, scope, validate, validate_notifications,
     },
     oncall::routing::normalize_value,
 };
@@ -59,6 +59,7 @@ use self::{
     matching::{Inventory, Matches, Visibility},
     notify::DueEvent,
 };
+use crate::slo::corrections::RemeasurePlan;
 
 /// Match counts are recomputed at most this often per downtime.
 const MATCH_COUNTS_TTL: Duration = Duration::from_secs(60);
@@ -194,9 +195,12 @@ pub async fn get(org: &str, user_id: &str, id: &str) -> Result<DowntimeDetail, D
     let inventory = inventory::cached(org).await?;
     let matches = matches_of(&row, &inventory);
     let visibility = access::visibility(org, user_id).await?;
+    let now = now_micros();
+    let mut affected = affected(&matches, &visibility);
+    mark_slo_applies(&mut affected.slos, &row, &inventory, now);
     Ok(DowntimeDetail {
-        item: list_item(&row, &counts_of(&matches), now_micros()),
-        affected: affected(&matches, &visibility),
+        item: list_item(&row, &counts_of(&matches), now),
+        affected,
         notification_log: notify::log_for(org, id).await?,
     })
 }
@@ -213,9 +217,10 @@ pub async fn create(
     let mut downtime = created(org, folder_id, &req, user_id, now_micros());
     downtime.notifications = with_continues(req.notifications.clone(), None);
     downtime.origin_region = origin_region();
-    db::downtimes::set(&downtime).await?;
+    let plan = remeasure_plan(None, &downtime).await?;
+    db::downtimes::set(&downtime, plan.jobs()).await?;
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&downtime)).await;
-    remeasure_slos(None, &downtime).await;
+    plan.trigger(&downtime.id).await;
     Ok(downtime)
 }
 
@@ -237,11 +242,12 @@ pub async fn update(
     let notifications = with_continues(req.notifications.clone(), continues);
     let mut after = edited(&before, req, user_id, now_micros());
     after.notifications = notifications;
-    set_if_unchanged(&after, before.updated_at).await?;
+    let plan = remeasure_plan(Some(&before), &after).await?;
+    set_if_unchanged(&after, before.updated_at, &plan).await?;
     if !before.same_coverage(&after) {
         forget_recorded_mutes(&after.id).await;
     }
-    remeasure_slos(Some(&before), &after).await;
+    plan.trigger(&after.id).await;
     Ok(after)
 }
 
@@ -255,14 +261,15 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
     }
     let now = now_micros();
     let after = cancelled(&before, user_id, now);
-    set_if_unchanged(&after, before.updated_at).await?;
+    let plan = remeasure_plan(Some(&before), &after).await?;
+    set_if_unchanged(&after, before.updated_at, &plan).await?;
     if let Some(window) = cancelled_window(&before, now) {
         notify::deliver_in_background(
             after.clone(),
             DueEvent::of_window(NotificationEvent::Cancelled, window),
         );
     }
-    remeasure_slos(Some(&before), &after).await;
+    plan.trigger(&after.id).await;
     Ok(after)
 }
 
@@ -282,9 +289,10 @@ pub async fn extend(
     if before.schedule.repeat == Repeat::None {
         let after = extended_once(&before, new_end, user_id, now);
         checked_request(org, user_id, request_of(&after)).await?;
-        set_if_unchanged(&after, before.updated_at).await?;
+        let plan = remeasure_plan(Some(&before), &after).await?;
+        set_if_unchanged(&after, before.updated_at, &plan).await?;
         notify::deliver_in_background(after.clone(), extended_event(window.start, new_end));
-        remeasure_slos(Some(&before), &after).await;
+        plan.trigger(&after.id).await;
         return Ok(ExtendDowntimeResponse {
             downtime: after,
             created_id: None,
@@ -306,12 +314,20 @@ pub async fn extend(
     let follow_up = follow_up(&before, window.end, new_end, user_id, now);
     checked_request(org, user_id, request_of(&follow_up)).await?;
     check_room(org)?;
-    if !db::downtimes::set_if_parent_unchanged(&follow_up, &before.id, before.updated_at).await? {
+    let plan = remeasure_plan(None, &follow_up).await?;
+    if !db::downtimes::set_if_parent_unchanged(
+        &follow_up,
+        &before.id,
+        before.updated_at,
+        plan.jobs(),
+    )
+    .await?
+    {
         return Err(changed_meanwhile());
     }
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&follow_up)).await;
     notify::deliver_in_background(before.clone(), extended_event(window.start, new_end));
-    remeasure_slos(None, &follow_up).await;
+    plan.trigger(&follow_up.id).await;
     Ok(ExtendDowntimeResponse {
         created_id: Some(follow_up.id.clone()),
         downtime: follow_up,
@@ -474,8 +490,9 @@ pub fn continues_window(follow_up: &Downtime, parent: &Downtime, window_end: i64
 async fn set_if_unchanged(
     downtime: &Downtime,
     expected_updated_at: i64,
+    plan: &RemeasurePlan,
 ) -> Result<(), DowntimeError> {
-    if db::downtimes::set_if_unchanged(downtime, expected_updated_at).await? {
+    if db::downtimes::set_if_unchanged(downtime, expected_updated_at, plan.jobs()).await? {
         Ok(())
     } else {
         Err(changed_meanwhile())
@@ -790,15 +807,23 @@ fn follow_up_notifications(parent: &Downtime, window_secs: i64) -> DowntimeNotif
     let own = parent.notifications.clone().unwrap_or_default();
     let mut events = own.events;
     events.started = false;
+    // No lead fits a window shorter than the minimum, so the reminder is dropped, not clamped.
+    let fits_reminder = window_secs >= MIN_ENDING_SOON_LEAD_SECS;
+    events.ending_soon &= fits_reminder;
     let destinations = if events.any() {
         own.destinations
     } else {
         vec![]
     };
+    let ending_soon_lead_secs = if fits_reminder {
+        own.ending_soon_lead_secs.min(window_secs)
+    } else {
+        own.ending_soon_lead_secs
+    };
     DowntimeNotifications {
         destinations,
         events,
-        ending_soon_lead_secs: own.ending_soon_lead_secs.min(window_secs),
+        ending_soon_lead_secs,
         continues: Some(parent.id.clone()),
     }
 }
@@ -937,19 +962,15 @@ async fn forget_recorded_mutes(id: &str) {
     }
 }
 
-/// Queues the re-measures before the request answers, so a restart cannot drop them (WP11).
-async fn remeasure_slos(before: Option<&Downtime>, after: &Downtime) {
+/// Planned before the write that queues it, so a failure fails the save and its retry plans again.
+async fn remeasure_plan(
+    before: Option<&Downtime>,
+    after: &Downtime,
+) -> Result<RemeasurePlan, DowntimeError> {
     if !corrections_may_change(before, after) {
-        return;
+        return Ok(RemeasurePlan::default());
     }
-    if let Err(e) = crate::slo::corrections::remeasure_for_downtime(&after.org, before, after).await
-    {
-        log::warn!(
-            "[DOWNTIMES] SLO re-measure for {}/{} failed: {e}",
-            after.org,
-            after.id
-        );
-    }
+    Ok(crate::slo::corrections::plan_for_downtime(&after.org, before, after).await?)
 }
 
 /// Only the schedule, the targets with their `slo_mode`, the condition and a cancel move a window.
@@ -1149,6 +1170,15 @@ fn affected(matches: &Matches, visibility: &Visibility) -> AffectedItems {
     }
 }
 
+/// The same check as the SLO page's correction refs, so both pages agree on a short window.
+fn mark_slo_applies(slos: &mut [PreviewMatch], row: &Downtime, inventory: &Inventory, now: i64) {
+    for slo in slos {
+        slo.applies = inventory.find(TargetModule::Slos, &slo.id).map(|item| {
+            crate::alerts::downtimes::enterprise::applies_to(row, item.slice_interval_secs, now)
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::downtimes::{
@@ -1290,6 +1320,7 @@ mod tests {
                     folder_id: "default".to_string(),
                     matched_by: None,
                     missing: None,
+                    applies: None,
                 })
                 .collect(),
             ..Default::default()
@@ -1699,6 +1730,40 @@ mod tests {
     }
 
     #[test]
+    fn a_follow_up_shorter_than_the_minimum_lead_drops_the_reminder() {
+        let reminder = NotificationEvents {
+            ending_soon: true,
+            ended: true,
+            ..Default::default()
+        };
+        let parent = notifying(daily("02:00", 3_600), reminder, 600);
+        let next = follow_up(&parent, 3 * HOUR, 3 * HOUR + 30 * 1_000_000, "ops", 0);
+        let n = next.notifications.clone().unwrap();
+        assert!(!n.events.ending_soon);
+        assert!(n.events.ended);
+        assert_eq!(n.destinations, ["slack"]);
+        assert_eq!(
+            validate_notifications(&n, &request_of(&next).schedule, |_| true),
+            Ok(())
+        );
+
+        // With the reminder its only event, the follow-up notifies nobody.
+        let only_reminder = NotificationEvents {
+            ending_soon: true,
+            ..Default::default()
+        };
+        let parent = notifying(daily("02:00", 3_600), only_reminder, 600);
+        let next = follow_up(&parent, 3 * HOUR, 3 * HOUR + 30 * 1_000_000, "ops", 0);
+        let n = next.notifications.clone().unwrap();
+        assert!(!n.events.any());
+        assert!(n.destinations.is_empty());
+        assert_eq!(
+            validate_notifications(&n, &request_of(&next).schedule, |_| true),
+            Ok(())
+        );
+    }
+
+    #[test]
     fn a_follow_up_continues_its_parents_window_in_every_region() {
         let mut parent = daily("02:00", 3_600);
         parent.origin_region = Some("us-east".to_string());
@@ -2005,5 +2070,29 @@ mod tests {
             Some(&row(vec![TargetModule::Slos], 0, HOUR)),
             &dropped
         ));
+    }
+
+    #[test]
+    fn the_detail_marks_an_slo_whose_window_holds_no_slice_start() {
+        let minute = 60_000_000;
+        let short = row(
+            vec![TargetModule::Slos],
+            10 * HOUR + 10 * minute,
+            10 * HOUR + 40 * minute,
+        );
+        let slo = |id: &str, slice_interval_secs| matching::Item {
+            id: id.to_string(),
+            slice_interval_secs,
+            ..Default::default()
+        };
+        let inventory = Inventory {
+            slos: vec![slo("hourly", 3_600), slo("minutely", 60)],
+            ..Default::default()
+        };
+        let mut slos = matched(&["hourly", "minutely", "unknown"]).matched;
+
+        mark_slo_applies(&mut slos, &short, &inventory, 10 * HOUR);
+        let applies: Vec<_> = slos.iter().map(|m| m.applies).collect();
+        assert_eq!(applies, [Some(false), Some(true), None]);
     }
 }

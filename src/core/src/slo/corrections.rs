@@ -40,6 +40,33 @@ use super::ingest::PassParams;
 /// `(group_key, slice_start)` of a slice row.
 pub type SliceKey = (String, i64);
 
+/// The re-measures a downtime change needs, planned before the write that queues them with it.
+#[derive(Debug, Default)]
+pub struct RemeasurePlan {
+    slos: Vec<Slo>,
+    jobs: Vec<jobs::Remeasure>,
+}
+
+impl RemeasurePlan {
+    /// The jobs the downtime write queues in its own transaction.
+    pub fn jobs(&self) -> &[jobs::Remeasure] {
+        &self.jobs
+    }
+
+    /// Wakes the backfill lane of every planned SLO, once the write committed its jobs.
+    pub async fn trigger(&self, downtime_id: &str) {
+        for (slo, job) in self.slos.iter().zip(&self.jobs) {
+            log::info!(
+                "[slo] re-measuring {} over [{}, {}) for downtime {downtime_id}",
+                slo.id,
+                job.range_start,
+                job.range_end
+            );
+            super::service::push_backfill_trigger(slo).await;
+        }
+    }
+}
+
 /// Fills and corrects slices in windows, un-corrects keys corrected before; returns rows added.
 pub fn apply(
     slices: &mut Vec<SliceRow>,
@@ -60,25 +87,19 @@ pub fn apply(
     added + restore_corrected(slices, windows, corrected_before, sli_type, params)
 }
 
-/// Queues, before returning, a re-measure of the windows the change moved for every SLO it covers.
-pub async fn remeasure_for_downtime(
+/// Plans a re-measure of the windows the change moves for every SLO it covers; an error plans none.
+pub async fn plan_for_downtime(
     org: &str,
     before: Option<&Downtime>,
     after: &Downtime,
-) -> Result<usize, anyhow::Error> {
+) -> Result<RemeasurePlan, anyhow::Error> {
     let slos = infra::table::slos::list(get_orm_client_ro().await, org, None).await?;
-    let db = get_orm_client_rw().await;
-    let now = config::utils::time::now_micros() / 1_000_000;
     let mut covered = Vec::with_capacity(slos.len());
     for slo in slos.into_iter().filter(|slo| slo.enabled) {
         let dims = crate::alerts::downtimes::dimensions_for_slo(&slo).await;
         covered.push((slo, dims));
     }
-    let queued = queue_remeasures(db, &covered, before, after, now).await;
-    for slo in &queued {
-        super::service::push_backfill_trigger(slo).await;
-    }
-    Ok(queued.len())
+    plan_remeasures(get_orm_client_rw().await, &covered, before, after).await
 }
 
 /// The one aligned range inside `[from, to)` covering every window, gaps between windows included.
@@ -151,44 +172,36 @@ pub fn corrected_keys_sql(slo_id: &str, generation: i32, start: i64, end: i64) -
     )
 }
 
-/// Queues the re-measure of every SLO the edit moved a window of; the SLOs queued.
-async fn queue_remeasures<'a>(
+/// The re-measure of every SLO the edit moves a window of; one failed read fails the plan.
+async fn plan_remeasures(
     db: &DatabaseConnection,
-    slos: &'a [(Slo, HashMap<String, String>)],
+    slos: &[(Slo, HashMap<String, String>)],
     before: Option<&Downtime>,
     after: &Downtime,
-    now: i64,
-) -> Vec<&'a Slo> {
-    let mut queued = Vec::new();
+) -> Result<RemeasurePlan, anyhow::Error> {
+    let mut plan = RemeasurePlan::default();
     for (slo, dims) in slos {
-        match remeasure_slo(db, slo, dims, before, after, now).await {
-            Ok(Some((start, end))) => {
-                log::info!(
-                    "[slo] re-measuring {} over [{start}, {end}) for downtime {}",
-                    slo.id,
-                    after.id
-                );
-                queued.push(slo);
-            }
-            Ok(None) => {}
-            Err(e) => log::warn!(
-                "[slo] re-measure of {} for downtime {} failed: {e}",
-                slo.id,
-                after.id
-            ),
-        }
+        let Some((start, end)) = remeasure_slo(db, slo, dims, before, after).await? else {
+            continue;
+        };
+        plan.jobs.push(jobs::Remeasure {
+            slo_id: slo.id.clone(),
+            generation: slo.definition_generation,
+            range_start: start,
+            range_end: end,
+        });
+        plan.slos.push(slo.clone());
     }
-    queued
+    Ok(plan)
 }
 
-/// Queues the re-measure one SLO needs for the edit; the queued range, or `None` if nothing moved.
+/// The range one SLO needs re-measured for the edit, or `None` if nothing moved.
 async fn remeasure_slo(
     db: &DatabaseConnection,
     slo: &Slo,
     dims: &HashMap<String, String>,
     before: Option<&Downtime>,
     after: &Downtime,
-    now: i64,
 ) -> Result<Option<(i64, i64)>, anyhow::Error> {
     let Some(status) = slo_table::load_status(db, &slo.id, "").await? else {
         return Ok(None);
@@ -209,12 +222,12 @@ async fn remeasure_slo(
     });
     let new = downtime_windows(slo, dims, std::slice::from_ref(after), from, to);
     let windows = changed_windows(old, new);
-    let Some((start, end)) = remeasure_span(&windows, from, to, slo.definition.slice_interval_secs)
-    else {
-        return Ok(None);
-    };
-    jobs::queue_remeasure(db, &slo.id, slo.definition_generation, start, end, now).await?;
-    Ok(Some((start, end)))
+    Ok(remeasure_span(
+        &windows,
+        from,
+        to,
+        slo.definition.slice_interval_secs,
+    ))
 }
 
 #[cfg(feature = "enterprise")]
@@ -920,6 +933,19 @@ mod tests {
 
         async fn jobs_of(db: &DatabaseConnection) -> Vec<slo_backfill_jobs::Model> {
             slo_backfill_jobs::Entity::find().all(db).await.unwrap()
+        }
+
+        /// Plans the edit and queues its jobs, as the downtime write does in its transaction.
+        async fn queue_remeasures(
+            db: &DatabaseConnection,
+            slos: &[(Slo, HashMap<String, String>)],
+            before: Option<&Downtime>,
+            after: &Downtime,
+            now: i64,
+        ) -> Vec<String> {
+            let plan = plan_remeasures(db, slos, before, after).await.unwrap();
+            jobs::queue_remeasures(db, plan.jobs(), now).await.unwrap();
+            plan.slos.into_iter().map(|slo| slo.id).collect()
         }
 
         #[tokio::test]

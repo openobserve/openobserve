@@ -2901,6 +2901,32 @@ fn model_to_incident_with_topology(
     }
 }
 
+/// Clears the mute before the events, so a failed append cannot leave it muted.
+async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    incident_id: &str,
+    downtime_id: &str,
+) -> Result<(), anyhow::Error> {
+    infra::table::alert_incidents::clear_muted_by_downtime_id_with(
+        conn,
+        org_id,
+        incident_id,
+        downtime_id,
+    )
+    .await?;
+    let resolved = IncidentEvent::resolved(None);
+    infra::table::incident_events::append_with(conn, org_id, incident_id, resolved).await?;
+    let name = infra::table::downtimes::get_with(conn, org_id, downtime_id)
+        .await
+        .ok()
+        .flatten()
+        .map_or_else(|| downtime_id.to_string(), |d| d.name);
+    let comment = IncidentEvent::comment("system", format!("Resolved while muted by {name}"));
+    infra::table::incident_events::append_with(conn, org_id, incident_id, comment).await?;
+    Ok(())
+}
+
 /// Update incident status
 pub async fn update_status(
     org_id: &str,
@@ -3079,30 +3105,17 @@ pub async fn update_status_as(
 }
 
 /// Records the resolved event of the auto-resolve job; a muted incident notifies nobody (D3).
-pub async fn record_auto_resolved(org_id: &str, incident_id: &str) -> Result<(), anyhow::Error> {
-    let muted_by = infra::table::alert_incidents::get(org_id, incident_id)
-        .await?
-        .and_then(|m| m.muted_by_downtime_id);
-    let Some(downtime_id) = muted_by else {
+pub async fn record_auto_resolved(
+    org_id: &str,
+    incident_id: &str,
+    muted_by_downtime_id: Option<&str>,
+) -> Result<(), anyhow::Error> {
+    let Some(downtime_id) = muted_by_downtime_id else {
         return crate::incidents::append_event(org_id, incident_id, IncidentEvent::resolved(None))
             .await;
     };
-    infra::table::incident_events::append(org_id, incident_id, IncidentEvent::resolved(None))
-        .await?;
-    let name = infra::table::downtimes::get(org_id, &downtime_id)
-        .await
-        .ok()
-        .flatten()
-        .map_or_else(|| downtime_id.clone(), |d| d.name);
-    infra::table::incident_events::append(
-        org_id,
-        incident_id,
-        IncidentEvent::comment("system", format!("Resolved while muted by {name}")),
-    )
-    .await?;
-    infra::table::alert_incidents::clear_muted_by_downtime_id(org_id, incident_id, &downtime_id)
-        .await?;
-    Ok(())
+    let conn = infra::db::get_orm_client_rw().await;
+    record_muted_auto_resolve(conn, org_id, incident_id, downtime_id).await
 }
 
 /// Update incident title
@@ -3529,5 +3542,31 @@ mod tests {
     #[tokio::test]
     async fn an_incident_that_is_not_muted_has_nothing_to_unmute() {
         assert!(!unmute_for_firing("default", &incident(None), None).await);
+    }
+
+    #[tokio::test]
+    async fn a_muted_auto_resolve_whose_event_append_fails_still_clears_the_mute() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, EntityTrait, Schema};
+
+        // Only the incidents table exists, so both event appends fail.
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        let row: alert_incidents::ActiveModel = incident(Some("dt-1")).into();
+        alert_incidents::Entity::insert(row.reset_all())
+            .exec(&db)
+            .await
+            .unwrap();
+
+        let recorded = record_muted_auto_resolve(&db, "default", "inc-1", "dt-1").await;
+        assert!(recorded.is_err());
+        let stored = alert_incidents::Entity::find_by_id("inc-1".to_string())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.muted_by_downtime_id, None);
     }
 }

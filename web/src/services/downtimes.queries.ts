@@ -37,6 +37,7 @@ import { syntheticsKeys } from "./synthetics.querykeys";
 import { sloKeys } from "./slos.querykeys";
 import { announcementKeys } from "./announcements.querykeys";
 import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
+import { dbmHttpError } from "@/utils/dbm/format";
 import {
   downtimeVariables,
   isEmailDestination,
@@ -255,11 +256,11 @@ const sendTestTo = async (
     if (!request) return { destination: dest.name, ok: false, unsupported: true };
     const res = (await destination.test({ org_identifier: org, data: request })).data;
     return { destination: dest.name, ok: !!res?.success, error: res?.error ?? undefined };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       destination: dest.name,
       ok: false,
-      error: err?.response?.data?.message ?? err?.message,
+      error: dbmHttpError(err).serverMessage ?? (err instanceof Error ? err.message : undefined),
     };
   }
 };

@@ -24,6 +24,22 @@ const STATUS_ORDER: Record<DowntimeStatus, number> = {
   cancelled: 4,
 };
 
+/** The list's stat filters, read from `?status=` on load and on every later URL change. */
+export const STAT_KEYS = [
+  "active",
+  "scheduled",
+  "recurring",
+  "ended",
+  "ended_early",
+  "cancelled",
+] as const;
+
+export type StatKey = (typeof STAT_KEYS)[number];
+
+/** The stat filter a `?status=` value names, or null for anything else. */
+export const statKeyOf = (value: unknown): StatKey | null =>
+  STAT_KEYS.find((key) => key === value) ?? null;
+
 type Row = Pick<DowntimeListItem, "id" | "status" | "schedule" | "current_window" | "next_window">;
 
 /** An edit of a finished row changes nothing, so it is duplicated instead. */
