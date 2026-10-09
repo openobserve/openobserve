@@ -204,6 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sampled="ratio"
       :events="events"
       :path-keys="branch.pathKeys"
+      :deleted-names="namedEvents.deletedNames.value"
       @update:open="(v) => !v && (branch = null)"
       @build-funnel="buildFunnel"
     />
@@ -312,7 +313,7 @@ const anchorKey = computed(() => {
 const anchorLabel = computed(() => {
   const d = def.value;
   const s = d.cohort ? d.cohort.funnel.steps[d.cohort.stepIndex - 1] : d.anchor;
-  return s ? stepLabel(s, events.value) : "";
+  return s ? stepLabel(s, events.value, namedEvents.deletedNames.value) : "";
 });
 
 const shownPanel = computed<PanelState<unknown>>(() =>
@@ -465,8 +466,7 @@ const nodeValue = (name: string) => flow.value?.nodes.find((n) => n.name === nam
 const linkValue = (source: string, target: string) =>
   flow.value?.links.find((l) => l.source === source && l.target === target)?.value ?? null;
 
-// A link already carries the full chain of keys from the anchor to its target; a box can be fed by
-// several links with different histories, so it falls back to the heaviest one as the representative path.
+// A box fed by several links with different histories falls back to the heaviest as the representative path.
 const pathKeysTo = (targetName: string, sourceName: string | null): string[] => {
   const f = flow.value;
   if (!f) return [];

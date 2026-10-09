@@ -341,6 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :steps="def.steps"
               :dim-label="dimLabel"
               :events="events"
+              :deleted-names="namedEvents.deletedNames.value"
             />
           </template>
         </div>
@@ -359,6 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :sampled="pa.sampleRatio.value"
         :expected-dropped="expectedDropped"
         :events="events"
+        :deleted-names="namedEvents.deletedNames.value"
         @update:open="(v) => !v && closeDropoff()"
         @paths="openCohortPaths"
       />
@@ -648,7 +650,13 @@ watch(
 
 // A saved funnel's name is the panel's default title; the panel stays a snapshot.
 const dashboardPanel = () => {
-  const panel = buildFunnelPanel(pa.scope.value, def.value, events.value, t);
+  const panel = buildFunnelPanel(
+    pa.scope.value,
+    def.value,
+    events.value,
+    t,
+    namedEvents.deletedNames.value,
+  );
   return pa.openedFunnel.value ? { ...panel, title: pa.openedFunnel.value.name } : panel;
 };
 

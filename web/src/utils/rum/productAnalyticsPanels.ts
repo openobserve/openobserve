@@ -113,11 +113,14 @@ export function buildTrendsPanel(
   interval: "1 day" | "1 week",
   tz: string,
   t: TranslateFn,
+  deletedNames: Readonly<Record<string, string>> = {},
 ): Record<string, unknown> {
   const sql = trendSql(scope, id, interval, tz, series, events);
   const x = axis("x_axis_1", t("rum.analytics.trends.time"));
   const y = series.length
-    ? series.slice(0, 5).map((s, i) => axis(`y_axis_${i + 1}`, raw(stepLabel(s, events))))
+    ? series
+        .slice(0, 5)
+        .map((s, i) => axis(`y_axis_${i + 1}`, raw(stepLabel(s, events, deletedNames))))
     : metric === "users" && id
       ? [axis("y_axis_2", t("rum.analytics.trends.users"))]
       : [axis("y_axis_1", t("rum.analytics.trends.sessions"))];
@@ -136,10 +139,13 @@ export function buildFunnelPanel(
   def: FunnelDef,
   events: NamedEvent[],
   t: TranslateFn,
+  deletedNames: Readonly<Record<string, string>> = {},
 ): Record<string, unknown> {
   const sql = funnelPanelSql(scope, def, { events, sample: 1 });
-  const first = def.steps[0] ? stepLabel(def.steps[0], events) : "";
-  const last = def.steps.length ? stepLabel(def.steps[def.steps.length - 1], events) : "";
+  const first = def.steps[0] ? stepLabel(def.steps[0], events, deletedNames) : "";
+  const last = def.steps.length
+    ? stepLabel(def.steps[def.steps.length - 1], events, deletedNames)
+    : "";
   return sqlPanel(
     "rum-analytics-funnel",
     "bar",

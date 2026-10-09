@@ -103,11 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <div v-if="!eventsHeld || chartSeries.length" class="h-64 w-full px-2 pb-2">
-      <!-- While events are loading, the schema would query an unresolved
-           event series, so the renderer must not mount at all here (v-if,
-           not v-show). Once events are ready, the renderer has to stay
-           mounted to run its query and report back, so its own first-load
-           wait is a v-show overlay instead. -->
+      <!-- v-if (not v-show): an unresolved event series must not mount the renderer at all. -->
       <OSkeleton
         v-if="eventsGate === 'loading'"
         class="h-full w-full"
@@ -182,6 +178,7 @@ const props = defineProps<{
   eventsStatus: NamedEventsStatus;
   range: { startUs: number; endUs: number };
   timezone: string;
+  deletedNames?: Readonly<Record<string, string>>;
 }>();
 const emit = defineEmits<{ "update:series": [StepRef[]]; "retry-events": [] }>();
 const { t } = useI18nTyped();
@@ -242,6 +239,7 @@ const panelSchema = computed(() =>
     interval.value,
     props.timezone,
     t,
+    props.deletedNames,
   ),
 );
 
@@ -262,11 +260,7 @@ const rendererKey = computed(() =>
   ]),
 );
 
-// `forceLoad` (passed below) skips PanelSchemaRenderer's cache-restore
-// shortcut, so its `loading` always flips true before a fetch and false
-// after — safe to drive a skeleton off it. A key change destroys and
-// recreates the renderer (new range/query/metric), so the skeleton must
-// come back until that fresh instance reports its own first load done.
+// `forceLoad` makes `loading` a reliable skeleton signal; a rendererKey change must re-arm it.
 const chartLoading = ref(true);
 watch(rendererKey, () => {
   chartLoading.value = true;
@@ -276,7 +270,7 @@ watch(rendererKey, () => {
 const labelOf = (s: StepRef): I18nText =>
   eventsGate.value !== "ready" && s.kind === "e" && !props.events.some((e) => e.id === s.key)
     ? t("rum.analytics.events.unloadedName")
-    : raw(stepLabel(s, props.events));
+    : raw(stepLabel(s, props.events, props.deletedNames));
 
 const seriesId = (s: StepRef) => `${s.kind}:${s.key}`;
 

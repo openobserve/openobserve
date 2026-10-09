@@ -590,15 +590,7 @@ const dateTime = ref({
 });
 const rumSessionStreamName = "_rumdata";
 
-// Non-editable part of the sessions query, kept verbatim in step with the
-// WHERE clause getSessions() builds so the sidebar's value counts describe the
-// same rows the table does. Passed separately from the editor value: `query`
-// drives the sidebar's include/exclude checkbox state, and a clause the user
-// cannot edit would show there as permanently ticked.
-// The health/type/device segments stay out — they filter the fetched rows
-// client-side (see tableRows), not the underlying query.
-// Sessions are listed regardless of replay availability; has_replay only toggles the
-// per-row play icon (see the cell-action_play template and getSessions()'s hasReplayField).
+// Mirrors getSessions()'s WHERE clause minus the editor value, so the sidebar's checkbox state reflects the query, not what the user is still typing (health/type/device segments are excluded too — they filter client-side, see tableRows).
 const fieldListBaseFilter = "1 = 1";
 
 // Dynamic editor height based on content lines
@@ -1026,6 +1018,7 @@ const getSessions = () => {
   req.query.sql = `
     SELECT
       min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp,
+      max(${store.state.zoConfig.timestamp_column}) as zo_sql_end_timestamp,
       min(type) as type,
       min(source) as source,
       SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count,
@@ -1084,15 +1077,16 @@ const getSessions = () => {
           city: hit.city,
           country_iso_code: hit.country_iso_code?.toLowerCase(),
           has_replay: hit.has_replay === 1 || hit.has_replay === true,
+          // _rumdata-derived fallback (us → ms) for sessions with no replay recording;
+          // getSessionTimeFromReplay overwrites it with the replay-authoritative value.
+          time_spent: (hit.zo_sql_end_timestamp - hit.zo_sql_timestamp) / 1000,
         };
       });
 
-      // Most sessions have no replay recording, so paint the list from _rumdata alone —
-      // don't make it wait on a second query to a stream that may not even exist.
+      // Paint from _rumdata alone — don't wait on a second query to a stream that may not exist.
       rows.value = Object.values(sessionState.data.sessions);
 
-      // Only this page's hits, not the full accumulated rows.value, so a later scroll
-      // page doesn't re-query replay data for sessions already enriched by an earlier one.
+      // Only this page's hits, so a later scroll page doesn't re-query sessions already enriched.
       const replaySessionIds = hits
         .filter((hit: any) => sessionState.data.sessions[hit.session_id]?.has_replay)
         .map((hit: any) => hit.session_id);
@@ -1171,10 +1165,7 @@ function clearWindowAggregates() {
   errorCluster.value = null;
 }
 
-// Query 2: Get start/end times from _sessionreplay, enriching the rows Query 1 already
-// painted. Only ever called with replay-tagged session IDs, so an empty/sanitized-away
-// list just means nothing to enrich — rows.value already holds the real session data and
-// must be left alone.
+// Only ever called with replay-tagged session IDs, so an empty/sanitized-away list means nothing to enrich — rows.value must be left alone.
 const getSessionTimeFromReplay = (req: any, sessionIds: string[], signal?: AbortSignal) => {
   if (sessionIds.length === 0) {
     isLoading.value.pop();
