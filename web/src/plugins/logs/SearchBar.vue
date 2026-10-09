@@ -2707,9 +2707,7 @@ export default defineComponent({
               for (const stream of searchObj.data.stream?.selectedStreamFields || []) {
                 if (
                   stream.name == col &&
-                  // A VRL-derived column named in the SQL is not a stream field, so it
-                  // must not be stored as an interesting field (nor persisted): quick
-                  // mode would then build a SELECT the backend rejects.
+                  // A VRL-derived column must not be stored, nor persisted, as interesting.
                   isSchemaBackedField(stream) &&
                   !searchObj.data.stream.interestingFieldList.includes(col) &&
                   col !== store.state.zoConfig?.timestamp_column

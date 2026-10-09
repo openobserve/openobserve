@@ -738,11 +738,7 @@ export const useStreamFields = () => {
                     group: resolveFieldGroup(key, "Utf8", semanticIndex, dynamicPrefixes),
                     isSchemaField: false,
                     showValues: false,
-                    // Hit-only fields (a VRL function's output) are not schema-backed,
-                    // so they can never be part of the quick-mode SELECT. Never carry
-                    // one as interesting: an entry persisted by an older build would
-                    // otherwise be re-added to interestingFieldList on every extract,
-                    // and the query it builds fails with "Search field not found".
+                    // Never interesting: a persisted entry would be re-added on every extract.
                     isInterestingField: false,
                     streams: [],
                   };

@@ -1478,8 +1478,6 @@ export default defineComponent({
             }
 
             if (searchObj.data.stream?.selectedStreamFields?.length > 0) {
-              // Drops the VRL-derived fields too — they are not selectable columns,
-              // so they must not survive into [FIELD_LIST].
               pruneInterestingFields(
                 searchObj.data.stream.interestingFieldList,
                 searchObj.data.stream.selectedStreamFields,
@@ -1829,10 +1827,7 @@ export default defineComponent({
     const handleQuickModeChange = () => {
       if (searchObj.meta.quickMode == true) {
         let field_list: string = "*";
-        // Same prune as setQuery/buildSearch: a non-schema field in this SELECT
-        // would fail the search with "Search field not found". Guarded on the schema
-        // being loaded, like setQuery — pruning against an empty field list would
-        // wipe the user's interesting fields instead of just the unselectable ones.
+        // Guarded: pruning before the fields load would wipe the user's interesting fields.
         if (searchObj.data.stream.selectedStreamFields?.length > 0) {
           pruneInterestingFields(
             searchObj.data.stream.interestingFieldList,

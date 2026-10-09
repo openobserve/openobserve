@@ -128,8 +128,6 @@ defineEmits<{
 
 const isFieldSelected = computed(() => props.selectedFields.includes(props.field.name));
 
-// Quick mode turns the interesting fields into the query's SELECT list, so only a
-// schema-backed field can be one — offering the toggle on a VRL-derived field would
-// build a query that fails with "Search field not found". See interestingFields.ts.
+// Quick mode selects the interesting fields by name, so only a schema-backed field can be one.
 const isInterestingCandidate = computed(() => isSchemaBackedField(props.field));
 </script>

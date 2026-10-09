@@ -320,8 +320,7 @@ export const useSearchQuery = (t: TranslateFn) => {
         req["clusters"] = searchObj.meta.clusters;
       }
 
-      // Only schema-backed fields can be in the SELECT; see interestingFields.ts.
-      // In read-only mode, create a filtered copy; in normal mode, mutate in place
+      // Read-only must not mutate the list; see interestingFields.ts for the predicate.
       const interestingFields: string[] = readOnly
         ? selectableInterestingFields(
             searchObj.data.stream.interestingFieldList,

@@ -196,10 +196,7 @@ const emit = defineEmits<{
 const isExpanded = ref(props.expanded ?? false);
 const fieldValuesPanelRef = ref();
 
-// Only a schema-backed field can be an interesting field, since quick mode selects
-// them by name. FieldRow currently routes non-schema fields to its simple row rather
-// than here, so this mirrors that gate instead of relying on it. See
-// interestingFields.ts.
+// Mirrors FieldRow's gate rather than relying on it routing non-schema fields elsewhere.
 const isInterestingCandidate = computed(() => isSchemaBackedField(props.field));
 
 watch(
