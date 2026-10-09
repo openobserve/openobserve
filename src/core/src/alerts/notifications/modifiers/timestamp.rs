@@ -29,7 +29,7 @@ pub(super) fn format(input: &str, args: &str, micros: bool) -> Option<String> {
     let timestamp = timestamp_value(input, micros)?;
     let reference_micros = timestamp.timestamp_micros();
     let timezone = args.get(1).map(String::as_str).unwrap_or("UTC");
-    if timezone.is_empty() || !valid_timezone_offset(timezone) {
+    if !valid_timezone(timezone) {
         return None;
     }
     let offset = config::utils::time::parse_timezone_to_offset_at(timezone, reference_micros)?;
@@ -112,7 +112,11 @@ fn decimal_timestamp(input: &str, micros: bool) -> Option<chrono::DateTime<chron
     )
 }
 
-fn valid_timezone_offset(timezone: &str) -> bool {
+fn valid_timezone(timezone: &str) -> bool {
+    // The shared parser aliases CST to China Standard Time, which is ambiguous for users.
+    if timezone.is_empty() || timezone.eq_ignore_ascii_case("cst") {
+        return false;
+    }
     if !timezone.starts_with(['+', '-']) {
         return true;
     }
@@ -213,6 +217,8 @@ mod tests {
             "formatTimestamp(1)",
             r#"formatTimestamp("%Q")"#,
             r#"formatTimestamp("%Y", "Unknown/Zone")"#,
+            r#"formatTimestamp("%Y", "CST")"#,
+            r#"formatTimestamp("%Y", "cst")"#,
             r#"formatTimestamp("%Y", "+08:99")"#,
             r#"formatTimestamp("%Y", "+8")"#,
             r#"formatTimestamp("%Y", "")"#,

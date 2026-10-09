@@ -45,18 +45,14 @@ mod tests {
 
     #[test]
     fn special_and_invalid_numbers() {
-        for function in ["humanizePercentage"] {
-            for value in ["NaN", "+Inf", "-Inf"] {
-                let expected = if function == "humanizePercentage" {
-                    format!("{value}%")
-                } else {
-                    value.to_string()
-                };
-                assert_eq!(format_modifier(value, function), Some(expected));
-            }
-            for invalid in ["", "abc", "1, 2", "null", "true", " 12 "] {
-                assert_eq!(format_modifier(invalid, function), None);
-            }
+        for value in ["NaN", "+Inf", "-Inf"] {
+            assert_eq!(
+                format_modifier(value, "humanizePercentage"),
+                Some(format!("{value}%"))
+            );
+        }
+        for invalid in ["", "abc", "1, 2", "null", "true", " 12 "] {
+            assert_eq!(format_modifier(invalid, "humanizePercentage"), None);
         }
     }
 }
