@@ -241,7 +241,8 @@ size="16px" class="q-mr-xs" />
             self="top middle"
             class="organization-menu-o2"
           >
-            <q-list data-test="organization-menu-list" style="width: 100%">
+            <!-- Firefox 157+ sizes collapsed flex items to zero, so the menu needs its own width or Quasar never positions it. -->
+            <q-list data-test="organization-menu-list" style="width: 470px">
               <q-item data-test="organization-menu-item" style="padding: 0">
                 <q-item-section
                   data-test="organization-menu-item-section"
