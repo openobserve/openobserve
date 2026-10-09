@@ -58,6 +58,8 @@ export interface DecodeResult {
 
 export interface MultiViewDecoder {
   push(segments: any[], watermark: number): DecodeResult;
+  /** Each view's last manifest row end, for views whose page unloaded without recording a ViewEnd. */
+  setViewEnds(ends: Map<string, number>): void;
   switches(): ReplaySwitch[];
   staleSpans(): StaleSpan[];
   concurrent(): boolean;
@@ -122,7 +124,11 @@ export function createMultiViewDecoder(): MultiViewDecoder {
   const stale: StaleSpan[] = [];
   let active: string | null = null;
   let pendingHandOver: { at: number } | null = null;
-  let sawConcurrent = false;
+  // The switch that left each view while it was still open, for a ViewEnd that arrives just after it.
+  const leftOpen = new Map<string, ReplaySwitch>();
+  let knownEnds = new Map<string, number>();
+  let expiries: [string, number][] = [];
+  let nextExpiry = 0;
   let clockStarted = false;
   let lastClock = -Infinity;
   let lastDecodedAt = -Infinity;
@@ -189,8 +195,9 @@ export function createMultiViewDecoder(): MultiViewDecoder {
   }
 
   function openStale(view: ViewTrack, at: number) {
+    // An ended view never takes another snapshot, so a span opened on it would never close.
+    if (view.ended || view.openStale) return;
     view.converter?.markStale();
-    if (view.openStale) return;
     view.openStale = { viewId: view.viewId, from: at, to: null };
     stale.push(view.openStale);
   }
@@ -204,17 +211,49 @@ export function createMultiViewDecoder(): MultiViewDecoder {
   function activate(view: ViewTrack, at: number, reason: SwitchReason, rebuilt: boolean) {
     const previous = active === null ? null : views.get(active);
     const fromEnded = !previous || previous.ended;
-    if (!fromEnded) sawConcurrent = true;
     active = view.viewId;
     pendingHandOver = null;
-    switchLog.push({
+    const entry: ReplaySwitch = {
       at,
       viewId: view.viewId,
       reason,
       rebuilt,
       fromEnded,
       href: view.lastMeta?.data?.href,
-    });
+    };
+    switchLog.push(entry);
+    if (previous && !fromEnded) leftOpen.set(previous.viewId, entry);
+  }
+
+  function endView(view: ViewTrack, at: number) {
+    view.ended = true;
+    view.converter = null;
+    view.preamble = [];
+    view.rebuilt = null;
+    if (view.viewId === active) pendingHandOver = { at };
+  }
+
+  // A bfcache restore stamps its snapshot before the old view's ViewEnd, so that switch was a hand-over.
+  function onViewEnd(view: ViewTrack, at: number) {
+    const left = leftOpen.get(view.viewId);
+    if (left && at - left.at <= HANDOVER_GRACE_MS) left.fromEnded = true;
+    endView(view, at);
+  }
+
+  function setViewEnds(ends: Map<string, number>) {
+    if (ends === knownEnds) return;
+    knownEnds = ends;
+    expiries = [...ends].sort((a, b) => a[1] - b[1]);
+    nextExpiry = 0;
+  }
+
+  // A full-page navigation or tab close records no ViewEnd, so a view past its last stored row has ended.
+  function expireViews(at: number) {
+    while (nextExpiry < expiries.length && expiries[nextExpiry][1] < at) {
+      const [viewId, end] = expiries[nextExpiry++];
+      const view = views.get(viewId);
+      if (view && !view.ended) endView(view, end);
+    }
   }
 
   function rebuild(view: ViewTrack, at: number, reason: SwitchReason): any[] {
@@ -294,6 +333,9 @@ export function createMultiViewDecoder(): MultiViewDecoder {
     view.lastSeenAt = at;
     closeStale(view, at);
     const current = active === null ? null : views.get(active);
+    const currentEnd = current ? knownEnds.get(current.viewId) : undefined;
+    if (current && !current.ended && currentEnd !== undefined && currentEnd <= at)
+      endView(current, currentEnd);
     const takesOver = view.focused !== false || !current || current.ended;
     if (view.viewId !== active && takesOver) {
       activate(view, at, "snapshot", false);
@@ -323,13 +365,7 @@ export function createMultiViewDecoder(): MultiViewDecoder {
     if (converted.some((r) => r?.type === FULL_SNAPSHOT)) onSnapshot(view, record.timestamp, out);
     if (view.viewId === active) out.push(...converted);
     else if (!view.hasSnapshot) view.preamble.push(...converted);
-    if (record?.type === VIEW_END) {
-      view.ended = true;
-      view.converter = null;
-      view.preamble = [];
-      view.rebuilt = null;
-      if (view.viewId === active) pendingHandOver = { at: record.timestamp };
-    }
+    if (record?.type === VIEW_END) onViewEnd(view, record.timestamp);
     return 0;
   }
 
@@ -389,6 +425,7 @@ export function createMultiViewDecoder(): MultiViewDecoder {
     let skippedRecords = 0;
     for (let key = nextKey(watermark); key !== null; key = nextKey(watermark)) {
       const item = take(key);
+      expireViews(item.at);
       if (pendingHandOver && item.at > pendingHandOver.at + HANDOVER_GRACE_MS)
         out.push(...resolveHandOver(item.at));
       if (item.at > lastDecodedAt) lastDecodedAt = item.at;
@@ -399,15 +436,18 @@ export function createMultiViewDecoder(): MultiViewDecoder {
       }
       skippedRecords += step(viewFor(key), item, out);
     }
-    if (pendingHandOver && watermark === Infinity) out.push(...resolveHandOver(pendingHandOver.at));
+    // An earlier push's clock may already be past the ended view, and the player drops records behind its playhead.
+    if (pendingHandOver && watermark === Infinity)
+      out.push(...resolveHandOver(Math.max(pendingHandOver.at, lastClock + 1)));
     addClock(out, earliest, watermark);
     return { events: out, skippedRecords };
   }
 
   return {
     push,
-    switches: () => switchLog.slice(),
+    setViewEnds,
+    switches: () => switchLog.map((entry) => ({ ...entry })),
     staleSpans: () => stale.map((span) => ({ ...span })),
-    concurrent: () => sawConcurrent,
+    concurrent: () => switchLog.some((entry) => entry.reason !== "missing" && !entry.fromEnded),
   };
 }
