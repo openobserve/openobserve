@@ -107,7 +107,7 @@ fn next_placeholder(tpl: &str, cursor: usize) -> Option<(usize, usize, bool)> {
         match ch {
             '{' if modifier => nested += 1,
             '{' => {
-                start = Some(index);
+                start = (!tpl[index + 1..].trim_start().starts_with('"')).then_some(index);
                 modifier = false;
             }
             '|' if start.is_some() => modifier = true,

@@ -840,4 +840,47 @@ mod golden {
             r#"{t|formatTimestamp("{host} %Q")} expanded"#
         );
     }
+
+    #[test]
+    fn custom_json_pipes_and_links_preserve_placeholders() {
+        let ctx = NotificationContext {
+            alert_count: "3".into(),
+            row_columns: vec![("bytes".into(), vec!["1536".into()])],
+            ..Default::default()
+        };
+        for prefix in ["a|b", "<https://example.com|View>"] {
+            let tpl = format!(
+                r#"{{"text":"{prefix}","count":"{{alert_count}}","size":"{{bytes|humanSize}}","invalid":"{{bytes:2|humanSize}}","unknown":"{{bytes|unknown}}"}}"#
+            );
+            let expected = serde_json::json!({"text":prefix,"count":"3","size":"1.5 KiB","invalid":"{bytes:2|humanSize}","unknown":"{bytes|unknown}"});
+            for is_email in [false, true] {
+                let rendered = apply_custom_template(&tpl, &ctx, is_email);
+                assert_eq!(serde_json::from_str::<Value>(&rendered).unwrap(), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn custom_nested_json_pipes_quotes_and_newlines() {
+        let ctx = NotificationContext {
+            row_columns: vec![
+                ("ratio".into(), vec!["0.9123".into()]),
+                ("host".into(), vec!["web\"1".into()]),
+            ],
+            ..Default::default()
+        };
+        let tpl = r#"{
+            "text": "a|b \"quoted\"",
+            "nested": { "link": "<https://example.com|View>",
+                "host": "{host}", "ratio": "{ratio|humanizePercentage}",
+                "fallback": "{missing|humanSize}" }
+        }"#;
+        let rendered = apply_custom_template(tpl, &ctx, false);
+        assert_eq!(
+            serde_json::from_str::<Value>(&rendered).unwrap(),
+            serde_json::json!({
+                "text":"a|b \"quoted\"", "nested":{"link":"<https://example.com|View>","host":"web\"1","ratio":"91.23%","fallback":"{missing|humanSize}"}
+            })
+        );
+    }
 }

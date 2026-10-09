@@ -8438,4 +8438,49 @@ mod modifier_tests {
             )]
         );
     }
+
+    #[test]
+    fn row_json_pipes_and_links_preserve_placeholders() {
+        let rows = vec![serde_json::from_value(json!({"bytes":1536})).unwrap()];
+        for prefix in ["a|b", "<https://example.com|View>"] {
+            let tpl = format!(
+                r#"{{"text":"{prefix}","count":"{{alert_count}}","size":"{{bytes|humanSize}}","invalid":"{{bytes:2|humanSize}}","unknown":"{{bytes|unknown}}"}}"#
+            );
+            assert_eq!(
+                process_row_template(
+                    "default",
+                    &tpl,
+                    &Alert::default(),
+                    RowTemplateType::Json,
+                    &rows
+                ),
+                vec![
+                    json!({"text":prefix,"count":"1","size":"1.5 KiB","invalid":"{bytes:2|humanSize}","unknown":"{bytes|unknown}"})
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn row_nested_json_pipes_quotes_and_newlines() {
+        let rows = vec![serde_json::from_value(json!({"ratio":0.9123,"host":"web\"1"})).unwrap()];
+        let tpl = r#"{
+            "text": "a|b \"quoted\"",
+            "nested": { "link": "<https://example.com|View>",
+                "host": "{host}", "ratio": "{ratio|humanizePercentage}",
+                "fallback": "{missing|humanSize}" }
+        }"#;
+        assert_eq!(
+            process_row_template(
+                "default",
+                tpl,
+                &Alert::default(),
+                RowTemplateType::Json,
+                &rows
+            ),
+            vec![json!({
+                "text":"a|b \"quoted\"", "nested":{"link":"<https://example.com|View>","host":"web\"1","ratio":"91.23%","fallback":"{missing|humanSize}"}
+            })]
+        );
+    }
 }
