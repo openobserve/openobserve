@@ -461,7 +461,7 @@ export const makeQueryConfigSchema = (t: Translator) =>
       // ── PromQL branch ────────────────────────────────────────────────────────
       if (isPromql && qc.promql_rule_mode) {
         if (
-          !qc.promql_multi_alert ||
+          (Number(val.pending_period_sec ?? 0) > 0 && !qc.promql_multi_alert) ||
           qc.promql_condition != null ||
           !isBlank(qc.promql_warning_value) ||
           !isBlank(tc.warning_threshold)

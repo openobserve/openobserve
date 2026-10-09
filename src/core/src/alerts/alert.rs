@@ -639,6 +639,7 @@ async fn prepare_alert(
         return Err(AlertError::AlertNameOfgaUnsupported);
     }
     alert.org_id = org_id.to_string();
+    alert.normalize_promql_rule_mode();
     if alert.query_condition.query_type == QueryType::PromQL
         && !alert.query_condition.promql_rule_mode
         && alert.query_condition.promql_condition.is_none()

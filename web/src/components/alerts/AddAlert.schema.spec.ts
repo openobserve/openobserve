@@ -97,7 +97,9 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
       ...base,
       query_condition: { ...base.query_condition, promql_multi_alert: false },
     };
-    expect(issuesByPath(single)["query_condition.promql_rule_mode"]).toBeTruthy();
+    expect(addAlertSchema.safeParse(single).success).toBe(true);
+    const pendingSingle = { ...single, pending_period_sec: 4 };
+    expect(issuesByPath(pendingSingle)["query_condition.promql_rule_mode"]).toBeTruthy();
   });
 
   it("passes a complete valid scheduled alert", () => {

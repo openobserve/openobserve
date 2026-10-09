@@ -58,7 +58,12 @@ pub(super) async fn evaluate(
         .enabled;
     let result =
         promql_service::search::search_rule(trace_id, org, &req, "", 0, super_cluster).await?;
-    rule_results(result, at, config::get_config().limit.alert_max_groups)
+    rule_results(
+        result,
+        at,
+        config::get_config().limit.alert_max_groups,
+        condition.promql_multi_alert,
+    )
 }
 
 pub(super) async fn infer_stream(org: &str, query: &QueryCondition) -> anyhow::Result<String> {
@@ -75,7 +80,12 @@ pub(super) async fn infer_stream(org: &str, query: &QueryCondition) -> anyhow::R
     ))
 }
 
-fn rule_results(result: PromValue, at: i64, cap: usize) -> anyhow::Result<TriggerEvalResults> {
+fn rule_results(
+    result: PromValue,
+    at: i64,
+    cap: usize,
+    multi_alert: bool,
+) -> anyhow::Result<TriggerEvalResults> {
     let PromValue::Vector(series) = result else {
         return Err(anyhow::anyhow!(
             "PromQL rule expression must return an instant vector"
@@ -109,32 +119,46 @@ fn rule_results(result: PromValue, at: i64, cap: usize) -> anyhow::Result<Trigge
         rule_series_rows.insert(key, row.clone());
         rows.push(row);
     }
-    let mut classification = classify_groups_by(observations, |_| Some(AlertLevel::Critical), cap);
-    for group in &mut classification.groups {
-        group.rule_value = raw_values
-            .get(&config::meta::alerts::grouping::group_key(&group.labels))
-            .cloned();
-    }
-    if matches!(
-        classification.cap,
-        config::meta::alerts::grouping::GroupCapOutcome::Exceeded { .. }
-    ) {
-        return Err(anyhow::anyhow!(
-            "Incomplete PromQL rule evaluation: returned series exceed alert_max_groups"
-        ));
-    }
     let level = (!rows.is_empty()).then_some(AlertLevel::Critical);
-    let first = classification.groups.first();
-    let rule_value = first.and_then(|g| g.rule_value.clone());
-    let group_label = first.map(|g| config::meta::alerts::grouping::render_labels(&g.labels));
+    let mut rule_value = rows
+        .first()
+        .and_then(|r| r.get("value"))
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let mut group_label = observations
+        .first()
+        .map(|g| config::meta::alerts::grouping::render_labels(&g.labels));
+    let group_classification = if multi_alert {
+        let mut classification =
+            classify_groups_by(observations, |_| Some(AlertLevel::Critical), cap);
+        for group in &mut classification.groups {
+            group.rule_value = raw_values
+                .get(&config::meta::alerts::grouping::group_key(&group.labels))
+                .cloned();
+        }
+        if matches!(
+            classification.cap,
+            config::meta::alerts::grouping::GroupCapOutcome::Exceeded { .. }
+        ) {
+            return Err(anyhow::anyhow!(
+                "Incomplete PromQL rule evaluation: returned series exceed alert_max_groups"
+            ));
+        }
+        let first = classification.groups.first();
+        rule_value = first.and_then(|g| g.rule_value.clone());
+        group_label = first.map(|g| config::meta::alerts::grouping::render_labels(&g.labels));
+        Some(classification)
+    } else {
+        None
+    };
     Ok(TriggerEvalResults {
         end_time: at,
         level,
         data: level.map(|_| rows),
         rule_value,
-        rule_series_rows: Some(rule_series_rows),
+        rule_series_rows: multi_alert.then_some(rule_series_rows),
         group_label,
-        group_classification: Some(classification),
+        group_classification,
         ..Default::default()
     })
 }
@@ -176,6 +200,7 @@ mod tests {
             vector(&[0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY]),
             600,
             10,
+            true,
         )
         .unwrap();
         let rows = results.data.unwrap();
@@ -197,12 +222,86 @@ mod tests {
     }
 
     #[test]
+    fn single_rule_matches_any_series_without_group_state_or_group_cap() {
+        use config::meta::{
+            alerts::{prom_rule::apply_rule_rollup_outcome, state::ROLLUP_GROUP_KEY},
+            self_reporting::usage::RunOutcome,
+        };
+        let first = rule_results(vector(&[f64::NAN, f64::INFINITY]), 600, 1, false).unwrap();
+        assert!(first.group_classification.is_none());
+        assert!(first.rule_series_rows.is_none());
+        assert_eq!(first.data.as_ref().unwrap().len(), 2);
+        let initial = apply_rule_rollup_outcome(
+            "single-rule",
+            None,
+            RunOutcome::Firing,
+            first.level,
+            600,
+            first.rule_value.as_deref(),
+        );
+        let previous = initial.state.unwrap();
+        assert_eq!(previous.group_key, ROLLUP_GROUP_KEY);
+        assert_eq!(
+            initial.transition.unwrap().rule_value.as_deref(),
+            Some("NaN")
+        );
+
+        let changed = rule_results(
+            PromValue::Vector(vec![InstantValue {
+                labels: vec![std::sync::Arc::new(Label::new("host", "new-host"))],
+                sample: Sample::new(0, f64::NEG_INFINITY),
+            }]),
+            660,
+            1,
+            false,
+        )
+        .unwrap();
+        let still_firing = apply_rule_rollup_outcome(
+            "single-rule",
+            Some(&previous),
+            RunOutcome::Firing,
+            changed.level,
+            660,
+            changed.rule_value.as_deref(),
+        );
+        assert!(still_firing.transition.is_none());
+        assert_eq!(still_firing.state.as_ref().unwrap().since, previous.since);
+        assert_eq!(changed.data.unwrap()[0]["value"], "-Inf");
+
+        let errored = apply_rule_rollup_outcome(
+            "single-rule",
+            still_firing.state.as_ref(),
+            RunOutcome::Error,
+            None,
+            720,
+            None,
+        );
+        assert_eq!(
+            errored.state.as_ref().unwrap().level,
+            Some(AlertLevel::Critical)
+        );
+        let empty = rule_results(vector(&[]), 780, 1, false).unwrap();
+        assert!(empty.data.is_none());
+        let recovered = apply_rule_rollup_outcome(
+            "single-rule",
+            errored.state.as_ref(),
+            RunOutcome::Normal,
+            Some(AlertLevel::Ok),
+            780,
+            empty.rule_value.as_deref(),
+        );
+        let transition = recovered.transition.unwrap();
+        assert_eq!(transition.to_outcome, RunOutcome::Normal);
+        assert!(transition.rule_value.is_none());
+    }
+
+    #[test]
     fn rule_empty_and_incomplete_results_are_distinct() {
-        let result = rule_results(vector(&[]), 600, 1).unwrap();
+        let result = rule_results(vector(&[]), 600, 1, true).unwrap();
         assert!(result.data.is_none());
         assert!(result.group_classification.unwrap().groups.is_empty());
-        assert!(rule_results(vector(&[1.0, 2.0]), 600, 1).is_err());
-        assert!(rule_results(PromValue::Float(1.0), 600, 1).is_err());
+        assert!(rule_results(vector(&[1.0, 2.0]), 600, 1, true).is_err());
+        assert!(rule_results(PromValue::Float(1.0), 600, 1, true).is_err());
     }
 
     #[test]
@@ -276,6 +375,7 @@ mod tests {
                 ),
                 600,
                 10,
+                true,
             )
             .unwrap();
             let classification = result.group_classification.unwrap();

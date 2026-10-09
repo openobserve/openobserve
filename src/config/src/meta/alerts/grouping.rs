@@ -65,7 +65,7 @@ pub const MIN_RESOLVE_THRESHOLD_SECS: i64 = 60;
 pub enum MultiAlertError {
     /// `multi_alert` without a `group_by`: there are no groups to fan out to.
     NotGrouped,
-    RuleModeNeedsMultiAlert,
+    RuleModeNeedsPromql,
     RuleModeThresholdConflict,
     /// The critical group-count gate is not "any group" (M-10).
     CountGateNotAnyGroup,
@@ -97,7 +97,7 @@ pub enum MultiAlertError {
 impl std::fmt::Display for MultiAlertError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::RuleModeNeedsMultiAlert => f.write_str("PromQL rule mode requires PromQL and promql_multi_alert=true"),
+            Self::RuleModeNeedsPromql => f.write_str("PromQL rule mode requires a PromQL query"),
             Self::RuleModeThresholdConflict => f.write_str("PromQL rule mode cannot have Critical/Warning value thresholds or a series-count gate"),
             Self::NotGrouped => {
                 f.write_str("per-group alerting requires at least one group_by column")
@@ -185,8 +185,15 @@ pub fn validate_multi_alert(
     // aggregation cannot have opted in at all, and multi-window comparison is
     // a sibling field.
     if query.promql_rule_mode {
-        if query.query_type != super::QueryType::PromQL || !query.promql_multi_alert {
-            return Err(MultiAlertError::RuleModeNeedsMultiAlert);
+        if query.query_type != super::QueryType::PromQL {
+            return Err(MultiAlertError::RuleModeNeedsPromql);
+        }
+        if query
+            .multi_time_range
+            .as_ref()
+            .is_some_and(|r| !r.is_empty())
+        {
+            return Err(MultiAlertError::MultiTimeRangeUnsupported);
         }
         if query.promql_condition.is_some()
             || query.promql_warning_value.is_some()
@@ -289,8 +296,6 @@ fn validate_promql_multi_alert(
         return Err(MultiAlertError::MultiTimeRangeUnsupported);
     }
 
-    // Without a condition there is no threshold to classify a series against,
-    // so there is nothing to be per-group about.
     if query.promql_rule_mode {
         return Ok(());
     }
@@ -4517,7 +4522,7 @@ mod tests {
         assert_eq!(back, plan);
     }
     #[test]
-    fn test_rule_mode_requires_explicit_multi_and_no_value_thresholds() {
+    fn test_rule_mode_allows_single_and_multi_without_value_thresholds() {
         let tc = TriggerCondition {
             operator: Operator::GreaterThanEquals,
             threshold: 1,
@@ -4532,10 +4537,21 @@ mod tests {
         };
         assert!(validate_multi_alert(&query, &tc, false).is_ok());
         query.promql_multi_alert = false;
+        assert!(validate_multi_alert(&query, &tc, false).is_ok());
+        query.multi_time_range = Some(vec![crate::meta::alerts::CompareHistoricData {
+            offset: "1w".into(),
+        }]);
         assert_eq!(
             validate_multi_alert(&query, &tc, false),
-            Err(MultiAlertError::RuleModeNeedsMultiAlert)
+            Err(MultiAlertError::MultiTimeRangeUnsupported)
         );
+        query.multi_time_range = None;
+        query.query_type = crate::meta::alerts::QueryType::SQL;
+        assert_eq!(
+            validate_multi_alert(&query, &tc, false),
+            Err(MultiAlertError::RuleModeNeedsPromql)
+        );
+        query.query_type = crate::meta::alerts::QueryType::PromQL;
         query.promql_multi_alert = true;
         query.promql_condition = Some(Condition {
             column: "value".into(),
