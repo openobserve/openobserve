@@ -40,3 +40,34 @@ describe("OBanner — preserveWhitespace", () => {
     expect(content.classes()).toContain("wrap-break-word");
   });
 });
+
+describe("OBanner — textSize and colors", () => {
+  it("keeps the compact bar scale unless a size is asked for", () => {
+    const bar = mount(OBanner, {
+      props: { bar: true },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(bar.classes()).not.toContain("text-base");
+    expect(bar.html()).toContain("text-compact");
+
+    const large = mount(OBanner, {
+      props: { bar: true, textSize: "large" },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(large.classes()).toContain("text-base");
+    expect(large.html()).not.toContain("text-compact");
+  });
+
+  it("paints runtime colours in place of the variant's tokens", () => {
+    const wrapper = mount(OBanner, {
+      props: { bar: true, variant: "info", colors: { background: "#1E3A8A", text: "#FFFFFF" } },
+      global: { stubs },
+    });
+
+    expect(wrapper.classes()).not.toContain("bg-banner-info-bg");
+    expect(wrapper.classes()).toContain("bg-banner-custom-bg");
+    expect(wrapper.attributes("style")).toContain("--color-banner-custom-bg: #1E3A8A");
+  });
+});

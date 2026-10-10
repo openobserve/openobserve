@@ -19,6 +19,7 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import announcements from "@/services/announcements";
 import { raw, type I18nText } from "@/types/i18n";
+import type { BannerColors, BannerTextSize } from "@/utils/announcementAppearance";
 import { orderBanners, type BannerVariantName } from "@/utils/announcementOrder";
 
 export type BannerVariant = BannerVariantName;
@@ -37,13 +38,18 @@ export interface Banner {
   starts_at?: number;
   ends_at?: number;
   dismissible: boolean;
-  cta?: BannerCta;
+  /** Link buttons, in order; older servers send only `cta`, which is folded in here. */
+  ctas: BannerCta[];
+  text_size?: BannerTextSize;
+  colors?: BannerColors;
+  icon?: string;
 }
 
 /** The banner as it arrives from the API, before its copy is branded via `raw()`. */
-interface WireBanner extends Omit<Banner, "message" | "cta"> {
+interface WireBanner extends Omit<Banner, "message" | "ctas"> {
   message: string;
   cta?: { text: string; url: string };
+  ctas?: { text: string; url: string }[];
 }
 
 /** Poll cadence. The server reads these from an in-memory cache, so this is cheap. */
@@ -56,6 +62,9 @@ const POLL_INTERVAL_MS = 3 * 60 * 1000;
 const MAX_TIMER_MS = 60 * 60 * 1000;
 
 const DISMISSED_STORAGE_KEY = "o2_dismissed_announcements";
+
+// Module scope so a save in Settings reaches the bar mounted in the layout.
+const configVersion = ref(0);
 
 function readDismissed(): string[] {
   try {
@@ -172,7 +181,10 @@ export function useAnnouncementBanners() {
         ? data.banners.map((banner: WireBanner) => ({
             ...banner,
             message: raw(banner.message),
-            cta: banner.cta ? { text: raw(banner.cta.text), url: banner.cta.url } : undefined,
+            ctas: (banner.ctas ?? (banner.cta ? [banner.cta] : [])).map((cta) => ({
+              text: raw(cta.text),
+              url: cta.url,
+            })),
           }))
         : [];
 
@@ -201,6 +213,7 @@ export function useAnnouncementBanners() {
   // Switching orgs changes which banners apply, so refetch rather than carrying
   // the previous org's set across.
   watch(orgIdentifier, () => void fetchBanners());
+  watch(configVersion, () => void fetchBanners());
 
   onScopeDispose(() => {
     if (pollTimer) clearInterval(pollTimer);
@@ -213,4 +226,9 @@ export function useAnnouncementBanners() {
     start,
     refresh: fetchBanners,
   };
+}
+
+/** Makes every mounted bar refetch now rather than at its next poll. */
+export function notifyAnnouncementsChanged(): void {
+  configVersion.value += 1;
 }

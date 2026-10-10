@@ -148,6 +148,13 @@ const pickButtonForeground = (bgHex: string): string => {
   return contrastRatio(white, bgHex) >= MIN_WHITE_CONTRAST ? white : darkText;
 };
 
+/** White or dark text, whichever reads better on an arbitrary user-chosen background. */
+export const pickReadableForeground = (bgHex: string): string => {
+  const darkText = cssToken("--color-grey-900", "#171717");
+  const white = "#FFFFFF";
+  return contrastRatio(white, bgHex) >= contrastRatio(darkText, bgHex) ? white : darkText;
+};
+
 /**
  * Mix two colors together (similar to CSS color-mix)
  * @param color1 - First hex color code (e.g., "#3F7994")

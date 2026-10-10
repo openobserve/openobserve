@@ -80,3 +80,25 @@
   opacity: 0.5 !important;
   box-shadow: var(--shadow-lg) !important;
 }
+
+/* ── Announcement banner message ───────────────────────────────────────────
+   Inline markup produced at runtime from operator markdown (v-html). Links and
+   code take the banner's own colour, which is operator-chosen per banner. */
+@utility announcement-message {
+  overflow-wrap: anywhere;
+  & a,
+  & a:hover {
+    color: inherit;
+    font-weight: var(--font-weight-semibold);
+    text-decoration: underline;
+  }
+  & a:hover {
+    opacity: 0.8;
+  }
+  & code {
+    font-family: var(--font-mono);
+    padding-inline: 0.25rem;
+    border-radius: var(--radius-default);
+    background-color: color-mix(in srgb, currentColor 14%, transparent);
+  }
+}

@@ -519,9 +519,16 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 20 children routes when enterprise is enabled", () => {
+    it("should have exactly 23 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise (incl. passwordPolicy)
+      expect(routes[0].children).toHaveLength(23); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 13 enterprise (incl. passwordPolicy, announcements + editor)
+    });
+
+    it("should have the announcement banner list and editor routes when enterprise", () => {
+      const names = useManagementRoutes()[0].children.map((child: any) => child.name);
+      expect(names).toEqual(
+        expect.arrayContaining(["announcementBanners", "announcementBannerEditor"]),
+      );
     });
   });
 
@@ -602,9 +609,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 22 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 24 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise (incl. passwordPolicy) + 1 cloud
+      expect(routes[0].children).toHaveLength(24); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 13 enterprise (incl. passwordPolicy, announcements + editor) + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
