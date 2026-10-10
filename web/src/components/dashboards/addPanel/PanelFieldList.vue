@@ -403,6 +403,7 @@ import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import { applyPromqlSeed, metricsStreamsOf } from "@/utils/dashboard/promqlSeed";
+import { pickDashboardPanelStream } from "@/utils/streamPersist";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
 import { buildTypeFilterBuckets } from "@/utils/metrics/metricFamily";
 import { BADGE_LABEL_KEYS, getBadgeStyle } from "@/utils/metrics/metricPalette";
@@ -536,6 +537,16 @@ const currentQueryFields = () =>
 const STREAM_LIST_WITHOUT_STREAM = new Set(["metrics", "build"]);
 
 const isEditPanel = props.editMode;
+
+const defaultStreamFor = (streamType: string) => {
+  const streams = dashboardPanelData.meta.stream.streamResults ?? [];
+  if (dashboardPanelDataPageKey !== "dashboard" || isEditPanel) return streams[0]?.name;
+  return pickDashboardPanelStream(
+    store.state.selectedOrganization?.identifier,
+    streamType,
+    streams,
+  );
+};
 let initialStreamsLoaded = false;
 
 const loadStreamsListBasedOnType = async () => {
@@ -809,8 +820,9 @@ watch(
             dashboardPanelData.layout.currentQueryIndex
           ].fields.stream;
       } else {
-        dashboardPanelData.data.queries[currentIndex].fields.stream =
-          dashboardPanelData.meta.stream.streamResults[0]?.name;
+        dashboardPanelData.data.queries[currentIndex].fields.stream = defaultStreamFor(
+          dashboardPanelData.data.queries[currentIndex].fields.stream_type,
+        );
       }
     }
   },

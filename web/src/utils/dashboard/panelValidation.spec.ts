@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  validateConditions,
   validateDashboardJson,
   validatePanel,
   validateSQLPanelFields,
@@ -311,5 +312,43 @@ describe("validatePanel on a PromQL formula", () => {
         { query: "", config: { formula: "" } },
       ]),
     ).toHaveLength(1);
+  });
+});
+
+describe("validateConditions", () => {
+  const t = gt as any;
+
+  it("flags a filter added without a value, including inside groups", () => {
+    const errors: string[] = [];
+    validateConditions(
+      t,
+      [
+        {
+          filterType: "group",
+          conditions: [
+            {
+              filterType: "condition",
+              type: "condition",
+              column: "level",
+              operator: "=",
+              value: "",
+            },
+            { filterType: "condition", type: "list", column: "job", values: [] },
+          ],
+        },
+      ],
+      errors,
+    );
+    expect(errors).toHaveLength(2);
+  });
+
+  it("accepts complete conditions", () => {
+    const errors: string[] = [];
+    validateConditions(
+      t,
+      [{ filterType: "condition", type: "condition", column: "a", operator: "Is Null" }],
+      errors,
+    );
+    expect(errors).toHaveLength(0);
   });
 });

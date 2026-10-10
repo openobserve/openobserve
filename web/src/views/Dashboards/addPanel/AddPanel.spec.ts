@@ -4882,5 +4882,58 @@ describe("AddPanel.vue", () => {
       expect(notificationMocks.showErrorNotification).not.toHaveBeenCalled();
       expect(wrapper.vm.errorData.errors).toEqual(["Add one field for the X-Axis"]);
     });
+
+    it("shows the errors and runs nothing when Apply is clicked on an incomplete builder", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const editor = {
+        reportValidationErrors: vi.fn(),
+        runQuery: vi.fn(),
+        initChartData: vi.fn(),
+      };
+      wrapper.vm.panelEditorRef = editor;
+      wrapper.vm.dashboardPanelData.data.queries[0].query = "SELECT count(*) FROM default";
+      wrapper.vm.dashboardPanelData.data.queries[0].fields.filter = {
+        filterType: "group",
+        conditions: [
+          { filterType: "condition", type: "condition", column: "level", operator: "=", value: "" },
+        ],
+      };
+
+      wrapper.vm.runQuery();
+
+      expect(editor.reportValidationErrors).toHaveBeenCalledTimes(1);
+      expect(editor.reportValidationErrors.mock.calls[0][0]).toContain(
+        "dashboard.utils.filterConditionValueRequired",
+      );
+      expect(editor.runQuery).not.toHaveBeenCalled();
+      expect(editor.initChartData).not.toHaveBeenCalled();
+      wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions = [];
+    });
+
+    it("still runs a custom SQL query that fails validation, as Apply always has", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation((errors: string[]) => {
+        errors.push("Alias _timestamp is not allowed");
+      });
+      const editor = {
+        reportValidationErrors: vi.fn(),
+        runQuery: vi.fn(),
+        initChartData: vi.fn(),
+      };
+      wrapper.vm.panelEditorRef = editor;
+      const query = wrapper.vm.dashboardPanelData.data.queries[0];
+      query.customQuery = true;
+      query.query = "SELECT _timestamp AS _timestamp FROM default";
+      query.fields.filter = { filterType: "group", conditions: [] };
+      wrapper.vm.shouldRefreshWithoutCache = false;
+
+      wrapper.vm.runQuery(true);
+
+      expect(editor.reportValidationErrors).not.toHaveBeenCalled();
+      expect(wrapper.vm.shouldRefreshWithoutCache).toBe(true);
+      expect(wrapper.vm.errorData.errors).toEqual(["Alias _timestamp is not allowed"]);
+      query.customQuery = false;
+    });
   });
 });

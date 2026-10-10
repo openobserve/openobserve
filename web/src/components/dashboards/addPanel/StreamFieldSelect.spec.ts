@@ -57,9 +57,11 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
+const getStreamMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({
-    getStream: vi.fn(() => Promise.resolve(mockStreamSchema)),
+    getStream: getStreamMock,
   })),
 }));
 
@@ -88,6 +90,7 @@ describe("StreamFieldSelect", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    getStreamMock.mockImplementation(() => Promise.resolve(mockStreamSchema));
   });
 
   afterEach(() => {
@@ -313,6 +316,17 @@ describe("StreamFieldSelect", () => {
       });
 
       expect(wrapper.vm.selectValue).toContain("field2");
+    });
+
+    it("does not refetch the schema when the parent passes an equal streams array", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      const callsAfterMount = getStreamMock.mock.calls.length;
+
+      await wrapper.setProps({ streams: defaultStreams.map((stream) => ({ ...stream })) });
+      await flushPromises();
+
+      expect(getStreamMock.mock.calls.length).toBe(callsAfterMount);
     });
 
     it("should refetch fields when streams change", async () => {

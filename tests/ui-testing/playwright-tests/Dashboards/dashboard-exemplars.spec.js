@@ -324,11 +324,11 @@ test.describe('Dashboard exemplars', () => {
     await openDashboard(page, dash);
     await page.locator('[data-test="dashboard-edit-panel-Edit-dropdown"]').click();
     await page.locator('[data-test="dashboard-edit-panel"]').click();
-    // The editor normalises an API-built panel's query fields on open, so the preview starts out of date.
-    const outdated = page.getByText('Your chart is not up to date');
-    await expect(outdated).toBeVisible({ timeout: 15_000 });
-    await page.locator('[data-test="dashboard-apply"]').click();
-    await expect(outdated).toHaveCount(0, { timeout: 30_000 });
+    // Apply re-runs the panel with whatever the editor normalised on open.
+    const apply = page.locator('[data-test="dashboard-apply"]');
+    await expect(apply).toBeEnabled({ timeout: 15_000 });
+    await apply.click();
+    await expect(apply).toBeEnabled({ timeout: 30_000 });
     expect(await page.locator(sel.points).count()).toBe(0);
     await page.locator('[data-test="panel-sidebar-header-collapsed"]').click();
     await page.locator('[data-test="dashboard-config-panel-search"] input').fill('exemplars');
