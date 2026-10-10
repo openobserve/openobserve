@@ -999,6 +999,13 @@
         "cloneNameSuffix": "ed7db8da1a1d7b88",
         "cloneSubmit": "5c383de653eb8586",
         "cloneTitle": "5afe261ff1bd85a4",
+        "costConfirmMessage": "a72491539dd7690a",
+        "costConfirmOk": "9c7ac399fbdc1f69",
+        "costConfirmTitle": "f7d86753062121f9",
+        "costEstimate": "24b6406b8fddf452",
+        "costLowerBound": "f9f4cabc2c46e8ff",
+        "costScoringOnly": "ee47bfca51f4b239",
+        "costUnknown": "08e396362bcfdaa7",
         "datasetPinned": "7ce35fd62bb61bd4",
         "datasetPlaceholder": "05ddc66867be822a",
         "datasetRows": "734bc09f57af31b2",
@@ -1778,6 +1785,14 @@
         "updated": "3a5ecca188c0579c",
         "version": "dd167905de0defca"
       },
+      "credentialsDialog": {
+        "body": "4c39a4d1b2903941",
+        "error": "c2bf3070f1f834ef",
+        "open": "ae90fd4ac62be7dc",
+        "submit": "95e154398a4bc009",
+        "success": "141d88647345c3be",
+        "title": "ae90fd4ac62be7dc"
+      },
       "delete": {
         "error": "1e585c6ca082d13e",
         "message": "2252abb12cb47093",
@@ -2027,6 +2042,7 @@
         "sourceLabel": "6c4cd5fbb4f3e9a7",
         "sourceManual": "b0b9fe24ffa96291",
         "statusCode": "920e413c7d411b61",
+        "storedCredentialsHint": "eedc89e7902cfa70",
         "title": "c02977b07ec93816"
       },
       "testRun": {

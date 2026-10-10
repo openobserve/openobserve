@@ -12680,6 +12680,13 @@
         "previewEmpty": "Selecciona un conjunto de datos para ver lo que se ejecutará.",
         "previewLoading": "Calculando espacios…",
         "previewSlots": "espacios a ejecutar",
+        "costEstimate": "~{cost} estimado (orden de magnitud)",
+        "costUnknown": "No se pudo estimar el costo",
+        "costLowerBound": "límite inferior, algunos modelos no tienen precio",
+        "costScoringOnly": "solo costo de puntuación",
+        "costConfirmTitle": "¿Ejecutar este experimento costoso?",
+        "costConfirmMessage": "Se estima que este experimento cuesta aproximadamente {cost}, por encima del umbral de advertencia de {threshold}. ¿Crearlo y ejecutarlo de todos modos?",
+        "costConfirmOk": "Crear de todos modos",
         "skippedFully": "{count} filas omitidas por completo: cada evaluador seleccionado necesita una salida esperada. Las filas omitidas no cuestan nada al ejecutarse.",
         "skippedPartially": "{count} filas omitidas parcialmente: la tarea aún se ejecuta, pero los evaluadores basados en referencia no pueden puntuar filas sin una salida esperada.",
         "skippedNone": "Cada fila coincidente puede puntuarse en al menos una dimensión.",
@@ -13303,6 +13310,7 @@
       },
       "testPanel": {
         "title": "Probar conexión",
+        "storedCredentialsHint": "Prueba la versión publicada con sus credenciales almacenadas. Tus cambios sin guardar se prueban cuando publicas.",
         "sourceLabel": "Entrada de muestra",
         "sourceDataset": "De un conjunto de datos",
         "sourceManual": "Manual",
@@ -13427,6 +13435,14 @@
         },
         "attemptsValue": "{count} de {max}",
         "resultsTitle": "Resultados"
+      },
+      "credentialsDialog": {
+        "open": "Reemplazar credenciales",
+        "title": "Reemplazar credenciales",
+        "body": "El nuevo valor reemplaza al almacenado en su lugar. La tarea conserva su versión y el valor almacenado nunca se muestra.",
+        "submit": "Reemplazar",
+        "success": "Credenciales reemplazadas",
+        "error": "No se pudieron reemplazar las credenciales"
       },
       "signingPanel": {
         "title": "Claves de firma",

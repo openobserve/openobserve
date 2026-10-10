@@ -78,6 +78,8 @@ export interface ExperimentCreatePayload {
   trialCount: number;
   metadata?: Record<string, unknown> | null;
   idempotencyKey?: string | null;
+  /** Required once the preview's cost estimate is over the warning threshold. */
+  confirmCostEstimate?: boolean;
 }
 
 /**
@@ -118,7 +120,20 @@ export interface ExperimentPreview {
   slotCount: number;
   pinnedScorers: PinnedExperimentScorer[];
   applicability?: ExperimentApplicability;
+  costEstimate?: ExperimentCostEstimate | null;
   sampleSlots: ExperimentSlot[];
+}
+
+/** An order-of-magnitude estimate of what the platform pays to run the experiment. */
+export interface ExperimentCostEstimate {
+  /** null when nothing could be priced. */
+  estimatedCost: number | null;
+  /** false for Remote/SDK tasks: the total is scoring cost only. */
+  taskCostEstimated: boolean;
+  /** Some dimension had no price, so the total is a lower bound. */
+  incomplete: boolean;
+  warningThreshold: number;
+  confirmationRequired: boolean;
 }
 
 export interface ExperimentScorerApplicability {
@@ -521,6 +536,20 @@ function value<T>(input: any, camel: string, snake: string, fallback: T): T {
   return (input?.[camel] ?? input?.[snake] ?? fallback) as T;
 }
 
+function normalizeCostEstimate(input: any): ExperimentCostEstimate | null {
+  if (!input) return null;
+  const cost = value<number | null>(input, "estimatedCost", "estimated_cost", null);
+  return {
+    estimatedCost: cost === null ? null : Number(cost),
+    taskCostEstimated: Boolean(value(input, "taskCostEstimated", "task_cost_estimated", false)),
+    incomplete: Boolean(input.incomplete),
+    warningThreshold: Number(value(input, "warningThreshold", "warning_threshold", 0)),
+    confirmationRequired: Boolean(
+      value(input, "confirmationRequired", "confirmation_required", false),
+    ),
+  };
+}
+
 function normalizePreview(input: any): ExperimentPreview {
   const applicability = value<any>(input, "applicability", "applicability", {});
   return {
@@ -575,6 +604,7 @@ function normalizePreview(input: any): ExperimentPreview {
         ),
       })),
     },
+    costEstimate: normalizeCostEstimate(value(input, "costEstimate", "cost_estimate", null)),
     sampleSlots: value<any[]>(input, "sampleSlots", "sample_slots", []).map((slot) => ({
       rowId: value(slot, "rowId", "row_id", ""),
       logicalId: value(slot, "logicalId", "logical_id", ""),

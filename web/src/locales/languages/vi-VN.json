@@ -12680,6 +12680,13 @@
         "previewEmpty": "Chọn một tập dữ liệu để xem nội dung sẽ chạy.",
         "previewLoading": "Đang tính toán slots…",
         "previewSlots": "slots sẽ chạy",
+        "costEstimate": "~{cost} ước tính (theo bậc độ lớn)",
+        "costUnknown": "Không thể ước tính chi phí",
+        "costLowerBound": "giới hạn dưới, một số mô hình không có giá",
+        "costScoringOnly": "chỉ tính chi phí chấm điểm",
+        "costConfirmTitle": "Chạy thí nghiệm tốn kém này?",
+        "costConfirmMessage": "Thí nghiệm này ước tính tốn khoảng {cost}, vượt ngưỡng cảnh báo {threshold}. Vẫn tạo và chạy?",
+        "costConfirmOk": "Vẫn tạo",
         "skippedFully": "{count} dòng bị bỏ qua hoàn toàn — mọi bộ chấm điểm đã chọn đều cần đầu ra dự kiến. Các dòng bị bỏ qua không tốn chi phí để chạy.",
         "skippedPartially": "{count} dòng bị bỏ qua một phần — tác vụ vẫn chạy, nhưng các bộ chấm điểm dựa trên tham chiếu không thể chấm điểm các dòng thiếu đầu ra dự kiến.",
         "skippedNone": "Mọi dòng khớp đều có thể được chấm điểm trên ít nhất một tiêu chí.",
@@ -13303,6 +13310,7 @@
       },
       "testPanel": {
         "title": "Kiểm tra kết nối",
+        "storedCredentialsHint": "Kiểm thử phiên bản đã phát hành bằng thông tin xác thực đã lưu. Các chỉnh sửa chưa lưu sẽ được kiểm thử khi bạn phát hành.",
         "sourceLabel": "Đầu vào mẫu",
         "sourceDataset": "Từ một tập dữ liệu",
         "sourceManual": "Thủ công",
@@ -13427,6 +13435,14 @@
         },
         "attemptsValue": "{count} trên {max}",
         "resultsTitle": "Kết quả"
+      },
+      "credentialsDialog": {
+        "open": "Thay thế thông tin xác thực",
+        "title": "Thay thế thông tin xác thực",
+        "body": "Giá trị mới thay thế giá trị đã lưu tại chỗ. Tác vụ giữ nguyên phiên bản và giá trị đã lưu không bao giờ được hiển thị.",
+        "submit": "Thay thế",
+        "success": "Đã thay thế thông tin xác thực",
+        "error": "Không thể thay thế thông tin xác thực"
       },
       "signingPanel": {
         "title": "Khóa ký",

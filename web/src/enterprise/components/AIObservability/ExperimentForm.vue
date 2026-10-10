@@ -576,13 +576,20 @@
     @update:ok="leaveDialog.onConfirm"
     @update:cancel="leaveDialog.show = false"
   />
+  <ConfirmDialog
+    v-model="costDialog.show"
+    :title="t('aiObservability.experiments.form.costConfirmTitle')"
+    :message="costDialog.message"
+    :ok-label="t('aiObservability.experiments.form.costConfirmOk')"
+    @update:ok="confirmCost"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -620,6 +627,7 @@ import {
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import {
   createPreviewRequestGate,
+  formatEstimatedCost,
   withPreviewScorers,
 } from "../../views/AIObservability/experimentPreview";
 import { aiExperimentsRoute } from "../../views/AIObservability/experimentRoutes";
@@ -657,6 +665,13 @@ const previewRequests = createPreviewRequestGate();
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 const idempotencyKey = ref(nextIdempotencyKey());
 const leaveDialog = reactive({ show: false, onConfirm: () => {} });
+// The body awaiting the user's OK to go over the cost warning threshold. Cancel
+// just closes the dialog: the form keeps its state and nothing is resent.
+const costDialog = reactive({
+  show: false,
+  message: "" as I18nText,
+  body: null as ExperimentCreatePayload | null,
+});
 let allowLeave = false;
 
 /** A query value only when it is really there — an absent key must fall through
@@ -1039,12 +1054,38 @@ async function submitClone(payload: ExperimentCreatePayload): Promise<string> {
   ).id;
 }
 
+function askCostConfirmation(body: ExperimentCreatePayload, serverMessage?: string) {
+  const estimate = preview.value?.costEstimate;
+  costDialog.message =
+    estimate?.estimatedCost != null
+      ? t("aiObservability.experiments.form.costConfirmMessage", {
+          cost: formatEstimatedCost(estimate.estimatedCost),
+          threshold: formatEstimatedCost(estimate.warningThreshold),
+        })
+      : raw(serverMessage ?? "");
+  costDialog.body = body;
+  costDialog.show = true;
+}
+
+function confirmCost() {
+  if (costDialog.body) send({ ...costDialog.body, confirmCostEstimate: true });
+  costDialog.body = null;
+}
+
 async function onSubmit(values: ExperimentForm) {
+  // The server pins scorer versions itself; reusing the preview's pins when
+  // one is in hand just closes the gap if a version ships mid-edit.
+  const payload = buildPayload(values);
+  const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
+  if (preview.value?.costEstimate?.confirmationRequired) {
+    askCostConfirmation(body);
+    return;
+  }
+  await send(body);
+}
+
+async function send(body: ExperimentCreatePayload) {
   try {
-    // The server pins scorer versions itself; reusing the preview's pins when
-    // one is in hand just closes the gap if a version ships mid-edit.
-    const payload = buildPayload(values);
-    const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
     const createdId = cloning.value
       ? await submitClone(body)
       : (await createExperimentWrite.mutateAsync(body)).experiment.id;
@@ -1058,6 +1099,12 @@ async function onSubmit(values: ExperimentForm) {
     });
     router.push(aiExperimentsRoute(orgId.value, { selectedId: createdId }));
   } catch (error: any) {
+    // 412 = over the cost warning threshold. Nothing was stored, so the
+    // confirmed retry may reuse the same idempotency key.
+    if (error?.response?.status === 412) {
+      askCostConfirmation(body, error.response.data?.message);
+      return;
+    }
     // An AxiosError IS an Error, so error.message is only ever "Request failed
     // with status code 400" — the server's reason lives on the response body.
     toast({

@@ -233,4 +233,26 @@ describe("RemoteTaskDetailPage", () => {
       expect.objectContaining({ variant: "error", message: "gone" }),
     );
   });
+
+  describe("replacing credentials", () => {
+    const button = '[data-test="ai-remote-task-detail-replace-credentials"]';
+
+    it("offers a replacement for a stored auth secret and opens the dialog", async () => {
+      get.mockResolvedValue(task({ auth: { type: "basic", usesSecret: true } }));
+      const wrapper = mountPage();
+      await flushPromises();
+
+      await wrapper.get(button).trigger("click");
+
+      const dialog = wrapper.findComponent({ name: "RemoteTaskCredentialsDialog" });
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("auth")).toEqual({ type: "basic", usesSecret: true });
+    });
+
+    it("offers nothing when the task has no auth secret", async () => {
+      const wrapper = mountPage();
+      await flushPromises();
+      expect(wrapper.find(button).exists()).toBe(false);
+    });
+  });
 });

@@ -12680,6 +12680,13 @@
         "previewEmpty": "Selecteer een dataset om te zien wat er wordt uitgevoerd.",
         "previewLoading": "Slots berekenen…",
         "previewSlots": "slots om uit te voeren",
+        "costEstimate": "~{cost} geschat (orde van grootte)",
+        "costUnknown": "Kosten konden niet worden geschat",
+        "costLowerBound": "ondergrens, sommige modellen hebben geen prijs",
+        "costScoringOnly": "alleen scoringkosten",
+        "costConfirmTitle": "Dit dure experiment uitvoeren?",
+        "costConfirmMessage": "Dit experiment kost naar schatting ongeveer {cost}, boven de waarschuwingsdrempel van {threshold}. Toch aanmaken en uitvoeren?",
+        "costConfirmOk": "Toch aanmaken",
         "skippedFully": "{count} rijen volledig overgeslagen — elke geselecteerde scorer heeft een verwachte output nodig. Overgeslagen rijen kosten niets om uit te voeren.",
         "skippedPartially": "{count} rijen gedeeltelijk overgeslagen — de taak wordt nog steeds uitgevoerd, maar referentiegebaseerde scorers kunnen geen rijen scoren zonder een verwachte output.",
         "skippedNone": "Elke overeenkomende rij kan op ten minste één dimensie worden gescoord.",
@@ -13303,6 +13310,7 @@
       },
       "testPanel": {
         "title": "Verbinding testen",
+        "storedCredentialsHint": "Test de gepubliceerde versie met de opgeslagen inloggegevens. Je niet-opgeslagen wijzigingen worden getest wanneer je publiceert.",
         "sourceLabel": "Voorbeeldinvoer",
         "sourceDataset": "Uit een dataset",
         "sourceManual": "Handmatig",
@@ -13427,6 +13435,14 @@
         },
         "attemptsValue": "{count} van {max}",
         "resultsTitle": "Resultaten"
+      },
+      "credentialsDialog": {
+        "open": "Inloggegevens vervangen",
+        "title": "Inloggegevens vervangen",
+        "body": "De nieuwe waarde vervangt de opgeslagen waarde ter plaatse. De taak behoudt zijn versie en de opgeslagen waarde wordt nooit getoond.",
+        "submit": "Vervangen",
+        "success": "Inloggegevens vervangen",
+        "error": "De inloggegevens konden niet worden vervangen"
       },
       "signingPanel": {
         "title": "Ondertekeningssleutels",

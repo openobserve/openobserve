@@ -41,3 +41,8 @@ export function withPreviewScorers(
     scorers: preview.pinnedScorers.map(({ id, version }) => ({ id, version })),
   };
 }
+
+/** Cost estimates are always USD; two decimals matches the server's 412 text. */
+export function formatEstimatedCost(cost: number): string {
+  return `$${cost.toFixed(2)}`;
+}

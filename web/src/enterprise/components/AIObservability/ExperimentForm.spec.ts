@@ -376,6 +376,110 @@ describe("ExperimentForm", () => {
       "Finish the task section",
     );
   });
+
+  describe("cost confirmation", () => {
+    const costEstimate = {
+      estimatedCost: 42.5,
+      taskCostEstimated: true,
+      incomplete: false,
+      warningThreshold: 10,
+      confirmationRequired: true,
+    };
+    const overThreshold = {
+      response: {
+        status: 412,
+        data: {
+          code: 412,
+          message:
+            "the estimated scoring cost of 42.50 USD is above the 10.00 USD warning threshold",
+        },
+      },
+    };
+
+    function costDialog(w: any) {
+      return w
+        .findAllComponents({ name: "ConfirmDialog" })
+        .find((d: any) => d.props("title") === "Run this costly experiment?");
+    }
+
+    it("shows the estimate in the preview panel", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, incomplete: true, taskCostEstimated: false },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      const text = wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text();
+      expect(text).toContain("$42.50");
+      expect(text).toContain("order of magnitude");
+      expect(text).toContain("lower bound");
+      expect(text).toContain("scoring cost only");
+    });
+
+    it("says when the cost could not be estimated", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, estimatedCost: null, confirmationRequired: false },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      expect(wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text()).toContain(
+        "could not be estimated",
+      );
+    });
+
+    it("asks before creating when the preview requires confirmation", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({ ...previewResult, costEstimate });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      await submit(wrapper);
+      expect(llmExperimentsService.create).not.toHaveBeenCalled();
+      expect(costDialog(wrapper).props("modelValue")).toBe(true);
+      expect(costDialog(wrapper).props("message")).toContain("$42.50");
+      expect(costDialog(wrapper).props("message")).toContain("$10.00");
+    });
+
+    it("opens the dialog on a 412 and resends the same payload with confirmCostEstimate on confirm", async () => {
+      (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await submit(wrapper);
+
+      expect(llmExperimentsService.create).toHaveBeenCalledTimes(1);
+      const dialog = costDialog(wrapper);
+      expect(dialog.props("modelValue")).toBe(true);
+      // No estimate on the preview, so the server's own text is shown.
+      expect(dialog.props("message")).toContain("42.50 USD");
+
+      dialog.vm.$emit("update:ok");
+      await flushPromises();
+
+      expect(llmExperimentsService.create).toHaveBeenCalledTimes(2);
+      const [first, retry] = (llmExperimentsService.create as any).mock.calls.map((c: any) => c[1]);
+      expect(retry).toEqual({ ...first, confirmCostEstimate: true });
+      expect(push).toHaveBeenCalled();
+    });
+
+    it("does not resend on cancel and keeps the form", async () => {
+      (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await submit(wrapper);
+
+      const dialog = costDialog(wrapper);
+      dialog.vm.$emit("update:modelValue", false);
+      dialog.vm.$emit("update:cancel");
+      await flushPromises();
+
+      expect(dialog.props("modelValue")).toBe(false);
+      expect(llmExperimentsService.create).toHaveBeenCalledTimes(1);
+      expect(push).not.toHaveBeenCalled();
+      expect(oform(wrapper).form.state.values.name).toBe("prompt v4 probe");
+    });
+  });
 });
 
 // Cloning opens this same form seeded from the source run, so a copy can be

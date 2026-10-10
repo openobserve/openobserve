@@ -12680,6 +12680,13 @@
         "previewEmpty": "Selecione um conjunto de dados para ver o que será executado.",
         "previewLoading": "Calculando slots…",
         "previewSlots": "slots a executar",
+        "costEstimate": "~{cost} estimado (ordem de magnitude)",
+        "costUnknown": "Não foi possível estimar o custo",
+        "costLowerBound": "limite inferior, alguns modelos não têm preço",
+        "costScoringOnly": "apenas o custo de pontuação",
+        "costConfirmTitle": "Executar este experimento custoso?",
+        "costConfirmMessage": "Este experimento tem um custo estimado de cerca de {cost}, acima do limite de aviso de {threshold}. Criar e executar mesmo assim?",
+        "costConfirmOk": "Criar mesmo assim",
         "skippedFully": "{count} linhas totalmente ignoradas — cada avaliador selecionado precisa de uma saída esperada. Linhas ignoradas não custam nada para executar.",
         "skippedPartially": "{count} linhas parcialmente ignoradas — a tarefa ainda é executada, mas avaliadores baseados em referência não podem pontuar linhas sem uma saída esperada.",
         "skippedNone": "Cada linha correspondente pode ser pontuada em pelo menos uma dimensão.",
@@ -13303,6 +13310,7 @@
       },
       "testPanel": {
         "title": "Testar conexão",
+        "storedCredentialsHint": "Testa a versão publicada com suas credenciais armazenadas. Suas edições não salvas são testadas quando você publica.",
         "sourceLabel": "Entrada de exemplo",
         "sourceDataset": "De um dataset",
         "sourceManual": "Manual",
@@ -13427,6 +13435,14 @@
         },
         "attemptsValue": "{count} de {max}",
         "resultsTitle": "Resultados"
+      },
+      "credentialsDialog": {
+        "open": "Substituir credenciais",
+        "title": "Substituir credenciais",
+        "body": "O novo valor substitui o valor armazenado no local. A tarefa mantém sua versão, e o valor armazenado nunca é exibido.",
+        "submit": "Substituir",
+        "success": "Credenciais substituídas",
+        "error": "Não foi possível substituir as credenciais"
       },
       "signingPanel": {
         "title": "Chaves de assinatura",

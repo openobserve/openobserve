@@ -18,6 +18,7 @@ const create = vi.fn();
 const saveDraft = vi.fn();
 const testConnection = vi.fn();
 const testCandidate = vi.fn();
+const testRun = vi.fn();
 const get = vi.fn();
 const remove = vi.fn();
 vi.mock("@/services/remote-tasks.service", () => ({
@@ -26,6 +27,7 @@ vi.mock("@/services/remote-tasks.service", () => ({
     saveDraft: (...a: any[]) => saveDraft(...a),
     testConnection: (...a: any[]) => testConnection(...a),
     testCandidate: (...a: any[]) => testCandidate(...a),
+    testRun: (...a: any[]) => testRun(...a),
     get: (...a: any[]) => get(...a),
     delete: (...a: any[]) => remove(...a),
   },
@@ -442,5 +444,100 @@ describe("RemoteTaskFormPage — test connection", () => {
 
     expect((wrapper.vm as any).testState).toBe("failed");
     expect((wrapper.vm as any).testError).toBe("connection refused");
+  });
+
+  // Secrets are write-only, so the form cannot send them back: a candidate test
+  // of a Basic-auth task would send a blank username and password.
+  describe("editing a task with a stored secret", () => {
+    beforeEach(() => {
+      route.params = { id: "head-1" };
+      get.mockResolvedValue({
+        entityId: "head-1",
+        name: "summarizer",
+        endpoint: "https://tasks.example.com/run",
+        httpMethod: "POST",
+        auth: { type: "basic", usesSecret: true },
+        customHeaders: [],
+        responseSchema: "$.output",
+        timeoutMs: 60_000,
+        maxAttempts: 3,
+        maxConcurrency: 4,
+        signing: { enabled: false, usesSecret: false },
+        isDraft: false,
+        version: 2,
+        isActive: true,
+        verificationStatus: "verified",
+      });
+    });
+
+    it("tests the stored version instead of sending blank secrets", async () => {
+      testRun.mockResolvedValue([
+        {
+          rowId: "sample-0",
+          status: "ok",
+          rawRequest: "{}",
+          rawResponse: "{}",
+          httpStatus: 200,
+          latencyMs: 42,
+          attempts: 1,
+        },
+      ]);
+      const wrapper = mountForm();
+      await flushPromises();
+
+      await runTest(wrapper);
+
+      expect(testCandidate).not.toHaveBeenCalled();
+      expect(testRun).toHaveBeenCalledWith("acme", "head-1", [expect.any(Object)]);
+      expect((wrapper.vm as any).testState).toBe("passed");
+      expect((wrapper.vm as any).testReport).toEqual({ ...report, parsedOutput: undefined });
+      expect(wrapper.findComponent({ name: "RemoteTaskTestPanel" }).props("hint")).toContain(
+        "stored credentials",
+      );
+    });
+
+    it("counts an explicit skip from the endpoint as a pass", async () => {
+      testRun.mockResolvedValue([
+        {
+          rowId: "sample-0",
+          status: "skipped",
+          rawRequest: "{}",
+          rawResponse: "{}",
+          httpStatus: 200,
+          latencyMs: 5,
+          attempts: 1,
+          error: "no context",
+        },
+      ]);
+      const wrapper = mountForm();
+      await flushPromises();
+
+      await runTest(wrapper);
+
+      expect((wrapper.vm as any).testState).toBe("passed");
+      expect((wrapper.vm as any).testError).toBeNull();
+    });
+
+    it("surfaces the stored version's failure", async () => {
+      testRun.mockResolvedValue([
+        {
+          rowId: "sample-0",
+          status: "error",
+          rawRequest: "{}",
+          rawResponse: "",
+          httpStatus: 401,
+          latencyMs: 5,
+          attempts: 1,
+          error: "401 Unauthorized",
+        },
+      ]);
+      const wrapper = mountForm();
+      await flushPromises();
+
+      await runTest(wrapper);
+
+      expect((wrapper.vm as any).testState).toBe("failed");
+      expect((wrapper.vm as any).testError).toBe("401 Unauthorized");
+    });
   });
 });

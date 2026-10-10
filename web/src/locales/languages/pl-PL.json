@@ -12680,6 +12680,13 @@
         "previewEmpty": "Wybierz zbiór danych, aby zobaczyć, co zostanie uruchomione.",
         "previewLoading": "Obliczanie slotów…",
         "previewSlots": "sloty do uruchomienia",
+        "costEstimate": "~{cost} szacunkowo (rząd wielkości)",
+        "costUnknown": "Nie udało się oszacować kosztu",
+        "costLowerBound": "dolna granica, niektóre modele nie mają ceny",
+        "costScoringOnly": "tylko koszt oceny",
+        "costConfirmTitle": "Uruchomić ten kosztowny eksperyment?",
+        "costConfirmMessage": "Szacowany koszt tego eksperymentu to około {cost}, powyżej progu ostrzegawczego {threshold}. Utworzyć i uruchomić go mimo to?",
+        "costConfirmOk": "Utwórz mimo to",
         "skippedFully": "{count} wierszy całkowicie pominiętych — każdy wybrany oceniacz wymaga oczekiwanego wyniku. Pominięte wiersze nie kosztują nic do uruchomienia.",
         "skippedPartially": "{count} wierszy częściowo pominiętych — zadanie nadal działa, ale oceniacze oparte na wzorcach nie mogą oceniać wierszy bez oczekiwanego wyniku.",
         "skippedNone": "Każdy dopasowany wiersz może być oceniony w co najmniej jednym wymiarze.",
@@ -13303,6 +13310,7 @@
       },
       "testPanel": {
         "title": "Test połączenia",
+        "storedCredentialsHint": "Testuje opublikowaną wersję z zapisanymi poświadczeniami. Niezapisane zmiany są testowane po opublikowaniu.",
         "sourceLabel": "Przykładowe dane wejściowe",
         "sourceDataset": "Z zestawu danych",
         "sourceManual": "Ręcznie",
@@ -13427,6 +13435,14 @@
         },
         "attemptsValue": "{count} z {max}",
         "resultsTitle": "Wyniki"
+      },
+      "credentialsDialog": {
+        "open": "Zastąp poświadczenia",
+        "title": "Zastąp poświadczenia",
+        "body": "Nowa wartość zastępuje zapisaną w tym samym miejscu. Zadanie zachowuje swoją wersję, a zapisana wartość nigdy nie jest pokazywana.",
+        "submit": "Zastąp",
+        "success": "Zastąpiono poświadczenia",
+        "error": "Nie udało się zastąpić poświadczeń"
       },
       "signingPanel": {
         "title": "Klucze podpisywania",

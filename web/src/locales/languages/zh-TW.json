@@ -12675,6 +12675,13 @@
         "previewEmpty": "選擇資料集以查看將執行的內容。",
         "previewLoading": "計算插槽中…",
         "previewSlots": "要執行的插槽",
+        "costEstimate": "估計約 {cost}（數量級）",
+        "costUnknown": "無法估計成本",
+        "costLowerBound": "下限，部分模型沒有價格",
+        "costScoringOnly": "僅評分成本",
+        "costConfirmTitle": "要執行這個高成本的實驗嗎？",
+        "costConfirmMessage": "此實驗估計成本約 {cost}，超過 {threshold} 警告閾值。仍要建立並執行嗎？",
+        "costConfirmOk": "仍要建立",
         "skippedFully": "{count} 行完全跳過 — 每個選取的評分器都需要預期輸出。跳過的行執行不花費任何成本。",
         "skippedPartially": "{count} 行部分跳過 — 任務仍會執行，但基於參考的評分器無法對沒有預期輸出的行進行評分。",
         "skippedNone": "每個匹配的行至少可在一項維度上評分。",
@@ -13298,6 +13305,7 @@
       },
       "testPanel": {
         "title": "測試連線",
+        "storedCredentialsHint": "使用已儲存的認證測試已發佈版本。您未儲存的編輯會在發佈時一併測試。",
         "sourceLabel": "範例輸入",
         "sourceDataset": "從資料集",
         "sourceManual": "手動",
@@ -13422,6 +13430,14 @@
         },
         "attemptsValue": "{count} / {max}",
         "resultsTitle": "結果"
+      },
+      "credentialsDialog": {
+        "open": "取代認證",
+        "title": "取代認證",
+        "body": "新值會就地取代已儲存的值。任務會保留其版本，且已儲存的值永遠不會顯示。",
+        "submit": "取代",
+        "success": "認證已取代",
+        "error": "無法取代認證"
       },
       "signingPanel": {
         "title": "簽章金鑰",

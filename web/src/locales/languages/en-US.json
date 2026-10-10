@@ -12680,6 +12680,13 @@
         "previewEmpty": "Select a dataset to see what will run.",
         "previewLoading": "Calculating slots…",
         "previewSlots": "slots to run",
+        "costEstimate": "~{cost} estimated (order of magnitude)",
+        "costUnknown": "Cost could not be estimated",
+        "costLowerBound": "lower bound, some models have no price",
+        "costScoringOnly": "scoring cost only",
+        "costConfirmTitle": "Run this costly experiment?",
+        "costConfirmMessage": "This experiment is estimated to cost about {cost}, above the {threshold} warning threshold. Create and run it anyway?",
+        "costConfirmOk": "Create anyway",
         "skippedFully": "{count} rows fully skipped — every selected scorer needs an expected output. Skipped rows cost nothing to run.",
         "skippedPartially": "{count} rows partially skipped — the task still runs, but reference-based scorers cannot score rows without an expected output.",
         "skippedNone": "Every matched row can be scored on at least one dimension.",
@@ -13303,6 +13310,7 @@
       },
       "testPanel": {
         "title": "Test Connection",
+        "storedCredentialsHint": "Tests the published version with its stored credentials. Your unsaved edits are tested when you publish.",
         "sourceLabel": "Sample Input",
         "sourceDataset": "From a Dataset",
         "sourceManual": "Manual",
@@ -13427,6 +13435,14 @@
         },
         "attemptsValue": "{count} of {max}",
         "resultsTitle": "Results"
+      },
+      "credentialsDialog": {
+        "open": "Replace credentials",
+        "title": "Replace credentials",
+        "body": "The new value replaces the stored one in place. The task keeps its version, and the stored value is never shown.",
+        "submit": "Replace",
+        "success": "Credentials replaced",
+        "error": "Could not replace the credentials"
       },
       "signingPanel": {
         "title": "Signing Keys",

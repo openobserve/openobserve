@@ -12680,6 +12680,13 @@
         "previewEmpty": "Wählen Sie einen Datensatz aus, um zu sehen, was ausgeführt wird.",
         "previewLoading": "Slots werden berechnet…",
         "previewSlots": "auszuführende Slots",
+        "costEstimate": "~{cost} geschätzt (Größenordnung)",
+        "costUnknown": "Kosten konnten nicht geschätzt werden",
+        "costLowerBound": "Untergrenze, für einige Modelle ist kein Preis verfügbar",
+        "costScoringOnly": "nur Bewertungskosten",
+        "costConfirmTitle": "Dieses kostspielige Experiment ausführen?",
+        "costConfirmMessage": "Für dieses Experiment werden Kosten von etwa {cost} geschätzt, was über dem Warnschwellenwert von {threshold} liegt. Trotzdem erstellen und ausführen?",
+        "costConfirmOk": "Trotzdem erstellen",
         "skippedFully": "{count} Zeilen vollständig übersprungen — jeder ausgewählte Scorer benötigt eine erwartete Ausgabe. Übersprungene Zeilen kosten nichts bei der Ausführung.",
         "skippedPartially": "{count} Zeilen teilweise übersprungen — die Aufgabe wird weiterhin ausgeführt, aber referenzbasierte Scorer können Zeilen ohne erwartete Ausgabe nicht bewerten.",
         "skippedNone": "Jede übereinstimmende Zeile kann in mindestens einer Dimension bewertet werden.",
@@ -13303,6 +13310,7 @@
       },
       "testPanel": {
         "title": "Verbindung testen",
+        "storedCredentialsHint": "Testet die veröffentlichte Version mit ihren gespeicherten Anmeldedaten. Ihre nicht gespeicherten Änderungen werden beim Veröffentlichen getestet.",
         "sourceLabel": "Beispieleingabe",
         "sourceDataset": "Aus einem Datensatz",
         "sourceManual": "Manuell",
@@ -13427,6 +13435,14 @@
         },
         "attemptsValue": "{count} von {max}",
         "resultsTitle": "Ergebnisse"
+      },
+      "credentialsDialog": {
+        "open": "Anmeldedaten ersetzen",
+        "title": "Anmeldedaten ersetzen",
+        "body": "Der neue Wert ersetzt den gespeicherten Wert an Ort und Stelle. Die Task behält ihre Version, und der gespeicherte Wert wird nie angezeigt.",
+        "submit": "Ersetzen",
+        "success": "Anmeldedaten ersetzt",
+        "error": "Die Anmeldedaten konnten nicht ersetzt werden"
       },
       "signingPanel": {
         "title": "Signaturschlüssel",
