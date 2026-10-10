@@ -1,6 +1,7 @@
 const { test } = require('./utils/enhanced-baseFixtures.js');
 const PageManager = require('../pages/page-manager.js');
 const testLogger = require('./utils/test-logger.js');
+const { E2E_LOCATION_ID } = require('./utils/synthetics-helpers.js');
 
 test.describe("Pre-Test Cleanup", () => {
   /**
@@ -463,6 +464,9 @@ test.describe("Pre-Test Cleanup", () => {
       ['service-graph-', 'tree-view-', 'graph-view-', 'graph-debug'],
       screenshotDir
     );
+
+    // The shared location is named explicitly because per-worker cleanup never removes it
+    await pm.apiCleanup.cleanupSynthetics(['synth_e2e_'], { locationIds: [E2E_LOCATION_ID] });
 
     // Clean up model pricing test records (mp_* names and cloned built-in "(Copy)" org models)
     await pm.apiCleanup.cleanupModelPricingModels([
