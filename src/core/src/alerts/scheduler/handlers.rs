@@ -2247,37 +2247,6 @@ async fn handle_alert_triggers(
     // Set the is_realtime field according to the alert
     new_trigger.is_realtime = alert.is_real_time;
 
-    // [ENTERPRISE] Initialize RCA batch tracking for this scheduler run
-    // #[cfg(feature = "enterprise")]
-    // let rca_enabled =
-    //     o2_enterprise::enterprise::ai::rca::integration::is_rca_enabled_for_org(&new_trigger.
-    // org); #[cfg(not(feature = "enterprise"))]
-    let _rca_enabled = false;
-
-    // Helper closure to mark alert completion and process batch if needed
-    // #[cfg(feature = "enterprise")]
-    // let mark_rca_completion = || async {
-    //     if rca_enabled {
-    //         let is_batch_complete =
-    //             o2_enterprise::enterprise::ai::rca::mark_alert_completed(trace_id);
-    //         if is_batch_complete {
-    //             log::info!(
-    //                 "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} complete, processing
-    // incidents",                 trace_id
-    //             );
-    //             if let Err(e) =
-    // o2_enterprise::enterprise::ai::rca::integration::process_batch_and_create_incidents(
-    //                 trace_id
-    //             ).await {
-    //                 log::error!(
-    //                     "[SCHEDULER trace_id {scheduler_trace_id}] Error creating incidents from
-    // batch {}: {}",                     trace_id, e
-    //                 );
-    //             }
-    //         }
-    //     }
-    // };
-
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
@@ -2593,10 +2562,6 @@ async fn handle_alert_triggers(
             .await;
         }
         publish_triggers_usage(trigger_data_stream);
-
-        // [ENTERPRISE] Mark completion even on failure
-        // #[cfg(feature = "enterprise")]
-        // mark_rca_completion().await;
 
         return Err(err);
     }
@@ -3201,32 +3166,6 @@ async fn handle_alert_triggers(
             }
         };
 
-        // [ENTERPRISE] Collect alert events for batched incident creation
-        // #[cfg(feature = "enterprise")]
-        // if rca_enabled && !data.is_empty() {
-        //     // Collect each deduplicated result row as an alert event
-        //     // Use parent trace_id for cross-alert correlation (not scheduler_trace_id)
-        //     for row in &data {
-        //         if let Err(e) =
-        // o2_enterprise::enterprise::ai::rca::integration::collect_alert_event(
-        // trace_id, // Use parent trace_id for cross-alert batch             &alert,
-        //             row,
-        //             triggered_at,
-        //         ) {
-        //             log::error!(
-        //                 "[SCHEDULER trace_id {scheduler_trace_id}] Error collecting alert event
-        // for RCA: {}",                 e
-        //             );
-        //             // Don't fail alert evaluation if RCA collection fails
-        //         }
-        //     }
-        //     log::debug!(
-        //         "[SCHEDULER trace_id {scheduler_trace_id}] Collected {} alert events for RCA
-        // batch {}",         data.len(),
-        //         trace_id
-        //     );
-        // }
-
         #[cfg(feature = "enterprise")]
         let (incident_handled_notification, incident_notify_error) = if alert.creates_incident
             && o2_enterprise::enterprise::common::config::get_config()
@@ -3734,10 +3673,6 @@ async fn handle_alert_triggers(
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream);
-
-    // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
-    // #[cfg(feature = "enterprise")]
-    // mark_rca_completion().await;
 
     Ok(())
 }
