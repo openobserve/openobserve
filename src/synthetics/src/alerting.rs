@@ -41,6 +41,11 @@ pub type MuteCheck = fn(
 
 static MUTE_CHECK: OnceLock<MuteCheck> = OnceLock::new();
 
+/// Whether an org can have a muted check now, answered from memory; the server registers it.
+pub type MayMute = fn(org: &str) -> bool;
+
+static MAY_MUTE: OnceLock<MayMute> = OnceLock::new();
+
 /// What a completed run is, before any suppression is applied.
 ///
 /// The distinction that matters is between an OUTAGE and a DEGRADATION. An
@@ -192,8 +197,14 @@ const MICROS_PER_MINUTE: i64 = 60 * 1_000_000;
 /// explicit setting beats a built-in default.
 const DEGRADED_REMINDER_US: i64 = 24 * 60 * MICROS_PER_MINUTE;
 
-pub fn register_mute_check(f: MuteCheck) {
+pub fn register_mute_check(f: MuteCheck, may_mute: MayMute) {
     let _ = MUTE_CHECK.set(f);
+    let _ = MAY_MUTE.set(may_mute);
+}
+
+/// False when nothing is registered, as in OSS or with downtimes off, so no row is loaded for it.
+pub fn may_mute(org: &str) -> bool {
+    MAY_MUTE.get().is_some_and(|f| f(org))
 }
 
 /// `None` when nothing is registered, so an OSS build never mutes.
@@ -847,5 +858,10 @@ mod tests {
     #[tokio::test]
     async fn nothing_registered_mutes_nothing() {
         assert_eq!(muted_by("default", "c1", "default", &[]).await, None);
+    }
+
+    #[test]
+    fn nothing_registered_means_no_org_can_mute() {
+        assert!(!may_mute("org"));
     }
 }

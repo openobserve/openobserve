@@ -287,7 +287,9 @@ async fn muted_checks(
     let mut seen = HashSet::new();
     let mut muted = HashSet::new();
     for mapping in mappings {
-        if !seen.insert(mapping.synthetics_id.as_str()) {
+        if !crate::alerting::may_mute(&mapping.org_id)
+            || !seen.insert(mapping.synthetics_id.as_str())
+        {
             continue;
         }
         let Ok(Some(check)) = infra::table::synthetics_checks::get_cached(
@@ -717,3 +719,24 @@ pub async fn run_domain_verifier() {
 
 #[cfg(not(feature = "enterprise"))]
 pub async fn run_domain_verifier() {}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{DatabaseBackend, MockDatabase};
+
+    use super::*;
+
+    #[tokio::test]
+    async fn with_nothing_registered_no_check_row_is_loaded() {
+        let db = MockDatabase::new(DatabaseBackend::Postgres).into_connection();
+        let mapping = infra::table::entity::status_page_component_checks::Model {
+            id: "map-1".to_string(),
+            component_id: "comp-1".to_string(),
+            synthetics_id: "mon-1".to_string(),
+            org_id: "org".to_string(),
+        };
+        let muted = muted_checks(&db, &[mapping]).await;
+        assert!(muted.is_empty());
+        assert!(db.into_transaction_log().is_empty(), "no query must run");
+    }
+}

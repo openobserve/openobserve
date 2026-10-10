@@ -770,6 +770,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         }
         openobserve_synthetics::alerting::register_mute_check(
             openobserve_core::synthetics::downtime_mute_check,
+            openobserve_core::synthetics::downtime_may_mute,
         );
     }
     // Warm the cache on queriers (UI APIs) and on whichever node role is the configured
