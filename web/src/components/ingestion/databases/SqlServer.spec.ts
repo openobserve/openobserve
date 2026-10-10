@@ -351,6 +351,31 @@ describe("sqlServerCard builder", () => {
     expect(prepare.variants!.every((v) => !!v.icon)).toBe(true);
   });
 
+  // VIEW SERVER PERFORMANCE STATE is a syntax error on SQL Server 2016–2019, so a
+  // bare GRANT of it would fail the whole batch there.
+  it("picks the server-state grant by SQL Server version and tags each version", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const versionCheck = "IF CAST(SERVERPROPERTY('ProductMajorVersion') AS int) >= 16";
+
+    const prepare = card.steps.find((s) => s.id === "prepare")!;
+    const gui = prepare.variants!.find((v) => v.id === "sql-client")!.code.raw;
+    expect(gui).toContain(versionCheck);
+    expect(gui).toContain("EXEC('GRANT VIEW SERVER PERFORMANCE STATE TO otel')");
+    expect(gui).toContain("EXEC('GRANT VIEW SERVER STATE TO otel')");
+    expect(gui).not.toMatch(/^GRANT VIEW SERVER PERFORMANCE STATE/m);
+    expect(prepare.pills).toEqual([
+      "SQL Server 2022+ · VIEW SERVER PERFORMANCE STATE",
+      "SQL Server 2016–2019 · VIEW SERVER STATE",
+    ]);
+
+    const dbm = card.steps.find((s) => s.id === "dbm-grant")!;
+    const dbmSql = dbm.variants!.find((v) => v.id === "sql-client")!.code.raw;
+    expect(dbmSql).toMatch(/^GRANT VIEW SERVER STATE TO otel;/);
+    expect(dbmSql).toContain(versionCheck);
+    expect(dbmSql).not.toMatch(/^GRANT VIEW SERVER PERFORMANCE STATE/m);
+    expect(dbm.pills).toHaveLength(2);
+  });
+
   it("uses the same literal login in Step 1 and the collector config (in lockstep)", () => {
     const card = sqlServerCard(SUBS, gt);
     const prepare = card.steps.find((s) => s.id === "prepare")!;

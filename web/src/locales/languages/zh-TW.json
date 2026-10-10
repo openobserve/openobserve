@@ -5052,7 +5052,7 @@
       "dbmMysqlLogPathHelp": "收集器必須能夠讀取此檔案。使用以下指令找到它：SHOW VARIABLES LIKE 'log_error';",
       "dbmMariadbLogPathHelp": "收集器必須能夠讀取此檔案。使用以下指令找到它：SHOW VARIABLES LIKE 'log_error';",
       "dbmPrepareMssqlTitle": "資料庫監控 · 授予存取權限（選用）",
-      "dbmPrepareMssqlDesc": "**以上所有步驟本身即完整** — 查詢時間已從應用程式的追蹤中連到資料庫，無需在此設定。最後這一組加入了追蹤永遠看不到的資訊：死結與被封鎖的查詢，這些只有資料庫本身會記錄。需要同時授予兩種權限 — 一個讓收集器讀取其他工作階段，另一個讓它讀取死結歷程。請在 SQL 用戶端中執行，**不要**在您的 shell 中執行。",
+      "dbmPrepareMssqlDesc": "**上述所有內容本身即已完備** — 查詢計時資料已透過您應用程式的追蹤送達資料庫，此處無需任何設定。最後這一組補上了追蹤永遠看不到的資訊：死結與遭封鎖的查詢，這些只有資料庫本身才會記錄。在 SQL Server 2022 及更新版本上，兩項授權都需要 — 一項讓收集器讀取其他工作階段，另一項讓它讀取死結歷程記錄；在 2016–2019 上，第一項即可涵蓋兩者，指令碼會依您的版本挑選正確的授權。請在 SQL 用戶端中執行，**不要**在您的 shell 中執行。",
       "dbmConfigureMssqlDesc": "寫入 `dbm-config.yaml` — 在下方設定要連線的資料庫。SQL Server 在此取得死結、被封鎖的查詢、活動範例、熱門查詢與執行計畫。sqlserver 接收器會讀取整個執行個體，因此活動與熱門查詢不受限於您上方指定的資料庫。",
       "dbmRunMssqlDesc": "同時執行兩份設定。請使用您在步驟 1 建立的相同登入名稱與密碼。",
       "dbmVerifyBlockingDesc": "開啟 **Infra → Databases → Blocked queries**。等待鎖定的工作階段一經取樣即會出現 — 該索引標籤空白可讓您判斷是沒有任何封鎖，還是沒有收集任何資料。",
