@@ -160,7 +160,8 @@ async fn watch(
                 }
                 infra::schema::put_stream_settings(item_key.to_string(), Arc::new(settings)).await;
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.insert(
+                infra::schema::insert_latest(
+                    &mut w,
                     item_key.to_string(),
                     SchemaCache::new(latest_schema.clone()),
                 );
@@ -223,7 +224,7 @@ async fn watch(
                 w.remove(item_key);
                 drop(w);
                 let mut w = STREAM_SCHEMAS_LATEST.write().await;
-                w.remove(item_key);
+                infra::schema::remove_latest(&mut w, item_key);
                 drop(w);
                 STREAM_RECORD_ID_GENERATOR.remove(item_key);
                 infra::schema::remove_stream_settings(item_key).await;

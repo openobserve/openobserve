@@ -184,4 +184,32 @@ describe("AIIntegrations", () => {
       syncedWrapper.unmount();
     });
   });
+  describe("Get started pick", () => {
+    const pickKey = () =>
+      `o2.onboarding.firstSource.${store.state.selectedOrganization.identifier}`;
+    afterEach(() => window.localStorage.removeItem(pickKey()));
+
+    it("pins the LLM pick as 'Your pick' in place of the landing category", () => {
+      window.localStorage.setItem(pickKey(), "llm");
+      const picked = mountComponent();
+      const tab = picked.find('[data-test="ingestion-ai-pick-tab-frameworks"]');
+      expect(picked.find('[data-test="ingestion-ai-pick-group"]').text()).toBe("Your pick");
+      expect(tab.text()).toContain("LLM or AI app");
+      expect(tab.attributes("aria-selected")).toBe("true");
+      expect(picked.find('[data-test="ingestion-ai-rest-group"]').text()).toBe("Categories");
+      expect(picked.find('[data-test="ai-integrations-category-frameworks"]').exists()).toBe(false);
+      expect(picked.find('[data-test="ai-integrations-category-model-providers"]').exists()).toBe(
+        true,
+      );
+      picked.unmount();
+    });
+
+    it("keeps today's rail for any other pick", () => {
+      window.localStorage.setItem(pickKey(), "kubernetes");
+      const other = mountComponent();
+      expect(other.find('[data-test="ingestion-ai-pick-group"]').exists()).toBe(false);
+      expect(other.find('[data-test="ai-integrations-category-frameworks"]').exists()).toBe(true);
+      other.unmount();
+    });
+  });
 });

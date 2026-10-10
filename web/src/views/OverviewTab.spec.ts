@@ -43,6 +43,18 @@ vi.mock("@/services/incidents", async (importOriginal) => {
     default: { list: vi.fn() },
   });
 });
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { get_organization_summary: vi.fn() },
+  });
+});
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { nameList: vi.fn() },
+  });
+});
 vi.mock("@/services/service_graph", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
@@ -90,8 +102,13 @@ import alertsService from "@/services/alerts";
 import anomalyService from "@/services/anomaly_detection";
 import incidentsService from "@/services/incidents";
 import serviceGraphService from "@/services/service_graph";
+import organizationsService from "@/services/organizations";
+import streamService from "@/services/stream";
 import config from "@/aws-exports";
 import OverviewTab from "./OverviewTab.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { streamProbeQuery } from "@/services/stream.queries";
+import { firstDataStorageKey } from "@/composables/firstEvent/useFirstDataNotice";
 
 // OverviewTab renders only O2 `lib` components.
 
@@ -175,6 +192,21 @@ describe("OverviewTab", () => {
     } as never);
   };
 
+  /** The org's stream lists by type; a type left out answers an empty list. */
+  const givenStreams = (byType: Record<string, Array<{ name: string; stream_type: string }>>) => {
+    vi.mocked(streamService.nameList).mockImplementation(((
+      _org: string,
+      type: string,
+      _schema: boolean,
+      offset = -1,
+      limit = -1,
+    ) => {
+      const all = byType[type] ?? [];
+      const list = limit > 0 ? all.slice(Math.max(offset, 0), Math.max(offset, 0) + limit) : all;
+      return Promise.resolve({ data: { list, total: all.length } });
+    }) as never);
+  };
+
   /** Recent Events is the one section that renders on OSS and enterprise alike. */
   const givenRecentEvents = () => {
     vi.mocked(alertsService.getHistory).mockResolvedValue({
@@ -220,6 +252,7 @@ describe("OverviewTab", () => {
     localStorage.removeItem("o2_overview_time");
 
     givenNoData();
+    givenStreams({ logs: [{ name: "app", stream_type: "logs" }] });
   });
 
   afterEach(() => {
@@ -558,7 +591,7 @@ describe("OverviewTab", () => {
 
       expect(internals(wrapper).hasAnyData).toBe(false);
       expect(wrapper.find(RECENT_EVENTS).exists()).toBe(false);
-      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
       // A rejected fetch must still mark the section loaded, or it skeletons
       // forever.
       expect(internals(wrapper).sectionState.recentEvents).toEqual({
@@ -645,6 +678,541 @@ describe("OverviewTab", () => {
       pending.resolve({ data: { nodes: [], edges: [] } });
       await flushPromises();
       expect(visibleSkeletons()).toEqual([]);
+    });
+  });
+  describe("load failures", () => {
+    const LOAD_ERROR = '[data-test="overview-load-error-empty-state"]';
+    const RETRY_CARD = '[data-test="overview-load-error-retry-card"]';
+    const NO_ACCESS = '[data-test="overview-no-access-empty-state"]';
+    const SECTION_ERROR = '[data-test$="-load-error"]';
+    const forbidden = () => Object.assign(new Error("forbidden"), { response: { status: 403 } });
+    const serverError = () => Object.assign(new Error("boom"), { response: { status: 500 } });
+    const refreshLastRun = () =>
+      wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt") as number | null;
+
+    const givenEnterprise = (flagOn: boolean) => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        incidents_enabled: true,
+        anomaly_detection_enabled: true,
+        restricted_routes_on_empty_data: flagOn,
+      });
+    };
+    const givenEverySectionFails = (err: () => Error) => {
+      vi.mocked(alertsService.getHistory).mockRejectedValue(err());
+      vi.mocked(anomalyService.list).mockRejectedValue(err());
+      vi.mocked(incidentsService.list).mockRejectedValue(err());
+      vi.mocked(serviceGraphService.getCurrentTopology).mockRejectedValue(err());
+    };
+
+    it("should show load-error with Retry, not all clear, when the only OSS section fails", async () => {
+      vi.mocked(alertsService.getHistory).mockRejectedValue(serverError());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(RETRY_CARD).exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(refreshLastRun()).toBeNull();
+    });
+
+    it("should show load-error in every edition with the flag off when every section fails", async () => {
+      givenEnterprise(false);
+      givenEverySectionFails(serverError);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.findAll(SECTION_ERROR)).toHaveLength(0);
+    });
+
+    it("should reload every section when Retry is clicked", async () => {
+      givenEnterprise(false);
+      givenEverySectionFails(serverError);
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      vi.mocked(alertsService.getHistory).mockClear();
+      givenNoData();
+
+      await wrapper.find(RETRY_CARD).trigger("click");
+      await flushPromises();
+
+      expect(alertsService.getHistory).toHaveBeenCalledTimes(1);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(refreshLastRun()).not.toBeNull();
+    });
+
+    it("should show one section error, never all clear or the full-page error, when one section fails", async () => {
+      givenEnterprise(false);
+      vi.mocked(incidentsService.list).mockRejectedValue(serverError());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      const errors = wrapper.findAll(SECTION_ERROR);
+      expect(errors.map((e) => e.attributes("data-test"))).toEqual([
+        "overview-incidents-load-error",
+      ]);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(refreshLastRun()).not.toBeNull();
+    });
+
+    it("should keep loaded rows beside the failed section and retry every section from its button", async () => {
+      givenEnterprise(false);
+      givenRecentEvents();
+      vi.mocked(anomalyService.list).mockRejectedValue(serverError());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-anomalies-load-error"]').exists()).toBe(true);
+      vi.mocked(alertsService.getHistory).mockClear();
+      vi.mocked(anomalyService.list).mockResolvedValue({ data: [] } as never);
+
+      await wrapper.find('[data-test="overview-anomalies-load-error-retry-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(alertsService.getHistory).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="overview-anomalies-load-error"]').exists()).toBe(false);
+    });
+
+    it("should count a 403 as a failure and never show no-access with the flag off", async () => {
+      givenEnterprise(false);
+      givenEverySectionFails(forbidden);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(NO_ACCESS).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should show the no-access state without the toolbar when every section answers 403 with the flag on", async () => {
+      givenEnterprise(true);
+      givenEverySectionFails(forbidden);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(NO_ACCESS).exists()).toBe(true);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find(REFRESH_BTN).exists()).toBe(false);
+    });
+
+    it("should show load-error, not no-access, when 403s mix with other failures and the flag is on", async () => {
+      givenEnterprise(true);
+      givenEverySectionFails(forbidden);
+      vi.mocked(alertsService.getHistory).mockRejectedValue(serverError());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(NO_ACCESS).exists()).toBe(false);
+    });
+  });
+
+  describe("monitoring state with the empty-data flag on", () => {
+    const NOT_MONITORED = '[data-test="overview-not-monitored-empty-state"]';
+    const summaryWithAlerts = (count: number) => ({
+      data: { alerts: { num_realtime: count, num_scheduled: 0 } },
+    });
+
+    beforeEach(() => {
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        anomaly_detection_enabled: true,
+        restricted_routes_on_empty_data: true,
+      });
+    });
+
+    it("should say nothing is watched yet when the org has no alert and no anomaly check", async () => {
+      vi.mocked(organizationsService.get_organization_summary).mockResolvedValue(
+        summaryWithAlerts(0) as never,
+      );
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(NOT_MONITORED).exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find('[data-test="overview-not-monitored-alert-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-not-monitored-anomaly-card"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-not-monitored-logs-card"]').exists()).toBe(true);
+    });
+
+    it("should show all clear with the scoped sentence once one alert exists", async () => {
+      vi.mocked(organizationsService.get_organization_summary).mockResolvedValue(
+        summaryWithAlerts(1) as never,
+      );
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(NOT_MONITORED).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).text()).toContain(
+        "No open incidents, anomalies or degraded services in the selected time range.",
+      );
+      expect(wrapper.find(EMPTY_STATE).text()).not.toContain("looks healthy");
+    });
+
+    it("should show load-error with Retry, never all clear or nothing watched, when only the summary fails", async () => {
+      vi.mocked(organizationsService.get_organization_summary).mockRejectedValue(
+        Object.assign(new Error("boom"), { response: { status: 500 } }),
+      );
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-load-error-retry-card"]').exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find(NOT_MONITORED).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt")).toBeNull();
+    });
+
+    it("should read the summary again on Retry and settle on nothing watched", async () => {
+      vi.mocked(organizationsService.get_organization_summary).mockRejectedValueOnce(
+        new Error("boom"),
+      );
+      vi.mocked(organizationsService.get_organization_summary).mockResolvedValue(
+        summaryWithAlerts(0) as never,
+      );
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      await wrapper.find('[data-test="overview-load-error-retry-card"]').trigger("click");
+      await flushPromises();
+
+      expect(organizationsService.get_organization_summary).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
+      expect(wrapper.find(NOT_MONITORED).exists()).toBe(true);
+    });
+
+    it("should keep rows on screen when only the summary fails", async () => {
+      givenRecentEvents();
+      vi.mocked(organizationsService.get_organization_summary).mockRejectedValue(new Error("boom"));
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+      expect(wrapper.find('[data-test="overview-load-error-empty-state"]').exists()).toBe(false);
+    });
+
+    it("should not read the org summary with the flag off", async () => {
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        restricted_routes_on_empty_data: false,
+      });
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(organizationsService.get_organization_summary).not.toHaveBeenCalled();
+      expect(wrapper.find(NOT_MONITORED).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+    });
+  });
+
+  describe("an org with no user streams and the flag off", () => {
+    const HERO = '[data-test="home-first-data-hero"]';
+    const LOAD_ERROR = '[data-test="overview-load-error-empty-state"]';
+    const RETRY_CARD = '[data-test="overview-load-error-retry-card"]';
+    const serverError = () => Object.assign(new Error("boom"), { response: { status: 500 } });
+    const internalOnly = {
+      logs: [
+        { name: "usage", stream_type: "logs" },
+        { name: "_o2_ingest_rejections", stream_type: "logs" },
+      ],
+      metrics: [{ name: "audit", stream_type: "metrics" }],
+    };
+    const refreshLastRun = () =>
+      wrapper.findComponent({ name: "ORefreshButton" }).props("lastRunAt") as number | null;
+
+    beforeEach(() => {
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        restricted_routes_on_empty_data: false,
+      });
+      store.commit("setSelectedOrganization", {
+        ...store.state.selectedOrganization,
+        label: "Acme Prod",
+      });
+      givenStreams(internalOnly);
+    });
+
+    it("should show the no-data hero with the flag-off sentence instead of all clear", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      const hero = wrapper.find(HERO);
+      expect(hero.exists()).toBe(true);
+      expect(hero.text()).toContain("Start sending data to OpenObserve");
+      expect(hero.text()).toContain(
+        "There's no data in Acme Prod yet. Alerts and recent events show here once it arrives. Pick how you want to start.",
+      );
+      for (const id of ["logs-card", "traces-card", "metrics-card", "otel-btn", "kubernetes-btn"]) {
+        expect(wrapper.find(`[data-test="home-no-data-${id}"]`).exists()).toBe(true);
+      }
+      expect(wrapper.find('[data-test="home-no-data-all-sources-link"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test^="first-event-status"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="first-data-panel"]').exists()).toBe(false);
+    });
+
+    it("should keep the toolbar with a fresh refresh run beside the hero", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(REFRESH_BTN).exists()).toBe(true);
+      expect(refreshLastRun()).not.toBeNull();
+    });
+
+    it("should ask nothing when the first-data notice already probed every type empty", async () => {
+      const org = store.state.selectedOrganization.identifier;
+      for (const type of ["logs", "metrics", "traces"]) {
+        queryClient.setQueryData(streamProbeQuery(org, type).queryKey, { list: [], total: 0 });
+      }
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(streamService.nameList).not.toHaveBeenCalled();
+      expect(wrapper.find(HERO).exists()).toBe(true);
+    });
+
+    it("should ask nothing and keep all clear when the notice recorded data for the org", async () => {
+      const org = store.state.selectedOrganization.identifier;
+      localStorage.setItem(
+        firstDataStorageKey(org),
+        JSON.stringify({ lastVisit: Date.now(), hadData: true }),
+      );
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      localStorage.removeItem(firstDataStorageKey(org));
+
+      expect(streamService.nameList).not.toHaveBeenCalled();
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+    });
+
+    it("should answer a later load from the cache, never a new request", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      const first = vi.mocked(streamService.nameList).mock.calls.length;
+      expect(first).toBeGreaterThan(0);
+
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+        startTime: 1,
+        endTime: 2,
+        relativeTimePeriod: "1h",
+      });
+      await flushPromises();
+
+      expect(streamService.nameList).toHaveBeenCalledTimes(first);
+      expect(wrapper.find(HERO).exists()).toBe(true);
+    });
+
+    it("should keep all clear when a page of internal streams leaves the rest unread", async () => {
+      const many = Array.from({ length: 25 }, (_, i) => ({
+        name: `_o2_s${i}`,
+        stream_type: "logs",
+      }));
+      givenStreams({ logs: many });
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+    });
+
+    it("should re-read the lists on Refresh and show all clear once a user stream arrived", async () => {
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find(HERO).exists()).toBe(true);
+      givenStreams({ ...internalOnly, traces: [{ name: "default", stream_type: "traces" }] });
+
+      await wrapper.find(REFRESH_BTN).trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find(HERO).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+    });
+
+    it("should keep all clear unchanged for an org that has a user stream", async () => {
+      givenStreams({ ...internalOnly, logs: [{ name: "app", stream_type: "logs" }] });
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+    });
+
+    it("should keep all clear when a stream list answers 403", async () => {
+      vi.mocked(streamService.nameList).mockRejectedValue(
+        Object.assign(new Error("forbidden"), { response: { status: 403 } }),
+      );
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(refreshLastRun()).not.toBeNull();
+    });
+
+    it("should show load-error with Retry, not all clear, when a stream probe hits a network error", async () => {
+      vi.mocked(streamService.nameList).mockRejectedValue(new Error("Network Error"));
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(RETRY_CARD).exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+      expect(refreshLastRun()).toBeNull();
+    });
+
+    it("should show load-error, not all clear, when a stream probe answers 500", async () => {
+      vi.mocked(streamService.nameList).mockRejectedValue(serverError());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+      expect(refreshLastRun()).toBeNull();
+    });
+
+    it("should show load-error when only one type's probe answers 500 and the others are empty", async () => {
+      const answer = vi.mocked(streamService.nameList).getMockImplementation()!;
+      vi.mocked(streamService.nameList).mockImplementation(((org: string, type: string, ...rest) =>
+        type === "traces" ? Promise.reject(serverError()) : answer(org, type, ...rest)) as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should keep all clear when one probe fails but another type has a user stream", async () => {
+      givenStreams({ ...internalOnly, logs: [{ name: "app", stream_type: "logs" }] });
+      const answer = vi.mocked(streamService.nameList).getMockImplementation()!;
+      vi.mocked(streamService.nameList).mockImplementation(((org: string, type: string, ...rest) =>
+        type === "traces" ? Promise.reject(serverError()) : answer(org, type, ...rest)) as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+    });
+
+    it("should re-run the probes on Retry and show the hero once they answer empty", async () => {
+      vi.mocked(streamService.nameList).mockRejectedValue(serverError());
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      givenStreams(internalOnly);
+      const before = vi.mocked(streamService.nameList).mock.calls.length;
+
+      await wrapper.find(RETRY_CARD).trigger("click");
+      await flushPromises();
+
+      expect(vi.mocked(streamService.nameList).mock.calls.length).toBeGreaterThan(before);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find(HERO).exists()).toBe(true);
+      expect(refreshLastRun()).not.toBeNull();
+    });
+
+    it("should re-run the probes on Retry and show all clear once a user stream is found", async () => {
+      vi.mocked(streamService.nameList).mockRejectedValue(new Error("Network Error"));
+      wrapper = mountOverviewTab();
+      await flushPromises();
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      givenStreams({ ...internalOnly, metrics: [{ name: "cpu", stream_type: "metrics" }] });
+
+      await wrapper.find(RETRY_CARD).trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+    });
+
+    it("should show rows and no load-error when a section has rows, even if the probes would fail", async () => {
+      givenRecentEvents();
+      vi.mocked(streamService.nameList).mockRejectedValue(serverError());
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(false);
+    });
+
+    it("should show rows and never ask for the stream lists when a section has rows", async () => {
+      givenRecentEvents();
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(RECENT_EVENTS).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+      expect(streamService.nameList).not.toHaveBeenCalled();
+    });
+
+    it("should let load-error win over the hero when every section fails", async () => {
+      vi.mocked(alertsService.getHistory).mockRejectedValue(new Error("boom"));
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(LOAD_ERROR).exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+    });
+
+    it("should let a section error win over the hero when one section fails", async () => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, incidents_enabled: true });
+      vi.mocked(incidentsService.list).mockRejectedValue(new Error("boom"));
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="overview-incidents-load-error"]').exists()).toBe(true);
+      expect(wrapper.find(HERO).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(false);
+    });
+
+    it("should leave the flag-on page unchanged and never ask for the stream lists", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, restricted_routes_on_empty_data: true });
+      vi.mocked(organizationsService.get_organization_summary).mockResolvedValue({
+        data: { alerts: { num_realtime: 1, num_scheduled: 0 } },
+      } as never);
+
+      wrapper = mountOverviewTab();
+      await flushPromises();
+
+      expect(wrapper.find(HERO).exists()).toBe(false);
+      expect(wrapper.find(EMPTY_STATE).exists()).toBe(true);
+      expect(streamService.nameList).not.toHaveBeenCalled();
     });
   });
 });

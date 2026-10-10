@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+    <CredentialCodeBlock slug="prometheus" :content="content" />
     <IngestionDocLink
       href="https://openobserve.ai/blog/send-metrics-using-kube-prometheus-stack-to-openobserve"
     >
@@ -30,10 +30,10 @@ import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "traces-otlp",
@@ -45,7 +45,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent, IngestionDocLink },
+  components: { CredentialCodeBlock, IngestionContent, IngestionDocLink },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
@@ -67,7 +67,6 @@ export default defineComponent({
       username: [EMAIL]
       password: [PASSCODE]`;
     return {
-      raw,
       t,
       store,
       config,

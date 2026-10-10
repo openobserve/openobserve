@@ -3,7 +3,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import Java from "./Java.vue";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 
 vi.mock("../../../aws-exports", () => ({
   default: {
@@ -40,9 +40,9 @@ vi.mock("@/composables/useIngestion", () => ({
   })),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: '<div data-test="copy-content">{{ content }}</div>',
     props: ["content"],
   },
@@ -89,15 +89,15 @@ describe("Java.vue Comprehensive Coverage", () => {
       global: {
         plugins: [mockRouter],
         provide: { store: mockStore },
-        components: { CopyContent },
+        components: { CredentialCodeBlock },
       },
     });
   };
 
   describe("Component Rendering Tests", () => {
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.exists()).toBe(true);
     });
 
@@ -205,16 +205,16 @@ describe("Java.vue Comprehensive Coverage", () => {
   });
 
   describe("Component Props Passing Tests", () => {
-    it("should pass content prop to CopyContent component", () => {
+    it("should pass content prop to CredentialCodeBlock component", () => {
       wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
+      const copyContent = wrapper.findComponent(CredentialCodeBlock);
       expect(copyContent.props("content")).toBeDefined();
       expect(typeof copyContent.props("content")).toBe("string");
     });
 
-    it("should pass processed content without [STREAM_NAME] to CopyContent", () => {
+    it("should pass processed content without [STREAM_NAME] to CredentialCodeBlock", () => {
       wrapper = createWrapper();
-      const content = wrapper.findComponent(CopyContent).props("content");
+      const content = wrapper.findComponent(CredentialCodeBlock).props("content");
       expect(content).not.toContain("[STREAM_NAME]");
       expect(content).toContain("java");
     });

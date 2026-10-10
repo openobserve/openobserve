@@ -113,8 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="bg-surface-panel border-border-default h-full border-e">
           <div class="h-full overflow-y-auto pt-1.5">
             <OTabs v-model="selectedCategory" orientation="vertical" dense class="px-1">
+              <FirstSourcePickGroup
+                v-if="pickTab"
+                rail="ai"
+                :tab="pickTab"
+                :rest-label="t('ingestion.firstSource.categories')"
+              />
               <OTab
-                v-for="cat in aiCategories"
+                v-for="cat in railCategories"
                 :key="cat.slug"
                 :name="cat.slug"
                 :label="raw(cat.name)"
@@ -213,10 +219,24 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import FirstSourcePickGroup, {
+  type FirstSourcePickTab,
+} from "@/components/ingestion/FirstSourcePickGroup.vue";
+import { firstSourceOption, readFirstSource } from "@/components/login/firstSourceOptions";
+import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "AIIntegrationsPage",
-  components: { OTabs, OTab, OSearchInput, OSplitter, ODrawer, OButton, OIcon },
+  components: {
+    OTabs,
+    OTab,
+    OSearchInput,
+    OSplitter,
+    ODrawer,
+    OButton,
+    OIcon,
+    FirstSourcePickGroup,
+  },
   setup() {
     const { lgUp } = useBreakpoint();
     const compact = computed(() => !lgUp.value);
@@ -313,6 +333,27 @@ export default defineComponent({
       },
     );
 
+    // The LLM pick's guide is this page's landing category, so the pick row stands in for that category.
+    const pickTab = computed<FirstSourcePickTab | undefined>(() => {
+      const option = firstSourceOption(
+        readFirstSource(store.state.selectedOrganization.identifier),
+      );
+      const landing = aiCategories[0];
+      if (option?.route !== "ai-integrations" || !landing) return undefined;
+      return {
+        name: landing.slug,
+        to: {
+          name: landing.integrations[0]?.routeName ?? "ai-integrations",
+          query: { org_identifier: store.state.selectedOrganization.identifier },
+        },
+        label: t(option.labelKey),
+        icon: option.logo ? "img:" + getImageURL(option.logo) : option.icon,
+      };
+    });
+    const railCategories = computed(() =>
+      aiCategories.filter((cat) => cat.slug !== pickTab.value?.name),
+    );
+
     const selectedIntegrationName = computed(
       () => filteredIntegrations.value.find((i) => i.routeName === selectedIntegration.value)?.name,
     );
@@ -331,6 +372,8 @@ export default defineComponent({
       store,
       isDark,
       aiCategories,
+      pickTab,
+      railCategories,
       selectedCategory,
       selectedIntegration,
       integrationFilter,

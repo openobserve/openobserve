@@ -14,9 +14,9 @@ vi.mock("../../../utils/zincutils", () => ({
   getIngestionURL: vi.fn(() => "http://localhost:5080"),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: '<div data-test="copy-content">{{ content }}</div>',
     props: ["content"],
   },

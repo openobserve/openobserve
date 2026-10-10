@@ -71,6 +71,7 @@ use crate::{
 pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
+pub mod rejections;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
@@ -714,6 +715,11 @@ pub async fn check_ingestion_allowed(
     ingester::check_memtable_size().map_err(|e| Error::ResourceError(e.to_string()))?;
 
     Ok(())
+}
+
+/// Whether a write must look its stream up to see if it is new; Cloud reports every new stream.
+pub fn checks_for_new_stream(org_id: &str) -> bool {
+    cfg!(feature = "cloud") || !infra::schema::org_has_user_stream(org_id)
 }
 
 pub fn get_val_for_attr(attr_val: &Value) -> Value {
@@ -1696,6 +1702,18 @@ mod tests {
         assert_eq!(row.delivery_attempted, Some(true));
         assert_eq!(row.error.as_deref(), Some("pagerduty timed out"));
         assert_eq!(row.success_response.as_deref(), Some("sent to slack"));
+    }
+
+    #[test]
+    fn test_new_stream_lookup_is_skipped_once_the_org_has_a_user_stream() {
+        let org = "ingestion_new_stream_lookup_org";
+        let key = format!("{org}/logs/app");
+        let mut map = hashbrown::HashMap::new();
+        assert!(checks_for_new_stream(org));
+        infra::schema::insert_latest(&mut map, key.clone(), SchemaCache::new(Schema::empty()));
+        assert_eq!(checks_for_new_stream(org), cfg!(feature = "cloud"));
+        infra::schema::remove_latest(&mut map, &key);
+        assert!(checks_for_new_stream(org));
     }
 
     #[test]

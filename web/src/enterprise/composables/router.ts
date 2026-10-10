@@ -252,6 +252,7 @@ const useEnvRoutes = () => {
       component: Billing,
       meta: {
         keepAlive: false,
+        allowOnEmptyData: true,
       },
       children: [
         {

@@ -496,3 +496,37 @@ describe("IngestLogs Component", () => {
     });
   });
 });
+
+describe("IngestLogs: Get started pick", () => {
+  const PICK_KEY = `o2.onboarding.firstSource.${store.state.selectedOrganization.identifier}`;
+  const ids = (wrapper: any): string[] =>
+    wrapper.findAll("[data-test]").map((el: any) => el.attributes("data-test"));
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("pins the curl guide under Your pick, with the rest of the rail under Logs", () => {
+    localStorage.setItem(PICK_KEY, "http");
+    const wrapper = mount(IngestLogs, buildMountOptions());
+    const rail = ids(wrapper);
+    expect(rail.slice(0, 3)).toEqual([
+      "ingestion-logs-pick-group",
+      "ingestion-logs-pick-tab-curl",
+      "ingestion-logs-rest-group",
+    ]);
+    expect(wrapper.find('[data-test="ingestion-logs-pick-group"]').text()).toBe("Your pick");
+    expect(wrapper.find('[data-test="ingestion-logs-rest-group"]').text()).toBe("Logs");
+    expect(rail).not.toContain("ingestion-logs-tab-curl");
+    expect(rail).toContain("ingestion-logs-tab-filebeat");
+    wrapper.unmount();
+  });
+
+  it("renders today's rail for a pick in another rail or no pick", () => {
+    localStorage.setItem(PICK_KEY, "webserver");
+    const wrapper = mount(IngestLogs, buildMountOptions());
+    expect(ids(wrapper)[0]).toBe("ingestion-logs-tab-curl");
+    expect(wrapper.find('[data-test="ingestion-logs-pick-group"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});

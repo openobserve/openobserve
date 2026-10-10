@@ -31,9 +31,9 @@ use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, folders, kv, metrics_usage,
-    model_pricing, organization, query_history, rum_analytics, service_accounts, short_url, slos,
-    sourcemaps, status, status_pages, stream, synthetics, users,
+    alerts, announcements, authz, dashboards, db_monitoring, folders, ingest_rejections, kv,
+    metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
+    short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
@@ -73,7 +73,8 @@ use crate::{
             validator_rum,
         },
         router::middlewares::{
-            blocked_orgs_middleware, password_policy_middleware, root_only_middleware,
+            blocked_orgs_middleware, ingest_rejections_middleware, password_policy_middleware,
+            root_only_middleware,
         },
     },
 };
@@ -291,7 +292,13 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                 );
             }
 
-            next.run(Request::from_parts(parts, body)).await
+            let mut response = next.run(Request::from_parts(parts, body)).await;
+            if let Some(token_name) = result.token_name {
+                response.extensions_mut().insert(
+                    openobserve_core::ingestion::rejections::RejectionTokenName(token_name),
+                );
+            }
+            response
         }
         Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     }
@@ -926,6 +933,7 @@ pub fn service_routes() -> Router {
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
+        .route("/{org_id}/ingest/recent_rejections", get(ingest_rejections::recent_rejections))
         .route("/{org_id}/passcode", get(organization::org::get_user_passcode).put(organization::org::update_user_passcode))
         .route("/{org_id}/rumtoken", get(organization::org::get_user_rumtoken).post(organization::org::create_user_rumtoken).put(organization::org::update_user_rumtoken))
         .route("/{org_id}/ingestion-tokens", get(organization::ingestion_tokens::list_ingestion_tokens).post(organization::ingestion_tokens::create_ingestion_token))
@@ -935,13 +943,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/rename", put(organization::org::rename_org))
 
         // ES compatibility
-        .route("/{org_id}/", get(organization::es::org_index).head(organization::es::org_index))
-        .route("/{org_id}/_license", get(organization::es::org_license))
-        .route("/{org_id}/_xpack", get(organization::es::org_xpack))
-        .route("/{org_id}/_ilm/policy/{name}", get(organization::es::org_ilm_policy).head(organization::es::org_ilm_policy))
-        .route("/{org_id}/_index_template/{name}", get(organization::es::org_index_template).head(organization::es::org_index_template).post(organization::es::org_index_template_create))
-        .route("/{org_id}/_data_stream/{name}", get(organization::es::org_data_stream).head(organization::es::org_data_stream).post(organization::es::org_data_stream_create))
-        .route("/{org_id}/_ingest/pipeline/{name}", get(organization::es::org_pipeline).head(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
+        .merge(es_compat_routes())
 
         // Streams
         .route("/{org_id}/streams", get(stream::list))
@@ -2073,6 +2075,7 @@ pub fn service_routes() -> Router {
         .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware))
         .layer(RequestDecompressionLayer::new())
+        .layer(middleware::from_fn(ingest_rejections_middleware))
         .layer(middleware::from_fn(
             decompression::preprocess_encoding_middleware,
         ))
@@ -2158,6 +2161,7 @@ pub fn splunk_collector_routes() -> Router {
         // Outermost, so the 10 MiB cap is measured on the wire before any
         // decompression can amplify an unauthenticated body.
         .layer(middleware::from_fn(hec_collector::wire_body_limit_middleware))
+        .layer(middleware::from_fn(ingest_rejections_middleware))
 }
 
 /// Create the full application router
@@ -2272,6 +2276,19 @@ fn node_routes() -> Router {
         .route("/refresh_nodes_list", get(status::refresh_nodes_list))
         .route("/refresh_user_sessions", get(status::refresh_user_sessions))
         .layer(middleware::from_fn(root_only_middleware))
+}
+
+/// Elasticsearch-compatibility handshake routes, merged into `service_routes` under its layers.
+#[rustfmt::skip]
+fn es_compat_routes() -> Router {
+    Router::new()
+        .route("/{org_id}/", get(organization::es::org_index).head(organization::es::org_index))
+        .route("/{org_id}/_license", get(organization::es::org_license))
+        .route("/{org_id}/_xpack", get(organization::es::org_xpack))
+        .route("/{org_id}/_ilm/policy/{name}", get(organization::es::org_ilm_policy).head(organization::es::org_ilm_policy))
+        .route("/{org_id}/_index_template/{name}", get(organization::es::org_index_template).head(organization::es::org_index_template).post(organization::es::org_index_template_create))
+        .route("/{org_id}/_data_stream/{name}", get(organization::es::org_data_stream).head(organization::es::org_data_stream).post(organization::es::org_data_stream_create))
+        .route("/{org_id}/_ingest/pipeline/{name}", get(organization::es::org_pipeline).head(organization::es::org_pipeline).post(organization::es::org_pipeline_create))
 }
 
 #[cfg(test)]
@@ -3243,6 +3260,150 @@ mod tests {
             StatusCode::METHOD_NOT_ALLOWED,
             "the catalog is read-only; the frontend issues GET"
         );
+    }
+
+    #[tokio::test]
+    async fn recent_rejections_route_reads_the_org_key_for_members_and_root_and_is_get_only() {
+        use common::{
+            infra::config::{ORG_USERS, USERS},
+            meta::ingest_rejections::{IngestRejection, RejectionReason},
+        };
+        use config::meta::user::{UserRole, UserType};
+
+        let org = "rej-route-acme";
+        let member = "member@rej-route.test";
+        let root = "root@rej-route.test";
+        let stranger = "stranger@rej-route.test";
+        USERS.insert(
+            member.to_string(),
+            infra::table::users::UserRecord {
+                email: member.to_string(),
+                first_name: "M".to_string(),
+                last_name: "R".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        for (org_id, email, role) in [
+            (org, member, UserRole::Viewer),
+            (config::DEFAULT_ORG, root, UserRole::Root),
+        ] {
+            ORG_USERS.insert(
+                format!("{org_id}/{email}"),
+                infra::table::org_users::OrgUserRecord {
+                    role,
+                    token: "token".to_string(),
+                    rum_token: None,
+                    org_id: org_id.to_string(),
+                    email: email.to_string(),
+                    created_at: 0,
+                    allow_static_token: true,
+                },
+            );
+        }
+        let now = config::utils::time::now_micros();
+        let entries = [
+            (now - 30, 400, RejectionReason::MalformedBody, None),
+            (
+                now - 10,
+                401,
+                RejectionReason::InvalidCredentials,
+                Some("ci"),
+            ),
+            (now - 20, 413, RejectionReason::BatchTooLarge, None),
+            (
+                now - 2 * 3_600_000_000,
+                429,
+                RejectionReason::RateOrQuota,
+                None,
+            ),
+        ]
+        .map(|(first_seen, status, reason, token)| {
+            IngestRejection::new(
+                first_seen,
+                status,
+                reason,
+                &format!("/api/{org}/default/_json"),
+                token,
+            )
+        });
+        infra::db::create_table().await.unwrap();
+        infra::coordinator::ingest_rejection::delete(org)
+            .await
+            .unwrap();
+        let value = bytes::Bytes::from(serde_json::to_vec(&entries).unwrap());
+        assert!(
+            infra::coordinator::ingest_rejection::put_if_revision(org, value, None)
+                .await
+                .unwrap()
+        );
+
+        let app = Router::new().route(
+            "/{org_id}/ingest/recent_rejections",
+            get(ingest_rejections::recent_rejections),
+        );
+        let call = |method: &str, user: &str| {
+            Request::builder()
+                .method(method)
+                .uri(format!("/{org}/ingest/recent_rejections"))
+                .header("user_id", user)
+                .body(Body::empty())
+                .unwrap()
+        };
+
+        let ok = app.clone().oneshot(call("GET", member)).await.unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(ok.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["tracked"], Value::Bool(true));
+        let list = json["list"].as_array().unwrap();
+        assert_eq!(list.len(), 3, "the entry older than an hour is absent");
+        assert_eq!(
+            list[0],
+            serde_json::json!({
+                "first_seen": now - 10,
+                "status": 401,
+                "reason": "invalid_credentials",
+                "path": format!("/api/{org}/default/_json"),
+                "token_name": "ci"
+            })
+        );
+        let reasons = list
+            .iter()
+            .map(|r| r["reason"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            reasons,
+            ["invalid_credentials", "batch_too_large", "malformed_body"],
+            "newest first"
+        );
+
+        let as_root = app.clone().oneshot(call("GET", root)).await.unwrap();
+        assert_eq!(as_root.status(), StatusCode::OK, "root has no org row");
+
+        let refused = app.clone().oneshot(call("GET", stranger)).await.unwrap();
+        assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+
+        let wrong_method = app.oneshot(call("POST", member)).await.unwrap();
+        assert_eq!(wrong_method.status(), StatusCode::METHOD_NOT_ALLOWED);
+
+        USERS.remove(member);
+        ORG_USERS.remove(&format!("{org}/{member}"));
+        ORG_USERS.remove(&format!("{}/{root}", config::DEFAULT_ORG));
+        infra::coordinator::ingest_rejection::delete(org)
+            .await
+            .unwrap();
     }
 
     #[test]

@@ -91,6 +91,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex min-h-0 flex-1 flex-col"
         :class="activeHomeTab.startsWith('dash:') ? '' : 'px-2.5 pt-px pb-2.5'"
       >
+        <FirstDataNotice
+          v-if="firstDataNotice?.visible.value"
+          class="mt-2.5 mb-3"
+          :stream="firstDataNotice.stream.value"
+          :arrived-at="firstDataNotice.arrivedAt.value"
+          @open="firstDataNotice.open"
+          @dismiss="firstDataNotice.dismiss"
+        />
+        <FirstDataPanel
+          v-if="flagOn && isDataTab && arrived"
+          signal="any"
+          variant="compact"
+          :arrived="arrived"
+          class="mt-2.5 mb-3"
+          @dismiss="arrived = undefined"
+          @open="openArrived"
+        />
         <!-- O2 AI Assistant tab -->
         <div
           v-if="activeHomeTab === 'ai'"
@@ -127,36 +144,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODrawer>
         </div>
 
-        <!-- Overview tab (no inner card-container — the outer section panel
-             already provides the border; avoids a double-bordered card). -->
-        <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
-          <OverviewTab />
-        </div>
+        <FirstDataPanel
+          v-if="flagOn && isDataTab"
+          v-slot="{ layout, statusLine }"
+          signal="any"
+          variant="compact"
+          :context="activeHomeTab === 'usage' ? 'usage' : 'overview'"
+          status-in-slot
+          @detected="(r) => (arrived = r)"
+        >
+          <HomeViewSkeleton v-if="layout === 'pending'" />
+          <div
+            v-else-if="layout !== 'none'"
+            class="min-h-0 flex-1 overflow-y-auto"
+            :class="{ 'pt-2.5': layout !== 'card' }"
+          >
+            <div
+              v-if="activeHomeTab === 'usage'"
+              class="flex shrink-0 flex-col not-empty:mb-3 empty:hidden"
+            >
+              <TrialPeriod current-page="usage" />
+            </div>
+            <OEmptyState
+              v-if="layout === 'forbidden'"
+              preset="no-access"
+              size="block"
+              data-test="home-no-access-empty-state"
+            />
+            <HomeNoDataState
+              v-else
+              :tab="activeHomeTab === 'usage' ? 'usage' : 'overview'"
+              :alternatives-only="layout === 'card'"
+            >
+              <template v-if="layout === 'status'" #status>
+                <component :is="statusLine" />
+              </template>
+            </HomeNoDataState>
+          </div>
+          <div v-else-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+            <OverviewTab />
+          </div>
+          <div v-else class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
+            <UsageTab />
+          </div>
+        </FirstDataPanel>
 
-        <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
-          <UsageTab />
-        </div>
+        <template v-else>
+          <!-- Overview tab (no inner card-container — the outer section panel
+               already provides the border; avoids a double-bordered card). -->
+          <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
+            <OverviewTab />
+          </div>
 
-        <!-- Pinned dashboard tab -->
-        <div v-else-if="activeHomeTab.startsWith('dash:')" class="min-h-0 flex-1 overflow-hidden">
-          <PinnedDashboardTab
-            :key="activeHomeTab"
-            :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
-            :folder-id="parsePinnedTabId(activeHomeTab).folderId"
-            @update-label="(l) => onPinnedLabel(parsePinnedTabId(activeHomeTab).dashboardId, l)"
-            @unavailable="onPinnedUnavailable"
-          />
-        </div>
+          <!-- Usage tab -->
+          <div v-if="activeHomeTab === 'usage'" class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
+            <UsageTab />
+          </div>
+
+          <!-- Pinned dashboard tab -->
+          <div v-else-if="activeHomeTab.startsWith('dash:')" class="min-h-0 flex-1 overflow-hidden">
+            <PinnedDashboardTab
+              :key="activeHomeTab"
+              :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
+              :folder-id="parsePinnedTabId(activeHomeTab).folderId"
+              @update-label="(l) => onPinnedLabel(parsePinnedTabId(activeHomeTab).dashboardId, l)"
+              @unavailable="onPinnedUnavailable"
+            />
+          </div>
+        </template>
       </div>
     </OPageLayout>
   </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
+import { computed, defineComponent, inject, ref, watch, onMounted, onUnmounted } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
 import UsageTab from "@/views/UsageTab.vue";
@@ -173,13 +238,24 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
+import { FIRST_DATA_NOTICE } from "@/composables/firstEvent/useFirstDataNotice";
+import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
+import { rangeRoute } from "@/composables/firstEvent/confirmQuery";
+import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
+import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PageHome",
 
   setup() {
     const store = useStore();
+    const router = useRouter();
     const { t } = useI18nTyped();
+    const firstDataNotice = inject(FIRST_DATA_NOTICE, null);
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
@@ -356,10 +432,28 @@ export default defineComponent({
     const { isMobile } = useBreakpoint();
     const mobileChatsOpen = ref(false);
 
+    // the first-data takeover replaces Overview and Usage only behind the empty-data flag; flag off is BASE Home
+    const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
+    const isDataTab = computed(
+      () => activeHomeTab.value === "overview" || activeHomeTab.value === "usage",
+    );
+    const arrived = ref<FirstEventResult>();
+    const openArrived = () => {
+      const r = arrived.value;
+      if (!r) return;
+      const org = store.state.selectedOrganization?.identifier ?? "";
+      router
+        .push(
+          rangeRoute(org, r.streamType, r.streamName, { startUs: r.rangeStart, endUs: r.rangeEnd }),
+        )
+        .catch(() => {});
+    };
+
     return {
       t,
       store,
       config,
+      firstDataNotice,
       isMobile,
       mobileChatsOpen,
       activeHomeTab,
@@ -373,6 +467,10 @@ export default defineComponent({
       onPinnedLabel,
       onPinnedUnavailable,
       onCloseTab,
+      flagOn,
+      isDataTab,
+      arrived,
+      openArrived,
     };
   },
   components: {
@@ -388,6 +486,12 @@ export default defineComponent({
     OIcon,
     ODrawer,
     PinnedDashboardTab,
+    FirstDataPanel,
+    FirstDataNotice,
+    HomeNoDataState,
+    HomeViewSkeleton,
+    TrialPeriod,
+    OEmptyState,
   },
 });
 </script>

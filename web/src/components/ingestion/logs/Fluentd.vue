@@ -15,18 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+  <IngestionContent :target-stream="targetStream">
+    <CredentialCodeBlock slug="fluentd" :content="content" />
   </IngestionContent>
 </template>
 
 <script lang="ts">
-import { raw } from "@/types/i18n";
 import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 export default defineComponent({
   name: "fluentd-mechanism",
@@ -38,7 +37,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent },
+  components: { CredentialCodeBlock, IngestionContent },
   setup() {
     const store = useStore();
     const endpoint: any = ref({
@@ -51,6 +50,7 @@ export default defineComponent({
 
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
+    const targetStream = "default";
     const content = `<source>
   @type forward
   port 24224
@@ -59,7 +59,7 @@ export default defineComponent({
 
 <match **>
   @type http
-  endpoint ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json
+  endpoint ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/${targetStream}/_json
   content_type json
   json_array true
   <auth>
@@ -69,7 +69,7 @@ export default defineComponent({
   </auth>
 </match>`;
     return {
-      raw,
+      targetStream,
       store,
       config,
       endpoint,

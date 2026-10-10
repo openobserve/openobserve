@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="m-3 mt-1 max-w-4xl">
+  <div ref="root" class="m-3 mt-1 max-w-4xl">
     <!-- Header -->
     <div class="mb-6 flex items-start gap-4">
       <OIcon name="cloud" size="xl" class="flex-shrink-0" />
@@ -190,7 +190,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-text-secondary mb-2 text-xs">
                 {{ t("ingestion.azureSetup.runCommandAfterDeployment") }}
               </div>
-              <CopyContent :content="raw(curlCommand)" data-test="azure-curl-command" />
+              <CredentialCodeBlock
+                slug="azure-curl"
+                data-test="azure-curl-command"
+                :content="curlCommand"
+              />
             </div>
           </div>
         </div>
@@ -202,8 +206,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-text-heading mb-2 text-sm font-semibold">
         {{ t("ingestion.azureSetup.manualTitle") }}
       </div>
-      <CopyContent :content="raw(manualContent)" />
+      <CredentialCodeBlock slug="azure-manual" :content="manualContent" />
     </div>
+
+    <FirstEventStatus
+      ref="bar"
+      :key="store.state.selectedOrganization.identifier"
+      class="mt-6"
+      :org="store.state.selectedOrganization.identifier"
+      @copy-command="copyPageSnippet"
+    />
   </div>
 </template>
 
@@ -219,7 +231,9 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import { generateARMTemplateURL, azureIntegrations } from "@/utils/azureIntegrations";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
+import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
+import { provideSnippetCopied } from "@/composables/firstEvent/firstEventCopied";
 import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -242,7 +256,8 @@ const activityLogsIntegration = azureIntegrations.find((i) => i.id === "activity
 export default defineComponent({
   name: "AzureConfig",
   components: {
-    CopyContent,
+    CredentialCodeBlock,
+    FirstEventStatus,
     OToggleGroup,
     OToggleGroupItem,
     OButton,
@@ -321,10 +336,22 @@ export default defineComponent({
       });
     };
 
+    const root = ref<HTMLElement | null>(null);
+    const bar = ref<InstanceType<typeof FirstEventStatus> | null>(null);
+    provideSnippetCopied(bar);
+    // Re-copies through the page's first block, so the clipboard, the toast and snippet_copied match a click on it.
+    const copyPageSnippet = () =>
+      root.value
+        ?.querySelector<HTMLElement>('[data-test^="ingestion-"][data-test$="-code-block-copy-btn"]')
+        ?.click();
+
     return {
       raw,
       t,
       store,
+      root,
+      bar,
+      copyPageSnippet,
       LOG_CATEGORIES,
       step2Mode,
       enabledCategories,
