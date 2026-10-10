@@ -2487,6 +2487,7 @@
   "login": {
     "lockedOut": "Too many failed sign-in attempts. Try again in {duration}, or contact your administrator.",
     "redirectingToSsoMessage": "Redirecting to SSO login page. If you are not redirected, please",
+    "signingIn": "Signing you in...",
     "clickHere": "click here",
     "loginWithSso": "Login with SSO",
     "loginAsInternalUser": "Login as internal user",
