@@ -28,8 +28,10 @@
 // running one.
 
 import type {
+  ImportTarget,
   Node,
   TerraformExport,
+  TerraformIdentityOptions,
   TerraformUnsupportedItem,
   TerraformUnsupportedReason,
 } from "@/utils/terraform/hcl";
@@ -40,6 +42,7 @@ import {
   boolWhen,
   bool,
   document,
+  importTarget,
   isFilled,
   list,
   literal,
@@ -52,7 +55,7 @@ import {
   str,
 } from "@/utils/terraform/hcl";
 
-export interface AlertTerraformOptions {
+export interface AlertTerraformOptions extends TerraformIdentityOptions {
   /** Alert folder the export came from. Emitted only when it is not the default. */
   folderId?: string;
 }
@@ -187,11 +190,84 @@ function deduplicationBlock(source: unknown): Node[] {
   ]);
 }
 
+/**
+ * Whether this payload is a composite alert.
+ *
+ * The tag is `composite` on the wire and `Composite` on a list row, so the
+ * comparison is case-insensitive rather than trusting one spelling.
+ */
+function isComposite(alert: Record<string, unknown>): boolean {
+  return String(alert.alert_type ?? "").toLowerCase() === "composite";
+}
+
 /** Anomaly-detection configs and truncated payloads have no provider resource. */
 function unsupportedReason(alert: Record<string, unknown>): TerraformUnsupportedReason | null {
   if (alert.alert_type === "anomaly_detection") return "anomaly";
+  // A composite has no stream and no schedule of its own — it is evaluated when a
+  // child changes state — so the ordinary alert's completeness test would reject
+  // every one of them. What it must have instead is an expression to combine.
+  if (isComposite(alert)) {
+    const expression = (alert.composite_condition as Record<string, unknown>)?.expression;
+    return typeof expression === "string" && expression.trim() !== "" ? null : "incomplete";
+  }
   if (!alert.stream_name || !alert.trigger_condition) return "incomplete";
   return null;
+}
+
+/**
+ * Renders a composite alert as `openobserve_composite_alert`.
+ *
+ * A composite combines the states of other alerts through a boolean expression,
+ * so it carries none of the query or schedule attributes an ordinary alert has:
+ * no stream, no period, no frequency, no threshold. `silence` is the only
+ * scheduling knob the provider accepts, and it arrives inside
+ * `trigger_condition` on the wire while being a top-level attribute in the
+ * schema.
+ *
+ * The expression references children by alert id. Those ids are left exactly as
+ * the server wrote them rather than being rewritten into `${openobserve_alert.x.alert_id}`
+ * references: the children may not be Terraform-managed at all, and inventing a
+ * reference to a resource that does not exist in the configuration would produce
+ * a file that cannot even parse. A user adopting the children too can replace
+ * the literals by hand, and the import blocks make that straightforward.
+ */
+function compositeAlertResource(
+  alert: Record<string, unknown>,
+  label: string,
+  options: AlertTerraformOptions,
+): string {
+  const folderId = options.folderId && options.folderId !== "default" ? options.folderId : null;
+  const composite = (alert.composite_condition ?? {}) as Record<string, unknown>;
+  const trigger = (alert.trigger_condition ?? {}) as Record<string, unknown>;
+
+  const nodes: Node[] = [
+    ...attr("name", quote(String(alert.name ?? ""))),
+    ...attr("folder_id", folderId === null ? null : quote(folderId)),
+    ...attr("expression", str(composite.expression)),
+    ...attr("description", str(alert.description)),
+    // Written unconditionally, for the same reason the ordinary alert exporter
+    // does it: a paused composite must not read like a live one.
+    ...attr("enabled", String(alert.enabled !== false)),
+    // Both default to their non-emitted value in the provider, so only the
+    // interesting direction is written.
+    ...attr("warning_counts_as_firing", boolWhen(composite.warning_counts_as_firing, false)),
+    ...attr(
+      "stale_child_policy",
+      composite.stale_child_policy && composite.stale_child_policy !== "use_last_state"
+        ? str(composite.stale_child_policy)
+        : null,
+    ),
+    ...attr("priority", num(alert.priority)),
+    ...attr("tags", list(alert.tags)),
+    ...attr("destinations", list(alert.destinations)),
+    ...attr("template", str(alert.template)),
+    ...attr("context_attributes", map(alert.context_attributes, INDENT)),
+    ...attr("silence", numUnless(trigger.silence, 0)),
+    ...attr("creates_incident", boolWhen(alert.creates_incident, true)),
+    ...attr("workflows", list(alert.workflows)),
+  ];
+
+  return resourceBlock("openobserve_composite_alert", label, nodes);
 }
 
 function alertResource(
@@ -235,9 +311,12 @@ function alertResource(
 }
 
 /**
- * Converts exported alert payloads into `openobserve_alert` resources.
+ * Converts exported alert payloads into provider resources.
  *
- * Alerts with no provider equivalent are reported in `unsupported` rather than
+ * Ordinary alerts become `openobserve_alert` and composites become
+ * `openobserve_composite_alert` — they are separate resource types with
+ * different schemas, and the payloads are told apart by `alert_type`. Alerts
+ * with no provider equivalent are reported in `unsupported` rather than
  * rendered as something that would not apply.
  */
 export function alertsToTerraform(
@@ -248,18 +327,29 @@ export function alertsToTerraform(
   const dropped = new Set<string>();
   const unsupported: TerraformUnsupportedItem[] = [];
   const resources: string[] = [];
+  const imports: ImportTarget[] = [];
 
-  for (const alert of alerts) {
-    if (!alert || typeof alert !== "object") continue;
+  alerts.forEach((alert, index) => {
+    if (!alert || typeof alert !== "object") return;
     const reason = unsupportedReason(alert);
     if (reason) {
       unsupported.push({ name: String(alert.name ?? ""), reason });
-      continue;
+      return;
     }
+    const composite = isComposite(alert);
+    const type = composite ? "openobserve_composite_alert" : "openobserve_alert";
+    const label = resourceLabel(alert.name, used, composite ? "composite_alert" : "alert");
     resources.push(
-      alertResource(alert, resourceLabel(alert.name, used, "alert"), options, dropped),
+      composite
+        ? compositeAlertResource(alert, label, options)
+        : alertResource(alert, label, options, dropped),
     );
-  }
+    imports.push(...importTarget(type, label, options.orgId, options.ids?.[index]));
+  });
 
-  return { hcl: document(resources), unsupported, droppedFields: [...dropped].sort() };
+  return {
+    hcl: document(resources, imports, options.orgId ?? ""),
+    unsupported,
+    droppedFields: [...dropped].sort(),
+  };
 }

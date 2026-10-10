@@ -14,13 +14,19 @@ export const PROVIDER_SOURCE = `${PROVIDER_NAMESPACE}/${PROVIDER_NAME}`;
 /**
  * The `version` constraint an exported configuration pins.
  *
- * Checked against what is actually published: the registry lists 1.0.0, 0.0.4
- * and 0.0.3, so `~> 1.0` resolves to 1.0.0 and `terraform init` succeeds. Raise
- * it only once a matching release is out, or every exported file will pin a
- * version nobody can fetch.
+ * Tracks the oldest release that has EVERY resource type an export can emit:
+ * 1.2.0 added `openobserve_composite_alert`, and 1.3.0 added
+ * `openobserve_pipeline` and `openobserve_pipeline_destination`. A looser
+ * constraint resolves to the same latest release on a fresh `terraform init`,
+ * but a configuration with a lock file pinned lower would satisfy it and then
+ * fail on an unknown resource type — an error that points at the exported file
+ * rather than at the version that produced it.
+ *
+ * Raise this only once a matching release is published, or every exported file
+ * will pin a version nobody can fetch. 1.3.0 is published and verified.
  * https://registry.terraform.io/v1/providers/openobserve/openobserve/versions
  */
-export const PROVIDER_VERSION = "~> 1.0";
+export const PROVIDER_VERSION = "~> 1.3";
 
 /** Both registries serve the same provider, so both links are derived from it. */
 export const TERRAFORM_REGISTRY_URL = `https://registry.terraform.io/providers/${PROVIDER_SOURCE}/latest`;

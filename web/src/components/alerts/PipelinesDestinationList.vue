@@ -111,6 +111,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="edit" size="sm" />
             </OButton>
             <OButton
+              :data-test="`pipeline-destination-list-${row.name}-export`"
+              data-row-action="export"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('common.export')"
+              @click="exportDestination(row)"
+            >
+              <OIcon name="download" size="sm" />
+            </OButton>
+            <OButton
               :data-test="`alert-destination-list-${row.name}-delete-destination`"
               data-row-action="delete"
               variant="ghost"
@@ -192,6 +202,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
+
+    <ExportResourceDialog
+      v-model:open="showExportDialog"
+      :items="destinationsToExport"
+      :terraform="destinationsTerraform"
+      :title="
+        t(
+          'alert_destinations.exportDialogTitle',
+          { count: destinationsToExport.length },
+          destinationsToExport.length,
+        )
+      "
+      :sub-title="t('alert_destinations.exportDialogSubtitle')"
+      file-prefix="pipeline-destinations"
+      data-test="pipeline-destination-export-dialog"
+    />
   </div>
 </template>
 <script lang="ts">
@@ -205,6 +231,8 @@ import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, com
 import type { Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
+import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
+import { pipelineDestinationsToTerraform } from "@/utils/pipelines/pipelineDestinationTerraform";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
 import { templatesQuery } from "@/services/alert_templates.queries";
@@ -256,6 +284,7 @@ export default defineComponent({
     OTag,
     OSearchInput,
     OTable,
+    ExportResourceDialog,
     ODropdown,
     ODropdownItem,
   },
@@ -483,6 +512,23 @@ export default defineComponent({
     const resetEditingDestination = () => {
       editingDestination.value = null;
     };
+    // ── Export ──────────────────────────────────────────────────────────────
+    // A destination row already carries its whole definition, so nothing is
+    // re-fetched; the import block addresses it by name, which is what the
+    // provider uses for this resource.
+    const showExportDialog = ref(false);
+    const destinationsToExport = ref<Record<string, unknown>[]>([]);
+    const destinationsTerraform = computed(() =>
+      pipelineDestinationsToTerraform(destinationsToExport.value, {
+        orgId: store.state.selectedOrganization.identifier,
+      }),
+    );
+
+    const exportDestination = (row: any) => {
+      destinationsToExport.value = [row];
+      showExportDialog.value = true;
+    };
+
     const deleteDestination = () => {
       if (confirmDelete.value?.data?.name) {
         destinationService
@@ -730,6 +776,10 @@ export default defineComponent({
       handleDestinationUpdated,
       getDestinations,
       deleteDestination,
+      showExportDialog,
+      destinationsToExport,
+      destinationsTerraform,
+      exportDestination,
       cancelDeleteDestination,
       confirmDelete,
       routeTo,
