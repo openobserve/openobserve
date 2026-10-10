@@ -401,7 +401,8 @@ function cloneJson<T>(value: T): T {
 }
 
 function sameSet(a: string[], b: string[]): boolean {
-  return a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
+  const sb = [...b].sort();
+  return a.length === b.length && [...a].sort().every((v, i) => v === sb[i]);
 }
 
 function timeBounds(time: TimeSelection, nowUs: number): { startUs: number; endUs: number } | null {

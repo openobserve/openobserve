@@ -16,26 +16,8 @@
 import { shallowRef, toRaw } from "vue";
 
 /**
- * Status Parser for Log Entries
- * =============================
- * Extracts and parses log severity/status information from log entries.
- *
- * Supported Input Formats:
- * - OTEL/Syslog numeric levels (0-7): { "severity": 0 } → info (OTEL UNSPECIFIED)
- * - Syslog numeric levels (1-7): { "syslog.severity": 3 } → error
- * - String levels: { "level": "ERROR" } → error
- * - Custom status fields: { "status": "warning" } → warning
- *
- * Priority System (1 = highest, 8 = lowest):
- * 0: UNSPECIFIED (mapped to info, priority 6)
- * 1: alert, 2: critical, 3: error, 4: warning,
- * 5: notice, 6: info, 7: debug, 8: ok/success
- *
- * Examples:
- * - extractStatusFromLog({ "severity": 0 }) → { level: "info", color: "#1E88E5", priority: 6 }
- * - extractStatusFromLog({ "level": "ERROR" }) → { level: "error", color: "#EF5350", priority: 3 }
- * - extractStatusFromLog({ "syslog.severity": 4 }) → { level: "warning", color: "#FB8C00", priority: 4 }
- * - extractStatusFromLog({ "status": "ok" }) → { level: "ok", color: "#43A047", priority: 8 }
+ * Explicit severity/status fields take precedence over HTTP status, then message inference.
+ * OTEL `severity` 0 is UNSPECIFIED and maps to info; syslog-severity fields map 0 to emergency.
  */
 
 export interface StatusInfo {

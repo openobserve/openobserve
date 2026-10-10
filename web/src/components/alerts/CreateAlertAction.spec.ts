@@ -17,6 +17,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 
+import OButton from "@/lib/core/Button/OButton.vue";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import {
@@ -229,6 +230,35 @@ describe("CreateAlertAction", () => {
       );
       await wrapper.findComponent(ButtonStub).trigger("click");
       expect(build).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["button", "toolbar", "icon"])(
+    "keeps the unavailable %s focusable, described and inactive",
+    async (variant) => {
+      const build = vi.fn(prefill);
+      wrapper = mount(CreateAlertAction, {
+        props: { source: "logs", build, variant, disabledReason: "Select a stream first" },
+        attachTo: document.body,
+        global: { plugins: [i18n], stubs: { ...stubs, OButton: false } },
+      });
+      const button = wrapper.get("button");
+      expect(wrapper.findComponent(OButton).props("focusableUnavailable")).toBe(true);
+      expect(button.attributes("disabled")).toBeUndefined();
+      expect(button.attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.get(".sr-only");
+      expect(reason.text()).toBe("Select a stream first");
+      expect(button.attributes("aria-describedby")).toBe(reason.attributes("id"));
+      if (variant !== "button") expect(button.attributes("aria-label")).toBe("Create Alert");
+      else expect(button.text()).toContain("Create Alert");
+      button.element.focus();
+      expect(document.activeElement).toBe(button.element);
+      await button.trigger("keydown", { key: "Enter" });
+      await button.trigger("keydown", { key: " " });
+      await button.trigger("click");
+      expect(build).not.toHaveBeenCalled();
+      expect(mockOpenAlertCreation).not.toHaveBeenCalled();
+      expect(alertCreationDialog.value).toBeNull();
     },
   );
 

@@ -99,6 +99,35 @@ describe("ShareButton", () => {
     wrapper.unmount();
   });
 
+  it.each(["", "   "])(
+    "describes an unconfigured web URL (%j) while keeping Share focusable",
+    async (webUrl) => {
+      store.state.zoConfig.web_url = webUrl;
+      const wrapper = mount(ShareButton, {
+        props: { url: "https://example.com/logs", tooltip: "Run first" },
+        attachTo: document.body,
+        global: { plugins: [store, i18n] },
+      });
+      const button = wrapper.get("button");
+      expect(button.attributes("aria-label")).toBe("Share Link");
+      expect(button.attributes("disabled")).toBeUndefined();
+      expect(button.attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.get(".sr-only");
+      expect(button.attributes("aria-describedby")).toBe(reason.attributes("id"));
+      expect(reason.text()).toBe(
+        "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
+      );
+      button.element.focus();
+      expect(document.activeElement).toBe(button.element);
+      await button.trigger("keydown", { key: "Enter" });
+      await button.trigger("keydown", { key: " " });
+      await button.trigger("click");
+      expect(shortURLService.create).not.toHaveBeenCalled();
+      expect(copyToClipboard).not.toHaveBeenCalled();
+      wrapper.unmount();
+    },
+  );
+
   it("should render the share button", () => {
     const wrapper = mount(ShareButton, {
       props: {
