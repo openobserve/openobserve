@@ -30,6 +30,9 @@ type ScopeDeps = {
   ACTION_ORDER: readonly string[];
 };
 
+// A downtime folder decides who manages a downtime, never what it mutes, so its grants carry that warning.
+const DOWNTIME_KEYS = new Set(["downtime_folder", "downtime"]);
+
 /** The pinned rows above a module's list, and the resource types each one's grants reach. */
 export const useRoleScopes = (deps: ScopeDeps) => {
   const { resourceMapper, isGranted, resourceLabel, moduleLabel, t, ACTION_ORDER } = deps;
@@ -42,7 +45,9 @@ export const useRoleScopes = (deps: ScopeDeps) => {
     label: t("iam.editRole.scopeAllOf", {
       module: node?.display_name ?? resourceLabel(resourceKey),
     }),
-    hint: t("iam.editRole.scopeIncludesFuture"),
+    hint: DOWNTIME_KEYS.has(resourceKey)
+      ? t("iam.editRole.scopeDowntimeHint")
+      : t("iam.editRole.scopeIncludesFuture"),
   });
 
   const everyStreamScope = (covers: string[]): ScopeRow => ({
@@ -95,7 +100,9 @@ export const useRoleScopes = (deps: ScopeDeps) => {
       resource: moduleKey,
       covers: items,
       label: t("iam.editRole.scopeThisFolder"),
-      hint: t("iam.editRole.scopeThisFolderHint"),
+      hint: DOWNTIME_KEYS.has(moduleKey)
+        ? t("iam.editRole.scopeDowntimeHint")
+        : t("iam.editRole.scopeThisFolderHint"),
     };
     // The type level grant reaches every folder, and through each folder its items.
     return moduleScope

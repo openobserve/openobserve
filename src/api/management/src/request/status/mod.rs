@@ -212,6 +212,7 @@ struct ConfigResponse<'a> {
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
+    downtimes_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
@@ -477,6 +478,7 @@ pub async fn zo_config(
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
     let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
@@ -606,6 +608,7 @@ pub async fn zo_config(
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
+        downtimes_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
@@ -1830,6 +1833,7 @@ const CACHE_MODULES: &[&str] = &[
     "realtime_triggers",
     "org_users",
     "compact_retention",
+    "downtimes",
 ];
 
 // Helper function to reload cache for a specific module
@@ -1849,7 +1853,28 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "org_users" => db::org_users::cache().await,
         "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
+        "downtimes" => {
+            reload_downtimes(enterprise_value!(false, get_o2_config().downtimes.enabled)).await
+        }
         _ => Err(anyhow::anyhow!("unsupported module")),
+    }
+}
+
+/// `all` lists downtimes only with the flag on, so the reply and total match main otherwise.
+fn all_cache_modules(downtimes_enabled: bool) -> Vec<&'static str> {
+    CACHE_MODULES
+        .iter()
+        .copied()
+        .filter(|module| downtimes_enabled || *module != "downtimes")
+        .collect()
+}
+
+/// With the flag off the cache stays empty, so no evaluation or SLO pass reads a downtime.
+async fn reload_downtimes(enabled: bool) -> Result<(), anyhow::Error> {
+    if enabled {
+        db::downtimes::cache().await
+    } else {
+        Ok(())
     }
 }
 
@@ -1872,7 +1897,8 @@ pub async fn cache_reload(
 
     // Expand "all" to all available modules
     if modules.contains(&"all") {
-        modules = CACHE_MODULES.to_vec();
+        let downtimes_enabled = enterprise_value!(false, get_o2_config().downtimes.enabled);
+        modules = all_cache_modules(downtimes_enabled);
     }
 
     let total_modules = modules.len();
@@ -1923,6 +1949,19 @@ mod tests {
     use serde_json;
 
     use super::*;
+
+    #[test]
+    fn with_downtimes_off_all_names_the_modules_main_names() {
+        assert!(!all_cache_modules(false).contains(&"downtimes"));
+        assert_eq!(all_cache_modules(false).len(), CACHE_MODULES.len() - 1);
+        assert!(all_cache_modules(true).contains(&"downtimes"));
+    }
+
+    #[tokio::test]
+    async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
+        reload_downtimes(false).await.unwrap();
+        assert!(db::downtimes::all_cached().is_empty());
+    }
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]

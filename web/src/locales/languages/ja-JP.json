@@ -560,6 +560,12 @@
       "description": "リモートタスクとは、実験が出力を生成するために呼び出すHTTPサービスです。一度公開して接続を確認すれば、すべての実験で使用した正確なバージョンを固定できます。",
       "action": "新規タスク",
       "actionDesc": "OpenObserveをエンドポイントに指定して接続をテストします。"
+    },
+    "noDowntimes": {
+      "title": "ダウンタイムはまだありません",
+      "description": "ダウンタイムは、指定した時間枠の間、アラート、異常検知、合成モニタリングチェックを実行したまま、それらの通知を停止します。",
+      "action": "ダウンタイムをスケジュール",
+      "actionDesc": "1 回限り、毎日、または毎週。すぐにミュートするには、アラート一覧の [ミュート] を使用します。"
     }
   },
   "common": {
@@ -1320,6 +1326,7 @@
     "topQueries": "トップクエリ",
     "profiles": "プロファイル",
     "productAnalytics": "プロダクト分析",
+    "downtimes": "ダウンタイム",
     "trialEndedTitle": "トライアルが終了しました",
     "trialPageNeedsPlan": "{page}にはプランが必要です",
     "trialPageNeedsPlanToast": "{page}にはプランが必要です。引き続き使用するには、このページでプランを選択してください。",
@@ -2822,6 +2829,7 @@
       "scopeCoveredByParent": "ロックされたアクションは {scope} に由来し、{module} で設定されます",
       "scopeAllOf": "すべての {module}",
       "scopeIncludesFuture": "後から作成されるリソースを含みます",
+      "scopeDowntimeHint": "ダウンタイムフォルダは、誰がダウンタイムを管理するかを制限し、何をミュートするかは制限しません。モジュールのすべてのフォルダをミュートするには、ユーザーがそのモジュールのすべてのフォルダを一覧表示する権限を持っている必要があります。ミュートされたチップやバナーには、ユーザーが一覧表示できないダウンタイム名が表示される場合があります。",
       "grantedByWiderScope": "より広いスコープで付与済み",
       "grantedHereAndByWiderScope": "ここで付与済み、かつより広いスコープでも付与済み",
       "stillGrantedByWiderScope": "ここでは削除済み、より広いスコープでは付与済みのまま",
@@ -8821,7 +8829,500 @@
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
     "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
-    "seconds": "秒"
+    "seconds": "秒",
+    "downtimes": {
+      "newTitle": "新規ダウンタイム",
+      "editTitle": "ダウンタイムを編集",
+      "detailTitle": "ダウンタイム",
+      "modules": {
+        "alerts": "アラート",
+        "anomaly_detections": "異常検知",
+        "synthetics": "合成モニタリングチェック",
+        "slos": "SLOs"
+      },
+      "modulesShort": {
+        "alerts": "アラート",
+        "anomaly_detections": "異常",
+        "synthetics": "合成モニタリング",
+        "slos": "SLOs"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "ウィンドウ中のインシデントは",
+          "muted": "作成してミュート (デフォルト)",
+          "mutedHelp": "インシデントは通常どおり作成されますが、ウィンドウ終了まで誰にも通知されません。",
+          "none": "作成しない",
+          "noneHelp": "ウィンドウ中はインシデントを作成しません。終了後の最初の発火で作成され、通知されます。",
+          "summary": "インシデントなし"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} 件の {key} | {count} 件の {key}",
+        "condition": "条件",
+        "allFolders": "すべてのフォルダ",
+        "oneFolder": "{name} フォルダ",
+        "nFolders": "{count} フォルダ | {count} フォルダ",
+        "tags": "タグ {tags}",
+        "nItems": "{count} 項目 | {count} 項目",
+        "asGood": "良好として",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
+      },
+      "duration": {
+        "days": "{count} 日",
+        "hours": "{count} 時間",
+        "minutes": "{count} 分"
+      },
+      "schedule": {
+        "windowRange": "{start} ～ {end} {zone}",
+        "onceSentence": "1 回 · {start} ～ {end} · {zone}",
+        "dailySentence": "毎日 · {time}、{duration} 間 · {zone}",
+        "weeklySentence": "毎週 {days} · {time}、{duration} 間 · {zone}",
+        "fromNoEnd": "{schedule}、{start} から（終了日なし）",
+        "fromUntil": "{schedule}、{start} から {until} まで"
+      },
+      "validation": {
+        "conditionRequired": "条件を追加するか、条件ブロックを削除してください。",
+        "pairKey": "すべての行でディメンションを選択してください。",
+        "pairOperator": "ダウンタイム条件では = または != を使用してください。",
+        "pairValue": "すべての行に値を入力してください。",
+        "loneStar": "値に単独の * は使用できません。",
+        "innerStar": "* は値の末尾にのみ使用できます。",
+        "emptyGroup": "条件グループを空にすることはできません。",
+        "tooDeep": "条件グループは最大 3 レベルまでネストできます。",
+        "tooManyPairs": "1 つの条件に含められるペアは最大 32 個です。",
+        "needsEq": "少なくとも 1 つの = 条件を追加してください。!= の行だけで構成された条件は、それ以外のすべての通知を停止してしまいます。",
+        "modulesRequired": "少なくとも 1 つのモジュールを選択してください。",
+        "foldersRequired": "「すべてのフォルダ」または少なくとも 1 つのフォルダを選択してください。",
+        "tagsRequired": "タグを追加するか、タグブロックを削除してください。",
+        "idsRequired": "項目を選択するか、特定の項目ブロックを削除してください。",
+        "idOutsideFolders": "選択した一部の項目が、選択したフォルダに含まれていません。",
+        "tooManyFolders": "選択できるフォルダは最大 {max} 個です。または「すべてのフォルダ」を選択してください。",
+        "tooManyTags": "追加できるタグは最大 {max} 個です。",
+        "tooManyIds": "選択できる項目は最大 {max} 個です。",
+        "nameTooLong": "名前は最大 256 文字です。",
+        "timezoneRequired": "タイムゾーンを選択してください。",
+        "startRequired": "開始日時を入力してください。",
+        "endRequired": "終了日時を入力してください。",
+        "endAfterStart": "終了は開始より後である必要があります。",
+        "windowTooLong": "ウィンドウは最長7日間です。",
+        "windowTooShort": "ウィンドウは最低1分間必要です。",
+        "startTimeRequired": "開始時刻を HH:MM 形式で入力してください。",
+        "durationInvalid": "90m や 1h 30m のような期間を入力してください。",
+        "weekdaysRequired": "少なくとも1日を選択してください。",
+        "untilAfterStart": "繰り返しの終了は最初の日以降である必要があります。",
+        "reasonTooLong": "理由は最大 {max} 文字までです。",
+        "windowOutlastsRepeat": "ウィンドウは繰り返しの間隔より長くできません。",
+        "startDateRequired": "初日を選択してください。"
+      },
+      "title": "ダウンタイム",
+      "subtitle": "アラート、異常検知、合成モニタリングのチェックは実行したまま、その通知のみを停止するスケジュールされたウィンドウ",
+      "newDowntime": "新しいダウンタイム",
+      "filterAll": "すべて",
+      "filterOnce": "一回限り",
+      "filterRecurring": "繰り返し",
+      "search": "名前、ディメンション、作成者で検索",
+      "searchAcross": "すべてのフォルダを検索",
+      "thisFolder": "このフォルダ",
+      "allFolders": "すべてのフォルダ",
+      "thisFolderTooltip": "選択したフォルダ内を検索",
+      "allFoldersTooltip": "すべてのフォルダ内を検索",
+      "noFolder": "ダウンタイムを保存できるフォルダーがありません",
+      "truncated": "{total} 件中最初の {shown} 件のダウンタイムを表示しています",
+      "stats": {
+        "active": "アクティブ",
+        "scheduled": "スケジュール済み",
+        "recurring": "繰り返し",
+        "ended": "終了",
+        "cancelled": "キャンセル済み",
+        "endedEarly": "早期終了",
+        "total": "合計"
+      },
+      "columns": {
+        "name": "名前",
+        "status": "ステータス",
+        "targets": "対象",
+        "schedule": "スケジュール",
+        "when": "終了 / 次回",
+        "matched": "一致",
+        "createdBy": "作成者",
+        "folder": "フォルダ"
+      },
+      "oneTime": "一回限り",
+      "recurring": "繰り返し",
+      "bannerOn": "このダウンタイムが有効な間、組織内の全員にバナーが表示されます",
+      "endsLabel": "終了",
+      "confirmEndNow": {
+        "title": "このダウンタイムを今すぐ終了しますか？",
+        "message": "通知はすぐに再開されます。ダウンタイムは早期終了としてリストに残ります。",
+        "ok": "今すぐ終了",
+        "keep": "継続する"
+      },
+      "extend": {
+        "menu": "延長時間",
+        "notActive": "延長できるのはアクティブなダウンタイムのみです",
+        "dialogTitle": "{name} を延長",
+        "newEnd": "新しい終了",
+        "confirmUntil": "{time} まで延長",
+        "followUp": "このダウンタイムは繰り返しのため、スケジュールは変更されません。現在のウィンドウの終了時刻から {name} という一回限りのダウンタイムが作成されます。",
+        "endAfterCurrent": "新しい終了は現在の終了より後にしてください。"
+      },
+      "nextLabel": "次回",
+      "matched": {
+        "alerts": "{count} 件のアラート | {count} 件のアラート",
+        "anomalies": "{count} 件の異常 | {count} 件の異常",
+        "synthetics": "{count} 件のチェック | {count} 件のチェック",
+        "slos": "{count} 件のSLO | {count} 件のSLO"
+      },
+      "actions": {
+        "endNow": "今すぐ終了",
+        "edit": "編集",
+        "duplicate": "複製",
+        "moveToFolder": "フォルダへ移動",
+        "cancel": "ダウンタイムをキャンセル",
+        "delete": "削除",
+        "more": "その他のアクション",
+        "muteForHour": "今すぐ 1 時間ミュート",
+        "extend": "延長"
+      },
+      "confirmCancel": {
+        "title": "ダウンタイムをキャンセル",
+        "message": "通知はすぐに再開されます。ダウンタイムは履歴として一覧に残ります。",
+        "bulkMessage": "{count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。 | {count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。",
+        "confirm": "ダウンタイムをキャンセル",
+        "keep": "ダウンタイムを維持"
+      },
+      "confirmDelete": {
+        "title": "ダウンタイムを削除",
+        "message": "ダウンタイムとその履歴が削除されます。この操作は元に戻せません。"
+      },
+      "copyOf": "{name} のコピー",
+      "form": {
+        "matches": {
+          "alerts": "{count} 件のアラートが一致します | {count} 件のアラートが一致します",
+          "anomaly_detections": "{count} 件の検出が一致します | {count} 件の検出が一致します",
+          "synthetics": "{count} 件のチェックが一致します | {count} 件のチェックが一致します",
+          "slos": "{count} 件の SLO が一致します | {count} 件の SLO が一致します"
+        },
+        "alertFolders": "アラートフォルダ",
+        "syntheticsFolders": "合成モニタリングフォルダ",
+        "noAlertFolderAccess": "アラートフォルダへのアクセス権がありません。",
+        "noSyntheticsFolderAccess": "合成モニタリングフォルダへのアクセス権がありません。",
+        "tags": "タグ",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "すべてのタグがチェックに含まれている必要があります。",
+        "removeBlock": "このブロックを削除",
+        "specificItems": "特定の項目",
+        "itemsHint": "選択したフォルダ内の項目のみが表示されます。",
+        "itemOption": "{name} · {folder}",
+        "addTags": "タグを追加",
+        "addItems": "特定の項目を追加",
+        "sloMode": "ウィンドウ内の SLO スコア",
+        "sloExclude": "ウィンドウを除外",
+        "sloCountAsGood": "ウィンドウを正常としてカウント",
+        "sloExcludeCaption": "ウィンドウ内の時間は正常にも異常にもカウントされません。これらの SLO のバーンレートアラートはこの時間に対して発報されません。",
+        "sloCountAsGoodCaption": "ウィンドウ内の時間は完全に正常としてカウントされます。SLO 契約で計画メンテナンスが稼働時間とみなされる場合にのみ使用してください。",
+        "cardCaption": "まずフォルダで絞り込み、その後に任意のブロックでさらに絞り込みます。上記のディメンション条件はこのモジュールにも適用されます。",
+        "noConditionForChecks": "上記のディメンション条件はチェックには適用されません。",
+        "appliesTo": "適用対象",
+        "tabTargets": "ターゲット",
+        "tabSchedule": "スケジュール",
+        "tabAdvanced": "詳細設定",
+        "modeInFolder": "{mode} 内",
+        "newMode": "新規ダウンタイム",
+        "editMode": "ダウンタイムを編集",
+        "namePlaceholder": "ダウンタイム名",
+        "nameLabel": "ダウンタイム名",
+        "renameHint": "クリックして名前を変更",
+        "reason": "理由",
+        "reasonHelp": "任意。一覧、詳細ページ、ミュートのツールチップに表示されます。",
+        "cancel": "キャンセル",
+        "save": "保存",
+        "activeBanner": "このダウンタイムは有効です。編集は次回の評価時に反映され、SLO モードの変更はすでに開始されたウィンドウを再測定します。",
+        "changedMeanwhile": "読み込んだ後に、このダウンタイムが他のユーザーによって変更されました。再読み込みしてからもう一度お試しください。",
+        "reload": "再読み込み",
+        "noModule": "「適用対象」でモジュールを選択してください。",
+        "checkSchedule": "スケジュールを確認してから、もう一度保存してください。"
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "アラート",
+          "anomaly_detections": "異常検出",
+          "synthetics": "合成モニタリングチェック",
+          "slos": "SLOs"
+        },
+        "whenOnce": "1 回、{start} から {end} {zone} まで",
+        "whenDaily": "毎日 {time} {zone} に、{duration} の間",
+        "whenWeekly": "毎週 {days} の {time} {zone} に、{duration} の間",
+        "inFolders": "フォルダ {names} 内 | フォルダ {names} 内",
+        "withCondition": "条件 {condition}",
+        "tagged": "タグ {tags}",
+        "named": "名前付き項目 {count} 件に限定 | 名前付き項目 {count} 件に限定",
+        "stopNotifying": "{when}: {targets} は通知を停止します。",
+        "nothingMuted": "{when}: ミュートされるアラートまたはチェックはありません。",
+        "sloUnchanged": "SLO スコアは変更されません。",
+        "sloExcluded": "{slos} はこの時間枠をスコアから除外します。",
+        "sloAsGood": "{slos} はこの時間枠を正常時間としてカウントします。"
+      },
+      "autoName": {
+        "once": "1 回",
+        "onceOn": "1 回 {date}",
+        "daily": "毎日",
+        "weekly": "毎週",
+        "all": {
+          "alerts": "すべてのアラート",
+          "anomaly_detections": "すべての異常検知",
+          "synthetics": "すべての合成モニタリングチェック",
+          "slos": "すべての SLO"
+        }
+      },
+      "condition": {
+        "none": "ディメンション条件なし",
+        "add": "追加",
+        "title": "ディメンション条件",
+        "onePer": "ダウンタイムごとに 1 つ",
+        "remove": "ディメンション条件を削除",
+        "caption": "アラート、異常検知、SLOs に適用されます。合成モニタリングのチェックにはディメンションがなく、タグを使用します。すべてのペアが一致する必要があります。代替には OR グループを使用します。値の末尾には * を使用できます。"
+      },
+      "resources": {
+        "refineBy": "リソースで絞り込む",
+        "load": "リソースを読み込む",
+        "needsEq": "リソースで絞り込む前に、少なくとも 1 つの = 条件を追加してください。",
+        "tooMany": "この条件と同時に出現する値が {count} 件あります。条件を絞り込んでリソースを選択してください。",
+        "lastSeen": "最終確認",
+        "streams": "ストリーム",
+        "footer": "{total} 中 {selected} 件を選択 · {source}",
+        "fromRegistry": "サービスレジストリから",
+        "fromSearch": "直近 24 時間のデータから",
+        "apply": "適用",
+        "loadFailed": "リソースを読み込めませんでした",
+        "notSeen": "過去 1 時間に確認されていません。",
+        "partial": "一部のソースが応答しませんでした。",
+        "items": "項目",
+        "fromValues": "アラート、サービスレジストリ、過去 1 時間のデータから",
+        "noValues": "このディメンションの値はまだ確認されていません。"
+      },
+      "scheduleForm": {
+        "once": "1 回",
+        "daily": "毎日",
+        "weekly": "毎週",
+        "startDate": "開始日",
+        "startTime": "開始時刻",
+        "endDate": "終了日",
+        "endTime": "終了時刻",
+        "days": "曜日",
+        "startsAt": "開始",
+        "duration": "期間",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "最大 7 日間、例: 90m または 1h 30m。",
+        "until": "繰り返し終了",
+        "untilPlaceholder": "終了日なし",
+        "timezone": "タイムゾーン",
+        "noWindow": "今後 8 日間に開始する時間枠はありません。",
+        "nextWindow": "次のウィンドウ: {window}。ウィンドウは日付をまたぐことがあります。",
+        "nextWindowWithUtc": "次のウィンドウ: {window} ({utc})。ウィンドウは日付をまたぐことがあります。",
+        "startsOn": "開始日"
+      },
+      "preview": {
+        "title": "プレビュー",
+        "failed": "プレビューを読み込めませんでした。",
+        "andMore": "他 {count} 件",
+        "noMatch": "現在一致するものはありません",
+        "fireTime": "{count} 件のアラートは発火時に識別子が確定します | {count} 件のアラートは発火時に識別子が確定します",
+        "undecidable": "{key} では区別できません",
+        "showAll": "全リストを表示",
+        "showLess": "表示を減らす",
+        "finishCondition": "プレビューを表示するには条件を完成させてください。"
+      },
+      "muteAllDialog": {
+        "title": "モジュール全体をミュートしますか？",
+        "intro": "フォルダ、アイテム、タグ、条件のいずれもこれらのモジュールを絞り込んでいないため、このダウンタイムは以下をミュートします:",
+        "every": {
+          "alerts": "この組織内のすべてのアラート",
+          "anomaly_detections": "この組織内のすべての異常検知",
+          "synthetics": "この組織内のすべての合成モニタリングチェック",
+          "slos": "この組織内のすべての SLO"
+        },
+        "matchedNow": "本日 {matched}",
+        "outro": "ウィンドウ内では、それらすべてについて通知、オンコールページ、ワークフローが停止します。",
+        "cancel": "キャンセル",
+        "confirm": "すべてミュート",
+        "titleOne": {
+          "alerts": "この組織のすべてのアラートをミュートしますか？",
+          "anomaly_detections": "この組織のすべての異常検知をミュートしますか？",
+          "synthetics": "この組織のすべての合成モニタリングチェックをミュートしますか？",
+          "slos": "この組織のすべての SLO をミュートしますか？"
+        },
+        "window": "期間: {window}"
+      },
+      "summaryPane": {
+        "title": "サマリー",
+        "filedIn": "登録先",
+        "window": "ウィンドウ",
+        "nextWindow": "次のウィンドウ",
+        "inUtc": "UTC 表記",
+        "largeMatch": "{modules}: このダウンタイムはアイテムの半数以上に一致しています。この組織の大部分はウィンドウ内で通知されません。",
+        "whatHappens": "何が起こるか",
+        "keepRunning": "評価とチェックは実行され続け、履歴も保持されます。",
+        "noNotifications": "通知、オンコールページ、ワークフローが停止します。",
+        "mutedIncidents": "インシデントはミュート状態でオープンし、ウィンドウ終了後に通知されます。"
+      },
+      "band": {
+        "now": "現在",
+        "none": "まだウィンドウは実行されておらず、予定もありません。",
+        "active": "アクティブ",
+        "next": "次回",
+        "past": "実行済み",
+        "track": "ウィンドウ",
+        "aria": "{kind}: {start} から {end}"
+      },
+      "detail": {
+        "overview": "概要",
+        "affected": "影響対象 · {count}",
+        "suppressed": "抑制済み · {count}",
+        "details": "詳細",
+        "condition": "条件",
+        "noTarget": "ターゲットなし",
+        "banner": "バナー",
+        "bannerOn": "アクティブな間、組織に表示されます",
+        "bannerOff": "バナーなし",
+        "occurrences": "発生回数",
+        "nextWindow": "次のウィンドウ: {window}。あなたのタイムゾーン: {local}。",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "一致条件",
+        "matchedBy": {
+          "query": "クエリ",
+          "source_alert": "ソースアラート",
+          "tag": "タグ",
+          "id": "名前付き",
+          "folder": "フォルダ",
+          "org": "組織全体"
+        },
+        "source": "ソース",
+        "wouldHaveNotified": "通知されていたはず",
+        "noSuppressed": "まだ何も抑制されていません",
+        "muteHourName": "{name} · 1 時間ミュート",
+        "notFoundTitle": "ダウンタイムが見つかりません",
+        "notFoundDescription": "削除されたか、リンクが別の組織を指している可能性があります。",
+        "backToList": "ダウンタイム一覧に戻る"
+      },
+      "mute": {
+        "title": {
+          "alerts": "{count} 件のアラートをミュート | {count} 件のアラートをミュート",
+          "anomaly_detections": "{count} 件の異常検出をミュート | {count} 件の異常検出をミュート",
+          "synthetics": "{count} 件のチェックをミュート | {count} 件のチェックをミュート",
+          "slos": "{count} 件の SLO をミュート | {count} 件の SLO をミュート",
+          "items": "{count} 件の項目をミュート | {count} 件の項目をミュート"
+        },
+        "subtitle": "実行と履歴の記録は継続されます。通知、ページ通知、ワークフローはウィンドウが終了するまで停止します。",
+        "muteFor": "ミュート期間",
+        "fileIn": "保存先",
+        "presets": {
+          "30m": "30 分",
+          "1h": "1 時間",
+          "2h": "2 時間",
+          "4h": "4 時間",
+          "custom": "カスタム"
+        },
+        "endsAt": "終了日時",
+        "endsIn": "{duration} 後に終了。",
+        "confirm": "ミュート",
+        "confirmUntil": "{time} までミュート",
+        "menu": "通知をミュート",
+        "until": "日時を指定…",
+        "bulk": "ミュート",
+        "muted": "ミュート中 · {duration} 後に終了",
+        "mutedTooltip": "{name} により {end} までミュート",
+        "exclude": "ウィンドウを除外…",
+        "firingMuted": "発火中 · ミュート",
+        "firingMutedTooltip": "発火は継続中です。通知は {name} によりミュートされています。"
+      },
+      "corrected": "修正済み",
+      "correctedBy": "スコアは {names} により修正",
+      "incident": {
+        "mutedBy": "ミュート中 · {name}",
+        "notLoaded": "ダウンタイムが読み込まれていません",
+        "notLoadedTooltip": "ダウンタイム {id} によりミュート中です。このダウンタイムは読み込まれた一覧に含まれていません。",
+        "banner": "{name} によりミュート。誰もページ通知を受けていません。ウィンドウ終了後の最初の発火で、遅延したオープン通知が送信されます。",
+        "bannerUntil": "{name} により {end} までミュート。誰もページ通知を受けていません。ウィンドウ終了後の最初の発火で、遅延したオープン通知が送信されます。"
+      },
+      "banner": {
+        "ended": "終了",
+        "endsInUnderMinute": "1 分未満で終了",
+        "endsInMinutes": "{count} 分後に終了 | {count} 分後に終了",
+        "endsIn": "{duration} 後に終了",
+        "firstEndsInUnderMinute": "最初の終了まで 1 分未満",
+        "firstEndsInMinutes": "最初の終了まで {count} 分 | 最初の終了まで {count} 分",
+        "firstEndsIn": "最初の終了まで {duration}",
+        "count": "{module} {count}",
+        "showBanner": "このダウンタイムが有効な間、組織内の全員にバナーを表示する",
+        "showBannerCaption": "バナーには名前、影響を受ける件数、残り時間が表示されます。アラート名が表示されることはありません。",
+        "preview": "プレビュー",
+        "previewMessage": "{name} が有効です。",
+        "tooLong": "バナーは最長 7 日間のウィンドウでのみ利用できます。"
+      },
+      "sloCorrections": {
+        "title": "ステータスの修正:",
+        "item": "{name}（{status}）",
+        "shorterThanSlice": "SLO のスライスより短いため、補正された分はありません"
+      },
+      "notify": {
+        "title": "通知",
+        "caption": "ダウンタイム自体について宛先に知らせます: 開始時、終了前、終了時。",
+        "destinations": "宛先",
+        "lead": "終了前のリマインダー",
+        "leadHelp": "例: 10m または 1h。1 分からウィンドウの長さまで。",
+        "regionNote": "スーパークラスターでは、ダウンタイムを作成したリージョンが送信します。この設定より前に作成されたダウンタイムはすべてのリージョンから送信されます。",
+        "tab": "通知",
+        "events": {
+          "started": "開始時",
+          "startedHelp": "各ウィンドウの開始時に 1 通送信します。",
+          "ending_soon": "終了前",
+          "ending_soonHelp": "終了前のリマインダーです。アラートが再び通知を始めても驚かずに済みます。",
+          "ended": "終了時",
+          "endedHelp": "各ウィンドウの終了時に 1 通送信します。",
+          "cancelled": "キャンセル時",
+          "cancelledHelp": "誰かがダウンタイムを終了または中止したときにすぐ送信します。",
+          "extended": "延長時",
+          "extendedHelp": "新しい終了時刻とともにすぐ送信します。"
+        },
+        "validation": {
+          "tooMany": "通知できる宛先は最大 {max} 件です。",
+          "eventRequired": "イベントを 1 つ以上選ぶか、宛先を削除してください。",
+          "leadInvalid": "リマインダーは終了の 1 分前からウィンドウの長さ前までの間に設定してください。"
+        },
+        "summary": {
+          "none": "独自の通知は送信しません。",
+          "sentence": "{destinations} に通知: {events}。",
+          "started": "開始時",
+          "endingSoon": "終了の {lead} 前",
+          "ended": "終了時",
+          "cancelled": "キャンセル時",
+          "extended": "延長時"
+        },
+        "log": {
+          "time": "時刻",
+          "event": "イベント",
+          "destinations": "宛先",
+          "result": "結果",
+          "ok": "送信済み",
+          "pending": "送信中",
+          "empty": "まだ通知は送信されていません",
+          "events": {
+            "started": "開始",
+            "ending_soon": "まもなく終了",
+            "ended": "終了",
+            "cancelled": "キャンセル",
+            "extended": "延長"
+          }
+        },
+        "test": {
+          "send": "テスト送信",
+          "sent": "{count} 件の宛先にテストを送信しました | {count} 件の宛先にテストを送信しました",
+          "failed": "テストは {names} に届きませんでした。"
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -8858,7 +9359,8 @@
     "countWorkflow": "{count} 件のワークフロー | {count} 件のワークフロー",
     "countAnomalyDetection": "{count} 件の異常検知器 | {count} 件の異常検知器",
     "countIncidentIntegration": "{count} 件のインシデント連携 | {count} 件のインシデント連携",
-    "sectionOtherConsumers": "その他の使用元"
+    "sectionOtherConsumers": "その他の使用元",
+    "countDowntime": "{count} 件のダウンタイム | {count} 件のダウンタイム"
   },
   "alert_library": {
     "header": "アラートライブラリ",
@@ -16715,7 +17217,8 @@
       "sourceMaps": "RUM — ソースマップ",
       "oncall": "オンコール",
       "oncallDetail": "オンコールページ",
-      "syntheticsJourney": "合成モニタリングジャーニー"
+      "syntheticsJourney": "合成モニタリングジャーニー",
+      "downtimes": "ダウンタイム"
     },
     "actions": {
       "openCheatsheet": "キーボードショートカットのチートシートを開く",
@@ -16824,6 +17327,8 @@
       "oncallEscalate": "エスカレート",
       "oncallSnooze": "スヌーズ",
       "oncallResolve": "解決",
+      "downtimesCreate": "新規ダウンタイム",
+      "downtimesRefresh": "ダウンタイムを更新",
       "functionsImport": "関数をインポート"
     }
   },
@@ -17257,6 +17762,13 @@
         "belowTopN": "上位N未満",
         "truncated": "省略",
         "gap": "ギャップ"
+      },
+      "downtimeStatus": {
+        "scheduled": "スケジュール済み",
+        "active": "アクティブ",
+        "ended": "終了",
+        "cancelled": "キャンセル済み",
+        "endedEarly": "早期終了"
       }
     }
   },
@@ -17653,6 +18165,24 @@
     },
     "iam": {
       "userSaveFailed": "ユーザーを保存できませんでした"
+    },
+    "downtimes": {
+      "cancelled": "ダウンタイムをキャンセルしました",
+      "cancelledMany": "{count} 件のダウンタイムをキャンセルしました | {count} 件のダウンタイムをキャンセルしました",
+      "cancelFailed": "ダウンタイムをキャンセルできませんでした",
+      "extended": "{time} まで延長しました",
+      "extendedFollowUp": "{name} を作成しました（{time} まで）",
+      "extendFailed": "ダウンタイムを延長できませんでした",
+      "reload": "再読み込み",
+      "deleted": "ダウンタイムを削除しました",
+      "deleteFailed": "ダウンタイムを削除できませんでした",
+      "created": "ダウンタイムを作成しました",
+      "updated": "ダウンタイムを保存しました",
+      "saveFailed": "ダウンタイムを保存できませんでした",
+      "muted": "{count} 件のアイテムを {time} までミュートしました。{folder} に保存しました。 | {count} 件のアイテムを {time} までミュートしました。{folder} に保存しました。",
+      "muteFailed": "ミュートを作成できませんでした",
+      "viewDowntime": "ダウンタイムを表示",
+      "itemsDropped": "選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。 | 選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。"
     }
   },
   "cipherKeys": {
@@ -17943,7 +18473,9 @@
       "budgetNote": "最後の点は上の予算残量タイルと等しくなります。0%の点線は枯渇を表し、その下ではSLOがターゲットで許容されるよりも多くのエラーを消費しています。ギャップは何も測定されていないバケットであり、ゼロとは同じではありません。",
       "burnExplain": "各バケット単独でバジェットが消費される速さを、バジェット中立レートの倍数で示します。",
       "burnFormula": "バーンレート = (100% − SLI) ÷ (100% − ターゲット)\nSLI = 100 × 良好 ÷ 合計（そのバケットのみ）\n\n右軸（同じラインをSLIとして読む）:\nSLI = 100% − バーンレート × (100% − ターゲット)",
-      "burnNote": "×1 はウィンドウの終了時にちょうどバジェットを使い切り、×2 はその半分の時点で使い切ります。×1 未満ではバジェットが蓄積されます。これはバケットごとの値で累積ではないため、スパイクは平均化されずに表示されたままになります。右軸は下向きにカウントされます。チャートの上方向はバーンが大きいことであり、SLI が低いことを意味します。"
+      "burnNote": "×1 はウィンドウの終了時にちょうどバジェットを使い切り、×2 はその半分の時点で使い切ります。×1 未満ではバジェットが蓄積されます。これはバケットごとの値で累積ではないため、スパイクは平均化されずに表示されたままになります。右軸は下向きにカウントされます。チャートの上方向はバーンが大きいことであり、SLI が低いことを意味します。",
+      "corrected": "ダウンタイムによる補正",
+      "correctedTooltip": "ダウンタイムによる補正: 除外されるため、バジェットラインはフラットになります"
     },
     "alerts": {
       "title": "アラート",

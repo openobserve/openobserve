@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="confirm-dialog"
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"
-    :secondary-button-label="t('confirmDialog.cancel')"
+    :secondary-button-label="cancelLabelComputed"
     :primary-button-label="okLabelComputed"
     :primary-button-color="okColor"
     @click:secondary="onCancel"
@@ -54,6 +54,7 @@ export default defineComponent({
     // and `okLabelComputed` already falls back when the prop is absent.
     okLabel: { type: String as unknown as PropType<I18nText> },
     okColor: { type: String, default: "primary" },
+    cancelLabel: { type: String as unknown as PropType<I18nText> },
   },
   setup(props, { emit }) {
     const { t } = useI18nTyped();
@@ -66,6 +67,8 @@ export default defineComponent({
     const okLabelComputed = computed(() => {
       return props.okLabel || t("confirmDialog.ok");
     });
+
+    const cancelLabelComputed = computed(() => props.cancelLabel || t("confirmDialog.cancel"));
 
     const onCancel = () => {
       open.value = false;
@@ -81,6 +84,7 @@ export default defineComponent({
       t,
       open,
       okLabelComputed,
+      cancelLabelComputed,
       onCancel,
       onConfirm,
     };

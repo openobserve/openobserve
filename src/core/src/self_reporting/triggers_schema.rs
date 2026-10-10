@@ -182,10 +182,12 @@ mod tests {
         assert!(field_names.contains(&"synthetics_location".to_string()));
         assert!(field_names.contains(&"delivery_attempted".to_string()));
 
+        // The history filter and the Suppressed tab of a downtime read this column.
+        assert!(field_names.contains(&"downtime_id".to_string()));
+
         // Verify count matches struct fields
-        // (35 total: 21 original + 5 dedup/grouping + 6 value-context + 2 synthetics skip + 1
-        // delivery)
-        assert_eq!(field_names.len(), 35);
+        // 36: 21 original + 5 dedup/grouping + 6 value-context + 2 synthetics + downtime + delivery
+        assert_eq!(field_names.len(), 36);
 
         // Verify no duplicate fields
         let unique_count = field_names

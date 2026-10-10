@@ -560,6 +560,12 @@
       "description": "Tác vụ từ xa là một dịch vụ HTTP mà các thử nghiệm của bạn gọi để tạo đầu ra. Xuất bản nó một lần, xác minh kết nối hoạt động, và mọi thử nghiệm có thể ghim chính xác phiên bản mà nó đã chạy.",
       "action": "Tác vụ mới",
       "actionDesc": "Trỏ OpenObserve tới endpoint của bạn và kiểm tra kết nối."
+    },
+    "noDowntimes": {
+      "title": "Chưa có thời gian tạm dừng nào",
+      "description": "Thời gian tạm dừng giữ cho cảnh báo, phát hiện bất thường và kiểm tra Synthetics tiếp tục chạy, đồng thời dừng thông báo của chúng trong khoảng thời gian bạn lên lịch.",
+      "action": "Lên lịch thời gian tạm dừng",
+      "actionDesc": "Một lần, hàng ngày hoặc hàng tuần. Để tắt nhanh, dùng Tắt tiếng trong danh sách cảnh báo."
     }
   },
   "common": {
@@ -1320,6 +1326,7 @@
     "topQueries": "Truy vấn hàng đầu",
     "profiles": "Profiles",
     "productAnalytics": "Phân tích sản phẩm",
+    "downtimes": "Thời gian tạm dừng",
     "trialEndedTitle": "Bản dùng thử của bạn đã kết thúc",
     "trialPageNeedsPlan": "{page} cần một gói dịch vụ",
     "trialPageNeedsPlanToast": "{page} cần một gói dịch vụ. Hãy chọn một gói trên trang này để tiếp tục sử dụng.",
@@ -2822,6 +2829,7 @@
       "scopeCoveredByParent": "Các hành động bị khóa đến từ {scope}, được đặt trong {module}",
       "scopeAllOf": "Tất cả {module}",
       "scopeIncludesFuture": "Bao gồm tài nguyên được tạo sau này",
+      "scopeDowntimeHint": "Thư mục thời gian tạm dừng giới hạn người quản lý một thời gian tạm dừng, chứ không giới hạn những gì nó tắt tiếng. Để tắt tiếng Tất cả thư mục của một mô-đun, người dùng cần có quyền liệt kê mọi thư mục của mô-đun đó. Các chip và banner bị tắt tiếng có thể hiển thị tên một thời gian tạm dừng mà người dùng không thể liệt kê.",
       "grantedByWiderScope": "Được cấp bởi phạm vi rộng hơn",
       "grantedHereAndByWiderScope": "Được cấp tại đây và bởi phạm vi rộng hơn",
       "stillGrantedByWiderScope": "Đã xóa tại đây, vẫn được cấp bởi phạm vi rộng hơn",
@@ -8821,7 +8829,500 @@
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
     "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
-    "seconds": "Giây"
+    "seconds": "Giây",
+    "downtimes": {
+      "newTitle": "Thời gian tạm dừng mới",
+      "editTitle": "Chỉnh sửa thời gian tạm dừng",
+      "detailTitle": "Thời gian tạm dừng",
+      "modules": {
+        "alerts": "Cảnh báo",
+        "anomaly_detections": "Phát hiện bất thường",
+        "synthetics": "Kiểm tra Synthetics",
+        "slos": "SLO"
+      },
+      "modulesShort": {
+        "alerts": "Cảnh báo",
+        "anomaly_detections": "Bất thường",
+        "synthetics": "Synthetics",
+        "slos": "SLO"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "Trong khung thời gian, sự cố được",
+          "muted": "Tạo và tắt tiếng (mặc định)",
+          "mutedHelp": "Sự cố vẫn mở như bình thường nhưng không thông báo cho ai cho đến khi khung thời gian kết thúc.",
+          "none": "Không tạo",
+          "noneHelp": "Không mở sự cố nào trong khung thời gian; lần kích hoạt đầu tiên sau đó sẽ mở sự cố và gửi thông báo.",
+          "summary": "không có sự cố"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}",
+        "condition": "điều kiện",
+        "allFolders": "tất cả thư mục",
+        "oneFolder": "thư mục {name}",
+        "nFolders": "{count} thư mục | {count} thư mục",
+        "tags": "thẻ {tags}",
+        "nItems": "{count} mục | {count} mục",
+        "asGood": "coi như tốt",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
+      },
+      "duration": {
+        "days": "{count} ngày",
+        "hours": "{count} giờ",
+        "minutes": "{count} phút"
+      },
+      "schedule": {
+        "windowRange": "{start} đến {end} {zone}",
+        "onceSentence": "Một lần · {start} đến {end} · {zone}",
+        "dailySentence": "Hàng ngày · {time} trong {duration} · {zone}",
+        "weeklySentence": "Hàng tuần vào {days} · {time} trong {duration} · {zone}",
+        "fromNoEnd": "{schedule}, từ {start}, không có ngày kết thúc",
+        "fromUntil": "{schedule}, từ {start} đến {until}"
+      },
+      "validation": {
+        "conditionRequired": "Thêm điều kiện hoặc xóa khối điều kiện.",
+        "pairKey": "Chọn một chiều cho mỗi hàng.",
+        "pairOperator": "Dùng = hoặc != trong điều kiện thời gian tạm dừng.",
+        "pairValue": "Nhập một giá trị cho mỗi hàng.",
+        "loneStar": "Một giá trị không thể chỉ là một dấu *.",
+        "innerStar": "Dấu * chỉ được phép ở cuối giá trị.",
+        "emptyGroup": "Nhóm điều kiện không được để trống.",
+        "tooDeep": "Một điều kiện chỉ có thể lồng các nhóm tối đa 3 cấp.",
+        "tooManyPairs": "Một điều kiện chỉ có thể chứa tối đa 32 cặp.",
+        "needsEq": "Thêm ít nhất một điều kiện =. Một điều kiện chỉ gồm các hàng != sẽ tắt tiếng mọi thứ khác.",
+        "modulesRequired": "Chọn ít nhất một mô-đun.",
+        "foldersRequired": "Chọn Tất cả thư mục hoặc ít nhất một thư mục.",
+        "tagsRequired": "Thêm một thẻ hoặc xóa khối thẻ.",
+        "idsRequired": "Chọn một mục hoặc xóa khối mục cụ thể.",
+        "idOutsideFolders": "Một số mục đã chọn không nằm trong các thư mục đã chọn.",
+        "tooManyFolders": "Chọn tối đa {max} thư mục, hoặc Tất cả thư mục.",
+        "tooManyTags": "Thêm tối đa {max} thẻ.",
+        "tooManyIds": "Chọn tối đa {max} mục.",
+        "nameTooLong": "Tên không được vượt quá 256 ký tự.",
+        "timezoneRequired": "Chọn múi giờ.",
+        "startRequired": "Nhập ngày và giờ bắt đầu.",
+        "endRequired": "Nhập ngày và giờ kết thúc.",
+        "endAfterStart": "Thời điểm kết thúc phải sau thời điểm bắt đầu.",
+        "windowTooLong": "Khoảng thời gian có thể kéo dài tối đa 7 ngày.",
+        "windowTooShort": "Khoảng thời gian phải kéo dài ít nhất 1 phút.",
+        "startTimeRequired": "Nhập giờ bắt đầu theo định dạng HH:MM.",
+        "durationInvalid": "Nhập thời lượng, ví dụ 90m hoặc 1h 30m.",
+        "weekdaysRequired": "Chọn ít nhất một ngày.",
+        "untilAfterStart": "Lặp lại đến phải bằng hoặc sau ngày đầu tiên.",
+        "reasonTooLong": "Lý do có thể dài tối đa {max} ký tự.",
+        "windowOutlastsRepeat": "Khung thời gian không thể dài hơn khoảng thời gian giữa các lần lặp lại.",
+        "startDateRequired": "Chọn ngày đầu tiên."
+      },
+      "title": "Thời gian ngừng",
+      "subtitle": "Các khoảng thời gian đã lên lịch giữ cho cảnh báo, phát hiện bất thường và kiểm tra Synthetics vẫn chạy nhưng dừng thông báo của chúng",
+      "newDowntime": "Thời gian ngừng mới",
+      "filterAll": "Tất cả",
+      "filterOnce": "Một lần",
+      "filterRecurring": "Định kỳ",
+      "search": "Tìm kiếm theo tên, thứ nguyên hoặc người tạo",
+      "searchAcross": "Tìm kiếm tất cả thư mục",
+      "thisFolder": "Thư mục này",
+      "allFolders": "Tất cả thư mục",
+      "thisFolderTooltip": "Tìm kiếm trong thư mục đã chọn",
+      "allFoldersTooltip": "Tìm kiếm trong mọi thư mục",
+      "noFolder": "Không có thư mục nào để bạn lưu thời gian ngừng hoạt động",
+      "truncated": "Đang hiển thị {shown} thời gian ngừng hoạt động đầu tiên trên tổng số {total}",
+      "stats": {
+        "active": "Đang hoạt động",
+        "scheduled": "Đã lên lịch",
+        "recurring": "Định kỳ",
+        "ended": "Đã kết thúc",
+        "cancelled": "Đã hủy",
+        "endedEarly": "Kết thúc sớm",
+        "total": "Tổng"
+      },
+      "columns": {
+        "name": "Tên",
+        "status": "Trạng thái",
+        "targets": "Mục tiêu",
+        "schedule": "Lịch trình",
+        "when": "Kết thúc / tiếp theo",
+        "matched": "Đã khớp",
+        "createdBy": "Người tạo",
+        "folder": "Thư mục"
+      },
+      "oneTime": "Một lần",
+      "recurring": "Định kỳ",
+      "bannerOn": "Biểu ngữ hiển thị cho mọi người trong tổ chức khi thời gian ngừng này đang hoạt động",
+      "endsLabel": "kết thúc",
+      "confirmEndNow": {
+        "title": "Kết thúc thời gian ngừng này ngay?",
+        "message": "Thông báo sẽ tiếp tục ngay. Thời gian ngừng vẫn ở trong danh sách với trạng thái kết thúc sớm.",
+        "ok": "Kết thúc ngay",
+        "keep": "Tiếp tục chạy"
+      },
+      "extend": {
+        "menu": "Gia hạn thêm",
+        "notActive": "Chỉ có thể gia hạn thời gian ngừng đang hoạt động",
+        "dialogTitle": "Gia hạn {name}",
+        "newEnd": "Kết thúc mới",
+        "confirmUntil": "Gia hạn đến {time}",
+        "followUp": "Thời gian ngừng này lặp lại nên lịch của nó giữ nguyên. Một thời gian ngừng một lần tên {name} sẽ được tạo từ cuối cửa sổ hiện tại.",
+        "endAfterCurrent": "Thời điểm kết thúc mới phải sau thời điểm kết thúc hiện tại."
+      },
+      "nextLabel": "tiếp theo",
+      "matched": {
+        "alerts": "{count} cảnh báo | {count} cảnh báo",
+        "anomalies": "{count} bất thường | {count} bất thường",
+        "synthetics": "{count} kiểm tra | {count} kiểm tra",
+        "slos": "{count} SLO | {count} SLO"
+      },
+      "actions": {
+        "endNow": "Kết thúc ngay",
+        "edit": "Chỉnh sửa",
+        "duplicate": "Nhân bản",
+        "moveToFolder": "Di chuyển đến thư mục",
+        "cancel": "Hủy thời gian ngừng",
+        "delete": "Xóa",
+        "more": "Thêm hành động",
+        "muteForHour": "Tắt tiếng ngay trong 1 giờ",
+        "extend": "Gia hạn"
+      },
+      "confirmCancel": {
+        "title": "Hủy khoảng ngừng",
+        "message": "Thông báo sẽ tiếp tục ngay lập tức. Khoảng ngừng vẫn ở trong danh sách để lưu lịch sử.",
+        "bulkMessage": "Hủy {count} khoảng ngừng? Thông báo sẽ tiếp tục ngay lập tức. | Hủy {count} khoảng ngừng? Thông báo sẽ tiếp tục ngay lập tức.",
+        "confirm": "Hủy khoảng ngừng",
+        "keep": "Giữ khoảng ngừng"
+      },
+      "confirmDelete": {
+        "title": "Xóa khoảng ngừng",
+        "message": "Khoảng ngừng và lịch sử của nó sẽ bị xóa. Không thể hoàn tác thao tác này."
+      },
+      "copyOf": "Bản sao của {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} cảnh báo khớp | {count} cảnh báo khớp",
+          "anomaly_detections": "{count} phát hiện bất thường khớp | {count} phát hiện bất thường khớp",
+          "synthetics": "{count} kiểm tra khớp | {count} kiểm tra khớp",
+          "slos": "{count} SLO khớp | {count} SLO khớp"
+        },
+        "alertFolders": "Thư mục cảnh báo",
+        "syntheticsFolders": "Thư mục Synthetics",
+        "noAlertFolderAccess": "Bạn không có quyền truy cập thư mục cảnh báo.",
+        "noSyntheticsFolderAccess": "Bạn không có quyền truy cập thư mục Synthetics.",
+        "tags": "Thẻ",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "Mỗi thẻ phải tồn tại trên bài kiểm tra.",
+        "removeBlock": "Xóa khối này",
+        "specificItems": "Mục cụ thể",
+        "itemsHint": "Chỉ những mục trong thư mục đã chọn mới được đưa ra.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Thêm thẻ",
+        "addItems": "Thêm mục cụ thể",
+        "sloMode": "Điểm SLO trong cửa sổ",
+        "sloExclude": "Loại trừ cửa sổ",
+        "sloCountAsGood": "Tính cửa sổ là tốt",
+        "sloExcludeCaption": "Thời gian trong cửa sổ không được tính là tốt cũng không phải xấu. Cảnh báo burn-rate trên các SLO này sẽ không kích hoạt cho khoảng thời gian đó.",
+        "sloCountAsGoodCaption": "Thời gian trong cửa sổ được tính là hoàn toàn tốt. Chỉ dùng tùy chọn này khi hợp đồng SLO của bạn quy định bảo trì theo kế hoạch vẫn là thời gian hoạt động.",
+        "cardCaption": "Thư mục trước, sau đó các khối tùy chọn thu hẹp thêm. Điều kiện chiều ở trên cũng áp dụng cho mô-đun này.",
+        "noConditionForChecks": "Điều kiện chiều ở trên không áp dụng cho các kiểm tra.",
+        "appliesTo": "Áp dụng cho",
+        "tabTargets": "Mục tiêu",
+        "tabSchedule": "Lịch trình",
+        "tabAdvanced": "Nâng cao",
+        "modeInFolder": "{mode} trong",
+        "newMode": "Khoảng ngừng mới",
+        "editMode": "Chỉnh sửa khoảng ngừng",
+        "namePlaceholder": "Tên khoảng ngừng",
+        "nameLabel": "Tên khoảng ngừng",
+        "renameHint": "Nhấp để đổi tên",
+        "reason": "Lý do",
+        "reasonHelp": "Tùy chọn. Hiển thị trong danh sách, trên trang chi tiết và trong chú thích của Muted.",
+        "cancel": "Hủy",
+        "save": "Lưu",
+        "activeBanner": "Khoảng ngừng này đang hoạt động. Chỉnh sửa sẽ có hiệu lực ở lần đánh giá tiếp theo, và thay đổi chế độ SLO sẽ đo lại các cửa sổ đã bắt đầu.",
+        "changedMeanwhile": "Ai đó đã thay đổi khoảng ngừng này kể từ khi bạn tải nó. Hãy tải lại và thử lại.",
+        "reload": "Tải lại",
+        "noModule": "Chọn một mô-đun trong Áp dụng cho.",
+        "checkSchedule": "Kiểm tra lịch, sau đó lưu lại."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "cảnh báo",
+          "anomaly_detections": "phát hiện bất thường",
+          "synthetics": "kiểm tra synthetics",
+          "slos": "SLO"
+        },
+        "whenOnce": "Một lần, từ {start} đến {end} {zone}",
+        "whenDaily": "Hàng ngày lúc {time} {zone}, trong {duration}",
+        "whenWeekly": "Mỗi {days} lúc {time} {zone}, trong {duration}",
+        "inFolders": "trong thư mục {names} | trong thư mục {names}",
+        "withCondition": "với {condition}",
+        "tagged": "được gắn thẻ {tags}",
+        "named": "giới hạn ở {count} mục được đặt tên | giới hạn ở {count} mục được đặt tên",
+        "stopNotifying": "{when}: {targets} ngừng thông báo.",
+        "nothingMuted": "{when}: không có cảnh báo hoặc kiểm tra nào bị tắt thông báo.",
+        "sloUnchanged": "Điểm SLO không thay đổi.",
+        "sloExcluded": "{slos} loại trừ khoảng thời gian này khỏi điểm của chúng.",
+        "sloAsGood": "{slos} tính khoảng thời gian này là thời gian tốt."
+      },
+      "autoName": {
+        "once": "một lần",
+        "onceOn": "một lần {date}",
+        "daily": "hàng ngày",
+        "weekly": "hàng tuần",
+        "all": {
+          "alerts": "Tất cả cảnh báo",
+          "anomaly_detections": "Tất cả phát hiện bất thường",
+          "synthetics": "Tất cả kiểm tra Synthetics",
+          "slos": "Tất cả SLO"
+        }
+      },
+      "condition": {
+        "none": "Không có điều kiện theo chiều",
+        "add": "Thêm",
+        "title": "Điều kiện theo chiều",
+        "onePer": "Một điều kiện mỗi khoảng tạm dừng",
+        "remove": "Xóa điều kiện theo chiều",
+        "caption": "Áp dụng cho cảnh báo, phát hiện bất thường và SLO. Kiểm tra Synthetics không có chiều và dùng thẻ. Tất cả các cặp phải khớp. Dùng nhóm OR cho các lựa chọn thay thế. Một giá trị có thể kết thúc bằng *."
+      },
+      "resources": {
+        "refineBy": "Tinh chỉnh theo tài nguyên",
+        "load": "Tải tài nguyên",
+        "needsEq": "Thêm ít nhất một điều kiện = trước khi tinh chỉnh theo tài nguyên.",
+        "tooMany": "{count} giá trị đồng xuất hiện với điều kiện này. Thu hẹp điều kiện để chọn tài nguyên.",
+        "lastSeen": "Lần xuất hiện gần nhất",
+        "streams": "Stream",
+        "footer": "{selected} trên {total} đã chọn · {source}",
+        "fromRegistry": "từ sổ đăng ký dịch vụ",
+        "fromSearch": "từ dữ liệu 24 giờ qua",
+        "apply": "Áp dụng",
+        "loadFailed": "Không thể tải tài nguyên",
+        "notSeen": "Không thấy trong một giờ qua.",
+        "partial": "Một số nguồn không phản hồi.",
+        "items": "Mục",
+        "fromValues": "từ cảnh báo, sổ đăng ký dịch vụ và dữ liệu của một giờ qua",
+        "noValues": "Chưa thấy giá trị nào cho chiều này."
+      },
+      "scheduleForm": {
+        "once": "Một lần",
+        "daily": "Hàng ngày",
+        "weekly": "Hàng tuần",
+        "startDate": "Ngày bắt đầu",
+        "startTime": "Giờ bắt đầu",
+        "endDate": "Ngày kết thúc",
+        "endTime": "Giờ kết thúc",
+        "days": "Các ngày",
+        "startsAt": "Bắt đầu lúc",
+        "duration": "Thời lượng",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Tối đa 7 ngày, ví dụ 90m hoặc 1h 30m.",
+        "until": "Lặp lại đến",
+        "untilPlaceholder": "Không có ngày kết thúc",
+        "timezone": "Múi giờ",
+        "noWindow": "Không có khoảng thời gian nào bắt đầu trong 8 ngày tới.",
+        "nextWindow": "Cửa sổ tiếp theo: {window}. Một cửa sổ có thể kéo dài qua nửa đêm.",
+        "nextWindowWithUtc": "Cửa sổ tiếp theo: {window} ({utc}). Một cửa sổ có thể kéo dài qua nửa đêm.",
+        "startsOn": "Bắt đầu vào ngày"
+      },
+      "preview": {
+        "title": "Xem trước",
+        "failed": "Không thể tải bản xem trước.",
+        "andMore": "và {count} mục khác",
+        "noMatch": "Hiện tại không có gì khớp",
+        "fireTime": "{count} cảnh báo xác định danh tính tại thời điểm kích hoạt | {count} cảnh báo xác định danh tính tại thời điểm kích hoạt",
+        "undecidable": "Không thể phân biệt bằng {key}",
+        "showAll": "Hiển thị danh sách đầy đủ",
+        "showLess": "Thu gọn",
+        "finishCondition": "Hoàn tất điều kiện để xem bản xem trước."
+      },
+      "muteAllDialog": {
+        "title": "Tắt thông báo cho toàn bộ mô-đun?",
+        "intro": "Không có thư mục, mục, thẻ hay điều kiện nào giới hạn các mô-đun này, vì vậy thời gian tắt thông báo này sẽ tắt thông báo cho:",
+        "every": {
+          "alerts": "Mọi cảnh báo trong tổ chức này",
+          "anomaly_detections": "Mọi phát hiện bất thường trong tổ chức này",
+          "synthetics": "Mọi kiểm tra Synthetics trong tổ chức này",
+          "slos": "Mọi SLO trong tổ chức này"
+        },
+        "matchedNow": "{matched} hôm nay",
+        "outro": "Thông báo, cuộc gọi trực và quy trình làm việc đều dừng cho tất cả chúng trong cửa sổ này.",
+        "cancel": "Hủy",
+        "confirm": "Tắt thông báo tất cả",
+        "titleOne": {
+          "alerts": "Tắt thông báo mọi cảnh báo trong tổ chức này?",
+          "anomaly_detections": "Tắt thông báo mọi phát hiện bất thường trong tổ chức này?",
+          "synthetics": "Tắt thông báo mọi kiểm tra Synthetics trong tổ chức này?",
+          "slos": "Tắt thông báo mọi SLO trong tổ chức này?"
+        },
+        "window": "Khoảng thời gian: {window}"
+      },
+      "summaryPane": {
+        "title": "Tóm tắt",
+        "filedIn": "Được lưu trong",
+        "window": "Cửa sổ",
+        "nextWindow": "Cửa sổ tiếp theo",
+        "inUtc": "Theo UTC",
+        "largeMatch": "{modules}: thời gian tắt thông báo khớp với hơn một nửa số mục. Phần lớn tổ chức này sẽ không nhận thông báo trong cửa sổ này.",
+        "whatHappens": "Điều gì sẽ xảy ra",
+        "keepRunning": "Các đánh giá và kiểm tra vẫn tiếp tục chạy và giữ nguyên lịch sử.",
+        "noNotifications": "Thông báo, cuộc gọi trực và quy trình làm việc sẽ dừng lại.",
+        "mutedIncidents": "Sự cố mở ra ở trạng thái tắt thông báo và sẽ gửi thông báo sau khi cửa sổ kết thúc."
+      },
+      "band": {
+        "now": "hiện tại",
+        "none": "Chưa có cửa sổ nào chạy và cũng không có cửa sổ nào được lên kế hoạch.",
+        "active": "Đang hoạt động",
+        "next": "Tiếp theo",
+        "past": "Đã chạy",
+        "track": "Cửa sổ",
+        "aria": "{kind}: {start} đến {end}"
+      },
+      "detail": {
+        "overview": "Tổng quan",
+        "affected": "Bị ảnh hưởng · {count}",
+        "suppressed": "Đã chặn · {count}",
+        "details": "Chi tiết",
+        "condition": "Điều kiện",
+        "noTarget": "Không có mục tiêu",
+        "banner": "Biểu ngữ",
+        "bannerOn": "Hiển thị cho tổ chức khi đang hoạt động",
+        "bannerOff": "Không có biểu ngữ",
+        "occurrences": "Số lần xuất hiện",
+        "nextWindow": "Cửa sổ tiếp theo: {window}. Giờ của bạn: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Khớp theo",
+        "matchedBy": {
+          "query": "Truy vấn",
+          "source_alert": "Cảnh báo nguồn",
+          "tag": "Thẻ",
+          "id": "Theo tên",
+          "folder": "Thư mục",
+          "org": "Toàn bộ tổ chức"
+        },
+        "source": "Nguồn",
+        "wouldHaveNotified": "Lẽ ra đã thông báo",
+        "noSuppressed": "Chưa có gì bị tạm chặn",
+        "muteHourName": "{name} · tắt thông báo 1 giờ",
+        "notFoundTitle": "Không tìm thấy thời gian ngừng",
+        "notFoundDescription": "Có thể nó đã bị xóa, hoặc liên kết trỏ đến một tổ chức khác.",
+        "backToList": "Quay lại danh sách thời gian ngừng"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Tắt thông báo {count} cảnh báo | Tắt thông báo {count} cảnh báo",
+          "anomaly_detections": "Tắt thông báo {count} phát hiện bất thường | Tắt thông báo {count} phát hiện bất thường",
+          "synthetics": "Tắt thông báo {count} kiểm tra | Tắt thông báo {count} kiểm tra",
+          "slos": "Tắt thông báo {count} SLO | Tắt thông báo {count} SLO",
+          "items": "Tắt thông báo {count} mục | Tắt thông báo {count} mục"
+        },
+        "subtitle": "Chúng vẫn tiếp tục chạy và giữ nguyên lịch sử. Thông báo, cuộc gọi trực và quy trình làm việc sẽ dừng cho đến khi khung thời gian kết thúc.",
+        "muteFor": "Tắt thông báo trong",
+        "fileIn": "Lưu vào",
+        "presets": {
+          "30m": "30 phút",
+          "1h": "1 giờ",
+          "2h": "2 giờ",
+          "4h": "4 giờ",
+          "custom": "Tùy chỉnh"
+        },
+        "endsAt": "Kết thúc vào",
+        "endsIn": "Sau {duration}.",
+        "confirm": "Tắt thông báo",
+        "confirmUntil": "Tắt thông báo đến {time}",
+        "menu": "Tắt thông báo",
+        "until": "Đến…",
+        "bulk": "Tắt thông báo",
+        "muted": "Đã tắt thông báo · kết thúc sau {duration}",
+        "mutedTooltip": "Đã tắt thông báo bởi {name} đến {end}",
+        "exclude": "Loại trừ một khoảng thời gian…",
+        "firingMuted": "Đang kích hoạt · đã tắt tiếng",
+        "firingMutedTooltip": "Vẫn đang kích hoạt. Thông báo đã bị {name} tắt tiếng."
+      },
+      "corrected": "Đã hiệu chỉnh",
+      "correctedBy": "Điểm được hiệu chỉnh bởi {names}",
+      "incident": {
+        "mutedBy": "Đã tắt thông báo · {name}",
+        "notLoaded": "Chưa tải thời gian ngừng",
+        "notLoadedTooltip": "Bị tắt tiếng bởi thời gian ngừng {id}, không nằm trong các thời gian ngừng đã tải.",
+        "banner": "Đã tắt thông báo bởi {name}. Không ai được gọi trực. Lần kích hoạt đầu tiên sau khung thời gian sẽ gửi thông báo mở bị trì hoãn.",
+        "bannerUntil": "Đã tắt thông báo bởi {name} đến {end}. Không ai được gọi trực. Lần kích hoạt đầu tiên sau khung thời gian sẽ gửi thông báo mở bị trì hoãn."
+      },
+      "banner": {
+        "ended": "đã kết thúc",
+        "endsInUnderMinute": "kết thúc sau chưa đầy một phút",
+        "endsInMinutes": "kết thúc sau {count} phút | kết thúc sau {count} phút",
+        "endsIn": "kết thúc sau {duration}",
+        "firstEndsInUnderMinute": "cái đầu tiên kết thúc sau chưa đầy một phút",
+        "firstEndsInMinutes": "cái đầu tiên kết thúc sau {count} phút | cái đầu tiên kết thúc sau {count} phút",
+        "firstEndsIn": "cái đầu tiên kết thúc sau {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Hiển thị biểu ngữ cho mọi người trong tổ chức khi khoảng thời gian tắt thông báo này đang hoạt động",
+        "showBannerCaption": "Biểu ngữ hiển thị tên, số lượng bị ảnh hưởng và thời gian còn lại. Nó không bao giờ nêu tên cảnh báo.",
+        "preview": "Xem trước",
+        "previewMessage": "{name} đang hoạt động.",
+        "tooLong": "Biểu ngữ chỉ khả dụng cho các khung thời gian tối đa 7 ngày."
+      },
+      "sloCorrections": {
+        "title": "Hiệu chỉnh trạng thái:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "ngắn hơn lát cắt của SLO, không có phút nào được hiệu chỉnh"
+      },
+      "notify": {
+        "title": "Thông báo",
+        "caption": "Báo cho các đích về chính thời gian ngừng: khi bắt đầu, trước khi kết thúc và khi kết thúc.",
+        "destinations": "Đích",
+        "lead": "Nhắc trước khi kết thúc",
+        "leadHelp": "Ví dụ 10m hoặc 1h, từ 1 phút đến độ dài cửa sổ.",
+        "regionNote": "Trong siêu cụm, khu vực tạo thời gian ngừng sẽ gửi. Thời gian ngừng tạo trước khi có cài đặt này gửi từ mọi khu vực.",
+        "tab": "Thông báo",
+        "events": {
+          "started": "Khi bắt đầu",
+          "startedHelp": "Một tin nhắn khi mỗi cửa sổ bắt đầu.",
+          "ending_soon": "Trước khi kết thúc",
+          "ending_soonHelp": "Lời nhắc trước khi kết thúc để không ai bất ngờ khi cảnh báo thông báo trở lại.",
+          "ended": "Khi kết thúc",
+          "endedHelp": "Một tin nhắn khi mỗi cửa sổ đóng.",
+          "cancelled": "Khi bị hủy",
+          "cancelledHelp": "Gửi ngay khi ai đó kết thúc hoặc hủy thời gian ngừng.",
+          "extended": "Khi được gia hạn",
+          "extendedHelp": "Gửi ngay cùng thời điểm kết thúc mới."
+        },
+        "validation": {
+          "tooMany": "Có thể thông báo tối đa {max} đích.",
+          "eventRequired": "Chọn ít nhất một sự kiện hoặc xóa các đích.",
+          "leadInvalid": "Lời nhắc phải đến trong khoảng từ 1 phút đến độ dài cửa sổ trước khi kết thúc."
+        },
+        "summary": {
+          "none": "Không gửi thông báo riêng.",
+          "sentence": "Thông báo cho {destinations}: {events}.",
+          "started": "khi bắt đầu",
+          "endingSoon": "{lead} trước khi kết thúc",
+          "ended": "khi kết thúc",
+          "cancelled": "khi bị hủy",
+          "extended": "khi được gia hạn"
+        },
+        "log": {
+          "time": "Thời gian",
+          "event": "Sự kiện",
+          "destinations": "Đích",
+          "result": "Kết quả",
+          "ok": "Đã gửi",
+          "pending": "Đang gửi",
+          "empty": "Chưa gửi thông báo nào",
+          "events": {
+            "started": "Đã bắt đầu",
+            "ending_soon": "Sắp kết thúc",
+            "ended": "Đã kết thúc",
+            "cancelled": "Đã hủy",
+            "extended": "Đã gia hạn"
+          }
+        },
+        "test": {
+          "send": "Gửi thử",
+          "sent": "Đã gửi thử đến {count} đích | Đã gửi thử đến {count} đích",
+          "failed": "Bản thử không đến được {names}."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -8858,7 +9359,8 @@
     "countWorkflow": "{count} quy trình làm việc | {count} quy trình làm việc",
     "countAnomalyDetection": "{count} bộ phát hiện bất thường | {count} bộ phát hiện bất thường",
     "countIncidentIntegration": "{count} tích hợp sự cố | {count} tích hợp sự cố",
-    "sectionOtherConsumers": "Cũng được sử dụng bởi"
+    "sectionOtherConsumers": "Cũng được sử dụng bởi",
+    "countDowntime": "{count} thời gian ngừng | {count} thời gian ngừng"
   },
   "alert_library": {
     "header": "Thư viện cảnh báo",
@@ -16715,7 +17217,8 @@
       "sourceMaps": "RUM — Bản đồ nguồn",
       "oncall": "Trực",
       "oncallDetail": "Trang trực",
-      "syntheticsJourney": "Hành trình Synthetics"
+      "syntheticsJourney": "Hành trình Synthetics",
+      "downtimes": "Thời gian ngừng"
     },
     "actions": {
       "openCheatsheet": "Mở bảng phím tắt",
@@ -16824,6 +17327,8 @@
       "oncallEscalate": "Leo thang",
       "oncallSnooze": "Tạm hoãn",
       "oncallResolve": "Giải quyết",
+      "downtimesCreate": "Thời gian ngừng mới",
+      "downtimesRefresh": "Làm mới thời gian ngừng",
       "functionsImport": "Nhập hàm"
     }
   },
@@ -17257,6 +17762,13 @@
         "belowTopN": "dưới top-N",
         "truncated": "bị cắt ngắn",
         "gap": "khoảng trống"
+      },
+      "downtimeStatus": {
+        "scheduled": "Đã lên lịch",
+        "active": "Đang hoạt động",
+        "ended": "Đã kết thúc",
+        "cancelled": "Đã hủy",
+        "endedEarly": "Kết thúc sớm"
       }
     }
   },
@@ -17653,6 +18165,24 @@
     },
     "iam": {
       "userSaveFailed": "Không thể lưu người dùng"
+    },
+    "downtimes": {
+      "cancelled": "Đã hủy thời gian ngừng",
+      "cancelledMany": "Đã hủy {count} thời gian ngừng | Đã hủy {count} thời gian ngừng",
+      "cancelFailed": "Không thể hủy thời gian ngừng",
+      "extended": "Đã gia hạn đến {time}",
+      "extendedFollowUp": "Đã tạo {name}, chạy đến {time}",
+      "extendFailed": "Không thể gia hạn thời gian ngừng",
+      "reload": "Tải lại",
+      "deleted": "Đã xóa thời gian ngừng",
+      "deleteFailed": "Không thể xóa thời gian ngừng",
+      "created": "Đã tạo thời gian ngừng",
+      "updated": "Đã lưu thời gian ngừng",
+      "saveFailed": "Không thể lưu thời gian ngừng",
+      "muted": "Đã tắt tiếng {count} mục đến {time}. Đã lưu vào {folder}. | Đã tắt tiếng {count} mục đến {time}. Đã lưu vào {folder}.",
+      "muteFailed": "Không thể tạo tắt tiếng",
+      "viewDowntime": "Xem thời gian ngừng",
+      "itemsDropped": "{count} mục đã chọn nằm ngoài các thư mục đã chọn và đã bị xóa. | {count} mục đã chọn nằm ngoài các thư mục đã chọn và đã bị xóa."
     }
   },
   "cipherKeys": {
@@ -17943,7 +18473,9 @@
       "budgetNote": "Điểm cuối cùng bằng với ô Ngân sách còn lại ở trên. Đường đứt nét ở 0% là sự cạn kiệt; bên dưới nó, SLO đã tiêu tốn nhiều lỗi hơn mức mục tiêu cho phép. Khoảng trống là các nhóm không có gì được đo, không giống như số không.",
       "burnExplain": "Tốc độ tiêu thụ ngân sách trong từng nhóm đứng riêng, tính theo bội số của tỷ lệ trung tính ngân sách.",
       "burnFormula": "tỷ lệ đốt = (100% − SLI) ÷ (100% − mục tiêu)\nSLI = 100 × tốt ÷ tổng, riêng cho nhóm đó\n\ntrục bên phải (cùng đường đó được đọc là SLI):\nSLI = 100% − tỷ lệ đốt × (100% − mục tiêu)",
-      "burnNote": "×1 tiêu thụ ngân sách chính xác vào cuối cửa sổ, ×2 thì trong nửa thời gian đó; dưới ×1 ngân sách đang được tích lũy. Vì tính theo từng nhóm chứ không lũy kế, một đột biến ở đây vẫn hiển thị thay vì bị trung bình hóa. Trục phải đếm ngược: càng lên cao trên biểu đồ càng tiêu thụ nhiều, tức là SLI thấp hơn."
+      "burnNote": "×1 tiêu thụ ngân sách chính xác vào cuối cửa sổ, ×2 thì trong nửa thời gian đó; dưới ×1 ngân sách đang được tích lũy. Vì tính theo từng nhóm chứ không lũy kế, một đột biến ở đây vẫn hiển thị thay vì bị trung bình hóa. Trục phải đếm ngược: càng lên cao trên biểu đồ càng tiêu thụ nhiều, tức là SLI thấp hơn.",
+      "corrected": "Được điều chỉnh bởi thời gian ngừng",
+      "correctedTooltip": "Được điều chỉnh bởi thời gian ngừng: đã loại trừ, nên đường ngân sách bằng phẳng"
     },
     "alerts": {
       "title": "Cảnh báo",

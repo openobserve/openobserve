@@ -336,6 +336,22 @@ describe("consumerBadges", () => {
     ]);
   });
 
+  it("counts the downtimes that notify a destination", () => {
+    const node = {
+      id: "destination:pager",
+      kind: "destination" as const,
+      name: "pager",
+      usageCount: 2,
+      orphan: false,
+      missing: false,
+      consumerCounts: { downtime: 2 },
+    };
+
+    expect(consumerBadges(node)).toEqual([
+      { kind: "downtime", count: 2, labelKey: "alert_dependencies.countDowntime" },
+    ]);
+  });
+
   it("returns nothing for a node with no consumerCounts", () => {
     expect(consumerBadges(null)).toEqual([]);
   });

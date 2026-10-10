@@ -24,6 +24,8 @@ import { isPasswordResetError } from "@/utils/passwordResetErrors";
 
 declare module "axios" {
   interface AxiosRequestConfig {
+    /** The caller renders a 403 itself, so it is left out of the grouped "Access Required" toast. */
+    skipAccessToast?: boolean;
     /** Skip the global Unauthorized toast on a 403; the caller handles the refusal itself. */
     silentForbidden?: boolean;
   }
@@ -154,6 +156,7 @@ const http = ({ headers } = {} as any) => {
           case 403:
             if (
               (config.isEnterprise == "true" || config.isCloud == "true") &&
+              !error.config?.skipAccessToast &&
               !error.config?.silentForbidden
             ) {
               const responseUrl = error.request?.responseURL || error.config?.url || "";

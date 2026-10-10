@@ -1,0 +1,1110 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Whether an item is inside an active downtime now, and which windows correct an SLO.
+
+use std::collections::HashMap;
+
+use config::meta::{
+    downtimes::{ActiveDowntime, CorrectionRef, CorrectionWindow},
+    slo::Slo,
+};
+
+/// Whether `O2_DOWNTIMES_ENABLED` is on; always off in the OSS build.
+#[cfg(feature = "enterprise")]
+pub fn enabled() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn enabled() -> bool {
+    false
+}
+
+/// Whether the org has an uncancelled downtime targeting `module`; else skip identity work.
+#[cfg(feature = "enterprise")]
+pub fn any_for(org: &str, module: config::meta::downtimes::TargetModule) -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        && enterprise::any_live_target(
+            &db::downtimes::list_cached(org),
+            module,
+            config::utils::time::now_micros(),
+        )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn any_for(_org: &str, _module: config::meta::downtimes::TargetModule) -> bool {
+    false
+}
+
+/// [any_for], counting also a row whose window ended after `since`, so the mute it left is closed.
+#[cfg(feature = "enterprise")]
+pub fn any_since(org: &str, module: config::meta::downtimes::TargetModule, since: i64) -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        && enterprise::any_target_since(
+            &db::downtimes::list_cached(org),
+            module,
+            since,
+            config::utils::time::now_micros(),
+        )
+}
+
+/// Whether an uncancelled row targets `module`, so a mute recorded under it can linger.
+#[cfg(feature = "enterprise")]
+pub fn any_row(org: &str, module: config::meta::downtimes::TargetModule) -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+        && enterprise::any_row_in(&db::downtimes::list_cached(org), module)
+}
+
+#[cfg(feature = "enterprise")]
+pub fn active_for_alert(
+    org: &str,
+    alert_id: &str,
+    folder_id: &str,
+    dims: &HashMap<String, String>,
+    now: i64,
+) -> Option<ActiveDowntime> {
+    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    enterprise::active_in(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::Alerts,
+        &item,
+        now,
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn active_for_alert(
+    _org: &str,
+    _alert_id: &str,
+    _folder_id: &str,
+    _dims: &HashMap<String, String>,
+    _now: i64,
+) -> Option<ActiveDowntime> {
+    None
+}
+
+/// [active_for_alert] without row `except`, which a cancel or delete just took out of force.
+#[cfg(feature = "enterprise")]
+pub fn active_for_alert_except(
+    org: &str,
+    alert_id: &str,
+    folder_id: &str,
+    dims: &HashMap<String, String>,
+    now: i64,
+    except: &str,
+) -> Option<ActiveDowntime> {
+    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    enterprise::active_in_except(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::Alerts,
+        &item,
+        now,
+        Some(except),
+    )
+}
+
+/// The recorded downtime's window at `at`; the muted firing that recorded it matched its scope.
+#[cfg(feature = "enterprise")]
+pub fn active_by_id(org: &str, id: &str, at: i64) -> Option<ActiveDowntime> {
+    enterprise::active_by_id_in(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::Alerts,
+        id,
+        at,
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn active_by_id(_org: &str, _id: &str, _at: i64) -> Option<ActiveDowntime> {
+    None
+}
+
+/// Whether the recorded downtime had a window in `[from, to)`, cut at its cancel.
+#[cfg(feature = "enterprise")]
+pub fn had_window(org: &str, id: &str, from: i64, to: i64) -> bool {
+    enterprise::had_window_in(&db::downtimes::list_cached(org), id, from, to)
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn had_window(_org: &str, _id: &str, _from: i64, _to: i64) -> bool {
+    false
+}
+
+#[cfg(feature = "enterprise")]
+pub fn active_for_synthetic(
+    org: &str,
+    check_id: &str,
+    folder_id: &str,
+    tags: &[String],
+    now: i64,
+) -> Option<ActiveDowntime> {
+    let no_identity = HashMap::new();
+    let item = enterprise::item(check_id, folder_id, &no_identity, tags);
+    enterprise::active_in(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::Synthetics,
+        &item,
+        now,
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn active_for_synthetic(
+    _org: &str,
+    _check_id: &str,
+    _folder_id: &str,
+    _tags: &[String],
+    _now: i64,
+) -> Option<ActiveDowntime> {
+    None
+}
+
+#[cfg(feature = "enterprise")]
+pub fn active_for_anomaly(
+    org: &str,
+    anomaly_id: &str,
+    folder_id: &str,
+    dims: &HashMap<String, String>,
+    now: i64,
+) -> Option<ActiveDowntime> {
+    let item = enterprise::item(anomaly_id, folder_id, dims, &[]);
+    enterprise::active_in(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::AnomalyDetections,
+        &item,
+        now,
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn active_for_anomaly(
+    _org: &str,
+    _anomaly_id: &str,
+    _folder_id: &str,
+    _dims: &HashMap<String, String>,
+    _now: i64,
+) -> Option<ActiveDowntime> {
+    None
+}
+
+/// The only async part: semantic groups and the source alert both come from in-memory caches.
+#[cfg(feature = "enterprise")]
+pub async fn dimensions_for_slo(slo: &Slo) -> HashMap<String, String> {
+    let groups = db::system_settings::get_semantic_field_groups(&slo.org).await;
+    let source = match &slo.definition.sli_config {
+        config::meta::slo::SliConfig::Alert { alert_id } => {
+            db::alerts::alert::get_alert_from_cache(&slo.org, alert_id).await
+        }
+        _ => None,
+    };
+    o2_enterprise::enterprise::downtimes::scope::slo_dimensions(
+        slo,
+        &groups,
+        source.as_ref().map(|(_, alert)| &alert.query_condition),
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub async fn dimensions_for_slo(_slo: &Slo) -> HashMap<String, String> {
+    HashMap::new()
+}
+
+/// Windows correcting this SLO in `[from, to)`; a cancelled row counts up to its cancel.
+#[cfg(feature = "enterprise")]
+pub fn corrections_for_slo(
+    slo: &Slo,
+    dims: &HashMap<String, String>,
+    from: i64,
+    to: i64,
+) -> Vec<CorrectionWindow> {
+    enterprise::corrections_in(&db::downtimes::list_cached(&slo.org), slo, dims, from, to)
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn corrections_for_slo(
+    _slo: &Slo,
+    _dims: &HashMap<String, String>,
+    _from: i64,
+    _to: i64,
+) -> Vec<CorrectionWindow> {
+    Vec::new()
+}
+
+/// The active and scheduled downtimes that correct this SLO, for its detail page.
+#[cfg(feature = "enterprise")]
+pub fn corrections_refs_for_slo(
+    slo: &Slo,
+    dims: &HashMap<String, String>,
+    now: i64,
+) -> Vec<CorrectionRef> {
+    enterprise::refs_in(&db::downtimes::list_cached(&slo.org), slo, dims, now)
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn corrections_refs_for_slo(
+    _slo: &Slo,
+    _dims: &HashMap<String, String>,
+    _now: i64,
+) -> Vec<CorrectionRef> {
+    Vec::new()
+}
+
+/// Pure over a slice of rows, so the rules are tested without the cache.
+#[cfg(feature = "enterprise")]
+pub(crate) mod enterprise {
+    use std::collections::HashMap;
+
+    use config::meta::{
+        downtimes::{
+            ActiveDowntime, CorrectionRef, CorrectionWindow, Downtime, DowntimeStatus,
+            IncidentMode, Repeat, SloCorrectionMode, TargetModule,
+        },
+        slo::{Slo, window::align_up},
+    };
+    use o2_enterprise::enterprise::downtimes::{
+        schedule,
+        scope::{self, TargetItem},
+    };
+
+    const MICROS: i64 = 1_000_000;
+
+    pub(crate) fn item<'a>(
+        id: &'a str,
+        folder_id: &'a str,
+        dimensions: &'a HashMap<String, String>,
+        tags: &'a [String],
+    ) -> TargetItem<'a> {
+        TargetItem {
+            id,
+            folder_id,
+            dimensions,
+            tags,
+        }
+    }
+
+    /// An org whose windows are all over leaves the slow path, though its rows stay for history.
+    pub(crate) fn any_live_target(rows: &[Downtime], module: TargetModule, now: i64) -> bool {
+        rows.iter().any(|row| {
+            row.cancelled_at.is_none()
+                && !ended_by(row, now)
+                && scope::target_for(&row.targets, module).is_some()
+                && (schedule::window_at(&row.schedule, now).is_some()
+                    || schedule::next_window(&row.schedule, now).is_some())
+        })
+    }
+
+    /// [any_live_target], or a row with a window in `[since, now)`.
+    pub(crate) fn any_target_since(
+        rows: &[Downtime],
+        module: TargetModule,
+        since: i64,
+        now: i64,
+    ) -> bool {
+        any_live_target(rows, module, now)
+            || rows.iter().any(|row| {
+                !row.cancelled_at.is_some_and(|at| at <= since)
+                    && !ended_by(row, since)
+                    && scope::target_for(&row.targets, module).is_some()
+                    && !schedule::windows_between(&row.schedule, row.cancelled_at, since, now)
+                        .is_empty()
+            })
+    }
+
+    /// A cancel already forgot the mutes recorded under its row; an ended row's may still linger.
+    pub(crate) fn any_row_in(rows: &[Downtime], module: TargetModule) -> bool {
+        rows.iter().any(|row| {
+            row.cancelled_at.is_none() && scope::target_for(&row.targets, module).is_some()
+        })
+    }
+
+    /// A one-time row whose end is at or before `at` has no window from `at` on.
+    pub(crate) fn ended_by(row: &Downtime, at: i64) -> bool {
+        row.schedule.repeat == Repeat::None && row.schedule.ends_at.is_some_and(|end| end <= at)
+    }
+
+    /// Every live row whose window holds `now` and whose target of `module` matches, merged.
+    pub(crate) fn active_in(
+        rows: &[Downtime],
+        module: TargetModule,
+        item: &TargetItem<'_>,
+        now: i64,
+    ) -> Option<ActiveDowntime> {
+        active_in_except(rows, module, item, now, None)
+    }
+
+    /// [active_in] without the row `except`.
+    pub(crate) fn active_in_except(
+        rows: &[Downtime],
+        module: TargetModule,
+        item: &TargetItem<'_>,
+        now: i64,
+        except: Option<&str>,
+    ) -> Option<ActiveDowntime> {
+        rows.iter()
+            .filter(|row| row.cancelled_at.is_none() && except != Some(row.id.as_str()))
+            .filter_map(|row| {
+                let window = schedule::window_at(&row.schedule, now)?;
+                let target = scope::target_for(&row.targets, module)?;
+                scope::matches(target, row.condition.as_ref(), item).then(|| ActiveDowntime {
+                    id: row.id.clone(),
+                    name: row.name.clone(),
+                    ends_at: window.end,
+                    incident_mode: target.incident_mode,
+                })
+            })
+            .reduce(merged)
+    }
+
+    /// Overlapping downtimes in any order: the latest end names the chip, any muted mode mutes.
+    pub(crate) fn merged(a: ActiveDowntime, b: ActiveDowntime) -> ActiveDowntime {
+        let incident_mode = if a.incident_mode.is_muted() || b.incident_mode.is_muted() {
+            IncidentMode::Muted
+        } else {
+            IncidentMode::None
+        };
+        let latest = if b.ends_at > a.ends_at { b } else { a };
+        ActiveDowntime {
+            incident_mode,
+            ..latest
+        }
+    }
+
+    /// Whether row `id` had a window overlapping `[from, to)`, cut at its cancel.
+    pub(crate) fn had_window_in(rows: &[Downtime], id: &str, from: i64, to: i64) -> bool {
+        rows.iter().any(|row| {
+            row.id == id
+                && !schedule::windows_between(&row.schedule, row.cancelled_at, from, to).is_empty()
+        })
+    }
+
+    /// One live row by id whose window holds `at` and which still targets `module`.
+    pub(crate) fn active_by_id_in(
+        rows: &[Downtime],
+        module: TargetModule,
+        id: &str,
+        at: i64,
+    ) -> Option<ActiveDowntime> {
+        let row = rows.iter().find(|row| {
+            row.id == id
+                && row.cancelled_at.is_none()
+                && scope::target_for(&row.targets, module).is_some()
+        })?;
+        let window = schedule::window_at(&row.schedule, at)?;
+        let target = scope::target_for(&row.targets, module)?;
+        Some(ActiveDowntime {
+            id: row.id.clone(),
+            name: row.name.clone(),
+            ends_at: window.end,
+            incident_mode: target.incident_mode,
+        })
+    }
+
+    /// The span of slice starts `[start, end)` corrects, in micros; `None` when it holds none.
+    pub(crate) fn aligned_span(
+        start: i64,
+        end: i64,
+        slice_interval_secs: i64,
+    ) -> Option<(i64, i64)> {
+        let ceil_secs = |us: i64| us.div_euclid(MICROS) + i64::from(us.rem_euclid(MICROS) != 0);
+        let start = align_up(ceil_secs(start), slice_interval_secs);
+        let end = align_up(ceil_secs(end), slice_interval_secs);
+        (start < end).then_some((start * MICROS, end * MICROS))
+    }
+
+    /// Aligned to the SLO's slices, so a window inside one slice is dropped; `Exclude` sorts first.
+    pub(crate) fn corrections_in(
+        rows: &[Downtime],
+        slo: &Slo,
+        dims: &HashMap<String, String>,
+        from: i64,
+        to: i64,
+    ) -> Vec<CorrectionWindow> {
+        let item = slo_item(slo, dims);
+        let interval = slo.definition.slice_interval_secs;
+        let mut windows: Vec<CorrectionWindow> = rows
+            .iter()
+            .filter_map(|row| {
+                let target = scope::target_for(&row.targets, TargetModule::Slos)?;
+                scope::matches(target, row.condition.as_ref(), &item).then_some((row, target))
+            })
+            .flat_map(|(row, target)| {
+                let mode = target.slo_mode.unwrap_or_default();
+                schedule::windows_between(&row.schedule, row.cancelled_at, from, to)
+                    .into_iter()
+                    .filter_map(move |w| {
+                        let (start, end) = aligned_span(w.start, w.end, interval)?;
+                        Some(CorrectionWindow {
+                            downtime_id: row.id.clone(),
+                            start,
+                            end,
+                            mode,
+                        })
+                    })
+            })
+            .collect();
+        windows.sort_by_key(|w| (w.mode != SloCorrectionMode::Exclude, w.start));
+        windows
+    }
+
+    pub(crate) fn refs_in(
+        rows: &[Downtime],
+        slo: &Slo,
+        dims: &HashMap<String, String>,
+        now: i64,
+    ) -> Vec<CorrectionRef> {
+        let item = slo_item(slo, dims);
+        rows.iter()
+            .filter(|row| covers(row, TargetModule::Slos, &item))
+            .filter_map(|row| {
+                let status = schedule::status(&row.schedule, row.cancelled_at, now);
+                matches!(status, DowntimeStatus::Active | DowntimeStatus::Scheduled).then(|| {
+                    CorrectionRef {
+                        downtime_id: row.id.clone(),
+                        name: row.name.clone(),
+                        status,
+                        applies: applies_to(row, slo.definition.slice_interval_secs, now),
+                    }
+                })
+            })
+            .collect()
+    }
+
+    /// Whether the current or next window holds a slice start; true when no window is known.
+    pub(crate) fn applies_to(row: &Downtime, slice_interval_secs: i64, now: i64) -> bool {
+        schedule::window_at(&row.schedule, now)
+            .or_else(|| schedule::next_window(&row.schedule, now))
+            .is_none_or(|w| aligned_span(w.start, w.end, slice_interval_secs).is_some())
+    }
+
+    fn covers(row: &Downtime, module: TargetModule, item: &TargetItem<'_>) -> bool {
+        scope::target_for(&row.targets, module)
+            .is_some_and(|target| scope::matches(target, row.condition.as_ref(), item))
+    }
+
+    fn slo_item<'a>(slo: &'a Slo, dims: &'a HashMap<String, String>) -> TargetItem<'a> {
+        item(&slo.id, &slo.folder_id, dims, &slo.tags)
+    }
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use config::meta::{
+        downtimes::{
+            DimensionCondition, Downtime, DowntimeSchedule, DowntimeTarget, IncidentMode,
+            PairOperator, Repeat, SloCorrectionMode, TargetFolders, TargetModule,
+        },
+        slo::{CountSource, SliConfig, SloDefinition},
+    };
+
+    use super::{enterprise::*, *};
+
+    const HOUR: i64 = 3_600_000_000;
+
+    fn target(module: TargetModule) -> DowntimeTarget {
+        DowntimeTarget {
+            module,
+            folders: TargetFolders::All,
+            tags: vec![],
+            ids: vec![],
+            slo_mode: None,
+            incident_mode: Default::default(),
+        }
+    }
+
+    fn row(id: &str, targets: Vec<DowntimeTarget>, start: i64, end: i64) -> Downtime {
+        Downtime {
+            id: id.to_string(),
+            org: "acme".to_string(),
+            folder_id: "default".to_string(),
+            name: id.to_string(),
+            reason: None,
+            condition: Some(DimensionCondition::Pair {
+                key: "service".to_string(),
+                operator: PairOperator::Eq,
+                value: "payments".to_string(),
+            }),
+            targets,
+            schedule: DowntimeSchedule {
+                repeat: Repeat::None,
+                starts_at: start,
+                ends_at: Some(end),
+                timezone: "UTC".to_string(),
+                start_time_local: None,
+                duration_secs: (end - start) / 1_000_000,
+                weekdays: vec![],
+            },
+            cancelled_at: None,
+            cancelled_by: None,
+            show_banner: true,
+            notifications: None,
+            origin_region: None,
+            version: 0,
+            created_by: "lin".to_string(),
+            created_at: 0,
+            updated_by: "lin".to_string(),
+            updated_at: 0,
+        }
+    }
+
+    fn payments() -> HashMap<String, String> {
+        HashMap::from([("service".to_string(), "payments".to_string())])
+    }
+
+    fn slo() -> Slo {
+        Slo {
+            id: "slo1".to_string(),
+            org: "acme".to_string(),
+            folder_id: "default".to_string(),
+            name: "checkout".to_string(),
+            description: String::new(),
+            definition: SloDefinition {
+                sli_config: SliConfig::Count {
+                    source: CountSource::SingleQuery {
+                        stream: "requests".to_string(),
+                        stream_type: "logs".to_string(),
+                        scope: None,
+                        good_expr: "status < 500".to_string(),
+                    },
+                },
+                group_by: None,
+                window_secs: 30 * 86_400,
+                slice_interval_secs: 300,
+            },
+            target: 99.9,
+            tags: vec![],
+            enabled: true,
+            owner: None,
+            definition_generation: 1,
+            groups_estimate: None,
+            groups_reserved: 1,
+        }
+    }
+
+    #[test]
+    fn active_in_matches_the_module_target_inside_the_window_only() {
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            10 * HOUR,
+            12 * HOUR,
+        )];
+        let dims = payments();
+        let alert = item("a1", "default", &dims, &[]);
+        let hit = active_in(&rows, TargetModule::Alerts, &alert, 11 * HOUR).unwrap();
+        assert_eq!(hit.id, "d1");
+        assert_eq!(hit.ends_at, 12 * HOUR);
+        assert!(active_in(&rows, TargetModule::Alerts, &alert, 13 * HOUR).is_none());
+        assert!(
+            active_in(&rows, TargetModule::AnomalyDetections, &alert, 11 * HOUR).is_none(),
+            "a row without a target for the module is skipped"
+        );
+        let other = HashMap::from([("service".to_string(), "checkout".to_string())]);
+        assert!(
+            active_in(
+                &rows,
+                TargetModule::Alerts,
+                &item("a1", "default", &other, &[]),
+                11 * HOUR
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn only_an_uncancelled_row_with_a_target_of_the_module_asks_for_the_identity() {
+        let alerts = row("d1", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let mut cancelled = row("d2", vec![target(TargetModule::Slos)], 0, HOUR);
+        cancelled.cancelled_at = Some(1);
+        let rows = [alerts, cancelled];
+        assert!(any_live_target(&rows, TargetModule::Alerts, 1));
+        assert!(!any_live_target(&rows, TargetModule::Slos, 1));
+        assert!(!any_live_target(&rows, TargetModule::Synthetics, 1));
+        assert!(!any_live_target(&[], TargetModule::Alerts, 1));
+    }
+
+    #[test]
+    fn a_row_whose_windows_are_over_takes_the_org_off_the_slow_path() {
+        const DAY: i64 = 24 * HOUR;
+        let ended_yesterday = row("d1", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let now = DAY + 2 * HOUR;
+        assert!(!any_live_target(
+            std::slice::from_ref(&ended_yesterday),
+            TargetModule::Alerts,
+            now
+        ));
+        let scheduled = row(
+            "d2",
+            vec![target(TargetModule::Alerts)],
+            2 * DAY,
+            2 * DAY + HOUR,
+        );
+        assert!(any_live_target(&[scheduled], TargetModule::Alerts, now));
+        let mut daily = row("d3", vec![target(TargetModule::Alerts)], 0, HOUR);
+        daily.schedule = DowntimeSchedule {
+            repeat: Repeat::Daily,
+            starts_at: 0,
+            ends_at: None,
+            timezone: "UTC".to_string(),
+            start_time_local: Some("00:00".to_string()),
+            duration_secs: 3_600,
+            weekdays: vec![],
+        };
+        assert!(any_live_target(
+            &[ended_yesterday, daily],
+            TargetModule::Alerts,
+            now
+        ));
+    }
+
+    #[test]
+    fn a_window_that_ended_after_since_still_counts_for_closing_its_mute() {
+        let ended = row("d1", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let rows = std::slice::from_ref(&ended);
+        let now = 2 * HOUR;
+        assert!(!any_live_target(rows, TargetModule::Alerts, now));
+        assert!(any_target_since(rows, TargetModule::Alerts, HOUR / 2, now));
+        assert!(!any_target_since(rows, TargetModule::Alerts, HOUR, now));
+        assert!(!any_target_since(rows, TargetModule::Slos, 0, now));
+    }
+
+    #[test]
+    fn only_a_cancelled_row_leaves_no_mute_to_close() {
+        let mut cancelled = row("d1", vec![target(TargetModule::Alerts)], 0, 20 * HOUR);
+        cancelled.cancelled_at = Some(HOUR);
+        assert!(!any_row_in(
+            std::slice::from_ref(&cancelled),
+            TargetModule::Alerts
+        ));
+        // A clear run 25 h after a one-time window still finds the row and forgets its mute.
+        let now = 26 * HOUR;
+        let ended = row("d2", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let rows = [cancelled, ended];
+        assert!(!any_target_since(
+            &rows,
+            TargetModule::Alerts,
+            now - 24 * HOUR,
+            now
+        ));
+        assert!(any_row_in(&rows, TargetModule::Alerts));
+        assert!(!any_row_in(&rows, TargetModule::Slos));
+    }
+
+    #[test]
+    fn rows_that_cannot_be_live_skip_the_window_math() {
+        let now = 1_000 * HOUR;
+        let ended: Vec<Downtime> = (0..500)
+            .map(|i| {
+                let start = i64::from(i) * HOUR;
+                row(
+                    &format!("d{i}"),
+                    vec![target(TargetModule::Alerts)],
+                    start,
+                    start + HOUR,
+                )
+            })
+            .collect();
+        assert!(ended.iter().all(|r| ended_by(r, now)));
+        assert!(!any_live_target(&ended, TargetModule::Alerts, now));
+        assert!(!any_target_since(
+            &ended,
+            TargetModule::Alerts,
+            now - HOUR,
+            now
+        ));
+        let mut cancelled = row("c", vec![target(TargetModule::Alerts)], now, now + HOUR);
+        cancelled.cancelled_at = Some(now - 2 * HOUR);
+        assert!(!any_target_since(
+            &[cancelled],
+            TargetModule::Alerts,
+            now - HOUR,
+            now
+        ));
+        let live = row(
+            "l",
+            vec![target(TargetModule::Alerts)],
+            now - HOUR,
+            now + HOUR,
+        );
+        assert!(!ended_by(&live, now));
+        assert!(any_live_target(&[live], TargetModule::Alerts, now));
+    }
+
+    #[test]
+    fn a_cancelled_downtime_leaves_the_alert_muted_by_the_other_until_it_ends() {
+        let dims = payments();
+        let alert = item("a1", "default", &dims, &[]);
+        let d1 = row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            9 * HOUR,
+            11 * HOUR,
+        );
+        let d2 = row(
+            "d2",
+            vec![target(TargetModule::Alerts)],
+            9 * HOUR,
+            12 * HOUR,
+        );
+        let rows = [d1, d2];
+        let at = 10 * HOUR;
+        let still = active_in_except(&rows, TargetModule::Alerts, &alert, at, Some("d1"));
+        assert_eq!(still.map(|d| d.id).as_deref(), Some("d2"));
+        assert!(
+            active_in_except(&rows[..1], TargetModule::Alerts, &alert, at, Some("d1")).is_none(),
+            "with no other downtime the record closes"
+        );
+        assert!(
+            active_in_except(&rows, TargetModule::Alerts, &alert, 12 * HOUR, Some("d1")).is_none(),
+            "once d2 ends the record closes"
+        );
+    }
+
+    #[test]
+    fn overlapping_downtimes_give_the_latest_end_and_mute_in_either_order() {
+        let dims = payments();
+        let alert = item("a1", "default", &dims, &[]);
+        let a = row(
+            "a",
+            vec![DowntimeTarget {
+                incident_mode: IncidentMode::None,
+                ..target(TargetModule::Alerts)
+            }],
+            9 * HOUR,
+            10 * HOUR,
+        );
+        let b = row("b", vec![target(TargetModule::Alerts)], 9 * HOUR, 12 * HOUR);
+        for rows in [[a.clone(), b.clone()], [b, a]] {
+            let hit = active_in(&rows, TargetModule::Alerts, &alert, 9 * HOUR + 1).unwrap();
+            assert_eq!(hit.id, "b");
+            assert_eq!(hit.ends_at, 12 * HOUR);
+            assert_eq!(hit.incident_mode, IncidentMode::Muted);
+        }
+    }
+
+    #[test]
+    fn a_later_ending_none_mode_downtime_keeps_the_mute_of_the_earlier_one() {
+        let early = ActiveDowntime {
+            id: "a".to_string(),
+            name: "a".to_string(),
+            ends_at: 10,
+            incident_mode: IncidentMode::Muted,
+        };
+        let late = ActiveDowntime {
+            id: "b".to_string(),
+            name: "b".to_string(),
+            ends_at: 12,
+            incident_mode: IncidentMode::None,
+        };
+        for merged in [
+            merged(early.clone(), late.clone()),
+            merged(late.clone(), early.clone()),
+        ] {
+            assert_eq!((merged.id.as_str(), merged.ends_at), ("b", 12));
+            assert_eq!(merged.incident_mode, IncidentMode::Muted);
+        }
+        let none = ActiveDowntime {
+            incident_mode: IncidentMode::None,
+            ..early
+        };
+        assert_eq!(merged(none, late).incident_mode, IncidentMode::None);
+    }
+
+    #[test]
+    fn a_recorded_downtime_holds_only_while_its_window_overlaps_the_hold() {
+        let mut rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            10 * HOUR,
+            12 * HOUR,
+        )];
+        // A hold that started inside the window still overlaps it after the window ends.
+        assert!(had_window_in(&rows, "d1", 12 * HOUR - 10, 12 * HOUR + 20));
+        assert!(!had_window_in(&rows, "d1", 13 * HOUR, 14 * HOUR));
+        assert!(!had_window_in(&rows, "d1", 12 * HOUR, 12 * HOUR), "no hold");
+        assert!(!had_window_in(&rows, "d2", 10 * HOUR, 11 * HOUR));
+        rows[0].cancelled_at = Some(10 * HOUR);
+        assert!(!had_window_in(&rows, "d1", 11 * HOUR, 12 * HOUR));
+    }
+
+    #[test]
+    fn a_recorded_downtime_covers_a_recovery_its_own_scope_cannot_see() {
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            10 * HOUR,
+            12 * HOUR,
+        )];
+        // The firing row carried service=payments; the definition alone has no service.
+        let no_dims = HashMap::new();
+        let definition = item("a1", "default", &no_dims, &[]);
+        assert!(active_in(&rows, TargetModule::Alerts, &definition, 11 * HOUR).is_none());
+        let recorded = active_by_id_in(&rows, TargetModule::Alerts, "d1", 11 * HOUR).unwrap();
+        assert_eq!(recorded.id, "d1");
+        // Asked at the recovery instant, so a hold that ends after the window still finds it.
+        assert!(active_by_id_in(&rows, TargetModule::Alerts, "d1", 13 * HOUR).is_none());
+        assert!(active_by_id_in(&rows, TargetModule::Slos, "d1", 11 * HOUR).is_none());
+        assert!(active_by_id_in(&rows, TargetModule::Alerts, "d2", 11 * HOUR).is_none());
+        let mut cancelled = rows.clone();
+        cancelled[0].cancelled_at = Some(10 * HOUR);
+        assert!(active_by_id_in(&cancelled, TargetModule::Alerts, "d1", 11 * HOUR).is_none());
+    }
+
+    #[test]
+    fn active_in_carries_the_incident_mode_of_the_alerts_target() {
+        let dims = payments();
+        let alert = item("a1", "default", &dims, &[]);
+        let muted = row("d1", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let hit = active_in(&[muted], TargetModule::Alerts, &alert, 1).unwrap();
+        assert_eq!(hit.incident_mode, IncidentMode::Muted);
+        let none = row(
+            "d2",
+            vec![DowntimeTarget {
+                incident_mode: IncidentMode::None,
+                ..target(TargetModule::Alerts)
+            }],
+            0,
+            HOUR,
+        );
+        let hit = active_in(&[none], TargetModule::Alerts, &alert, 1).unwrap();
+        assert_eq!(hit.incident_mode, IncidentMode::None);
+    }
+
+    #[test]
+    fn active_in_skips_a_cancelled_row() {
+        let mut cancelled = row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            10 * HOUR,
+            12 * HOUR,
+        );
+        cancelled.cancelled_at = Some(10 * HOUR + 1);
+        let dims = payments();
+        let alert = item("a1", "default", &dims, &[]);
+        assert!(active_in(&[cancelled], TargetModule::Alerts, &alert, 11 * HOUR).is_none());
+    }
+
+    #[test]
+    fn corrections_ignore_rows_without_an_slos_target_and_rows_that_miss_the_slo() {
+        let mut other_service = row("d2", vec![target(TargetModule::Slos)], 0, 2 * HOUR);
+        other_service.condition = Some(DimensionCondition::Pair {
+            key: "service".to_string(),
+            operator: PairOperator::Eq,
+            value: "checkout".to_string(),
+        });
+        let rows = vec![
+            row("d1", vec![target(TargetModule::Alerts)], 0, 2 * HOUR),
+            other_service,
+        ];
+        assert!(corrections_in(&rows, &slo(), &payments(), 0, 4 * HOUR).is_empty());
+    }
+
+    #[test]
+    fn corrections_clip_a_cancelled_row_and_put_exclude_first() {
+        let mut cancelled = row("d1", vec![target(TargetModule::Slos)], HOUR, 5 * HOUR);
+        cancelled.cancelled_at = Some(3 * HOUR);
+        let mut as_good = target(TargetModule::Slos);
+        as_good.slo_mode = Some(SloCorrectionMode::CountAsGood);
+        let rows = vec![row("d0", vec![as_good], 0, 2 * HOUR), cancelled];
+
+        let got = corrections_in(
+            &rows,
+            &slo(),
+            &payments(),
+            2 * HOUR - 300_000_000,
+            10 * HOUR,
+        );
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0].downtime_id, "d1");
+        assert_eq!(got[0].mode, SloCorrectionMode::Exclude);
+        assert_eq!(
+            (got[0].start, got[0].end),
+            (2 * HOUR - 300_000_000, 3 * HOUR)
+        );
+        assert_eq!(got[1].downtime_id, "d0");
+        assert_eq!(got[1].mode, SloCorrectionMode::CountAsGood);
+    }
+
+    /// A slice is corrected when it starts inside the window, so the window is cut to those starts.
+    #[test]
+    fn corrections_are_aligned_to_the_slo_slices() {
+        let minute = 60_000_000;
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Slos)],
+            10 * HOUR + 10 * minute + 1,
+            11 * HOUR + 2 * minute,
+        )];
+        let got = corrections_in(&rows, &slo(), &payments(), 0, 24 * HOUR);
+        assert_eq!(
+            (got[0].start, got[0].end),
+            (10 * HOUR + 15 * minute, 11 * HOUR + 5 * minute)
+        );
+    }
+
+    #[test]
+    fn a_window_inside_one_slice_corrects_nothing() {
+        let minute = 60_000_000;
+        let mut hourly = slo();
+        hourly.definition.slice_interval_secs = 3_600;
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Slos)],
+            10 * HOUR + 10 * minute,
+            10 * HOUR + 40 * minute,
+        )];
+        assert!(corrections_in(&rows, &hourly, &payments(), 0, 24 * HOUR).is_empty());
+    }
+
+    #[test]
+    fn a_30_minute_window_on_an_hourly_slo_does_not_apply() {
+        let minute = 60_000_000;
+        let mut hourly = slo();
+        hourly.definition.slice_interval_secs = 3_600;
+        let rows = vec![
+            row(
+                "short",
+                vec![target(TargetModule::Slos)],
+                10 * HOUR + 10 * minute,
+                10 * HOUR + 40 * minute,
+            ),
+            row(
+                "hour",
+                vec![target(TargetModule::Slos)],
+                10 * HOUR,
+                11 * HOUR,
+            ),
+        ];
+        let refs = refs_in(&rows, &hourly, &payments(), 10 * HOUR + 20 * minute);
+        let applies: Vec<(&str, bool)> = refs
+            .iter()
+            .map(|r| (r.downtime_id.as_str(), r.applies))
+            .collect();
+        assert_eq!(applies, [("short", false), ("hour", true)]);
+
+        let scheduled = refs_in(&rows, &hourly, &payments(), 9 * HOUR);
+        assert!(!scheduled[0].applies, "a scheduled window is checked too");
+    }
+
+    #[test]
+    fn refs_list_active_and_scheduled_rows_only() {
+        let mut cancelled = row("gone", vec![target(TargetModule::Slos)], 0, HOUR);
+        cancelled.cancelled_at = Some(1);
+        let rows = vec![
+            row("active", vec![target(TargetModule::Slos)], 0, 2 * HOUR),
+            row(
+                "later",
+                vec![target(TargetModule::Slos)],
+                5 * HOUR,
+                6 * HOUR,
+            ),
+            row("past", vec![target(TargetModule::Slos)], 0, HOUR / 2),
+            cancelled,
+        ];
+        let got: Vec<String> = refs_in(&rows, &slo(), &payments(), HOUR)
+            .into_iter()
+            .map(|r| r.downtime_id)
+            .collect();
+        assert_eq!(got, ["active", "later"]);
+    }
+
+    #[test]
+    fn a_composite_tagged_with_the_service_is_suppressed_by_its_downtime() {
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            10 * HOUR,
+            12 * HOUR,
+        )];
+        let tags = ["service:payments".to_string(), "team:core".to_string()];
+        let dims = o2_enterprise::enterprise::downtimes::scope::composite_dimensions(&tags);
+        let composite = item("c1", "default", &dims, &[]);
+        let hit = active_in(&rows, TargetModule::Alerts, &composite, 11 * HOUR);
+        assert_eq!(hit.map(|d| d.id).as_deref(), Some("d1"));
+
+        let other = o2_enterprise::enterprise::downtimes::scope::composite_dimensions(&[
+            "service:checkout".to_string(),
+        ]);
+        let unrelated = item("c2", "default", &other, &[]);
+        assert!(active_in(&rows, TargetModule::Alerts, &unrelated, 11 * HOUR).is_none());
+    }
+
+    #[test]
+    fn an_slo_alert_takes_the_identity_of_its_slo_query() {
+        let groups = [config::meta::correlation::FieldAlias {
+            id: "service".to_string(),
+            display: "Service".to_string(),
+            group: None,
+            fields: vec!["service".to_string(), "service_name".to_string()],
+            is_workload_type: false,
+        }];
+        let mut measured = slo();
+        measured.definition.sli_config = SliConfig::Count {
+            source: CountSource::SingleQuery {
+                stream: "requests".to_string(),
+                stream_type: "logs".to_string(),
+                scope: Some("service_name = 'payments'".to_string()),
+                good_expr: "status < 500".to_string(),
+            },
+        };
+        let dims =
+            o2_enterprise::enterprise::downtimes::scope::slo_dimensions(&measured, &groups, None);
+        assert_eq!(dims.get("service").map(String::as_str), Some("payments"));
+
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            10 * HOUR,
+            12 * HOUR,
+        )];
+        let slo_alert = item("burn-alert", "default", &dims, &[]);
+        let hit = active_in(&rows, TargetModule::Alerts, &slo_alert, 11 * HOUR);
+        assert_eq!(hit.map(|d| d.id).as_deref(), Some("d1"));
+    }
+
+    /// A cancel re-measures the pre-cancel windows, so later slices lose their correction.
+    #[test]
+    fn a_cancel_re_measures_the_windows_of_the_row_before_the_cancel() {
+        let before = row("d1", vec![target(TargetModule::Slos)], HOUR, 5 * HOUR);
+        let mut after = before.clone();
+        after.cancelled_at = Some(3 * HOUR);
+
+        let after_only = corrections_in(
+            std::slice::from_ref(&after),
+            &slo(),
+            &payments(),
+            0,
+            10 * HOUR,
+        );
+        let span_after = crate::slo::corrections::remeasure_span(&after_only, 0, 36_000, 300);
+        assert_eq!(span_after, Some((3_600, 10_800)));
+
+        let both = corrections_in(&[before, after], &slo(), &payments(), 0, 10 * HOUR);
+        let span = crate::slo::corrections::remeasure_span(&both, 0, 36_000, 300);
+        assert_eq!(
+            span,
+            Some((3_600, 18_000)),
+            "the cancelled tail is measured again"
+        );
+    }
+}

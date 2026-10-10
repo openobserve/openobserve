@@ -560,6 +560,12 @@
       "description": "远程任务是实验调用以生成输出的 HTTP 服务。发布一次并验证连接可用后，每个实验都能固定它所使用的确切版本。",
       "action": "新建任务",
       "actionDesc": "将 OpenObserve 指向您的端点并测试连接。"
+    },
+    "noDowntimes": {
+      "title": "暂无静默期",
+      "description": "静默期会让告警、异常检测和合成监控检查继续运行，并在您设定的时间窗口内停止发送通知。",
+      "action": "安排静默期",
+      "actionDesc": "一次性、每天或每周。如需快速静音，请使用告警列表中的“静音”。"
     }
   },
   "common": {
@@ -1320,6 +1326,7 @@
     "topQueries": "热门查询",
     "profiles": "性能分析",
     "productAnalytics": "产品分析",
+    "downtimes": "静默期",
     "trialEndedTitle": "您的试用已结束",
     "trialPageNeedsPlan": "{page} 需要订阅计划",
     "trialPageNeedsPlanToast": "{page} 需要订阅计划。请在本页选择一个计划以继续使用。",
@@ -2822,6 +2829,7 @@
       "scopeCoveredByParent": "锁定的操作来自 {scope}，在 {module} 中设置",
       "scopeAllOf": "所有 {module}",
       "scopeIncludesFuture": "包括之后创建的资源",
+      "scopeDowntimeHint": "静默期文件夹限制的是谁可以管理某个静默期，而不是它会静默什么。要静默某个模块的所有文件夹，用户需要拥有列出该模块每个文件夹的权限。已静默的标签和横幅可能会提及用户无法列出的静默期。",
       "grantedByWiderScope": "由更大范围授予",
       "grantedHereAndByWiderScope": "在此处及更大范围授予",
       "stillGrantedByWiderScope": "已在此处移除，但仍由更大范围授予",
@@ -8821,7 +8829,500 @@
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
     "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。",
-    "seconds": "秒"
+    "seconds": "秒",
+    "downtimes": {
+      "newTitle": "新建静默期",
+      "editTitle": "编辑静默期",
+      "detailTitle": "静默期",
+      "modules": {
+        "alerts": "告警",
+        "anomaly_detections": "异常检测",
+        "synthetics": "合成监控检查",
+        "slos": "SLO"
+      },
+      "modulesShort": {
+        "alerts": "告警",
+        "anomaly_detections": "异常",
+        "synthetics": "合成监控",
+        "slos": "SLO"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "在窗口期间，事件将",
+          "muted": "创建并静音（默认）",
+          "mutedHelp": "事件照常创建，但在窗口结束前不通知任何人。",
+          "none": "不创建",
+          "noneHelp": "窗口期间不创建事件；窗口结束后的首次触发会创建事件并发送通知。",
+          "summary": "不创建事件"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} 个 {key} | {count} 个 {key}",
+        "condition": "条件",
+        "allFolders": "所有文件夹",
+        "oneFolder": "{name} 文件夹",
+        "nFolders": "{count} 个文件夹 | {count} 个文件夹",
+        "tags": "标签 {tags}",
+        "nItems": "{count} 个项 | {count} 个项",
+        "asGood": "视为正常",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
+      },
+      "duration": {
+        "days": "{count} 天",
+        "hours": "{count} 小时",
+        "minutes": "{count} 分钟"
+      },
+      "schedule": {
+        "windowRange": "{start} 至 {end} {zone}",
+        "onceSentence": "一次 · {start} 至 {end} · {zone}",
+        "dailySentence": "每天 · {time} 持续 {duration} · {zone}",
+        "weeklySentence": "每周 {days} · {time} 持续 {duration} · {zone}",
+        "fromNoEnd": "{schedule}，自 {start} 起，无结束日期",
+        "fromUntil": "{schedule}，自 {start} 至 {until}"
+      },
+      "validation": {
+        "conditionRequired": "请添加条件，或移除条件块。",
+        "pairKey": "请为每一行选择维度。",
+        "pairOperator": "在静默期条件中请使用 = 或 !=。",
+        "pairValue": "请为每一行输入值。",
+        "loneStar": "值不能只是一个 *。",
+        "innerStar": "* 只能出现在值的末尾。",
+        "emptyGroup": "条件组不能为空。",
+        "tooDeep": "条件中的分组最多只能嵌套 3 层。",
+        "tooManyPairs": "一个条件最多可包含 32 对。",
+        "needsEq": "请至少添加一个 = 条件。如果条件只由 != 行组成，将会静默其他所有内容。",
+        "modulesRequired": "请至少选择一个模块。",
+        "foldersRequired": "请选择“所有文件夹”或至少一个文件夹。",
+        "tagsRequired": "请添加标签，或移除标签块。",
+        "idsRequired": "请选择一项，或移除特定项块。",
+        "idOutsideFolders": "部分所选项目不在所选文件夹中。",
+        "tooManyFolders": "最多选择 {max} 个文件夹，或选择所有文件夹。",
+        "tooManyTags": "最多添加 {max} 个标签。",
+        "tooManyIds": "最多选择 {max} 个项目。",
+        "nameTooLong": "名称最多为 256 个字符。",
+        "timezoneRequired": "请选择时区。",
+        "startRequired": "请输入开始日期和时间。",
+        "endRequired": "请输入结束日期和时间。",
+        "endAfterStart": "结束时间必须晚于开始时间。",
+        "windowTooLong": "时间窗口最长可持续 7 天。",
+        "windowTooShort": "时间窗口最短必须持续 1 分钟。",
+        "startTimeRequired": "请按 HH:MM 格式输入开始时间。",
+        "durationInvalid": "请输入时长，例如 90m 或 1h 30m。",
+        "weekdaysRequired": "请至少选择一天。",
+        "untilAfterStart": "重复截止日期必须不早于第一天。",
+        "reasonTooLong": "原因最多 {max} 个字符。",
+        "windowOutlastsRepeat": "时间窗口不能长于两次重复之间的时间。",
+        "startDateRequired": "请选择第一天。"
+      },
+      "title": "停机时间",
+      "subtitle": "按计划执行的时间窗口，在此期间告警、异常检测和合成监控检查继续运行，但停止发送通知",
+      "newDowntime": "新建停机时间",
+      "filterAll": "全部",
+      "filterOnce": "一次性",
+      "filterRecurring": "重复",
+      "search": "按名称、维度或创建者搜索",
+      "searchAcross": "搜索所有文件夹",
+      "thisFolder": "当前文件夹",
+      "allFolders": "所有文件夹",
+      "thisFolderTooltip": "在所选文件夹中搜索",
+      "allFoldersTooltip": "在所有文件夹中搜索",
+      "noFolder": "没有可用于存放停机时间的文件夹",
+      "truncated": "显示 {total} 个停机时间中的前 {shown} 个",
+      "stats": {
+        "active": "生效中",
+        "scheduled": "已计划",
+        "recurring": "重复",
+        "ended": "已结束",
+        "cancelled": "已取消",
+        "endedEarly": "提前结束",
+        "total": "总计"
+      },
+      "columns": {
+        "name": "名称",
+        "status": "状态",
+        "targets": "目标",
+        "schedule": "计划",
+        "when": "结束 / 下次",
+        "matched": "匹配",
+        "createdBy": "创建者",
+        "folder": "文件夹"
+      },
+      "oneTime": "一次性",
+      "recurring": "重复",
+      "bannerOn": "此停机时间生效期间，组织内所有人都会看到横幅提示",
+      "endsLabel": "结束",
+      "confirmEndNow": {
+        "title": "立即结束此停机？",
+        "message": "通知会立即恢复。该停机将以提前结束状态保留在列表中。",
+        "ok": "立即结束",
+        "keep": "继续运行"
+      },
+      "extend": {
+        "menu": "延长时长",
+        "notActive": "只能延长处于活动状态的停机",
+        "dialogTitle": "延长 {name}",
+        "newEnd": "新的结束时间",
+        "confirmUntil": "延长至 {time}",
+        "followUp": "此停机会重复，因此其计划保持不变。将从当前窗口结束时创建名为 {name} 的一次性停机。",
+        "endAfterCurrent": "新的结束时间必须晚于当前结束时间。"
+      },
+      "nextLabel": "下次",
+      "matched": {
+        "alerts": "{count} 条告警 | {count} 条告警",
+        "anomalies": "{count} 个异常 | {count} 个异常",
+        "synthetics": "{count} 项检查 | {count} 项检查",
+        "slos": "{count} 个 SLO | {count} 个 SLO"
+      },
+      "actions": {
+        "endNow": "立即结束",
+        "edit": "编辑",
+        "duplicate": "复制",
+        "moveToFolder": "移动到文件夹",
+        "cancel": "取消停机时间",
+        "delete": "删除",
+        "more": "更多操作",
+        "muteForHour": "立即静音 1 小时",
+        "extend": "延长"
+      },
+      "confirmCancel": {
+        "title": "取消静默时段",
+        "message": "通知将立即恢复。该静默时段会保留在列表中作为历史记录。",
+        "bulkMessage": "取消 {count} 个静默时段？通知将立即恢复。 | 取消 {count} 个静默时段？通知将立即恢复。",
+        "confirm": "取消静默时段",
+        "keep": "保留静默时段"
+      },
+      "confirmDelete": {
+        "title": "删除静默时段",
+        "message": "该静默时段及其历史记录将被删除。此操作无法撤销。"
+      },
+      "copyOf": "{name} 的副本",
+      "form": {
+        "matches": {
+          "alerts": "{count} 个告警匹配 | {count} 个告警匹配",
+          "anomaly_detections": "{count} 个检测匹配 | {count} 个检测匹配",
+          "synthetics": "{count} 个检查匹配 | {count} 个检查匹配",
+          "slos": "{count} 个 SLO 匹配 | {count} 个 SLO 匹配"
+        },
+        "alertFolders": "告警文件夹",
+        "syntheticsFolders": "合成监控文件夹",
+        "noAlertFolderAccess": "您无权访问告警文件夹。",
+        "noSyntheticsFolderAccess": "您无权访问合成监控文件夹。",
+        "tags": "标签",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "每个标签都必须在该检查上。",
+        "removeBlock": "移除此区块",
+        "specificItems": "指定项目",
+        "itemsHint": "仅提供所选文件夹中的项目。",
+        "itemOption": "{name} · {folder}",
+        "addTags": "添加标签",
+        "addItems": "添加指定项目",
+        "sloMode": "窗口内的 SLO 得分",
+        "sloExclude": "排除该窗口",
+        "sloCountAsGood": "将该窗口计为良好",
+        "sloExcludeCaption": "窗口内的时间既不计为良好，也不计为不良。这些 SLO 上的燃烧率告警不会针对该时间触发。",
+        "sloCountAsGoodCaption": "窗口内的时间全部计为良好。仅当您的 SLO 约定计划内维护属于正常运行时间时才使用此项。",
+        "cardCaption": "先按文件夹筛选，再由可选区块进一步缩小范围。上方的维度条件同样适用于此模块。",
+        "noConditionForChecks": "上方的维度条件不适用于检查。",
+        "appliesTo": "适用于",
+        "tabTargets": "目标",
+        "tabSchedule": "计划",
+        "tabAdvanced": "高级",
+        "modeInFolder": "{mode} 位于",
+        "newMode": "新建静默时段",
+        "editMode": "编辑静默时段",
+        "namePlaceholder": "静默时段名称",
+        "nameLabel": "静默时段名称",
+        "renameHint": "点击重命名",
+        "reason": "原因",
+        "reasonHelp": "可选。将显示在列表、详情页面以及“已静音”提示中。",
+        "cancel": "取消",
+        "save": "保存",
+        "activeBanner": "此静默时段已生效。编辑将在下次评估时生效，而更改 SLO 模式会重新计算已开始的窗口。",
+        "changedMeanwhile": "自您加载后，有人更改了此静默时段。请重新加载后重试。",
+        "reload": "重新加载",
+        "noModule": "请在“适用于”中选择一个模块。",
+        "checkSchedule": "请检查计划，然后再次保存。"
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "告警",
+          "anomaly_detections": "异常检测",
+          "synthetics": "合成监控检查",
+          "slos": "SLO"
+        },
+        "whenOnce": "单次，从 {start} 到 {end} {zone}",
+        "whenDaily": "每天 {time} {zone}，持续 {duration}",
+        "whenWeekly": "每{days} {time} {zone}，持续 {duration}",
+        "inFolders": "在文件夹 {names} 中 | 在文件夹 {names} 中",
+        "withCondition": "条件为 {condition}",
+        "tagged": "标记为 {tags}",
+        "named": "限于 {count} 个指定项 | 限于 {count} 个指定项",
+        "stopNotifying": "{when}：{targets} 停止通知。",
+        "nothingMuted": "{when}：没有告警或检查被静默。",
+        "sloUnchanged": "SLO 评分不会改变。",
+        "sloExcluded": "{slos} 将该时间窗口从评分中排除。",
+        "sloAsGood": "{slos} 将该时间窗口计为正常时间。"
+      },
+      "autoName": {
+        "once": "单次",
+        "onceOn": "单次 {date}",
+        "daily": "每天",
+        "weekly": "每周",
+        "all": {
+          "alerts": "所有告警",
+          "anomaly_detections": "所有异常检测",
+          "synthetics": "所有合成监控检查",
+          "slos": "所有 SLO"
+        }
+      },
+      "condition": {
+        "none": "无维度条件",
+        "add": "添加",
+        "title": "维度条件",
+        "onePer": "每个静默时段一个",
+        "remove": "移除维度条件",
+        "caption": "适用于告警、异常检测和 SLO。合成监控检查没有维度，使用标签。所有条件对都必须匹配。使用 OR 组表示备选条件。值可以 * 结尾。"
+      },
+      "resources": {
+        "refineBy": "按资源细化",
+        "load": "加载资源",
+        "needsEq": "按资源细化之前，请至少添加一个 = 条件。",
+        "tooMany": "有 {count} 个值与该条件同时出现。请缩小条件范围以选择资源。",
+        "lastSeen": "上次出现",
+        "streams": "数据流",
+        "footer": "已选择 {selected}/{total} · {source}",
+        "fromRegistry": "来自服务注册表",
+        "fromSearch": "来自最近 24 小时的数据",
+        "apply": "应用",
+        "loadFailed": "无法加载资源",
+        "notSeen": "过去一小时内未出现。",
+        "partial": "部分来源未响应。",
+        "items": "项目",
+        "fromValues": "来自告警、服务注册表和过去一小时的数据",
+        "noValues": "此维度尚未出现任何值。"
+      },
+      "scheduleForm": {
+        "once": "单次",
+        "daily": "每天",
+        "weekly": "每周",
+        "startDate": "开始日期",
+        "startTime": "开始时间",
+        "endDate": "结束日期",
+        "endTime": "结束时间",
+        "days": "星期",
+        "startsAt": "开始于",
+        "duration": "时长",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "最长 7 天，例如 90m 或 1h 30m。",
+        "until": "重复截止",
+        "untilPlaceholder": "无结束日期",
+        "timezone": "时区",
+        "noWindow": "未来 8 天内没有窗口开始。",
+        "nextWindow": "下一个窗口：{window}。窗口可以跨越午夜。",
+        "nextWindowWithUtc": "下一个窗口：{window}（{utc}）。窗口可以跨越午夜。",
+        "startsOn": "开始日期"
+      },
+      "preview": {
+        "title": "预览",
+        "failed": "无法加载预览。",
+        "andMore": "以及另外 {count} 项",
+        "noMatch": "当前没有匹配项",
+        "fireTime": "{count} 个告警在触发时确定其身份 | {count} 个告警在触发时确定其身份",
+        "undecidable": "无法通过 {key} 区分",
+        "showAll": "显示完整列表",
+        "showLess": "收起",
+        "finishCondition": "完成条件后即可查看预览。"
+      },
+      "muteAllDialog": {
+        "title": "静默整个模块？",
+        "intro": "没有文件夹、项、标签或条件收窄这些模块，因此此停用时段会静默：",
+        "every": {
+          "alerts": "此组织中的每个告警",
+          "anomaly_detections": "此组织中的每个异常检测",
+          "synthetics": "此组织中的每个合成监控检查",
+          "slos": "此组织中的每个 SLO"
+        },
+        "matchedNow": "今天 {matched}",
+        "outro": "在窗口内，所有这些的通知、值班呼叫和工作流都会停止。",
+        "cancel": "取消",
+        "confirm": "全部静默",
+        "titleOne": {
+          "alerts": "静默此组织中的每条告警？",
+          "anomaly_detections": "静默此组织中的每个异常检测？",
+          "synthetics": "静默此组织中的每个合成监控检查？",
+          "slos": "静默此组织中的每个 SLO？"
+        },
+        "window": "时间窗口：{window}"
+      },
+      "summaryPane": {
+        "title": "摘要",
+        "filedIn": "归档于",
+        "window": "窗口",
+        "nextWindow": "下一个窗口",
+        "inUtc": "UTC 时间",
+        "largeMatch": "{modules}：此停用时段匹配超过半数的项。此组织的大部分内容在窗口内不会发送通知。",
+        "whatHappens": "会发生什么",
+        "keepRunning": "评估和检查会继续运行并保留其历史记录。",
+        "noNotifications": "通知、值班呼叫和工作流会停止。",
+        "mutedIncidents": "事件以静默状态开启，并在窗口结束后发送通知。"
+      },
+      "band": {
+        "now": "现在",
+        "none": "尚无窗口运行过，也未计划任何窗口。",
+        "active": "进行中",
+        "next": "下一个",
+        "past": "已运行",
+        "track": "窗口",
+        "aria": "{kind}：{start} 至 {end}"
+      },
+      "detail": {
+        "overview": "概览",
+        "affected": "受影响 · {count}",
+        "suppressed": "已抑制 · {count}",
+        "details": "详情",
+        "condition": "条件",
+        "noTarget": "无目标",
+        "banner": "横幅",
+        "bannerOn": "激活期间向组织显示",
+        "bannerOff": "无横幅",
+        "occurrences": "发生次数",
+        "nextWindow": "下一个窗口：{window}。您的时间：{local}。",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "匹配依据",
+        "matchedBy": {
+          "query": "查询",
+          "source_alert": "源告警",
+          "tag": "标签",
+          "id": "命名",
+          "folder": "文件夹",
+          "org": "整个组织"
+        },
+        "source": "来源",
+        "wouldHaveNotified": "本应通知",
+        "noSuppressed": "尚未抑制任何内容",
+        "muteHourName": "{name} · 静音 1 小时",
+        "notFoundTitle": "未找到停机时段",
+        "notFoundDescription": "它可能已被删除，或链接指向其他组织。",
+        "backToList": "返回停机时段"
+      },
+      "mute": {
+        "title": {
+          "alerts": "静音 {count} 个告警 | 静音 {count} 个告警",
+          "anomaly_detections": "静音 {count} 个异常检测 | 静音 {count} 个异常检测",
+          "synthetics": "静音 {count} 个检查 | 静音 {count} 个检查",
+          "slos": "静音 {count} 个 SLO | 静音 {count} 个 SLO",
+          "items": "静音 {count} 个项目 | 静音 {count} 个项目"
+        },
+        "subtitle": "它们会继续运行并保留历史记录。通知、值班呼叫和工作流会在窗口结束前停止。",
+        "muteFor": "静音时长",
+        "fileIn": "归档到",
+        "presets": {
+          "30m": "30 分钟",
+          "1h": "1 小时",
+          "2h": "2 小时",
+          "4h": "4 小时",
+          "custom": "自定义"
+        },
+        "endsAt": "结束于",
+        "endsIn": "将在 {duration} 后结束。",
+        "confirm": "静音",
+        "confirmUntil": "静音至 {time}",
+        "menu": "静音通知",
+        "until": "至…",
+        "bulk": "静音",
+        "muted": "已静音 · {duration}后结束",
+        "mutedTooltip": "由 {name} 静音，至 {end}",
+        "exclude": "排除一个时间窗口…",
+        "firingMuted": "触发中 · 已静音",
+        "firingMutedTooltip": "仍在触发。通知已被 {name} 静音。"
+      },
+      "corrected": "已修正",
+      "correctedBy": "评分已由 {names} 修正",
+      "incident": {
+        "mutedBy": "已静音 · {name}",
+        "notLoaded": "停机时间未加载",
+        "notLoadedTooltip": "已被停机时间 {id} 静音，该停机时间不在已加载的列表中。",
+        "banner": "由 {name} 静音。无人被呼叫。窗口结束后的首次触发会发送延迟的已开启通知。",
+        "bannerUntil": "由 {name} 静音，至 {end}。无人被呼叫。窗口结束后的首次触发会发送延迟的已开启通知。"
+      },
+      "banner": {
+        "ended": "已结束",
+        "endsInUnderMinute": "不到 1 分钟后结束",
+        "endsInMinutes": "{count} 分钟后结束 | {count} 分钟后结束",
+        "endsIn": "{duration}后结束",
+        "firstEndsInUnderMinute": "最早的一个不到一分钟后结束",
+        "firstEndsInMinutes": "最早的一个 {count} 分钟后结束 | 最早的一个 {count} 分钟后结束",
+        "firstEndsIn": "最早的一个 {duration}后结束",
+        "count": "{module} {count}",
+        "showBanner": "在此静音时段生效期间，向组织内所有人显示横幅",
+        "showBannerCaption": "横幅会显示名称、受影响的数量和剩余时间。它绝不会显示具体的告警名称。",
+        "preview": "预览",
+        "previewMessage": "{name} 生效中。",
+        "tooLong": "横幅仅适用于最长 7 天的窗口。"
+      },
+      "sloCorrections": {
+        "title": "状态修正：",
+        "item": "{name}（{status}）",
+        "shorterThanSlice": "短于 SLO 的切片，未校正任何分钟"
+      },
+      "notify": {
+        "title": "通知",
+        "caption": "向目标告知停机本身：开始时、结束前和结束时。",
+        "destinations": "目标",
+        "lead": "结束前提醒",
+        "leadHelp": "例如 10m 或 1h，介于 1 分钟和窗口长度之间。",
+        "regionNote": "在超级集群中，由创建停机的区域发送。此设置之前创建的停机会从每个区域发送。",
+        "tab": "通知",
+        "events": {
+          "started": "开始时",
+          "startedHelp": "每个窗口开始时发送一条消息。",
+          "ending_soon": "结束前",
+          "ending_soonHelp": "结束前的提醒，告警再次通知时不会让人意外。",
+          "ended": "结束时",
+          "endedHelp": "每个窗口结束时发送一条消息。",
+          "cancelled": "取消时",
+          "cancelledHelp": "有人结束或取消停机时立即发送。",
+          "extended": "延长时",
+          "extendedHelp": "带着新的结束时间立即发送。"
+        },
+        "validation": {
+          "tooMany": "最多可通知 {max} 个目标。",
+          "eventRequired": "请至少选择一个事件，或移除目标。",
+          "leadInvalid": "提醒必须在结束前 1 分钟到窗口长度之间。"
+        },
+        "summary": {
+          "none": "不发送自己的通知。",
+          "sentence": "通知 {destinations}：{events}。",
+          "started": "开始时",
+          "endingSoon": "结束前 {lead}",
+          "ended": "结束时",
+          "cancelled": "取消时",
+          "extended": "延长时"
+        },
+        "log": {
+          "time": "时间",
+          "event": "事件",
+          "destinations": "目标",
+          "result": "结果",
+          "ok": "已发送",
+          "pending": "发送中",
+          "empty": "尚未发送通知",
+          "events": {
+            "started": "已开始",
+            "ending_soon": "即将结束",
+            "ended": "已结束",
+            "cancelled": "已取消",
+            "extended": "已延长"
+          }
+        },
+        "test": {
+          "send": "发送测试",
+          "sent": "已向 {count} 个目标发送测试 | 已向 {count} 个目标发送测试",
+          "failed": "测试未送达 {names}。"
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -8858,7 +9359,8 @@
     "countWorkflow": "{count} 个工作流 | {count} 个工作流",
     "countAnomalyDetection": "{count} 个异常检测器 | {count} 个异常检测器",
     "countIncidentIntegration": "{count} 个事件集成 | {count} 个事件集成",
-    "sectionOtherConsumers": "还被以下使用"
+    "sectionOtherConsumers": "还被以下使用",
+    "countDowntime": "{count} 个停机 | {count} 个停机"
   },
   "alert_library": {
     "header": "告警库",
@@ -16715,7 +17217,8 @@
       "sourceMaps": "RUM — 源映射",
       "oncall": "值班",
       "oncallDetail": "值班页面",
-      "syntheticsJourney": "合成监控旅程"
+      "syntheticsJourney": "合成监控旅程",
+      "downtimes": "停机"
     },
     "actions": {
       "openCheatsheet": "打开键盘快捷键备忘单",
@@ -16824,6 +17327,8 @@
       "oncallEscalate": "升级",
       "oncallSnooze": "暂停",
       "oncallResolve": "解决",
+      "downtimesCreate": "新建停机",
+      "downtimesRefresh": "刷新停机",
       "functionsImport": "导入函数"
     }
   },
@@ -17257,6 +17762,13 @@
         "belowTopN": "top-N 以下",
         "truncated": "已截断",
         "gap": "缺口"
+      },
+      "downtimeStatus": {
+        "scheduled": "已计划",
+        "active": "生效中",
+        "ended": "已结束",
+        "cancelled": "已取消",
+        "endedEarly": "提前结束"
       }
     }
   },
@@ -17653,6 +18165,24 @@
     },
     "iam": {
       "userSaveFailed": "无法保存用户"
+    },
+    "downtimes": {
+      "cancelled": "停机已取消",
+      "cancelledMany": "{count} 个停机已取消 | {count} 个停机已取消",
+      "cancelFailed": "无法取消停机",
+      "extended": "已延长至 {time}",
+      "extendedFollowUp": "已创建 {name}，运行至 {time}",
+      "extendFailed": "无法延长停机",
+      "reload": "重新加载",
+      "deleted": "停机已删除",
+      "deleteFailed": "无法删除停机",
+      "created": "停机已创建",
+      "updated": "停机已保存",
+      "saveFailed": "无法保存停机",
+      "muted": "已将 {count} 个项目静音，直到 {time}。已归档到 {folder}。 | 已将 {count} 个项目静音，直到 {time}。已归档到 {folder}。",
+      "muteFailed": "无法创建静音",
+      "viewDowntime": "查看停机",
+      "itemsDropped": "{count} 个所选项目不在所选文件夹内，已被移除。 | {count} 个所选项目不在所选文件夹内，已被移除。"
     }
   },
   "cipherKeys": {
@@ -17943,7 +18473,9 @@
       "budgetNote": "最后一个点等于上方的剩余预算磁贴。0% 处的虚线表示耗尽；低于该线表示 SLO 已消耗的错误超过目标允许的范围。间隙是没有测量数据的时间桶，这与零不同。",
       "burnExplain": "每个桶中预算燃烧的速度，以预算中性率的倍数表示。",
       "burnFormula": "燃烧速率 = (100% − SLI) ÷ (100% − 目标)\nSLI = 100 × 良好 ÷ 总计，仅针对该时间桶\n\n右轴（同一条线读作 SLI）：\nSLI = 100% − 燃烧速率 × (100% − 目标)",
-      "burnNote": "×1 在窗口结束时正好用完预算，×2 则在一半时用完；低于 ×1 表示预算正在累积。由于这是按桶而非累计，所以此处的尖峰仍可见，而不会被平均掉。右轴向下计数：图表越往上表示燃烧越多，即 SLI 越低。"
+      "burnNote": "×1 在窗口结束时正好用完预算，×2 则在一半时用完；低于 ×1 表示预算正在累积。由于这是按桶而非累计，所以此处的尖峰仍可见，而不会被平均掉。右轴向下计数：图表越往上表示燃烧越多，即 SLI 越低。",
+      "corrected": "已由停机校正",
+      "correctedTooltip": "已由停机校正：已排除，因此预算线保持平稳"
     },
     "alerts": {
       "title": "告警",

@@ -396,6 +396,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 
@@ -947,6 +948,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 
@@ -1029,6 +1031,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 
@@ -1096,6 +1099,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 

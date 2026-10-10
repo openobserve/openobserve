@@ -106,7 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useQuery } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import { permittedFoldersQuery } from "@/services/common.queries";
+import { folderKeys } from "@/services/common.querykeys";
+import type { Folder } from "@/services/common";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AddFolder from "./AddFolder.vue";
@@ -159,25 +164,43 @@ export default defineComponent({
     const showDialog = ref(false);
     const { iconFor } = useFolderIcons();
 
-    const selectedFolderIcon = computed(() =>
-      iconFor(
-        (store.state.organizationData.foldersByType[props.type] ?? []).find(
-          (f: any) => f.folderId === props.modelValue,
-        ),
-      ),
+    const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+
+    // The store list injects "default" for every type; a folder-scoped user may not file a downtime there.
+    const permittedOnly = computed(() => props.type === "downtimes");
+    const permitted = useQuery(
+      () =>
+        Object.assign(permittedFoldersQuery(orgId.value, props.type), {
+          enabled: permittedOnly.value && !!orgId.value,
+        }),
+      queryClient,
     );
 
-    const folderOptions = computed(
-      () =>
-        store.state.organizationData.foldersByType[props.type]?.map((f: any) => ({
-          label: f.name,
-          value: f.folderId,
-          iconComponent: folderIconOption(iconFor(f)),
-        })) ?? [],
+    const folders = computed<Folder[]>(() =>
+      permittedOnly.value
+        ? (permitted.data.value ?? [])
+        : (store.state.organizationData.foldersByType[props.type] ?? []),
+    );
+
+    const selectedFolderIcon = computed(() =>
+      iconFor(folders.value.find((f) => f.folderId === props.modelValue)),
+    );
+
+    const folderOptions = computed(() =>
+      folders.value.map((f) => ({
+        label: raw(f.name),
+        value: f.folderId,
+        iconComponent: folderIconOption(iconFor(f)),
+      })),
     );
 
     const onFolderAdded = (newFolder: any) => {
       showDialog.value = false;
+      if (permittedOnly.value) {
+        void queryClient.invalidateQueries({
+          queryKey: folderKeys.permitted(orgId.value, props.type),
+        });
+      }
       if (newFolder?.data?.folderId) {
         emit("update:modelValue", newFolder.data.folderId);
       }

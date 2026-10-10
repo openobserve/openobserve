@@ -151,6 +151,27 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
     });
   });
 
+  describe("legacy timezone names", () => {
+    it("finds Asia/Kolkata by the old name Calcutta", () => {
+      wrapper.vm.timezoneFilterFn("Calcutta");
+      expect(wrapper.vm.filteredTimezone).toContain("Asia/Kolkata");
+      const kolkata = wrapper.vm.timezoneSelectOptions.find(
+        (o: { value: string }) => o.value === "Asia/Kolkata",
+      );
+      expect(kolkata.searchText).toContain("Asia/Calcutta");
+    });
+
+    it("files an alert without a timezone under the app's zone exactly as main did", async () => {
+      const mockAlertsService = await import("@/services/alerts");
+      vi.mocked(mockAlertsService.default.create_by_alert_id).mockResolvedValue(true as any);
+      wrapper.vm.store.state.timezone = "Asia/Calcutta";
+      const input: any = { name: "legacy-zone", trigger_condition: {} };
+      await wrapper.vm.createAlert(input, 1, "folder1");
+      const sent = vi.mocked(mockAlertsService.default.create_by_alert_id).mock.calls.at(-1)?.[1];
+      expect(sent.trigger_condition.timezone).toBe("Asia/Calcutta");
+    });
+  });
+
   describe("1. Data Update Functions", () => {
     describe("updateUserSelectedDestinations", () => {
       it("should call the function without errors", () => {

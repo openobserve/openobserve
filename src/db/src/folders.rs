@@ -80,6 +80,10 @@ pub enum FolderError {
     #[error("Folder contains prompts. Please move/delete prompts from folder.")]
     DeleteWithPrompts,
 
+    /// An error that occurs when trying to delete a folder that contains downtimes.
+    #[error("Folder contains downtimes. Please move/delete downtimes from folder.")]
+    DeleteWithDowntimes,
+
     /// An error that occurs when trying to delete a folder that cannot be found.
     #[error("Folder not found")]
     NotFound,
@@ -247,6 +251,7 @@ pub async fn list_folders(
         FolderType::Reports => OFGA_MODELS.get("report_folders").unwrap().key,
         FolderType::Synthetics => OFGA_MODELS.get("synthetic_folder").unwrap().key,
         FolderType::Workflows => OFGA_MODELS.get("workflow_folder").unwrap().key,
+        FolderType::Downtimes => OFGA_MODELS.get("downtime_folders").unwrap().key,
         FolderType::Prompts => OFGA_MODELS.get("prompt_folders").unwrap().key,
     };
     #[cfg(not(feature = "enterprise"))]
@@ -358,6 +363,14 @@ pub async fn delete_folder(
                 return Err(FolderError::DeleteWithWorkflows);
             }
         }
+        FolderType::Downtimes => {
+            if let Some(folder_pk) =
+                table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
+                && !table::downtimes::release_folder(org_id, &folder_pk).await?
+            {
+                return Err(FolderError::DeleteWithDowntimes);
+            }
+        }
         FolderType::Prompts => {
             if let Some(folder_pk) =
                 table::folders::get_pk_by_name(org_id, folder_id, folder_type).await?
@@ -424,6 +437,7 @@ fn folder_type_ofga_name(folder_type: FolderType) -> &'static str {
         FolderType::Reports => "report_folders",
         FolderType::Synthetics => "synthetic_folder",
         FolderType::Workflows => "workflow_folder",
+        FolderType::Downtimes => "downtime_folders",
         FolderType::Prompts => "prompt_folders",
     }
 }
@@ -463,6 +477,10 @@ async fn permitted_folders(
         FolderType::Workflows => (
             OFGA_MODELS.get("workflow_folder").unwrap().key,
             OFGA_MODELS.get("workflows").unwrap().key,
+        ),
+        FolderType::Downtimes => (
+            OFGA_MODELS.get("downtime_folders").unwrap().key,
+            OFGA_MODELS.get("downtimes").unwrap().key,
         ),
         // Prompt grants are plain `prompt:{id}` with no folder prefix, so there is no
         // individual grant to lift a folder into view: only folder `GET` counts.

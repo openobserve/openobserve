@@ -401,6 +401,7 @@ pub async fn list_synthetics(
             referenced_by,
             references,
             reference_state,
+            active_downtime: None,
         });
     }
 

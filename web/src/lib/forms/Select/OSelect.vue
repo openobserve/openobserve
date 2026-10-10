@@ -91,6 +91,8 @@ type NormalizedOption = {
   expandable?: boolean;
   /** Reka string key of the expandable option this one is nested under. */
   parentKey?: string;
+  /** Extra lowercase text the search matches besides the label, e.g. a zone's legacy names. */
+  searchText?: string;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -234,6 +236,8 @@ function normalizeOption(input: unknown): NormalizedOption | null {
     parentKey: isPrimitiveSelectValue(option["parentValue"])
       ? toRekaString(option["parentValue"])
       : undefined,
+    searchText:
+      typeof option["searchText"] === "string" ? option["searchText"].toLowerCase() : undefined,
   };
 }
 
@@ -271,6 +275,9 @@ const inputEnabled = computed(() => props.searchable);
 const resolvedSearchPlaceholder = computed(
   () => props.searchPlaceholder ?? t("common.searchEllipsis"),
 );
+
+const matchesTerm = (opt: NormalizedOption, term: string) =>
+  opt.label.toLowerCase().includes(term) || !!opt.searchText?.includes(term);
 
 const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;
@@ -320,14 +327,14 @@ const baseFilteredOptions = computed(() => {
       // Include the header only if at least one subsequent non-header item matches
       let j = i + 1;
       while (j < options.length && !options[j].header) {
-        if (options[j].label.toLowerCase().includes(term)) {
+        if (matchesTerm(options[j], term)) {
           result.push(opt);
           break;
         }
         j++;
       }
     } else {
-      if (opt.label.toLowerCase().includes(term)) {
+      if (matchesTerm(opt, term)) {
         result.push(opt);
       }
     }

@@ -33,6 +33,8 @@ mod composite_alerts_contract_tests;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
+pub mod downtime_notifications;
+pub mod downtimes;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;

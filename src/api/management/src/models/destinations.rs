@@ -148,7 +148,8 @@ impl From<meta_dest::Template> for Template {
 
         // Shared rule lives in `config::prebuilt_loader` so the HTTP DTO and
         // the service-layer guards can't drift apart.
-        let is_prebuilt = config::prebuilt_loader::is_prebuilt_template_name(&value.name);
+        let is_prebuilt = config::prebuilt_loader::is_prebuilt_template_name(&value.name)
+            || openobserve_core::alerts::templates::is_downtime_template_name(&value.name);
 
         Self {
             name: value.name,
@@ -337,6 +338,8 @@ pub enum DestinationConsumerKind {
     AnomalyDetection,
     #[cfg(feature = "enterprise")]
     IncidentIntegration,
+    #[cfg(feature = "enterprise")]
+    Downtime,
 }
 
 impl From<destination_usage::DestinationConsumer> for DestinationConsumerKind {
@@ -356,6 +359,8 @@ impl From<destination_usage::DestinationConsumer> for DestinationConsumerKind {
             destination_usage::DestinationConsumer::IncidentIntegration => {
                 Self::IncidentIntegration
             }
+            #[cfg(feature = "enterprise")]
+            destination_usage::DestinationConsumer::Downtime => Self::Downtime,
         }
     }
 }

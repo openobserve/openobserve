@@ -472,6 +472,112 @@ pub async fn create_default_probe_token(
     Ok(())
 }
 
+/// The synthetics mute check over the downtimes cache, for `register_mute_check`.
+pub fn downtime_mute_check(
+    org: &str,
+    check_id: &str,
+    folder_id: &str,
+    tags: &[String],
+) -> openobserve_synthetics::alerting::BoxFuture<'static, Option<String>> {
+    let (org, check_id, folder_id, tags) = (
+        org.to_string(),
+        check_id.to_string(),
+        folder_id.to_string(),
+        tags.to_vec(),
+    );
+    Box::pin(async move {
+        if !crate::alerts::downtimes::any_for(
+            &org,
+            config::meta::downtimes::TargetModule::Synthetics,
+        ) {
+            return None;
+        }
+        let folder_id = public_folder_id(&folder_id).await;
+        crate::alerts::downtimes::active_for_synthetic(
+            &org,
+            &check_id,
+            &folder_id,
+            &tags,
+            config::utils::time::now_micros(),
+        )
+        .map(|downtime| downtime.id)
+    })
+}
+
+/// Whether the org can mute a check now, from the downtime cache, for `register_mute_check`.
+pub fn downtime_may_mute(org: &str) -> bool {
+    crate::alerts::downtimes::any_for(org, config::meta::downtimes::TargetModule::Synthetics)
+}
+
+/// Sets the Muted chip on each listed check a downtime silences now.
+#[cfg(feature = "enterprise")]
+pub fn fill_active_downtimes(
+    org_id: &str,
+    items: &mut [config::meta::synthetics::SyntheticListItem],
+) {
+    if !crate::alerts::downtimes::any_for(org_id, config::meta::downtimes::TargetModule::Synthetics)
+    {
+        return;
+    }
+    let now = config::utils::time::now_micros();
+    for item in items.iter_mut() {
+        item.active_downtime = crate::alerts::downtimes::active_for_synthetic(
+            org_id,
+            &item.id,
+            &item.folder_id,
+            &item.tags,
+            now,
+        );
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn fill_active_downtimes(
+    _org_id: &str,
+    _items: &mut [config::meta::synthetics::SyntheticListItem],
+) {
+}
+
+/// Stored checks hold the folder primary key, while downtime targets name the public id.
+async fn public_folder_id(folder_id: &str) -> String {
+    infra::table::folders::get_name_by_pk(folder_id)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| folder_id.to_string())
+}
+
+/// Destinations of the unmuted checks; without `may_mute` all count and no folder is read.
+#[cfg(feature = "enterprise")]
+async fn unmuted_destinations(
+    org_id: &str,
+    checks: &[config::meta::synthetics::Synthetic],
+    may_mute: bool,
+) -> Vec<String> {
+    let now = config::utils::time::now_micros();
+    let mut destinations = Vec::new();
+    for check in checks {
+        if may_mute {
+            let folder_id = public_folder_id(&check.folder_id).await;
+            if crate::alerts::downtimes::active_for_synthetic(
+                org_id,
+                &check.id,
+                &folder_id,
+                &check.tags,
+                now,
+            )
+            .is_some()
+            {
+                continue;
+            }
+        }
+        destinations.extend(check.destinations.iter().cloned());
+    }
+    destinations.sort();
+    destinations.dedup();
+    destinations
+}
+
 // ── Private-location staleness watcher ────────────────────────────────────────
 
 /// Ticks every 60s on scheduler nodes. A private location whose registered
@@ -521,52 +627,76 @@ pub async fn location_staleness_watcher() {
                 // Nothing runs here — stay quiet, re-evaluate next tick.
                 continue;
             }
-            // Claim before dispatch so a location without destinations is still
-            // one-shot (no per-tick log spam / retry storm), AND so that only one
-            // scheduler node speaks. This watcher runs on every scheduler node, so
-            // the suppression flag cannot live in this process's memory — N nodes
-            // would each believe they had not notified yet and send N pages for
-            // one outage. The CAS in `try_claim_down_notification` makes exactly
-            // one node the winner.
-            match infra::table::synthetics_locations::try_claim_down_notification(&loc.id, now)
-                .await
-            {
-                Ok(true) => {}
-                Ok(false) => continue, // another node is sending it
-                Err(e) => {
-                    log::error!(
-                        "[synthetics] staleness watcher: claim down notification for {}: {e}",
-                        loc.id
-                    );
-                    continue;
-                }
+            let may_mute = downtime_may_mute(&org_id);
+            let destinations = unmuted_destinations(&org_id, &checks, may_mute).await;
+            if may_mute && destinations.is_empty() {
+                log::debug!(
+                    "[synthetics] private location down: {} ({}) org={} affected_checks={}, every check muted",
+                    loc.label,
+                    loc.id,
+                    org_id,
+                    checks.len()
+                );
             }
-
-            let mut destinations: Vec<String> =
-                checks.iter().flat_map(|c| c.destinations.clone()).collect();
-            destinations.sort();
-            destinations.dedup();
-            log::warn!(
-                "[synthetics] private location down: {} ({}) org={} affected_checks={} destinations={}",
-                loc.label,
-                loc.id,
-                org_id,
-                checks.len(),
-                destinations.len()
-            );
-            if destinations.is_empty() {
-                continue;
-            }
-            notify_location_down(
-                &org_id,
-                &loc,
-                checks.len(),
-                window_us / 1_000_000,
+            report_location_down(
+                &loc.id,
                 &destinations,
+                may_mute,
+                async || {
+                    infra::table::synthetics_locations::try_claim_down_notification(&loc.id, now)
+                        .await
+                },
+                async |destinations| {
+                    log::warn!(
+                        "[synthetics] private location down: {} ({}) org={} affected_checks={} destinations={}",
+                        loc.label,
+                        loc.id,
+                        org_id,
+                        checks.len(),
+                        destinations.len()
+                    );
+                    if !destinations.is_empty() {
+                        notify_location_down(
+                            &org_id,
+                            &loc,
+                            checks.len(),
+                            window_us / 1_000_000,
+                            destinations,
+                        )
+                        .await
+                    }
+                },
             )
             .await;
         }
     }
+}
+
+/// One notification per outage from the CAS winner; only a mute emptying the list keeps the claim.
+#[cfg(feature = "enterprise")]
+async fn report_location_down(
+    loc_id: &str,
+    destinations: &[String],
+    may_mute: bool,
+    claim: impl AsyncFnOnce() -> Result<bool, infra::errors::Error>,
+    notify: impl AsyncFnOnce(&[String]),
+) -> bool {
+    if may_mute && destinations.is_empty() {
+        return false;
+    }
+    match claim().await {
+        Ok(true) => {}
+        Ok(false) => return false,
+        Err(e) => {
+            log::error!(
+                "[synthetics] staleness watcher: claim down notification for {loc_id}: {e}"
+            );
+            return false;
+        }
+    }
+    // The winner reports even an empty list, so the outage is logged once as on main.
+    notify(destinations).await;
+    !destinations.is_empty()
 }
 
 #[cfg(all(test, feature = "enterprise"))]
@@ -768,6 +898,121 @@ mod tests {
         let line = locations_line(&firing());
         assert!(line.starts_with("2 of 3: "), "{line}");
         assert!(!line.contains("aws-eu-central-1"), "{line}");
+    }
+
+    async fn locations_db() -> sea_orm::DatabaseConnection {
+        use infra::table::entity::synthetics_locations;
+        use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema, Set};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(synthetics_locations::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        synthetics_locations::Entity::insert(synthetics_locations::ActiveModel {
+            id: Set("loc-1".to_string()),
+            org_id: Set(Some("org1".to_string())),
+            kind: Set("private".to_string()),
+            provider: Set("custom".to_string()),
+            region: Set("corp-hq".to_string()),
+            label: Set("Corp HQ".to_string()),
+            pool: Set("private-org1-corp-hq".to_string()),
+            enabled: Set(true),
+            down_notified_at: Set(0),
+            created_at: Set(1),
+            updated_at: Set(1),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn down_notified_at(db: &sea_orm::DatabaseConnection) -> i64 {
+        use sea_orm::EntityTrait;
+        infra::table::entity::synthetics_locations::Entity::find_by_id("loc-1")
+            .one(db)
+            .await
+            .unwrap()
+            .unwrap()
+            .down_notified_at
+    }
+
+    /// One watcher tick for loc-1, with the destinations its unmuted checks left.
+    async fn tick(
+        db: &sea_orm::DatabaseConnection,
+        destinations: &[String],
+        now: i64,
+        sent: &std::sync::atomic::AtomicUsize,
+    ) -> bool {
+        tick_with(db, destinations, true, now, sent).await
+    }
+
+    async fn tick_with(
+        db: &sea_orm::DatabaseConnection,
+        destinations: &[String],
+        may_mute: bool,
+        now: i64,
+        sent: &std::sync::atomic::AtomicUsize,
+    ) -> bool {
+        report_location_down(
+            "loc-1",
+            destinations,
+            may_mute,
+            async || {
+                infra::table::synthetics_locations::try_claim_down_notification_with(
+                    db, "loc-1", now,
+                )
+                .await
+            },
+            async |destinations| {
+                if !destinations.is_empty() {
+                    sent.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
+            },
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn a_location_whose_every_check_is_muted_keeps_its_down_claim() {
+        let db = locations_db().await;
+        let sent = std::sync::atomic::AtomicUsize::new(0);
+
+        assert!(!tick(&db, &[], 100, &sent).await);
+        assert_eq!(
+            down_notified_at(&db).await,
+            0,
+            "a muted tick must not use up the claim"
+        );
+        assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn with_no_downtime_a_location_without_destinations_uses_its_claim_as_before() {
+        let db = locations_db().await;
+        let sent = std::sync::atomic::AtomicUsize::new(0);
+
+        assert!(!tick_with(&db, &[], false, 100, &sent).await);
+        assert_eq!(
+            down_notified_at(&db).await,
+            100,
+            "the claim is one-shot on main"
+        );
+        assert!(!tick_with(&db, &["pager".to_string()], false, 200, &sent).await);
+        assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn the_first_tick_after_the_mute_claims_and_notifies_once() {
+        let db = locations_db().await;
+        let sent = std::sync::atomic::AtomicUsize::new(0);
+        let destinations = ["pager".to_string()];
+
+        assert!(!tick(&db, &[], 100, &sent).await);
+        assert!(tick(&db, &destinations, 200, &sent).await);
+        assert!(!tick(&db, &destinations, 300, &sent).await);
+        assert_eq!(down_notified_at(&db).await, 200);
+        assert_eq!(sent.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 }
 

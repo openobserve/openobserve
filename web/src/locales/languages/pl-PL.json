@@ -560,6 +560,12 @@
       "description": "Zadanie zdalne to usługa HTTP, którą eksperymenty wywołują w celu generowania wyników. Opublikuj je raz, potwierdź, że połączenie działa, a każdy eksperyment może przypiąć dokładną wersję, na której działał.",
       "action": "Nowe zadanie",
       "actionDesc": "Podaj OpenObserve swój endpoint i przetestuj połączenie."
+    },
+    "noDowntimes": {
+      "title": "Brak przerw",
+      "description": "Przerwa pozwala alertom, wykrywaniu anomalii i testom syntetycznym działać dalej, a na zaplanowany okres wstrzymuje ich powiadomienia.",
+      "action": "Zaplanuj przerwę",
+      "actionDesc": "Jednorazowo, codziennie lub co tydzień. Aby szybko wyciszyć, użyj opcji Wycisz na liście alertów."
     }
   },
   "common": {
@@ -1320,6 +1326,7 @@
     "topQueries": "Najczęstsze zapytania",
     "profiles": "Profile",
     "productAnalytics": "Analityka produktu",
+    "downtimes": "Przerwy",
     "trialEndedTitle": "Twój okres próbny zakończył się",
     "trialPageNeedsPlan": "{page} wymaga planu",
     "trialPageNeedsPlanToast": "{page} wymaga planu. Wybierz plan na tej stronie, aby dalej z niego korzystać.",
@@ -2822,6 +2829,7 @@
       "scopeCoveredByParent": "Zablokowane akcje pochodzą z {scope}, ustawionego w {module}",
       "scopeAllOf": "Wszystkie {module}",
       "scopeIncludesFuture": "Obejmuje zasoby utworzone później",
+      "scopeDowntimeHint": "Folder przerwy ogranicza, kto zarządza przerwą, a nie to, co ona wycisza. Aby wyciszyć wszystkie foldery modułu, użytkownik potrzebuje uprawnienia do listowania wszystkich folderów tego modułu. Wyciszone znaczniki i banery mogą wskazywać przerwę, której użytkownik nie może wyświetlić.",
       "grantedByWiderScope": "Przyznane przez szerszy zakres",
       "grantedHereAndByWiderScope": "Przyznane tutaj i przez szerszy zakres",
       "stillGrantedByWiderScope": "Usunięte tutaj, nadal przyznane przez szerszy zakres",
@@ -8821,7 +8829,500 @@
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
     "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
-    "seconds": "Sekundy"
+    "seconds": "Sekundy",
+    "downtimes": {
+      "newTitle": "Nowa przerwa",
+      "editTitle": "Edytuj przerwę",
+      "detailTitle": "Przerwa",
+      "modules": {
+        "alerts": "Alerty",
+        "anomaly_detections": "Wykrywanie anomalii",
+        "synthetics": "Testy syntetyczne",
+        "slos": "SLO"
+      },
+      "modulesShort": {
+        "alerts": "Alerty",
+        "anomaly_detections": "Anomalia",
+        "synthetics": "Syntetyki",
+        "slos": "SLO"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "W trakcie okna incydenty są",
+          "muted": "Tworzone i wyciszane (domyślnie)",
+          "mutedHelp": "Incydenty otwierają się jak zwykle, ale nikogo nie powiadamiają do końca okna.",
+          "none": "Nie są tworzone",
+          "noneHelp": "W trakcie okna nie otwiera się żaden incydent; pierwsze wyzwolenie po nim otwiera incydent i powiadamia.",
+          "summary": "bez incydentów"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}",
+        "condition": "warunek",
+        "allFolders": "wszystkie foldery",
+        "oneFolder": "folder {name}",
+        "nFolders": "{count} folder | {count} folderów",
+        "tags": "tag {tags}",
+        "nItems": "{count} element | {count} elementów",
+        "asGood": "jako dobre",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
+      },
+      "duration": {
+        "days": "{count} d",
+        "hours": "{count} godz.",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "od {start} do {end} {zone}",
+        "onceSentence": "Jednorazowo · od {start} do {end} · {zone}",
+        "dailySentence": "Codziennie · {time} przez {duration} · {zone}",
+        "weeklySentence": "Co tydzień w {days} · {time} przez {duration} · {zone}",
+        "fromNoEnd": "{schedule}, od {start} bez daty końcowej",
+        "fromUntil": "{schedule}, od {start} do {until}"
+      },
+      "validation": {
+        "conditionRequired": "Dodaj warunek lub usuń blok warunku.",
+        "pairKey": "Wybierz wymiar dla każdego wiersza.",
+        "pairOperator": "W warunku przerwy użyj = lub !=.",
+        "pairValue": "Wprowadź wartość dla każdego wiersza.",
+        "loneStar": "Wartość nie może być samym znakiem *.",
+        "innerStar": "Znak * jest dozwolony tylko na końcu wartości.",
+        "emptyGroup": "Grupa warunków nie może być pusta.",
+        "tooDeep": "Warunek może zagnieżdżać grupy na maksymalnie 3 poziomach.",
+        "tooManyPairs": "Warunek może zawierać maksymalnie 32 pary.",
+        "needsEq": "Dodaj co najmniej jeden warunek =. Warunek złożony wyłącznie z wierszy != wyciszyłby wszystko inne.",
+        "modulesRequired": "Wybierz co najmniej jeden moduł.",
+        "foldersRequired": "Wybierz Wszystkie foldery lub co najmniej jeden folder.",
+        "tagsRequired": "Dodaj tag lub usuń blok tagów.",
+        "idsRequired": "Wybierz element lub usuń blok konkretnych elementów.",
+        "idOutsideFolders": "Niektóre wybrane elementy nie należą do wybranych folderów.",
+        "tooManyFolders": "Wybierz maksymalnie {max} folderów lub Wszystkie foldery.",
+        "tooManyTags": "Dodaj maksymalnie {max} tagów.",
+        "tooManyIds": "Wybierz maksymalnie {max} elementów.",
+        "nameTooLong": "Nazwa może mieć maksymalnie 256 znaków.",
+        "timezoneRequired": "Wybierz strefę czasową.",
+        "startRequired": "Wprowadź datę i godzinę rozpoczęcia.",
+        "endRequired": "Podaj datę i godzinę zakończenia.",
+        "endAfterStart": "Zakończenie musi być późniejsze niż początek.",
+        "windowTooLong": "Okno może trwać maksymalnie 7 dni.",
+        "windowTooShort": "Okno musi trwać co najmniej 1 minutę.",
+        "startTimeRequired": "Podaj godzinę rozpoczęcia w formacie HH:MM.",
+        "durationInvalid": "Podaj czas trwania, np. 90m lub 1h 30m.",
+        "weekdaysRequired": "Wybierz co najmniej jeden dzień.",
+        "untilAfterStart": "Data „powtarzaj do” musi przypadać na pierwszy dzień lub później.",
+        "reasonTooLong": "Powód może mieć maksymalnie {max} znaków.",
+        "windowOutlastsRepeat": "Okno nie może być dłuższe niż czas między powtórzeniami.",
+        "startDateRequired": "Wybierz pierwszy dzień."
+      },
+      "title": "Okna serwisowe",
+      "subtitle": "Zaplanowane okna, w których alerty, wykrywanie anomalii i kontrole syntetyczne nadal działają, ale ich powiadomienia są wstrzymywane",
+      "newDowntime": "Nowe okno serwisowe",
+      "filterAll": "Wszystkie",
+      "filterOnce": "Jednorazowe",
+      "filterRecurring": "Cykliczne",
+      "search": "Szukaj po nazwie, wymiarze lub autorze",
+      "searchAcross": "Przeszukaj wszystkie foldery",
+      "thisFolder": "Ten folder",
+      "allFolders": "Wszystkie foldery",
+      "thisFolderTooltip": "Szukaj w wybranym folderze",
+      "allFoldersTooltip": "Szukaj w każdym folderze",
+      "noFolder": "Brak folderu, w którym możesz zapisać przestój",
+      "truncated": "Wyświetlanie pierwszych {shown} z {total} przestojów",
+      "stats": {
+        "active": "Aktywne",
+        "scheduled": "Zaplanowane",
+        "recurring": "Cykliczne",
+        "ended": "Zakończone",
+        "cancelled": "Anulowane",
+        "endedEarly": "Zakończona wcześniej",
+        "total": "Razem"
+      },
+      "columns": {
+        "name": "Nazwa",
+        "status": "Status",
+        "targets": "Cele",
+        "schedule": "Harmonogram",
+        "when": "Koniec / następne",
+        "matched": "Dopasowane",
+        "createdBy": "Utworzone przez",
+        "folder": "Folder"
+      },
+      "oneTime": "Jednorazowe",
+      "recurring": "Cykliczne",
+      "bannerOn": "Gdy to okno serwisowe jest aktywne, wszyscy w organizacji widzą baner",
+      "endsLabel": "kończy się",
+      "confirmEndNow": {
+        "title": "Zakończyć tę przerwę teraz?",
+        "message": "Powiadomienia zostaną od razu wznowione. Przerwa pozostanie na liście jako zakończona wcześniej.",
+        "ok": "Zakończ teraz",
+        "keep": "Pozostaw aktywną"
+      },
+      "extend": {
+        "menu": "Przedłuż o",
+        "notActive": "Przedłużyć można tylko aktywną przerwę",
+        "dialogTitle": "Przedłuż {name}",
+        "newEnd": "Nowy koniec",
+        "confirmUntil": "Przedłuż do {time}",
+        "followUp": "Ta przerwa się powtarza, więc jej harmonogram pozostaje bez zmian. Od końca bieżącego okna zostanie utworzona jednorazowa przerwa o nazwie {name}.",
+        "endAfterCurrent": "Nowy koniec musi być późniejszy niż obecny."
+      },
+      "nextLabel": "następne",
+      "matched": {
+        "alerts": "{count} alert | {count} alerty",
+        "anomalies": "{count} anomalia | {count} anomalie",
+        "synthetics": "{count} kontrola | {count} kontrole",
+        "slos": "{count} SLO | {count} SLO"
+      },
+      "actions": {
+        "endNow": "Zakończ teraz",
+        "edit": "Edytuj",
+        "duplicate": "Duplikuj",
+        "moveToFolder": "Przenieś do folderu",
+        "cancel": "Anuluj okno serwisowe",
+        "delete": "Usuń",
+        "more": "Więcej akcji",
+        "muteForHour": "Wycisz teraz na 1 godz.",
+        "extend": "Przedłuż"
+      },
+      "confirmCancel": {
+        "title": "Anuluj przestój",
+        "message": "Powiadomienia zostaną wznowione natychmiast. Przestój pozostaje na liście w celach historycznych.",
+        "bulkMessage": "Anulować {count} przestój? Powiadomienia zostaną wznowione natychmiast. | Anulować {count} przestojów? Powiadomienia zostaną wznowione natychmiast.",
+        "confirm": "Anuluj przestój | Anuluj przestoje",
+        "keep": "Zachowaj przestój | Zachowaj przestoje"
+      },
+      "confirmDelete": {
+        "title": "Usuń przestój",
+        "message": "Przestój i jego historia zostaną usunięte. Tej operacji nie można cofnąć."
+      },
+      "copyOf": "Kopia: {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} pasujący alert | {count} pasujących alertów",
+          "anomaly_detections": "{count} pasująca detekcja anomalii | {count} pasujących detekcji anomalii",
+          "synthetics": "{count} pasująca kontrola | {count} pasujących kontroli",
+          "slos": "{count} pasujące SLO | {count} pasujących SLO"
+        },
+        "alertFolders": "Foldery alertów",
+        "syntheticsFolders": "Foldery syntetyków",
+        "noAlertFolderAccess": "Nie masz dostępu do folderów alertów.",
+        "noSyntheticsFolderAccess": "Nie masz dostępu do folderów syntetyków.",
+        "tags": "Tagi",
+        "tagPlaceholder": "klucz:wartość",
+        "tagsHint": "Każdy tag musi występować w kontroli.",
+        "removeBlock": "Usuń ten blok",
+        "specificItems": "Konkretne elementy",
+        "itemsHint": "Wyświetlane są tylko elementy z wybranych folderów.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Dodaj tagi",
+        "addItems": "Dodaj konkretne elementy",
+        "sloMode": "Wynik SLO w oknie",
+        "sloExclude": "Wyklucz okno",
+        "sloCountAsGood": "Licz okno jako dobre",
+        "sloExcludeCaption": "Czas w oknie nie liczy się ani jako dobry, ani jako zły. Alerty burn-rate dla tych SLO nie zostaną wyzwolone w tym okresie.",
+        "sloCountAsGoodCaption": "Czas w oknie liczy się jako w pełni dobry. Użyj tego tylko wtedy, gdy umowa SLO mówi, że planowana konserwacja to czas dostępności.",
+        "cardCaption": "Najpierw foldery, a opcjonalne bloki zawężają wybór dalej. Warunek wymiaru powyżej dotyczy również tego modułu.",
+        "noConditionForChecks": "Warunek wymiaru powyżej nie dotyczy kontroli.",
+        "appliesTo": "Dotyczy",
+        "tabTargets": "Cele",
+        "tabSchedule": "Harmonogram",
+        "tabAdvanced": "Zaawansowane",
+        "modeInFolder": "{mode} w",
+        "newMode": "Nowy przestój",
+        "editMode": "Edytuj przestój",
+        "namePlaceholder": "Nazwa przestoju",
+        "nameLabel": "Nazwa przestoju",
+        "renameHint": "Kliknij, aby zmienić nazwę",
+        "reason": "Powód",
+        "reasonHelp": "Opcjonalne. Wyświetlane na liście, na stronie szczegółów i w podpowiedzi Wyciszone.",
+        "cancel": "Anuluj",
+        "save": "Zapisz",
+        "activeBanner": "Ten przestój jest aktywny. Zmiana zacznie obowiązywać przy następnej ewaluacji, a zmiana trybu SLO ponownie zmierzy okna, które już się rozpoczęły.",
+        "changedMeanwhile": "Ktoś zmienił ten przestój od czasu jego załadowania. Załaduj ponownie i spróbuj jeszcze raz.",
+        "reload": "Załaduj ponownie",
+        "noModule": "Wybierz moduł w polu Dotyczy.",
+        "checkSchedule": "Sprawdź harmonogram, a następnie zapisz ponownie."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "alerty",
+          "anomaly_detections": "detekcje anomalii",
+          "synthetics": "kontrole syntetyczne",
+          "slos": "SLO"
+        },
+        "whenOnce": "Jednorazowo, od {start} do {end} {zone}",
+        "whenDaily": "Codziennie o {time} {zone}, przez {duration}",
+        "whenWeekly": "W każdy {days} o {time} {zone}, przez {duration}",
+        "inFolders": "w folderze {names} | w folderach {names}",
+        "withCondition": "z {condition}",
+        "tagged": "z tagami {tags}",
+        "named": "ograniczone do {count} nazwanego elementu | ograniczone do {count} nazwanych elementów",
+        "stopNotifying": "{when}: {targets} przestają wysyłać powiadomienia.",
+        "nothingMuted": "{when}: nie wyciszono żadnego alertu ani sprawdzenia.",
+        "sloUnchanged": "Wyniki SLO nie ulegają zmianie.",
+        "sloExcluded": "{slos} wykluczają to okno ze swojego wyniku.",
+        "sloAsGood": "{slos} zaliczają to okno jako czas prawidłowy."
+      },
+      "autoName": {
+        "once": "jednorazowo",
+        "onceOn": "jednorazowo {date}",
+        "daily": "codziennie",
+        "weekly": "co tydzień",
+        "all": {
+          "alerts": "Wszystkie alerty",
+          "anomaly_detections": "Wszystkie wykrywania anomalii",
+          "synthetics": "Wszystkie testy syntetyczne",
+          "slos": "Wszystkie SLO"
+        }
+      },
+      "condition": {
+        "none": "Brak warunku wymiaru",
+        "add": "Dodaj",
+        "title": "Warunek wymiaru",
+        "onePer": "Jeden na wyłączenie",
+        "remove": "Usuń warunek wymiaru",
+        "caption": "Dotyczy alertów, wykrywania anomalii i SLO. Sprawdzenia syntetyczne nie mają wymiarów i używają tagów. Wszystkie pary muszą się zgadzać. Dla alternatyw użyj grupy OR. Wartość może kończyć się znakiem *."
+      },
+      "resources": {
+        "refineBy": "Zawęź według zasobu",
+        "load": "Wczytaj zasoby",
+        "needsEq": "Dodaj co najmniej jeden warunek = przed zawężaniem według zasobu.",
+        "tooMany": "{count} wartości współwystępuje z tym warunkiem. Zawęź warunek, aby wybrać zasoby.",
+        "lastSeen": "Ostatnio widziano",
+        "streams": "Strumienie",
+        "footer": "Wybrano {selected} z {total} · {source}",
+        "fromRegistry": "z rejestru usług",
+        "fromSearch": "z danych z ostatnich 24 godzin",
+        "apply": "Zastosuj",
+        "loadFailed": "Nie udało się wczytać zasobów",
+        "notSeen": "Nie widziano w ostatniej godzinie.",
+        "partial": "Niektóre źródła nie odpowiedziały.",
+        "items": "Elementy",
+        "fromValues": "z alertów, rejestru usług i danych z ostatniej godziny",
+        "noValues": "Nie widziano jeszcze wartości dla tego wymiaru."
+      },
+      "scheduleForm": {
+        "once": "Jednorazowo",
+        "daily": "Codziennie",
+        "weekly": "Co tydzień",
+        "startDate": "Data rozpoczęcia",
+        "startTime": "Godzina rozpoczęcia",
+        "endDate": "Data zakończenia",
+        "endTime": "Godzina zakończenia",
+        "days": "Dni",
+        "startsAt": "Rozpoczyna się o",
+        "duration": "Czas trwania",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Do 7 dni, na przykład 90m lub 1h 30m.",
+        "until": "Powtarzaj do",
+        "untilPlaceholder": "Bez daty zakończenia",
+        "timezone": "Strefa czasowa",
+        "noWindow": "Żadne okno nie rozpoczyna się w ciągu najbliższych 8 dni.",
+        "nextWindow": "Następne okno: {window}. Okno może przekraczać północ.",
+        "nextWindowWithUtc": "Następne okno: {window} ({utc}). Okno może przekraczać północ.",
+        "startsOn": "Rozpoczyna się dnia"
+      },
+      "preview": {
+        "title": "Podgląd",
+        "failed": "Nie udało się wczytać podglądu.",
+        "andMore": "i {count} więcej",
+        "noMatch": "Obecnie nic nie pasuje",
+        "fireTime": "{count} alert ustala swoją tożsamość w momencie wyzwolenia | {count} alertów ustala swoją tożsamość w momencie wyzwolenia",
+        "undecidable": "Nie da się ich rozróżnić po {key}",
+        "showAll": "Pokaż pełną listę",
+        "showLess": "Pokaż mniej",
+        "finishCondition": "Dokończ warunek, aby zobaczyć podgląd."
+      },
+      "muteAllDialog": {
+        "title": "Wyciszyć całe moduły?",
+        "intro": "Żaden folder, element, tag ani warunek nie zawęża tych modułów, więc to wyciszenie obejmuje:",
+        "every": {
+          "alerts": "Każdy alert w tej organizacji",
+          "anomaly_detections": "Każde wykrywanie anomalii w tej organizacji",
+          "synthetics": "Każdy test syntetyczny w tej organizacji",
+          "slos": "Każdy SLO w tej organizacji"
+        },
+        "matchedNow": "{matched} dzisiaj",
+        "outro": "Powiadomienia, wezwania dyżurne i przepływy pracy zostają wstrzymane dla nich wszystkich w obrębie okna.",
+        "cancel": "Anuluj",
+        "confirm": "Wycisz wszystko",
+        "titleOne": {
+          "alerts": "Wyciszyć każdy alert w tej organizacji?",
+          "anomaly_detections": "Wyciszyć każde wykrywanie anomalii w tej organizacji?",
+          "synthetics": "Wyciszyć każdy test syntetyczny w tej organizacji?",
+          "slos": "Wyciszyć każde SLO w tej organizacji?"
+        },
+        "window": "Okno: {window}"
+      },
+      "summaryPane": {
+        "title": "Podsumowanie",
+        "filedIn": "Zapisane w",
+        "window": "Okno",
+        "nextWindow": "Następne okno",
+        "inUtc": "W UTC",
+        "largeMatch": "{modules}: wyciszenie obejmuje ponad połowę elementów. Większość tej organizacji nie otrzyma powiadomień w obrębie okna.",
+        "whatHappens": "Co się dzieje",
+        "keepRunning": "Ewaluacje i testy nadal działają i zachowują swoją historię.",
+        "noNotifications": "Powiadomienia, wezwania dyżurne i przepływy pracy zostają wstrzymane.",
+        "mutedIncidents": "Incydenty są otwierane jako wyciszone i powiadamiają po zakończeniu okna."
+      },
+      "band": {
+        "now": "teraz",
+        "none": "Żadne okno jeszcze nie wystąpiło i żadne nie jest zaplanowane.",
+        "active": "Aktywne",
+        "next": "Następne",
+        "past": "Wystąpiło",
+        "track": "Okna",
+        "aria": "{kind}: od {start} do {end}"
+      },
+      "detail": {
+        "overview": "Przegląd",
+        "affected": "Objęte · {count}",
+        "suppressed": "Wyciszone · {count}",
+        "details": "Szczegóły",
+        "condition": "Warunek",
+        "noTarget": "Brak celu",
+        "banner": "Baner",
+        "bannerOn": "Wyświetlany organizacji, gdy aktywny",
+        "bannerOff": "Brak banera",
+        "occurrences": "Wystąpienia",
+        "nextWindow": "Następne okno: {window}. Twój czas: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Dopasowane przez",
+        "matchedBy": {
+          "query": "Zapytanie",
+          "source_alert": "Alert źródłowy",
+          "tag": "Tag",
+          "id": "Nazwany",
+          "folder": "Folder",
+          "org": "Cała organizacja"
+        },
+        "source": "Źródło",
+        "wouldHaveNotified": "Wysłałoby powiadomienie",
+        "noSuppressed": "Nic nie zostało jeszcze wyciszone",
+        "muteHourName": "{name} · wyciszenie 1 godz.",
+        "notFoundTitle": "Nie znaleziono przestoju",
+        "notFoundDescription": "Mógł zostać usunięty albo link wskazuje inną organizację.",
+        "backToList": "Wróć do przestojów"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Wycisz {count} alert | Wycisz {count} alerty",
+          "anomaly_detections": "Wycisz {count} detekcję anomalii | Wycisz {count} detekcje anomalii",
+          "synthetics": "Wycisz {count} sprawdzenie | Wycisz {count} sprawdzenia",
+          "slos": "Wycisz {count} SLO | Wycisz {count} SLO",
+          "items": "Wycisz {count} element | Wycisz {count} elementy"
+        },
+        "subtitle": "Działają dalej i zachowują swoją historię. Powiadomienia, wezwania i przepływy pracy zostają wstrzymane do końca okna.",
+        "muteFor": "Wycisz na",
+        "fileIn": "Zapisz w",
+        "presets": {
+          "30m": "30 min",
+          "1h": "1 godz.",
+          "2h": "2 godz.",
+          "4h": "4 godz.",
+          "custom": "Niestandardowy"
+        },
+        "endsAt": "Kończy się",
+        "endsIn": "Za {duration}.",
+        "confirm": "Wycisz",
+        "confirmUntil": "Wycisz do {time}",
+        "menu": "Wycisz powiadomienia",
+        "until": "Do…",
+        "bulk": "Wycisz",
+        "muted": "Wyciszone · kończy się za {duration}",
+        "mutedTooltip": "Wyciszone przez {name} do {end}",
+        "exclude": "Wyklucz okno…",
+        "firingMuted": "Wyzwolony · wyciszony",
+        "firingMutedTooltip": "Nadal się wyzwala. Powiadomienia wycisza {name}."
+      },
+      "corrected": "Skorygowane",
+      "correctedBy": "Ocena skorygowana przez {names}",
+      "incident": {
+        "mutedBy": "Wyciszone · {name}",
+        "notLoaded": "Okno serwisowe nie zostało wczytane",
+        "notLoadedTooltip": "Wyciszono przez okno serwisowe {id}, którego nie ma wśród wczytanych okien serwisowych.",
+        "banner": "Wyciszone przez {name}. Nikt nie otrzymał wezwania. Pierwsze wyzwolenie po zakończeniu okna wysyła opóźnione powiadomienie o otwarciu.",
+        "bannerUntil": "Wyciszone przez {name} do {end}. Nikt nie otrzymał wezwania. Pierwsze wyzwolenie po zakończeniu okna wysyła opóźnione powiadomienie o otwarciu."
+      },
+      "banner": {
+        "ended": "zakończone",
+        "endsInUnderMinute": "kończy się w mniej niż minutę",
+        "endsInMinutes": "kończy się za {count} minutę | kończy się za {count} minuty",
+        "endsIn": "kończy się za {duration}",
+        "firstEndsInUnderMinute": "pierwsza kończy się za mniej niż minutę",
+        "firstEndsInMinutes": "pierwsza kończy się za {count} minutę | pierwsza kończy się za {count} minut",
+        "firstEndsIn": "pierwsza kończy się za {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Pokaż baner wszystkim w organizacji, gdy to wyciszenie jest aktywne",
+        "showBannerCaption": "Baner pokazuje nazwę, liczby objętych elementów i pozostały czas. Nigdy nie podaje nazwy alertu.",
+        "preview": "Podgląd",
+        "previewMessage": "{name} jest aktywne.",
+        "tooLong": "Baner jest dostępny tylko dla okien o długości do 7 dni."
+      },
+      "sloCorrections": {
+        "title": "Korekty statusu:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "krótszy niż przedział SLO, nie skorygowano żadnych minut"
+      },
+      "notify": {
+        "title": "Powiadamiaj",
+        "caption": "Informuj miejsca docelowe o samym przestoju: gdy się zaczyna, przed końcem i gdy się kończy.",
+        "destinations": "Miejsca docelowe",
+        "lead": "Przypomnij przed końcem",
+        "leadHelp": "Na przykład 10m lub 1h, od 1 minuty do długości okna.",
+        "regionNote": "W superklastrze wysyła region, w którym utworzono przestój. Przestój utworzony przed tym ustawieniem wysyła z każdego regionu.",
+        "tab": "Powiadomienia",
+        "events": {
+          "started": "Gdy się zaczyna",
+          "startedHelp": "Jedna wiadomość na początku każdego okna.",
+          "ending_soon": "Przed końcem",
+          "ending_soonHelp": "Przypomnienie przed końcem, aby nikogo nie zaskoczyły ponowne powiadomienia alertów.",
+          "ended": "Gdy się kończy",
+          "endedHelp": "Jedna wiadomość na zakończenie każdego okna.",
+          "cancelled": "Gdy zostanie anulowany",
+          "cancelledHelp": "Wysyłane od razu, gdy ktoś zakończy lub odwoła przestój.",
+          "extended": "Gdy zostanie przedłużony",
+          "extendedHelp": "Wysyłane od razu z nowym końcem."
+        },
+        "validation": {
+          "tooMany": "Można powiadomić najwyżej {max} miejsc docelowych.",
+          "eventRequired": "Wybierz co najmniej jedno zdarzenie albo usuń miejsca docelowe.",
+          "leadInvalid": "Przypomnienie musi przyjść od 1 minuty do długości okna przed końcem."
+        },
+        "summary": {
+          "none": "Nie wysyła własnych powiadomień.",
+          "sentence": "Powiadamia {destinations}: {events}.",
+          "started": "gdy się zaczyna",
+          "endingSoon": "{lead} przed końcem",
+          "ended": "gdy się kończy",
+          "cancelled": "gdy zostanie anulowany",
+          "extended": "gdy zostanie przedłużony"
+        },
+        "log": {
+          "time": "Czas",
+          "event": "Zdarzenie",
+          "destinations": "Miejsca docelowe",
+          "result": "Wynik",
+          "ok": "Wysłano",
+          "pending": "Wysyłanie",
+          "empty": "Nie wysłano jeszcze żadnych powiadomień",
+          "events": {
+            "started": "Rozpoczęty",
+            "ending_soon": "Wkrótce się kończy",
+            "ended": "Zakończony",
+            "cancelled": "Anulowany",
+            "extended": "Przedłużony"
+          }
+        },
+        "test": {
+          "send": "Wyślij test",
+          "sent": "Test wysłano do {count} miejsca docelowego | Test wysłano do {count} miejsc docelowych",
+          "failed": "Test nie dotarł do {names}."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Otwórz",
@@ -8858,7 +9359,8 @@
     "countWorkflow": "{count} przepływ pracy | {count} przepływy pracy",
     "countAnomalyDetection": "{count} detektor anomalii | {count} detektory anomalii",
     "countIncidentIntegration": "{count} integracja incydentów | {count} integracje incydentów",
-    "sectionOtherConsumers": "Używane również przez"
+    "sectionOtherConsumers": "Używane również przez",
+    "countDowntime": "{count} przestój | {count} przestoje"
   },
   "alert_library": {
     "header": "Biblioteka alertów",
@@ -16715,7 +17217,8 @@
       "sourceMaps": "RUM — Mapy źródłowe",
       "oncall": "Dyżur",
       "oncallDetail": "Strona dyżuru",
-      "syntheticsJourney": "Ścieżka syntetyczna"
+      "syntheticsJourney": "Ścieżka syntetyczna",
+      "downtimes": "Przerwy"
     },
     "actions": {
       "openCheatsheet": "Otwórz ściągawkę skrótów klawiszowych",
@@ -16824,6 +17327,8 @@
       "oncallEscalate": "Eskaluj",
       "oncallSnooze": "Odłóż",
       "oncallResolve": "Rozwiąż",
+      "downtimesCreate": "Nowa przerwa",
+      "downtimesRefresh": "Odśwież przerwy",
       "functionsImport": "Importuj funkcję"
     }
   },
@@ -17257,6 +17762,13 @@
         "belowTopN": "poniżej top-N",
         "truncated": "obcięty",
         "gap": "luka"
+      },
+      "downtimeStatus": {
+        "scheduled": "Zaplanowana",
+        "active": "Aktywna",
+        "ended": "Zakończona",
+        "cancelled": "Anulowana",
+        "endedEarly": "Zakończona wcześniej"
       }
     }
   },
@@ -17653,6 +18165,24 @@
     },
     "iam": {
       "userSaveFailed": "Nie udało się zapisać użytkownika"
+    },
+    "downtimes": {
+      "cancelled": "Przerwa anulowana",
+      "cancelledMany": "{count} przerwa anulowana | {count} przerw anulowanych",
+      "cancelFailed": "Nie udało się anulować przerwy",
+      "extended": "Przedłużono do {time}",
+      "extendedFollowUp": "Utworzono {name}, trwa do {time}",
+      "extendFailed": "Nie udało się przedłużyć przerwy",
+      "reload": "Załaduj ponownie",
+      "deleted": "Przerwa usunięta",
+      "deleteFailed": "Nie udało się usunąć przerwy",
+      "created": "Przerwa utworzona",
+      "updated": "Przerwa zapisana",
+      "saveFailed": "Nie udało się zapisać przerwy",
+      "muted": "Wyciszono {count} element do {time}. Zapisano w {folder}. | Wyciszono {count} elementów do {time}. Zapisano w {folder}.",
+      "muteFailed": "Nie udało się utworzyć wyciszenia",
+      "viewDowntime": "Wyświetl przerwę",
+      "itemsDropped": "{count} wybrany element znajduje się poza wybranymi folderami i został usunięty. | {count} wybranych elementów znajduje się poza wybranymi folderami i zostało usuniętych."
     }
   },
   "cipherKeys": {
@@ -17943,7 +18473,9 @@
       "budgetNote": "Ostatni punkt odpowiada kafelkowi pozostałego budżetu powyżej. Przerywana linia na poziomie 0% to wyczerpanie; poniżej niej SLO wykorzystało więcej błędów, niż pozwala cel. Luki to przedziały, w których nic nie zmierzono, co nie jest tym samym co zero.",
       "burnExplain": "Jak szybko budżet spala się w każdym przedziale osobno, jako wielokrotność tempa neutralnego budżetowo.",
       "burnFormula": "wskaźnik wypalania = (100% − SLI) ÷ (100% − cel)\nSLI = 100 × dobre ÷ suma, dla tego przedziału osobno\n\nprawa oś (ta sama linia odczytana jako SLI):\nSLI = 100% − wskaźnik wypalania × (100% − cel)",
-      "burnNote": "×1 zużywa budżet dokładnie na końcu okna, ×2 w połowie; poniżej ×1 budżet jest oszczędzany. Ponieważ jest to na przedział, a nie skumulowanie, pik tutaj pozostaje widoczny zamiast zostać uśredniony. Prawa oś liczona jest w dół: góra wykresu to większe spalanie, czyli niższe SLI."
+      "burnNote": "×1 zużywa budżet dokładnie na końcu okna, ×2 w połowie; poniżej ×1 budżet jest oszczędzany. Ponieważ jest to na przedział, a nie skumulowanie, pik tutaj pozostaje widoczny zamiast zostać uśredniony. Prawa oś liczona jest w dół: góra wykresu to większe spalanie, czyli niższe SLI.",
+      "corrected": "Skorygowane przez przerwę",
+      "correctedTooltip": "Skorygowane przez przerwę: wyłączone, więc linia budżetu pozostaje płaska"
     },
     "alerts": {
       "title": "Alerty",

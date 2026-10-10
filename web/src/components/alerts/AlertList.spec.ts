@@ -1751,6 +1751,25 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       );
     });
 
+    it("marks a firing row under an active downtime as a muted firing", async () => {
+      const downtime = { id: "dt-1", name: "Kafka upgrade", ends_at: 1_900_000_000_000_000 };
+      const { wrapper, row } = await anomalyRow({ active_downtime: downtime });
+
+      expect(row.last_outcome).toBe("firing");
+      expect(wrapper.vm.isMutedFiring(row)).toBe(true);
+      // Row cells render through the virtualised table, which jsdom does not lay out reliably.
+      expect(i18n.global.t("alerts.downtimes.mute.firingMuted")).toBe("Firing · muted");
+      expect(
+        i18n.global.t("alerts.downtimes.mute.firingMutedTooltip", { name: "Kafka upgrade" }),
+      ).toContain("Kafka upgrade");
+    });
+
+    it("keeps the plain outcome badge when no downtime is active", async () => {
+      const { wrapper, row } = await anomalyRow();
+
+      expect(wrapper.vm.isMutedFiring(row)).toBe(false);
+    });
+
     it("carries the priority and tags the API already sends", async () => {
       const { row } = await anomalyRow();
 

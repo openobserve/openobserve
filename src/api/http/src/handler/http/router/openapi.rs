@@ -292,6 +292,17 @@ use crate::{
         openobserve_api_management::request::slos::move_slos,
         openobserve_api_management::request::slos::list_slo_eligible_alerts,
         openobserve_api_management::request::slos::preview_alert_sli,
+        openobserve_api_management::request::downtimes::list_downtimes,
+        openobserve_api_management::request::downtimes::create_downtime,
+        openobserve_api_management::request::downtimes::preview_downtime,
+        openobserve_api_management::request::downtimes::downtime_resources,
+        openobserve_api_management::request::downtimes::downtime_values,
+        openobserve_api_management::request::downtimes::get_downtime,
+        openobserve_api_management::request::downtimes::update_downtime,
+        openobserve_api_management::request::downtimes::cancel_downtime,
+        openobserve_api_management::request::downtimes::extend_downtime,
+        openobserve_api_management::request::downtimes::move_downtimes,
+        openobserve_api_management::request::downtimes::delete_downtime,
         synthetics::list_synthetics,
         synthetics::create_synthetic,
         synthetics::get_synthetic,
@@ -426,6 +437,44 @@ use crate::{
             openobserve_api_management::request::alerts::incidents::IncidentSeverity,
             openobserve_api_management::request::alerts::incidents::IncidentStatus,
             config::meta::alerts::incidents::Incident,
+            config::meta::downtimes::Downtime,
+            config::meta::downtimes::DowntimeRequest,
+            config::meta::downtimes::DowntimeListItem,
+            config::meta::downtimes::DowntimeDetail,
+            config::meta::downtimes::ListDowntimesResponse,
+            config::meta::downtimes::PreviewRequest,
+            config::meta::downtimes::PreviewResponse,
+            config::meta::downtimes::ResourcesRequest,
+            config::meta::downtimes::ResourcesResponse,
+            config::meta::downtimes::ValuesRequest,
+            config::meta::downtimes::ValuesResponse,
+            config::meta::downtimes::ValueSuggestion,
+            config::meta::downtimes::MoveDowntimesRequest,
+            config::meta::downtimes::CreateDowntimeResponse,
+            config::meta::downtimes::ExtendDowntimeRequest,
+            config::meta::downtimes::ExtendDowntimeResponse,
+            config::meta::downtimes::DowntimeTarget,
+            config::meta::downtimes::TargetFolders,
+            config::meta::downtimes::DimensionCondition,
+            config::meta::downtimes::LogicalOp,
+            config::meta::downtimes::PairOperator,
+            config::meta::downtimes::TargetModule,
+            config::meta::downtimes::DowntimeSchedule,
+            config::meta::downtimes::Repeat,
+            config::meta::downtimes::DowntimeStatus,
+            config::meta::downtimes::DowntimeWindow,
+            config::meta::downtimes::ResourceValue,
+            config::meta::downtimes::SloCorrectionMode,
+            config::meta::downtimes::IncidentMode,
+            config::meta::downtimes::PreviewMatch,
+            config::meta::downtimes::ActiveDowntime,
+            config::meta::downtimes::CorrectionRef,
+            config::meta::downtimes::DowntimeStatusCounts,
+            config::meta::downtimes::AffectedItems,
+            config::meta::downtimes::DowntimeNotifications,
+            config::meta::downtimes::NotificationEvents,
+            config::meta::downtimes::NotificationEvent,
+            config::meta::downtimes::DowntimeNotificationLogEntry,
             config::meta::alerts::incidents::IncidentWithAlerts,
             config::meta::alerts::incidents::IncidentAlert,
             config::meta::alerts::incidents::IncidentStats,
@@ -589,6 +638,7 @@ use crate::{
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
+        (name = "Downtimes", description = "Scheduled windows that keep evaluating alerts, anomaly detections, synthetics checks and SLOs but notify nobody (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
     ),
     info(
@@ -984,5 +1034,36 @@ mod tests {
             .collect();
         assert!(tags.contains(&"Product Analytics"), "{tags:?}");
         assert!(!tags.contains(&"RUM"), "{tags:?}");
+    }
+
+    #[test]
+    fn every_schema_ref_resolves() {
+        fn collect_refs<'a>(value: &'a serde_json::Value, refs: &mut Vec<&'a str>) {
+            match value {
+                serde_json::Value::Object(map) => {
+                    if let Some(r) = map.get("$ref").and_then(|r| r.as_str()) {
+                        refs.push(r);
+                    }
+                    map.values().for_each(|v| collect_refs(v, refs));
+                }
+                serde_json::Value::Array(items) => items.iter().for_each(|v| collect_refs(v, refs)),
+                _ => {}
+            }
+        }
+
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        let mut refs = Vec::new();
+        collect_refs(&spec, &mut refs);
+        let mut unresolved = refs
+            .into_iter()
+            .filter(|r| {
+                r.strip_prefix("#/components/schemas/")
+                    .is_some_and(|name| !schemas.contains_key(name))
+            })
+            .collect::<Vec<_>>();
+        unresolved.sort_unstable();
+        unresolved.dedup();
+        assert!(unresolved.is_empty(), "unresolved refs: {unresolved:?}");
     }
 }

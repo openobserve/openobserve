@@ -560,6 +560,12 @@
       "description": "Uzak görev, deneylerinizin çıktı üretmek için çağırdığı bir HTTP hizmetidir. Bir kez yayınlayın, bağlantının çalıştığını doğrulayın ve her deney, üzerinde çalıştığı tam sürümü sabitleyebilir.",
       "action": "Yeni Görev",
       "actionDesc": "OpenObserve'i uç noktanıza yönlendirin ve bağlantıyı test edin."
+    },
+    "noDowntimes": {
+      "title": "Henüz kesinti yok",
+      "description": "Bir kesinti; uyarıların, anomali algılamalarının ve sentetik kontrollerin çalışmaya devam etmesini sağlar ve planladığınız bir zaman aralığı boyunca bildirimlerini durdurur.",
+      "action": "Kesinti planla",
+      "actionDesc": "Tek seferlik, günlük veya haftalık. Hızlıca sessize almak için uyarı listesindeki Sessize Al seçeneğini kullanın."
     }
   },
   "common": {
@@ -1320,6 +1326,7 @@
     "topQueries": "En Çok Kullanılan Sorgular",
     "profiles": "Profiller",
     "productAnalytics": "Ürün Analitiği",
+    "downtimes": "Kesintiler",
     "trialEndedTitle": "Deneme süreniz sona erdi",
     "trialPageNeedsPlan": "{page} için bir plan gerekli",
     "trialPageNeedsPlanToast": "{page} için bir plan gerekli. Kullanmaya devam etmek için bu sayfadan bir plan seçin.",
@@ -2822,6 +2829,7 @@
       "scopeCoveredByParent": "Kilitli eylemler, {module} içinde ayarlanan {scope} kapsamından gelir",
       "scopeAllOf": "Tüm {module}",
       "scopeIncludesFuture": "Sonradan oluşturulan kaynakları içerir",
+      "scopeDowntimeHint": "Bir kesinti klasörü, bir kesintiyi kimin yöneteceğini sınırlar, neyi susturacağını değil. Bir modülün Tüm klasörlerini susturmak için, kullanıcının o modülün her klasörünü listeleme yetkisine sahip olması gerekir. Susturulmuş çipler ve banner'lar, kullanıcının listeleyemediği bir kesintiyi adlandırabilir.",
       "grantedByWiderScope": "Daha geniş bir kapsam tarafından verildi",
       "grantedHereAndByWiderScope": "Burada ve daha geniş bir kapsam tarafından verildi",
       "stillGrantedByWiderScope": "Burada kaldırıldı, hâlâ daha geniş bir kapsam tarafından veriliyor",
@@ -8821,7 +8829,500 @@
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
     "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
-    "seconds": "Saniye"
+    "seconds": "Saniye",
+    "downtimes": {
+      "newTitle": "Yeni kesinti",
+      "editTitle": "Kesintiyi düzenle",
+      "detailTitle": "Kesinti",
+      "modules": {
+        "alerts": "Uyarılar",
+        "anomaly_detections": "Anomali algılamaları",
+        "synthetics": "Sentetik kontroller",
+        "slos": "SLO'lar"
+      },
+      "modulesShort": {
+        "alerts": "Uyarılar",
+        "anomaly_detections": "Anomali",
+        "synthetics": "Sentetikler",
+        "slos": "SLO'lar"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "Pencere boyunca olaylar",
+          "muted": "Oluşturulur ve sessize alınır (varsayılan)",
+          "mutedHelp": "Olaylar her zamanki gibi açılır ancak pencere bitene kadar kimseye bildirim gönderilmez.",
+          "none": "Oluşturulmaz",
+          "noneHelp": "Pencere boyunca olay açılmaz; pencereden sonraki ilk tetikleme bir olay açar ve bildirim gönderir.",
+          "summary": "olay yok"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}",
+        "condition": "koşul",
+        "allFolders": "tüm klasörler",
+        "oneFolder": "{name} klasörü",
+        "nFolders": "{count} klasör | {count} klasör",
+        "tags": "etiket {tags}",
+        "nItems": "{count} öğe | {count} öğe",
+        "asGood": "iyi olarak",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
+      },
+      "duration": {
+        "days": "{count} g",
+        "hours": "{count} sa",
+        "minutes": "{count} dk"
+      },
+      "schedule": {
+        "windowRange": "{start} - {end} {zone}",
+        "onceSentence": "Bir kez · {start} - {end} · {zone}",
+        "dailySentence": "Günlük · {time}, {duration} boyunca · {zone}",
+        "weeklySentence": "Haftalık {days} · {time}, {duration} boyunca · {zone}",
+        "fromNoEnd": "{schedule}, {start} tarihinden itibaren, bitiş tarihi yok",
+        "fromUntil": "{schedule}, {start} ile {until} arasında"
+      },
+      "validation": {
+        "conditionRequired": "Bir koşul ekleyin veya koşul bloğunu kaldırın.",
+        "pairKey": "Her satır için bir boyut seçin.",
+        "pairOperator": "Bir kesinti koşulunda = veya != kullanın.",
+        "pairValue": "Her satır için bir değer girin.",
+        "loneStar": "Bir değer tek başına * olamaz.",
+        "innerStar": "* yalnızca bir değerin sonunda kullanılabilir.",
+        "emptyGroup": "Bir koşul grubu boş olamaz.",
+        "tooDeep": "Bir koşulda gruplar en fazla 3 seviye iç içe yerleştirilebilir.",
+        "tooManyPairs": "Bir koşul en fazla 32 çift içerebilir.",
+        "needsEq": "En az bir = koşulu ekleyin. Yalnızca != satırlarından oluşan bir koşul diğer her şeyi sessize alır.",
+        "modulesRequired": "En az bir modül seçin.",
+        "foldersRequired": "Tüm klasörler seçeneğini veya en az bir klasör seçin.",
+        "tagsRequired": "Bir etiket ekleyin veya etiketler bloğunu kaldırın.",
+        "idsRequired": "Bir öğe seçin veya belirli öğeler bloğunu kaldırın.",
+        "idOutsideFolders": "Seçilen bazı öğeler seçilen klasörlerde değil.",
+        "tooManyFolders": "En fazla {max} klasör veya Tüm klasörler seçin.",
+        "tooManyTags": "En fazla {max} etiket ekleyin.",
+        "tooManyIds": "En fazla {max} öğe seçin.",
+        "nameTooLong": "Bir ad en fazla 256 karakter olabilir.",
+        "timezoneRequired": "Bir saat dilimi seçin.",
+        "startRequired": "Bir başlangıç tarihi ve saati girin.",
+        "endRequired": "Bir bitiş tarihi ve saati girin.",
+        "endAfterStart": "Bitiş, başlangıçtan sonra olmalıdır.",
+        "windowTooLong": "Bir pencere en fazla 7 gün sürebilir.",
+        "windowTooShort": "Bir pencere en az 1 dakika sürmelidir.",
+        "startTimeRequired": "Başlangıç saatini SS:DD olarak girin.",
+        "durationInvalid": "90dk veya 1sa 30dk gibi bir süre girin.",
+        "weekdaysRequired": "En az bir gün seçin.",
+        "untilAfterStart": "Yineleme bitişi, ilk gün veya sonrasında olmalıdır.",
+        "reasonTooLong": "Bir neden en fazla {max} karakter olabilir.",
+        "windowOutlastsRepeat": "Pencere, tekrarlar arasındaki süreden uzun olamaz.",
+        "startDateRequired": "İlk günü seçin."
+      },
+      "title": "Kesintiler",
+      "subtitle": "Uyarıları, anomali algılamalarını ve sentetik kontrolleri çalışır durumda tutan ancak bildirimlerini durduran planlanmış pencereler",
+      "newDowntime": "Yeni kesinti",
+      "filterAll": "Tümü",
+      "filterOnce": "Tek seferlik",
+      "filterRecurring": "Yinelenen",
+      "search": "Ada, boyuta veya oluşturana göre ara",
+      "searchAcross": "Tüm klasörlerde ara",
+      "thisFolder": "Bu klasör",
+      "allFolders": "Tüm klasörler",
+      "thisFolderTooltip": "Seçili klasörde ara",
+      "allFoldersTooltip": "Her klasörde ara",
+      "noFolder": "Kesinti kaydedebileceğiniz bir klasör yok",
+      "truncated": "{total} kesintinin ilk {shown} tanesi gösteriliyor",
+      "stats": {
+        "active": "Etkin",
+        "scheduled": "Planlanmış",
+        "recurring": "Yinelenen",
+        "ended": "Sona erdi",
+        "cancelled": "İptal edildi",
+        "endedEarly": "Erken bitti",
+        "total": "Toplam"
+      },
+      "columns": {
+        "name": "Ad",
+        "status": "Durum",
+        "targets": "Hedefler",
+        "schedule": "Zamanlama",
+        "when": "Bitiş / sonraki",
+        "matched": "Eşleşen",
+        "createdBy": "Oluşturan",
+        "folder": "Klasör"
+      },
+      "oneTime": "Tek seferlik",
+      "recurring": "Yinelenen",
+      "bannerOn": "Bu kesinti etkinken kuruluştaki herkese bir banner gösterilir",
+      "endsLabel": "bitiş",
+      "confirmEndNow": {
+        "title": "Bu kesinti şimdi bitirilsin mi?",
+        "message": "Bildirimler hemen yeniden başlar. Kesinti listede erken bitti olarak kalır.",
+        "ok": "Şimdi bitir",
+        "keep": "Devam etsin"
+      },
+      "extend": {
+        "menu": "Uzatma süresi",
+        "notActive": "Yalnızca etkin bir kesinti uzatılabilir",
+        "dialogTitle": "{name} uzat",
+        "newEnd": "Yeni bitiş",
+        "confirmUntil": "{time} saatine kadar uzat",
+        "followUp": "Bu kesinti tekrarlandığı için zamanlaması olduğu gibi kalır. Geçerli pencerenin bitişinden itibaren {name} adlı tek seferlik bir kesinti oluşturulur.",
+        "endAfterCurrent": "Yeni bitiş, geçerli bitişten sonra olmalıdır."
+      },
+      "nextLabel": "sonraki",
+      "matched": {
+        "alerts": "{count} uyarı | {count} uyarılar",
+        "anomalies": "{count} anomali | {count} anomaliler",
+        "synthetics": "{count} kontrol | {count} kontroller",
+        "slos": "{count} SLO | {count} SLO'lar"
+      },
+      "actions": {
+        "endNow": "Şimdi bitir",
+        "edit": "Düzenle",
+        "duplicate": "Çoğalt",
+        "moveToFolder": "Klasöre taşı",
+        "cancel": "Kesintiyi iptal et",
+        "delete": "Sil",
+        "more": "Diğer işlemler",
+        "muteForHour": "Şimdi 1 saat sessize al",
+        "extend": "Uzat"
+      },
+      "confirmCancel": {
+        "title": "Kesinti süresini iptal et",
+        "message": "Bildirimler hemen devam eder. Kesinti süresi geçmiş için listede kalır.",
+        "bulkMessage": "{count} kesinti süresi iptal edilsin mi? Bildirimler hemen devam eder. | {count} kesinti süresi iptal edilsin mi? Bildirimler hemen devam eder.",
+        "confirm": "Kesinti süresini iptal et | Kesinti sürelerini iptal et",
+        "keep": "Kesinti süresini koru | Kesinti sürelerini koru"
+      },
+      "confirmDelete": {
+        "title": "Kesinti süresini sil",
+        "message": "Kesinti süresi ve geçmişi kaldırılır. Bu geri alınamaz."
+      },
+      "copyOf": "{name} kopyası",
+      "form": {
+        "matches": {
+          "alerts": "{count} uyarı eşleşiyor | {count} uyarı eşleşiyor",
+          "anomaly_detections": "{count} algılama eşleşiyor | {count} algılama eşleşiyor",
+          "synthetics": "{count} kontrol eşleşiyor | {count} kontrol eşleşiyor",
+          "slos": "{count} SLO eşleşiyor | {count} SLO eşleşiyor"
+        },
+        "alertFolders": "Uyarı klasörleri",
+        "syntheticsFolders": "Sentetik klasörleri",
+        "noAlertFolderAccess": "Uyarı klasörlerine erişiminiz yok.",
+        "noSyntheticsFolderAccess": "Sentetik klasörlerine erişiminiz yok.",
+        "tags": "Etiketler",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "Her etiket kontrolde bulunmalıdır.",
+        "removeBlock": "Bu bloğu kaldır",
+        "specificItems": "Belirli öğeler",
+        "itemsHint": "Yalnızca seçilen klasörlerdeki öğeler sunulur.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Etiket ekle",
+        "addItems": "Belirli öğe ekle",
+        "sloMode": "Pencere içindeki SLO puanı",
+        "sloExclude": "Pencereyi hariç tut",
+        "sloCountAsGood": "Pencereyi iyi olarak say",
+        "sloExcludeCaption": "Pencere içindeki süre ne iyi ne de kötü olarak sayılır. Bu SLO'lardaki yakma oranı uyarıları bunun için tetiklenmez.",
+        "sloCountAsGoodCaption": "Pencere içindeki süre tamamen iyi olarak sayılır. Bunu yalnızca SLO sözleşmeniz planlı bakımın çalışma süresi olduğunu söylüyorsa kullanın.",
+        "cardCaption": "Önce klasörler, ardından isteğe bağlı bloklar daha da daraltır. Yukarıdaki boyut koşulu bu modül için de geçerlidir.",
+        "noConditionForChecks": "Yukarıdaki boyut koşulu kontroller için geçerli değildir.",
+        "appliesTo": "Şunlara uygulanır",
+        "tabTargets": "Hedefler",
+        "tabSchedule": "Zamanlama",
+        "tabAdvanced": "Gelişmiş",
+        "modeInFolder": "{mode} içinde",
+        "newMode": "Yeni kesinti süresi",
+        "editMode": "Kesinti süresini düzenle",
+        "namePlaceholder": "Kesinti süresi adı",
+        "nameLabel": "Kesinti süresi adı",
+        "renameHint": "Yeniden adlandırmak için tıklayın",
+        "reason": "Neden",
+        "reasonHelp": "İsteğe bağlı. Listede, ayrıntı sayfasında ve Sessize alındı ipucunda gösterilir.",
+        "cancel": "İptal",
+        "save": "Kaydet",
+        "activeBanner": "Bu kesinti süresi etkin. Bir düzenleme bir sonraki değerlendirmede geçerli olur ve SLO modundaki bir değişiklik başlamış olan pencereleri yeniden ölçer.",
+        "changedMeanwhile": "Siz yükledikten sonra biri bu kesinti süresini değiştirdi. Yeniden yükleyip tekrar deneyin.",
+        "reload": "Yeniden yükle",
+        "noModule": "Şunlara uygulanır bölümünden bir modül seçin.",
+        "checkSchedule": "Zamanlamayı kontrol edin, ardından yeniden kaydedin."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "uyarılar",
+          "anomaly_detections": "anomali algılamaları",
+          "synthetics": "sentetik kontrolleri",
+          "slos": "SLO'lar"
+        },
+        "whenOnce": "Bir kez, {start} ile {end} arasında {zone}",
+        "whenDaily": "Her gün {time} {zone}, {duration} boyunca",
+        "whenWeekly": "Her {days} {time} {zone}, {duration} boyunca",
+        "inFolders": "{names} klasöründe | {names} klasörlerinde",
+        "withCondition": "{condition} ile",
+        "tagged": "{tags} etiketli",
+        "named": "{count} adlandırılmış öğeyle sınırlı | {count} adlandırılmış öğeyle sınırlı",
+        "stopNotifying": "{when}: {targets} bildirim göndermeyi durdurur.",
+        "nothingMuted": "{when}: hiçbir uyarı veya kontrol sessize alınmaz.",
+        "sloUnchanged": "SLO puanları değişmez.",
+        "sloExcluded": "{slos} bu aralığı puanından hariç tutar.",
+        "sloAsGood": "{slos} bu aralığı iyi süre olarak sayar."
+      },
+      "autoName": {
+        "once": "bir kez",
+        "onceOn": "bir kez {date}",
+        "daily": "günlük",
+        "weekly": "haftalık",
+        "all": {
+          "alerts": "Tüm uyarılar",
+          "anomaly_detections": "Tüm anomali tespitleri",
+          "synthetics": "Tüm sentetik kontroller",
+          "slos": "Tüm SLO'lar"
+        }
+      },
+      "condition": {
+        "none": "Boyut koşulu yok",
+        "add": "Ekle",
+        "title": "Boyut koşulu",
+        "onePer": "Her kesinti için bir tane",
+        "remove": "Boyut koşulunu kaldır",
+        "caption": "Uyarılar, anomali algılamaları ve SLO'lar için geçerlidir. Sentetik kontrollerin boyutu yoktur ve etiket kullanır. Tüm çiftler eşleşmelidir. Alternatifler için bir OR grubu kullanın. Bir değer * ile bitebilir."
+      },
+      "resources": {
+        "refineBy": "Kaynağa göre daralt",
+        "load": "Kaynakları yükle",
+        "needsEq": "Kaynağa göre daraltmadan önce en az bir = koşulu ekleyin.",
+        "tooMany": "Bu koşulla birlikte {count} değer görülüyor. Kaynak seçmek için koşulu daraltın.",
+        "lastSeen": "Son görülme",
+        "streams": "Akışlar",
+        "footer": "{total} öğeden {selected} tanesi seçildi · {source}",
+        "fromRegistry": "hizmet kayıt defterinden",
+        "fromSearch": "son 24 saatlik veriden",
+        "apply": "Uygula",
+        "loadFailed": "Kaynaklar yüklenemedi",
+        "notSeen": "Son bir saatte görülmedi.",
+        "partial": "Bazı kaynaklar yanıt vermedi.",
+        "items": "Öğeler",
+        "fromValues": "uyarılardan, hizmet kayıt defterinden ve son bir saatin verilerinden",
+        "noValues": "Bu boyut için henüz değer görülmedi."
+      },
+      "scheduleForm": {
+        "once": "Bir kez",
+        "daily": "Günlük",
+        "weekly": "Haftalık",
+        "startDate": "Başlangıç tarihi",
+        "startTime": "Başlangıç saati",
+        "endDate": "Bitiş tarihi",
+        "endTime": "Bitiş saati",
+        "days": "Günler",
+        "startsAt": "Başlangıç",
+        "duration": "Süre",
+        "durationPlaceholder": "1sa 30dk",
+        "durationHelp": "En fazla 7 gün, örneğin 90dk veya 1sa 30dk.",
+        "until": "Şu tarihe kadar tekrarla",
+        "untilPlaceholder": "Bitiş tarihi yok",
+        "timezone": "Saat dilimi",
+        "noWindow": "Önümüzdeki 8 gün içinde başlayan bir zaman aralığı yok.",
+        "nextWindow": "Sonraki pencere: {window}. Bir pencere gece yarısını geçebilir.",
+        "nextWindowWithUtc": "Sonraki pencere: {window} ({utc}). Bir pencere gece yarısını geçebilir.",
+        "startsOn": "Başlangıç tarihi"
+      },
+      "preview": {
+        "title": "Önizleme",
+        "failed": "Önizleme yüklenemedi.",
+        "andMore": "ve {count} tane daha",
+        "noMatch": "Şu anda hiçbir şey eşleşmiyor",
+        "fireTime": "{count} uyarı kimliğini tetiklenme anında belirler | {count} uyarı kimliğini tetiklenme anında belirler",
+        "undecidable": "{key} ile ayırt edilemiyor",
+        "showAll": "Tam listeyi göster",
+        "showLess": "Daha az göster",
+        "finishCondition": "Önizlemeyi görmek için koşulu tamamlayın."
+      },
+      "muteAllDialog": {
+        "title": "Tüm modüller sessize alınsın mı?",
+        "intro": "Hiçbir klasör, öğe, etiket veya koşul bu modülleri daraltmıyor, bu nedenle bu kesinti şunları sessize alır:",
+        "every": {
+          "alerts": "Bu organizasyondaki tüm uyarılar",
+          "anomaly_detections": "Bu organizasyondaki tüm anomali tespitleri",
+          "synthetics": "Bu organizasyondaki tüm sentetik kontroller",
+          "slos": "Bu organizasyondaki tüm SLO'lar"
+        },
+        "matchedNow": "bugün {matched}",
+        "outro": "Pencere içinde hepsi için bildirimler, nöbet çağrıları ve iş akışları durur.",
+        "cancel": "İptal",
+        "confirm": "Tümünü sessize al",
+        "titleOne": {
+          "alerts": "Bu organizasyondaki her uyarı sessize alınsın mı?",
+          "anomaly_detections": "Bu organizasyondaki her anomali tespiti sessize alınsın mı?",
+          "synthetics": "Bu organizasyondaki her sentetik kontrol sessize alınsın mı?",
+          "slos": "Bu organizasyondaki her SLO sessize alınsın mı?"
+        },
+        "window": "Pencere: {window}"
+      },
+      "summaryPane": {
+        "title": "Özet",
+        "filedIn": "Kayıtlı olduğu yer",
+        "window": "Pencere",
+        "nextWindow": "Sonraki pencere",
+        "inUtc": "UTC olarak",
+        "largeMatch": "{modules}: kesinti, öğelerin yarısından fazlasıyla eşleşiyor. Bu organizasyonun büyük kısmı pencere içinde bildirim göndermeyecek.",
+        "whatHappens": "Ne olur",
+        "keepRunning": "Değerlendirmeler ve kontroller çalışmaya devam eder ve geçmişlerini korur.",
+        "noNotifications": "Bildirimler, nöbet çağrıları ve iş akışları durur.",
+        "mutedIncidents": "Olaylar sessiz olarak açılır ve pencere sonrasında bildirim gönderir."
+      },
+      "band": {
+        "now": "şimdi",
+        "none": "Henüz hiçbir pencere çalışmadı ve planlanmış bir pencere yok.",
+        "active": "Etkin",
+        "next": "Sonraki",
+        "past": "Çalıştı",
+        "track": "Pencereler",
+        "aria": "{kind}: {start} - {end}"
+      },
+      "detail": {
+        "overview": "Genel Bakış",
+        "affected": "Etkilenen · {count}",
+        "suppressed": "Bastırılan · {count}",
+        "details": "Ayrıntılar",
+        "condition": "Koşul",
+        "noTarget": "Hedef yok",
+        "banner": "Banner",
+        "bannerOn": "Etkin olduğu sürece organizasyona gösterilir",
+        "bannerOff": "Banner yok",
+        "occurrences": "Gerçekleşmeler",
+        "nextWindow": "Sonraki pencere: {window}. Sizin saatinizle: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Eşleştiren",
+        "matchedBy": {
+          "query": "Sorgu",
+          "source_alert": "Kaynak uyarı",
+          "tag": "Etiket",
+          "id": "Adlandırılmış",
+          "folder": "Klasör",
+          "org": "Tüm organizasyon"
+        },
+        "source": "Kaynak",
+        "wouldHaveNotified": "Bildirim gönderilirdi",
+        "noSuppressed": "Henüz hiçbir şey bastırılmadı",
+        "muteHourName": "{name} · 1 sa sustur",
+        "notFoundTitle": "Kesinti süresi bulunamadı",
+        "notFoundDescription": "Silinmiş olabilir veya bağlantı başka bir kuruluşu gösteriyor olabilir.",
+        "backToList": "Kesinti sürelerine dön"
+      },
+      "mute": {
+        "title": {
+          "alerts": "{count} uyarıyı sustur | {count} uyarıyı sustur",
+          "anomaly_detections": "{count} anomali tespitini sustur | {count} anomali tespitini sustur",
+          "synthetics": "{count} kontrolü sustur | {count} kontrolü sustur",
+          "slos": "{count} SLO'yu sustur | {count} SLO'yu sustur",
+          "items": "{count} öğeyi sustur | {count} öğeyi sustur"
+        },
+        "subtitle": "Çalışmaya devam eder ve geçmişlerini korurlar. Bildirimler, çağrılar ve iş akışları pencere bitene kadar durur.",
+        "muteFor": "Susturma süresi",
+        "fileIn": "Dosyalama yeri",
+        "presets": {
+          "30m": "30 dk",
+          "1h": "1 sa",
+          "2h": "2 sa",
+          "4h": "4 sa",
+          "custom": "Özel"
+        },
+        "endsAt": "Bitiş",
+        "endsIn": "{duration} içinde.",
+        "confirm": "Sustur",
+        "confirmUntil": "{time} zamanına kadar sustur",
+        "menu": "Bildirimleri sustur",
+        "until": "Şu zamana kadar…",
+        "bulk": "Sustur",
+        "muted": "Susturuldu · {duration} içinde bitiyor",
+        "mutedTooltip": "{name} tarafından {end} zamanına kadar susturuldu",
+        "exclude": "Bir zaman aralığını hariç tut…",
+        "firingMuted": "Tetikleniyor · sessize alındı",
+        "firingMutedTooltip": "Hâlâ tetikleniyor. Bildirimler {name} tarafından sessize alındı."
+      },
+      "corrected": "Düzeltildi",
+      "correctedBy": "Puan {names} tarafından düzeltildi",
+      "incident": {
+        "mutedBy": "Susturuldu · {name}",
+        "notLoaded": "Kesinti yüklenmedi",
+        "notLoadedTooltip": "{id} kesintisi tarafından sessize alındı; bu kesinti yüklenenler arasında değil.",
+        "banner": "{name} tarafından susturuldu. Kimseye çağrı gönderilmedi. Pencereden sonraki ilk tetiklenme, gecikmiş açılış bildirimini gönderir.",
+        "bannerUntil": "{name} tarafından {end} zamanına kadar susturuldu. Kimseye çağrı gönderilmedi. Pencereden sonraki ilk tetiklenme, gecikmiş açılış bildirimini gönderir."
+      },
+      "banner": {
+        "ended": "bitti",
+        "endsInUnderMinute": "bir dakikadan kısa süre içinde bitiyor",
+        "endsInMinutes": "{count} dakika içinde bitiyor | {count} dakika içinde bitiyor",
+        "endsIn": "{duration} içinde bitiyor",
+        "firstEndsInUnderMinute": "ilki bir dakikadan kısa sürede bitiyor",
+        "firstEndsInMinutes": "ilki {count} dakika içinde bitiyor | ilki {count} dakika içinde bitiyor",
+        "firstEndsIn": "ilki {duration} içinde bitiyor",
+        "count": "{module} {count}",
+        "showBanner": "Bu kesinti aktifken organizasyondaki herkese bir banner göster",
+        "showBannerCaption": "Banner adı, etkilenen sayıları ve kalan süreyi gösterir. Hiçbir zaman bir uyarının adını vermez.",
+        "preview": "Önizleme",
+        "previewMessage": "{name} aktif.",
+        "tooLong": "Banner yalnızca en fazla 7 günlük pencereler için kullanılabilir."
+      },
+      "sloCorrections": {
+        "title": "Durum düzeltmeleri:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "SLO diliminden kısa, hiçbir dakika düzeltilmedi"
+      },
+      "notify": {
+        "title": "Bildir",
+        "caption": "Hedeflere kesinti süresinin kendisini bildirin: başladığında, bitmeden önce ve bittiğinde.",
+        "destinations": "Hedefler",
+        "lead": "Bitişten önce hatırlat",
+        "leadHelp": "Örneğin 10m veya 1h, 1 dakika ile pencere uzunluğu arasında.",
+        "regionNote": "Süper kümede, kesinti süresinin oluşturulduğu bölge gönderir. Bu ayardan önce oluşturulan bir kesinti süresi her bölgeden gönderir.",
+        "tab": "Bildirimler",
+        "events": {
+          "started": "Başladığında",
+          "startedHelp": "Her pencere başlarken bir ileti.",
+          "ending_soon": "Bitmeden önce",
+          "ending_soonHelp": "Bitişten önce bir hatırlatma; uyarılar yeniden bildirim gönderdiğinde kimse şaşırmaz.",
+          "ended": "Bittiğinde",
+          "endedHelp": "Her pencere kapanırken bir ileti.",
+          "cancelled": "İptal edildiğinde",
+          "cancelledHelp": "Biri kesinti süresini bitirdiğinde veya iptal ettiğinde hemen gönderilir.",
+          "extended": "Uzatıldığında",
+          "extendedHelp": "Yeni bitişle birlikte hemen gönderilir."
+        },
+        "validation": {
+          "tooMany": "En fazla {max} hedef bildirilebilir.",
+          "eventRequired": "En az bir olay seçin veya hedefleri kaldırın.",
+          "leadInvalid": "Hatırlatma, bitişten 1 dakika ile pencere uzunluğu kadar önce arasında gelmelidir."
+        },
+        "summary": {
+          "none": "Kendi bildirimini göndermez.",
+          "sentence": "{destinations} hedeflerini bildirir: {events}.",
+          "started": "başladığında",
+          "endingSoon": "bitişten {lead} önce",
+          "ended": "bittiğinde",
+          "cancelled": "iptal edildiğinde",
+          "extended": "uzatıldığında"
+        },
+        "log": {
+          "time": "Zaman",
+          "event": "Olay",
+          "destinations": "Hedefler",
+          "result": "Sonuç",
+          "ok": "Gönderildi",
+          "pending": "Gönderiliyor",
+          "empty": "Henüz bildirim gönderilmedi",
+          "events": {
+            "started": "Başladı",
+            "ending_soon": "Yakında bitiyor",
+            "ended": "Bitti",
+            "cancelled": "İptal edildi",
+            "extended": "Uzatıldı"
+          }
+        },
+        "test": {
+          "send": "Test gönder",
+          "sent": "Test {count} hedefe gönderildi | Test {count} hedefe gönderildi",
+          "failed": "Test {names} hedefine ulaşmadı."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -8858,7 +9359,8 @@
     "countWorkflow": "{count} iş akışı | {count} iş akışı",
     "countAnomalyDetection": "{count} anomali dedektörü | {count} anomali dedektörü",
     "countIncidentIntegration": "{count} olay entegrasyonu | {count} olay entegrasyonu",
-    "sectionOtherConsumers": "Ayrıca kullananlar"
+    "sectionOtherConsumers": "Ayrıca kullananlar",
+    "countDowntime": "{count} kesinti süresi | {count} kesinti süresi"
   },
   "alert_library": {
     "header": "Uyarı Kitaplığı",
@@ -16715,7 +17217,8 @@
       "sourceMaps": "RUM - Kaynak Haritaları",
       "oncall": "Nöbet",
       "oncallDetail": "Nöbet sayfası",
-      "syntheticsJourney": "Sentetikler yolculuğu"
+      "syntheticsJourney": "Sentetikler yolculuğu",
+      "downtimes": "Kesintiler"
     },
     "actions": {
       "openCheatsheet": "Klavye kısayolları hile sayfasını aç",
@@ -16824,6 +17327,8 @@
       "oncallEscalate": "Yükselt",
       "oncallSnooze": "Ertele",
       "oncallResolve": "Çöz",
+      "downtimesCreate": "Yeni kesinti",
+      "downtimesRefresh": "Kesintileri yenile",
       "functionsImport": "Fonksiyonu içe aktar"
     }
   },
@@ -17257,6 +17762,13 @@
         "belowTopN": "üst-N altında",
         "truncated": "kesilmiş",
         "gap": "boşluk"
+      },
+      "downtimeStatus": {
+        "scheduled": "Planlandı",
+        "active": "Etkin",
+        "ended": "Sona erdi",
+        "cancelled": "İptal edildi",
+        "endedEarly": "Erken bitti"
       }
     }
   },
@@ -17653,6 +18165,24 @@
     },
     "iam": {
       "userSaveFailed": "Kullanıcı kaydedilemedi"
+    },
+    "downtimes": {
+      "cancelled": "Kesinti iptal edildi",
+      "cancelledMany": "{count} kesinti iptal edildi | {count} kesinti iptal edildi",
+      "cancelFailed": "Kesinti iptal edilemedi",
+      "extended": "{time} saatine kadar uzatıldı",
+      "extendedFollowUp": "{name} oluşturuldu, {time} saatine kadar sürüyor",
+      "extendFailed": "Kesinti uzatılamadı",
+      "reload": "Yeniden yükle",
+      "deleted": "Kesinti silindi",
+      "deleteFailed": "Kesinti silinemedi",
+      "created": "Kesinti oluşturuldu",
+      "updated": "Kesinti kaydedildi",
+      "saveFailed": "Kesinti kaydedilemedi",
+      "muted": "{count} öğe {time} zamanına kadar sessize alındı. {folder} klasörüne kaydedildi. | {count} öğe {time} zamanına kadar sessize alındı. {folder} klasörüne kaydedildi.",
+      "muteFailed": "Sessize alma oluşturulamadı",
+      "viewDowntime": "Kesintiyi görüntüle",
+      "itemsDropped": "{count} seçilen öğe, seçilen klasörlerin dışında olduğu için kaldırıldı. | {count} seçilen öğe, seçilen klasörlerin dışında olduğu için kaldırıldı."
     }
   },
   "cipherKeys": {
@@ -17943,7 +18473,9 @@
       "budgetNote": "Son nokta, yukarıdaki Kalan Bütçe karosuna eşittir. %0'daki kesikli çizgi tükenmeyi gösterir; altında SLO, hedefin izin verdiğinden daha fazla hata tüketmiştir. Boşluklar, hiçbir şeyin ölçülmediği bölmelerdir; bu sıfır ile aynı şey değildir.",
       "burnExplain": "Bütçenin her kovada ne kadar hızlı tükendiği, bütçe-nötr oranın katı olarak.",
       "burnFormula": "tükenme oranı = (100% − SLI) ÷ (100% − hedef)\nSLI = 100 × iyi ÷ toplam, yalnızca o bölme için\n\nsağ eksen (aynı çizginin SLI olarak okunuşu):\nSLI = 100% − tükenme oranı × (100% − hedef)",
-      "burnNote": "×1 bütçeyi pencerenin tam sonunda harcar, ×2 yarısında; ×1 altında bütçe biriktiriliyor. Kova başına olduğu ve kümülatif olmadığı için, buradaki bir ani artış görünür kalır, ortalamaya karışıp kaybolmaz. Sağ eksen aşağı doğru sayar: grafik yukarısı daha fazla yanma demektir, bu da daha düşük bir SLI'dır."
+      "burnNote": "×1 bütçeyi pencerenin tam sonunda harcar, ×2 yarısında; ×1 altında bütçe biriktiriliyor. Kova başına olduğu ve kümülatif olmadığı için, buradaki bir ani artış görünür kalır, ortalamaya karışıp kaybolmaz. Sağ eksen aşağı doğru sayar: grafik yukarısı daha fazla yanma demektir, bu da daha düşük bir SLI'dır.",
+      "corrected": "Bir kesinti tarafından düzeltildi",
+      "correctedTooltip": "Bir kesinti tarafından düzeltildi: hariç tutuldu, bu yüzden bütçe çizgisi düz."
     },
     "alerts": {
       "title": "Uyarılar",

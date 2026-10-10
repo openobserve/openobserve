@@ -1,0 +1,1580 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Downtimes table operations; rows store the folder key, [Downtime] carries the public id.
+
+use std::collections::HashMap;
+
+use config::meta::{
+    downtimes::{Downtime, DowntimeSchedule, Repeat},
+    folder::{DEFAULT_FOLDER, FolderType},
+};
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, NotSet, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, LockType, OnConflict},
+};
+use svix_ksuid::KsuidLike;
+
+use super::{
+    entity::{
+        downtime_notifications as notifications,
+        downtimes::{ActiveModel, Column, Entity, Model},
+        folders,
+    },
+    folders::{folder_type_into_i16, get_model as get_folder_model},
+    slo_backfill_jobs::{Remeasure, queue_remeasures},
+};
+use crate::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    errors::{self, Error},
+};
+
+const TOMBSTONE_ATTEMPTS: usize = 8;
+const DELETE_CHUNK: usize = 500;
+
+/// What a local write needs the stored rows to still be, checked in its transaction.
+#[derive(Clone, Copy, Debug)]
+pub enum Guard<'a> {
+    /// A new row, or a plain upsert.
+    None,
+    /// The row still has this `updated_at` and is not deleted.
+    Unchanged(i64),
+    /// A follow-up row, inserted while its parent still has this `updated_at`.
+    ParentUnchanged { parent_id: &'a str, updated_at: i64 },
+}
+
+/// The version of a stored row, soft-deleted or not, for ordering replicated writes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RowVersion {
+    pub version: i64,
+    pub updated_at: i64,
+    pub deleted: bool,
+}
+
+/// A fresh downtime id.
+pub fn new_id() -> String {
+    svix_ksuid::Ksuid::new(None, None).to_string()
+}
+
+pub async fn list(org: &str, folder_id: Option<&str>) -> Result<Vec<Downtime>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_with(client, org, folder_id).await
+}
+
+pub async fn list_all() -> Result<Vec<Downtime>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_all_with(client).await
+}
+
+pub async fn get(org: &str, id: &str) -> Result<Option<Downtime>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    get_with(client, org, id).await
+}
+
+/// A local write and its SLO re-measures in one transaction; false if `guard` no longer holds.
+pub async fn write(
+    downtime: &Downtime,
+    guard: Guard<'_>,
+    remeasures: &[Remeasure],
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let now = config::utils::time::now_micros() / 1_000_000;
+    write_with(client, downtime, guard, remeasures, now).await
+}
+
+/// Soft delete: the row stays as a tombstone so a late replicated put cannot bring it back.
+pub async fn delete(org: &str, id: &str) -> Result<Option<RowVersion>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_with(client, org, id).await
+}
+
+/// The version of the row, including a soft-deleted one.
+pub async fn version(org: &str, id: &str) -> Result<Option<RowVersion>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    version_with(client, org, id).await
+}
+
+/// Deletes ended, cancelled and soft-deleted rows older than `cutoff`.
+pub async fn delete_ended_before(cutoff: i64) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_ended_before_with(client, cutoff).await
+}
+
+/// `(org, id)` of the rows [delete_ended_before] removes, for the cache and coordinator.
+pub async fn list_ended_before(cutoff: i64) -> Result<Vec<Downtime>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    list_ended_before_with(client, cutoff).await
+}
+
+pub async fn move_to_folder(
+    org: &str,
+    ids: &[String],
+    dst_folder_id: &str,
+) -> Result<u64, errors::Error> {
+    let client = get_orm_client_rw().await;
+    move_to_folder_with(client, org, ids, dst_folder_id).await
+}
+
+/// Rows filed in the folder with this primary key; guards folder deletion.
+pub async fn count_by_folder(org: &str, folder_pk: &str) -> Result<u64, errors::Error> {
+    let client = get_orm_client_ro().await;
+    count_by_folder_with(client, org, folder_pk).await
+}
+
+/// Readies a folder for deletion: false if a live row is filed there, else its tombstones go.
+pub async fn release_folder(org: &str, folder_pk: &str) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    release_folder_with(client, org, folder_pk).await
+}
+
+/// Removes every row of an org and returns the removed ids.
+pub async fn delete_by_org(org: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    delete_by_org_with(client, org).await
+}
+
+pub async fn count_by_folder_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    folder_pk: &str,
+) -> Result<u64, errors::Error> {
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::FolderId.eq(folder_pk))
+        .filter(Column::DeletedAt.is_null())
+        .count(conn)
+        .await?)
+}
+
+pub async fn list_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    folder_id: Option<&str>,
+) -> Result<Vec<Downtime>, errors::Error> {
+    let mut query = Entity::find()
+        .filter(Column::Org.eq(org))
+        .filter(Column::DeletedAt.is_null());
+    if let Some(folder_id) = folder_id {
+        let Some(folder) = get_folder_model(conn, org, folder_id, FolderType::Downtimes).await?
+        else {
+            return Ok(vec![]);
+        };
+        query = query.filter(Column::FolderId.eq(folder.id));
+    }
+    let models = query.order_by_desc(Column::StartsAt).all(conn).await?;
+    into_downtimes(conn, models).await
+}
+
+pub async fn list_all_with<C: ConnectionTrait>(conn: &C) -> Result<Vec<Downtime>, errors::Error> {
+    let models = Entity::find()
+        .filter(Column::DeletedAt.is_null())
+        .all(conn)
+        .await?;
+    into_downtimes(conn, models).await
+}
+
+pub async fn get_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<Downtime>, errors::Error> {
+    let Some(model) = Entity::find_by_id(id)
+        .filter(Column::Org.eq(org))
+        .filter(Column::DeletedAt.is_null())
+        .one(conn)
+        .await?
+    else {
+        return Ok(None);
+    };
+    Ok(into_downtimes(conn, vec![model]).await?.pop())
+}
+
+/// Tombstones move to the default folder, so they still order a late replicated put of their row.
+pub async fn release_folder_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    folder_pk: &str,
+) -> Result<bool, errors::Error> {
+    if count_by_folder_with(conn, org, folder_pk).await? > 0 {
+        return Ok(false);
+    }
+    let tombstones = Condition::all()
+        .add(Column::Org.eq(org))
+        .add(Column::FolderId.eq(folder_pk))
+        .add(Column::DeletedAt.is_not_null());
+    let default_pk = default_folder_pk_with(conn, org).await?;
+    // The default folder itself has nowhere to send them.
+    if default_pk == folder_pk {
+        Entity::delete_many().filter(tombstones).exec(conn).await?;
+    } else {
+        Entity::update_many()
+            .col_expr(Column::FolderId, Expr::value(default_pk))
+            .filter(tombstones)
+            .exec(conn)
+            .await?;
+    }
+    Ok(true)
+}
+
+pub async fn version_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<RowVersion>, errors::Error> {
+    Ok(Entity::find_by_id(id)
+        .filter(Column::Org.eq(org))
+        .one(conn)
+        .await?
+        .map(|m| RowVersion {
+            version: m.version,
+            updated_at: m.updated_at,
+            deleted: m.deleted_at.is_some(),
+        }))
+}
+
+/// Upsert that also clears `deleted_at`, so a newer replicated put restores a soft-deleted row.
+pub async fn put_with<C: ConnectionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+) -> Result<(), errors::Error> {
+    let folder_pk = folder_pk(conn, downtime).await?;
+    Entity::insert(to_active_model(downtime, folder_pk)?)
+        .on_conflict(
+            OnConflict::column(Column::Id)
+                .update_columns([
+                    Column::Org,
+                    Column::FolderId,
+                    Column::Name,
+                    Column::Reason,
+                    Column::Condition,
+                    Column::Targets,
+                    Column::ShowBanner,
+                    Column::Repeat,
+                    Column::StartsAt,
+                    Column::EndsAt,
+                    Column::Timezone,
+                    Column::StartTimeLocal,
+                    Column::DurationSecs,
+                    Column::Weekdays,
+                    Column::CancelledAt,
+                    Column::CancelledBy,
+                    Column::DeletedAt,
+                    Column::Notifications,
+                    Column::OriginRegion,
+                    Column::Version,
+                    Column::CreatedBy,
+                    Column::CreatedAt,
+                    Column::UpdatedBy,
+                    Column::UpdatedAt,
+                ])
+                .to_owned(),
+        )
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+pub async fn write_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+    guard: Guard<'_>,
+    remeasures: &[Remeasure],
+    now: i64,
+) -> Result<bool, errors::Error> {
+    let txn = conn.begin().await?;
+    let written = match guard {
+        Guard::None => {
+            put_with(&txn, downtime).await?;
+            true
+        }
+        Guard::Unchanged(updated_at) => put_if_unchanged_with(&txn, downtime, updated_at).await?,
+        Guard::ParentUnchanged {
+            parent_id,
+            updated_at,
+        } => insert_if_parent_unchanged_with(&txn, downtime, parent_id, updated_at).await?,
+    };
+    if !written {
+        txn.rollback().await?;
+        return Ok(false);
+    }
+    queue_remeasures(&txn, remeasures, now).await?;
+    txn.commit().await?;
+    Ok(true)
+}
+
+pub async fn put_if_unchanged_with<C: ConnectionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+    expected_updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let folder_pk = folder_pk(conn, downtime).await?;
+    let mut model = to_active_model(downtime, folder_pk)?;
+    model.id = NotSet;
+    model.org = NotSet;
+    let res = Entity::update_many()
+        .set(model)
+        .filter(Column::Org.eq(&downtime.org))
+        .filter(Column::Id.eq(&downtime.id))
+        .filter(Column::UpdatedAt.eq(expected_updated_at))
+        .filter(Column::DeletedAt.is_null())
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected == 1)
+}
+
+pub async fn insert_if_parent_unchanged_with<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    row: &Downtime,
+    parent_id: &str,
+    expected_updated_at: i64,
+) -> Result<bool, errors::Error> {
+    let txn = conn.begin().await?;
+    let mut parent = Entity::find_by_id(parent_id).filter(Column::Org.eq(&row.org));
+    // The row lock holds a racing cancel until this commits; SQLite serializes writers instead.
+    if txn.get_database_backend() != sea_orm::DatabaseBackend::Sqlite {
+        parent = parent.lock(LockType::Update);
+    }
+    let unchanged = parent.one(&txn).await?.is_some_and(|p| {
+        p.updated_at == expected_updated_at && p.cancelled_at.is_none() && p.deleted_at.is_none()
+    });
+    if !unchanged || continued_with(&txn, row, parent_id).await? {
+        txn.rollback().await?;
+        return Ok(false);
+    }
+    put_with(&txn, row).await?;
+    txn.commit().await?;
+    Ok(true)
+}
+
+/// Whether a live follow-up already continues the parent from `row`'s start; the parent lock
+/// serializes this.
+async fn continued_with<C: ConnectionTrait>(
+    conn: &C,
+    row: &Downtime,
+    parent_id: &str,
+) -> Result<bool, errors::Error> {
+    let siblings = Entity::find()
+        .filter(Column::Org.eq(&row.org))
+        .filter(Column::StartsAt.eq(row.schedule.starts_at))
+        .filter(Column::CancelledAt.is_null())
+        .filter(Column::DeletedAt.is_null())
+        .all(conn)
+        .await?;
+    Ok(siblings.into_iter().any(|m| {
+        m.notifications
+            .and_then(|v| {
+                v.get("continues")
+                    .and_then(|c| c.as_str().map(str::to_string))
+            })
+            .is_some_and(|continues| continues == parent_id)
+    }))
+}
+
+/// Local delete: tombstones the row as the next version; the tombstone, `None` for no row.
+pub async fn delete_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<RowVersion>, errors::Error> {
+    for _ in 0..TOMBSTONE_ATTEMPTS {
+        let Some(stored) = version_with(conn, org, id).await? else {
+            return Ok(None);
+        };
+        if let Some(tombstone) = write_tombstone(conn, org, id, stored).await? {
+            return Ok(Some(tombstone));
+        }
+    }
+    Err(Error::Message(format!(
+        "downtime {org}/{id} kept changing during its delete"
+    )))
+}
+
+/// Writes a replicated put only while the row is still `stored`, or still absent for `None`.
+pub async fn put_if_stored_with<C: ConnectionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+    stored: Option<RowVersion>,
+) -> Result<bool, errors::Error> {
+    let folder_pk = folder_pk(conn, downtime).await?;
+    let mut model = to_active_model(downtime, folder_pk)?;
+    let Some(stored) = stored else {
+        let inserted = Entity::insert(model)
+            .on_conflict(OnConflict::column(Column::Id).do_nothing().to_owned())
+            .exec_without_returning(conn)
+            .await?;
+        return Ok(inserted == 1);
+    };
+    model.id = NotSet;
+    model.org = NotSet;
+    let res = Entity::update_many()
+        .set(model)
+        .filter(still(org_id(&downtime.org, &downtime.id), stored))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected == 1)
+}
+
+/// Tombstones a replicated delete at its own version and time, only while the row is `stored`.
+pub async fn tombstone_if_stored_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    stored: RowVersion,
+    version: i64,
+    deleted_at: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
+        .col_expr(Column::DeletedAt, Expr::value(deleted_at))
+        .col_expr(Column::UpdatedAt, Expr::value(deleted_at))
+        .col_expr(Column::Version, Expr::value(version))
+        .filter(still(org_id(org, id), stored))
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected == 1)
+}
+
+/// A tombstone for a row this region never saw; false if a row with the id exists by now.
+pub async fn insert_tombstone_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    folder_pk: &str,
+    version: i64,
+    deleted_at: i64,
+) -> Result<bool, errors::Error> {
+    let tombstone = ActiveModel {
+        id: Set(id.to_string()),
+        org: Set(org.to_string()),
+        folder_id: Set(folder_pk.to_string()),
+        name: Set(id.to_string()),
+        reason: Set(None),
+        condition: Set(None),
+        targets: Set(serde_json::json!([])),
+        show_banner: Set(false),
+        repeat: Set(Repeat::None.to_i16()),
+        starts_at: Set(deleted_at),
+        ends_at: Set(Some(deleted_at)),
+        timezone: Set("UTC".to_string()),
+        start_time_local: Set(None),
+        duration_secs: Set(0),
+        weekdays: Set(None),
+        cancelled_at: Set(None),
+        cancelled_by: Set(None),
+        deleted_at: Set(Some(deleted_at)),
+        notifications: Set(None),
+        origin_region: Set(None),
+        version: Set(version),
+        created_by: Set(String::new()),
+        created_at: Set(deleted_at),
+        updated_by: Set(String::new()),
+        updated_at: Set(deleted_at),
+    };
+    let inserted = Entity::insert(tombstone)
+        .on_conflict(OnConflict::column(Column::Id).do_nothing().to_owned())
+        .exec_without_returning(conn)
+        .await?;
+    Ok(inserted == 1)
+}
+
+pub async fn delete_ended_before_with<C: ConnectionTrait>(
+    conn: &C,
+    cutoff: i64,
+) -> Result<u64, errors::Error> {
+    let expired = || {
+        Condition::any()
+            .add(ended_before(cutoff))
+            .add(Column::DeletedAt.lt(cutoff))
+    };
+    let ids: Vec<String> = Entity::find()
+        .select_only()
+        .column(Column::Id)
+        .filter(expired())
+        .into_tuple()
+        .all(conn)
+        .await?;
+    let mut removed = 0;
+    for chunk in ids.chunks(DELETE_CHUNK) {
+        notifications::Entity::delete_many()
+            .filter(notifications::Column::DowntimeId.is_in(chunk.to_vec()))
+            .exec(conn)
+            .await?;
+        removed += Entity::delete_many()
+            .filter(expired())
+            .filter(Column::Id.is_in(chunk.to_vec()))
+            .exec(conn)
+            .await?
+            .rows_affected;
+    }
+    Ok(removed)
+}
+
+pub async fn list_ended_before_with<C: ConnectionTrait>(
+    conn: &C,
+    cutoff: i64,
+) -> Result<Vec<Downtime>, errors::Error> {
+    let models = Entity::find()
+        .filter(ended_before(cutoff))
+        .filter(Column::DeletedAt.is_null())
+        .all(conn)
+        .await?;
+    into_downtimes(conn, models).await
+}
+
+pub async fn move_to_folder_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    ids: &[String],
+    dst_folder_id: &str,
+) -> Result<u64, errors::Error> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+    let folder = get_folder_model(conn, org, dst_folder_id, FolderType::Downtimes)
+        .await?
+        .ok_or_else(|| Error::Message(format!("downtime folder {dst_folder_id} not found")))?;
+    let res = Entity::update_many()
+        .col_expr(Column::FolderId, Expr::value(folder.id))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(config::utils::time::now_micros()),
+        )
+        .filter(Column::Org.eq(org))
+        .filter(Column::Id.is_in(ids.to_vec()))
+        .filter(Column::DeletedAt.is_null())
+        .exec(conn)
+        .await?;
+    Ok(res.rows_affected)
+}
+
+pub async fn delete_by_org_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+) -> Result<Vec<String>, errors::Error> {
+    let ids: Vec<String> = Entity::find()
+        .filter(Column::Org.eq(org))
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(|m| m.id)
+        .collect();
+    notifications::Entity::delete_many()
+        .filter(notifications::Column::Org.eq(org))
+        .exec(conn)
+        .await?;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(conn)
+        .await?;
+    Ok(ids)
+}
+
+/// One compare-and-swap against `stored`; `None` when another write moved the row first.
+async fn write_tombstone<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    stored: RowVersion,
+) -> Result<Option<RowVersion>, errors::Error> {
+    if stored.deleted {
+        return Ok(Some(stored));
+    }
+    let tombstone = RowVersion {
+        version: stored.version + 1,
+        updated_at: config::utils::time::now_micros(),
+        deleted: true,
+    };
+    let written = tombstone_if_stored_with(
+        conn,
+        org,
+        id,
+        stored,
+        tombstone.version,
+        tombstone.updated_at,
+    )
+    .await?;
+    Ok(written.then_some(tombstone))
+}
+
+fn org_id(org: &str, id: &str) -> Condition {
+    Condition::all()
+        .add(Column::Org.eq(org))
+        .add(Column::Id.eq(id))
+}
+
+/// `cond` narrowed to a row still at `stored`; its version and `updated_at` pair never repeats.
+fn still(cond: Condition, stored: RowVersion) -> Condition {
+    let deleted = if stored.deleted {
+        Column::DeletedAt.is_not_null()
+    } else {
+        Column::DeletedAt.is_null()
+    };
+    cond.add(Column::Version.eq(stored.version))
+        .add(Column::UpdatedAt.eq(stored.updated_at))
+        .add(deleted)
+}
+
+async fn folder_pk<C: ConnectionTrait>(
+    conn: &C,
+    downtime: &Downtime,
+) -> Result<String, errors::Error> {
+    get_folder_model(
+        conn,
+        &downtime.org,
+        &downtime.folder_id,
+        FolderType::Downtimes,
+    )
+    .await?
+    .map(|folder| folder.id)
+    .ok_or_else(|| {
+        Error::Message(format!(
+            "downtime folder {} not found in org {}",
+            downtime.folder_id, downtime.org
+        ))
+    })
+}
+
+/// The primary key of the org's default downtime folder, created on this connection if missing.
+async fn default_folder_pk_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+) -> Result<String, errors::Error> {
+    if let Some(model) = get_folder_model(conn, org, DEFAULT_FOLDER, FolderType::Downtimes).await? {
+        return Ok(model.id);
+    }
+    let folder = config::meta::folder::Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: DEFAULT_FOLDER.to_owned(),
+        description: DEFAULT_FOLDER.to_owned(),
+        icon: None,
+    };
+    super::folders::get_or_create_with(conn, org, folder, FolderType::Downtimes).await?;
+    get_folder_model(conn, org, DEFAULT_FOLDER, FolderType::Downtimes)
+        .await?
+        .map(|model| model.id)
+        .ok_or_else(|| Error::Message(format!("no default downtime folder in {org}")))
+}
+
+/// Open-ended recurring rows have no `ends_at`, so they never match.
+fn ended_before(cutoff: i64) -> Condition {
+    Condition::any()
+        .add(Column::EndsAt.lt(cutoff))
+        .add(Column::CancelledAt.lt(cutoff))
+}
+
+fn to_active_model(d: &Downtime, folder_pk: String) -> Result<ActiveModel, errors::Error> {
+    Ok(ActiveModel {
+        id: Set(d.id.clone()),
+        org: Set(d.org.clone()),
+        folder_id: Set(folder_pk),
+        name: Set(d.name.clone()),
+        reason: Set(d.reason.clone()),
+        condition: Set(d.condition.as_ref().map(serde_json::to_value).transpose()?),
+        targets: Set(serde_json::to_value(&d.targets)?),
+        show_banner: Set(d.show_banner),
+        repeat: Set(d.schedule.repeat.to_i16()),
+        starts_at: Set(d.schedule.starts_at),
+        ends_at: Set(d.schedule.ends_at),
+        timezone: Set(d.schedule.timezone.clone()),
+        start_time_local: Set(d.schedule.start_time_local.clone()),
+        duration_secs: Set(d.schedule.duration_secs),
+        weekdays: Set(Some(serde_json::to_value(&d.schedule.weekdays)?)),
+        cancelled_at: Set(d.cancelled_at),
+        cancelled_by: Set(d.cancelled_by.clone()),
+        deleted_at: Set(None),
+        notifications: Set(d
+            .notifications
+            .as_ref()
+            .map(serde_json::to_value)
+            .transpose()?),
+        origin_region: Set(d.origin_region.clone()),
+        version: Set(d.version),
+        created_by: Set(d.created_by.clone()),
+        created_at: Set(d.created_at),
+        updated_by: Set(d.updated_by.clone()),
+        updated_at: Set(d.updated_at),
+    })
+}
+
+fn from_model(m: Model, folder_id: String) -> Result<Downtime, errors::Error> {
+    let repeat = Repeat::from_i16(m.repeat).ok_or_else(|| {
+        Error::Message(format!("downtime {} has unknown repeat {}", m.id, m.repeat))
+    })?;
+    Ok(Downtime {
+        condition: m.condition.map(serde_json::from_value).transpose()?,
+        targets: serde_json::from_value(m.targets)?,
+        schedule: DowntimeSchedule {
+            repeat,
+            starts_at: m.starts_at,
+            ends_at: m.ends_at,
+            timezone: m.timezone,
+            start_time_local: m.start_time_local,
+            duration_secs: m.duration_secs,
+            weekdays: m
+                .weekdays
+                .map(serde_json::from_value)
+                .transpose()?
+                .unwrap_or_default(),
+        },
+        id: m.id,
+        org: m.org,
+        folder_id,
+        name: m.name,
+        reason: m.reason,
+        cancelled_at: m.cancelled_at,
+        cancelled_by: m.cancelled_by,
+        show_banner: m.show_banner,
+        // An unreadable notification setting must not drop the row, which would stop the muting.
+        notifications: m.notifications.and_then(|v| {
+            serde_json::from_value(v)
+                .inspect_err(|e| log::warn!("[DOWNTIMES] ignoring unreadable notifications: {e}"))
+                .ok()
+        }),
+        origin_region: m.origin_region,
+        version: m.version,
+        created_by: m.created_by,
+        created_at: m.created_at,
+        updated_by: m.updated_by,
+        updated_at: m.updated_at,
+    })
+}
+
+/// A row that no longer parses is logged and skipped, so one bad row cannot hide the others.
+async fn into_downtimes<C: ConnectionTrait>(
+    conn: &C,
+    models: Vec<Model>,
+) -> Result<Vec<Downtime>, errors::Error> {
+    let slugs = folder_slugs(conn, &models).await?;
+    Ok(models
+        .into_iter()
+        .filter_map(|m| {
+            let folder_id = slugs
+                .get(&m.folder_id)
+                .cloned()
+                .unwrap_or_else(|| m.folder_id.clone());
+            let id = m.id.clone();
+            from_model(m, folder_id)
+                .inspect_err(|e| log::warn!("[DOWNTIMES] skipping unreadable row {id}: {e}"))
+                .ok()
+        })
+        .collect())
+}
+
+async fn folder_slugs<C: ConnectionTrait>(
+    conn: &C,
+    models: &[Model],
+) -> Result<HashMap<String, String>, errors::Error> {
+    if models.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let mut pks: Vec<String> = models.iter().map(|m| m.folder_id.clone()).collect();
+    pks.sort_unstable();
+    pks.dedup();
+    Ok(folders::Entity::find()
+        .filter(folders::Column::Id.is_in(pks))
+        .filter(folders::Column::Type.eq(folder_type_into_i16(FolderType::Downtimes)))
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(|f| (f.id, f.folder_id))
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::downtimes::{DowntimeTarget, TargetFolders, TargetModule};
+    use sea_orm::{Database, DatabaseConnection, Schema};
+
+    use super::*;
+
+    const DAY: i64 = 86_400_000_000;
+
+    async fn db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        crate::table::migration::create_downtime_notifications_for_test(&db)
+            .await
+            .unwrap();
+        for (pk, org, slug, folder_type) in [
+            ("pk-default", "acme", "default", FolderType::Downtimes),
+            ("pk-planned", "acme", "planned", FolderType::Downtimes),
+            ("pk-alerts", "acme", "planned", FolderType::Alerts),
+            ("pk-other", "other", "default", FolderType::Downtimes),
+        ] {
+            folders::Entity::insert(folders::ActiveModel {
+                id: Set(pk.to_string()),
+                org: Set(org.to_string()),
+                folder_id: Set(slug.to_string()),
+                name: Set(slug.to_string()),
+                description: Set(None),
+                icon: Set(None),
+                r#type: Set(folder_type_into_i16(folder_type)),
+            })
+            .exec(&db)
+            .await
+            .unwrap();
+        }
+        db
+    }
+
+    fn downtime(id: &str, repeat: Repeat, ends_at: Option<i64>) -> Downtime {
+        Downtime {
+            id: id.to_string(),
+            org: "acme".to_string(),
+            folder_id: "default".to_string(),
+            name: id.to_string(),
+            reason: None,
+            condition: None,
+            targets: vec![DowntimeTarget {
+                module: TargetModule::Alerts,
+                folders: TargetFolders::All,
+                tags: vec![],
+                ids: vec![],
+                slo_mode: None,
+                incident_mode: Default::default(),
+            }],
+            schedule: DowntimeSchedule {
+                repeat,
+                starts_at: 10 * DAY,
+                ends_at,
+                timezone: "UTC".to_string(),
+                start_time_local: (repeat != Repeat::None).then(|| "02:00".to_string()),
+                duration_secs: 3600,
+                weekdays: if repeat == Repeat::Weekly {
+                    vec![7]
+                } else {
+                    vec![]
+                },
+            },
+            cancelled_at: None,
+            cancelled_by: None,
+            show_banner: true,
+            notifications: None,
+            origin_region: None,
+            version: 0,
+            created_by: "lin".to_string(),
+            created_at: 1,
+            updated_by: "lin".to_string(),
+            updated_at: 1,
+        }
+    }
+
+    fn ids(rows: &[Downtime]) -> Vec<&str> {
+        let mut ids: Vec<&str> = rows.iter().map(|d| d.id.as_str()).collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    async fn log_sent(db: &DatabaseConnection, org: &str, downtime_id: &str) {
+        let record = super::super::downtime_notifications::DowntimeNotification {
+            id: new_id(),
+            org: org.to_string(),
+            downtime_id: downtime_id.to_string(),
+            window_start: 1,
+            event: "started".to_string(),
+            sent_at: 1,
+            destinations: serde_json::json!(["slack"]),
+            result: Some("ok".to_string()),
+        };
+        super::super::downtime_notifications::insert_if_absent_with(db, &record)
+            .await
+            .unwrap();
+    }
+
+    async fn logged(db: &DatabaseConnection) -> Vec<String> {
+        let mut ids: Vec<String> = notifications::Entity::find()
+            .all(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|m| m.downtime_id)
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    #[test]
+    fn a_new_id_is_a_ksuid() {
+        assert_eq!(new_id().len(), 27);
+    }
+
+    #[tokio::test]
+    async fn put_then_get_returns_the_row_with_its_public_folder_id() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::Weekly, None);
+        d.folder_id = "planned".to_string();
+        d.reason = Some("CHG-1".to_string());
+        put_with(&db, &d).await.unwrap();
+
+        let stored = Entity::find_by_id("d1").one(&db).await.unwrap().unwrap();
+        assert_eq!(stored.folder_id, "pk-planned");
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(d));
+        assert_eq!(get_with(&db, "other", "d1").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn put_is_an_upsert_on_the_id() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+        d.name = "renamed".to_string();
+        d.cancelled_at = Some(10 * DAY);
+        put_with(&db, &d).await.unwrap();
+
+        let rows = list_with(&db, "acme", None).await.unwrap();
+        assert_eq!(rows, vec![d]);
+    }
+
+    #[tokio::test]
+    async fn put_refuses_a_folder_that_does_not_exist() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        d.folder_id = "missing".to_string();
+        assert!(put_with(&db, &d).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn list_filters_by_org_and_by_folder() {
+        let db = db().await;
+        let mut planned = downtime("d2", Repeat::Daily, None);
+        planned.folder_id = "planned".to_string();
+        put_with(&db, &downtime("d1", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        put_with(&db, &planned).await.unwrap();
+        let mut foreign = downtime("d3", Repeat::None, Some(11 * DAY));
+        foreign.org = "other".to_string();
+        put_with(&db, &foreign).await.unwrap();
+
+        assert_eq!(
+            ids(&list_with(&db, "acme", None).await.unwrap()),
+            ["d1", "d2"]
+        );
+        assert_eq!(
+            ids(&list_with(&db, "acme", Some("planned")).await.unwrap()),
+            ["d2"]
+        );
+        assert!(
+            list_with(&db, "acme", Some("nope"))
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d1", "d2", "d3"]);
+    }
+
+    #[tokio::test]
+    async fn delete_hides_only_the_named_row_and_keeps_it_as_a_tombstone() {
+        let db = db().await;
+        put_with(&db, &downtime("d1", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        put_with(&db, &downtime("d2", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+
+        assert_eq!(ids(&list_with(&db, "acme", None).await.unwrap()), ["d2"]);
+        assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d2"]);
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), None);
+        assert_eq!(
+            count_by_folder_with(&db, "acme", "pk-default")
+                .await
+                .unwrap(),
+            1
+        );
+        let stored = Entity::find_by_id("d1").one(&db).await.unwrap().unwrap();
+        let deleted_at = stored
+            .deleted_at
+            .expect("the row stays with deleted_at set");
+        assert_eq!(stored.updated_at, deleted_at);
+        assert_eq!(
+            version_with(&db, "acme", "d1").await.unwrap(),
+            Some(RowVersion {
+                version: 1,
+                updated_at: deleted_at,
+                deleted: true
+            })
+        );
+        assert_eq!(
+            version_with(&db, "acme", "d2").await.unwrap(),
+            Some(RowVersion {
+                version: 0,
+                updated_at: 1,
+                deleted: false
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_delete_whose_read_went_stale_retries_against_the_newer_row() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        d.version = 1;
+        put_with(&db, &d).await.unwrap();
+        let read = version_with(&db, "acme", "d1").await.unwrap().unwrap();
+        // A replicated put lands between the delete's read and its write.
+        d.version = 7;
+        put_with(&db, &d).await.unwrap();
+
+        assert_eq!(
+            write_tombstone(&db, "acme", "d1", read).await.unwrap(),
+            None
+        );
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(d));
+        let tombstone = delete_with(&db, "acme", "d1").await.unwrap().unwrap();
+        assert_eq!((tombstone.version, tombstone.deleted), (8, true));
+        assert_eq!(
+            version_with(&db, "acme", "d1").await.unwrap(),
+            Some(tombstone)
+        );
+        // A second local delete returns the tombstone as it is.
+        assert_eq!(
+            delete_with(&db, "acme", "d1").await.unwrap(),
+            Some(tombstone)
+        );
+        assert_eq!(delete_with(&db, "acme", "nope").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn a_replicated_tombstone_keeps_its_version_and_time_and_needs_the_read_row() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        d.version = 1;
+        put_with(&db, &d).await.unwrap();
+        let read = version_with(&db, "acme", "d1").await.unwrap().unwrap();
+
+        assert!(
+            tombstone_if_stored_with(&db, "acme", "d1", read, 4, 5_000)
+                .await
+                .unwrap()
+        );
+        let tombstone = RowVersion {
+            version: 4,
+            updated_at: 5_000,
+            deleted: true,
+        };
+        assert_eq!(
+            version_with(&db, "acme", "d1").await.unwrap(),
+            Some(tombstone)
+        );
+        // The row moved since `read`, so a write against it changes nothing.
+        assert!(
+            !tombstone_if_stored_with(&db, "acme", "d1", read, 9, 9_000)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !insert_tombstone_with(&db, "acme", "d1", "pk-default", 9, 9_000)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            version_with(&db, "acme", "d1").await.unwrap(),
+            Some(tombstone)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_replicated_put_writes_only_over_the_row_it_read() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        d.version = 1;
+        assert!(put_if_stored_with(&db, &d, None).await.unwrap());
+        // A second writer that also saw no row loses to the first.
+        assert!(!put_if_stored_with(&db, &d, None).await.unwrap());
+        let read = version_with(&db, "acme", "d1").await.unwrap().unwrap();
+
+        let tombstone = delete_with(&db, "acme", "d1").await.unwrap().unwrap();
+        let mut incoming = d.clone();
+        incoming.version = 2;
+        assert!(
+            !put_if_stored_with(&db, &incoming, Some(read))
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), None);
+
+        incoming.version = 3;
+        assert!(
+            put_if_stored_with(&db, &incoming, Some(tombstone))
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(incoming));
+    }
+
+    #[tokio::test]
+    async fn put_restores_a_soft_deleted_row() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+        d.updated_at = i64::MAX;
+        put_with(&db, &d).await.unwrap();
+
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(d));
+    }
+
+    #[tokio::test]
+    async fn put_if_unchanged_writes_only_on_a_matching_version() {
+        let db = db().await;
+        let d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+
+        let mut stale = d.clone();
+        stale.name = "stale".to_string();
+        stale.updated_at = 3;
+        assert!(!put_if_unchanged_with(&db, &stale, 2).await.unwrap());
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(d.clone()));
+
+        let mut fresh = d.clone();
+        fresh.name = "fresh".to_string();
+        fresh.folder_id = "planned".to_string();
+        fresh.updated_at = 3;
+        assert!(put_if_unchanged_with(&db, &fresh, 1).await.unwrap());
+        assert_eq!(
+            get_with(&db, "acme", "d1").await.unwrap(),
+            Some(fresh.clone())
+        );
+
+        assert!(!put_if_unchanged_with(&db, &fresh, 1).await.unwrap());
+        let mut foreign = fresh.clone();
+        foreign.org = "other".to_string();
+        foreign.folder_id = "default".to_string();
+        assert!(!put_if_unchanged_with(&db, &foreign, 3).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn an_extension_read_before_a_cancel_is_refused_and_the_cancel_stands() {
+        let db = db().await;
+        let d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+
+        let mut cancelled = d.clone();
+        cancelled.cancelled_at = Some(10 * DAY + 1);
+        cancelled.cancelled_by = Some("lin".to_string());
+        cancelled.updated_at = 2;
+        assert!(put_if_unchanged_with(&db, &cancelled, 1).await.unwrap());
+
+        let mut extended = d.clone();
+        extended.schedule.ends_at = Some(12 * DAY);
+        extended.schedule.duration_secs = 2 * 86_400;
+        extended.updated_at = 3;
+        assert!(!put_if_unchanged_with(&db, &extended, 1).await.unwrap());
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(cancelled));
+    }
+
+    #[tokio::test]
+    async fn a_follow_up_is_inserted_only_while_its_parent_is_unchanged() {
+        let db = db().await;
+        let parent = downtime("p1", Repeat::Daily, None);
+        put_with(&db, &parent).await.unwrap();
+        let mut follow_up = downtime("f1", Repeat::None, Some(11 * DAY));
+        follow_up.notifications = Some(config::meta::downtimes::DowntimeNotifications {
+            continues: Some("p1".to_string()),
+            ..Default::default()
+        });
+        assert!(
+            insert_if_parent_unchanged_with(&db, &follow_up, "p1", 1)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            get_with(&db, "acme", "f1").await.unwrap(),
+            Some(follow_up.clone())
+        );
+        assert_eq!(
+            get_with(&db, "acme", "p1").await.unwrap(),
+            Some(parent.clone())
+        );
+        let mut second = downtime("f3", Repeat::None, Some(11 * DAY));
+        second.notifications = follow_up.notifications.clone();
+        assert!(
+            !insert_if_parent_unchanged_with(&db, &second, "p1", 1)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "acme", "f3").await.unwrap(), None);
+
+        let mut cancelled = parent.clone();
+        cancelled.cancelled_at = Some(10 * DAY + 1);
+        cancelled.cancelled_by = Some("lin".to_string());
+        cancelled.updated_at = 2;
+        assert!(put_if_unchanged_with(&db, &cancelled, 1).await.unwrap());
+        let late = downtime("f2", Repeat::None, Some(11 * DAY));
+        assert!(
+            !insert_if_parent_unchanged_with(&db, &late, "p1", 1)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !insert_if_parent_unchanged_with(&db, &late, "p1", 2)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "acme", "f2").await.unwrap(), None);
+        assert!(
+            !insert_if_parent_unchanged_with(&db, &late, "missing", 1)
+                .await
+                .unwrap()
+        );
+        assert_eq!(get_with(&db, "acme", "f2").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn put_if_unchanged_never_writes_a_soft_deleted_row() {
+        let db = db().await;
+        let d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+        let updated_at = Entity::find_by_id("d1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap()
+            .updated_at;
+
+        assert!(!put_if_unchanged_with(&db, &d, updated_at).await.unwrap());
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn move_to_folder_moves_only_the_named_ids() {
+        let db = db().await;
+        for id in ["d1", "d2", "d3"] {
+            put_with(&db, &downtime(id, Repeat::None, Some(11 * DAY)))
+                .await
+                .unwrap();
+        }
+        let moved = move_to_folder_with(
+            &db,
+            "acme",
+            &["d1".to_string(), "d3".to_string()],
+            "planned",
+        )
+        .await
+        .unwrap();
+        assert_eq!(moved, 2);
+        assert_eq!(
+            ids(&list_with(&db, "acme", Some("planned")).await.unwrap()),
+            ["d1", "d3"]
+        );
+        assert_eq!(
+            ids(&list_with(&db, "acme", Some("default")).await.unwrap()),
+            ["d2"]
+        );
+        assert!(
+            move_to_folder_with(&db, "acme", &["d2".to_string()], "missing")
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_ended_before_leaves_scheduled_and_recurring_rows_alone() {
+        let db = db().await;
+        let cutoff = 20 * DAY;
+        let mut cancelled = downtime("cancelled", Repeat::Daily, None);
+        cancelled.cancelled_at = Some(12 * DAY);
+        let mut cancelled_recently = downtime("cancelled_recently", Repeat::None, Some(30 * DAY));
+        cancelled_recently.cancelled_at = Some(25 * DAY);
+        for d in [
+            downtime("ended_once", Repeat::None, Some(11 * DAY)),
+            downtime("ended_weekly", Repeat::Weekly, Some(15 * DAY)),
+            cancelled,
+            downtime("scheduled_once", Repeat::None, Some(40 * DAY)),
+            downtime("open_weekly", Repeat::Weekly, None),
+            downtime("bounded_weekly", Repeat::Weekly, Some(60 * DAY)),
+            cancelled_recently,
+        ] {
+            put_with(&db, &d).await.unwrap();
+        }
+
+        for (id, deleted_at) in [
+            ("deleted_long_ago", 12 * DAY),
+            ("deleted_recently", 25 * DAY),
+        ] {
+            put_with(&db, &downtime(id, Repeat::Weekly, None))
+                .await
+                .unwrap();
+            Entity::update_many()
+                .col_expr(Column::DeletedAt, Expr::value(deleted_at))
+                .filter(Column::Id.eq(id))
+                .exec(&db)
+                .await
+                .unwrap();
+        }
+
+        for id in ["ended_once", "deleted_long_ago", "open_weekly"] {
+            log_sent(&db, "acme", id).await;
+        }
+
+        let ended = list_ended_before_with(&db, cutoff).await.unwrap();
+        let mut listed = ids(&ended);
+        listed.sort_unstable();
+        assert_eq!(listed, ["cancelled", "ended_once", "ended_weekly"]);
+        assert_eq!(delete_ended_before_with(&db, cutoff).await.unwrap(), 4);
+        assert_eq!(logged(&db).await, ["open_weekly"]);
+        assert!(
+            Entity::find_by_id("deleted_long_ago")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            Entity::find_by_id("deleted_recently")
+                .one(&db)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            ids(&list_with(&db, "acme", None).await.unwrap()),
+            [
+                "bounded_weekly",
+                "cancelled_recently",
+                "open_weekly",
+                "scheduled_once"
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_returns_the_removed_ids_and_spares_other_orgs() {
+        let db = db().await;
+        put_with(&db, &downtime("d1", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        let mut foreign = downtime("d2", Repeat::None, Some(11 * DAY));
+        foreign.org = "other".to_string();
+        put_with(&db, &foreign).await.unwrap();
+
+        log_sent(&db, "acme", "d1").await;
+        log_sent(&db, "other", "d2").await;
+
+        assert_eq!(delete_by_org_with(&db, "acme").await.unwrap(), ["d1"]);
+        assert_eq!(ids(&list_all_with(&db).await.unwrap()), ["d2"]);
+        assert_eq!(logged(&db).await, ["d2"]);
+    }
+
+    /// The test schema with `downtimes_folder_fk` enforced, as the migration creates it.
+    async fn db_with_folder_fk() -> DatabaseConnection {
+        use sea_orm::{ConnectOptions, sea_query::ForeignKey};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        db.execute_unprepared("PRAGMA foreign_keys = ON")
+            .await
+            .unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        let mut downtimes = schema.create_table_from_entity(Entity);
+        downtimes.foreign_key(
+            ForeignKey::create()
+                .from(Entity, Column::FolderId)
+                .to(folders::Entity, folders::Column::Id),
+        );
+        for stmt in [schema.create_table_from_entity(folders::Entity), downtimes] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        folders::Entity::insert(folders::ActiveModel {
+            id: Set("pk-default".to_string()),
+            org: Set("acme".to_string()),
+            folder_id: Set("default".to_string()),
+            name: Set("default".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(folder_type_into_i16(FolderType::Downtimes)),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        db
+    }
+
+    #[tokio::test]
+    async fn a_folder_whose_only_row_is_deleted_can_be_deleted() {
+        let db = db_with_folder_fk().await;
+        put_with(&db, &downtime("d1", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+
+        assert!(
+            folders::Entity::delete_by_id("pk-default")
+                .exec(&db)
+                .await
+                .is_err(),
+            "the tombstone still holds the folder"
+        );
+        assert!(
+            release_folder_with(&db, "acme", "pk-default")
+                .await
+                .unwrap()
+        );
+        assert!(Entity::find_by_id("d1").one(&db).await.unwrap().is_none());
+        folders::Entity::delete_by_id("pk-default")
+            .exec(&db)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_released_folder_hands_its_tombstones_to_the_default_folder() {
+        let db = db_with_folder_fk().await;
+        folders::Entity::insert(folders::ActiveModel {
+            id: Set("pk-ops".to_string()),
+            org: Set("acme".to_string()),
+            folder_id: Set("ops".to_string()),
+            name: Set("ops".to_string()),
+            description: Set(None),
+            icon: Set(None),
+            r#type: Set(folder_type_into_i16(FolderType::Downtimes)),
+        })
+        .exec(&db)
+        .await
+        .unwrap();
+        let mut row = downtime("d1", Repeat::None, Some(11 * DAY));
+        row.folder_id = "ops".to_string();
+        put_with(&db, &row).await.unwrap();
+        delete_with(&db, "acme", "d1").await.unwrap();
+
+        assert!(release_folder_with(&db, "acme", "pk-ops").await.unwrap());
+        let stored = Entity::find_by_id("d1").one(&db).await.unwrap().unwrap();
+        assert_eq!(stored.folder_id, "pk-default");
+        assert!(
+            version_with(&db, "acme", "d1")
+                .await
+                .unwrap()
+                .is_some_and(|v| v.deleted),
+            "the tombstone still orders a late put"
+        );
+        folders::Entity::delete_by_id("pk-ops")
+            .exec(&db)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_folder_with_a_live_row_is_not_released() {
+        let db = db_with_folder_fk().await;
+        put_with(&db, &downtime("d1", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        put_with(&db, &downtime("d2", Repeat::None, Some(11 * DAY)))
+            .await
+            .unwrap();
+        delete_with(&db, "acme", "d2").await.unwrap();
+
+        assert!(
+            !release_folder_with(&db, "acme", "pk-default")
+                .await
+                .unwrap()
+        );
+        assert!(
+            Entity::find_by_id("d2").one(&db).await.unwrap().is_some(),
+            "nothing is removed while the folder stays"
+        );
+    }
+
+    async fn jobs_table(db: &DatabaseConnection) {
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend)
+            .create_table_from_entity(crate::table::entity::slo_backfill_jobs::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+    }
+
+    fn remeasure(slo_id: &str) -> Remeasure {
+        Remeasure {
+            slo_id: slo_id.to_string(),
+            generation: 1,
+            range_start: 300,
+            range_end: 600,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_re_measure_that_fails_for_one_slo_writes_neither_the_row_nor_any_job() {
+        let db = db().await;
+        jobs_table(&db).await;
+        let before = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &before).await.unwrap();
+        db.execute_unprepared(
+            "CREATE TRIGGER refuse_b BEFORE INSERT ON slo_backfill_jobs \
+             WHEN NEW.slo_id = 'b' BEGIN SELECT RAISE(ABORT, 'refused'); END",
+        )
+        .await
+        .unwrap();
+        let mut edited = before.clone();
+        edited.schedule.ends_at = Some(12 * DAY);
+        edited.updated_at = 2;
+        let jobs = [remeasure("a"), remeasure("b"), remeasure("c")];
+
+        let guard = Guard::Unchanged(before.updated_at);
+        assert!(write_with(&db, &edited, guard, &jobs, 100).await.is_err());
+        assert_eq!(
+            get_with(&db, "acme", "d1").await.unwrap(),
+            Some(before.clone())
+        );
+        let queued = crate::table::entity::slo_backfill_jobs::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        assert!(queued.is_empty(), "no job without its downtime write");
+
+        // The same edit again still sees its change, so it queues every re-measure.
+        db.execute_unprepared("DROP TRIGGER refuse_b")
+            .await
+            .unwrap();
+        assert!(write_with(&db, &edited, guard, &jobs, 100).await.unwrap());
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(edited));
+        let mut queued: Vec<String> = crate::table::entity::slo_backfill_jobs::Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|job| job.slo_id)
+            .collect();
+        queued.sort_unstable();
+        assert_eq!(queued, ["a", "b", "c"]);
+    }
+
+    #[tokio::test]
+    async fn a_write_whose_guard_fails_queues_no_job() {
+        let db = db().await;
+        jobs_table(&db).await;
+        let d = downtime("d1", Repeat::None, Some(11 * DAY));
+        put_with(&db, &d).await.unwrap();
+
+        let guard = Guard::Unchanged(d.updated_at + 1);
+        let jobs = [remeasure("a")];
+        assert!(!write_with(&db, &d, guard, &jobs, 100).await.unwrap());
+        let queued = crate::table::entity::slo_backfill_jobs::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        assert!(queued.is_empty());
+    }
+}

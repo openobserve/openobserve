@@ -158,6 +158,8 @@ import {
   budgetUnitsFor,
   budgetedBadFor,
   buildSloBurndownQuery,
+  correctedRanges,
+  isMissingCorrectedColumn,
   toBurndownSeries,
   type SloBurndownPoint,
   type SloSliceBucket,
@@ -311,6 +313,9 @@ function twoUnitTooltip(rows: (value: number) => Array<[string, string]>) {
       const point = Array.isArray(params) ? params[0] : params;
       if (!point) return "";
       const head = point.axisValueLabel ?? point.name ?? "";
+      if (points.value[point.dataIndex]?.corrected) {
+        return [head, t("slos.chart.correctedTooltip")].join("<br/>");
+      }
       const raw = Number(point.value);
       // A gap is a bucket nobody measured, and it has no reading in EITHER
       // unit. Echarts would otherwise render it as a bare dash.
@@ -378,6 +383,23 @@ function baseOptions(axisColor: string, gridColor: string, tooltip: unknown) {
   };
 }
 
+const bucketSecs = computed(() => bucketSecsFor(props.windowSecs, props.sliceIntervalSecs));
+
+/** Corrected runs as category-axis index pairs, for the band on the budget chart. */
+const correctedAreas = computed(() => {
+  const indexOf = new Map(points.value.map((p, i) => [p.ts, i]));
+  const last = Math.max(points.value.length - 1, 0);
+  const closeAt = (end: number) => {
+    const i = points.value.findIndex((p) => p.ts >= end);
+    return i < 0 ? last : i;
+  };
+  // The band closes on the first bucket after the run, so a one-bucket run still has width.
+  return correctedRanges(points.value, bucketSecs.value).map(([start, end]) => [
+    { xAxis: indexOf.get(start) ?? 0, name: t("slos.chart.corrected") },
+    { xAxis: closeAt(end) },
+  ]);
+});
+
 const budgetOptions = computed(() => {
   void store.state.theme; // getComputedStyle is not reactive — re-resolve on flip.
   const accent = resolveToken("--color-accent", "#5960b2");
@@ -441,6 +463,19 @@ const budgetOptions = computed(() => {
             color: danger,
           },
           data: [{ yAxis: 0 }],
+        },
+        markArea: {
+          silent: true,
+          animation: false,
+          itemStyle: {
+            color: accent,
+            opacity: 0.12,
+            borderColor: accent,
+            borderWidth: 1,
+            borderType: "dashed",
+          },
+          label: { position: "insideTop", color: accent, fontSize: 10, distance: 6 },
+          data: correctedAreas.value,
         },
       },
     ],
@@ -554,15 +589,17 @@ async function load() {
 
   const nowSecs = Math.floor(Date.now() / 1000);
   const startSecs = nowSecs - props.windowSecs;
-  const sql = buildSloBurndownQuery({
-    sloId: props.sloId,
-    generation: props.generation,
-    startSecs,
-    bucketSecs: bucketSecsFor(props.windowSecs, props.sliceIntervalSecs),
-  });
+  const sqlFor = (withCorrected: boolean) =>
+    buildSloBurndownQuery({
+      sloId: props.sloId,
+      generation: props.generation,
+      startSecs,
+      bucketSecs: bucketSecs.value,
+      withCorrected,
+    });
 
-  try {
-    const res = await searchService.search(
+  const search = (sql: string) =>
+    searchService.search(
       {
         org_identifier: org,
         query: {
@@ -585,6 +622,13 @@ async function load() {
       },
       "ui",
     );
+
+  try {
+    // Streams written before the upgrade have no `corrected_by` until the first pass merges it.
+    const res = await search(sqlFor(true)).catch((e: unknown) => {
+      if (isMissingCorrectedColumn(e)) return search(sqlFor(false));
+      throw e;
+    });
 
     if (controller !== mine) return;
     const hits: SloSliceBucket[] = res?.data?.hits ?? [];

@@ -560,6 +560,12 @@
       "description": "遠端任務是您的實驗呼叫以產生輸出的 HTTP 服務。只要發佈一次並確認連線可用，每個實驗都能固定其執行時所用的確切版本。",
       "action": "新增任務",
       "actionDesc": "將 OpenObserve 指向您的端點並測試連線。"
+    },
+    "noDowntimes": {
+      "title": "尚無停機時段",
+      "description": "停機時段會讓警示、異常偵測與合成監控檢查持續運作，並在您排定的時間範圍內停止發送通知。",
+      "action": "排定停機時段",
+      "actionDesc": "單次、每日或每週。若要快速靜音，請使用警示清單中的「靜音」。"
     }
   },
   "common": {
@@ -1320,6 +1326,7 @@
     "topQueries": "熱門查詢",
     "profiles": "效能剖析",
     "productAnalytics": "產品分析",
+    "downtimes": "停機時段",
     "trialEndedTitle": "您的試用期已結束",
     "trialPageNeedsPlan": "{page} 需要方案",
     "trialPageNeedsPlanToast": "{page} 需要方案。請在此頁面選擇一個方案以繼續使用。",
@@ -2822,6 +2829,7 @@
       "scopeCoveredByParent": "鎖定的動作來自 {scope}，於 {module} 設定",
       "scopeAllOf": "所有 {module}",
       "scopeIncludesFuture": "包含日後建立的資源",
+      "scopeDowntimeHint": "停機時段資料夾限制的是誰能管理該停機時段，而不是它會靜音什麼。若要靜音某個模組的所有資料夾，使用者需要擁有列出該模組每個資料夾的權限。已靜音的標籤和橫幅可能會顯示使用者無法列出的停機時段名稱。",
       "grantedByWiderScope": "由更廣泛的範圍授權",
       "grantedHereAndByWiderScope": "已在此處及更廣泛的範圍授權",
       "stillGrantedByWiderScope": "已在此處移除，仍由更廣泛的範圍授權",
@@ -8816,7 +8824,500 @@
     "sloLongWindow": "長視窗",
     "sloShortWindow": "短視窗",
     "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。",
-    "seconds": "秒"
+    "seconds": "秒",
+    "downtimes": {
+      "newTitle": "新增停機時段",
+      "editTitle": "編輯停機時段",
+      "detailTitle": "停機時段",
+      "modules": {
+        "alerts": "警示",
+        "anomaly_detections": "異常偵測",
+        "synthetics": "合成監控檢查",
+        "slos": "SLOs"
+      },
+      "modulesShort": {
+        "alerts": "警示",
+        "anomaly_detections": "異常",
+        "synthetics": "合成監控",
+        "slos": "SLOs"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "在窗口期間，事件將",
+          "muted": "建立並靜音（預設）",
+          "mutedHelp": "事件照常建立，但在窗口結束前不通知任何人。",
+          "none": "不建立",
+          "noneHelp": "窗口期間不建立事件；窗口結束後的首次觸發會建立事件並發送通知。",
+          "summary": "不建立事件"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} 個 {key} | {count} 個 {key}",
+        "condition": "條件",
+        "allFolders": "所有資料夾",
+        "oneFolder": "{name} 資料夾",
+        "nFolders": "{count} 個資料夾 | {count} 個資料夾",
+        "tags": "標籤 {tags}",
+        "nItems": "{count} 個項目 | {count} 個項目",
+        "asGood": "視為良好",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
+      },
+      "duration": {
+        "days": "{count} 天",
+        "hours": "{count} 小時",
+        "minutes": "{count} 分鐘"
+      },
+      "schedule": {
+        "windowRange": "{start} 至 {end} {zone}",
+        "onceSentence": "單次 · {start} 至 {end} · {zone}",
+        "dailySentence": "每日 · {time}，持續 {duration} · {zone}",
+        "weeklySentence": "每週於 {days} · {time}，持續 {duration} · {zone}",
+        "fromNoEnd": "{schedule}，自 {start} 起，無結束日期",
+        "fromUntil": "{schedule}，自 {start} 至 {until}"
+      },
+      "validation": {
+        "conditionRequired": "請新增條件，或移除條件區塊。",
+        "pairKey": "請為每一列選擇維度。",
+        "pairOperator": "停機時段條件中請使用 = 或 !=。",
+        "pairValue": "請為每一列輸入值。",
+        "loneStar": "值不能只有一個 *。",
+        "innerStar": "* 只能出現在值的結尾。",
+        "emptyGroup": "條件群組不能是空的。",
+        "tooDeep": "條件的群組巢狀層級最多為 3 層。",
+        "tooManyPairs": "一個條件最多可包含 32 組配對。",
+        "needsEq": "請至少新增一個 = 條件。若條件僅由 != 列組成，將會靜音其他所有項目。",
+        "modulesRequired": "請至少選擇一個模組。",
+        "foldersRequired": "請選擇「所有資料夾」或至少一個資料夾。",
+        "tagsRequired": "請新增標籤，或移除標籤區塊。",
+        "idsRequired": "請挑選項目，或移除特定項目區塊。",
+        "idOutsideFolders": "部分已選項目不在所選的資料夾中。",
+        "tooManyFolders": "最多選擇 {max} 個資料夾，或選擇所有資料夾。",
+        "tooManyTags": "最多新增 {max} 個標籤。",
+        "tooManyIds": "最多選擇 {max} 個項目。",
+        "nameTooLong": "名稱最多可為 256 個字元。",
+        "timezoneRequired": "請選擇時區。",
+        "startRequired": "請輸入開始日期與時間。",
+        "endRequired": "輸入結束日期與時間。",
+        "endAfterStart": "結束時間必須晚於開始時間。",
+        "windowTooLong": "時段最多可持續 7 天。",
+        "windowTooShort": "時段必須至少持續 1 分鐘。",
+        "startTimeRequired": "以 HH:MM 格式輸入開始時間。",
+        "durationInvalid": "輸入持續時間，例如 90m 或 1h 30m。",
+        "weekdaysRequired": "至少選擇一天。",
+        "untilAfterStart": "重複截止日必須不早於第一天。",
+        "reasonTooLong": "原因最多 {max} 個字元。",
+        "windowOutlastsRepeat": "時間視窗不能長於兩次重複之間的時間。",
+        "startDateRequired": "請選擇第一天。"
+      },
+      "title": "停機時段",
+      "subtitle": "排程時段可讓警示、異常偵測與合成監控檢查繼續執行，但停止其通知",
+      "newDowntime": "新增停機時段",
+      "filterAll": "全部",
+      "filterOnce": "單次",
+      "filterRecurring": "週期性",
+      "search": "依名稱、維度或建立者搜尋",
+      "searchAcross": "搜尋所有資料夾",
+      "thisFolder": "此資料夾",
+      "allFolders": "所有資料夾",
+      "thisFolderTooltip": "在選取的資料夾中搜尋",
+      "allFoldersTooltip": "在每個資料夾中搜尋",
+      "noFolder": "沒有可用於存放停機時間的資料夾",
+      "truncated": "顯示 {total} 個停機時間中的前 {shown} 個",
+      "stats": {
+        "active": "作用中",
+        "scheduled": "已排程",
+        "recurring": "週期性",
+        "ended": "已結束",
+        "cancelled": "已取消",
+        "endedEarly": "提前結束",
+        "total": "總計"
+      },
+      "columns": {
+        "name": "名稱",
+        "status": "狀態",
+        "targets": "目標",
+        "schedule": "排程",
+        "when": "結束 / 下次",
+        "matched": "符合",
+        "createdBy": "建立者",
+        "folder": "資料夾"
+      },
+      "oneTime": "單次",
+      "recurring": "週期性",
+      "bannerOn": "此停機時段作用中時，會向組織中的所有人顯示橫幅",
+      "endsLabel": "結束",
+      "confirmEndNow": {
+        "title": "立即結束此停機時間？",
+        "message": "通知會立即恢復。此停機時間會以提前結束狀態保留在清單中。",
+        "ok": "立即結束",
+        "keep": "繼續執行"
+      },
+      "extend": {
+        "menu": "延長時長",
+        "notActive": "只能延長處於啟用狀態的停機時間",
+        "dialogTitle": "延長 {name}",
+        "newEnd": "新的結束時間",
+        "confirmUntil": "延長至 {time}",
+        "followUp": "此停機時間會重複，因此其排程保持不變。將從目前時段結束時建立名為 {name} 的一次性停機時間。",
+        "endAfterCurrent": "新的結束時間必須晚於目前的結束時間。"
+      },
+      "nextLabel": "下次",
+      "matched": {
+        "alerts": "{count} 個警示 | {count} 個警示",
+        "anomalies": "{count} 個異常 | {count} 個異常",
+        "synthetics": "{count} 個檢查 | {count} 個檢查",
+        "slos": "{count} 個 SLO | {count} 個 SLO"
+      },
+      "actions": {
+        "endNow": "立即結束",
+        "edit": "編輯",
+        "duplicate": "複製",
+        "moveToFolder": "移至資料夾",
+        "cancel": "取消停機時段",
+        "delete": "刪除",
+        "more": "更多動作",
+        "muteForHour": "立即靜音 1 小時",
+        "extend": "延長"
+      },
+      "confirmCancel": {
+        "title": "取消停機時段",
+        "message": "通知會立即恢復。停機時段會保留在清單中以供記錄。",
+        "bulkMessage": "取消 {count} 個停機時段？通知會立即恢復。 | 取消 {count} 個停機時段？通知會立即恢復。",
+        "confirm": "取消停機時段",
+        "keep": "保留停機時段"
+      },
+      "confirmDelete": {
+        "title": "刪除停機時段",
+        "message": "停機時段及其歷史記錄將被移除。此操作無法復原。"
+      },
+      "copyOf": "{name} 的副本",
+      "form": {
+        "matches": {
+          "alerts": "{count} 個警示符合 | {count} 個警示符合",
+          "anomaly_detections": "{count} 個偵測符合 | {count} 個偵測符合",
+          "synthetics": "{count} 個檢查符合 | {count} 個檢查符合",
+          "slos": "{count} 個 SLO 符合 | {count} 個 SLO 符合"
+        },
+        "alertFolders": "警示資料夾",
+        "syntheticsFolders": "合成監控資料夾",
+        "noAlertFolderAccess": "您無權存取警示資料夾。",
+        "noSyntheticsFolderAccess": "您無權存取合成監控資料夾。",
+        "tags": "標籤",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "檢查必須具備每一個標籤。",
+        "removeBlock": "移除此區塊",
+        "specificItems": "特定項目",
+        "itemsHint": "僅會提供所選資料夾中的項目。",
+        "itemOption": "{name} · {folder}",
+        "addTags": "新增標籤",
+        "addItems": "新增特定項目",
+        "sloMode": "視窗內的 SLO 分數",
+        "sloExclude": "排除該視窗",
+        "sloCountAsGood": "將該視窗計為良好",
+        "sloExcludeCaption": "視窗內的期間既不計為良好也不計為不良。這些 SLO 的燃燒率警示不會因此觸發。",
+        "sloCountAsGoodCaption": "視窗內的期間完全計為良好。僅當您的 SLO 合約載明計畫性維護屬於正常運作時間時，才使用此選項。",
+        "cardCaption": "先選擇資料夾，接著選用的區塊會進一步縮小範圍。上方的維度條件也適用於此模組。",
+        "noConditionForChecks": "上方的維度條件不適用於檢查。",
+        "appliesTo": "適用於",
+        "tabTargets": "目標",
+        "tabSchedule": "排程",
+        "tabAdvanced": "進階",
+        "modeInFolder": "{mode} 於",
+        "newMode": "新增停機時段",
+        "editMode": "編輯停機時段",
+        "namePlaceholder": "停機時段名稱",
+        "nameLabel": "停機時段名稱",
+        "renameHint": "點擊以重新命名",
+        "reason": "原因",
+        "reasonHelp": "選填。會顯示於清單、詳細資料頁面以及「已靜音」工具提示中。",
+        "cancel": "取消",
+        "save": "儲存",
+        "activeBanner": "此停機時段已生效。編輯會在下一次評估時生效，而變更 SLO 模式會重新計算已開始的視窗。",
+        "changedMeanwhile": "自您載入後，有人變更了此停機時段。請重新載入後再試一次。",
+        "reload": "重新載入",
+        "noModule": "請在「適用於」中選擇模組。",
+        "checkSchedule": "請檢查排程，然後再次儲存。"
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "警示",
+          "anomaly_detections": "異常偵測",
+          "synthetics": "合成監控檢查",
+          "slos": "SLOs"
+        },
+        "whenOnce": "單次，從 {start} 到 {end} {zone}",
+        "whenDaily": "每天 {time} {zone}，持續 {duration}",
+        "whenWeekly": "每週 {days} 的 {time} {zone}，持續 {duration}",
+        "inFolders": "在資料夾 {names} 中 | 在資料夾 {names} 中",
+        "withCondition": "條件為 {condition}",
+        "tagged": "標籤為 {tags}",
+        "named": "限於 {count} 個具名項目 | 限於 {count} 個具名項目",
+        "stopNotifying": "{when}：{targets} 停止通知。",
+        "nothingMuted": "{when}：沒有任何警示或檢查被靜音。",
+        "sloUnchanged": "SLO 分數不會改變。",
+        "sloExcluded": "{slos} 會將該時間範圍排除於分數之外。",
+        "sloAsGood": "{slos} 會將該時間範圍計為正常時間。"
+      },
+      "autoName": {
+        "once": "單次",
+        "onceOn": "單次 {date}",
+        "daily": "每日",
+        "weekly": "每週",
+        "all": {
+          "alerts": "所有警示",
+          "anomaly_detections": "所有異常偵測",
+          "synthetics": "所有合成監控檢查",
+          "slos": "所有 SLO"
+        }
+      },
+      "condition": {
+        "none": "無維度條件",
+        "add": "新增",
+        "title": "維度條件",
+        "onePer": "每個停機時間一組",
+        "remove": "移除維度條件",
+        "caption": "適用於警示、異常偵測與 SLOs。合成監控檢查沒有維度，改用標籤。所有配對都必須相符。使用 OR 群組表示替代條件。值可以 * 結尾。"
+      },
+      "resources": {
+        "refineBy": "依資源篩選",
+        "load": "載入資源",
+        "needsEq": "依資源篩選前，請至少新增一個 = 條件。",
+        "tooMany": "有 {count} 個值與此條件同時出現。請縮小條件範圍以挑選資源。",
+        "lastSeen": "上次出現",
+        "streams": "串流",
+        "footer": "已選 {selected} / {total} · {source}",
+        "fromRegistry": "來自服務登錄檔",
+        "fromSearch": "來自過去 24 小時的資料",
+        "apply": "套用",
+        "loadFailed": "無法載入資源",
+        "notSeen": "過去一小時內未出現。",
+        "partial": "部分來源未回應。",
+        "items": "項目",
+        "fromValues": "來自告警、服務登錄和過去一小時的資料",
+        "noValues": "此維度尚未出現任何值。"
+      },
+      "scheduleForm": {
+        "once": "單次",
+        "daily": "每日",
+        "weekly": "每週",
+        "startDate": "開始日期",
+        "startTime": "開始時間",
+        "endDate": "結束日期",
+        "endTime": "結束時間",
+        "days": "星期",
+        "startsAt": "開始於",
+        "duration": "持續時間",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "最多 7 天，例如 90m 或 1h 30m。",
+        "until": "重複直到",
+        "untilPlaceholder": "無結束日期",
+        "timezone": "時區",
+        "noWindow": "未來 8 天內沒有時間範圍開始。",
+        "nextWindow": "下個時段：{window}。時段可跨午夜。",
+        "nextWindowWithUtc": "下個時段：{window}（{utc}）。時段可跨午夜。",
+        "startsOn": "開始日期"
+      },
+      "preview": {
+        "title": "預覽",
+        "failed": "無法載入預覽。",
+        "andMore": "還有 {count} 個",
+        "noMatch": "目前沒有符合的項目",
+        "fireTime": "{count} 個警示在觸發時才確定其身分 | {count} 個警示在觸發時才確定其身分",
+        "undecidable": "無法依 {key} 區分",
+        "showAll": "顯示完整清單",
+        "showLess": "顯示較少",
+        "finishCondition": "完成條件後即可查看預覽。"
+      },
+      "muteAllDialog": {
+        "title": "要將整個模組靜音嗎？",
+        "intro": "沒有資料夾、項目、標籤或條件縮小這些模組的範圍，因此此時段會靜音：",
+        "every": {
+          "alerts": "此組織中的每個警示",
+          "anomaly_detections": "此組織中的每個異常偵測",
+          "synthetics": "此組織中的每個合成監控檢查",
+          "slos": "此組織中的每個 SLO"
+        },
+        "matchedNow": "今天 {matched}",
+        "outro": "在時段內，上述所有項目的通知、值班呼叫與工作流程都會停止。",
+        "cancel": "取消",
+        "confirm": "全部靜音",
+        "titleOne": {
+          "alerts": "要將此組織中的每個警示靜音嗎？",
+          "anomaly_detections": "要將此組織中的每個異常偵測靜音嗎？",
+          "synthetics": "要將此組織中的每個合成監控檢查靜音嗎？",
+          "slos": "要將此組織中的每個 SLO 靜音嗎？"
+        },
+        "window": "時間窗口：{window}"
+      },
+      "summaryPane": {
+        "title": "摘要",
+        "filedIn": "歸類於",
+        "window": "時段",
+        "nextWindow": "下個時段",
+        "inUtc": "以 UTC 顯示",
+        "largeMatch": "{modules}：此時段符合超過半數的項目。此組織中大多數項目在時段內都不會通知。",
+        "whatHappens": "會發生什麼",
+        "keepRunning": "評估與檢查會持續執行並保留其歷史記錄。",
+        "noNotifications": "通知、值班呼叫與工作流程會停止。",
+        "mutedIncidents": "事件會以靜音狀態開啟，並在時段結束後通知。"
+      },
+      "band": {
+        "now": "現在",
+        "none": "尚無時段執行過，也沒有已規劃的時段。",
+        "active": "作用中",
+        "next": "下一個",
+        "past": "已執行",
+        "track": "時段",
+        "aria": "{kind}：{start} 至 {end}"
+      },
+      "detail": {
+        "overview": "概觀",
+        "affected": "受影響 · {count}",
+        "suppressed": "已抑制 · {count}",
+        "details": "詳細資料",
+        "condition": "條件",
+        "noTarget": "無目標",
+        "banner": "橫幅",
+        "bannerOn": "作用中時向組織顯示",
+        "bannerOff": "無橫幅",
+        "occurrences": "發生次數",
+        "nextWindow": "下個時段：{window}。您的時間：{local}。",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "符合依據",
+        "matchedBy": {
+          "query": "查詢",
+          "source_alert": "來源警示",
+          "tag": "標籤",
+          "id": "具名",
+          "folder": "資料夾",
+          "org": "整個組織"
+        },
+        "source": "來源",
+        "wouldHaveNotified": "原本會通知",
+        "noSuppressed": "尚未抑制任何內容",
+        "muteHourName": "{name} · 靜音 1 小時",
+        "notFoundTitle": "找不到停機時段",
+        "notFoundDescription": "它可能已被刪除，或連結指向其他組織。",
+        "backToList": "返回停機時段"
+      },
+      "mute": {
+        "title": {
+          "alerts": "靜音 {count} 個警示 | 靜音 {count} 個警示",
+          "anomaly_detections": "靜音 {count} 個異常偵測 | 靜音 {count} 個異常偵測",
+          "synthetics": "靜音 {count} 個檢查 | 靜音 {count} 個檢查",
+          "slos": "靜音 {count} 個 SLO | 靜音 {count} 個 SLO",
+          "items": "靜音 {count} 個項目 | 靜音 {count} 個項目"
+        },
+        "subtitle": "它們會繼續執行並保留歷史記錄。通知、呼叫和工作流程會停止，直到時間範圍結束。",
+        "muteFor": "靜音時長",
+        "fileIn": "歸檔至",
+        "presets": {
+          "30m": "30 分鐘",
+          "1h": "1 小時",
+          "2h": "2 小時",
+          "4h": "4 小時",
+          "custom": "自訂"
+        },
+        "endsAt": "結束於",
+        "endsIn": "將於 {duration} 後結束。",
+        "confirm": "靜音",
+        "confirmUntil": "靜音至 {time}",
+        "menu": "靜音通知",
+        "until": "直到…",
+        "bulk": "靜音",
+        "muted": "已靜音 · {duration} 後結束",
+        "mutedTooltip": "由 {name} 靜音至 {end}",
+        "exclude": "排除時間範圍…",
+        "firingMuted": "觸發中 · 已靜音",
+        "firingMutedTooltip": "仍在觸發。通知已被 {name} 靜音。"
+      },
+      "corrected": "已修正",
+      "correctedBy": "分數由 {names} 修正",
+      "incident": {
+        "mutedBy": "已靜音 · {name}",
+        "notLoaded": "停機時段未載入",
+        "notLoadedTooltip": "已被停機時段 {id} 靜音，該停機時段不在已載入的清單中。",
+        "banner": "由 {name} 靜音。沒有人被呼叫。時間範圍結束後的第一次觸發會發送延遲的開啟通知。",
+        "bannerUntil": "由 {name} 靜音至 {end}。沒有人被呼叫。時間範圍結束後的第一次觸發會發送延遲的開啟通知。"
+      },
+      "banner": {
+        "ended": "已結束",
+        "endsInUnderMinute": "將於不到一分鐘後結束",
+        "endsInMinutes": "將於 {count} 分鐘後結束 | 將於 {count} 分鐘後結束",
+        "endsIn": "將於 {duration} 後結束",
+        "firstEndsInUnderMinute": "最早的一個不到一分鐘後結束",
+        "firstEndsInMinutes": "最早的一個將於 {count} 分鐘後結束 | 最早的一個將於 {count} 分鐘後結束",
+        "firstEndsIn": "最早的一個將於 {duration} 後結束",
+        "count": "{module} {count}",
+        "showBanner": "當此靜音期間生效時，向組織中的所有人顯示橫幅",
+        "showBannerCaption": "橫幅會顯示名稱、受影響的數量和剩餘時間。它永遠不會列出警示名稱。",
+        "preview": "預覽",
+        "previewMessage": "{name} 已生效。",
+        "tooLong": "橫幅僅適用於最長 7 天的時間範圍。"
+      },
+      "sloCorrections": {
+        "title": "狀態修正：",
+        "item": "{name}（{status}）",
+        "shorterThanSlice": "短於 SLO 的切片，未校正任何分鐘"
+      },
+      "notify": {
+        "title": "通知",
+        "caption": "向目標告知停機本身：開始時、結束前和結束時。",
+        "destinations": "目標",
+        "lead": "結束前提醒",
+        "leadHelp": "例如 10m 或 1h，介於 1 分鐘和視窗長度之間。",
+        "regionNote": "在超級叢集中，由建立停機的區域傳送。此設定之前建立的停機會從每個區域傳送。",
+        "tab": "通知",
+        "events": {
+          "started": "開始時",
+          "startedHelp": "每個視窗開始時傳送一則訊息。",
+          "ending_soon": "結束前",
+          "ending_soonHelp": "結束前的提醒，警示再次通知時不會讓人意外。",
+          "ended": "結束時",
+          "endedHelp": "每個視窗結束時傳送一則訊息。",
+          "cancelled": "取消時",
+          "cancelledHelp": "有人結束或取消停機時立即傳送。",
+          "extended": "延長時",
+          "extendedHelp": "帶著新的結束時間立即傳送。"
+        },
+        "validation": {
+          "tooMany": "最多可通知 {max} 個目標。",
+          "eventRequired": "請至少選擇一個事件，或移除目標。",
+          "leadInvalid": "提醒必須在結束前 1 分鐘到視窗長度之間。"
+        },
+        "summary": {
+          "none": "不傳送自己的通知。",
+          "sentence": "通知 {destinations}：{events}。",
+          "started": "開始時",
+          "endingSoon": "結束前 {lead}",
+          "ended": "結束時",
+          "cancelled": "取消時",
+          "extended": "延長時"
+        },
+        "log": {
+          "time": "時間",
+          "event": "事件",
+          "destinations": "目標",
+          "result": "結果",
+          "ok": "已傳送",
+          "pending": "傳送中",
+          "empty": "尚未傳送通知",
+          "events": {
+            "started": "已開始",
+            "ending_soon": "即將結束",
+            "ended": "已結束",
+            "cancelled": "已取消",
+            "extended": "已延長"
+          }
+        },
+        "test": {
+          "send": "傳送測試",
+          "sent": "已向 {count} 個目標傳送測試 | 已向 {count} 個目標傳送測試",
+          "failed": "測試未送達 {names}。"
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "開啟",
@@ -8853,7 +9354,8 @@
     "countWorkflow": "{count} 個工作流程 | {count} 個工作流程",
     "countAnomalyDetection": "{count} 個異常偵測器 | {count} 個異常偵測器",
     "countIncidentIntegration": "{count} 個事件整合 | {count} 個事件整合",
-    "sectionOtherConsumers": "也用於"
+    "sectionOtherConsumers": "也用於",
+    "countDowntime": "{count} 個停機 | {count} 個停機"
   },
   "alert_library": {
     "header": "警示庫",
@@ -16710,7 +17212,8 @@
       "sourceMaps": "RUM — 來源映射",
       "oncall": "值班",
       "oncallDetail": "值班頁面",
-      "syntheticsJourney": "合成監控旅程"
+      "syntheticsJourney": "合成監控旅程",
+      "downtimes": "停機時間"
     },
     "actions": {
       "openCheatsheet": "開啟鍵盤快捷鍵速查表",
@@ -16819,6 +17322,8 @@
       "oncallEscalate": "升級",
       "oncallSnooze": "延後",
       "oncallResolve": "解決",
+      "downtimesCreate": "新增停機時間",
+      "downtimesRefresh": "重新整理停機時間",
       "functionsImport": "匯入函式"
     }
   },
@@ -17252,6 +17757,13 @@
         "belowTopN": "top-N 以下",
         "truncated": "已截斷",
         "gap": "間隙"
+      },
+      "downtimeStatus": {
+        "scheduled": "已排程",
+        "active": "進行中",
+        "ended": "已結束",
+        "cancelled": "已取消",
+        "endedEarly": "提前結束"
       }
     }
   },
@@ -17648,6 +18160,24 @@
     },
     "iam": {
       "userSaveFailed": "無法儲存使用者"
+    },
+    "downtimes": {
+      "cancelled": "停機時間已取消",
+      "cancelledMany": "{count} 個停機時間已取消 | {count} 個停機時間已取消",
+      "cancelFailed": "無法取消停機時間",
+      "extended": "已延長至 {time}",
+      "extendedFollowUp": "已建立 {name}，執行至 {time}",
+      "extendFailed": "無法延長停機時間",
+      "reload": "重新載入",
+      "deleted": "停機時間已刪除",
+      "deleteFailed": "無法刪除停機時間",
+      "created": "停機時間已建立",
+      "updated": "停機時間已儲存",
+      "saveFailed": "無法儲存停機時間",
+      "muted": "已將 {count} 個項目靜音至 {time}。歸檔於 {folder}。 | 已將 {count} 個項目靜音至 {time}。歸檔於 {folder}。",
+      "muteFailed": "無法建立靜音",
+      "viewDowntime": "檢視停機時間",
+      "itemsDropped": "有 {count} 個選取的項目不在選取的分類中，已被移除。 | 有 {count} 個選取的項目不在選取的分類中，已被移除。"
     }
   },
   "cipherKeys": {
@@ -17938,7 +18468,9 @@
       "budgetNote": "最後一個點等於上方的剩餘預算圖塊。0% 的虛線表示耗盡；低於此線表示 SLO 已花費超過目標允許的錯誤。間隙是沒有測量資料的區段，這與零不同。",
       "burnExplain": "每個桶自身消耗預算的速度，以預算中性速率的倍數表示。",
       "burnFormula": "燃燒率 = (100% − SLI) ÷ (100% − 目標)\nSLI = 100 × 良好 ÷ 總數，僅針對該區段\n\n右軸（同一條線讀作 SLI）：\nSLI = 100% − 燃燒率 × (100% − 目標)",
-      "burnNote": "×1 會在時間窗結束時剛好花完預算，×2 則在時間窗一半時花完；低於 ×1 表示預算正在累積。由於這是每個桶而非累計，尖峰會保持可見，不會被平均掉。右軸向下計數：圖表向上表示消耗更多，即 SLI 較低。"
+      "burnNote": "×1 會在時間窗結束時剛好花完預算，×2 則在時間窗一半時花完；低於 ×1 表示預算正在累積。由於這是每個桶而非累計，尖峰會保持可見，不會被平均掉。右軸向下計數：圖表向上表示消耗更多，即 SLI 較低。",
+      "corrected": "已由停機時間修正",
+      "correctedTooltip": "已由停機時間修正：已排除，因此預算線維持平直"
     },
     "alerts": {
       "title": "警示",

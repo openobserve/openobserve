@@ -384,6 +384,10 @@ pub struct Incident {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub topology_context: Option<IncidentTopology>,
+
+    /// Set while a downtime mutes this incident (D3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub muted_by_downtime_id: Option<String>,
 }
 
 /// Alert info within an incident (junction table representation)
@@ -1872,6 +1876,7 @@ mod tests {
             group_values: serde_json::Value::Null,
             key_type: KeyType::default(),
             topology_context,
+            muted_by_downtime_id: None,
         }
     }
 
@@ -1886,6 +1891,19 @@ mod tests {
         assert!(!obj.contains_key("topology_context"));
         assert!(!obj.contains_key("acknowledged_by"));
         assert!(!obj.contains_key("acknowledged_at"));
+        assert!(!obj.contains_key("muted_by_downtime_id"));
+    }
+
+    #[test]
+    fn a_muted_incident_names_its_downtime_and_old_rows_read_unmuted() {
+        let mut incident = make_incident(None, None, None, None);
+        incident.muted_by_downtime_id = Some("2f9K".to_string());
+        let json = serde_json::to_value(&incident).unwrap();
+        assert_eq!(json["muted_by_downtime_id"], "2f9K");
+        let mut old = json.as_object().unwrap().clone();
+        old.remove("muted_by_downtime_id");
+        let back: Incident = serde_json::from_value(serde_json::Value::Object(old)).unwrap();
+        assert_eq!(back.muted_by_downtime_id, None);
     }
 
     #[test]

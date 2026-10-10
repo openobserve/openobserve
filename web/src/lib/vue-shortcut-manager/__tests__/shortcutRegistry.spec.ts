@@ -15,6 +15,7 @@ const OSS: ShortcutCapabilities = {
   modelPricingEnabled: false,
   rbacEnabled: false,
   aiEnabled: false,
+  downtimesEnabled: false,
 };
 const ENTERPRISE: ShortcutCapabilities = {
   isEnterprise: true,
@@ -25,6 +26,7 @@ const ENTERPRISE: ShortcutCapabilities = {
   modelPricingEnabled: true,
   rbacEnabled: true,
   aiEnabled: true,
+  downtimesEnabled: true,
 };
 const CLOUD: ShortcutCapabilities = {
   isEnterprise: false,
@@ -35,6 +37,7 @@ const CLOUD: ShortcutCapabilities = {
   modelPricingEnabled: true,
   rbacEnabled: true,
   aiEnabled: true,
+  downtimesEnabled: true,
 };
 
 /** Mirrors ShortcutCheatsheet: a page shows unless its gate rejects the caps. */
@@ -67,6 +70,7 @@ const GATED_IN_OSS = [
   "shortcuts.pages.searchSchedulers",
   "shortcuts.pages.alertSources",
   "shortcuts.pages.alertIncidents",
+  "shortcuts.pages.downtimes",
   "shortcuts.pages.pipelineDestinations",
   "shortcuts.pages.iamRoles",
   "shortcuts.pages.iamGroups",
@@ -173,6 +177,16 @@ describe("shortcut cheatsheet OSS gating", () => {
     // llmProviders follows online_evals_enabled; modelPricing follows model_pricing_enabled.
     expect(pages.has("shortcuts.pages.llmProviders")).toBe(false);
     expect(pages.has("shortcuts.pages.modelPricing")).toBe(false);
+  });
+
+  it("hides Downtimes on enterprise and cloud while downtimes_enabled is off", () => {
+    expect(
+      visiblePages({ ...ENTERPRISE, downtimesEnabled: false }).has("shortcuts.pages.downtimes"),
+    ).toBe(false);
+    expect(
+      visiblePages({ ...CLOUD, downtimesEnabled: false }).has("shortcuts.pages.downtimes"),
+    ).toBe(false);
+    expect(visiblePages(ENTERPRISE).has("shortcuts.pages.downtimes")).toBe(true);
   });
 
   it("gates IAM Roles/Groups behind rbac_enabled on enterprise/cloud", () => {

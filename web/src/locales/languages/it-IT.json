@@ -560,6 +560,12 @@
       "description": "Un'attività remota è un servizio HTTP che i tuoi esperimenti chiamano per produrre output. Pubblicalo una volta, verifica che la connessione funzioni e ogni esperimento può fissare la versione esatta con cui è stato eseguito.",
       "action": "Nuova attività",
       "actionDesc": "Punta OpenObserve al tuo endpoint e testa la connessione."
+    },
+    "noDowntimes": {
+      "title": "Ancora nessun downtime",
+      "description": "Un downtime mantiene in esecuzione avvisi, rilevamento anomalie e controlli Synthetics e interrompe le relative notifiche per una finestra da te pianificata.",
+      "action": "Pianifica un downtime",
+      "actionDesc": "Una tantum, giornaliero o settimanale. Per un silenziamento rapido, usa Silenzia nell'elenco degli avvisi."
     }
   },
   "common": {
@@ -1320,6 +1326,7 @@
     "topQueries": "Query principali",
     "profiles": "Profili",
     "productAnalytics": "Analisi di prodotto",
+    "downtimes": "Downtime",
     "trialEndedTitle": "La tua prova è terminata",
     "trialPageNeedsPlan": "{page} richiede un piano",
     "trialPageNeedsPlanToast": "{page} richiede un piano. Scegline uno in questa pagina per continuare a usarlo.",
@@ -2822,6 +2829,7 @@
       "scopeCoveredByParent": "Le azioni bloccate provengono da {scope}, impostato in {module}",
       "scopeAllOf": "Tutti i {module}",
       "scopeIncludesFuture": "Include le risorse create in seguito",
+      "scopeDowntimeHint": "Una cartella di downtime limita chi gestisce un downtime, non ciò che silenzia. Per silenziare tutte le cartelle di un modulo, un utente deve disporre del diritto di elencare ogni cartella di quel modulo. I chip e i banner silenziati possono riportare il nome di un downtime che un utente non può elencare.",
       "grantedByWiderScope": "Concesso da un ambito più ampio",
       "grantedHereAndByWiderScope": "Concesso qui e da un ambito più ampio",
       "stillGrantedByWiderScope": "Rimosso qui, ancora concesso da un ambito più ampio",
@@ -8821,7 +8829,500 @@
     "sloLongWindow": "Finestra lunga",
     "sloShortWindow": "Finestra breve",
     "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
-    "seconds": "Secondi"
+    "seconds": "Secondi",
+    "downtimes": {
+      "newTitle": "Nuovo downtime",
+      "editTitle": "Modifica downtime",
+      "detailTitle": "Downtime",
+      "modules": {
+        "alerts": "Avvisi",
+        "anomaly_detections": "Rilevamento anomalie",
+        "synthetics": "Controlli Synthetics",
+        "slos": "SLO"
+      },
+      "modulesShort": {
+        "alerts": "Avvisi",
+        "anomaly_detections": "Anomalia",
+        "synthetics": "Synthetics",
+        "slos": "SLO"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "Durante la finestra, gli incidenti sono",
+          "muted": "Creati e silenziati (predefinito)",
+          "mutedHelp": "Gli incidenti si aprono normalmente ma non notificano nessuno fino alla fine della finestra.",
+          "none": "Non creati",
+          "noneHelp": "Nessun incidente viene aperto durante la finestra; il primo allarme successivo ne apre uno e notifica.",
+          "summary": "nessun incidente"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}",
+        "condition": "condizione",
+        "allFolders": "tutte le cartelle",
+        "oneFolder": "cartella {name}",
+        "nFolders": "{count} cartella | {count} cartelle",
+        "tags": "tag {tags}",
+        "nItems": "{count} elemento | {count} elementi",
+        "asGood": "come buono",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
+      },
+      "duration": {
+        "days": "{count} g",
+        "hours": "{count} h",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "da {start} a {end} {zone}",
+        "onceSentence": "Una tantum · da {start} a {end} · {zone}",
+        "dailySentence": "Giornaliero · {time} per {duration} · {zone}",
+        "weeklySentence": "Settimanale il {days} · {time} per {duration} · {zone}",
+        "fromNoEnd": "{schedule}, dal {start} senza data di fine",
+        "fromUntil": "{schedule}, dal {start} al {until}"
+      },
+      "validation": {
+        "conditionRequired": "Aggiungi una condizione o rimuovi il blocco condizione.",
+        "pairKey": "Scegli una dimensione per ogni riga.",
+        "pairOperator": "Usa = o != in una condizione di downtime.",
+        "pairValue": "Inserisci un valore per ogni riga.",
+        "loneStar": "Un valore non può essere un solo *.",
+        "innerStar": "Il carattere * è consentito solo alla fine di un valore.",
+        "emptyGroup": "Un gruppo di condizioni non può essere vuoto.",
+        "tooDeep": "Una condizione può annidare gruppi al massimo su 3 livelli.",
+        "tooManyPairs": "Una condizione può contenere al massimo 32 coppie.",
+        "needsEq": "Aggiungi almeno una condizione =. Una condizione composta solo da righe != silenzierebbe tutto il resto.",
+        "modulesRequired": "Scegli almeno un modulo.",
+        "foldersRequired": "Scegli tutte le cartelle o almeno una cartella.",
+        "tagsRequired": "Aggiungi un tag o rimuovi il blocco dei tag.",
+        "idsRequired": "Seleziona un elemento o rimuovi il blocco degli elementi specifici.",
+        "idOutsideFolders": "Alcuni elementi scelti non sono nelle cartelle scelte.",
+        "tooManyFolders": "Scegli al massimo {max} cartelle, oppure Tutte le cartelle.",
+        "tooManyTags": "Aggiungi al massimo {max} tag.",
+        "tooManyIds": "Seleziona al massimo {max} elementi.",
+        "nameTooLong": "Un nome può contenere al massimo 256 caratteri.",
+        "timezoneRequired": "Scegli un fuso orario.",
+        "startRequired": "Inserisci una data e un'ora di inizio.",
+        "endRequired": "Inserisci una data e un'ora di fine.",
+        "endAfterStart": "La fine deve essere successiva all'inizio.",
+        "windowTooLong": "Una finestra può durare al massimo 7 giorni.",
+        "windowTooShort": "Una finestra deve durare almeno 1 minuto.",
+        "startTimeRequired": "Inserisci un'ora di inizio nel formato HH:MM.",
+        "durationInvalid": "Inserisci una durata come 90m o 1h 30m.",
+        "weekdaysRequired": "Scegli almeno un giorno.",
+        "untilAfterStart": "La ripetizione fino a deve essere uguale o successiva al primo giorno.",
+        "reasonTooLong": "Un motivo può contenere al massimo {max} caratteri.",
+        "windowOutlastsRepeat": "La finestra non può durare più del tempo tra le ripetizioni.",
+        "startDateRequired": "Scegli il primo giorno."
+      },
+      "title": "Periodi di inattività",
+      "subtitle": "Finestre pianificate che mantengono in esecuzione avvisi, rilevamento delle anomalie e controlli Synthetics, ma ne sospendono le notifiche",
+      "newDowntime": "Nuovo periodo di inattività",
+      "filterAll": "Tutti",
+      "filterOnce": "Una tantum",
+      "filterRecurring": "Ricorrente",
+      "search": "Cerca per nome, dimensione o creatore",
+      "searchAcross": "Cerca in tutte le cartelle",
+      "thisFolder": "Questa cartella",
+      "allFolders": "Tutte le cartelle",
+      "thisFolderTooltip": "Cerca nella cartella selezionata",
+      "allFoldersTooltip": "Cerca in ogni cartella",
+      "noFolder": "Nessuna cartella in cui puoi archiviare un downtime",
+      "truncated": "Vengono mostrati i primi {shown} downtime su {total}",
+      "stats": {
+        "active": "Attivi",
+        "scheduled": "Pianificati",
+        "recurring": "Ricorrenti",
+        "ended": "Conclusi",
+        "cancelled": "Annullati",
+        "endedEarly": "Terminato in anticipo",
+        "total": "Totale"
+      },
+      "columns": {
+        "name": "Nome",
+        "status": "Stato",
+        "targets": "Target",
+        "schedule": "Pianificazione",
+        "when": "Fine / prossimo",
+        "matched": "Corrispondenze",
+        "createdBy": "Creato da",
+        "folder": "Cartella"
+      },
+      "oneTime": "Una tantum",
+      "recurring": "Ricorrente",
+      "bannerOn": "Un banner viene mostrato a tutti nell'organizzazione mentre questo periodo di inattività è attivo",
+      "endsLabel": "termina",
+      "confirmEndNow": {
+        "title": "Terminare questo downtime ora?",
+        "message": "Le notifiche riprendono subito. Il downtime resta nell'elenco come terminato in anticipo.",
+        "ok": "Termina ora",
+        "keep": "Lascia attivo"
+      },
+      "extend": {
+        "menu": "Estendi di",
+        "notActive": "Solo un downtime attivo può essere esteso",
+        "dialogTitle": "Estendi {name}",
+        "newEnd": "Nuova fine",
+        "confirmUntil": "Estendi fino alle {time}",
+        "followUp": "Questo downtime si ripete, quindi la sua pianificazione resta invariata. Viene creato un downtime singolo chiamato {name} dalla fine della finestra attuale.",
+        "endAfterCurrent": "La nuova fine deve essere successiva alla fine attuale."
+      },
+      "nextLabel": "prossimo",
+      "matched": {
+        "alerts": "{count} avviso | {count} avvisi",
+        "anomalies": "{count} anomalia | {count} anomalie",
+        "synthetics": "{count} controllo | {count} controlli",
+        "slos": "{count} SLO | {count} SLO"
+      },
+      "actions": {
+        "endNow": "Termina ora",
+        "edit": "Modifica",
+        "duplicate": "Duplica",
+        "moveToFolder": "Sposta nella cartella",
+        "cancel": "Annulla periodo di inattività",
+        "delete": "Elimina",
+        "more": "Altre azioni",
+        "muteForHour": "Silenzia ora per 1 h",
+        "extend": "Estendi"
+      },
+      "confirmCancel": {
+        "title": "Annulla downtime",
+        "message": "Le notifiche riprendono immediatamente. Il downtime resta nell'elenco per lo storico.",
+        "bulkMessage": "Annullare {count} downtime? Le notifiche riprendono immediatamente. | Annullare {count} downtime? Le notifiche riprendono immediatamente.",
+        "confirm": "Annulla downtime | Annulla downtime",
+        "keep": "Mantieni downtime | Mantieni downtime"
+      },
+      "confirmDelete": {
+        "title": "Elimina downtime",
+        "message": "Il downtime e il suo storico vengono rimossi. L'operazione non può essere annullata."
+      },
+      "copyOf": "Copia di {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} avviso corrisponde | {count} avvisi corrispondono",
+          "anomaly_detections": "{count} rilevamento corrisponde | {count} rilevamenti corrispondono",
+          "synthetics": "{count} controllo corrisponde | {count} controlli corrispondono",
+          "slos": "{count} SLO corrisponde | {count} SLO corrispondono"
+        },
+        "alertFolders": "Cartelle degli avvisi",
+        "syntheticsFolders": "Cartelle di Synthetics",
+        "noAlertFolderAccess": "Non hai accesso alle cartelle degli avvisi.",
+        "noSyntheticsFolderAccess": "Non hai accesso alle cartelle di Synthetics.",
+        "tags": "Tag",
+        "tagPlaceholder": "chiave:valore",
+        "tagsHint": "Ogni tag deve essere presente sul controllo.",
+        "removeBlock": "Rimuovi questo blocco",
+        "specificItems": "Elementi specifici",
+        "itemsHint": "Vengono proposti solo gli elementi presenti nelle cartelle selezionate.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Aggiungi tag",
+        "addItems": "Aggiungi elementi specifici",
+        "sloMode": "Punteggio SLO all'interno della finestra",
+        "sloExclude": "Escludi la finestra",
+        "sloCountAsGood": "Considera la finestra come buona",
+        "sloExcludeCaption": "Il tempo all'interno della finestra non conta né come buono né come cattivo. Gli avvisi di burn-rate su questi SLO non si attivano per essa.",
+        "sloCountAsGoodCaption": "Il tempo nella finestra conta come completamente buono. Usalo solo quando il tuo contratto SLO prevede che la manutenzione pianificata sia tempo di attività.",
+        "cardCaption": "Prima le cartelle, poi i blocchi opzionali restringono ulteriormente. La condizione sulla dimensione riportata sopra si applica anche a questo modulo.",
+        "noConditionForChecks": "La condizione sulla dimensione riportata sopra non si applica ai controlli.",
+        "appliesTo": "Si applica a",
+        "tabTargets": "Target",
+        "tabSchedule": "Pianificazione",
+        "tabAdvanced": "Avanzate",
+        "modeInFolder": "{mode} in",
+        "newMode": "Nuovo downtime",
+        "editMode": "Modifica downtime",
+        "namePlaceholder": "Nome del downtime",
+        "nameLabel": "Nome del downtime",
+        "renameHint": "Fai clic per rinominare",
+        "reason": "Motivo",
+        "reasonHelp": "Opzionale. Mostrato nell'elenco, nella pagina di dettaglio e nel tooltip Silenziato.",
+        "cancel": "Annulla",
+        "save": "Salva",
+        "activeBanner": "Questo downtime è attivo. Una modifica ha effetto alla prossima valutazione e un cambiamento della modalità SLO rimisura le finestre già avviate.",
+        "changedMeanwhile": "Qualcuno ha modificato questo downtime dopo che lo hai caricato. Ricarica e riprova.",
+        "reload": "Ricarica",
+        "noModule": "Scegli un modulo in Si applica a.",
+        "checkSchedule": "Controlla la pianificazione, poi salva di nuovo."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "avvisi",
+          "anomaly_detections": "rilevamenti di anomalie",
+          "synthetics": "controlli di Synthetics",
+          "slos": "SLO"
+        },
+        "whenOnce": "Una volta, da {start} a {end} {zone}",
+        "whenDaily": "Ogni giorno alle {time} {zone}, per {duration}",
+        "whenWeekly": "Ogni {days} alle {time} {zone}, per {duration}",
+        "inFolders": "nella cartella {names} | nelle cartelle {names}",
+        "withCondition": "con {condition}",
+        "tagged": "con tag {tags}",
+        "named": "limitato a {count} elemento con nome | limitato a {count} elementi con nome",
+        "stopNotifying": "{when}: {targets} smettono di inviare notifiche.",
+        "nothingMuted": "{when}: nessun avviso o controllo è silenziato.",
+        "sloUnchanged": "I punteggi SLO non vengono modificati.",
+        "sloExcluded": "{slos} escludono la finestra dal proprio punteggio.",
+        "sloAsGood": "{slos} considerano la finestra come tempo valido."
+      },
+      "autoName": {
+        "once": "una volta",
+        "onceOn": "una volta {date}",
+        "daily": "giornaliero",
+        "weekly": "settimanale",
+        "all": {
+          "alerts": "Tutti gli avvisi",
+          "anomaly_detections": "Tutti i rilevamenti di anomalie",
+          "synthetics": "Tutti i controlli Synthetics",
+          "slos": "Tutti gli SLO"
+        }
+      },
+      "condition": {
+        "none": "Nessuna condizione di dimensione",
+        "add": "Aggiungi",
+        "title": "Condizione di dimensione",
+        "onePer": "Una per periodo di inattività",
+        "remove": "Rimuovi la condizione di dimensione",
+        "caption": "Si applica ad avvisi, rilevamento di anomalie e SLO. I controlli Synthetics non hanno dimensioni e usano i tag. Tutte le coppie devono corrispondere. Usa un gruppo OR per le alternative. Un valore può terminare con *."
+      },
+      "resources": {
+        "refineBy": "Affina per risorsa",
+        "load": "Carica risorse",
+        "needsEq": "Aggiungi almeno una condizione = prima di affinare per risorsa.",
+        "tooMany": "{count} valori compaiono insieme a questa condizione. Restringi la condizione per selezionare le risorse.",
+        "lastSeen": "Visto l'ultima volta",
+        "streams": "Stream",
+        "footer": "{selected} di {total} selezionati · {source}",
+        "fromRegistry": "dal registro dei servizi",
+        "fromSearch": "dalle ultime 24 ore di dati",
+        "apply": "Applica",
+        "loadFailed": "Impossibile caricare le risorse",
+        "notSeen": "Non visto nell'ultima ora.",
+        "partial": "Alcune fonti non hanno risposto.",
+        "items": "Elementi",
+        "fromValues": "dagli avvisi, dal registro dei servizi e dai dati dell'ultima ora",
+        "noValues": "Nessun valore ancora visto per questa dimensione."
+      },
+      "scheduleForm": {
+        "once": "Una volta",
+        "daily": "Giornaliero",
+        "weekly": "Settimanale",
+        "startDate": "Data di inizio",
+        "startTime": "Ora di inizio",
+        "endDate": "Data di fine",
+        "endTime": "Ora di fine",
+        "days": "Giorni",
+        "startsAt": "Inizia alle",
+        "duration": "Durata",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Fino a 7 giorni, ad esempio 90m o 1h 30m.",
+        "until": "Ripeti fino al",
+        "untilPlaceholder": "Nessuna data di fine",
+        "timezone": "Fuso orario",
+        "noWindow": "Nessuna finestra inizia nei prossimi 8 giorni.",
+        "nextWindow": "Prossima finestra: {window}. Una finestra può attraversare la mezzanotte.",
+        "nextWindowWithUtc": "Prossima finestra: {window} ({utc}). Una finestra può attraversare la mezzanotte.",
+        "startsOn": "Inizia il"
+      },
+      "preview": {
+        "title": "Anteprima",
+        "failed": "Impossibile caricare l'anteprima.",
+        "andMore": "e altri {count}",
+        "noMatch": "Al momento non corrisponde nulla",
+        "fireTime": "{count} avviso determina la propria identità al momento dell'attivazione | {count} avvisi determinano la propria identità al momento dell'attivazione",
+        "undecidable": "Non è possibile distinguerli tramite {key}",
+        "showAll": "Mostra l'elenco completo",
+        "showLess": "Mostra meno",
+        "finishCondition": "Completa la condizione per vedere un'anteprima."
+      },
+      "muteAllDialog": {
+        "title": "Silenziare interi moduli?",
+        "intro": "Nessuna cartella, elemento, tag o condizione restringe questi moduli, quindi questo downtime silenzia:",
+        "every": {
+          "alerts": "Tutti gli avvisi in questa organizzazione",
+          "anomaly_detections": "Tutte le rilevazioni di anomalie in questa organizzazione",
+          "synthetics": "Tutti i controlli Synthetics in questa organizzazione",
+          "slos": "Tutti gli SLO in questa organizzazione"
+        },
+        "matchedNow": "{matched} oggi",
+        "outro": "Le notifiche, le pagine di reperibilità e i workflow si interrompono per tutti questi elementi all'interno della finestra.",
+        "cancel": "Annulla",
+        "confirm": "Silenzia tutto",
+        "titleOne": {
+          "alerts": "Silenziare ogni avviso in questa organizzazione?",
+          "anomaly_detections": "Silenziare ogni rilevamento di anomalie in questa organizzazione?",
+          "synthetics": "Silenziare ogni controllo Synthetics in questa organizzazione?",
+          "slos": "Silenziare ogni SLO in questa organizzazione?"
+        },
+        "window": "Finestra: {window}"
+      },
+      "summaryPane": {
+        "title": "Riepilogo",
+        "filedIn": "Archiviato in",
+        "window": "Finestra",
+        "nextWindow": "Prossima finestra",
+        "inUtc": "In UTC",
+        "largeMatch": "{modules}: il downtime corrisponde a più della metà degli elementi. La maggior parte di questa organizzazione non invierà notifiche all'interno della finestra.",
+        "whatHappens": "Cosa succede",
+        "keepRunning": "Le valutazioni e i controlli continuano a essere eseguiti e conservano la loro cronologia.",
+        "noNotifications": "Le notifiche, le pagine di reperibilità e i workflow si interrompono.",
+        "mutedIncidents": "Gli incidenti vengono aperti silenziati e notificano al termine della finestra."
+      },
+      "band": {
+        "now": "ora",
+        "none": "Nessuna finestra è ancora stata eseguita e nessuna è pianificata.",
+        "active": "Attiva",
+        "next": "Prossima",
+        "past": "Eseguita",
+        "track": "Finestre",
+        "aria": "{kind}: da {start} a {end}"
+      },
+      "detail": {
+        "overview": "Panoramica",
+        "affected": "Interessati · {count}",
+        "suppressed": "Soppressi · {count}",
+        "details": "Dettagli",
+        "condition": "Condizione",
+        "noTarget": "Nessun target",
+        "banner": "Banner",
+        "bannerOn": "Mostrato all'organizzazione mentre è attivo",
+        "bannerOff": "Nessun banner",
+        "occurrences": "Occorrenze",
+        "nextWindow": "Prossima finestra: {window}. La tua ora: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Corrispondenza per",
+        "matchedBy": {
+          "query": "Query",
+          "source_alert": "Avviso di origine",
+          "tag": "Tag",
+          "id": "Con nome",
+          "folder": "Cartella",
+          "org": "Intera organizzazione"
+        },
+        "source": "Origine",
+        "wouldHaveNotified": "Avrebbe notificato",
+        "noSuppressed": "Non è ancora stato soppresso nulla",
+        "muteHourName": "{name} · silenzia 1 h",
+        "notFoundTitle": "Periodo di inattività non trovato",
+        "notFoundDescription": "Potrebbe essere stato eliminato, oppure il link punta a un'altra organizzazione.",
+        "backToList": "Torna ai periodi di inattività"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Silenzia {count} avviso | Silenzia {count} avvisi",
+          "anomaly_detections": "Silenzia {count} rilevamento anomalie | Silenzia {count} rilevamenti anomalie",
+          "synthetics": "Silenzia {count} controllo | Silenzia {count} controlli",
+          "slos": "Silenzia {count} SLO | Silenzia {count} SLO",
+          "items": "Silenzia {count} elemento | Silenzia {count} elementi"
+        },
+        "subtitle": "Continuano a funzionare e mantengono la loro cronologia. Notifiche, pagine e workflow si interrompono fino alla fine della finestra.",
+        "muteFor": "Silenzia per",
+        "fileIn": "Archivia in",
+        "presets": {
+          "30m": "30 min",
+          "1h": "1 h",
+          "2h": "2 h",
+          "4h": "4 h",
+          "custom": "Personalizzato"
+        },
+        "endsAt": "Termina il",
+        "endsIn": "Tra {duration}.",
+        "confirm": "Silenzia",
+        "confirmUntil": "Silenzia fino a {time}",
+        "menu": "Silenzia notifiche",
+        "until": "Fino a…",
+        "bulk": "Silenzia",
+        "muted": "Silenziato · termina tra {duration}",
+        "mutedTooltip": "Silenziato da {name} fino a {end}",
+        "exclude": "Escludi una finestra…",
+        "firingMuted": "Attivo · silenziato",
+        "firingMutedTooltip": "Ancora attivo. Le notifiche sono silenziate da {name}."
+      },
+      "corrected": "Corretto",
+      "correctedBy": "Punteggio corretto da {names}",
+      "incident": {
+        "mutedBy": "Silenziato · {name}",
+        "notLoaded": "Periodo di inattività non caricato",
+        "notLoadedTooltip": "Silenziato dal periodo di inattività {id}, che non è tra quelli caricati.",
+        "banner": "Silenziato da {name}. Nessuno è stato avvisato. La prima attivazione dopo la finestra invia la notifica di apertura ritardata.",
+        "bannerUntil": "Silenziato da {name} fino a {end}. Nessuno è stato avvisato. La prima attivazione dopo la finestra invia la notifica di apertura ritardata."
+      },
+      "banner": {
+        "ended": "terminato",
+        "endsInUnderMinute": "termina tra meno di un minuto",
+        "endsInMinutes": "termina tra {count} minuto | termina tra {count} minuti",
+        "endsIn": "termina tra {duration}",
+        "firstEndsInUnderMinute": "il primo termina tra meno di un minuto",
+        "firstEndsInMinutes": "il primo termina tra {count} minuto | il primo termina tra {count} minuti",
+        "firstEndsIn": "il primo termina tra {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Mostra un banner a tutti nell'organizzazione mentre questo silenziamento è attivo",
+        "showBannerCaption": "Il banner mostra il nome, i conteggi interessati e il tempo rimanente. Non nomina mai un avviso.",
+        "preview": "Anteprima",
+        "previewMessage": "{name} è attivo.",
+        "tooLong": "Un banner è disponibile solo per finestre fino a 7 giorni."
+      },
+      "sloCorrections": {
+        "title": "Correzioni di stato:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "più breve dell'intervallo dello SLO, nessun minuto corretto"
+      },
+      "notify": {
+        "title": "Notifica",
+        "caption": "Avvisa le destinazioni sul fermo stesso: quando inizia, prima che finisca e quando finisce.",
+        "destinations": "Destinazioni",
+        "lead": "Promemoria prima della fine",
+        "leadHelp": "Ad esempio 10m o 1h, tra 1 minuto e la durata della finestra.",
+        "regionNote": "In un super cluster invia la regione in cui il fermo è stato creato. Un fermo creato prima di questa impostazione invia da ogni regione.",
+        "tab": "Notifiche",
+        "events": {
+          "started": "Quando inizia",
+          "startedHelp": "Un messaggio all'inizio di ogni finestra.",
+          "ending_soon": "Prima che finisca",
+          "ending_soonHelp": "Un promemoria prima della fine, così nessuno è sorpreso quando gli avvisi notificano di nuovo.",
+          "ended": "Quando finisce",
+          "endedHelp": "Un messaggio alla chiusura di ogni finestra.",
+          "cancelled": "Quando viene annullato",
+          "cancelledHelp": "Inviato subito quando qualcuno termina o annulla il fermo.",
+          "extended": "Quando viene esteso",
+          "extendedHelp": "Inviato subito con la nuova fine."
+        },
+        "validation": {
+          "tooMany": "Si possono notificare al massimo {max} destinazioni.",
+          "eventRequired": "Scegli almeno un evento, oppure rimuovi le destinazioni.",
+          "leadInvalid": "Il promemoria deve arrivare tra 1 minuto e la durata della finestra prima della fine."
+        },
+        "summary": {
+          "none": "Non invia notifiche proprie.",
+          "sentence": "Notifica {destinations}: {events}.",
+          "started": "quando inizia",
+          "endingSoon": "{lead} prima che finisca",
+          "ended": "quando finisce",
+          "cancelled": "quando viene annullato",
+          "extended": "quando viene esteso"
+        },
+        "log": {
+          "time": "Ora",
+          "event": "Evento",
+          "destinations": "Destinazioni",
+          "result": "Risultato",
+          "ok": "Inviata",
+          "pending": "Invio in corso",
+          "empty": "Nessuna notifica ancora inviata",
+          "events": {
+            "started": "Iniziato",
+            "ending_soon": "Sta per finire",
+            "ended": "Terminato",
+            "cancelled": "Annullato",
+            "extended": "Esteso"
+          }
+        },
+        "test": {
+          "send": "Invia test",
+          "sent": "Test inviato a {count} destinazione | Test inviato a {count} destinazioni",
+          "failed": "Il test non ha raggiunto {names}."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Apri",
@@ -8858,7 +9359,8 @@
     "countWorkflow": "{count} workflow | {count} workflow",
     "countAnomalyDetection": "{count} rilevatore di anomalie | {count} rilevatori di anomalie",
     "countIncidentIntegration": "{count} integrazione di incidenti | {count} integrazioni di incidenti",
-    "sectionOtherConsumers": "Utilizzato anche da"
+    "sectionOtherConsumers": "Utilizzato anche da",
+    "countDowntime": "{count} fermo | {count} fermi"
   },
   "alert_library": {
     "header": "Libreria di avvisi",
@@ -16715,7 +17217,8 @@
       "sourceMaps": "RUM — Source Maps",
       "oncall": "Reperibilità",
       "oncallDetail": "Pagina di reperibilità",
-      "syntheticsJourney": "Percorso Synthetics"
+      "syntheticsJourney": "Percorso Synthetics",
+      "downtimes": "Downtime"
     },
     "actions": {
       "openCheatsheet": "Apri il cheatsheet delle scorciatoie da tastiera",
@@ -16824,6 +17327,8 @@
       "oncallEscalate": "Inoltra",
       "oncallSnooze": "Posticipa",
       "oncallResolve": "Risolvi",
+      "downtimesCreate": "Nuovo downtime",
+      "downtimesRefresh": "Aggiorna i downtime",
       "functionsImport": "Importa funzione"
     }
   },
@@ -17257,6 +17762,13 @@
         "belowTopN": "sotto la top-N",
         "truncated": "troncato",
         "gap": "lacuna"
+      },
+      "downtimeStatus": {
+        "scheduled": "Pianificato",
+        "active": "Attivo",
+        "ended": "Terminato",
+        "cancelled": "Annullato",
+        "endedEarly": "Terminato in anticipo"
       }
     }
   },
@@ -17653,6 +18165,24 @@
     },
     "iam": {
       "userSaveFailed": "Impossibile salvare l'utente"
+    },
+    "downtimes": {
+      "cancelled": "Downtime annullato",
+      "cancelledMany": "{count} downtime annullato | {count} downtime annullati",
+      "cancelFailed": "Impossibile annullare il downtime",
+      "extended": "Esteso fino alle {time}",
+      "extendedFollowUp": "Creato {name}, attivo fino alle {time}",
+      "extendFailed": "Impossibile estendere il downtime",
+      "reload": "Ricarica",
+      "deleted": "Downtime eliminato",
+      "deleteFailed": "Impossibile eliminare il downtime",
+      "created": "Downtime creato",
+      "updated": "Downtime salvato",
+      "saveFailed": "Impossibile salvare il downtime",
+      "muted": "Silenziato {count} elemento fino a {time}. Archiviato in {folder}. | Silenziati {count} elementi fino a {time}. Archiviati in {folder}.",
+      "muteFailed": "Impossibile creare il silenziamento",
+      "viewDowntime": "Visualizza downtime",
+      "itemsDropped": "{count} elemento scelto è al di fuori delle cartelle scelte ed è stato rimosso. | {count} elementi scelti sono al di fuori delle cartelle scelte e sono stati rimossi."
     }
   },
   "cipherKeys": {
@@ -17943,7 +18473,9 @@
       "budgetNote": "L'ultimo punto equivale al riquadro Budget rimanente sopra. La linea tratteggiata allo 0% è l'esaurimento; al di sotto di essa, l'SLO ha speso più errori di quanto l'obiettivo consenta. Le lacune sono bucket senza nulla misurato, che non è la stessa cosa di zero.",
       "burnExplain": "Quanto velocemente il budget si consuma in ogni singolo bucket, come multiplo del tasso neutro rispetto al budget.",
       "burnFormula": "tasso di consumo = (100% − SLI) ÷ (100% − obiettivo)\nSLI = 100 × buoni ÷ totale, per quel singolo bucket\n\nasse destro (la stessa linea letta come SLI):\nSLI = 100% − tasso di consumo × (100% − obiettivo)",
-      "burnNote": "×1 consuma il budget esattamente alla fine della finestra, ×2 in metà tempo; sotto ×1 il budget viene accantonato. Poiché è per bucket e non cumulativo, un picco qui rimane visibile invece di essere appiattito dalla media. L'asse destro conta verso il basso: salendo nel grafico si ha più consumo, che corrisponde a un SLI inferiore."
+      "burnNote": "×1 consuma il budget esattamente alla fine della finestra, ×2 in metà tempo; sotto ×1 il budget viene accantonato. Poiché è per bucket e non cumulativo, un picco qui rimane visibile invece di essere appiattito dalla media. L'asse destro conta verso il basso: salendo nel grafico si ha più consumo, che corrisponde a un SLI inferiore.",
+      "corrected": "Corretto da un downtime",
+      "correctedTooltip": "Corretto da un downtime: escluso, quindi la linea del budget è piatta"
     },
     "alerts": {
       "title": "Avvisi",

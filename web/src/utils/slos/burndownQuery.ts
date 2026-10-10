@@ -32,6 +32,8 @@ export interface SloSliceBucket {
   bucket: number;
   good: number;
   total: number;
+  /** 1 when a downtime corrected any slice in the bucket; absent on the fallback query. */
+  corrected?: boolean | number;
 }
 
 /** One point on both charts. `null` means unmeasured — never zero (D34). */
@@ -42,6 +44,8 @@ export interface SloBurndownPoint {
   remaining: number | null;
   /** Burn rate for THIS bucket alone — multiples of budget-neutral. */
   burn: number | null;
+  /** A downtime corrected a slice in this bucket (WP11): its slices are 0 / 0. */
+  corrected: boolean;
 }
 
 /** The reserved stream slices are written to (`SLO_SLICES_STREAM`). */
@@ -94,8 +98,10 @@ export function buildSloBurndownQuery(opts: {
   /** Window start, epoch seconds — the left edge of the chart. */
   startSecs: number;
   bucketSecs: number;
+  /** Off for the retry against a stream that has no `corrected_by` column yet. */
+  withCorrected?: boolean;
 }): string {
-  const { sloId, generation, startSecs, bucketSecs } = opts;
+  const { sloId, generation, startSecs, bucketSecs, withCorrected = true } = opts;
   const bucket = Math.max(1, Math.floor(bucketSecs));
   // Repeated verbatim in SELECT and GROUP BY rather than grouping by the
   // alias: alias-in-GROUP-BY is an extension, and this query is not the place
@@ -104,9 +110,14 @@ export function buildSloBurndownQuery(opts: {
   return [
     `SELECT ${bucketExpr} AS bucket,`,
     `       SUM(good) AS good,`,
-    `       SUM(total) AS total`,
+    withCorrected ? `       SUM(total) AS total,` : `       SUM(total) AS total`,
+    ...(withCorrected
+      ? [`       MAX(CASE WHEN corrected_by <> '' THEN 1 ELSE 0 END) AS corrected`]
+      : []),
     `FROM (`,
-    `  SELECT slice_start, good, total,`,
+    withCorrected
+      ? `  SELECT slice_start, good, total, corrected_by,`
+      : `  SELECT slice_start, good, total,`,
     `         ROW_NUMBER() OVER (`,
     `           PARTITION BY slice_start ORDER BY rev DESC`,
     `         ) AS rn`,
@@ -229,6 +240,35 @@ export function toBurndownSeries(buckets: SloSliceBucket[], target: number): Slo
     // read over one bucket is exactly what "how fast is it burning now" means.
     const burn = total > 0 ? (100 - (100 * good) / total) / budgetWidth : null;
 
-    return { ts: Number(b.bucket) || 0, remaining, burn };
+    return { ts: Number(b.bucket) || 0, remaining, burn, corrected: !!Number(b.corrected ?? 0) };
   });
+}
+
+/** Runs of consecutive corrected buckets, each as `[startTs, endTs + bucketSecs]` in seconds. */
+export function correctedRanges(
+  points: SloBurndownPoint[],
+  bucketSecs: number,
+): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  let open: [number, number] | null = null;
+  for (const p of points) {
+    if (!p.corrected) {
+      open = null;
+      continue;
+    }
+    if (open && p.ts <= open[1]) {
+      open[1] = p.ts + bucketSecs;
+      continue;
+    }
+    open = [p.ts, p.ts + bucketSecs];
+    ranges.push(open);
+  }
+  return ranges;
+}
+
+/** True when a search failed only because the stream predates the `corrected_by` column. */
+export function isMissingCorrectedColumn(error: unknown): boolean {
+  const e = error as { message?: unknown; response?: { data?: unknown } } | null;
+  const text = [e?.message, JSON.stringify(e?.response?.data ?? "")].join(" ");
+  return text.includes("corrected_by");
 }

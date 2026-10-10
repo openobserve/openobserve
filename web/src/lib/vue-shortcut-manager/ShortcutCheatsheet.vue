@@ -263,6 +263,7 @@ const capabilities = computed<ShortcutCapabilities>(() => ({
   modelPricingEnabled: Boolean(store.state.zoConfig?.model_pricing_enabled),
   rbacEnabled: Boolean(store.state.zoConfig?.rbac_enabled),
   aiEnabled: Boolean(store.state.zoConfig?.ai_enabled),
+  downtimesEnabled: store.state.zoConfig?.downtimes_enabled === true,
 }));
 
 const open = computed({

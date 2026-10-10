@@ -61,6 +61,10 @@ pub struct AlertHistoryQuery {
     pub sort_by: Option<String>,
     /// Sort order (asc or desc, default: desc)
     pub sort_order: Option<String>,
+    /// Only runs this downtime suppressed; also reads synthetics and anomaly runs.
+    pub downtime_id: Option<String>,
+    /// Filter by run outcome, for example `suppressed`.
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -118,6 +122,9 @@ pub struct AlertHistoryEntry {
     /// §7.5) — the UI renders "≥ N". Absent = exact.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_is_lower_bound: Option<bool>,
+    /// The downtime that suppressed this run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub downtime_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -409,6 +416,7 @@ pub async fn get_alert_history(
                     threshold_operator: None,
                     group_label: None,
                     value_is_lower_bound: None,
+                    downtime_id: None,
                 }
             })
             .collect();
@@ -559,9 +567,17 @@ pub async fn get_alert_history(
     // Build SQL WHERE clause for the _meta organization's triggers stream.
     // Composites publish with module = "composite" and share the ordinary
     // alert outcome vocabulary, so include them in the same history read.
+    // Anomaly detections are the `alerts` resource, so the alert check above already gates them.
+    let synthetics_readable =
+        query.downtime_id.is_some() && reads_every_synthetic(&org_id, &user_email.user_id).await;
+    let modules = history_modules(query.downtime_id.is_some(), synthetics_readable);
     let mut where_clause = format!(
-        "module IN ('alert', 'composite') AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+        "module IN ({modules}) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
+    where_clause.push_str(&downtime_filters(
+        query.downtime_id.as_deref(),
+        query.status.as_deref(),
+    ));
 
     // Add alert ID filter if provided
     // The key field contains the alert ID in the format "alert_name/alert_id"
@@ -663,7 +679,7 @@ pub async fn get_alert_history(
          threshold_operator, group_label, value_is_lower_bound, is_realtime, is_silenced, \
          start_time, end_time, retries, \
          delay_in_secs, evaluation_took_in_secs, \
-         source_node, query_took, error \
+         source_node, query_took, error, downtime_id \
          FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
          ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
@@ -797,6 +813,11 @@ pub async fn get_alert_history(
                 .filter(|s| !s.is_empty())
                 .map(String::from),
             value_is_lower_bound: hit.get("value_is_lower_bound").and_then(|v| v.as_bool()),
+            downtime_id: hit
+                .get("downtime_id")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+                .map(String::from),
         });
     }
 
@@ -809,6 +830,92 @@ pub async fn get_alert_history(
     };
 
     MetaHttpResponse::json(response)
+}
+
+/// The modules a history read covers; a `?downtime_id=` read adds those a downtime can mute.
+fn history_modules(by_downtime: bool, synthetics_readable: bool) -> String {
+    let mut modules = vec!["'alert'", "'composite'"];
+    if by_downtime {
+        modules.push("'anomaly_detection'");
+        if synthetics_readable {
+            modules.push("'synthetics'");
+        }
+    }
+    modules.join(", ")
+}
+
+/// Synthetics runs carry no per-check filter here, so only an org-wide synthetics read sees them.
+#[cfg(feature = "enterprise")]
+async fn reads_every_synthetic(org_id: &str, user_id: &str) -> bool {
+    if db::user::is_root_user(user_id) || !o2_openfga::config::get_config().enabled {
+        return true;
+    }
+    let object_type = o2_openfga::meta::mapping::OFGA_MODELS
+        .get("synthetics")
+        .map_or("synthetics", |model| model.key);
+    let listed = match openobserve_api_common::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        "GET",
+        object_type,
+    )
+    .await
+    {
+        Ok(listed) => listed,
+        Err(e) => {
+            log::warn!("synthetics read of {user_id} in {org_id} unreadable: {e}");
+            return false;
+        }
+    };
+    every_synthetic_readable(
+        listed.as_deref(),
+        &format!("{object_type}:_all_{org_id}"),
+        async || {
+            openobserve_core::auth::check_permissions(
+                org_id,
+                org_id,
+                user_id,
+                "synthetics",
+                "GET",
+                None,
+                true,
+                false,
+                false,
+            )
+            .await
+        },
+    )
+    .await
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn reads_every_synthetic(_org_id: &str, _user_id: &str) -> bool {
+    true
+}
+
+/// `None` from ListObjects means no list filtering, not a grant, so the org-wide check decides.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+async fn every_synthetic_readable(
+    listed: Option<&[String]>,
+    all_key: &str,
+    org_wide_grant: impl AsyncFnOnce() -> bool,
+) -> bool {
+    match listed {
+        Some(permitted) => permitted.iter().any(|object| object == all_key),
+        None => org_wide_grant().await,
+    }
+}
+
+/// The downtime filters of the history read, quoted with the same single-quote escaping.
+fn downtime_filters(downtime_id: Option<&str>, status: Option<&str>) -> String {
+    let mut clause = String::new();
+    if let Some(id) = downtime_id.filter(|id| !id.is_empty()) {
+        clause.push_str(&format!(" AND downtime_id = '{}'", id.replace('\'', "''")));
+    }
+    if let Some(status) = status.filter(|status| !status.is_empty()) {
+        clause.push_str(&format!(" AND status = '{}'", status.replace('\'', "''")));
+    }
+    clause
 }
 
 /// Bulk anomaly history query — returns the most recent N hits per anomaly config in one request.
@@ -1043,6 +1150,8 @@ mod tests {
             size: None,
             sort_by: None,
             sort_order: None,
+            downtime_id: None,
+            status: None,
         };
 
         assert!(query.alert_id.is_none());
@@ -1085,6 +1194,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         assert_eq!(entry.alert_name, "test_alert");
@@ -1142,6 +1252,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1188,6 +1299,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         assert_eq!(entry.status, "error");
@@ -1209,6 +1321,8 @@ mod tests {
             size: Some(25),
             sort_by: None,
             sort_order: None,
+            downtime_id: None,
+            status: None,
         };
 
         assert_eq!(query.from.unwrap(), 100);
@@ -1244,6 +1358,8 @@ mod tests {
                 size: None,
                 sort_by: Some(field.to_string()),
                 sort_order: Some("asc".to_string()),
+                downtime_id: None,
+                status: None,
             };
 
             assert_eq!(query.sort_by, Some(field.to_string()));
@@ -1263,6 +1379,8 @@ mod tests {
             size: None,
             sort_by: Some("timestamp".to_string()),
             sort_order: Some("asc".to_string()),
+            downtime_id: None,
+            status: None,
         };
         assert_eq!(query_asc.sort_order, Some("asc".to_string()));
 
@@ -1276,6 +1394,8 @@ mod tests {
             size: None,
             sort_by: Some("timestamp".to_string()),
             sort_order: Some("desc".to_string()),
+            downtime_id: None,
+            status: None,
         };
         assert_eq!(query_desc.sort_order, Some("desc".to_string()));
     }
@@ -1408,6 +1528,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         let json = serde_json::to_string(&entry).unwrap();
@@ -1451,6 +1572,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
 
         let response = AlertHistoryResponse {
@@ -1500,6 +1622,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1542,6 +1665,7 @@ mod tests {
             threshold_operator: None,
             group_label: None,
             value_is_lower_bound: None,
+            downtime_id: None,
         };
         let json = serde_json::to_value(&entry).unwrap();
         let obj = json.as_object().unwrap();
@@ -1551,5 +1675,47 @@ mod tests {
         assert!(obj.contains_key("grouped"));
         assert!(obj.contains_key("group_size"));
         assert!(obj.contains_key("anomaly_count"));
+    }
+
+    #[tokio::test]
+    async fn unfiltered_listing_is_not_a_synthetics_grant() {
+        let all = "synthetics:_all_acme";
+        assert!(!every_synthetic_readable(None, all, async || false).await);
+        assert!(every_synthetic_readable(None, all, async || true).await);
+        let listed = [all.to_string()];
+        assert!(every_synthetic_readable(Some(&listed), all, async || false).await);
+        let one = ["synthetics:c1".to_string()];
+        assert!(!every_synthetic_readable(Some(&one), all, async || true).await);
+    }
+
+    #[test]
+    fn a_user_without_synthetics_read_sees_no_synthetics_runs() {
+        assert_eq!(
+            history_modules(true, false),
+            "'alert', 'composite', 'anomaly_detection'"
+        );
+        assert_eq!(
+            history_modules(true, true),
+            "'alert', 'composite', 'anomaly_detection', 'synthetics'"
+        );
+        assert_eq!(history_modules(false, true), "'alert', 'composite'");
+    }
+
+    #[test]
+    fn downtime_filters_quote_and_combine() {
+        assert_eq!(downtime_filters(None, None), "");
+        assert_eq!(
+            downtime_filters(Some("2f9K"), None),
+            " AND downtime_id = '2f9K'"
+        );
+        assert_eq!(
+            downtime_filters(None, Some("suppressed")),
+            " AND status = 'suppressed'"
+        );
+        assert_eq!(
+            downtime_filters(Some("a'b"), Some("suppressed")),
+            " AND downtime_id = 'a''b' AND status = 'suppressed'"
+        );
+        assert_eq!(downtime_filters(Some(""), Some("")), "");
     }
 }

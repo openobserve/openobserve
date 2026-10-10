@@ -1,0 +1,59 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { computed, toValue, type MaybeRefOrGetter } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useStore } from "vuex";
+import { downtimesLookupQuery } from "@/services/downtimes.queries";
+import type { DowntimeListItem } from "@/services/downtimes";
+import { useDowntimesEnabled } from "./useDowntimesEnabled";
+
+/** Names and windows of downtimes by id, for surfaces that only carry `muted_by_downtime_id`. */
+export function useDowntimeLookup(needed: MaybeRefOrGetter<boolean>) {
+  type StoreState = {
+    zoConfig?: Record<string, unknown>;
+    selectedOrganization?: { identifier?: string };
+  };
+  const store = useStore() as { state?: StoreState } | undefined;
+  // Read directly rather than through useOrgId, so a storeless mount stays inert.
+  const orgId = computed(() => store?.state?.selectedOrganization?.identifier ?? "");
+
+  const downtimesEnabled = useDowntimesEnabled();
+
+  const list = useQuery(() =>
+    Object.assign(downtimesLookupQuery(orgId.value), {
+      enabled: !!orgId.value && downtimesEnabled.value && toValue(needed),
+    }),
+  );
+
+  const byId = computed(
+    () => new Map((list.data.value?.items ?? []).map((d) => [d.id, d] as const)),
+  );
+
+  const downtimeOf = (id: string | null | undefined): DowntimeListItem | undefined =>
+    id ? byId.value.get(id) : undefined;
+
+  /** The org holds more downtimes than the one page the lookup reads. */
+  const truncated = computed(() => !!list.data.value?.truncated);
+
+  /** The downtime's name, or its id when the list is not readable. */
+  const nameOf = (id: string) => downtimeOf(id)?.name ?? id;
+
+  /** An id the capped list did not carry, so its name is unknown rather than missing. */
+  const notLoaded = (id: string | null | undefined): boolean =>
+    !!id && truncated.value && !downtimeOf(id);
+
+  return { downtimesEnabled, downtimeOf, nameOf, truncated, notLoaded };
+}

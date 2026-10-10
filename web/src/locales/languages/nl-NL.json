@@ -560,6 +560,12 @@
       "description": "Een remote taak is een HTTP-service die uw experimenten aanroepen om uitvoer te produceren. Publiceer hem eenmalig, bewijs dat de verbinding werkt, en elk experiment kan de exacte versie vastpinnen waartegen het is uitgevoerd.",
       "action": "Nieuwe taak",
       "actionDesc": "Wijs OpenObserve naar uw endpoint en test de verbinding."
+    },
+    "noDowntimes": {
+      "title": "Nog geen downtimes",
+      "description": "Een downtime laat alarmen, anomaliedetecties en synthetische checks doorlopen en stopt hun meldingen gedurende een venster dat je plant.",
+      "action": "Een downtime plannen",
+      "actionDesc": "Eenmalig, dagelijks of wekelijks. Gebruik voor snel dempen Dempen in de alarmlijst."
     }
   },
   "common": {
@@ -1320,6 +1326,7 @@
     "topQueries": "Top Queries",
     "profiles": "Profielen",
     "productAnalytics": "Productanalyse",
+    "downtimes": "Downtimes",
     "trialEndedTitle": "Je proefperiode is afgelopen",
     "trialPageNeedsPlan": "{page} heeft een plan nodig",
     "trialPageNeedsPlanToast": "{page} heeft een plan nodig. Kies er een op deze pagina om deze te blijven gebruiken.",
@@ -2822,6 +2829,7 @@
       "scopeCoveredByParent": "Vergrendelde acties komen van {scope}, ingesteld in {module}",
       "scopeAllOf": "Alle {module}",
       "scopeIncludesFuture": "Omvat ook resources die later worden aangemaakt",
+      "scopeDowntimeHint": "Een downtime-map beperkt wie een downtime beheert, niet wat deze dempt. Om Alle mappen van een module te dempen, moet een gebruiker het recht hebben om elke map van die module weer te geven. Gedempte chips en banners kunnen een downtime vermelden die een gebruiker niet kan weergeven.",
       "grantedByWiderScope": "Toegekend door een ruimere scope",
       "grantedHereAndByWiderScope": "Hier toegekend en door een ruimere scope",
       "stillGrantedByWiderScope": "Hier verwijderd, nog steeds toegekend door een ruimere scope",
@@ -8821,7 +8829,500 @@
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
     "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
-    "seconds": "Seconden"
+    "seconds": "Seconden",
+    "downtimes": {
+      "newTitle": "Nieuwe downtime",
+      "editTitle": "Downtime bewerken",
+      "detailTitle": "Downtime",
+      "modules": {
+        "alerts": "Alarmen",
+        "anomaly_detections": "Anomaliedetecties",
+        "synthetics": "Synthetics-checks",
+        "slos": "SLO's"
+      },
+      "modulesShort": {
+        "alerts": "Alarmen",
+        "anomaly_detections": "Anomalie",
+        "synthetics": "Synthetics",
+        "slos": "SLO's"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "Tijdens het venster worden incidenten",
+          "muted": "Aangemaakt en gedempt (standaard)",
+          "mutedHelp": "Incidenten openen zoals gewoonlijk, maar melden niemand iets tot het venster eindigt.",
+          "none": "Niet aangemaakt",
+          "noneHelp": "Tijdens het venster opent geen incident; de eerste melding daarna opent er een en waarschuwt.",
+          "summary": "geen incidenten"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}s",
+        "condition": "voorwaarde",
+        "allFolders": "alle mappen",
+        "oneFolder": "map {name}",
+        "nFolders": "{count} map | {count} mappen",
+        "tags": "tag {tags}",
+        "nItems": "{count} item | {count} items",
+        "asGood": "als goed",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}"
+      },
+      "duration": {
+        "days": "{count} d",
+        "hours": "{count} u",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "{start} tot {end} {zone}",
+        "onceSentence": "Eenmalig · {start} tot {end} · {zone}",
+        "dailySentence": "Dagelijks · {time} gedurende {duration} · {zone}",
+        "weeklySentence": "Wekelijks op {days} · {time} gedurende {duration} · {zone}",
+        "fromNoEnd": "{schedule}, vanaf {start} zonder einddatum",
+        "fromUntil": "{schedule}, van {start} tot en met {until}"
+      },
+      "validation": {
+        "conditionRequired": "Voeg een voorwaarde toe of verwijder het voorwaardeblok.",
+        "pairKey": "Kies een dimensie voor elke rij.",
+        "pairOperator": "Gebruik = of != in een downtimevoorwaarde.",
+        "pairValue": "Voer een waarde in voor elke rij.",
+        "loneStar": "Een waarde mag niet alleen een * zijn.",
+        "innerStar": "Een * is alleen toegestaan aan het einde van een waarde.",
+        "emptyGroup": "Een voorwaardegroep mag niet leeg zijn.",
+        "tooDeep": "Een voorwaarde kan groepen maximaal 3 niveaus diep nesten.",
+        "tooManyPairs": "Een voorwaarde kan maximaal 32 paren bevatten.",
+        "needsEq": "Voeg minstens één = voorwaarde toe. Een voorwaarde met alleen != rijen zou al het andere dempen.",
+        "modulesRequired": "Kies minstens één module.",
+        "foldersRequired": "Kies Alle mappen of minstens één map.",
+        "tagsRequired": "Voeg een tag toe of verwijder het tagsblok.",
+        "idsRequired": "Kies een item of verwijder het blok met specifieke items.",
+        "idOutsideFolders": "Sommige gekozen items staan niet in de gekozen mappen.",
+        "tooManyFolders": "Kies maximaal {max} mappen, of Alle mappen.",
+        "tooManyTags": "Voeg maximaal {max} tags toe.",
+        "tooManyIds": "Kies maximaal {max} items.",
+        "nameTooLong": "Een naam mag maximaal 256 tekens bevatten.",
+        "timezoneRequired": "Kies een tijdzone.",
+        "startRequired": "Voer een startdatum en -tijd in.",
+        "endRequired": "Voer een einddatum en -tijd in.",
+        "endAfterStart": "Het einde moet na het begin liggen.",
+        "windowTooLong": "Een venster kan maximaal 7 dagen duren.",
+        "windowTooShort": "Een venster moet minstens 1 minuut duren.",
+        "startTimeRequired": "Voer een starttijd in als HH:MM.",
+        "durationInvalid": "Voer een duur in zoals 90m of 1h 30m.",
+        "weekdaysRequired": "Kies minstens één dag.",
+        "untilAfterStart": "Herhalen tot moet op of na de eerste dag vallen.",
+        "reasonTooLong": "Een reden mag maximaal {max} tekens bevatten.",
+        "windowOutlastsRepeat": "Het venster mag niet langer zijn dan de tijd tussen herhalingen.",
+        "startDateRequired": "Kies de eerste dag."
+      },
+      "title": "Downtimes",
+      "subtitle": "Geplande vensters waarin alarmen, anomaliedetecties en Synthetics-checks blijven draaien, maar hun meldingen worden gestopt",
+      "newDowntime": "Nieuwe downtime",
+      "filterAll": "Alle",
+      "filterOnce": "Eenmalig",
+      "filterRecurring": "Terugkerend",
+      "search": "Zoeken op naam, dimensie of maker",
+      "searchAcross": "Alle mappen doorzoeken",
+      "thisFolder": "Deze map",
+      "allFolders": "Alle mappen",
+      "thisFolderTooltip": "Zoeken in de geselecteerde map",
+      "allFoldersTooltip": "Zoeken in elke map",
+      "noFolder": "Geen map waarin u een downtime kunt opslaan",
+      "truncated": "De eerste {shown} van {total} downtimes worden getoond",
+      "stats": {
+        "active": "Actief",
+        "scheduled": "Gepland",
+        "recurring": "Terugkerend",
+        "ended": "Beëindigd",
+        "cancelled": "Geannuleerd",
+        "endedEarly": "Vroegtijdig beëindigd",
+        "total": "Totaal"
+      },
+      "columns": {
+        "name": "Naam",
+        "status": "Status",
+        "targets": "Doelen",
+        "schedule": "Planning",
+        "when": "Einde / volgende",
+        "matched": "Overeenkomsten",
+        "createdBy": "Aangemaakt door",
+        "folder": "Map"
+      },
+      "oneTime": "Eenmalig",
+      "recurring": "Terugkerend",
+      "bannerOn": "Er wordt een banner getoond aan iedereen in de organisatie zolang deze downtime actief is",
+      "endsLabel": "eindigt",
+      "confirmEndNow": {
+        "title": "Deze onderbreking nu beëindigen?",
+        "message": "Meldingen worden meteen hervat. De onderbreking blijft in de lijst als vroegtijdig beëindigd.",
+        "ok": "Nu beëindigen",
+        "keep": "Laten doorlopen"
+      },
+      "extend": {
+        "menu": "Verlengen met",
+        "notActive": "Alleen een actieve onderbreking kan worden verlengd",
+        "dialogTitle": "{name} verlengen",
+        "newEnd": "Nieuw einde",
+        "confirmUntil": "Verlengen tot {time}",
+        "followUp": "Deze onderbreking herhaalt zich, dus het schema blijft zoals het is. Vanaf het einde van het huidige venster wordt een eenmalige onderbreking met de naam {name} gemaakt.",
+        "endAfterCurrent": "Het nieuwe einde moet later zijn dan het huidige einde."
+      },
+      "nextLabel": "volgende",
+      "matched": {
+        "alerts": "{count} alarm | {count} alarmen",
+        "anomalies": "{count} anomalie | {count} anomalieën",
+        "synthetics": "{count} check | {count} checks",
+        "slos": "{count} SLO | {count} SLO's"
+      },
+      "actions": {
+        "endNow": "Nu beëindigen",
+        "edit": "Bewerken",
+        "duplicate": "Dupliceren",
+        "moveToFolder": "Naar map verplaatsen",
+        "cancel": "Downtime annuleren",
+        "delete": "Verwijderen",
+        "more": "Meer acties",
+        "muteForHour": "Nu 1 uur dempen",
+        "extend": "Verlengen"
+      },
+      "confirmCancel": {
+        "title": "Downtime annuleren",
+        "message": "Meldingen worden direct hervat. De downtime blijft in de lijst voor de geschiedenis.",
+        "bulkMessage": "{count} downtime annuleren? Meldingen worden direct hervat. | {count} downtimes annuleren? Meldingen worden direct hervat.",
+        "confirm": "Downtime annuleren | Downtimes annuleren",
+        "keep": "Downtime behouden | Downtimes behouden"
+      },
+      "confirmDelete": {
+        "title": "Downtime verwijderen",
+        "message": "De downtime en de geschiedenis ervan worden verwijderd. Dit kan niet ongedaan worden gemaakt."
+      },
+      "copyOf": "Kopie van {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} alarm komt overeen | {count} alarmen komen overeen",
+          "anomaly_detections": "{count} detectie komt overeen | {count} detecties komen overeen",
+          "synthetics": "{count} check komt overeen | {count} checks komen overeen",
+          "slos": "{count} SLO komt overeen | {count} SLO's komen overeen"
+        },
+        "alertFolders": "Alarmmappen",
+        "syntheticsFolders": "Synthetics-mappen",
+        "noAlertFolderAccess": "Je hebt geen toegang tot alarmmappen.",
+        "noSyntheticsFolderAccess": "Je hebt geen toegang tot Synthetics-mappen.",
+        "tags": "Tags",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "Elke tag moet op de check aanwezig zijn.",
+        "removeBlock": "Dit blok verwijderen",
+        "specificItems": "Specifieke items",
+        "itemsHint": "Alleen items in de gekozen mappen worden aangeboden.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Tags toevoegen",
+        "addItems": "Specifieke items toevoegen",
+        "sloMode": "SLO-score binnen het venster",
+        "sloExclude": "Het venster uitsluiten",
+        "sloCountAsGood": "Het venster als goed tellen",
+        "sloExcludeCaption": "Tijd binnen het venster telt niet als goed en niet als slecht. Burn-rate-alarmen op deze SLO's worden hiervoor niet geactiveerd.",
+        "sloCountAsGoodCaption": "Tijd in het venster telt als volledig goed. Gebruik dit alleen wanneer je SLO-contract zegt dat gepland onderhoud uptime is.",
+        "cardCaption": "Eerst mappen, daarna vernauwen de optionele blokken verder. De dimensievoorwaarde hierboven geldt ook voor deze module.",
+        "noConditionForChecks": "De dimensievoorwaarde hierboven geldt niet voor checks.",
+        "appliesTo": "Van toepassing op",
+        "tabTargets": "Doelen",
+        "tabSchedule": "Planning",
+        "tabAdvanced": "Geavanceerd",
+        "modeInFolder": "{mode} in",
+        "newMode": "Nieuwe downtime",
+        "editMode": "Downtime bewerken",
+        "namePlaceholder": "Naam van downtime",
+        "nameLabel": "Naam van downtime",
+        "renameHint": "Klik om te hernoemen",
+        "reason": "Reden",
+        "reasonHelp": "Optioneel. Wordt weergegeven in de lijst, op de detailpagina en in de tooltip bij Gedempt.",
+        "cancel": "Annuleren",
+        "save": "Opslaan",
+        "activeBanner": "Deze downtime is actief. Een bewerking wordt van kracht bij de volgende evaluatie, en een wijziging van de SLO-modus herberekent de vensters die al zijn gestart.",
+        "changedMeanwhile": "Iemand heeft deze downtime gewijzigd nadat u deze hebt geladen. Laad opnieuw en probeer het nog eens.",
+        "reload": "Opnieuw laden",
+        "noModule": "Kies een module bij Van toepassing op.",
+        "checkSchedule": "Controleer het schema en sla daarna opnieuw op."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "alarmen",
+          "anomaly_detections": "anomaliedetecties",
+          "synthetics": "synthetics-checks",
+          "slos": "SLO's"
+        },
+        "whenOnce": "Eenmalig, van {start} tot {end} {zone}",
+        "whenDaily": "Elke dag om {time} {zone}, gedurende {duration}",
+        "whenWeekly": "Elke {days} om {time} {zone}, gedurende {duration}",
+        "inFolders": "in de map {names} | in de mappen {names}",
+        "withCondition": "met {condition}",
+        "tagged": "met tag {tags}",
+        "named": "beperkt tot {count} genoemd item | beperkt tot {count} genoemde items",
+        "stopNotifying": "{when}: {targets} stoppen met melden.",
+        "nothingMuted": "{when}: geen enkel alarm of controle is gedempt.",
+        "sloUnchanged": "SLO-scores worden niet gewijzigd.",
+        "sloExcluded": "{slos} sluiten het venster uit van hun score.",
+        "sloAsGood": "{slos} rekenen het venster als goede tijd."
+      },
+      "autoName": {
+        "once": "eenmalig",
+        "onceOn": "eenmalig {date}",
+        "daily": "dagelijks",
+        "weekly": "wekelijks",
+        "all": {
+          "alerts": "Alle alarmen",
+          "anomaly_detections": "Alle anomaliedetecties",
+          "synthetics": "Alle synthetics-checks",
+          "slos": "Alle SLO's"
+        }
+      },
+      "condition": {
+        "none": "Geen dimensievoorwaarde",
+        "add": "Toevoegen",
+        "title": "Dimensievoorwaarde",
+        "onePer": "Eén per downtime",
+        "remove": "Dimensievoorwaarde verwijderen",
+        "caption": "Van toepassing op alarmen, anomaliedetecties en SLO's. Synthetics-controles hebben geen dimensies en gebruiken tags. Alle paren moeten overeenkomen. Gebruik een OR-groep voor alternatieven. Een waarde kan eindigen op *."
+      },
+      "resources": {
+        "refineBy": "Verfijnen op resource",
+        "load": "Resources laden",
+        "needsEq": "Voeg minstens één = voorwaarde toe voordat u op resource verfijnt.",
+        "tooMany": "{count} waarden komen samen voor met deze voorwaarde. Vernauw de voorwaarde om resources te kiezen.",
+        "lastSeen": "Laatst gezien",
+        "streams": "Streams",
+        "footer": "{selected} van {total} geselecteerd · {source}",
+        "fromRegistry": "uit het serviceregister",
+        "fromSearch": "uit de gegevens van de laatste 24 uur",
+        "apply": "Toepassen",
+        "loadFailed": "Kon de resources niet laden",
+        "notSeen": "Niet gezien in het afgelopen uur.",
+        "partial": "Sommige bronnen gaven geen antwoord.",
+        "items": "Items",
+        "fromValues": "uit waarschuwingen, het serviceregister en de gegevens van het afgelopen uur",
+        "noValues": "Nog geen waarden gezien voor deze dimensie."
+      },
+      "scheduleForm": {
+        "once": "Eenmalig",
+        "daily": "Dagelijks",
+        "weekly": "Wekelijks",
+        "startDate": "Startdatum",
+        "startTime": "Starttijd",
+        "endDate": "Einddatum",
+        "endTime": "Eindtijd",
+        "days": "Dagen",
+        "startsAt": "Start om",
+        "duration": "Duur",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Maximaal 7 dagen, bijvoorbeeld 90m of 1h 30m.",
+        "until": "Herhalen tot",
+        "untilPlaceholder": "Geen einddatum",
+        "timezone": "Tijdzone",
+        "noWindow": "Geen enkel venster start in de komende 8 dagen.",
+        "nextWindow": "Volgend venster: {window}. Een venster kan over middernacht heen vallen.",
+        "nextWindowWithUtc": "Volgend venster: {window} ({utc}). Een venster kan over middernacht heen vallen.",
+        "startsOn": "Begint op"
+      },
+      "preview": {
+        "title": "Voorbeeld",
+        "failed": "Het voorbeeld kon niet worden geladen.",
+        "andMore": "en nog {count}",
+        "noMatch": "Er is nu niets dat overeenkomt.",
+        "fireTime": "{count} alarm bepaalt zijn identiteit op het moment van afgaan | {count} alarmen bepalen hun identiteit op het moment van afgaan",
+        "undecidable": "Niet te onderscheiden op basis van {key}",
+        "showAll": "Toon de volledige lijst",
+        "showLess": "Toon minder",
+        "finishCondition": "Maak de voorwaarde af om een voorbeeld te zien."
+      },
+      "muteAllDialog": {
+        "title": "Hele modules dempen?",
+        "intro": "Geen map, item, tag of voorwaarde beperkt deze modules, dus deze stilteperiode dempt:",
+        "every": {
+          "alerts": "Elk alarm in deze organisatie",
+          "anomaly_detections": "Elke anomaliedetectie in deze organisatie",
+          "synthetics": "Elke synthetics-check in deze organisatie",
+          "slos": "Elke SLO in deze organisatie"
+        },
+        "matchedNow": "{matched} vandaag",
+        "outro": "Meldingen, piketoproepen en workflows stoppen voor al deze items binnen het venster.",
+        "cancel": "Annuleren",
+        "confirm": "Alles dempen",
+        "titleOne": {
+          "alerts": "Elk alarm in deze organisatie dempen?",
+          "anomaly_detections": "Elke anomaliedetectie in deze organisatie dempen?",
+          "synthetics": "Elke synthetics-check in deze organisatie dempen?",
+          "slos": "Elke SLO in deze organisatie dempen?"
+        },
+        "window": "Venster: {window}"
+      },
+      "summaryPane": {
+        "title": "Samenvatting",
+        "filedIn": "Ingedeeld in",
+        "window": "Venster",
+        "nextWindow": "Volgend venster",
+        "inUtc": "In UTC",
+        "largeMatch": "{modules}: de stilteperiode komt overeen met meer dan de helft van de items. Het grootste deel van deze organisatie verstuurt geen meldingen binnen het venster.",
+        "whatHappens": "Wat gebeurt er",
+        "keepRunning": "Evaluaties en controles blijven draaien en behouden hun geschiedenis.",
+        "noNotifications": "Meldingen, piketoproepen en workflows stoppen.",
+        "mutedIncidents": "Incidenten starten gedempt en melden na het venster."
+      },
+      "band": {
+        "now": "nu",
+        "none": "Er heeft nog geen venster plaatsgevonden en er is geen gepland.",
+        "active": "Actief",
+        "next": "Volgende",
+        "past": "Gedraaid",
+        "track": "Vensters",
+        "aria": "{kind}: {start} tot {end}"
+      },
+      "detail": {
+        "overview": "Overzicht",
+        "affected": "Betroffen · {count}",
+        "suppressed": "Onderdrukt · {count}",
+        "details": "Details",
+        "condition": "Voorwaarde",
+        "noTarget": "Geen doel",
+        "banner": "Banner",
+        "bannerOn": "Zichtbaar voor de organisatie zolang actief",
+        "bannerOff": "Geen banner",
+        "occurrences": "Voorvallen",
+        "nextWindow": "Volgend venster: {window}. Uw tijd: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Gematcht op",
+        "matchedBy": {
+          "query": "Query",
+          "source_alert": "Bronalarm",
+          "tag": "Tag",
+          "id": "Naam",
+          "folder": "Map",
+          "org": "Hele organisatie"
+        },
+        "source": "Bron",
+        "wouldHaveNotified": "Zou hebben gemeld",
+        "noSuppressed": "Er is nog niets onderdrukt",
+        "muteHourName": "{name} · 1 u dempen",
+        "notFoundTitle": "Downtime niet gevonden",
+        "notFoundDescription": "Mogelijk is deze verwijderd, of verwijst de link naar een andere organisatie.",
+        "backToList": "Terug naar downtimes"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Demp {count} alarm | Demp {count} alarmen",
+          "anomaly_detections": "Demp {count} anomaliedetectie | Demp {count} anomaliedetecties",
+          "synthetics": "Demp {count} controle | Demp {count} controles",
+          "slos": "Demp {count} SLO | Demp {count} SLO's",
+          "items": "Demp {count} item | Demp {count} items"
+        },
+        "subtitle": "Ze blijven draaien en behouden hun geschiedenis. Meldingen, piketoproepen en workflows stoppen tot het venster eindigt.",
+        "muteFor": "Demp voor",
+        "fileIn": "Opbergen in",
+        "presets": {
+          "30m": "30 min",
+          "1h": "1 u",
+          "2h": "2 u",
+          "4h": "4 u",
+          "custom": "Aangepast"
+        },
+        "endsAt": "Eindigt op",
+        "endsIn": "Over {duration}.",
+        "confirm": "Demp",
+        "confirmUntil": "Demp tot {time}",
+        "menu": "Meldingen dempen",
+        "until": "Tot…",
+        "bulk": "Demp",
+        "muted": "Gedempt · eindigt over {duration}",
+        "mutedTooltip": "Gedempt door {name} tot {end}",
+        "exclude": "Een venster uitsluiten…",
+        "firingMuted": "Actief · gedempt",
+        "firingMutedTooltip": "Nog steeds actief. Meldingen worden gedempt door {name}."
+      },
+      "corrected": "Gecorrigeerd",
+      "correctedBy": "Score gecorrigeerd door {names}",
+      "incident": {
+        "mutedBy": "Gedempt · {name}",
+        "notLoaded": "Downtime niet geladen",
+        "notLoadedTooltip": "Gedempt door downtime {id}, die niet bij de geladen downtimes zit.",
+        "banner": "Gedempt door {name}. Niemand werd opgeroepen. De eerste keer dat het alarm afgaat na het venster verstuurt de vertraagde geopend-melding.",
+        "bannerUntil": "Gedempt door {name} tot {end}. Niemand werd opgeroepen. De eerste keer dat het alarm afgaat na het venster verstuurt de vertraagde geopend-melding."
+      },
+      "banner": {
+        "ended": "beëindigd",
+        "endsInUnderMinute": "eindigt over minder dan een minuut",
+        "endsInMinutes": "eindigt over {count} minuut | eindigt over {count} minuten",
+        "endsIn": "eindigt over {duration}",
+        "firstEndsInUnderMinute": "eerste eindigt binnen een minuut",
+        "firstEndsInMinutes": "eerste eindigt over {count} minuut | eerste eindigt over {count} minuten",
+        "firstEndsIn": "eerste eindigt over {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Toon een banner aan iedereen in de organisatie zolang deze downtime actief is",
+        "showBannerCaption": "De banner toont de naam, de getroffen aantallen en de resterende tijd. Er wordt nooit een alarm bij naam genoemd.",
+        "preview": "Voorbeeld",
+        "previewMessage": "{name} is actief.",
+        "tooLong": "Een banner is alleen beschikbaar voor vensters van maximaal 7 dagen."
+      },
+      "sloCorrections": {
+        "title": "Statuscorrecties:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "korter dan het interval van de SLO, geen minuten gecorrigeerd"
+      },
+      "notify": {
+        "title": "Melden",
+        "caption": "Laat bestemmingen weten wat de downtime zelf doet: wanneer hij begint, voor hij eindigt en wanneer hij eindigt.",
+        "destinations": "Bestemmingen",
+        "lead": "Herinneren voor het einde",
+        "leadHelp": "Bijvoorbeeld 10m of 1h, tussen 1 minuut en de lengte van het venster.",
+        "regionNote": "In een supercluster verstuurt de regio waar de downtime is gemaakt deze berichten. Een downtime van voor deze instelling verstuurt vanuit elke regio.",
+        "tab": "Meldingen",
+        "events": {
+          "started": "Wanneer hij begint",
+          "startedHelp": "Eén bericht bij het begin van elk venster.",
+          "ending_soon": "Voor hij eindigt",
+          "ending_soonHelp": "Een herinnering voor het einde, zodat niemand verrast is als alerts weer melden.",
+          "ended": "Wanneer hij eindigt",
+          "endedHelp": "Eén bericht bij het sluiten van elk venster.",
+          "cancelled": "Wanneer hij wordt geannuleerd",
+          "cancelledHelp": "Direct verstuurd als iemand de downtime beëindigt of afblaast.",
+          "extended": "Wanneer hij wordt verlengd",
+          "extendedHelp": "Direct verstuurd met het nieuwe einde."
+        },
+        "validation": {
+          "tooMany": "Er kunnen hoogstens {max} bestemmingen worden gemeld.",
+          "eventRequired": "Kies minstens één gebeurtenis, of verwijder de bestemmingen.",
+          "leadInvalid": "De herinnering moet tussen 1 minuut en de vensterlengte voor het einde komen."
+        },
+        "summary": {
+          "none": "Verstuurt geen eigen meldingen.",
+          "sentence": "Meldt aan {destinations}: {events}.",
+          "started": "wanneer hij begint",
+          "endingSoon": "{lead} voor het einde",
+          "ended": "wanneer hij eindigt",
+          "cancelled": "wanneer hij wordt geannuleerd",
+          "extended": "wanneer hij wordt verlengd"
+        },
+        "log": {
+          "time": "Tijd",
+          "event": "Gebeurtenis",
+          "destinations": "Bestemmingen",
+          "result": "Resultaat",
+          "ok": "Verzonden",
+          "pending": "Bezig met verzenden",
+          "empty": "Nog geen meldingen verzonden",
+          "events": {
+            "started": "Gestart",
+            "ending_soon": "Eindigt binnenkort",
+            "ended": "Beëindigd",
+            "cancelled": "Geannuleerd",
+            "extended": "Verlengd"
+          }
+        },
+        "test": {
+          "send": "Test versturen",
+          "sent": "Test verstuurd naar {count} bestemming | Test verstuurd naar {count} bestemmingen",
+          "failed": "De test heeft {names} niet bereikt."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -8858,7 +9359,8 @@
     "countWorkflow": "{count} workflow | {count} workflows",
     "countAnomalyDetection": "{count} anomaliedetector | {count} anomaliedetectoren",
     "countIncidentIntegration": "{count} incidentintegratie | {count} incidentintegraties",
-    "sectionOtherConsumers": "Ook gebruikt door"
+    "sectionOtherConsumers": "Ook gebruikt door",
+    "countDowntime": "{count} downtime | {count} downtimes"
   },
   "alert_library": {
     "header": "Alarmbibliotheek",
@@ -16715,7 +17217,8 @@
       "sourceMaps": "RUM — Bronkaarten",
       "oncall": "Piket",
       "oncallDetail": "Piketpagina",
-      "syntheticsJourney": "Synthetics-traject"
+      "syntheticsJourney": "Synthetics-traject",
+      "downtimes": "Onderbrekingen"
     },
     "actions": {
       "openCheatsheet": "Cheatsheet voor sneltoetsen openen",
@@ -16824,6 +17327,8 @@
       "oncallEscalate": "Escaleren",
       "oncallSnooze": "Snoozen",
       "oncallResolve": "Oplossen",
+      "downtimesCreate": "Nieuwe onderbreking",
+      "downtimesRefresh": "Onderbrekingen vernieuwen",
       "functionsImport": "Functie importeren"
     }
   },
@@ -17257,6 +17762,13 @@
         "belowTopN": "onder top-N",
         "truncated": "afgekapt",
         "gap": "hiaat"
+      },
+      "downtimeStatus": {
+        "scheduled": "Gepland",
+        "active": "Actief",
+        "ended": "Beëindigd",
+        "cancelled": "Geannuleerd",
+        "endedEarly": "Vroegtijdig beëindigd"
       }
     }
   },
@@ -17653,6 +18165,24 @@
     },
     "iam": {
       "userSaveFailed": "Kon de gebruiker niet opslaan"
+    },
+    "downtimes": {
+      "cancelled": "Onderbreking geannuleerd",
+      "cancelledMany": "{count} onderbreking geannuleerd | {count} onderbrekingen geannuleerd",
+      "cancelFailed": "Kon de onderbreking niet annuleren",
+      "extended": "Verlengd tot {time}",
+      "extendedFollowUp": "{name} gemaakt, loopt tot {time}",
+      "extendFailed": "Kon de onderbreking niet verlengen",
+      "reload": "Opnieuw laden",
+      "deleted": "Onderbreking verwijderd",
+      "deleteFailed": "Kon de onderbreking niet verwijderen",
+      "created": "Onderbreking aangemaakt",
+      "updated": "Onderbreking opgeslagen",
+      "saveFailed": "Kon de onderbreking niet opslaan",
+      "muted": "{count} item gedempt tot {time}. Opgeslagen in {folder}. | {count} items gedempt tot {time}. Opgeslagen in {folder}.",
+      "muteFailed": "Kon de demping niet aanmaken",
+      "viewDowntime": "Onderbreking bekijken",
+      "itemsDropped": "{count} gekozen item valt buiten de gekozen mappen en is verwijderd. | {count} gekozen items vallen buiten de gekozen mappen en zijn verwijderd."
     }
   },
   "cipherKeys": {
@@ -17943,7 +18473,9 @@
       "budgetNote": "Het laatste punt is gelijk aan de tegel 'Resterend budget' hierboven. De stippellijn bij 0% is uitputting; daaronder heeft de SLO meer fouten verbruikt dan het doel toestaat. Gaten zijn buckets waarin niets is gemeten, wat niet hetzelfde is als nul.",
       "burnExplain": "Hoe snel het budget in elke bucket afzonderlijk verbrandt, als een veelvoud van de budgetneutrale snelheid.",
       "burnFormula": "verbrandingssnelheid = (100% − SLI) ÷ (100% − doel)\nSLI = 100 × goed ÷ totaal, voor die bucket alleen\n\nrechteras (dezelfde lijn gelezen als SLI):\nSLI = 100% − verbrandingssnelheid × (100% − doel)",
-      "burnNote": "×1 verbruikt het budget precies aan het einde van het venster, ×2 in de helft daarvan; onder ×1 wordt het budget opgespaard. Omdat het per bucket is en niet cumulatief, blijft een piek hier zichtbaar in plaats van te worden weggemiddeld. De rechteras telt naar beneden: omhoog op de grafiek is meer verbruik, wat een lagere SLI betekent."
+      "burnNote": "×1 verbruikt het budget precies aan het einde van het venster, ×2 in de helft daarvan; onder ×1 wordt het budget opgespaard. Omdat het per bucket is en niet cumulatief, blijft een piek hier zichtbaar in plaats van te worden weggemiddeld. De rechteras telt naar beneden: omhoog op de grafiek is meer verbruik, wat een lagere SLI betekent.",
+      "corrected": "Gecorrigeerd door een onderbreking",
+      "correctedTooltip": "Gecorrigeerd door een onderbreking: uitgesloten, zodat de budgetlijn vlak blijft"
     },
     "alerts": {
       "title": "Meldingen",
