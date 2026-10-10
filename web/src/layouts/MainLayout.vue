@@ -1238,7 +1238,7 @@ export default defineComponent({
         claim_parser_function: "",
         org_storage_enabled: false,
         domain_org_mappings: [],
-        red_insights_enabled: true,
+        red_insights_enabled: false,
       };
 
       try {
