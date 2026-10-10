@@ -26,8 +26,6 @@ use axum::{
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
-#[cfg(feature = "cloud")]
-use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
@@ -35,6 +33,8 @@ use openobserve_api_management::request::{
     model_pricing, organization, query_history, rum_analytics, service_accounts, short_url, slos,
     sourcemaps, status, status_pages, stream, synthetics, users,
 };
+#[cfg(feature = "cloud")]
+use openobserve_api_management::request::{cloud, organization::billing_group};
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
 use openobserve_core::auth::AuthExtractor;
@@ -2043,24 +2043,24 @@ pub fn service_routes() -> Router {
             )
             .route(
                 "/{org_id}/billing_group/invites",
-                get(organization::billing_group::list_invites)
-                    .post(organization::billing_group::invite),
+                get(billing_group::list_invites).post(billing_group::invite),
             )
             .route(
                 "/{org_id}/billing_group/invites/{token}/accept",
-                post(organization::billing_group::accept),
+                post(billing_group::accept),
             )
             .route(
                 "/{org_id}/billing_group/invites/{token}/reject",
-                delete(organization::billing_group::reject),
+                delete(billing_group::reject),
             )
             .route(
                 "/{org_id}/billing_group/membership",
-                get(organization::billing_group::check_membership),
+                get(billing_group::check_membership).delete(billing_group::leave_group),
             )
+            .route("/{org_id}/billing_group/members", get(billing_group::check_members))
             .route(
-                "/{org_id}/billing_group/members",
-                get(organization::billing_group::check_members),
+                "/{org_id}/billing_group/members/{member_org_id}",
+                delete(billing_group::remove_member),
             );
     }
 

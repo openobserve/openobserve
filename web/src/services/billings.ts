@@ -101,6 +101,10 @@ const billings = {
   reject_billing_group_invite: (org_identifier: string, token: string) => {
     return http().delete(`/api/${org_identifier}/billing_group/invites/${token}/reject`);
   },
+  remove_billing_group_member: (org_identifier: string, member_org_id: string) =>
+    http().delete(`/api/${org_identifier}/billing_group/members/${member_org_id}`),
+  leave_billing_group: (org_identifier: string) =>
+    http().delete(`/api/${org_identifier}/billing_group/membership`),
 };
 
 export default billings;
