@@ -54,6 +54,7 @@ export interface ContentBlock {
   suggestion?: string; // remediation hint
   details?: Record<string, any>; // error details
   recoverable?: boolean; // for stream-level errors
+  ephemeral?: boolean; // shown in the live chat, never saved to history
   // Navigation action (from navigation_action events):
   navigationAction?: NavigationAction; // Optional navigation button for tool calls
 }

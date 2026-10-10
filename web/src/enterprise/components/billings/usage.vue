@@ -546,9 +546,10 @@ export default defineComponent({
         byteTile("dataretention", t("billing.dataRetention"), dataRetentionIcon),
         {
           key: "ai_credits",
-          label: t("billing.aiCredits"),
+          label: t("billing.aiBillableCredits"),
           icon: aiIcon.value,
-          value: usageData.value.ai_credits ?? "0.00",
+          // Credits are whole units; the 2-decimal string is for byte metrics.
+          value: String(Math.round(Number(usageData.value.ai_credits ?? 0))),
           unit: t("billing.credits"),
         },
       ];

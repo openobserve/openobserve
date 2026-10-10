@@ -213,9 +213,21 @@ pub(crate) fn ai_authorization_error_response(
             })),
         )
             .into_response(),
-        AiUsageAuthorizationError::PaymentRequired(message) => {
-            MetaHttpResponse::payment_required(message)
-        }
+        AiUsageAuthorizationError::PaymentRequired {
+            message,
+            remedy,
+            payer_org_id,
+        } => (
+            StatusCode::PAYMENT_REQUIRED,
+            Json(serde_json::json!({
+                "code": StatusCode::PAYMENT_REQUIRED.as_u16(),
+                "message": message,
+                "error_type": "ai_credits_exhausted",
+                "remedy": remedy,
+                "payer_org_id": payer_org_id,
+            })),
+        )
+            .into_response(),
         AiUsageAuthorizationError::Unavailable(message) => (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(MetaHttpResponse::error(
@@ -235,9 +247,11 @@ fn ai_post_upstream_authorization_error_response(
 
     match error {
         AiUsageAuthorizationError::PaidOverageConsentRequired(_) => {
-            ai_authorization_error_response(AiUsageAuthorizationError::PaymentRequired(
-                "AI credit limit was reached while the request was running.".to_string(),
-            ))
+            ai_authorization_error_response(AiUsageAuthorizationError::PaymentRequired {
+                message: "AI credit limit was reached while the request was running.".to_string(),
+                remedy: openobserve_core::trial_quota::PaymentRemedy::Retry,
+                payer_org_id: None,
+            })
         }
         error => ai_authorization_error_response(error),
     }
@@ -1377,6 +1391,37 @@ mod tests {
         assert!(!serialized.contains("ai_chat"));
         assert!(!serialized.contains("new_incident"));
         assert!(!serialized.contains("incident_reanalysis"));
+    }
+
+    #[cfg(feature = "cloud")]
+    #[tokio::test]
+    async fn payment_required_carries_its_remedy() {
+        use openobserve_core::trial_quota::{AiUsageAuthorizationError, PaymentRemedy};
+
+        for (remedy, expected) in [
+            (PaymentRemedy::Subscribe, "subscribe"),
+            (
+                PaymentRemedy::ContactAccountManager,
+                "contact_account_manager",
+            ),
+            (PaymentRemedy::Retry, "retry"),
+        ] {
+            let response =
+                ai_authorization_error_response(AiUsageAuthorizationError::PaymentRequired {
+                    message: "out".to_string(),
+                    remedy,
+                    payer_org_id: Some("payer".to_string()),
+                });
+            assert_eq!(response.status(), StatusCode::PAYMENT_REQUIRED);
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(body["error_type"], "ai_credits_exhausted");
+            assert_eq!(body["remedy"], expected);
+            assert_eq!(body["message"], "out");
+            assert_eq!(body["payer_org_id"], "payer");
+        }
     }
 
     #[cfg(feature = "enterprise")]

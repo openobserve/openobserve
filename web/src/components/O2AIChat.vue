@@ -284,6 +284,7 @@
           @always-confirm="handleToolAlwaysConfirm"
         />
         <O2AIPaidUsageConsent v-if="showPaidUsageConsent" />
+        <O2AICreditsNotice v-if="isCloud" :busy="isLoading" />
 
         <!-- Hidden file input for image upload -->
         <input
@@ -341,6 +342,8 @@ import { useChatConsentSurface } from "@/composables/usePaidOverageConsent";
 import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
 import O2AIChatHistoryMenu from "@/components/ai-assistant/chat/O2AIChatHistoryMenu.vue";
 import O2AIChatInput from "@/components/ai-assistant/chat/O2AIChatInput.vue";
+import O2AICreditsNotice from "@/components/ai-assistant/chat/O2AICreditsNotice.vue";
+import config from "@/aws-exports";
 import O2AIChatMessage from "@/components/ai-assistant/chat/O2AIChatMessage.vue";
 import O2AIChatToolCallIndicator from "@/components/ai-assistant/chat/O2AIChatToolCallIndicator.vue";
 import { useChatHistory } from "@/composables/useChatHistory";
@@ -396,6 +399,7 @@ export default defineComponent({
     O2AIHomeWelcome,
     O2AIChatHistoryMenu,
     O2AIChatInput,
+    O2AICreditsNotice,
     O2AIChatMessage,
     O2AIChatToolCallIndicator,
     ODropdown,
@@ -590,6 +594,7 @@ export default defineComponent({
       isSessionOwnerUnavailable,
       appendErrorBlock,
       runTurn,
+      lastTurnCreditsExhausted,
       tryReattach,
       disposeRenderFlush,
     } = useChatStream({
@@ -892,6 +897,11 @@ export default defineComponent({
       await saveToHistory();
 
       await runTurn(hasImages, messagesToSend);
+      // Keep the draft so it can be resent once billing allows it.
+      if (lastTurnCreditsExhausted.value && !inputMessage.value) {
+        inputMessage.value = userMessage;
+        chatInput.value?.setContent?.(userMessage);
+      }
     };
 
     const selectCapability = (capability: string) => {
@@ -1193,6 +1203,7 @@ export default defineComponent({
 
     return {
       raw,
+      isCloud: config.isCloud === "true",
       showPaidUsageConsent,
       inputMessage,
       chatMessages,

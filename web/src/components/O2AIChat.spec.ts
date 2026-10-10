@@ -908,8 +908,69 @@ describe("O2AIChat", () => {
           contentBlocks?: Array<{ message: string }>;
         };
         expect(last?.contentBlocks?.at(-1)?.message).toBe(
-          "Paid AI usage was not authorized. No paid request was started.",
+          "Paid AI usage is off, so this request wasn't sent.",
         );
+      });
+    });
+
+    describe("AI credits exhausted (402)", () => {
+      const sendAndGetLast = async (remedy?: string) => {
+        wrapper = mountO2AIChat({ isOpen: true });
+        const vm = wrapper.vm as any;
+        mockFetchAiChat.mockResolvedValueOnce({
+          ok: false,
+          status: 402,
+          json: vi.fn().mockResolvedValue({
+            code: 402,
+            message: "Free trial quota exhausted (1000/1000 used).",
+            error_type: "ai_credits_exhausted",
+            remedy,
+          }),
+        });
+        vm.inputMessage = "count errors";
+        await vm.sendMessage();
+        await flushPromises();
+        return vm.chatMessages.at(-1).contentBlocks.at(-1);
+      };
+
+      it("offers Plans when the org can subscribe, and keeps the notice out of history", async () => {
+        const block = await sendAndGetLast("subscribe");
+
+        expect(block).toMatchObject({
+          type: "error",
+          ephemeral: true,
+          suggestion:
+            "Subscribe to keep using AI. Further usage is billed on this organization's invoice.",
+          navigationAction: { action: "navigate_direct", target: { path: "/billings/plans" } },
+        });
+      });
+
+      it("points contract orgs to their account manager, with no Plans button", async () => {
+        const block = await sendAndGetLast("contact_account_manager");
+
+        expect(block.suggestion).toBe("Contact your account manager to add more AI credits");
+        expect(block.navigationAction).toBeUndefined();
+      });
+
+      it("keeps the server wording when the remedy is unknown", async () => {
+        const block = await sendAndGetLast();
+
+        expect(block.suggestion).toBe("Free trial quota exhausted (1000/1000 used).");
+        expect(block.navigationAction).toBeUndefined();
+        expect(block.recoverable).toBe(false);
+      });
+
+      it("marks a mid-request exhaustion as retryable", async () => {
+        const block = await sendAndGetLast("retry");
+
+        expect(block.recoverable).toBe(true);
+        expect(block.navigationAction).toBeUndefined();
+      });
+
+      it("restores the draft so it can be resent", async () => {
+        await sendAndGetLast("subscribe");
+
+        expect((wrapper.vm as any).inputMessage).toBe("count errors");
       });
     });
 

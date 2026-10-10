@@ -532,6 +532,28 @@ describe("useChatHistory", () => {
       expect(entry!.title).toBe(exactContent);
     });
 
+    it("should drop ephemeral blocks, and replies left with nothing", async () => {
+      const { saveToHistory, loadChat } = useChatHistory(
+        () => USER1,
+        () => ORG1,
+        gt,
+      );
+      const notice = { type: "error" as const, message: "out of credits", ephemeral: true };
+      const messages = [
+        { role: "user", content: "hi" },
+        {
+          role: "assistant",
+          content: "kept",
+          contentBlocks: [{ type: "text", text: "kept" }, notice],
+        },
+        { role: "assistant", content: "", contentBlocks: [notice] },
+      ] as ChatMessage[];
+      const chatId = await saveToHistory(messages, "session-ephemeral");
+      const entry = await loadChat(chatId!);
+      expect(entry!.messages).toHaveLength(2);
+      expect(entry!.messages[1].contentBlocks).toEqual([{ type: "text", text: "kept" }]);
+    });
+
     it("should store the userOrgKey on the saved record", async () => {
       const { saveToHistory, loadChat } = useChatHistory(
         () => USER1,

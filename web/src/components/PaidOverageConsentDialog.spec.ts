@@ -76,7 +76,7 @@ describe("PaidOverageConsentDialog", () => {
 
   it("presents one cumulative AI Credits permission without internal row names", () => {
     const text = mountDialog().text();
-    expect(text).toContain(i18n.global.t("paidUsage.aiCredits"));
+    expect(text).toContain(i18n.global.t("paidUsage.consentScope"));
     for (const row of ["ai_chat", "new_incident", "incident_reanalysis"]) {
       expect(text).not.toContain(row);
     }
@@ -85,7 +85,7 @@ describe("PaidOverageConsentDialog", () => {
   it("names the organization's own billing cycle for direct billing", () => {
     const wrapper = mountDialog();
     expect(wrapper.find('[data-test="paid-overage-billing-cycle-copy"]').text()).toContain(
-      i18n.global.t("paidUsage.organizationBillingCycle"),
+      i18n.global.t("paidUsage.consentBilling"),
     );
   });
 
@@ -95,7 +95,7 @@ describe("PaidOverageConsentDialog", () => {
     };
     const wrapper = mountDialog();
     expect(wrapper.find('[data-test="paid-overage-billing-cycle-copy"]').text()).toContain(
-      i18n.global.t("paidUsage.payerBillingCycle"),
+      i18n.global.t("paidUsage.consentBillingPayer", { payer: "payer" }),
     );
   });
 

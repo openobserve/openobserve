@@ -30,6 +30,13 @@ pub const SYNTHETICS_STATUS_FEATURE: &str = "synthetics_status_protocol";
 /// The `YYYYMM` a lifetime row carries, meaning the count belongs to no month.
 pub const LIFETIME_PERIOD: i32 = 0;
 
+/// What [`try_spend`] decided; `used` is the pool total after the spend or at refusal.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Spend {
+    Spent { used: i64, limit: i64 },
+    Exhausted { used: i64, limit: i64 },
+}
+
 /// One settled window's free steps per pool. `month` scopes the status pool alone.
 pub struct SyntheticsDeltas {
     pub browser: i64,
@@ -105,6 +112,95 @@ async fn get_total_usage_for_org_in<C: ConnectionTrait>(
         .one(conn)
         .await?;
     Ok(result.flatten().unwrap_or(0))
+}
+
+/// Check and spend a pool's limit in ONE transaction; the seed-row lock serializes spenders.
+pub async fn try_spend(
+    org_id: &str,
+    seed_feature: &str,
+    feature: &str,
+    features: &[&str],
+    cost: i64,
+    default_limit: i64,
+) -> Result<Spend, sea_orm::DbErr> {
+    try_spend_in(
+        get_orm_client_rw().await,
+        org_id,
+        seed_feature,
+        feature,
+        features,
+        cost,
+        default_limit,
+    )
+    .await
+}
+
+/// [`try_spend`] against a caller-supplied connection.
+async fn try_spend_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    seed_feature: &str,
+    feature: &str,
+    features: &[&str],
+    cost: i64,
+    default_limit: i64,
+) -> Result<Spend, sea_orm::DbErr> {
+    let txn = conn.begin().await?;
+    let now = config::utils::time::now_micros();
+    // A zero-cost increment: creates the row if missing and locks it either way.
+    increment_lifetime_row(&txn, org_id, seed_feature, 0, now).await?;
+
+    // A refund flushes as a negative delta, so a pool can sum below zero.
+    let used = get_total_usage_for_org_in(&txn, org_id, features)
+        .await?
+        .max(0);
+    let limit = trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .select_only()
+        .column_as(trial_quota_usage::Column::UsageLimit.max(), "usage_limit")
+        .into_tuple::<Option<i64>>()
+        .one(&txn)
+        .await?
+        .flatten()
+        .unwrap_or(default_limit);
+
+    if used.saturating_add(cost) > limit {
+        txn.rollback().await?;
+        return Ok(Spend::Exhausted { used, limit });
+    }
+    increment_lifetime_row(&txn, org_id, feature, cost, now).await?;
+    txn.commit().await?;
+    Ok(Spend::Spent {
+        used: used + cost,
+        limit,
+    })
+}
+
+/// Each feature's usage for an org, for the per-feature breakdown.
+pub async fn get_usage_by_feature(
+    org_id: &str,
+    features: &[&str],
+) -> Result<Vec<(String, i64)>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .select_only()
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::UsageCount)
+        .into_tuple()
+        .all(get_orm_client_ro().await)
+        .await
+}
+
+/// Every row of the given features, for refreshing a node's usage cache.
+pub async fn load_for_features(
+    features: &[&str],
+) -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr> {
+    trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .all(get_orm_client_ro().await)
+        .await
 }
 
 /// Get the explicitly configured shared usage limit for an organization.
@@ -1166,5 +1262,82 @@ mod tests {
         apply_status(&db, ORG, 0, 202609).await;
 
         assert!(has_no_row(&db, ORG, STATUS).await);
+    }
+
+    async fn spend(db: &DatabaseConnection, feature: &str, cost: i64) -> Spend {
+        try_spend_in(db, ORG, AI, feature, AI_FEATURES, cost, 50)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn spend_is_capped_by_the_pool_total_across_features() {
+        let db = db().await;
+        assert_eq!(
+            spend(&db, "new_incident", 20).await,
+            Spend::Spent {
+                used: 20,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 29).await,
+            Spend::Spent {
+                used: 49,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, "new_incident", 20).await,
+            Spend::Exhausted {
+                used: 49,
+                limit: 50
+            },
+            "the incident row alone is under 50, the pool is not",
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Spent {
+                used: 50,
+                limit: 50
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Exhausted {
+                used: 50,
+                limit: 50
+            }
+        );
+        assert_eq!(row_of(&db, ORG, "new_incident").await.usage_count, 20);
+    }
+
+    #[tokio::test]
+    async fn spend_reads_an_explicit_limit_over_the_default() {
+        let db = db().await;
+        seed_row(&db, ORG, "new_incident", 50, Some(60)).await;
+
+        assert_eq!(
+            spend(&db, AI, 10).await,
+            Spend::Spent {
+                used: 60,
+                limit: 60
+            }
+        );
+        assert_eq!(
+            spend(&db, AI, 1).await,
+            Spend::Exhausted {
+                used: 60,
+                limit: 60
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn spend_ignores_rows_of_other_pools() {
+        let db = db().await;
+        seed(&db, ORG, BROWSER, 1_000).await;
+
+        assert_eq!(spend(&db, AI, 1).await, Spend::Spent { used: 1, limit: 50 });
     }
 }

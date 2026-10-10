@@ -48,6 +48,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-text-body text-base leading-[1.375rem]">{{
           t("billing.pricingErrorMessage")
         }}</span>
+        <OButton
+          variant="ghost"
+          size="sm"
+          class="ms-2"
+          data-test="billing-pricing-retry"
+          @click="$emit('retry-pricing')"
+        >
+          {{ t("common.retry") }}
+        </OButton>
       </div>
       <div
         v-for="(feature, index) in features"

@@ -5,11 +5,8 @@
     class="rounded-default bg-surface-base border-border-default mb-2 flex w-full flex-col gap-3.5 border-2 px-4 pt-4 pb-3.5 shadow-sm"
     data-test="o2-ai-paid-usage-consent"
   >
-    <div>
-      <div class="text-text-heading text-sm font-semibold">
-        {{ t("paidUsage.consentTitle") }}
-      </div>
-      <div class="text-text-secondary mt-0.5 text-xs">{{ t("paidUsage.consentSubtitle") }}</div>
+    <div class="text-text-heading text-sm font-semibold">
+      {{ t("paidUsage.consentTitle") }}
     </div>
 
     <PaidOverageConsentBody />
