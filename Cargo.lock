@@ -8240,6 +8240,7 @@ dependencies = [
  "chrono",
  "common",
  "config",
+ "datafusion",
  "db",
  "enrichment",
  "futures",

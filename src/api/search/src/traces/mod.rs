@@ -30,7 +30,7 @@ use config::{
             default_use_cache,
         },
         stream::StreamType,
-        traces::session::{quote_identifier, quote_sql_string},
+        traces::session::{quote_identifier, quote_sql_string, trace_id_predicate},
     },
     metrics,
     utils::{json, time::now_micros},
@@ -67,6 +67,35 @@ pub(crate) mod schema_compat;
 pub mod session;
 pub mod time_index;
 pub mod user;
+
+#[derive(Debug, Serialize)]
+struct TraceResponseItem {
+    trace_id: String,
+    start_time: i64,
+    end_time: i64,
+    duration: i64,
+    spans: [u64; 2],
+    service_name: Vec<TraceServiceNameItem>,
+    first_event: serde_json::Value,
+    gen_ai_usage_input_tokens: i64,
+    gen_ai_usage_output_tokens: i64,
+    gen_ai_usage_total_tokens: i64,
+    gen_ai_usage_cost: f64,
+    gen_ai_input_messages: Option<serde_json::Value>,
+    models: Vec<String>,
+}
+
+#[derive(Debug, Default, Serialize)]
+struct TraceServiceNameItem {
+    service_name: String,
+    count: u64,
+    duration: i64,
+    /// Inferred-service category ("database"/"queue"/"rpc"/"external") when this
+    /// entity is an uninstrumented dependency; `None` for instrumented services.
+    /// The UI renders inferred entities with a dotted style.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_type: Option<String>,
+}
 
 pub(crate) async fn check_stream_permissions(
     org_id: &str,
@@ -372,7 +401,7 @@ pub async fn get_latest_traces(
     }
 
     // Schema-dependent expressions for Q2a trace aggregates — computed once here
-    // and reused in Q1 (merged) and Q2b (service breakdown).
+    // and reused in Q2a (trace summaries) and Q2b (service breakdown).
     let has_ref_parent_id = schema
         .as_ref()
         .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
@@ -424,11 +453,7 @@ pub async fn get_latest_traces(
     let sort_order = if sort_order == "asc" { "ASC" } else { "DESC" };
 
     // search
-    let query_sql = if let Some(ref validated) = validated_schema {
-        build_llm_trace_query(&stream_name, validated, &extra_trace_selects)
-    } else {
-        build_trace_query(&stream_name, &extra_trace_selects)
-    };
+    let summary_query_sql = build_trace_query(&stream_name, &extra_trace_selects);
     let sql_order_expr = match sort_by.as_str() {
         "duration" => format!("zo_sql_duration {sort_order}"),
         "start_time" | "_timestamp" => format!("zo_sql_timestamp {sort_order}"),
@@ -444,11 +469,12 @@ pub async fn get_latest_traces(
     if let Err(e) = config::utils::sql::validate_optional_where_fragment(&filter) {
         return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
     }
-    let query_sql = if filter.is_empty() {
-        format!("{query_sql} GROUP BY trace_id ORDER BY {sql_order_expr}")
-    } else {
-        format!("{query_sql} WHERE {filter} GROUP BY trace_id ORDER BY {sql_order_expr}")
-    };
+    let query_sql = build_trace_selection_query(
+        &stream_name,
+        &filter,
+        &sql_order_expr,
+        validated_schema.as_ref(),
+    );
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
             sql: query_sql.to_string(),
@@ -532,6 +558,55 @@ pub async fn get_latest_traces(
         return MetaHttpResponse::json(resp_search);
     }
 
+    let q1_hits = resp_search.hits;
+    req = build_trace_summary_request(&summary_query_sql, &q1_hits, req);
+    start_time = req.query.start_time;
+    end_time = req.query.end_time;
+    let resp_search = match SearchService::cache::search(
+        &trace_id,
+        &org_id,
+        stream_type,
+        user_id_opt.clone(),
+        &req,
+        "".to_string(),
+        false,
+        None,
+        false,
+    )
+    .instrument(http_span.clone())
+    .await
+    .and_then(|mut res| {
+        merge_trace_summaries(&q1_hits, &mut res)?;
+        Ok(res)
+    }) {
+        Ok(res) => res,
+        Err(err) => {
+            metrics::HTTP_RESPONSE_TIME
+                .with_label_values(&[
+                    "/api/org/traces/latest",
+                    "500",
+                    &org_id,
+                    stream_type.as_str(),
+                    "",
+                    "",
+                ])
+                .observe(start.elapsed().as_secs_f64());
+            metrics::HTTP_INCOMING_REQUESTS
+                .with_label_values(&[
+                    "/api/org/traces/latest",
+                    "500",
+                    &org_id,
+                    stream_type.as_str(),
+                    "",
+                    "",
+                ])
+                .inc();
+            log::error!("get traces latest summary error: {err:?}");
+            return map_error_to_http_response(&err, Some(trace_id));
+        }
+    };
+
+    drop(q1_hits);
     let mut traces_data: HashMap<String, TraceResponseItem> =
         HashMap::with_capacity(resp_search.hits.len());
     // Trace IDs that have more than one service — these need a follow-up Q2b.
@@ -552,7 +627,7 @@ pub async fn get_latest_traces(
             end_time = trace_end_time / 1000 + 1;
         }
 
-        // Q2a fields now populated directly from Q1 (merged query).
+        // Q2a aggregates include all spans for the trace, independent of the Q1 filter.
         let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
         let error_count = json::get_int_value(item.get("error_count").unwrap_or_default());
         let max_duration = json::get_int_value(item.get("max_duration").unwrap_or_default());
@@ -655,16 +730,7 @@ pub async fn get_latest_traces(
 
     // Q2b: per-(trace_id, service_name) breakdown, only for multi-service traces.
     if !multi_service_tids.is_empty() {
-        // Trace IDs come from DB rows and must be validated before interpolating into SQL.
-        let multi_ids = multi_service_tids
-            .iter()
-            .map(|tid| {
-                tid.chars()
-                    .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-                    .collect::<String>()
-            })
-            .filter(|tid| !tid.is_empty())
-            .collect::<Vec<String>>();
+        // Trace IDs come from DB rows and must be SQL-quoted without changing their values.
         // max(infer_service_type) over a COALESCE group is the group's inferred type
         // ("database"/"queue"/...) for inferred entities and NULL for instrumented
         // services, which the UI uses to render inferred nodes with a dotted style.
@@ -677,13 +743,11 @@ pub async fn get_latest_traces(
             &stream_name,
             service_key_expr,
             svc_type_select,
-            &multi_ids,
+            &multi_service_tids,
         );
-        req.query.sql = svc_sql;
-        req.query.from = 0;
-        // Output is bounded to the total service count summed from Q1, so a single
+        // Output is bounded to the total service count summed from Q2a, so a single
         // request fetches everything.
-        req.query.size = multi_service_total;
+        req = build_trace_service_request(req, svc_sql, multi_service_total);
 
         let search_res = SearchService::cache::search(
             &trace_id,
@@ -697,7 +761,11 @@ pub async fn get_latest_traces(
             false,
         )
         .instrument(http_span.clone())
-        .await;
+        .await
+        .and_then(|res| {
+            validate_trace_query_response(&res)?;
+            Ok(res)
+        });
 
         let resp_search = match search_res {
             Ok(res) => res,
@@ -819,7 +887,7 @@ pub async fn get_latest_traces(
 /// (when the optional input-messages column exists) the first input message.
 ///
 /// `extra_selects` are additional aggregate columns appended before `FROM` (e.g.
-/// span_count, error_count, max_duration — the Q2a fields now merged into Q1).
+/// span_count, error_count, max_duration).
 ///
 /// For legacy `_o2_llm` streams the column names are mapped to the legacy
 /// `llm_*` equivalents. The function is pure — callers add WHERE and ORDER BY.
@@ -829,6 +897,11 @@ fn build_llm_trace_query(
     extra_selects: &str,
 ) -> String {
     let stream_ident = quote_identifier(stream_name);
+    let extra_selects = if extra_selects.is_empty() {
+        String::new()
+    } else {
+        format!(", {extra_selects}")
+    };
     let first_msg_clause = if validated.has_gen_ai {
         if validated.has_input_messages {
             format!(
@@ -860,8 +933,7 @@ fn build_llm_trace_query(
             {total_tokens_expr}, \
             sum(gen_ai_usage_cost) as gen_ai_usage_cost_details, \
             array_agg(DISTINCT gen_ai_response_model) FILTER (WHERE gen_ai_response_model IS NOT NULL AND gen_ai_response_model != '') as gen_ai_response_models, \
-            {first_msg_clause} as gen_ai_input_messages, \
-            {extra_selects} \
+            {first_msg_clause} as gen_ai_input_messages{extra_selects} \
             FROM {stream_ident}"
         )
     } else {
@@ -879,23 +951,142 @@ fn build_llm_trace_query(
             {total_tokens_expr}, \
             sum(llm_usage_cost_total) as gen_ai_usage_cost_details, \
             array_agg(DISTINCT llm_model_name) FILTER (WHERE llm_model_name IS NOT NULL AND llm_model_name != '') as gen_ai_response_models, \
-            {first_msg_clause} as gen_ai_input_messages, \
-            {extra_selects} \
+            {first_msg_clause} as gen_ai_input_messages{extra_selects} \
             FROM {stream_ident}"
         )
     }
 }
 
-/// Q1 trace aggregation for streams without a validated LLM schema.
+/// Trace aggregation for streams without a validated LLM schema.
 fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
+    let extra_selects = if extra_selects.is_empty() {
+        String::new()
+    } else {
+        format!(", {extra_selects}")
+    };
     format!(
         "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp, \
         min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
-        (max(end_time) - min(start_time)) as zo_sql_duration, \
-        {extra_selects} \
+        (max(end_time) - min(start_time)) as zo_sql_duration{extra_selects} \
         FROM {}",
         quote_identifier(stream_name)
     )
+}
+
+fn build_trace_selection_query(
+    stream_name: &str,
+    filter: &str,
+    sql_order_expr: &str,
+    validated: Option<&schema_compat::ValidatedLlmSchema>,
+) -> String {
+    let query_sql = if let Some(validated) = validated {
+        build_llm_trace_query(stream_name, validated, "")
+    } else {
+        build_trace_query(stream_name, "")
+    };
+    let where_clause = if filter.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE ({filter})")
+    };
+    format!("{query_sql}{where_clause} GROUP BY trace_id ORDER BY {sql_order_expr}")
+}
+
+fn build_trace_summary_request(
+    summary_query_sql: &str,
+    q1_hits: &[serde_json::Value],
+    mut req: config::meta::search::Request,
+) -> config::meta::search::Request {
+    let mut trace_ids = Vec::with_capacity(q1_hits.len());
+    for hit in q1_hits {
+        if let Some(tid) = hit.get("trace_id").and_then(|v| v.as_str()) {
+            trace_ids.push(tid.to_string());
+        }
+        let start = json::get_int_value(hit.get("trace_start_time").unwrap_or_default());
+        let end = json::get_int_value(hit.get("trace_end_time").unwrap_or_default());
+        if start > 0 && start / 1000 < req.query.start_time {
+            req.query.start_time = start / 1000;
+        }
+        if end > 0 && end / 1000 + 1 > req.query.end_time {
+            req.query.end_time = end / 1000 + 1;
+        }
+    }
+    req.query.sql = format!(
+        "{summary_query_sql} WHERE {} GROUP BY trace_id",
+        trace_id_predicate(&trace_ids)
+    );
+    req.query.from = 0;
+    req.query.size = trace_ids.len() as i64;
+    req
+}
+
+fn validate_trace_query_response(
+    response: &config::meta::search::Response,
+) -> Result<(), infra::errors::Error> {
+    if response.is_partial || !response.function_error.is_empty() {
+        return Err(infra::errors::Error::ErrorCode(
+            infra::errors::ErrorCodes::ServerInternalError(format!(
+                "Trace statistics are incomplete: {}",
+                response.function_error.join("; ")
+            )),
+        ));
+    }
+    Ok(())
+}
+
+fn build_trace_service_request(
+    mut req: config::meta::search::Request,
+    sql: String,
+    size: i64,
+) -> config::meta::search::Request {
+    // Service counts and their row limit are valid only for the summary query's time window.
+    req.query.sql = sql;
+    req.query.from = 0;
+    req.query.size = size;
+    req
+}
+
+fn merge_trace_summaries(
+    q1_hits: &[serde_json::Value],
+    summaries: &mut config::meta::search::Response,
+) -> Result<(), infra::errors::Error> {
+    validate_trace_query_response(summaries)?;
+    let incomplete = || {
+        infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::ServerInternalError(
+            "Trace statistics are incomplete: selected trace IDs do not match summary results"
+                .to_string(),
+        ))
+    };
+    let mut selected = q1_hits
+        .iter()
+        .filter_map(|hit| Some((hit.get("trace_id")?.as_str()?, hit)))
+        .collect::<HashMap<_, _>>();
+    if selected.len() != q1_hits.len() {
+        return Err(incomplete());
+    }
+    for summary in &mut summaries.hits {
+        let tid = summary
+            .get("trace_id")
+            .and_then(|value| value.as_str())
+            .ok_or_else(incomplete)?;
+        let q1 = selected.remove(tid).ok_or_else(incomplete)?;
+        for field in [
+            "gen_ai_usage_details_input",
+            "gen_ai_usage_details_output",
+            "gen_ai_usage_details_total",
+            "gen_ai_usage_cost_details",
+            "gen_ai_response_models",
+            "gen_ai_input_messages",
+        ] {
+            if let Some(value) = q1.get(field) {
+                summary[field] = value.clone();
+            }
+        }
+    }
+    if !selected.is_empty() {
+        return Err(incomplete());
+    }
+    Ok(())
 }
 
 /// Q2b per-(trace, service) breakdown.
@@ -1173,10 +1364,10 @@ pub async fn get_latest_traces_stream(
 /// Core streaming logic for get_latest_traces_stream.
 ///
 /// For each time partition (newest first):
-///   1. Run Query 1: GROUP BY trace_id to get trace summaries with per-trace aggregates
-///      (span_count, error_count, etc. — formerly Q2a, now merged).
-///   2. Run Query 2b: per-service breakdown only for multi-service traces.
-///   3. Assemble TraceResponseItem and stream hits via the sender.
+///   1. Run Query 1: GROUP BY trace_id to select matching trace IDs and timing fields.
+///   2. Run Query 2a: per-trace aggregates without the original filter.
+///   3. Run Query 2b: per-service breakdown only for multi-service traces.
+///   4. Assemble TraceResponseItem and stream hits via the sender.
 #[allow(clippy::too_many_arguments)]
 async fn process_latest_traces_stream(
     org_id: String,
@@ -1216,7 +1407,7 @@ async fn process_latest_traces_stream(
     };
 
     // Schema-dependent expressions for Q2a trace aggregates — computed once here
-    // and reused in Q1 (merged) and Q2b (service breakdown).
+    // and reused in Q2a (trace summaries) and Q2b (service breakdown).
     let stream_schema =
         infra::schema::get_stream_schema_from_cache(&org_id, &stream_name, StreamType::Traces)
             .await;
@@ -1255,19 +1446,16 @@ async fn process_latest_traces_stream(
          first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name"
     );
 
-    // Build the aggregation SQL (Query 1) — shared with get_latest_traces through
-    // build_llm_trace_query. The validated schema (or fallback when not cached)
-    // guarantees required columns exist and optional columns are checked.
-    let query_sql_base = if let Some(ref validated) = validated_schema {
-        build_llm_trace_query(&stream_name, validated, &extra_trace_selects)
-    } else {
-        build_trace_query(&stream_name, &extra_trace_selects)
-    };
-    let query_sql = if filter.is_empty() {
-        format!("{query_sql_base} GROUP BY trace_id ORDER BY {sql_order_expr}")
-    } else {
-        format!("{query_sql_base} WHERE {filter} GROUP BY trace_id ORDER BY {sql_order_expr}")
-    };
+    // Build the aggregation SQL (Query 2a) — shared with get_latest_traces through
+    // build_trace_query; LLM fields remain in the filtered Query 1 so their scope is preserved.
+    // The validated schema (or fallback when not cached) is used by Query 1 for LLM fields.
+    let summary_query_sql = build_trace_query(&stream_name, &extra_trace_selects);
+    let query_sql = build_trace_selection_query(
+        &stream_name,
+        &filter,
+        &sql_order_expr,
+        validated_schema.as_ref(),
+    );
 
     // Build a base search request. from/size are set per-partition; leave at 0 here.
     let base_req = config::meta::search::Request {
@@ -1558,6 +1746,7 @@ async fn process_latest_traces_stream(
         // ---------- Query 2: fetch span details only for the traces we will deliver ----------
         let Some(traces_data) = run_q2_for_traces(
             &deliverable_q1,
+            &summary_query_sql,
             p_start,
             p_end,
             &base_req,
@@ -1640,6 +1829,7 @@ async fn process_latest_traces_stream(
 
         let Some(traces_data) = run_q2_for_traces(
             &deliverable_q1,
+            &summary_query_sql,
             start_time,
             end_time,
             &base_req,
@@ -1710,8 +1900,7 @@ fn parse_order_expr(sql_order_expr: &str) -> (String, bool) {
     (col, is_desc)
 }
 
-/// Runs Q2b (per-service breakdown) for a slice of Q1 hits that already contain
-/// the per-trace aggregate fields (span_count, error_count, etc. — merged from Q2a).
+/// Runs Q2a (per-trace aggregates) and Q2b (per-service breakdown) for selected Q1 hits.
 /// Builds the `TraceResponseItem` map.
 ///
 /// `window_start` / `window_end` (microseconds) are the initial search window; they expand
@@ -1722,6 +1911,7 @@ fn parse_order_expr(sql_order_expr: &str) -> (String, bool) {
 #[allow(clippy::too_many_arguments)]
 async fn run_q2_for_traces(
     q1_hits: &[serde_json::Value],
+    summary_query_sql: &str,
     window_start: i64,
     window_end: i64,
     base_req: &config::meta::search::Request,
@@ -1733,13 +1923,41 @@ async fn run_q2_for_traces(
     sender: &mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
     log_ctx: &str,
 ) -> Option<HashMap<String, TraceResponseItem>> {
-    let mut q2_start = window_start;
-    let mut q2_end = window_end;
+    if sender.is_closed() {
+        return None;
+    }
+    let mut req2 = base_req.clone();
+    req2.query.start_time = window_start;
+    req2.query.end_time = window_end;
+    req2 = build_trace_summary_request(summary_query_sql, q1_hits, req2);
+    let summary_res = match SearchService::cache::search(
+        req_trace_id,
+        org_id,
+        stream_type,
+        Some(user_id.to_string()),
+        &req2,
+        "".to_string(),
+        false,
+        None,
+        false,
+    )
+    .await
+    .and_then(|mut res| {
+        merge_trace_summaries(q1_hits, &mut res)?;
+        Ok(res)
+    }) {
+        Ok(res) => res,
+        Err(e) => {
+            log::error!("[TRACES_STREAM trace_id {req_trace_id}] Q2a error ({log_ctx}): {e}");
+            let _ = sender.send(Err(e)).await;
+            return None;
+        }
+    };
     let mut traces_data: HashMap<String, TraceResponseItem> = HashMap::with_capacity(q1_hits.len());
     let mut multi_service_tids: Vec<String> = Vec::new();
     let mut multi_service_total: i64 = 0;
 
-    for item in q1_hits {
+    for item in summary_res.hits {
         let tid = item
             .get("trace_id")
             .and_then(|v| v.as_str())
@@ -1748,17 +1966,11 @@ async fn run_q2_for_traces(
         let trace_start_time =
             json::get_int_value(item.get("trace_start_time").unwrap_or_default());
         let trace_end_time = json::get_int_value(item.get("trace_end_time").unwrap_or_default());
-        if trace_start_time > 0 && trace_start_time / 1000 < q2_start {
-            q2_start = trace_start_time / 1000;
-        }
-        if trace_end_time > 0 && trace_end_time / 1000 + 1 > q2_end {
-            q2_end = trace_end_time / 1000 + 1;
-        }
         if tid.is_empty() {
             continue;
         }
 
-        // Q2a fields now populated directly from Q1 (merged query).
+        // Q2a aggregates include all spans for the trace, independent of the Q1 filter.
         let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
         let error_count = json::get_int_value(item.get("error_count").unwrap_or_default());
         let max_duration = json::get_int_value(item.get("max_duration").unwrap_or_default());
@@ -1875,15 +2087,6 @@ async fn run_q2_for_traces(
     };
 
     if !multi_service_tids.is_empty() {
-        let multi_ids = multi_service_tids
-            .iter()
-            .map(|tid| {
-                tid.chars()
-                    .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-                    .collect::<String>()
-            })
-            .filter(|tid| !tid.is_empty())
-            .collect::<Vec<String>>();
         let svc_type_select = if has_infer {
             ", max(infer_service_type) AS service_type"
         } else {
@@ -1893,14 +2096,9 @@ async fn run_q2_for_traces(
             stream_name,
             service_key_expr,
             svc_type_select,
-            &multi_ids,
+            &multi_service_tids,
         );
-        let mut req3 = base_req.clone();
-        req3.query.sql = svc_sql;
-        req3.query.from = 0;
-        req3.query.size = multi_service_total;
-        req3.query.start_time = q2_start;
-        req3.query.end_time = q2_end;
+        let req3 = build_trace_service_request(req2, svc_sql, multi_service_total);
 
         if sender.is_closed() {
             return None;
@@ -1917,7 +2115,10 @@ async fn run_q2_for_traces(
             false,
         )
         .await
-        {
+        .and_then(|res| {
+            validate_trace_query_response(&res)?;
+            Ok(res)
+        }) {
             Ok(res) => res,
             Err(e) => {
                 log::error!("[TRACES_STREAM trace_id {req_trace_id}] Q2b error ({log_ctx}): {e}");
@@ -1958,38 +2159,472 @@ async fn run_q2_for_traces(
     Some(traces_data)
 }
 
-#[derive(Debug, Serialize)]
-struct TraceResponseItem {
-    trace_id: String,
-    start_time: i64,
-    end_time: i64,
-    duration: i64,
-    spans: [u16; 2],
-    service_name: Vec<TraceServiceNameItem>,
-    first_event: serde_json::Value,
-    gen_ai_usage_input_tokens: i64,
-    gen_ai_usage_output_tokens: i64,
-    gen_ai_usage_total_tokens: i64,
-    gen_ai_usage_cost: f64,
-    gen_ai_input_messages: Option<serde_json::Value>,
-    models: Vec<String>,
-}
-
-#[derive(Debug, Default, Serialize)]
-struct TraceServiceNameItem {
-    service_name: String,
-    count: u16,
-    duration: i64,
-    /// Inferred-service category ("database"/"queue"/"rpc"/"external") when this
-    /// entity is an uninstrumented dependency; `None` for instrumented services.
-    /// The UI renders inferred entities with a dotted style.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    service_type: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use datafusion::{
+        arrow::{datatypes::DataType, util::display::array_value_to_string},
+        catalog::MemTable,
+        execution::{runtime_env::RuntimeEnvBuilder, session_state::SessionStateBuilder},
+        optimizer::Optimizer,
+        physical_optimizer::optimizer::PhysicalOptimizer,
+        prelude::{SessionConfig, SessionContext},
+    };
+    use search::datafusion::{
+        optimizer::physical_optimizer::rewrite_match::RewriteMatchPhysical,
+        udf::match_all_udf::MATCH_ALL_UDF,
+    };
+
     use super::*;
+
+    const TRACE_SUMMARY_SELECTS: &str = "count(*) AS span_count, \
+         sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count, \
+         max(duration) AS max_duration, count(DISTINCT service_name) AS service_count, \
+         max(CASE WHEN reference_parent_span_id = '' THEN service_name END) AS root_service_name, \
+         max(CASE WHEN reference_parent_span_id = '' THEN operation_name END) AS root_operation_name, \
+         first_value(service_name ORDER BY _timestamp ASC) AS first_service_name";
+
+    async fn trace_filter_test_context() -> SessionContext {
+        // MemTable cannot restore full-text columns pruned before the physical rewrite.
+        let rules = Optimizer::new()
+            .rules
+            .into_iter()
+            .filter(|rule| rule.name() != "optimize_projections")
+            .collect();
+        let mut physical_rules = PhysicalOptimizer::new().rules;
+        physical_rules.insert(
+            0,
+            Arc::new(RewriteMatchPhysical::new(vec![(
+                "message".to_string(),
+                DataType::Utf8,
+            )])),
+        );
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new())
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_optimizer_rules(rules)
+            .with_physical_optimizer_rules(physical_rules)
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let message_type = if config::get_config().common.utf8_view_enabled {
+            "Utf8View"
+        } else {
+            "Utf8"
+        };
+        let data = ctx
+            .sql(&format!(
+                "SELECT trace_id, _timestamp, start_time, end_time, duration, service_name, \
+                 operation_name, span_status, reference_parent_span_id, \
+                 arrow_cast(message, '{message_type}') AS message FROM (VALUES \
+                 ('a', 1000, 1000, 1100, 100, 'gateway', 'gateway_root', 'OK', '', 'other'), \
+                 ('a', 1010, 1010, 1015, 5, 'api', 'api_child', 'OK', 'root', 'needle'), \
+                 ('a', 1020, 1020, 1030, 10, 'db', 'db_child', 'ERROR', 'root', 'other'), \
+                 ('b', 2000, 2000, 2300, 300, 'gateway', 'gateway_root', 'OK', '', 'other'), \
+                 ('b', 2010, 2010, 2015, 5, 'api', 'api_child', 'OK', 'root', 'needle'), \
+                 ('b', 2020, 2020, 2030, 10, 'db', 'db_child', 'ERROR', 'root', 'other'), \
+                 ('c', 3000, 3000, 3050, 50, 'other', 'unmatched', 'OK', '', 'other') \
+                 ) AS spans(trace_id, _timestamp, start_time, end_time, duration, \
+                 service_name, operation_name, span_status, reference_parent_span_id, message)",
+            ))
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+        let table = MemTable::try_new(data[0].schema(), vec![data]).unwrap();
+        ctx.register_table("traces", Arc::new(table)).unwrap();
+        ctx.register_udf(MATCH_ALL_UDF.clone());
+        ctx
+    }
+
+    async fn trace_summary_rows(ctx: &SessionContext, sql: &str) -> Vec<Vec<String>> {
+        let batches = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        batches
+            .iter()
+            .flat_map(|batch| {
+                (0..batch.num_rows()).map(|row| {
+                    batch
+                        .columns()
+                        .iter()
+                        .map(|column| array_value_to_string(column.as_ref(), row).unwrap())
+                        .collect()
+                })
+            })
+            .collect()
+    }
+
+    async fn trace_query_response(
+        ctx: &SessionContext,
+        sql: &str,
+    ) -> config::meta::search::Response {
+        let batches = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        let mut writer = datafusion::arrow::json::ArrayWriter::new(Vec::new());
+        writer
+            .write_batches(&batches.iter().collect::<Vec<_>>())
+            .unwrap();
+        writer.finish().unwrap();
+        config::meta::search::Response {
+            hits: serde_json::from_slice(&writer.into_inner()).unwrap(),
+            ..Default::default()
+        }
+    }
+
+    async fn trace_two_stage_rows(ctx: &SessionContext, selection_sql: &str) -> Vec<Vec<String>> {
+        let rows = trace_summary_rows(ctx, selection_sql).await;
+        if rows.is_empty() {
+            return Vec::new();
+        }
+        let hits = rows
+            .iter()
+            .map(|row| {
+                serde_json::json!({
+                    "trace_id": row[0],
+                    "trace_start_time": row[2].parse::<i64>().unwrap(),
+                    "trace_end_time": row[3].parse::<i64>().unwrap(),
+                })
+            })
+            .collect::<Vec<_>>();
+        let req = build_trace_summary_request(
+            &build_trace_query("traces", TRACE_SUMMARY_SELECTS),
+            &hits,
+            config::meta::search::Request::default(),
+        );
+        trace_summary_rows(
+            ctx,
+            &format!("{} ORDER BY zo_sql_timestamp ASC", req.query.sql),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn test_trace_filter_preserves_complete_summary() {
+        let ctx = trace_filter_test_context().await;
+        let base = build_trace_query("traces", TRACE_SUMMARY_SELECTS);
+        let expected = vec![
+            vec![
+                "a",
+                "1000",
+                "1000",
+                "1100",
+                "100",
+                "3",
+                "1",
+                "100",
+                "3",
+                "gateway",
+                "gateway_root",
+                "gateway",
+            ],
+            vec![
+                "b",
+                "2000",
+                "2000",
+                "2300",
+                "300",
+                "3",
+                "1",
+                "300",
+                "3",
+                "gateway",
+                "gateway_root",
+                "gateway",
+            ],
+        ];
+        for filter in [
+            "service_name = 'api'",
+            "span_status = 'ERROR'",
+            "service_name = 'api' AND duration = 5",
+            "service_name = 'api' OR span_status = 'ERROR'",
+            "match_all('needle')",
+            "match_all('needle') AND service_name = 'api'",
+            "match_all('missing') OR span_status = 'ERROR'",
+        ] {
+            let sql = build_trace_selection_query("traces", filter, "zo_sql_timestamp ASC", None);
+            assert_eq!(trace_two_stage_rows(&ctx, &sql).await, expected, "{filter}");
+        }
+        let old_sql = format!(
+            "{base} WHERE service_name = 'api' GROUP BY trace_id ORDER BY zo_sql_timestamp ASC"
+        );
+        let old_rows = trace_summary_rows(&ctx, &old_sql).await;
+        assert_eq!(old_rows[0][5], "1");
+        assert_eq!(old_rows[0][6], "0");
+    }
+
+    #[tokio::test]
+    async fn test_trace_filter_requires_a_single_matching_span() {
+        let ctx = trace_filter_test_context().await;
+        for filter in [
+            "service_name = 'api' AND span_status = 'ERROR'",
+            "match_all('needle') AND span_status = 'ERROR'",
+            "service_name = 'missing'",
+            "match_all('missing')",
+        ] {
+            let sql = build_trace_selection_query("traces", filter, "zo_sql_timestamp ASC", None);
+            assert!(
+                trace_two_stage_rows(&ctx, &sql).await.is_empty(),
+                "{filter}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_trace_service_counts_preserve_custom_trace_ids() {
+        let ctx = trace_filter_test_context().await;
+        let data = ctx
+            .sql("SELECT 'trace-''1' AS trace_id, _timestamp, start_time, end_time, duration, service_name, operation_name, span_status, reference_parent_span_id FROM traces WHERE trace_id = 'a'")
+            .await
+            .unwrap();
+        ctx.register_table("custom_traces", data.into_view())
+            .unwrap();
+        let selection = build_trace_selection_query(
+            "custom_traces",
+            "service_name = 'api'",
+            "zo_sql_timestamp ASC",
+            None,
+        );
+        let selected = trace_query_response(&ctx, &selection).await;
+        let req = build_trace_summary_request(
+            &build_trace_query("custom_traces", TRACE_SUMMARY_SELECTS),
+            &selected.hits,
+            config::meta::search::Request::default(),
+        );
+        let mut summaries = trace_query_response(&ctx, &req.query.sql).await;
+        merge_trace_summaries(&selected.hits, &mut summaries).unwrap();
+        assert_eq!(summaries.hits[0]["span_count"], 3);
+        let ids = vec![summaries.hits[0]["trace_id"].as_str().unwrap().to_string()];
+        let services = trace_query_response(
+            &ctx,
+            &build_service_breakdown_query("custom_traces", "service_name", "", &ids),
+        )
+        .await;
+        assert_eq!(services.hits.len(), 3);
+        for hit in services.hits {
+            assert_eq!(hit["trace_id"], "trace-'1");
+            assert_eq!(hit["svc_count"], 1);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_trace_filter_sorting_pagination_and_empty_filter() {
+        let ctx = trace_filter_test_context().await;
+        let unfiltered = build_trace_selection_query("traces", "", "zo_sql_timestamp ASC", None);
+        let rows = trace_summary_rows(&ctx, &unfiltered).await;
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[2][0], "c");
+        for (order, expected_id) in [
+            ("zo_sql_duration DESC", "a"),
+            ("zo_sql_duration ASC", "b"),
+            ("zo_sql_timestamp DESC", "a"),
+            ("zo_sql_timestamp ASC", "b"),
+        ] {
+            let sql = build_trace_selection_query(
+                "traces",
+                "service_name IN ('api','gateway')",
+                order,
+                None,
+            );
+            let rows = trace_two_stage_rows(&ctx, &format!("{sql} LIMIT 1 OFFSET 1")).await;
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0][0], expected_id);
+            assert_eq!(rows[0][5], "3");
+            assert_eq!(rows[0][6], "1");
+        }
+    }
+
+    #[test]
+    fn test_trace_summary_request_keeps_selected_ids_and_resets_pagination() {
+        let mut base = config::meta::search::Request::default();
+        base.query.from = 20;
+        base.query.size = 10;
+        base.query.start_time = 10;
+        base.query.end_time = 20;
+        base.timeout = 30;
+        base.use_cache = false;
+        let hits = vec![
+            serde_json::json!({"trace_id": "a", "trace_start_time": 9000, "trace_end_time": 25000}),
+            serde_json::json!({"trace_id": "b'c", "trace_start_time": 12000, "trace_end_time": 18000}),
+        ];
+        let req = build_trace_summary_request(
+            &build_trace_query("trace\" stream", TRACE_SUMMARY_SELECTS),
+            &hits,
+            base,
+        );
+        assert!(req.query.sql.contains("FROM \"trace\"\" stream\" WHERE"));
+        assert!(
+            req.query
+                .sql
+                .ends_with("WHERE \"trace_id\" IN ('a', 'b''c') GROUP BY trace_id")
+        );
+        assert_eq!(req.query.from, 0);
+        assert_eq!(req.query.size, 2);
+        assert_eq!(req.query.start_time, 9);
+        assert_eq!(req.query.end_time, 26);
+        assert_eq!(req.timeout, 30);
+        assert!(!req.use_cache);
+    }
+
+    #[tokio::test]
+    async fn test_trace_two_stage_llm_keeps_filtered_fields() {
+        let ctx = trace_filter_test_context().await;
+        for has_gen_ai in [true, false] {
+            let columns = if has_gen_ai {
+                [
+                    "gen_ai_usage_input_tokens",
+                    "gen_ai_usage_output_tokens",
+                    "gen_ai_usage_total_tokens",
+                    "gen_ai_usage_cost",
+                    "gen_ai_response_model",
+                    "gen_ai_input_messages",
+                ]
+            } else {
+                [
+                    "llm_usage_tokens_input",
+                    "llm_usage_tokens_output",
+                    "llm_usage_tokens_total",
+                    "llm_usage_cost_total",
+                    "llm_model_name",
+                    "llm_input",
+                ]
+            };
+            let data = ctx
+                .sql(&format!(
+                    "SELECT *, 10 AS {}, 20 AS {}, 30 AS {}, CAST(0.5 AS DOUBLE) AS {}, \
+                 service_name AS {}, operation_name AS {} FROM traces",
+                    columns[0], columns[1], columns[2], columns[3], columns[4], columns[5],
+                ))
+                .await
+                .unwrap();
+            ctx.register_table("llm_traces", data.into_view()).unwrap();
+            let mut validated = schema_compat::ValidatedLlmSchema::fallback(has_gen_ai);
+            validated.has_total_tokens = true;
+            validated.has_input_messages = true;
+            let selection = build_trace_selection_query(
+                "llm_traces",
+                "service_name = 'api'",
+                "zo_sql_timestamp ASC",
+                Some(&validated),
+            );
+            let selected = trace_query_response(&ctx, &selection).await;
+            let req = build_trace_summary_request(
+                &build_trace_query("llm_traces", TRACE_SUMMARY_SELECTS),
+                &selected.hits,
+                config::meta::search::Request::default(),
+            );
+            let mut summaries = trace_query_response(&ctx, &req.query.sql).await;
+            merge_trace_summaries(&selected.hits, &mut summaries).unwrap();
+            assert_eq!(summaries.hits.len(), 2);
+            for hit in summaries.hits {
+                assert_eq!(hit["gen_ai_usage_details_input"], 10);
+                assert_eq!(hit["gen_ai_usage_details_output"], 20);
+                assert_eq!(hit["gen_ai_usage_details_total"], 30);
+                assert_eq!(hit["gen_ai_usage_cost_details"], 0.5);
+                assert_eq!(hit["gen_ai_response_models"], serde_json::json!(["api"]));
+                assert_eq!(hit["gen_ai_input_messages"], "api_child");
+                assert_eq!(hit["span_count"], 3);
+                assert_eq!(hit["error_count"], 1);
+                assert_eq!(hit["root_service_name"], "gateway");
+            }
+            ctx.deregister_table("llm_traces").unwrap();
+        }
+    }
+
+    #[test]
+    fn test_trace_counts_above_u16_limit_are_preserved() {
+        for count in [65_535_i64, 65_536, 100_000] {
+            let item = TraceResponseItem {
+                trace_id: "a".to_string(),
+                start_time: 0,
+                end_time: 0,
+                duration: 0,
+                spans: [count.try_into().unwrap_or_default(); 2],
+                service_name: vec![TraceServiceNameItem {
+                    count: count.try_into().unwrap_or_default(),
+                    ..Default::default()
+                }],
+                first_event: serde_json::Value::Null,
+                gen_ai_usage_input_tokens: 0,
+                gen_ai_usage_output_tokens: 0,
+                gen_ai_usage_total_tokens: 0,
+                gen_ai_usage_cost: 0.0,
+                gen_ai_input_messages: None,
+                models: vec![],
+            };
+            let value = serde_json::to_value(item).unwrap();
+            assert_eq!(value["spans"], serde_json::json!([count, count]));
+            assert_eq!(value["service_name"][0]["count"], count);
+        }
+    }
+
+    #[test]
+    fn test_trace_summary_rejects_partial_and_mismatched_results() {
+        let selected = vec![
+            serde_json::json!({"trace_id": "a"}),
+            serde_json::json!({"trace_id": "b"}),
+        ];
+        for hits in [
+            vec![],
+            vec![serde_json::json!({"trace_id": "a"})],
+            vec![
+                serde_json::json!({"trace_id": "a"}),
+                serde_json::json!({"trace_id": "a"}),
+            ],
+            vec![
+                serde_json::json!({"trace_id": "a"}),
+                serde_json::json!({"trace_id": "c"}),
+            ],
+        ] {
+            let mut response = config::meta::search::Response {
+                hits,
+                ..Default::default()
+            };
+            assert!(merge_trace_summaries(&selected, &mut response).is_err());
+        }
+        let mut response = config::meta::search::Response {
+            hits: selected.clone(),
+            is_partial: true,
+            ..Default::default()
+        };
+        assert!(merge_trace_summaries(&selected, &mut response).is_err());
+        response.is_partial = false;
+        response.function_error.push("query timed out".to_string());
+        assert!(merge_trace_summaries(&selected, &mut response).is_err());
+        response.function_error.clear();
+        response.hits.reverse();
+        assert!(merge_trace_summaries(&selected, &mut response).is_ok());
+    }
+
+    #[test]
+    fn test_trace_service_request_keeps_summary_window() {
+        let mut base = config::meta::search::Request::default();
+        base.query.start_time = 100;
+        base.query.end_time = 200;
+        let selected = vec![serde_json::json!({
+            "trace_id": "a", "trace_start_time": 150000, "trace_end_time": 160000,
+        })];
+        let req = build_trace_summary_request(
+            &build_trace_query("traces", TRACE_SUMMARY_SELECTS),
+            &selected,
+            base,
+        );
+        let mut summary = config::meta::search::Response {
+            hits: vec![serde_json::json!({
+                "trace_id": "a", "trace_start_time": 120000, "trace_end_time": 400000,
+                "span_count": 2, "service_count": 2,
+            })],
+            ..Default::default()
+        };
+        merge_trace_summaries(&selected, &mut summary).unwrap();
+        let service_req = build_trace_service_request(
+            req,
+            build_service_breakdown_query("traces", "service_name", "", &["a".to_string()]),
+            summary.hits[0]["service_count"].as_i64().unwrap(),
+        );
+        assert_eq!(service_req.query.start_time, 100);
+        assert_eq!(service_req.query.end_time, 200);
+        assert_eq!(service_req.query.size, 2);
+    }
 
     #[test]
     fn test_trace_service_name_item_default() {
