@@ -266,7 +266,7 @@ async fn try_finish(
     Ok(false)
 }
 
-/// Counts the failure; the error goes back to the lane, or the job is FAILED at the last attempt.
+/// Counts a re-measure's failure, FAILED at the last attempt; a plain backfill retries for good.
 async fn record_failed_finish(
     db: &DatabaseConnection,
     job: &slo_backfill_jobs::Model,
@@ -274,6 +274,9 @@ async fn record_failed_finish(
     now: i64,
     error: anyhow::Error,
 ) -> Result<ChunkOutcome, anyhow::Error> {
+    if job.kind != jobs::KIND_REMEASURE {
+        return Err(error);
+    }
     let (slo_id, generation) = (&job.slo_id, job.definition_generation);
     let message = error.to_string();
     if !jobs::record_failed_attempt(db, slo_id, generation, &message, version, now).await? {
@@ -935,6 +938,21 @@ mod tests {
                 assert_eq!(stored.error.as_deref(), Some("partial result"));
             }
         }
+    }
+
+    #[tokio::test]
+    async fn a_plain_backfill_keeps_retrying_after_six_failed_finishes() {
+        let db = jobs_db().await;
+        jobs::queue(&db, "slo1", 1, 0, 900, 100).await.unwrap();
+        let queued = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+        assert_ne!(queued.kind, jobs::KIND_REMEASURE);
+        for _ in 0..=MAX_FINISH_ATTEMPTS {
+            let job = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+            let failure = anyhow::anyhow!("partial result");
+            let outcome = record_failed_finish(&db, &job, job.updated_at, 100, failure).await;
+            assert!(outcome.is_err(), "the lane keeps the trigger and retries");
+        }
+        assert_eq!(jobs::get(&db, "slo1", 1).await.unwrap().unwrap(), queued);
     }
 
     #[tokio::test]

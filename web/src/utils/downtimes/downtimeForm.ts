@@ -117,6 +117,8 @@ export interface DowntimeFormValues extends Record<string, unknown> {
   reason: string;
   show_banner: boolean;
   notifications: NotifyFormValues;
+  /** The version an edit loaded, sent back so a stale save is refused. */
+  version?: number;
 }
 
 /** What a row action already knows, read from the create page's query string. */
@@ -356,6 +358,7 @@ export function buildDowntimeRequest(values: DowntimeFormValues): DowntimeReques
   if (condition) body.condition = condition;
   const notifications = buildNotifications(values.notifications);
   if (notifications) body.notifications = notifications;
+  if (values.version !== undefined) body.version = values.version;
   return body;
 }
 
@@ -423,6 +426,7 @@ export function downtimeToFormValues(d: Downtime): DowntimeFormValues {
     reason: d.reason ?? "",
     show_banner: d.show_banner,
     notifications: notifyValues(d.notifications),
+    version: d.version,
   };
 }
 

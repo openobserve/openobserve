@@ -34,9 +34,10 @@ use config::{
         downtimes::{
             AffectedItems, DimensionCondition, Downtime, DowntimeDetail, DowntimeListItem,
             DowntimeNotifications, DowntimeRequest, DowntimeSchedule, DowntimeStatus,
-            DowntimeWindow, ExtendDowntimeRequest, ExtendDowntimeResponse, MoveDowntimesRequest,
-            NotificationEvent, PreviewMatch, PreviewRequest, PreviewResponse, Repeat,
-            ResourcesRequest, ResourcesResponse, TargetModule, ValuesRequest, ValuesResponse,
+            DowntimeTarget, DowntimeWindow, ExtendDowntimeRequest, ExtendDowntimeResponse,
+            MoveDowntimesRequest, NotificationEvent, PreviewMatch, PreviewRequest, PreviewResponse,
+            Repeat, ResourcesRequest, ResourcesResponse, TargetModule, ValuesRequest,
+            ValuesResponse,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
@@ -212,7 +213,7 @@ pub async fn create(
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
     let folder_id = resolve_folder(org, &req.folder_id).await?;
-    let req = checked_request(org, user_id, req).await?;
+    let req = checked_request(org, user_id, req, None).await?;
     check_room(org)?;
     let now = now_micros();
     let mut downtime = created(org, folder_id, &req, user_id, now);
@@ -238,7 +239,8 @@ pub async fn update(
     ensure_enabled()?;
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
-    let req = checked_request(org, user_id, req).await?;
+    check_version(req.version, &before)?;
+    let req = checked_request(org, user_id, req, Some(&before.targets)).await?;
     let continues = before
         .notifications
         .as_ref()
@@ -252,9 +254,7 @@ pub async fn update(
     if !before.same_coverage(&after) {
         forget_recorded_mutes(&after.org, &after.id).await;
     }
-    if before.schedule != after.schedule
-        && let Some(due) = started_on_save(&after, now)
-    {
+    if let Some(due) = started_on_edit(&before, &after, now) {
         notify::deliver_in_background(after.clone(), due);
     }
     plan.trigger(&after.id).await;
@@ -266,10 +266,14 @@ pub async fn cancel(org: &str, user_id: &str, id: &str) -> Result<Downtime, Down
     ensure_enabled()?;
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
+    let now = now_micros();
     if before.cancelled_at.is_some() {
+        // A retry still reaches the follow-ups a failed cancel left live.
+        if before.schedule.repeat != Repeat::None {
+            cancel_follow_ups(org, user_id, &before.id, now).await;
+        }
         return Ok(before);
     }
-    let now = now_micros();
     check_cancellable(&before, now)?;
     let after = cancelled(&before, user_id, now);
     let plan = remeasure_plan(Some(&before), &after).await?;
@@ -298,6 +302,7 @@ pub async fn extend(
     ensure_enabled()?;
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
+    check_version(req.version, &before)?;
     let now = now_micros();
     let window = extendable_window(&before, now)?;
     if before.schedule.repeat == Repeat::None {
@@ -337,7 +342,7 @@ pub async fn extend(
         ));
     }
     let follow_up = follow_up(&before, window.end, new_end, user_id, now);
-    checked_request(org, user_id, request_of(&follow_up)).await?;
+    checked_request(org, user_id, request_of(&follow_up), Some(&before.targets)).await?;
     check_room(org)?;
     let plan = remeasure_plan(None, &follow_up).await?;
     if !db::downtimes::set_if_parent_unchanged(
@@ -521,7 +526,16 @@ pub async fn forget_recorded_mutes(org: &str, id: &str) {
             return;
         }
     };
-    recover_cleared(org, &cleared, async |org, alert_id| {
+    let now = now_micros();
+    let mut others = HashMap::new();
+    for alert_id in &cleared {
+        if let Some(other) = muted_by_another(org, alert_id, id, now).await {
+            others.insert(alert_id.clone(), other);
+        }
+    }
+    let conn = infra::db::get_orm_client_rw().await;
+    let unmuted = record_other_mutes(conn, cleared, &others).await;
+    recover_cleared(org, &unmuted, async |org, alert_id| {
         crate::alerts::incidents::recover_after_muted_resolve(org, alert_id).await
     })
     .await;
@@ -563,7 +577,7 @@ async fn extend_once(
     now: i64,
 ) -> Result<Downtime, DowntimeError> {
     let after = extended_once(before, new_end, user_id, now);
-    checked_request(org, user_id, request_of(&after)).await?;
+    checked_request(org, user_id, request_of(&after), Some(&before.targets)).await?;
     let plan = remeasure_plan(Some(before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
     plan.trigger(&after.id).await;
@@ -673,6 +687,7 @@ fn check_preview(
         },
         show_banner: false,
         notifications: None,
+        version: None,
     };
     validate(&placeholder, groups).map_err(DowntimeError::BadRequest)
 }
@@ -715,11 +730,12 @@ fn check_room(org: &str) -> Result<(), DowntimeError> {
     Ok(())
 }
 
-/// Validates, normalizes as stored, then checks what the user may silence (WP6).
+/// Validates, normalizes as stored, then checks what the user may silence if it changed.
 async fn checked_request(
     org: &str,
     user_id: &str,
     mut req: DowntimeRequest,
+    stored_targets: Option<&[DowntimeTarget]>,
 ) -> Result<DowntimeRequest, DowntimeError> {
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
@@ -734,9 +750,26 @@ async fn checked_request(
         target.tags = config::meta::alerts::tags::normalize_tags(&target.tags)
             .map_err(|e| DowntimeError::BadRequest(format!("{e}.")))?;
     }
-    let inventory = inventory::load(org).await?;
-    access::check_targets(org, user_id, &req.targets, &inventory).await?;
+    if targets_changed(stored_targets, &req.targets) {
+        let inventory = inventory::load(org).await?;
+        access::check_targets(org, user_id, &req.targets, &inventory).await?;
+    }
     Ok(req)
+}
+
+/// Unchanged stored targets were checked when written, so an edit or extend keeps them.
+fn targets_changed(stored: Option<&[DowntimeTarget]>, requested: &[DowntimeTarget]) -> bool {
+    stored.is_none_or(|stored| stored != requested)
+}
+
+/// A request that names the version it was loaded at fails when the row moved on since.
+fn check_version(requested: Option<i64>, row: &Downtime) -> Result<(), DowntimeError> {
+    match requested {
+        Some(version) if version != row.version => Err(DowntimeError::Conflict(
+            "Someone changed this downtime since you loaded it. Reload and try again.".to_string(),
+        )),
+        _ => Ok(()),
+    }
 }
 
 async fn existing_destinations(
@@ -880,6 +913,7 @@ fn request_of(row: &Downtime) -> DowntimeRequest {
         schedule: row.schedule.clone(),
         show_banner: row.show_banner,
         notifications: row.notifications.clone(),
+        version: None,
     }
 }
 
@@ -916,6 +950,14 @@ fn started_on_save(row: &Downtime, now: i64) -> Option<DueEvent> {
     }
     schedule::window_at(&row.schedule, now)
         .map(|window| DueEvent::of_window(NotificationEvent::Started, window))
+}
+
+/// A schedule edit sends Started only when no window was in force before it.
+fn started_on_edit(before: &Downtime, after: &Downtime, now: i64) -> Option<DueEvent> {
+    if before.schedule == after.schedule || schedule::window_at(&before.schedule, now).is_some() {
+        return None;
+    }
+    started_on_save(after, now)
 }
 
 /// Cancelling a row that already ended would rewrite its history as a cancel.
@@ -1142,6 +1184,53 @@ async fn recover_cleared(
             log::error!("[downtimes] incident on-call recovery failed for {org}/{alert_id}: {e}");
         }
     }
+}
+
+/// The live downtime other than `except` that still mutes the alert, so its escalation stays held.
+async fn muted_by_another(org: &str, alert_id: &str, except: &str, now: i64) -> Option<String> {
+    let Ok(ksuid) = <svix_ksuid::Ksuid as std::str::FromStr>::from_str(alert_id) else {
+        return None;
+    };
+    let conn = infra::db::get_orm_client_ro().await;
+    match crate::alerts::alert::get_by_id(conn, org, ksuid).await {
+        Ok((folder, alert)) => crate::alerts::scheduler::handlers::downtime_decision_except(
+            &alert,
+            &folder.folder_id,
+            except,
+            now,
+        )
+        .await
+        .map(|downtime| downtime.id),
+        Err(crate::alerts::alert::AlertError::AlertNotFound) => None,
+        Err(e) => {
+            log::warn!("[downtimes] alert {org}/{alert_id} unreadable for the mute check: {e}");
+            None
+        }
+    }
+}
+
+/// Records the downtime still muting each alert in `others`; returns the alerts left unmuted.
+async fn record_other_mutes<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    cleared: Vec<String>,
+    others: &HashMap<String, String>,
+) -> Vec<String> {
+    let mut unmuted = Vec::with_capacity(cleared.len());
+    for alert_id in cleared {
+        let Some(other) = others.get(&alert_id) else {
+            unmuted.push(alert_id);
+            continue;
+        };
+        if let Err(e) =
+            infra::table::alert_states::set_last_downtime_id_with(conn, &alert_id, Some(other))
+                .await
+        {
+            // Unrecorded, the page would outlive the other downtime, so it closes now instead.
+            log::warn!("[downtimes] could not record {other} as the mute of {alert_id}: {e}");
+            unmuted.push(alert_id);
+        }
+    }
+    unmuted
 }
 
 /// Planned before the write that queues it, so a failure fails the save and its retry plans again.
@@ -1469,6 +1558,7 @@ mod tests {
             schedule: d.schedule.clone(),
             show_banner: false,
             notifications: None,
+            version: None,
         };
         assert_eq!(name_of(&req, 0), "All alerts · once 1 Jan");
         let named = DowntimeRequest {
@@ -1662,14 +1752,14 @@ mod tests {
     fn by(secs: i64) -> ExtendDowntimeRequest {
         ExtendDowntimeRequest {
             by_secs: Some(secs),
-            until: None,
+            ..Default::default()
         }
     }
 
     fn until(at: i64) -> ExtendDowntimeRequest {
         ExtendDowntimeRequest {
-            by_secs: None,
             until: Some(at),
+            ..Default::default()
         }
     }
 
@@ -1725,6 +1815,7 @@ mod tests {
             ExtendDowntimeRequest {
                 by_secs: Some(60),
                 until: Some(15 * HOUR),
+                version: None,
             },
         ] {
             assert!(
@@ -2216,6 +2307,7 @@ mod tests {
             schedule: row(vec![TargetModule::Alerts], 0, HOUR).schedule,
             show_banner: false,
             notifications: None,
+            version: None,
         };
         let new = created("acme", "default".to_string(), &req, "lin", 5);
         assert_eq!(new.version, 1);
@@ -2378,6 +2470,146 @@ mod tests {
         assert!(check_cancellable(&d, 11 * HOUR).is_ok());
         assert!(check_cancellable(&d, 9 * HOUR).is_ok());
         assert!(check_cancellable(&daily("09:00", 3_600), 30 * HOUR).is_ok());
+    }
+
+    #[test]
+    fn a_repeated_cancel_of_a_parent_still_finds_its_live_follow_up() {
+        let parent = daily("09:00", 3_600);
+        let now = 9 * HOUR + HOUR / 2;
+        let cancelled_parent = cancelled(&parent, "ops", now);
+        let live = follow_up(&parent, 10 * HOUR, 11 * HOUR, "ops", now);
+        let rows = [cancelled_parent.clone(), live.clone()];
+        let retry_at = now + 60_000_000;
+        assert_eq!(
+            follow_ups_to_cancel(&rows, &cancelled_parent.id, retry_at),
+            vec![live.id.as_str()]
+        );
+        let stopped = cancelled(&live, "ops", retry_at);
+        assert_eq!(stopped.cancelled_at, Some(retry_at));
+        assert!(
+            follow_ups_to_cancel(&[cancelled_parent, stopped], &parent.id, retry_at).is_empty()
+        );
+    }
+
+    #[test]
+    fn an_edit_or_extend_checks_the_targets_only_when_they_changed() {
+        let all = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        assert!(targets_changed(None, &all.targets), "a create checks them");
+        assert!(
+            !targets_changed(Some(&all.targets), &all.targets),
+            "a rename or extend"
+        );
+        let extended = extended_once(&all, 13 * HOUR, "ops", 11 * HOUR);
+        assert!(!targets_changed(Some(&all.targets), &extended.targets));
+        let mut some = all.targets.clone();
+        some[0].folders = TargetFolders::Some {
+            folder_ids: vec!["ops".to_string()],
+        };
+        assert!(targets_changed(Some(&some), &all.targets), "widened to All");
+        let mut with_id = some.clone();
+        with_id[0].ids = vec!["a1".to_string()];
+        assert!(targets_changed(Some(&some), &with_id));
+    }
+
+    #[test]
+    fn a_request_loaded_at_an_older_version_is_a_conflict() {
+        let mut stored = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        stored.version = 3;
+        let err = check_version(Some(2), &stored).unwrap_err();
+        assert!(matches!(
+            &err,
+            DowntimeError::Conflict(m)
+                if m == "Someone changed this downtime since you loaded it. Reload and try again."
+        ));
+        assert!(check_version(Some(3), &stored).is_ok());
+        assert!(
+            check_version(None, &stored).is_ok(),
+            "a request without it keeps today's rule"
+        );
+        let body: DowntimeRequest = serde_json::from_value(serde_json::json!({
+            "targets": [],
+            "schedule": stored.schedule,
+        }))
+        .unwrap();
+        assert_eq!(body.version, None);
+        let extend: ExtendDowntimeRequest =
+            serde_json::from_value(serde_json::json!({ "by_secs": 60, "version": 3 })).unwrap();
+        assert_eq!(extend.version, Some(3));
+    }
+
+    #[test]
+    fn moving_the_start_of_an_active_row_sends_no_second_started() {
+        let now = 10 * HOUR;
+        let events = NotificationEvents {
+            started: true,
+            ..Default::default()
+        };
+        let active = notifying(
+            row(vec![TargetModule::Alerts], now - HOUR, 12 * HOUR),
+            events,
+            600,
+        );
+        let mut earlier = active.clone();
+        earlier.schedule.starts_at -= 5 * 60_000_000;
+        assert_eq!(started_on_edit(&active, &earlier, now), None);
+
+        let scheduled = notifying(
+            row(vec![TargetModule::Alerts], 11 * HOUR, 12 * HOUR),
+            events,
+            600,
+        );
+        let mut now_active = scheduled.clone();
+        now_active.schedule.starts_at = now - 60_000_000;
+        assert_eq!(
+            started_on_edit(&scheduled, &now_active, now),
+            started_on_save(&now_active, now)
+        );
+        assert!(started_on_edit(&scheduled, &now_active, now).is_some());
+        assert_eq!(
+            started_on_edit(&scheduled, &scheduled, now),
+            None,
+            "a rename"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cancel_of_d1_records_d2_on_the_alert_it_still_mutes() {
+        use infra::table::{alert_states, entity::alert_states as states};
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(states::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        for alert_id in ["a1", "a2"] {
+            alert_states::set_last_downtime_id_with(&db, alert_id, Some("d1"))
+                .await
+                .unwrap();
+        }
+        let cleared = alert_states::clear_last_downtime_id_with(&db, "d1")
+            .await
+            .unwrap();
+        let others = HashMap::from([("a1".to_string(), "d2".to_string())]);
+
+        let unmuted = record_other_mutes(&db, cleared, &others).await;
+        assert_eq!(
+            unmuted,
+            ["a2"],
+            "only the alert nothing else mutes recovers now"
+        );
+        let ids = vec!["a1".to_string(), "a2".to_string()];
+        let recorded = alert_states::last_downtime_ids_with(&db, &ids)
+            .await
+            .unwrap();
+        assert_eq!(recorded.get("a1").map(String::as_str), Some("d2"));
+        assert!(!recorded.contains_key("a2"));
+        // D2's end or cancel then finds the alert and closes its page.
+        assert_eq!(
+            alert_states::clear_last_downtime_id_with(&db, "d2")
+                .await
+                .unwrap(),
+            ["a1"]
+        );
     }
 
     #[tokio::test]

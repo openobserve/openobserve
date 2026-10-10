@@ -9039,6 +9039,8 @@
         "cancel": "İptal",
         "save": "Kaydet",
         "activeBanner": "Bu kesinti süresi etkin. Bir düzenleme bir sonraki değerlendirmede geçerli olur ve SLO modundaki bir değişiklik başlamış olan pencereleri yeniden ölçer.",
+        "changedMeanwhile": "Siz yükledikten sonra biri bu kesinti süresini değiştirdi. Yeniden yükleyip tekrar deneyin.",
+        "reload": "Yeniden yükle",
         "noModule": "Şunlara uygulanır bölümünden bir modül seçin.",
         "checkSchedule": "Zamanlamayı kontrol edin, ardından yeniden kaydedin."
       },
@@ -18171,6 +18173,7 @@
       "extended": "{time} saatine kadar uzatıldı",
       "extendedFollowUp": "{name} oluşturuldu, {time} saatine kadar sürüyor",
       "extendFailed": "Kesinti uzatılamadı",
+      "reload": "Yeniden yükle",
       "deleted": "Kesinti silindi",
       "deleteFailed": "Kesinti silinemedi",
       "created": "Kesinti oluşturuldu",

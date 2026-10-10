@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useRouter } from "vue-router";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { formatInTimeZone } from "date-fns-tz";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
 import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { extendDowntimeMutation } from "@/services/downtimes.queries";
+import { downtimeKeys } from "@/services/downtimes.querykeys";
 import type { Downtime, ExtendDowntimeRequest, ExtendDowntimeResponse } from "@/services/downtimes";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { dbmHttpError } from "@/utils/dbm/format";
@@ -30,6 +31,7 @@ export function useExtendDowntime() {
   const orgId = useOrgId();
   const router = useRouter();
   const mutation = useMutation(() => extendDowntimeMutation(orgId.value));
+  const queryClient = useQueryClient();
   // The zone the downtime pages show times in, read once so the dialog and its toast agree.
   const timezone = useViewerTimezone().value;
 
@@ -39,11 +41,12 @@ export function useExtendDowntime() {
       : "";
 
   const extend = async (
-    row: Pick<Downtime, "id" | "folder_id">,
+    row: Pick<Downtime, "id" | "folder_id" | "version">,
     body: ExtendDowntimeRequest,
   ): Promise<ExtendDowntimeResponse | null> => {
+    const sent = row.version === undefined ? body : { ...body, version: row.version };
     try {
-      const result = await mutation.mutateAsync({ id: row.id, body, folder: row.folder_id });
+      const result = await mutation.mutateAsync({ id: row.id, body: sent, folder: row.folder_id });
       const time = endText(result.schedule.ends_at);
       const createdId = result.created_id;
       if (createdId) {
@@ -66,16 +69,27 @@ export function useExtendDowntime() {
       }
       return result;
     } catch (err: unknown) {
-      const { serverMessage } = dbmHttpError(err);
+      const { status, serverMessage } = dbmHttpError(err);
+      // A 409 means the row moved since it was loaded, so the lists reload to show it.
+      const reload =
+        status === 409
+          ? {
+              label: t("toastMessages.downtimes.reload"),
+              handler: () => {
+                void queryClient.invalidateQueries({ queryKey: downtimeKeys.all(orgId.value) });
+              },
+            }
+          : undefined;
       toast({
         variant: "error",
         message: serverMessage ? raw(serverMessage) : t("toastMessages.downtimes.extendFailed"),
+        ...(reload ? { action: reload } : {}),
       });
       return null;
     }
   };
 
-  const extendBy = (row: Pick<Downtime, "id" | "folder_id">, seconds: number) =>
+  const extendBy = (row: Pick<Downtime, "id" | "folder_id" | "version">, seconds: number) =>
     extend(row, { by_secs: seconds });
 
   return { extend, extendBy, isPending: mutation.isPending, timezone };

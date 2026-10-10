@@ -9039,6 +9039,8 @@
         "cancel": "Cancelar",
         "save": "Salvar",
         "activeBanner": "Este downtime está ativo. Uma edição entra em vigor na próxima avaliação, e uma alteração no modo do SLO faz uma nova medição das janelas que já começaram.",
+        "changedMeanwhile": "Alguém alterou este downtime desde que o carregou. Recarregue e tente novamente.",
+        "reload": "Recarregar",
         "noModule": "Escolha um módulo em Aplica-se a.",
         "checkSchedule": "Verifique o agendamento e guarde novamente."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Prolongada até {time}",
       "extendedFollowUp": "{name} criada, ativa até {time}",
       "extendFailed": "Não foi possível prolongar a indisponibilidade",
+      "reload": "Recarregar",
       "deleted": "Indisponibilidade excluída",
       "deleteFailed": "Não foi possível excluir a indisponibilidade",
       "created": "Indisponibilidade criada",

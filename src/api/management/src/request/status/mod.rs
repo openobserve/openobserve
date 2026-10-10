@@ -1853,8 +1853,19 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "org_users" => db::org_users::cache().await,
         "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
-        "downtimes" => db::downtimes::cache().await,
+        "downtimes" => {
+            reload_downtimes(enterprise_value!(false, get_o2_config().downtimes.enabled)).await
+        }
         _ => Err(anyhow::anyhow!("unsupported module")),
+    }
+}
+
+/// With the flag off the cache stays empty, so no evaluation or SLO pass reads a downtime.
+async fn reload_downtimes(enabled: bool) -> Result<(), anyhow::Error> {
+    if enabled {
+        db::downtimes::cache().await
+    } else {
+        Ok(())
     }
 }
 
@@ -1928,6 +1939,12 @@ mod tests {
     use serde_json;
 
     use super::*;
+
+    #[tokio::test]
+    async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
+        reload_downtimes(false).await.unwrap();
+        assert!(db::downtimes::all_cached().is_empty());
+    }
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]

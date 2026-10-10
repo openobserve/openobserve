@@ -73,6 +73,7 @@ const makeRouter = () =>
     routes: [
       { path: "/downtimes", name: "downtimes", component: { template: "<div />" } },
       { path: "/downtimes/add", name: "addDowntime", component: AddDowntime },
+      { path: "/downtimes/:id/edit", name: "editDowntime", component: AddDowntime },
       { path: "/downtimes/:id", name: "downtimeDetail", component: { template: "<div />" } },
     ],
   });
@@ -343,6 +344,77 @@ describe("AddDowntime", () => {
     const day = wrapper.get(`[data-test="downtime-schedule-weekday-${isoWeekday(today)}"]`);
     expect(day.attributes("data-state")).toBe("on");
     expect(wrapper.find('[data-test="downtime-schedule-starts-on"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+  it("sends the loaded version on an edit and offers a reload when the row moved meanwhile", async () => {
+    const stored = (version: number, name: string) => ({
+      id: "d1",
+      org: "default",
+      folder_id: "default",
+      name,
+      targets: [{ module: "alerts", folders: { kind: "all" }, ids: ["a1"] }],
+      schedule: {
+        repeat: "none",
+        starts_at: (Date.now() + 3_600_000) * 1000,
+        ends_at: (Date.now() + 7_200_000) * 1000,
+        timezone: "UTC",
+        duration_secs: 3600,
+        weekdays: [],
+      },
+      show_banner: true,
+      created_by: "lin",
+      created_at: 1,
+      updated_by: "lin",
+      updated_at: version,
+      version,
+      status: "scheduled",
+      current_window: null,
+      next_window: null,
+      matched_alerts: 1,
+      matched_anomalies: 0,
+      matched_synthetics: 0,
+      matched_slos: 0,
+      affected: { alerts: [], anomalies: [], synthetics: [], slos: [] },
+    });
+    vi.mocked(downtimes.get).mockResolvedValue({ data: stored(3, "Mine") } as any);
+    vi.mocked(downtimes.update).mockReset();
+    vi.mocked(downtimes.update).mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          message: "Someone changed this downtime since you loaded it. Reload and try again.",
+        },
+      },
+    });
+    const router = makeRouter();
+    await router.push({
+      name: "editDowntime",
+      params: { id: "d1" },
+      query: { org_identifier: "default", folder: "default" },
+    });
+    await router.isReady();
+    const wrapper = mount(AddDowntime, {
+      global: { plugins: [store, router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    await save(wrapper);
+    expect(downtimes.update).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(downtimes.update).mock.calls[0][2].version).toBe(3);
+    const banner = wrapper.get('[data-test="add-downtime-stale-banner"]');
+    expect(banner.text()).toContain("Someone changed this downtime since you loaded it.");
+
+    vi.mocked(downtimes.get).mockResolvedValue({ data: stored(4, "Theirs") } as any);
+    vi.mocked(downtimes.update).mockResolvedValueOnce({ data: {} } as any);
+    await wrapper.get('[data-test="add-downtime-reload"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="add-downtime-stale-banner"]').exists()).toBe(false);
+    expect(wrapper.get('[data-test="add-downtime-name-value"]').text()).toBe("Theirs");
+
+    await save(wrapper);
+    expect(downtimes.update).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(downtimes.update).mock.calls[1][2].version).toBe(4);
     wrapper.unmount();
   });
 });

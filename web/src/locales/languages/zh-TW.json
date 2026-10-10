@@ -9034,6 +9034,8 @@
         "cancel": "取消",
         "save": "儲存",
         "activeBanner": "此停機時段已生效。編輯會在下一次評估時生效，而變更 SLO 模式會重新計算已開始的視窗。",
+        "changedMeanwhile": "自您載入後，有人變更了此停機時段。請重新載入後再試一次。",
+        "reload": "重新載入",
         "noModule": "請在「適用於」中選擇模組。",
         "checkSchedule": "請檢查排程，然後再次儲存。"
       },
@@ -18166,6 +18168,7 @@
       "extended": "已延長至 {time}",
       "extendedFollowUp": "已建立 {name}，執行至 {time}",
       "extendFailed": "無法延長停機時間",
+      "reload": "重新載入",
       "deleted": "停機時間已刪除",
       "deleteFailed": "無法刪除停機時間",
       "created": "停機時間已建立",

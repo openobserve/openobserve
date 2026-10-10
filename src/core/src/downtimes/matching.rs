@@ -18,7 +18,8 @@
 use std::collections::{HashMap, HashSet};
 
 use config::meta::downtimes::{
-    DimensionCondition, DowntimeTarget, PreviewMatch, PreviewResponse, TargetFolders, TargetModule,
+    DimensionCondition, DowntimeTarget, LogicalOp, PairOperator, PreviewMatch, PreviewResponse,
+    TargetFolders, TargetModule,
 };
 use o2_enterprise::enterprise::downtimes::scope::{self, TargetItem};
 
@@ -171,7 +172,9 @@ pub fn match_module(
             out.at_fire_time.push(item.preview());
         } else if scope::eval_condition(cond, &item.dims) {
             out.matched.push(matched(target, Some(cond), item));
-        } else if let Some(key) = scope::undecidable_key(cond, &item.dims) {
+        } else if !ruled_out(cond, &item.dims)
+            && let Some(key) = scope::undecidable_key(cond, &item.dims)
+        {
             out.undecidable.push(PreviewMatch {
                 missing: Some(key),
                 ..item.preview()
@@ -227,6 +230,23 @@ pub fn to_preview(matches: &Matches, visibility: &Visibility) -> PreviewResponse
     }
 }
 
+/// An `=` pair every match must hold that the item's own value fails, whatever the `Or` keys say.
+fn ruled_out(cond: &DimensionCondition, dims: &HashMap<String, String>) -> bool {
+    match cond {
+        DimensionCondition::Group {
+            op: LogicalOp::And,
+            items,
+        } => items.iter().any(|c| ruled_out(c, dims)),
+        DimensionCondition::Group { .. } => false,
+        DimensionCondition::Pair {
+            key,
+            operator: PairOperator::Eq,
+            ..
+        } => dims.contains_key(key) && !scope::eval_condition(cond, dims),
+        DimensionCondition::Pair { .. } => false,
+    }
+}
+
 fn matched(
     target: &DowntimeTarget,
     condition: Option<&DimensionCondition>,
@@ -258,8 +278,6 @@ fn slo_matched_by(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::downtimes::{LogicalOp, PairOperator};
-
     use super::*;
 
     fn dims(pairs: &[(&str, &str)]) -> HashMap<String, String> {
@@ -343,6 +361,27 @@ mod tests {
         assert_eq!(ids(&got.matched), ["a1"]);
         assert_eq!(ids(&got.undecidable), ["a2"]);
         assert_eq!(got.undecidable[0].missing.as_deref(), Some("host"));
+    }
+
+    #[test]
+    fn an_alert_the_and_pairs_rule_out_is_not_undecidable() {
+        let cond = DimensionCondition::Group {
+            op: LogicalOp::And,
+            items: vec![
+                eq("service", "payments-api"),
+                DimensionCondition::Group {
+                    op: LogicalOp::Or,
+                    items: vec![eq("host", "node-1")],
+                },
+            ],
+        };
+        let items = vec![
+            item("web", "default", &[("service", "web-server")]),
+            item("pay", "default", &[("service", "payments-api")]),
+        ];
+        let got = match_module(&target(TargetModule::Alerts), Some(&cond), &items);
+        assert!(got.matched.is_empty());
+        assert_eq!(ids(&got.undecidable), ["pay"]);
     }
 
     #[test]

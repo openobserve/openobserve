@@ -232,6 +232,9 @@ pub struct DowntimeRequest {
     pub show_banner: bool,
     #[serde(default)]
     pub notifications: Option<DowntimeNotifications>,
+    /// The version the edit was loaded at; a newer stored row makes the edit a 409.
+    #[serde(default)]
+    pub version: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -531,6 +534,9 @@ pub struct ExtendDowntimeRequest {
     /// The new end, microseconds UTC.
     #[serde(default)]
     pub until: Option<i64>,
+    /// The version the row was loaded at; a newer stored row makes the extension a 409.
+    #[serde(default)]
+    pub version: Option<i64>,
 }
 
 /// The row that now ends later: the extended one-time row, or the follow-up of a recurring one.

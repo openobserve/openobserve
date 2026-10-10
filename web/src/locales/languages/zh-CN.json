@@ -9039,6 +9039,8 @@
         "cancel": "取消",
         "save": "保存",
         "activeBanner": "此静默时段已生效。编辑将在下次评估时生效，而更改 SLO 模式会重新计算已开始的窗口。",
+        "changedMeanwhile": "自您加载后，有人更改了此静默时段。请重新加载后重试。",
+        "reload": "重新加载",
         "noModule": "请在“适用于”中选择一个模块。",
         "checkSchedule": "请检查计划，然后再次保存。"
       },
@@ -18171,6 +18173,7 @@
       "extended": "已延长至 {time}",
       "extendedFollowUp": "已创建 {name}，运行至 {time}",
       "extendFailed": "无法延长停机",
+      "reload": "重新加载",
       "deleted": "停机已删除",
       "deleteFailed": "无法删除停机",
       "created": "停机已创建",

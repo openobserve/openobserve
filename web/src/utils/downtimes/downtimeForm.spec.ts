@@ -94,6 +94,13 @@ describe("buildDowntimeRequest", () => {
     });
   });
 
+  it("sends back the version an edit loaded, and none for a row without one", () => {
+    const edited = buildDowntimeRequest(downtimeToFormValues({ ...flow1, version: 4 }));
+    expect(edited.version).toBe(4);
+    expect("version" in buildDowntimeRequest(downtimeToFormValues(flow1))).toBe(false);
+    expect("version" in buildDowntimeRequest(defaultDowntimeValues(NOW, "UTC"))).toBe(false);
+  });
+
   it("sends no SLOs target unless the SLOs module is chosen, and sends its mode", () => {
     const values = defaultDowntimeValues(NOW, "UTC");
     expect(buildDowntimeRequest(values).targets.some((t) => t.module === "slos")).toBe(false);

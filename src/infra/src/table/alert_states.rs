@@ -128,18 +128,38 @@ pub async fn set_last_downtime_id_with<C: sea_orm::ConnectionTrait>(
     alert_id: &str,
     downtime_id: Option<&str>,
 ) -> Result<u64, errors::Error> {
-    let mut update = alert_states::Entity::update_many()
-        .col_expr(
-            alert_states::Column::LastDowntimeId,
-            sea_orm::sea_query::Expr::value(downtime_id.map(str::to_string)),
+    let Some(downtime_id) = downtime_id else {
+        let res = alert_states::Entity::update_many()
+            .col_expr(
+                alert_states::Column::LastDowntimeId,
+                sea_orm::sea_query::Expr::value(Option::<String>::None),
+            )
+            .filter(alert_states::Column::AlertId.eq(alert_id))
+            .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY))
+            .filter(alert_states::Column::LastDowntimeId.is_not_null())
+            .exec(conn)
+            .await?;
+        return Ok(res.rows_affected);
+    };
+    // A real-time alert never runs through the scheduler, so its rollup row may not exist yet.
+    let row = alert_states::ActiveModel {
+        alert_id: Set(alert_id.to_string()),
+        group_key: Set(ROLLUP_GROUP_KEY.to_string()),
+        last_downtime_id: Set(Some(downtime_id.to_string())),
+        ..Default::default()
+    };
+    let res = alert_states::Entity::insert(row)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns([
+                alert_states::Column::AlertId,
+                alert_states::Column::GroupKey,
+            ])
+            .update_column(alert_states::Column::LastDowntimeId)
+            .to_owned(),
         )
-        .filter(alert_states::Column::AlertId.eq(alert_id))
-        .filter(alert_states::Column::GroupKey.eq(ROLLUP_GROUP_KEY));
-    if downtime_id.is_none() {
-        update = update.filter(alert_states::Column::LastDowntimeId.is_not_null());
-    }
-    let res = update.exec(conn).await?;
-    Ok(res.rows_affected)
+        .exec_without_returning(conn)
+        .await?;
+    Ok(res)
 }
 
 /// Forgets a downtime every alert recorded; returns those alerts, whose mute the caller closes.
@@ -1776,6 +1796,50 @@ mod tests {
         );
         let ids = vec!["alert-1".to_string()];
         assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_mute_of_an_alert_with_no_state_row_creates_its_rollup_row() {
+        let db = db().await;
+        set_last_downtime_id_with(&db, "realtime-1", Some("dt"))
+            .await
+            .unwrap();
+        let ids = vec!["realtime-1".to_string()];
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.get("realtime-1").map(String::as_str), Some("dt"));
+        let row = get_with(&db, "realtime-1", ROLLUP_GROUP_KEY)
+            .await
+            .unwrap()
+            .expect("the rollup row is inserted");
+        assert_eq!(
+            row.last_outcome, None,
+            "the other columns keep their defaults"
+        );
+        assert_eq!(row.level, None);
+
+        // A second mute updates the row it made, and a clear leaves no record.
+        set_last_downtime_id_with(&db, "realtime-1", Some("dt-2"))
+            .await
+            .unwrap();
+        let found = last_downtime_ids_with(&db, &ids).await.unwrap();
+        assert_eq!(found.get("realtime-1").map(String::as_str), Some("dt-2"));
+        assert_eq!(
+            set_last_downtime_id_with(&db, "realtime-1", None)
+                .await
+                .unwrap(),
+            1
+        );
+        assert!(last_downtime_ids_with(&db, &ids).await.unwrap().is_empty());
+        // A clear of an alert with no row inserts nothing.
+        set_last_downtime_id_with(&db, "never-ran", None)
+            .await
+            .unwrap();
+        assert!(
+            get_with(&db, "never-ran", ROLLUP_GROUP_KEY)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     /// The episode axis has to survive the UPDATE half of the upsert, not only

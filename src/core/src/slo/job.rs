@@ -1210,12 +1210,8 @@ async fn measure_range(
 
 /// The downtime windows over `[start, end)`; none without a cached downtime that targets SLOs.
 async fn correction_windows(slo: &Slo, start: i64, end: i64) -> Vec<CorrectionWindow> {
-    let corrects_slos = db::downtimes::list_cached(&slo.org).iter().any(|row| {
-        row.targets
-            .iter()
-            .any(|target| target.module == TargetModule::Slos)
-    });
-    if !corrects_slos {
+    let rows = db::downtimes::list_cached(&slo.org);
+    if !corrects_slos(crate::alerts::downtimes::enabled(), &rows) {
         return Vec::new();
     }
     let dims = crate::alerts::downtimes::dimensions_for_slo(slo).await;
@@ -1225,6 +1221,16 @@ async fn correction_windows(slo: &Slo, start: i64, end: i64) -> Vec<CorrectionWi
         start.saturating_mul(1_000_000),
         end.saturating_mul(1_000_000),
     )
+}
+
+/// With downtimes off, rows left in the cache correct nothing, as before the feature existed.
+fn corrects_slos(enabled: bool, rows: &[config::meta::downtimes::Downtime]) -> bool {
+    enabled
+        && rows.iter().any(|row| {
+            row.targets
+                .iter()
+                .any(|target| target.module == TargetModule::Slos)
+        })
 }
 
 /// One delta per group; a corrected slice counts as covered and adds `0 / 0`.
@@ -2350,5 +2356,52 @@ mod downtime_correction_tests {
         let without = trailing_rollup_sql("slo1", 1, 0, 3_600, false);
         assert!(!without.contains("corrected_by"), "{without}");
         assert!(without.contains("group_key = ''"), "{without}");
+    }
+
+    #[test]
+    fn with_downtimes_off_a_cached_slo_downtime_corrects_nothing() {
+        use config::meta::downtimes::{
+            Downtime, DowntimeSchedule, DowntimeTarget, Repeat, TargetFolders,
+        };
+
+        let row = Downtime {
+            id: "d1".to_string(),
+            org: "acme".to_string(),
+            folder_id: "default".to_string(),
+            name: "d1".to_string(),
+            reason: None,
+            condition: None,
+            targets: vec![DowntimeTarget {
+                module: TargetModule::Slos,
+                folders: TargetFolders::All,
+                tags: vec![],
+                ids: vec![],
+                slo_mode: None,
+                incident_mode: Default::default(),
+            }],
+            schedule: DowntimeSchedule {
+                repeat: Repeat::None,
+                starts_at: 0,
+                ends_at: Some(3_600_000_000),
+                timezone: "UTC".to_string(),
+                start_time_local: None,
+                duration_secs: 3_600,
+                weekdays: vec![],
+            },
+            cancelled_at: None,
+            cancelled_by: None,
+            show_banner: false,
+            notifications: None,
+            origin_region: None,
+            version: 1,
+            created_by: "lin".to_string(),
+            created_at: 0,
+            updated_by: "lin".to_string(),
+            updated_at: 0,
+        };
+        let rows = [row];
+        assert!(!corrects_slos(false, &rows));
+        assert!(corrects_slos(true, &rows));
+        assert!(!corrects_slos(true, &[]));
     }
 }

@@ -415,15 +415,26 @@ async fn downtime_usage(org_id: &str) -> Result<Vec<DestinationUse>, Destination
     let rows = cached
         .iter()
         .chain(stored.iter().filter(|d| !ids.contains(d.id.as_str())));
-    Ok(downtime_uses(rows))
+    Ok(downtime_uses(rows, config::utils::time::now_micros()))
 }
 
+/// Only a row that can still notify holds its destinations; ended and cancelled rows never send.
 #[cfg(feature = "enterprise")]
 fn downtime_uses<'a>(
     rows: impl Iterator<Item = &'a config::meta::downtimes::Downtime>,
+    now: i64,
 ) -> Vec<DestinationUse> {
+    use config::meta::downtimes::DowntimeStatus;
+    use o2_enterprise::enterprise::downtimes::schedule;
+
     let mut uses = Vec::new();
-    for row in rows {
+    let live = rows.filter(|row| {
+        matches!(
+            schedule::status(&row.schedule, row.cancelled_at, now),
+            DowntimeStatus::Scheduled | DowntimeStatus::Active
+        )
+    });
+    for row in live {
         let names = row
             .notifications
             .as_ref()
@@ -971,7 +982,7 @@ mod tests {
                 ..row("d3", "Quiet", &[])
             },
         ];
-        let uses = downtime_uses(rows.iter());
+        let uses = downtime_uses(rows.iter(), 0);
         let pagerduty: Vec<DestinationUse> = uses
             .into_iter()
             .filter(|u| u.destination_name == "pagerduty")
@@ -983,7 +994,7 @@ mod tests {
             usage_message("pagerduty", &pagerduty),
             "'pagerduty' is used by 1 downtime (Nightly deploy)"
         );
-        let slack: Vec<DestinationUse> = downtime_uses(rows.iter())
+        let slack: Vec<DestinationUse> = downtime_uses(rows.iter(), 0)
             .into_iter()
             .filter(|u| u.destination_name == "slack")
             .collect();
@@ -991,6 +1002,13 @@ mod tests {
             usage_message("slack", &slack),
             "'slack' is used by 2 downtimes (Nightly deploy, DB failover)"
         );
+        // Ended at 2, then cancelled before its start: neither holds `slack` any more.
+        assert!(downtime_uses(rows.iter(), 2).is_empty());
+        let cancelled = Downtime {
+            cancelled_at: Some(0),
+            ..row("d4", "Called off", &["slack"])
+        };
+        assert!(downtime_uses([cancelled].iter(), 0).is_empty());
     }
 
     #[test]

@@ -39,6 +39,8 @@ use config::{
 const UNKNOWN_SERVICE: &str = "unknown";
 /// Window behind the alert in which a service-graph edge counts as a dependency.
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
+/// How many of an alert's latest firings a Firing run after a window looks through for open pages.
+const MUTED_RESOLVES_SCANNED: u64 = 10;
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -1033,6 +1035,31 @@ pub async fn recover_after_muted_resolve(
     }
     o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, &incident.id)
         .await?;
+    Ok(())
+}
+
+/// [recover_after_muted_resolve] for a Firing run, which may already have opened a newer incident.
+pub async fn recover_muted_resolves(org_id: &str, alert_id: &str) -> Result<(), anyhow::Error> {
+    if !o2_enterprise::enterprise::oncall::is_enabled() {
+        return Ok(());
+    }
+    let resolved = infra::table::alert_incidents::resolved_incidents_for_alert(
+        org_id,
+        alert_id,
+        MUTED_RESOLVES_SCANNED,
+    )
+    .await?;
+    for incident_id in resolved {
+        let records =
+            infra::table::oncall_responses::list_for_incident(org_id, &incident_id).await?;
+        if holds_open_record(&records) {
+            o2_enterprise::enterprise::oncall::escalation::recover_for_incident(
+                org_id,
+                &incident_id,
+            )
+            .await?;
+        }
+    }
     Ok(())
 }
 
@@ -2895,6 +2922,11 @@ async fn model_to_incident(
     Ok(model_to_incident_with_topology(db_model, topology))
 }
 
+/// A record still open on a resolved incident is the page a muted resolve left escalating.
+fn holds_open_record(records: &[config::meta::oncall::Response]) -> bool {
+    records.iter().any(|record| !record.state.is_terminal())
+}
+
 /// Only a resolve can clear a mute, and only an org with downtimes can have one.
 fn reads_mute_before(status: &str, downtimes_enabled: bool) -> bool {
     downtimes_enabled && status == "resolved"
@@ -3586,6 +3618,43 @@ mod tests {
         assert_eq!(mute_change(Some("dt-1"), None), MuteChange::Keep);
         assert_eq!(mute_change(None, Some("dt-1")), MuteChange::Unmute("dt-1"));
         assert_eq!(mute_change(None, None), MuteChange::Keep);
+    }
+
+    #[test]
+    fn only_a_resolved_incident_with_an_open_record_is_recovered_after_the_window() {
+        use config::meta::oncall::{
+            ResponderRole, Response, ResponseState, SubjectRef, SubjectType,
+        };
+        let record = |state| Response {
+            id: "resp_1".into(),
+            org_id: "acme".into(),
+            subject: SubjectRef::new(SubjectType::Alert, "al_1", 1),
+            team_id: Some("team_1".into()),
+            title: None,
+            cause: None,
+            cause_note: None,
+            snoozed_until: None,
+            ladder_anchor: None,
+            ladder_run: None,
+            priority: 2,
+            responder_role: ResponderRole::Owner,
+            exhausted_at: None,
+            origin_response_id: None,
+            state,
+            opened_at: 0,
+            acked_by: None,
+            acked_at: None,
+            closed_at: None,
+            incident_id: Some("inc_1".into()),
+            updated_at: 0,
+        };
+        assert!(holds_open_record(&[record(ResponseState::Triggered)]));
+        assert!(holds_open_record(&[
+            record(ResponseState::Resolved),
+            record(ResponseState::Acknowledged)
+        ]));
+        assert!(!holds_open_record(&[record(ResponseState::Resolved)]));
+        assert!(!holds_open_record(&[]));
     }
 
     #[test]

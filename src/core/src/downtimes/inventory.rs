@@ -28,8 +28,9 @@ use config::meta::{
     slo::{SliConfig, Slo},
     synthetics::ListSyntheticsParams,
 };
+use infra::table::entity::alert_composites;
 use o2_enterprise::enterprise::{
-    downtimes::scope::{anomaly_dimensions, slo_dimensions},
+    downtimes::scope::{anomaly_dimensions, composite_dimensions, slo_dimensions},
     oncall::routing::dimensions_for_alert,
 };
 
@@ -65,9 +66,13 @@ pub async fn cached(org: &str) -> Result<Arc<Inventory>, anyhow::Error> {
 pub async fn load(org: &str) -> Result<Inventory, anyhow::Error> {
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     let alerts = cached_alerts(org).await;
-    let slos = infra::table::slos::list(infra::db::get_orm_client_ro().await, org, None).await?;
+    let conn = infra::db::get_orm_client_ro().await;
+    let slos = infra::table::slos::list(conn, org, None).await?;
+    let composites = infra::table::alert_composites::list_by_org(conn, org).await?;
+    let mut alert_items = alert_items(&alerts, &slos, &groups);
+    alert_items.extend(composites.iter().map(composite_item));
     Ok(Inventory {
-        alerts: alert_items(&alerts, &slos, &groups),
+        alerts: alert_items,
         anomalies: anomaly_items(org, &groups).await?,
         synthetics: synthetic_items(org).await?,
         slos: slos
@@ -112,6 +117,23 @@ fn alert_items(alerts: &[(Folder, Alert)], slos: &[Slo], groups: &[FieldAlias]) 
             })
         })
         .collect()
+}
+
+/// Composites are not in `ALERTS`; their `key:value` tags are their identity, as at run time.
+fn composite_item(composite: &alert_composites::Model) -> Item {
+    let tags: Vec<String> = composite
+        .tags
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    Item {
+        id: composite.id.clone(),
+        name: composite.name.clone(),
+        folder_id: composite.folder_id.clone(),
+        dims: composite_dimensions(&tags),
+        tags,
+        ..Default::default()
+    }
 }
 
 fn slo_item(slo: &Slo, groups: &[FieldAlias], alerts: &[(Folder, Alert)]) -> Item {
@@ -189,4 +211,73 @@ async fn synthetic_items(org: &str) -> Result<Vec<Item>, anyhow::Error> {
             ..Default::default()
         })
         .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::downtimes::{DowntimeTarget, TargetFolders, TargetModule};
+
+    use super::*;
+    use crate::downtimes::matching::{Visibility, match_all, to_preview};
+
+    fn composite(id: &str, folder_id: &str, tags: &[&str]) -> alert_composites::Model {
+        alert_composites::Model {
+            id: id.to_string(),
+            org: "acme".to_string(),
+            folder_id: folder_id.to_string(),
+            name: format!("{id} name"),
+            description: None,
+            expression: "a AND b".to_string(),
+            warning_counts_as_firing: false,
+            stale_child_policy: 0,
+            destinations: serde_json::json!([]),
+            template: None,
+            context_attributes: None,
+            enabled: true,
+            silence_seconds: 0,
+            creates_incident: false,
+            workflows: serde_json::json!([]),
+            priority: None,
+            tags: Some(serde_json::json!(tags)),
+            owner: None,
+            last_edited_by: None,
+            updated_at: None,
+            evaluation_generation: 0,
+            pending_period_sec: 0,
+        }
+    }
+
+    #[test]
+    fn a_composite_is_an_alert_item_whose_tags_are_its_identity() {
+        let item = composite_item(&composite("c1", "ops", &["service:payments", "critical"]));
+        assert_eq!(item.id, "c1");
+        assert_eq!(item.folder_id, "ops");
+        assert_eq!(item.tags, ["service:payments", "critical"]);
+        assert_eq!(item.dims, composite_dimensions(&item.tags));
+        assert!(!item.dims.is_empty());
+    }
+
+    #[test]
+    fn a_composite_named_by_id_is_found_and_previewed_under_its_folder() {
+        let inventory = Inventory {
+            alerts: vec![composite_item(&composite("c1", "ops", &[]))],
+            ..Default::default()
+        };
+        assert!(inventory.find(TargetModule::Alerts, "c1").is_some());
+        let targets = [DowntimeTarget {
+            module: TargetModule::Alerts,
+            folders: TargetFolders::All,
+            tags: vec![],
+            ids: vec!["c1".to_string()],
+            slo_mode: None,
+            incident_mode: Default::default(),
+        }];
+        let preview = to_preview(
+            &match_all(&inventory, None, &targets),
+            &Visibility::default(),
+        );
+        assert_eq!(preview.alerts_total, 1);
+        assert_eq!(preview.alerts[0].id, "c1");
+        assert_eq!(preview.alerts[0].folder_id, "ops");
+    }
 }

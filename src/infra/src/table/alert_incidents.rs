@@ -635,6 +635,54 @@ pub async fn latest_incident_for_alert(
     get(org_id, &link.incident_id).await
 }
 
+/// The resolved incidents among the alert's `limit` latest firings, newest first.
+pub async fn resolved_incidents_for_alert(
+    org_id: &str,
+    alert_id: &str,
+    limit: u64,
+) -> Result<Vec<String>, errors::Error> {
+    resolved_incidents_for_alert_with(get_orm_client_ro().await, org_id, alert_id, limit).await
+}
+
+/// [`resolved_incidents_for_alert`] against a caller-supplied connection.
+pub async fn resolved_incidents_for_alert_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_id: &str,
+    limit: u64,
+) -> Result<Vec<String>, errors::Error> {
+    let links: Vec<String> = alert_incident_alerts::Entity::find()
+        .select_only()
+        .column(alert_incident_alerts::Column::IncidentId)
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .order_by_desc(alert_incident_alerts::Column::AlertFiredAt)
+        .limit(limit)
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let mut ids: Vec<String> = Vec::with_capacity(links.len());
+    for id in links {
+        if !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+    if ids.is_empty() {
+        return Ok(ids);
+    }
+    let resolved: Vec<String> = alert_incidents::Entity::find()
+        .select_only()
+        .column(alert_incidents::Column::Id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.eq("resolved"))
+        .filter(alert_incidents::Column::Id.is_in(ids.clone()))
+        .into_tuple()
+        .all(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(ids.into_iter().filter(|id| resolved.contains(id)).collect())
+}
+
 /// Get actual alert counts for multiple incidents (source of truth)
 ///
 /// Returns a HashMap of incident_id -> actual_count from junction table.
@@ -999,6 +1047,62 @@ mod tests {
         let stmt = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
         db.execute(backend.build(&stmt)).await.unwrap();
         db
+    }
+
+    /// An incident in `status` that alert `a1` fired into at `fired_at`.
+    async fn fired_into(db: &DatabaseConnection, status: &str, fired_at: i64) -> String {
+        let mut incident = new_incident(
+            "acme",
+            "P2",
+            serde_json::json!({"service": "payments"}),
+            "service",
+            fired_at,
+            None,
+            None,
+        );
+        incident.status = Set(status.to_string());
+        let incident = incident.insert(db).await.unwrap();
+        alert_incident_alerts::ActiveModel {
+            incident_id: Set(incident.id.clone()),
+            alert_id: Set("a1".to_string()),
+            alert_fired_at: Set(fired_at),
+            alert_name: Set("a1".to_string()),
+            alert_kind: Set("alert".to_string()),
+            correlation_reason: Set(None),
+            created_at: Set(fired_at),
+            resolved_at: Set(None),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+        incident.id
+    }
+
+    #[tokio::test]
+    async fn a_firing_after_the_window_finds_the_resolved_incidents_but_not_the_open_one() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        let oldest = fired_into(&db, "resolved", 1).await;
+        let quiet = fired_into(&db, "resolved", 2).await;
+        let open = fired_into(&db, "open", 3).await;
+
+        let found = resolved_incidents_for_alert_with(&db, "acme", "a1", 10)
+            .await
+            .unwrap();
+        assert_eq!(found, [quiet.clone(), oldest]);
+        assert!(!found.contains(&open));
+        let latest_two = resolved_incidents_for_alert_with(&db, "acme", "a1", 2)
+            .await
+            .unwrap();
+        assert_eq!(latest_two, [quiet]);
+        assert!(
+            resolved_incidents_for_alert_with(&db, "other", "a1", 10)
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     async fn muted_incident(db: &DatabaseConnection, downtime_id: &str) -> alert_incidents::Model {

@@ -91,6 +91,8 @@ export interface Downtime {
   created_at: number;
   updated_by: string;
   updated_at: number;
+  /** Bumped by every write; an edit that sends the version it loaded is refused once it moved. */
+  version?: number;
 }
 
 export interface DowntimeWindow {
@@ -154,10 +156,14 @@ export interface DowntimeRequest {
   schedule: DowntimeSchedule;
   show_banner: boolean;
   notifications?: DowntimeNotifications;
+  /** The loaded row's version; a newer stored row answers 409. */
+  version?: number;
 }
 
-/** Exactly one of the two. */
-export type ExtendDowntimeRequest = { by_secs: number } | { until: number };
+/** Exactly one of the two, with the loaded row's version when known. */
+export type ExtendDowntimeRequest = ({ by_secs: number } | { until: number }) & {
+  version?: number;
+};
 
 /** The row that now ends later; for a recurring row, the one-time follow-up it created. */
 export interface ExtendDowntimeResponse extends Downtime {

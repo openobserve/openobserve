@@ -111,6 +111,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
+      <div v-if="staleMessage" class="shrink-0 px-3 pt-2">
+        <OBanner
+          variant="warning"
+          dense
+          inline-actions
+          :content="staleMessage"
+          data-test="add-downtime-stale-banner"
+        >
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              :loading="detailQuery.isFetching.value"
+              data-test="add-downtime-reload"
+              @click="reloadRow"
+            >
+              {{ t("alerts.downtimes.form.reload") }}
+            </OButton>
+          </template>
+        </OBanner>
+      </div>
+
       <div v-if="editStatus === 'active'" class="shrink-0 px-3 pt-2">
         <OBanner
           variant="info"
@@ -357,7 +379,12 @@ import {
   downtimePreviewQuery,
   saveDowntimeMutation,
 } from "@/services/downtimes.queries";
-import type { DowntimeStatus, PreviewRequest, TargetModule } from "@/services/downtimes";
+import type {
+  DowntimeDetail,
+  DowntimeStatus,
+  PreviewRequest,
+  TargetModule,
+} from "@/services/downtimes";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import { useToast } from "@/lib/feedback/Toast/useToast";
@@ -508,6 +535,8 @@ const MATCHED_KEYS = {
   slos: "alerts.downtimes.matched.slos",
 } as const satisfies Record<TargetModule, I18nKey>;
 
+const staleMessage = ref<I18nText | null>(null);
+
 const save = async (submitted: DowntimeFormValues) => {
   const body = buildDowntimeRequest(submitted);
   try {
@@ -524,6 +553,12 @@ const save = async (submitted: DowntimeFormValues) => {
       query: { org_identifier: orgId.value, folder: body.folder_id },
     });
   } catch (err: any) {
+    // An edit of a row that moved since it loaded keeps the user's changes and offers a reload.
+    if (isEdit.value && err?.response?.status === 409) {
+      staleMessage.value =
+        raw(err?.response?.data?.message) || t("alerts.downtimes.form.changedMeanwhile");
+      return;
+    }
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("toastMessages.downtimes.saveFailed"),
@@ -597,18 +632,33 @@ const noFolder = computed(() => !isEdit.value && folderDefault.folderId.value ==
 // Edit and Duplicate load the saved row once; the condition builder remounts on it.
 const resetToken = ref(0);
 const loadedFrom = ref("");
+const loadRow = (row: DowntimeDetail) => {
+  loadedFrom.value = sourceId.value;
+  const loaded = downtimeToFormValues(row);
+  if (!isEdit.value) {
+    loaded.name = t("alerts.downtimes.copyOf", { name: row.name });
+    // A duplicate is a new row, so it carries no version to check.
+    loaded.version = undefined;
+  }
+  form.reset(loaded);
+  resetToken.value += 1;
+};
 watch(
   () => detailQuery.data.value,
   (row) => {
     if (!row || loadedFrom.value === sourceId.value) return;
-    loadedFrom.value = sourceId.value;
-    const loaded = downtimeToFormValues(row);
-    if (!isEdit.value) loaded.name = t("alerts.downtimes.copyOf", { name: row.name });
-    form.reset(loaded);
-    resetToken.value += 1;
+    loadRow(row);
   },
   { immediate: true },
 );
+
+// Reload replaces the form with the stored row, so the next save starts from its version.
+const reloadRow = async () => {
+  const { data } = await detailQuery.refetch();
+  if (!data) return;
+  staleMessage.value = null;
+  loadRow(data);
+};
 
 // Preview and resources are checked against the folder, so neither runs on a guessed one.
 const folderSettled = computed(() =>

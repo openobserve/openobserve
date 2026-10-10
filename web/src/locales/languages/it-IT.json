@@ -9039,6 +9039,8 @@
         "cancel": "Annulla",
         "save": "Salva",
         "activeBanner": "Questo downtime è attivo. Una modifica ha effetto alla prossima valutazione e un cambiamento della modalità SLO rimisura le finestre già avviate.",
+        "changedMeanwhile": "Qualcuno ha modificato questo downtime dopo che lo hai caricato. Ricarica e riprova.",
+        "reload": "Ricarica",
         "noModule": "Scegli un modulo in Si applica a.",
         "checkSchedule": "Controlla la pianificazione, poi salva di nuovo."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Esteso fino alle {time}",
       "extendedFollowUp": "Creato {name}, attivo fino alle {time}",
       "extendFailed": "Impossibile estendere il downtime",
+      "reload": "Ricarica",
       "deleted": "Downtime eliminato",
       "deleteFailed": "Impossibile eliminare il downtime",
       "created": "Downtime creato",

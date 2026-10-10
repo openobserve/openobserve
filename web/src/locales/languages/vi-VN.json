@@ -9039,6 +9039,8 @@
         "cancel": "Hủy",
         "save": "Lưu",
         "activeBanner": "Khoảng ngừng này đang hoạt động. Chỉnh sửa sẽ có hiệu lực ở lần đánh giá tiếp theo, và thay đổi chế độ SLO sẽ đo lại các cửa sổ đã bắt đầu.",
+        "changedMeanwhile": "Ai đó đã thay đổi khoảng ngừng này kể từ khi bạn tải nó. Hãy tải lại và thử lại.",
+        "reload": "Tải lại",
         "noModule": "Chọn một mô-đun trong Áp dụng cho.",
         "checkSchedule": "Kiểm tra lịch, sau đó lưu lại."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Đã gia hạn đến {time}",
       "extendedFollowUp": "Đã tạo {name}, chạy đến {time}",
       "extendFailed": "Không thể gia hạn thời gian ngừng",
+      "reload": "Tải lại",
       "deleted": "Đã xóa thời gian ngừng",
       "deleteFailed": "Không thể xóa thời gian ngừng",
       "created": "Đã tạo thời gian ngừng",

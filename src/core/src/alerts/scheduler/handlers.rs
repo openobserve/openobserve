@@ -91,7 +91,7 @@ async fn persist_alert_run_state(
     // Every delivery path persists here, the grouped, deduplicated and pending ones included.
     #[cfg(feature = "enterprise")]
     if clears_recorded_mute(outcome) {
-        record_last_downtime(&alert.org_id, alert_id, None).await;
+        clear_recorded_mute(&alert.org_id, alert_id).await;
     }
 
     // ── Per-group fan-out (M-1/M-2/M-3) ─────────────────────────────────────
@@ -2314,6 +2314,31 @@ pub(crate) async fn downtime_decision(
     })
 }
 
+/// [downtime_decision] on the definition, ignoring row `except` the cache may still show live.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn downtime_decision_except(
+    alert: &config::meta::alerts::alert::Alert,
+    folder_id: &str,
+    except: &str,
+    now: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    if !alert_downtimes_in(&alert.org_id) {
+        return None;
+    }
+    let alert_id = alert.id.as_ref()?.to_string();
+    let identity = downtime_identity(alert, &[]).await;
+    muted_in_every_group(&identity, |dims| {
+        crate::alerts::downtimes::active_for_alert_except(
+            &alert.org_id,
+            &alert_id,
+            folder_id,
+            dims,
+            now,
+            except,
+        )
+    })
+}
+
 /// The identity a downtime is matched on, shared by evaluation and the grouped flush.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn downtime_identity(
@@ -2698,6 +2723,16 @@ fn starts_silence_window(
         && !evaluates_through_silence
 }
 
+/// A pending run of an alert with silence stores no end time, as when silence was decided first.
+fn pending_stores_end_time(
+    should_store_last_end_time: bool,
+    silence_minutes: i64,
+    evaluates_through_silence: bool,
+) -> bool {
+    should_store_last_end_time
+        && !starts_silence_window(true, false, silence_minutes, evaluates_through_silence)
+}
+
 /// Whether this run moves `last_notified_level` and the delivery silence window.
 fn records_delivery_state(alert_level_delivery: bool, delivery: &DeliveryDecision) -> bool {
     alert_level_delivery && delivery.resets_silence()
@@ -2720,6 +2755,27 @@ pub(crate) async fn record_last_downtime(org: &str, alert_id: &str, downtime_id:
     }
     if let Err(e) = infra::table::alert_states::set_last_downtime_id(alert_id, downtime_id).await {
         log::warn!("[SCHEDULER] could not record the downtime of {alert_id}: {e}");
+    }
+}
+
+/// Drops the Muted chip; a record that existed means a muted resolve may have left a page open.
+#[cfg(feature = "enterprise")]
+async fn clear_recorded_mute(org: &str, alert_id: &str) {
+    if !alert_downtimes_in(org) {
+        return;
+    }
+    match infra::table::alert_states::set_last_downtime_id(alert_id, None).await {
+        Ok(0) => {}
+        Ok(_) => {
+            if let Err(e) = crate::alerts::incidents::recover_muted_resolves(org, alert_id).await {
+                log::error!(
+                    "[SCHEDULER] on-call recovery after the mute failed for {alert_id}: {e}"
+                );
+            }
+        }
+        Err(e) => {
+            log::warn!("[SCHEDULER] could not clear the recorded downtime of {alert_id}: {e}")
+        }
     }
 }
 
@@ -3396,11 +3452,12 @@ async fn handle_alert_triggers(
         )
     {
         trigger_data_stream.status = RunOutcome::Pending;
-        trigger_data.period_end_time = if should_store_last_end_time {
-            Some(trigger_results.end_time)
-        } else {
-            None
-        };
+        trigger_data.period_end_time = pending_stores_end_time(
+            should_store_last_end_time,
+            alert.trigger_condition.silence,
+            evaluates_through_silence,
+        )
+        .then_some(trigger_results.end_time);
         // A pending run was never delivered, so the next run keeps the cadence without silence.
         new_trigger.next_run_at =
             alert
@@ -8383,6 +8440,18 @@ mod tests {
         );
         assert!(!starts_silence_window(false, false, 10, false));
         assert!(!starts_silence_window(true, false, 10, true));
+    }
+
+    #[test]
+    fn a_pending_run_with_silence_stores_no_period_end_time() {
+        // Silence 10, pending 2, no downtime: the end time is re-derived, as on main.
+        assert!(!pending_stores_end_time(true, 10, false));
+        assert!(pending_stores_end_time(true, 0, false));
+        assert!(
+            pending_stores_end_time(true, 10, true),
+            "it evaluates through silence"
+        );
+        assert!(!pending_stores_end_time(false, 0, false));
     }
 
     #[test]

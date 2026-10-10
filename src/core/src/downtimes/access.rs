@@ -190,6 +190,9 @@ async fn check_target_folders(
     user_id: &str,
     target: &DowntimeTarget,
 ) -> Result<(), DowntimeError> {
+    if !needs_folder_check(target) {
+        return Ok(());
+    }
     let (folder_type, ofga_type) = folder_kind(target.module);
     let TargetFolders::Some { folder_ids } = &target.folders else {
         // All needs the role-wide LIST grant on every folder of the module.
@@ -266,6 +269,11 @@ async fn check_target_ids(
         }
     }
     Ok(())
+}
+
+/// Named ids narrow All to those items, and [check_target_ids] reads each of them.
+fn needs_folder_check(target: &DowntimeTarget) -> bool {
+    !matches!(target.folders, TargetFolders::All) || target.ids.is_empty()
 }
 
 /// The `(id, folder)` rows a ListObjects answer grants; a role-wide grant answers `_all_{org}`.
@@ -347,6 +355,28 @@ mod tests {
             all_folders_denied(TargetModule::Synthetics),
             "You cannot list every synthetics folder, so you cannot silence all of them."
         );
+    }
+
+    fn target(folders: TargetFolders, ids: &[&str]) -> DowntimeTarget {
+        DowntimeTarget {
+            module: TargetModule::Alerts,
+            folders,
+            tags: vec![],
+            ids: ids.iter().map(|id| id.to_string()).collect(),
+            slo_mode: None,
+            incident_mode: Default::default(),
+        }
+    }
+
+    #[test]
+    fn a_quick_mute_of_named_ids_needs_no_org_wide_list() {
+        assert!(!needs_folder_check(&target(TargetFolders::All, &["a1"])));
+        assert!(needs_folder_check(&target(TargetFolders::All, &[])));
+        let some = TargetFolders::Some {
+            folder_ids: vec!["ops".to_string()],
+        };
+        assert!(needs_folder_check(&target(some.clone(), &[])));
+        assert!(needs_folder_check(&target(some, &["a1"])));
     }
 
     #[test]

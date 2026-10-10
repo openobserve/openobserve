@@ -9039,6 +9039,8 @@
         "cancel": "Cancel",
         "save": "Save",
         "activeBanner": "This downtime is active. An edit takes effect at the next evaluation, and a change to the SLO mode re-measures the windows that already started.",
+        "changedMeanwhile": "Someone changed this downtime since you loaded it. Reload and try again.",
+        "reload": "Reload",
         "noModule": "Choose a module in Applies to.",
         "checkSchedule": "Check the schedule, then save again."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Extended until {time}",
       "extendedFollowUp": "Created {name}, running until {time}",
       "extendFailed": "Could not extend the downtime",
+      "reload": "Reload",
       "deleted": "Downtime deleted",
       "deleteFailed": "Could not delete the downtime",
       "created": "Downtime created",

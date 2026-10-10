@@ -9039,6 +9039,8 @@
         "cancel": "Cancelar",
         "save": "Guardar",
         "activeBanner": "Este periodo de inactividad está activo. Una edición surte efecto en la próxima evaluación, y un cambio en el modo de SLO vuelve a medir las ventanas que ya comenzaron.",
+        "changedMeanwhile": "Alguien cambió este periodo de inactividad desde que lo cargó. Recárguelo e inténtelo de nuevo.",
+        "reload": "Recargar",
         "noModule": "Elige un módulo en «Se aplica a».",
         "checkSchedule": "Revise la programación y vuelva a guardar."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Ampliado hasta {time}",
       "extendedFollowUp": "Se creó {name}, activo hasta {time}",
       "extendFailed": "No se pudo ampliar el tiempo de inactividad",
+      "reload": "Recargar",
       "deleted": "Tiempo de inactividad eliminado",
       "deleteFailed": "No se pudo eliminar el tiempo de inactividad",
       "created": "Tiempo de inactividad creado",

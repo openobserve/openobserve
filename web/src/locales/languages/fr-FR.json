@@ -9039,6 +9039,8 @@
         "cancel": "Annuler",
         "save": "Enregistrer",
         "activeBanner": "Cette indisponibilité est active. Une modification prend effet à la prochaine évaluation, et un changement du mode SLO recalcule les fenêtres déjà commencées.",
+        "changedMeanwhile": "Quelqu'un a modifié cette indisponibilité depuis que vous l'avez chargée. Rechargez et réessayez.",
+        "reload": "Recharger",
         "noModule": "Choisissez un module dans S'applique à.",
         "checkSchedule": "Vérifiez la planification, puis enregistrez à nouveau."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Prolongée jusqu'à {time}",
       "extendedFollowUp": "{name} créée, active jusqu'à {time}",
       "extendFailed": "Impossible de prolonger l'indisponibilité",
+      "reload": "Recharger",
       "deleted": "Indisponibilité supprimée",
       "deleteFailed": "Impossible de supprimer l'indisponibilité",
       "created": "Indisponibilité créée",

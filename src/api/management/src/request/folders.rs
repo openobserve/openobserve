@@ -67,6 +67,15 @@ fn folder_error_response(value: FolderError) -> Response {
     }
 }
 
+/// An old node never meets the downtimes folder type while the feature is off.
+fn refused_folder_type(
+    folder_type: config::meta::folder::FolderType,
+    downtimes_enabled: bool,
+) -> Option<Response> {
+    (folder_type == config::meta::folder::FolderType::Downtimes && !downtimes_enabled)
+        .then(|| MetaHttpResponse::forbidden("Downtimes are not enabled"))
+}
+
 #[cfg(feature = "enterprise")]
 fn downtimes_enabled() -> bool {
     openobserve_core::downtimes::ensure_enabled().is_ok()
@@ -116,9 +125,8 @@ pub async fn create_folder(
     axum::Json(body): axum::Json<CreateFolderRequestBody>,
 ) -> Response {
     let folder_type: config::meta::folder::FolderType = folder_type.into();
-    // An old node never meets the downtimes folder type while the feature is off.
-    if folder_type == config::meta::folder::FolderType::Downtimes && !downtimes_enabled() {
-        return MetaHttpResponse::forbidden("Downtimes are not enabled");
+    if let Some(refused) = refused_folder_type(folder_type, downtimes_enabled()) {
+        return refused;
     }
     let folder = body.into();
     match folders::save_folder(&org_id, folder, folder_type, false).await {
@@ -646,19 +654,14 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn a_downtimes_folder_is_forbidden_while_the_flag_is_off() {
-        let body = CreateFolderRequestBody {
-            name: "planned".to_string(),
-            description: String::new(),
-            icon: None,
-        };
-        let response = create_folder(
-            Path(("acme".to_string(), FolderType::Downtimes)),
-            axum::Json(body),
-        )
-        .await;
-        assert_eq!(response.status().as_u16(), 403);
+    #[test]
+    fn a_downtimes_folder_is_forbidden_while_the_flag_is_off() {
+        use config::meta::folder::FolderType as Stored;
+
+        let refused = refused_folder_type(Stored::Downtimes, false).expect("refused");
+        assert_eq!(refused.status().as_u16(), 403);
+        assert!(refused_folder_type(Stored::Downtimes, true).is_none());
+        assert!(refused_folder_type(Stored::Alerts, false).is_none());
     }
 
     #[test]

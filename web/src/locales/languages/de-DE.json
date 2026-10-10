@@ -9039,6 +9039,8 @@
         "cancel": "Abbrechen",
         "save": "Speichern",
         "activeBanner": "Dieses Wartungsfenster ist aktiv. Eine Bearbeitung wird bei der nächsten Auswertung wirksam, und eine Änderung des SLO-Modus bewertet die bereits begonnenen Fenster neu.",
+        "changedMeanwhile": "Jemand hat dieses Wartungsfenster geändert, seit Sie es geladen haben. Laden Sie es neu und versuchen Sie es erneut.",
+        "reload": "Neu laden",
         "noModule": "Wählen Sie ein Modul unter „Gilt für“.",
         "checkSchedule": "Prüfen Sie den Zeitplan und speichern Sie dann erneut."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Verlängert bis {time}",
       "extendedFollowUp": "{name} erstellt, läuft bis {time}",
       "extendFailed": "Die Ausfallzeit konnte nicht verlängert werden",
+      "reload": "Neu laden",
       "deleted": "Ausfallzeit gelöscht",
       "deleteFailed": "Die Ausfallzeit konnte nicht gelöscht werden",
       "created": "Ausfallzeit erstellt",

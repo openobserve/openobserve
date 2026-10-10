@@ -9039,6 +9039,8 @@
         "cancel": "Anuluj",
         "save": "Zapisz",
         "activeBanner": "Ten przestój jest aktywny. Zmiana zacznie obowiązywać przy następnej ewaluacji, a zmiana trybu SLO ponownie zmierzy okna, które już się rozpoczęły.",
+        "changedMeanwhile": "Ktoś zmienił ten przestój od czasu jego załadowania. Załaduj ponownie i spróbuj jeszcze raz.",
+        "reload": "Załaduj ponownie",
         "noModule": "Wybierz moduł w polu Dotyczy.",
         "checkSchedule": "Sprawdź harmonogram, a następnie zapisz ponownie."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Przedłużono do {time}",
       "extendedFollowUp": "Utworzono {name}, trwa do {time}",
       "extendFailed": "Nie udało się przedłużyć przerwy",
+      "reload": "Załaduj ponownie",
       "deleted": "Przerwa usunięta",
       "deleteFailed": "Nie udało się usunąć przerwy",
       "created": "Przerwa utworzona",

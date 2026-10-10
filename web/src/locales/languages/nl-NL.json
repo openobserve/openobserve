@@ -9039,6 +9039,8 @@
         "cancel": "Annuleren",
         "save": "Opslaan",
         "activeBanner": "Deze downtime is actief. Een bewerking wordt van kracht bij de volgende evaluatie, en een wijziging van de SLO-modus herberekent de vensters die al zijn gestart.",
+        "changedMeanwhile": "Iemand heeft deze downtime gewijzigd nadat u deze hebt geladen. Laad opnieuw en probeer het nog eens.",
+        "reload": "Opnieuw laden",
         "noModule": "Kies een module bij Van toepassing op.",
         "checkSchedule": "Controleer het schema en sla daarna opnieuw op."
       },
@@ -18171,6 +18173,7 @@
       "extended": "Verlengd tot {time}",
       "extendedFollowUp": "{name} gemaakt, loopt tot {time}",
       "extendFailed": "Kon de onderbreking niet verlengen",
+      "reload": "Opnieuw laden",
       "deleted": "Onderbreking verwijderd",
       "deleteFailed": "Kon de onderbreking niet verwijderen",
       "created": "Onderbreking aangemaakt",

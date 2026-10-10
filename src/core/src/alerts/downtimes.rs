@@ -22,6 +22,19 @@ use config::meta::{
     slo::Slo,
 };
 
+/// Whether `O2_DOWNTIMES_ENABLED` is on; always off in the OSS build.
+#[cfg(feature = "enterprise")]
+pub fn enabled() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+}
+
+#[cfg(not(feature = "enterprise"))]
+pub fn enabled() -> bool {
+    false
+}
+
 /// Whether the org has an uncancelled downtime targeting `module`; else skip identity work.
 #[cfg(feature = "enterprise")]
 pub fn any_for(org: &str, module: config::meta::downtimes::TargetModule) -> bool {
@@ -54,15 +67,13 @@ pub fn any_since(org: &str, module: config::meta::downtimes::TargetModule, since
         )
 }
 
-/// Whether the org keeps any row targeting `module`, so a mute recorded under it can still linger.
+/// Whether an uncancelled row targets `module`, so a mute recorded under it can linger.
 #[cfg(feature = "enterprise")]
 pub fn any_row(org: &str, module: config::meta::downtimes::TargetModule) -> bool {
     o2_enterprise::enterprise::common::config::get_config()
         .downtimes
         .enabled
-        && db::downtimes::list_cached(org).iter().any(|row| {
-            o2_enterprise::enterprise::downtimes::scope::target_for(&row.targets, module).is_some()
-        })
+        && enterprise::any_row_in(&db::downtimes::list_cached(org), module)
 }
 
 #[cfg(feature = "enterprise")]
@@ -91,6 +102,26 @@ pub fn active_for_alert(
     _now: i64,
 ) -> Option<ActiveDowntime> {
     None
+}
+
+/// [active_for_alert] without row `except`, which a cancel or delete just took out of force.
+#[cfg(feature = "enterprise")]
+pub fn active_for_alert_except(
+    org: &str,
+    alert_id: &str,
+    folder_id: &str,
+    dims: &HashMap<String, String>,
+    now: i64,
+    except: &str,
+) -> Option<ActiveDowntime> {
+    let item = enterprise::item(alert_id, folder_id, dims, &[]);
+    enterprise::active_in_except(
+        &db::downtimes::list_cached(org),
+        config::meta::downtimes::TargetModule::Alerts,
+        &item,
+        now,
+        Some(except),
+    )
 }
 
 /// The recorded downtime's window at `at`; the muted firing that recorded it matched its scope.
@@ -247,7 +278,7 @@ pub(crate) mod enterprise {
     use config::meta::{
         downtimes::{
             ActiveDowntime, CorrectionRef, CorrectionWindow, Downtime, DowntimeStatus,
-            IncidentMode, SloCorrectionMode, TargetModule,
+            IncidentMode, Repeat, SloCorrectionMode, TargetModule,
         },
         slo::{Slo, window::align_up},
     };
@@ -276,6 +307,7 @@ pub(crate) mod enterprise {
     pub(crate) fn any_live_target(rows: &[Downtime], module: TargetModule, now: i64) -> bool {
         rows.iter().any(|row| {
             row.cancelled_at.is_none()
+                && !ended_by(row, now)
                 && scope::target_for(&row.targets, module).is_some()
                 && (schedule::window_at(&row.schedule, now).is_some()
                     || schedule::next_window(&row.schedule, now).is_some())
@@ -291,10 +323,24 @@ pub(crate) mod enterprise {
     ) -> bool {
         any_live_target(rows, module, now)
             || rows.iter().any(|row| {
-                scope::target_for(&row.targets, module).is_some()
+                !row.cancelled_at.is_some_and(|at| at <= since)
+                    && !ended_by(row, since)
+                    && scope::target_for(&row.targets, module).is_some()
                     && !schedule::windows_between(&row.schedule, row.cancelled_at, since, now)
                         .is_empty()
             })
+    }
+
+    /// A cancel already forgot the mutes recorded under its row; an ended row's may still linger.
+    pub(crate) fn any_row_in(rows: &[Downtime], module: TargetModule) -> bool {
+        rows.iter().any(|row| {
+            row.cancelled_at.is_none() && scope::target_for(&row.targets, module).is_some()
+        })
+    }
+
+    /// A one-time row whose end is at or before `at` has no window from `at` on.
+    pub(crate) fn ended_by(row: &Downtime, at: i64) -> bool {
+        row.schedule.repeat == Repeat::None && row.schedule.ends_at.is_some_and(|end| end <= at)
     }
 
     /// Every live row whose window holds `now` and whose target of `module` matches, merged.
@@ -304,8 +350,19 @@ pub(crate) mod enterprise {
         item: &TargetItem<'_>,
         now: i64,
     ) -> Option<ActiveDowntime> {
+        active_in_except(rows, module, item, now, None)
+    }
+
+    /// [active_in] without the row `except`.
+    pub(crate) fn active_in_except(
+        rows: &[Downtime],
+        module: TargetModule,
+        item: &TargetItem<'_>,
+        now: i64,
+        except: Option<&str>,
+    ) -> Option<ActiveDowntime> {
         rows.iter()
-            .filter(|row| row.cancelled_at.is_none())
+            .filter(|row| row.cancelled_at.is_none() && except != Some(row.id.as_str()))
             .filter_map(|row| {
                 let window = schedule::window_at(&row.schedule, now)?;
                 let target = scope::target_for(&row.targets, module)?;
@@ -629,6 +686,98 @@ mod tests {
         assert!(any_target_since(rows, TargetModule::Alerts, HOUR / 2, now));
         assert!(!any_target_since(rows, TargetModule::Alerts, HOUR, now));
         assert!(!any_target_since(rows, TargetModule::Slos, 0, now));
+    }
+
+    #[test]
+    fn only_a_cancelled_row_leaves_no_mute_to_close() {
+        let mut cancelled = row("d1", vec![target(TargetModule::Alerts)], 0, 20 * HOUR);
+        cancelled.cancelled_at = Some(HOUR);
+        assert!(!any_row_in(
+            std::slice::from_ref(&cancelled),
+            TargetModule::Alerts
+        ));
+        // A clear run 25 h after a one-time window still finds the row and forgets its mute.
+        let now = 26 * HOUR;
+        let ended = row("d2", vec![target(TargetModule::Alerts)], 0, HOUR);
+        let rows = [cancelled, ended];
+        assert!(!any_target_since(
+            &rows,
+            TargetModule::Alerts,
+            now - 24 * HOUR,
+            now
+        ));
+        assert!(any_row_in(&rows, TargetModule::Alerts));
+        assert!(!any_row_in(&rows, TargetModule::Slos));
+    }
+
+    #[test]
+    fn rows_that_cannot_be_live_skip_the_window_math() {
+        let now = 1_000 * HOUR;
+        let ended: Vec<Downtime> = (0..500)
+            .map(|i| {
+                let start = i64::from(i) * HOUR;
+                row(
+                    &format!("d{i}"),
+                    vec![target(TargetModule::Alerts)],
+                    start,
+                    start + HOUR,
+                )
+            })
+            .collect();
+        assert!(ended.iter().all(|r| ended_by(r, now)));
+        assert!(!any_live_target(&ended, TargetModule::Alerts, now));
+        assert!(!any_target_since(
+            &ended,
+            TargetModule::Alerts,
+            now - HOUR,
+            now
+        ));
+        let mut cancelled = row("c", vec![target(TargetModule::Alerts)], now, now + HOUR);
+        cancelled.cancelled_at = Some(now - 2 * HOUR);
+        assert!(!any_target_since(
+            &[cancelled],
+            TargetModule::Alerts,
+            now - HOUR,
+            now
+        ));
+        let live = row(
+            "l",
+            vec![target(TargetModule::Alerts)],
+            now - HOUR,
+            now + HOUR,
+        );
+        assert!(!ended_by(&live, now));
+        assert!(any_live_target(&[live], TargetModule::Alerts, now));
+    }
+
+    #[test]
+    fn a_cancelled_downtime_leaves_the_alert_muted_by_the_other_until_it_ends() {
+        let dims = payments();
+        let alert = item("a1", "default", &dims, &[]);
+        let d1 = row(
+            "d1",
+            vec![target(TargetModule::Alerts)],
+            9 * HOUR,
+            11 * HOUR,
+        );
+        let d2 = row(
+            "d2",
+            vec![target(TargetModule::Alerts)],
+            9 * HOUR,
+            12 * HOUR,
+        );
+        let rows = [d1, d2];
+        let at = 10 * HOUR;
+        let still = active_in_except(&rows, TargetModule::Alerts, &alert, at, Some("d1"));
+        assert_eq!(still.map(|d| d.id).as_deref(), Some("d2"));
+        assert!(
+            active_in_except(&rows[..1], TargetModule::Alerts, &alert, at, Some("d1")).is_none(),
+            "with no other downtime the record closes"
+        );
+        assert!(
+            active_in_except(&rows, TargetModule::Alerts, &alert, 12 * HOUR, Some("d1")).is_none(),
+            "once d2 ends the record closes"
+        );
     }
 
     #[test]
