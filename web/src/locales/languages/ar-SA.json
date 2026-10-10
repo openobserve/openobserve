@@ -8866,7 +8866,8 @@
         "nItems": "{count} عنصر | {count} عناصر",
         "asGood": "كجيد",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "لا تُفتح أي حوادث خلال النافذة."
       },
       "duration": {
         "days": "{count} يوم",

@@ -2758,10 +2758,19 @@ pub(crate) async fn record_last_downtime(org: &str, alert_id: &str, downtime_id:
     }
 }
 
+/// An ended one-time row is off the live path, but the mute it recorded can still hold a page open.
+#[cfg(feature = "enterprise")]
+fn mute_may_linger(rows: &[config::meta::downtimes::Downtime]) -> bool {
+    crate::alerts::downtimes::enterprise::any_row_in(
+        rows,
+        config::meta::downtimes::TargetModule::Alerts,
+    )
+}
+
 /// Drops the Muted chip; a record that existed means a muted resolve may have left a page open.
 #[cfg(feature = "enterprise")]
 async fn clear_recorded_mute(org: &str, alert_id: &str) {
-    if !alert_downtimes_in(org) {
+    if !crate::alerts::downtimes::enabled() || !mute_may_linger(&db::downtimes::list_cached(org)) {
         return;
     }
     match infra::table::alert_states::set_last_downtime_id(alert_id, None).await {
@@ -8581,6 +8590,41 @@ mod tests {
         assert!(!clears_recorded_mute(&RunOutcome::Suppressed));
         assert!(!clears_recorded_mute(&RunOutcome::Normal));
         assert!(!clears_recorded_mute(&RunOutcome::Skipped));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_firing_after_an_ended_one_time_window_still_clears_its_mute() {
+        let ended: config::meta::downtimes::Downtime = serde_json::from_value(serde_json::json!({
+            "id": "d1",
+            "org": "acme",
+            "name": "deploy",
+            "targets": [{"module": "alerts", "folders": {"kind": "all"}}],
+            "schedule": {
+                "repeat": "none",
+                "starts_at": 0,
+                "ends_at": 3_600_000_000_i64,
+                "timezone": "UTC",
+                "duration_secs": 3600,
+                "weekdays": []
+            },
+            "created_by": "lin",
+            "created_at": 0,
+            "updated_by": "lin",
+            "updated_at": 0
+        }))
+        .unwrap();
+        let rows = std::slice::from_ref(&ended);
+        let now = 2 * 3_600_000_000_i64;
+        assert!(!crate::alerts::downtimes::enterprise::any_live_target(
+            rows,
+            config::meta::downtimes::TargetModule::Alerts,
+            now
+        ));
+        assert!(mute_may_linger(rows));
+        let mut cancelled = ended;
+        cancelled.cancelled_at = Some(1);
+        assert!(!mute_may_linger(&[cancelled]));
     }
 
     #[cfg(feature = "enterprise")]

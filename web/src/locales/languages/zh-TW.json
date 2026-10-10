@@ -8861,7 +8861,8 @@
         "nItems": "{count} 個項目 | {count} 個項目",
         "asGood": "視為良好",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "時段期間不會開啟任何事件。"
       },
       "duration": {
         "days": "{count} 天",

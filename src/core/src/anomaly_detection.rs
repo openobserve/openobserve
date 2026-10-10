@@ -3179,7 +3179,7 @@ pub fn downtime_is_muted(
     Box::pin(async move { muted_by_downtime(&org_id, &anomaly_id).await })
 }
 
-/// `custom_sql` equalities, then `key:value` tags, matched on the Anomaly detections target.
+/// `custom_sql` equalities, then plain `=` filters, then `key:value` tags, on the Anomaly target.
 #[cfg(feature = "enterprise")]
 async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
     if !crate::alerts::downtimes::any_for(
@@ -3199,7 +3199,8 @@ async fn muted_by_downtime(org_id: &str, anomaly_id: &str) -> Option<String> {
         .unwrap_or_default();
     let semantic_groups = crate::db::system_settings::get_semantic_field_groups(org_id).await;
     let dims = o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
-        row.custom_sql.as_deref(),
+        crate::alerts::downtimes::anomaly_sql(&row.query_mode, row.custom_sql.as_deref()),
+        crate::alerts::downtimes::anomaly_filters(&row.query_mode, row.filters.as_ref()),
         &tags,
         &semantic_groups,
     );

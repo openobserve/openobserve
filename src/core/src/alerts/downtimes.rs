@@ -208,6 +208,19 @@ pub fn active_for_anomaly(
     None
 }
 
+/// An anomaly config's filters count only in filters mode, where its query applies them.
+pub fn anomaly_filters<'a>(
+    query_mode: &str,
+    filters: Option<&'a serde_json::Value>,
+) -> Option<&'a serde_json::Value> {
+    filters.filter(|_| query_mode.eq_ignore_ascii_case("filters"))
+}
+
+/// An anomaly config's `custom_sql` counts in every mode but filters, whose query ignores it.
+pub fn anomaly_sql<'a>(query_mode: &str, custom_sql: Option<&'a str>) -> Option<&'a str> {
+    custom_sql.filter(|_| !query_mode.eq_ignore_ascii_case("filters"))
+}
+
 /// The only async part: semantic groups and the source alert both come from in-memory caches.
 #[cfg(feature = "enterprise")]
 pub async fn dimensions_for_slo(slo: &Slo) -> HashMap<String, String> {
@@ -1106,5 +1119,55 @@ mod tests {
             Some((3_600, 18_000)),
             "the cancelled tail is measured again"
         );
+    }
+
+    #[test]
+    fn an_anomaly_config_filtered_on_a_service_is_muted_by_that_service() {
+        let groups = [config::meta::correlation::FieldAlias {
+            id: "service".to_string(),
+            display: "Service".to_string(),
+            group: None,
+            fields: vec!["service".to_string(), "service_name".to_string()],
+            is_workload_type: false,
+        }];
+        let filters = serde_json::json!([
+            {"field": "service", "operator": "=", "value": "payments"}
+        ]);
+        let dims = o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
+            None,
+            Some(&filters),
+            &[],
+            &groups,
+        );
+        assert_eq!(dims.get("service").map(String::as_str), Some("payments"));
+
+        let rows = vec![row(
+            "d1",
+            vec![target(TargetModule::AnomalyDetections)],
+            10 * HOUR,
+            12 * HOUR,
+        )];
+        let config = item("an1", "default", &dims, &[]);
+        let hit = active_in(&rows, TargetModule::AnomalyDetections, &config, 11 * HOUR);
+        assert_eq!(hit.map(|d| d.id).as_deref(), Some("d1"));
+    }
+
+    #[test]
+    fn only_a_filters_mode_config_takes_its_filters_into_the_identity() {
+        let filters = serde_json::json!([
+            {"field": "env", "operator": "=", "value": "prod"}
+        ]);
+        assert_eq!(anomaly_filters("filters", Some(&filters)), Some(&filters));
+        assert_eq!(anomaly_filters("custom_sql", Some(&filters)), None);
+        assert_eq!(anomaly_filters("", Some(&filters)), None);
+        assert_eq!(anomaly_filters("filters", None), None);
+    }
+
+    #[test]
+    fn a_filters_mode_config_ignores_a_leftover_custom_sql() {
+        let sql = Some("SELECT * FROM logs WHERE env = 'prod'");
+        assert_eq!(anomaly_sql("filters", sql), None);
+        assert_eq!(anomaly_sql("custom_sql", sql), sql);
+        assert_eq!(anomaly_sql("", sql), sql, "a missing mode keeps the SQL");
     }
 }

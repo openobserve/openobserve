@@ -369,10 +369,16 @@ pub async fn delete(org: &str, user_id: &str, id: &str) -> Result<(), DowntimeEr
     let row = load(org, id).await?;
     access::authorize_row(org, user_id, &row, "DELETE").await?;
     check_deletable(&row, now_micros())?;
-    db::downtimes::delete(org, id).await?;
-    db::authz::remove_ownership(org, "downtimes", db::downtimes::ownership(&row)).await;
-    forget_recorded_mutes(org, id).await;
-    Ok(())
+    let read = infra::table::downtimes::RowVersion {
+        version: row.version,
+        updated_at: row.updated_at,
+        deleted: false,
+    };
+    finish_delete(db::downtimes::delete(org, id, read), async {
+        db::authz::remove_ownership(org, "downtimes", db::downtimes::ownership(&row)).await;
+        forget_recorded_mutes(org, id).await;
+    })
+    .await
 }
 
 /// One `set_if_unchanged` per row, so every node and region sees it; this node reloads once.
@@ -536,7 +542,7 @@ pub async fn forget_recorded_mutes(org: &str, id: &str) {
     let conn = infra::db::get_orm_client_rw().await;
     let unmuted = record_other_mutes(conn, cleared, &others).await;
     recover_cleared(org, &unmuted, async |org, alert_id| {
-        crate::alerts::incidents::recover_after_muted_resolve(org, alert_id).await
+        crate::alerts::incidents::recover_muted_resolves(org, alert_id).await
     })
     .await;
 }
@@ -553,6 +559,18 @@ pub fn corrections_may_change(before: Option<&Downtime>, after: &Downtime) -> bo
             || before.condition != after.condition
             || before.cancelled_at != after.cancelled_at
     })
+}
+
+/// A lost delete compare-and-set is a 409 that leaves the row's ownership and mutes alone.
+async fn finish_delete(
+    deleted: impl Future<Output = Result<bool, anyhow::Error>>,
+    after: impl Future<Output = ()>,
+) -> Result<(), DowntimeError> {
+    if !deleted.await? {
+        return Err(changed_meanwhile());
+    }
+    after.await;
+    Ok(())
 }
 
 /// A concurrent edit, cancel or delete since `expected_updated_at` makes this write a 409.
@@ -2645,5 +2663,17 @@ mod tests {
         })
         .await;
         assert_eq!(recovered, ["acme/a1", "acme/a2", "acme/a3"]);
+    }
+
+    #[tokio::test]
+    async fn a_delete_that_lost_to_another_writer_is_a_409_and_keeps_the_row_state() {
+        let mut cleaned = false;
+        let lost = finish_delete(async { Ok(false) }, async { cleaned = true }).await;
+        assert!(matches!(lost, Err(DowntimeError::Conflict(_))));
+        assert!(!cleaned, "ownership and mutes stay with the live row");
+
+        let won = finish_delete(async { Ok(true) }, async { cleaned = true }).await;
+        assert!(won.is_ok());
+        assert!(cleaned);
     }
 }

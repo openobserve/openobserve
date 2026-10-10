@@ -3,7 +3,7 @@
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import type { DowntimeRequest } from "@/services/downtimes";
-import { completePairs, notifySentence, summarySentence } from "./summary";
+import { completePairs, incidentsLine, notifySentence, summarySentence } from "./summary";
 
 const flow1: DowntimeRequest = {
   folder_id: "planned-maintenance",
@@ -135,5 +135,17 @@ describe("notifySentence", () => {
         gt,
       ),
     ).toBe("Notifies slack-oncall, pd: 10 min before it ends, when it ends, when it is cancelled.");
+  });
+});
+
+describe("incidentsLine", () => {
+  it("follows the incident mode of the alerts target", () => {
+    expect(incidentsLine(flow1.targets, gt)).toBe(
+      "Incidents open muted and notify after the window.",
+    );
+    const none = flow1.targets.map((target) =>
+      target.module === "alerts" ? { ...target, incident_mode: "none" as const } : target,
+    );
+    expect(incidentsLine(none, gt)).toBe("No incidents open during the window.");
   });
 });

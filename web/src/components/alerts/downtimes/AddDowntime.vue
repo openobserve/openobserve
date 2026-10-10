@@ -15,7 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OForm :form="form" v-slot="{ isSubmitting }" class="h-full w-full" data-test="add-downtime">
+  <OForm
+    :form="form"
+    v-slot="{ isSubmitting }"
+    class="h-full w-full"
+    data-test="add-downtime"
+    @keydown.capture="blockEnterSubmit"
+  >
     <OPageLayout bleed>
       <template #header>
         <OPageHeader
@@ -605,6 +611,26 @@ const confirmMuteAll = async () => {
 watch(muteAllOpen, (open) => {
   if (!open) pendingSave.value = null;
 });
+
+// Inputs whose Enter would submit the form implicitly; a textarea keeps Enter for its newline.
+const NON_TEXT_INPUTS = new Set([
+  "button",
+  "submit",
+  "reset",
+  "checkbox",
+  "radio",
+  "file",
+  "image",
+]);
+
+// Only the Save button saves; the name field and pickers still see the Enter they handle.
+const blockEnterSubmit = (event: KeyboardEvent) => {
+  if (event.key !== "Enter") return;
+  const target = event.target;
+  if (target instanceof HTMLInputElement && !NON_TEXT_INPUTS.has(target.type)) {
+    event.preventDefault();
+  }
+};
 
 const form = useOForm<DowntimeFormValues>({
   defaultValues: initial,

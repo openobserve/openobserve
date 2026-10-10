@@ -8866,7 +8866,8 @@
         "nItems": "{count} 항목 | {count} 항목",
         "asGood": "정상으로 처리",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "기간 동안에는 인시던트가 열리지 않습니다."
       },
       "duration": {
         "days": "{count}일",

@@ -101,6 +101,14 @@ export function targetPhrase(
   return raw(parts.join(" "));
 }
 
+/** The incident line of the summary: none open when the alerts target opens no incidents. */
+export function incidentsLine(targets: DowntimeTarget[], t: TranslateFn): I18nText {
+  const alerts = targets.find((tg) => tg.module === "alerts");
+  return alerts?.incident_mode === "none"
+    ? t("alerts.downtimes.summary.noIncidents")
+    : t("alerts.downtimes.summaryPane.mutedIncidents");
+}
+
 const sloClause = (
   targets: DowntimeTarget[],
   conditionText: string | null,

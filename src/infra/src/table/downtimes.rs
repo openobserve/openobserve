@@ -95,10 +95,14 @@ pub async fn write(
     write_with(client, downtime, guard, remeasures, now).await
 }
 
-/// Soft delete: the row stays as a tombstone so a late replicated put cannot bring it back.
-pub async fn delete(org: &str, id: &str) -> Result<Option<RowVersion>, errors::Error> {
+/// Soft delete of the row at `stored`; the tombstone, or `None` when another write moved it first.
+pub async fn delete_if_stored(
+    org: &str,
+    id: &str,
+    stored: RowVersion,
+) -> Result<Option<RowVersion>, errors::Error> {
     let client = get_orm_client_rw().await;
-    delete_with(client, org, id).await
+    delete_if_stored_with(client, org, id, stored).await
 }
 
 /// The version of the row, including a soft-deleted one.
@@ -400,6 +404,16 @@ pub async fn delete_with<C: ConnectionTrait>(
     Err(Error::Message(format!(
         "downtime {org}/{id} kept changing during its delete"
     )))
+}
+
+/// [delete_if_stored] against a caller-supplied connection.
+pub async fn delete_if_stored_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+    stored: RowVersion,
+) -> Result<Option<RowVersion>, errors::Error> {
+    write_tombstone(conn, org, id, stored).await
 }
 
 /// Writes a replicated put only while the row is still `stored`, or still absent for `None`.
@@ -1053,6 +1067,40 @@ mod tests {
             Some(tombstone)
         );
         assert_eq!(delete_with(&db, "acme", "nope").await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn a_delete_of_a_row_rescheduled_since_its_read_changes_nothing() {
+        let db = db().await;
+        let mut d = downtime("d1", Repeat::None, Some(11 * DAY));
+        d.version = 1;
+        d.updated_at = 100;
+        put_with(&db, &d).await.unwrap();
+        let loaded = get_with(&db, "acme", "d1").await.unwrap().unwrap();
+        let read = RowVersion {
+            version: loaded.version,
+            updated_at: loaded.updated_at,
+            deleted: false,
+        };
+        // Another writer reschedules the ended row before the delete lands.
+        d.schedule.ends_at = Some(20 * DAY);
+        d.version = 2;
+        d.updated_at = 200;
+        put_with(&db, &d).await.unwrap();
+
+        assert_eq!(
+            delete_if_stored_with(&db, "acme", "d1", read)
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(get_with(&db, "acme", "d1").await.unwrap(), Some(d));
+        let fresh = version_with(&db, "acme", "d1").await.unwrap().unwrap();
+        let tombstone = delete_if_stored_with(&db, "acme", "d1", fresh)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!((tombstone.version, tombstone.deleted), (3, true));
     }
 
     #[tokio::test]

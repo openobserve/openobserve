@@ -8866,7 +8866,8 @@
         "nItems": "{count} elemento | {count} elementi",
         "asGood": "come buono",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "Durante la finestra non vengono aperti incidenti."
       },
       "duration": {
         "days": "{count} g",

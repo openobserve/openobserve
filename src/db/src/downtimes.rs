@@ -80,22 +80,19 @@ pub async fn set_if_parent_unchanged(
     Ok(true)
 }
 
-pub async fn delete(org: &str, id: &str) -> Result<(), anyhow::Error> {
-    let tombstone = table::delete(org, id).await?;
+/// Deletes the row only while it is still at `stored`; false when another write moved it first.
+pub async fn delete(org: &str, id: &str, stored: table::RowVersion) -> Result<bool, anyhow::Error> {
+    let Some(tombstone) = table::delete_if_stored(org, id, stored).await? else {
+        return Ok(false);
+    };
     coordinator::emit_delete_event(org, id).await?;
     remove_cached(org, id);
     // Other regions order by the tombstone's own version and time, so both travel as written.
     #[cfg(feature = "enterprise")]
-    {
-        let (version, deleted_at) = tombstone.map_or_else(
-            || (0, config::utils::time::now_micros()),
-            |t| (t.version, t.updated_at),
-        );
-        super_cluster::emit_delete(org, id, version, deleted_at).await;
-    }
+    super_cluster::emit_delete(org, id, tombstone.version, tombstone.updated_at).await;
     #[cfg(not(feature = "enterprise"))]
     let _ = tombstone;
-    Ok(())
+    Ok(true)
 }
 
 /// Org deletion: every row, every node cache, every region and every OpenFGA tuple.

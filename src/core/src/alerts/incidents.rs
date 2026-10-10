@@ -1016,29 +1016,7 @@ pub async fn resolve_alert_firing(
     Ok(())
 }
 
-/// The on-call recovery a muted [resolve_alert_firing] skipped, run once the window is over.
-pub async fn recover_after_muted_resolve(
-    org_id: &str,
-    alert_id: &str,
-) -> Result<(), anyhow::Error> {
-    if !o2_enterprise::enterprise::oncall::is_enabled() {
-        return Ok(());
-    }
-    let Some(incident) =
-        infra::table::alert_incidents::latest_incident_for_alert(org_id, alert_id).await?
-    else {
-        return Ok(());
-    };
-    // An open incident is still live; its own resolve closes the record.
-    if incident.status != "resolved" {
-        return Ok(());
-    }
-    o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, &incident.id)
-        .await?;
-    Ok(())
-}
-
-/// [recover_after_muted_resolve] for a Firing run, which may already have opened a newer incident.
+/// The on-call recovery a muted [resolve_alert_firing] skipped, over the recent resolved incidents.
 pub async fn recover_muted_resolves(org_id: &str, alert_id: &str) -> Result<(), anyhow::Error> {
     if !o2_enterprise::enterprise::oncall::is_enabled() {
         return Ok(());
@@ -1049,16 +1027,14 @@ pub async fn recover_muted_resolves(org_id: &str, alert_id: &str) -> Result<(), 
         MUTED_RESOLVES_SCANNED,
     )
     .await?;
-    for incident_id in resolved {
-        let records =
-            infra::table::oncall_responses::list_for_incident(org_id, &incident_id).await?;
-        if holds_open_record(&records) {
-            o2_enterprise::enterprise::oncall::escalation::recover_for_incident(
-                org_id,
-                &incident_id,
-            )
+    let mut records = HashMap::with_capacity(resolved.len());
+    for incident_id in &resolved {
+        let held = infra::table::oncall_responses::list_for_incident(org_id, incident_id).await?;
+        records.insert(incident_id.clone(), held);
+    }
+    for incident_id in left_open(&resolved, &records) {
+        o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
             .await?;
-        }
     }
     Ok(())
 }
@@ -1463,6 +1439,21 @@ async fn reopened_after_mute(
     }
 }
 
+/// The un-mute already won, so a failed severity raise is logged and the "opened" page still goes.
+async fn escalate_then_reopen(
+    org_id: &str,
+    incident_id: &str,
+    escalate: impl std::future::Future<Output = Result<bool, anyhow::Error>>,
+    reopen: impl std::future::Future<Output = IncidentCorrelationOutcome>,
+) -> IncidentCorrelationOutcome {
+    if let Err(e) = escalate.await {
+        log::error!(
+            "[incidents] severity of reopened incident {org_id}/{incident_id} not raised: {e}"
+        );
+    }
+    reopen.await
+}
+
 /// Create a brand new incident and set up its initial state.
 #[allow(clippy::too_many_arguments)]
 async fn create_new_incident(
@@ -1759,8 +1750,13 @@ async fn find_or_create_incident(
             );
             if reopened {
                 // Recomputed from the un-muting firing, so "opened" carries the right level.
-                escalate_severity(org_id, &incident, subject, eval_level).await?;
-                return Ok(reopened_after_mute(org_id, incident.id, service_name).await);
+                return Ok(escalate_then_reopen(
+                    org_id,
+                    &incident.id,
+                    escalate_severity(org_id, &incident, subject, eval_level),
+                    reopened_after_mute(org_id, incident.id.clone(), service_name),
+                )
+                .await);
             }
 
             // A muted firing must not raise the severity silently; the un-muting firing does it.
@@ -1932,8 +1928,13 @@ async fn find_or_create_incident(
                 triggered_at,
             );
             if reopened {
-                escalate_severity(org_id, &existing, subject, eval_level).await?;
-                return Ok(reopened_after_mute(org_id, existing.id, service_name).await);
+                return Ok(escalate_then_reopen(
+                    org_id,
+                    &existing.id,
+                    escalate_severity(org_id, &existing, subject, eval_level),
+                    reopened_after_mute(org_id, existing.id.clone(), service_name),
+                )
+                .await);
             }
 
             if is_new_alert_type {
@@ -2922,6 +2923,18 @@ async fn model_to_incident(
     Ok(model_to_incident_with_topology(db_model, topology))
 }
 
+/// The resolved incidents whose on-call record a muted resolve left open, in scan order.
+fn left_open<'a>(
+    resolved: &'a [String],
+    records: &HashMap<String, Vec<config::meta::oncall::Response>>,
+) -> Vec<&'a str> {
+    resolved
+        .iter()
+        .filter(|id| records.get(*id).is_some_and(|held| holds_open_record(held)))
+        .map(String::as_str)
+        .collect()
+}
+
 /// A record still open on a resolved incident is the page a muted resolve left escalating.
 fn holds_open_record(records: &[config::meta::oncall::Response]) -> bool {
     records.iter().any(|record| !record.state.is_terminal())
@@ -3620,13 +3633,13 @@ mod tests {
         assert_eq!(mute_change(None, None), MuteChange::Keep);
     }
 
-    #[test]
-    fn only_a_resolved_incident_with_an_open_record_is_recovered_after_the_window() {
-        use config::meta::oncall::{
-            ResponderRole, Response, ResponseState, SubjectRef, SubjectType,
-        };
-        let record = |state| Response {
-            id: "resp_1".into(),
+    fn oncall_record(
+        incident_id: &str,
+        state: config::meta::oncall::ResponseState,
+    ) -> config::meta::oncall::Response {
+        use config::meta::oncall::{ResponderRole, Response, SubjectRef, SubjectType};
+        Response {
+            id: format!("resp_{incident_id}"),
             org_id: "acme".into(),
             subject: SubjectRef::new(SubjectType::Alert, "al_1", 1),
             team_id: Some("team_1".into()),
@@ -3645,9 +3658,15 @@ mod tests {
             acked_by: None,
             acked_at: None,
             closed_at: None,
-            incident_id: Some("inc_1".into()),
+            incident_id: Some(incident_id.into()),
             updated_at: 0,
-        };
+        }
+    }
+
+    #[test]
+    fn only_a_resolved_incident_with_an_open_record_is_recovered_after_the_window() {
+        use config::meta::oncall::ResponseState;
+        let record = |state| oncall_record("inc_1", state);
         assert!(holds_open_record(&[record(ResponseState::Triggered)]));
         assert!(holds_open_record(&[
             record(ResponseState::Resolved),
@@ -3724,5 +3743,102 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(stored.muted_by_downtime_id, None);
+    }
+
+    #[tokio::test]
+    async fn a_newer_open_incident_does_not_hide_the_page_a_muted_resolve_left_open() {
+        use config::meta::oncall::ResponseState;
+        use infra::table::entity::{alert_incident_alerts, alert_incidents};
+        use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, EntityTrait, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(alert_incidents::Entity),
+            schema.create_table_from_entity(alert_incident_alerts::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        // I1 resolved quietly under the ended window; the Firing run after it opened I2.
+        for (id, status, fired_at) in [("i1", "resolved", 1), ("i2", "open", 2)] {
+            let mut model = incident(None);
+            model.id = id.to_string();
+            model.status = status.to_string();
+            let row: alert_incidents::ActiveModel = model.into();
+            alert_incidents::Entity::insert(row.reset_all())
+                .exec(&db)
+                .await
+                .unwrap();
+            let link = alert_incident_alerts::Model {
+                incident_id: id.to_string(),
+                alert_id: "a1".to_string(),
+                alert_fired_at: fired_at,
+                alert_name: "a1".to_string(),
+                alert_kind: "alert".to_string(),
+                correlation_reason: None,
+                created_at: fired_at,
+                resolved_at: None,
+            };
+            let link: alert_incident_alerts::ActiveModel = link.into();
+            alert_incident_alerts::Entity::insert(link.reset_all())
+                .exec(&db)
+                .await
+                .unwrap();
+        }
+        let resolved = infra::table::alert_incidents::resolved_incidents_for_alert_with(
+            &db,
+            "default",
+            "a1",
+            MUTED_RESOLVES_SCANNED,
+        )
+        .await
+        .unwrap();
+        assert_eq!(resolved, ["i1"]);
+
+        let records = HashMap::from([
+            (
+                "i1".to_string(),
+                vec![oncall_record("i1", ResponseState::Triggered)],
+            ),
+            (
+                "i2".to_string(),
+                vec![oncall_record("i2", ResponseState::Triggered)],
+            ),
+        ]);
+        assert_eq!(
+            left_open(&resolved, &records),
+            ["i1"],
+            "I1's page is closed; the live I2 keeps its own"
+        );
+        let closed = HashMap::from([(
+            "i1".to_string(),
+            vec![oncall_record("i1", ResponseState::Resolved)],
+        )]);
+        assert!(left_open(&resolved, &closed).is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_failed_severity_raise_after_the_unmute_still_sends_the_opened_page() {
+        let mut paged = 0;
+        let outcome = escalate_then_reopen(
+            "default",
+            "inc-1",
+            async { Err(anyhow::anyhow!("db down")) },
+            async {
+                paged += 1;
+                IncidentCorrelationOutcome::NewIncidentCreated {
+                    incident_id: "inc-1".to_string(),
+                    service_name: "payments".to_string(),
+                }
+            },
+        )
+        .await;
+        assert!(matches!(
+            outcome,
+            IncidentCorrelationOutcome::NewIncidentCreated { ref incident_id, .. }
+                if incident_id == "inc-1"
+        ));
+        assert_eq!(paged, 1, "the delayed opened message goes out once");
     }
 }

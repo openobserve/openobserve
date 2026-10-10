@@ -275,7 +275,7 @@ async fn forget_recorded_mute(org: &str, alert_id: &str) {
     if let Err(e) = infra::table::alert_states::set_last_downtime_id(alert_id, None).await {
         log::warn!("[RECOVERY] could not clear the recorded downtime of {alert_id}: {e}");
     }
-    if let Err(e) = crate::alerts::incidents::recover_after_muted_resolve(org, alert_id).await {
+    if let Err(e) = crate::alerts::incidents::recover_muted_resolves(org, alert_id).await {
         log::error!("[RECOVERY] incident on-call recovery failed for {org}/{alert_id}: {e}");
     }
 }

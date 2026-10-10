@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ul class="text-text-body flex list-disc flex-col gap-0.5 ps-5 text-xs">
         <li>{{ t("alerts.downtimes.summaryPane.keepRunning") }}</li>
         <li>{{ t("alerts.downtimes.summaryPane.noNotifications") }}</li>
-        <li>{{ t("alerts.downtimes.summaryPane.mutedIncidents") }}</li>
+        <li data-test="downtime-summary-incidents">{{ incidentsText }}</li>
       </ul>
     </div>
   </div>
@@ -71,7 +71,7 @@ import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { DowntimeRequest, TargetModule } from "@/services/downtimes";
 import { currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
-import { notifySentence, summarySentence } from "@/utils/downtimes/summary";
+import { incidentsLine, notifySentence, summarySentence } from "@/utils/downtimes/summary";
 import { MODULE_LABEL_KEYS, type FolderNameFn } from "@/utils/downtimes/targetSummary";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
@@ -91,6 +91,8 @@ const { t } = useI18nTyped();
 const sentence = computed(() => summarySentence(props.request, t, props.folderName));
 
 const notifyText = computed(() => notifySentence(props.request.notifications, t));
+
+const incidentsText = computed(() => incidentsLine(props.request.targets, t));
 
 const window = computed(() => currentOrNextWindow(props.request.schedule, Date.now() * 1000));
 

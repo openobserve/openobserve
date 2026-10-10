@@ -8866,7 +8866,8 @@
         "nItems": "{count} öğe | {count} öğe",
         "asGood": "iyi olarak",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "Pencere boyunca hiçbir olay açılmaz."
       },
       "duration": {
         "days": "{count} g",

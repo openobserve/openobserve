@@ -8866,7 +8866,8 @@
         "nItems": "{count} 項目 | {count} 項目",
         "asGood": "良好として",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "ウィンドウ中はインシデントがオープンされません。"
       },
       "duration": {
         "days": "{count} 日",

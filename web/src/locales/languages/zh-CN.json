@@ -8866,7 +8866,8 @@
         "nItems": "{count} 个项 | {count} 个项",
         "asGood": "视为正常",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "窗口期间不会开启任何事件。"
       },
       "duration": {
         "days": "{count} 天",

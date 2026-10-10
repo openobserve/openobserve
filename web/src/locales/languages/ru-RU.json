@@ -8866,7 +8866,8 @@
         "nItems": "{count} элемент | {count} элементов",
         "asGood": "как успешные",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "Во время окна инциденты не открываются."
       },
       "duration": {
         "days": "{count} д",

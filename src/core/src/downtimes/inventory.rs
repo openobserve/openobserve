@@ -185,7 +185,18 @@ async fn anomaly_items(org: &str, groups: &[FieldAlias]) -> Result<Vec<Item>, an
             .and_then(|t| serde_json::from_value(t).ok())
             .unwrap_or_default();
         items.push(Item {
-            dims: anomaly_dimensions(config.custom_sql.as_deref(), &tags, groups),
+            dims: anomaly_dimensions(
+                crate::alerts::downtimes::anomaly_sql(
+                    &config.query_mode,
+                    config.custom_sql.as_deref(),
+                ),
+                crate::alerts::downtimes::anomaly_filters(
+                    &config.query_mode,
+                    config.filters.as_ref(),
+                ),
+                &tags,
+                groups,
+            ),
             id: config.anomaly_id,
             name: config.name,
             folder_id,

@@ -8866,7 +8866,8 @@
         "nItems": "{count} mục | {count} mục",
         "asGood": "coi như tốt",
         "chip": "{module} · {text}",
-        "moreTargets": "+{count}"
+        "moreTargets": "+{count}",
+        "noIncidents": "Không có sự cố nào được mở trong khi cửa sổ diễn ra."
       },
       "duration": {
         "days": "{count} ngày",

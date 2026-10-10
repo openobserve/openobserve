@@ -301,6 +301,35 @@ describe("AddDowntime", () => {
     wrapper.unmount();
   });
 
+  // jsdom has no implicit submission, so the press submits the form unless the page cancelled it.
+  const pressEnter = async (wrapper: ReturnType<typeof mount>, dataTest: string) => {
+    const field = wrapper.get(`[data-test="${dataTest}"]`);
+    const input = (
+      field.element.matches("input") ? field.element : field.get("input").element
+    ) as HTMLInputElement;
+    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    input.dispatchEvent(enter);
+    if (!enter.defaultPrevented) input.form?.requestSubmit();
+    await flushPromises();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await flushPromises();
+    return enter;
+  };
+
+  it("saves nothing on Enter in the duration field or the lead field", async () => {
+    const { wrapper } = await mountPage();
+    await seeSchedule(wrapper);
+    await wrapper.get('[data-test="downtime-schedule-repeat-daily"]').trigger("click");
+    wrapper.findComponent(AlertDestinationsField).vm.$emit("update:destinations", ["slack-oncall"]);
+    await flushPromises();
+    for (const field of ["downtime-schedule-duration", "downtime-notify-lead"]) {
+      expect((await pressEnter(wrapper, field)).defaultPrevented).toBe(true);
+    }
+    expect(dialog()).toBeNull();
+    expect(downtimes.create).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it("focuses Cancel in the mute-all dialog, so Enter there saves nothing", async () => {
     const { wrapper } = await mountPage();
     await seeSchedule(wrapper);

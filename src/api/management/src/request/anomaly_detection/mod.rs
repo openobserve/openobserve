@@ -119,8 +119,13 @@ async fn add_active_downtimes(org_id: &str, configs: &mut [serde_json::Value]) {
             .get("tags")
             .and_then(|t| serde_json::from_value(t.clone()).ok())
             .unwrap_or_default();
+        let query_mode = text("query_mode").unwrap_or_default();
         let dims = o2_enterprise::enterprise::downtimes::scope::anomaly_dimensions(
-            text("custom_sql").as_deref(),
+            openobserve_core::alerts::downtimes::anomaly_sql(
+                &query_mode,
+                text("custom_sql").as_deref(),
+            ),
+            openobserve_core::alerts::downtimes::anomaly_filters(&query_mode, obj.get("filters")),
             &tags,
             &semantic_groups,
         );

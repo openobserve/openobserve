@@ -43,6 +43,9 @@ pub const MAX_FINISH_ATTEMPTS: i32 = 5;
 /// Rebuilds per finish while incremental passes keep moving the watermark; the next tick retries.
 const REBUILD_ATTEMPTS: usize = 3;
 
+/// A re-measure's rebuilt aggregate and burn cache, read before its guarded finish.
+type RebuildRead = (super::reconcile::Rebuild, Option<super::job::BurnRebuild>);
+
 /// Whether the job has more work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChunkOutcome {
@@ -235,35 +238,58 @@ async fn try_finish(
     version: i64,
     now: i64,
 ) -> Result<bool, anyhow::Error> {
-    for _ in 0..REBUILD_ATTEMPTS {
-        let (rebuilt, burn) = if remeasure {
-            (
+    let generation = slo.definition_generation;
+    finish_with_rebuilds(db, &slo.id, generation, version, now, move || async move {
+        if remeasure {
+            Ok((
                 super::reconcile::rebuild(slo).await?,
                 super::job::rebuild_burn_cache(slo).await?,
-            )
+            ))
         } else {
-            (super::reconcile::Rebuild::default(), None)
-        };
-        let generation = slo.definition_generation;
-        match finish_job(
+            Ok((super::reconcile::Rebuild::default(), None))
+        }
+    })
+    .await
+}
+
+/// Finishes on a current rebuild; a watermark that never holds still marks the job done.
+async fn finish_with_rebuilds<F>(
+    db: &DatabaseConnection,
+    slo_id: &str,
+    generation: i32,
+    version: i64,
+    now: i64,
+    mut rebuild: impl FnMut() -> F,
+) -> Result<bool, anyhow::Error>
+where
+    F: std::future::Future<Output = Result<RebuildRead, anyhow::Error>>,
+{
+    let mut last_burn = None;
+    for _ in 0..REBUILD_ATTEMPTS {
+        let (rebuilt, burn) = rebuild().await?;
+        let finished = finish_job(
             db,
-            &slo.id,
+            slo_id,
             generation,
             version,
             now,
             &rebuilt,
             burn.as_ref(),
         )
-        .await?
-        {
+        .await?;
+        match finished {
             Finish::Done => return Ok(true),
             Finish::Superseded => return Ok(false),
-            Finish::Stale => {
-                log::info!("[slo] a pass moved {} during its re-measure finish", slo.id)
-            }
+            Finish::Stale => log::info!("[slo] a pass moved {slo_id} during its re-measure finish"),
         }
+        last_burn = burn;
     }
-    Ok(false)
+    // The slo_maintenance sweep reconciles the aggregate; the burn merge accepts a newer watermark.
+    log::warn!("[slo] {slo_id} kept moving through its re-measure finish; the sweep reconciles it");
+    let rebuilt = super::reconcile::Rebuild::default();
+    let burn = last_burn.as_ref();
+    let finished = finish_job(db, slo_id, generation, version, now, &rebuilt, burn).await?;
+    Ok(finished == Finish::Done)
 }
 
 /// Counts a re-measure's failure, FAILED at the last attempt; a plain backfill retries for good.
@@ -1073,5 +1099,52 @@ mod tests {
             jobs::get(&db, "slo1", 1).await.unwrap().unwrap().state,
             jobs::STATE_DONE
         );
+    }
+
+    #[tokio::test]
+    async fn a_watermark_that_moves_on_every_rebuild_still_ends_done() {
+        let db = jobs_db().await;
+        pass_at(&db, WM, 10.0, 20.0).await;
+        jobs::queue_remeasure(&db, "slo1", 1, WM - 3_600, WM, 100)
+            .await
+            .unwrap();
+        let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+        let mut watermark = WM;
+        let mut rebuilds = 0;
+        let finished = finish_with_rebuilds(&db, "slo1", 1, loaded.updated_at, 100, || {
+            rebuilds += 1;
+            let read = rebuilt_at(Some(watermark), 15.0);
+            // A pass commits after every rebuild read.
+            watermark += SLICE;
+            let (db, moved_to) = (&db, watermark);
+            async move {
+                pass_at(db, moved_to, 1.0, 1.0).await;
+                Ok((read, Some(burn_rebuild(true))))
+            }
+        })
+        .await;
+        assert!(finished.unwrap());
+        assert_eq!(rebuilds, REBUILD_ATTEMPTS);
+        assert_eq!(
+            jobs::get(&db, "slo1", 1).await.unwrap().unwrap().state,
+            jobs::STATE_DONE
+        );
+        let passes = 10.0 + REBUILD_ATTEMPTS as f64;
+        assert_eq!(
+            rollup_good(&db).await,
+            Some(passes),
+            "the passes' totals stay for the sweep"
+        );
+        let row = slo_table::load_status(&db, "slo1", "")
+            .await
+            .unwrap()
+            .unwrap();
+        let buf = config::meta::slo::burn::parse_trailing(row.trailing_slices.as_ref());
+        assert_eq!(
+            buf.get(&(WM - 2 * SLICE)),
+            Some(&(0.0, 0.0)),
+            "the corrected burn slice is written"
+        );
+        assert!(row.burn_windows.is_some());
     }
 }

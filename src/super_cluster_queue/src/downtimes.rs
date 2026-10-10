@@ -207,7 +207,7 @@ async fn apply_put<'a, C: ConnectionTrait + TransactionTrait>(
         let Some(planned) = plan_put(conn, downtime).await? else {
             return Ok(None);
         };
-        let plan = remeasure_plan(&planned, planner).await?;
+        let plan = remeasure_plan(&planned, planner).await;
         if write_put(conn, &planned, &plan).await? {
             return Ok(Some(WrittenPut { planned, plan }));
         }
@@ -317,21 +317,25 @@ fn delete_applies(stored: RowVersion, version: i64, deleted_at: i64) -> bool {
     }
 }
 
-/// Slices and re-measure jobs are per region, so a replicated edit re-measures here as a save does.
+/// Re-measures are per region; a failed plan still writes the row and the next edit re-plans.
 async fn remeasure_plan<'a>(
     planned: &PlannedPut,
     planner: &(dyn Fn(Option<Downtime>, Downtime) -> PlanFuture<'a> + Sync),
-) -> Result<RemeasurePlan> {
+) -> RemeasurePlan {
     let (before, after) = (planned.before.as_ref(), &planned.downtime);
     if !openobserve_core::downtimes::corrections_may_change(before, after) {
-        return Ok(RemeasurePlan::default());
+        return RemeasurePlan::default();
     }
-    planner(before.cloned(), after.clone()).await.map_err(|e| {
-        Error::Message(format!(
-            "[DOWNTIMES] could not plan the SLO re-measure of {}/{}: {e}",
-            after.org, after.id
-        ))
-    })
+    planner(before.cloned(), after.clone())
+        .await
+        .unwrap_or_else(|e| {
+            log::error!(
+                "[DOWNTIMES] could not plan the SLO re-measure of {}/{}, writing it without one: {e}",
+                after.org,
+                after.id
+            );
+            RemeasurePlan::default()
+        })
 }
 
 /// A row that arrives before its folder is filed in the default folder until its next edit.
@@ -999,16 +1003,22 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_put_whose_plan_fails_writes_no_row() {
-        let db = db().await;
+    async fn a_put_whose_plan_fails_still_stores_the_row_and_queues_nothing() {
+        let (db, _) = slo_db().await;
         let planner = |_: Option<Downtime>, _: Downtime| -> PlanFuture<'static> {
             Box::pin(async { Err(anyhow::anyhow!("SLO list unreadable")) })
         };
-        assert!(apply_put(&db, &slo_downtime(), &planner).await.is_err());
+        let replicated = slo_downtime();
+        let written = apply_put(&db, &replicated, &planner)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(written.plan.jobs().is_empty());
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
-            None
+            Some(replicated)
         );
+        assert!(jobs(&db).await.is_empty());
     }
 
     #[tokio::test]

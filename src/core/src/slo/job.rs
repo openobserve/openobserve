@@ -941,6 +941,19 @@ fn fold_burn_cache(
     (burn::trailing_to_json(&buf), windows)
 }
 
+/// The rollup row under its lock, read only for a burn cache; an SLO without burn alerts skips it.
+async fn rollup_for_burn<C: sea_orm::ConnectionTrait>(
+    txn: &C,
+    slo_id: &str,
+    durations: &[i64],
+) -> Result<Option<infra::table::entity::slo_status::Model>, infra::errors::Error> {
+    if durations.is_empty() {
+        return Ok(None);
+    }
+    // Read under the row lock, so a re-measure's burn rebuild cannot land before the write.
+    slo_table::load_rollup_for_update(txn, slo_id).await
+}
+
 /// The pass's status write, with the burn cache folded onto the rollup row it locks first.
 pub(super) async fn write_pass_status(
     db: &sea_orm::DatabaseConnection,
@@ -953,8 +966,7 @@ pub(super) async fn write_pass_status(
     use sea_orm::TransactionTrait;
 
     let txn = db.begin().await?;
-    // Read under the row lock, so a re-measure's burn rebuild cannot land before the write.
-    let rollup = match slo_table::load_rollup_for_update(&txn, &slo.id).await {
+    let rollup = match rollup_for_burn(&txn, &slo.id, durations).await {
         Ok(row) => row,
         Err(e) => {
             let _ = txn.rollback().await;
@@ -2403,5 +2415,16 @@ mod downtime_correction_tests {
         assert!(!corrects_slos(false, &rows));
         assert!(corrects_slos(true, &rows));
         assert!(!corrects_slos(true, &[]));
+    }
+
+    #[tokio::test]
+    async fn a_pass_without_burn_alerts_locks_no_rollup_row() {
+        // No status table exists, so any read of the rollup row fails.
+        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
+        assert!(rollup_for_burn(&db, "slo1", &[]).await.unwrap().is_none());
+        assert!(
+            rollup_for_burn(&db, "slo1", &[3600]).await.is_err(),
+            "a burn cache reads the row"
+        );
     }
 }
