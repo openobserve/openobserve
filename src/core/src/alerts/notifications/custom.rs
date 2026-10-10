@@ -98,6 +98,8 @@ pub(crate) fn apply_custom_template_plain(
         .replace("{alert_warning_threshold}", &ctx.alert_threshold_warn)
         .replace("{alert_start_time}", &ctx.alert_start_time)
         .replace("{alert_end_time}", &ctx.alert_end_time)
+        .replace("{alert_start_time_millis}", &ctx.alert_start_time_millis)
+        .replace("{alert_end_time_millis}", &ctx.alert_end_time_millis)
         .replace("{alert_url}", &ctx.alert_url)
         .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
         .replace(
@@ -519,6 +521,8 @@ mod golden {
             alert_threshold_warn: "80".into(),
             alert_start_time: "2026-08-01T10:00:00".into(),
             alert_end_time: "2026-08-01T10:10:00".into(),
+            alert_start_time_millis: "1785578400000".into(),
+            alert_end_time_millis: "1785579000000".into(),
             alert_url: "https://o2.example/short/abc".into(),
             alert_trigger_time: 1_754_000_000_000_000,
             alert_trigger_time_str: "2026-08-01T10:10:00".into(),
@@ -621,6 +625,20 @@ mod golden {
     fn golden_rows_json_context() {
         let out = apply_custom_template(r#"{"rows": "{rows}"}"#, &fixture_ctx(), false);
         assert_eq!(out, GOLDEN_ROWS_JSON);
+    }
+
+    /// The `_millis` variants substitute alongside the formatted times, which keep their output.
+    #[test]
+    fn start_and_end_time_millis_substitute() {
+        let out = apply_custom_template(
+            r#"{"from":"{alert_start_time_millis}","to":"{alert_end_time_millis}","at":"{alert_start_time}"}"#,
+            &fixture_ctx(),
+            false,
+        );
+        assert_eq!(
+            out,
+            r#"{"from":"1785578400000","to":"1785579000000","at":"2026-08-01T10:00:00"}"#
+        );
     }
 
     #[test]

@@ -3734,7 +3734,15 @@ fn process_row_templates_plain(
                     .unwrap_or_default(),
             )
             .replace("{alert_start_time}", &alert_start_time_str)
-            .replace("{alert_end_time}", &alert_end_time_str);
+            .replace("{alert_end_time}", &alert_end_time_str)
+            .replace(
+                "{alert_start_time_millis}",
+                &epoch_millis_or_na(alert_start_time),
+            )
+            .replace(
+                "{alert_end_time_millis}",
+                &epoch_millis_or_na(alert_end_time),
+            );
 
         if let Some(contidion) = &alert.query_condition.promql_condition {
             resp = resp
@@ -3803,6 +3811,15 @@ fn workflow_alert_count(alert: &Alert, rows_len: usize, actual_value: Option<f64
         }
         Some(v) if is_count_family && v.is_finite() => Value::from(v),
         _ => Value::from(rows_len),
+    }
+}
+
+/// Epoch milliseconds for a microsecond timestamp; "N/A" when unknown, like the formatted times.
+fn epoch_millis_or_na(micros: i64) -> String {
+    if micros > 0 {
+        (micros / 1000).to_string()
+    } else {
+        String::from("N/A")
     }
 }
 
@@ -4095,6 +4112,8 @@ async fn build_notification_context(
         alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
         alert_start_time: alert_start_time_str,
         alert_end_time: alert_end_time_str,
+        alert_start_time_millis: epoch_millis_or_na(alert_start_time),
+        alert_end_time_millis: epoch_millis_or_na(alert_end_time),
         alert_url,
         alert_trigger_time: evaluation_timestamp,
         alert_trigger_time_str: evaluation_timestamp_str,
@@ -5646,6 +5665,33 @@ mod tests {
     }
 
     #[test]
+    fn test_process_row_template_start_end_time_millis() {
+        let row_template = "{alert_start_time_millis}-{alert_end_time_millis}".to_string();
+        let mut with_window = Map::new();
+        with_window.insert(
+            "zo_sql_min_time".to_string(),
+            json!(1_785_578_400_123_456_i64),
+        );
+        with_window.insert(
+            "zo_sql_max_time".to_string(),
+            json!(1_785_579_000_000_000_i64),
+        );
+        let mut without_time = Map::new();
+        without_time.insert("name".to_string(), json!("Alice"));
+
+        let result = process_row_template(
+            "test_org",
+            &row_template,
+            &Alert::default(),
+            RowTemplateType::String,
+            &[with_window, without_time],
+        );
+
+        assert_eq!(result[0].as_str().unwrap(), "1785578400123-1785579000000");
+        assert_eq!(result[1].as_str().unwrap(), "N/A-N/A");
+    }
+
+    #[test]
     fn test_process_row_template_json_type_invalid_json_fallback() {
         let row_template = "This is not valid JSON: {name}".to_string();
         let mut row1 = Map::new();
@@ -5976,6 +6022,49 @@ mod tests {
         assert_eq!(arr.len(), 2);
         assert_eq!(arr[0]["user"], "Alice");
         assert_eq!(arr[1]["user"], "Bob");
+    }
+
+    #[tokio::test]
+    async fn test_process_dest_template_start_end_time_millis() {
+        let dest_tpl = r#"{"from": "{alert_start_time_millis}", "to": "{alert_end_time_millis}"}"#;
+        let mut row1 = Map::new();
+        row1.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json!(1_785_578_400_123_456_i64),
+        );
+        let mut row2 = Map::new();
+        row2.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            json!(1_785_578_430_000_000_i64),
+        );
+        let options = ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+            episode_id: None,
+            resolved: false,
+        };
+
+        let result = process_dest_template(
+            "test_org",
+            dest_tpl,
+            &Alert::default(),
+            &[row1, row2],
+            &[],
+            options,
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        // the end bound carries the one-minute pad of get_alert_start_end_time
+        assert_eq!(
+            result,
+            r#"{"from": "1785578400123", "to": "1785578490000"}"#
+        );
     }
 
     #[tokio::test]

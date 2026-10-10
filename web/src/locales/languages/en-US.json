@@ -8203,6 +8203,8 @@
         "alertDescription": "The alert's description text",
         "alertStartTime": "Window start time (ISO 8601)",
         "alertEndTime": "Window end time (ISO 8601)",
+        "alertStartTimeMillis": "Window start time in epoch millis",
+        "alertEndTimeMillis": "Window end time in epoch millis",
         "alertUrl": "Link back to OpenObserve to investigate",
         "alertTriggerTime": "When the alert fired (ISO 8601)",
         "alertTriggerTimeMillis": "Trigger time in epoch millis",
