@@ -15585,7 +15585,6 @@
         "previewLabel": "Steps it runs here",
         "openChild": "Open \"{name}\"",
         "noAccessRemedy": "Ask for read access to its folder, or remove the reference.",
-        "disabledTooltip": "Subtests are not enabled on this deployment.",
         "loadFailed": "Couldn't load this subtest, so its steps and step count are unknown.",
         "missing": "This subtest no longer exists. Remove the reference, or pick another test.",
         "noAccessBadge": "no access",

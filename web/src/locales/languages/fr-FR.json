@@ -15585,7 +15585,6 @@
         "previewLabel": "Étapes exécutées ici",
         "openChild": "Ouvrir « {name} »",
         "noAccessRemedy": "Demandez l'accès en lecture à son dossier, ou supprimez la référence.",
-        "disabledTooltip": "Les sous-tests ne sont pas activés sur ce déploiement.",
         "loadFailed": "Impossible de charger ce sous-test : ses étapes et leur nombre sont inconnus.",
         "missing": "Ce sous-test n’existe plus. Supprimez la référence ou choisissez un autre test.",
         "noAccessBadge": "pas d'accès",

@@ -15585,7 +15585,6 @@
         "previewLabel": "Burada çalıştırdığı adımlar",
         "openChild": "\"{name}\" testini aç",
         "noAccessRemedy": "Klasörüne okuma erişimi isteyin veya referansı kaldırın.",
-        "disabledTooltip": "Bu dağıtımda alt testler etkin değil.",
         "loadFailed": "Bu alt test yüklenemedi, bu nedenle adımları ve adım sayısı bilinmiyor.",
         "missing": "Bu alt test artık mevcut değil. Referansı kaldırın veya başka bir test seçin.",
         "noAccessBadge": "erişim yok",

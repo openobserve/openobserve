@@ -15580,7 +15580,6 @@
         "previewLabel": "在此執行的步驟",
         "openChild": "開啟「{name}」",
         "noAccessRemedy": "請申請其資料夾的讀取權限，或移除該參照。",
-        "disabledTooltip": "此部署未啟用子測試。",
         "loadFailed": "無法載入此子測試，因此其步驟和步驟數未知。",
         "missing": "此子測試已不存在。請移除參照，或選擇其他測試。",
         "noAccessBadge": "無權存取",

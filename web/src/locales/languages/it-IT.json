@@ -15585,7 +15585,6 @@
         "previewLabel": "Passi eseguiti qui",
         "openChild": "Apri \"{name}\"",
         "noAccessRemedy": "Chiedi l'accesso in lettura alla sua cartella, o rimuovi il riferimento.",
-        "disabledTooltip": "I subtest non sono abilitati in questa installazione.",
         "loadFailed": "Impossibile caricare questo subtest, quindi i suoi passi e il loro numero sono sconosciuti.",
         "missing": "Questo subtest non esiste più. Rimuovi il riferimento o scegli un altro test.",
         "noAccessBadge": "nessun accesso",

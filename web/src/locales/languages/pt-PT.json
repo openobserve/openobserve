@@ -15585,7 +15585,6 @@
         "previewLabel": "Passos que executa aqui",
         "openChild": "Abrir \"{name}\"",
         "noAccessRemedy": "Peça acesso de leitura à pasta dele, ou remova a referência.",
-        "disabledTooltip": "Os subtestes não estão ativados nesta implementação.",
         "loadFailed": "Não foi possível carregar este subteste, por isso os passos e o número de passos são desconhecidos.",
         "missing": "Este subteste já não existe. Remova a referência ou escolha outro teste.",
         "noAccessBadge": "sem acesso",

@@ -15585,7 +15585,6 @@
         "previewLabel": "Stappen die hier draaien",
         "openChild": "\"{name}\" openen",
         "noAccessRemedy": "Vraag leestoegang tot de map, of verwijder de verwijzing.",
-        "disabledTooltip": "Subtests zijn niet ingeschakeld in deze implementatie.",
         "loadFailed": "Deze subtest kon niet worden geladen, dus de stappen en het aantal stappen zijn onbekend.",
         "missing": "Deze subtest bestaat niet meer. Verwijder de verwijzing of kies een andere test.",
         "noAccessBadge": "geen toegang",

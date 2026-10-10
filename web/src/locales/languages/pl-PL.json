@@ -15585,7 +15585,6 @@
         "previewLabel": "Kroki wykonywane tutaj",
         "openChild": "Otwórz \"{name}\"",
         "noAccessRemedy": "Poproś o dostęp do odczytu jego folderu albo usuń odwołanie.",
-        "disabledTooltip": "Podtesty nie są włączone w tym wdrożeniu.",
         "loadFailed": "Nie udało się wczytać tego podtestu, więc jego kroki i ich liczba są nieznane.",
         "missing": "Ten podtest już nie istnieje. Usuń odwołanie lub wybierz inny test.",
         "noAccessBadge": "brak dostępu",

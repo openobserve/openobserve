@@ -15585,7 +15585,6 @@
         "previewLabel": "Các bước chạy tại đây",
         "openChild": "Mở \"{name}\"",
         "noAccessRemedy": "Hãy xin quyền đọc thư mục của nó, hoặc bỏ tham chiếu.",
-        "disabledTooltip": "Bài test con chưa được bật trên bản triển khai này.",
         "loadFailed": "Không thể tải bài test con này, nên chưa biết các bước và số bước của nó.",
         "missing": "Bài test con này không còn tồn tại. Hãy xóa tham chiếu hoặc chọn bài test khác.",
         "noAccessBadge": "không có quyền",

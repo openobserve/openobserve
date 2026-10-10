@@ -15585,7 +15585,6 @@
         "previewLabel": "Pasos que ejecuta aquí",
         "openChild": "Abrir \"{name}\"",
         "noAccessRemedy": "Pida acceso de lectura a su carpeta, o elimine la referencia.",
-        "disabledTooltip": "Los subtests no están habilitados en esta implementación.",
         "loadFailed": "No se pudo cargar este subtest, así que sus pasos y el número de pasos son desconocidos.",
         "missing": "Este subtest ya no existe. Quita la referencia o elige otro test.",
         "noAccessBadge": "sin acceso",
