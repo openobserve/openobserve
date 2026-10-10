@@ -15,5 +15,6 @@
 
 pub mod cluster_info;
 pub mod grpc;
+pub mod memory_metrics;
 pub mod node;
 pub mod runtime_metrics;

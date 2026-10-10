@@ -68,12 +68,14 @@ impl MemoryPool for PeakMemoryPool {
 
     fn grow(&self, reservation: &MemoryReservation, additional: usize) {
         self.inner.grow(reservation, additional);
+        add_reserved(additional as i64);
         let current = self.inner.reserved();
         self.update_peak(current);
     }
 
     fn shrink(&self, reservation: &MemoryReservation, size: usize) {
         self.inner.shrink(reservation, size);
+        add_reserved(-(size as i64));
     }
 
     fn try_grow(
@@ -83,6 +85,7 @@ impl MemoryPool for PeakMemoryPool {
     ) -> Result<(), datafusion::error::DataFusionError> {
         let result = self.inner.try_grow(reservation, additional);
         if result.is_ok() {
+            add_reserved(additional as i64);
             let current = self.inner.reserved();
             self.update_peak(current);
         }
@@ -96,6 +99,13 @@ impl MemoryPool for PeakMemoryPool {
     fn memory_limit(&self) -> MemoryLimit {
         self.inner.memory_limit()
     }
+}
+
+/// Process-wide total across every live query and merge pool.
+fn add_reserved(delta: i64) {
+    config::metrics::DATAFUSION_MEMORY_RESERVED_BYTES
+        .with_label_values::<&str>(&[])
+        .add(delta);
 }
 
 impl fmt::Display for PeakMemoryPool {
