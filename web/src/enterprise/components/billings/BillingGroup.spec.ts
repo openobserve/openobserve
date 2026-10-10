@@ -35,6 +35,8 @@ vi.mock("@/services/billings", async (importOriginal) => {
       send_billing_group_invite: vi.fn(),
       accept_billing_group_invite: vi.fn(),
       reject_billing_group_invite: vi.fn(),
+      remove_billing_group_member: vi.fn(),
+      leave_billing_group: vi.fn(),
     },
   });
 });
@@ -46,6 +48,8 @@ const billing = BillingService as unknown as {
   send_billing_group_invite: ReturnType<typeof vi.fn>;
   accept_billing_group_invite: ReturnType<typeof vi.fn>;
   reject_billing_group_invite: ReturnType<typeof vi.fn>;
+  remove_billing_group_member: ReturnType<typeof vi.fn>;
+  leave_billing_group: ReturnType<typeof vi.fn>;
 };
 
 interface MountOptions {
@@ -57,6 +61,8 @@ interface MountOptions {
   // When true, render the ODrawer body slot inline (a real <OForm> + fields)
   // instead of fully stubbing the drawer — needed for the invite-form tests.
   renderDrawer?: boolean;
+  // When true, render each row's actions cell so row buttons can be found.
+  renderTable?: boolean;
 }
 
 // Slot-rendering ODrawer stub so the real OForm in the body is mounted.
@@ -67,6 +73,13 @@ const ODrawerSlotStub = {
   emits: ["update:open", "click:primary", "click:secondary"],
 };
 
+const OTableActionsStub = {
+  name: "OTable",
+  template:
+    "<div><div v-for='row in data' :key='row.key'><slot name='cell-actions' :row='row' /></div></div>",
+  props: ["data"],
+};
+
 async function mountBillingGroup(opts: MountOptions = {}) {
   const {
     membership = null,
@@ -75,6 +88,7 @@ async function mountBillingGroup(opts: MountOptions = {}) {
     allowedOrgs = "default",
     org = "default",
     renderDrawer = false,
+    renderTable = false,
   } = opts;
 
   billing.get_billing_group_membership.mockResolvedValue({
@@ -102,8 +116,11 @@ async function mountBillingGroup(opts: MountOptions = {}) {
       stubs: {
         OButton: true,
         AppTabs: true,
-        OTable: true,
+        OTable: renderTable ? OTableActionsStub : true,
         ODrawer: renderDrawer ? ODrawerSlotStub : true,
+        ODialog: true,
+        ODropdown: { template: "<div><slot name='trigger' /><slot /></div>" },
+        ODropdownItem: true,
       },
     },
   });
@@ -489,6 +506,121 @@ describe("BillingGroup.vue", () => {
 
       expect(form.state.isValid).toBe(true);
       expect(billing.send_billing_group_invite).toHaveBeenCalledWith("default", "target-org");
+    });
+  });
+
+  describe("remove member and leave group", () => {
+    const member = {
+      id: 1,
+      payer_org_id: "default",
+      member_org_id: "child-1",
+      member_org_name: "Child One",
+      created_at: 1,
+      created_by: "a@b.com",
+      accepted_by: null,
+    };
+    const sentPending = {
+      token: "sent-1",
+      inviter_org_id: "default",
+      invitee_org_id: "target-org",
+      invitee_org_name: "Target Org",
+      inviter_id: "me@default.com",
+      status: "Pending",
+      created_at: 2,
+      expires_at: 3,
+    };
+    const membership = {
+      id: 1,
+      payer_org_id: "payer-id",
+      payer_org_name: "Acme",
+      member_org_id: "default",
+      created_at: 1,
+      created_by: "root@example.com",
+      accepted_by: null,
+    };
+
+    const button = (w: VueWrapper<any>, dataTest: string) =>
+      w.findAllComponents({ name: "OButton" }).find((b) => b.attributes("data-test") === dataTest);
+    const dialog = (w: VueWrapper<any>, dataTest: string) =>
+      w.findAllComponents({ name: "ODialog" }).find((d) => d.attributes("data-test") === dataTest)!;
+
+    it("offers Remove on active rows and not on pending rows", async () => {
+      ({ wrapper } = await mountBillingGroup({
+        members: [member],
+        invites: [sentPending],
+        renderTable: true,
+      }));
+
+      expect(button(wrapper, "org-group-remove-member-child-1")).toBeDefined();
+      expect(wrapper.find('[data-test="org-group-remove-member-child-1-menu"]').exists()).toBe(
+        true,
+      );
+      expect(button(wrapper, "org-group-remove-member-target-org")).toBeUndefined();
+      expect(wrapper.find('[data-test="org-group-remove-member-target-org-menu"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("removes the member with the right ids after the dialog is accepted, then reloads", async () => {
+      billing.remove_billing_group_member.mockResolvedValue({ data: "ok" });
+      ({ wrapper } = await mountBillingGroup({ members: [member], renderTable: true }));
+
+      button(wrapper, "org-group-remove-member-child-1")!.vm.$emit("click");
+      await flushPromises();
+      const removeDialog = dialog(wrapper, "org-group-remove-dialog");
+      expect(removeDialog.props("open")).toBe(true);
+
+      removeDialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(billing.remove_billing_group_member).toHaveBeenCalledWith("default", "child-1");
+      expect(billing.get_billing_group_membership).toHaveBeenCalledTimes(2);
+      expect(dialog(wrapper, "org-group-remove-dialog").props("open")).toBe(false);
+    });
+
+    it("shows Leave billing group on the member view only", async () => {
+      ({ wrapper } = await mountBillingGroup({ membership }));
+      expect(button(wrapper, "org-group-leave")).toBeDefined();
+      wrapper.unmount();
+
+      ({ wrapper } = await mountBillingGroup({ members: [member] }));
+      expect(button(wrapper, "org-group-leave")).toBeUndefined();
+    });
+
+    it("leaves the group after the dialog is accepted, then reloads", async () => {
+      billing.leave_billing_group.mockResolvedValue({ data: "ok" });
+      ({ wrapper } = await mountBillingGroup({ membership }));
+
+      button(wrapper, "org-group-leave")!.vm.$emit("click");
+      await flushPromises();
+      const leaveDialog = dialog(wrapper, "org-group-leave-dialog");
+      expect(leaveDialog.props("open")).toBe(true);
+
+      leaveDialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(billing.leave_billing_group).toHaveBeenCalledWith("default");
+      expect(billing.get_billing_group_membership).toHaveBeenCalledTimes(2);
+    });
+
+    it("calls nothing when either dialog is cancelled", async () => {
+      ({ wrapper } = await mountBillingGroup({ members: [member], renderTable: true }));
+      button(wrapper, "org-group-remove-member-child-1")!.vm.$emit("click");
+      await flushPromises();
+      dialog(wrapper, "org-group-remove-dialog").vm.$emit("click:secondary");
+      await flushPromises();
+      expect(dialog(wrapper, "org-group-remove-dialog").props("open")).toBe(false);
+      wrapper.unmount();
+
+      ({ wrapper } = await mountBillingGroup({ membership }));
+      button(wrapper, "org-group-leave")!.vm.$emit("click");
+      await flushPromises();
+      dialog(wrapper, "org-group-leave-dialog").vm.$emit("click:secondary");
+      await flushPromises();
+      expect(dialog(wrapper, "org-group-leave-dialog").props("open")).toBe(false);
+
+      expect(billing.remove_billing_group_member).not.toHaveBeenCalled();
+      expect(billing.leave_billing_group).not.toHaveBeenCalled();
     });
   });
 });
