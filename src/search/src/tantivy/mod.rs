@@ -853,8 +853,8 @@ mod tests {
     #[test]
     fn test_get_cache_entry_distinct() {
         let mut distinct_values = HashSet::new();
-        distinct_values.insert("value1".to_string());
-        distinct_values.insert("value2".to_string());
+        distinct_values.insert(Some("value1".to_string()));
+        distinct_values.insert(Some("value2".to_string()));
         let result = TantivyResult::Distinct(distinct_values.clone());
 
         let entry = get_cache_entry(result);

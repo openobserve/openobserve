@@ -103,13 +103,14 @@ impl WarmPlan {
         match rule {
             None => {}
             Some(IndexOptimizeMode::SimpleDistinct(field, ..)) => {
-                // This collector reads only the target term dictionary and
-                // does not execute the Tantivy query.
                 debug_assert!(
                     file_in_range,
                     "SimpleDistinct files must be fully covered by the query time range"
                 );
                 *self = Self::default();
+                if query.downcast_ref::<tantivy::query::AllQuery>().is_some() {
+                    self.fast_fields.insert(field.clone());
+                }
                 if let Ok(field) = schema.get_field(field) {
                     self.dictionary_field = Some(field);
                 }
@@ -312,6 +313,17 @@ mod tests {
         );
         assert_eq!(exact_terms(&not_equal).len(), 1);
         assert!(not_equal.full_posting_fields.is_empty());
+    }
+
+    #[test]
+    fn simple_distinct_warms_fast_field_for_null_detection() {
+        let (plan, _) = build_plan(
+            Condition::All(),
+            Some(IndexOptimizeMode::SimpleDistinct("tag".into(), 1, true)),
+            true,
+            false,
+        );
+        assert_eq!(plan.fast_fields, HashSet::from(["tag".to_string()]));
     }
 
     #[test]

@@ -322,7 +322,7 @@ mod tests {
         assert_eq!(prepared.fallback_files[0].key, files[0].key);
         assert_eq!(answered_files(&prepared), 2);
         assert!(
-            matches!(result(&prepared), Some(TantivyMultiResult::Distinct(values)) if values.len() == 1 && values.contains("svc-a"))
+            matches!(result(&prepared), Some(TantivyMultiResult::Distinct(values)) if values.len() == 1 && values.contains(&Some("svc-a".to_string())))
         );
     }
 

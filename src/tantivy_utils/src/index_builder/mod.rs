@@ -148,7 +148,19 @@ fn build_tantivy_schema(
         .collect::<HashSet<_>>();
     let index_fields_filtered = index_fields
         .iter()
-        .filter(|f| schema_fields.contains_key(f))
+        .filter(|f| {
+            schema_fields.get(f).is_some_and(|v| {
+                matches!(
+                    v.data_type(),
+                    DataType::Utf8
+                        | DataType::LargeUtf8
+                        | DataType::Int64
+                        | DataType::UInt64
+                        | DataType::Float64
+                        | DataType::Boolean
+                )
+            })
+        })
         .map(String::from)
         .collect::<HashSet<_>>();
     let tantivy_fields: HashSet<_> = &fts_fields_filtered | &index_fields_filtered;
@@ -198,9 +210,7 @@ macro_rules! process_string_array_sync {
     ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
         if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
             for (i, doc) in $docs.iter_mut().enumerate() {
-                if array.is_null(i) {
-                    doc.add_text($field, "");
-                } else {
+                if !array.is_null(i) {
                     doc.add_text($field, array.value(i));
                 }
             }
@@ -213,9 +223,7 @@ macro_rules! process_numeric_array_sync {
     ($data:expr, $array_type:ty, $docs:expr, $field:expr) => {
         if let Some(array) = $data.as_any().downcast_ref::<$array_type>() {
             for (i, doc) in $docs.iter_mut().enumerate() {
-                if array.is_null(i) {
-                    doc.add_text($field, "");
-                } else {
+                if !array.is_null(i) {
                     let text = array.value(i).to_string();
                     doc.add_text($field, &text);
                 }
@@ -251,13 +259,6 @@ pub(super) fn convert_batch_to_docs_sync(
             process_numeric_array_sync!(data, UInt64Array, docs, field);
             process_numeric_array_sync!(data, Float64Array, docs, field);
             process_numeric_array_sync!(data, BooleanArray, docs, field);
-            for doc in docs.iter_mut() {
-                doc.add_text(field, "");
-            }
-        } else {
-            for doc in docs.iter_mut() {
-                doc.add_text(field, "");
-            }
         }
     }
 
@@ -285,6 +286,63 @@ pub(super) mod tests {
     use config::TIMESTAMP_COL_NAME;
 
     use super::*;
+
+    #[test]
+    fn test_null_fields_preserve_documents_and_empty_values() {
+        use arrow::array::{BooleanArray, Float64Array, Int32Array, UInt64Array};
+        use tantivy::schema::Value;
+
+        let schema = Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("s", DataType::Utf8, true),
+            Field::new("i", DataType::Int64, true),
+            Field::new("u", DataType::UInt64, true),
+            Field::new("f", DataType::Float64, true),
+            Field::new("b", DataType::Boolean, true),
+            Field::new("unsupported", DataType::Int32, true),
+        ]);
+        let batch = RecordBatch::try_new(
+            Arc::new(schema),
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2])),
+                Arc::new(StringArray::from(vec![None, Some("")])),
+                Arc::new(Int64Array::from(vec![None, Some(0)])),
+                Arc::new(UInt64Array::from(vec![None, Some(0)])),
+                Arc::new(Float64Array::from(vec![None, Some(0.0)])),
+                Arc::new(BooleanArray::from(vec![None, Some(false)])),
+                Arc::new(Int32Array::from(vec![None, Some(42)])),
+            ],
+        )
+        .unwrap();
+        let mut fields = batch.schema().fields().to_vec();
+        fields.push(Arc::new(Field::new("missing", DataType::Utf8, true)));
+        let fields_to_index = ["s", "i", "u", "f", "b", "missing", "unsupported"].map(String::from);
+        let index_schema =
+            build_tantivy_schema(&[], &fields_to_index, &Schema::new(fields)).unwrap();
+        let docs = convert_batch_to_docs_sync(&batch, &index_schema);
+        assert_eq!(docs.len(), 2);
+        assert!(index_schema.schema.get_field("unsupported").is_err());
+        for (name, expected) in [
+            ("s", ""),
+            ("i", "0"),
+            ("u", "0"),
+            ("f", "0"),
+            ("b", "false"),
+        ] {
+            let field = index_schema.schema.get_field(name).unwrap();
+            assert!(docs[0].get_first(field).is_none());
+            assert_eq!(docs[1].get_first(field).unwrap().as_str(), Some(expected));
+        }
+        let missing = index_schema.schema.get_field("missing").unwrap();
+        let timestamp = index_schema.schema.get_field(TIMESTAMP_COL_NAME).unwrap();
+        for (row, doc) in docs.iter().enumerate() {
+            assert!(doc.get_first(missing).is_none());
+            assert_eq!(
+                doc.get_first(timestamp).unwrap().as_i64(),
+                Some(row as i64 + 1)
+            );
+        }
+    }
 
     /// Helper function to create test record batches.
     /// Shared with [`super::sequential`] and [`super::parallel`] test modules.

@@ -314,11 +314,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_generate_tantivy_index_non_string_fields() {
-        // Create a batch with non-string fields in the schema
         let fields = vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("content", DataType::Utf8, false),
-            Field::new("number_field", DataType::Int32, false), // Non-string field
+            Field::new("number_field", DataType::Int64, false),
         ];
 
         let schema = Arc::new(Schema::new(fields));
@@ -327,7 +326,7 @@ mod tests {
             vec![
                 Arc::new(Int64Array::from(vec![1000, 1001, 1002])),
                 Arc::new(StringArray::from(vec!["content1", "content2", "content3"])),
-                Arc::new(arrow::array::Int32Array::from(vec![1, 2, 3])),
+                Arc::new(Int64Array::from(vec![1, 2, 3])),
             ],
         )
         .unwrap();
@@ -341,7 +340,7 @@ mod tests {
             buf,
             make_index_schema(
                 &["content".to_string()],
-                &["number_field".to_string()], // This field is not Utf8
+                &["number_field".to_string()],
                 &batch.schema(),
             ),
         )
@@ -354,8 +353,21 @@ mod tests {
         let index = index.unwrap();
         let schema = index.schema();
         assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
-        assert!(schema.get_field("number_field").is_ok()); // Non-string fields are still indexed
+        assert!(schema.get_field("number_field").is_ok());
         assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+        let query = tantivy::query::TermQuery::new(
+            tantivy::Term::from_field_text(schema.get_field("number_field").unwrap(), "2"),
+            tantivy::schema::IndexRecordOption::Basic,
+        );
+        assert_eq!(
+            index
+                .reader()
+                .unwrap()
+                .searcher()
+                .search(&query, &tantivy::collector::Count)
+                .unwrap(),
+            1
+        );
     }
 
     #[tokio::test]
