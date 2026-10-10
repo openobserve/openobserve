@@ -48,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :failed-from-ms="failedFromMs"
         :timeline-ms="timelineMs"
         :single-snapshot="singleSnapshot"
+        :multi-tab-hint="anchorMovedForTabs"
         :retry-attempt="retryAttempt"
         @retry="emit('retry')"
       />
@@ -143,6 +144,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="px-1">/</div>
             <div data-test="video-player-duration">{{ playerState.duration }}</div>
           </div>
+          <span
+            v-if="showingLabel"
+            class="border-border-default text-text-body ms-3 max-w-64 truncate rounded-full border px-2 text-xs"
+            :title="shownSwitch?.href"
+            data-test="video-player-showing"
+          >
+            {{ t("rum.sessionReplayShowing", { page: showingLabel }) }}
+          </span>
           <ReplayStatusChip
             class="ms-3"
             :load-state="loadState"
@@ -187,6 +196,7 @@ import {
   onDeactivated,
 } from "vue";
 import { useStore } from "vuex";
+import { useToast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -198,10 +208,11 @@ import ReplayLoadBand from "@/components/rum/ReplayLoadBand.vue";
 import ReplayPlaybackOverlay from "@/components/rum/ReplayPlaybackOverlay.vue";
 import ReplayStatusChip from "@/components/rum/ReplayStatusChip.vue";
 import {
-  createRecordConverter,
-  dropChangesBeforeFirstSnapshot,
-  type RecordConverter,
-} from "@/utils/rum/sessionReplayChangeFormat";
+  createMultiViewDecoder,
+  type MultiViewDecoder,
+  type ReplaySwitch,
+  type StaleSpan,
+} from "@/utils/rum/sessionReplayViews";
 import { resolveRelativeLinks } from "@/utils/rum/sessionReplayUrls";
 import { MAX_ATTEMPTS } from "@/utils/rum/sessionReplayLoader";
 import {
@@ -209,7 +220,6 @@ import {
   expectsMoreData,
   formatReplayTime,
   isLoadedAt,
-  isSkipMarker,
   shouldBuffer,
   skippedCount,
   timelineLength,
@@ -251,6 +261,9 @@ const props = defineProps({
   speed: { type: Number as PropType<number | undefined>, default: undefined },
   skipInactivity: { type: Boolean as PropType<boolean | undefined>, default: undefined },
   intent: { type: String as PropType<ReplayIntent>, default: "pause" },
+  watermark: { type: Number, default: Number.POSITIVE_INFINITY },
+  anchorMovedForTabs: { type: Boolean, default: false },
+  viewEnds: { type: Map as PropType<Map<string, number>>, default: () => new Map() },
 });
 
 const emit = defineEmits<{
@@ -264,9 +277,12 @@ const emit = defineEmits<{
   "playback-state": [state: PlaybackState];
   "loaded-end-change": [sessionMs: number];
   "segments-taken": [count: number];
+  "tab-notice": [text: string];
 }>();
 
 const { t } = useI18nTyped();
+
+const { toast } = useToast();
 
 const store = useStore();
 
@@ -287,11 +303,17 @@ const worker: Ref<Worker | null> = ref(null);
 
 const workerProcessId = ref(0);
 
-// Appended segments must reuse this same converter, in order, or they decode against lost state.
-let runConverter: RecordConverter | null = null;
+// Appended segments must reuse this same decoder, in order, or they decode against lost state.
+let runDecoder: MultiViewDecoder | null = null;
+// A reused rebuilt snapshot is the same object, and its stylesheet URLs must be proxied only once.
+const decoratedSnapshots = new WeakSet<object>();
+const replaySwitches = shallowRef<ReplaySwitch[]>([]);
+const staleSpans = shallowRef<StaleSpan[]>([]);
+const multiTab = ref(false);
 // A later batch may carry no Meta record, so the page URL for resolving relative links must outlive one batch.
 let runPageHref: string | undefined;
 let convertedSegmentCount = 0;
+let lastSwitchToastAt = 0;
 let segmentWork: Promise<unknown> = Promise.resolve();
 // rrweb's controller restarts at 0 on play() after a finish, so every resume after one must go through goto.
 let finished = false;
@@ -423,6 +445,69 @@ const playerState = ref({
   actualTime: 0,
 });
 
+const playheadAbsMs = computed(() => playerState.value.startTime + playerState.value.actualTime);
+
+const switchAtPlayhead = computed(() => {
+  let found: ReplaySwitch | null = null;
+  for (const entry of replaySwitches.value) {
+    if (entry.at > playheadAbsMs.value) break;
+    found = entry;
+  }
+  return found;
+});
+
+const shownSwitch = computed(() => {
+  let found: ReplaySwitch | null = null;
+  for (const entry of replaySwitches.value) {
+    if (entry.at > playheadAbsMs.value) break;
+    if (entry.reason !== "missing") found = entry;
+  }
+  return found;
+});
+
+const pageLabel = (href: string | undefined) => {
+  if (!href) return "";
+  try {
+    const url = new URL(href);
+    return url.host ? `${url.host}${url.pathname}` : href;
+  } catch {
+    return href;
+  }
+};
+
+const showingLabel = computed(() => (multiTab.value ? pageLabel(shownSwitch.value?.href) : ""));
+
+const tabNotice = computed(() => {
+  if (switchAtPlayhead.value?.reason === "missing") return t("rum.sessionReplayMissingTab");
+  const viewId = shownSwitch.value?.viewId;
+  const now = playheadAbsMs.value;
+  const gap = staleSpans.value.find(
+    (span) => span.viewId === viewId && span.from <= now && (span.to === null || now < span.to),
+  );
+  return gap
+    ? t("rum.sessionReplayTabGap", { time: formatReplayTime(gap.from - sessionStart.value) })
+    : "";
+});
+
+// A forward move larger than real playback can produce is a seek, and a seek must not announce a switch.
+watch(playheadAbsMs, (now, previous) => {
+  if (!multiTab.value || mode.value !== "playing" || previous === undefined) return;
+  if (!(now > previous) || now - previous > 2000 * speedValue.value) return;
+  const crossed = replaySwitches.value.find(
+    (entry) =>
+      entry.at > previous && entry.at <= now && !entry.fromEnded && entry.reason !== "missing",
+  );
+  if (!crossed || Date.now() - lastSwitchToastAt < 10_000) return;
+  lastSwitchToastAt = Date.now();
+  toast({
+    variant: "info",
+    message: t("rum.sessionReplayNowShowingTab", { page: pageLabel(crossed.href) }),
+    timeout: 3000,
+  });
+});
+
+watch(tabNotice, (text) => emit("tab-notice", text), { immediate: true });
+
 onBeforeMount(async () => {
   await importVideoPlayer();
   initializeWorker();
@@ -470,7 +555,7 @@ onBeforeUnmount(() => {
     }
     player.value = null;
   }
-  runConverter = null;
+  runDecoder = null;
   runPageHref = undefined;
   convertedSegmentCount = 0;
   rrwebPlayer = null;
@@ -515,105 +600,89 @@ function calculatePlayerDimensions(): { width: number; height: number } {
   return { width: playerWidth, height: playerHeight };
 }
 
-// The converter threads node-id and string-table state across one forward-only run, so the same instance must serve every batch of that run.
-const convertSegments = (segments: any[], converter: RecordConverter, cold: boolean) => {
-  const out: any[] = [];
-  let skippedRecords = 0;
-
-  segments.forEach((segment: any, segmentIndex: number) => {
-    // A skipped segment leaves the converter out of step until the next full snapshot.
-    if (isSkipMarker(segment)) {
-      converter.markStale();
-      return;
+const decorateRecord = (record: any) => {
+  let segCopy = record;
+  if (segCopy.type === 8) {
+    segCopy = {
+      ...segCopy,
+      data: { payload: { ...segCopy.data }, tag: "viewport" },
+      type: 5,
+    };
+  }
+  if (segCopy.type === 4) runPageHref = segCopy.data?.href;
+  if (segCopy.type === 3 && segCopy.data?.source === 0) {
+    segCopy.data.adds?.forEach((add: any) => resolveRelativeLinks(add.node, runPageHref));
+  }
+  if (
+    segCopy.type === 2 &&
+    segCopy.data?.node?.type === 0 &&
+    !decoratedSnapshots.has(segCopy.data)
+  ) {
+    decoratedSnapshots.add(segCopy.data);
+    try {
+      decorateSnapshotNode(segCopy.data.node);
+    } catch (e) {
+      console.log(e);
     }
-    const convertedRecords: any[] = [];
-    // A cold converter has no string table, so Change records before the run's first snapshot decode to empty strings.
-    const records =
-      cold && segmentIndex === 0
-        ? dropChangesBeforeFirstSnapshot(segment.records ?? [])
-        : (segment.records ?? []);
-    records.forEach((record: any) => {
-      // One unconvertible record must not cost the whole session, so skip it and carry on.
-      try {
-        convertedRecords.push(...converter.convert(record));
-      } catch (e) {
-        skippedRecords++;
-        console.error("Session replay: skipped an unconvertible record", e);
-      }
-    });
-    convertedRecords.forEach((record: any) => {
-      let segCopy = record;
-      if (segCopy.type === 8) {
-        const seg = {
-          ...segCopy,
-          data: {
-            payload: {
-              ...segCopy.data,
-            },
-            tag: "viewport",
-          },
-          type: 5,
-        };
-        segCopy = seg;
-      }
-      if (segCopy.type === 4) runPageHref = segCopy.data?.href;
-      if (segCopy.type === 3 && segCopy.data?.source === 0) {
-        segCopy.data.adds?.forEach((add: any) => resolveRelativeLinks(add.node, runPageHref));
-      }
-      try {
-        if (segCopy.type === 2 && segCopy.data.node.type === 0) {
-          resolveRelativeLinks(segCopy.data.node, runPageHref);
-          segCopy.data.node.childNodes.forEach((child: any) => {
-            if (child.type === 2 && child.tagName === "html") {
-              child.childNodes.forEach((_child: any) => {
-                if (_child.type === 2 && _child.tagName === "head") {
-                  _child.childNodes.forEach((__child: any) => {
-                    if (
-                      __child.type === 2 &&
-                      __child.tagName === "link" &&
-                      __child.attributes.rel === "stylesheet" &&
-                      typeof __child.attributes.href === "string" &&
-                      __child.attributes.href.endsWith(".css") &&
-                      __child.attributes._cssText
-                    ) {
-                      workerProcessId.value++;
-                      processCss(__child.attributes._cssText, workerProcessId.value).then(
-                        (res: any) => {
-                          __child.attributes._cssText = res.updatedCssString;
-                        },
-                      );
-                    }
-                  });
-                }
-              });
-            }
+  }
+  return segCopy;
+};
+
+const decorateSnapshotNode = (node: any) => {
+  resolveRelativeLinks(node, runPageHref);
+  node.childNodes.forEach((child: any) => {
+    if (child.type !== 2 || child.tagName !== "html") return;
+    child.childNodes.forEach((_child: any) => {
+      if (_child.type !== 2 || _child.tagName !== "head") return;
+      _child.childNodes.forEach((__child: any) => {
+        if (
+          __child.type === 2 &&
+          __child.tagName === "link" &&
+          __child.attributes.rel === "stylesheet" &&
+          typeof __child.attributes.href === "string" &&
+          __child.attributes.href.endsWith(".css") &&
+          __child.attributes._cssText
+        ) {
+          workerProcessId.value++;
+          processCss(__child.attributes._cssText, workerProcessId.value).then((res: any) => {
+            __child.attributes._cssText = res.updatedCssString;
           });
         }
-      } catch (e) {
-        console.log(e);
-      }
-      out.push(segCopy);
+      });
     });
   });
+};
 
+const syncDecoderState = (decoder: MultiViewDecoder) => {
+  replaySwitches.value = decoder.switches();
+  staleSpans.value = decoder.staleSpans();
+  multiTab.value = decoder.concurrent();
+};
+
+// One decoder serves the whole forward-only run, so per-view converter state survives every batch.
+const convertSegments = (segments: any[], decoder: MultiViewDecoder) => {
+  decoder.setViewEnds(props.viewEnds);
+  const { events, skippedRecords } = decoder.push(segments, props.watermark);
   if (skippedRecords) {
     console.warn(`Session replay: ${skippedRecords} record(s) could not be converted`);
   }
-
-  return out;
+  syncDecoderState(decoder);
+  return events.map(decorateRecord);
 };
 
 const setupSession = async () => {
   session.value = [];
   if (!props.segments.length) return;
 
-  runConverter = null;
+  runDecoder = null;
   runPageHref = undefined;
   convertedSegmentCount = 0;
 
-  const converter = createRecordConverter();
+  const decoder = createMultiViewDecoder();
   const consumed = props.segments.length;
-  session.value = convertSegments(props.segments.slice(0, consumed), converter, true);
+  session.value = convertSegments(props.segments.slice(0, consumed), decoder);
+  // A push held wholly behind the watermark yields only a clock record; rrweb-player needs a snapshot, so retry on the next change with a fresh decoder.
+  if (!session.value.some((event: any) => event.type === 2)) return;
 
   session.value.every((segment: any) => {
     if (segment.data.height && segment.data.width) {
@@ -652,7 +721,7 @@ const setupSession = async () => {
   );
 
   // Adopt the run only once the player exists; a discarded conversion must not be appended to.
-  runConverter = converter;
+  runDecoder = decoder;
   convertedSegmentCount = consumed;
   takenCount.value = consumed;
 
@@ -676,9 +745,9 @@ const setupSession = async () => {
 
 // Re-running setupSession per batch would re-convert the whole session, which is the cost this path exists to avoid.
 const appendSegments = async (newSegments: any[], takenAfter: number) => {
-  if (!player.value || !runConverter || !newSegments.length) return;
+  if (!player.value || !runDecoder) return;
 
-  const records = convertSegments(newSegments, runConverter, false).sort(
+  const records = convertSegments(newSegments, runDecoder).sort(
     (a: any, b: any) => a.timestamp - b.timestamp,
   );
 
@@ -977,8 +1046,8 @@ const processCss = (cssString: string, id: string | number) => {
 };
 
 watch(
-  () => props.segments.length,
-  (length) => {
+  () => [props.segments.length, props.watermark] as const,
+  ([length]) => {
     if (!length) return;
     const step = () => {
       if (!player.value) return setupSession();

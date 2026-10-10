@@ -1333,6 +1333,183 @@ describe("VideoPlayer", () => {
     });
   });
 
+  describe("Multi-tab sessions", () => {
+    const T = 1704110400000;
+    const opening = (t: number, id: string, hasFocus = true) => [
+      { type: 4, timestamp: t, data: { href: `https://app.test/${id}`, width: 800, height: 600 } },
+      { type: 6, timestamp: t, data: { has_focus: hasFocus } },
+      {
+        type: 2,
+        format: 1,
+        timestamp: t,
+        data: [[1, [null, "#document"], [1, "HTML"], [1, "BODY"], [1, "#text", id]]],
+      },
+    ];
+    const seg = (view: string, index: number, records: any[]) => ({
+      view: { id: view },
+      index_in_view: index,
+      start: records[0].timestamp,
+      end: records[records.length - 1].timestamp,
+      records,
+    });
+
+    it("builds the player only from the shown view's events", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+      const wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.setProps({
+        segments: [seg("A", 0, opening(T, "A")), seg("B", 0, opening(T + 1000, "B", false))],
+      });
+      await flushPromises();
+      const events = (rrwebPlayerMock as any).mock.calls[0][0].props.events;
+      expect(events.filter((e: any) => e.type === 2)).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("holds records at or after the watermark until it moves", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+      playerSpies.addEvent.mockClear();
+      const wrapper = mountComponent({ watermark: T + 5000 });
+      await flushPromises();
+      await wrapper.setProps({
+        segments: [
+          seg("A", 0, [
+            ...opening(T, "A"),
+            { type: 3, timestamp: T + 9000, data: { source: 2, type: 2, id: 1, x: 0, y: 0 } },
+          ]),
+        ],
+      });
+      await flushPromises();
+      const built = (rrwebPlayerMock as any).mock.calls[0][0].props.events;
+      expect(built.some((e: any) => e.timestamp === T + 9000)).toBe(false);
+      expect(playerSpies.addEvent).not.toHaveBeenCalledWith(
+        expect.objectContaining({ timestamp: T + 9000 }),
+      );
+      await wrapper.setProps({ watermark: Infinity });
+      await flushPromises();
+      expect(playerSpies.addEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ timestamp: T + 9000 }),
+      );
+      wrapper.unmount();
+    });
+
+    it("builds no player while every record is held, then builds once the watermark moves", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+      const errorSpy = vi.spyOn(console, "error");
+      errorSpy.mockClear();
+      const wrapper = mountComponent({ watermark: T });
+      await flushPromises();
+      await wrapper.setProps({ segments: [seg("A", 0, opening(T, "A"))] });
+      await flushPromises();
+      expect(rrwebPlayerMock).not.toHaveBeenCalled();
+      expect(errorSpy).not.toHaveBeenCalled();
+      await wrapper.setProps({ watermark: Infinity });
+      await flushPromises();
+      expect(rrwebPlayerMock).toHaveBeenCalledTimes(1);
+      const built = (rrwebPlayerMock as any).mock.calls[0][0].props.events;
+      expect(built.filter((e: any) => e.type === 2)).toHaveLength(1);
+      errorSpy.mockRestore();
+      wrapper.unmount();
+    });
+
+    it("passes the known view ends to the decoder, so a page load without ViewEnd is not another tab", async () => {
+      const text = (t: number) => ({ type: 12, timestamp: t, data: [] });
+      const segments = [
+        seg("A", 0, [...opening(T, "A"), text(T + 300)]),
+        seg("B", 0, opening(T + 1000, "B")),
+      ];
+      const known = mountComponent({
+        viewEnds: new Map([
+          ["A", T + 300],
+          ["B", T + 1000],
+        ]),
+      });
+      await flushPromises();
+      await known.setProps({ segments });
+      await flushPromises();
+      expect(known.find('[data-test="video-player-showing"]').exists()).toBe(false);
+      known.unmount();
+
+      const unknown = mountComponent();
+      await flushPromises();
+      await unknown.setProps({ segments });
+      await flushPromises();
+      expect(unknown.find('[data-test="video-player-showing"]').exists()).toBe(true);
+      unknown.unmount();
+    });
+
+    it("decorates a reused rebuilt snapshot only once", async () => {
+      const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
+      (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
+      const click = (t: number) => ({
+        type: 3,
+        timestamp: t,
+        data: { source: 2, type: 2, id: 1, x: 0, y: 0 },
+      });
+      const wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.setProps({
+        segments: [
+          seg("A", 0, opening(T, "A")),
+          seg("B", 0, opening(T + 1000, "B")),
+          seg("A", 1, [click(T + 2000)]),
+          seg("B", 1, [click(T + 3000)]),
+          seg("A", 2, [click(T + 4000)]),
+        ],
+      });
+      await flushPromises();
+      const events = (rrwebPlayerMock as any).mock.calls[0][0].props.events;
+      const rebuiltA = events.filter(
+        (e: any) => e.type === 2 && (e.timestamp === T + 2000 || e.timestamp === T + 4000),
+      );
+      expect(rebuiltA).toHaveLength(2);
+      expect(rebuiltA[0].data).toBe(rebuiltA[1].data);
+      wrapper.unmount();
+    });
+
+    it("shows the Showing chip only for sessions with concurrent views", async () => {
+      const single = mountComponent();
+      await flushPromises();
+      await single.setProps({ segments: [seg("A", 0, opening(T, "A"))] });
+      await flushPromises();
+      expect(single.find('[data-test="video-player-showing"]').exists()).toBe(false);
+      single.unmount();
+
+      const multi = mountComponent();
+      await flushPromises();
+      await multi.setProps({
+        segments: [seg("A", 0, opening(T, "A")), seg("B", 0, opening(T + 1000, "B"))],
+      });
+      await flushPromises();
+      const chip = multi.find('[data-test="video-player-showing"]');
+      expect(chip.exists()).toBe(true);
+      expect(chip.text()).toContain("https://app.test/A");
+      multi.unmount();
+    });
+
+    it("emits a gap notice while the shown view is stale", async () => {
+      playerSpies.getCurrentTime.mockReturnValue(5000);
+      const wrapper = mountComponent();
+      await flushPromises();
+      await wrapper.setProps({
+        segments: [
+          seg("A", 0, opening(T, "A")),
+          seg("A", 2, [{ type: 12, timestamp: T + 3000, data: [] }]),
+        ],
+      });
+      await flushPromises();
+      (wrapper.vm as any).playerState.startTime = T;
+      (wrapper.vm as any).playerState.actualTime = 5000;
+      await flushPromises();
+      const notices = wrapper.emitted("tab-notice") ?? [];
+      expect(String(notices.at(-1)?.[0])).toContain("gap from");
+      wrapper.unmount();
+    });
+  });
+
   describe("Error and empty states", () => {
     it("shows the load error with a Retry that reaches the parent", async () => {
       const local = mountComponent({ loadState: "error" });

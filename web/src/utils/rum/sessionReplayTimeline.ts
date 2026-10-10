@@ -41,6 +41,7 @@ export interface SkipMarker {
   segmentId: string;
   start: number;
   end: number;
+  viewId?: string;
 }
 
 export type ReplayIntent = "play" | "pause";

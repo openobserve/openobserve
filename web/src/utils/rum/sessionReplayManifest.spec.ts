@@ -18,6 +18,8 @@ import {
   dedupManifest,
   trimBeforeReplayStart,
   findTargetIndex,
+  lastEndByView,
+  replayWatermark,
   segmentId,
   selectInitialWindow,
   snapshotStarts,
@@ -54,6 +56,7 @@ describe("sessionReplayManifest", () => {
         targetIndex: 4,
         from: 4000,
         to: 5000,
+        movedForViews: false,
       });
     });
 
@@ -67,6 +70,7 @@ describe("sessionReplayManifest", () => {
         targetIndex: 1,
         from: 1000,
         to: 2000,
+        movedForViews: false,
       });
     });
 
@@ -76,6 +80,7 @@ describe("sessionReplayManifest", () => {
         targetIndex: 0,
         from: 1000,
         to: 1000,
+        movedForViews: false,
       });
     });
 
@@ -95,6 +100,22 @@ describe("sessionReplayManifest", () => {
   describe("snapshotStarts", () => {
     it("lists only the segments that can anchor a cold player", () => {
       expect(snapshotStarts(manifest)).toEqual([1000, 4000]);
+    });
+  });
+
+  describe("lastEndByView", () => {
+    it("maps each view id to the end of its last row and ignores rows without one", () => {
+      const rows = [
+        { start: 1000, end: 1900, view_id: "A" },
+        { start: 1500, end: 2500, view_id: "B" },
+        { start: 2000, end: 2400, view_id: "A" },
+        { start: 3000, end: 3100 },
+        { start: 3200, end: 3300, view_id: null },
+      ];
+      expect([...lastEndByView(rows)]).toEqual([
+        ["A", 2400],
+        ["B", 2500],
+      ]);
     });
   });
 
@@ -173,6 +194,74 @@ describe("sessionReplayManifest", () => {
 
     it("counts a missing records_count as zero rather than NaN", () => {
       expect(summarizeManifest([{ start: 1, end: 2 }], true).recordCount).toBe(0);
+    });
+  });
+
+  describe("selectInitialWindow across views", () => {
+    const row = (
+      view_id: string | undefined,
+      index_in_view: number,
+      start: number,
+      end: number,
+      full = false,
+    ) => ({
+      view_id,
+      index_in_view,
+      start,
+      end,
+      has_full_snapshot: full,
+      records_count: 1,
+    });
+
+    it("anchors on the earliest snapshot among views alive at the target", () => {
+      const rows = [
+        row("A", 0, 0, 5, true),
+        row("B", 0, 10, 15, true),
+        row("A", 1, 20, 25),
+        row("C", 0, 30, 35, true),
+        row("A", 2, 40, 45),
+        row("C", 1, 40, 46),
+      ];
+      const window = selectInitialWindow(rows, 41)!;
+      expect(window.anchorIndex).toBe(0);
+      expect(window.movedForViews).toBe(true);
+    });
+
+    it("ignores a view that ended before the target", () => {
+      const rows = [row("A", 0, 0, 5, true), row("B", 0, 10, 15, true), row("B", 1, 20, 25)];
+      const window = selectInitialWindow(rows, 21)!;
+      expect(window.anchorIndex).toBe(1);
+      expect(window.movedForViews).toBe(false);
+    });
+
+    it("keeps the legacy anchor without view columns", () => {
+      const rows = [
+        row(undefined, 0, 0, 5, true),
+        row(undefined, 0, 10, 15, true),
+        row(undefined, 0, 20, 25),
+      ];
+      const window = selectInitialWindow(rows, 21)!;
+      expect(window.anchorIndex).toBe(1);
+      expect(window.movedForViews).toBe(false);
+    });
+  });
+  describe("replayWatermark", () => {
+    const rows = [
+      { start: 0, end: 5 },
+      { start: 10, end: 15 },
+      { start: 20, end: 25 },
+    ];
+
+    it("is the start of the next row the run has not taken", () => {
+      expect(replayWatermark(rows, 0, false)).toBe(10);
+    });
+
+    it("is the last row's start while live once the run holds every row", () => {
+      expect(replayWatermark(rows, 2, true)).toBe(20);
+    });
+
+    it("is unbounded once the run holds every row of a finished session", () => {
+      expect(replayWatermark(rows, 2, false)).toBe(Number.POSITIVE_INFINITY);
     });
   });
 });
