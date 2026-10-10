@@ -61,6 +61,10 @@ export const timezoneSearchText = (zone: string): string | undefined => {
   return aliases.length ? [zone, ...aliases].join(" ") : undefined;
 };
 
+/** The browser's zone exactly as it names it, for values that are saved. */
+export const savedBrowserTimezone = (): string =>
+  Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
 /** The browser's zone under its canonical name, `UTC` when the browser reports none. */
 export const browserTimezone = (): string =>
   canonicalTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");

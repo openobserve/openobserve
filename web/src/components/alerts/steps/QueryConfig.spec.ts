@@ -397,10 +397,10 @@ describe("QueryConfig.vue", () => {
       expect(submitted[0].trigger_condition.timezone).toBe("Asia/Calcutta");
     });
 
-    it("onCronTimezoneChange stores a legacy zone under its canonical name", async () => {
+    it("onCronTimezoneChange stores a legacy zone as picked, as main did", async () => {
       wrapper.vm.onCronTimezoneChange("Asia/Calcutta");
       await nextTick();
-      expect(wrapper.vm.cronTimezone).toBe("Asia/Kolkata");
+      expect(wrapper.vm.cronTimezone).toBe("Asia/Calcutta");
     });
   });
 

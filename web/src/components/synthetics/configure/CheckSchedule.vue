@@ -20,7 +20,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, BrowserCheckSchedule } from "@/types/synthetics";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
-import { browserTimezone } from "@/utils/timezoneAliases";
+import { browserTimezone, savedBrowserTimezone } from "@/utils/timezoneAliases";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -76,7 +76,7 @@ const frequencyPreset = computed<FrequencyPreset>({
   set: (v: FrequencyPreset) => {
     if (v === "cron") {
       const patch: Partial<BrowserCheckSchedule> = { type: "cron", isCustomFrequency: false };
-      if (!props.check.schedule.timezone) patch.timezone = browserTimezone();
+      if (!props.check.schedule.timezone) patch.timezone = savedBrowserTimezone();
       updateSchedule(patch);
     } else if (v === "custom") {
       const cur = props.check.schedule;
@@ -190,7 +190,7 @@ const startType = computed({
   get: () => props.check.schedule.startType ?? "now",
   set: (v: string) => {
     const patch: Partial<BrowserCheckSchedule> = { startType: v as "now" | "later" };
-    if (v === "later" && !props.check.schedule.timezone) patch.timezone = browserTimezone();
+    if (v === "later" && !props.check.schedule.timezone) patch.timezone = savedBrowserTimezone();
     updateSchedule(patch);
   },
 });

@@ -1804,7 +1804,7 @@ import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
-import { browserTimezone, canonicalTimezone } from "@/utils/timezoneAliases";
+import { savedBrowserTimezone } from "@/utils/timezoneAliases";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
@@ -2959,7 +2959,7 @@ export default defineComponent({
           // Entering cron mode is where a timezone first gets SAVED (parity:
           // pre-migration seeded it here, not at mount).
           if (!cronTimezone.value) {
-            cronTimezone.value = browserTimezone();
+            cronTimezone.value = savedBrowserTimezone();
           }
         }
         validateCron();
@@ -3010,7 +3010,7 @@ export default defineComponent({
       // "Browser Time (<zone>)" is a display-only shortcut; persist the resolved
       // IANA zone so trigger_condition.timezone stays a value the backend can
       // parse (storing the raw label produces a NaN tz_offset).
-      cronTimezone.value = canonicalTimezone(resolveBrowserTimezone(value));
+      cronTimezone.value = resolveBrowserTimezone(value);
       validateCron();
       emitTriggerUpdate();
     };

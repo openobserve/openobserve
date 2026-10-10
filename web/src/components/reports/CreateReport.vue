@@ -633,7 +633,6 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useLocalTimezone } from "@/utils/zincutils";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
-import { canonicalTimezone } from "@/utils/timezoneAliases";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
 import dashboardService from "@/services/dashboards";
@@ -1142,10 +1141,7 @@ const customFrequencyOptions = computed(() => [
   { label: t("reports.frequencyUnits.months"), value: "months" },
 ]);
 
-// The options hold canonical names, so a legacy zone such as `Asia/Calcutta` is renamed to match one.
-const currentTimezone = canonicalTimezone(
-  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone,
-);
+const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
 
 // The report's stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.

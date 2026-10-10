@@ -1860,6 +1860,15 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
     }
 }
 
+/// `all` lists downtimes only with the flag on, so the reply and total match main otherwise.
+fn all_cache_modules(downtimes_enabled: bool) -> Vec<&'static str> {
+    CACHE_MODULES
+        .iter()
+        .copied()
+        .filter(|module| downtimes_enabled || *module != "downtimes")
+        .collect()
+}
+
 /// With the flag off the cache stays empty, so no evaluation or SLO pass reads a downtime.
 async fn reload_downtimes(enabled: bool) -> Result<(), anyhow::Error> {
     if enabled {
@@ -1888,7 +1897,8 @@ pub async fn cache_reload(
 
     // Expand "all" to all available modules
     if modules.contains(&"all") {
-        modules = CACHE_MODULES.to_vec();
+        let downtimes_enabled = enterprise_value!(false, get_o2_config().downtimes.enabled);
+        modules = all_cache_modules(downtimes_enabled);
     }
 
     let total_modules = modules.len();
@@ -1939,6 +1949,13 @@ mod tests {
     use serde_json;
 
     use super::*;
+
+    #[test]
+    fn with_downtimes_off_all_names_the_modules_main_names() {
+        assert!(!all_cache_modules(false).contains(&"downtimes"));
+        assert_eq!(all_cache_modules(false).len(), CACHE_MODULES.len() - 1);
+        assert!(all_cache_modules(true).contains(&"downtimes"));
+    }
 
     #[tokio::test]
     async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {

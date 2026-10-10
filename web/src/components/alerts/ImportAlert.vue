@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
-import { canonicalTimezone, timezoneSearchText } from "@/utils/timezoneAliases";
+import { timezoneSearchText } from "@/utils/timezoneAliases";
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -969,7 +969,7 @@ export default defineComponent({
         input.context_attributes = {};
       }
       if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) {
-        input.trigger_condition.timezone = canonicalTimezone(store.state.timezone);
+        input.trigger_condition.timezone = store.state.timezone;
       }
       if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "tolerance_in_secs")) {
         input.trigger_condition.tolerance_in_secs = null;

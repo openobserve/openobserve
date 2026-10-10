@@ -1057,12 +1057,14 @@ mod tests {
 
     #[tokio::test]
     async fn with_downtimes_off_a_replicated_put_writes_nothing() {
-        // The flag is checked first; with it on, the folder lookup would need the region database.
-        let msg = DowntimeMessage::Put {
+        // With the flag on the same Put reaches the folder lookup, which fails without a region
+        // database.
+        let put = || DowntimeMessage::Put {
             org: "acme".to_string(),
             downtime: Box::new(slo_downtime()),
         };
-        apply(msg, false).await.unwrap();
+        assert!(apply(put(), true).await.is_err(), "the flag-on path writes");
+        apply(put(), false).await.unwrap();
         let delete = DowntimeMessage::Delete {
             org: "acme".to_string(),
             id: "d1".to_string(),

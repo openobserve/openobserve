@@ -655,14 +655,16 @@ pub async fn location_staleness_watcher() {
                         checks.len(),
                         destinations.len()
                     );
-                    notify_location_down(
-                        &org_id,
-                        &loc,
-                        checks.len(),
-                        window_us / 1_000_000,
-                        destinations,
-                    )
-                    .await
+                    if !destinations.is_empty() {
+                        notify_location_down(
+                            &org_id,
+                            &loc,
+                            checks.len(),
+                            window_us / 1_000_000,
+                            destinations,
+                        )
+                        .await
+                    }
                 },
             )
             .await;
@@ -692,11 +694,9 @@ async fn report_location_down(
             return false;
         }
     }
-    if destinations.is_empty() {
-        return false;
-    }
+    // The winner reports even an empty list, so the outage is logged once as on main.
     notify(destinations).await;
-    true
+    !destinations.is_empty()
 }
 
 #[cfg(all(test, feature = "enterprise"))]
@@ -964,8 +964,10 @@ mod tests {
                 )
                 .await
             },
-            async |_| {
-                sent.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            async |destinations| {
+                if !destinations.is_empty() {
+                    sent.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
             },
         )
         .await

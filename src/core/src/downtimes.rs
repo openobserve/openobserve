@@ -240,7 +240,7 @@ pub async fn update(
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
     check_version(req.version, &before)?;
-    let req = checked_request(org, user_id, req, Some(&before.targets)).await?;
+    let req = checked_request(org, user_id, req, Some(&before)).await?;
     let continues = before
         .notifications
         .as_ref()
@@ -342,7 +342,7 @@ pub async fn extend(
         ));
     }
     let follow_up = follow_up(&before, window.end, new_end, user_id, now);
-    checked_request(org, user_id, request_of(&follow_up), Some(&before.targets)).await?;
+    checked_request(org, user_id, request_of(&follow_up), Some(&before)).await?;
     check_room(org)?;
     let plan = remeasure_plan(None, &follow_up).await?;
     if !db::downtimes::set_if_parent_unchanged(
@@ -577,7 +577,7 @@ async fn extend_once(
     now: i64,
 ) -> Result<Downtime, DowntimeError> {
     let after = extended_once(before, new_end, user_id, now);
-    checked_request(org, user_id, request_of(&after), Some(&before.targets)).await?;
+    checked_request(org, user_id, request_of(&after), Some(before)).await?;
     let plan = remeasure_plan(Some(before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
     plan.trigger(&after.id).await;
@@ -735,7 +735,7 @@ async fn checked_request(
     org: &str,
     user_id: &str,
     mut req: DowntimeRequest,
-    stored_targets: Option<&[DowntimeTarget]>,
+    stored: Option<&Downtime>,
 ) -> Result<DowntimeRequest, DowntimeError> {
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
@@ -750,16 +750,20 @@ async fn checked_request(
         target.tags = config::meta::alerts::tags::normalize_tags(&target.tags)
             .map_err(|e| DowntimeError::BadRequest(format!("{e}.")))?;
     }
-    if targets_changed(stored_targets, &req.targets) {
+    if scope_changed(stored, &req.targets, req.condition.as_ref()) {
         let inventory = inventory::load(org).await?;
         access::check_targets(org, user_id, &req.targets, &inventory).await?;
     }
     Ok(req)
 }
 
-/// Unchanged stored targets were checked when written, so an edit or extend keeps them.
-fn targets_changed(stored: Option<&[DowntimeTarget]>, requested: &[DowntimeTarget]) -> bool {
-    stored.is_none_or(|stored| stored != requested)
+/// Unchanged stored targets and condition were checked when written; dropping a condition widens.
+fn scope_changed(
+    stored: Option<&Downtime>,
+    targets: &[DowntimeTarget],
+    condition: Option<&DimensionCondition>,
+) -> bool {
+    stored.is_none_or(|stored| stored.targets != targets || stored.condition.as_ref() != condition)
 }
 
 /// A request that names the version it was loaded at fails when the row moved on since.
@@ -2492,23 +2496,39 @@ mod tests {
     }
 
     #[test]
-    fn an_edit_or_extend_checks_the_targets_only_when_they_changed() {
+    fn an_edit_or_extend_checks_the_scope_only_when_it_changed() {
         let all = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
-        assert!(targets_changed(None, &all.targets), "a create checks them");
         assert!(
-            !targets_changed(Some(&all.targets), &all.targets),
+            scope_changed(None, &all.targets, None),
+            "a create checks it"
+        );
+        assert!(
+            !scope_changed(Some(&all), &all.targets, all.condition.as_ref()),
             "a rename or extend"
         );
         let extended = extended_once(&all, 13 * HOUR, "ops", 11 * HOUR);
-        assert!(!targets_changed(Some(&all.targets), &extended.targets));
-        let mut some = all.targets.clone();
-        some[0].folders = TargetFolders::Some {
+        assert!(!scope_changed(
+            Some(&all),
+            &extended.targets,
+            extended.condition.as_ref()
+        ));
+        let mut some = all.clone();
+        some.targets[0].folders = TargetFolders::Some {
             folder_ids: vec!["ops".to_string()],
         };
-        assert!(targets_changed(Some(&some), &all.targets), "widened to All");
-        let mut with_id = some.clone();
+        assert!(
+            scope_changed(Some(&some), &all.targets, None),
+            "widened to All"
+        );
+        let mut with_id = some.targets.clone();
         with_id[0].ids = vec!["a1".to_string()];
-        assert!(targets_changed(Some(&some), &with_id));
+        assert!(scope_changed(Some(&some), &with_id, None));
+        let mut narrowed = all.clone();
+        narrowed.condition = Some(serde_json::from_value(serde_json::json!({"type": "pair", "key": "service", "operator": "=", "value": "api"})).unwrap());
+        assert!(
+            scope_changed(Some(&narrowed), &narrowed.targets, None),
+            "dropping the condition widens to every alert"
+        );
     }
 
     #[test]
