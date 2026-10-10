@@ -23,11 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :size="size"
     :loading="isLoading"
     :disabled="disabled || !url || isWebUrlNotConfigured"
-    :focusable-unavailable="disabled && !!tooltip"
+    :focusable-unavailable="isWebUrlNotConfigured || (disabled && !!tooltip)"
     @click="handleShareClick"
     icon-left="share"
   >
-    <template #unavailable-reason>{{ tooltip }}</template>
+    <template #unavailable-reason>{{
+      isWebUrlNotConfigured ? t("search.webUrlNotConfigured") : tooltip
+    }}</template>
     <span v-if="showLabel" class="ms-1">{{ t("search.shareLink") }}</span>
     <OTooltip v-if="isWebUrlNotConfigured">
       <template #content

@@ -53,10 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :variant="buttonVariant"
     size="sm-action"
     :disabled="!!disabledReason"
+    focusable-unavailable
     :icon-left="source_.icon"
     :data-test="dataTest"
     @click="onActivate"
   >
+    <template #unavailable-reason>{{ disabledReason }}</template>
     {{ label }}
     <OTooltip
       v-if="disabledReason || note"
@@ -70,11 +72,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     variant="outline"
     size="sm-toolbar"
     :disabled="!!disabledReason"
+    focusable-unavailable
     :icon-left="source_.icon"
     :aria-label="label"
     :data-test="dataTest"
     @click="onActivate"
   >
+    <template #unavailable-reason>{{ disabledReason }}</template>
     <span class="max-md:hidden">{{ label }}</span>
     <OTooltip v-if="disabledReason || isMobile" :content="disabledReason || label" />
   </OButton>
@@ -84,11 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     variant="ghost"
     size="sm"
     :disabled="!!disabledReason"
+    focusable-unavailable
     :icon-left="source_.icon"
     :aria-label="label"
     :data-test="dataTest"
     @click="onActivate"
   >
+    <template #unavailable-reason>{{ disabledReason }}</template>
     <OTooltip :content="disabledReason || label" side="top" />
   </OButton>
 </template>

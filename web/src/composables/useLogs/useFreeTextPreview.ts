@@ -40,9 +40,8 @@ export function useFreeTextPreview(
     clearTimeout(timer);
     timer = undefined;
   };
-  const update = (raw: string) => {
+  const update = (raw: string, ctx = buildFilterContext(searchObj, config())) => {
     cancel();
-    const ctx = buildFilterContext(searchObj, config());
     const plan = planStreamsFilter(raw.trim(), searchObj.data.stream.selectedStream, ctx);
     if (searchObj.meta.sqlMode || plan.kind !== "freeText") {
       searchObj.data.freeTextDecorations = null;
@@ -51,8 +50,7 @@ export function useFreeTextPreview(
     timer = setTimeout(() => {
       timer = undefined;
       const preview = { ...searchObj, data: { ...searchObj.data, query: raw } };
-      const context = buildFilterContext(searchObj, config());
-      searchObj.data.freeTextDecorations = freeTextDecorations(preview, context, t);
+      searchObj.data.freeTextDecorations = freeTextDecorations(preview, ctx, t);
     }, 150);
   };
   watch(
@@ -64,9 +62,12 @@ export function useFreeTextPreview(
     (value, previous) => {
       const editor = readEditor();
       const queryChanged = value.query !== previous?.query;
-      update(queryChanged && editor.trim() !== value.query.trim() ? value.query : editor);
+      update(
+        queryChanged && editor.trim() !== value.query.trim() ? value.query : editor,
+        value.context,
+      );
     },
-    { deep: true, immediate: true },
+    { immediate: true },
   );
   onScopeDispose(cancel);
   return () => update(readEditor());

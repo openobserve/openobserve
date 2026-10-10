@@ -140,6 +140,54 @@ describe("useFreeTextPreview (AC-BW.8)", () => {
     scope.stop();
   });
 
+  it("tracks nested schema, settings, config and stream changes with one context per update", async () => {
+    const obj = makeSearchObj();
+    const zoConfig = reactive({ default_fts_keys: ["body"] });
+    const readConfig = vi.fn(() => zoConfig);
+    const scope = effectScope();
+    const update = scope.run(() => useFreeTextPreview(obj, readConfig, () => obj.data.query, gt))!;
+    vi.advanceTimersByTime(150);
+    expect(readConfig).toHaveBeenCalledTimes(1);
+    expect(obj.data.freeTextDecorations).not.toBeNull();
+
+    readConfig.mockClear();
+    update();
+    vi.advanceTimersByTime(150);
+    expect(readConfig).toHaveBeenCalledTimes(1);
+
+    obj.data.streamResults!.list![0].schema![0].type = "Boolean";
+    await nextTick();
+    vi.advanceTimersByTime(150);
+    expect(obj.data.freeTextDecorations).toBeNull();
+    obj.data.streamResults!.list![0].schema![0].type = "Utf8";
+    await nextTick();
+    vi.advanceTimersByTime(150);
+    expect(obj.data.freeTextDecorations).not.toBeNull();
+
+    zoConfig.default_fts_keys.splice(0);
+    await nextTick();
+    vi.advanceTimersByTime(150);
+    expect(obj.data.freeTextDecorations).toBeNull();
+    obj.data.streamResults!.list![0].settings!.full_text_search_keys = ["body"];
+    await nextTick();
+    vi.advanceTimersByTime(150);
+    expect(obj.data.freeTextDecorations).not.toBeNull();
+    obj.data.streamResults!.list![0].settings!.full_text_search_keys!.splice(0);
+    await nextTick();
+    vi.advanceTimersByTime(150);
+    expect(obj.data.freeTextDecorations).toBeNull();
+
+    zoConfig.default_fts_keys.push("body");
+    await nextTick();
+    vi.advanceTimersByTime(150);
+    expect(obj.data.freeTextDecorations).not.toBeNull();
+    obj.data.stream.selectedStream.splice(0);
+    await nextTick();
+    vi.advanceTimersByTime(150);
+    expect(obj.data.freeTextDecorations).toBeNull();
+    scope.stop();
+  });
+
   it("cancels stale edits and pending timers on disposal", () => {
     const obj = makeSearchObj();
     let text = "timeout";

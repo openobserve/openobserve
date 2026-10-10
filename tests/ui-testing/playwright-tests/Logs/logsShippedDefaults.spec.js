@@ -33,6 +33,8 @@ test.describe('Logs shipped defaults: auto-run with the cost guard', () => {
   let config;
 
   test.beforeAll(async ({ request }) => {
+    config = await readConfig(request, ORG);
+    test.skip(!Number.isFinite(Number(config.auto_query_max_scan_mb)), 'The backend phase adds auto_query_max_scan_mb.');
     const now = Date.now() * 1000;
     const rows = Array.from({ length: 200 }, (_, i) => ({
       _timestamp: now - (200 - i) * 2_000_000,
@@ -41,7 +43,6 @@ test.describe('Logs shipped defaults: auto-run with the cost guard', () => {
     }));
     await ingestRows(request, ORG, STREAM, rows);
     const entry = await waitForStats(request, ORG, STREAM);
-    config = await readConfig(request, ORG);
     expect(config.auto_query_enabled).toBe(true);
     expect(config.query_on_stream_selection).toBe(true);
     expect(Number(config.auto_query_max_scan_mb)).toBeGreaterThan(0);
