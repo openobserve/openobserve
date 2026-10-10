@@ -1008,6 +1008,30 @@ impl<'de> Deserialize<'de> for FileFormatConfig {
 }
 
 #[derive(Serialize, EnvConfig, Default)]
+pub struct MainRuntime {
+    #[env_config(
+        name = "ZO_MAIN_RUNTIME_BLOCKING_WORKER_NUM",
+        default = 0,
+        help = "Maximum blocking threads; 0 keeps the default of 512. Requires a process restart."
+    )]
+    pub blocking_worker_num: usize,
+}
+
+impl MainRuntime {
+    pub fn load() -> Result<Self, anyhow::Error> {
+        // Early CLI commands must not initialize or validate the full server config.
+        if let Err(e) = load_config() {
+            log::error!("Failed to load config {e}");
+        }
+        let mut cfg = Self::init().map_err(anyhow::Error::msg)?;
+        if cfg.blocking_worker_num == 0 {
+            cfg.blocking_worker_num = 512;
+        }
+        Ok(cfg)
+    }
+}
+
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Config {
     pub auth: Auth,
     pub http_streaming: HttpStreaming,
@@ -1018,6 +1042,7 @@ pub struct Config {
     pub common: Common,
     pub search: Search,
     pub limit: Limit,
+    pub main_runtime: MainRuntime,
     pub compact: Compact,
     pub cache_latest_files: CacheLatestFiles,
     pub memory_cache: MemoryCache,
@@ -2644,6 +2669,24 @@ pub struct Limit {
     pub http_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_HTTP_WORKER_MAX_BLOCKING", default = 0)]
     pub http_worker_max_blocking: usize, // equals to 256 if 0
+    #[env_config(
+        name = "ZO_DATAFUSION_RUNTIME_BLOCKING_WORKER_NUM",
+        default = 0,
+        help = "Maximum blocking threads; 0 keeps the default of 512. Requires a process restart."
+    )]
+    pub datafusion_runtime_blocking_worker_num: usize,
+    #[env_config(
+        name = "ZO_VORTEX_RUNTIME_BLOCKING_WORKER_NUM",
+        default = 0,
+        help = "Maximum blocking threads; 0 keeps the default of 512. Requires a process restart."
+    )]
+    pub vortex_runtime_blocking_worker_num: usize,
+    #[env_config(
+        name = "ZO_WAL_RUNTIME_BLOCKING_WORKER_NUM",
+        default = 0,
+        help = "Maximum blocking threads; 0 keeps the default of 512. Requires a process restart."
+    )]
+    pub wal_runtime_blocking_worker_num: usize,
     #[env_config(name = "ZO_GRPC_RUNTIME_WORKER_NUM", default = 0)]
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
@@ -3848,14 +3891,20 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.grpc_runtime_worker_num == 0 {
         cfg.limit.grpc_runtime_worker_num = cpu_num;
     }
-    if cfg.limit.grpc_runtime_blocking_worker_num == 0 {
-        cfg.limit.grpc_runtime_blocking_worker_num = 512;
-    }
     if cfg.limit.job_runtime_worker_num == 0 {
         cfg.limit.job_runtime_worker_num = cpu_num;
     }
-    if cfg.limit.job_runtime_blocking_worker_num == 0 {
-        cfg.limit.job_runtime_blocking_worker_num = 512;
+    for blocking_worker_num in [
+        &mut cfg.main_runtime.blocking_worker_num,
+        &mut cfg.limit.datafusion_runtime_blocking_worker_num,
+        &mut cfg.limit.vortex_runtime_blocking_worker_num,
+        &mut cfg.limit.wal_runtime_blocking_worker_num,
+        &mut cfg.limit.grpc_runtime_blocking_worker_num,
+        &mut cfg.limit.job_runtime_blocking_worker_num,
+    ] {
+        if *blocking_worker_num == 0 {
+            *blocking_worker_num = 512;
+        }
     }
     // HACK for thread_num equal to CPU core * 4
     if cfg.limit.query_thread_num == 0 {
@@ -5383,6 +5432,70 @@ mod tests {
         cfg.self_profiles.cpu_secs = 5;
         check_self_profiles_config(&mut cfg);
         assert!(!cfg.self_profiles.enabled);
+    }
+
+    #[test]
+    fn runtime_blocking_limits_from_env() {
+        const KEYS: [&str; 6] = [
+            "ZO_MAIN_RUNTIME_BLOCKING_WORKER_NUM",
+            "ZO_DATAFUSION_RUNTIME_BLOCKING_WORKER_NUM",
+            "ZO_VORTEX_RUNTIME_BLOCKING_WORKER_NUM",
+            "ZO_WAL_RUNTIME_BLOCKING_WORKER_NUM",
+            "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM",
+            "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM",
+        ];
+        if let Ok(case) = std::env::var("O2_RUNTIME_BLOCKING_CONFIG_CASE") {
+            if case == "invalid" {
+                assert!(std::panic::catch_unwind(MainRuntime::init).is_err());
+                assert!(std::panic::catch_unwind(Limit::init).is_err());
+                return;
+            }
+            let mut cfg = Config::init().unwrap();
+            check_limit_config(&mut cfg).unwrap();
+            let actual = [
+                cfg.main_runtime.blocking_worker_num,
+                cfg.limit.datafusion_runtime_blocking_worker_num,
+                cfg.limit.vortex_runtime_blocking_worker_num,
+                cfg.limit.wal_runtime_blocking_worker_num,
+                cfg.limit.grpc_runtime_blocking_worker_num,
+                cfg.limit.job_runtime_blocking_worker_num,
+            ];
+            let expected = if case == "explicit" {
+                [1, 2, 3, 4, 5, 6]
+            } else {
+                [512; 6]
+            };
+            assert_eq!(actual, expected);
+            return;
+        }
+        for case in ["unset", "zero", "explicit", "invalid"] {
+            let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+            command
+                .args(["--exact", "config::tests::runtime_blocking_limits_from_env"])
+                .env("O2_RUNTIME_BLOCKING_CONFIG_CASE", case);
+            for (index, key) in KEYS.iter().enumerate() {
+                command.env_remove(key);
+                match case {
+                    "zero" => {
+                        command.env(key, "0");
+                    }
+                    "explicit" => {
+                        command.env(key, (index + 1).to_string());
+                    }
+                    "invalid" => {
+                        command.env(key, "-1");
+                    }
+                    _ => {}
+                }
+            }
+            let output = command.output().unwrap();
+            assert!(
+                output.status.success(),
+                "{case}: {}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
     }
 
     #[test]

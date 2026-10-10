@@ -69,18 +69,14 @@ async fn flush_reporting() {
 }
 
 fn main() -> Result<(), anyhow::Error> {
-    create_main_runtime()?.block_on(run())
+    // Select CLI config before constructing runtimes so their limits honor --config.
+    let app = cli::init()?;
+    create_main_runtime()?.block_on(run(app))
 }
 
 // the HTTP leader parses and rewrites SQL here, so it needs the same stack as the other runtimes
-async fn run() -> Result<(), anyhow::Error> {
-    // CLI provides the path to the config file (if any)
-    // In case a custom path is provided, the file will be read first
-    // and config variables will be loaded.
-    // This has to happen as the foremost step as any call to
-    // get_config without this would be loaded from local `.env`
-    // or environment itself.
-    if cli::cli().await? {
+async fn run(app: clap::ArgMatches) -> Result<(), anyhow::Error> {
+    if cli::cli(app).await? {
         return Ok(());
     }
 
