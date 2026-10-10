@@ -96,7 +96,9 @@
         :suggestions="suggestions"
         :field-value-resolver="fieldValueResolver ?? undefined"
         :debounce-time="debounceTime"
+        :free-text-decorations="freeTextDecorations ?? null"
         @update:query="handleQueryUpdate"
+        @user-edit="emit('user-edit')"
         @run-query="emit('run-query')"
         @focus="handleEditorFocus"
         @blur="handleEditorBlur"
@@ -166,6 +168,7 @@ interface Props {
   suggestions?: any[]; // Autocomplete suggestions for Monaco
   fieldValueResolver?: ((field: string) => Promise<string[]>) | null; // Field-value lookup awaited by the completion provider
   debounceTime?: number; // Debounce time for query updates (ms)
+  freeTextDecorations?: { ranges: { start: number; end: number }[]; hover: I18nText } | null;
 
   // NL Mode (optional external control)
   nlpMode?: boolean; // External NLP mode control (undefined = internal control)
@@ -203,6 +206,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   "update:query": [query: string];
+  "user-edit": [];
   "language-change": [language: Language];
   "ask-ai": [naturalLanguage: string, language: Language];
   "run-query": [];
@@ -552,6 +556,10 @@ defineExpose({
     if (editorRef.value?.setValue) {
       editorRef.value.setValue(value);
     }
+  },
+  replaceValue: (value: string) => {
+    if (editorRef.value?.replaceValue) editorRef.value.replaceValue(value);
+    else if (editorRef.value?.setValue) editorRef.value.setValue(value);
   },
 
   // Cursor and autocomplete (for dashboards)

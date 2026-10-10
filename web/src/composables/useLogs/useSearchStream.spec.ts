@@ -16,17 +16,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import analytics from "@/services/product_analytics";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
+import { notePageRequest } from "@/composables/useLogs/logsRowNav";
 
-const { searchObj, connection } = vi.hoisted(() => ({
+const { searchObj, connection, query } = vi.hoisted(() => ({
   searchObj: {
     loading: true,
     loadingProgressPercentage: 50,
     loadingHistogram: false,
     loadingHistogramProgressPercentage: 0,
-    meta: { refreshInterval: 0, clearCache: false },
-    data: {},
+    meta: { refreshInterval: 0, clearCache: false } as any,
+    data: {} as any,
   },
-  connection: { getDataThroughStream: vi.fn(), cleanupConnection: vi.fn() },
+  connection: {
+    getDataThroughStream: vi.fn(),
+    cleanupConnection: vi.fn(),
+    buildWebSocketPayload: vi.fn(),
+    initializeSearchConnection: vi.fn(),
+  },
+  query: { req: { query: {} } as unknown },
 }));
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
@@ -38,7 +45,7 @@ vi.mock("@/composables/useNotifications", () => ({
   default: () => ({ showErrorNotification: vi.fn() }),
 }));
 vi.mock("@/composables/useLogs/useSearchQuery", () => ({
-  default: () => ({ getQueryReq: () => ({ query: {} }) }),
+  default: () => ({ getQueryReq: () => query.req }),
 }));
 vi.mock("@/composables/useLogs/useSearchConnection", () => ({ default: () => connection }));
 vi.mock("@/composables/useLogs/useSearchResponseHandler", () => ({ default: () => ({}) }));
@@ -74,5 +81,75 @@ describe("useSearchStream — logs_search_completed", () => {
     completeSearch({ type: "search", isPagination: true });
     completeSearch({ type: "histogram", isPagination: false });
     expect(analytics.track).not.toHaveBeenCalled();
+  });
+});
+
+describe("useSearchStream — page crossing signals (4a §3.2.2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    query.req = { query: {} };
+    searchObj.meta.showDetailTab = true;
+    searchObj.meta.resultGrid = {
+      navigation: { currentRowIndex: 3, selectionActive: true, pendingPageSelection: null },
+    };
+    searchObj.data.resultGrid = { pageRequest: null, pageLoad: null };
+  });
+
+  it("writes `done` for the pagination search's own completion, with its traceId", () => {
+    completeSearch({ type: "search", isPagination: true, traceId: "page-2" });
+    expect(searchObj.data.resultGrid.pageLoad).toEqual({
+      requestId: "page-2",
+      ok: true,
+      reason: "done",
+    });
+  });
+
+  it("histogram, pageCount and non-pagination completions write nothing", () => {
+    completeSearch({ type: "histogram", isPagination: true, traceId: "h" });
+    completeSearch({ type: "pageCount", isPagination: true, traceId: "c" });
+    completeSearch({ type: "search", isPagination: false, traceId: "s" });
+    expect(searchObj.data.resultGrid.pageLoad).toBeNull();
+  });
+
+  it("a pagination query that builds to null fails the pending crossing at once (AC2.12)", () => {
+    searchObj.meta.resultGrid.navigation.pendingPageSelection = {
+      page: 2,
+      position: "first",
+      requestId: null,
+    };
+    query.req = null;
+    useSearchStream((key: string) => key).getDataThroughStream(true);
+    expect(connection.getDataThroughStream).not.toHaveBeenCalled();
+    expect(searchObj.meta.resultGrid.navigation.pendingPageSelection).toBeNull();
+    expect(searchObj.meta.showDetailTab).toBe(false);
+  });
+
+  it("a throw while dispatching a page fails the crossing quietly, since a toast is already shown", () => {
+    searchObj.meta.resultGrid.navigation.pendingPageSelection = {
+      page: 2,
+      position: "first",
+      requestId: null,
+    };
+    connection.getDataThroughStream.mockImplementationOnce(() => {
+      throw new Error("init");
+    });
+    useSearchStream((key: string) => key).getDataThroughStream(true);
+    expect(searchObj.meta.resultGrid.navigation.pendingPageSelection).toBeNull();
+  });
+
+  it("a retried pagination request rebinds the crossing instead of superseding it", () => {
+    searchObj.meta.resultGrid.navigation.pendingPageSelection = {
+      page: 2,
+      position: "first",
+      requestId: "old",
+    };
+    connection.buildWebSocketPayload.mockImplementationOnce(() => {
+      notePageRequest(searchObj as any, "new");
+      return { traceId: "new" };
+    });
+    useSearchStream((key: string) => key).getDataThroughStream(true);
+    const { onReset } = connection.getDataThroughStream.mock.calls.at(-1)![2];
+    onReset({ type: "search", isPagination: true, traceId: "old", queryReq: {} });
+    expect(searchObj.meta.resultGrid.navigation.pendingPageSelection?.requestId).toBe("new");
   });
 });

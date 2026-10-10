@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h } from "vue";
+import { h, nextTick, reactive } from "vue";
 import OToggleGroup from "./OToggleGroup.vue";
 import OToggleGroupItem from "./OToggleGroupItem.vue";
 
@@ -54,7 +54,76 @@ describe("OToggleGroupItem", () => {
     expect(btn.attributes("data-disabled")).toBeDefined();
   });
 
-  // --- Size classes ---
+  it("focuses the unavailable reason without changing the selection", async () => {
+    const wrapper = mountItem(
+      { value: "x", disabled: true, focusableUnavailable: true, tooltip: "Run the query first" },
+      { default: () => h("span", "Visualize") },
+    );
+    const reasonControl = wrapper.find('[role="button"][aria-disabled="true"]');
+    expect(reasonControl.attributes("tabindex")).toBe("0");
+    expect(reasonControl.attributes("aria-label")).toBeUndefined();
+    const label = wrapper.get(`#${reasonControl.attributes("aria-labelledby")}`);
+    expect(label.text()).toBe("Visualize");
+    expect(label.attributes("aria-hidden")).toBeUndefined();
+    expect(reasonControl.get("button").attributes("aria-hidden")).toBe("true");
+    expect(wrapper.find(`#${reasonControl.attributes("aria-describedby")}`).text()).toBe(
+      "Run the query first",
+    );
+    await reasonControl.trigger("keydown", { key: "Enter" });
+    await reasonControl.trigger("click");
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    expect(wrapper.find("button").attributes("disabled")).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it("keeps the icon-only unavailable wrapper name separate from its reason", () => {
+    const wrapper = mountItem({
+      value: "x",
+      disabled: true,
+      focusableUnavailable: true,
+      "aria-label": "Visualize",
+      tooltip: "Run the query first",
+      iconLeft: "timeline",
+    });
+    const control = wrapper.get('[role="button"][aria-disabled="true"]');
+    expect(control.attributes("aria-label")).toBe("Visualize");
+    const reason = wrapper.get(`#${control.attributes("aria-describedby")}`);
+    expect(reason.text()).toBe("Run the query first");
+    expect(reason.attributes("aria-hidden")).toBe("true");
+    wrapper.unmount();
+  });
+
+  it("exposes only the unavailable wrapper when the Timechart text is collapsed", async () => {
+    const props = reactive({
+      value: "timechart",
+      disabled: true,
+      focusableUnavailable: true,
+      "aria-label": "Timechart",
+      tooltip: "Run the query first",
+      iconLeft: "timeline",
+    });
+    const wrapper = mountItem(props);
+    const control = wrapper.get('[role="button"][aria-disabled="true"]');
+    const inner = control.get("button");
+    expect(control.attributes("aria-label")).toBe("Timechart");
+    expect(control.attributes("aria-labelledby")).toBeUndefined();
+    expect(control.attributes("tabindex")).toBe("0");
+    expect(control.attributes("aria-hidden")).toBeUndefined();
+    expect(inner.attributes("aria-hidden")).toBe("true");
+    expect(inner.attributes("disabled")).toBeDefined();
+    expect(wrapper.get(`#${control.attributes("aria-describedby")}`).text()).toBe(
+      "Run the query first",
+    );
+    await control.trigger("click");
+    await control.trigger("keydown", { key: "Enter" });
+    await control.trigger("keydown", { key: " " });
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+    props.disabled = false;
+    await nextTick();
+    expect(wrapper.get("button").attributes("aria-hidden")).toBeUndefined();
+    expect(wrapper.find('[role="button"][aria-disabled="true"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
 
   it("applies md size classes by default", () => {
     const wrapper = mountItem({ value: "x" });

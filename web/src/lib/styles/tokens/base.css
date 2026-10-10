@@ -600,6 +600,17 @@
   --color-json-object: #4b5563;
   --color-json-string: #047857;
   --color-latency-p95: #0a4ce8;
+  /* Logs severity spine/border: non-text, so each clears 3:1 on the page surface. */
+  --color-log-severity-emergency-indicator: #e53935;
+  --color-log-severity-alert-indicator: #ea580c;
+  --color-log-severity-critical-indicator: #f4511e;
+  --color-log-severity-error-indicator: #ef5350;
+  --color-log-severity-warning-indicator: #dd7b00;
+  --color-log-severity-notice-indicator: #16a34a;
+  --color-log-severity-info-indicator: #1e88e5;
+  --color-log-severity-debug-indicator: #00a3b7;
+  --color-log-severity-trace-indicator: #8497a0;
+  --color-log-severity-ok-indicator: #43a047;
   --color-log-table-header-bg: #f1f3f7;
   --color-log-table-row-bg: #ffffff;
   --color-log-table-row-border: #e4e6ec;

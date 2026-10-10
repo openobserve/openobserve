@@ -319,7 +319,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -738,15 +738,10 @@ export default defineComponent({
         },
       },
     ]);
-    // Own page: claim the keyboard scope and load history on mount, then hand the
-    // scope back to the logs page on leave.
     onMounted(() => {
-      getManager()?.setScope("search-history");
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      getManager()?.setScope("logs");
-    });
+
     return {
       isMobile,
       searchObj,

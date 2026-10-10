@@ -169,7 +169,13 @@ const barVariantClass = computed(() => {
     </div>
 
     <!-- A phone keeps the message at least 12rem wide; past that the actions wrap under it, end-aligned. -->
-    <div v-if="hasActionsSlot" :class="bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : ''">
+    <div
+      v-if="hasActionsSlot"
+      :class="[
+        'flex flex-wrap items-center gap-2',
+        bar ? 'shrink-0' : inlineActions ? 'max-md:ms-auto' : '',
+      ]"
+    >
       <slot name="actions" />
     </div>
   </div>

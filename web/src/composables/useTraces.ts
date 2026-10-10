@@ -33,6 +33,7 @@ import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import { gt } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { PageLoad, PageRequest, PendingPageSelection } from "@/utils/pageCrossing";
 
 // Mirrors the backend's is_internal_stream(); other `_`-prefixed streams are user data.
 const INTERNAL_LOG_STREAMS = new Set([
@@ -98,7 +99,10 @@ const defaultObject = {
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
-        currentRowIndex: 0,
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as PendingPageSelection | null,
+        lastOpenedId: null as string | null,
       },
     },
     scrollInfo: {},
@@ -156,6 +160,8 @@ const defaultObject = {
       currentDateTime: new Date(),
       currentPage: 0,
       columns: <any>[],
+      pageRequest: null as PageRequest | null,
+      pageLoad: null as PageLoad | null,
     },
     queryPayload: <any>{},
     transforms: <any>[],

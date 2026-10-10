@@ -395,6 +395,34 @@ describe("useSearchResponseHandler", () => {
     });
   });
 
+  describe("handleSearchError — page crossing outcome (4a §3.2.2)", () => {
+    const fail = (request: object, code: number) =>
+      responseHandler.handleSearchError(request, {
+        content: { message: "x", trace_id: "server-trace", code },
+      } as any);
+
+    it("records `error` for the pagination search, keyed by its own traceId", () => {
+      fail({ type: "search", isPagination: true, traceId: "page-2" }, 500);
+      expect(mockState.searchObj.data.resultGrid.pageLoad).toEqual({
+        requestId: "page-2",
+        ok: false,
+        reason: "error",
+      });
+    });
+
+    it("records `cancelled` for code 20009", () => {
+      fail({ type: "search", isPagination: true, traceId: "page-2" }, 20009);
+      expect(mockState.searchObj.data.resultGrid.pageLoad?.reason).toBe("cancelled");
+    });
+
+    it("histogram, pageCount and first-page errors record nothing", () => {
+      fail({ type: "histogram", isPagination: true, traceId: "h" }, 500);
+      fail({ type: "pageCount", isPagination: true, traceId: "c" }, 500);
+      fail({ type: "search", isPagination: false, traceId: "s" }, 500);
+      expect(mockState.searchObj.data.resultGrid.pageLoad ?? null).toBeNull();
+    });
+  });
+
   describe("handleSearchResponse", () => {
     beforeEach(() => {
       // The shared mockSearchPartitionMap is already cleared in the main beforeEach
@@ -603,7 +631,7 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.datetime.startTime).toBe(1000);
       expect(mockState.searchObj.data.datetime.endTime).toBe(2000);
       expect(mockState.searchObj.data.datetime.type).toBe("absolute");
-      expect(utils.updateUrlQueryParams).toHaveBeenCalled();
+      expect(utils.updateUrlQueryParams).toHaveBeenCalledWith(null, null, "replace");
     });
   });
 

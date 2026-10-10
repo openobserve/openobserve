@@ -947,10 +947,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :session-id="manualEvaluationTarget.sessionId"
       @update:open="updateManualEvaluationOpen"
     />
+
+    <div
+      class="sr-only"
+      aria-live="polite"
+      aria-atomic="true"
+      data-test="trace-details-span-nav-live"
+    >
+      {{ spanNavAnnouncement }}
+    </div>
   </div>
 </template>
 
 <script lang="ts">
+import { announceInto } from "@/utils/announceInto";
 import {
   defineComponent,
   ref,
@@ -964,6 +974,7 @@ import {
   nextTick,
   computed,
   provide,
+  toRef,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -1048,6 +1059,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { ancestorChain, nextVisibleSpan } from "@/utils/rowNavigation";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
@@ -1254,6 +1266,10 @@ export default defineComponent({
     enableCorrelationLinks: {
       type: Boolean,
       default: false,
+    },
+    shortcutsActive: {
+      type: Boolean,
+      default: true,
     },
   },
   components: {
@@ -3307,27 +3323,49 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
-    const nextSpanHandler = () => {
+    const spanNavAnnouncement = ref("");
+    const announceSpanNav = (message: string) => announceInto(spanNavAnnouncement, message);
+    const spanAncestors = (spanId: string): string[] =>
+      ancestorChain(
+        spanId,
+        (id) => spanMap.value[id]?.reference_parent_span_id,
+        spanList.value?.length ?? 0,
+      );
+    const stepSpan = (direction: 1 | -1) => {
       if (isInputFocused()) return;
-      const list = spanList.value;
-      if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
-      if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
-    };
-    const prevSpanHandler = () => {
-      if (isInputFocused()) return;
-      const list = spanList.value;
-      if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
-      if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
+      const visible: string[] = spanPositionList.value.map((s: any) => s.spanId);
+      const current = selectedSpanId.value || null;
+      const next = nextVisibleSpan(visible, current, spanAncestors, direction);
+      if (next) {
+        updateSelectedSpan(next);
+        const row = spanPositionList.value.find((s: any) => s.spanId === next);
+        announceSpanNav(
+          t("traces.spanNav.position", {
+            index: visible.indexOf(next) + 1,
+            count: visible.length,
+            name: row?.operationName ?? "",
+          }),
+        );
+        return;
+      }
+      const hasAnchor =
+        current !== null &&
+        (visible.includes(current) || spanAncestors(current).some((id) => visible.includes(id)));
+      if (hasAnchor) {
+        announceSpanNav(
+          t(direction === 1 ? "traces.spanNav.lastSpan" : "traces.spanNav.firstSpan"),
+        );
+      }
     };
 
-    useShortcuts([
-      // `traceNextSpan` registers j + ↓, `tracePrevSpan` registers k + ↑
-      // (both bindings live in the registry under `keys`).
-      { id: "traceNextSpan", handler: nextSpanHandler },
-      { id: "tracePrevSpan", handler: prevSpanHandler },
-    ]);
+    useShortcuts(
+      [
+        { id: "traceNextSpan", handler: () => stepSpan(1) },
+        { id: "tracePrevSpan", handler: () => stepSpan(-1) },
+      ],
+      undefined,
+      { active: toRef(props, "shortcutsActive") },
+    );
     return {
       router,
       t,
@@ -3363,6 +3401,8 @@ export default defineComponent({
       closeSidebar,
       toggleSpanCollapse,
       spanPositionList,
+      spanNavAnnouncement,
+      stepSpan,
       spanDimensions,
       splitterModel,
       ChartData,

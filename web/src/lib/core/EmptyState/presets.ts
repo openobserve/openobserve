@@ -119,6 +119,21 @@ export const emptyStatePresets = {
     ],
   },
 
+  "search-cancelled": {
+    illustration: "query",
+    variant: "neutral",
+    titleKey: "emptyState.searchCancelled.title",
+    descriptionKey: "emptyState.searchCancelled.description",
+    actions: [
+      {
+        id: "run",
+        icon: "play-arrow",
+        titleKey: "emptyState.searchCancelled.action",
+        descriptionKey: "emptyState.searchCancelled.actionDesc",
+      },
+    ],
+  },
+
   // --- first-run "create your first X" -------------------------------------
   "no-dashboards": {
     illustration: "board",

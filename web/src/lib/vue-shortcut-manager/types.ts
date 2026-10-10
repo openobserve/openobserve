@@ -15,7 +15,7 @@ export interface Shortcut {
   keyForWindows?: string;
   /** Override combo on macOS (falls back to `key`). */
   keyForMac?: string;
-  handler: () => void;
+  handler: (e?: KeyboardEvent) => void;
   description?: I18nText;
   scope?: string;
   whenFocused?: Ref<HTMLElement | null> | HTMLElement | null;
@@ -37,12 +37,16 @@ export interface Shortcut {
  */
 export interface ShortcutById {
   id: string;
-  handler: () => void;
+  handler: (e?: KeyboardEvent) => void;
   whenFocused?: Ref<HTMLElement | null> | HTMLElement | null;
 }
 
 /** Either a registry-driven reference (`{ id, handler }`) or a full inline `Shortcut`. */
 export type ShortcutInput = ShortcutById | Shortcut;
+
+export interface UseShortcutsOptions {
+  active?: Ref<boolean>;
+}
 
 export interface ShortcutManagerOptions {
   preventDefault?: boolean;

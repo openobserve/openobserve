@@ -70,6 +70,12 @@
       "title": "Select a stream to get started",
       "description": "Pick a stream, then run your query to explore its data. Refine results with filters and a custom time range."
     },
+    "searchCancelled": {
+      "title": "Search cancelled",
+      "description": "No results were loaded. Run the query to load events.",
+      "action": "Run query",
+      "actionDesc": "Run the same query again"
+    },
     "noQueryApplied": {
       "title": "Run a query to see results",
       "description": "Adjust your filters and click 'Run query' to load events for this stream.",
@@ -1036,9 +1042,115 @@
     "savedFunctionNotFound": "Function not found.",
     "exportLogs": "Export logs",
     "runQuery": "Run query",
+    "runQueryPendingLabel": "Run query, changes not applied yet",
     "refreshCacheAndRunQuery": "Refresh Cache & Run Query",
     "liveModeTooltip": "Auto-run query on filter/time changes",
     "autoRunEnabled": "Auto run enabled",
+    "queryActions": {
+      "runEditedFirst": "Run your edited query first",
+      "runFirst": "Run your query first",
+      "usesEditedQuery": "Uses your edited query (not run yet)",
+      "usesUnrunQuery": "Uses your query (not run yet)",
+      "downloadsShownResults": "Downloads the shown results, not your edit",
+      "downloadsLastRun": "Uses the query that last ran, not your edit"
+    },
+    "noFtsRecovery": {
+      "title": "Full-text search fields are not configured for {stream}",
+      "description": "Search field values, or clear the whole query to see logs in this time range.",
+      "searchField": "Search a specific field",
+      "searchFieldHint": "Choose a field for the search, keeping excluded words.",
+      "clearRun": "Show logs without this search",
+      "clearRunHint": "Clear the whole query and run in the same time range.",
+      "editPermission": "You need permission to edit stream settings.",
+      "scope": "Search {stream} in the current time range.",
+      "singleStreamScope": "Search {stream} only; {otherStreams} will be deselected.",
+      "stream": "Stream",
+      "field": "Field",
+      "match": "Match",
+      "value": "Value",
+      "contains": "Contains text",
+      "equals": "Equals",
+      "preview": "Filter preview",
+      "replacement": "This replaces the whole query with a field filter and keeps excluded words. No full-text field is required.",
+      "run": "Run field search",
+      "close": "Close field search",
+      "skipped": "{stream} was skipped because it has no full-text search fields configured.",
+      "resultsScope": "These results are from {streams} only.",
+      "noFields": "This stream has no fields available for a field search.",
+      "valueRequired": "Enter a value to search.",
+      "fieldRequired": "Choose a field to search.",
+      "invalidValue": "Enter a valid value for this field.",
+      "configureHint": "Makes full-text search fast for this stream."
+    },
+    "autoRunPersistNeedsRun": "Run the query first: this action saves or shares what you ran",
+    "autoRunSearchAroundActive": "Showing records around a line: run the query to return to results",
+    "autoRunStaleTooltip": "Run the query to update results",
+    "searchCancelledNotice": "Search cancelled.",
+    "linePermalink": {
+      "disabledFunction": "Turn off the function to link a single line",
+      "disabledTimestampRewrite": "This query rewrites the timestamp",
+      "disabledNotSingleLines": "Rows from this query are not single log lines",
+      "disabledNoTimestamp": "This row has no timestamp",
+      "disabledEnrichmentTable": "Enrichment table rows can't be linked",
+      "toastNotUnique": "Copied a link to the timestamp; this line could not be uniquely identified.",
+      "toastWideStream": "This stream is too wide to link one line exactly; copied a link to the timestamp",
+      "bannerInvalid": "This link is malformed; showing the shared search only",
+      "bannerDenied": "You don't have access to stream {stream}.",
+      "bannerStreamMissing": "Stream {stream} no longer exists",
+      "bannerError": "Could not load the shared log line.",
+      "bannerIncomplete": "Could not search every line at this timestamp",
+      "bannerGone": "This log line is no longer available. It may be past the stream's retention or deleted.",
+      "bannerGoneRetention": "This log line is no longer available. It may be past the stream's retention ({days} day) or deleted. | This log line is no longer available. It may be past the stream's retention ({days} days) or deleted.",
+      "bannerFound": "Showing a shared log line",
+      "bannerAmbiguous": "{count} line at this timestamp; the exact line could not be identified | {count} lines at this timestamp; the exact line could not be identified",
+      "bannerChanged": "The line may have changed since the link was made",
+      "actionShowLines": "Show these lines",
+      "actionShowInContext": "Show in context",
+      "bannerAmbiguousTieHeavy": "{count} line shares this timestamp and the stream has no _o2_id, so the exact line could not be identified. Lines at that timestamp are highlighted. | {count} lines share this timestamp and the stream has no _o2_id, so the exact line could not be identified. Lines at that timestamp are highlighted.",
+      "bannerDismiss": "Dismiss",
+      "copyLink": "Copy link",
+      "copyLinkTooltip": "Copy a link to this log line",
+      "copyLinkMenu": "Copy link to this log line",
+      "toastCopied": "Link to log line copied",
+      "toastCopiedValid": "Link to log line copied · valid for {days} day | Link to log line copied · valid for {days} days",
+      "toastLookupFailed": "Could not look up this line; copied a link to the timestamp",
+      "toastShortFailed": "Could not shorten the link; copied the full link instead",
+      "toastFailed": "Could not create a link to this log line",
+      "toastScopeChanged": "The organization or stream changed while the link was being made; nothing was copied",
+      "popoverTitle": "Link to this log line",
+      "popoverDesc": "Your browser blocked automatic copying. Select the link and copy it, or use the button.",
+      "pageNotice": "This link was on page {page}.",
+      "pageGo": "Go to page {page}",
+      "pageGoLast": "Go to last page ({page})"
+    },
+    "autoRunPendingDot": "Run query to apply latest changes",
+    "autoRunAppliesTo": "Applies to Logs and Traces",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "This search would scan about {size}",
+    "autoRunGuardLinkTitle": "This link would scan about {size}",
+    "autoRunGuardDescAutoRun": "{scope}. Auto Run paused so you can narrow it first.",
+    "autoRunGuardDescPaused": "{scope}. Paused so you can narrow it first.",
+    "autoRunGuardDescLink": "Opened from a link · {scope}. Review the scope, then run it.",
+    "autoRunGuardHint": "Turn off Auto Run to apply filter and time changes manually.",
+    "autoRunGuardUnknownTitle": "Size unknown for this window",
+    "autoRunGuardUnknownDesc": "{streams} has no size statistics yet, so Auto Run only runs windows of 1 hour or less on it.",
+    "autoRunGuardUnknownManyDesc": "{count} stream has no size statistics yet, so Auto Run waits for you. {scope}. | {count} streams have no size statistics yet, so Auto Run waits for you. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Ready to run across regions",
+    "autoRunGuardSuperClusterDesc": "Search size can't be estimated on a multi-region cluster yet, so Auto Run waits for you. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Stream not available",
+    "autoRunGuardUnresolvedDesc": "Stream {streams} does not exist or you don't have access to it.",
+    "autoRunGuardBanner": "This change would scan about {size} ({scope}), so Auto Run paused. The results below are from the previous query.",
+    "autoRunGuardBannerPaused": "This change would scan about {size} ({scope}), so it is paused. The results below are from the previous query.",
+    "autoRunGuardBannerUnknown": "Size unknown for this window ({scope}), so it is paused. The results below are from the previous query.",
+    "autoRunGuardBannerRefresh": "Auto-refresh would scan about {size} per refresh ({scope}), so it is paused until you run this once. The results below are from the previous query.",
+    "autoRunGuardRunAnyway": "Run anyway",
+    "autoRunGuardRunQuery": "Run query",
+    "autoRunGuardNarrow": "Narrow to {period}",
+    "autoRunGuardNarrowWithSize": "Narrow to {period} (~{size})",
+    "autoRunGuardSearchJob": "Run as search job",
+    "autoRunGuardSelectStream": "Select a stream",
+    "searchJobNoPermission": "You do not have permission to create search jobs",
     "turnOnLiveMode": "Turn on Auto Run",
     "turnOffLiveMode": "Turn off Auto Run",
     "autoRefreshWithValue": "Auto Refresh: {value}",
@@ -1251,6 +1363,7 @@
     "histogramSearchQueryCancelled": "Histogram search query was cancelled",
     "histogramUnavailableForQueries": "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
     "invalidDateFormat": "Invalid date format.",
+    "missingStreamAndNoFts": "One or more filter fields do not exist in \"{missingStreams}\", hence no search is performed in the mentioned stream.\n Not searched: {noFtsStreams} (no full-text fields).",
     "missingStreamFilterFields": "One or more filter fields do not exist in \"{streams}\", hence no search is performed in the mentioned stream.\n",
     "noColumnFoundInStream": "No column found in selected stream.",
     "noStreamFoundInOrganization": "No stream found in selected organization!",
@@ -1271,7 +1384,19 @@
     "aliasNotAllowed": "Alias '{alias}' is not allowed.",
     "commonGroupFields": "Common Group Fields",
     "queryRangeHours": "{count} hour | {count} hours",
-    "menuGroupAlerts": "Alerts"
+    "menuGroupAlerts": "Alerts",
+    "freeTextChooseFirst": "Choose how to search text first",
+    "freeTextScanLogsOnly": "Scan mode works in the logs view only; set a full-text field to use text search here",
+    "freeTextSearchedFields": "Full-text search in: {fields} (all words, any order)",
+    "freeTextPreview": "Full-text search in: {fields} (all words, any order)\n\nRuns as {sql}",
+    "freeTextRunsAs": "Runs as {sql}",
+    "freeTextNotSearched": "Not searched: {streams} (no full-text fields).",
+    "freeTextSetField": "Configure full-text search fields",
+    "freeTextNoFtsTitle": "\"{stream}\" has no full-text fields",
+    "freeTextNoFtsTitleMulti": "The selected streams have no full-text fields",
+    "freeTextNoTextFields": "This stream has no text fields to search.",
+    "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
+    "freeTextBuildNotice": "This filter has text search; edit it in SQL."
   },
   "menu": {
     "upgradeToProPlan": "Upgrade to PRO Plan",
@@ -11402,7 +11527,21 @@
     "eventClusterAriaLabelPlural": "{count} events, {errors} errors",
     "eventMarkerTooltip": "Event: {name}",
     "exceptionMarkerTooltip": "Exception: {type}",
-    "spanEventFallback": "span event"
+    "spanEventFallback": "span event",
+    "spanNav": {
+      "firstSpan": "First span",
+      "lastSpan": "Last span",
+      "position": "Span {index} of {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "Trace {row} of {count}, page {page}",
+      "spanPosition": "Span {row} of {count}, page {page}",
+      "firstResult": "First result",
+      "lastResult": "Last result",
+      "loadingPage": "Loading page {page}",
+      "pageFailed": "Couldn't load page {page}",
+      "pageEmpty": "Page {page} has no results"
+    }
   },
   "aiToolset": {
     "header": "AI Toolsets",
@@ -14635,11 +14774,12 @@
     "noStream": {
       "title": "Pick a stream to start exploring",
       "description": "Choose a stream, then press <strong>Run query</strong>. You can refine with filters, a VRL function, and a custom time range once results come in.",
+      "descriptionAutoRun": "Choose a stream to see its latest logs. You can refine with filters, a VRL function, and a custom time range once results come in.",
       "selectStream": "Select a stream",
       "selectStreamDesc": "Browse logs, traces, metrics & RUM streams",
       "queryGuide": "Read the query guide",
       "queryGuideDesc": "Filters, SQL mode, VRL & saved views",
-      "recent": "Recent:"
+      "recent": "Last used:"
     },
     "noEvents": {
       "title": "No events found",
@@ -14688,12 +14828,40 @@
       "sendToAiChat": "Send to AI Chat",
       "contentCopiedSuccessfully": "Content Copied Successfully!"
     },
+    "severity": {
+      "srText": "Severity {level}",
+      "srTextInferred": "Severity {level}, inferred",
+      "inferredLabel": "{level} · inferred",
+      "popoverTitle": "Severity: {level}",
+      "popoverAriaLabel": "Severity evidence",
+      "evidence": "Evidence",
+      "fromField": "From field {field}",
+      "inferredFrom": "Inferred from the {field} text.",
+      "notSearchable": "Not searchable; the histogram does not use it.",
+      "noLevelField": "No level field on this row, and no text field to scan.",
+      "noLevelWordInField": "No level field on this row, and no level word in {field}.",
+      "notInSelectedColumns": "Level field not in the selected columns",
+      "levels": {
+        "emergency": "emergency",
+        "alert": "alert",
+        "critical": "critical",
+        "error": "error",
+        "warning": "warning",
+        "notice": "notice",
+        "info": "info",
+        "debug": "debug",
+        "trace": "trace",
+        "ok": "ok",
+        "unknown": "unknown"
+      }
+    },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select * query is not supported for visualization.",
       "fixErrorsAndRetry": "There are some errors, please fix them and try again"
     },
     "buildQueryPage": {
-      "validationErrors": "There are some errors, please fix them and try again"
+      "validationErrors": "There are some errors, please fix them and try again",
+      "parserLoadFailed": "Couldn't load the query parser, so the search filter can't be added to the chart. Runs are paused until it loads."
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL Query :",
@@ -14895,6 +15063,18 @@
     },
     "logsNoEventsState": {
       "lastData": "Last data: {formatted} ({zone})"
+    },
+    "rowNav": {
+      "autoRefreshEdge": "Auto-refresh is on; turn it off to change pages",
+      "position": "Log {row} of {count}, page {page}",
+      "positionLabel": "Log {row} of {count} · Page {page}",
+      "loadingPage": "Loading page {page}…",
+      "loadingPageAnnouncement": "Loading page {page}",
+      "resultsChanged": "Results changed",
+      "notInPage": "Not in the current page",
+      "loadingResults": "Loading results…",
+      "previousLog": "Previous log",
+      "nextLog": "Next log"
     }
   },
   "queryError": {
@@ -14929,7 +15109,10 @@
     "traceId": "Trace ID:",
     "askAi": "Ask AI to fix my query",
     "showDetail": "Show details",
-    "hideDetail": "Hide details"
+    "hideDetail": "Hide details",
+    "runAs": "Run as",
+    "searchTextFor": "Search text for \"{text}\"",
+    "searchTextDesc": "Search the whole input as one phrase"
   },
   "refreshButton": {
     "justNow": "just now",
@@ -16824,7 +17007,17 @@
       "oncallEscalate": "Escalate",
       "oncallSnooze": "Snooze",
       "oncallResolve": "Resolve",
-      "functionsImport": "Import function"
+      "functionsImport": "Import function",
+      "logsNextRow": "Next log (opens details)",
+      "logsPrevRow": "Previous log (opens details)",
+      "logsRowFocusMove": "Move focus between rows",
+      "logsRowOpen": "Open the focused row",
+      "logsDetailClose": "Close details and return to the row",
+      "tracesNextRow": "Select next trace",
+      "tracesPrevRow": "Select previous trace",
+      "tracesRowOpen": "Open the selected trace",
+      "traceNextVisibleSpan": "Next visible span",
+      "tracePrevVisibleSpan": "Previous visible span"
     }
   },
   "components": {
@@ -17192,7 +17385,13 @@
         "debug": "Debug",
         "info": "Info",
         "warn": "WARN",
-        "fatal": "Fatal"
+        "fatal": "Fatal",
+        "emergency": "Emergency",
+        "alert": "Alert",
+        "critical": "Critical",
+        "notice": "Notice",
+        "ok": "OK",
+        "unknown": "Unknown"
       },
       "pipelineRunOutcome": {
         "firing": "Firing",

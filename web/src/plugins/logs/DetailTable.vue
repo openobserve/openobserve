@@ -15,7 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="searchdetaildialog flex h-full flex-col flex-nowrap" data-test="dialog-box">
+  <div
+    class="searchdetaildialog flex h-full flex-col flex-nowrap"
+    :class="severityBorderClass"
+    data-test="dialog-box"
+    data-no-autofocus
+  >
     <!-- Single Tab Row -->
     <div class="flex shrink-0 items-center justify-between">
       <div class="-mb-0.75 flex items-center gap-2">
@@ -41,6 +46,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
       </div>
       <div class="flex shrink-0 items-center gap-2 pe-3">
+        <OPopover v-if="!embedded" align="end" :aria-label="t('logs.severity.popoverAriaLabel')">
+          <template #trigger>
+            <OTag
+              type="logLevel"
+              :value="severity.level"
+              :label="severityTagLabel"
+              clickable
+              data-test="log-detail-severity-badge"
+              :data-severity-source="severity.source"
+            />
+          </template>
+          <div
+            class="flex w-72 flex-col gap-1.5 px-3 py-2.5 text-xs"
+            data-test="log-detail-severity-popover"
+          >
+            <span class="text-text-heading font-semibold">{{
+              t("logs.severity.popoverTitle", { level: severityTagLabel })
+            }}</span>
+            <span class="text-text-secondary text-2xs">{{ t("logs.severity.evidence") }}</span>
+            <i18n-t
+              v-if="severity.source === 'field' || severity.source === 'http'"
+              keypath="logs.severity.fromField"
+              tag="span"
+              scope="global"
+              class="text-text-heading"
+            >
+              <template #field>
+                <code class="font-mono">{{ raw(severity.field) }}</code>
+                {{ raw(severityFieldValue) }}
+              </template>
+            </i18n-t>
+            <template v-else-if="severity.source === 'message'">
+              <i18n-t
+                keypath="logs.severity.inferredFrom"
+                tag="span"
+                scope="global"
+                class="text-text-heading"
+              >
+                <template #field>
+                  <code class="font-mono">{{ raw(severity.field) }}</code>
+                </template>
+              </i18n-t>
+              <span class="text-text-heading">{{ t("logs.severity.notSearchable") }}</span>
+            </template>
+            <span v-else-if="severity.notFetched" class="text-text-heading">{{
+              t("logs.severity.notInSelectedColumns")
+            }}</span>
+            <i18n-t
+              v-else-if="severity.field"
+              keypath="logs.severity.noLevelWordInField"
+              tag="span"
+              scope="global"
+              class="text-text-heading"
+              data-test="log-detail-severity-no-level-word"
+            >
+              <template #field>
+                <code class="font-mono">{{ raw(severity.field) }}</code>
+              </template>
+            </i18n-t>
+            <span v-else class="text-text-heading" data-test="log-detail-severity-no-text-field">{{
+              t("logs.severity.noLevelField")
+            }}</span>
+          </div>
+        </OPopover>
+        <div
+          v-if="!embedded && lineLink.kind !== 'hidden'"
+          class="flex shrink-0 items-center"
+          data-test="log-detail-copy-line-link"
+        >
+          <OTooltip :content="lineLinkTooltip" />
+          <OButton
+            data-test="log-detail-copy-line-link-btn"
+            variant="outline"
+            size="xs"
+            icon-left="link"
+            :disabled="lineLink.kind === 'disabled' || pageLoading"
+            focusable-unavailable
+            :loading="lineLinkBusy"
+            @click="copyLineLink(modelValue, 'drawer')"
+          >
+            {{ t("search.linePermalink.copyLink") }}
+            <template #unavailable-reason>{{ lineLinkTooltip }}</template>
+          </OButton>
+          <LogLineLinkPopover source="drawer" />
+        </div>
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
@@ -66,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="xs"
             variant="outline"
             icon-left="account-tree"
+            :disabled="pageLoading"
             @click="viewTrace"
             >{{ t("search.viewTrace") }}</OButton
           >
@@ -85,10 +176,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'flex min-h-0 flex-1 flex-col',
+        'relative flex min-h-0 flex-1 flex-col',
         tab.startsWith('correlated-') ? 'full-height-panels overflow-hidden' : 'overflow-y-auto',
       ]"
+      :aria-busy="pageLoading ? 'true' : undefined"
     >
+      <div
+        v-if="pageLoading"
+        class="bg-dialog-bg/80 text-text-secondary absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 text-sm"
+        data-test="log-detail-page-loading"
+      >
+        <OSpinner size="lg" />
+        <span>{{ t("logs.rowNav.loadingPage", { page: pageLoadingPage }) }}</span>
+      </div>
       <OTabPanels
         data-test="log-detail-tab-container"
         v-model="tab"
@@ -382,6 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="correlationProps"
             mode="embedded-tabs"
             external-active-tab="traces"
+            :shortcuts-active="tab === 'correlated-traces'"
             :service-name="correlationProps.serviceName"
             :matched-dimensions="correlationProps.matchedDimensions"
             :additional-dimensions="correlationProps.additionalDimensions"
@@ -432,12 +533,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-detail-previous-detail-btn"
             variant="outline"
             size="sm-action"
-            :disabled="currentIndex <= 0"
+            :disabled="prevDisabled"
+            focusable-unavailable
+            :loading="pageLoading && pageLoadingDirection === 'prev'"
             @click="$emit('showPrevDetail', false, true)"
-            ><OIcon name="navigate-before" size="sm" class="me-1" />{{
-              t("common.previous")
-            }}</OButton
           >
+            <OTooltip :content="prevTooltip" shortcut-id="logsPrevRow" />
+            <OIcon name="navigate-before" size="sm" class="me-1" />{{ t("common.previous") }}
+            <OShortcut
+              id="logsPrevRow"
+              class="ms-1.5 max-md:hidden"
+              data-test="log-detail-previous-detail-btn-kbd"
+            />
+            <template #unavailable-reason>{{ prevTooltip }}</template>
+          </OButton>
         </div>
         <div
           v-show="
@@ -453,11 +562,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="recordSizeOptions"
             size="md"
             class="select-noof-records"
+            :disabled="pageLoading"
           />
           <OButton
             data-test="logs-detail-table-search-around-btn"
             variant="outline"
             size="sm-action"
+            :disabled="pageLoading"
             @click="searchTimeBoxed(rowData, selectedRelativeValue)"
             >{{ t("common.searchAround") }}</OButton
           >
@@ -467,10 +578,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="log-detail-next-detail-btn"
             variant="outline"
             size="sm-action"
-            :disabled="currentIndex >= totalLength - 1"
+            :disabled="nextDisabled"
+            focusable-unavailable
+            :loading="pageLoading && pageLoadingDirection === 'next'"
             @click="$emit('showNextDetail', true, false)"
-            >{{ t("common.next") }}<OIcon name="navigate-next" size="sm" class="ms-1"
-          /></OButton>
+          >
+            <OTooltip :content="nextTooltip" shortcut-id="logsNextRow" />
+            {{ t("common.next") }}
+            <OShortcut
+              id="logsNextRow"
+              class="ms-1.5 max-md:hidden"
+              data-test="log-detail-next-detail-btn-kbd"
+            />
+            <OIcon name="navigate-next" size="sm" class="ms-1" />
+            <template #unavailable-reason>{{ nextTooltip }}</template>
+          </OButton>
         </div>
       </div>
     </OCardSection>
@@ -483,7 +605,16 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { defineComponent, ref, reactive, onBeforeMount, computed, watch, type PropType } from "vue";
+import {
+  defineComponent,
+  ref,
+  reactive,
+  onBeforeMount,
+  onMounted,
+  computed,
+  watch,
+  type PropType,
+} from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -497,7 +628,11 @@ import JsonPreview from "./JsonPreview.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
-import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { resolveLogSeverity, type KnownLogSeverityLevel } from "@/utils/logs/statusParser";
+import useLogSeverity from "@/composables/useLogs/useLogSeverity";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
@@ -511,6 +646,10 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import LogLineLinkPopover from "@/plugins/logs/LogLineLinkPopover.vue";
+import { lineLinkBusy, useLogLineLink } from "@/composables/useLogs/useLogLineLink";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -519,6 +658,19 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
+const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
+  emergency: "border-log-severity-emergency-indicator",
+  alert: "border-log-severity-alert-indicator",
+  critical: "border-log-severity-critical-indicator",
+  error: "border-log-severity-error-indicator",
+  warning: "border-log-severity-warning-indicator",
+  notice: "border-log-severity-notice-indicator",
+  info: "border-log-severity-info-indicator",
+  debug: "border-log-severity-debug-indicator",
+  trace: "border-log-severity-trace-indicator",
+  ok: "border-log-severity-ok-indicator",
+};
+
 const defaultValue: any = () => {
   return {
     data: {},
@@ -549,9 +701,14 @@ export default defineComponent({
     ODropdownSeparator,
     OSwitch,
     OSpinner,
+    OShortcut,
+    OTooltip,
+    LogLineLinkPopover,
     OIcon,
     OTable,
     OSearchInput,
+    OTag,
+    OPopover,
   },
   emits: [
     "showPrevDetail",
@@ -565,6 +722,7 @@ export default defineComponent({
     "closeTable",
     "show-correlation",
     "load-correlation", // New event for lazy loading correlation data
+    "update:tab",
   ],
   props: {
     modelValue: {
@@ -616,6 +774,34 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    hasPrevPage: {
+      type: Boolean,
+      default: false,
+    },
+    hasNextPage: {
+      type: Boolean,
+      default: false,
+    },
+    pageLoading: {
+      type: Boolean,
+      default: false,
+    },
+    pageLoadingDirection: {
+      type: String as PropType<"next" | "prev" | null>,
+      default: null,
+    },
+    pageLoadingPage: {
+      type: Number,
+      default: 0,
+    },
+    navDisabledReason: {
+      type: String as PropType<"resultsChanged" | "notInPage" | "loading" | null>,
+      default: null,
+    },
+    pageEdgeReason: {
+      type: String as unknown as PropType<I18nText | null>,
+      default: null,
+    },
   },
   methods: {
     toggleIncludeSearchTerm(
@@ -660,6 +846,15 @@ export default defineComponent({
     ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
+    const { lineLinkState, copyLineLink } = useLogLineLink();
+    const lineLink = computed(() => lineLinkState(props.modelValue));
+    const lineLinkTooltip = computed(() =>
+      props.pageLoading
+        ? t("logs.rowNav.loadingPage", { page: props.pageLoadingPage })
+        : lineLink.value.kind === "disabled"
+          ? lineLink.value.reason
+          : t("search.linePermalink.copyLinkTooltip"),
+    );
 
     // The View Trace action is rendered in this component's header row (not
     // inside JsonPreview) so it stays reachable from every tab. Gate on
@@ -712,6 +907,7 @@ export default defineComponent({
 
     // Watch for tab changes - load correlation data when user clicks a correlation tab
     watch(tab, (newTab, oldTab) => {
+      emit("update:tab", newTab);
       const isCorrelationTab = newTab.startsWith("correlated-");
 
       // Only emit if switching TO a correlation tab AND we don't have data yet
@@ -776,9 +972,25 @@ export default defineComponent({
         searchObj.data.stream.selectedStream.length <= 1 || !!rowData.value?.[STREAM_NAME_FIELD],
     );
 
-    // Compute status color for the top border
-    const statusColor = computed(() => {
-      return extractStatusFromLog(rowData.value).color;
+    const { rowSeverity } = useLogSeverity();
+    const severity = computed(() =>
+      props.embedded ? resolveLogSeverity(props.modelValue) : rowSeverity(props.modelValue),
+    );
+    const severityTagLabel = computed(() => {
+      const label = resolveBadgeLabel("logLevel", severity.value.level);
+      return severity.value.source === "message"
+        ? t("logs.severity.inferredLabel", { level: label })
+        : label;
+    });
+    const severityFieldValue = computed(() => {
+      const value = severity.value.field ? props.modelValue?.[severity.value.field] : undefined;
+      return value === undefined ? "" : `(${String(value)})`;
+    });
+    const severityBorderClass = computed(() => {
+      if (props.embedded) return "";
+      const { level } = severity.value;
+      if (level === "unknown") return "border-t-3 border-border-default";
+      return `border-t-3 border-solid ${SEVERITY_BORDER_CLASSES[level]}`;
     });
 
     // Check if service streams feature is enabled
@@ -894,6 +1106,38 @@ export default defineComponent({
       tabOrder.value = order;
       window.localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.name)));
     };
+
+    onMounted(() => emit("update:tab", tab.value));
+
+    const NAV_DISABLED_KEYS = {
+      resultsChanged: "logs.rowNav.resultsChanged",
+      notInPage: "logs.rowNav.notInPage",
+      loading: "logs.rowNav.loadingResults",
+    } as const;
+
+    const atFirst = computed(() => props.currentIndex <= 0 && !props.hasPrevPage);
+    const atLast = computed(
+      () => props.currentIndex >= props.totalLength - 1 && !props.hasNextPage,
+    );
+    const prevDisabled = computed(
+      () => props.pageLoading || !!props.navDisabledReason || atFirst.value,
+    );
+    const nextDisabled = computed(
+      () => props.pageLoading || !!props.navDisabledReason || atLast.value,
+    );
+
+    const navTooltip = (atEdge: boolean, fallback: I18nText, edge: I18nText): I18nText => {
+      if (props.pageLoading) return t("logs.rowNav.loadingPage", { page: props.pageLoadingPage });
+      if (props.navDisabledReason) return t(NAV_DISABLED_KEYS[props.navDisabledReason]);
+      if (atEdge) return props.pageEdgeReason ?? edge;
+      return fallback;
+    };
+    const prevTooltip = computed(() =>
+      navTooltip(atFirst.value, t("logs.rowNav.previousLog"), t("traces.rowNav.firstResult")),
+    );
+    const nextTooltip = computed(() =>
+      navTooltip(atLast.value, t("logs.rowNav.nextLog"), t("traces.rowNav.lastResult")),
+    );
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
@@ -1107,10 +1351,19 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
       router,
+      lineLink,
+      lineLinkTooltip,
+      lineLinkBusy,
+      copyLineLink,
       rowData,
       tab,
+      prevDisabled,
+      nextDisabled,
+      prevTooltip,
+      nextTooltip,
       flattenJSONObject,
       selectedRelativeValue,
       recordSizeOptions,
@@ -1136,7 +1389,10 @@ export default defineComponent({
       addSearchTerm,
       closeTable,
       showCorrelation,
-      statusColor,
+      severity,
+      severityTagLabel,
+      severityFieldValue,
+      severityBorderClass,
       tableColumns,
       tableRows,
       detailSearchQuery,

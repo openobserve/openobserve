@@ -195,7 +195,7 @@ describe("DetailTable Component", () => {
       },
       OButton: {
         template:
-          '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled"><slot /></button>',
+          '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disabled" :aria-disabled="$attrs.disabled || undefined"><slot /></button>',
         emits: ["click"],
       },
       ODropdown: true,
@@ -403,13 +403,13 @@ describe("DetailTable Component", () => {
 
   it("should disable previous button when currentIndex is 0", () => {
     const prevButton = wrapper.find('[data-test="log-detail-previous-detail-btn"]');
-    expect(prevButton.attributes("disabled")).toBeDefined();
+    expect(prevButton.attributes("aria-disabled")).toBeDefined();
   });
 
   it("should disable next button when at last index", async () => {
     await wrapper.setProps({ currentIndex: 9, totalLength: 10 });
     const nextButton = wrapper.find('[data-test="log-detail-next-detail-btn"]');
-    expect(nextButton.attributes("disabled")).toBeDefined();
+    expect(nextButton.attributes("aria-disabled")).toBeDefined();
   });
 
   it("should emit showPrevDetail when previous button clicked", async () => {
@@ -889,6 +889,7 @@ describe("DetailTable Component", () => {
       "closeTable",
       "show-correlation",
       "load-correlation",
+      "update:tab",
     ];
     expect(componentOptions.emits).toEqual(expectedEmits);
   });
@@ -1242,6 +1243,244 @@ describe("DetailTable Component", () => {
 
       expect(traceWrapper.find(BUTTON).isVisible()).toBe(true);
       expect(traceWrapper.find(WRAP_TOGGLE).isVisible()).toBe(true);
+    });
+  });
+  describe("severity tag and drawer border (A7)", () => {
+    let sevWrapper: any;
+    const BADGE = '[data-test="log-detail-severity-badge"]';
+    const POPOVER = '[data-test="log-detail-severity-popover"]';
+    const mountWith = (modelValue: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
+      mount(DetailTable, {
+        attachTo: document.body,
+        props: { ...defaultProps, modelValue, ...extra },
+        global: globalMountOptions,
+      });
+
+    afterEach(() => {
+      sevWrapper?.unmount();
+      document.body.querySelectorAll("[data-o-popover-content]").forEach((n) => n.remove());
+    });
+
+    it("AC-A1.3: an inferred row shows an 'inferred' tag and the same solid border", async () => {
+      sevWrapper = mountWith({ message: "2026-10-06 12:00:01 ERROR payment failed" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.exists()).toBe(true);
+      expect(badge.element.tagName).toBe("BUTTON");
+      expect(badge.attributes("data-severity-source")).toBe("message");
+      expect(badge.text()).toContain("inferred");
+      const root = sevWrapper.find('[data-test="dialog-box"]');
+      expect(root.classes()).toEqual(
+        expect.arrayContaining([
+          "border-t-3",
+          "border-log-severity-error-indicator",
+          "border-solid",
+        ]),
+      );
+      expect(root.classes()).not.toContain("border-dashed");
+    });
+
+    it("an HTTP row shows a solid tag and border", async () => {
+      sevWrapper = mountWith({ status: 503 });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.attributes("data-severity-source")).toBe("http");
+      expect(badge.text()).not.toContain("inferred");
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toEqual(
+        expect.arrayContaining(["border-log-severity-error-indicator", "border-solid"]),
+      );
+    });
+
+    it("a row with no evidence shows an unknown tag and a neutral border", async () => {
+      sevWrapper = mountWith({ host: "a" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      expect(badge.attributes("data-severity-source")).toBe("none");
+      expect(badge.text()).toBe("Unknown");
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).toContain(
+        "border-border-default",
+      );
+    });
+
+    it("is the first item of the header action row", async () => {
+      sevWrapper = mountWith({ level: "warn" });
+      await flushPromises();
+      const html = sevWrapper.html();
+      const ai = html.indexOf("logs-detail-ai-context-btn");
+      expect(ai).toBeGreaterThan(0);
+      expect(html.indexOf("log-detail-severity-badge")).toBeLessThan(ai);
+    });
+
+    it("is hidden, with no border, when embedded", async () => {
+      sevWrapper = mountWith({ message: "[ERROR] x" }, { embedded: true });
+      await flushPromises();
+      expect(sevWrapper.find(BADGE).exists()).toBe(false);
+      expect(sevWrapper.find('[data-test="dialog-box"]').classes()).not.toContain("border-t-3");
+    });
+
+    it("opens its popover from the keyboard with the 'Not searchable' note", async () => {
+      sevWrapper = mountWith({ message: "[ERROR] x" });
+      await flushPromises();
+      const badge = sevWrapper.find(BADGE);
+      (badge.element as HTMLElement).focus();
+      expect(document.activeElement).toBe(badge.element);
+      await badge.trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      const popover = document.body.querySelector(POPOVER);
+      expect(popover).not.toBeNull();
+      expect(popover!.textContent).toContain("Not searchable");
+      expect(popover!.textContent).toContain("message");
+    });
+
+    it("names the field for an explicit row", async () => {
+      sevWrapper = mountWith({ severity_number: 18 });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      const text = document.body.querySelector(POPOVER)?.textContent ?? "";
+      expect(text).toContain("From field");
+      expect(text).toContain("severity_number");
+      expect(text).toContain("(18)");
+    });
+
+    it("says there is no text field to scan for an unknown row without one", async () => {
+      sevWrapper = mountWith({ host: "a" });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      const popover = document.body.querySelector(POPOVER);
+      expect(popover?.textContent).toContain(
+        "No level field on this row, and no text field to scan.",
+      );
+      expect(popover?.querySelector('[data-test="log-detail-severity-no-level-word"]')).toBeNull();
+    });
+
+    it("names the scanned text field for an unknown row with no level word", async () => {
+      sevWrapper = mountWith({ host: "a", body: "heartbeat ok" });
+      await flushPromises();
+      await sevWrapper.find(BADGE).trigger("click");
+      await flushPromises();
+      const line = document.body.querySelector(
+        `${POPOVER} [data-test="log-detail-severity-no-level-word"]`,
+      );
+      expect(line?.textContent?.replace(/\s+/g, " ").trim()).toBe(
+        "No level field on this row, and no level word in body.",
+      );
+      expect(line?.querySelector("code")?.textContent).toBe("body");
+    });
+  });
+
+  describe("J/K footer and page crossing (4a §3.3)", () => {
+    const dashboardStub = {
+      name: "TelemetryCorrelationDashboard",
+      props: ["externalActiveTab", "shortcutsActive"],
+      template: "<div />",
+    };
+
+    const mountFooter = async (props: Record<string, unknown> = {}) => {
+      wrapper?.unmount();
+      wrapper = mount(DetailTable, {
+        attachTo: "#app",
+        props: { ...defaultProps, ...props },
+        global: {
+          ...globalMountOptions,
+          stubs: {
+            ...globalMountOptions.stubs,
+            OButton: false,
+            TelemetryCorrelationDashboard: dashboardStub,
+            CorrelatedLogsTable: true,
+          },
+        },
+      });
+      await flushPromises();
+      return wrapper;
+    };
+
+    const button = (name: "next" | "previous") =>
+      wrapper.find(`[data-test="log-detail-${name}-detail-btn"]`);
+
+    it("shows the J and K keycaps from the registry and opts out of drawer autofocus", async () => {
+      await mountFooter();
+      expect(wrapper.find('[data-test="log-detail-next-detail-btn-kbd"]').text()).toContain("J");
+      expect(wrapper.find('[data-test="log-detail-previous-detail-btn-kbd"]').text()).toContain(
+        "K",
+      );
+      expect(
+        wrapper.find('[data-test="dialog-box"]').attributes("data-no-autofocus"),
+      ).toBeDefined();
+    });
+
+    it("keeps Next enabled on the last row when another page exists", async () => {
+      await mountFooter({ currentIndex: 9, totalLength: 10, hasNextPage: true });
+      expect(button("next").attributes("aria-disabled")).toBeUndefined();
+      await wrapper.setProps({ hasNextPage: false });
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      await wrapper.setProps({ currentIndex: 0, hasPrevPage: true });
+      expect(button("previous").attributes("aria-disabled")).toBeUndefined();
+    });
+
+    it("covers the record while a page loads, keeps the footer and blocks record actions", async () => {
+      await mountFooter({
+        currentIndex: 9,
+        totalLength: 10,
+        hasNextPage: true,
+        pageLoading: true,
+        pageLoadingDirection: "next",
+        pageLoadingPage: 2,
+      });
+      const overlay = wrapper.find('[data-test="log-detail-page-loading"]');
+      expect(overlay.exists()).toBe(true);
+      expect(overlay.text()).toContain("Loading page 2…");
+      expect(overlay.element.parentElement?.getAttribute("aria-busy")).toBe("true");
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      expect(button("next").attributes("aria-busy")).toBe("true");
+      expect(button("previous").attributes("aria-disabled")).toBeDefined();
+      expect(button("previous").attributes("aria-busy")).toBeUndefined();
+      expect(
+        wrapper.find('[data-test="logs-detail-table-search-around-btn"]').attributes("disabled"),
+      ).toBeDefined();
+    });
+
+    it("disables both buttons with the reason as their tooltip", async () => {
+      await mountFooter({ currentIndex: 3, navDisabledReason: "resultsChanged" });
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      expect(button("previous").attributes("aria-disabled")).toBeDefined();
+      expect(wrapper.vm.nextTooltip).toBe("Results changed");
+      await wrapper.setProps({ navDisabledReason: "loading" });
+      expect(wrapper.vm.prevTooltip).toBe("Loading results…");
+      await wrapper.setProps({ navDisabledReason: "notInPage" });
+      expect(wrapper.vm.nextTooltip).toBe("Not in the current page");
+    });
+
+    it("explains a blocked page edge on the edge button only (AC5.7)", async () => {
+      await mountFooter({
+        currentIndex: 9,
+        totalLength: 10,
+        pageEdgeReason: "Run the query to update results",
+      });
+      expect(button("next").attributes("aria-disabled")).toBeDefined();
+      expect(wrapper.vm.nextTooltip).toBe("Run the query to update results");
+      expect(wrapper.vm.prevTooltip).toBe("Previous log");
+    });
+
+    it("emits update:tab on mount, including a correlated initial tab, and on every change", async () => {
+      await mountFooter({ initialTab: "correlated-logs" });
+      expect(wrapper.emitted("update:tab")?.[0]).toEqual(["correlated-logs"]);
+      wrapper.vm.tab = "table";
+      await flushPromises();
+      expect(wrapper.emitted("update:tab")?.at(-1)).toEqual(["table"]);
+    });
+
+    it("lets only the visible correlated-traces tab own the trace shortcuts (AC1.8)", async () => {
+      await mountFooter({ correlationProps: { serviceName: "svc" }, initialTab: "json" });
+      const traces = () =>
+        wrapper
+          .findAllComponents(dashboardStub)
+          .find((c: any) => c.props("externalActiveTab") === "traces");
+      expect(traces()?.props("shortcutsActive")).toBe(false);
+      wrapper.vm.tab = "correlated-traces";
+      await flushPromises();
+      expect(traces()?.props("shortcutsActive")).toBe(true);
     });
   });
 });

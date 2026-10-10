@@ -58,9 +58,11 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     },
     meta?: {
       clear_cache?: Boolean;
+      generationId?: number;
     },
   ) => {
     const parsedSQL: any = fnParsedSQL();
+    const generationId = meta?.generationId;
 
     if (searchObj.data.stream.selectedStream.length > 1) {
       const errMsg = t("search.histogramUnavailableForQueries");
@@ -115,6 +117,8 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,
           is_ui_histogram: true,
         };
+        if (generationId !== null && generationId !== undefined)
+          payload.generationId = generationId;
 
         initializeSearchConnection(payload);
 
@@ -137,6 +141,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
             buildWebSocketPayload,
             initializeSearchConnection,
             callbacks,
+            generationId,
           );
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
@@ -157,6 +162,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
             buildWebSocketPayload,
             initializeSearchConnection,
             callbacks,
+            generationId,
           );
           searchObjDebug["pagecountEndTime"] = performance.now();
         }, 0);
@@ -274,6 +280,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       onComplete: (payload: any, response: any) => void;
       onReset: (data: any, traceId?: string) => void;
     },
+    generationId?: number,
   ) => {
     if (searchObj.data.queryResults.total > queryReq.query.from + queryReq.query.size) {
       return;
@@ -296,6 +303,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     }
 
     const payload = buildWebSocketPayload(queryReq, false, "pageCount");
+    if (generationId !== null && generationId !== undefined) payload.generationId = generationId;
 
     if (callbacks) {
       payload.onData = callbacks.onData;

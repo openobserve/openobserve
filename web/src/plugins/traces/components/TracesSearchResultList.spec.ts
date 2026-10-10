@@ -41,9 +41,20 @@ vi.mock("@/utils/clipboard", () => ({
 }));
 // ─── Shared searchObj reference — lets tests read addToFilter after mutation ─
 const sharedSearchObj = {
+  meta: {
+    refreshInterval: 0,
+    resultGrid: {
+      navigation: {
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as any,
+        lastOpenedId: null as string | null,
+      },
+    },
+  },
   data: {
     stream: { selectedStreamFields: [] as string[], addToFilter: "" },
-    resultGrid: { columns: [] as any[] },
+    resultGrid: { columns: [] as any[], pageRequest: null as any, pageLoad: null as any },
   },
 };
 

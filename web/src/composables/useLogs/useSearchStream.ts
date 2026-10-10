@@ -34,6 +34,13 @@ import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramM
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
 import { raw, type TranslateFn } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import {
+  failPendingPageNavigation,
+  notePageLoad,
+  notePageRetry,
+  notifyHitsComplete,
+} from "@/composables/useLogs/logsRowNav";
 
 export const useSearchStream = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
@@ -48,50 +55,74 @@ export const useSearchStream = (t: TranslateFn) => {
 
   const { searchObj, resetQueryData } = searchState();
 
+  const onData = (payload: any, response: any) => {
+    const autoRun = useLogsAutoRun();
+    if (!autoRun.isPayloadCurrent(payload)) return;
+    responseProcessor.handleSearchResponse(payload, response);
+    autoRun.onPayloadData(payload, response?.type);
+  };
+
+  const onError = (payload: any, error: any) => {
+    const autoRun = useLogsAutoRun();
+    if (!autoRun.isPayloadCurrent(payload)) {
+      autoRun.finishPayload(payload);
+      return;
+    }
+    autoRun.onPayloadError(payload);
+    responseProcessor.handleSearchError(payload, error);
+  };
+
+  const searchCallbacks = () => ({
+    onData,
+    onError,
+    onComplete: handleSearchComplete,
+    onReset: handleSearchReset,
+  });
+
   /**
    * Main entry point for search operations
    * Delegates to appropriate split composables
    */
-  const getDataThroughStream = (isPagination: boolean) => {
+  const getDataThroughStream = (
+    isPagination: boolean,
+    generationId?: number,
+    options: { reuseSchema?: boolean } = {},
+  ) => {
     try {
       if (!isPagination) resetQueryData();
 
       // 1. Build the query using the query composable
       const queryReq = queryBuilder.getQueryReq(isPagination);
-      if (!queryReq) return;
+      if (!queryReq) {
+        if (isPagination) failPendingPageNavigation(searchObj);
+        return;
+      }
 
-      // 2. Set up response callbacks
-      const callbacks = {
-        onData: responseProcessor.handleSearchResponse,
-        onError: responseProcessor.handleSearchError,
-        onComplete: handleSearchComplete,
-        onReset: handleSearchReset,
-      };
-
-      // 3. Execute the search through connection manager
-      connectionManager.getDataThroughStream(queryReq, isPagination, callbacks);
+      connectionManager.getDataThroughStream(
+        queryReq,
+        isPagination,
+        searchCallbacks(),
+        generationId,
+        options,
+      );
     } catch (error: any) {
       console.error("Search operation failed:", error);
       searchObj.loading = false;
+      if (isPagination) failPendingPageNavigation(searchObj, { quiet: true });
       showErrorNotification(t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"));
     }
   };
 
-  const getHistogramData = (queryReq: any, meta: any) => {
-    const histogramCallbacks = {
-      onData: responseProcessor.handleSearchResponse,
-      onError: responseProcessor.handleSearchError,
-      onComplete: handleSearchComplete,
-      onReset: handleSearchReset,
-    };
-
-    histogramHandler.processHistogramRequest(
+  const getHistogramData = (queryReq: any, meta: any = {}) => {
+    const launch = histogramHandler.processHistogramRequest(
       queryReq,
       connectionManager.buildWebSocketPayload,
       connectionManager.initializeSearchConnection,
-      histogramCallbacks,
+      searchCallbacks(),
       meta,
     );
+    useLogsAutoRun().trackLaunch(meta?.generationId, launch);
+    return launch;
   };
 
   /**
@@ -99,6 +130,14 @@ export const useSearchStream = (t: TranslateFn) => {
    * Orchestrates histogram processing if needed
    */
   const handleSearchComplete = (payload: any) => {
+    const autoRun = useLogsAutoRun();
+    if (!autoRun.isPayloadCurrent(payload)) {
+      autoRun.finishPayload(payload);
+      connectionManager.cleanupConnection(payload.traceId);
+      return;
+    }
+    autoRun.onPayloadComplete(payload);
+
     if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
       analytics.track("logs_search_completed");
     }
@@ -107,6 +146,7 @@ export const useSearchStream = (t: TranslateFn) => {
     if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
       getHistogramData(payload.queryReq, {
         clear_cache: payload.clear_cache,
+        generationId: payload.generationId,
       });
     }
 
@@ -117,6 +157,8 @@ export const useSearchStream = (t: TranslateFn) => {
     if (payload.type === "search") {
       searchObj.loading = false;
       searchObj.loadingProgressPercentage = 0;
+      if (payload.isPagination) notePageLoad(searchObj, payload.traceId, "done");
+      notifyHitsComplete(payload);
     }
     if (payload.type === "histogram" || payload.type === "pageCount") {
       searchObj.loadingHistogram = false;
@@ -129,6 +171,7 @@ export const useSearchStream = (t: TranslateFn) => {
 
     // Clean up connection
     connectionManager.cleanupConnection(payload.traceId);
+    autoRun.finishPayload(payload);
   };
 
   /**
@@ -161,12 +204,15 @@ export const useSearchStream = (t: TranslateFn) => {
           };
         }
 
+        if (data.isPagination) notePageRetry(searchObj, data.traceId);
         // Rebuild payload and retry
         const payload = connectionManager.buildWebSocketPayload(
           data.queryReq,
           data.isPagination,
           "search",
         );
+        (payload as { generationId?: number }).generationId = data.generationId;
+        (payload as { reuseSchema?: boolean }).reuseSchema = data.reuseSchema;
 
         connectionManager.initializeSearchConnection(payload);
         addTraceId(payload.traceId);

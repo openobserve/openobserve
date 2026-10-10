@@ -321,6 +321,9 @@ export interface OTableProps<TData = any> {
   sortOrder?: "asc" | "desc";
   /** Maps TanStack column id → backend field name for server-side sort */
   sortFieldMap?: Record<string, string>;
+  sortClearable?: boolean;
+  sortDisabled?: boolean;
+  sortDisabledReason?: I18nText;
 
   // ── Filtering ──
   /** Global search/filter text */
@@ -528,6 +531,7 @@ export interface OTableProps<TData = any> {
   rowTone?: (row: TData) => RowTone | null;
   /** Static class or dynamic function for row <tr> */
   rowClass?: string | ((row: TData) => string);
+  activeRowIndex?: number | null;
   /** Dynamic inline style for row */
   getRowStyle?: (row: TData) => Record<string, any>;
   /** Returns a CSS color for the status bar (4px left border) per row */

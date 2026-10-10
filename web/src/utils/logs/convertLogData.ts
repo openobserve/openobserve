@@ -5,6 +5,7 @@ import {
 } from "@/utils/dashboard/colorPalette";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
+import { resolveSeverityFieldValue } from "@/utils/logs/statusParser";
 
 export const convertLogData = (
   x: any,
@@ -200,38 +201,21 @@ export const formatCount = (value: number): string => {
   return String(value);
 };
 
-// Maps numeric severity levels (0-7) to their semantic names, matching
-// statusParser.ts mapNumericStatus. Needed because the backend histogram
-// query selects the raw field value as zo_sql_breakdown, which for OTEL
-// severity data are numbers. useHistogram.ts coerces these to strings.
-// Only maps 0-7; other numeric strings (200, 500, etc.) pass through.
-const NUMERIC_SEVERITY_TO_SEMANTIC: Record<string, string> = {
-  "0": "info", // OTEL UNSPECIFIED
-  "1": "alert",
-  "2": "critical",
-  "3": "error",
-  "4": "warning",
-  "5": "notice",
-  "6": "info",
-  "7": "debug",
-};
-
 const getSemanticColor = (
   label: unknown,
   isDarkTheme: boolean,
   fallbackPalette: string[],
+  breakdownField?: string | null,
 ): string => {
   const map = isDarkTheme ? SEMANTIC_COLORS_DARK : SEMANTIC_COLORS_LIGHT;
   const lowerLabel = String(label ?? "")
     .trim()
     .toLowerCase();
 
-  const directMatch = map[lowerLabel];
-  if (directMatch) return directMatch;
+  if (Object.hasOwn(map, lowerLabel)) return map[lowerLabel];
 
-  const semanticName = NUMERIC_SEVERITY_TO_SEMANTIC[lowerLabel];
-  if (semanticName)
-    return map[semanticName] ?? fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
+  const resolved = breakdownField ? resolveSeverityFieldValue(breakdownField, label) : null;
+  if (resolved && map[resolved.level]) return map[resolved.level];
 
   return fallbackPalette[getSeriesHash(String(label), fallbackPalette)];
 };
@@ -261,7 +245,7 @@ export const convertStackedLogData = (
         values[i] ?? 0,
       ]),
       itemStyle: {
-        color: getSemanticColor(label, isDarkTheme, palette),
+        color: getSemanticColor(label, isDarkTheme, palette, params.breakdownField),
       },
     };
   });

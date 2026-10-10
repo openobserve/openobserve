@@ -956,4 +956,28 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       expect(wrapper.vm.showMetricSelector).toBe(false);
     });
   });
+
+  describe("embedded trace shortcuts (4a §3.5, AC1.8)", () => {
+    const showDirectTrace = async (props: Record<string, unknown>) => {
+      wrapper = createWrapper({ externalActiveTab: "traces", ...props });
+      await flushPromises();
+      wrapper.vm.tracesLoading = false;
+      wrapper.vm.tracesError = null;
+      wrapper.vm.traceCorrelationMode = "direct";
+      wrapper.vm.traceSpanList = [{ span_id: "s1", trace_id: "t1" }];
+      await flushPromises();
+      return wrapper.findComponent({ name: "TraceDetails" });
+    };
+
+    it("forwards shortcutsActive, so a hidden kept-alive tab never owns J/K", async () => {
+      const details = await showDirectTrace({ shortcutsActive: false });
+      expect(details.exists()).toBe(true);
+      expect(details.attributes("shortcuts-active")).toBe("false");
+    });
+
+    it("defaults to active for every other embedder", async () => {
+      const details = await showDirectTrace({});
+      expect(details.attributes("shortcuts-active")).toBe("true");
+    });
+  });
 });

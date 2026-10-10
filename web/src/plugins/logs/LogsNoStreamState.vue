@@ -72,13 +72,17 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
-import { restoreLogsStream } from "@/utils/streamPersist";
+import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
 import DOMPurify from "dompurify";
 
-const props = defineProps<{
-  /** Org identifier — used to look up recently used streams from localStorage. */
-  orgId: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    orgId: string;
+    streamType?: string;
+    autoRun?: boolean;
+  }>(),
+  { streamType: "logs", autoRun: false },
+);
 
 const emit = defineEmits<{
   "select-stream": [];
@@ -87,14 +91,17 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-// Show up to 3 recently used streams (deduplicated, most recent first).
 const recentStreams = computed<string[]>(() => {
   if (!props.orgId) return [];
-  return restoreLogsStream(props.orgId).slice(0, 3);
+  return restoreLogsSelectedStreams(props.orgId, props.streamType).slice(0, 3);
 });
 
 // Uses v-html — content is fully i18n-controlled, no user input.
-const description = computed(() => DOMPurify.sanitize(t("logs.noStream.description")));
+const description = computed(() =>
+  DOMPurify.sanitize(
+    t(props.autoRun ? "logs.noStream.descriptionAutoRun" : "logs.noStream.description"),
+  ),
+);
 
 const openQueryGuide = () => {
   window.open("https://openobserve.ai/docs/example-queries/", "_blank", "noopener,noreferrer");

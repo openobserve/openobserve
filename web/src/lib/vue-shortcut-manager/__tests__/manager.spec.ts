@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { defineComponent, h, nextTick } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { ShortcutManager, getManager, resetManager } from "@/lib/vue-shortcut-manager/manager";
 import { useShortcut, useShortcuts } from "@/lib/vue-shortcut-manager/composables";
@@ -475,5 +475,303 @@ describe("shortcutRegistry", () => {
 
   it("should return undefined display for an unknown id", () => {
     expect(getShortcutDisplay("nopeNotAnId")).toBeUndefined();
+  });
+});
+
+describe("handler event argument", () => {
+  beforeEach(() => {
+    resetManager();
+  });
+
+  it("passes the KeyboardEvent to the handler, including repeat", () => {
+    const handler = vi.fn();
+    getManager()!.register({ key: "j", handler, description: "next" });
+
+    const first = new KeyboardEvent("keydown", { key: "j" });
+    window.dispatchEvent(first);
+    const held = new KeyboardEvent("keydown", { key: "j", repeat: true });
+    window.dispatchEvent(held);
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(handler.mock.calls[0][0]).toBe(first);
+    expect(handler.mock.calls[0][0].repeat).toBe(false);
+    expect(handler.mock.calls[1][0]).toBe(held);
+    expect(handler.mock.calls[1][0].repeat).toBe(true);
+  });
+
+  it("passes the event to a registry-bound useShortcuts handler", async () => {
+    const handler = vi.fn();
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          useShortcuts([{ id: "logsNextRow", handler }]);
+          return () => h("div");
+        },
+      }),
+    );
+    await nextTick();
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", repeat: true }));
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler.mock.calls[0][0]).toBeInstanceOf(KeyboardEvent);
+    expect(handler.mock.calls[0][0].repeat).toBe(true);
+    wrapper.unmount();
+  });
+});
+
+describe("scope stack", () => {
+  let manager: ShortcutManager;
+
+  beforeEach(() => {
+    resetManager();
+    manager = new ShortcutManager();
+  });
+
+  it("returns the newest acquired scope, else the base scope", () => {
+    expect(manager.getScope()).toBe("global");
+    manager.setScope("base");
+    const logs = manager.acquireScope("logs");
+    expect(manager.getScope()).toBe("logs");
+    manager.setScope("other-base");
+    expect(manager.getScope()).toBe("logs");
+    manager.releaseScope(logs);
+    expect(manager.getScope()).toBe("other-base");
+  });
+
+  it("an out-of-order release never clobbers a newer owner", () => {
+    const logs = manager.acquireScope("logs");
+    const trace = manager.acquireScope("trace-detail");
+    const dialog = manager.acquireScope("dialog");
+
+    manager.releaseScope(trace);
+    expect(manager.getScope()).toBe("dialog");
+    manager.releaseScope(dialog);
+    expect(manager.getScope()).toBe("logs");
+    manager.releaseScope(logs);
+    expect(manager.getScope()).toBe("global");
+  });
+
+  it("releasing an unknown or already released token is a no-op", () => {
+    const logs = manager.acquireScope("logs");
+    manager.releaseScope(Symbol("stranger"));
+    expect(manager.getScope()).toBe("logs");
+    manager.releaseScope(logs);
+    manager.releaseScope(logs);
+    expect(manager.getScope()).toBe("global");
+  });
+
+  it("dispatches to the shortcut of the scope on top of the stack", () => {
+    const logsJ = vi.fn();
+    const traceJ = vi.fn();
+    manager.register({ key: "j", handler: logsJ, scope: "logs" });
+    manager.register({ key: "j", handler: traceJ, scope: "trace-detail" });
+    manager.acquireScope("logs");
+    const trace = manager.acquireScope("trace-detail");
+
+    manager.handleKeyDown(fakeEvent({ key: "j" }));
+    expect(traceJ).toHaveBeenCalledOnce();
+
+    manager.releaseScope(trace);
+    manager.handleKeyDown(fakeEvent({ key: "j" }));
+    expect(logsJ).toHaveBeenCalledOnce();
+  });
+});
+
+describe("useShortcuts active option", () => {
+  beforeEach(() => {
+    resetManager();
+  });
+
+  it("registers and holds the scope only while active (false → true → false)", async () => {
+    const active = ref(false);
+    const handler = vi.fn();
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          useShortcuts([{ id: "traceNextSpan", handler }], undefined, { active });
+          return () => h("div");
+        },
+      }),
+    );
+    await nextTick();
+    const mgr = getManager()!;
+    expect(mgr.getAll()).toHaveLength(0);
+    expect(mgr.getScope()).toBe("global");
+
+    active.value = true;
+    await nextTick();
+    expect(mgr.getById("traceNextSpan-0")?.key).toBe("j");
+    expect(mgr.getScope()).toBe("trace-detail");
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "j" }));
+    expect(handler).toHaveBeenCalledOnce();
+
+    active.value = false;
+    await nextTick();
+    expect(mgr.getAll()).toHaveLength(0);
+    expect(mgr.getScope()).toBe("global");
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "j" }));
+    expect(handler).toHaveBeenCalledOnce();
+
+    wrapper.unmount();
+  });
+
+  it("registers nothing when mounted inactive and unmounted", async () => {
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          useShortcuts([{ id: "traceNextSpan", handler: vi.fn() }], undefined, {
+            active: ref(false),
+          });
+          return () => h("div");
+        },
+      }),
+    );
+    await nextTick();
+    wrapper.unmount();
+    expect(getManager()!.getAll()).toHaveLength(0);
+    expect(getManager()!.getScope()).toBe("global");
+  });
+
+  it("releases on unmount while active", async () => {
+    const wrapper = mount(
+      defineComponent({
+        setup() {
+          useShortcuts([{ id: "traceNextSpan", handler: vi.fn() }], undefined, {
+            active: ref(true),
+          });
+          return () => h("div");
+        },
+      }),
+    );
+    await nextTick();
+    expect(getManager()!.getScope()).toBe("trace-detail");
+    wrapper.unmount();
+    expect(getManager()!.getAll()).toHaveLength(0);
+    expect(getManager()!.getScope()).toBe("global");
+  });
+});
+
+describe("scope ownership sequences (4a §3.6)", () => {
+  const logsJ = vi.fn();
+  const spanJ = vi.fn();
+  const showTrace = ref(false);
+  const traceActive = ref(true);
+  const showDialog = ref(false);
+  const showOverlay = ref(false);
+
+  const TraceDetails = defineComponent({
+    setup() {
+      useShortcuts([{ id: "traceNextSpan", handler: spanJ }], undefined, { active: traceActive });
+      return () => h("div");
+    },
+  });
+  const RegexDialog = defineComponent({
+    setup() {
+      useShortcuts([{ key: "escape", handler: vi.fn(), scope: "regex-dialog" }]);
+      return () => h("div");
+    },
+  });
+  const Overlay = defineComponent({
+    setup() {
+      useShortcuts([{ key: "escape", handler: vi.fn(), scope: "overlay" }]);
+      return () => h("div");
+    },
+  });
+  const LogsPage = defineComponent({
+    setup() {
+      useShortcuts([{ id: "logsNextRow", handler: logsJ }]);
+      return () =>
+        h("div", [
+          showTrace.value ? h(TraceDetails) : null,
+          showDialog.value ? h(RegexDialog) : null,
+          showOverlay.value ? h(Overlay) : null,
+        ]);
+    },
+  });
+
+  const pressJ = (repeat = false) =>
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", repeat }));
+
+  beforeEach(() => {
+    resetManager();
+    logsJ.mockReset();
+    spanJ.mockReset();
+    showTrace.value = false;
+    traceActive.value = true;
+    showDialog.value = false;
+    showOverlay.value = false;
+  });
+
+  it("correlated traces → page crossing on the JSON tab → JSON keeps the logs scope", async () => {
+    const wrapper = mount(LogsPage);
+    await nextTick();
+    const mgr = getManager()!;
+    expect(mgr.getScope()).toBe("logs");
+
+    showTrace.value = true;
+    await nextTick();
+    expect(mgr.getScope()).toBe("trace-detail");
+    pressJ();
+    expect(spanJ).toHaveBeenCalledOnce();
+
+    traceActive.value = false;
+    await nextTick();
+    expect(mgr.getScope()).toBe("logs");
+
+    pressJ(true);
+    expect(logsJ).toHaveBeenCalledOnce();
+    expect(logsJ.mock.calls[0][0].repeat).toBe(true);
+    expect(mgr.getScope()).toBe("logs");
+    pressJ();
+    expect(logsJ).toHaveBeenCalledTimes(2);
+    expect(spanJ).toHaveBeenCalledOnce();
+
+    wrapper.unmount();
+    expect(mgr.getScope()).toBe("global");
+  });
+
+  it("correlated traces → nested dialog → tab left → dialog closed ends on logs", async () => {
+    const wrapper = mount(LogsPage);
+    showTrace.value = true;
+    await nextTick();
+    const mgr = getManager()!;
+
+    showDialog.value = true;
+    await nextTick();
+    expect(mgr.getScope()).toBe("regex-dialog");
+
+    traceActive.value = false;
+    await nextTick();
+    expect(mgr.getScope()).toBe("regex-dialog");
+
+    showDialog.value = false;
+    await nextTick();
+    expect(mgr.getScope()).toBe("logs");
+    pressJ();
+    expect(logsJ).toHaveBeenCalledOnce();
+    expect(spanJ).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
+  it("TraceDetails unmounting under a newer owner leaves that owner active", async () => {
+    const wrapper = mount(LogsPage);
+    showTrace.value = true;
+    await nextTick();
+    showOverlay.value = true;
+    await nextTick();
+    const mgr = getManager()!;
+    expect(mgr.getScope()).toBe("overlay");
+
+    showTrace.value = false;
+    await nextTick();
+    expect(mgr.getScope()).toBe("overlay");
+    expect(mgr.getById("traceNextSpan-0")).toBeUndefined();
+
+    showOverlay.value = false;
+    await nextTick();
+    expect(mgr.getScope()).toBe("logs");
+
+    wrapper.unmount();
   });
 });

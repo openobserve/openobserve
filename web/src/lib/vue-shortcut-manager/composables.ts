@@ -1,16 +1,22 @@
 import { raw } from "@/types/i18n";
 
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { getManager } from "./manager";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import { getShortcutDef, resolveShortcutKeys } from "./shortcutRegistry";
-import type { Shortcut, ShortcutById, ShortcutInput, RegisteredShortcut } from "./types";
+import type {
+  Shortcut,
+  ShortcutById,
+  ShortcutInput,
+  RegisteredShortcut,
+  UseShortcutsOptions,
+} from "./types";
 
 // ---------- useShortcut ----------
 
 export function useShortcut(
   key: string,
-  handler: () => void,
+  handler: (e?: KeyboardEvent) => void,
   options: Pick<Shortcut, "description" | "scope" | "whenFocused"> = {},
 ): void {
   let id: string;
@@ -34,6 +40,47 @@ function isById(input: ShortcutInput): input is ShortcutById {
   return !("key" in input) && !("keyForWindows" in input) && !("keyForMac" in input);
 }
 
+function resolveShortcuts(
+  shortcuts: ShortcutInput[],
+  scope: string | undefined,
+): { toRegister: Shortcut[]; resolvedScope: string | undefined } {
+  const mac = isMacOS();
+  const toRegister: Shortcut[] = [];
+  let inferredScope: string | undefined;
+
+  for (const input of shortcuts) {
+    if (isById(input)) {
+      const def = getShortcutDef(input.id);
+      if (!def) {
+        console.warn(
+          `[vue-shortcut-manager] Unknown shortcut id "${input.id}". ` +
+            `Add it to shortcutRegistry.ts.`,
+        );
+        continue;
+      }
+      if (def.scope && inferredScope === undefined) inferredScope = def.scope;
+      const keys = resolveShortcutKeys(def, mac);
+      keys.forEach((key, i) => {
+        toRegister.push({
+          id: keys.length > 1 ? `${def.id}-${i}` : def.id,
+          key,
+          scope: def.scope,
+          description: raw(def.descriptionKey),
+          handler: input.handler,
+          whenFocused: input.whenFocused,
+          allowInInput: def.allowInInput,
+        });
+      });
+    } else {
+      if (input.scope && inferredScope === undefined) inferredScope = input.scope;
+      const key = (mac ? input.keyForMac : input.keyForWindows) ?? input.key;
+      toRegister.push({ ...input, key });
+    }
+  }
+
+  return { toRegister, resolvedScope: scope ?? inferredScope };
+}
+
 /**
  * Register a component's keyboard shortcuts in a single call.
  *
@@ -52,68 +99,54 @@ function isById(input: ShortcutInput): input is ShortcutById {
  * mounted that scope is made active (and restored on unmount) so page-level
  * shortcuts only fire on their page. Pass `scope` to override.
  */
-export function useShortcuts(shortcuts: ShortcutInput[], scope?: string): void {
-  const ids: string[] = [];
-  let previousScope: string | undefined;
-  let resolvedScope: string | undefined;
+export function useShortcuts(
+  shortcuts: ShortcutInput[],
+  scope?: string,
+  options: UseShortcutsOptions = {},
+): void {
+  let ids: string[] = [];
+  let scopeToken: symbol | null = null;
+  let isMounted = false;
+  let isRegistered = false;
+
+  const activate = () => {
+    const manager = getManager();
+    if (!manager || isRegistered) return;
+    isRegistered = true;
+    const { toRegister, resolvedScope } = resolveShortcuts(shortcuts, scope);
+    if (resolvedScope) scopeToken = manager.acquireScope(resolvedScope);
+    ids = toRegister.map((s) =>
+      manager.register(resolvedScope && !s.scope ? { ...s, scope: resolvedScope } : s),
+    );
+  };
+
+  const deactivate = () => {
+    const manager = getManager();
+    if (!manager || !isRegistered) return;
+    isRegistered = false;
+    ids.forEach((id) => manager.unregisterById(id));
+    ids = [];
+    if (scopeToken) manager.releaseScope(scopeToken);
+    scopeToken = null;
+  };
 
   onMounted(() => {
-    const manager = getManager();
-    if (!manager) return;
-
-    const mac = isMacOS();
-    const toRegister: Shortcut[] = [];
-    let inferredScope: string | undefined;
-
-    for (const input of shortcuts) {
-      if (isById(input)) {
-        const def = getShortcutDef(input.id);
-        if (!def) {
-          console.warn(
-            `[vue-shortcut-manager] Unknown shortcut id "${input.id}". ` +
-              `Add it to shortcutRegistry.ts.`,
-          );
-          continue;
-        }
-        if (def.scope && inferredScope === undefined) inferredScope = def.scope;
-        const keys = resolveShortcutKeys(def, mac);
-        keys.forEach((key, i) => {
-          toRegister.push({
-            id: keys.length > 1 ? `${def.id}-${i}` : def.id,
-            key,
-            scope: def.scope,
-            description: raw(def.descriptionKey),
-            handler: input.handler,
-            whenFocused: input.whenFocused,
-            allowInInput: def.allowInInput,
-          });
-        });
-      } else {
-        // Inline shortcut — pick the combo for this platform.
-        if (input.scope && inferredScope === undefined) inferredScope = input.scope;
-        const key = (mac ? input.keyForMac : input.keyForWindows) ?? input.key;
-        toRegister.push({ ...input, key });
-      }
-    }
-
-    resolvedScope = scope ?? inferredScope;
-
-    if (resolvedScope) {
-      previousScope = manager.getScope();
-      manager.setScope(resolvedScope);
-    }
-
-    for (const s of toRegister) {
-      ids.push(manager.register(resolvedScope && !s.scope ? { ...s, scope: resolvedScope } : s));
-    }
+    isMounted = true;
+    if (options.active?.value ?? true) activate();
   });
 
   onUnmounted(() => {
-    const manager = getManager();
-    if (!manager) return;
-    ids.forEach((id) => manager.unregisterById(id));
-    if (resolvedScope) manager.setScope(previousScope ?? "global");
+    isMounted = false;
+    deactivate();
   });
+
+  if (options.active) {
+    watch(options.active, (on) => {
+      if (!isMounted) return;
+      if (on) activate();
+      else deactivate();
+    });
+  }
 }
 
 // ---------- useShortcutList ----------

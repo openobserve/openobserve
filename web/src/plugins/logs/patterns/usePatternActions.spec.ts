@@ -331,6 +331,27 @@ describe("usePatternActions", () => {
       expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain("(code = 500)");
     });
 
+    it("renders a bare word as match_all for the patterns' stream, never dropping it (AC6.2)", () => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [{ name: "test-stream", schema: [{ name: "body", type: "Utf8" }], settings: {} }],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [{ name: "body" }];
+      (mockStore.state as any).zoConfig = { default_fts_keys: ["body"] };
+      mockSearchObj.data.query = "timeout";
+      try {
+        const sql = usePatternActions().buildPatternsAlertPrefill().sql;
+        expect(sql).toContain("(match_all('timeout'))");
+        expect(sql).not.toMatch(/\(timeout\)/);
+        mockSearchObj.data.query = "error AND body='x'";
+        expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain(
+          "(match_all('error') AND body='x')",
+        );
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+        delete (mockStore.state as any).zoConfig;
+      }
+    });
+
     it("says so when a SQL-mode query cannot be spliced in", () => {
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.data.query = 'SELECT * FROM "test-stream"';

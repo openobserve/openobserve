@@ -15,12 +15,13 @@
 
 import { nextTick, ref } from "vue";
 import { byString } from "@/utils/json";
-import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 
 import { searchState } from "@/composables/useLogs/searchState";
+import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 import useStreams from "@/composables/useStreams";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { captureFromSearchHits } from "@/composables/fieldValueStore";
@@ -35,6 +36,7 @@ import {
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { bumpSeveritySchemaGeneration } from "@/utils/logs/statusParser";
 import {
   resolveFieldGroup,
   buildSemanticIndex,
@@ -47,6 +49,49 @@ import {
 import { buildStreamNameColumn, shouldShowStreamNameColumn } from "@/utils/logs/streamNameColumn";
 import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServiceCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { isGuardActive } from "@/composables/useLogs/useAutoRun";
+import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateScanMb";
+import { restoreLogsSelectedStreams } from "@/utils/streamPersist";
+import { sqlSources } from "@/utils/logs/sqlSources";
+
+export interface InitialStreamInput {
+  list: StreamStatsEntry[];
+  current: string[];
+  currentFromUrl: boolean;
+  persisted: string[];
+  allowLatest: boolean;
+}
+
+export interface InitialStreamPick {
+  selected: string[];
+  missing: string[];
+  source: "url" | "current" | "persisted" | "latest" | "none";
+}
+
+export interface StreamListOptions {
+  fromUrl?: boolean;
+  isCurrent?: () => boolean;
+}
+
+export function pickInitialLogsStreams(input: InitialStreamInput): InitialStreamPick {
+  const readable = new Set(input.list.map((entry) => entry.name));
+  const current = input.current.filter((name) => !!name);
+  if (current.length) {
+    const valid = current.filter((name) => readable.has(name));
+    const missing = current.filter((name) => !readable.has(name));
+    if (input.currentFromUrl) {
+      return missing.length
+        ? { selected: [], missing, source: "url" }
+        : { selected: valid, missing: [], source: "url" };
+    }
+    if (valid.length) return { selected: valid, missing, source: "current" };
+  }
+  const persisted = input.persisted.filter((name) => readable.has(name));
+  if (persisted.length) return { selected: persisted, missing: [], source: "persisted" };
+  const latest = input.allowLatest ? pickLatestStream(input.list) : null;
+  if (latest) return { selected: [latest], missing: [], source: "latest" };
+  return { selected: [], missing: [], source: "none" };
+}
 
 export const useStreamFields = () => {
   const { t } = useI18nTyped();
@@ -133,7 +178,7 @@ export const useStreamFields = () => {
     }
   };
 
-  const extractFields = async () => {
+  const extractFields = async (options: { reuseLoadedSchema?: boolean } = {}) => {
     schemaRequestToken.value++;
     const capturedToken = schemaRequestToken.value;
     searchObj.loadingStream = true;
@@ -269,7 +314,14 @@ export const useStreamFields = () => {
 
             // check for schema exist in the object or not
             // if not pull the schema from server.
-            const streamData = await loadStreamFields(stream.name);
+            const streamData =
+              options.reuseLoadedSchema && Array.isArray(stream.schema)
+                ? {
+                    schema: stream.schema,
+                    settings: stream.settings,
+                    removedSchemaFields: stream.removedSchemaFields,
+                  }
+                : await loadStreamFields(stream.name);
             if (capturedToken !== schemaRequestToken.value) return;
             if (streamData.schema === undefined) {
               searchObj.loadingStream = false;
@@ -279,6 +331,7 @@ export const useStreamFields = () => {
 
             stream.settings = { ...streamData.settings };
             stream.schema = [...streamData.schema];
+            stream.removedSchemaFields = [...(streamData.removedSchemaFields ?? [])];
 
             userDefineSchemaSettings = stream.settings?.defined_schema_fields?.slice() || [];
 
@@ -778,6 +831,7 @@ export const useStreamFields = () => {
 
         if (!shouldGroup) {
           searchObj.data.stream.selectedStreamFields = [...commonSchemaMaps, ...schemaMaps];
+          bumpSeveritySchemaGeneration();
           searchObj.data.stream.selectedInterestingStreamFields = [
             ...interestingCommonSchemaMaps,
             ...interestingSchemaMaps,
@@ -832,6 +886,7 @@ export const useStreamFields = () => {
           }
 
           searchObj.data.stream.selectedStreamFields = orderedFields;
+          bumpSeveritySchemaGeneration();
           searchObj.data.stream.selectedInterestingStreamFields = orderedInterestingFields;
         }
 
@@ -868,81 +923,73 @@ export const useStreamFields = () => {
     }
   };
 
-  const getStreamList = async (selectStream: boolean = true) => {
+  const getStreamList = async (selectStream: boolean = true, options: StreamListOptions = {}) => {
     try {
       // commented below function as we are doing resetStreamData from all the places where getStreamList is called
       // resetStreamData();
       const streamType = searchObj.data.stream.streamType || "logs";
       const streamData: any = await getStreams(streamType, false);
+      if (options.isCurrent && !options.isCurrent()) return;
       searchObj.data.streamResults = {
         ...streamData,
       };
       await nextTick();
-      await loadStreamLists(selectStream);
+      if (options.isCurrent && !options.isCurrent()) return;
+      await loadStreamLists(selectStream, options);
       return;
     } catch (e: any) {
       console.error("Error while getting stream list", e);
     }
   };
 
-  const loadStreamLists = async (selectStream: boolean = true) => {
+  const initialStreamInput = (options: StreamListOptions): InitialStreamInput => {
+    const zoConfig = store.state.zoConfig ?? {};
+    const streamType = searchObj.data.stream.streamType || "logs";
+    let current: string[] = Array.isArray(searchObj.data.stream.selectedStream)
+      ? [...searchObj.data.stream.selectedStream]
+      : [];
+    if (options.fromUrl && !current.length && searchObj.meta.sqlMode && searchObj.data.query) {
+      current = sqlSources(searchObj.data.query).sources;
+    }
+    const legacy =
+      zoConfig.query_on_stream_selection === false ||
+      router?.currentRoute?.value?.query?.type === "stream_explorer";
+    return {
+      list: searchObj.data.streamResults.list,
+      current,
+      currentFromUrl: !!options.fromUrl,
+      persisted: zoConfig.auto_query_enabled
+        ? restoreLogsSelectedStreams(store.state.selectedOrganization?.identifier, streamType)
+        : [],
+      allowLatest: legacy || isGuardActive(zoConfig),
+    };
+  };
+
+  const loadStreamLists = async (selectStream: boolean = true, options: StreamListOptions = {}) => {
     try {
       if (searchObj.data.streamResults.list.length > 0) {
-        let lastUpdatedStreamTime = 0;
-        let latestStream = "";
+        searchObj.data.stream.streamLists = searchObj.data.streamResults.list.map((item: any) => ({
+          label: item.name,
+          value: item.name,
+        }));
 
-        let selectedStream: any[] = [];
-        let existingValidStreams: any[] = [];
-
-        // Capture current selection (from localStorage restore or in-session state)
-        // to use as a fallback when no URL param is present.
-        const currentSelection: string[] = Array.isArray(searchObj.data.stream.selectedStream)
-          ? searchObj.data.stream.selectedStream
-          : [];
-
-        searchObj.data.stream.streamLists = [];
-        let itemObj: {
-          label: I18nText;
-          value: string;
-        };
-
-        for (const item of searchObj.data.streamResults.list) {
-          itemObj = {
-            label: item.name,
-            value: item.name,
-          };
-
-          searchObj.data.stream.streamLists.push(itemObj);
-
-          // If isFirstLoad is true, then select the stream from query params
-          if (router.currentRoute.value?.query?.stream == item.name) {
-            selectedStream.push(itemObj.value);
-          }
-          if (!router.currentRoute.value?.query?.stream && currentSelection.includes(item.name)) {
-            existingValidStreams.push(itemObj.value);
-          }
-          if (
-            !router.currentRoute.value?.query?.stream &&
-            item.stats.doc_time_max >= lastUpdatedStreamTime
-          ) {
-            lastUpdatedStreamTime = item.stats.doc_time_max;
-            latestStream = item.name;
-          }
+        if (!selectStream) return;
+        const pick = pickInitialLogsStreams(initialStreamInput(options));
+        if (pick.source === "url" && pick.missing.length) {
+          searchObj.data.stream.selectedStream = [];
+          searchObj.data.filterErrMsg = t("search.streamNotExist").replace(
+            "[STREAM_NAME]",
+            pick.missing.join(", "),
+          );
+          return;
         }
-
-        // Priority: URL param > existing valid selection > latest by doc_time_max
-        if (!selectedStream.length && existingValidStreams.length) {
-          selectedStream = existingValidStreams;
-        } else if (!selectedStream.length && latestStream) {
-          selectedStream = [latestStream];
-        }
-
+        const current = searchObj.data.stream.selectedStream;
         if (
-          (store.state.zoConfig.query_on_stream_selection == false ||
-            router.currentRoute.value.query?.type == "stream_explorer") &&
-          selectStream
+          !Array.isArray(current) ||
+          current.length !== pick.selected.length ||
+          current.some((name: string, i: number) => name !== pick.selected[i])
         ) {
-          searchObj.data.stream.selectedStream = selectedStream;
+          searchObj.data.stream.selectedStream = pick.selected;
         }
       } else {
         searchObj.data.errorMsg = t("search.noStreamFoundInOrganization");
@@ -977,6 +1024,18 @@ export const useStreamFields = () => {
     });
   };
 
+  const dropUnknownLinkColumns = () => {
+    const known = new Set(
+      (searchObj.data.stream.selectedStreamFields ?? []).map(
+        (field: { name?: string }) => field?.name,
+      ),
+    );
+    if (!known.size) return;
+    const fields = searchObj.data.stream.selectedFields ?? [];
+    const kept = fields.filter((name: string) => known.has(name));
+    if (kept.length !== fields.length) searchObj.data.stream.selectedFields = kept;
+  };
+
   const updateGridColumns = () => {
     try {
       searchObj.data.resultGrid.columns = [];
@@ -985,8 +1044,9 @@ export const useStreamFields = () => {
         useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
       const logFieldSelectedValue: any = [];
       const stream = searchObj.data.stream.selectedStream.sort().join("_");
-      // Check if logFilterField has keys (since it's an object, not an array)
+      if (columnsFromUrl.value) dropUnknownLinkColumns();
       if (
+        !columnsFromUrl.value &&
         Object.keys(logFilterField).length > 0 &&
         logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`] != undefined &&
         Array.isArray(logFilterField[`${store.state.selectedOrganization.identifier}_${stream}`])

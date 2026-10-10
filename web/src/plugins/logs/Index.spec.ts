@@ -206,9 +206,9 @@ vi.mock("@/composables/useLogs", async () => {
       const api = actual.default(...args);
       return {
         ...api,
-        loadLogsData: () => {
+        loadLogsData: (...loadArgs: Parameters<typeof api.loadLogsData>) => {
           loaderCalls.push("logs");
-          return api.loadLogsData();
+          return api.loadLogsData(...loadArgs);
         },
         loadVisualizeData: () => {
           loaderCalls.push("visualize");
@@ -338,6 +338,181 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.searchObj.data.editorValue).toBe(
       'SELECT message,"user" FROM "stream1" WHERE message = \'asdf\' and "user" = \'test\'',
     );
+  });
+
+  describe("search-job page crossing (4a §3.2.2, AC2.11)", () => {
+    const prime = () => {
+      const { searchObj } = wrapper.vm;
+      searchObj.meta.jobId = "job-1";
+      searchObj.meta.refreshInterval = 0;
+      searchObj.meta.resultGrid.navigation.pendingPageSelection = {
+        page: 2,
+        position: "first",
+        requestId: null,
+      };
+      searchObj.data.resultGrid.pageRequest = null;
+      searchObj.data.resultGrid.pageLoad = null;
+      return searchObj;
+    };
+
+    afterEach(() => {
+      wrapper.vm.searchObj.meta.jobId = "";
+      wrapper.vm.searchObj.meta.resultGrid.navigation.pendingPageSelection = null;
+    });
+
+    it("binds the crossing before the job page loads and records `done` after it", async () => {
+      const searchObj = prime();
+      let finish!: () => void;
+      wrapper.vm.getJobData = vi.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+      const run = wrapper.vm.getMoreData();
+      const bound = searchObj.meta.resultGrid.navigation.pendingPageSelection.requestId;
+      expect(bound).toMatch(/^job-\d+$/);
+      expect(wrapper.vm.getJobData).toHaveBeenCalledWith(false);
+      expect(searchObj.data.resultGrid.pageLoad).toBeNull();
+      finish();
+      await run;
+      expect(searchObj.data.resultGrid.pageLoad).toEqual({
+        requestId: bound,
+        ok: true,
+        reason: "done",
+      });
+    });
+
+    it("records `error` when the job page throws", async () => {
+      const searchObj = prime();
+      wrapper.vm.getJobData = vi.fn(() => Promise.reject(new Error("job failed")));
+      await wrapper.vm.getMoreData();
+      expect(searchObj.data.resultGrid.pageLoad).toMatchObject({ ok: false, reason: "error" });
+    });
+  });
+
+  describe("free text (item 1)", () => {
+    const stream = (name: string, fts: boolean) => ({
+      name,
+      schema: [
+        { name: fts ? "body" : "msg_text", type: "Utf8" },
+        { name: "level", type: "Utf8" },
+      ],
+      settings: fts ? { full_text_search_keys: ["body"] } : {},
+    });
+    const select = (...streams: any[]) => {
+      wrapper.vm.searchObj.data.streamResults = { list: streams };
+      wrapper.vm.searchObj.data.stream.selectedStream = streams.map((s: any) => s.name);
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "level" }];
+      wrapper.vm.searchObj.data.stream.interestingFieldList = [];
+      wrapper.vm.searchObj.meta.quickMode = false;
+    };
+
+    it.each(["refused AND level='x' -- note", "/* c */ refused AND level='x'"])(
+      "SQL toggle retains comments in an unrun mix: %s",
+      async (query) => {
+        select(stream("fts_a", true));
+        wrapper.vm.searchObj.data.query = query;
+        await wrapper.vm.setQuery(true);
+        const sql = wrapper.vm.searchObj.data.query;
+        expect(sql).toContain("match_all('refused') AND level = 'x'");
+        expect(sql).toContain(query.includes("--") ? "-- note\n" : "/* c */");
+      },
+    );
+
+    it("SQL toggle renders a bare word as match_all per stream (AC6.3)", async () => {
+      select(stream("fts_a", true), stream("fts_d", true));
+      wrapper.vm.searchObj.data.query = "timeout";
+
+      await wrapper.vm.setQuery(true);
+
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        `SELECT * FROM "fts_a" WHERE match_all('timeout') UNION ALL BY NAME SELECT * FROM "fts_d" WHERE match_all('timeout')`,
+      );
+    });
+
+    it("SQL toggle is refused while a stream cannot search text (AC6.3)", async () => {
+      select(stream("fts_a", true), stream("nofts_b", false));
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.data.query = "timeout";
+
+      await wrapper.vm.setQuery(true);
+
+      expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false);
+      expect(wrapper.vm.searchObj.data.query).toBe("timeout");
+      expect(wrapper.vm.searchObj.data.freeTextBlocked.streams).toEqual(["nofts_b"]);
+    });
+
+    it("SQL toggle treats text that only contains select as a filter (isAuthoredStatement)", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "msg='select'";
+
+      await wrapper.vm.setQuery(true);
+
+      expect(wrapper.vm.searchObj.data.query).toBe(`SELECT * FROM "fts_a" WHERE msg = 'select'`);
+    });
+
+    it("Search text writes durable match_all and runs it (AC5.2)", async () => {
+      select(stream("fts_a", true));
+      const searchBar = { updateQuery: vi.fn(), handleRunQueryFn: vi.fn() };
+      wrapper.vm.searchBarRef = searchBar as any;
+
+      wrapper.vm.onSearchText("status =");
+
+      expect(wrapper.vm.searchObj.data.query).toBe("match_all('status =')");
+      expect(wrapper.vm.searchObj.data.editorValue).toBe("match_all('status =')");
+      expect(searchBar.updateQuery).toHaveBeenCalled();
+      expect(searchBar.handleRunQueryFn).toHaveBeenCalledTimes(1);
+    });
+
+    it("Run as writes the suggestion verbatim and runs it (AC5.6)", async () => {
+      select(stream("fts_a", true));
+      const searchBar = { updateQuery: vi.fn(), handleRunQueryFn: vi.fn() };
+      wrapper.vm.searchBarRef = searchBar as any;
+
+      wrapper.vm.onRunSuggestion("level='api' AND match_all('timeout')");
+
+      expect(wrapper.vm.searchObj.data.query).toBe("level='api' AND match_all('timeout')");
+      expect(searchBar.handleRunQueryFn).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the no-FTS panel in the results slot while blocked (AC3.1)", async () => {
+      select(stream("nofts_b", false));
+      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
+      wrapper.vm.searchObj.data.filterErrMsg = "";
+      wrapper.vm.searchObj.loading = false;
+      wrapper.vm.searchObj.data.freeTextBlocked = {
+        streams: ["nofts_b"],
+        plan: { kind: "sql", filter: "" },
+      };
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="logs-no-fts-panel"]').text()).toContain(
+        "Full-text search fields are not configured for nofts_b",
+      );
+      wrapper.vm.searchObj.data.freeTextBlocked = null;
+    });
+
+    it("SQL mode renders an unrun mix just like Run", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "refused AND level='error'";
+      await wrapper.vm.setQuery(true);
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        `SELECT * FROM "fts_a" WHERE match_all('refused') AND level = 'error'`,
+      );
+    });
+
+    it("Build gets the rendered WHERE for a pure-text filter", () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.query = "timeout";
+      expect(wrapper.vm.buildWhereForBuild).toEqual({
+        where: "match_all('timeout')",
+        freeText: true,
+      });
+      wrapper.vm.searchObj.data.query = "error AND level='x'";
+      expect(wrapper.vm.buildWhereForBuild).toEqual({
+        where: "match_all('error') AND level='x'",
+        freeText: true,
+      });
+      wrapper.vm.searchObj.data.query = "level='x'";
+      expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "level='x'", freeText: false });
+    });
   });
 
   it("Should modify SQL query when adding/removing interesting fields", async () => {
@@ -472,7 +647,7 @@ describe("Logs Index", async () => {
       'SELECT timestamp,level,message FROM "my_stream1" WHERE level = "error"',
     );
     expect(setQuerySpy).toHaveBeenCalledWith(true);
-    expect(updateUrlQueryParamsSpy).toHaveBeenCalled();
+    expect(updateUrlQueryParamsSpy).not.toHaveBeenCalled();
 
     // Test with empty interesting fields list
     wrapper.vm.searchObj.data.stream.interestingFieldList = [];
@@ -680,6 +855,11 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     // do not rely on spying internal closures; assert state change
     await wrapper.vm.runQueryFn();
+    expect(wrapper.vm.autoRun.engine.currentGeneration("grid")).toMatchObject({
+      reason: "run",
+      kind: "explicit",
+    });
+    await flushPromises();
     expect(wrapper.vm.showJobScheduler).toBe(true);
   });
 
@@ -773,7 +953,7 @@ describe("Logs Index", async () => {
     expect(wrapper.vm.showJobScheduler).toBe(true);
   });
 
-  it("Should watch fullSQLMode true -> setQuery & updateUrl; false -> reset and maybe getQueryData", async () => {
+  it("Should watch fullSQLMode true -> setQuery without a URL write; false -> reset and maybe getQueryData", async () => {
     const setQuerySpy = vi.spyOn(wrapper.vm, "setQuery");
     const updateSpy = vi.spyOn(wrapper.vm, "updateUrlQueryParams");
 
@@ -783,7 +963,7 @@ describe("Logs Index", async () => {
     wrapper.vm.searchObj.meta.sqlMode = true;
     await flushPromises();
     expect(setQuerySpy).toHaveBeenCalledWith(true);
-    expect(updateSpy).toHaveBeenCalled();
+    expect(updateSpy).not.toHaveBeenCalled();
 
     // Trigger false branch
     wrapper.vm.searchObj.loading = false;
@@ -835,7 +1015,10 @@ describe("Logs Index", async () => {
       wrapper.vm.searchData();
 
       expect(wrapper.vm.searchObj.loading).toBe(true);
-      expect(wrapper.vm.searchObj.runQuery).toBe(true);
+      expect(wrapper.vm.autoRun.engine.currentGeneration("grid")).toMatchObject({
+        reason: "run",
+        kind: "explicit",
+      });
       expect((analytics as any).track).toHaveBeenCalledWith(
         "Button Click",
         expect.objectContaining({ button: "Search Data" }),

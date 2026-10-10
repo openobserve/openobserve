@@ -425,10 +425,57 @@ describe("convertLogData.ts", () => {
       expect(options.series[0].itemStyle.color).toBe("#EF5350");
     });
 
-    it("maps numeric severity 0 to info blue (OTEL UNSPECIFIED)", () => {
+    it("does not read 0 on level as info: it is unrecognised there, so it keeps a hash colour", () => {
       const bd = makeBreakdown([["0", [1]]]);
       const { options } = convertStackedLogData([ts1], bd, baseParams, false);
-      expect(options.series[0].itemStyle.color).toBe("#1E88E5");
+      expect(["#aaa", "#bbb", "#ccc"]).toContain(options.series[0].itemStyle.color);
+    });
+
+    it.each([
+      ["level", "WARN2", "#FB8C00"],
+      ["severity", "ERROR3", "#EF5350"],
+      ["status", "500", "#EF5350"],
+      ["response_code", "404", "#FB8C00"],
+      ["syslog_severity", "0", "#E53935"],
+      ["level", "50", "#EF5350"],
+      ["status", "3", "#EF5350"],
+      ["severity_number", "18", "#EF5350"],
+      ["severity_number", "10", "#1E88E5"],
+    ])("colours %s=%s through that field's rules (%s)", (breakdownField, value, colour) => {
+      const bd = makeBreakdown([[value, [1]]]);
+      const { options } = convertStackedLogData(
+        [ts1],
+        bd,
+        { ...baseParams, breakdownField },
+        false,
+      );
+      expect(options.series[0].itemStyle.color).toBe(colour);
+      expect(options.series[0].name).toBe(value);
+    });
+
+    it("uses the dark semantic colour for a per-field match", () => {
+      const bd = makeBreakdown([["500", [1]]]);
+      const params = { ...baseParams, breakdownField: "status" };
+      const { options } = convertStackedLogData([ts1], bd, params, true);
+      expect(options.series[0].itemStyle.color).toBe("#D95C5C");
+    });
+
+    it.each([
+      ["level", "constructor"],
+      ["level", "__proto__"],
+      ["status", "600"],
+      ["severity_number", "0"],
+      ["level", "W"],
+      ["host", "500"],
+    ])("keeps a hash colour for unrecognised %s=%s", (breakdownField, value) => {
+      const bd = makeBreakdown([[value, [1]]]);
+      const { options } = convertStackedLogData(
+        [ts1],
+        bd,
+        { ...baseParams, breakdownField },
+        false,
+      );
+      expect(["#aaa", "#bbb", "#ccc"]).toContain(options.series[0].itemStyle.color);
     });
 
     it("falls back to palette for numeric string outside 0-7 range (e.g. HTTP 200)", () => {

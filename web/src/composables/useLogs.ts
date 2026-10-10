@@ -38,9 +38,20 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
-import useStreamingSearch from "@/composables/useStreamingSearch";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import type { RunReason } from "@/composables/useLogs/useAutoRun";
+import { resetTransient } from "@/utils/logs/transientSearchKeys";
+import { refreshFreeTextSchemas } from "@/composables/useLogs/freeTextSearch";
+import { decodeFtScan } from "@/utils/logs/freeTextScan";
+import {
+  decodeColumns,
+  initShownSearchFromUrl,
+  parseRowsParam,
+  writeLogsUrl,
+} from "@/composables/useLogs/useLogsUrl";
+import { columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 
 const useLogs = (t: TranslateFn) => {
   const store = useStore();
@@ -61,8 +72,7 @@ const useLogs = (t: TranslateFn) => {
     useStreamFields();
 
   const { showErrorNotification } = useNotifications();
-  const { getStreams } = useStreams(t);
-  const { cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
+  const { getStreams, getStream } = useStreams(t);
 
   const router = useRouter();
 
@@ -77,13 +87,14 @@ const useLogs = (t: TranslateFn) => {
     searchObj = reactive(Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_LOGS_CONFIG))));
   };
 
-  const getJobData = async (isPagination = false) => {
+  const getJobData = async (isPagination = false, snapshot: any = null) => {
+    const scheduling = searchObj.meta.jobId === "";
     try {
       // window will have more priority
       // if window has use_web_socket property then use that
       // else use organization settings
-      const queryReq: any = buildSearch();
-      if (queryReq == false) {
+      const queryReq: any = snapshot ? cloneDeep(snapshot) : buildSearch();
+      if (!queryReq) {
         throw new Error(notificationMsg.value || t("search.somethingWentWrongPeriod"));
       }
       if (searchObj.meta.jobId == "") {
@@ -122,25 +133,22 @@ const useLogs = (t: TranslateFn) => {
       }
       searchObj.data.queryResults.subpage = 1;
       if (searchObj.meta.jobId == "") {
-        searchService
-          .schedule_search(
-            {
-              org_identifier: searchObj.organizationIdentifier,
-              query: queryReq,
-              page_type: searchObj.data.stream.streamType,
-            },
-            "ui",
-          )
-          .then(() => {
-            toast({
-              variant: "success",
-              message: t("toastMessages.composables.jobAddedSuccessfully"),
-              action: {
-                label: t("toastMessages.composables.goToJobScheduler"),
-                handler: () => routeToSearchSchedule(),
-              },
-            });
-          });
+        await searchService.schedule_search(
+          {
+            org_identifier: searchObj.organizationIdentifier,
+            query: queryReq,
+            page_type: searchObj.data.stream.streamType,
+          },
+          "ui",
+        );
+        toast({
+          variant: "success",
+          message: t("toastMessages.composables.jobAddedSuccessfully"),
+          action: {
+            label: t("toastMessages.composables.goToJobScheduler"),
+            handler: () => routeToSearchSchedule(),
+          },
+        });
       } else {
         await getPaginatedData(queryReq);
       }
@@ -150,13 +158,15 @@ const useLogs = (t: TranslateFn) => {
       }
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(
-        raw(
-          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
-        ),
-      );
+      if (!scheduling) {
+        showErrorNotification(
+          raw(
+            notificationMsg.value ||
+              t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+          ),
+        );
+      }
       throw e;
-      // notificationMsg.value = "";
     }
   };
 
@@ -182,6 +192,26 @@ const useLogs = (t: TranslateFn) => {
     });
   };
 
+  const armRefreshInterval = () => {
+    clearInterval(store.state.refreshIntervalID);
+    if (!(searchObj.meta.refreshInterval > 0)) return;
+    const refreshIntervalID = setInterval(() => {
+      if (
+        searchObj.meta.logsVisualizeToggle === "logs" &&
+        searchObj.data.stream.selectedStream.length > 0
+      ) {
+        useLogsAutoRun().engine.tick();
+      }
+    }, searchObj.meta.refreshInterval * 1000);
+    store.dispatch("setRefreshIntervalID", refreshIntervalID);
+  };
+
+  useLogsAutoRun().setRearmRefresh(() => {
+    if (searchObj.meta.refreshInterval > 0 && router.currentRoute.value.name === "logs") {
+      armRefreshInterval();
+    }
+  });
+
   const refreshData = () => {
     try {
       if (
@@ -189,19 +219,7 @@ const useLogs = (t: TranslateFn) => {
         router.currentRoute.value.name == "logs" &&
         enableRefreshInterval(searchObj.meta.refreshInterval)
       ) {
-        clearInterval(store.state.refreshIntervalID);
-        const refreshIntervalID = setInterval(async () => {
-          if (
-            searchObj.loading == false &&
-            searchObj.loadingHistogram == false &&
-            searchObj.meta.logsVisualizeToggle == "logs" &&
-            searchObj.data.stream.selectedStream.length > 0
-          ) {
-            searchObj.loading = true;
-            await getQueryData(false);
-          }
-        }, searchObj.meta.refreshInterval * 1000);
-        store.dispatch("setRefreshIntervalID", refreshIntervalID);
+        armRefreshInterval();
 
         // only notify if user is in logs page
         if (searchObj.meta.logsVisualizeToggle == "logs") {
@@ -230,51 +248,46 @@ const useLogs = (t: TranslateFn) => {
     }
   };
 
-  const cancelInflightRequests = () => {
-    const orgId = searchObj.organizationIdentifier;
-    if (searchObj.data.lastSearchTraceId) {
-      cancelStreamQueryBasedOnRequestId({
-        trace_id: searchObj.data.lastSearchTraceId,
-        org_id: orgId,
-      });
-      searchObj.data.lastSearchTraceId = "";
-    }
-    if (searchObj.data.lastHistogramTraceId) {
-      cancelStreamQueryBasedOnRequestId({
-        trace_id: searchObj.data.lastHistogramTraceId,
-        org_id: orgId,
-      });
-      searchObj.data.lastHistogramTraceId = "";
-    }
-  };
-
-  const loadLogsData = async () => {
+  const loadLogsData = async (
+    reason: RunReason = "landing",
+    options: { ignoreUrl?: boolean; origin?: string } = {},
+  ) => {
     try {
-      cancelInflightRequests();
+      const autoRun = useLogsAutoRun();
+      const wasLoading = searchObj.loading;
+      autoRun.engine.resetScope(reason === "url" ? "url" : "org");
+      searchObj.loading = wasLoading;
       resetFunctions();
 
-      // Create initialStreamSelected variable to handle first time load when api call for functions is
-      // in-progress and user select stream from dropdown in that case it loads data but it should wait for
-      // additional details from the user like filter conditions and time range selection before load data
-      // it should work in case of page refresh, navigate user from streams page or short url
-      let initialStreamSelected: boolean = searchObj.data.stream.selectedStream.length > 0;
-
-      await getStreamList();
+      const query = router.currentRoute.value.query;
+      const fromUrl = !options.ignoreUrl && (!!query.stream || query.sql_mode === "true");
+      await getStreamList(true, { fromUrl });
       await getFunctions();
       await extractFields();
+      searchObj.loading = false;
       if (searchObj.meta.jobId == "") {
-        if (initialStreamSelected) {
-          await getQueryData();
-        } else {
-          searchObj.loading = false;
-        }
+        const result =
+          searchObj.data.stream.selectedStream.length > 0
+            ? autoRun.request(fromUrl ? "url" : reason, { origin: options.origin })
+            : "skipped-ineligible";
+        if (result !== "scheduled" && result !== "dispatched") showNoQueryAppliedIfIdle();
       } else {
+        autoRun.engine.resetScope("job");
         await getJobData();
       }
       refreshData();
     } catch (e: any) {
       searchObj.loading = false;
     }
+  };
+
+  const showNoQueryAppliedIfIdle = () => {
+    if (searchObj.loading || searchObj.meta.executed || searchObj.meta.pendingExecution) return;
+    if (searchObj.data.stream.streamLists.length) searchObj.data.errorMsg = "";
+    if (!Array.isArray(searchObj.data.queryResults?.hits)) {
+      searchObj.data.queryResults = { hits: [] };
+    }
+    if (!searchObj.data.queryResults.hits.length) searchObj.meta.searchApplied = false;
   };
 
   const loadVisualizeData = async () => {
@@ -301,6 +314,7 @@ const useLogs = (t: TranslateFn) => {
 
   const loadJobData = async () => {
     try {
+      useLogsAutoRun().engine.resetScope("job");
       resetFunctions();
       await getStreamList();
       await getFunctions();
@@ -315,11 +329,6 @@ const useLogs = (t: TranslateFn) => {
 
   const handleRunQuery = async (clear_cache = false) => {
     try {
-      cancelInflightRequests();
-      searchObj.loading = true;
-      searchObj.meta.refreshHistogram = true;
-      initialQueryPayload.value = null;
-      searchObj.data.queryResults.aggs = null;
       searchObj.meta.clearCache = clear_cache;
       if (
         Object.hasOwn(router.currentRoute.value.query, "type") &&
@@ -328,10 +337,37 @@ const useLogs = (t: TranslateFn) => {
       ) {
         delete router.currentRoute.value.query.type;
       }
-      await getQueryData();
+      useLogsAutoRun().engine.requestRun("run");
     } catch (e: any) {
       console.log("Error while loading logs data");
     }
+  };
+
+  const runGridSearch = async (
+    generationId: number,
+    mode: "full" | "page" | "page-size" = "full",
+    origin?: string,
+  ) => {
+    if (mode !== "page") {
+      searchObj.meta.refreshHistogram = true;
+      initialQueryPayload.value = null;
+      if (searchObj.data.queryResults) searchObj.data.queryResults.aggs = null;
+    }
+    searchObj.loading = true;
+    searchObj.loadingProgressPercentage = 0;
+    if (mode === "full") {
+      await refreshFreeTextSchemas(searchObj, store.state.zoConfig, (name) =>
+        getStream(name, searchObj.data.stream.streamType || "logs", true, true),
+      );
+      if (!useLogsAutoRun().engine.isCurrent(generationId)) return;
+    }
+    await getQueryData(mode === "page", { generationId, reuseSchema: mode !== "full", origin });
+  };
+
+  const resetRunStateForReapply = () => {
+    useLogsAutoRun().engine.resetScope("reapply");
+    resetTransient(searchObj as unknown as Record<string, unknown>);
+    searchObj.meta.freeTextScan = {};
   };
 
   const restoreUrlQueryParams = async (_dashboardPanelData: any = null) => {
@@ -382,6 +418,7 @@ const useLogs = (t: TranslateFn) => {
         searchObj.meta.pendingUrlQueryRestore = true;
       }
     }
+    searchObj.meta.freeTextScan = decodeFtScan(queryParams.ft_scan);
 
     if (
       Object.prototype.hasOwnProperty.call(queryParams, "defined_schemas") &&
@@ -425,6 +462,15 @@ const useLogs = (t: TranslateFn) => {
       searchObj.meta.showHistogram = queryParams.show_histogram == "true" ? true : false;
     }
 
+    const rows = parseRowsParam(queryParams.rows);
+    if (rows !== null) searchObj.meta.resultGrid.rowsPerPage = rows;
+    const columns = searchObj.meta.sqlMode ? null : decodeColumns(queryParams.columns);
+    if (columns !== null) {
+      searchObj.data.stream.selectedFields = columns;
+      searchObj.meta.isFtsDefaultColumn = false;
+      columnsFromUrl.value = true;
+    }
+
     searchObj.shouldIgnoreWatcher = false;
     if (Object.hasOwn(queryParams, "type") && queryParams.type == "search_history_re_apply") {
       delete queryParams.type;
@@ -450,13 +496,11 @@ const useLogs = (t: TranslateFn) => {
       searchObj.meta.showTransformEditor = queryParams.fn_editor == "true" ? true : false;
     }
 
-    // TODO OK : Replace push with replace and test all scenarios
-    router.push({
-      query: {
-        ...queryParams,
-        sql_mode: searchObj.meta.sqlMode,
-        defined_schemas: searchObj.meta.useUserDefinedSchemas,
-      },
+    initShownSearchFromUrl(queryParams);
+    void writeLogsUrl("replace", {
+      ...queryParams,
+      sql_mode: searchObj.meta.sqlMode,
+      defined_schemas: searchObj.meta.useUserDefinedSchemas,
     });
   };
 
@@ -479,8 +523,7 @@ const useLogs = (t: TranslateFn) => {
         searchObj.data.stream.streamLists.push(itemObj);
       });
     } else {
-      searchObj.loading = true;
-      loadLogsData();
+      loadLogsData("activation");
     }
   };
 
@@ -747,6 +790,9 @@ const useLogs = (t: TranslateFn) => {
     restoreUrlQueryParams,
     updateStreams,
     handleRunQuery,
+    runGridSearch,
+    resetRunStateForReapply,
+    armRefreshInterval,
     reorderSelectedFields,
     getFilterExpressionByFieldType,
     extractValueQuery,

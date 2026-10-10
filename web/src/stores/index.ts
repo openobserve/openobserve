@@ -23,6 +23,7 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
+import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -281,6 +282,7 @@ export default createStore({
     // },
     setConfig(state, payload) {
       state.zoConfig = payload;
+      setSeverityInferenceEnabled(payload?.ui_logs_severity_inference !== false);
     },
     setFolders(state, payload) {
       state.organizationData.folders = payload;

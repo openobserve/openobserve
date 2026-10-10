@@ -58,6 +58,28 @@ describe("OContextMenuItem", () => {
     expect(wrapper.find("[data-disabled]").exists()).toBe(true);
   });
 
+  it("keeps an unavailable reason reachable without selecting", async () => {
+    const wrapper = await mountItemInMenu(
+      { disabled: true, focusableUnavailable: true, description: "Run the query first" },
+      { default: () => h("span", "Copy link") },
+    );
+    const item = wrapper.findComponent(OContextMenuItem);
+    expect(item.attributes("aria-disabled")).toBe("true");
+    expect(item.attributes("data-disabled")).toBeUndefined();
+    expect(wrapper.find(`#${item.attributes("aria-describedby")}`).text()).toBe(
+      "Run the query first",
+    );
+    const reason = wrapper.get(`#${item.attributes("aria-describedby")}`);
+    expect(reason.attributes("aria-hidden")).toBe("true");
+    const nameContent = item.element.cloneNode(true) as HTMLElement;
+    nameContent.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
+    expect(nameContent.textContent).toBe("Copy link");
+    await item.trigger("click");
+    await item.trigger("keydown", { key: "Enter" });
+    expect(item.emitted("select")).toBeFalsy();
+    wrapper.unmount();
+  });
+
   it("applies default variant classes", async () => {
     const wrapper = await mountItemInMenu({}, { default: () => h("span", "Action") });
     expect(wrapper.find(".text-dropdown-item-text").exists()).toBe(true);
