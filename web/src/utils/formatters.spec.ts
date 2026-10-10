@@ -20,6 +20,7 @@ import {
   formatSizeFromMB,
   addCommasToNumber,
   formatTimeWithSuffix,
+  formatTierRule,
   formatDuration,
   durationFormatter,
   maskText,
@@ -561,6 +562,35 @@ describe("minuteOfDayToHhmm", () => {
   it("normalises out-of-range and negative minutes into the day", () => {
     expect(minuteOfDayToHhmm(1500)).toBe("01:00");
     expect(minuteOfDayToHhmm(-60)).toBe("23:00");
+  });
+});
+
+describe("formatTierRule", () => {
+  it("renders a set rule with the first key and its values", () => {
+    expect(
+      formatTierRule({
+        keys: ["openai.response.service_tier", "openai.request.service_tier"],
+        op: "in",
+        values: ["flex", "priority"],
+      }),
+    ).toBe("openai.response.service_tier in flex, priority");
+    expect(formatTierRule({ keys: ["speed"], op: "not_in", values: ["fast"] })).toBe(
+      "speed not in fast",
+    );
+  });
+
+  it("renders presence and comparison rules", () => {
+    expect(formatTierRule({ keys: ["speed"], op: "exists" })).toBe("speed exists");
+    expect(formatTierRule({ keys: ["speed"], op: "not_exists" })).toBe("speed missing");
+    expect(formatTierRule({ keys: ["usage.input"], op: "gte", value: 272000 })).toBe(
+      "usage.input ≥ 272000",
+    );
+  });
+
+  it("skips blank keys and tolerates a missing operator", () => {
+    expect(formatTierRule({ keys: [" ", "service_tier"], values: ["flex"] })).toBe(
+      "service_tier in flex",
+    );
   });
 });
 

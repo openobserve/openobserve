@@ -28,7 +28,8 @@ use std::{
 };
 
 use config::meta::model_pricing::{
-    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource, windows_match,
+    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingContext, PricingSource,
+    PricingTierDefinition, windows_match,
 };
 use dashmap::DashMap;
 use infra::table;
@@ -296,12 +297,14 @@ pub struct CostResult {
 /// `span_ts_micros` is the span's start time; it selects tiers restricted to recurring UTC
 /// time-of-day windows (peak / off-peak pricing). Pass `None` when the time is unknown —
 /// time-restricted tiers are then skipped in favour of the unrestricted default tier.
+/// `ctx` holds the span attributes rules read; an empty context skips rule-restricted tiers.
 pub fn calculate_cost_from_definition(
     definition: &ModelPricingDefinition,
     usage: &HashMap<String, i64>,
     span_ts_micros: Option<i64>,
+    ctx: &PricingContext,
 ) -> CostResult {
-    calculate_cost_from_definition_with_tier_usage(definition, usage, usage, span_ts_micros)
+    calculate_cost_from_definition_with_tier_usage(definition, usage, usage, span_ts_micros, ctx)
 }
 
 /// Calculate cost using `usage`, but select conditional pricing tiers with `tier_usage`.
@@ -312,8 +315,9 @@ pub fn calculate_cost_from_definition_with_tier_usage(
     usage: &HashMap<String, i64>,
     tier_usage: &HashMap<String, i64>,
     span_ts_micros: Option<i64>,
+    ctx: &PricingContext,
 ) -> CostResult {
-    let tier = match select_tier(definition, tier_usage, span_ts_micros) {
+    let tier = match select_tier(definition, tier_usage, span_ts_micros, ctx) {
         Some(t) => t,
         None => {
             log::warn!(
@@ -366,50 +370,38 @@ pub fn calculate_cost_from_definition_with_tier_usage(
     }
 }
 
-/// Whether a tier is a candidate for `usage` at `span_ts_micros`.
-/// Both restrictions must hold: the span must fall in one of the tier's UTC windows
-/// (if any) *and* satisfy the tier's usage condition (if any).
+/// Every restriction must hold: UTC window (if any), usage condition (if any), all rules.
 fn tier_matches(
-    tier: &config::meta::model_pricing::PricingTierDefinition,
+    tier: &PricingTierDefinition,
     usage: &HashMap<String, i64>,
     span_ts_micros: Option<i64>,
+    ctx: &PricingContext,
 ) -> bool {
     if !windows_match(&tier.utc_windows, span_ts_micros) {
         return false;
     }
-    match tier.condition {
-        Some(ref cond) => {
-            let actual = usage.get(&cond.usage_key).copied().unwrap_or(0) as f64;
-            cond.operator.evaluate(actual, cond.value)
+    if let Some(ref cond) = tier.condition {
+        let actual = usage.get(&cond.usage_key).copied().unwrap_or(0) as f64;
+        if !cond.operator.evaluate(actual, cond.value) {
+            return false;
         }
-        None => true,
     }
-}
-
-/// A tier with neither a condition nor UTC windows — the unconditional fallback.
-fn is_default_tier(tier: &config::meta::model_pricing::PricingTierDefinition) -> bool {
-    tier.condition.is_none() && tier.utc_windows.is_empty()
+    tier.rules.iter().all(|rule| rule.matches(ctx, usage))
 }
 
 fn select_tier<'a>(
     definition: &'a ModelPricingDefinition,
     usage: &HashMap<String, i64>,
     span_ts_micros: Option<i64>,
-) -> Option<&'a config::meta::model_pricing::PricingTierDefinition> {
-    // Evaluate restricted tiers (conditional and/or time-windowed) in order; first match
-    // wins. The unconditional tier is skipped here so its position in the list — often
-    // first — does not shadow the restricted ones.
-    for tier in &definition.tiers {
-        if is_default_tier(tier) {
-            continue;
-        }
-        if tier_matches(tier, usage, span_ts_micros) {
-            return Some(tier);
-        }
-    }
-
-    // Fallback: first unrestricted tier (validation guarantees at least one exists).
-    definition.tiers.iter().find(|t| is_default_tier(t))
+    ctx: &PricingContext,
+) -> Option<&'a PricingTierDefinition> {
+    // Most restrictions wins, ties go to list order; the unrestricted tier is only the fallback.
+    definition
+        .tiers
+        .iter()
+        .filter(|t| !t.is_default() && tier_matches(t, usage, span_ts_micros, ctx))
+        .min_by_key(|t| std::cmp::Reverse(t.restriction_count()))
+        .or_else(|| definition.tiers.iter().find(|t| t.is_default()))
 }
 
 // ── Startup: cache + watch ────────────────────────────────────────────────────
@@ -517,7 +509,7 @@ pub async fn delete_by_id(org_id: &str, id: &str) -> Result<bool, anyhow::Error>
 #[cfg(test)]
 mod tests {
     use config::meta::model_pricing::{
-        PricingTierDefinition, TierCondition, TierOperator, UtcTimeWindow,
+        PricingTierDefinition, RuleOp, TierCondition, TierOperator, TierRule, UtcTimeWindow,
     };
 
     use super::*;
@@ -553,6 +545,7 @@ mod tests {
                     UtcTimeWindow::from_hm((1, 0), (4, 0)),
                     UtcTimeWindow::from_hm((6, 0), (10, 0)),
                 ],
+                rules: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Off-Peak".to_string(),
@@ -562,6 +555,7 @@ mod tests {
                     ("output".to_string(), 0.00000198),
                 ]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             },
         ])
     }
@@ -572,7 +566,12 @@ mod tests {
         let usage = HashMap::from([("input".to_string(), 1_000_000i64)]);
 
         for (h, m) in [(1, 0), (2, 30), (3, 59), (6, 0), (9, 59)] {
-            let result = calculate_cost_from_definition(&def, &usage, at_utc(h, m));
+            let result = calculate_cost_from_definition(
+                &def,
+                &usage,
+                at_utc(h, m),
+                &PricingContext::default(),
+            );
             assert_eq!(result.tier_name, "Peak", "expected peak at {h:02}:{m:02}");
             assert!((result.cost["input"] - 1.32).abs() < 1e-12);
         }
@@ -585,7 +584,12 @@ mod tests {
 
         // 00:59 (before), 04:00 (exclusive end), 05:00 (gap), 10:00 (exclusive end), 23:00
         for (h, m) in [(0, 59), (4, 0), (5, 0), (10, 0), (23, 0)] {
-            let result = calculate_cost_from_definition(&def, &usage, at_utc(h, m));
+            let result = calculate_cost_from_definition(
+                &def,
+                &usage,
+                at_utc(h, m),
+                &PricingContext::default(),
+            );
             assert_eq!(
                 result.tier_name, "Off-Peak",
                 "expected off-peak at {h:02}:{m:02}"
@@ -599,7 +603,7 @@ mod tests {
         // With no span timestamp, the time-restricted tier must not be selected.
         let def = peak_off_peak_definition();
         let usage = HashMap::from([("input".to_string(), 1_000_000i64)]);
-        let result = calculate_cost_from_definition(&def, &usage, None);
+        let result = calculate_cost_from_definition(&def, &usage, None, &PricingContext::default());
         assert_eq!(result.tier_name, "Off-Peak");
     }
 
@@ -614,11 +618,13 @@ mod tests {
 
         let usage = HashMap::from([("input".to_string(), 1_000_000i64)]);
         assert_eq!(
-            calculate_cost_from_definition(&def, &usage, at_utc(2, 0)).tier_name,
+            calculate_cost_from_definition(&def, &usage, at_utc(2, 0), &PricingContext::default())
+                .tier_name,
             "Peak"
         );
         assert_eq!(
-            calculate_cost_from_definition(&def, &usage, at_utc(14, 0)).tier_name,
+            calculate_cost_from_definition(&def, &usage, at_utc(14, 0), &PricingContext::default())
+                .tier_name,
             "Off-Peak"
         );
     }
@@ -630,7 +636,8 @@ mod tests {
         assert_eq!(def.tiers[0].name, "Peak");
         let usage = HashMap::from([("input".to_string(), 1_000i64)]);
         assert_eq!(
-            calculate_cost_from_definition(&def, &usage, at_utc(14, 0)).tier_name,
+            calculate_cost_from_definition(&def, &usage, at_utc(14, 0), &PricingContext::default())
+                .tier_name,
             "Off-Peak"
         );
     }
@@ -643,26 +650,40 @@ mod tests {
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000001)]),
                 utc_windows: vec![UtcTimeWindow::from_hm((22, 0), (2, 0))],
+                rules: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Day".to_string(),
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000002)]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             },
         ]);
         let usage = HashMap::from([("input".to_string(), 1_000i64)]);
 
         for (h, m) in [(22, 0), (23, 30), (0, 0), (1, 59)] {
             assert_eq!(
-                calculate_cost_from_definition(&def, &usage, at_utc(h, m)).tier_name,
+                calculate_cost_from_definition(
+                    &def,
+                    &usage,
+                    at_utc(h, m),
+                    &PricingContext::default()
+                )
+                .tier_name,
                 "Night",
                 "expected night tier at {h:02}:{m:02}"
             );
         }
         for (h, m) in [(2, 0), (12, 0), (21, 59)] {
             assert_eq!(
-                calculate_cost_from_definition(&def, &usage, at_utc(h, m)).tier_name,
+                calculate_cost_from_definition(
+                    &def,
+                    &usage,
+                    at_utc(h, m),
+                    &PricingContext::default()
+                )
+                .tier_name,
                 "Day",
                 "expected day tier at {h:02}:{m:02}"
             );
@@ -682,12 +703,14 @@ mod tests {
                 }),
                 prices: HashMap::from([("input".to_string(), 0.00001)]),
                 utc_windows: vec![UtcTimeWindow::from_hm((1, 0), (4, 0))],
+                rules: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Default".to_string(),
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000001)]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             },
         ]);
 
@@ -696,17 +719,20 @@ mod tests {
 
         // both hold
         assert_eq!(
-            calculate_cost_from_definition(&def, &big, at_utc(2, 0)).tier_name,
+            calculate_cost_from_definition(&def, &big, at_utc(2, 0), &PricingContext::default())
+                .tier_name,
             "Peak Extended"
         );
         // window holds, condition does not
         assert_eq!(
-            calculate_cost_from_definition(&def, &small, at_utc(2, 0)).tier_name,
+            calculate_cost_from_definition(&def, &small, at_utc(2, 0), &PricingContext::default())
+                .tier_name,
             "Default"
         );
         // condition holds, window does not
         assert_eq!(
-            calculate_cost_from_definition(&def, &big, at_utc(14, 0)).tier_name,
+            calculate_cost_from_definition(&def, &big, at_utc(14, 0), &PricingContext::default())
+                .tier_name,
             "Default"
         );
     }
@@ -724,6 +750,7 @@ mod tests {
             &billable,
             &tier_usage,
             at_utc(2, 0),
+            &PricingContext::default(),
         );
         assert_eq!(result.tier_name, "Peak");
         assert!((result.cost["input"] - 0.132).abs() < 1e-12);
@@ -739,10 +766,11 @@ mod tests {
                 ("output".to_string(), 0.000015),
             ]),
             utc_windows: Vec::new(),
+            rules: Vec::new(),
         }]);
 
         let usage = HashMap::from([("input".to_string(), 1000i64), ("output".to_string(), 500)]);
-        let result = calculate_cost_from_definition(&def, &usage, None);
+        let result = calculate_cost_from_definition(&def, &usage, None, &PricingContext::default());
         assert_eq!(result.tier_name, "Default");
         assert!((result.cost["input"] - 0.003).abs() < 1e-10);
         assert!((result.cost["output"] - 0.0075).abs() < 1e-10);
@@ -760,6 +788,7 @@ mod tests {
                     ("output".to_string(), 0.000015),
                 ]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Extended Context".to_string(),
@@ -773,6 +802,7 @@ mod tests {
                     ("output".to_string(), 0.0000225),
                 ]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             },
         ]);
 
@@ -781,7 +811,7 @@ mod tests {
             ("input".to_string(), 50_000i64),
             ("output".to_string(), 10_000),
         ]);
-        let result = calculate_cost_from_definition(&def, &usage, None);
+        let result = calculate_cost_from_definition(&def, &usage, None, &PricingContext::default());
         assert_eq!(result.tier_name, "Default");
         assert!((result.cost["input"] - 0.15).abs() < 1e-10);
 
@@ -790,7 +820,7 @@ mod tests {
             ("input".to_string(), 250_000i64),
             ("output".to_string(), 10_000),
         ]);
-        let result = calculate_cost_from_definition(&def, &usage, None);
+        let result = calculate_cost_from_definition(&def, &usage, None, &PricingContext::default());
         assert_eq!(result.tier_name, "Extended Context");
         assert!((result.cost["input"] - 1.5).abs() < 1e-10);
         assert!((result.cost["output"] - 0.225).abs() < 1e-10);
@@ -807,6 +837,7 @@ mod tests {
                     ("cache_read_input_tokens".to_string(), 0.0000001),
                 ]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             },
             PricingTierDefinition {
                 name: "Extended Context".to_string(),
@@ -820,6 +851,7 @@ mod tests {
                     ("cache_read_input_tokens".to_string(), 0.0000002),
                 ]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             },
         ]);
 
@@ -834,6 +866,7 @@ mod tests {
             &billable_usage,
             &tier_usage,
             None,
+            &PricingContext::default(),
         );
 
         assert_eq!(result.tier_name, "Extended Context");
@@ -894,10 +927,11 @@ mod tests {
                 ("output".to_string(), 0.000015),
             ]),
             utc_windows: Vec::new(),
+            rules: Vec::new(),
         }]);
 
         let usage = HashMap::from([("input".to_string(), 0i64), ("output".to_string(), 0)]);
-        let result = calculate_cost_from_definition(&def, &usage, None);
+        let result = calculate_cost_from_definition(&def, &usage, None, &PricingContext::default());
         assert!(result.cost.is_empty());
     }
 
@@ -925,6 +959,7 @@ mod tests {
                         condition: None,
                         prices: HashMap::from([("input".to_string(), 0.000001)]),
                         utc_windows: Vec::new(),
+                        rules: Vec::new(),
                     }],
                     ..Default::default()
                 },
@@ -939,6 +974,7 @@ mod tests {
                         condition: None,
                         prices: HashMap::from([("input".to_string(), 0.000005)]),
                         utc_windows: Vec::new(),
+                        rules: Vec::new(),
                     }],
                     ..Default::default()
                 },
@@ -971,6 +1007,7 @@ mod tests {
                 ("total".to_string(), 0.0001), // should be ignored
             ]),
             utc_windows: Vec::new(),
+            rules: Vec::new(),
         }]);
 
         let usage = HashMap::from([
@@ -978,7 +1015,7 @@ mod tests {
             ("output".to_string(), 500),
             ("total".to_string(), 1500), // should be skipped
         ]);
-        let result = calculate_cost_from_definition(&def, &usage, None);
+        let result = calculate_cost_from_definition(&def, &usage, None, &PricingContext::default());
         // total should be computed as sum of input+output costs, not from the "total" usage key
         assert!((result.cost["input"] - 0.003).abs() < 1e-10);
         assert!((result.cost["output"] - 0.0075).abs() < 1e-10);
@@ -993,11 +1030,12 @@ mod tests {
             condition: None,
             prices: HashMap::from([("input".to_string(), 0.000003)]),
             utc_windows: Vec::new(),
+            rules: Vec::new(),
         }]);
 
         // "output" has tokens but no price configured → should not appear in cost
         let usage = HashMap::from([("input".to_string(), 1000i64), ("output".to_string(), 500)]);
-        let result = calculate_cost_from_definition(&def, &usage, None);
+        let result = calculate_cost_from_definition(&def, &usage, None, &PricingContext::default());
         assert!((result.cost["input"] - 0.003).abs() < 1e-10);
         assert!(!result.cost.contains_key("output"));
         assert!((result.cost["total"] - 0.003).abs() < 1e-10);
@@ -1016,12 +1054,14 @@ mod tests {
                     }),
                     prices: HashMap::from([("input".to_string(), 0.00001)]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
                 },
                 PricingTierDefinition {
                     name: "Default".to_string(),
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
                 },
             ])
         };
@@ -1032,73 +1072,133 @@ mod tests {
 
         // Gt: 150 > 100 → conditional, 100 !> 100 → default
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Gt), &usage_150, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Gt),
+                &usage_150,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Conditional"
         );
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Gt), &usage_100, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Gt),
+                &usage_100,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Default"
         );
 
         // Gte: 100 >= 100 → conditional, 50 !>= 100 → default
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Gte), &usage_100, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Gte),
+                &usage_100,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Conditional"
         );
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Gte), &usage_50, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Gte),
+                &usage_50,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Default"
         );
 
         // Lt: 50 < 100 → conditional, 100 !< 100 → default
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Lt), &usage_50, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Lt),
+                &usage_50,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Conditional"
         );
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Lt), &usage_100, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Lt),
+                &usage_100,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Default"
         );
 
         // Lte: 100 <= 100 → conditional, 150 !<= 100 → default
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Lte), &usage_100, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Lte),
+                &usage_100,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Conditional"
         );
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Lte), &usage_150, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Lte),
+                &usage_150,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Default"
         );
 
         // Eq: 100 == 100 → conditional, 50 != 100 → default
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Eq), &usage_100, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Eq),
+                &usage_100,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Conditional"
         );
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Eq), &usage_50, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Eq),
+                &usage_50,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Default"
         );
 
         // Neq: 50 != 100 → conditional, 100 == 100 → default
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Neq), &usage_50, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Neq),
+                &usage_50,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Conditional"
         );
         assert_eq!(
-            calculate_cost_from_definition(&make_tiered(TierOperator::Neq), &usage_100, None)
-                .tier_name,
+            calculate_cost_from_definition(
+                &make_tiered(TierOperator::Neq),
+                &usage_100,
+                None,
+                &PricingContext::default()
+            )
+            .tier_name,
             "Default"
         );
     }
@@ -1115,6 +1215,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1127,6 +1228,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1147,6 +1249,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1159,6 +1262,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::from([("input".to_string(), 0.000001)]),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1180,6 +1284,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::new(),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1193,6 +1298,7 @@ mod tests {
                     condition: None,
                     prices: HashMap::new(),
                     utc_windows: Vec::new(),
+                    rules: Vec::new(),
                 }],
                 ..Default::default()
             },
@@ -1214,6 +1320,7 @@ mod tests {
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000003)]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             }],
             ..Default::default()
         }]));
@@ -1238,6 +1345,7 @@ mod tests {
                 condition: None,
                 prices: HashMap::from([("input".to_string(), 0.000005)]),
                 utc_windows: Vec::new(),
+                rules: Vec::new(),
             }],
             ..Default::default()
         }]));
@@ -1281,6 +1389,7 @@ mod tests {
                         condition: None,
                         prices: HashMap::from([("input".to_string(), 0.000010)]),
                         utc_windows: Vec::new(),
+                        rules: Vec::new(),
                     }],
                     ..Default::default()
                 },
@@ -1296,6 +1405,7 @@ mod tests {
                         condition: None,
                         prices: HashMap::from([("input".to_string(), 0.000003)]),
                         utc_windows: Vec::new(),
+                        rules: Vec::new(),
                     }],
                     ..Default::default()
                 },
@@ -1426,5 +1536,206 @@ mod tests {
         // At ts=15M, org entry is now applicable and wins by source priority
         let result = find_pricing_sync_at(&entries, "gpt-4o", Some(15_000_000));
         assert_eq!(result.unwrap().name, "gpt-4o-org");
+    }
+
+    // ── Attribute rules (service tier) ────────────────────────────────────
+
+    fn service_tier(values: &[&str]) -> Vec<TierRule> {
+        vec![TierRule {
+            keys: vec![
+                "openai.response.service_tier".to_string(),
+                "openai.request.service_tier".to_string(),
+            ],
+            op: RuleOp::In,
+            values: values.iter().map(|v| v.to_string()).collect(),
+            value: None,
+        }]
+    }
+
+    fn long_context() -> Option<TierCondition> {
+        Some(TierCondition {
+            usage_key: "input".to_string(),
+            operator: TierOperator::Gt,
+            value: 272_000.0,
+        })
+    }
+
+    fn input_price(per_mtok: f64) -> HashMap<String, f64> {
+        HashMap::from([("input".to_string(), per_mtok / 1_000_000.0)])
+    }
+
+    /// Built-in OpenAI layout: tiers binaries without `rules` can see first, rule tiers after.
+    fn service_tier_definition() -> ModelPricingDefinition {
+        make_definition(vec![
+            PricingTierDefinition {
+                name: "Standard".to_string(),
+                prices: input_price(2.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Large Context".to_string(),
+                condition: long_context(),
+                prices: input_price(4.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Fast mode".to_string(),
+                rules: service_tier(&["fast", "priority"]),
+                prices: input_price(4.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Flex".to_string(),
+                rules: service_tier(&["flex"]),
+                prices: input_price(1.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Fast mode · Large context".to_string(),
+                condition: long_context(),
+                rules: service_tier(&["fast", "priority"]),
+                prices: input_price(8.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Flex · Large context".to_string(),
+                condition: long_context(),
+                rules: service_tier(&["flex"]),
+                prices: input_price(2.0),
+                ..Default::default()
+            },
+        ])
+    }
+
+    fn tier_for(def: &ModelPricingDefinition, input: i64, tier: Option<&str>) -> String {
+        let usage = HashMap::from([("input".to_string(), input)]);
+        let ctx = PricingContext::from_strings(
+            &tier
+                .map(|t| {
+                    HashMap::from([("openai.request.service_tier".to_string(), t.to_string())])
+                })
+                .unwrap_or_default(),
+        );
+        calculate_cost_from_definition(def, &usage, None, &ctx).tier_name
+    }
+
+    #[test]
+    fn test_rules_most_restricted_matching_tier_wins() {
+        let def = service_tier_definition();
+        assert_eq!(tier_for(&def, 1_000, None), "Standard");
+        assert_eq!(tier_for(&def, 300_000, None), "Large Context");
+        assert_eq!(tier_for(&def, 1_000, Some("flex")), "Flex");
+        assert_eq!(tier_for(&def, 1_000, Some("priority")), "Fast mode");
+        assert_eq!(
+            tier_for(&def, 300_000, Some("fast")),
+            "Fast mode · Large context"
+        );
+        assert_eq!(
+            tier_for(&def, 300_000, Some("flex")),
+            "Flex · Large context"
+        );
+        // Values no tier lists ("default", "auto") price at the standard rates.
+        assert_eq!(tier_for(&def, 1_000, Some("default")), "Standard");
+        assert_eq!(tier_for(&def, 300_000, Some("auto")), "Large Context");
+    }
+
+    #[test]
+    fn test_rules_selection_is_independent_of_list_order() {
+        let mut def = service_tier_definition();
+        def.tiers.reverse();
+        assert_eq!(tier_for(&def, 1_000, None), "Standard");
+        assert_eq!(tier_for(&def, 300_000, None), "Large Context");
+        assert_eq!(tier_for(&def, 1_000, Some("flex")), "Flex");
+        assert_eq!(
+            tier_for(&def, 300_000, Some("flex")),
+            "Flex · Large context"
+        );
+    }
+
+    #[test]
+    fn test_rules_equal_specificity_ties_go_to_list_order() {
+        let mut def = service_tier_definition();
+        // A flex 300k span matches "Large Context" and "Flex" equally; the first listed wins.
+        def.tiers.truncate(4);
+        assert_eq!(tier_for(&def, 300_000, Some("flex")), "Large Context");
+        def.tiers.swap(1, 3);
+        assert_eq!(tier_for(&def, 300_000, Some("flex")), "Flex");
+    }
+
+    #[test]
+    fn test_rules_cost_uses_selected_tier_prices() {
+        let def = service_tier_definition();
+        let usage = HashMap::from([("input".to_string(), 100_000i64)]);
+        let ctx = PricingContext::from_strings(&HashMap::from([(
+            "openai.response.service_tier".to_string(),
+            "flex".to_string(),
+        )]));
+        let result = calculate_cost_from_definition(&def, &usage, None, &ctx);
+        assert_eq!(result.tier_name, "Flex");
+        // 100K tokens at $1/MTok
+        assert!((result.cost["input"] - 0.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn test_rules_skipped_without_context() {
+        // Callers without span attributes (the eval cost calculator) never get a rule rate.
+        let def = service_tier_definition();
+        let usage = HashMap::from([("input".to_string(), 300_000i64)]);
+        let result = calculate_cost_from_definition(&def, &usage, None, &PricingContext::default());
+        assert_eq!(result.tier_name, "Large Context");
+    }
+
+    #[test]
+    fn test_rules_layout_safe_for_binaries_without_rules() {
+        // A binary that predates `rules` sees these tiers without it and must still price standard.
+        let mut legacy = service_tier_definition();
+        for tier in &mut legacy.tiers {
+            tier.rules.clear();
+        }
+        assert_eq!(tier_for(&legacy, 1_000, None), "Standard");
+        assert_eq!(tier_for(&legacy, 300_000, None), "Large Context");
+    }
+
+    #[test]
+    fn test_rules_compose_with_time_windows() {
+        let def = make_definition(vec![
+            PricingTierDefinition {
+                name: "Default".to_string(),
+                prices: input_price(2.0),
+                ..Default::default()
+            },
+            PricingTierDefinition {
+                name: "Flex off-peak".to_string(),
+                rules: service_tier(&["flex"]),
+                utc_windows: vec![UtcTimeWindow::from_hm((1, 0), (4, 0))],
+                prices: input_price(0.5),
+                ..Default::default()
+            },
+        ]);
+        assert_eq!(
+            select_tier_name(&def, Some("flex"), at_utc(2, 0)),
+            "Flex off-peak"
+        );
+        assert_eq!(
+            select_tier_name(&def, Some("flex"), at_utc(14, 0)),
+            "Default"
+        );
+        assert_eq!(select_tier_name(&def, None, at_utc(2, 0)), "Default");
+    }
+
+    fn select_tier_name(
+        def: &ModelPricingDefinition,
+        tier: Option<&str>,
+        ts: Option<i64>,
+    ) -> String {
+        let usage = HashMap::from([("input".to_string(), 1_000i64)]);
+        let ctx = PricingContext::from_strings(
+            &tier
+                .map(|t| {
+                    HashMap::from([("openai.request.service_tier".to_string(), t.to_string())])
+                })
+                .unwrap_or_default(),
+        );
+        calculate_cost_from_definition(def, &usage, ts, &ctx).tier_name
     }
 }

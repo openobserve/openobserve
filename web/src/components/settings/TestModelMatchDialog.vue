@@ -51,6 +51,54 @@
             {{ t("modelPricing.localTimeHint", { range: testAtTimeLocalHint }) }}
           </OText>
         </div>
+
+        <!-- Optional span attributes — lets service-tier / speed tiers be tested -->
+        <div class="flex flex-col gap-1.5" data-test="test-match-attributes">
+          <OText variant="label">{{ t("modelPricing.testAttributesLabel") }}</OText>
+          <OText variant="meta">{{ t("modelPricing.testAttributesHint") }}</OText>
+          <div
+            v-for="(attr, aIdx) in testAttributes"
+            :key="aIdx"
+            class="flex items-end gap-1.5"
+            :data-test="`test-match-attribute-row-${aIdx}`"
+          >
+            <OInput
+              v-model="attr.key"
+              :placeholder="
+                t('modelPricing.ruleKeysPlaceholder', {
+                  example: raw('openai.response.service_tier'),
+                })
+              "
+              size="sm"
+              :data-test="`test-match-attribute-key-${aIdx}`"
+            />
+            <OInput
+              v-model="attr.value"
+              :placeholder="t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })"
+              size="sm"
+              :data-test="`test-match-attribute-value-${aIdx}`"
+            />
+            <OButton
+              variant="ghost"
+              size="icon-xs-sq"
+              type="button"
+              :data-test="`test-match-attribute-remove-${aIdx}`"
+              @click="removeAttribute(aIdx)"
+            >
+              <OIcon name="close" size="xs" />
+            </OButton>
+          </div>
+          <OButton
+            variant="outline"
+            size="sm-action"
+            type="button"
+            class="self-start"
+            data-test="test-match-attribute-add"
+            @click="addAttribute"
+          >
+            {{ t("modelPricing.testAddAttribute") }}
+          </OButton>
+        </div>
       </div>
 
       <!-- ── Vertical divider ── -->
@@ -203,8 +251,20 @@
                     }}</span>
                   </div>
                   <div
+                    v-for="(rule, rIdx) in matchedTierRules"
+                    :key="rIdx"
                     class="text-2xs mt-0.5 opacity-50"
-                    v-if="!matchedTierDef?.condition && !matchedTierWindows.length"
+                    data-test="test-match-tier-rule"
+                  >
+                    <OCode>{{ formatTierRule(rule) }}</OCode>
+                  </div>
+                  <div
+                    class="text-2xs mt-0.5 opacity-50"
+                    v-if="
+                      !matchedTierDef?.condition &&
+                      !matchedTierWindows.length &&
+                      !matchedTierRules.length
+                    "
                   >
                     {{ t("modelPricing.defaultPricingTier") }}
                   </div>
@@ -256,6 +316,7 @@ import modelPricingService from "@/services/model_pricing";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -265,6 +326,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import {
   operatorSymbol,
+  formatTierRule,
   formatUtcWindows,
   formatUtcWindowsInTz,
   utcMinuteToTzHhmm,
@@ -290,6 +352,26 @@ const testModelName = ref("");
 // Optional `HH:MM` UTC time-of-day to test at; empty = "right now". Lets a
 // peak / off-peak tier be exercised without waiting for its window.
 const testAtTime = ref("");
+// Optional span attributes, so a tier restricted by attribute rules (OpenAI
+// service tier, Anthropic speed) can be exercised. Blank keys are not sent.
+const testAttributes = ref<Array<{ key: string; value: string }>>([]);
+
+function addAttribute() {
+  testAttributes.value = [...testAttributes.value, { key: "", value: "" }];
+}
+
+function removeAttribute(idx: number) {
+  testAttributes.value = testAttributes.value.filter((_, i) => i !== idx);
+}
+
+function attributesPayload(): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const attr of testAttributes.value) {
+    const key = attr.key.trim();
+    if (key) out[key] = attr.value.trim();
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 // Reset on open. Focus is OInput's `autofocus`, not a ref call — OInput is
 // `<script setup>` with no defineExpose, so it has no focus() to reach for.
@@ -298,6 +380,7 @@ watch(internalValue, (val) => {
     testResult.value = null;
     testModelName.value = "";
     testAtTime.value = "";
+    testAttributes.value = [];
   }
 });
 
@@ -333,6 +416,7 @@ async function callTestApi() {
       model_name: testModelName.value,
       usage: undefined,
       timestamp: testTimestampMicros(),
+      attributes: attributesPayload(),
     });
     testResult.value = res.data;
   } catch {
@@ -358,6 +442,13 @@ watch(testModelName, (val) => {
 watch(testAtTime, () => {
   if (testResult.value !== null && testModelName.value) callTestApi();
 });
+watch(
+  testAttributes,
+  () => {
+    if (testResult.value !== null && testModelName.value) callTestApi();
+  },
+  { deep: true },
+);
 
 // ── Derived display values ────────────────────────────────────────────────────
 
@@ -400,6 +491,8 @@ const pricingRows = computed(() => {
 const matchedTierWindows = computed<Array<{ start_minute: number; end_minute: number }>>(
   () => matchedTierDef.value?.utc_windows ?? [],
 );
+
+const matchedTierRules = computed<any[]>(() => matchedTierDef.value?.rules ?? []);
 
 // "· 06:30–09:30, 11:30–15:30 IST" — the matched tier's hours in the user's
 // timezone. Empty when the user's timezone is UTC (nothing to convert).
