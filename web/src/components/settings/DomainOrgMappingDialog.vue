@@ -60,11 +60,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <OFormInput
-        data-test="settings-domain-org-mapping-group-input"
-        name="user_group"
-        :label="t('settings.domainOrgMappings.userGroup')"
-        :placeholder="t('settings.domainOrgMappings.userGroupPlaceholder')"
-        :help-text="t('settings.domainOrgMappings.userGroupHelp')"
+        data-test="settings-domain-org-mapping-role-claim-input"
+        name="role_claim_name"
+        :label="t('settings.domainOrgMappings.roleClaimName')"
+        :placeholder="t('settings.domainOrgMappings.roleClaimNamePlaceholder')"
+        :help-text="t('settings.domainOrgMappings.roleClaimNameHelp')"
+      />
+
+      <OFormSwitch
+        v-if="hasRoleClaim"
+        data-test="settings-domain-org-mapping-create-missing-roles-switch"
+        name="create_missing_roles"
+        :label="t('settings.domainOrgMappings.createMissingRoles')"
       />
     </OForm>
   </ODialog>
@@ -77,6 +84,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -137,7 +145,8 @@ const mappingDefaults = computed((): DomainOrgMappingForm => {
     domain: props.mapping.domain ?? "",
     org_id: props.mapping.org_id ?? "",
     base_role: props.mapping.base_role ?? base.base_role,
-    user_group: props.mapping.user_group ?? "",
+    role_claim_name: props.mapping.role_claim_name ?? "",
+    create_missing_roles: props.mapping.create_missing_roles ?? base.create_missing_roles,
   };
 });
 
@@ -146,6 +155,8 @@ const form = useOForm<DomainOrgMappingForm>({
   schema: makeDomainOrgMappingSchema(t),
   onSubmit,
 });
+
+const hasRoleClaim = form.useStore((state) => !!state.values.role_claim_name?.trim());
 
 // The form is created here so it survives the dialog body's unmount, so it is
 // re-seeded from the current mapping on every open.
@@ -163,12 +174,15 @@ function onSubmit(value: DomainOrgMappingForm) {
     return;
   }
 
+  const roleClaimName = value.role_claim_name?.trim() || undefined;
   emit("save", {
     domain,
     org_id: value.org_id.trim(),
     base_role: value.base_role,
     // Omitted rather than "" so the payload matches the optional backend field.
-    user_group: value.user_group?.trim() || undefined,
+    role_claim_name: roleClaimName,
+    // Only meaningful with a claim, so a cleared claim also clears the flag.
+    create_missing_roles: !!roleClaimName && value.create_missing_roles,
   });
   emit("update:open", false);
 }

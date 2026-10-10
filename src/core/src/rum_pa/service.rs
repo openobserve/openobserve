@@ -22,9 +22,9 @@ use sea_orm::{ConnectionTrait, TransactionTrait};
 use serde::Serialize;
 
 use super::{
-    CreateFunnel, CreateNamedEvent, Current, FunnelDef, FunnelRef, NamedEvent, RumPaError,
-    SavedFunnel, UpdateFunnel, UpdateNamedEvent, validate_def, validate_description, validate_name,
-    validate_rules, validate_sql,
+    CreateFunnel, CreateNamedEvent, Current, FunnelDef, FunnelRef, NamedEvent, NamedEventRef,
+    RumPaError, SavedFunnel, UpdateFunnel, UpdateNamedEvent, validate_def, validate_description,
+    validate_name, validate_rules, validate_sql,
 };
 
 /// The super-cluster meta-topic module; keys are `/rum_analytics/{org}/{table}/{id}`.
@@ -119,6 +119,20 @@ pub async fn delete_event<C: ConnectionTrait + TransactionTrait>(
     let row = retry_once(|| delete_event_once(db, scope, id, force)).await?;
     emit_delete(scope.org, EVENTS_TABLE, &row.id, row.version).await;
     Ok(())
+}
+
+/// The names deleted named events among `ids` had just before deletion; ids never captured
+/// (never deleted, or deleted before this capture existed) are omitted.
+pub async fn deleted_event_names<C: ConnectionTrait>(
+    db: &C,
+    org: &str,
+    ids: &[String],
+) -> Result<Vec<NamedEventRef>, RumPaError> {
+    Ok(rum_pa::tombstoned_names::<NamedEvents, _>(db, org, ids)
+        .await?
+        .into_iter()
+        .map(|(id, name)| NamedEventRef { id, name })
+        .collect())
 }
 
 /// The saved funnels whose steps use the event, whether or not the event still exists.
@@ -362,7 +376,8 @@ async fn delete_event_once<C: ConnectionTrait + TransactionTrait>(
             return Err(RumPaError::EventInUse(users));
         }
     }
-    rum_pa::delete::<NamedEvents, _>(&txn, scope.org, scope.app, id, row.version).await?;
+    rum_pa::delete::<NamedEvents, _>(&txn, scope.org, scope.app, id, row.version, &row.name)
+        .await?;
     txn.commit().await?;
     Ok(row)
 }
@@ -458,7 +473,7 @@ async fn delete_funnel_once<C: ConnectionTrait + TransactionTrait>(
     let row = rum_pa::get_for_update::<Funnels, _>(&txn, scope.org, scope.app, id)
         .await?
         .ok_or(RumPaError::NotFound)?;
-    rum_pa::delete::<Funnels, _>(&txn, scope.org, scope.app, id, row.version).await?;
+    rum_pa::delete::<Funnels, _>(&txn, scope.org, scope.app, id, row.version, &row.name).await?;
     txn.commit().await?;
     Ok(row)
 }
@@ -797,6 +812,23 @@ mod tests {
         .await
         .unwrap_err();
         assert_eq!(err, RumPaError::UnknownEvent(vec![event.id.clone()]));
+    }
+
+    #[tokio::test]
+    async fn a_deleted_event_s_name_is_recoverable_by_id_afterwards() {
+        let db = db().await;
+        let event = create(&db, SCOPE, "Signup").await;
+        delete_event(&db, SCOPE, &event.id, false).await.unwrap();
+        let refs = deleted_event_names(&db, SCOPE.org, &[event.id.clone(), "absent".into()])
+            .await
+            .unwrap();
+        assert_eq!(
+            refs,
+            [NamedEventRef {
+                id: event.id,
+                name: "Signup".into()
+            }]
+        );
     }
 
     #[tokio::test]

@@ -1,7 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { onMounted, ref } from "vue";
+import { flushPromises } from "@vue/test-utils";
 import { usePanelDataLoader } from "./usePanelDataLoader";
 import queryService from "../../services/search";
+
+const RealAbortController = globalThis.AbortController;
 
 /**
  * Lets the NEXT usePanelDataLoader() install its visibility observer.
@@ -1588,6 +1591,61 @@ describe("usePanelDataLoader", () => {
       expect(loader.loading.value).toBe(true);
       expect(cacheOperationCount).toBe(cacheWritesBefore);
       await rerun;
+    });
+  });
+
+  describe("first load waiting on a multi-select child variable", () => {
+    it("sends one query when the child resolves to ALL, not one per watcher", async () => {
+      global.AbortController = RealAbortController;
+      const streams: any[] = [];
+      streamOverride = (payload) => {
+        streams.push(payload);
+        return `stream-${streams.length}`;
+      };
+      const ctr = {
+        name: "ctr",
+        type: "query_values",
+        multiSelect: true,
+        value: [],
+        isVariablePartialLoaded: false,
+      };
+      const variablesData = createMockVariablesData({ values: [ctr] });
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({
+          queryConfig: { query: "SELECT * FROM t WHERE c IN ($ctr)" },
+        }),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        variablesData,
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+
+      // The mount run waits for ctr, which has never loaded.
+      const mountRun = loader.loadData();
+      await flushPromises();
+      expect(streams).toHaveLength(0);
+
+      variablesData.value = {
+        isVariablesLoading: false,
+        values: [{ ...ctr, value: ["_o2_all_"], isVariablePartialLoaded: true }],
+      };
+      await flushPromises();
+      await mountRun;
+      await flushPromises();
+
+      expect(streams).toHaveLength(1);
     });
   });
 
