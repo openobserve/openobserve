@@ -33,16 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </span>
 
-      <!-- Tab List -->
-      <TabList
-        v-if="showTabs && selectedTabId !== null"
-        class="mt-2"
-        :dashboardData="dashboardData"
-        :viewOnly="viewOnly"
-        @refresh="refreshDashboard"
-      />
-
-      <!-- Below the tabs: these scope the ACTIVE tab, and above them the strip both read as page chrome and shifted the tab bar as its height changed per tab. -->
+      <!-- Global variables sit above the tab bar: they apply dashboard-wide, not to the active tab. -->
       <VariablesValueSelector
         v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
         :scope="'global'"
@@ -53,6 +44,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :initialVariableValues="initialVariableValues"
         class="global-variables-selector"
         data-test="global-variables-selector"
+      />
+
+      <!-- Tab List -->
+      <TabList
+        v-if="showTabs && selectedTabId !== null"
+        class="mt-2"
+        :dashboardData="dashboardData"
+        :viewOnly="viewOnly"
+        @refresh="refreshDashboard"
       />
 
       <!-- Tab-scoped Variables (for active tab, if using manager) -->
@@ -320,6 +320,7 @@ import {
   nextTick,
   reactive,
   inject,
+  type Ref,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
@@ -333,7 +334,7 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import useNotifications from "@/composables/useNotifications";
-import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { getVariableKey, useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import {
@@ -537,6 +538,11 @@ export default defineComponent({
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
 
+    const dashboardAutoRun = inject<Ref<boolean>>("dashboardAutoRun", ref(false));
+    watch(dashboardAutoRun, (on) => variablesManager.setLiveMode(on === true), {
+      immediate: true,
+    });
+
     // Computed properties for filtered variables by scope
     // Per-tab narrowing of a global variable (`curatedTabs`) is applied by
     // VariablesValueSelector at RENDER time, not here: this list also decides
@@ -715,6 +721,13 @@ export default defineComponent({
         };
       },
     );
+
+    // Auto Run applies without the time change that drops per-panel refresh snapshots above.
+    variablesManager.onAutoCommit(() => {
+      if (!variablesManager.isLiveMode.value) return;
+      const { __global, ...panelSnapshots } = currentVariablesDataRef.value;
+      if (Object.keys(panelSnapshots).length) currentVariablesDataRef.value = { __global };
+    });
 
     watch(
       () => currentVariablesDataRef.value,
@@ -1326,31 +1339,25 @@ export default defineComponent({
           ...Object.values(newData.panels).flat(),
         ];
 
-        let shouldAutoCommit = false;
+        const firstLoadedKeys: string[] = [];
 
         for (const variable of allVariables) {
           // Only check query_values variables that just finished loading
           if (variable.type !== "query_values") continue;
           if (!variable.isVariablePartialLoaded) continue;
 
-          // Find this variable in committed state
+          // Not committed yet, or committed before it ever loaded → first load
           const committedVar = findInCommitted(variable);
-
-          if (!committedVar) {
-            // Variable doesn't exist in committed state → first load
-            shouldAutoCommit = true;
-            break;
-          } else if (committedVar.isVariablePartialLoaded === false) {
-            // Variable exists but was never loaded → first load
-            shouldAutoCommit = true;
-            break;
+          if (!committedVar || committedVar.isVariablePartialLoaded === false) {
+            firstLoadedKeys.push(
+              getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId),
+            );
           }
-          // else: committedVar.isVariablePartialLoaded === true → reload → no commit
         }
 
-        if (shouldAutoCommit) {
-          // Auto-commit so panels see the new values
-          variablesManager.commitAll();
+        if (firstLoadedKeys.length) {
+          // Waits for their dependents so a first load reaches panels in one commit.
+          variablesManager.commitWhenSettled(firstLoadedKeys);
         }
       },
       { deep: true },
@@ -1546,6 +1553,7 @@ export default defineComponent({
 
     // Exposed methods for parent components to interact with variables manager
     const commitAllVariables = () => {
+      variablesManager.cancelPendingCommit();
       variablesManager.commitAll();
     };
 

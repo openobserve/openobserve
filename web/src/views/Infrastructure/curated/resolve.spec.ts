@@ -1352,7 +1352,7 @@ describe("§5.5 buildDashboard", () => {
     expect(namespace.type).toBe("query_values");
     expect(namespace.multiSelect).toBe(true);
     expect(namespace.selectAllValueForMultiSelect).toBe("all");
-    expect(namespace.scope).toBe("global");
+    expect(namespace.scope).toBe("tabs");
     expect(namespace.query_data).toEqual(
       expect.objectContaining({
         stream_type: "metrics",
@@ -2062,6 +2062,8 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
 
       const manager = useVariablesManager(((key: string) => key) as never);
       await manager.initialize(built.variables.list, built);
+      // Tab-scoped pickers are marked pending when their tab becomes visible.
+      manager.setTabVisibility("workloads", true);
       const managed = manager.getAllVisibleVariables("workloads") as any[];
       expect(managed.length).toBeGreaterThan(0);
 
@@ -2142,7 +2144,8 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         }
         expect(ours.queryDataKeys).toEqual(theirs.queryDataKeys);
         expect(ours.type).toBe(theirs.type);
-        expect(ours.scope).toBe(theirs.scope);
+        // Tab-scoped so each picker renders below the tab bar on the sections it scopes.
+        expect(ours.scope).toBe("tabs");
         expect(ours.multiSelect).toBe(theirs.multiSelect);
         // The sentinel VALUE is a deliberate per-picker choice, not a shape contract:
         // `cluster` opts into "first" so the page opens on one cluster rather than a
@@ -2473,9 +2476,7 @@ describe("the built dashboard does not depend on the selected tab", () => {
   // and would never fetch its options at all).
   it("each built picker declares the sections that scope it", () => {
     const dashboard: any = build(resolve({}));
-    const byName = Object.fromEntries(
-      dashboard.variables.list.map((v: any) => [v.name, v.curatedTabs]),
-    );
+    const byName = Object.fromEntries(dashboard.variables.list.map((v: any) => [v.name, v.tabs]));
     // Cluster renders on ALL THREE tabs: a Workloads without it answered a
     // per-cluster question with every cluster's pods, silently.
     expect(byName.cluster).toEqual(["inventory", "health", "utilization", "nodes", "workloads"]);
@@ -2528,7 +2529,7 @@ describe("the built dashboard does not depend on the selected tab", () => {
       const expected = kubernetesPage.sections
         .filter((section) => (section.scopedBy ?? []).includes(variable.name))
         .map((section) => section.id);
-      expect(variable.curatedTabs, variable.name).toEqual(expected);
+      expect(variable.tabs, variable.name).toEqual(expected);
     }
   });
 });

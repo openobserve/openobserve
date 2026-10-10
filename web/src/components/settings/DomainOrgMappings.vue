@@ -60,12 +60,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mt-1 flex flex-wrap items-center gap-1">
               <OTag type="userRole" :value="badgeRole(mapping.base_role)" />
               <OTag
-                v-if="mapping.user_group"
+                v-if="mapping.role_claim_name"
                 type="fieldTag"
                 class="max-w-full min-w-0"
-                :data-test="`settings-domain-org-mappings-item-group-${index}`"
+                :data-test="`settings-domain-org-mappings-item-role-claim-${index}`"
               >
-                <OTruncatedText class="text-xs">{{ mapping.user_group }}</OTruncatedText>
+                <OTruncatedText class="text-xs">{{ mapping.role_claim_name }}</OTruncatedText>
               </OTag>
             </div>
           </div>

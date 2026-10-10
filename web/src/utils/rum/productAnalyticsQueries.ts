@@ -1005,7 +1005,7 @@ const GROUPED_INCLUDE: Readonly<Record<PathsInclude, string>> = {
 const ATTR_WINDOW = `OVER (PARTITION BY sid ORDER BY t, key ${WHOLE})`;
 
 // Error rows have no key, so they get their own LAG partition and the dedup matches the flow query.
-const pathTail = (def: PathsDef, attrs: boolean, anchor: string): string[] => {
+const pathTail = (def: PathsDef, attrs: boolean, anchor: string, uid: boolean): string[] => {
   const d = attrs
     ? `d AS (SELECT *, LAG(key) OVER (PARTITION BY sid, CASE WHEN ty = 'error' THEN 1 ELSE 0 END ORDER BY t, key) AS pk, SUM(CASE WHEN ty = 'error' THEN 1 ELSE 0 END) ${ATTR_WINDOW} AS errors, MIN(t) ${ATTR_WINDOW} AS started, MAX(t) ${ATTR_WINDOW} AS ended, MAX(hr) ${ATTR_WINDOW} AS has_replay FROM e)`
     : "d AS (SELECT *, LAG(key) OVER (PARTITION BY sid ORDER BY t, key) AS pk FROM e)";
@@ -1023,6 +1023,7 @@ const pathTail = (def: PathsDef, attrs: boolean, anchor: string): string[] => {
           "MAX(started) AS started",
           "MAX(ended) AS ended",
           "MAX(has_replay) AS has_replay",
+          `${uid ? "MAX(uid)" : "CAST(NULL AS VARCHAR)"} AS user_label`,
           "MAX(CASE WHEN n = n0 THEN t END) AS t0",
         ]
       : []),
@@ -1049,21 +1050,25 @@ const cohortPathCtes = (
     id,
     cohort.funnel,
     opts.events,
-    { errors: attrs, label: false, sample: opts.sample },
+    { errors: attrs, label: attrs, sample: opts.sample },
     k,
   );
+  const uid = attrs && !!id;
   const include = attrs
     ? `(${GROUPED_INCLUDE[def.include]} OR ty = 'error')`
     : GROUPED_INCLUDE[def.include];
   // Per session tk already is the step time; a user's first reach can sit in another session.
   const stepT =
     unit === "sid" ? "tk" : `MIN(CASE WHEN v${k} = 1 THEN t END) OVER (PARTITION BY sid)`;
+  const uidCol = uid ? ", uid" : "";
+  // A sessions chain admits unnamed clicks only for their identity; the users chain already had them in the Sankey.
+  const unnamed = uid && unit === "sid" ? " AND (ty <> 'action' OR COALESCE(k, '') <> '')" : "";
   return [
     ...ctes,
     reachCte(unit, k, true),
-    `cr AS (SELECT sid, t, ty, hr, k, ${stepT} AS step_t FROM r WHERE rk = 1 AND rk1 = 0)`,
-    `e AS (SELECT sid, t, ty, hr, step_t, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key FROM cr WHERE step_t IS NOT NULL AND ${include})`,
-    ...pathTail(def, attrs, "MAX(CASE WHEN t <= step_t THEN n END)"),
+    `cr AS (SELECT sid, t, ty, hr, k${uidCol}, ${stepT} AS step_t FROM r WHERE rk = 1 AND rk1 = 0)`,
+    `e AS (SELECT sid, t, ty, hr${uidCol}, step_t, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key FROM cr WHERE step_t IS NOT NULL AND ${include}${unnamed})`,
+    ...pathTail(def, attrs, "MAX(CASE WHEN t <= step_t THEN n END)", uid),
   ];
 };
 
@@ -1090,6 +1095,7 @@ const pathCtes = (
   const types = anchorKindCovered
     ? include
     : `(${include} OR ${stepPredicateRaw(anchor, scope, opts.events)})`;
+  const idRows = attrs ? id : null;
   const cols = [
     "session_id AS sid",
     "type AS ty",
@@ -1098,22 +1104,33 @@ const pathCtes = (
     atnCol(scope),
     hrExpr(scope),
     ...(has(scope, "view_name") ? ["MIN(view_name) AS vn"] : []),
+    ...(idRows
+      ? [...identityGroupCols(idRows), `CASE WHEN ${types} THEN 1 ELSE 0 END AS inc`]
+      : []),
   ];
-  const ctes = [
-    `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND ${types} GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} ELSE CAST(date AS VARCHAR) END)`,
-  ];
+  const groupKey = `CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)}`;
+  // Identity-only rows feed the uid window and are then dropped, so the path rows stay exactly the Sankey's.
+  const ctes = idRows
+    ? [
+        `e00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND (${types} OR ${identityExpr(idRows)} IS NOT NULL) GROUP BY session_id, type, ${groupKey} WHEN type = 'error' THEN CAST(date AS VARCHAR) ELSE type END, CASE WHEN ${types} THEN 1 ELSE 0 END)`,
+        `e0 AS (SELECT * FROM (SELECT *, ${UID_WINDOW} AS uid FROM e00) q WHERE inc = 1)`,
+      ]
+    : [
+        `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND ${types} GROUP BY session_id, type, ${groupKey} ELSE CAST(date AS VARCHAR) END)`,
+      ];
+  const uidCol = idRows ? ", uid" : "";
   const pk = pageKeyExpr("url", scope.schema, "vn");
   const ck = clickKeyExpr("atn");
   if (anchor.kind === "e") {
     const keepVn = has(scope, "view_name") ? ", vn" : "";
     ctes.push(
-      `e1 AS (SELECT sid, t, ty, hr, url${keepVn}, CASE WHEN ty = 'view' THEN ${pk} WHEN ty = 'action' THEN ${ck} END AS k FROM e0)`,
-      `e AS (SELECT sid, t, ty, hr, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key, CASE WHEN ${stepPredicateGrouped(anchor, scope, opts.events)} THEN 1 ELSE 0 END AS am FROM e1)`,
+      `e1 AS (SELECT sid, t, ty, hr${uidCol}, url${keepVn}, CASE WHEN ty = 'view' THEN ${pk} WHEN ty = 'action' THEN ${ck} END AS k FROM e0)`,
+      `e AS (SELECT sid, t, ty, hr${uidCol}, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key, CASE WHEN ${stepPredicateGrouped(anchor, scope, opts.events)} THEN 1 ELSE 0 END AS am FROM e1)`,
     );
-    return [...ctes, ...pathTail(def, attrs, "MIN(CASE WHEN am = 1 THEN n END)")];
+    return [...ctes, ...pathTail(def, attrs, "MIN(CASE WHEN am = 1 THEN n END)", !!idRows)];
   }
   ctes.push(
-    `e AS (SELECT sid, t, ty, hr, CASE WHEN ty = 'view' THEN 'p:' || ${pk} WHEN ty = 'action' THEN 'c:' || ${ck} END AS key FROM e0)`,
+    `e AS (SELECT sid, t, ty, hr${uidCol}, CASE WHEN ty = 'view' THEN 'p:' || ${pk} WHEN ty = 'action' THEN 'c:' || ${ck} END AS key FROM e0)`,
   );
   return [
     ...ctes,
@@ -1121,6 +1138,7 @@ const pathCtes = (
       def,
       attrs,
       `MIN(CASE WHEN key = ${lit(`${anchor.kind}:${anchor.key}`)} THEN n END)`,
+      !!idRows,
     ),
   ];
 };
@@ -1153,7 +1171,7 @@ export function branchSessionsSql(
   const j = Math.min(Math.max(0, Math.trunc(stepDepth)), Math.trunc(def.depth));
   return withCtes(
     pathCtes(scope, id, def, opts, true),
-    `SELECT sid, t${j} AS step_t, errors, 0 AS frustrations, has_replay, started, ended, COUNT(*) OVER () AS total FROM pa WHERE ${predicate} ORDER BY has_replay DESC, step_t DESC, sid LIMIT ${PAGE_LIMIT} OFFSET ${PAGE_LIMIT * Math.max(0, Math.trunc(page))}`,
+    `SELECT sid, t${j} AS step_t, errors, 0 AS frustrations, has_replay, started, ended, user_label, COUNT(*) OVER () AS total FROM pa WHERE ${predicate} ORDER BY has_replay DESC, step_t DESC, sid LIMIT ${PAGE_LIMIT} OFFSET ${PAGE_LIMIT * Math.max(0, Math.trunc(page))}`,
   );
 }
 

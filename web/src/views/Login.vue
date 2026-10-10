@@ -65,6 +65,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { isSameOriginRedirect } from "@/utils/safeUrl";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 
 export default defineComponent({
   name: "LoginPage",
@@ -124,8 +125,17 @@ export default defineComponent({
 
           store.dispatch("setOrganizations", res.data.data);
 
-          orgOptions.value = res.data.data.map(
-            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
+          const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+          orgOptions.value = labeledOrgs.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+              label: string;
+            }) => {
+              // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
               let optiondata: any = {
                 label: data.name,
                 id: data.id,
@@ -156,7 +166,7 @@ export default defineComponent({
                 tempDefaultOrg = optiondata;
               }
 
-              return optiondata;
+              return { ...optiondata, label: data.label };
             },
           );
 

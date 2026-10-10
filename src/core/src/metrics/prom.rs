@@ -382,6 +382,7 @@ pub async fn remote_write(
 
         // every sample of a series shares its labels, so the identity is loop-invariant
         let series_hash = super::signature_of_series_labels(&label_pairs);
+        let schema = metric_schema_map.get(&metric_name);
 
         // a label the schema has not seen goes down the JSON path, which evolves the schema
         if event.histograms.is_empty()
@@ -393,14 +394,13 @@ pub async fn remote_write(
             let has_writable = event
                 .samples
                 .iter()
-                .any(|s| sample_cell(s.value, metric_schema_map.get(&metric_name)).is_some());
+                .any(|s| sample_cell(s.value, schema).is_some());
             if has_writable && !gate.admit().await {
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
                 return Ok(());
             }
             for sample in &event.samples {
-                if let Some(value) = sample_cell(sample.value, metric_schema_map.get(&metric_name))
-                {
+                if let Some(value) = sample_cell(sample.value, schema) {
                     let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
                     columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
                 }
@@ -425,8 +425,7 @@ pub async fn remote_write(
         let can_move_labels = event.histograms.is_empty();
         for (sample_idx, sample) in event.samples.into_iter().enumerate() {
             sample_count += 1;
-            let Some(sample_val) = sample_cell(sample.value, metric_schema_map.get(&metric_name))
-            else {
+            let Some(sample_val) = sample_cell(sample.value, schema) else {
                 continue;
             };
 

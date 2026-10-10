@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :events-status="pa.eventsStatus.value"
         :range="range"
         :timezone="timezone"
+        :deleted-names="namedEvents.deletedNames.value"
         @update:series="(s) => (pa.trendSeries.value = s)"
         @retry-events="pa.retryEvents()"
       />

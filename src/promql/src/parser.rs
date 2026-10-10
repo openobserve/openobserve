@@ -62,11 +62,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn legacy_smoothing_function_keeps_signature_and_round_trips() {
-        let query = "holt_winters(m[5m], 0.5, 0.3)";
-        let expr = parse(query).unwrap();
-        assert_eq!(parse(&expr.to_string()).unwrap(), expr);
-        assert!(parse("holt_winters(m[5m], 0.5)").is_err());
+    fn smoothing_functions_preserve_names_when_formatted() {
+        for name in ["holt_winters", "double_exponential_smoothing"] {
+            let query = format!("{name}(m[5m], 0.5, 0.3)");
+            let expr = parse(&query).unwrap();
+            assert_eq!(expr.to_string(), query);
+            assert_eq!(expr.prettify(), query);
+            assert_eq!(parse(&expr.to_string()).unwrap(), expr);
+        }
+    }
+
+    #[test]
+    fn smoothing_functions_name_the_called_function_in_arity_errors() {
+        for name in ["holt_winters", "double_exponential_smoothing"] {
+            for args in ["m[5m], 0.5", "m[5m], 0.5, 0.3, 0.1"] {
+                let error = parse(&format!("{name}({args})")).unwrap_err();
+                assert!(error.contains(&format!("call to '{name}'")), "{error}");
+            }
+        }
     }
 
     #[test]
