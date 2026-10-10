@@ -8911,6 +8911,8 @@
         "durationInvalid": "Enter a duration such as 90m or 1h 30m.",
         "weekdaysRequired": "Choose at least one day.",
         "untilAfterStart": "Repeat until must be on or after the first day.",
+        "reasonTooLong": "A reason can be at most {max} characters.",
+        "windowOutlastsRepeat": "The window cannot be longer than the time between repeats.",
         "startDateRequired": "Choose the first day."
       },
       "title": "Downtimes",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Score corrected by {names}",
       "incident": {
         "mutedBy": "Muted · {name}",
+        "notLoaded": "Downtime not loaded",
+        "notLoadedTooltip": "Muted by downtime {id}, which is not among the downtimes loaded.",
         "banner": "Muted by {name}. Nobody was paged. The first firing after the window sends the delayed opened notification.",
         "bannerUntil": "Muted by {name} until {end}. Nobody was paged. The first firing after the window sends the delayed opened notification."
       },

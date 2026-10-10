@@ -201,6 +201,27 @@ describe("buildDowntimeRequest", () => {
     expect(inZone("Pacific/Auckland")).toBe(Date.parse("2026-09-30T11:00:00Z") * 1000);
   });
 
+  it("saves a legacy zone name back unchanged and keeps the recurring start", () => {
+    const midDay = Date.parse("2026-10-01T13:00:00Z") * 1000;
+    const row: Downtime = {
+      ...flow1,
+      schedule: {
+        repeat: "daily",
+        starts_at: midDay,
+        ends_at: null,
+        timezone: "Asia/Calcutta",
+        start_time_local: "09:00",
+        duration_secs: 3600,
+        weekdays: [],
+      },
+    };
+    const values = downtimeToFormValues(row);
+    expect(values.schedule.timezone).toBe("Asia/Calcutta");
+    const body = buildDowntimeRequest(values);
+    expect(body.schedule.timezone).toBe("Asia/Calcutta");
+    expect(body.schedule.starts_at).toBe(midDay);
+  });
+
   it("drops blank names and reasons so the backend generates a name", () => {
     const body = buildDowntimeRequest(defaultDowntimeValues(NOW, "UTC"));
     expect(body).not.toHaveProperty("name");

@@ -8911,6 +8911,8 @@
         "durationInvalid": "Introduce una duración como 90m o 1h 30m.",
         "weekdaysRequired": "Elige al menos un día.",
         "untilAfterStart": "Repetir hasta debe ser el primer día o posterior.",
+        "reasonTooLong": "Un motivo puede tener como máximo {max} caracteres.",
+        "windowOutlastsRepeat": "La ventana no puede ser más larga que el tiempo entre repeticiones.",
         "startDateRequired": "Elija el primer día."
       },
       "title": "Tiempos de inactividad",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Puntuación corregida por {names}",
       "incident": {
         "mutedBy": "Silenciado · {name}",
+        "notLoaded": "Tiempo de inactividad no cargado",
+        "notLoadedTooltip": "Silenciado por el tiempo de inactividad {id}, que no está entre los cargados.",
         "banner": "Silenciado por {name}. No se avisó a nadie. El primer disparo después de la ventana envía la notificación de apertura retrasada.",
         "bannerUntil": "Silenciado por {name} hasta {end}. No se avisó a nadie. El primer disparo después de la ventana envía la notificación de apertura retrasada."
       },

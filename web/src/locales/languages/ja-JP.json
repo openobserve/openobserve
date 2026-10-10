@@ -8911,6 +8911,8 @@
         "durationInvalid": "90m や 1h 30m のような期間を入力してください。",
         "weekdaysRequired": "少なくとも1日を選択してください。",
         "untilAfterStart": "繰り返しの終了は最初の日以降である必要があります。",
+        "reasonTooLong": "理由は最大 {max} 文字までです。",
+        "windowOutlastsRepeat": "ウィンドウは繰り返しの間隔より長くできません。",
         "startDateRequired": "初日を選択してください。"
       },
       "title": "ダウンタイム",
@@ -9237,6 +9239,8 @@
       "correctedBy": "スコアは {names} により修正",
       "incident": {
         "mutedBy": "ミュート中 · {name}",
+        "notLoaded": "ダウンタイムが読み込まれていません",
+        "notLoadedTooltip": "ダウンタイム {id} によりミュート中です。このダウンタイムは読み込まれた一覧に含まれていません。",
         "banner": "{name} によりミュート。誰もページ通知を受けていません。ウィンドウ終了後の最初の発火で、遅延したオープン通知が送信されます。",
         "bannerUntil": "{name} により {end} までミュート。誰もページ通知を受けていません。ウィンドウ終了後の最初の発火で、遅延したオープン通知が送信されます。"
       },

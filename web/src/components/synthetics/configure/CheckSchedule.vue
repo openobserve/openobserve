@@ -20,7 +20,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, BrowserCheckSchedule } from "@/types/synthetics";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
-import { browserTimezone, canonicalTimezone, timezoneSearchText } from "@/utils/timezoneAliases";
+import { browserTimezone } from "@/utils/timezoneAliases";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -139,22 +139,27 @@ watch(
   },
 );
 
-const { browserTz, browserTimeValue, zones } = useTimezoneOptions({ browserEntry: true });
+// The stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+const {
+  browserTz,
+  browserTimeValue,
+  timezoneOptions: zoneOptions,
+} = useTimezoneOptions({
+  browserEntry: true,
+  current: () => props.check.schedule.timezone,
+});
 
 // The browser entry's value is persisted and parsed back, so it stays English.
-const timezoneOptions: { label: I18nText; value: string; searchText?: string }[] = zones.map(
-  (tz) =>
-    tz === browserTimeValue
-      ? { label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }), value: tz }
-      : { label: raw(tz), value: tz, searchText: timezoneSearchText(tz) },
+const timezoneOptions = computed(() =>
+  zoneOptions.value.map((option) =>
+    option.value === browserTimeValue
+      ? { label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }), value: option.value }
+      : option,
+  ),
 );
 
-// The options hold canonical names, so a stored legacy zone such as `Asia/Calcutta` still selects one.
 const timezone = computed({
-  get: () => {
-    const stored = props.check.schedule.timezone;
-    return stored ? canonicalTimezone(stored) : browserTimezone();
-  },
+  get: () => props.check.schedule.timezone || browserTimezone(),
   set: (v: string | number | boolean | null | undefined) =>
     updateSchedule({ timezone: v != null ? String(v) : "UTC" }),
 });

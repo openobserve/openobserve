@@ -443,7 +443,7 @@ export default defineComponent({
       browserTimeValue: browserTime,
       zones: timezoneOptions,
     } = useTimezoneOptions({ browserEntry: true });
-    const filteredTimezone = ref<any>([...timezoneOptions]);
+    const filteredTimezone = ref<any>([...timezoneOptions.value]);
 
     const timezoneSelectOptions = computed(() =>
       (filteredTimezone.value as string[]).map((tz: string) =>
@@ -1099,11 +1099,11 @@ export default defineComponent({
 
     const timezoneFilterFn = (val: string) => {
       if (val === "") {
-        filteredTimezone.value = timezoneOptions;
+        filteredTimezone.value = timezoneOptions.value;
         return;
       }
       const needle = val.toLowerCase();
-      filteredTimezone.value = timezoneOptions.filter((timezone: string) =>
+      filteredTimezone.value = timezoneOptions.value.filter((timezone: string) =>
         (timezoneSearchText(timezone) ?? timezone).toLowerCase().includes(needle),
       );
     };

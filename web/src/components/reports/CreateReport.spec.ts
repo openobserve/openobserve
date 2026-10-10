@@ -643,18 +643,35 @@ describe("CreateReport", () => {
       expect(vi.mocked(reports.updateReport)).toHaveBeenCalled();
     });
 
-    it("selects Asia/Kolkata for a stored Asia/Calcutta, and finds it by the old name", async () => {
+    it("keeps a stored Asia/Calcutta through load and an unchanged save, shown as Asia/Kolkata", async () => {
       vi.mocked(reports.getReport).mockResolvedValueOnce({
         data: { ...MOCK_REPORT, timezone: "Asia/Calcutta" },
       } as any);
+      vi.mocked(reports.updateReport).mockClear();
       const { wrapper: w } = mountComponent({ name: "legacy-zone-report" });
       await flushPromises();
-      expect((w.vm as any).form.state.values.timezone).toBe("Asia/Kolkata");
+      expect((w.vm as any).form.state.values.timezone).toBe("Asia/Calcutta");
       const options = (w.vm as any).timezoneSelectOptions as {
+        label: string;
         value: string;
         searchText?: string;
       }[];
-      expect(options.find((o) => o.value === "Asia/Kolkata")?.searchText).toContain("Calcutta");
+      const stored = options.find((o) => o.value === "Asia/Calcutta");
+      expect(stored?.label).toBe("Asia/Kolkata");
+      expect(stored?.searchText).toContain("Calcutta");
+      expect(options.filter((o) => o.label === "Asia/Kolkata")).toHaveLength(1);
+
+      // The schedule step holds the picker.
+      (w.vm as any).step = 2;
+      await flushPromises();
+      const picker = w.findAllComponents(OSelect).find((c) => c.props("name") === "timezone");
+      expect(picker?.props("modelValue")).toBe("Asia/Calcutta");
+      expect(picker?.text()).toContain("Asia/Kolkata");
+
+      await submitForm(w);
+      const sent = vi.mocked(reports.updateReport).mock.calls.at(-1) ?? [];
+      const payload = sent.find((arg: any) => arg && typeof arg === "object") as any;
+      expect(payload?.timezone).toBe("Asia/Calcutta");
       w.unmount();
     });
 

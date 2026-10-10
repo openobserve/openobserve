@@ -142,6 +142,7 @@ import {
 } from "@/utils/downtimes/downtimeForm";
 import type { Repeat } from "@/services/downtimes";
 import { ISO_WEEKDAYS, currentOrNextWindow, formatWindow } from "@/utils/downtimes/schedule";
+import { canonicalTimezone } from "@/utils/timezoneAliases";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormDate from "@/lib/forms/Date/OFormDate.vue";
@@ -151,9 +152,9 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 
 const { t } = useI18nTyped();
 const form = inject(FORM_CONTEXT_KEY, null);
-const { timezoneOptions } = useTimezoneOptions();
-
 const schedule = form.useStore((s: { values: DowntimeFormValues }) => s.values.schedule);
+// The stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+const { timezoneOptions } = useTimezoneOptions({ current: () => schedule.value?.timezone });
 const repeat = computed(() => schedule.value?.repeat);
 
 const REPEATS: readonly Repeat[] = ["none", "daily", "weekly"];
@@ -179,7 +180,8 @@ const nextWindowText = computed(() => {
   if (!window) return t("alerts.downtimes.scheduleForm.noWindow");
   const inZone = formatWindow(window, built.timezone, t);
   const inUtc = formatWindow(window, "UTC", t);
-  return built.timezone === "UTC"
+  // Canonical only for display, so a stored `Etc/UTC` shows the window once.
+  return canonicalTimezone(built.timezone) === "UTC"
     ? t("alerts.downtimes.scheduleForm.nextWindow", { window: inZone })
     : t("alerts.downtimes.scheduleForm.nextWindowWithUtc", { window: inZone, utc: inUtc });
 });

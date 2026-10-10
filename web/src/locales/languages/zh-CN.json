@@ -8911,6 +8911,8 @@
         "durationInvalid": "请输入时长，例如 90m 或 1h 30m。",
         "weekdaysRequired": "请至少选择一天。",
         "untilAfterStart": "重复截止日期必须不早于第一天。",
+        "reasonTooLong": "原因最多 {max} 个字符。",
+        "windowOutlastsRepeat": "时间窗口不能长于两次重复之间的时间。",
         "startDateRequired": "请选择第一天。"
       },
       "title": "停机时间",
@@ -9237,6 +9239,8 @@
       "correctedBy": "评分已由 {names} 修正",
       "incident": {
         "mutedBy": "已静音 · {name}",
+        "notLoaded": "停机时间未加载",
+        "notLoadedTooltip": "已被停机时间 {id} 静音，该停机时间不在已加载的列表中。",
         "banner": "由 {name} 静音。无人被呼叫。窗口结束后的首次触发会发送延迟的已开启通知。",
         "bannerUntil": "由 {name} 静音，至 {end}。无人被呼叫。窗口结束后的首次触发会发送延迟的已开启通知。"
       },

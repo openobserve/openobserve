@@ -42,7 +42,6 @@ import {
   parseDuration,
   utcMicrosToLocal,
 } from "./schedule";
-import { canonicalTimezone } from "@/utils/timezoneAliases";
 
 /** The "All folders" option inside the Folders select. */
 export const ALL_FOLDERS = "__all__";
@@ -386,9 +385,9 @@ const scheduleValues = (s: DowntimeSchedule): ScheduleFormValues => {
     duration: durationInput(s.duration_secs),
     weekdays: [...s.weekdays],
     until_date: once ? "" : end.date,
-    timezone: canonicalTimezone(s.timezone),
+    timezone: s.timezone,
     starts_at: once ? null : s.starts_at,
-    starts_at_timezone: once ? null : canonicalTimezone(s.timezone),
+    starts_at_timezone: once ? null : s.timezone,
   };
 };
 

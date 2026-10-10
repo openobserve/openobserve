@@ -7,6 +7,7 @@ import { gt } from "@/types/i18n";
 import store from "@/test/unit/helpers/store";
 import downtimes, { type DowntimeListItem } from "@/services/downtimes";
 import { queryClient } from "@/composables/query/queryClient";
+import { dismissAll, toastRecords } from "@/lib/feedback/Toast/useToast";
 import ExtendDowntimeDialog from "./ExtendDowntimeDialog.vue";
 import { makeExtendSchema, type ExtendForm } from "./ExtendDowntimeDialog.schema";
 
@@ -103,6 +104,33 @@ describe("ExtendDowntimeDialog", () => {
     expect((call[2] as { until: number }).until).toBe(START + 3 * HOUR);
     expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
     wrapper.unmount();
+  });
+
+  it("states the new end in the app's zone, not the browser's", async () => {
+    const resolved = Intl.DateTimeFormat.prototype.resolvedOptions;
+    const spy = vi
+      .spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions")
+      .mockImplementation(function (this: Intl.DateTimeFormat) {
+        return { ...resolved.call(this), timeZone: "Asia/Tokyo" };
+      });
+    store.state.timezone = "UTC";
+    dismissAll();
+    vi.mocked(downtimes.extend).mockResolvedValue({
+      data: { ...row("none"), schedule: { ...row("none").schedule, ends_at: START + 3 * HOUR } },
+    } as any);
+    try {
+      const wrapper = await mountDialog(row("none"));
+      dialog()!.querySelector<HTMLButtonElement>('[data-test="o-dialog-primary-btn"]')!.click();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await flushPromises();
+      const success = toastRecords.find((r) => r.variant === "success");
+      expect(String(success?.message)).toBe("Extended until 17 Sep 17:00 UTC");
+      wrapper.unmount();
+    } finally {
+      spy.mockRestore();
+      dismissAll();
+    }
   });
 });
 

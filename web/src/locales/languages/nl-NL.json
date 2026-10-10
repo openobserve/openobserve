@@ -8911,6 +8911,8 @@
         "durationInvalid": "Voer een duur in zoals 90m of 1h 30m.",
         "weekdaysRequired": "Kies minstens één dag.",
         "untilAfterStart": "Herhalen tot moet op of na de eerste dag vallen.",
+        "reasonTooLong": "Een reden mag maximaal {max} tekens bevatten.",
+        "windowOutlastsRepeat": "Het venster mag niet langer zijn dan de tijd tussen herhalingen.",
         "startDateRequired": "Kies de eerste dag."
       },
       "title": "Downtimes",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Score gecorrigeerd door {names}",
       "incident": {
         "mutedBy": "Gedempt · {name}",
+        "notLoaded": "Downtime niet geladen",
+        "notLoadedTooltip": "Gedempt door downtime {id}, die niet bij de geladen downtimes zit.",
         "banner": "Gedempt door {name}. Niemand werd opgeroepen. De eerste keer dat het alarm afgaat na het venster verstuurt de vertraagde geopend-melding.",
         "bannerUntil": "Gedempt door {name} tot {end}. Niemand werd opgeroepen. De eerste keer dat het alarm afgaat na het venster verstuurt de vertraagde geopend-melding."
       },

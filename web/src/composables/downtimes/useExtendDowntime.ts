@@ -18,6 +18,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { formatInTimeZone } from "date-fns-tz";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useOrgId } from "@/composables/query";
+import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { extendDowntimeMutation } from "@/services/downtimes.queries";
 import type { Downtime, ExtendDowntimeRequest, ExtendDowntimeResponse } from "@/services/downtimes";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -29,7 +30,8 @@ export function useExtendDowntime() {
   const orgId = useOrgId();
   const router = useRouter();
   const mutation = useMutation(() => extendDowntimeMutation(orgId.value));
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  // The zone the downtime pages show times in, read once so the dialog and its toast agree.
+  const timezone = useViewerTimezone().value;
 
   const endText = (micros?: number | null) =>
     micros

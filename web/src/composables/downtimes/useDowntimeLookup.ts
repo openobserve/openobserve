@@ -45,8 +45,15 @@ export function useDowntimeLookup(needed: MaybeRefOrGetter<boolean>) {
   const downtimeOf = (id: string | null | undefined): DowntimeListItem | undefined =>
     id ? byId.value.get(id) : undefined;
 
+  /** The org holds more downtimes than the one page the lookup reads. */
+  const truncated = computed(() => !!list.data.value?.truncated);
+
   /** The downtime's name, or its id when the list is not readable. */
   const nameOf = (id: string) => downtimeOf(id)?.name ?? id;
 
-  return { downtimesEnabled, downtimeOf, nameOf };
+  /** An id the capped list did not carry, so its name is unknown rather than missing. */
+  const notLoaded = (id: string | null | undefined): boolean =>
+    !!id && truncated.value && !downtimeOf(id);
+
+  return { downtimesEnabled, downtimeOf, nameOf, truncated, notLoaded };
 }

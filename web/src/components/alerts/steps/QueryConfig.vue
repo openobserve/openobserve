@@ -1804,7 +1804,7 @@ import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
 import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
-import { browserTimezone, canonicalTimezone, timezoneSearchText } from "@/utils/timezoneAliases";
+import { browserTimezone, canonicalTimezone } from "@/utils/timezoneAliases";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
@@ -2894,8 +2894,6 @@ export default defineComponent({
     const cronDescription = computed(() =>
       describeCron(t, cronExpression.value, cronTimezone.value),
     );
-    const filteredTimezones = ref<string[]>([]);
-
     // Initialize timezone
     // Populate the timezone OPTIONS only. This must NOT seed the timezone value:
     // `cronTimezone` is now form-owned, so writing here would push a browser
@@ -2903,30 +2901,9 @@ export default defineComponent({
     // display ref, leaving the stored value untouched until the user entered cron
     // mode (onFrequencyUnitChange still seeds it there). defaultAlertValue()
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
-    const {
-      browserTz,
-      browserTimeValue: browserTime,
-      zones: timezoneZones,
-    } = useTimezoneOptions({ browserEntry: true });
-    // Only the OPTIONS are populated here; this must not seed cronTimezone.
-    filteredTimezones.value = timezoneZones.length ? [...timezoneZones] : ["UTC"];
-
-    const timezoneSelectOptions = computed(() =>
-      filteredTimezones.value.map((tz: string) =>
-        tz === browserTime
-          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-          : { label: raw(tz), value: tz, searchText: timezoneSearchText(tz) },
-      ),
-    );
-
-    // The options hold canonical names, so a loaded legacy zone such as `Asia/Calcutta` is renamed to match one.
-    watch(
-      cronTimezone,
-      (zone) => {
-        const canonical = canonicalTimezone(zone);
-        if (canonical !== zone) cronTimezone.value = canonical;
-      },
-      { immediate: true },
+    // The stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+    const { zones: filteredTimezones, timezoneOptions: timezoneSelectOptions } = useTimezoneOptions(
+      { browserEntry: true, current: cronTimezone },
     );
 
     const validateCron = () => {

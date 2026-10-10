@@ -43,6 +43,23 @@ export type { DowntimeFormValues } from "@/utils/downtimes/downtimeForm";
 
 const MODULES = ["alerts", "anomaly_detections", "synthetics", "slos"] as const;
 
+const SECS_PER_DAY = 86_400;
+
+/** The server's cap on a downtime's reason, in characters. */
+export const MAX_REASON_LEN = 1_000;
+
+/** The shortest time between two starts of a recurring schedule, as the server counts it; none for one-time. */
+export const repeatGapSecs = (
+  s: Pick<ScheduleFormValues, "repeat" | "weekdays">,
+): number | null => {
+  if (s.repeat === "daily") return SECS_PER_DAY;
+  if (s.repeat !== "weekly") return null;
+  const days = [...new Set(s.weekdays)].sort((a, b) => a - b);
+  if (days.length === 0) return null;
+  const gaps = days.slice(1).map((day, i) => day - days[i]);
+  return Math.min(...gaps, days[0] + 7 - days[days.length - 1]) * SECS_PER_DAY;
+};
+
 /** Answers the folder of a picked item, so an id outside the chosen folders is refused. */
 export interface AddDowntimeSchemaContext {
   itemFolder?: (module: TargetModule, id: string) => string | undefined;
@@ -213,10 +230,16 @@ const recurringIssues = (s: ScheduleFormValues, t: TranslateFn): Issue[] => {
     });
   }
   const secs = parseDuration(s.duration);
+  const gap = repeatGapSecs(s);
   if (secs === null || secs < MIN_DURATION_SECS || secs > MAX_DURATION_SECS) {
     issues.push({
       path: ["schedule", "duration"],
       message: t("alerts.downtimes.validation.durationInvalid"),
+    });
+  } else if (gap !== null && secs > gap) {
+    issues.push({
+      path: ["schedule", "duration"],
+      message: t("alerts.downtimes.validation.windowOutlastsRepeat"),
     });
   }
   if (s.repeat === "weekly" && s.weekdays.length === 0) {
@@ -296,7 +319,11 @@ export const makeAddDowntimeSchema = (t: TranslateFn, ctx: AddDowntimeSchemaCont
         slos: targetSchema,
       }),
       schedule: scheduleSchema,
-      reason: z.string(),
+      reason: z.string().refine(
+        // Code points of the trimmed text, as the server counts what buildDowntimeRequest sends.
+        (reason) => [...reason.trim()].length <= MAX_REASON_LEN,
+        t("alerts.downtimes.validation.reasonTooLong", { max: MAX_REASON_LEN }),
+      ),
       show_banner: z.boolean(),
       notifications: notifySchema,
     })

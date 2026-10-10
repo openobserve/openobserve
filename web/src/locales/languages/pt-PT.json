@@ -8911,6 +8911,8 @@
         "durationInvalid": "Insira uma duração como 90m ou 1h 30m.",
         "weekdaysRequired": "Escolha pelo menos um dia.",
         "untilAfterStart": "Repetir até deve ser no primeiro dia ou depois dele.",
+        "reasonTooLong": "Um motivo pode ter no máximo {max} caracteres.",
+        "windowOutlastsRepeat": "A janela não pode ser mais longa do que o tempo entre repetições.",
         "startDateRequired": "Escolha o primeiro dia."
       },
       "title": "Inatividades",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Pontuação corrigida por {names}",
       "incident": {
         "mutedBy": "Silenciado · {name}",
+        "notLoaded": "Inatividade não carregada",
+        "notLoadedTooltip": "Silenciado pela inatividade {id}, que não está entre as carregadas.",
         "banner": "Silenciado por {name}. Ninguém foi acionado. O primeiro disparo após a janela envia a notificação de abertura atrasada.",
         "bannerUntil": "Silenciado por {name} até {end}. Ninguém foi acionado. O primeiro disparo após a janela envia a notificação de abertura atrasada."
       },

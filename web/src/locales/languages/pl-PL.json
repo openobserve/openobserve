@@ -8911,6 +8911,8 @@
         "durationInvalid": "Podaj czas trwania, np. 90m lub 1h 30m.",
         "weekdaysRequired": "Wybierz co najmniej jeden dzień.",
         "untilAfterStart": "Data „powtarzaj do” musi przypadać na pierwszy dzień lub później.",
+        "reasonTooLong": "Powód może mieć maksymalnie {max} znaków.",
+        "windowOutlastsRepeat": "Okno nie może być dłuższe niż czas między powtórzeniami.",
         "startDateRequired": "Wybierz pierwszy dzień."
       },
       "title": "Okna serwisowe",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Ocena skorygowana przez {names}",
       "incident": {
         "mutedBy": "Wyciszone · {name}",
+        "notLoaded": "Okno serwisowe nie zostało wczytane",
+        "notLoadedTooltip": "Wyciszono przez okno serwisowe {id}, którego nie ma wśród wczytanych okien serwisowych.",
         "banner": "Wyciszone przez {name}. Nikt nie otrzymał wezwania. Pierwsze wyzwolenie po zakończeniu okna wysyła opóźnione powiadomienie o otwarciu.",
         "bannerUntil": "Wyciszone przez {name} do {end}. Nikt nie otrzymał wezwania. Pierwsze wyzwolenie po zakończeniu okna wysyła opóźnione powiadomienie o otwarciu."
       },

@@ -8911,6 +8911,8 @@
         "durationInvalid": "Nhập thời lượng, ví dụ 90m hoặc 1h 30m.",
         "weekdaysRequired": "Chọn ít nhất một ngày.",
         "untilAfterStart": "Lặp lại đến phải bằng hoặc sau ngày đầu tiên.",
+        "reasonTooLong": "Lý do có thể dài tối đa {max} ký tự.",
+        "windowOutlastsRepeat": "Khung thời gian không thể dài hơn khoảng thời gian giữa các lần lặp lại.",
         "startDateRequired": "Chọn ngày đầu tiên."
       },
       "title": "Thời gian ngừng",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Điểm được hiệu chỉnh bởi {names}",
       "incident": {
         "mutedBy": "Đã tắt thông báo · {name}",
+        "notLoaded": "Chưa tải thời gian ngừng",
+        "notLoadedTooltip": "Bị tắt tiếng bởi thời gian ngừng {id}, không nằm trong các thời gian ngừng đã tải.",
         "banner": "Đã tắt thông báo bởi {name}. Không ai được gọi trực. Lần kích hoạt đầu tiên sau khung thời gian sẽ gửi thông báo mở bị trì hoãn.",
         "bannerUntil": "Đã tắt thông báo bởi {name} đến {end}. Không ai được gọi trực. Lần kích hoạt đầu tiên sau khung thời gian sẽ gửi thông báo mở bị trì hoãn."
       },

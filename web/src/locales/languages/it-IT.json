@@ -8911,6 +8911,8 @@
         "durationInvalid": "Inserisci una durata come 90m o 1h 30m.",
         "weekdaysRequired": "Scegli almeno un giorno.",
         "untilAfterStart": "La ripetizione fino a deve essere uguale o successiva al primo giorno.",
+        "reasonTooLong": "Un motivo può contenere al massimo {max} caratteri.",
+        "windowOutlastsRepeat": "La finestra non può durare più del tempo tra le ripetizioni.",
         "startDateRequired": "Scegli il primo giorno."
       },
       "title": "Periodi di inattività",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Punteggio corretto da {names}",
       "incident": {
         "mutedBy": "Silenziato · {name}",
+        "notLoaded": "Periodo di inattività non caricato",
+        "notLoadedTooltip": "Silenziato dal periodo di inattività {id}, che non è tra quelli caricati.",
         "banner": "Silenziato da {name}. Nessuno è stato avvisato. La prima attivazione dopo la finestra invia la notifica di apertura ritardata.",
         "bannerUntil": "Silenziato da {name} fino a {end}. Nessuno è stato avvisato. La prima attivazione dopo la finestra invia la notifica di apertura ritardata."
       },

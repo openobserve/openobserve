@@ -1148,7 +1148,11 @@ const currentTimezone = canonicalTimezone(
 );
 const timezone = ref(currentTimezone);
 
-const { timezoneOptions: timezoneSelectOptions } = useTimezoneOptions({ browserEntry: true });
+// The report's stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+const { timezoneOptions: timezoneSelectOptions } = useTimezoneOptions({
+  browserEntry: true,
+  current: form.useStore((s: any) => s.values?.timezone),
+});
 
 const getDashboaordFolders = () => {
   return new Promise((resolve, reject) => {
@@ -1377,7 +1381,7 @@ const setupEditingReport = async (report: any) => {
   const scheduleDate = dateInReportTz.toFormat("yyyy-MM-dd");
   // HH:MM
   const scheduleTime = dateInReportTz.toFormat("HH:mm");
-  const scheduleTimezone = canonicalTimezone(report.timezone);
+  const scheduleTimezone = report.timezone;
 
   // edit reports always open on the "Schedule Later" tab (form-owned now).
   const timeTab = "scheduleLater";

@@ -8911,6 +8911,8 @@
         "durationInvalid": "Saisissez une durée telle que 90m ou 1h 30m.",
         "weekdaysRequired": "Choisissez au moins un jour.",
         "untilAfterStart": "« Répéter jusqu'au » doit être au premier jour ou après.",
+        "reasonTooLong": "Un motif peut contenir au plus {max} caractères.",
+        "windowOutlastsRepeat": "La fenêtre ne peut pas être plus longue que l'intervalle entre les répétitions.",
         "startDateRequired": "Choisissez le premier jour."
       },
       "title": "Plages de maintenance",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Score corrigé par {names}",
       "incident": {
         "mutedBy": "En sourdine · {name}",
+        "notLoaded": "Plage de maintenance non chargée",
+        "notLoadedTooltip": "Mis en sourdine par la plage de maintenance {id}, qui ne fait pas partie des plages chargées.",
         "banner": "Mis en sourdine par {name}. Personne n'a été appelé par astreinte. Le premier déclenchement après la fenêtre envoie la notification d'ouverture différée.",
         "bannerUntil": "Mis en sourdine par {name} jusqu'à {end}. Personne n'a été appelé par astreinte. Le premier déclenchement après la fenêtre envoie la notification d'ouverture différée."
       },

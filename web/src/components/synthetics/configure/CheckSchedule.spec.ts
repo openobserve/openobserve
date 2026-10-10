@@ -560,7 +560,7 @@ describe("CheckSchedule", () => {
   });
 
   describe("legacy timezone names", () => {
-    it("selects Asia/Kolkata for a stored Asia/Calcutta, and finds it by the old name", () => {
+    it("keeps a stored Asia/Calcutta as the value, shown as Asia/Kolkata and found by either name", () => {
       const check = makeCheck({
         schedule: {
           type: "cron",
@@ -573,11 +573,17 @@ describe("CheckSchedule", () => {
       const select = wrapper
         .findAllComponents(OSelectStub)
         .find((c) => c.attributes("data-test") === "synthetics-check-schedule-timezone-select")!;
-      expect(select.props("modelValue")).toBe("Asia/Kolkata");
-      const options = select.props("options") as { value: string; searchText?: string }[];
-      const kolkata = options.find((o) => o.value === "Asia/Kolkata");
-      expect(kolkata?.searchText).toContain("Asia/Calcutta");
-      expect(options.some((o) => o.value === "Asia/Calcutta")).toBe(false);
+      expect(select.props("modelValue")).toBe("Asia/Calcutta");
+      const options = select.props("options") as {
+        label: string;
+        value: string;
+        searchText?: string;
+      }[];
+      const stored = options.find((o) => o.value === "Asia/Calcutta");
+      expect(stored?.label).toBe("Asia/Kolkata");
+      expect(stored?.searchText).toContain("Asia/Calcutta");
+      expect(options.filter((o) => o.label === "Asia/Kolkata")).toHaveLength(1);
+      expect(wrapper.emitted("update:check")).toBeFalsy();
     });
   });
 

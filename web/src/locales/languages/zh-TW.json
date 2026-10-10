@@ -8906,6 +8906,8 @@
         "durationInvalid": "輸入持續時間，例如 90m 或 1h 30m。",
         "weekdaysRequired": "至少選擇一天。",
         "untilAfterStart": "重複截止日必須不早於第一天。",
+        "reasonTooLong": "原因最多 {max} 個字元。",
+        "windowOutlastsRepeat": "時間視窗不能長於兩次重複之間的時間。",
         "startDateRequired": "請選擇第一天。"
       },
       "title": "停機時段",
@@ -9232,6 +9234,8 @@
       "correctedBy": "分數由 {names} 修正",
       "incident": {
         "mutedBy": "已靜音 · {name}",
+        "notLoaded": "停機時段未載入",
+        "notLoadedTooltip": "已被停機時段 {id} 靜音，該停機時段不在已載入的清單中。",
         "banner": "由 {name} 靜音。沒有人被呼叫。時間範圍結束後的第一次觸發會發送延遲的開啟通知。",
         "bannerUntil": "由 {name} 靜音至 {end}。沒有人被呼叫。時間範圍結束後的第一次觸發會發送延遲的開啟通知。"
       },

@@ -8911,6 +8911,8 @@
         "durationInvalid": "90m 또는 1h 30m과 같은 기간을 입력하세요.",
         "weekdaysRequired": "요일을 하나 이상 선택하세요.",
         "untilAfterStart": "반복 종료일은 첫 날짜 이후여야 합니다.",
+        "reasonTooLong": "사유는 최대 {max}자까지 입력할 수 있습니다.",
+        "windowOutlastsRepeat": "기간은 반복 간격보다 길 수 없습니다.",
         "startDateRequired": "첫날을 선택하세요."
       },
       "title": "다운타임",
@@ -9237,6 +9239,8 @@
       "correctedBy": "{names}이(가) 점수 수정",
       "incident": {
         "mutedBy": "음소거됨 · {name}",
+        "notLoaded": "다운타임이 로드되지 않음",
+        "notLoadedTooltip": "다운타임 {id}에 의해 음소거되었으며, 로드된 다운타임에 포함되어 있지 않습니다.",
         "banner": "{name}이(가) 음소거했습니다. 아무도 호출되지 않았습니다. 기간이 끝난 후 첫 발화 시 지연된 열림 알림이 전송됩니다.",
         "bannerUntil": "{name}이(가) {end}까지 음소거했습니다. 아무도 호출되지 않았습니다. 기간이 끝난 후 첫 발화 시 지연된 열림 알림이 전송됩니다."
       },

@@ -8911,6 +8911,8 @@
         "durationInvalid": "90dk veya 1sa 30dk gibi bir süre girin.",
         "weekdaysRequired": "En az bir gün seçin.",
         "untilAfterStart": "Yineleme bitişi, ilk gün veya sonrasında olmalıdır.",
+        "reasonTooLong": "Bir neden en fazla {max} karakter olabilir.",
+        "windowOutlastsRepeat": "Pencere, tekrarlar arasındaki süreden uzun olamaz.",
         "startDateRequired": "İlk günü seçin."
       },
       "title": "Kesintiler",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Puan {names} tarafından düzeltildi",
       "incident": {
         "mutedBy": "Susturuldu · {name}",
+        "notLoaded": "Kesinti yüklenmedi",
+        "notLoadedTooltip": "{id} kesintisi tarafından sessize alındı; bu kesinti yüklenenler arasında değil.",
         "banner": "{name} tarafından susturuldu. Kimseye çağrı gönderilmedi. Pencereden sonraki ilk tetiklenme, gecikmiş açılış bildirimini gönderir.",
         "bannerUntil": "{name} tarafından {end} zamanına kadar susturuldu. Kimseye çağrı gönderilmedi. Pencereden sonraki ilk tetiklenme, gecikmiş açılış bildirimini gönderir."
       },

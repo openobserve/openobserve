@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import { conditionToBuilder } from "@/utils/downtimes/conditionBridge";
 import { defaultDowntimeValues, type DowntimeFormValues } from "@/utils/downtimes/downtimeForm";
-import { makeAddDowntimeSchema, tabForPath } from "./AddDowntime.schema";
+import { makeAddDowntimeSchema, repeatGapSecs, tabForPath } from "./AddDowntime.schema";
 
 const NOW = Date.parse("2026-09-17T12:20:00Z");
 
@@ -146,6 +146,39 @@ describe("AddDowntime schema", () => {
     v.schedule = { ...v.schedule, repeat: "daily", start_date: "" };
     expect(errorsOf(v)["schedule.start_date"]).toBe("Choose the first day.");
     v.schedule.start_date = "2026-09-17";
+    expect(errorsOf(v)).toEqual({});
+  });
+
+  it("refuses a window longer than the time between repeats, as the server does", () => {
+    const gap = "The window cannot be longer than the time between repeats.";
+    const recurring = (repeat: "daily" | "weekly", weekdays: number[], duration: string) => {
+      const v = valid();
+      v.schedule = { ...v.schedule, repeat, start_time: "02:00", weekdays, duration };
+      return errorsOf(v)["schedule.duration"];
+    };
+    expect(recurring("daily", [], "25h")).toBe(gap);
+    expect(recurring("daily", [], "24h")).toBeUndefined();
+    expect(recurring("weekly", [1, 2], "2d")).toBe(gap);
+    expect(recurring("weekly", [1, 4], "3d")).toBeUndefined();
+    // Sunday and Monday are one day apart across the week boundary.
+    expect(recurring("weekly", [7, 1, 4], "25h")).toBe(gap);
+  });
+
+  it("measures the repeat gap like the server", () => {
+    expect(repeatGapSecs({ repeat: "none", weekdays: [] })).toBeNull();
+    expect(repeatGapSecs({ repeat: "daily", weekdays: [] })).toBe(86_400);
+    expect(repeatGapSecs({ repeat: "weekly", weekdays: [3] })).toBe(7 * 86_400);
+    expect(repeatGapSecs({ repeat: "weekly", weekdays: [1, 4, 4] })).toBe(3 * 86_400);
+  });
+
+  it("caps the reason at 1,000 characters", () => {
+    const v = valid();
+    v.reason = "é".repeat(1_001);
+    expect(errorsOf(v).reason).toBe("A reason can be at most 1000 characters.");
+    v.reason = "é".repeat(1_000);
+    expect(errorsOf(v)).toEqual({});
+    // The server receives the trimmed reason, so padding does not count.
+    v.reason = `${"é".repeat(1_000)}   `;
     expect(errorsOf(v)).toEqual({});
   });
 });

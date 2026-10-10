@@ -142,16 +142,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="max-w-60 min-w-12 shrink-4"
               data-test="incident-list-muted"
             >
-              <span class="truncate">{{
-                t("alerts.downtimes.incident.mutedBy", { name: nameOf(row.muted_by_downtime_id) })
-              }}</span>
-              <OTooltip
-                :content="
-                  t('alerts.downtimes.incident.mutedBy', {
-                    name: nameOf(row.muted_by_downtime_id),
-                  })
-                "
-              />
+              <span class="truncate">{{ mutedLabel(row.muted_by_downtime_id) }}</span>
+              <OTooltip :content="mutedTooltip(row.muted_by_downtime_id)" />
             </OTag>
           </div>
         </template>
@@ -405,9 +397,18 @@ export default defineComponent({
     // reactivity hot path — the difference is very visible at a few hundred rows.
     const allIncidents = shallowRef<Incident[]>([]);
     // The downtimes list is read only to name a muted row's downtime.
-    const { nameOf } = useDowntimeLookup(() =>
+    const { nameOf, notLoaded } = useDowntimeLookup(() =>
       allIncidents.value.some((incident) => !!incident.muted_by_downtime_id),
     );
+    // A downtime past the lookup's one page says so, with its id kept for the tooltip.
+    const mutedLabel = (id: string) =>
+      t("alerts.downtimes.incident.mutedBy", {
+        name: notLoaded(id) ? t("alerts.downtimes.incident.notLoaded") : nameOf(id),
+      });
+    const mutedTooltip = (id: string) =>
+      notLoaded(id)
+        ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
+        : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
     const searchQuery = ref("");
     // Primary filter groups the lifecycle like other list pages: Active covers
     // both open and acknowledged (still needs attention), Resolved is done.
@@ -944,7 +945,8 @@ export default defineComponent({
     ]);
 
     return {
-      nameOf,
+      mutedLabel,
+      mutedTooltip,
       raw,
       t,
       loading,

@@ -8911,6 +8911,8 @@
         "durationInvalid": "Geben Sie eine Dauer wie 90m oder 1h 30m ein.",
         "weekdaysRequired": "Wählen Sie mindestens einen Tag.",
         "untilAfterStart": "Wiederholen bis muss am oder nach dem ersten Tag liegen.",
+        "reasonTooLong": "Ein Grund darf höchstens {max} Zeichen lang sein.",
+        "windowOutlastsRepeat": "Das Fenster darf nicht länger sein als die Zeit zwischen den Wiederholungen.",
         "startDateRequired": "Wählen Sie den ersten Tag."
       },
       "title": "Wartungsfenster",
@@ -9237,6 +9239,8 @@
       "correctedBy": "Bewertung korrigiert durch {names}",
       "incident": {
         "mutedBy": "Stummgeschaltet · {name}",
+        "notLoaded": "Wartungsfenster nicht geladen",
+        "notLoadedTooltip": "Stummgeschaltet durch Wartungsfenster {id}, das nicht unter den geladenen Wartungsfenstern ist.",
         "banner": "Stummgeschaltet von {name}. Niemand wurde alarmiert. Die erste Auslösung nach dem Zeitfenster sendet die verzögerte Benachrichtigung über den geöffneten Vorfall.",
         "bannerUntil": "Stummgeschaltet von {name} bis {end}. Niemand wurde alarmiert. Die erste Auslösung nach dem Zeitfenster sendet die verzögerte Benachrichtigung über den geöffneten Vorfall."
       },

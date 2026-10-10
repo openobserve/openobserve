@@ -130,6 +130,15 @@ describe("AddDowntime", () => {
     await flushPromises();
   };
 
+  it("counts the reason against the server's 1,000-character cap", async () => {
+    const { wrapper } = await mountPage();
+    const field = wrapper.get('[data-test="add-downtime-reason"]');
+    const textarea = field.element.matches("textarea") ? field : field.get("textarea");
+    expect(textarea.attributes("maxlength")).toBe("1000");
+    expect(wrapper.text()).toContain("0/1000");
+    wrapper.unmount();
+  });
+
   it("asks before muting a whole module and names the impact", async () => {
     vi.mocked(downtimes.preview).mockResolvedValue({
       data: { ...EMPTY_PREVIEW, alerts_total: 12 },

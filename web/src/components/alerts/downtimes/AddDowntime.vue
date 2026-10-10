@@ -206,11 +206,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-tab-pane="advanced"
                 class="flex flex-col gap-5"
               >
+                <!-- maxlength counts UTF-16 units: a stricter cap than the server's code points, only for astral characters. -->
                 <OFormTextarea
                   name="reason"
                   :label="t('alerts.downtimes.form.reason')"
                   :help-text="t('alerts.downtimes.form.reasonHelp')"
                   :rows="3"
+                  :maxlength="MAX_REASON_LEN"
                   autogrow
                   data-test="add-downtime-reason"
                 />
@@ -380,7 +382,7 @@ import {
   MODULE_ORDER,
   type FolderNameFn,
 } from "@/utils/downtimes/targetSummary";
-import { makeAddDowntimeSchema, tabForPath } from "./AddDowntime.schema";
+import { MAX_REASON_LEN, makeAddDowntimeSchema, tabForPath } from "./AddDowntime.schema";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
