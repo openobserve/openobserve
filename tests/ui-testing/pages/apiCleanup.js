@@ -1048,6 +1048,51 @@ class APICleanup {
     }
 
     /**
+     * Create a realtime pipeline with no function node — stream straight to
+     * stream. The counterpart to createPipelineUsingFunction, for showing that a
+     * pipeline calling nothing is exported without a `functions` key.
+     * @param {string} pipelineName
+     * @param {string} [sourceStream]
+     * @param {string} [org]
+     * @returns {Promise<string>} the new pipeline's id
+     */
+    async createPlainPipeline(pipelineName, sourceStream = 'e2e_automate', org = null) {
+        const targetOrg = org || this.org;
+        const stamp = Date.now();
+        const inputId = `in-${stamp}`;
+        const outputId = `out-${stamp}`;
+        const payload = {
+            pipeline_id: '', version: 0, enabled: true, org: targetOrg,
+            name: pipelineName, description: 'E2E pipeline with no function node',
+            source: { source_type: 'realtime' }, paused_at: null,
+            nodes: [
+                { id: inputId, position: { x: 100, y: 100 }, io_type: 'input',
+                  data: { node_type: 'stream', stream_type: 'logs', stream_name: sourceStream, org_id: targetOrg } },
+                { id: outputId, position: { x: 500, y: 300 }, io_type: 'output',
+                  data: { node_type: 'stream', stream_type: 'logs', stream_name: `${pipelineName}_dest`, org_id: targetOrg } },
+            ],
+            edges: [{
+                id: `e1-${stamp}`, source: inputId, target: outputId, type: 'custom',
+                animated: true, updatable: true,
+                markerEnd: { type: 'arrowclosed', width: 20, height: 20 },
+                style: { strokeWidth: 2 },
+            }],
+        };
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/pipelines`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createPlainPipeline: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json().catch(() => ({}));
+        testLogger.info('Created pipeline with no function node', { pipelineName, org: targetOrg });
+        return result.id;
+    }
+
+    /**
      * Create a JavaScript function (transType 1) via API.
      * @param {string} functionName
      * @param {string} jsCode - Function body; JS is not VRL, so it is stored verbatim
@@ -1065,6 +1110,32 @@ class APICleanup {
             throw new Error(`createJsFunction: HTTP ${response.status} — ${body}`);
         }
         testLogger.info('Created JS function via API', { functionName, org: targetOrg });
+        return await response.json().catch(() => ({}));
+    }
+
+    /**
+     * Replace a function's body in place (PUT), leaving every pipeline that
+     * calls it pointing at it.
+     *
+     * The alternative — delete and recreate — is refused with a 409 while any
+     * pipeline depends on the function, so this is the only way to change the
+     * logic behind a live dependent.
+     * @param {string} functionName - must already exist
+     * @param {string} vrlCode
+     * @param {string} [org]
+     */
+    async updateFunction(functionName, vrlCode, org = null) {
+        const targetOrg = org || this.org;
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/functions/${functionName}`, {
+            method: 'PUT',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: functionName, function: vrlCode, params: 'row', transType: 0 })
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`updateFunction: HTTP ${response.status} — ${body}`);
+        }
+        testLogger.info('Updated function via API', { functionName, org: targetOrg });
         return await response.json().catch(() => ({}));
     }
 

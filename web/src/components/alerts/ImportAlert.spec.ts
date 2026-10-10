@@ -918,4 +918,24 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       expect(payload.anomaly_config.seasonality).toBeUndefined();
     });
   });
+
+  describe("error list rendering", () => {
+    it("colours a plain-string error like the ones with an inline fix-up", async () => {
+      // Asserting the pushed value cannot catch a missing colour class; only the render can.
+      wrapper.vm.alertErrorsToDisplay = [
+        [
+          { field: "alert_name", message: "Alert - 1: Name is mandatory" },
+          "Alert - 1: Cron expression should be a valid cron expression.",
+        ],
+      ];
+      await wrapper.vm.$nextTick();
+
+      const classesOf = (errorIndex: number) =>
+        wrapper.find(`[data-test="alert-import-error-0-${errorIndex}"]`).find("span").classes();
+
+      expect(classesOf(1)).toContain("text-status-negative");
+      // Same colour as the branch that does have an inline control.
+      expect(classesOf(1)).toEqual(classesOf(0));
+    });
+  });
 });

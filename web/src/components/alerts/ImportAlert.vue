@@ -258,7 +258,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </span>
 
-                  <span v-else>{{ errorMessage }}</span>
+                  <!-- Errors with no inline fix-up are pushed as plain strings, and must read as errors too. -->
+                  <span v-else class="text-status-negative">{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
