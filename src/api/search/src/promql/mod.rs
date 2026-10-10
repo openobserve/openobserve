@@ -1204,14 +1204,16 @@ fn validate_label_values_params(
     start: Option<String>,
     end: Option<String>,
 ) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
-    let (selector, start, end) = validate_metadata_params(matcher, start, end)?;
-    if label_name != config::meta::promql::NAME_LABEL {
-        metrics::prom::label_values_metric_name(selector.as_ref()).map_err(|e| e.to_string())?;
+    // __name__ lists stream names; any selector (including regex) is valid
+    if label_name == config::meta::promql::NAME_LABEL {
+        return parse_selector_params(matcher, start, end);
     }
+    let (selector, start, end) = validate_metadata_params(matcher, start, end)?;
+    metrics::prom::label_values_metric_name(selector.as_ref()).map_err(|e| e.to_string())?;
     Ok((selector, start, end))
 }
 
-fn validate_metadata_params(
+fn parse_selector_params(
     matcher: Option<String>,
     start: Option<String>,
     end: Option<String>,
@@ -1225,9 +1227,7 @@ fn validate_metadata_params(
                 return Err(err);
             }
             Ok(parser::Expr::VectorSelector(sel)) => {
-                let err = if metrics::prom::try_into_metric_name(&sel).is_none() {
-                    Some("match[] must specify a metric name or a non-empty exact __name__ matcher")
-                } else if sel.offset.is_some() {
+                let err = if sel.offset.is_some() {
                     Some("match[]: unexpected offset modifier")
                 } else if sel.at.is_some() {
                     Some("match[]: unexpected @ modifier")
@@ -1263,6 +1263,22 @@ fn validate_metadata_params(
     };
     if start > end {
         let err = "start must not be later than end";
+        log::error!("{err}");
+        return Err(err.to_owned());
+    }
+    Ok((selector, start, end))
+}
+
+fn validate_metadata_params(
+    matcher: Option<String>,
+    start: Option<String>,
+    end: Option<String>,
+) -> Result<(Option<parser::VectorSelector>, i64, i64), String> {
+    let (selector, start, end) = parse_selector_params(matcher, start, end)?;
+    if let Some(ref sel) = selector
+        && metrics::prom::try_into_metric_name(sel).is_none()
+    {
+        let err = "match[] must specify a metric name or a non-empty exact __name__ matcher";
         log::error!("{err}");
         return Err(err.to_owned());
     }
@@ -1842,6 +1858,19 @@ mod tests {
         ] {
             assert!(
                 validate_label_values_params("job", Some(matcher.to_owned()), None, None).is_ok(),
+                "{matcher}"
+            );
+        }
+        // __name__ accepts regex and negation matchers — the exact-name requirement does not apply
+        for matcher in [
+            r#"{__name__=~"node.*"}"#,
+            r#"{__name__!~"up.*"}"#,
+            r#"{__name__!="up"}"#,
+            r#"{job="prometheus"}"#,
+        ] {
+            assert!(
+                validate_label_values_params("__name__", Some(matcher.to_owned()), None, None)
+                    .is_ok(),
                 "{matcher}"
             );
         }
