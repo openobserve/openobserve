@@ -1376,6 +1376,7 @@
     "loadingSessionReplay": "Loading session replay…",
     "sessionReplaySeekBehindWindow": "This moment is before the part of the session that is loaded. Reopen the session from this event to play it.",
     "sessionReplayTruncated": "This session is too long to load completely. Showing the first {count} segments.",
+    "sessionReplayOtherTabs": "This session was recorded in more than one browser tab. Showing one of them.",
     "sessionReplayLoadingPercent": "Loading {percent}%",
     "sessionReplayFullyLoaded": "Fully loaded",
     "sessionReplayLoadFailedChip": "Load failed · Retry",

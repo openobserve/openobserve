@@ -15,13 +15,22 @@
 
 import {
   compareManifestOrder,
+  hasFullSnapshot,
   segmentId,
+  splitIntoTracks,
+  viewKey,
   type ManifestEntry,
 } from "@/utils/rum/sessionReplayManifest";
 
 export interface ManifestTailMerge {
   appended: ManifestEntry[];
   late: boolean;
+}
+
+export interface TrackRows {
+  rows: ManifestEntry[];
+  current: string;
+  otherTab: boolean;
 }
 
 /** A session whose last replay row is this recent is still being recorded; the Sessions list uses the same rule. */
@@ -69,6 +78,29 @@ export function mergeManifestTail(
     tail = row;
   }
   return { appended, late };
+}
+
+// Splitting every row seen again on each poll keeps a live session on the tab a reload would pick.
+export function keepTrackRows(seen: ManifestEntry[], current: string): TrackRows {
+  const tracks = splitIntoTracks(seen);
+  const track = tracks.find((each) => each.views.some((view) => view.id === current));
+  if (!track) return { rows: [], current, otherTab: tracks.length > 1 };
+  const own = new Set([current]);
+  let next = current;
+  for (const view of track.views.slice(track.views.findIndex((each) => each.id === current) + 1)) {
+    const first = track.rows
+      .filter((row) => viewKey(row) === view.id)
+      .sort(compareManifestOrder)[0];
+    // The converter can only start a view from its own full snapshot, so later views wait for it.
+    if (!hasFullSnapshot(first)) break;
+    own.add(view.id);
+    next = view.id;
+  }
+  return {
+    rows: track.rows.filter((row) => own.has(viewKey(row))),
+    current: next,
+    otherTab: tracks.length > 1,
+  };
 }
 
 export function shouldStopLive(

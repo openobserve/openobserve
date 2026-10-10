@@ -538,7 +538,10 @@ const convertSegments = (segments: any[], converter: RecordConverter, cold: bool
         convertedRecords.push(...converter.convert(record));
       } catch (e) {
         skippedRecords++;
-        console.error("Session replay: skipped an unconvertible record", e);
+        console.error(
+          `Session replay: skipped an unconvertible record (view ${segment.view?.id ?? "unknown"}, segment ${segment.index_in_view ?? "unknown"}, at ${record?.timestamp})`,
+          e,
+        );
       }
     });
     convertedRecords.forEach((record: any) => {

@@ -445,6 +445,25 @@ describe("VideoPlayer", () => {
       parent.unmount();
     });
 
+    it("names the segment and record it skips when a record cannot be converted", async () => {
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const broken = {
+        view: { id: "view-7" },
+        index_in_view: 3,
+        records: [{ type: 12, timestamp: 1704110450000, data: [[1, null]] }],
+      };
+
+      const localWrapper = mountComponent({ segments: [...mockSegments, broken] });
+      await flushPromises();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Session replay: skipped an unconvertible record (view view-7, segment 3, at 1704110450000)",
+        expect.any(TypeError),
+      );
+      localWrapper.unmount();
+      errorSpy.mockRestore();
+    });
+
     it("should append later segments through addEvent instead of rebuilding the player", async () => {
       const { default: rrwebPlayerMock } = await import("@openobserve/rrweb-player");
       (rrwebPlayerMock as ReturnType<typeof vi.fn>).mockClear();
