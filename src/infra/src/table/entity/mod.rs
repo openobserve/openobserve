@@ -80,6 +80,7 @@ pub mod re_pattern_stream_map;
 pub mod re_patterns;
 pub mod report_dashboards;
 pub mod reports;
+pub mod rum_pa_app_settings;
 pub mod rum_pa_funnels;
 pub mod rum_pa_named_events;
 pub mod rum_pa_tombstones;
