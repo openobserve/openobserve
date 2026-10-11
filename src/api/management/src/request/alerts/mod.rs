@@ -49,7 +49,7 @@ use {
 #[cfg(feature = "enterprise")]
 use crate::models::alerts::requests::UpdateAnomalyAlertFields;
 #[cfg(feature = "enterprise")]
-use crate::models::alerts::responses::anomaly_config_to_list_item;
+use crate::models::alerts::responses::anomaly_list_items;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::alerts::{
@@ -709,6 +709,7 @@ fn composite_list_item(
         referenced_by_composite_count: None,
         expression_summary: None,
         active_downtime: None,
+        downtime_dimensions: Default::default(),
     })
 }
 
@@ -2983,9 +2984,9 @@ pub async fn list_alerts(
         // would return every anomaly config alongside the matching alerts.
         let before = list.len();
         list.extend(
-            configs
-                .iter()
-                .filter_map(anomaly_config_to_list_item)
+            anomaly_list_items(&org_id, &configs)
+                .await
+                .into_iter()
                 .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
                 .filter(|item| match &priority_filter {
                     None => true,

@@ -356,7 +356,7 @@ pub(crate) mod enterprise {
         row.schedule.repeat == Repeat::None && row.schedule.ends_at.is_some_and(|end| end <= at)
     }
 
-    /// Every live row whose window holds `now` and whose target of `module` matches, merged.
+    /// Every row live at `now` whose window and `module` target match, merged.
     pub(crate) fn active_in(
         rows: &[Downtime],
         module: TargetModule,
@@ -375,7 +375,10 @@ pub(crate) mod enterprise {
         except: Option<&str>,
     ) -> Option<ActiveDowntime> {
         rows.iter()
-            .filter(|row| row.cancelled_at.is_none() && except != Some(row.id.as_str()))
+            .filter(|row| {
+                row.cancelled_at.is_none_or(|cancelled| cancelled > now)
+                    && except != Some(row.id.as_str())
+            })
             .filter_map(|row| {
                 let window = schedule::window_at(&row.schedule, now)?;
                 let target = scope::target_for(&row.targets, module)?;
@@ -411,7 +414,7 @@ pub(crate) mod enterprise {
         })
     }
 
-    /// One live row by id whose window holds `at` and which still targets `module`.
+    /// Row `id` if uncancelled at `at`, its window holds `at` and it still targets `module`.
     pub(crate) fn active_by_id_in(
         rows: &[Downtime],
         module: TargetModule,
@@ -420,7 +423,7 @@ pub(crate) mod enterprise {
     ) -> Option<ActiveDowntime> {
         let row = rows.iter().find(|row| {
             row.id == id
-                && row.cancelled_at.is_none()
+                && row.cancelled_at.is_none_or(|cancelled| cancelled > at)
                 && scope::target_for(&row.targets, module).is_some()
         })?;
         let window = schedule::window_at(&row.schedule, at)?;

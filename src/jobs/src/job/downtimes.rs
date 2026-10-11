@@ -29,7 +29,7 @@ use openobserve_core::downtimes::{
     notify::{self, DueEvent},
 };
 
-const INTERVAL_SECS: u64 = 30;
+const INTERVAL_SECS: u64 = notify::TICK_INTERVAL_SECS;
 const MIGRATION_ORG: &str = "_migration";
 const LAST_TICK_KEY: &str = "downtimes_notifier_last_tick";
 const MICROS_PER_SEC: i64 = 1_000_000;

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use arrow_schema::Schema;
 use axum::{
     extract::{Path, Query},
     response::Response,
@@ -39,6 +40,12 @@ use utoipa::ToSchema;
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
+
+/// Every column the data query reads but `downtime_id`, which [history_columns] adds.
+const HISTORY_COLUMNS: &str = "_timestamp, org, key, status, level, actual_value, \
+     threshold_value, threshold_operator, group_label, value_is_lower_bound, is_realtime, \
+     is_silenced, start_time, end_time, retries, delay_in_secs, evaluation_took_in_secs, \
+     source_node, query_took, error";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertHistoryQuery {
@@ -571,6 +578,25 @@ pub async fn get_alert_history(
     let synthetics_readable =
         query.downtime_id.is_some() && reads_every_synthetic(&org_id, &user_email.user_id).await;
     let modules = history_modules(query.downtime_id.is_some(), synthetics_readable);
+    let triggers_schema =
+        match triggers_schema(infra::schema::get(&org_id, TRIGGERS_STREAM, StreamType::Logs).await)
+        {
+            Ok(schema) => schema,
+            Err(response) => return response,
+        };
+    if query
+        .downtime_id
+        .as_deref()
+        .is_some_and(|id| !id.is_empty())
+        && triggers_schema.field_with_name("downtime_id").is_err()
+    {
+        return MetaHttpResponse::json(AlertHistoryResponse {
+            total: 0,
+            from,
+            size,
+            hits: vec![],
+        });
+    }
     let mut where_clause = format!(
         "module IN ({modules}) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
@@ -674,13 +700,9 @@ pub async fn get_alert_history(
 
     // Step 2: Get the actual paginated results
     // Build data query with LIMIT/OFFSET for pagination
+    let columns = history_columns(&triggers_schema);
     let data_sql = format!(
-        "SELECT _timestamp, org, key, status, level, actual_value, threshold_value, \
-         threshold_operator, group_label, value_is_lower_bound, is_realtime, is_silenced, \
-         start_time, end_time, retries, \
-         delay_in_secs, evaluation_took_in_secs, \
-         source_node, query_took, error, downtime_id \
-         FROM \"{TRIGGERS_STREAM}\" \
+        "SELECT {columns} FROM \"{TRIGGERS_STREAM}\" \
          WHERE {where_clause} \
          ORDER BY {sort_column} {sort_order} LIMIT {size} OFFSET {from}"
     );
@@ -903,6 +925,23 @@ async fn every_synthetic_readable(
     match listed {
         Some(permitted) => permitted.iter().any(|object| object == all_key),
         None => org_wide_grant().await,
+    }
+}
+
+/// The triggers stream's schema; a failed read is a server error, never an empty stream.
+fn triggers_schema(read: infra::errors::Result<Schema>) -> Result<Schema, Response> {
+    read.map_err(|e| {
+        log::error!("Failed to read the alert history schema: {e}");
+        MetaHttpResponse::internal_error(format!("Failed to read the alert history schema: {e}"))
+    })
+}
+
+/// [HISTORY_COLUMNS], with `downtime_id` once the stream has it: an upgraded stream learns it late.
+fn history_columns(schema: &Schema) -> String {
+    if schema.field_with_name("downtime_id").is_ok() {
+        format!("{HISTORY_COLUMNS}, downtime_id")
+    } else {
+        HISTORY_COLUMNS.to_string()
     }
 }
 
@@ -1717,5 +1756,31 @@ mod tests {
             " AND downtime_id = 'a''b' AND status = 'suppressed'"
         );
         assert_eq!(downtime_filters(Some(""), Some("")), "");
+    }
+
+    #[test]
+    fn a_failed_schema_read_is_a_server_error_not_an_empty_history() {
+        let failed = triggers_schema(Err(infra::errors::Error::Message("db down".to_string())));
+        assert_eq!(
+            failed.map(|_| ()).unwrap_err().status(),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+        let missing = triggers_schema(Ok(Schema::empty())).unwrap();
+        assert!(missing.field_with_name("downtime_id").is_err());
+    }
+
+    #[test]
+    fn a_stream_from_before_downtimes_reads_without_downtime_id() {
+        use arrow_schema::{DataType, Field};
+
+        let field = |name: &str| Field::new(name, DataType::Utf8, true);
+        let upgraded: Vec<Field> = HISTORY_COLUMNS.split(", ").map(field).collect();
+        let columns = history_columns(&Schema::new(upgraded.clone()));
+        assert!(!columns.contains("downtime_id"), "{columns}");
+        assert_eq!(columns, HISTORY_COLUMNS);
+
+        let mut current = upgraded;
+        current.push(field("downtime_id"));
+        assert!(history_columns(&Schema::new(current)).ends_with(", downtime_id"));
     }
 }

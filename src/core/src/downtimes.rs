@@ -256,7 +256,7 @@ pub async fn update(
     if !before.same_coverage(&after) {
         forget_recorded_mutes(&after.org, &after.id).await;
     }
-    if let Some(due) = started_on_edit(&before, &after, now) {
+    if let Some(due) = started_on_edit(&before, &after, &notify::this_region(), now) {
         notify::deliver_in_background(after.clone(), due);
     }
     plan.trigger(&after.id).await;
@@ -995,11 +995,19 @@ fn started_on_save(row: &Downtime, now: i64) -> Option<DueEvent> {
 }
 
 /// A schedule edit sends Started only when no window was in force before it.
-fn started_on_edit(before: &Downtime, after: &Downtime, now: i64) -> Option<DueEvent> {
+fn started_on_edit(
+    before: &Downtime,
+    after: &Downtime,
+    region: &str,
+    now: i64,
+) -> Option<DueEvent> {
     if before.schedule == after.schedule || schedule::window_at(&before.schedule, now).is_some() {
         return None;
     }
-    started_on_save(after, now)
+    let due = started_on_save(after, now)?;
+    // The origin's ticker sends a recent start; one a whole tick back is behind its checkpoint.
+    let passed = due.window.start < now - notify::TICK_INTERVAL_SECS as i64 * 1_000_000;
+    (passed || notify::sends_here(after, region)).then_some(due)
 }
 
 /// Cancelling a row that already ended would rewrite its history as a cancel.
@@ -2637,7 +2645,7 @@ mod tests {
         );
         let mut earlier = active.clone();
         earlier.schedule.starts_at -= 5 * 60_000_000;
-        assert_eq!(started_on_edit(&active, &earlier, now), None);
+        assert_eq!(started_on_edit(&active, &earlier, "", now), None);
 
         let scheduled = notifying(
             row(vec![TargetModule::Alerts], 11 * HOUR, 12 * HOUR),
@@ -2647,15 +2655,66 @@ mod tests {
         let mut now_active = scheduled.clone();
         now_active.schedule.starts_at = now - 60_000_000;
         assert_eq!(
-            started_on_edit(&scheduled, &now_active, now),
+            started_on_edit(&scheduled, &now_active, "", now),
             started_on_save(&now_active, now)
         );
-        assert!(started_on_edit(&scheduled, &now_active, now).is_some());
+        assert!(started_on_edit(&scheduled, &now_active, "", now).is_some());
         assert_eq!(
-            started_on_edit(&scheduled, &scheduled, now),
+            started_on_edit(&scheduled, &scheduled, "", now),
             None,
             "a rename"
         );
+    }
+
+    #[test]
+    fn an_edit_outside_the_origin_region_leaves_started_to_the_origin() {
+        let now = 10 * HOUR;
+        let events = NotificationEvents {
+            started: true,
+            ..Default::default()
+        };
+        let mut scheduled = notifying(
+            row(vec![TargetModule::Alerts], 11 * HOUR, 12 * HOUR),
+            events,
+            600,
+        );
+        scheduled.origin_region = Some("us-east".to_string());
+        let mut now_active = scheduled.clone();
+        now_active.schedule.starts_at = now - 10_000_000;
+
+        assert_eq!(
+            started_on_edit(&scheduled, &now_active, "eu-west", now),
+            None
+        );
+        assert_eq!(
+            started_on_edit(&scheduled, &now_active, "us-east", now),
+            started_on_save(&now_active, now)
+        );
+        assert!(started_on_edit(&scheduled, &now_active, "us-east", now).is_some());
+    }
+
+    #[test]
+    fn a_start_the_origin_ticker_already_passed_is_sent_by_the_editing_region() {
+        let now = 10 * HOUR;
+        let events = NotificationEvents {
+            started: true,
+            ..Default::default()
+        };
+        let mut scheduled = notifying(
+            row(vec![TargetModule::Alerts], 11 * HOUR, 12 * HOUR),
+            events,
+            600,
+        );
+        scheduled.origin_region = Some("us-east".to_string());
+        // 09:59 at 10:00: the origin's checkpoint is past it, so its ticker never sends it.
+        let mut backdated = scheduled.clone();
+        backdated.schedule.starts_at = now - 60_000_000;
+
+        assert_eq!(
+            started_on_edit(&scheduled, &backdated, "eu-west", now),
+            started_on_save(&backdated, now)
+        );
+        assert!(started_on_edit(&scheduled, &backdated, "eu-west", now).is_some());
     }
 
     #[tokio::test]

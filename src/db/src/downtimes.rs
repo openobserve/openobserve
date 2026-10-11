@@ -29,6 +29,7 @@ use infra::{
         slo_backfill_jobs::Remeasure,
     },
 };
+use sea_orm::ConnectionTrait;
 
 /// `org -> rows`. Replaced whole per org, so a reader never sees a partial org.
 static DOWNTIMES: LazyLock<RwLock<HashMap<String, Arc<Vec<Downtime>>>>> =
@@ -195,6 +196,13 @@ pub fn ownership(downtime: &Downtime) -> Authz {
 /// Reloads one org from the table so the cache never holds half a row.
 pub async fn reload_org(org: &str) -> Result<(), anyhow::Error> {
     let rows = table::list(org, None).await?;
+    replace_org(org, rows);
+    Ok(())
+}
+
+/// [reload_org] through `conn`, so a caller can read the primary instead of a replica.
+pub async fn reload_org_with<C: ConnectionTrait>(conn: &C, org: &str) -> Result<(), anyhow::Error> {
+    let rows = table::list_with(conn, org, None).await?;
     replace_org(org, rows);
     Ok(())
 }

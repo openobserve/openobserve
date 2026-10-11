@@ -30,6 +30,8 @@ use super::{DowntimeError, MatchCounts};
 use crate::alerts::templates::{DOWNTIME_EMAIL_TITLE, downtime_templates};
 
 pub const LOG_LIMIT: u64 = 50;
+/// How often the notifier ticks; a start one tick back is already behind every healthy checkpoint.
+pub const TICK_INTERVAL_SECS: u64 = 30;
 pub const RESULT_OK: &str = "ok";
 const DOWNTIME_VARIABLE_PREFIX: &str = "{downtime_";
 

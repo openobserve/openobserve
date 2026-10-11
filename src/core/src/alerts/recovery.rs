@@ -439,6 +439,82 @@ mod tests {
     }
 
     #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_recovery_before_the_cancel_of_its_window_stays_suppressed_when_emitted_after() {
+        use std::collections::HashMap;
+
+        use config::meta::downtimes::{Downtime, TargetModule};
+
+        use crate::alerts::downtimes::enterprise::{
+            active_by_id_in, active_in, any_target_since, item,
+        };
+
+        const MINUTE: i64 = 60_000_000;
+        let at = |minutes: i64| 9 * 60 * MINUTE + minutes * MINUTE;
+        // 09:00-10:00, cancelled at 09:30.
+        let row: Downtime = serde_json::from_value(serde_json::json!({
+            "id": "dt-1", "org": "default", "name": "deploy",
+            "targets": [{ "module": "alerts", "folders": { "kind": "all" } }],
+            "schedule": {
+                "repeat": "none", "starts_at": at(0), "ends_at": at(60),
+                "timezone": "UTC", "duration_secs": 3_600
+            },
+            "cancelled_at": at(30),
+            "created_by": "lin", "created_at": 0, "updated_by": "lin", "updated_at": 0
+        }))
+        .unwrap();
+        let rows = [row];
+        let mut alert = Alert::default();
+        alert.notify_on_recovery = true;
+        // Recovered at 09:20, emitted at 09:40 once `keep_firing_for` ran out.
+        let event = RecoveryEvent {
+            org_id: "default".into(),
+            alert_id: "a1".into(),
+            group_key: String::new(),
+            episode_id: "ep_1".into(),
+            incident_id: None,
+            opened_at: at(5),
+            recovered_at: at(20),
+            emitted_at: at(40),
+            last_notified_level: None,
+            group_labels: None,
+        };
+
+        assert!(any_target_since(
+            &rows,
+            TargetModule::Alerts,
+            event.recovered_at,
+            event.emitted_at
+        ));
+        let dims = HashMap::new();
+        let matched = active_in(
+            &rows,
+            TargetModule::Alerts,
+            &item("a1", "default", &dims, &[]),
+            event.recovered_at,
+        );
+        assert_eq!(matched.map(|d| d.id).as_deref(), Some("dt-1"));
+        let downtime_id =
+            active_by_id_in(&rows, TargetModule::Alerts, "dt-1", event.recovered_at).map(|d| d.id);
+        assert_eq!(downtime_id.as_deref(), Some("dt-1"));
+
+        assert_eq!(
+            recovery_route(&alert, &event, downtime_id.is_some()),
+            RecoveryRoute {
+                oncall: false,
+                destinations: false
+            }
+        );
+        let record = suppressed_recovery_record(&alert, &event, downtime_id.unwrap());
+        assert_eq!(record.status, RunOutcome::Suppressed);
+        assert_eq!(record.downtime_id.as_deref(), Some("dt-1"));
+        assert_eq!(record._timestamp, event.emitted_at);
+
+        // A recovery after the cancel is not inside the window.
+        assert!(active_by_id_in(&rows, TargetModule::Alerts, "dt-1", at(35)).is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
     fn escalation(
         state: config::meta::oncall::ResponseState,
         closed_at: Option<i64>,

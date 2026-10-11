@@ -2310,13 +2310,40 @@ pub(crate) async fn downtime_decision(
     now: i64,
 ) -> Option<config::meta::downtimes::ActiveDowntime> {
     let rows = rows?;
-    if !alert_downtimes_in(&alert.org_id) {
+    if !crate::alerts::downtimes::enabled() {
+        return None;
+    }
+    let cached = db::downtimes::list_cached(&alert.org_id);
+    let wall = config::utils::time::now_micros();
+    downtime_decision_in(&cached, alert, folder_id, rows, now, wall).await
+}
+
+/// [downtime_decision] over `cached`; `now` is past when a delayed recovery asks at `recovered_at`.
+#[cfg(feature = "enterprise")]
+async fn downtime_decision_in(
+    cached: &[config::meta::downtimes::Downtime],
+    alert: &config::meta::alerts::alert::Alert,
+    folder_id: &str,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+    now: i64,
+    wall: i64,
+) -> Option<config::meta::downtimes::ActiveDowntime> {
+    use config::meta::downtimes::TargetModule;
+
+    use crate::alerts::downtimes::enterprise::{active_in, any_target_since, item};
+
+    if !any_target_since(cached, TargetModule::Alerts, now, wall) {
         return None;
     }
     let alert_id = alert.id.as_ref()?.to_string();
     let identity = downtime_identity(alert, rows).await;
     muted_in_every_group(&identity, |dims| {
-        crate::alerts::downtimes::active_for_alert(&alert.org_id, &alert_id, folder_id, dims, now)
+        active_in(
+            cached,
+            TargetModule::Alerts,
+            &item(&alert_id, folder_id, dims, &[]),
+            now,
+        )
     })
 }
 
@@ -8426,6 +8453,50 @@ mod tests {
             assert!(trigger.data.contains("\"normal\""));
             assert!(!trigger.data.contains("\"error\""));
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn a_recovery_emitted_after_its_downtime_was_cancelled_is_still_muted() {
+        use config::meta::downtimes::Downtime;
+
+        const MINUTE: i64 = 60_000_000;
+        let at = |minutes: i64| 9 * 60 * MINUTE + minutes * MINUTE;
+        // The org's only downtime, 09:00-10:00, cancelled at 09:30; the cancel cleared the record.
+        let row: Downtime = serde_json::from_value(serde_json::json!({
+            "id": "dt-1", "org": "recovery_after_cancel", "name": "deploy",
+            "targets": [{ "module": "alerts", "folders": { "kind": "all" } }],
+            "schedule": {
+                "repeat": "none", "starts_at": at(0), "ends_at": at(60),
+                "timezone": "UTC", "duration_secs": 3_600
+            },
+            "cancelled_at": at(30),
+            "created_by": "lin", "created_at": 0, "updated_by": "lin", "updated_at": 0
+        }))
+        .unwrap();
+        let mut alert = config::meta::alerts::alert::Alert::default();
+        alert.org_id = "recovery_after_cancel".to_string();
+        alert.id = Some(<svix_ksuid::Ksuid as svix_ksuid::KsuidLike>::new(
+            None, None,
+        ));
+
+        // Recovered at 09:20, asked at 09:40 when `keep_firing_for` released it.
+        let decision = downtime_decision_in(
+            std::slice::from_ref(&row),
+            &alert,
+            "default",
+            &[],
+            at(20),
+            at(40),
+        )
+        .await;
+        assert_eq!(decision.map(|d| d.id).as_deref(), Some("dt-1"));
+        // A recovery after the cancel is not muted.
+        assert!(
+            downtime_decision_in(&[row], &alert, "default", &[], at(35), at(40))
+                .await
+                .is_none()
+        );
     }
 
     #[tokio::test]

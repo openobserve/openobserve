@@ -97,44 +97,15 @@ pub fn next_chunk(
 
 /// Fill one chunk for `slo`.
 pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
-    let cfg = get_config();
     let db = get_orm_client_rw().await;
-
-    let Some(job) = jobs::get(db, &slo.id, slo.definition_generation).await? else {
-        return Ok(ChunkOutcome::Done);
-    };
-    if job.state == jobs::STATE_DONE || job.state == jobs::STATE_CANCELLED {
-        return Ok(ChunkOutcome::Done);
-    }
-    if job.state == jobs::STATE_FAILED {
-        return Ok(ChunkOutcome::Failed);
-    }
-
-    let remeasure = job.kind == jobs::KIND_REMEASURE;
-    let Some((start, end)) = next_chunk(
-        job.done_through,
-        job.range_start,
-        job.range_end,
-        cfg.slo.backfill_chunk_secs,
-        slo.definition.slice_interval_secs,
-    ) else {
-        return finish(db, slo, &job, job.updated_at, now_secs()).await;
-    };
-
-    let written = if remeasure {
-        super::job::remeasure_range(slo, start, end).await?
-    } else {
-        super::job::run_range(slo, start, end, config::meta::slo::slice::Writer::Backfill).await?
-    };
-
-    let now = now_secs();
-    let Some(version) = record_chunk(db, &job, start, written as i64, now).await? else {
-        return Ok(ChunkOutcome::Superseded);
-    };
-    if start <= job.range_start {
-        return finish(db, slo, &job, version, now).await;
-    }
-    Ok(ChunkOutcome::More)
+    run_chunk_with(db, slo, async |remeasure, start, end| {
+        if remeasure {
+            super::job::remeasure_range(slo, start, end).await
+        } else {
+            super::job::run_range(slo, start, end, config::meta::slo::slice::Writer::Backfill).await
+        }
+    })
+    .await
 }
 
 /// The range a new backfill should cover: the SLO's window, ending where the
@@ -193,6 +164,51 @@ pub async fn is_needed(slo: &Slo) -> Result<bool, anyhow::Error> {
     let db = get_orm_client_ro().await;
     let status = slo_table::load_status(db, &slo.id, "").await?;
     Ok(status.is_some_and(|s| s.definition_generation == slo.definition_generation))
+}
+
+/// [run_chunk] on `db`, measuring `[start, end)` with `measure(remeasure, start, end)`.
+async fn run_chunk_with(
+    db: &DatabaseConnection,
+    slo: &Slo,
+    measure: impl AsyncFnOnce(bool, i64, i64) -> Result<usize, anyhow::Error>,
+) -> Result<ChunkOutcome, anyhow::Error> {
+    let cfg = get_config();
+
+    let Some(job) = jobs::get(db, &slo.id, slo.definition_generation).await? else {
+        return Ok(ChunkOutcome::Done);
+    };
+    if job.state == jobs::STATE_DONE || job.state == jobs::STATE_CANCELLED {
+        return Ok(ChunkOutcome::Done);
+    }
+    if job.state == jobs::STATE_FAILED {
+        return Ok(ChunkOutcome::Failed);
+    }
+
+    let remeasure = job.kind == jobs::KIND_REMEASURE;
+    let Some((start, end)) = next_chunk(
+        job.done_through,
+        job.range_start,
+        job.range_end,
+        cfg.slo.backfill_chunk_secs,
+        slo.definition.slice_interval_secs,
+    ) else {
+        return finish(db, slo, &job, job.updated_at, now_secs()).await;
+    };
+
+    // A cache or replica lagging the node that edited the downtime would measure the old windows.
+    if remeasure {
+        db::downtimes::reload_org_with(db, &slo.org).await?;
+    }
+    let written = measure(remeasure, start, end).await?;
+
+    let now = now_secs();
+    let Some(version) = record_chunk(db, &job, start, written as i64, now).await? else {
+        return Ok(ChunkOutcome::Superseded);
+    };
+    if start <= job.range_start {
+        return finish(db, slo, &job, version, now).await;
+    }
+    Ok(ChunkOutcome::More)
 }
 
 /// Moves `done_through` to the chunk's start; the job's new version, or `None` if it changed.
@@ -634,6 +650,80 @@ mod tests {
                 .await
                 .unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn a_remeasure_whose_downtime_reload_fails_records_no_progress() {
+        // No downtimes table on this connection, so the reload fails.
+        let db = jobs_db().await;
+        jobs::queue_remeasure(&db, "slo1", 1, 0, 400 * DAY, 100)
+            .await
+            .unwrap();
+        let queued = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+
+        let outcome = run_chunk_with(&db, &burn_slo(), async |_, _, _| Ok(3)).await;
+        assert!(outcome.is_err(), "{outcome:?}");
+        let stored = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
+        assert_eq!(stored.done_through, None);
+        assert_eq!(stored, queued);
+    }
+
+    #[tokio::test]
+    async fn a_remeasure_reads_the_downtimes_through_the_chunk_connection() {
+        use config::meta::{downtimes::Downtime, folder::FolderType};
+        use infra::table::{entity, folders};
+        use sea_orm::{ConnectionTrait, Schema};
+
+        let org = "backfill_reload_rw";
+        let db = jobs_db().await;
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(entity::folders::Entity),
+            schema.create_table_from_entity(entity::downtimes::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        let folder = config::meta::folder::Folder {
+            folder_id: "default".into(),
+            name: "default".into(),
+            description: String::new(),
+            icon: None,
+        };
+        folders::get_or_create_with(&db, org, folder, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let row: Downtime = serde_json::from_value(serde_json::json!({
+            "id": "dt-rw", "org": org, "name": "dt-rw", "targets": [],
+            "schedule": {
+                "repeat": "none", "starts_at": 0, "timezone": "UTC", "duration_secs": 60
+            },
+            "created_by": "lin", "created_at": 0, "updated_by": "lin", "updated_at": 0
+        }))
+        .unwrap();
+        infra::table::downtimes::put_with(&db, &row).await.unwrap();
+        jobs::queue_remeasure(&db, "slo1", 1, 0, 400 * DAY, 100)
+            .await
+            .unwrap();
+        let slo = Slo {
+            org: org.into(),
+            ..burn_slo()
+        };
+
+        let cached = || -> Vec<String> {
+            ::db::downtimes::list_cached(org)
+                .iter()
+                .map(|d| d.id.clone())
+                .collect()
+        };
+        let outcome = run_chunk_with(&db, &slo, async |remeasure, _, _| {
+            assert!(remeasure);
+            Ok(cached().len())
+        })
+        .await
+        .unwrap();
+        assert_eq!(outcome, ChunkOutcome::More);
+        assert_eq!(cached(), ["dt-rw"]);
     }
 
     fn rebuilt(good: f64) -> super::super::reconcile::Rebuild {
