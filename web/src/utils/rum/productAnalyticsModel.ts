@@ -25,6 +25,7 @@ import {
   IDENTITY_FIELDS,
   MAX_FUNNEL_STEPS,
   type BreakdownDim,
+  type ExclusionStep,
   type FunnelCohort,
   type FunnelDef,
   type FunnelUnit,
@@ -36,25 +37,34 @@ import {
   type RetentionDef,
   type RetentionMode,
   type SampleRatio,
+  type StepFilters,
   type StepKind,
   type StepRef,
 } from "@/utils/rum/productAnalyticsQueries";
 
-export interface NamedEventRule {
-  t: "view";
-  op: "eq" | "prefix" | "regex";
-  value: string;
-}
+export type NamedEventRule =
+  | { t: "view"; op: "eq" | "prefix" | "regex"; value: string }
+  | { t: "view"; op: "param"; name: string; value?: string; onPage?: string }
+  | { t: "view"; op: "ref"; value: string; onPage?: string };
 export interface NamedActionRule {
   t: "action";
-  targets: string[];
+  op?: "in" | "prefix" | "contains" | "regex";
+  targets?: string[];
+  value?: string;
   onPage?: string;
 }
+export interface NamedErrorRule {
+  t: "error";
+  op: "eq" | "prefix" | "contains" | "regex";
+  value: string;
+  onPage?: string;
+}
+export type NamedRule = NamedEventRule | NamedActionRule | NamedErrorRule;
 export interface NamedEvent {
   id: string;
   app: string;
   name: string;
-  rules: (NamedEventRule | NamedActionRule)[];
+  rules: NamedRule[];
   version: number;
   createdBy: string;
   createdAt: number;
@@ -75,12 +85,16 @@ export interface SavedFunnel {
   createdAt: number;
   updatedBy: string;
   updatedAt: number;
+  /** The rules hash `sql` was compiled with (null when unknown) and the app's hash now; absent from older servers. */
+  rulesHash?: string | null;
+  currentRulesHash?: string;
 }
 export interface SavedFunnelBody {
   name: string;
   description?: string;
   def: Record<string, unknown>;
   sql: string;
+  rules_hash?: string;
 }
 export interface IdentityGap {
   reason: "absent" | "placeholder";
@@ -219,6 +233,66 @@ export interface AnalyticsScopeState {
   datetime: AnalyticsDateTime;
   includeAllIdentities: boolean;
   exact: boolean;
+  includeExcluded: boolean;
+  newUsers: boolean;
+  apps: string[];
+}
+export type SessionField =
+  | "user_agent_user_agent_family"
+  | "user_agent_os_family"
+  | "user_agent_device_family"
+  | "geo_info_country"
+  | "geo_info_city"
+  | "usr_id"
+  | "usr_email"
+  | "usr_anonymous_id"
+  | "env"
+  | "version";
+export type MatchOp = "eq" | "in" | "prefix" | "suffix" | "contains" | "regex";
+export interface SessionRule {
+  field: SessionField;
+  op: MatchOp;
+  values: string[];
+}
+export interface PageRule {
+  op: "eq" | "prefix" | "regex";
+  value: string;
+}
+export interface BuiltinBots {
+  version: number;
+  families: string[];
+  devices: string[];
+}
+export interface AppExclusions {
+  bots: boolean;
+  builtinBots: BuiltinBots;
+  sessions: SessionRule[];
+  pages: PageRule[];
+}
+export interface AppSettings extends AppExclusions {
+  id: string | null;
+  app: string;
+  version: number;
+  rulesHash: string;
+  createdBy: string | null;
+  createdAt: number | null;
+  updatedBy: string | null;
+  updatedAt: number | null;
+}
+export interface PutAppSettingsBody {
+  bots: boolean;
+  sessions: SessionRule[];
+  pages: PageRule[];
+  version: number;
+}
+export interface UaSuggestionRow {
+  ua: string | null;
+  dev: string | null;
+  sessions: number;
+}
+export interface UaSuggestion {
+  family: string;
+  sessions: number;
 }
 
 export const MAX_EVENTS_PER_APP = 50 as const;
@@ -251,6 +325,26 @@ const DAILY_MAX_DAYS = 14;
 const WEEKLY_MAX_DAYS = 90;
 const MONTH_DATA_DAYS = 60;
 const DATA_TEST_NAME = /^[a-z0-9]+([-_./:][a-z0-9]+)*$/;
+export const CONTAINER_SUFFIXES = [
+  "page",
+  "content",
+  "dialog",
+  "layout",
+  "container",
+  "panel",
+  "wrapper",
+  "section",
+] as const;
+const BOT_LIKE =
+  /(bot|crawl|spider|headless|monitor|pinger|preview|scan|check|lighthouse|pagespeed|selenium|puppeteer|playwright)/i;
+const COVERING_OPS: readonly MatchOp[] = ["eq", "in", "prefix", "suffix", "contains"];
+const CREDENTIAL_PARAMS = ["id_token", "access_token", "code", "token"];
+const PARAM_NAME = /^[A-Za-z0-9_.-]{1,128}$/;
+const REF_HOST = /^[a-z0-9.-]+$/;
+export const MAX_COMPARED_APPS = 10;
+const MAX_EXCLUSIONS = 5;
+const MAX_STEP_MS = 86400000;
+const NEW_USERS_LOOKBACK_US = 30 * 86400000000;
 const MIN_REMAINING_VALUES = 3;
 const MAX_SCOPE_VALUE = 256;
 const MAX_SCOPE_VALUES = 50;
@@ -418,23 +512,59 @@ export function regexProblem(
   return null;
 }
 
-const parseRule = (raw: unknown): NamedEventRule | NamedActionRule | null => {
+const isOptionalKey = (v: unknown): boolean => v === undefined || v === null || isKey(v);
+
+const withOnPage = <T extends object>(rule: T, onPage: unknown): T =>
+  onPage ? { ...rule, onPage: onPage as string } : rule;
+
+// A value the engine matches as a regex must also compile there, not only in JS.
+const matchValue = (op: unknown, value: unknown): value is string =>
+  isKey(value) && (op !== "regex" || !regexProblem(value));
+
+const parseViewRule = (raw: Record<string, unknown>): NamedEventRule | null => {
+  if (!isOptionalKey(raw.onPage)) return null;
+  if (raw.op === "param") {
+    if (typeof raw.name !== "string" || !PARAM_NAME.test(raw.name)) return null;
+    if (CREDENTIAL_PARAMS.includes(raw.name) || !isOptionalKey(raw.value)) return null;
+    const rule: NamedEventRule = raw.value
+      ? { t: "view", op: "param", name: raw.name, value: raw.value as string }
+      : { t: "view", op: "param", name: raw.name };
+    return withOnPage(rule, raw.onPage);
+  }
+  if (raw.op === "ref") {
+    if (typeof raw.value !== "string" || !REF_HOST.test(raw.value)) return null;
+    return withOnPage<NamedEventRule>({ t: "view", op: "ref", value: raw.value }, raw.onPage);
+  }
+  if (raw.op !== "eq" && raw.op !== "prefix" && raw.op !== "regex") return null;
+  if (!matchValue(raw.op, raw.value)) return null;
+  return { t: "view", op: raw.op, value: raw.value };
+};
+
+const parseActionRule = (raw: Record<string, unknown>): NamedActionRule | null => {
+  if (!isOptionalKey(raw.onPage)) return null;
+  if (raw.op === "prefix" || raw.op === "contains" || raw.op === "regex") {
+    if (!matchValue(raw.op, raw.value)) return null;
+    return withOnPage<NamedActionRule>({ t: "action", op: raw.op, value: raw.value }, raw.onPage);
+  }
+  if (raw.op !== undefined && raw.op !== "in") return null;
+  const targets = raw.targets;
+  if (!Array.isArray(targets) || !targets.length || targets.length > MAX_TARGETS) return null;
+  if (!targets.every(isKey)) return null;
+  return withOnPage<NamedActionRule>({ t: "action", targets: [...targets] }, raw.onPage);
+};
+
+const parseErrorRule = (raw: Record<string, unknown>): NamedErrorRule | null => {
+  const op = raw.op;
+  if (op !== "eq" && op !== "prefix" && op !== "contains" && op !== "regex") return null;
+  if (!isOptionalKey(raw.onPage) || !matchValue(op, raw.value)) return null;
+  return withOnPage<NamedErrorRule>({ t: "error", op, value: raw.value }, raw.onPage);
+};
+
+const parseRule = (raw: unknown): NamedRule | null => {
   if (!isRecord(raw)) return null;
-  if (raw.t === "view") {
-    if (raw.op !== "eq" && raw.op !== "prefix" && raw.op !== "regex") return null;
-    if (!isKey(raw.value)) return null;
-    if (raw.op === "regex" && regexProblem(raw.value)) return null;
-    return { t: "view", op: raw.op, value: raw.value };
-  }
-  if (raw.t === "action") {
-    const targets = raw.targets;
-    if (!Array.isArray(targets) || !targets.length || targets.length > MAX_TARGETS) return null;
-    if (!targets.every(isKey)) return null;
-    if (raw.onPage !== undefined && raw.onPage !== null && !isKey(raw.onPage)) return null;
-    return raw.onPage
-      ? { t: "action", targets: [...targets], onPage: raw.onPage as string }
-      : { t: "action", targets: [...targets] };
-  }
+  if (raw.t === "view") return parseViewRule(raw);
+  if (raw.t === "action") return parseActionRule(raw);
+  if (raw.t === "error") return parseErrorRule(raw);
   return null;
 };
 
@@ -460,7 +590,7 @@ export function parseNamedEventDraft(raw: unknown, app: string): NamedEventDraft
   if (!Array.isArray(raw.rules) || !raw.rules.length || raw.rules.length > MAX_RULES) return null;
   const rules = raw.rules.map(parseRule);
   if (rules.some((r) => r === null)) return null;
-  return { app, name: raw.name, rules: rules as (NamedEventRule | NamedActionRule)[] };
+  return { app, name: raw.name, rules: rules as NamedRule[] };
 }
 
 const parseAudit = (raw: Record<string, unknown>) => {
@@ -671,17 +801,61 @@ export function decodeDef(param: string | undefined): unknown {
   }
 }
 
+const STEP_OPTION_KEYS = ["min", "fr", "er"];
+const EXCLUSION_KEYS = ["s", "a", "b", "w"];
+
+const onlyKeys = (raw: Record<string, unknown>, keys: readonly string[]): boolean =>
+  Object.keys(raw).every((k) => keys.includes(k));
+
+const isMs = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= MAX_STEP_MS;
+
+// An unknown option must fail the whole definition, so an older build never drops a filter it cannot apply.
+const parseStepFilters = (raw: unknown): StepFilters | null => {
+  if (!isRecord(raw) || !onlyKeys(raw, STEP_OPTION_KEYS)) return null;
+  if (raw.min !== undefined && !isMs(raw.min)) return null;
+  if ((raw.fr !== undefined && raw.fr !== 1) || (raw.er !== undefined && raw.er !== 1)) return null;
+  return {
+    ...(raw.min !== undefined ? { minMs: raw.min as number } : {}),
+    ...(raw.fr === 1 ? { frustrated: true as const } : {}),
+    ...(raw.er === 1 ? { errored: true as const } : {}),
+  };
+};
+
 export function parseStepRef(raw: unknown): StepRef | null {
-  if (!Array.isArray(raw) || raw.length !== 2) return null;
-  const [kind, key] = raw;
-  if (kind !== "p" && kind !== "c" && kind !== "e") return null;
+  if (!Array.isArray(raw) || (raw.length !== 2 && raw.length !== 3)) return null;
+  const [kind, key, opts] = raw;
+  if (kind !== "p" && kind !== "c" && kind !== "e" && kind !== "r") return null;
   if (kind === "e" ? !isEntityId(key) : !isKey(key)) return null;
-  return { kind: kind as StepKind, key };
+  if (raw.length === 2) return { kind: kind as StepKind, key };
+  const f = kind === "p" ? parseStepFilters(opts) : null;
+  return f ? { kind, key, f } : null;
 }
 
-export function stepRefParam(step: StepRef): [StepKind, string] {
-  return [step.kind, step.key];
+export function stepRefParam(step: StepRef): unknown[] {
+  if (!step.f) return [step.kind, step.key];
+  const { minMs, frustrated, errored } = step.f;
+  return [
+    step.kind,
+    step.key,
+    {
+      ...(minMs !== undefined ? { min: minMs } : {}),
+      ...(frustrated ? { fr: 1 } : {}),
+      ...(errored ? { er: 1 } : {}),
+    },
+  ];
 }
+
+const parseExclusion = (raw: unknown, n: number): ExclusionStep | null => {
+  if (!isRecord(raw) || !onlyKeys(raw, EXCLUSION_KEYS)) return null;
+  const step = parseStepRef(raw.s);
+  const { a, b, w } = raw;
+  if (!step || typeof a !== "number" || !Number.isInteger(a) || a < 1) return null;
+  if ((b === undefined) === (w === undefined)) return null;
+  if (b !== undefined)
+    return typeof b === "number" && Number.isInteger(b) && a < b && b <= n ? { step, a, b } : null;
+  return isMs(w) && w > 0 && a <= n ? { step, a, withinMs: w } : null;
+};
 
 export function parseFunnelDef(raw: unknown): FunnelDef | null {
   if (!isRecord(raw) || !Array.isArray(raw.s)) return null;
@@ -695,11 +869,16 @@ export function parseFunnelDef(raw: unknown): FunnelDef | null {
   if (!WINDOWS.includes(w as FunnelWindow)) return null;
   const b = raw.b === undefined || raw.b === null ? null : raw.b;
   if (b !== null && !Object.prototype.hasOwnProperty.call(DIMENSIONS, b as string)) return null;
+  const xs = raw.x === undefined ? [] : raw.x;
+  if (!Array.isArray(xs) || xs.length > MAX_EXCLUSIONS) return null;
+  const x = xs.map((e) => parseExclusion(e, steps.length));
+  if (x.some((e) => e === null)) return null;
   return {
     steps: steps as StepRef[],
     unit,
     window: unit === "sessions" ? "session" : (w as FunnelWindow),
     breakdown: b as BreakdownDim | null,
+    x: x as ExclusionStep[],
   };
 }
 
@@ -710,6 +889,12 @@ export function funnelParam(def: FunnelDef): Record<string, unknown> {
     w: def.window,
   };
   if (def.breakdown) out.b = def.breakdown;
+  if (def.x?.length)
+    out.x = def.x.map((e) => ({
+      s: stepRefParam(e.step),
+      a: e.a,
+      ...(e.b !== undefined ? { b: e.b } : { w: e.withinMs }),
+    }));
   return out;
 }
 
@@ -754,6 +939,12 @@ export function parseSavedFunnel(raw: unknown, app: string): SavedFunnel | null 
     createdAt: audit.createdAt,
     updatedBy: audit.updatedBy,
     updatedAt: audit.updatedAt,
+    ...(typeof raw.currentRulesHash === "string"
+      ? {
+          rulesHash: typeof raw.rulesHash === "string" ? raw.rulesHash : null,
+          currentRulesHash: raw.currentRulesHash,
+        }
+      : {}),
   };
 }
 
@@ -879,13 +1070,73 @@ export function parseScope(query: Record<string, unknown>): {
   for (const [param, key] of [
     ["idall", "includeAllIdentities"],
     ["exact", "exact"],
+    ["xall", "includeExcluded"],
+    ["new", "newUsers"],
   ] as const) {
     if (query[param] === undefined) continue;
     const flag = flagParam(query[param]);
     if (flag === null) invalid.push(param);
     else scope[key] = flag;
   }
+  if (query.apps !== undefined) {
+    const apps = scopeValues(query.apps);
+    if (apps && apps.length <= MAX_COMPARED_APPS) scope.apps = apps;
+    else invalid.push("apps");
+  }
   return { scope, invalid };
+}
+
+/** New users are those first seen in the range, so the scan reaches back far enough to see earlier activity. */
+export function newUsersSearchRange(range: { startUs: number; endUs: number }): {
+  startUs: number;
+  endUs: number;
+} {
+  return { startUs: range.startUs - NEW_USERS_LOOKBACK_US, endUs: range.endUs };
+}
+
+const covers = (rule: SessionRule, value: string): boolean => {
+  const v = rule.values;
+  if (rule.op === "eq" || rule.op === "in") return v.includes(value);
+  if (rule.op === "prefix") return v.some((x) => value.startsWith(x));
+  if (rule.op === "suffix") return v.some((x) => value.endsWith(x));
+  return v.some((x) => value.includes(x));
+};
+
+const uaCovered = (row: UaSuggestionRow, ex: AppExclusions): boolean => {
+  if (row.ua && ex.builtinBots.families.includes(row.ua)) return true;
+  if (row.dev && ex.builtinBots.devices.includes(row.dev)) return true;
+  return ex.sessions.some((r) => {
+    if (!COVERING_OPS.includes(r.op)) return false;
+    const value =
+      r.field === "user_agent_user_agent_family"
+        ? row.ua
+        : r.field === "user_agent_device_family"
+          ? row.dev
+          : null;
+    return value !== null && covers(r, value);
+  });
+};
+
+/** Bot-like browser families no rule covers, with their sessions; the built-in labels are never suggested. */
+export function uaSuggestions(rows: UaSuggestionRow[], ex: AppExclusions): UaSuggestion[] {
+  const byFamily = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.ua || !BOT_LIKE.test(row.ua) || uaCovered(row, ex)) continue;
+    byFamily.set(row.ua, (byFamily.get(row.ua) ?? 0) + num(row.sessions));
+  }
+  return [...byFamily].map(([family, sessions]) => ({ family, sessions }));
+}
+
+/** The Overview banner's trigger; `tone` is "warning" only for a user-agent suggestion. */
+export function exclusionBanner(
+  ua: UaSuggestion[],
+  sessions: number,
+  identityTop: IdentityTopRow | undefined,
+): { tone: "warning" | "info" } | null {
+  if (ua.some((r) => r.sessions > DOMINANT_SHARE * sessions)) return { tone: "warning" };
+  if (identityTop && num(identityTop.s) > DOMINANT_SHARE * num(identityTop.total_s))
+    return { tone: "info" };
+  return null;
 }
 
 export function computeDelta(cur: number, prev: number, prevWindowHasData: boolean): Delta {
@@ -1126,7 +1377,7 @@ export function pushRecentFunnel(org: string, app: string, def: FunnelDef): Funn
 }
 
 const nodeKind = (key: string): StepKind =>
-  key.startsWith("c:") ? "c" : key.startsWith("e:") ? "e" : "p";
+  key.startsWith("c:") ? "c" : key.startsWith("e:") ? "e" : key.startsWith("r:") ? "r" : "p";
 
 interface LiveRow {
   row: Record<string, unknown>;
@@ -1247,7 +1498,7 @@ export const pathStepLabel = (
   key: string,
   events: readonly Pick<NamedEvent, "id" | "name">[],
 ): string => {
-  const bare = key.replace(/^[pce]:/, "");
+  const bare = key.replace(/^[pcer]:/, "");
   return key.startsWith("e:") ? (events.find((e) => e.id === bare)?.name ?? bare) : bare;
 };
 
@@ -1267,6 +1518,7 @@ const kindTag = (kind: PathNodeKind): string =>
     p: gt("rum.analytics.kind.page"),
     c: gt("rum.analytics.kind.click"),
     e: gt("rum.analytics.kind.event"),
+    r: gt("rum.analytics.kind.error"),
     other: gt("rum.analytics.funnel.other"),
     exit: gt("rum.analytics.paths.leftApp"),
     start: gt("rum.analytics.paths.sessionStart"),
