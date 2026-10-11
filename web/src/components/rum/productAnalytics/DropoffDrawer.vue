@@ -428,7 +428,8 @@ async function load(force = false, resetRetry = true) {
   pageRuns.clear();
   const scope = pa.scope.value;
   const id = pa.identitySql.value;
-  const spec = (sql: string, limit: number) => ({ sql, ...cur, limit, sampled: ratio.value });
+  const range = pa.newUsersRange(cur, props.cohort.funnel.unit === "users" && !!id);
+  const spec = (sql: string, limit: number) => ({ sql, ...range, limit, sampled: ratio.value });
   await Promise.all([
     runner.run("next", spec(dropoffNextSql(scope, id, props.cohort, opts()), 6), key),
     runner.run(
@@ -458,7 +459,7 @@ const loadMore = async () => {
       `sessions-${page}`,
       {
         sql: cohortSessionsSql(pa.scope.value, pa.identitySql.value, props.cohort, page, opts()),
-        ...cur,
+        ...pa.newUsersRange(cur, props.cohort.funnel.unit === "users" && !!pa.identitySql.value),
         limit: PAGE_LIMIT,
         sampled: ratio.value,
       },

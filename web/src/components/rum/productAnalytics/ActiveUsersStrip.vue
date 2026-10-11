@@ -25,6 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary text-xs" data-test="rum-analytics-active-users-subtitle">{{
         t("rum.analytics.activeUsers.subtitle", { unit: unit.label, field: raw(field) })
       }}</span>
+      <span
+        v-if="identityRuleNote"
+        class="text-text-secondary text-xs"
+        data-test="rum-analytics-active-users-identity-note"
+        >{{ t("rum.analytics.exclusions.identityRowForm") }}</span
+      >
     </div>
     <AnalyticsPanelState
       :state="state"
@@ -52,6 +58,7 @@ const props = defineProps<{
   state: PanelState<{ dau: number; wau: number; mau: number }>;
   field: IdentityField;
   unit: IdentityLabels;
+  identityRuleNote?: boolean;
 }>();
 const emit = defineEmits<{ retry: [] }>();
 const { t } = useI18nTyped();

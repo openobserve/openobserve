@@ -37,6 +37,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-funnel-saved-missing"
       />
       <OBanner
+        v-if="needsNewer"
+        variant="warning"
+        dense
+        :content="t('rum.analytics.funnel.needsNewer')"
+        data-test="rum-analytics-funnel-needs-newer"
+      />
+      <OBanner
+        v-if="stale"
+        variant="info"
+        dense
+        :content="t('rum.analytics.saved.stale')"
+        data-test="rum-analytics-funnel-saved-stale"
+      />
+      <OBanner
         v-if="linkProblem === 'forbidden'"
         variant="warning"
         dense
@@ -330,11 +344,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @dropoff="openDropoff"
               @suggestions-retry="retrySuggestions"
             />
+            <span
+              v-if="def.x?.length"
+              class="text-text-secondary text-xs"
+              data-test="rum-analytics-funnel-exclusions-caption"
+              >{{ exclusionsCaption }}</span
+            >
           </template>
           <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
             <span class="text-text-secondary text-xs">{{
               t("rum.analytics.funnel.breakdownTimeHidden")
             }}</span>
+            <span
+              v-if="def.breakdown === 'app'"
+              class="text-text-secondary text-xs"
+              data-test="rum-analytics-funnel-by-app-rules"
+              >{{ t("rum.analytics.funnel.byAppRules", { app: raw(pa.state.app) }) }}</span
+            >
             <FunnelBreakdown
               :rows="breakdown.rows"
               :total="breakdown.total"
@@ -342,6 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :dim-label="dimLabel"
               :events="events"
               :deleted-names="namedEvents.deletedNames.value"
+              :builtin-only="builtinOnlyApps"
             />
           </template>
         </div>
@@ -351,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-model:open="dashboardOpen"
         :dashboard-panel-data="{ data: {} }"
         :panels="[dashboardPanel()]"
-        :notice="t('rum.analytics.dashboard.snapshot')"
+        :notice="t('rum.analytics.funnel.dashboardSnapshot')"
       />
       <DropoffDrawer
         v-if="dropoffCohort"
@@ -514,17 +541,44 @@ const dimLabels = computed<Record<BreakdownDim, I18nText>>(() => ({
   country: t("rum.analytics.funnel.dims.country"),
   version: t("rum.analytics.funnel.dims.version"),
   env: t("rum.analytics.funnel.dims.env"),
+  app: t("rum.analytics.funnel.dims.app"),
 }));
 
 const breakdownOptions = computed(() => [
   { label: t("rum.analytics.funnel.noBreakdown"), value: "none" },
   ...(Object.keys(DIMENSIONS) as BreakdownDim[])
-    .filter((d) => pa.schema.value[DIMENSIONS[d]])
+    .filter((d) => (d === "app" ? !!pa.scope.value.apps?.length : pa.schema.value[DIMENSIONS[d]]))
     .map((d) => ({ label: dimLabels.value[d], value: d })),
 ]);
 
 const dimLabel = computed(() =>
   def.value.breakdown ? dimLabels.value[def.value.breakdown] : raw(""),
+);
+
+// Exclusions are applied to whatever the funnel's unit links together, so the caption names that span.
+const exclusionsCaption = computed<I18nText>(() => {
+  const w = effectiveDef.value.window;
+  if (w === "1h") return t("rum.analytics.funnel.exclusionsAcross1h");
+  if (w === "1d") return t("rum.analytics.funnel.exclusionsAcross1d");
+  if (w === "7d") return t("rum.analytics.funnel.exclusionsAcross7d");
+  return t("rum.analytics.funnel.exclusionsPerSession");
+});
+
+// An app with no settings row still gets the built-in bot rule, and only that.
+const builtinOnlyApps = computed(() =>
+  def.value.breakdown === "app"
+    ? pa.scopeSettings.value.filter((s) => s.id === null).map((s) => s.app)
+    : [],
+);
+
+// A NULL stored hash is a funnel saved before hashes existed, so it counts as changed.
+const stale = computed(() => {
+  const f = pa.openedFunnel.value;
+  return !!f && f.currentRulesHash !== undefined && f.rulesHash !== f.currentRulesHash;
+});
+
+const needsNewer = computed(
+  () => linkProblem.value === "unreadable" || pa.invalidParams.value.includes("funnel"),
 );
 
 const breakdown = computed(() =>
@@ -615,12 +669,15 @@ const dashboardTip = computed<I18nText>(() => {
     : t("rum.analytics.dashboard.funnelOnly");
 });
 
+// Stored and server-run SQL always keeps the app's rules; xall changes only what is displayed.
+const snapshotScope = () => ({ ...pa.scope.value, xall: undefined });
+
 // The alert starts at today's conversion, so it fires on any drop below what the user sees now.
 const openAlert = () => {
   const dt = pa.state.datetime;
   requestAlertCreation(
     buildPrefillFromRumFunnel({
-      scope: pa.scope.value,
+      scope: snapshotScope(),
       id: identitySql.value,
       def: { ...effectiveDef.value, breakdown: null },
       events: events.value,
@@ -651,7 +708,7 @@ watch(
 // A saved funnel's name is the panel's default title; the panel stays a snapshot.
 const dashboardPanel = () => {
   const panel = buildFunnelPanel(
-    pa.scope.value,
+    snapshotScope(),
     def.value,
     events.value,
     t,
@@ -662,9 +719,9 @@ const dashboardPanel = () => {
 
 // The time-relative SQL the funnel runs for `d`, kept beside it as a snapshot; null when Users cannot be counted here.
 const savedSql = (d: FunnelDef): string | null =>
-  d.unit === "users" && !identitySql.value
+  !pa.rulesReady.value || (d.unit === "users" && !identitySql.value)
     ? null
-    : funnelSql(pa.scope.value, identitySql.value, d, { events: events.value, sample: 1 });
+    : funnelSql(snapshotScope(), identitySql.value, d, { events: events.value, sample: 1 });
 
 // An sf link wins over the funnel it carried; only a confirmed absence drops it, a failed read keeps it for Retry.
 const resolveSavedLink = async (retry = false, quiet = false) => {
@@ -676,11 +733,12 @@ const resolveSavedLink = async (retry = false, quiet = false) => {
   let status = await savedFunnels.ensure(o, app, retry, quiet);
   // A load superseded by a forced reload settled nothing, so the newest reload in flight decides.
   while (status === "loading" && same()) status = await savedFunnels.ensure(o, app, false, quiet);
-  let found: SavedFunnel | null | "failed" =
+  let found: SavedFunnel | null | "failed" | "unreadable" =
     savedFunnels.funnels.value.find((f) => f.id === id) ?? null;
-  if (!found && status === "ready") found = await savedFunnels.fetchOne(o, app, id);
+  if (!found && status === "ready") found = await savedFunnels.readOne(o, app, id);
   if (!same() || status === "loading") return;
-  if (found === "failed" || status === "failed") pa.setSavedLinkIssue(app, id, "failed");
+  if (found === "unreadable") pa.setSavedLinkIssue(app, id, "unreadable");
+  else if (found === "failed" || status === "failed") pa.setSavedLinkIssue(app, id, "failed");
   else if (found) pa.openSavedFunnel(found, editedInSession(found.id, pa.funnel.value));
   else if (status === "forbidden") pa.setSavedLinkIssue(app, id, "forbidden");
   else pa.markSavedFunnelMissing();
@@ -757,7 +815,7 @@ const compute = async (force = false) => {
     "funnel",
     {
       sql: funnelSql(pa.scope.value, identitySql.value, d, { ...opts, sample: 1 }),
-      ...cur,
+      ...pa.newUsersRange(cur, d.unit === "users" && !!identitySql.value),
       limit: d.breakdown ? 1000 : 1,
       sampled: 1,
     },
@@ -783,7 +841,7 @@ const runSuggestions = (
         { ...d, breakdown: null },
         { ...opts, sample: sampled },
       ),
-      ...cur,
+      ...pa.newUsersRange(cur, d.unit === "users" && !!identitySql.value),
       limit: 5,
       sampled,
     },

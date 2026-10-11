@@ -109,6 +109,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @retry="pa.retryEvents()"
         />
         <OEmptyState
+          v-else-if="anchorIgnored"
+          preset="no-search-results"
+          size="block"
+          :title="t('rum.analytics.pathsView.anchorIgnoredTitle')"
+          :description="t('rum.analytics.pathsView.anchorIgnoredDescription')"
+          data-test="rum-analytics-paths-anchor-ignored"
+        >
+          <template #actions>
+            <OButton
+              variant="outline"
+              size="md"
+              data-test="rum-analytics-paths-anchor-ignored-edit-btn"
+              @click="emit('open-exclusions')"
+              >{{ t("rum.analytics.pathsView.editExclusions") }}</OButton
+            >
+          </template>
+        </OEmptyState>
+        <OEmptyState
           v-else-if="anchorIssue === 'none'"
           preset="no-search-results"
           size="block"
@@ -161,6 +179,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @select="onFlowSelect"
           />
         </AnalyticsPanelState>
+        <p
+          v-if="ignoredPages.length && !anchorIgnored"
+          class="text-text-secondary mt-2 flex flex-wrap items-center gap-1 text-xs"
+          data-test="rum-analytics-paths-ignored-footnote"
+        >
+          {{
+            t(
+              "rum.analytics.pathsView.ignoredFootnote",
+              {
+                count: ignoredPages.length,
+                pages: raw(ignoredPages.map((p) => p.value).join(", ")),
+              },
+              ignoredPages.length,
+            )
+          }}
+          <OButton
+            variant="ghost-primary"
+            size="xs"
+            data-test="rum-analytics-paths-ignored-edit-btn"
+            @click="emit('open-exclusions')"
+            >{{ t("rum.analytics.pathsView.editExclusions") }}</OButton
+          >
+        </p>
       </div>
     </OCard>
 
@@ -241,6 +282,7 @@ import {
   pathStepLabel,
   type BranchTarget,
   type NamedEvent,
+  type PageRule,
   type PathFlow,
 } from "@/utils/rum/productAnalyticsModel";
 import {
@@ -263,6 +305,7 @@ interface Branch {
   pathKeys: string[];
 }
 
+const emit = defineEmits<{ "open-exclusions": [] }>();
 const { t } = useI18nTyped();
 const router = useRouter();
 const pa = useProductAnalytics();
@@ -314,6 +357,24 @@ const anchorLabel = computed(() => {
   const d = def.value;
   const s = d.cohort ? d.cohort.funnel.steps[d.cohort.stepIndex - 1] : d.anchor;
   return s ? stepLabel(s, events.value, namedEvents.deletedNames.value) : "";
+});
+
+const ignoredPages = computed<PageRule[]>(() => pa.scope.value.exclusions?.pages ?? []);
+
+const pageIgnored = (key: string, rule: PageRule): boolean => {
+  if (rule.op === "eq") return key === rule.value;
+  if (rule.op === "prefix") return key.startsWith(rule.value);
+  try {
+    return new RegExp(rule.value).test(key);
+  } catch {
+    return false;
+  }
+};
+
+// The paths query drops ignored pages, so an ignored anchor could never be reached.
+const anchorIgnored = computed(() => {
+  const a = def.value.cohort ? null : def.value.anchor;
+  return a?.kind === "p" && ignoredPages.value.some((r) => pageIgnored(a.key, r));
 });
 
 const shownPanel = computed<PanelState<unknown>>(() =>
@@ -415,6 +476,11 @@ const compute = async (force = false) => {
     return;
   }
   if (!(await ensureAnchor())) return;
+  if (anchorIgnored.value) {
+    hold("idle");
+    void pa.syncUrl(router);
+    return;
+  }
   const d = def.value;
   const anchorRules =
     d.anchor?.kind === "e" ? events.value.find((e) => e.id === d.anchor?.key)?.rules : null;
@@ -431,7 +497,7 @@ const compute = async (force = false) => {
       "paths",
       {
         sql: pathsSql(pa.scope.value, pa.identitySql.value, d, opts),
-        ...cur,
+        ...pa.newUsersRange(cur, !!pa.identitySql.value),
         limit: 5000,
         sampled: ratio.value,
       },
@@ -450,7 +516,7 @@ const compute = async (force = false) => {
             d.cohort.stepIndex,
             opts,
           ),
-          ...cur,
+          ...pa.newUsersRange(cur, d.cohort.funnel.unit === "users" && !!pa.identitySql.value),
           limit: 2,
           sampled: ratio.value,
         },

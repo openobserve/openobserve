@@ -13,12 +13,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { defineComponent, h, KeepAlive, ref, type Ref } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
 import { createStore } from "vuex";
 
+// JSDOM has no layout, so the real virtualizer renders no rows; render them all.
+vi.mock("@tanstack/vue-virtual", async () => {
+  const { computed, unref } = await import("vue");
+  return {
+    useVirtualizer: (options: any) =>
+      computed(() => {
+        const count = unref(options).count;
+        return {
+          getVirtualItems: () =>
+            Array.from({ length: count }, (_, index) => ({
+              index,
+              key: index,
+              start: index * 28,
+              size: 28,
+              end: (index + 1) * 28,
+              lane: 0,
+            })),
+          getTotalSize: () => count * 28,
+          scrollToIndex: () => {},
+          measureElement: () => {},
+        };
+      }),
+  };
+});
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), { default: { search: vi.fn() } });
@@ -53,6 +77,8 @@ import AnalyticsFunnels from "./AnalyticsFunnels.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import i18n from "@/locales";
 import { assertJoinFree } from "@/utils/rum/productAnalyticsQueries";
 import { decodeDef, encodeDef } from "@/utils/rum/productAnalyticsModel";
 import { alertCreationDialog } from "@/composables/alerts/useAlertCreation";
@@ -1435,6 +1461,347 @@ describe("AnalyticsFunnels", () => {
         .trigger("click");
       await settle();
       expect(loadToasts()).toBe(2);
+    });
+  });
+
+  describe("pa gap fixes: funnels", () => {
+    const svc = api.service as unknown as Record<string, Mock>;
+    const CURRENT_HASH = "0123456789abcdef";
+    const settingsOf = (app: string, extra: Record<string, unknown> = {}) => ({
+      id: `settings-${app}`.padEnd(27, "0"),
+      app,
+      bots: true,
+      builtinBots: {
+        version: 1,
+        families: ["HeadlessChrome", "PhantomJS", "Spider"],
+        devices: ["Spider"],
+      },
+      sessions: [],
+      pages: [],
+      version: 1,
+      rulesHash: CURRENT_HASH,
+      createdBy: "admin@x.com",
+      createdAt: 1,
+      updatedBy: "admin@x.com",
+      updatedAt: 1,
+      ...extra,
+    });
+    const LOGIN_WEB = {
+      s: [
+        ["p", "/web/login"],
+        ["p", "/web"],
+      ],
+      u: "sessions",
+      w: "session",
+    };
+    const THREE = (u: string, w: string, x: unknown[]) =>
+      encodeDef({
+        s: [
+          ["p", "/web"],
+          ["p", "/web/logs"],
+          ["p", "/web/billings"],
+        ],
+        u,
+        w,
+        x,
+      } as never);
+    const BETWEEN = { s: ["p", "/web/ingestion"], a: 2, b: 3 };
+    const pageText = () => document.body.textContent ?? "";
+
+    beforeEach(() => {
+      svc.getAppSettings = vi.fn(async (_org: string, app: string) => ({ data: settingsOf(app) }));
+    });
+    afterEach(() => {
+      delete svc.getAppSettings;
+    });
+
+    // Each mount starts from a clean module state so two opened funnels can be compared.
+    const openedSavedText = async (fields: Record<string, unknown>) => {
+      wrapper?.unmount();
+      wrapper = null;
+      document.body.innerHTML = "";
+      resetProductAnalytics();
+      resetSavedFunnels();
+      resetFunnelDraft();
+      api.reset();
+      // reset() restores the default settings, whose hash would not match the rows' currentRulesHash.
+      svc.getAppSettings.mockImplementation(async (_org: string, app: string) => ({
+        data: settingsOf(app),
+      }));
+      routes = baseRoutes();
+      respond();
+      const row = api.seedFunnel("web", "Signup", LOGIN_WEB, fields);
+      await mountFunnels({ sf: row.id });
+      await settle();
+      expect(text("rum-analytics-funnel-saved-name")).toBe("Signup");
+      return wrapper!.text();
+    };
+
+    it("P7-R11: a saved funnel whose stored rulesHash differs from currentRulesHash shows the stale banner, and a NULL stored hash counts as changed", async () => {
+      const fresh = await openedSavedText({
+        rulesHash: CURRENT_HASH,
+        currentRulesHash: CURRENT_HASH,
+      });
+      const changed = await openedSavedText({
+        rulesHash: "aaaaaaaaaaaaaaaa",
+        currentRulesHash: CURRENT_HASH,
+      });
+      const nullHash = await openedSavedText({ rulesHash: null, currentRulesHash: CURRENT_HASH });
+      expect(changed.length).toBeGreaterThan(fresh.length);
+      expect(nullHash).toBe(changed);
+    }, 30_000);
+
+    const leafTexts = () =>
+      new Set(
+        [...document.body.querySelectorAll("*")]
+          .filter((el) => el.children.length === 0)
+          .map((el) => el.textContent?.trim() ?? "")
+          .filter(Boolean),
+      );
+
+    it("P7-R11: Save on a stale saved funnel stores the current rules_hash and clears the stale banner", async () => {
+      await openedSavedText({ rulesHash: CURRENT_HASH, currentRulesHash: CURRENT_HASH });
+      const freshLeaves = leafTexts();
+      await openedSavedText({ rulesHash: "aaaaaaaaaaaaaaaa", currentRulesHash: CURRENT_HASH });
+      const banner = [...leafTexts()].filter((t) => !freshLeaves.has(t));
+      expect(banner.length).toBeGreaterThan(0);
+      const update = api.service.updateFunnel.getMockImplementation()!;
+      api.service.updateFunnel.mockImplementation(async (...args: never[]) => {
+        const [, , id, body] = args as unknown as [string, string, string, Record<string, unknown>];
+        const res = (await update(...args)) as { data: Record<string, unknown> };
+        const stored = api.funnels.get(id)!;
+        stored.rulesHash = body.rules_hash ?? null;
+        stored.currentRulesHash = CURRENT_HASH;
+        return {
+          data: { ...res.data, rulesHash: stored.rulesHash, currentRulesHash: CURRENT_HASH },
+        };
+      });
+      const pa = useProductAnalytics();
+      pa.funnel.value = {
+        ...pa.funnel.value,
+        steps: [
+          { kind: "p", key: "/web/login" },
+          { kind: "p", key: "/web/logs" },
+        ],
+      };
+      await settle();
+      await wrapper!.find('[data-test="rum-analytics-funnel-save-btn"]').trigger("click");
+      await settle();
+      expect(api.bodies("updateFunnel").at(-1)).toMatchObject({ rules_hash: CURRENT_HASH });
+      const after = leafTexts();
+      expect(banner.filter((t) => after.has(t))).toEqual([]);
+    }, 30_000);
+
+    it("P7-R11: Save is disabled when the app's settings failed to load", async () => {
+      svc.getAppSettings = vi.fn(async () => {
+        throw { response: { status: 503, data: {} } };
+      });
+      await mountFunnels({ funnel: encodeDef(LOGIN_WEB) });
+      await settle();
+      const save = wrapper!.find('[data-test="rum-analytics-funnel-save-btn"]');
+      expect(save.exists()).toBe(true);
+      expect(save.attributes("disabled")).toBeDefined();
+    });
+
+    it("P6-R2: a saved funnel with an unknown key in an exclusion shows This funnel needs a newer version", async () => {
+      const row = api.seedFunnel("web", "Future", {
+        ...LOGIN_WEB,
+        x: [{ s: ["p", "/web/ingestion"], a: 1, b: 2, zz: 1 }],
+      });
+      await mountFunnels({ sf: row.id });
+      await settle();
+      expect(pageText()).toContain("This funnel needs a newer version");
+    });
+
+    it("P6-R2: a funnel link with an unknown key in a step's options shows This funnel needs a newer version", async () => {
+      await mountFunnels({
+        funnel: encodeDef({
+          ...LOGIN_WEB,
+          s: [["p", "/web/login", { min: 1000, zz: 1 }], ...LOGIN_WEB.s.slice(1)],
+        } as never),
+      });
+      await settle();
+      expect(pageText()).toContain("This funnel needs a newer version");
+    });
+
+    it("P7-R12: a Sessions funnel with an exclusion says Exclusions are checked per session", async () => {
+      await mountFunnels({ funnel: THREE("sessions", "session", [BETWEEN]) });
+      await settle();
+      expect(pageText()).toContain("Exclusions are checked per session");
+      expect(pageText()).not.toContain("across sessions within");
+    });
+
+    it("P7-R12: a Users funnel with a 7d window says the exclusions are checked across sessions within 7 days", async () => {
+      await mountFunnels({ funnel: THREE("users", "7d", [BETWEEN]) });
+      await settle();
+      expect(pageText()).toContain("across sessions within 7 days");
+      expect(pageText()).not.toContain("Exclusions are checked per session");
+    });
+
+    it("P7-R12: a Users funnel with a 1d window says Exclusions are checked across sessions within 1 day", async () => {
+      await mountFunnels({ funnel: THREE("users", "1d", [BETWEEN]) });
+      await settle();
+      expect(pageText()).toContain("Exclusions are checked across sessions within 1 day");
+    });
+
+    it("P7-R12: removing a step an exclusion references drops that exclusion and toasts its name", async () => {
+      await mountFunnels({ funnel: THREE("sessions", "session", [BETWEEN]) });
+      await settle();
+      toastSpy.mockClear();
+      await wrapper!.find('[data-test="rum-analytics-funnel-step-2-remove"]').trigger("click");
+      await settle();
+      const sent = decodeDef(router.currentRoute.value.query.funnel as string) as {
+        s: unknown[];
+        x?: unknown[];
+      };
+      expect(sent.s).toEqual([
+        ["p", "/web"],
+        ["p", "/web/logs"],
+      ]);
+      expect(sent.x ?? []).toEqual([]);
+      const messages = toastSpy.mock.calls.map((c) =>
+        String((c[0] as { message: unknown }).message),
+      );
+      expect(messages.some((m) => m.includes("/web/ingestion"))).toBe(true);
+    });
+
+    it("P7-R13: the By app table says named events use the primary app's rules and marks an app without a settings row built-in rule only", async () => {
+      svc.getAppSettings = vi.fn(async (_org: string, app: string) => ({
+        data:
+          app === "web"
+            ? settingsOf(app)
+            : settingsOf(app, {
+                id: null,
+                version: 0,
+                createdBy: null,
+                createdAt: null,
+                updatedBy: null,
+                updatedAt: null,
+              }),
+      }));
+      routes = [
+        [
+          /AS app, COUNT/,
+          [
+            { app: "web", sessions: 500 },
+            { app: "web-eu1", sessions: 200 },
+          ],
+        ],
+        [
+          /SELECT dim, /,
+          [
+            { dim: "web", c1: 150, c2: 60 },
+            { dim: "web-eu1", c1: 50, c2: 20 },
+          ],
+        ],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels({ apps: "web-eu1", funnel: encodeDef({ ...LOGIN_WEB, b: "app" }) });
+      await settle();
+      expect(pageText()).toContain("Named events use web's rules");
+      const rows = wrapper!.findAll('[data-test^="rum-analytics-funnel-breakdown-row-"]');
+      const eu1 = rows.find((r) => r.text().includes("web-eu1"));
+      const primary = rows.find((r) => r.text().includes("web") && !r.text().includes("web-eu1"));
+      expect(eu1?.text()).toContain("built-in rule only");
+      expect(primary?.text()).not.toContain("built-in rule only");
+    });
+
+    const PICKER_ROWS = [
+      { kind: "p", k: "/web", sessions: 10, at: null },
+      { kind: "c", k: "save-btn", sessions: 8, at: "click" },
+    ];
+    const openPicker = async (pickerRows: Hit[]) => {
+      api.seedEvent("web", "Opened logs");
+      // The pickers read action_type and error_message only when the stream has them.
+      usePerformance().performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: {
+          usr_email: { name: "usr_email" },
+          user_agent_user_agent_family: { name: "b" },
+          action_type: { name: "action_type" },
+          error_message: { name: "error_message" },
+        },
+      };
+      routes = [
+        [
+          /substr\(error_message, 1, 120\) AS k/,
+          [{ k: "Failed to fetch billing info", sessions: 4 }],
+        ],
+        [/\bAS at\b/, pickerRows],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      await setSteps([["p", "/a"]]);
+      const picker = wrapper!
+        .findAllComponents(OSelect)
+        .find((s) => s.attributes("data-test") === "rum-analytics-funnel-add-step-select")!;
+      await picker.find("button").trigger("click");
+      picker.vm.$emit("open");
+      await settle();
+      return picker;
+    };
+    const optionEl = (label: string) =>
+      [...document.querySelectorAll('[role="option"]')].find((el) =>
+        el.textContent?.includes(label),
+      );
+
+    it("P7-R15: the step picker groups Named events, Clicks and custom actions with a custom action tagged Event, and Errors", async () => {
+      const picker = await openPicker([
+        ...PICKER_ROWS,
+        { kind: "c", k: "signup_completed", sessions: 5, at: "custom" },
+      ]);
+      const options = picker.props("options") as { label: string; header?: boolean }[];
+      const headers = options.filter((o) => o.header).map((o) => String(o.label));
+      expect(headers).toEqual(
+        expect.arrayContaining(["Named events", "Clicks and custom actions", "Errors"]),
+      );
+      const errorsAt = options.findIndex((o) => o.header && String(o.label) === "Errors");
+      expect(options.slice(errorsAt + 1).map((o) => String(o.label))).toContain(
+        "Failed to fetch billing info",
+      );
+      expect(optionEl("signup_completed")?.textContent).toContain("Event");
+      expect(optionEl("save-btn")?.textContent).not.toContain("Event");
+      expect(pageText()).not.toContain("No custom actions in range");
+    });
+
+    it("P7-R15: with no custom actions in range the clicks group says why", async () => {
+      await openPicker(PICKER_ROWS);
+      expect(pageText()).toContain(
+        "No custom actions in range. Custom actions come only from users with telemetry on",
+      );
+    });
+
+    const NOTE = "Uses this app's exclusions as of now; re-create it after they change";
+
+    it("P7-R17: Alert me hands the alert form a note that it keeps this app's exclusions as of creation", async () => {
+      alertCreationDialog.value = null;
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      await wrapper!.find('[data-test="rum-analytics-funnel-alert-btn"]').trigger("click");
+      const prefill = alertCreationDialog.value!.prefill;
+      const lines = prefill.warnings.map((w) =>
+        String(i18n.global.t(`alerts.prefill.warnings.${w.key}`, w.params ?? {})),
+      );
+      expect(lines.some((l) => l.includes(NOTE))).toBe(true);
+      alertCreationDialog.value = null;
+    });
+
+    it("P7-R17: Add to dashboard carries a note that the panel keeps this app's exclusions as of creation", async () => {
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      await wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').trigger("click");
+      await flushPromises();
+      expect(String(wrapper!.findComponent({ name: "AddToDashboard" }).props("notice"))).toContain(
+        NOTE,
+      );
     });
   });
 });
