@@ -331,6 +331,8 @@ fn restore_corrected(
         .map(|s| s.slice_start)
         .collect();
     restored.retain(|s| !s.group_key.is_empty() || !grouped_starts.contains(&s.slice_start));
+    // A window's overall filler too, so `exact_rollup` writes the only overall row.
+    slices.retain(|s| !s.group_key.is_empty() || !grouped_starts.contains(&s.slice_start));
     let added = restored.len();
     slices.extend(restored);
     added
@@ -585,6 +587,28 @@ mod tests {
                 .iter()
                 .any(|s| s.group_key == "region=us" && s.slice_start == 600)
         );
+    }
+
+    /// A grouped time-slice SLO with no data in the slice, after a correction and after a cancel.
+    #[test]
+    fn a_restore_leaves_exactly_one_overall_row_per_slice() {
+        let mut before = keys(&[300]);
+        before.insert(("region=eu".to_string(), 300));
+        before.insert(("region=us".to_string(), 300));
+        let corrected = [window("dt", 300, 600, SloCorrectionMode::Exclude)];
+        for windows in [&corrected[..], &[]] {
+            let mut slices = Vec::new();
+            apply(&mut slices, windows, &before, SliType::TimeSlice, &params());
+            let rollup = super::super::ingest::exact_rollup(&slices, &params());
+            slices.extend(rollup);
+            let overall: Vec<&SliceRow> =
+                slices.iter().filter(|s| s.group_key.is_empty()).collect();
+            assert_eq!(overall.len(), 1, "{overall:?}");
+            assert_eq!((overall[0].slice_start, overall[0].rev), (300, 7));
+            assert_eq!((overall[0].good, overall[0].total), (0.0, 0.0));
+            let expected = windows.first().map(|w| w.downtime_id.as_str());
+            assert_eq!(overall[0].corrected_by.as_deref(), expected);
+        }
     }
 
     #[test]

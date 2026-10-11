@@ -64,6 +64,8 @@ describe("zone conversion", () => {
   it("returns null for a malformed date or time", () => {
     expect(localToUtcMicros("20-09-2026", "02:00", "UTC")).toBeNull();
     expect(localToUtcMicros("2026-09-20", "2am", "UTC")).toBeNull();
+    expect(localToUtcMicros("2026-13-01", "00:00", "UTC")).toBeNull();
+    expect(localToUtcMicros("2026-02-30", "00:00", "UTC")).toBeNull();
   });
 });
 
@@ -143,6 +145,79 @@ describe("currentOrNextWindow", () => {
       start: micros("2026-09-18T18:00:00Z"),
       end: micros("2026-09-21T06:00:00Z"),
     });
+  });
+});
+
+describe("DST, as the server resolves it", () => {
+  const daily = (time: string, duration: number): DowntimeSchedule => ({
+    repeat: "daily",
+    starts_at: micros("2026-01-01T05:00:00Z"),
+    ends_at: null,
+    timezone: "America/New_York",
+    start_time_local: time,
+    duration_secs: duration,
+    weekdays: [],
+  });
+
+  it("moves a start in the spring-forward gap to the first valid minute", () => {
+    expect(localToUtcMicros("2026-03-08", "02:30", "America/New_York")).toBe(
+      micros("2026-03-08T07:00:00Z"),
+    );
+    expect(currentOrNextWindow(daily("02:30", 3600), micros("2026-03-08T06:00:00Z"))?.start).toBe(
+      micros("2026-03-08T07:00:00Z"),
+    );
+  });
+
+  it.each(["UTC", "Asia/Kolkata", "America/New_York", "Europe/Berlin"])(
+    "takes the earlier instant of a fall-back hour on a %s host",
+    (host) => {
+      const saved = process.env.TZ;
+      process.env.TZ = host;
+      try {
+        expect(localToUtcMicros("2026-11-01", "01:30", "America/New_York")).toBe(
+          micros("2026-11-01T05:30:00Z"),
+        );
+        expect(localToUtcMicros("2026-10-25", "02:30", "Europe/Berlin")).toBe(
+          micros("2026-10-25T00:30:00Z"),
+        );
+        expect(
+          currentOrNextWindow(daily("01:30", 3600), micros("2026-11-01T04:00:00Z"))?.start,
+        ).toBe(micros("2026-11-01T05:30:00Z"));
+        // A full-day window that ends in the repeated hour ends at its first occurrence.
+        const berlin = { ...daily("02:30", 86_400), timezone: "Europe/Berlin" };
+        expect(currentOrNextWindow(berlin, micros("2026-10-24T12:00:00Z"))).toEqual({
+          start: micros("2026-10-24T00:30:00Z"),
+          end: micros("2026-10-25T00:30:00Z"),
+        });
+      } finally {
+        process.env.TZ = saved;
+      }
+    },
+  );
+
+  it("runs a full-day daily rule midnight to midnight with no overlap and no gap", () => {
+    const full = daily("00:00", 86_400);
+    expect(currentOrNextWindow(full, micros("2026-03-08T12:00:00Z"))).toEqual({
+      start: micros("2026-03-08T05:00:00Z"),
+      end: micros("2026-03-09T04:00:00Z"),
+    });
+    expect(currentOrNextWindow(full, micros("2026-11-02T04:30:00Z"))).toEqual({
+      start: micros("2026-11-01T04:00:00Z"),
+      end: micros("2026-11-02T05:00:00Z"),
+    });
+    const weekend = { ...full, repeat: "weekly" as const, weekdays: [6, 7] };
+    expect(currentOrNextWindow(weekend, micros("2026-11-02T04:30:00Z"))).toEqual({
+      start: micros("2026-11-01T04:00:00Z"),
+      end: micros("2026-11-02T05:00:00Z"),
+    });
+    expect(currentOrNextWindow(weekend, micros("2026-03-08T12:00:00Z"))?.end).toBe(
+      micros("2026-03-09T04:00:00Z"),
+    );
+    for (const now of ["2026-03-11T04:00:00Z", "2026-11-04T05:00:00Z"]) {
+      const got = recentWindows(full, micros(now), 5);
+      expect(got).toHaveLength(5);
+      for (let i = 1; i < got.length; i += 1) expect(got[i].start).toBe(got[i - 1].end);
+    }
   });
 });
 

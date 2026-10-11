@@ -98,6 +98,7 @@ const scheduleSchema = z.object({
   until_date: z.string(),
   timezone: z.string(),
   starts_at: z.number().nullable(),
+  ends_at: z.number().nullable(),
   starts_at_timezone: z.string().nullable(),
 });
 
@@ -281,7 +282,9 @@ const notifyIssues = (n: NotifyFormValues, s: ScheduleFormValues, t: TranslateFn
   }
   const lead = parseDuration(n.lead);
   const window = windowSecs(s);
-  const outside = lead === null || lead < MIN_DURATION_SECS || (window !== null && lead > window);
+  // A recurring full-day window is an hour shorter on a spring-forward day, as the server bounds it.
+  const max = s.repeat !== "none" && window === 86_400 ? window - 3600 : window;
+  const outside = lead === null || lead < MIN_DURATION_SECS || (max !== null && lead > max);
   if (n.ending_soon && outside) {
     issues.push({
       path: ["notifications", "lead"],

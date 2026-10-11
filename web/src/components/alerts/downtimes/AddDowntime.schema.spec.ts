@@ -220,6 +220,18 @@ describe("AddDowntime schema, notifications", () => {
     expect(errorsOf(notifying({ lead: "2h", ending_soon: false }))).toEqual({});
   });
 
+  it("caps the lead of a recurring full-day rule at 23 hours, its spring-forward length", () => {
+    const fullDay = (lead: string) => {
+      const v = notifying({ lead });
+      v.schedule = { ...v.schedule, repeat: "daily", start_time: "00:00", duration: "1d" };
+      return v;
+    };
+    expect(errorsOf(fullDay("24h"))["notifications.lead"]).toBe(
+      "The reminder must come between 1 minute and the window length before the end.",
+    );
+    expect(errorsOf(fullDay("23h"))).toEqual({});
+  });
+
   it("refuses more than ten destinations", () => {
     const destinations = Array.from({ length: 11 }, (_, i) => `d${i}`);
     expect(errorsOf(notifying({ destinations }))["notifications.destinations"]).toBe(

@@ -213,7 +213,7 @@ pub async fn create(
 ) -> Result<Downtime, DowntimeError> {
     ensure_enabled()?;
     let folder_id = resolve_folder(org, &req.folder_id).await?;
-    let req = checked_request(org, user_id, req, None).await?;
+    let req = checked_request(org, user_id, req, None, true).await?;
     check_room(org)?;
     let now = now_micros();
     let mut downtime = created(org, folder_id, &req, user_id, now);
@@ -240,7 +240,7 @@ pub async fn update(
     let before = load(org, id).await?;
     access::authorize_row(org, user_id, &before, "PUT").await?;
     check_version(req.version, &before)?;
-    let req = checked_request(org, user_id, req, Some(&before)).await?;
+    let req = checked_request(org, user_id, req, Some(&before), true).await?;
     let continues = before
         .notifications
         .as_ref()
@@ -342,7 +342,7 @@ pub async fn extend(
         ));
     }
     let follow_up = follow_up(&before, window.end, new_end, user_id, now);
-    checked_request(org, user_id, request_of(&follow_up), Some(&before)).await?;
+    checked_request(org, user_id, request_of(&follow_up), Some(&before), false).await?;
     check_room(org)?;
     let plan = remeasure_plan(None, &follow_up).await?;
     if !db::downtimes::set_if_parent_unchanged(
@@ -595,7 +595,7 @@ async fn extend_once(
     now: i64,
 ) -> Result<Downtime, DowntimeError> {
     let after = extended_once(before, new_end, user_id, now);
-    checked_request(org, user_id, request_of(&after), Some(before)).await?;
+    checked_request(org, user_id, request_of(&after), Some(before), false).await?;
     let plan = remeasure_plan(Some(before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
     plan.trigger(&after.id).await;
@@ -754,14 +754,13 @@ async fn checked_request(
     user_id: &str,
     mut req: DowntimeRequest,
     stored: Option<&Downtime>,
+    check_destinations: bool,
 ) -> Result<DowntimeRequest, DowntimeError> {
     let groups = db::system_settings::get_semantic_field_groups(org).await;
     validate(&req, &groups).map_err(DowntimeError::BadRequest)?;
     span_as_duration(&mut req.schedule);
     if let Some(notifications) = &req.notifications {
-        let known = existing_destinations(org, notifications).await?;
-        validate_notifications(notifications, &req.schedule, |name| known.contains(name))
-            .map_err(DowntimeError::BadRequest)?;
+        check_notifications(org, notifications, &req.schedule, check_destinations).await?;
     }
     req.condition = req.condition.as_ref().map(normalized_condition);
     for target in &mut req.targets {
@@ -773,6 +772,24 @@ async fn checked_request(
         access::check_targets(org, user_id, &req.targets, &inventory).await?;
     }
     Ok(req)
+}
+
+/// An extend keeps the saved destinations, which the delete guard holds.
+async fn check_notifications(
+    org: &str,
+    notifications: &DowntimeNotifications,
+    schedule: &DowntimeSchedule,
+    check_destinations: bool,
+) -> Result<(), DowntimeError> {
+    let known = if check_destinations {
+        Some(existing_destinations(org, notifications).await?)
+    } else {
+        None
+    };
+    validate_notifications(notifications, schedule, |name| {
+        known.as_ref().is_none_or(|known| known.contains(name))
+    })
+    .map_err(DowntimeError::BadRequest)
 }
 
 /// Unchanged stored targets and condition were checked when written; dropping a condition widens.
@@ -2008,6 +2025,34 @@ mod tests {
                 Ok(())
             );
         }
+    }
+
+    #[tokio::test]
+    async fn an_extend_keeps_a_destination_that_no_longer_exists_but_checks_the_lead() {
+        let all = NotificationEvents {
+            started: true,
+            ending_soon: true,
+            ended: true,
+            cancelled: true,
+            extended: true,
+        };
+        let before = row(vec![TargetModule::Alerts], 10 * HOUR, 12 * HOUR);
+        let after = extended_once(&notifying(before, all, 600), 13 * HOUR, "ops", 11 * HOUR);
+        let req = request_of(&after);
+        let n = req.notifications.clone().unwrap();
+        assert!(
+            check_notifications("acme", &n, &req.schedule, false)
+                .await
+                .is_ok()
+        );
+        let too_early = DowntimeNotifications {
+            ending_soon_lead_secs: 10 * 3_600,
+            ..n
+        };
+        assert!(matches!(
+            check_notifications("acme", &too_early, &req.schedule, false).await,
+            Err(DowntimeError::BadRequest(_))
+        ));
     }
 
     #[test]

@@ -86,25 +86,19 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
     apply(msg, get_o2_config().downtimes.enabled).await
 }
 
-/// With the flag off the message is acked unapplied, as the local routes refuse every write.
+/// With the flag off the row is still written and only the side effects are skipped.
 async fn apply(msg: DowntimeMessage, enabled: bool) -> Result<()> {
-    if !enabled {
-        log::debug!("[DOWNTIMES] downtimes are off here, skipping a replicated message");
-        return Ok(());
-    }
     match msg {
         DowntimeMessage::Put { org, mut downtime } => {
             downtime.org = org;
             downtime.folder_id = local_folder_id(&downtime).await?;
             let client = infra::db::get_orm_client_rw().await;
-            let planner = |before: Option<Downtime>, after: Downtime| -> PlanFuture<'static> {
-                Box::pin(async move {
-                    corrections::plan_for_downtime(&after.org, before.as_ref(), &after).await
-                })
-            };
-            let Some(written) = apply_put(client, &downtime, &planner).await? else {
+            let Some(written) = apply_put(client, &downtime, &planner(enabled)).await? else {
                 return Ok(());
             };
+            if !enabled {
+                return Ok(());
+            }
             // A redelivered Put sees no coverage change, so the mutes go before the emit.
             if written.planned.coverage_changed {
                 openobserve_core::downtimes::forget_recorded_mutes(&downtime.org, &downtime.id)
@@ -129,14 +123,34 @@ async fn apply(msg: DowntimeMessage, enabled: bool) -> Result<()> {
                 table::folders::get_or_create(&org, default_folder(), FolderType::Downtimes)
                     .await?;
             }
-            // Mutes first: a failed emit is redelivered, and then the delete no longer applies.
-            let after: AfterDelete<'_> = Box::pin(async {
-                openobserve_core::downtimes::forget_recorded_mutes(&org, &id).await;
-                coordinator::downtimes::emit_delete_event(&org, &id).await
-            });
+            let after = after_delete(&org, &id, enabled);
             apply_delete_message(client, &org, &id, version, deleted_at, after).await
         }
     }
+}
+
+/// The region's re-measure planner; with the flag off it plans nothing, so no SLO job is queued.
+fn planner(enabled: bool) -> impl Fn(Option<Downtime>, Downtime) -> PlanFuture<'static> + Sync {
+    move |before: Option<Downtime>, after: Downtime| -> PlanFuture<'static> {
+        Box::pin(async move {
+            if !enabled {
+                return Ok(RemeasurePlan::default());
+            }
+            corrections::plan_for_downtime(&after.org, before.as_ref(), &after).await
+        })
+    }
+}
+
+/// What an applied Delete does next; nothing with the flag off.
+fn after_delete<'a>(org: &'a str, id: &'a str, enabled: bool) -> AfterDelete<'a> {
+    Box::pin(async move {
+        if !enabled {
+            return Ok(());
+        }
+        // Mutes first: a failed emit is redelivered, and then the delete no longer applies.
+        openobserve_core::downtimes::forget_recorded_mutes(org, id).await;
+        coordinator::downtimes::emit_delete_event(org, id).await
+    })
 }
 
 /// Runs `after` only when the delete applied, as the local delete clears the mutes of its row.
@@ -207,7 +221,7 @@ async fn apply_put<'a, C: ConnectionTrait + TransactionTrait>(
         let Some(planned) = plan_put(conn, downtime).await? else {
             return Ok(None);
         };
-        let plan = remeasure_plan(&planned, planner).await;
+        let plan = remeasure_plan(&planned, planner).await?;
         if write_put(conn, &planned, &plan).await? {
             return Ok(Some(WrittenPut { planned, plan }));
         }
@@ -317,25 +331,26 @@ fn delete_applies(stored: RowVersion, version: i64, deleted_at: i64) -> bool {
     }
 }
 
-/// Re-measures are per region; a failed plan still writes the row and the next edit re-plans.
+/// A failed plan writes nothing, so the queue redelivers, as a failed `queue_remeasures` does.
 async fn remeasure_plan<'a>(
     planned: &PlannedPut,
     planner: &(dyn Fn(Option<Downtime>, Downtime) -> PlanFuture<'a> + Sync),
-) -> RemeasurePlan {
+) -> Result<RemeasurePlan> {
     let (before, after) = (planned.before.as_ref(), &planned.downtime);
     if !openobserve_core::downtimes::corrections_may_change(before, after) {
-        return RemeasurePlan::default();
+        return Ok(RemeasurePlan::default());
     }
-    planner(before.cloned(), after.clone())
-        .await
-        .unwrap_or_else(|e| {
-            log::error!(
-                "[DOWNTIMES] could not plan the SLO re-measure of {}/{}, writing it without one: {e}",
-                after.org,
-                after.id
-            );
-            RemeasurePlan::default()
-        })
+    planner(before.cloned(), after.clone()).await.map_err(|e| {
+        log::error!(
+            "[DOWNTIMES] could not plan the SLO re-measure of {}/{}, leaving the put for redelivery: {e}",
+            after.org,
+            after.id
+        );
+        Error::Message(format!(
+            "[DOWNTIMES] SLO re-measure plan of {}/{} failed: {e}",
+            after.org, after.id
+        ))
+    })
 }
 
 /// A row that arrives before its folder is filed in the default folder until its next edit.
@@ -1003,22 +1018,31 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_put_whose_plan_fails_still_stores_the_row_and_queues_nothing() {
-        let (db, _) = slo_db().await;
-        let planner = |_: Option<Downtime>, _: Downtime| -> PlanFuture<'static> {
+    async fn a_put_whose_plan_fails_writes_no_row_and_its_redelivery_does() {
+        let (db, slos) = slo_db().await;
+        let failing = |_: Option<Downtime>, _: Downtime| -> PlanFuture<'static> {
             Box::pin(async { Err(anyhow::anyhow!("SLO list unreadable")) })
         };
         let replicated = slo_downtime();
-        let written = apply_put(&db, &replicated, &planner)
-            .await
-            .unwrap()
-            .unwrap();
-        assert!(written.plan.jobs().is_empty());
+        assert!(apply_put(&db, &replicated, &failing).await.is_err());
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            None
+        );
+        assert!(jobs(&db).await.is_empty());
+
+        let planner = planner_over(&db, &slos);
+        assert!(
+            apply_put(&db, &replicated, &planner)
+                .await
+                .unwrap()
+                .is_some()
+        );
         assert_eq!(
             table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
             Some(replicated)
         );
-        assert!(jobs(&db).await.is_empty());
+        assert_eq!(jobs(&db).await.len(), 1);
     }
 
     #[tokio::test]
@@ -1066,21 +1090,43 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn with_downtimes_off_a_replicated_put_writes_nothing() {
-        // With the flag on the same Put reaches the folder lookup, which fails without a region
-        // database.
+    async fn with_downtimes_off_a_replicated_put_stores_the_row_and_queues_nothing() {
+        let (db, _) = slo_db().await;
+        let replicated = slo_downtime();
+        let written = apply_put(&db, &replicated, &planner(false))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(written.plan.jobs().is_empty());
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            Some(replicated)
+        );
+        assert!(jobs(&db).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn with_downtimes_off_a_replicated_delete_tombstones() {
+        let db = db().await;
+        put(&db, &versioned(1, 10)).await.unwrap();
+        apply_delete_message(&db, "acme", "d1", 2, 20, after_delete("acme", "d1", false))
+            .await
+            .unwrap();
+        assert_eq!(deleted_at(&db).await, 20);
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn with_downtimes_off_a_replicated_message_still_reaches_the_database() {
+        // Both flags reach the folder lookup, which fails without a region database.
         let put = || DowntimeMessage::Put {
             org: "acme".to_string(),
             downtime: Box::new(slo_downtime()),
         };
-        assert!(apply(put(), true).await.is_err(), "the flag-on path writes");
-        apply(put(), false).await.unwrap();
-        let delete = DowntimeMessage::Delete {
-            org: "acme".to_string(),
-            id: "d1".to_string(),
-            version: 2,
-            deleted_at: 20,
-        };
-        apply(delete, false).await.unwrap();
+        assert!(apply(put(), true).await.is_err());
+        assert!(apply(put(), false).await.is_err());
     }
 }

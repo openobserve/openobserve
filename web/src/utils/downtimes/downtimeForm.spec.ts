@@ -229,6 +229,31 @@ describe("buildDowntimeRequest", () => {
     expect(body.schedule.starts_at).toBe(midDay);
   });
 
+  it("keeps a quick mute's instants on a reason-only edit and rebuilds only the end it changes", () => {
+    const startsAt = Date.parse("2026-09-17T12:20:13.500Z") * 1000;
+    const endsAt = Date.parse("2026-09-17T12:30:59.900Z") * 1000;
+    const row: Downtime = {
+      ...flow1,
+      schedule: {
+        repeat: "none",
+        starts_at: startsAt,
+        ends_at: endsAt,
+        timezone: "UTC",
+        duration_secs: 646,
+        weekdays: [],
+      },
+    };
+    const values = { ...downtimeToFormValues(row), reason: "Rollback in progress" };
+    const same = buildDowntimeRequest(values).schedule;
+    expect([same.starts_at, same.ends_at]).toEqual([startsAt, endsAt]);
+    const moved = buildDowntimeRequest({
+      ...values,
+      schedule: { ...values.schedule, end_time: "13:00" },
+    }).schedule;
+    expect(moved.starts_at).toBe(startsAt);
+    expect(moved.ends_at).toBe(Date.parse("2026-09-17T13:00:00Z") * 1000);
+  });
+
   it("drops blank names and reasons so the backend generates a name", () => {
     const body = buildDowntimeRequest(defaultDowntimeValues(NOW, "UTC"));
     expect(body).not.toHaveProperty("name");

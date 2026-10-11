@@ -474,6 +474,7 @@ async fn dispatch_per_group(
         rows_by_group_key(records, &group_by)
     };
     let cfg = get_config();
+    let muted_groups = group_downtime_map(alert, folder_id, records).await;
 
     let plan = plan_dispatch(
         classification,
@@ -482,6 +483,7 @@ async fn dispatch_per_group(
         &alert.trigger_condition,
         now_micros(),
         cfg.limit.alert_max_group_notifications_per_eval,
+        |key| muted_groups.contains_key(key),
     );
 
     // Never silent: both the volume cap and any consistency failure are
@@ -509,19 +511,23 @@ async fn dispatch_per_group(
     let mut errors: Vec<String> = Vec::new();
     let mut delivered_groups: std::collections::HashSet<String> = Default::default();
     let (mut downtime_suppressed, mut downtime_id) = (0usize, None);
-    let muted_groups = group_downtime_map(alert, folder_id, records).await;
     let mut attempted = false;
+    // One group muted, the others notify: no send and no silence window for this group.
+    for key in &plan.muted {
+        let Some(downtime) = muted_groups.get(key) else {
+            continue;
+        };
+        log::info!(
+            "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {key}: suppressed by downtime {}",
+            downtime.id
+        );
+        crate::alerts::alert::count_suppressed_run(&alert.org_id, "alerts");
+        downtime_suppressed += 1;
+        downtime_id.get_or_insert(downtime.id.clone());
+    }
     for item in &plan.items {
-        // One group muted, the others notify: no send and no silence window for this group.
-        if let Some(downtime) = muted_groups.get(&item.group_key).cloned() {
-            log::info!(
-                "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: suppressed by downtime {}",
-                item.group_key,
-                downtime.id
-            );
-            crate::alerts::alert::count_suppressed_run(&alert.org_id, "alerts");
-            downtime_suppressed += 1;
-            downtime_id.get_or_insert(downtime.id);
+        // The plan already moved muted groups out; this only guards a send.
+        if muted_groups.contains_key(&item.group_key) {
             continue;
         }
         // The group's OWN row, level and value — never the worst group's

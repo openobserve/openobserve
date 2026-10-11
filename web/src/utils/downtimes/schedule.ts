@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime, getTimezoneOffset } from "date-fns-tz";
 import type { I18nText, TranslateFn } from "@/types/i18n";
 import { raw } from "@/types/i18n";
 import type { DowntimeSchedule, DowntimeWindow } from "@/services/downtimes";
@@ -25,6 +25,8 @@ export const ISO_WEEKDAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 const MICROS = 1_000_000;
 const DAY_MS = 86_400_000;
+const FULL_DAY_SECS = 86_400;
+const MAX_GAP_MINUTES = 180;
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -76,9 +78,28 @@ export function formatDuration(secs: number, t: TranslateFn): I18nText {
 /** A wall-clock date and time in `tz`, as microseconds UTC; `null` when either part is malformed. */
 export function localToUtcMicros(date: string, time: string, tz: string): number | null {
   if (!isYmd(date) || !isHhMm(time) || !tz) return null;
-  const ms = fromZonedTime(`${date}T${time}:00`, tz).getTime();
-  return Number.isFinite(ms) ? ms * 1000 : null;
+  const naive = Date.parse(`${date}T${time}:00Z`);
+  if (!Number.isFinite(naive) || new Date(naive).toISOString().slice(0, 10) !== date) return null;
+  // A wall time in a spring-forward gap moves to the first valid minute, as the server does.
+  for (let minutes = 0; minutes <= MAX_GAP_MINUTES; minutes += 1) {
+    const at = earliestInstant(naive + minutes * 60_000, tz);
+    if (at !== null) return at * 1000;
+  }
+  return null;
 }
+
+/** The earliest instant whose wall clock in `tz` reads `naive` (a UTC-labelled wall time), else `null`. */
+const earliestInstant = (naive: number, tz: string): number | null => {
+  const wall = new Date(naive).toISOString().slice(0, 16);
+  const candidates = [
+    fromZonedTime(`${wall}:00`, tz).getTime(),
+    ...[naive - DAY_MS, naive + DAY_MS].map((near) => naive - getTimezoneOffset(tz, near)),
+  ].filter((ms) => Number.isFinite(ms));
+  const valid = candidates.filter(
+    (ms) => formatInTimeZone(new Date(ms), tz, "yyyy-MM-dd'T'HH:mm") === wall,
+  );
+  return valid.length ? Math.min(...valid) : null;
+};
 
 export function utcMicrosToLocal(micros: number, tz: string): { date: string; time: string } {
   const at = new Date(Math.floor(micros / 1000));
@@ -105,6 +126,17 @@ const occursOn = (s: DowntimeSchedule, ymd: string): boolean => {
   return s.repeat !== "weekly" || s.weekdays.includes(isoWeekday(ymd));
 };
 
+/** A full-day window ends at the next day's start, so DST days neither overlap nor gap. */
+const windowEnd = (s: DowntimeSchedule, day: string, start: number): number => {
+  if (s.duration_secs !== FULL_DAY_SECS || !s.start_time_local) {
+    return start + s.duration_secs * MICROS;
+  }
+  return (
+    localToUtcMicros(addDays(day, 1), s.start_time_local, s.timezone) ??
+    start + s.duration_secs * MICROS
+  );
+};
+
 /** The window that is running at `nowMicros`, else the next one; recurring rows look 8 days ahead. */
 export function currentOrNextWindow(s: DowntimeSchedule, nowMicros: number): DowntimeWindow | null {
   if (s.repeat === "none") {
@@ -121,7 +153,7 @@ export function currentOrNextWindow(s: DowntimeSchedule, nowMicros: number): Dow
     const start = localToUtcMicros(day, s.start_time_local, s.timezone);
     // The server skips an occurrence that starts before `starts_at`, e.g. 09:00 on a day that starts at 13:00.
     if (start === null || start < s.starts_at) continue;
-    const end = start + s.duration_secs * MICROS;
+    const end = windowEnd(s, day, start);
     if (end > nowMicros) return { start, end };
   }
   return null;
@@ -144,7 +176,7 @@ export function recentWindows(
     if (!occursOn(s, day)) continue;
     const start = localToUtcMicros(day, s.start_time_local, s.timezone);
     if (start === null || start < s.starts_at) continue;
-    const end = start + s.duration_secs * MICROS;
+    const end = windowEnd(s, day, start);
     if (end <= nowMicros) found.push({ start, end });
   }
   return found.reverse();

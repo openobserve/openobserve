@@ -95,9 +95,11 @@ export interface ScheduleFormValues {
   weekdays: number[];
   until_date: string;
   timezone: string;
-  /** A loaded recurring row's `starts_at`, kept while `start_date` and `timezone` are unchanged so a mid-day start survives an edit. */
+  /** A loaded row's `starts_at`, kept while its local date (and time, for a one-time row) and `timezone` are unchanged. */
   starts_at: number | null;
-  /** The zone `starts_at` was loaded in. */
+  /** A loaded one-time row's `ends_at`, kept while `end_date`, `end_time` and `timezone` are unchanged. */
+  ends_at: number | null;
+  /** The zone `starts_at` and `ends_at` were loaded in. */
   starts_at_timezone: string | null;
 }
 
@@ -189,6 +191,7 @@ export function defaultDowntimeValues(nowMs: number, timezone: string): Downtime
       until_date: "",
       timezone,
       starts_at: null,
+      ends_at: null,
       starts_at_timezone: null,
     },
     reason: "",
@@ -196,6 +199,9 @@ export function defaultDowntimeValues(nowMs: number, timezone: string): Downtime
     notifications: emptyNotify(),
   };
 }
+
+/** A one-time row's loaded instants are not a series start, nor the reverse. */
+const LOADED_NONE = { starts_at: null, ends_at: null, starts_at_timezone: null };
 
 /** The schedule after the user picks another repeat: once on the next full hour, recurring from today, weekly on today's weekday. */
 export function scheduleForRepeat(
@@ -208,6 +214,7 @@ export function scheduleForRepeat(
     const once = defaultDowntimeValues(nowMs, timezone).schedule;
     return {
       ...s,
+      ...LOADED_NONE,
       repeat,
       start_date: once.start_date,
       start_time: once.start_time,
@@ -218,7 +225,7 @@ export function scheduleForRepeat(
   const today = utcMicrosToLocal(nowMs * 1000, timezone).date;
   const weekdays =
     repeat === "weekly" && s.weekdays.length === 0 ? [isoWeekday(today)] : [...s.weekdays];
-  return { ...s, repeat, start_date: today, weekdays };
+  return { ...s, ...(s.repeat === "none" ? LOADED_NONE : {}), repeat, start_date: today, weekdays };
 }
 
 export function notifyAfterPick(prev: NotifyFormValues, destinations: string[]): NotifyFormValues {
@@ -303,10 +310,19 @@ const recurringStartsAt = (s: ScheduleFormValues): number => {
   return localToUtcMicros(s.start_date, "00:00", s.timezone) ?? 0;
 };
 
+/** A one-time instant stays as loaded while its date, time and zone are unchanged, so seconds survive an edit. */
+const onceAt = (s: ScheduleFormValues, loaded: number | null, date: string, time: string) => {
+  if (loaded !== null && s.starts_at_timezone === s.timezone) {
+    const local = utcMicrosToLocal(loaded, s.timezone);
+    if (local.date === date && local.time === time) return loaded;
+  }
+  return localToUtcMicros(date, time, s.timezone);
+};
+
 export function buildSchedule(s: ScheduleFormValues): DowntimeSchedule {
   if (s.repeat === "none") {
-    const startsAt = localToUtcMicros(s.start_date, s.start_time, s.timezone) ?? 0;
-    const endsAt = localToUtcMicros(s.end_date, s.end_time, s.timezone) ?? startsAt;
+    const startsAt = onceAt(s, s.starts_at, s.start_date, s.start_time) ?? 0;
+    const endsAt = onceAt(s, s.ends_at, s.end_date, s.end_time) ?? startsAt;
     return {
       repeat: "none",
       starts_at: startsAt,
@@ -389,8 +405,9 @@ const scheduleValues = (s: DowntimeSchedule): ScheduleFormValues => {
     weekdays: [...s.weekdays],
     until_date: once ? "" : end.date,
     timezone: s.timezone,
-    starts_at: once ? null : s.starts_at,
-    starts_at_timezone: once ? null : s.timezone,
+    starts_at: s.starts_at,
+    ends_at: once ? (s.ends_at ?? null) : null,
+    starts_at_timezone: s.timezone,
   };
 };
 
