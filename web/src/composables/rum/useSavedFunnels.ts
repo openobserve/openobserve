@@ -21,14 +21,22 @@ import { rumPaError } from "@/utils/rum/rumPaApiError";
 import {
   MAX_FUNNELS_PER_APP,
   fitsSqlCap,
+  parseFunnelDef,
   parseSavedFunnel,
   parseSavedFunnelDraft,
   type SavedFunnel,
+  type SavedFunnelBody,
 } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef } from "@/utils/rum/productAnalyticsQueries";
 import { createScopedList } from "@/composables/rum/scopedList";
 
-export type SavedFunnelDraft = { name: string; description?: string; def: FunnelDef; sql: string };
+export type SavedFunnelDraft = {
+  name: string;
+  description?: string;
+  def: FunnelDef;
+  sql: string;
+  rulesHash?: string;
+};
 export type SaveFunnelResult =
   | { kind: "saved"; funnel: SavedFunnel }
   | { kind: "conflict"; current: SavedFunnel }
@@ -57,18 +65,49 @@ const refuse = (message: I18nText): never => {
   throw new Error(message);
 };
 
+// A node from before rules_hash rejects the unknown field with a 400, so the save is retried once without it.
+const sendWithoutHashOnOldNode = async <T>(
+  send: (b: SavedFunnelBody) => Promise<T>,
+  body: SavedFunnelBody,
+): Promise<T> => {
+  try {
+    return await send(body);
+  } catch (e) {
+    const { status, code } = rumPaError(e);
+    // Only an unknown-field rejection is an old node; a body without a code is treated the same.
+    if (body.rules_hash === undefined || status !== 400 || (code && code !== "invalid_body"))
+      throw e;
+    const older = { ...body };
+    delete older.rules_hash;
+    return send(older);
+  }
+};
+
 export default function useSavedFunnels() {
+  /** Like fetchOne, but "unreadable" for this app's row whose definition this build cannot read. */
+  const readOne = async (
+    org: string,
+    app: string,
+    id: string,
+  ): Promise<SavedFunnel | null | "failed" | "unreadable"> => {
+    try {
+      const row = (await api.getFunnel(org, app, id)).data as Record<string, unknown> | null;
+      const funnel = parseSavedFunnel(row, app);
+      if (funnel) return funnel;
+      return row?.app === app && !parseFunnelDef(row.def) ? "unreadable" : null;
+    } catch (e) {
+      return rumPaError(e).status === 404 ? null : "failed";
+    }
+  };
+
   /** One funnel by id, for a link that arrives before the list; null only when confirmed absent or unreadable. */
   const fetchOne = async (
     org: string,
     app: string,
     id: string,
   ): Promise<SavedFunnel | null | "failed"> => {
-    try {
-      return parseSavedFunnel((await api.getFunnel(org, app, id)).data, app);
-    } catch (e) {
-      return rumPaError(e).status === 404 ? null : "failed";
-    }
+    const res = await readOne(org, app, id);
+    return res === "unreadable" ? null : res;
   };
 
   const nameTaken = (name: string, exceptId?: string): boolean =>
@@ -99,13 +138,16 @@ export default function useSavedFunnels() {
   ): Promise<SaveFunnelResult> => {
     if (!opened && funnels.value.length >= MAX_FUNNELS_PER_APP) refuse(capMessage());
     if (!fitsSqlCap(draft.sql)) refuse(gt("rum.analytics.saved.sqlTooLarge"));
-    const body = parseSavedFunnelDraft(draft);
-    if (!body) return refuse(gt("rum.analytics.saved.invalid"));
+    const parsed = parseSavedFunnelDraft(draft);
+    if (!parsed) return refuse(gt("rum.analytics.saved.invalid"));
+    const body = draft.rulesHash ? { ...parsed, rules_hash: draft.rulesHash } : parsed;
+    const send = (b: SavedFunnelBody) =>
+      opened
+        ? api.updateFunnel(org, app, opened.id, { ...b, version: opened.version })
+        : api.createFunnel(org, app, b);
     let row: unknown;
     try {
-      row = opened
-        ? (await api.updateFunnel(org, app, opened.id, { ...body, version: opened.version })).data
-        : (await api.createFunnel(org, app, body)).data;
+      row = (await sendWithoutHashOnOldNode(send, body)).data;
     } catch (e) {
       const err = rumPaError(e);
       if (err.code === "duplicate_name") return { kind: "duplicate" };
@@ -160,6 +202,7 @@ export default function useSavedFunnels() {
     status,
     ensure,
     fetchOne,
+    readOne,
     nameTaken,
     save,
     remove,
