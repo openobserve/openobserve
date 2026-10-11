@@ -239,7 +239,7 @@ async fn try_finish(
     now: i64,
 ) -> Result<bool, anyhow::Error> {
     let generation = slo.definition_generation;
-    finish_with_rebuilds(db, &slo.id, generation, version, now, move || async move {
+    let rebuild = move || async move {
         if remeasure {
             Ok((
                 super::reconcile::rebuild(slo).await?,
@@ -248,8 +248,8 @@ async fn try_finish(
         } else {
             Ok((super::reconcile::Rebuild::default(), None))
         }
-    })
-    .await
+    };
+    finish_with_rebuilds(db, &slo.id, generation, version, now, rebuild).await
 }
 
 /// Finishes on a current rebuild; a watermark that never holds still marks the job done.
@@ -284,11 +284,22 @@ where
         }
         last_burn = burn;
     }
-    // The slo_maintenance sweep reconciles the aggregate; the burn merge accepts a newer watermark.
-    log::warn!("[slo] {slo_id} kept moving through its re-measure finish; the sweep reconciles it");
+    // The burn merge accepts a newer watermark; one more guarded rebuild corrects the aggregate.
+    log::warn!("[slo] {slo_id} kept moving through its re-measure finish; reconciling it");
     let rebuilt = super::reconcile::Rebuild::default();
     let burn = last_burn.as_ref();
     let finished = finish_job(db, slo_id, generation, version, now, &rebuilt, burn).await?;
+    let reconciled = match rebuild().await {
+        Ok((rebuilt, _)) => write_if_current(db, slo_id, generation, &rebuilt).await,
+        Err(e) => Err(e),
+    };
+    match reconciled {
+        Ok(true) => {}
+        Ok(false) => {
+            log::warn!("[slo] {slo_id} moved during its reconcile; the sweep reconciles it")
+        }
+        Err(e) => log::warn!("[slo] reconcile of {slo_id} failed; the sweep reconciles it: {e}"),
+    }
     Ok(finished == Finish::Done)
 }
 
@@ -346,6 +357,23 @@ async fn finish_job(
     }
     txn.commit().await?;
     Ok(Finish::Done)
+}
+
+/// Writes the aggregate only while no pass has moved the rollup since the rebuild read it.
+async fn write_if_current(
+    db: &DatabaseConnection,
+    slo_id: &str,
+    generation: i32,
+    rebuilt: &super::reconcile::Rebuild,
+) -> Result<bool, anyhow::Error> {
+    let txn = db.begin().await?;
+    if !rebuild_is_current(&txn, slo_id, generation, rebuilt).await? {
+        txn.rollback().await?;
+        return Ok(false);
+    }
+    super::reconcile::write_rebuilt(&txn, slo_id, &rebuilt.rows).await?;
+    txn.commit().await?;
+    Ok(true)
 }
 
 /// Read under the rollup lock a pass writes under, so no pass commits between this and the write.
@@ -1111,7 +1139,7 @@ mod tests {
         let loaded = jobs::get(&db, "slo1", 1).await.unwrap().unwrap();
         let mut watermark = WM;
         let mut rebuilds = 0;
-        let finished = finish_with_rebuilds(&db, "slo1", 1, loaded.updated_at, 100, || {
+        let rebuild = || {
             rebuilds += 1;
             let read = rebuilt_at(Some(watermark), 15.0);
             // A pass commits after every rebuild read.
@@ -1121,15 +1149,19 @@ mod tests {
                 pass_at(db, moved_to, 1.0, 1.0).await;
                 Ok((read, Some(burn_rebuild(true))))
             }
-        })
-        .await;
+        };
+        let finished = finish_with_rebuilds(&db, "slo1", 1, loaded.updated_at, 100, rebuild).await;
         assert!(finished.unwrap());
-        assert_eq!(rebuilds, REBUILD_ATTEMPTS);
+        assert_eq!(
+            rebuilds,
+            REBUILD_ATTEMPTS + 1,
+            "the give-up reconciles once"
+        );
         assert_eq!(
             jobs::get(&db, "slo1", 1).await.unwrap().unwrap().state,
             jobs::STATE_DONE
         );
-        let passes = 10.0 + REBUILD_ATTEMPTS as f64;
+        let passes = 10.0 + REBUILD_ATTEMPTS as f64 + 1.0;
         assert_eq!(
             rollup_good(&db).await,
             Some(passes),
@@ -1146,5 +1178,44 @@ mod tests {
             "the corrected burn slice is written"
         );
         assert!(row.burn_windows.is_some());
+    }
+
+    async fn give_up_with(db: &DatabaseConnection, moves: impl Fn(usize) -> bool) -> f64 {
+        pass_at(db, WM, 10.0, 20.0).await;
+        jobs::queue_remeasure(db, "slo1", 1, WM - 3_600, WM, 100)
+            .await
+            .unwrap();
+        let loaded = jobs::get(db, "slo1", 1).await.unwrap().unwrap();
+        let (mut watermark, mut reads) = (WM, 0);
+        let rebuild = || {
+            let read = rebuilt_at(Some(watermark), 15.0);
+            let moved = moves(reads).then(|| {
+                watermark += SLICE;
+                watermark
+            });
+            reads += 1;
+            async move {
+                if let Some(moved_to) = moved {
+                    pass_at(db, moved_to, 1.0, 1.0).await;
+                }
+                Ok((read, None))
+            }
+        };
+        let finished = finish_with_rebuilds(db, "slo1", 1, loaded.updated_at, 100, rebuild).await;
+        assert!(finished.unwrap());
+        assert_eq!(reads, REBUILD_ATTEMPTS + 1, "the give-up reconciles once");
+        rollup_good(db).await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_pass_between_the_reconcile_read_and_write_keeps_its_totals() {
+        let good = give_up_with(&jobs_db().await, |_| true).await;
+        assert_eq!(good, 10.0 + REBUILD_ATTEMPTS as f64 + 1.0);
+    }
+
+    #[tokio::test]
+    async fn a_reconcile_read_that_holds_writes_the_rebuild() {
+        let good = give_up_with(&jobs_db().await, |read| read < REBUILD_ATTEMPTS).await;
+        assert_eq!(good, 15.0);
     }
 }

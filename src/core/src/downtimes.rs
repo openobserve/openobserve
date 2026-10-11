@@ -191,7 +191,9 @@ pub async fn list(
 
 pub async fn get(org: &str, user_id: &str, id: &str) -> Result<DowntimeDetail, DowntimeError> {
     ensure_enabled()?;
-    let row = load(org, id).await?;
+    let row = infra::table::downtimes::get(org, id)
+        .await?
+        .ok_or(DowntimeError::NotFound)?;
     access::authorize_row(org, user_id, &row, "GET").await?;
     let inventory = inventory::cached(org).await?;
     let matches = matches_of(&row, &inventory);
@@ -710,8 +712,9 @@ fn check_preview(
     validate(&placeholder, groups).map_err(DowntimeError::BadRequest)
 }
 
+/// Writes read the primary, so replica lag cannot fail their compare-and-set with a false 409.
 async fn load(org: &str, id: &str) -> Result<Downtime, DowntimeError> {
-    infra::table::downtimes::get(org, id)
+    infra::table::downtimes::get_rw(org, id)
         .await?
         .ok_or(DowntimeError::NotFound)
 }
@@ -2720,5 +2723,30 @@ mod tests {
         let won = finish_delete(async { Ok(true) }, async { cleaned = true }).await;
         assert!(won.is_ok());
         assert!(cleaned);
+    }
+
+    fn body_of(head: &str) -> &'static str {
+        let src = include_str!("downtimes.rs");
+        let start = src.find(head).unwrap_or_else(|| panic!("{head} not found"));
+        let rest = &src[start..];
+        &rest[..rest.find("\n}\n").unwrap()]
+    }
+
+    #[test]
+    fn writes_load_the_row_from_the_primary_and_the_detail_from_the_replica() {
+        assert!(body_of("async fn load(").contains("downtimes::get_rw(org, id)"));
+        for write in [
+            "pub async fn update(",
+            "pub async fn cancel(",
+            "pub async fn extend(",
+            "pub async fn delete(",
+            "pub async fn move_to_folder(",
+            "async fn cancel_follow_up(",
+        ] {
+            assert!(body_of(write).contains("load(org, "), "{write}");
+        }
+        let detail = body_of("pub async fn get(");
+        assert!(detail.contains("downtimes::get(org, id)"));
+        assert!(!detail.contains("load(org, "));
     }
 }

@@ -84,6 +84,12 @@ pub async fn get(org: &str, id: &str) -> Result<Option<Downtime>, errors::Error>
     get_with(client, org, id).await
 }
 
+/// The row as the primary holds it, for a read that a compare-and-set follows.
+pub async fn get_rw(org: &str, id: &str) -> Result<Option<Downtime>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    get_with(client, org, id).await
+}
+
 /// A local write and its SLO re-measures in one transaction; false if `guard` no longer holds.
 pub async fn write(
     downtime: &Downtime,

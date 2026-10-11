@@ -226,21 +226,27 @@ describe("AddDowntime", () => {
         alerts_total: 1,
       },
     } as any);
-    const { wrapper } = await mountPage();
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    await flushPromises();
-    expect(wrapper.text()).toContain("payments-api-errors");
-    const calls = vi.mocked(downtimes.preview).mock.calls.length;
-    await wrapper.get('[data-test="downtime-condition-add"]').trigger("click");
-    await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    await flushPromises();
-    expect(wrapper.find('[data-test="add-downtime-preview-incomplete"]').text()).toBe(
-      "Finish the condition to see a preview.",
-    );
-    expect(wrapper.text()).toContain("payments-api-errors");
-    expect(vi.mocked(downtimes.preview).mock.calls.length).toBe(calls);
-    wrapper.unmount();
+    // Fake timers run the 300 ms preview debounce without spending the test's time budget.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const { wrapper } = await mountPage();
+      await vi.advanceTimersByTimeAsync(350);
+      await flushPromises();
+      expect(wrapper.text()).toContain("payments-api-errors");
+      const calls = vi.mocked(downtimes.preview).mock.calls.length;
+      await wrapper.get('[data-test="downtime-condition-add"]').trigger("click");
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(350);
+      await flushPromises();
+      expect(wrapper.find('[data-test="add-downtime-preview-incomplete"]').text()).toBe(
+        "Finish the condition to see a preview.",
+      );
+      expect(wrapper.text()).toContain("payments-api-errors");
+      expect(vi.mocked(downtimes.preview).mock.calls.length).toBe(calls);
+      wrapper.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("notifies nobody until a destination is picked", async () => {
