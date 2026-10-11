@@ -93,6 +93,7 @@ const def = (...steps: [string, string][]): FunnelDef => ({
   unit: "sessions",
   window: "session",
   breakdown: null,
+  x: [],
 });
 const events: NamedEvent[] = [
   {

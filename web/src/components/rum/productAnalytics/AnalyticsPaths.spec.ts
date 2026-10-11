@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
 import { createStore } from "vuex";
@@ -38,6 +38,8 @@ import useProductAnalytics, { resetProductAnalytics } from "@/composables/rum/us
 import AnalyticsPaths from "./AnalyticsPaths.vue";
 import PathSessionsDrawer from "./PathSessionsDrawer.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import StepPicker from "./StepPicker.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { PathFlow } from "@/utils/rum/productAnalyticsModel";
 
@@ -780,5 +782,117 @@ describe("PathSessionsDrawer (AC-26, AC-59)", () => {
       document.querySelector('[data-test="rum-analytics-paths-branch-incomplete"]'),
     ).not.toBeNull();
     w.unmount();
+  });
+});
+
+describe("pa gap fixes (Paths ignored pages)", () => {
+  let wrapper: VueWrapper | null = null;
+  const settingsApi = api.service as unknown as Record<string, Mock>;
+  const IGNORED = [
+    { op: "eq", value: "/web/login" },
+    { op: "eq", value: "/web/cb" },
+  ];
+
+  const mountAt = async (anchor: string) => {
+    const router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { path: "/p", name: "productAnalyticsPaths", component: { template: "<div />" } },
+        { path: "/f", name: "productAnalyticsFunnels", component: { template: "<div />" } },
+        { path: "/fb", name: "productAnalyticsFunnelBuilder", component: { template: "<div />" } },
+      ],
+    });
+    await router.push("/p?app=web&period=7d");
+    useProductAnalytics().initFromRoute({ app: "web", period: "7d" });
+    useProductAnalytics().paths.value = {
+      anchor: { kind: "p", key: anchor },
+      direction: "next",
+      depth: 3,
+      include: "all",
+      cohort: null,
+    };
+    wrapper = mount(AnalyticsPaths, {
+      global: {
+        plugins: [router, store],
+        stubs: { PathsFlow: FlowStub, PathSessionsDrawer: DrawerStub },
+      },
+      attachTo: document.body,
+    });
+    await new Promise((r) => setTimeout(r, 30));
+    for (let i = 0; i < 5; i++) await flushPromises();
+  };
+
+  beforeEach(() => {
+    resetProductAnalytics();
+    resetNamedEvents();
+    api.reset();
+    vi.mocked(searchService.search).mockReset();
+    usePerformance().performanceState.data.streams._rumdata = { name: "_rumdata", schema: {} };
+    pathRows = PATH_ROWS();
+    entryRows = LOGIN_ENTRY;
+    branchPage = null;
+    settingsApi.getAppSettings.mockImplementation(async () => ({
+      data: {
+        id: "web-settings-id",
+        app: "web",
+        bots: true,
+        builtinBots: {
+          version: 1,
+          families: ["HeadlessChrome", "PhantomJS", "Spider"],
+          devices: ["Spider"],
+        },
+        sessions: [],
+        pages: IGNORED,
+        version: 1,
+        rulesHash: "0123456789abcdef",
+        createdBy: "admin@x.com",
+        createdAt: 1,
+        updatedBy: "admin@x.com",
+        updatedAt: 1,
+      },
+    }));
+    respond();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  it("P7-R10: the Paths footnote names the ignored pages", async () => {
+    await mountAt("/");
+    expect(pathSqls()).not.toEqual([]);
+    expect(wrapper!.text()).toContain("/web/login");
+    expect(wrapper!.text()).toContain("/web/cb");
+  });
+
+  it("P7-R10: with no path left after collapsing, the empty state still names the ignored pages", async () => {
+    pathRows = [];
+    await mountAt("/");
+    expect(wrapper!.find('[data-test="rum-analytics-paths-empty"]').exists()).toBe(true);
+    expect(wrapper!.text()).toContain("/web/login");
+    expect(wrapper!.text()).toContain("/web/cb");
+  });
+
+  it("P7-R10: the anchor picker's options query leaves out the ignored pages", async () => {
+    await mountAt("/");
+    wrapper!.findComponent(StepPicker).findComponent(OSelect).vm.$emit("open");
+    await new Promise((r) => setTimeout(r, 30));
+    for (let i = 0; i < 4; i++) await flushPromises();
+    const picker = sqls().filter((s) => /GROUP BY kind, k/.test(s));
+    expect(picker).toHaveLength(1);
+    expect(picker[0]).toMatch(/NOT \([^)]*'\/web\/login'/);
+    expect(picker[0]).toMatch(/NOT \([^)]*'\/web\/cb'/);
+  });
+
+  it("P7-R10: a deep link to an ignored anchor says the page is ignored and offers Edit exclusions", async () => {
+    await mountAt("/web/login");
+    expect(wrapper!.text()).toContain("This page is ignored for this app");
+    expect(
+      wrapper!
+        .findAll("button, a, [role='button']")
+        .some((b) => b.text().trim() === "Edit exclusions"),
+    ).toBe(true);
   });
 });

@@ -391,7 +391,7 @@ const compute = async (force = false) => {
         events: events.value,
         sample: ratio.value,
       }),
-      startUs: p.boundariesUs[0],
+      startUs: pa.newUsersRange({ startUs: p.boundariesUs[0], endUs: end }).startUs,
       endUs: end,
       limit: (p.boundariesUs.length * (p.boundariesUs.length + 1)) / 2,
       sampled: ratio.value,

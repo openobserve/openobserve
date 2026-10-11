@@ -33,13 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #actions>
       <OSelect
         v-if="appOptions.length > 1"
-        :model-value="state.app"
+        :model-value="[state.app, ...(pa.scope.value.apps ?? [])]"
         :options="appOptions"
         size="sm"
         searchable
+        multiple
+        row-click-single-select
         class="w-48 max-md:w-36"
         data-test="rum-analytics-app-select"
-        @update:model-value="onAppChange"
+        @update:model-value="onAppsChange"
       />
       <OTag
         v-else-if="state.app"
@@ -70,6 +72,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-version-select"
         @update:model-value="onVersionChange"
       />
+      <OTag
+        v-if="exclusionCount !== null"
+        :label="
+          likelyBot
+            ? t('rum.analytics.exclusions.chipLikelyBot', { count: exclusionCount })
+            : t('rum.analytics.exclusions.chip', { count: exclusionCount })
+        "
+        :variant="likelyBot ? 'warning-soft' : 'default-outline'"
+        size="md"
+        clickable
+        data-test="rum-analytics-exclusions-chip"
+        @click="exclusionsOpen = true"
+      />
+      <OButton
+        v-if="showNewUsers"
+        variant="outline"
+        size="sm"
+        :active="state.newUsers"
+        :aria-pressed="state.newUsers"
+        :disabled="newUsersDisabled"
+        data-test="rum-analytics-new-users-chip"
+        @click="toggleNewUsers"
+        >{{ t("rum.analytics.exclusions.newUsersOnly")
+        }}<OTooltip
+          v-if="newUsersDisabled"
+          :content="t('rum.analytics.exclusions.newUsersSessionsTip')"
+      /></OButton>
       <DateTimePickerDashboard
         ref="dateTimePickerRef"
         :model-value="state.datetime"
@@ -256,11 +285,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else class="min-h-0 flex-1 overflow-auto">
         <router-view v-slot="{ Component }">
           <keep-alive :include="SUBTAB_VIEWS">
-            <component :is="Component" />
+            <component
+              :is="Component"
+              @open-exclusions="exclusionsOpen = true"
+              @likely-bot="(v: boolean) => (likelyBot = v)"
+            />
           </keep-alive>
         </router-view>
       </div>
     </div>
+    <ExclusionsDrawer v-model:open="exclusionsOpen" />
   </OPageLayout>
 </template>
 
@@ -290,6 +324,7 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import SampledTag from "@/components/rum/productAnalytics/SampledTag.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import RumNoDataState from "@/components/rum/RumNoDataState.vue";
+import ExclusionsDrawer from "@/components/rum/productAnalytics/ExclusionsDrawer.vue";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useFunnelDraft from "@/composables/rum/useFunnelDraft";
@@ -300,6 +335,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
   EXACT_ROW_LIMIT,
+  MAX_COMPARED_APPS,
   MAX_EVENTS_PER_APP,
   type AnalyticsDateTime,
 } from "@/utils/rum/productAnalyticsModel";
@@ -352,6 +388,8 @@ let activatedOnce = false;
 const invalidDismissed = ref(false);
 const identityOpen = ref(false);
 const dateTimePickerRef = ref<any>(null);
+const exclusionsOpen = ref(false);
+const likelyBot = ref(false);
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
@@ -372,6 +410,19 @@ const appOptions = computed(() => {
   if (state.app && !listed.includes(state.app)) listed.unshift(state.app);
   return listed.map((a) => ({ label: raw(a), value: a }));
 });
+// Ignored pages are not counted: they never change which sessions are kept.
+const exclusionCount = computed(() => {
+  const ex = pa.scope.value.exclusions;
+  return ex ? (ex.bots ? 1 : 0) + ex.sessions.length : null;
+});
+
+const NEW_USERS_ROUTES: string[] = [PA_ROUTES.funnelBuilder, PA_ROUTES.paths, PA_ROUTES.retention];
+const showNewUsers = computed(() => NEW_USERS_ROUTES.includes(String(route.name)));
+// New users are counted per user, so a Sessions funnel has nothing to filter.
+const newUsersDisabled = computed(
+  () => route.name === PA_ROUTES.funnelBuilder && pa.funnel.value.unit === "sessions",
+);
+
 const envSelectOptions = computed(() =>
   envOptions.value.map((o) => ({ label: raw(o.value), value: o.value })),
 );
@@ -452,6 +503,22 @@ const reload = async (force = false) => {
 const onAppChange = (value: unknown) => {
   if (typeof value !== "string" || value === state.app) return;
   pa.setScope({ app: value, env: [], version: [] }, true);
+  void reload();
+};
+
+// A row click picks one app and a checkbox adds a compared app, so the primary stays while it is still picked.
+const onAppsChange = (value: unknown) => {
+  const picked = Array.isArray(value) ? value.map(String) : [];
+  if (!picked.length) return;
+  const primary = picked.includes(state.app) ? state.app : picked[0];
+  const apps = picked.filter((a) => a !== primary).slice(0, MAX_COMPARED_APPS);
+  if (primary !== state.app) pa.setScope({ app: primary, env: [], version: [], apps }, true);
+  else pa.setScope({ apps });
+  void reload();
+};
+
+const toggleNewUsers = () => {
+  pa.setScope({ newUsers: !state.newUsers });
   void reload();
 };
 

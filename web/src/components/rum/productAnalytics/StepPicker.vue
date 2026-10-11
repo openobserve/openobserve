@@ -38,6 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }}</span>
       <span v-else>{{ t("components.select.noOptionsFound") }}</span>
     </template>
+    <template v-if="noCustom" #after-options>
+      <span class="text-text-secondary px-3 py-2 text-xs" :data-test="`${dataTest}-no-custom`">{{
+        t("rum.analytics.picker.noCustom")
+      }}</span>
+    </template>
   </OSelect>
 </template>
 
@@ -48,13 +53,20 @@ import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import useProductAnalytics, {
   PICKER_LIMIT,
   type PickerOption,
+  type PickerResult,
 } from "@/composables/rum/useProductAnalytics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
 import type { StepKind, StepRef } from "@/utils/rum/productAnalyticsQueries";
 
 const FULL_LIST = PICKER_LIMIT;
-const KIND_ICON: Record<StepKind, string> = { p: "article", c: "ads-click", e: "bookmark" };
+const FULL_ERRORS = 50;
+const KIND_ICON: Record<StepKind, string> = {
+  p: "article",
+  c: "ads-click",
+  e: "bookmark",
+  r: "error-outline",
+};
 
 const props = withDefaults(
   defineProps<{
@@ -76,7 +88,7 @@ const rows = ref<PickerOption[]>([]);
 const searched = ref<{ scope: string; options: PickerOption[] }>({ scope: "", options: [] });
 const loading = ref(false);
 const failed = ref(false);
-let loadedKey = "";
+const loadedKey = ref("");
 
 const encode = (s: { kind: StepKind; key: string }) => `${s.kind}:${s.key}`;
 
@@ -84,7 +96,7 @@ const value = computed(() => (props.modelValue ? encode(props.modelValue) : null
 
 const options = computed<SelectOption[]>(() => {
   const seen = new Set<string>();
-  const byKind: Record<StepKind, SelectOption[]> = { e: [], p: [], c: [] };
+  const byKind: Record<StepKind, SelectOption[]> = { e: [], p: [], c: [], r: [] };
   for (const e of props.events) {
     byKind.e.push({
       label: raw(e.name),
@@ -98,7 +110,12 @@ const options = computed<SelectOption[]>(() => {
     const v = encode(r);
     if (r.kind === "e" || seen.has(v)) continue;
     seen.add(v);
-    byKind[r.kind].push({ label: raw(r.key), value: v, icon: KIND_ICON[r.kind] });
+    byKind[r.kind].push({
+      label: raw(r.key),
+      value: v,
+      icon: KIND_ICON[r.kind],
+      ...(r.custom ? { badge: t("rum.analytics.kind.event") } : {}),
+    });
   }
   if (props.modelValue && !seen.has(encode(props.modelValue))) {
     byKind[props.modelValue.kind].unshift({
@@ -111,6 +128,7 @@ const options = computed<SelectOption[]>(() => {
     e: t("rum.analytics.picker.events"),
     p: t("rum.analytics.picker.pages"),
     c: t("rum.analytics.picker.clicks"),
+    r: t("rum.analytics.picker.errors"),
   };
   return props.kinds.flatMap((k) =>
     byKind[k].length
@@ -119,33 +137,57 @@ const options = computed<SelectOption[]>(() => {
   );
 });
 
+const withErrors = computed(() => props.kinds.includes("r"));
+const count = (kind: "r" | "rest") =>
+  rows.value.filter((r) => (r.kind === "r") === (kind === "r")).length;
+
+// Custom actions arrive only from users with telemetry on, so an empty list needs saying why.
+const noCustom = computed(
+  () =>
+    props.kinds.includes("c") &&
+    loadedKey.value === pa.scopeKey.value &&
+    !failed.value &&
+    !rows.value.some((r) => r.custom),
+);
+
+const ok = (...res: PickerResult[]) => res.every((r) => r.status === "ok");
+
 // Only a successful read marks the scope loaded, so a failure is retried on the next open.
 const load = async () => {
   const key = pa.scopeKey.value;
-  if (loadedKey === key) return;
+  if (loadedKey.value === key) return;
   loading.value = true;
   try {
-    const res = await pa.loadPicker();
+    const [res, errors] = await Promise.all([
+      pa.loadPicker(),
+      withErrors.value ? pa.loadErrorPicker() : null,
+    ]);
     if (key !== pa.scopeKey.value) return;
-    failed.value = res.status !== "ok";
-    rows.value = res.options;
-    if (res.status === "ok") loadedKey = key;
+    const all = errors ? [res, errors] : [res];
+    failed.value = !ok(...all);
+    rows.value = all.flatMap((r) => r.options);
+    if (!failed.value) loadedKey.value = key;
   } finally {
     loading.value = false;
   }
 };
 
-// The server is asked only when the first rows did not already hold every key.
+// The server is asked only for a list whose first rows did not already hold every key.
 const onSearch = async (term: string) => {
   failed.value = false;
-  if (!term || rows.value.length < FULL_LIST) return;
+  const more = count("rest") >= FULL_LIST;
+  const moreErrors = withErrors.value && count("r") >= FULL_ERRORS;
+  if (!term || (!more && !moreErrors)) return;
   const scope = pa.scopeKey.value;
   loading.value = true;
   try {
-    const res = await pa.searchPicker(term);
+    const all = await Promise.all([
+      ...(more ? [pa.searchPicker(term)] : []),
+      ...(moreErrors ? [pa.loadErrorPicker(term)] : []),
+    ]);
     if (scope !== pa.scopeKey.value) return;
-    failed.value = res.status !== "ok";
-    searched.value = { scope, options: res.options };
+    failed.value = !ok(...all);
+    searched.value = { scope, options: all.flatMap((r) => r.options) };
   } finally {
     loading.value = false;
   }
