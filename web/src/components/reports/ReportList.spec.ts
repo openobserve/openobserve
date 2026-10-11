@@ -350,6 +350,12 @@ describe("ReportList", () => {
       expect(wrapper.vm.reportsTableRows).toHaveLength(2);
     });
 
+    it("switches tabs through the route so History is deep-linkable", () => {
+      const router = vi.mocked(vueRouter.useRouter).mock.results.at(-1)!.value;
+      wrapper.vm.onTabChange("history");
+      expect(router.push).toHaveBeenCalledWith({ query: { tab: "history" } });
+    });
+
     it("refreshes rows after filtering (index is OTable's built-in show-index)", async () => {
       wrapper.vm.staticReportsList = [{ ...REPORT_SCHEDULED }, { ...REPORT_CACHED }];
       wrapper.vm.activeTab = "shared";
@@ -422,30 +428,26 @@ describe("ReportList", () => {
 
   // ── Date formatting ──────────────────────────────────────────────────────
 
-  describe("last_triggered_at formatting", () => {
-    // These used to call `wrapper.vm.convertUnixToDateFormat(null)` — asserting
-    // the shared util's null handling, which `date.spec.ts` already owns, and
-    // forcing the component to `defineExpose` a function purely so a test could
-    // reach it. What is actually ReportList's to get right is the ROW mapping:
-    // format a real timestamp, and show "-" when there is none.
-    it("formats a triggered report's timestamp for the table", () => {
+  describe("last run column", () => {
+    it("shows Never for a report that has not run", () => {
       const row = wrapper.vm.reportsTableRows.find((r: any) => r.name === REPORT_SCHEDULED.name);
-
-      // 1234567890000000µs = 2009-02-13T23:31:30Z. The suite pins TZ=UTC
-      // (vitest.config.ts), so the zero offset renders as `Z`.
-      expect(row.last_triggered_at).toBe("2009-02-13T23:31:30Z");
-      // ...and the raw value is kept alongside it, for sorting.
-      expect(row.last_triggered_at_raw).toBe(REPORT_SCHEDULED.last_triggered_at);
+      expect(row.last_run_chip).toBe("never");
     });
 
-    it("shows a dash for a report that has never triggered", async () => {
-      wrapper.vm.activeTab = "cached";
-      await flushPromises();
+    it("maps the stored last run onto the chip", () => {
+      const rows = wrapper.vm.shapeReports([
+        { ...REPORT_SCHEDULED, last_run_status: "error", last_run_at: 5 },
+        { ...REPORT_SCHEDULED, last_run_status: "succeeded", last_run_at: 5 },
+      ]);
+      expect(rows.map((r: any) => r.last_run_chip)).toEqual(["error", "succeeded"]);
+    });
 
-      const row = wrapper.vm.reportsTableRows.find((r: any) => r.name === REPORT_CACHED.name);
-
-      expect(row.last_triggered_at).toBe("-");
-      expect(row.last_triggered_at_raw).toBeNull();
+    it("calls an enabled report overdue once its run is 15 minutes late", () => {
+      const late = (Date.now() - 16 * 60_000) * 1000;
+      const [row] = wrapper.vm.shapeReports([
+        { ...REPORT_SCHEDULED, enabled: true, next_run_at: late, last_run_status: "succeeded" },
+      ]);
+      expect(row.last_run_chip).toBe("overdue");
     });
   });
 

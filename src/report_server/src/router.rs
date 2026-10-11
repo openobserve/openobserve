@@ -32,6 +32,9 @@ pub struct HttpResponse {
     pub error_detail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
+    /// True when the dashboard had not finished loading before it was rendered.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partial: Option<bool>,
 }
 
 impl HttpResponse {
@@ -41,6 +44,7 @@ impl HttpResponse {
             message: e,
             error_detail: None,
             trace_id: None,
+            partial: None,
         }
     }
 
@@ -50,7 +54,13 @@ impl HttpResponse {
             message: msg,
             error_detail: None,
             trace_id: None,
+            partial: None,
         }
+    }
+
+    fn with_partial(mut self, partial: bool) -> Self {
+        self.partial = partial.then_some(true);
+        self
     }
 }
 
@@ -74,7 +84,7 @@ pub async fn send_report(
     } else {
         ReportType::PDF
     };
-    let (pdf_data, email_dashboard_url) = match generate_report(
+    let (pdf_data, email_dashboard_url, partial) = match generate_report(
         &report.dashboards[0],
         &org_id,
         &cfg.report_server.user_email,
@@ -101,9 +111,10 @@ pub async fn send_report(
         log::info!("Dashboard data cached by report {report_name}");
         return (
             StatusCode::OK,
-            Json(HttpResponse::success(format!(
-                "dashboard data cached by report {report_name}"
-            ))),
+            Json(
+                HttpResponse::success(format!("dashboard data cached by report {report_name}"))
+                    .with_partial(partial),
+            ),
         )
             .into_response();
     }
@@ -124,9 +135,10 @@ pub async fn send_report(
     {
         Ok(_) => (
             StatusCode::OK,
-            Json(HttpResponse::success(
-                "report sent to emails successfully".into(),
-            )),
+            Json(
+                HttpResponse::success("report sent to emails successfully".into())
+                    .with_partial(partial),
+            ),
         )
             .into_response(),
         Err(e) => {
@@ -257,6 +269,7 @@ mod tests {
             message: "ok".to_string(),
             error_detail: None,
             trace_id: None,
+            partial: None,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
@@ -271,11 +284,23 @@ mod tests {
             message: "err".to_string(),
             error_detail: Some("detail".to_string()),
             trace_id: Some("tid".to_string()),
+            partial: Some(true),
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("error_detail"));
         assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("partial"));
+    }
+
+    #[test]
+    fn test_http_response_partial_only_when_true() {
+        let full =
+            serde_json::to_value(HttpResponse::success("ok".into()).with_partial(false)).unwrap();
+        assert!(!full.as_object().unwrap().contains_key("partial"));
+        let partial =
+            serde_json::to_value(HttpResponse::success("ok".into()).with_partial(true)).unwrap();
+        assert_eq!(partial["partial"], serde_json::json!(true));
     }
 
     #[test]

@@ -347,17 +347,6 @@ impl ListReportsParams {
     }
 }
 
-/// An item in a list of reports which only includes a subset of all the report fields.
-#[derive(Debug, Clone)]
-pub struct ListReportItem {
-    pub name: String,
-    pub owner: String,
-    pub description: Option<String>,
-
-    /// The last time the report was triggered in Unix microseconds.
-    pub last_triggered_at: i64,
-}
-
 #[derive(Debug, Clone)]
 pub struct ReportListFilters {
     pub dashboard: Option<String>,
@@ -693,21 +682,6 @@ mod tests {
         );
         assert_eq!(params.has_destinations, Some(true));
         assert_eq!(params.page_size_and_idx, Some((10, 0)));
-    }
-
-    #[test]
-    fn test_list_report_item() {
-        let item = ListReportItem {
-            name: "test_report".to_string(),
-            owner: "test_owner".to_string(),
-            description: Some("Test description".to_string()),
-            last_triggered_at: 1640995200000000,
-        };
-
-        assert_eq!(item.name, "test_report");
-        assert_eq!(item.owner, "test_owner");
-        assert_eq!(item.description, Some("Test description".to_string()));
-        assert_eq!(item.last_triggered_at, 1640995200000000);
     }
 
     #[test]

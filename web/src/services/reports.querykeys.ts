@@ -15,7 +15,7 @@
 
 import { orgKey } from "@/composables/query/keys";
 import { stableFilters } from "@/composables/query/queryClient";
-import type { ReportListFilters } from "./reports";
+import type { ReportHistoryQuery, ReportListFilters } from "./reports";
 
 /**
  * Keys only, dependency-free apart from `orgKey`, so a write in another domain
@@ -33,5 +33,15 @@ export const reportKeys = {
       "list",
       filters.folder ?? "__all__",
       stableFilters({ isCache: filters.isCache, nameQuery: filters.nameQuery }),
+    ),
+  detail: (org: string, id: string) => orgKey(org, "reports", "detail", id),
+  historyAll: (org: string) => orgKey(org, "reports", "history"),
+  history: (org: string, query: ReportHistoryQuery) =>
+    orgKey(
+      org,
+      "reports",
+      "history",
+      query.report_id ?? "__all__",
+      stableFilters(query as unknown as Record<string, unknown>),
     ),
 };

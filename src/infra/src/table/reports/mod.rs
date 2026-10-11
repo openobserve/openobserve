@@ -25,12 +25,20 @@ use config::meta::{
 pub use intermediate::convert_str_to_meta_report_timerange;
 pub use queries::ListReportsQueryResult;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
-    QueryFilter, Set, TransactionTrait,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, Condition, ConnectionTrait, EntityTrait,
+    ModelTrait, QueryFilter, Set, TransactionTrait, sea_query::Expr,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
 use super::entity::{report_dashboards, reports};
+
+/// The outcome of a report's latest run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LastRun {
+    pub at: i64,
+    pub status: String,
+    pub error: Option<String>,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -89,6 +97,28 @@ pub async fn get_by_id<C: ConnectionTrait + TransactionTrait>(
     txn.commit().await?;
     let (folder, report) = models.try_into()?;
     Ok(Some((folder, report)))
+}
+
+/// Gets a report and its KSUID by its name, from one read.
+pub async fn get_with_id_by_name<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    folder_snowflake_id: &str,
+    report_name: &str,
+) -> Result<Option<(String, MetaReport)>, Error> {
+    let Some(models) = queries::SelectReportAndJoinRelationsResult::get(
+        conn,
+        org_id,
+        folder_snowflake_id,
+        report_name,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    let id = models.report.id.clone();
+    let (_, report) = models.try_into()?;
+    Ok(Some((id, report)))
 }
 
 /// Creates a new report.
@@ -156,6 +186,9 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
         updated_at: Set(Some(now)),
         start_at: Set(report.start),
         image_preview: Set(report.image_preview),
+        last_run_at: NotSet,
+        last_run_status: NotSet,
+        last_run_error: NotSet,
     };
     let report_model = report_active_model.insert(&txn).await?;
 
@@ -260,6 +293,9 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
         updated_at: Set(Some(Utc::now().timestamp_micros())),
         start_at: Set(report.start),
         image_preview: Set(report.image_preview),
+        last_run_at: NotSet,
+        last_run_status: NotSet,
+        last_run_error: NotSet,
     };
     report_active_model.update(&txn).await?;
 
@@ -375,6 +411,9 @@ pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
         updated_at: Set(Some(Utc::now().timestamp_micros())),
         start_at: Set(report.start),
         image_preview: Set(report.image_preview),
+        last_run_at: NotSet,
+        last_run_status: NotSet,
+        last_run_error: NotSet,
     };
     report_active_model.update(&txn).await?;
 
@@ -427,6 +466,49 @@ pub async fn delete_by_name<C: ConnectionTrait + TransactionTrait>(
     report_model.delete(&txn).await?;
     txn.commit().await?;
     Ok(report_id)
+}
+
+/// Stores a report's latest run; an older run never overwrites a newer one, so late replicas no-op.
+pub async fn set_last_run(
+    org: &str,
+    report_id: &str,
+    at: i64,
+    status: &str,
+    error: Option<&str>,
+) -> Result<(), Error> {
+    let client = crate::db::get_orm_client_rw().await;
+    reports::Entity::update_many()
+        .col_expr(reports::Column::LastRunAt, Expr::value(at))
+        .col_expr(reports::Column::LastRunStatus, Expr::value(status))
+        .col_expr(
+            reports::Column::LastRunError,
+            Expr::value(error.map(str::to_string)),
+        )
+        .filter(reports::Column::Org.eq(org))
+        .filter(reports::Column::Id.eq(report_id))
+        .filter(
+            Condition::any()
+                .add(reports::Column::LastRunAt.is_null())
+                .add(reports::Column::LastRunAt.lte(at)),
+        )
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+/// The outcome of a report's latest run, if it has run.
+pub async fn get_last_run<C: ConnectionTrait>(
+    conn: &C,
+    report_id: &str,
+) -> Result<Option<LastRun>, Error> {
+    let found = reports::Entity::find_by_id(report_id).one(conn).await?;
+    Ok(found.and_then(|m| {
+        Some(LastRun {
+            at: m.last_run_at?,
+            status: m.last_run_status.unwrap_or_default(),
+            error: m.last_run_error,
+        })
+    }))
 }
 
 /// Delete all reports.

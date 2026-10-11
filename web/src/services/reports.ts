@@ -132,7 +132,25 @@ const reports = {
       });
   },
   triggerReportById: (org_identifier: string, report_id: string) => {
-    return http().put(`/api/v2/${org_identifier}/reports/${report_id}/trigger`);
+    return http().put<TriggerReportResponse>(
+      `/api/v2/${org_identifier}/reports/${report_id}/trigger`,
+    );
+  },
+  getHistory: (org_identifier: string, query: ReportHistoryQuery) => {
+    const params = new URLSearchParams();
+    if (query.report_id) params.append("report_id", query.report_id);
+    params.append("start_time", String(query.start_time));
+    params.append("end_time", String(query.end_time));
+    for (const status of query.status ?? []) params.append("status", status);
+    if (query.trigger_source) params.append("trigger_source", query.trigger_source);
+    if (typeof query.is_cached === "boolean") params.append("is_cached", String(query.is_cached));
+    params.append("from", String(query.from ?? 0));
+    params.append("size", String(query.size ?? 100));
+    if (query.sort_by) params.append("sort_by", query.sort_by);
+    if (query.sort_order) params.append("sort_order", query.sort_order);
+    return http().get<ReportHistoryResponse>(
+      `/api/v2/${org_identifier}/reports/history?${params.toString()}`,
+    );
   },
   toggleReportStateById: (org_identifier: string, report_id: string, state: boolean) => {
     return http()
@@ -151,4 +169,73 @@ export interface ReportListFilters {
   folder?: string;
   isCache?: boolean;
   nameQuery?: string;
+}
+
+export type ReportRunStatus = "succeeded" | "error" | "skipped";
+export type ReportTriggerSource = "scheduled" | "manual";
+
+export interface ReportHistoryQuery {
+  report_id?: string;
+  start_time: number;
+  end_time: number;
+  status?: ReportRunStatus[];
+  trigger_source?: ReportTriggerSource;
+  is_cached?: boolean;
+  from?: number;
+  size?: number;
+  sort_by?: "_timestamp" | "status" | "end_time" | "retries";
+  sort_order?: "asc" | "desc";
+}
+
+/** One report run, as `GET /api/v2/{org}/reports/history` returns it. */
+export interface ReportRunHit {
+  timestamp: number;
+  report_id: string;
+  /** Empty when the report was deleted. */
+  report_name: string;
+  status: ReportRunStatus | "unknown";
+  is_cached: boolean;
+  trigger_source: ReportTriggerSource;
+  triggered_by: string | null;
+  scheduled_for: number | null;
+  finished_at: number | null;
+  duration_ms: number | null;
+  is_partial: boolean;
+  delay_in_secs: number | null;
+  time_in_queue_ms: number | null;
+  retries: number;
+  recipient_count: number | null;
+  attachment_type: string | null;
+  dashboard_count: number | null;
+  error: string | null;
+  source_node: string | null;
+  scheduler_trace_id: string | null;
+  /** Provisional on a failed run; never shown as the next run. */
+  next_run_at: number | null;
+}
+
+export interface ReportRunCounts {
+  succeeded: number;
+  cached: number;
+  error: number;
+  skipped: number;
+  total: number;
+}
+
+export type ReportHistoryDisabledReason =
+  "usage_report_to_own_org_off" | "usage_reporting_remote" | "trial_expired";
+
+export interface ReportHistoryResponse {
+  total: number;
+  from: number;
+  size: number;
+  disabled_reason: ReportHistoryDisabledReason | null;
+  counts: ReportRunCounts;
+  hits: ReportRunHit[];
+}
+
+export interface TriggerReportResponse {
+  code: number;
+  message: string;
+  run: ReportRunHit;
 }

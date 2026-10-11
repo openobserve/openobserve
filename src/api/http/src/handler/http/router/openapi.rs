@@ -236,6 +236,7 @@ use crate::{
         openobserve_api_management::request::dashboards::reports::enable_report_v2,
         openobserve_api_management::request::dashboards::reports::trigger_report_v2,
         openobserve_api_management::request::dashboards::reports::move_reports,
+        openobserve_api_management::request::dashboards::reports_history::get_report_history,
         openobserve_api_management::request::authz::fga::create_role,
         openobserve_api_management::request::authz::fga::delete_role,
         openobserve_api_management::request::authz::fga::get_roles,

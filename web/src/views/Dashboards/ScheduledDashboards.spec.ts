@@ -356,6 +356,22 @@ describe("ScheduledDashboards", () => {
       expect(rows[0].isCached).toBe(true);
     });
 
+    it("reads the list's is_cached flag for the tab and the Last run chip", async () => {
+      const emailed = {
+        ...mockReports[1],
+        name: "Emailed",
+        destinations: undefined,
+        is_cached: false,
+        last_run_status: "succeeded",
+        last_run_at: 1_760_000_000_000_000,
+      };
+      const wrapper = createWrapper({ reports: [emailed] });
+      await flushPromises();
+      const rows = (wrapper.vm as any).scheduledReports;
+      expect(rows[0].isCached).toBe(false);
+      expect(rows[0].last_run_chip).toBe("succeeded");
+    });
+
     it("should handle frequency formatting for different types", () => {
       const wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);

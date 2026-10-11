@@ -1523,6 +1523,23 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft", icon: "help-outline" },
   },
 
+  // Report run outcome — dot. "Sent" names the email, not the job; overdue/never/paused are list-only.
+  reportRunStatus: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      succeeded: { variant: "success-soft", labelKey: "components.badge.reportRunStatus.sent" },
+      partial: { variant: "success-soft", labelKey: "components.badge.reportRunStatus.partial" },
+      cached: { variant: "blue-soft", labelKey: "components.badge.reportRunStatus.cached" },
+      error: { variant: "error-soft", labelKey: "components.badge.reportRunStatus.failed" },
+      skipped: { variant: "warning-soft", labelKey: "components.badge.reportRunStatus.skipped" },
+      overdue: { variant: "warning-soft", labelKey: "components.badge.reportRunStatus.overdue" },
+      never: { variant: "default-soft", labelKey: "components.badge.reportRunStatus.never" },
+      paused: { variant: "default-soft", labelKey: "components.badge.reportRunStatus.paused" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Recent-event result (overview) — plain. Failed/Firing run hot (red), Error
   // is the milder amber.
   eventStatus: {

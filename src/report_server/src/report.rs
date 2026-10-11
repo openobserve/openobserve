@@ -147,7 +147,7 @@ pub async fn generate_report(
     timezone: &str,
     report_type: ReportType,
     report_name: &str,
-) -> Result<(Vec<u8>, String), anyhow::Error> {
+) -> Result<(Vec<u8>, String, bool), anyhow::Error> {
     let dashboard_id = &dashboard.dashboard;
     let folder_id = &dashboard.folder;
 
@@ -328,20 +328,22 @@ pub async fn generate_report(
     log::info!("waiting for data to load for dashboard {dashboard_id}");
 
     // If the span element is not rendered yet, capture whatever is loaded till now
-    match wait_for_panel_data_load(&page).await {
+    let partial = match wait_for_panel_data_load(&page).await {
         Err(e) => {
             log::error!(
                 "[REPORT] error finding the span element for dashboard {dashboard_id}: {e}"
             );
             log::info!("[REPORT] proceeding with whatever data is loaded until now");
+            true
         }
         Ok(dur) => {
             log::info!(
                 "[REPORT] all panel data loaded for report dashboard: {dashboard_id} in {} seconds",
                 dur.as_secs_f64()
             );
+            false
         }
-    }
+    };
 
     if let Err(e) = page.find_element("main").await {
         let page_url = page.url().await;
@@ -392,7 +394,7 @@ pub async fn generate_report(
         log::error!("Error closing temporary directory: {e}");
     }
 
-    Ok((pdf_data, email_dashb_url))
+    Ok((pdf_data, email_dashb_url, partial))
 }
 
 /// Sends emails to the [`Report`] recipients. Currently only one pdf data is supported.

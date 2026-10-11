@@ -80,14 +80,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="cursor-pointer" @click="openReport(row)">{{ row.frequency }}</span>
         </template>
 
-        <template #cell-last_triggered_at="{ row }">
-          <span class="cursor-pointer" @click="openReport(row)">
+        <template #cell-last_run="{ row }">
+          <span class="inline-flex cursor-pointer items-center gap-2" @click="openReport(row)">
+            <OTag type="reportRunStatus" :value="row.last_run_chip" />
             <OTimeCell
-              :value="row.last_triggered_at_raw"
+              v-if="row.last_run_at_raw"
+              :value="row.last_run_at_raw"
               unit="us"
-              mode="absolute"
+              mode="relative"
               :timezone="store.state.timezone"
-              :empty-label="t('dashboard.scheduledDashboardsPage.never')"
             />
           </span>
         </template>
@@ -128,6 +129,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { isCachedReport, lastRunChip } from "@/utils/reports/reportRun";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 
@@ -191,8 +194,9 @@ const createScheduledReport = () => {
 
 // Row shape for the list: adds the raw sort keys not on the shared interface.
 // "#" is provided by OTable's show-index, so rows built here omit it.
-type ScheduledReportRow = Omit<ScheduledDashboardReport, "#"> & {
-  last_triggered_at_raw: number | null;
+type ScheduledReportRow = Omit<ScheduledDashboardReport, "#" | "last_triggered_at"> & {
+  last_run_at_raw: number | null;
+  last_run_chip: string;
   created_at_raw: number | null;
 };
 
@@ -227,14 +231,12 @@ const formatReports = () => {
     tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
     time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
     frequency: getFrequencyValue(report.frequency),
-    last_triggered_at_raw: report.last_triggered_at || null,
-    last_triggered_at: report.last_triggered_at
-      ? convertUnixToDateFormat(report.last_triggered_at)
-      : "-",
+    last_run_at_raw: report.last_run_at || null,
+    last_run_chip: lastRunChip(report, isCachedReport(report)),
     created_at_raw: report.created_at || null,
     created_at: convertUnixToDateFormat(report.created_at),
     orgId: report.org_id,
-    isCached: !report?.destinations?.length,
+    isCached: isCachedReport(report),
   }));
 
   filterReports();
@@ -289,9 +291,10 @@ const columns: OTableColumnDef[] = [
     meta: { align: "left" },
   },
   {
-    id: "last_triggered_at",
-    header: t("reports.lastTriggeredAt"),
-    accessorKey: "last_triggered_at",
+    id: "last_run",
+    header: t("reports.history.lastRun"),
+    accessorKey: "last_run_chip",
+    cell: " ",
     sortable: false,
     size: COL.dateAbsolute,
     meta: { align: "left" },

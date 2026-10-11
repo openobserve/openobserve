@@ -181,11 +181,19 @@ mod tests {
         assert!(field_names.contains(&"synthetics_error_source".to_string()));
         assert!(field_names.contains(&"synthetics_location".to_string()));
         assert!(field_names.contains(&"delivery_attempted".to_string()));
+        for f in [
+            "trigger_source",
+            "triggered_by",
+            "recipient_count",
+            "attachment_type",
+            "dashboard_count",
+            "scheduled_for",
+        ] {
+            assert!(field_names.contains(&f.to_string()), "missing {f}");
+        }
 
-        // Verify count matches struct fields
-        // (35 total: 21 original + 5 dedup/grouping + 6 value-context + 2 synthetics skip + 1
-        // delivery)
-        assert_eq!(field_names.len(), 35);
+        // 21 original + 5 dedup/grouping + 6 value-context + 2 synthetics + 1 delivery + 6 report
+        assert_eq!(field_names.len(), 41);
 
         // Verify no duplicate fields
         let unique_count = field_names

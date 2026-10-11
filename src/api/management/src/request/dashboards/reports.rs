@@ -17,11 +17,13 @@ use std::collections::HashMap;
 
 use axum::{
     extract::{OriginalUri, Path, Query},
-    response::Response,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use config::meta::{
     dashboards::reports::{Report, ReportListFilters},
     folder::DEFAULT_FOLDER,
+    self_reporting::usage::{RunOutcome, TriggerData},
     triggers::{Trigger, TriggerModule},
 };
 use db::scheduler;
@@ -38,14 +40,27 @@ use serde::Deserialize;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
-    models::reports::{ListReportsResponseBody, ListReportsResponseBodyItem},
-    request::{BulkDeleteRequest, BulkDeleteResponse, dashboards::get_folder},
+    models::reports::{
+        GetReportResponseBody, LastRunFields, ListReportsResponseBody, ListReportsResponseBodyItem,
+    },
+    request::{
+        BulkDeleteRequest, BulkDeleteResponse,
+        dashboards::{get_folder, reports_history::ReportRunHit},
+    },
 };
 
 #[derive(Debug, serde::Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MoveReportsRequestBody {
     pub report_ids: Vec<String>,
     pub dst_folder_id: String,
+}
+
+/// Reply to Run now: the run is returned before the stream copy becomes searchable.
+#[derive(Debug, serde::Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TriggerReportResponse {
+    pub code: u16,
+    pub message: String,
+    pub run: ReportRunHit,
 }
 
 /// CreateReport
@@ -258,7 +273,9 @@ pub async fn list_reports(
                     let scheduled_job = scheduled_jobs.remove(&d.report_id);
                     match ListReportsResponseBodyItem::try_from(d) {
                         Ok(mut item) => {
-                            item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
+                            item.last_triggered_at =
+                                scheduled_job.as_ref().and_then(|t| t.start_time);
+                            item.last_run.next_run_at = scheduled_job.map(|t| t.next_run_at);
                             Some(item)
                         }
                         Err(e) => {
@@ -513,9 +530,9 @@ pub async fn enable_report(
         ("name" = String, Path, description = "Report name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Report sent; `run` is the history row of the run", content_type = "application/json", body = inline(TriggerReportResponse)),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
-        (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+        (status = 500, description = "Send failed; `run` carries the error", content_type = "application/json", body = inline(TriggerReportResponse)),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -523,7 +540,7 @@ pub async fn enable_report(
 )]
 pub async fn trigger_report(
     Path((org_id, name)): Path<(String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if let Err(resp) = guard_stored_report(
@@ -536,8 +553,8 @@ pub async fn trigger_report(
     {
         return resp;
     }
-    match reports::trigger(&org_id, DEFAULT_FOLDER, &name).await {
-        Ok(_) => MetaHttpResponse::ok("Report triggered"),
+    match reports::trigger(&org_id, DEFAULT_FOLDER, &name, &user_email.user_id).await {
+        Ok(run) => manual_run_response(&run),
         Err(e) => match e {
             ReportError::ReportNotFound => MetaHttpResponse::not_found(e),
             e => MetaHttpResponse::internal_error(e),
@@ -676,7 +693,9 @@ pub async fn list_reports_v2(
                     let scheduled_job = scheduled_jobs.remove(&d.report_id);
                     match ListReportsResponseBodyItem::try_from(d) {
                         Ok(mut item) => {
-                            item.last_triggered_at = scheduled_job.and_then(|t| t.start_time);
+                            item.last_triggered_at =
+                                scheduled_job.as_ref().and_then(|t| t.start_time);
+                            item.last_run.next_run_at = scheduled_job.map(|t| t.next_run_at);
                             Some(item)
                         }
                         Err(e) => {
@@ -707,7 +726,7 @@ pub async fn list_reports_v2(
         ("report_id" = String, Path, description = "Report ID (KSUID)"),
     ),
     responses(
-        (status = StatusCode::OK, body = inline(Report)),
+        (status = StatusCode::OK, body = inline(GetReportResponseBody)),
         (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
     ),
     extensions(
@@ -715,10 +734,25 @@ pub async fn list_reports_v2(
     )
 )]
 pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) -> Response {
-    match reports::get_by_id(&org_id, &report_id).await {
-        Ok((_, report)) => MetaHttpResponse::json(report),
-        Err(e) => e.into(),
-    }
+    let report = match reports::get_by_id(&org_id, &report_id).await {
+        Ok((_, report)) => report,
+        Err(e) => return e.into(),
+    };
+    let last_run =
+        infra::table::reports::get_last_run(infra::db::get_orm_client_ro().await, &report_id)
+            .await
+            .unwrap_or_else(|e| {
+                log::error!("Error reading the last run of report {report_id}: {e}");
+                None
+            });
+    let next_run_at = scheduler::get(&org_id, TriggerModule::Report, &report_id)
+        .await
+        .ok()
+        .map(|t| t.next_run_at);
+    MetaHttpResponse::json(GetReportResponseBody {
+        report,
+        last_run: LastRunFields::new(last_run, next_run_at),
+    })
 }
 
 /// UpdateReportV2
@@ -968,8 +1002,9 @@ pub async fn enable_report_v2(
         ("report_id" = String, Path, description = "Report ID (KSUID)"),
     ),
     responses(
-        (status = 200, description = "Success", body = Object),
+        (status = 200, description = "Report sent; `run` is the history row of the run", body = inline(TriggerReportResponse)),
         (status = 404, description = "Not found", body = ()),
+        (status = 500, description = "Send failed; `run` carries the error", body = inline(TriggerReportResponse)),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -977,7 +1012,7 @@ pub async fn enable_report_v2(
 )]
 pub async fn trigger_report_v2(
     Path((org_id, report_id)): Path<(String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if let Err(resp) = guard_stored_report(
@@ -990,8 +1025,8 @@ pub async fn trigger_report_v2(
     {
         return resp;
     }
-    match reports::trigger_by_id(&org_id, &report_id).await {
-        Ok(_) => MetaHttpResponse::ok("Report triggered"),
+    match reports::trigger_by_id(&org_id, &report_id, &user_email.user_id).await {
+        Ok(run) => manual_run_response(&run),
         Err(e) => e.into(),
     }
 }
@@ -1069,6 +1104,26 @@ pub async fn move_reports(
         }),
         Err(e) => e.into(),
     }
+}
+
+/// 200 when the send succeeded, 500 with the error when it failed; the run row rides along.
+fn manual_run_response(row: &TriggerData) -> Response {
+    let run = ReportRunHit::from_trigger(row);
+    let (status, message) = match (&row.status, &run.error) {
+        (RunOutcome::Error, error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            error
+                .clone()
+                .unwrap_or_else(|| "Report send failed".to_string()),
+        ),
+        _ => (StatusCode::OK, "Report triggered".to_string()),
+    };
+    let body = TriggerReportResponse {
+        code: status.as_u16(),
+        message,
+        run,
+    };
+    (status, axum::Json(body)).into_response()
 }
 
 /// Saves as `reports::save` does, refusing between its checks and its write.
@@ -1174,7 +1229,49 @@ fn report_error_response(e: ReportError) -> Response {
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
+    use config::meta::self_reporting::usage::{RunOutcome, TriggerData};
     use openobserve_core::dashboards::reports::ReportError;
+
+    use super::manual_run_response;
+
+    #[test]
+    fn manual_run_response_is_200_with_the_run_on_success() {
+        let row = TriggerData {
+            key: "r/abc".to_string(),
+            ..Default::default()
+        };
+        assert_eq!(manual_run_response(&row).status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn manual_run_response_names_a_failure_that_carries_no_error_text() {
+        let row = TriggerData {
+            key: "r/abc".to_string(),
+            status: RunOutcome::Error,
+            ..Default::default()
+        };
+        let resp = manual_run_response(&row);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["message"], "Report send failed");
+        assert_eq!(json["run"]["status"], "error");
+    }
+
+    #[test]
+    fn manual_run_response_is_500_when_the_send_failed() {
+        let row = TriggerData {
+            key: "r/abc".to_string(),
+            status: RunOutcome::Error,
+            error: Some("error processing report: report server 500: boom".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            manual_run_response(&row).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 
     fn status(err: ReportError) -> StatusCode {
         Response::from(err).status()

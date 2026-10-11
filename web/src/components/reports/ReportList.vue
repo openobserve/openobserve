@@ -22,7 +22,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       title-data-test="report-list-title"
       icon="description"
       :subtitle="t('reports.subtitle')"
+      tabs-below
     >
+      <template #header-tabs>
+        <OTabs
+          :model-value="activeTab"
+          align="left"
+          data-test="report-list-tabs"
+          @change="onTabChange"
+        >
+          <OTab
+            name="shared"
+            data-test="tab-shared"
+            :label="t('reports.scheduled')"
+            icon="schedule"
+          />
+          <OTab name="cached" data-test="tab-cached" :label="t('reports.cached')" icon="database" />
+          <OTab
+            name="history"
+            data-test="tab-history"
+            :label="t('reports.history.tab')"
+            icon="history"
+          />
+        </OTabs>
+      </template>
+
       <template #actions>
         <OButton
           data-test="report-list-add-report-btn"
@@ -34,8 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
+      <ReportHistory v-if="activeTab === 'history'" />
+
       <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
       <div
+        v-else
         data-test="report-list-splitter"
         class="report-list-table flex min-h-0 flex-1 max-md:flex-col"
       >
@@ -69,25 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :default-columns="false"
               show-index
               table-id="reports-report-list"
+              :column-visibility="{ next_run_at: false }"
+              @row-click="openReport"
             >
-              <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
+              <!-- Toolbar: search (inline folder scope) + refresh -->
               <template #toolbar>
                 <div
                   class="@container/report-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
                 >
-                  <div class="app-tabs-container">
-                    <AppTabs
-                      class="tabs-selection-container"
-                      :tabs="tabs"
-                      v-model:active-tab="activeTab"
-                      @update:active-tab="
-                        () => {
-                          invalidateFolderCache(activeFolderId, true);
-                          loadReports(activeFolderId);
-                        }
-                      "
-                    />
-                  </div>
                   <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
                   <div
                     class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:max-lg:min-w-80"
@@ -194,14 +210,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ row.folder_name || t("common.defaultLabel") }}
               </template>
 
-              <!-- Last triggered timestamp -->
-              <template #cell-last_triggered_at="{ row }">
+              <!-- Last run: outcome chip, then when it ended -->
+              <template #cell-last_run="{ row }">
+                <span class="inline-flex" :data-test="`report-list-${row.name}-last-run`">
+                  <OTag type="reportRunStatus" :value="row.last_run_chip" />
+                  <OTooltip :content="lastRunTooltip(row)" />
+                </span>
+              </template>
+              <template #cell-last_run_at="{ row }">
                 <OTimeCell
-                  :value="row.last_triggered_at_raw"
+                  :value="row.last_run_at"
+                  unit="us"
+                  mode="relative"
+                  :timezone="store.state.timezone"
+                />
+              </template>
+              <template #cell-next_run_at="{ row }">
+                <OTag v-if="!row.enabled" type="reportRunStatus" value="paused" />
+                <OTimeCell
+                  v-else
+                  :value="row.next_run_at"
                   unit="us"
                   mode="absolute"
                   :timezone="store.state.timezone"
-                  :empty-label="t('reports.never')"
                 />
               </template>
 
@@ -225,7 +256,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
                   class="max-md:hidden"
-                  @click="toggleReportState(row)"
+                  @click.stop="toggleReportState(row)"
+                />
+
+                <!-- Run now: send, never play — Resume already uses the triangle -->
+                <OButton
+                  :data-test="`report-list-${row.name}-run-now`"
+                  data-row-action="run-now"
+                  icon-left="send"
+                  variant="ghost"
+                  size="icon-sm"
+                  :loading="runningReportId === row.report_id"
+                  :title="t('reports.history.runNow')"
+                  class="max-md:hidden"
+                  @click.stop="openRunNow(row)"
                 />
 
                 <!-- Edit -->
@@ -237,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   :title="t('alerts.edit')"
                   class="max-md:hidden"
-                  @click="editReport(row)"
+                  @click.stop="editReport(row)"
                 />
 
                 <!-- Move to folder -->
@@ -248,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   :title="t('reports.moveToFolder')"
                   class="max-md:hidden"
-                  @click="openMoveDialog(row)"
+                  @click.stop="openMoveDialog(row)"
                 />
 
                 <!-- Delete -->
@@ -260,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   :title="t('alerts.delete')"
                   class="max-md:hidden"
-                  @click="confirmDeleteReport(row)"
+                  @click.stop="confirmDeleteReport(row)"
                 />
 
                 <ODropdown side="bottom" align="end">
@@ -283,6 +327,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="toggleReportState(row)"
                   >
                     <span>{{ row.enabled ? t("alerts.pause") : t("alerts.start") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="send"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-run-now-menu`"
+                    @select="openRunNow(row)"
+                  >
+                    <span>{{ t("reports.history.runNow") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
                     icon-left="edit"
@@ -357,6 +409,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmBulkDelete = false"
     />
 
+    <ReportRunNowDialog
+      v-if="runNowRow"
+      v-model:open="runNowOpen"
+      :report-id="runNowRow.report_id"
+      :report-name="runNowRow.name"
+      :last-run-status="runNowRow.last_run_status"
+      :last-run-error="runNowRow.last_run_error"
+      @update:running="(r) => (runningReportId = r ? runNowRow!.report_id : '')"
+      @ran="refreshReports"
+    />
+
     <!-- Move to folder dialog -->
     <MoveAcrossFolders
       v-model:open="showMoveDialog"
@@ -376,7 +439,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { reportsQuery } from "@/services/reports.queries";
 import { reportKeys } from "@/services/reports.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent, nextTick } from "vue";
+import { ref, onBeforeMount, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -392,7 +455,12 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18nTyped, raw } from "@/types/i18n";
 import reports from "@/services/reports";
 import { debounce } from "lodash-es";
-import AppTabs from "@/components/common/AppTabs.vue";
+import ReportHistory from "@/components/reports/ReportHistory.vue";
+import ReportRunNowDialog from "@/components/reports/ReportRunNowDialog.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { isCachedReport, lastRunChip } from "@/utils/reports/reportRun";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -462,7 +530,11 @@ const forbidden = computed(() => {
 const isLoadingReports = ref(true);
 const fetching = reportsList.isFetching;
 const lastUpdatedAt = reportsList.dataUpdatedAt;
-const activeTab = ref("shared");
+type ListTab = "shared" | "cached" | "history";
+const activeTab = computed<ListTab>(() => {
+  const tab = router.currentRoute.value.query.tab;
+  return tab === "cached" || tab === "history" ? tab : "shared";
+});
 const filterQuery = ref(""); // client-side filter within current folder
 const searchQuery = ref(""); // API search across all folders
 const cachedFolderReports = ref<any[]>([]); // current folder's reports before cross-folder search
@@ -489,10 +561,50 @@ const selectedReports = computed({
 });
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
-const tabs = reactive([
-  { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
-  { label: t("reports.cached"), value: "cached", icon: "database" },
-]);
+const onTabChange = (name: string | number) => {
+  if (name === activeTab.value) return;
+  const { tab: _tab, report_id: _id, run: _run, ...rest } = router.currentRoute.value.query;
+  router.push({ query: name === "shared" ? rest : { ...rest, tab: String(name) } });
+};
+
+watch(activeTab, (tab) => {
+  if (tab === "history") return;
+  invalidateFolderCache(activeFolderId.value, true);
+  loadReports(activeFolderId.value);
+});
+
+const runNowOpen = ref(false);
+const runNowRow = ref<any>(null);
+const runningReportId = ref("");
+
+const openRunNow = (row: any) => {
+  runNowRow.value = row;
+  runNowOpen.value = true;
+};
+
+const openReport = (row: any) =>
+  router.push({
+    name: "reportDetail",
+    params: { report_id: row.report_id },
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+      folder: row.folder_id || activeFolderId.value,
+    },
+  });
+
+const lastRunTooltip = (row: any) => {
+  if (row.last_run_chip === "overdue" && row.next_run_at) {
+    return t("reports.history.overdueTooltip", {
+      time: raw(convertUnixToDateFormat(row.next_run_at)),
+    });
+  }
+  if (row.last_run_status === "error" || row.last_run_status === "skipped") {
+    return raw(row.last_run_error) || t("reports.history.noErrorText");
+  }
+  if (row.last_run_chip === "succeeded") return t("reports.history.acceptedTooltip");
+  if (row.last_run_chip === "cached") return t("reports.history.cachedTooltip");
+  return t("reports.history.neverTooltip");
+};
 
 const deleteDialog = ref({
   show: false,
@@ -537,9 +649,32 @@ const columns = computed<OTableColumnDef[]>(() => {
       meta: { align: "left" },
     },
     {
-      id: "last_triggered_at",
-      header: t("alerts.lastTriggered"),
-      accessorKey: "last_triggered_at",
+      id: "last_run",
+      header: t("reports.history.lastRun"),
+      accessorKey: "last_run_chip",
+      cell: " ",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: 130,
+      meta: { align: "left" },
+    },
+    {
+      id: "last_run_at",
+      header: t("reports.history.lastRunAt"),
+      accessorKey: "last_run_at",
+      cell: " ",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: 120,
+      meta: { align: "left" },
+    },
+    {
+      id: "next_run_at",
+      header: t("reports.history.nextRun"),
+      accessorKey: "next_run_at",
+      cell: " ",
       sortable: true,
       resizable: true,
       hideable: true,
@@ -550,8 +685,8 @@ const columns = computed<OTableColumnDef[]>(() => {
       id: "actions",
       header: t("alerts.actions"),
       isAction: true,
-      size: 150,
-      meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+      size: 180,
+      meta: { align: "center", cellClass: "actions-column", actionCount: 5 },
     },
   ];
 
@@ -576,10 +711,7 @@ const columns = computed<OTableColumnDef[]>(() => {
 const shapeReports = (rows: any[]) =>
   rows.map((report: any) => ({
     ...report,
-    last_triggered_at_raw: report.last_triggered_at || null,
-    last_triggered_at: report.last_triggered_at
-      ? convertUnixToDateFormat(report.last_triggered_at)
-      : "-",
+    last_run_chip: lastRunChip(report, isCachedReport(report)),
   }));
 
 const renderReports = (rows: any[]) => {

@@ -875,6 +875,7 @@ onBeforeMount(async () => {
       .then(async (res: any) => {
         await setupEditingReport(res.data);
         originalReportData.value = snapshot();
+        if (query?.step === "destinations") step.value = 3;
       })
       .catch((err) => {
         // Optional chaining throughout: this catch also receives non-HTTP
@@ -1364,6 +1365,12 @@ const saveReport = async (value: CreateReportForm) => {
 };
 
 const goToReports = () => {
+  const returnTo = router.currentRoute.value.query.returnTo;
+  // Only an in-app path: a full URL here would make the form an open redirect.
+  if (typeof returnTo === "string" && returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+    router.replace(returnTo);
+    return;
+  }
   router.replace({
     name: "reports",
     query: {

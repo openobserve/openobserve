@@ -1261,6 +1261,18 @@ const useRoutes = () => {
         },
       },
       {
+        path: "/reports/detail/:report_id",
+        name: "reportDetail",
+        component: () => import("@/views/reports/ReportDetail.vue"),
+        props: true,
+        meta: {
+          titleKey: "routeTitles.reportDetail",
+        },
+        beforeEnter(to: any, from: any, next: any) {
+          routeGuard(to, from, next);
+        },
+      },
+      {
         path: "/reports/create",
         name: "createReport",
         component: CreateReport,
