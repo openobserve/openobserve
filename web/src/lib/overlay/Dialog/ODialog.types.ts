@@ -73,6 +73,8 @@ export interface DialogProps {
 
   /** Label for the primary action button (right side). Omit to hide. */
   primaryButtonLabel?: I18nText;
+  /** data-test for the primary button. @default "o-dialog-primary-btn" */
+  primaryButtonDataTest?: string;
   /** Label for the secondary action button (right of neutral, left of primary). Omit to hide. */
   secondaryButtonLabel?: I18nText;
   /** Label for the neutral action button (left side). Omit to hide. */
