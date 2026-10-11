@@ -387,7 +387,7 @@ async fn continued_with<C: ConnectionTrait>(
     }))
 }
 
-/// Local delete: tombstones the row as the next version; the tombstone, `None` for no row.
+/// Unordered delete for a replicated message with no version; a user delete uses the version check.
 pub async fn delete_with<C: ConnectionTrait>(
     conn: &C,
     org: &str,
