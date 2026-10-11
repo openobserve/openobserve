@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :tooltip="param.key === 'OpenObserveAccessKey' ? false : undefined"
                       class="flex-1"
                       :class="paramValTextClass"
-                      >{{ param.value }}</OTruncatedText
+                      >{{ param.secret ? maskSecret(param.value) : param.value }}</OTruncatedText
                     >
                     <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
                       <OIcon name="content-copy" size="sm" />
@@ -340,6 +340,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { maskSecret } from "@/composables/useCredentialSnippet";
 
 const COMPLETE_TEMPLATE_URL =
   "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml";
@@ -436,7 +437,7 @@ export default defineComponent({
         { key: "TemplateS3Bucket", value: "openobserve-datasources-bucket" },
         { key: "TemplateS3Prefix", value: "datasource/cloud/aws" },
         { key: "OpenObserveEndpoint", value: endpointUrl },
-        { key: "OpenObserveAccessKey", value: accessKey },
+        { key: "OpenObserveAccessKey", value: accessKey, secret: true },
         ...QUICK_SETUP_SERVICES.map(({ flag }) => ({
           key: flag,
           value: serviceFlags[flag],
@@ -567,6 +568,7 @@ export default defineComponent({
       showTargetRegions,
       showServices,
       stackSetParams,
+      maskSecret,
       AWS_REGIONS,
       regionOptions,
       QUICK_SETUP_SERVICES,

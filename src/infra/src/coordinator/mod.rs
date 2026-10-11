@@ -19,6 +19,7 @@ pub mod dashboards;
 pub mod destinations;
 pub mod downtimes;
 pub mod events;
+pub mod ingest_rejection;
 pub mod model_pricing;
 pub mod oncall;
 pub mod org_status;

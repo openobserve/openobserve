@@ -582,9 +582,9 @@ describe("LogstashDatasource.vue Component Logic", () => {
     expect(LogstashDatasource.props.currUserEmail.type).toBe(String);
   });
 
-  // Test 47: Component has CopyContent in components
-  it("should have CopyContent component registered", () => {
-    expect(LogstashDatasource.components).toHaveProperty("CopyContent");
+  // Test 47: Component has CredentialCodeBlock in components
+  it("should have CredentialCodeBlock component registered", () => {
+    expect(LogstashDatasource.components).toHaveProperty("CredentialCodeBlock");
   });
 
   // Test 48: Content includes proper JSON endpoint

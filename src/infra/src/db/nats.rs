@@ -47,6 +47,8 @@ use crate::{
 };
 
 const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
+/// Equals the first-event watch stop, so a reason is written at most once per org per watch.
+pub const INGEST_REJECTION_MAX_AGE_SECS: u64 = 3_600;
 
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
@@ -77,26 +79,7 @@ async fn get_bucket_by_key<'a>(
         history: cfg.nats.history,
         ..Default::default()
     };
-    // Named literally, like the buckets above: this layer does not import from
-    // the domain modules. A test in `cluster::ai_sessions` pins these names.
-    if bucket_name == "nodes"
-        || bucket_name == "clusters"
-        || bucket_name == "locker"
-        || bucket_name == "lockers"
-        || bucket_name == "ai_replicas"
-        || bucket_name == "ai_session_owners"
-    {
-        // if changed ttl need recreate the bucket
-        // CMD: nats kv del -f o2_nodes
-        let ttl = if bucket_name.starts_with("locker") {
-            cfg.nats.lock_max_age
-        } else if bucket_name == "ai_session_owners" {
-            cfg.limit.ai_session_owner_ttl as u64
-        } else {
-            // o2-ai replicas heartbeat on the same contract as cluster nodes.
-            cfg.limit.node_heartbeat_ttl as u64
-        };
-        let ttl = Duration::from_secs(ttl);
+    if let Some(ttl) = bucket_ttl(bucket_name) {
         bucket.max_age = ttl;
         if cfg.nats.v211_support {
             bucket.limit_markers = Some(ttl);
@@ -113,6 +96,11 @@ async fn get_bucket_by_key<'a>(
         })?,
     };
     Ok((kv, key.trim_start_matches(bucket_name)))
+}
+
+pub async fn kv_store(key: &str) -> Result<jetstream::kv::Store> {
+    let prefix = get_config().nats.prefix.clone();
+    Ok(get_bucket_by_key(&prefix, key).await?.0)
 }
 
 pub async fn init() -> Result<()> {
@@ -994,7 +982,7 @@ async fn keep_alive_lock(
 }
 
 #[inline]
-fn key_encode(key: &str) -> String {
+pub(crate) fn key_encode(key: &str) -> String {
     base64::encode(key).replace('+', "-").replace('/', "_")
 }
 
@@ -1006,15 +994,24 @@ fn key_decode(key: &str) -> Option<String> {
     base64::decode(key.replace('-', "+").replace('_', "/")).ok()
 }
 
-/// Whether `get_bucket_by_key` gives `bucket_name` a `max_age`. Lets the domain
-/// modules assert their buckets still get a TTL without this layer importing
-/// from them — see `cluster::ai_sessions`.
+fn bucket_ttl(bucket_name: &str) -> Option<Duration> {
+    let cfg = get_config();
+    // Named literally: this layer does not import from the domain modules, whose tests pin these.
+    let secs = match bucket_name {
+        "locker" | "lockers" => cfg.nats.lock_max_age,
+        "ai_session_owners" => cfg.limit.ai_session_owner_ttl as u64,
+        // o2-ai replicas heartbeat on the same contract as cluster nodes.
+        "nodes" | "clusters" | "ai_replicas" => cfg.limit.node_heartbeat_ttl as u64,
+        "ingest_rejection" => INGEST_REJECTION_MAX_AGE_SECS,
+        _ => return None,
+    };
+    Some(Duration::from_secs(secs))
+}
+
+/// Whether `get_bucket_by_key` gives `bucket_name` a `max_age`, for the domain modules' tests.
 #[cfg(test)]
 pub(crate) fn bucket_has_ttl(bucket_name: &str) -> bool {
-    matches!(
-        bucket_name,
-        "nodes" | "clusters" | "locker" | "lockers" | "ai_replicas" | "ai_session_owners"
-    )
+    bucket_ttl(bucket_name).is_some()
 }
 
 #[inline]
@@ -1033,6 +1030,25 @@ mod tests {
         assert!(!use_kv_watcher("/super_cluster_kv_nodes/"));
         assert!(!use_kv_watcher("/super_cluster_kv_clusters/"));
         assert!(!use_kv_watcher("/other_prefix/"));
+    }
+
+    #[test]
+    fn test_bucket_ttl_pins_ingest_rejection_to_one_hour() {
+        let cfg = get_config();
+        assert_eq!(
+            bucket_ttl("ingest_rejection"),
+            Some(Duration::from_secs(3_600))
+        );
+        assert_eq!(
+            bucket_ttl("nodes"),
+            Some(Duration::from_secs(cfg.limit.node_heartbeat_ttl as u64))
+        );
+        assert_eq!(
+            bucket_ttl("lockers"),
+            Some(Duration::from_secs(cfg.nats.lock_max_age))
+        );
+        assert_eq!(bucket_ttl("schema"), None);
+        assert_eq!(bucket_ttl("organization"), None);
     }
 
     #[test]

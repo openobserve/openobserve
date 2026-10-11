@@ -48,6 +48,7 @@ pub mod logs;
 pub mod metrics;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
+pub mod onboarding;
 pub mod org_cleanup;
 #[cfg(feature = "cloud")]
 pub mod org_usage;
