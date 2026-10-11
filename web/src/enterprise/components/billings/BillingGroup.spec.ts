@@ -107,7 +107,7 @@ async function mountBillingGroup(opts: MountOptions = {}) {
     billing_group_allowed_orgs: allowedOrgs,
   };
 
-  const orgGroupInvite = reactive({ trigger: 0, canInvite: false });
+  const orgGroupInvite = reactive({ trigger: 0, canInvite: false, refreshMembers: vi.fn() });
 
   const wrapper = mount(BillingGroup, {
     global: {
@@ -561,9 +561,13 @@ describe("BillingGroup.vue", () => {
       );
     });
 
-    it("removes the member with the right ids after the dialog is accepted, then reloads", async () => {
+    it("removes the member with the right ids after the dialog is accepted, then reloads and refreshes the payer member list", async () => {
       billing.remove_billing_group_member.mockResolvedValue({ data: "ok" });
-      ({ wrapper } = await mountBillingGroup({ members: [member], renderTable: true }));
+      let orgGroupInvite: any;
+      ({ wrapper, orgGroupInvite } = await mountBillingGroup({
+        members: [member],
+        renderTable: true,
+      }));
 
       button(wrapper, "org-group-remove-member-child-1")!.vm.$emit("click");
       await flushPromises();
@@ -576,6 +580,7 @@ describe("BillingGroup.vue", () => {
       expect(billing.remove_billing_group_member).toHaveBeenCalledWith("default", "child-1");
       expect(billing.get_billing_group_membership).toHaveBeenCalledTimes(2);
       expect(dialog(wrapper, "org-group-remove-dialog").props("open")).toBe(false);
+      expect(orgGroupInvite.refreshMembers).toHaveBeenCalledTimes(1);
     });
 
     it("shows Leave billing group on the member view only", async () => {
@@ -587,9 +592,10 @@ describe("BillingGroup.vue", () => {
       expect(button(wrapper, "org-group-leave")).toBeUndefined();
     });
 
-    it("leaves the group after the dialog is accepted, then reloads", async () => {
+    it("leaves the group after the dialog is accepted, then reloads and refreshes the payer member list", async () => {
       billing.leave_billing_group.mockResolvedValue({ data: "ok" });
-      ({ wrapper } = await mountBillingGroup({ membership }));
+      let orgGroupInvite: any;
+      ({ wrapper, orgGroupInvite } = await mountBillingGroup({ membership }));
 
       button(wrapper, "org-group-leave")!.vm.$emit("click");
       await flushPromises();
@@ -601,6 +607,7 @@ describe("BillingGroup.vue", () => {
 
       expect(billing.leave_billing_group).toHaveBeenCalledWith("default");
       expect(billing.get_billing_group_membership).toHaveBeenCalledTimes(2);
+      expect(orgGroupInvite.refreshMembers).toHaveBeenCalledTimes(1);
     });
 
     it("calls nothing when either dialog is cancelled", async () => {

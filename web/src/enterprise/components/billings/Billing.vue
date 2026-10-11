@@ -407,6 +407,7 @@ export default defineComponent({
     const orgGroupInvite = reactive({
       trigger: 0,
       canInvite: false,
+      refreshMembers: fetchBillingMembers,
     });
     provide("orgGroupInvite", orgGroupInvite);
     const selectUsageDate = () => {
