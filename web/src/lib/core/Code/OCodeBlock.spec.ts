@@ -8,6 +8,10 @@ vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: (...args: unknown[]) => copyMock(...args),
 }));
 vi.mock("vuex", () => ({ useStore: () => ({ state: { theme: "light" } }) }));
+const toastMock = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: unknown[]) => toastMock(...args),
+}));
 
 import OCodeBlock from "./OCodeBlock.vue";
 
@@ -145,6 +149,23 @@ describe("OCodeBlock", () => {
     });
   });
 
+  describe("inset", () => {
+    const style = (w: any) => w.find("pre").attributes("style") ?? "";
+
+    it("keeps the code flush with the border by default", () => {
+      expect(style(mountBlock({ code: "SELECT 1" }))).not.toContain("padding");
+    });
+
+    it("pads the code away from the border when asked", () => {
+      expect(style(mountBlock({ code: "SELECT 1", inset: true }))).toContain("padding: 0.75rem");
+    });
+
+    it("adds the inset to the height cap so the same number of lines stays visible", () => {
+      const capped = style(mountBlock({ code: "SELECT 1", inset: true, maxLines: 4 }));
+      expect(capped).toMatch(/max-height:\s*calc\([^)]*em \+ 1\.5rem\)/);
+    });
+  });
+
   describe("line numbers", () => {
     const gutter = (w: any) => w.find('[data-test="code-block-line-numbers"]');
 
@@ -189,6 +210,181 @@ describe("OCodeBlock", () => {
         lineNumbers: true,
       });
       expect(gutter(wrapper).text()).toBe("1");
+    });
+  });
+
+  describe("copy on click and masked selection", () => {
+    const TOKEN = "abcd1234secretwxyz";
+    const MASK = "abcd\u2022\u2022\u2022\u2022wxyz";
+    const code = `curl -u me@x.io:${TOKEN} -k https://h/api/o/default/_json`;
+    const masked = `curl -u me@x.io:${MASK} -k https://h/api/o/default/_json`;
+
+    const mountAttached = (props: Record<string, unknown>) =>
+      mount(OCodeBlock, {
+        props: { code, codeMasked: masked, copyOnClick: true, ...props } as any,
+        global: { stubs },
+        attachTo: document.body,
+      });
+
+    // Maps a character offset in the rendered text to the text node holding it.
+    const pointAt = (root: Node, index: number): [Node, number] => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let seen = 0;
+      let node = walker.nextNode();
+      while (node) {
+        const len = node.textContent?.length ?? 0;
+        if (index <= seen + len) return [node, index - seen];
+        seen += len;
+        node = walker.nextNode();
+      }
+      throw new Error("offset outside the text");
+    };
+
+    const select = (root: Element, from: number, to: number) => {
+      const range = document.createRange();
+      range.setStart(...pointAt(root, from));
+      range.setEnd(...pointAt(root, to));
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+    };
+
+    const fireCopy = (el: Element) => {
+      const setData = vi.fn();
+      const event = new Event("copy", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", { value: { setData } });
+      el.dispatchEvent(event);
+      return { setData, event };
+    };
+
+    beforeEach(() => {
+      toastMock.mockReset();
+      window.getSelection()?.removeAllRanges();
+    });
+
+    it("copies the real code and focuses the block on the first click", async () => {
+      const wrapper = mountAttached({ tokenName: "prod-ingest" });
+      const pre = wrapper.find("pre");
+      await pre.trigger("pointerdown");
+      await pre.trigger("click");
+      await flushPromises();
+      expect(copyMock).toHaveBeenCalledTimes(1);
+      expect(copyMock.mock.calls[0][0]).toBe(code);
+      expect(copyMock.mock.calls[0][2].successMessage).toBe("Copied with org token prod-ingest");
+      expect(document.activeElement).toBe(pre.element);
+      expect(wrapper.emitted("copy")).toEqual([[{ partial: false }]]);
+      wrapper.unmount();
+    });
+
+    it("treats later clicks on the focused block as plain text", async () => {
+      const wrapper = mountAttached({});
+      const pre = wrapper.find("pre");
+      await pre.trigger("pointerdown");
+      await pre.trigger("click");
+      await pre.trigger("pointerdown");
+      await pre.trigger("click");
+      expect(copyMock).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+
+    it("does not copy on a click that ends a drag selection", async () => {
+      const wrapper = mountAttached({});
+      const codeEl = wrapper.find("code").element;
+      select(codeEl, 0, 4);
+      await wrapper.find("pre").trigger("click");
+      expect(copyMock).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("copies again on Enter while focused", async () => {
+      const wrapper = mountAttached({});
+      await wrapper.find("pre").trigger("keydown", { key: "Enter" });
+      await flushPromises();
+      expect(copyMock).toHaveBeenCalledTimes(1);
+      expect(copyMock.mock.calls[0][0]).toBe(code);
+      wrapper.unmount();
+    });
+
+    it("leaves clicks alone without copyOnClick", async () => {
+      const wrapper = mountAttached({ copyOnClick: false });
+      const pre = wrapper.find("pre");
+      await pre.trigger("click");
+      expect(copyMock).not.toHaveBeenCalled();
+      expect(pre.attributes("tabindex")).toBeUndefined();
+      wrapper.unmount();
+    });
+
+    it("puts the real token in the clipboard for a selection across the mask", async () => {
+      const wrapper = mountAttached({ tokenName: "prod-ingest" });
+      const codeEl = wrapper.find("code").element;
+      const from = masked.indexOf("me@");
+      const to = masked.indexOf(" https");
+      select(codeEl, from, to);
+      const { setData, event } = fireCopy(codeEl);
+      expect(setData).toHaveBeenCalledWith("text/plain", `me@x.io:${TOKEN} -k`);
+      expect(event.defaultPrevented).toBe(true);
+      expect(codeEl.textContent).toBe(masked);
+      expect(toastMock.mock.calls[0][0].message).toBe("Copied with org token prod-ingest");
+      expect(wrapper.emitted("copy")).toEqual([[{ partial: true }]]);
+      wrapper.unmount();
+    });
+
+    it("copies the whole token when the selection only touches part of the mask", () => {
+      const wrapper = mountAttached({});
+      const codeEl = wrapper.find("code").element;
+      const bullets = masked.indexOf("\u2022");
+      select(codeEl, bullets + 1, bullets + 3);
+      const { setData } = fireCopy(codeEl);
+      expect(setData).toHaveBeenCalledWith("text/plain", "1234secret");
+      wrapper.unmount();
+    });
+
+    it("copies a selection without the token unchanged", () => {
+      const wrapper = mountAttached({});
+      const codeEl = wrapper.find("code").element;
+      select(codeEl, masked.indexOf("https"), masked.length);
+      const { setData, event } = fireCopy(codeEl);
+      expect(setData).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+      expect(wrapper.emitted("copy")).toEqual([[{ partial: true }]]);
+      wrapper.unmount();
+    });
+
+    it("does not rewrite when the mask does not line up with the code", () => {
+      const wrapper = mountAttached({ codeMasked: "unrelated \u2022\u2022\u2022 text" });
+      const codeEl = wrapper.find("code").element;
+      select(codeEl, 0, 14);
+      const { setData } = fireCopy(codeEl);
+      expect(setData).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("does not rewrite once the secret is revealed", async () => {
+      const wrapper = mountAttached({});
+      await wrapper.find('[data-test="code-block-reveal-btn"]').trigger("click");
+      const codeEl = wrapper.find("code").element;
+      select(codeEl, 0, code.length);
+      const { setData } = fireCopy(codeEl);
+      expect(setData).not.toHaveBeenCalled();
+      wrapper.unmount();
+    });
+
+    it("shows the token as a toolbar link that emits token-click", async () => {
+      const wrapper = mountAttached({
+        tokenName: "prod-ingest",
+        dataTest: "ingestion-curl-code-block",
+      });
+      const link = wrapper.find('[data-test="ingestion-curl-code-block-token-link"]');
+      expect(link.text()).toBe("org token · prod-ingest");
+      await link.trigger("click");
+      expect(wrapper.emitted("token-click")).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("has no token link without a token name", () => {
+      const wrapper = mountAttached({});
+      expect(wrapper.find('[data-test="code-block-token-link"]').exists()).toBe(false);
+      wrapper.unmount();
     });
   });
 });
