@@ -14,16 +14,33 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { sqlIn, sqlLiteral } from "@/utils/query/sqlFilterBuilder";
-import type {
-  NamedActionRule,
-  NamedEvent,
-  NamedEventRule,
+import {
+  CONTAINER_SUFFIXES,
+  type AppExclusions,
+  type MatchOp,
+  type NamedEvent,
+  type NamedRule,
+  type PageRule,
+  type SessionRule,
 } from "@/utils/rum/productAnalyticsModel";
 
-export type StepKind = "p" | "c" | "e";
+export type StepKind = "p" | "c" | "e" | "r";
+export interface StepFilters {
+  minMs?: number;
+  frustrated?: true;
+  errored?: true;
+}
 export interface StepRef {
   kind: StepKind;
   key: string;
+  f?: StepFilters;
+}
+/** Exactly one of `b` (between steps a and b) and `withinMs` (within that long after step a). */
+export interface ExclusionStep {
+  step: StepRef;
+  a: number;
+  b?: number;
+  withinMs?: number;
 }
 export type IdentityField = "usr_id" | "usr_email" | "usr_anonymous_id";
 export interface AnalyticsScope {
@@ -31,6 +48,11 @@ export interface AnalyticsScope {
   env: string[];
   version: string[];
   schema: Record<string, boolean>;
+  exclusions?: AppExclusions;
+  xall?: boolean;
+  apps?: string[];
+  appExclusions?: Record<string, AppExclusions>;
+  newSince?: number;
 }
 export interface IdentitySql {
   field: IdentityField;
@@ -38,12 +60,13 @@ export interface IdentitySql {
 }
 export type FunnelUnit = "sessions" | "users";
 export type FunnelWindow = "session" | "1h" | "1d" | "7d";
-export type BreakdownDim = "browser" | "os" | "device" | "country" | "version" | "env";
+export type BreakdownDim = "browser" | "os" | "device" | "country" | "version" | "env" | "app";
 export interface FunnelDef {
   steps: StepRef[];
   unit: FunnelUnit;
   window: FunnelWindow;
   breakdown: BreakdownDim | null;
+  x?: ExclusionStep[];
 }
 export interface FunnelCohort {
   funnel: FunnelDef;
@@ -94,6 +117,7 @@ export const DIMENSIONS: Readonly<Record<BreakdownDim, string>> = {
   country: "geo_info_country",
   version: "version",
   env: "env",
+  app: "application_id",
 };
 export const SAMPLE_CHARS = "0123456789abcdef" as const;
 export const MAX_FUNNEL_STEPS = 10;
@@ -101,7 +125,6 @@ export const PAGE_LIMIT = 200;
 const DAY_US = 86400000000;
 const WHOLE = "ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING";
 const ROOT_URL_RE = "^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*/?(?:[?#].*)?$";
-const NOT_SYNTHETIC = "(session_type IS NULL OR session_type <> 'synthetics')";
 const hrExpr = (scope: AnalyticsScope): string =>
   has(scope, "session_has_replay")
     ? "MAX(CASE WHEN session_has_replay IS NOT NULL THEN 1 ELSE 0 END) AS hr"
@@ -212,14 +235,210 @@ export function samplePredicate(expr: string, sample: SampleRatio): string {
   return `substr(md5(${expr}), 1, 1) IN (${lits(SAMPLE_CHARS.slice(0, 16 / sample).split(""))})`;
 }
 
-export function scopeClause(scope: AnalyticsScope, sample: SampleRatio = 1): string {
-  const parts = [`application_id = ${lit(scope.app)}`, "session_id IS NOT NULL"];
+export function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const opMatch = (op: MatchOp, col: string, value: string | string[]): string => {
+  if (op === "in") return `${col} IN (${lits(Array.isArray(value) ? value : [value])})`;
+  const v = lit(value);
+  if (op === "eq") return `${col} = ${v}`;
+  if (op === "prefix") return `starts_with(${col}, ${v})`;
+  if (op === "suffix") return `ends_with(${col}, ${v})`;
+  if (op === "contains") return `strpos(${col}, ${v}) > 0`;
+  return `regexp_like(${col}, ${v})`;
+};
+
+const opMiss = (op: Exclude<MatchOp, "in">, col: string, value: string): string => {
+  const v = lit(value);
+  if (op === "eq") return `${col} <> ${v}`;
+  if (op === "contains") return `strpos(${col}, ${v}) = 0`;
+  return `NOT ${opMatch(op, col, value)}`;
+};
+
+// One condition per value, except `in`, which lists them all; NULL never excludes.
+const ruleKeeps = (r: SessionRule): string[] =>
+  r.op === "in"
+    ? [`(${r.field} IS NULL OR ${r.field} NOT IN (${lits(r.values)}))`]
+    : r.values.map(
+        (v) => `(${r.field} IS NULL OR ${opMiss(r.op as Exclude<MatchOp, "in">, r.field, v)})`,
+      );
+
+const ruleMatches = (r: SessionRule): string[] =>
+  (r.op === "in" ? [r.values] : r.values).map(
+    (v) => `${r.field} IS NOT NULL AND ${opMatch(r.op, r.field, v)}`,
+  );
+
+const anyOf = (conds: string[]): string =>
+  conds.length === 1 ? conds[0] : `(${conds.map((c) => `(${c})`).join(" OR ")})`;
+
+const isIdentityRule = (r: SessionRule): boolean =>
+  (IDENTITY_FIELDS as readonly string[]).includes(r.field);
+
+const scopeApps = (scope: AnalyticsScope): string[] => [
+  ...new Set([scope.app, ...(scope.apps ?? [])]),
+];
+
+const settingsOf = (scope: AnalyticsScope, app: string): AppExclusions | undefined =>
+  app === scope.app ? scope.exclusions : scope.appExclusions?.[app];
+
+// `xall` lifts the session rules only; ignored pages read settingsOf directly.
+const activeRules = (scope: AnalyticsScope, app: string): AppExclusions | undefined =>
+  scope.xall ? undefined : settingsOf(scope, app);
+
+const builtinKeeps = (scope: AnalyticsScope, ex: AppExclusions | undefined): string[] => {
+  if (!ex?.bots) return [];
+  const halves: [string, string[]][] = [
+    ["user_agent_user_agent_family", ex.builtinBots.families],
+    ["user_agent_device_family", ex.builtinBots.devices],
+  ];
+  return halves
+    .filter(([f, labels]) => has(scope, f) && labels.length)
+    .map(([f, labels]) => `(${f} IS NULL OR ${f} NOT IN (${lits(labels)}))`);
+};
+
+const savedRules = (
+  scope: AnalyticsScope,
+  ex: AppExclusions | undefined,
+  identity: boolean,
+): SessionRule[] =>
+  (ex?.sessions ?? []).filter((r) => has(scope, r.field) && isIdentityRule(r) === identity);
+
+const rowKeeps = (
+  scope: AnalyticsScope,
+  ex: AppExclusions | undefined,
+  identityRows: boolean,
+): string[] => [
+  ...builtinKeeps(scope, ex),
+  ...savedRules(scope, ex, false).flatMap(ruleKeeps),
+  ...(identityRows ? savedRules(scope, ex, true).flatMap(ruleKeeps) : []),
+];
+
+const appScope = (scope: AnalyticsScope): string => {
+  const apps = scopeApps(scope);
+  return apps.length > 1
+    ? `application_id IN (${lits(apps)})`
+    : `application_id = ${lit(scope.app)}`;
+};
+
+// Compared apps each keep their own rules, so every app gets its own branch of one OR.
+const rulesClause = (scope: AnalyticsScope, identityRows: boolean): string[] => {
+  const apps = scopeApps(scope);
+  const branches = apps.map((a) => ({
+    a,
+    keeps: rowKeeps(scope, activeRules(scope, a), identityRows),
+  }));
+  if (apps.length === 1) return branches[0].keeps;
+  if (!branches.some((b) => b.keeps.length)) return [];
+  const one = ({ a, keeps }: { a: string; keeps: string[] }) =>
+    keeps.length
+      ? `(application_id = ${lit(a)} AND ${keeps.join(" AND ")})`
+      : `application_id = ${lit(a)}`;
+  return [`(${branches.map(one).join(" OR ")})`];
+};
+
+const scopeWhere = (scope: AnalyticsScope, sample: SampleRatio, identityRows: boolean): string => {
+  const parts = [appScope(scope), "session_id IS NOT NULL"];
   if (has(scope, "env") && scope.env.length) parts.push(sqlIn("env", scope.env));
   if (has(scope, "version") && scope.version.length) parts.push(sqlIn("version", scope.version));
-  if (has(scope, "session_type")) parts.push(NOT_SYNTHETIC);
+  if (has(scope, "session_type"))
+    parts.push("(session_type IS NULL OR session_type <> 'synthetics')");
   if (sample > 1) parts.push(samplePredicate("session_id", sample));
-  return parts.join(" AND ");
+  return [...parts, ...rulesClause(scope, identityRows)].join(" AND ");
+};
+
+/** The scope with every row-level exclusion; identity rules are left to each builder's session pass. */
+export function scopeClause(scope: AnalyticsScope, sample: SampleRatio = 1): string {
+  return scopeWhere(scope, sample, false);
 }
+
+// Clicks, click pages, active users and identity tops filter identity rules row by row.
+const rowScope = (scope: AnalyticsScope): string => scopeWhere(scope, 1, true);
+
+// One `WHEN` per app, so a compared app's flag never reads another app's rules.
+const appFlag = (
+  scope: AnalyticsScope,
+  cond: (ex: AppExclusions | undefined) => string[],
+): string => {
+  const apps = scopeApps(scope);
+  const whens = apps.flatMap((a) => {
+    const conds = cond(activeRules(scope, a));
+    if (!conds.length) return [];
+    const app = apps.length > 1 ? `application_id = ${lit(a)} AND ` : "";
+    return [`WHEN ${app}${anyOf(conds)} THEN 1`];
+  });
+  return whens.length ? `MAX(CASE ${whens.join(" ")} ELSE 0 END)` : "0";
+};
+
+interface SessionPass {
+  xi: string;
+  widen: string;
+}
+
+const PASS_XS = "MAX(xi) OVER (PARTITION BY sid) AS xs";
+
+// Identity rules flag the whole session, because its first views carry no identity yet.
+const sessionPass = (scope: AnalyticsScope): SessionPass | null => {
+  const rules = scopeApps(scope).flatMap((a) => savedRules(scope, activeRules(scope, a), true));
+  if (!rules.length) return null;
+  const xi = appFlag(scope, (ex) => savedRules(scope, ex, true).flatMap(ruleMatches));
+  const fields = [...new Set(rules.map((r) => r.field))];
+  return { xi: `${xi} AS xi`, widen: fields.map((f) => ` OR ${f} IS NOT NULL`).join("") };
+};
+
+const filtered = (
+  src: string,
+  pass: SessionPass | null,
+  where = "",
+  newSince: number | null = null,
+  alias = `${src}s`,
+  unit = "sid",
+): string => {
+  const cols = [
+    ...(pass ? [PASS_XS] : []),
+    ...(newSince !== null ? [`MIN(t0) OVER (PARTITION BY ${unit}) AS first_t`] : []),
+  ];
+  const conds = [
+    ...(pass ? ["xs = 0"] : []),
+    ...(newSince !== null ? [`first_t >= ${newSince}`] : []),
+  ];
+  if (where) conds.push(conds.length ? `(${where})` : where);
+  const from = cols.length ? `(SELECT *, ${cols.join(", ")} FROM ${src}) ${alias}` : src;
+  return conds.length ? `${from} WHERE ${conds.join(" AND ")}` : from;
+};
+
+const pageMatch = (k: string, pages: PageRule[], tagged: boolean): string => {
+  const text = tagged ? `substr(${k}, 3)` : k;
+  const onPage = (cond: string) => (tagged ? `(starts_with(${k}, 'p:') AND ${cond})` : cond);
+  const eqs = pages.filter((p) => p.op === "eq").map((p) => (tagged ? `p:${p.value}` : p.value));
+  return [
+    ...(eqs.length ? [`${k} IN (${lits(eqs)})`] : []),
+    ...pages
+      .filter((p) => p.op === "prefix")
+      .map((p) => onPage(`starts_with(${text}, ${lit(p.value)})`)),
+    ...pages
+      .filter((p) => p.op === "regex")
+      .map((p) => onPage(`regexp_like(${text}, ${lit(p.value)})`)),
+  ].join(" OR ");
+};
+
+const ignoredPagePredicate = (k: string, pages: PageRule[], tagged = false): string =>
+  `NOT (${pageMatch(k, pages, tagged)})`;
+
+// Each compared app hides its own pages, so the rows carry their app.
+const ignoredFilter = (scope: AnalyticsScope, keep: (pages: PageRule[]) => string): string => {
+  const apps = scopeApps(scope);
+  const pagesOf = (a: string) => settingsOf(scope, a)?.pages ?? [];
+  if (!apps.some((a) => pagesOf(a).length)) return "";
+  if (apps.length === 1) return keep(pagesOf(scope.app));
+  const one = (a: string) =>
+    pagesOf(a).length ? `(app = ${lit(a)} AND ${keep(pagesOf(a))})` : `app = ${lit(a)}`;
+  return `(${apps.map(one).join(" OR ")})`;
+};
+
+const APP_COL = "MIN(application_id) AS app";
+
+const comparing = (scope: AnalyticsScope): boolean => scopeApps(scope).length > 1;
 
 export function identityExpr(id: IdentitySql): string {
   if (!IDENTITY_FIELDS.includes(id.field)) throw new Error(`Unknown identity field ${id.field}`);
@@ -232,12 +451,41 @@ export function identityExpr(id: IdentitySql): string {
 const findEvent = (id: string, events: readonly NamedEvent[]): NamedEvent | undefined =>
   events.find((e) => e.id === id);
 
-const rawRule = (rule: NamedEventRule | NamedActionRule, scope: AnalyticsScope): string => {
+const MASK_TOKEN = /:(id|num|email|token)/;
+
+const paramPattern = (name: string, value: string | undefined): string =>
+  `[?#&]${escapeRegex(name)}${value === undefined ? "(=|&|#|$)" : `=${escapeRegex(value)}(&|#|$)`}`;
+
+const refPattern = (host: string): string => `^https?://([^/]*\\.)?${escapeRegex(host)}(/|:|$)`;
+
+const onPageAnd = (pk: string, onPage: string | undefined): string =>
+  onPage ? ` AND ${pk} = ${lit(onPage)}` : "";
+
+const rawRule = (rule: NamedRule, scope: AnalyticsScope): string => {
   const pk = pageKeyExpr("view_url", scope.schema);
+  if (rule.t === "error")
+    return has(scope, "error_message")
+      ? `(type = 'error' AND ${opMatch(rule.op, "error_message", rule.value)}${onPageAnd(pk, rule.onPage)})`
+      : "(1 = 0)";
   if (rule.t === "action") {
     if (!has(scope, "action_target_name")) return "(1 = 0)";
-    const onPage = rule.onPage ? ` AND ${pk} = ${lit(rule.onPage)}` : "";
-    return `(type = 'action' AND action_target_name <> '' AND ${clickKeyExpr("action_target_name")} IN (${lits(rule.targets)})${onPage})`;
+    const op = rule.op ?? "in";
+    const value = rule.value ?? "";
+    // A masked token never appears in the raw name, so only a literal value can prefilter.
+    const pre =
+      (op === "prefix" || op === "contains") && !MASK_TOKEN.test(value)
+        ? ` AND strpos(action_target_name, ${lit(value)}) > 0`
+        : "";
+    const match = opMatch(op, clickKeyExpr("action_target_name"), rule.targets ?? value);
+    return `(type = 'action' AND action_target_name <> ''${pre} AND ${match}${onPageAnd(pk, rule.onPage)})`;
+  }
+  if (rule.op === "param") {
+    const pre = rule.value === undefined ? rule.name : `${rule.name}=`;
+    return `(type = 'view' AND strpos(view_url, ${lit(pre)}) > 0 AND regexp_like(view_url, ${lit(paramPattern(rule.name, rule.value))})${onPageAnd(pk, rule.onPage)})`;
+  }
+  if (rule.op === "ref") {
+    if (!has(scope, "view_referrer")) return "(1 = 0)";
+    return `(type = 'view' AND strpos(view_referrer, ${lit(rule.value)}) > 0 AND regexp_like(view_referrer, ${lit(refPattern(rule.value))})${onPageAnd(pk, rule.onPage)})`;
   }
   if (rule.op === "eq") return stepPredicateRaw({ kind: "p", key: rule.value }, scope, []);
   if (rule.op === "prefix") {
@@ -247,13 +495,16 @@ const rawRule = (rule: NamedEventRule | NamedActionRule, scope: AnalyticsScope):
   return `(type = 'view' AND regexp_like(${pk}, ${lit(rule.value)}))`;
 };
 
-const groupedRule = (rule: NamedEventRule | NamedActionRule, scope: AnalyticsScope): string => {
-  if (rule.t === "action") {
-    const onPage = rule.onPage
-      ? ` AND ${pageKeyExpr("url", scope.schema, "vn")} = ${lit(rule.onPage)}`
-      : "";
-    return `(ty = 'action' AND k IN (${lits(rule.targets)})${onPage})`;
-  }
+const groupedRule = (rule: NamedRule, scope: AnalyticsScope): string => {
+  const pk = pageKeyExpr("url", scope.schema, "vn");
+  if (rule.t === "error")
+    return `(ty = 'error' AND ${opMatch(rule.op, "em", rule.value)}${onPageAnd(pk, rule.onPage)})`;
+  if (rule.t === "action")
+    return `(ty = 'action' AND ${opMatch(rule.op ?? "in", "k", rule.targets ?? rule.value ?? "")}${onPageAnd(pk, rule.onPage)})`;
+  if (rule.op === "param")
+    return `(ty = 'view' AND regexp_like(url, ${lit(paramPattern(rule.name, rule.value))})${onPageAnd(pk, rule.onPage)})`;
+  if (rule.op === "ref")
+    return `(ty = 'view' AND regexp_like(ref, ${lit(refPattern(rule.value))})${onPageAnd(pk, rule.onPage)})`;
   if (rule.op === "eq") return `(ty = 'view' AND k = ${lit(rule.value)})`;
   if (rule.op === "prefix") return `(ty = 'view' AND starts_with(k, ${lit(rule.value)}))`;
   return `(ty = 'view' AND regexp_like(k, ${lit(rule.value)}))`;
@@ -271,6 +522,10 @@ export function stepPredicateRaw(
     if (!has(scope, "action_target_name")) return "(1 = 0)";
     return `(type = 'action' AND action_target_name <> '' AND ${clickKeyExpr("action_target_name")} = ${lit(step.key)})`;
   }
+  if (step.kind === "r")
+    return has(scope, "error_message")
+      ? `(type = 'error' AND starts_with(error_message, ${lit(step.key)}))`
+      : "(1 = 0)";
   const ev = findEvent(step.key, events);
   if (!ev) return "(1 = 0)";
   return `(${ev.rules.map((r) => rawRule(r, scope)).join(" OR ")})`;
@@ -283,6 +538,7 @@ export function stepPredicateGrouped(
 ): string {
   if (step.kind === "p") return `ty = 'view' AND k = ${lit(step.key)}`;
   if (step.kind === "c") return `ty = 'action' AND k = ${lit(step.key)}`;
+  if (step.kind === "r") return `ty = 'error' AND starts_with(em, ${lit(step.key)})`;
   const ev = findEvent(step.key, events);
   if (!ev) return "1 = 0";
   return `(${ev.rules.map((r) => groupedRule(r, scope)).join(" OR ")})`;
@@ -305,7 +561,7 @@ const presentCandidates = (scope: AnalyticsScope): IdentityField[] =>
 
 // Q3 counts synthetic sessions, so its filter omits the synthetics exclusion that every other builder applies.
 const unfilteredScope = (scope: AnalyticsScope): string => {
-  const parts = [`application_id = ${lit(scope.app)}`, "session_id IS NOT NULL"];
+  const parts = [appScope(scope), "session_id IS NOT NULL"];
   if (has(scope, "env") && scope.env.length) parts.push(sqlIn("env", scope.env));
   if (has(scope, "version") && scope.version.length) parts.push(sqlIn("version", scope.version));
   return parts.join(" AND ");
@@ -320,41 +576,149 @@ export function facetOptionsSql(scope: AnalyticsScope, field: "env" | "version")
   return `SELECT ${f} AS value, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE application_id = ${lit(scope.app)} AND session_id IS NOT NULL AND ${f} IS NOT NULL AND ${f} <> '' GROUP BY ${f} ORDER BY sessions DESC LIMIT 100`;
 }
 
+const sumWhen = (conds: string[], value: string, alias: string): string =>
+  conds.length
+    ? `SUM(CASE WHEN ${conds.join(" AND ")} THEN ${value} ELSE 0 END) AS ${alias}`
+    : `SUM(${value}) AS ${alias}`;
+
+// Every session stays in g with its rule flags, so one scan returns the total and the kept counts.
 export function summarySql(scope: AnalyticsScope, currentStartUs: number): string {
   const cs = Math.trunc(currentStartUs);
-  const hasSessionType = has(scope, "session_type");
-  const synthetic = hasSessionType
-    ? `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`
-    : "0 AS synthetic_sessions";
-  // The WHERE keeps bots for synthetic_sessions, so every other count must drop them itself.
-  const notSynthetic = hasSessionType ? ` AND ${NOT_SYNTHETIC}` : "";
-  const cols = [
-    `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} THEN session_id END) AS sessions`,
-    `COUNT(DISTINCT CASE WHEN _timestamp < ${cs}${notSynthetic} THEN session_id END) AS prev_sessions`,
-    `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} AND type = 'view' THEN view_id END) AS views`,
-    `COUNT(CASE WHEN _timestamp >= ${cs}${notSynthetic} AND type IN ('view', 'action') THEN 1 END) AS va_rows`,
-    synthetic,
-    "MAX(_timestamp) AS data_through_us",
+  const ids = presentCandidates(scope);
+  const xb = appFlag(scope, (ex) => {
+    const keeps = builtinKeeps(scope, ex);
+    return keeps.length ? [`NOT (${keeps.join(" AND ")})`] : [];
+  });
+  const xr = appFlag(scope, (ex) => {
+    const keeps = savedRules(scope, ex, false).flatMap(ruleKeeps);
+    return [
+      ...(keeps.length ? [`NOT (${keeps.join(" AND ")})`] : []),
+      ...savedRules(scope, ex, true).flatMap(ruleMatches),
+    ];
+  });
+  const tagged = ids.map(
+    (f) =>
+      `array_agg(DISTINCT CASE WHEN _timestamp >= ${cs} AND NULLIF(${f}, '') IS NOT NULL THEN ${lit(`${f}:`)} || ${f} END)`,
+  );
+  const g = [
+    "session_id AS sid",
+    `${xb} AS xb`,
+    `${xr} AS xr`,
+    `${has(scope, "session_type") ? "MAX(CASE WHEN session_type = 'synthetics' THEN 1 ELSE 0 END)" : "0"} AS syn`,
+    `MAX(CASE WHEN _timestamp >= ${cs} THEN 1 ELSE 0 END) AS cur`,
+    `MAX(CASE WHEN _timestamp < ${cs} THEN 1 ELSE 0 END) AS prv`,
+    `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs} AND type = 'view' THEN view_id END) AS views`,
+    `COUNT(CASE WHEN _timestamp >= ${cs} AND type IN ('view', 'action') THEN 1 END) AS va`,
+    "MAX(_timestamp) AS dt",
+    ...ids.map(
+      (f) =>
+        `MAX(CASE WHEN _timestamp >= ${cs} AND NULLIF(${f}, '') IS NOT NULL THEN 1 ELSE 0 END) AS ${f}__has`,
+    ),
+    ...(ids.length
+      ? [`${tagged.length > 1 ? `array_concat(${tagged.join(", ")})` : tagged[0]} AS ivs`]
+      : []),
   ];
-  for (const f of presentCandidates(scope)) {
-    cols.push(
-      `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} THEN NULLIF(${f}, '') END) AS ${f}__values`,
-    );
-    cols.push(
-      `COUNT(DISTINCT CASE WHEN _timestamp >= ${cs}${notSynthetic} AND NULLIF(${f}, '') IS NOT NULL THEN session_id END) AS ${f}__sessions`,
-    );
-  }
-  return `SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${unfilteredScope(scope)} LIMIT 1`;
+  // A session's values fan out to one row each; the appended NULL keeps a session without any.
+  const first = ids.length ? ["rn = 1"] : [];
+  const kept = ["xb = 0", "xr = 0"];
+  const cols = [
+    sumWhen([...first, "cur = 1", "syn = 0", ...kept], "1", "sessions"),
+    sumWhen([...first, "prv = 1", "syn = 0", ...kept], "1", "prev_sessions"),
+    sumWhen([...first, "cur = 1", "syn = 0"], "1", "total_sessions"),
+    sumWhen([...first, "cur = 1", "syn = 0", "xb = 0"], "1", "builtin_kept_sessions"),
+    sumWhen([...first, ...kept], "views", "views"),
+    sumWhen(first, "va", "va_rows"),
+    sumWhen([...first, "cur = 1", "syn = 1"], "1", "synthetic_sessions"),
+    "MAX(dt) AS data_through_us",
+    ...ids.flatMap((f) => [
+      `COUNT(DISTINCT CASE WHEN ${kept.join(" AND ")} AND starts_with(v, ${lit(`${f}:`)}) THEN v END) AS ${f}__values`,
+      `COUNT(DISTINCT CASE WHEN ${kept.join(" AND ")} AND ${f}__has = 1 THEN sid END) AS ${f}__sessions`,
+    ]),
+  ];
+  const ctes = [
+    `g AS (SELECT ${g.join(", ")} FROM "_rumdata" WHERE ${unfilteredScope(scope)} GROUP BY session_id)`,
+    ...(ids.length
+      ? [
+          "gv AS (SELECT *, unnest(array_append(ivs, CAST(NULL AS VARCHAR))) AS v FROM g)",
+          "gr AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY sid ORDER BY v) AS rn FROM gv)",
+        ]
+      : []),
+  ];
+  return withCtes(ctes, `SELECT ${cols.join(", ")} FROM ${ids.length ? "gr" : "g"} LIMIT 1`);
 }
 
 export function identityTopSql(scope: AnalyticsScope, field: IdentityField): string {
   const u = identityExpr({ field, excluded: [] });
   return withCtes(
     [
-      `v AS (SELECT ${u} AS u, COUNT(DISTINCT session_id) AS s FROM "_rumdata" WHERE ${scopeClause(scope)} AND type IN ('view','action') AND ${u} IS NOT NULL GROUP BY ${u})`,
+      `v AS (SELECT ${u} AS u, COUNT(DISTINCT session_id) AS s FROM "_rumdata" WHERE ${rowScope(scope)} AND type IN ('view','action') AND ${u} IS NOT NULL GROUP BY ${u})`,
       "r AS (SELECT u, s, SUM(s) OVER () AS total_s, COUNT(*) OVER () AS n_values FROM v)",
     ],
     "SELECT u, s, total_s, n_values FROM r ORDER BY s DESC, u LIMIT 3",
+  );
+}
+
+/** Top browser and device families over the scope without any exclusion, for the likely-bot suggestions. */
+export function userAgentSuggestionSql(scope: AnalyticsScope): string {
+  const bare = { app: scope.app, env: scope.env, version: scope.version, schema: scope.schema };
+  return `SELECT user_agent_user_agent_family AS ua, user_agent_device_family AS dev, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${scopeClause(bare)} GROUP BY user_agent_user_agent_family, user_agent_device_family ORDER BY sessions DESC LIMIT 15`;
+}
+
+/** Matched sessions of a draft event's rules, as one `e0_sessions` row; the preview always applies the exclusions. */
+export function namedEventPreviewSql(
+  scope: AnalyticsScope,
+  event: Pick<NamedEvent, "rules">,
+): string {
+  const ruled = { ...scope, xall: false };
+  const hit = event.rules.length
+    ? `(${event.rules.map((r) => rawRule(r, ruled)).join(" OR ")})`
+    : "FALSE";
+  const pass = sessionPass(ruled);
+  if (!pass)
+    return `SELECT COUNT(DISTINCT session_id) AS e0_sessions FROM "_rumdata" WHERE ${scopeClause(ruled)} AND ${hit} LIMIT 1`;
+  return withCtes(
+    [
+      `g AS (SELECT session_id AS sid, MAX(CASE WHEN ${hit} THEN 1 ELSE 0 END) AS hit, ${pass.xi} FROM "_rumdata" WHERE ${scopeClause(ruled)} AND (${hit}${pass.widen}) GROUP BY session_id)`,
+    ],
+    "SELECT COUNT(CASE WHEN hit = 1 THEN 1 END) AS e0_sessions FROM g WHERE xi = 0 LIMIT 1",
+  );
+}
+
+// A query naming a field the stream lacks fails whole, so an absent field reads as NULL.
+const viewCol = (scope: AnalyticsScope, field: string, type: "BIGINT" | "VARCHAR"): string =>
+  has(scope, field) ? field : `CAST(NULL AS ${type})`;
+
+const errorCol = (scope: AnalyticsScope): string =>
+  has(scope, "error_message") ? "error_message" : "CAST(NULL AS VARCHAR)";
+
+export function errorPickerSql(scope: AnalyticsScope, term?: string): string {
+  const msg = errorCol(scope);
+  const filter = term ? ` AND strpos(lower(${msg}), ${lit(term.toLowerCase())}) > 0` : "";
+  const pass = sessionPass(scope);
+  if (!pass)
+    return `SELECT substr(${msg}, 1, 120) AS k, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${scopeClause(scope)} AND type = 'error'${filter} GROUP BY 1 ORDER BY sessions DESC LIMIT 50`;
+  const k = `CASE WHEN type = 'error'${filter} THEN substr(${msg}, 1, 120) END`;
+  return withCtes(
+    [
+      `e0 AS (SELECT session_id AS sid, ${k} AS k, ${pass.xi} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'error'${pass.widen}) GROUP BY session_id, ${k})`,
+    ],
+    `SELECT k, COUNT(DISTINCT sid) AS sessions FROM ${filtered("e0", pass, "k IS NOT NULL")} GROUP BY k ORDER BY sessions DESC LIMIT 50`,
+  );
+}
+
+// The SDK records nothing about the clicked element, so a container is told apart by its name only.
+export function unnamedClicksSql(scope: AnalyticsScope): string {
+  const container = `regexp_like(${atnRawRef(scope)}, '-(${CONTAINER_SUFFIXES.join("|")})$')`;
+  const pk = pageKeyExpr("view_url", scope.schema);
+  const click = actionClickAnd(scope);
+  const pass = sessionPass(scope);
+  if (!pass)
+    return `SELECT ${pk} AS pg, COUNT(*) AS clicks, COUNT(CASE WHEN ${container} THEN 1 END) AS unnamed FROM "_rumdata" WHERE ${scopeClause(scope)} AND ${click} GROUP BY 1 ORDER BY unnamed DESC LIMIT 20`;
+  return withCtes(
+    [
+      `c0 AS (SELECT session_id AS sid, ${pk} AS pg, COUNT(CASE WHEN ${click} THEN 1 END) AS clicks, COUNT(CASE WHEN ${click} AND ${container} THEN 1 END) AS unnamed, ${pass.xi} FROM "_rumdata" WHERE ${scopeClause(scope)} AND ((${click})${pass.widen}) GROUP BY session_id, ${pk})`,
+    ],
+    `SELECT pg, SUM(clicks) AS clicks, SUM(unnamed) AS unnamed FROM ${filtered("c0", pass, "clicks > 0")} GROUP BY pg ORDER BY unnamed DESC LIMIT 20`,
   );
 }
 
@@ -371,33 +735,56 @@ const identityGroupCols = (id: IdentitySql): string[] => {
 const UID_WINDOW =
   "FIRST_VALUE(u0) OVER (PARTITION BY sid ORDER BY CASE WHEN u0 IS NULL THEN 1 ELSE 0 END, ut)";
 
+// The page key is computed once per view, so the ignored-page filter runs before the entry/exit aggregate.
 export function entryExitSql(
   scope: AnalyticsScope,
   currentStartUs: number,
   id: IdentitySql | null,
 ): string {
   const cs = Math.trunc(currentStartUs);
-  // One session is one entry, in its first view's window, and one exit, in its last view's window.
-  const cols = [
+  const pass = sessionPass(scope);
+  const app = comparing(scope);
+  const u = id ? identityExpr(id) : null;
+  // Identity rows join the view rows, so a view is told apart by its id and the rest dropped later.
+  const mixed = !!u || !!pass;
+  const vid = "CASE WHEN type = 'view' THEN view_id END";
+  const v0 = [
     "session_id AS sid",
-    `CASE WHEN MIN(CASE WHEN type = 'view' THEN _timestamp END) >= ${cs} THEN 1 ELSE 0 END AS ce`,
-    `CASE WHEN MAX(CASE WHEN type = 'view' THEN _timestamp END) >= ${cs} THEN 1 ELSE 0 END AS cx`,
-    "substr(MIN(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_url END), 14) AS fu",
-    "substr(MAX(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_url END), 14) AS lu",
-    "MAX(CASE WHEN type = 'view' THEN 1 ELSE 0 END) AS hv",
-    ...(has(scope, "view_name")
+    ...(mixed ? [`${vid} AS vid`] : []),
+    "MIN(_timestamp) AS ts",
+    "MIN(date) AS t",
+    "MIN(view_url) AS url",
+    ...(has(scope, "view_name") ? ["MIN(view_name) AS vn"] : []),
+    ...(app ? [APP_COL] : []),
+    ...(u
+      ? [`first_value(${u} ORDER BY CASE WHEN ${u} IS NULL THEN 1 ELSE 0 END, date) AS u0`]
+      : []),
+    ...(pass ? [pass.xi] : []),
+  ];
+  const rows = mixed
+    ? `(type = 'view'${u ? ` OR ${u} IS NOT NULL` : ""}${pass?.widen ?? ""})`
+    : "type = 'view'";
+  const v1 = [
+    "sid",
+    ...(mixed ? ["vid"] : []),
+    "ts",
+    "t",
+    `${pageKeyExpr("url", scope.schema, "vn")} AS k`,
+    ...(app ? ["app"] : []),
+    ...(u
       ? [
-          "substr(MIN(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_name END), 14) AS fvn",
-          "substr(MAX(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_name END), 14) AS lvn",
+          "first_value(u0) OVER (PARTITION BY sid ORDER BY CASE WHEN u0 IS NULL THEN 1 ELSE 0 END, t) AS u",
         ]
       : []),
+    ...(pass ? [PASS_XS] : []),
   ];
-  let extra = "";
-  if (id) {
-    const u = identityExpr(id);
-    cols.push(`first_value(${u} ORDER BY CASE WHEN ${u} IS NULL THEN 1 ELSE 0 END, date) AS u`);
-    extra = ` OR ${u} IS NOT NULL`;
-  }
+  const ignored = ignoredFilter(scope, (p) => ignoredPagePredicate("k", p));
+  const keep = [
+    ...(pass ? ["xs = 0"] : []),
+    ...(mixed ? ["vid IS NOT NULL"] : []),
+    "k IS NOT NULL",
+    ...(ignored ? [ignored] : []),
+  ];
   const agg: string[] = [];
   for (const [side, n] of [
     ["entry", 1],
@@ -414,9 +801,12 @@ export function entryExitSql(
   }
   return withCtes(
     [
-      `s0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view'${extra}) GROUP BY session_id)`,
-      `s1 AS (SELECT sid${id ? ", u" : ""}, unnest(make_array(ce, cx)) AS cur, unnest(make_array(${pageKeyExpr("fu", scope.schema, "fvn")}, ${pageKeyExpr("lu", scope.schema, "lvn")})) AS k, unnest(make_array(1, 2)) AS side FROM s0 WHERE hv = 1)`,
-      `g AS (SELECT k, ${agg.join(", ")} FROM s1 WHERE k IS NOT NULL GROUP BY k)`,
+      `v0 AS (SELECT ${v0.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND ${rows} GROUP BY session_id, ${mixed ? vid : "view_id"})`,
+      `v1 AS (SELECT ${v1.join(", ")} FROM v0)`,
+      `v AS (SELECT * FROM v1 WHERE ${keep.join(" AND ")})`,
+      `s0 AS (SELECT sid, CASE WHEN MIN(ts) >= ${cs} THEN 1 ELSE 0 END AS ce, CASE WHEN MAX(ts) >= ${cs} THEN 1 ELSE 0 END AS cx, substr(MIN(CAST(t AS VARCHAR) || k), 14) AS fk, substr(MAX(CAST(t AS VARCHAR) || k), 14) AS lk${u ? ", MAX(u) AS u" : ""} FROM v GROUP BY sid)`,
+      `s1 AS (SELECT sid${u ? ", u" : ""}, unnest(make_array(ce, cx)) AS cur, unnest(make_array(fk, lk)) AS k, unnest(make_array(1, 2)) AS side FROM s0)`,
+      `g AS (SELECT k, ${agg.join(", ")} FROM s1 GROUP BY k)`,
     ],
     "SELECT *, entry_sessions + exit_sessions + prev_entry_sessions + prev_exit_sessions AS rank_key FROM g ORDER BY rank_key DESC, k LIMIT 1000",
   );
@@ -425,12 +815,26 @@ export function entryExitSql(
 export function stepPickerSql(scope: AnalyticsScope, term?: string): string {
   const filter = term ? ` AND strpos(lower(k), ${lit(term.toLowerCase())}) > 0` : "";
   const groupKey = has(scope, "action_target_name") ? "action_target_name" : actionKey(scope);
+  const pass = sessionPass(scope);
+  const app = comparing(scope);
+  const at = has(scope, "action_type");
+  const cols = [
+    "session_id AS sid",
+    "type AS ty",
+    "MIN(view_url) AS url",
+    atnCol(scope),
+    ...(has(scope, "view_name") ? ["MIN(view_name) AS vn"] : []),
+    ...(at ? ["MIN(action_type) AS at"] : []),
+    ...(app ? [APP_COL] : []),
+    ...(pass ? [pass.xi] : []),
+  ];
+  const ignored = ignoredFilter(scope, (p) => `NOT (kind = 'p' AND (${pageMatch("k", p, false)}))`);
   return withCtes(
     [
-      `e0 AS (SELECT session_id AS sid, type AS ty, MIN(view_url) AS url, ${atnCol(scope)}${has(scope, "view_name") ? ", MIN(view_name) AS vn" : ""} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR ${actionClickExpr(scope)}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id ELSE ${groupKey} END)`,
-      `e AS (SELECT sid, CASE WHEN ty = 'view' THEN 'p' ELSE 'c' END AS kind, CASE WHEN ty = 'view' THEN ${pageKeyExpr("url", scope.schema, "vn")} ELSE ${clickKeyExpr("atn")} END AS k FROM e0)`,
+      `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR ${actionClickExpr(scope)}${pass?.widen ?? ""}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id ELSE ${groupKey} END)`,
+      `e AS (SELECT sid, CASE WHEN ty = 'view' THEN 'p' ELSE 'c' END AS kind, CASE WHEN ty = 'view' THEN ${pageKeyExpr("url", scope.schema, "vn")} ELSE ${clickKeyExpr("atn")} END AS k${at ? ", at" : ""}${app ? ", app" : ""} FROM ${filtered("e0", pass)})`,
     ],
-    `SELECT kind, k, COUNT(DISTINCT sid) AS sessions FROM e WHERE k IS NOT NULL AND k <> ''${filter} GROUP BY kind, k ORDER BY sessions DESC, kind, k LIMIT ${term ? 50 : 200}`,
+    `SELECT kind, k, COUNT(DISTINCT sid) AS sessions${at ? ", MIN(at) AS at" : ""} FROM e WHERE k IS NOT NULL AND k <> ''${ignored ? ` AND ${ignored}` : ""}${filter} GROUP BY kind, k ORDER BY sessions DESC, kind, k LIMIT ${term ? 50 : 200}`,
   );
 }
 
@@ -443,6 +847,8 @@ export function pagesSql(
   id: IdentitySql | null,
 ): string {
   const c = cur(currentStartUs);
+  const pass = sessionPass(scope);
+  const app = comparing(scope);
   const cols = [
     "session_id AS sid",
     "type AS ty",
@@ -451,8 +857,10 @@ export function pagesSql(
     "MIN(CASE WHEN type = 'view' THEN view_url END) AS url",
     ...(has(scope, "view_name") ? ["MIN(CASE WHEN type = 'view' THEN view_name END) AS vn"] : []),
     ...(id ? identityGroupCols(id) : []),
+    ...(app ? [APP_COL] : []),
+    ...(pass ? [pass.xi] : []),
   ];
-  const extra = id ? ` OR ${identityExpr(id)} IS NOT NULL` : "";
+  const extra = `${id ? ` OR ${identityExpr(id)} IS NOT NULL` : ""}${pass?.widen ?? ""}`;
   const agg = [
     "COUNT(DISTINCT CASE WHEN cur = 1 THEN sid END) AS sessions",
     "COUNT(DISTINCT CASE WHEN cur = 0 THEN sid END) AS prev_sessions",
@@ -465,12 +873,14 @@ export function pagesSql(
         ]
       : []),
   ];
+  const ignored = ignoredFilter(scope, (p) => ignoredPagePredicate("k", p));
+  const appCol = app ? ", app" : "";
   return withCtes(
     [
       `v0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view'${extra}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id END, ${c})`,
-      `v1 AS (SELECT sid, ty, cur, vid, url${has(scope, "view_name") ? ", vn" : ""}${id ? `, ${UID_WINDOW} AS u` : ""} FROM v0)`,
-      `v AS (SELECT ${pageKeyExpr("url", scope.schema, "vn")} AS k, sid, cur, vid${id ? ", u" : ""} FROM v1 WHERE ty = 'view')`,
-      `g AS (SELECT k, ${agg.join(", ")} FROM v WHERE k IS NOT NULL GROUP BY k)`,
+      `v1 AS (SELECT sid, ty, cur, vid, url${has(scope, "view_name") ? ", vn" : ""}${id ? `, ${UID_WINDOW} AS u` : ""}${appCol} FROM ${filtered("v0", pass)})`,
+      `v AS (SELECT ${pageKeyExpr("url", scope.schema, "vn")} AS k, sid, cur, vid${id ? ", u" : ""}${appCol} FROM v1 WHERE ty = 'view')`,
+      `g AS (SELECT k, ${agg.join(", ")} FROM v WHERE k IS NOT NULL${ignored ? ` AND ${ignored}` : ""} GROUP BY k)`,
     ],
     `SELECT *, ${RANK_KEY} FROM g ORDER BY rank_key DESC, k LIMIT 500`,
   );
@@ -497,7 +907,7 @@ export function clicksSql(
   }
   return withCtes(
     [
-      `g AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND ${actionClickAnd(scope)} GROUP BY ${ck})`,
+      `g AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${rowScope(scope)} AND ${actionClickAnd(scope)} GROUP BY ${ck})`,
     ],
     `SELECT *, ${RANK_KEY} FROM g WHERE k <> '' ORDER BY rank_key DESC, k LIMIT 500`,
   );
@@ -510,8 +920,28 @@ export function clickPagesSql(
 ): string {
   const ck = clickKeyExpr(atnRawRef(scope));
   const pk = pageKeyExpr("view_url", scope.schema);
-  return `SELECT ${ck} AS k, ${pk} AS pg, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${scopeClause(scope)} AND _timestamp >= ${Math.trunc(currentStartUs)} AND ${actionClickAnd(scope)} AND ${ck} IN (${lits(keys)}) GROUP BY ${ck}, ${pk} ORDER BY sessions DESC, k, pg LIMIT 2000`;
+  return `SELECT ${ck} AS k, ${pk} AS pg, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${rowScope(scope)} AND _timestamp >= ${Math.trunc(currentStartUs)} AND ${actionClickAnd(scope)} AND ${ck} IN (${lits(keys)}) GROUP BY ${ck}, ${pk} ORDER BY sessions DESC, k, pg LIMIT 2000`;
 }
+
+// With identity rules each session's rows group per bucket first, so the session pass can flag them.
+const trendPassSql = (
+  scope: AnalyticsScope,
+  pass: SessionPass,
+  histogram: string,
+  cols: string[],
+  rows: string,
+  ys: string[],
+  groupBy = "",
+  keep = "",
+): string => {
+  const tail = "GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 1000";
+  return withCtes(
+    [
+      `g AS (SELECT session_id AS sid, ${histogram} AS x_axis_1, ${[...cols, pass.xi].join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND ${rows} GROUP BY session_id, ${histogram}${groupBy})`,
+    ],
+    `SELECT x_axis_1, ${ys.join(", ")} FROM ${filtered("g", pass, keep)} ${tail}`,
+  );
+};
 
 export function trendSql(
   scope: AnalyticsScope,
@@ -521,15 +951,37 @@ export function trendSql(
   series: StepRef[],
   events: NamedEvent[],
 ): string {
-  const bucket = `histogram(_timestamp, ${lit(interval === "1 week" ? "1 week" : "1 day")}, ${lit(tz)}) AS x_axis_1`;
+  const histogram = `histogram(_timestamp, ${lit(interval === "1 week" ? "1 week" : "1 day")}, ${lit(tz)})`;
+  const bucket = `${histogram} AS x_axis_1`;
   const tail = "GROUP BY x_axis_1 ORDER BY x_axis_1 ASC LIMIT 1000";
+  const pass = sessionPass(scope);
   if (!series.length) {
+    if (pass) {
+      // Grouping by the identity value too counts every value a session-day carries.
+      const u = id ? identityExpr(id) : null;
+      const ys = [
+        "COUNT(DISTINCT sid) AS y_axis_1",
+        ...(u ? ["COUNT(DISTINCT u) AS y_axis_2"] : []),
+      ];
+      const va = "type IN ('view', 'action')";
+      // Rows the pass widened in only flag the session; they never count as activity.
+      const cols = [...(u ? [`${u} AS u`] : []), `MAX(CASE WHEN ${va} THEN 1 ELSE 0 END) AS va`];
+      const rows = `(${va}${pass.widen})`;
+      return trendPassSql(scope, pass, histogram, cols, rows, ys, u ? `, ${u}` : "", "va = 1");
+    }
     const users = id
       ? `, COUNT(DISTINCT CASE WHEN type IN ('view', 'action') THEN ${identityExpr(id)} END) AS y_axis_2`
       : "";
     return `SELECT ${bucket}, COUNT(DISTINCT session_id) AS y_axis_1${users} FROM "_rumdata" WHERE ${scopeClause(scope)} AND type IN ('view', 'action') ${tail}`;
   }
   const preds = series.slice(0, 5).map((s) => stepPredicateRaw(s, scope, events));
+  if (pass) {
+    const cols = preds.map((p, i) => `MAX(CASE WHEN ${p} THEN 1 ELSE 0 END) AS y${i + 1}`);
+    const ys = preds.map(
+      (_, i) => `COUNT(DISTINCT CASE WHEN y${i + 1} = 1 THEN sid END) AS y_axis_${i + 1}`,
+    );
+    return trendPassSql(scope, pass, histogram, cols, `(${preds.join(" OR ")}${pass.widen})`, ys);
+  }
   const ys = preds.map(
     (p, i) => `COUNT(DISTINCT CASE WHEN ${p} THEN session_id END) AS y_axis_${i + 1}`,
   );
@@ -539,11 +991,14 @@ export function trendSql(
 export function activeUsersSql(scope: AnalyticsScope, id: IdentitySql, endUs: number): string {
   const u = identityExpr(id);
   const end = Math.trunc(endUs);
-  return `SELECT COUNT(DISTINCT CASE WHEN _timestamp >= ${end - DAY_US} THEN ${u} END) AS dau, COUNT(DISTINCT CASE WHEN _timestamp >= ${end - 7 * DAY_US} THEN ${u} END) AS wau, COUNT(DISTINCT ${u}) AS mau FROM "_rumdata" WHERE ${scopeClause(scope)} AND type IN ('view', 'action') AND ${u} IS NOT NULL LIMIT 1`;
+  return `SELECT COUNT(DISTINCT CASE WHEN _timestamp >= ${end - DAY_US} THEN ${u} END) AS dau, COUNT(DISTINCT CASE WHEN _timestamp >= ${end - 7 * DAY_US} THEN ${u} END) AS wau, COUNT(DISTINCT ${u}) AS mau FROM "_rumdata" WHERE ${rowScope(scope)} AND type IN ('view', 'action') AND ${u} IS NOT NULL LIMIT 1`;
 }
 
 const actionKey = (scope: AnalyticsScope): string =>
   has(scope, "action_id") ? "COALESCE(action_id, CAST(date AS VARCHAR))" : "CAST(date AS VARCHAR)";
+
+const groupKey = (scope: AnalyticsScope, errors: boolean): string =>
+  `CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} ${errors ? "WHEN type = 'error' THEN CAST(date AS VARCHAR) " : ""}ELSE type END`;
 
 const unique = (items: string[]): string[] => [...new Set(items)];
 
@@ -552,9 +1007,17 @@ const stepEvents = (steps: StepRef[], events: NamedEvent[]): NamedEvent[] =>
     s.kind === "e" ? [findEvent(s.key, events)].filter((e): e is NamedEvent => !!e) : [],
   );
 
-// An on-page action rule compares the page key of the action's own URL, so the grouped rows must keep it.
+const eventRules = (steps: StepRef[], events: NamedEvent[]): NamedRule[] =>
+  stepEvents(steps, events).flatMap((e) => e.rules);
+
+// On-page and URL parameter rules read the row's own URL, so the grouped rows must keep it.
 const needsUrl = (steps: StepRef[], events: NamedEvent[]): boolean =>
-  stepEvents(steps, events).some((e) => e.rules.some((r) => r.t === "action" && !!r.onPage));
+  eventRules(steps, events).some(
+    (r) => ("onPage" in r && !!r.onPage) || (r.t === "view" && r.op === "param"),
+  );
+
+const needsRef = (steps: StepRef[], events: NamedEvent[]): boolean =>
+  eventRules(steps, events).some((r) => r.t === "view" && r.op === "ref");
 
 const actionRowPredicates = (
   scope: AnalyticsScope,
@@ -563,9 +1026,35 @@ const actionRowPredicates = (
 ): string[] =>
   unique([
     ...steps.filter((s) => s.kind === "c").map((s) => stepPredicateRaw(s, scope, events)),
-    ...stepEvents(steps, events).flatMap((e) =>
-      e.rules.filter((r): r is NamedActionRule => r.t === "action").map((r) => rawRule(r, scope)),
-    ),
+    ...eventRules(steps, events)
+      .filter((r) => r.t === "action")
+      .map((r) => rawRule(r, scope)),
+  ]);
+
+const errorRowPredicates = (
+  scope: AnalyticsScope,
+  steps: StepRef[],
+  events: NamedEvent[],
+): string[] =>
+  unique([
+    ...steps.filter((s) => s.kind === "r").map((s) => stepPredicateRaw(s, scope, events)),
+    ...eventRules(steps, events)
+      .filter((r) => r.t === "error")
+      .map((r) => rawRule(r, scope)),
+  ]);
+
+const errorKeepPredicates = (
+  scope: AnalyticsScope,
+  steps: StepRef[],
+  events: NamedEvent[],
+): string[] =>
+  unique([
+    ...steps
+      .filter((s) => s.kind === "r")
+      .map((s) => `(${stepPredicateGrouped(s, scope, events)})`),
+    ...eventRules(steps, events)
+      .filter((r) => r.t === "error")
+      .map((r) => groupedRule(r, scope)),
   ]);
 
 const viewKeepPredicates = (
@@ -575,28 +1064,109 @@ const viewKeepPredicates = (
 ): string[] => {
   const pk = pageKeyExpr("url", scope.schema, "vn");
   const eq = (key: string) => `(${urlPrefilter(key, "url")} AND ${pk} = ${lit(key)})`;
-  const fromRules = stepEvents(steps, events).flatMap((e) =>
-    e.rules
-      .filter((r): r is NamedEventRule => r.t === "view")
-      .map((r) => {
-        if (r.op === "eq") return eq(r.value);
-        if (r.op === "prefix") {
-          const pf = prefixPrefilter(r.value, "url");
-          return `(${pf ? `${pf} AND ` : ""}starts_with(${pk}, ${lit(r.value)}))`;
-        }
-        return `regexp_like(${pk}, ${lit(r.value)})`;
-      }),
-  );
+  const fromRules = eventRules(steps, events).flatMap((r) => {
+    if (r.t !== "view") return [];
+    if (r.op === "eq") return [eq(r.value)];
+    if (r.op === "prefix") {
+      const pf = prefixPrefilter(r.value, "url");
+      return [`(${pf ? `${pf} AND ` : ""}starts_with(${pk}, ${lit(r.value)}))`];
+    }
+    if (r.op === "regex") return [`regexp_like(${pk}, ${lit(r.value)})`];
+    return [groupedRule(r, scope)];
+  });
   return unique([...steps.filter((s) => s.kind === "p").map((s) => eq(s.key)), ...fromRules]);
 };
 
-const stepFlags = (scope: AnalyticsScope, steps: StepRef[], events: NamedEvent[]): string =>
-  steps
-    .map(
-      (s, i) =>
-        `CASE WHEN ${stepPredicateGrouped(s, scope, events)} THEN 1 ELSE 0 END AS m${i + 1}`,
-    )
-    .join(", ");
+interface Exclusion {
+  j: number;
+  e: ExclusionStep;
+}
+
+const exclusionsOf = (def: FunnelDef): Exclusion[] =>
+  (def.x ?? []).map((e, i) => ({ j: i + 1, e }));
+
+const betweenOf = (def: FunnelDef): Exclusion[] =>
+  exclusionsOf(def).filter((x) => x.e.b !== undefined);
+
+const withinOf = (def: FunnelDef): Exclusion[] =>
+  exclusionsOf(def).filter((x) => x.e.b === undefined);
+
+// Exclusion rows enter the scan like steps, but never the sequence conditions.
+const scannedSteps = (def: FunnelDef): StepRef[] => [
+  ...def.steps,
+  ...(def.x ?? []).map((e) => e.step),
+];
+
+const flag = (pred: string, alias: string): string =>
+  `CASE WHEN ${pred} THEN 1 ELSE 0 END AS ${alias}`;
+
+// view_time_spent is in nanoseconds.
+const filterConds = (f: StepFilters | undefined): string =>
+  [
+    ...(f?.minMs !== undefined ? [`vts >= ${f.minMs * 1000000}`] : []),
+    ...(f?.frustrated ? ["vf = 1"] : []),
+    ...(f?.errored ? ["ve = 1"] : []),
+  ]
+    .map((c) => ` AND ${c}`)
+    .join("");
+
+const stepFlags = (
+  scope: AnalyticsScope,
+  def: FunnelDef,
+  events: NamedEvent[],
+  ungated: boolean,
+): string => {
+  const step = (s: StepRef) => `${stepPredicateGrouped(s, scope, events)}${filterConds(s.f)}`;
+  const near = (i: number) =>
+    withinOf(def)
+      .filter((x) => x.e.a === i)
+      .map((x) => ` AND (nx${x.j} IS NULL OR nx${x.j} - t > ${x.e.withinMs})`)
+      .join("");
+  return [
+    ...def.steps.map((s, i) => flag(`${step(s)}${near(i + 1)}`, `m${i + 1}`)),
+    ...betweenOf(def).map((x) => flag(stepPredicateGrouped(x.e.step, scope, events), `mx${x.j}`)),
+    ...(ungated ? withinOf(def).map((x) => flag(step(def.steps[x.e.a - 1]), `ma${x.j}`)) : []),
+  ].join(", ");
+};
+
+const scanCols = (scope: AnalyticsScope, def: FunnelDef, events: NamedEvent[]): string[] => {
+  const f = def.steps.map((s) => s.f);
+  const all = scannedSteps(def);
+  return [
+    ...(f.some((x) => x?.minMs !== undefined)
+      ? [`MAX(${viewCol(scope, "view_time_spent", "BIGINT")}) AS vts`]
+      : []),
+    ...(f.some((x) => x?.frustrated)
+      ? [
+          `CASE WHEN MAX(${viewCol(scope, "view_frustration_count", "BIGINT")}) > 0 THEN 1 ELSE 0 END AS vf`,
+        ]
+      : []),
+    ...(f.some((x) => x?.errored)
+      ? [
+          `CASE WHEN MAX(${viewCol(scope, "view_error_count", "BIGINT")}) > 0 THEN 1 ELSE 0 END AS ve`,
+        ]
+      : []),
+    ...(errorRowPredicates(scope, all, events).length ? [`MIN(${errorCol(scope)}) AS em`] : []),
+    ...(needsRef(all, events) ? [`MIN(${viewCol(scope, "view_referrer", "VARCHAR")}) AS ref`] : []),
+  ];
+};
+
+const colAlias = (col: string): string => col.slice(col.lastIndexOf(" AS ") + 4);
+
+// The RANGE frame counts an exclusion row that ties the step row on t.
+const withinCtes = (scope: AnalyticsScope, def: FunnelDef, events: NamedEvent[]): string[] => {
+  const near = withinOf(def);
+  if (!near.length) return [];
+  const flags = near.map((x) => flag(stepPredicateGrouped(x.e.step, scope, events), `mx${x.j}`));
+  const next = near.map(
+    (x) =>
+      `MIN(CASE WHEN mx${x.j} = 1 THEN t END) OVER (PARTITION BY sid ORDER BY t RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS nx${x.j}`,
+  );
+  return [
+    `x0f AS (SELECT *, ${flags.join(", ")} FROM x0)`,
+    `x1a AS (SELECT *, ${next.join(", ")} FROM x0f)`,
+  ];
+};
 
 const range1 = (n: number): number[] => Array.from({ length: n }, (_, i) => i + 1);
 
@@ -605,19 +1175,65 @@ const stepConds = (n: number): string =>
     .map((i) => `m${i} = 1`)
     .join(", ");
 
+const exAgg = (j: number): string =>
+  `MAX(CASE WHEN mx${j} = 1 AND t > ta${j} AND t < tb${j} THEN 1 ELSE 0 END)`;
+
+// A window bounds the span to the converting chain: step a's latest reach before b, not its first.
+const spanCtes = (
+  names: [string, string, string],
+  src: string,
+  partition: string,
+  windowMs: number | null,
+  n: number,
+  between: Exclusion[],
+): string[] => {
+  const [w, r0, r] = names;
+  const over = `OVER (PARTITION BY ${partition})`;
+  const conds = stepConds(n);
+  const matches = between.flatMap(({ j, e }) => [
+    `sequence_step_match(${windowMs ?? 0}, ${e.a}, t, ${conds}) ${over} AS va${j}`,
+    `sequence_step_match(${windowMs ?? 0}, ${e.b}, t, ${conds}) ${over} AS vb${j}`,
+  ]);
+  const tb = between.map(({ j }) => `MIN(CASE WHEN vb${j} THEN t END) ${over} AS tb${j}`);
+  const first = `${w} AS (SELECT *, ${matches.join(", ")} FROM ${src})`;
+  if (!windowMs) {
+    const ta = between.map(({ j }) => `MIN(CASE WHEN va${j} THEN t END) ${over} AS ta${j}`);
+    return [first, `${r} AS (SELECT *, ${[...ta, ...tb].join(", ")} FROM ${w})`];
+  }
+  const ta = between.map(
+    ({ j }) =>
+      `MAX(CASE WHEN va${j} AND t < tb${j} AND t >= tb${j} - ${windowMs} THEN t END) ${over} AS ta${j}`,
+  );
+  return [
+    first,
+    `${r0} AS (SELECT *, ${tb.join(", ")} FROM ${w})`,
+    `${r} AS (SELECT *, ${ta.join(", ")} FROM ${r0})`,
+  ];
+};
+
 // One window stage replaces the n-1 chain windows: the partition's depth and whether a row is a matched step k.
 const sequenceCtes = (
   n: number,
   partition: string,
   windowMs: number | null,
   k: number,
+  src: string,
+  between: Exclusion[],
 ): string[] => {
   const conds = stepConds(n);
   const w = windowMs ?? 0;
-  const next = k < n ? `, CASE WHEN wr >= ${k + 1} THEN 1 ELSE 0 END AS v${k + 1}` : "";
+  const over = `OVER (PARTITION BY ${partition})`;
+  const ex = between.map(({ j }) => `, ${exAgg(j)} ${over} AS ex${j}`).join("");
+  const gate = (i: number) =>
+    between
+      .filter((x) => (x.e.b ?? 0) <= i)
+      .map((x) => ` AND ex${x.j} = 0`)
+      .join("");
+  const next =
+    k < n ? `, CASE WHEN wr >= ${k + 1}${gate(k + 1)} THEN 1 ELSE 0 END AS v${k + 1}` : "";
   return [
-    `w AS (SELECT *, sequence_depth(${w}, t, ${conds}) OVER (PARTITION BY ${partition}) AS wr, sequence_step_match(${w}, ${k}, t, ${conds}) OVER (PARTITION BY ${partition}) AS wv FROM x2)`,
-    `v AS (SELECT *, CASE WHEN wv THEN 1 ELSE 0 END AS v${k}${next} FROM w)`,
+    `w AS (SELECT *, sequence_depth(${w}, t, ${conds}) ${over} AS wr, sequence_step_match(${w}, ${k}, t, ${conds}) ${over} AS wv${ex} FROM ${src})`,
+    `v AS (SELECT *, CASE WHEN wv${gate(k)} THEN 1 ELSE 0 END AS v${k}${next} FROM w)`,
   ];
 };
 
@@ -634,6 +1250,47 @@ const chainShape = (id: IdentitySql | null, def: FunnelDef): ChainShape => {
   return { users, windowMs, partition: users && windowMs ? "COALESCE(uid, 's:' || sid)" : "sid" };
 };
 
+interface FunnelParts {
+  n1: number[];
+  between: Exclusion[];
+  within: Exclusion[];
+  windowMs: number | null;
+}
+
+const fromStepTimes = (p: FunnelParts, xrInSource: boolean): string[] => {
+  const gate = (i: number) =>
+    p.between
+      .filter((x) => (x.e.b ?? 0) <= i)
+      .map((x) => `ex${x.j} = 0`)
+      .join(" AND ");
+  const reach = (i: number) =>
+    `CASE WHEN f[${i}] IS NOT NULL${gate(i) ? ` AND ${gate(i)}` : ""} THEN 1 ELSE 0 END AS r${i}`;
+  const dur = (i: number) => (gate(i) ? `CASE WHEN ${gate(i)} THEN f[${i}] END` : `f[${i}]`);
+  return [
+    ...p.n1.map(reach),
+    ...p.n1.slice(1).map((i) => `${dur(i)} AS d${i}`),
+    ...p.n1.map((i) => `seen${i}`),
+    ...p.between.map(({ j, e }) =>
+      xrInSource
+        ? `xr${j}`
+        : `CASE WHEN f[${e.b}] IS NOT NULL AND ex${j} = 1 THEN 1 ELSE 0 END AS xr${j}`,
+    ),
+    ...p.within.map(
+      ({ j, e }) =>
+        `CASE WHEN g${j}[${e.a}] IS NOT NULL AND f[${e.a}] IS NULL THEN 1 ELSE 0 END AS xr${j}`,
+    ),
+  ];
+};
+
+// Step a's chain without its within-N gate, so the gate's removals can be counted.
+const ungatedTimes = (p: FunnelParts): string[] =>
+  p.within.map(
+    ({ j, e }) =>
+      `sequence_step_times(${p.windowMs ?? 0}, t, ${range1(e.a)
+        .map((i) => (i === e.a ? `ma${j} = 1` : `m${i} = 1`))
+        .join(", ")}) AS g${j}`,
+  );
+
 const funnelCtes = (
   scope: AnalyticsScope,
   id: IdentitySql | null,
@@ -644,8 +1301,19 @@ const funnelCtes = (
   const { users, windowMs, partition } = chainShape(id, def);
   const n = def.steps.length;
   const u = users && id ? identityExpr(id) : "";
-  const url = needsUrl(def.steps, events);
+  const all = scannedSteps(def);
+  const url = needsUrl(all, events);
   const vnAvail = has(scope, "view_name");
+  const pass = sessionPass(scope);
+  const extra = scanCols(scope, def, events);
+  const errors = errorRowPredicates(scope, all, events);
+  const newSince = users ? (scope.newSince ?? null) : null;
+  const p: FunnelParts = {
+    n1: range1(n),
+    between: betweenOf(def),
+    within: withinOf(def),
+    windowMs,
+  };
   const cols = [
     "session_id AS sid",
     "type AS ty",
@@ -655,71 +1323,98 @@ const funnelCtes = (
     ...(users && id ? identityGroupCols(id) : []),
     ...(dim ? [`MIN(${dim}) AS dim`] : []),
     ...(vnAvail ? ["MIN(view_name) AS vn"] : []),
+    ...extra,
+    ...(newSince !== null ? ["MIN(date) AS t0"] : []),
+    ...(pass ? [pass.xi] : []),
   ];
   const rowFilter = [
     "type = 'view'",
-    ...actionRowPredicates(scope, def.steps, events),
+    ...actionRowPredicates(scope, all, events),
+    ...errors,
     ...(users ? [`${u} IS NOT NULL`] : []),
   ].join(" OR ");
-  const keep = viewKeepPredicates(scope, def.steps, events).join(" OR ") || "FALSE";
+  const keep = viewKeepPredicates(scope, all, events).join(" OR ") || "FALSE";
   const k = `CASE WHEN ty = 'view' THEN ${pageKeyExpr("url", scope.schema, "vn")} WHEN ty = 'action' THEN ${clickKeyExpr("atn")} END AS k`;
-  const ctes = [
-    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (${rowFilter}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} ELSE type END)`,
-    `x0 AS (SELECT sid, t, ty, ${k}${users ? ", u0, ut" : ""}${dim ? ", dim" : ""}${url ? ", url" : ""}${url && vnAvail ? ", vn" : ""} FROM x00 WHERE ty = 'action' OR (ty = 'view' AND (${keep}))${users ? " OR u0 IS NOT NULL" : ""})`,
-    `x1 AS (SELECT sid, t, ty, k${dim ? ", dim" : ""}, ${stepFlags(scope, def.steps, events)}, ${users ? `${UID_WINDOW} AS uid` : "CAST(NULL AS VARCHAR) AS uid"} FROM x0)`,
+  const carry = [
+    ...(users ? ["u0", "ut"] : []),
+    ...(dim ? ["dim"] : []),
+    ...(url ? ["url"] : []),
+    ...(url && vnAvail ? ["vn"] : []),
+    ...extra.map(colAlias),
+    ...(newSince !== null ? ["t0"] : []),
   ];
-  const n1 = range1(n);
+  const errorKeep = errorKeepPredicates(scope, all, events)
+    .map((e) => ` OR ${e}`)
+    .join("");
+  const x0Where = `ty = 'action' OR (ty = 'view' AND (${keep}))${errorKeep}${users ? " OR u0 IS NOT NULL" : ""}`;
+  const near = withinCtes(scope, def, events);
+  const ctes = [
+    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (${rowFilter}${pass?.widen ?? ""}) GROUP BY session_id, type, ${groupKey(scope, errors.length > 0)})`,
+    `x0 AS (SELECT sid, t, ty, ${k}${carry.map((c) => `, ${c}`).join("")} FROM ${filtered("x00", pass, x0Where)})`,
+    ...near,
+    `x1 AS (SELECT sid, t, ty, k${dim ? ", dim" : ""}, ${stepFlags(scope, def, events, true)}, ${users ? `${UID_WINDOW} AS uid` : "CAST(NULL AS VARCHAR) AS uid"}${newSince !== null ? ", t0" : ""} FROM ${near.length ? "x1a" : "x0"})`,
+  ];
   let source = "x1";
   if (users) {
-    const x2Cols = [
-      "sid",
-      "t",
-      "ty",
-      "k",
-      ...(dim ? ["dim"] : []),
-      ...n1.map((i) => `m${i}`),
-      "uid",
+    const flags = [
+      ...p.n1.map((i) => `m${i}`),
+      ...p.between.map((x) => `mx${x.j}`),
+      ...p.within.map((x) => `ma${x.j}`),
     ];
+    const x2Cols = ["sid", "t", "ty", "k", ...(dim ? ["dim"] : []), ...flags, "uid"];
+    const rows = flags.map((f) => `${f} = 1`).join(" OR ");
+    if (newSince !== null)
+      ctes.push(
+        "fs AS (SELECT *, MIN(t0) OVER (PARTITION BY COALESCE(uid, 's:' || sid)) AS first_t FROM x1)",
+      );
     ctes.push(
-      `x2 AS (SELECT ${x2Cols.join(", ")} FROM x1 WHERE ${n1.map((i) => `m${i} = 1`).join(" OR ")})`,
+      `x2 AS (SELECT ${x2Cols.join(", ")} FROM ${newSince !== null ? `fs WHERE (${rows}) AND first_t >= ${newSince}` : `x1 WHERE ${rows}`})`,
     );
     source = "x2";
   }
+  if (p.between.length) {
+    ctes.push(...spanCtes(["w", "r0", "r"], source, partition, windowMs, n, p.between));
+    source = "r";
+  }
   const f = `sequence_step_times(${windowMs ?? 0}, t, ${stepConds(n)}) AS f`;
-  const seen = n1.map((i) => `SUM(m${i}) AS seen${i}`);
+  const exs = p.between.map((x) => `${exAgg(x.j)} AS ex${x.j}`);
+  const seen = p.n1.map((i) => `SUM(m${i}) AS seen${i}`);
   const firstDim = "first_value(dim ORDER BY CASE WHEN m1 = 1 THEN 0 ELSE 1 END, t) AS dim";
-  const fromF = [
-    ...n1.map((i) => `CASE WHEN f[${i}] IS NOT NULL THEN 1 ELSE 0 END AS r${i}`),
-    ...n1.slice(1).map((i) => `f[${i}] AS d${i}`),
-    ...n1.map((i) => `seen${i}`),
-  ];
   if (users && windowMs) {
     // A windowed sequence spans the user's sessions, so it aggregates the user's rows directly.
     const su = [
       "CASE WHEN uid IS NULL THEN 1 ELSE 0 END AS anon",
       f,
+      ...ungatedTimes(p),
+      ...exs,
+      // ex needs tb, the unit's reach of step b, so a flagged unit is one removed at b.
+      ...p.between.map((x) => `${exAgg(x.j)} AS xr${x.j}`),
       ...seen,
       "COUNT(DISTINCT CASE WHEN m1 = 1 THEN sid END) AS s1s",
       ...(dim ? [firstDim] : []),
     ];
     ctes.push(
-      `su AS (SELECT ${su.join(", ")} FROM x2 GROUP BY ${partition}, CASE WHEN uid IS NULL THEN 1 ELSE 0 END)`,
-      `pu AS (SELECT anon, ${[...fromF, "s1s", ...(dim ? ["dim"] : [])].join(", ")} FROM su)`,
+      `su AS (SELECT ${su.join(", ")} FROM ${source} GROUP BY ${partition}, CASE WHEN uid IS NULL THEN 1 ELSE 0 END)`,
+      `pu AS (SELECT anon, ${[...fromStepTimes(p, true), "s1s", ...(dim ? ["dim"] : [])].join(", ")} FROM su)`,
     );
     return { ctes, users };
   }
   const dimCols = dim ? [firstDim, "MIN(CASE WHEN m1 = 1 THEN t END) AS t1"] : [];
   ctes.push(
-    `s AS (SELECT ${["sid", "MAX(uid) AS uid", f, ...seen, ...dimCols].join(", ")} FROM ${source} GROUP BY sid)`,
-    `ps AS (SELECT ${["sid", "uid", ...fromF, ...(dim ? ["dim", "t1"] : [])].join(", ")} FROM s)`,
+    `s AS (SELECT ${["sid", "MAX(uid) AS uid", f, ...ungatedTimes(p), ...exs, ...seen, ...dimCols].join(", ")} FROM ${source} GROUP BY sid)`,
+    `ps AS (SELECT ${["sid", "uid", ...fromStepTimes(p, false), ...(dim ? ["dim", "t1"] : [])].join(", ")} FROM s)`,
   );
   if (users) {
     const pu = [
       "CASE WHEN uid IS NULL THEN 1 ELSE 0 END AS anon",
-      ...n1.map((i) => `MAX(r${i}) AS r${i}`),
-      ...n1.slice(1).map((i) => `MIN(d${i}) AS d${i}`),
-      ...n1.map((i) => `SUM(seen${i}) AS seen${i}`),
+      ...p.n1.map((i) => `MAX(r${i}) AS r${i}`),
+      ...p.n1.slice(1).map((i) => `MIN(d${i}) AS d${i}`),
+      ...p.n1.map((i) => `SUM(seen${i}) AS seen${i}`),
       "SUM(r1) AS s1s",
+      // A user who converted cleanly in any session is not counted as removed.
+      ...exclusionsOf(def).map(
+        ({ j, e }) => `CASE WHEN MAX(r${e.b ?? e.a}) = 0 THEN MAX(xr${j}) ELSE 0 END AS xr${j}`,
+      ),
       ...(dim ? ["first_value(dim ORDER BY t1) AS dim"] : []),
     ];
     ctes.push(
@@ -732,7 +1427,8 @@ const funnelCtes = (
 const breakdownField = (scope: AnalyticsScope, def: FunnelDef): string | null => {
   if (!def.breakdown) return null;
   const field = DIMENSIONS[def.breakdown];
-  return field && has(scope, field) ? field : null;
+  // Every scope already filters on application_id, so the stream always has it.
+  return field && (field === "application_id" || has(scope, field)) ? field : null;
 };
 
 export function funnelSql(
@@ -744,8 +1440,12 @@ export function funnelSql(
   const dim = breakdownField(scope, def);
   const { ctes, users } = funnelCtes(scope, id, def, opts.events, dim);
   const n = def.steps.length;
+  const xr = exclusionsOf(def).map(({ j }) => j);
   if (dim) {
-    const cnt = range1(n).map((i) => `SUM(r${i}) AS c${i}`);
+    const cnt = [
+      ...range1(n).map((i) => `SUM(r${i}) AS c${i}`),
+      ...xr.map((j) => `SUM(xr${j}) AS xr${j}`),
+    ];
     return withCtes(
       ctes,
       `SELECT dim, ${cnt.join(", ")} FROM ${users ? "pu WHERE anon = 0" : "ps"} GROUP BY dim ORDER BY c1 DESC, dim LIMIT 1000`,
@@ -755,6 +1455,9 @@ export function funnelSql(
     users ? `SUM(CASE WHEN anon = 0 THEN r${i} ELSE 0 END) AS c${i}` : `SUM(r${i}) AS c${i}`,
   );
   const seen = range1(n).map((i) => `SUM(seen${i}) AS seen${i}`);
+  const removed = xr.map((j) =>
+    users ? `SUM(CASE WHEN anon = 0 THEN xr${j} ELSE 0 END) AS xr${j}` : `SUM(xr${j}) AS xr${j}`,
+  );
   const extra = users
     ? ["SUM(s1s) AS s1_sessions", "SUM(CASE WHEN anon = 1 THEN s1s ELSE 0 END) AS left_out"]
     : [];
@@ -769,7 +1472,7 @@ export function funnelSql(
     });
   return withCtes(
     ctes,
-    `SELECT ${[...cnt, ...seen, ...extra, ...pcts].join(", ")} FROM ${users ? "pu" : "ps"} LIMIT 1`,
+    `SELECT ${[...cnt, ...seen, ...removed, ...extra, ...pcts].join(", ")} FROM ${users ? "pu" : "ps"} LIMIT 1`,
   );
 }
 
@@ -818,6 +1521,8 @@ interface FullChainOpts {
   errors: boolean;
   label: boolean;
   sample: SampleRatio;
+  // Funnel drill-ins follow the funnel, which keeps new users in Users mode only; cohort paths always do.
+  newUsers: boolean;
 }
 
 const fullChainCtes = (
@@ -829,10 +1534,16 @@ const fullChainCtes = (
   stepK: number,
 ): { ctes: string[]; unit: string; windowMs: number | null; frustration: boolean } => {
   const { users, windowMs, partition } = chainShape(id, def);
-  const idf = !!id && (users || o.label);
+  const newSince = o.newUsers && id ? (scope.newSince ?? null) : null;
+  const idf = !!id && (users || o.label || newSince !== null);
   const frustration = o.errors && has(scope, "action_frustration_type");
-  const url = needsUrl(def.steps, events);
+  const all = scannedSteps(def);
+  const url = needsUrl(all, events);
   const vnAvail = has(scope, "view_name");
+  const pass = sessionPass(scope);
+  const extra = scanCols(scope, def, events);
+  const app = comparing(scope);
+  const between = betweenOf(def);
   const cols = [
     "session_id AS sid",
     "type AS ty",
@@ -845,21 +1556,49 @@ const fullChainCtes = (
       : []),
     ...(idf && id ? identityGroupCols(id) : []),
     ...(vnAvail ? ["MIN(view_name) AS vn"] : []),
+    ...extra,
+    ...(newSince !== null ? ["MIN(date) AS t0"] : []),
+    ...(app ? [APP_COL] : []),
+    ...(pass ? [pass.xi] : []),
   ];
   const types = o.errors ? "'view', 'error'" : "'view'";
+  const errorRows = errorRowPredicates(scope, all, events)
+    .map((e) => ` OR ${e}`)
+    .join("");
   const identityRows = idf && id ? ` OR ${identityExpr(id)} IS NOT NULL` : "";
   const k = `CASE WHEN ty = 'view' THEN ${pageKeyExpr("url", scope.schema, "vn")} WHEN ty = 'action' THEN ${clickKeyExpr("atn")} END AS k`;
   const fr = frustration ? ", fr" : "";
-  const keepUrl = url ? ", url" : "";
-  const keepVn = url && vnAvail ? ", vn" : "";
+  const carry = [
+    ...(url ? ["url"] : []),
+    ...(url && vnAvail ? ["vn"] : []),
+    ...extra.map(colAlias),
+    ...(newSince !== null ? ["t0"] : []),
+    ...(app ? ["app"] : []),
+  ]
+    .map((c) => `, ${c}`)
+    .join("");
+  const near = withinCtes(scope, def, events);
   const ctes = [
-    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, users ? 1 : o.sample)} AND (type IN (${types}) OR ${actionClickExpr(scope)}${identityRows}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} WHEN type = 'error' THEN CAST(date AS VARCHAR) ELSE type END)`,
+    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, users ? 1 : o.sample)} AND (type IN (${types}) OR ${actionClickExpr(scope)}${errorRows}${identityRows}${pass?.widen ?? ""}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} WHEN type = 'error' THEN CAST(date AS VARCHAR) ELSE type END)`,
     idf
-      ? `x0 AS (SELECT sid, ty, t, hr${fr}, u0, ut${keepUrl}${keepVn}, ${k} FROM x00)`
-      : `x0 AS (SELECT sid, ty, t, hr${fr}${keepUrl}${keepVn}, ${k} FROM x00 WHERE ty IN ('view', 'action', 'error'))`,
-    `x1 AS (SELECT sid, ty, t, hr${fr}, k, ${stepFlags(scope, def.steps, events)}, ${idf ? `${UID_WINDOW} AS uid` : "CAST(NULL AS VARCHAR) AS uid"} FROM x0)`,
-    `x2 AS (SELECT * FROM (SELECT *, MAX(m1) OVER (PARTITION BY ${partition}) AS h1 FROM x1) q WHERE h1 = 1 AND ty IN ('view', 'action', 'error'))`,
-    ...sequenceCtes(def.steps.length, partition, windowMs, stepK),
+      ? `x0 AS (SELECT sid, ty, t, hr${fr}, u0, ut${carry}, ${k} FROM ${filtered("x00", pass)})`
+      : `x0 AS (SELECT sid, ty, t, hr${fr}${carry}, ${k} FROM ${filtered("x00", pass, "ty IN ('view', 'action', 'error')")})`,
+    ...near,
+    `x1 AS (SELECT sid, ty, t, hr${fr}, k${app ? ", app" : ""}, ${stepFlags(scope, def, events, false)}, ${idf ? `${UID_WINDOW} AS uid` : "CAST(NULL AS VARCHAR) AS uid"}${newSince !== null ? ", t0" : ""} FROM ${near.length ? "x1a" : "x0"})`,
+    newSince !== null
+      ? `x2 AS (SELECT * FROM (SELECT *, MAX(m1) OVER (PARTITION BY ${partition}) AS h1, MIN(t0) OVER (PARTITION BY COALESCE(uid, 's:' || sid)) AS first_t FROM x1) q WHERE h1 = 1 AND first_t >= ${newSince} AND ty IN ('view', 'action', 'error'))`
+      : `x2 AS (SELECT * FROM (SELECT *, MAX(m1) OVER (PARTITION BY ${partition}) AS h1 FROM x1) q WHERE h1 = 1 AND ty IN ('view', 'action', 'error'))`,
+    ...(between.length
+      ? spanCtes(["xw", "xr0", "xrr"], "x2", partition, windowMs, def.steps.length, between)
+      : []),
+    ...sequenceCtes(
+      def.steps.length,
+      partition,
+      windowMs,
+      stepK,
+      between.length ? "xrr" : "x2",
+      between,
+    ),
   ];
   return { ctes, unit: users ? "uid" : "sid", windowMs, frustration };
 };
@@ -891,7 +1630,7 @@ const nextAfterSql = (
     id,
     def,
     opts.events,
-    { errors: false, label: false, sample: opts.sample },
+    { errors: false, label: false, sample: opts.sample, newUsers: def.unit === "users" },
     k,
   );
   ctes.push(reachCte(unit, k, dropped));
@@ -943,7 +1682,7 @@ export function dropoffHealthSql(
     id,
     def,
     opts.events,
-    { errors: true, label: false, sample: opts.sample },
+    { errors: true, label: false, sample: opts.sample, newUsers: def.unit === "users" },
     k,
   );
   ctes.push(reachCte(unit, k, true));
@@ -973,7 +1712,7 @@ export function cohortSessionsSql(
     id,
     cohort.funnel,
     opts.events,
-    { errors: true, label: true, sample: opts.sample },
+    { errors: true, label: true, sample: opts.sample, newUsers: cohort.funnel.unit === "users" },
     k,
   );
   ctes.push(reachCte(unit, k, true));
@@ -1002,10 +1741,12 @@ const GROUPED_INCLUDE: Readonly<Record<PathsInclude, string>> = {
 const ATTR_WINDOW = `OVER (PARTITION BY sid ORDER BY t, key ${WHOLE})`;
 
 // Error rows have no key, so they get their own LAG partition and the dedup matches the flow query.
-const pathTail = (def: PathsDef, attrs: boolean, anchor: string, uid: boolean): string[] => {
+const pathTail = (def: PathsDef, attrs: boolean, anchor: string, ignored: string): string[] => {
+  // Ignored pages drop out before the LAG dedup, so A, ignored, A reads as one A.
+  const where = ignored ? ` WHERE ${attrs ? `key IS NULL OR ${ignored}` : ignored}` : "";
   const d = attrs
-    ? `d AS (SELECT *, LAG(key) OVER (PARTITION BY sid, CASE WHEN ty = 'error' THEN 1 ELSE 0 END ORDER BY t, key) AS pk, SUM(CASE WHEN ty = 'error' THEN 1 ELSE 0 END) ${ATTR_WINDOW} AS errors, MIN(t) ${ATTR_WINDOW} AS started, MAX(t) ${ATTR_WINDOW} AS ended, MAX(hr) ${ATTR_WINDOW} AS has_replay FROM e)`
-    : "d AS (SELECT *, LAG(key) OVER (PARTITION BY sid ORDER BY t, key) AS pk FROM e)";
+    ? `d AS (SELECT *, LAG(key) OVER (PARTITION BY sid, CASE WHEN ty = 'error' THEN 1 ELSE 0 END ORDER BY t, key) AS pk, SUM(CASE WHEN ty = 'error' THEN 1 ELSE 0 END) ${ATTR_WINDOW} AS errors, MIN(t) ${ATTR_WINDOW} AS started, MAX(t) ${ATTR_WINDOW} AS ended, MAX(hr) ${ATTR_WINDOW} AS has_replay FROM e${where})`
+    : `d AS (SELECT *, LAG(key) OVER (PARTITION BY sid ORDER BY t, key) AS pk FROM e${where})`;
   const sign = def.direction === "next" ? "+" : "-";
   const depth = Math.min(5, Math.max(1, Math.trunc(def.depth)));
   const window =
@@ -1020,7 +1761,6 @@ const pathTail = (def: PathsDef, attrs: boolean, anchor: string, uid: boolean): 
           "MAX(started) AS started",
           "MAX(ended) AS ended",
           "MAX(has_replay) AS has_replay",
-          `${uid ? "MAX(uid)" : "CAST(NULL AS VARCHAR)"} AS user_label`,
           "MAX(CASE WHEN n = n0 THEN t END) AS t0",
         ]
       : []),
@@ -1032,6 +1772,9 @@ const pathTail = (def: PathsDef, attrs: boolean, anchor: string, uid: boolean): 
     `pa AS (SELECT ${cols.join(", ")} FROM an WHERE ${window} GROUP BY sid)`,
   ];
 };
+
+const pathIgnored = (scope: AnalyticsScope): string =>
+  ignoredFilter(scope, (p) => ignoredPagePredicate("key", p, true));
 
 const cohortPathCtes = (
   scope: AnalyticsScope,
@@ -1047,25 +1790,22 @@ const cohortPathCtes = (
     id,
     cohort.funnel,
     opts.events,
-    { errors: attrs, label: attrs, sample: opts.sample },
+    { errors: attrs, label: false, sample: opts.sample, newUsers: true },
     k,
   );
-  const uid = attrs && !!id;
   const include = attrs
     ? `(${GROUPED_INCLUDE[def.include]} OR ty = 'error')`
     : GROUPED_INCLUDE[def.include];
+  const app = comparing(scope) ? ", app" : "";
   // Per session tk already is the step time; a user's first reach can sit in another session.
   const stepT =
     unit === "sid" ? "tk" : `MIN(CASE WHEN v${k} = 1 THEN t END) OVER (PARTITION BY sid)`;
-  const uidCol = uid ? ", uid" : "";
-  // A sessions chain admits unnamed clicks only for their identity; the users chain already had them in the Sankey.
-  const unnamed = uid && unit === "sid" ? " AND (ty <> 'action' OR COALESCE(k, '') <> '')" : "";
   return [
     ...ctes,
     reachCte(unit, k, true),
-    `cr AS (SELECT sid, t, ty, hr, k${uidCol}, ${stepT} AS step_t FROM r WHERE rk = 1 AND rk1 = 0)`,
-    `e AS (SELECT sid, t, ty, hr${uidCol}, step_t, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key FROM cr WHERE step_t IS NOT NULL AND ${include}${unnamed})`,
-    ...pathTail(def, attrs, "MAX(CASE WHEN t <= step_t THEN n END)", uid),
+    `cr AS (SELECT sid, t, ty, hr, k${app}, ${stepT} AS step_t FROM r WHERE rk = 1 AND rk1 = 0)`,
+    `e AS (SELECT sid, t, ty, hr, step_t${app}, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key FROM cr WHERE step_t IS NOT NULL AND ${include})`,
+    ...pathTail(def, attrs, "MAX(CASE WHEN t <= step_t THEN n END)", pathIgnored(scope)),
   ];
 };
 
@@ -1086,13 +1826,25 @@ const pathCtes = (
   // anchor. Otherwise (e.g. a page anchor under "Clicks") the anchor's own event must be let
   // through regardless, or it can never be found as "reached" downstream.
   const anchorKindCovered =
-    def.include === "all" ||
+    (def.include === "all" && anchor.kind !== "r") ||
     (anchor.kind === "p" && def.include === "pages") ||
     (anchor.kind === "c" && def.include === "clicks");
   const types = anchorKindCovered
     ? include
     : `(${include} OR ${stepPredicateRaw(anchor, scope, opts.events)})`;
-  const idRows = attrs ? id : null;
+  const pass = sessionPass(scope);
+  // New users are told apart by their identity, as in a Users funnel.
+  const newSince = id ? (scope.newSince ?? null) : null;
+  const app = comparing(scope);
+  const widen = `${pass?.widen ?? ""}${newSince !== null && id ? ` OR ${identityExpr(id)} IS NOT NULL` : ""}`;
+  const anchorCols = [
+    ...(errorRowPredicates(scope, [anchor], opts.events).length
+      ? [`MIN(${errorCol(scope)}) AS em`]
+      : []),
+    ...(needsRef([anchor], opts.events)
+      ? [`MIN(${viewCol(scope, "view_referrer", "VARCHAR")}) AS ref`]
+      : []),
+  ];
   const cols = [
     "session_id AS sid",
     "type AS ty",
@@ -1101,42 +1853,49 @@ const pathCtes = (
     atnCol(scope),
     hrExpr(scope),
     ...(has(scope, "view_name") ? ["MIN(view_name) AS vn"] : []),
-    ...(idRows
-      ? [...identityGroupCols(idRows), `CASE WHEN ${types} THEN 1 ELSE 0 END AS inc`]
-      : []),
+    ...anchorCols,
+    ...(newSince !== null && id ? [...identityGroupCols(id), "MIN(date) AS t0"] : []),
+    ...(app ? [APP_COL] : []),
+    ...(pass ? [pass.xi] : []),
+    // Rows widened in for the identity are dropped after it, so they never become path steps.
+    ...(widen ? [`MAX(CASE WHEN ${types} THEN 1 ELSE 0 END) AS kp`] : []),
   ];
-  const groupKey = `CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)}`;
-  // Identity-only rows feed the uid window and are then dropped, so the path rows stay exactly the Sankey's.
-  const ctes = idRows
-    ? [
-        `e00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND (${types} OR ${identityExpr(idRows)} IS NOT NULL) GROUP BY session_id, type, ${groupKey} WHEN type = 'error' THEN CAST(date AS VARCHAR) ELSE type END, CASE WHEN ${types} THEN 1 ELSE 0 END)`,
-        `e0 AS (SELECT * FROM (SELECT *, ${UID_WINDOW} AS uid FROM e00) q WHERE inc = 1)`,
-      ]
-    : [
-        `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND ${types} GROUP BY session_id, type, ${groupKey} ELSE CAST(date AS VARCHAR) END)`,
-      ];
-  const uidCol = idRows ? ", uid" : "";
+  const ctes = [
+    `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND ${widen ? `(${types}${widen})` : types} GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} ELSE CAST(date AS VARCHAR) END)`,
+  ];
+  if (newSince !== null) ctes.push(`e0u AS (SELECT *, ${UID_WINDOW} AS uid FROM e0)`);
+  const src = filtered(
+    newSince !== null ? "e0u" : "e0",
+    pass,
+    widen ? "kp = 1" : "",
+    newSince,
+    newSince !== null ? "e0us" : "e0s",
+    "COALESCE(uid, 's:' || sid)",
+  );
   const pk = pageKeyExpr("url", scope.schema, "vn");
   const ck = clickKeyExpr("atn");
+  const appCol = app ? ", app" : "";
+  const ignored = pathIgnored(scope);
   if (anchor.kind === "e") {
     const keepVn = has(scope, "view_name") ? ", vn" : "";
     ctes.push(
-      `e1 AS (SELECT sid, t, ty, hr${uidCol}, url${keepVn}, CASE WHEN ty = 'view' THEN ${pk} WHEN ty = 'action' THEN ${ck} END AS k FROM e0)`,
-      `e AS (SELECT sid, t, ty, hr${uidCol}, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key, CASE WHEN ${stepPredicateGrouped(anchor, scope, opts.events)} THEN 1 ELSE 0 END AS am FROM e1)`,
+      `e1 AS (SELECT sid, t, ty, hr, url${keepVn}${anchorCols.map((c) => `, ${colAlias(c)}`).join("")}${appCol}, CASE WHEN ty = 'view' THEN ${pk} WHEN ty = 'action' THEN ${ck} END AS k FROM ${src})`,
+      `e AS (SELECT sid, t, ty, hr${appCol}, CASE WHEN ty = 'view' THEN 'p:' || k WHEN ty = 'action' THEN 'c:' || k END AS key, CASE WHEN ${stepPredicateGrouped(anchor, scope, opts.events)} THEN 1 ELSE 0 END AS am FROM e1)`,
     );
-    return [...ctes, ...pathTail(def, attrs, "MIN(CASE WHEN am = 1 THEN n END)", !!idRows)];
+    return [...ctes, ...pathTail(def, attrs, "MIN(CASE WHEN am = 1 THEN n END)", ignored)];
   }
+  const anchorKey = lit(`${anchor.kind}:${anchor.key}`);
+  // An error anchor is the only error row with a key, so it can be found in the sequence.
+  const errorKey =
+    anchor.kind === "r"
+      ? ` WHEN ${stepPredicateGrouped(anchor, scope, opts.events)} THEN ${anchorKey}`
+      : "";
   ctes.push(
-    `e AS (SELECT sid, t, ty, hr${uidCol}, CASE WHEN ty = 'view' THEN 'p:' || ${pk} WHEN ty = 'action' THEN 'c:' || ${ck} END AS key FROM e0)`,
+    `e AS (SELECT sid, t, ty, hr${appCol}, CASE WHEN ty = 'view' THEN 'p:' || ${pk} WHEN ty = 'action' THEN 'c:' || ${ck}${errorKey} END AS key FROM ${src})`,
   );
   return [
     ...ctes,
-    ...pathTail(
-      def,
-      attrs,
-      `MIN(CASE WHEN key = ${lit(`${anchor.kind}:${anchor.key}`)} THEN n END)`,
-      !!idRows,
-    ),
+    ...pathTail(def, attrs, `MIN(CASE WHEN key = ${anchorKey} THEN n END)`, ignored),
   ];
 };
 
@@ -1168,7 +1927,7 @@ export function branchSessionsSql(
   const j = Math.min(Math.max(0, Math.trunc(stepDepth)), Math.trunc(def.depth));
   return withCtes(
     pathCtes(scope, id, def, opts, true),
-    `SELECT sid, t${j} AS step_t, errors, 0 AS frustrations, has_replay, started, ended, user_label, COUNT(*) OVER () AS total FROM pa WHERE ${predicate} ORDER BY has_replay DESC, step_t DESC, sid LIMIT ${PAGE_LIMIT} OFFSET ${PAGE_LIMIT * Math.max(0, Math.trunc(page))}`,
+    `SELECT sid, t${j} AS step_t, errors, 0 AS frustrations, has_replay, started, ended, COUNT(*) OVER () AS total FROM pa WHERE ${predicate} ORDER BY has_replay DESC, step_t DESC, sid LIMIT ${PAGE_LIMIT} OFFSET ${PAGE_LIMIT * Math.max(0, Math.trunc(page))}`,
   );
 }
 
@@ -1193,17 +1952,53 @@ const retentionCtes = (
   const pred = (step: StepRef | null) =>
     step ? stepPredicateRaw(step, scope, opts.events) : "1 = 1";
   const sample = opts.sample > 1 ? ` AND ${samplePredicate(u, opts.sample)}` : "";
+  const pass = sessionPass(scope);
+  const newSince = scope.newSince ?? null;
+  // The session pass needs each session's rows apart, so the first group keeps session_id and rolls up after.
+  const bySession = perSession || !!pass;
+  const anchors = [def.start, def.ret].filter((s): s is StepRef => !!s);
+  const errors = errorRowPredicates(scope, anchors, opts.events);
+  const types = errors.length
+    ? `(type IN ('view', 'action') OR ${errors.join(" OR ")})`
+    : "type IN ('view', 'action')";
   const cols = [
     `${u} AS u`,
     `${p} AS p`,
     `MAX(CASE WHEN ${pred(def.start)} THEN 1 ELSE 0 END) AS s`,
     `MAX(CASE WHEN ${pred(def.ret)} THEN 1 ELSE 0 END) AS r`,
-    ...(perSession ? ["session_id AS sid", "MAX(_timestamp) AS ts"] : []),
+    ...(bySession ? ["session_id AS sid"] : []),
+    ...(perSession ? ["MAX(_timestamp) AS ts"] : []),
+    ...(newSince !== null ? ["MIN(date) AS t0"] : []),
+    // Rows the pass widened in only flag the session, so kp drops groups made of them alone.
+    ...(pass ? [pass.xi, `MAX(CASE WHEN ${types} THEN 1 ELSE 0 END) AS kp`] : []),
   ];
-  return [
-    `a AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND type IN ('view', 'action') AND ${u} IS NOT NULL${sample} GROUP BY ${u}, ${p}${perSession ? ", session_id" : ""})`,
-    "c AS (SELECT *, MIN(CASE WHEN s = 1 THEN p END) OVER (PARTITION BY u) AS cohort, MAX(CASE WHEN r = 1 THEN p END) OVER (PARTITION BY u) AS last_ret FROM a)",
+  const rows = `${types} AND ${u} IS NOT NULL`;
+  const ctes = [
+    `a AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND ${pass ? `((${rows})${pass.widen})` : rows}${sample} GROUP BY ${u}, ${p}${bySession ? ", session_id" : ""})`,
   ];
+  let src = "a";
+  if (pass) {
+    const roll = [
+      "u",
+      "p",
+      "MAX(s) AS s",
+      "MAX(r) AS r",
+      ...(perSession ? ["sid", "MAX(ts) AS ts"] : []),
+      ...(newSince !== null ? ["MIN(t0) AS t0"] : []),
+    ];
+    ctes.push(
+      `a1 AS (SELECT ${roll.join(", ")} FROM ${filtered("a", pass, "u IS NOT NULL AND kp = 1", null, "a0")} GROUP BY u, p${perSession ? ", sid" : ""})`,
+    );
+    src = "a1";
+  }
+  const from =
+    newSince !== null
+      ? `(SELECT *, MIN(t0) OVER (PARTITION BY u) AS first_t FROM ${src}) an WHERE first_t >= ${newSince}`
+      : src;
+  ctes.push(
+    `c AS (SELECT *, MIN(CASE WHEN s = 1 THEN p END) OVER (PARTITION BY u) AS cohort, MAX(CASE WHEN r = 1 THEN p END) OVER (PARTITION BY u) AS last_ret FROM ${from})`,
+  );
+  return ctes;
 };
 
 export function retentionSql(
@@ -1247,10 +2042,16 @@ export function retentionCellUsersSql(
 
 const MAX_FEATURE_EVENTS = 5;
 
-const featureRule = (rule: NamedEventRule | NamedActionRule): string => {
-  if (rule.t === "action") {
-    return `(ty = 'action' AND k IN (${lits(rule.targets)})${rule.onPage ? ` AND pg = ${lit(rule.onPage)}` : ""})`;
-  }
+const featureRule = (rule: NamedRule): string => {
+  const onPage = "onPage" in rule && rule.onPage ? ` AND pg = ${lit(rule.onPage)}` : "";
+  if (rule.t === "error")
+    return `(ty = 'error' AND ${opMatch(rule.op, "em", rule.value)}${onPage})`;
+  if (rule.t === "action")
+    return `(ty = 'action' AND ${opMatch(rule.op ?? "in", "k", rule.targets ?? rule.value ?? "")}${onPage})`;
+  if (rule.op === "param")
+    return `(ty = 'view' AND regexp_like(url, ${lit(paramPattern(rule.name, rule.value))})${onPage})`;
+  if (rule.op === "ref")
+    return `(ty = 'view' AND regexp_like(ref, ${lit(refPattern(rule.value))})${onPage})`;
   if (rule.op === "eq") return `(ty = 'view' AND pg = ${lit(rule.value)})`;
   if (rule.op === "prefix") return `(ty = 'view' AND starts_with(pg, ${lit(rule.value)}))`;
   return `(ty = 'view' AND regexp_like(pg, ${lit(rule.value)}))`;
@@ -1265,6 +2066,11 @@ export function featuresSql(
   if (!events.length || events.length > MAX_FEATURE_EVENTS)
     throw new Error("Features take 1 to 5 events per request");
   const c = cur(currentStartUs);
+  const pass = sessionPass(scope);
+  const steps = events.map((e): StepRef => ({ kind: "e", key: e.id }));
+  const errors = errorRowPredicates(scope, steps, events);
+  const ref = needsRef(steps, events);
+  const url = eventRules(steps, events).some((r) => r.t === "view" && r.op === "param");
   const cols = [
     "session_id AS sid",
     "type AS ty",
@@ -1273,8 +2079,14 @@ export function featuresSql(
     atnCol(scope),
     ...(has(scope, "view_name") ? ["MIN(view_name) AS vn"] : []),
     ...(id ? identityGroupCols(id) : []),
+    ...(errors.length ? [`MIN(${errorCol(scope)}) AS em`] : []),
+    ...(ref ? [`MIN(${viewCol(scope, "view_referrer", "VARCHAR")}) AS ref`] : []),
+    ...(pass ? [pass.xi] : []),
   ];
-  const extra = id ? ` OR ${identityExpr(id)} IS NOT NULL` : "";
+  const extra = `${errors.map((e) => ` OR ${e}`).join("")}${id ? ` OR ${identityExpr(id)} IS NOT NULL` : ""}${pass?.widen ?? ""}`;
+  const carry = [...(url ? ["url"] : []), ...(errors.length ? ["em"] : []), ...(ref ? ["ref"] : [])]
+    .map((col) => `, ${col}`)
+    .join("");
   const agg = events.flatMap((ev, i) => {
     const p = `(${ev.rules.map(featureRule).join(" OR ")})`;
     return [
@@ -1290,10 +2102,11 @@ export function featuresSql(
         : []),
     ];
   });
+  const errorGroup = errors.length ? " WHEN type = 'error' THEN CAST(date AS VARCHAR)" : "";
   return withCtes(
     [
-      `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR ${actionClickExpr(scope)}${extra}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} END, ${c})`,
-      `e1 AS (SELECT sid, ty, cur, ${pageKeyExpr("url", scope.schema, "vn")} AS pg, ${clickKeyExpr("atn")} AS k${id ? `, ${UID_WINDOW} AS u` : ""} FROM e0)`,
+      `e0 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (type = 'view' OR ${actionClickExpr(scope)}${extra}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)}${errorGroup} END, ${c})`,
+      `e1 AS (SELECT sid, ty, cur, ${pageKeyExpr("url", scope.schema, "vn")} AS pg, ${clickKeyExpr("atn")} AS k${carry}${id ? `, ${UID_WINDOW} AS u` : ""} FROM ${filtered("e0", pass)})`,
     ],
     `SELECT ${agg.join(", ")} FROM e1 LIMIT 1`,
   );
