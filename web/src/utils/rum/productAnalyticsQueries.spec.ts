@@ -50,13 +50,11 @@ import {
   stepPredicateRaw,
   urlPrefilter,
   type AnalyticsScope,
-  type BuildOpts,
-  type PathsDef,
   type RegexPass,
 } from "@/utils/rum/productAnalyticsQueries";
 import type { NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import * as MODEL from "@/utils/rum/productAnalyticsModel";
 import * as PROVEN from "@/utils/rum/__fixtures__/productAnalyticsProvenSql";
-import * as PATHS from "@/utils/rum/__fixtures__/productAnalyticsPathsSql";
 import * as QUERIES from "@/utils/rum/productAnalyticsQueries";
 import * as SEQ from "@/utils/rum/__fixtures__/productAnalyticsSequenceSql";
 
@@ -135,15 +133,6 @@ const norm = (sql: string, s: AnalyticsScope, sample: 1 | 2 | 4 | 8 | 16 = 1): s
   return out.split(String(CS)).join("{cs}");
 };
 
-// Strips the drawer's NULL user_label wherever it sits, so the rest can be compared with the pre-#2851 SQL.
-const dropColumn = (sql: string, col: string): string =>
-  sql.replace(new RegExp(`,\\s*${col}`, "g"), "").replace(new RegExp(`${col},\\s*`, "g"), "");
-const withoutNullLabel = (sql: string): string =>
-  dropColumn(
-    dropColumn(sql, String.raw`CAST\(NULL AS VARCHAR\) AS user_label\b`),
-    String.raw`\buser_label\b`,
-  );
-
 const scope = (patch: Partial<AnalyticsScope> = {}): AnalyticsScope => ({
   app: "web",
   env: [],
@@ -151,16 +140,6 @@ const scope = (patch: Partial<AnalyticsScope> = {}): AnalyticsScope => ({
   schema: {},
   ...patch,
 });
-
-const summaryColumns = (sql: string): Record<string, string> => {
-  const select = sql.slice("SELECT ".length, sql.indexOf(' FROM "_rumdata"'));
-  return Object.fromEntries(
-    select.split(/, (?=COUNT\(|MAX\(|0 AS )/).map((c) => {
-      const at = c.lastIndexOf(" AS ");
-      return [c.slice(at + 4), c.slice(0, at)];
-    }),
-  );
-};
 
 describe("page key (AC-4, AC-7)", () => {
   it.each(KEY_TABLE)("%s -> %s", (url, viewName, schema, expected) => {
@@ -389,67 +368,27 @@ describe("scope-load builders (G2)", () => {
     );
   });
 
-  it("Q3 summary equals the proven shape, counts synthetic sessions and excludes them from sessions (P1-M2)", () => {
+  it("P5-R8: Q3 summary flags synthetic sessions per session, drops them from sessions and counts them apart (P1-M2)", () => {
     const sql = summarySql(s, CS);
-    const unscoped = "application_id = 'web' AND session_id IS NOT NULL";
-    expect(sql.split(unscoped).join("{scope}").split(String(CS)).join("{cs}")).toBe(
-      PROVEN.Q3_SUMMARY,
-    );
-    // `sessions`/`prev_sessions` must drop synthetics so the KPI matches the "N synthetic sessions
-    // excluded" caption, while `synthetic_sessions` still counts them via its own, unfiltered CASE.
-    expect(sql).toContain(
-      "CASE WHEN _timestamp >= {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS sessions".replace(
-        "{cs}",
-        String(CS),
-      ),
-    );
-    expect(sql).toContain(
-      "CASE WHEN _timestamp < {cs} AND (session_type IS NULL OR session_type <> 'synthetics') THEN session_id END) AS prev_sessions".replace(
-        "{cs}",
-        String(CS),
-      ),
-    );
-    expect(sql).toContain(
-      `CASE WHEN _timestamp >= ${CS} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`,
-    );
+    const g = sql.slice(sql.indexOf("g AS (SELECT ") + "g AS (SELECT ".length);
+    const final = sql.slice(sql.lastIndexOf("\n") + 1);
+    expect(g).toContain("MAX(CASE WHEN session_type = 'synthetics' THEN 1 ELSE 0 END) AS syn");
+    expect(final).toMatch(/SUM\(CASE WHEN [^)]*cur = 1 AND syn = 0[^)]*\) AS sessions/);
+    expect(final).toMatch(/SUM\(CASE WHEN [^)]*prv = 1 AND syn = 0[^)]*\) AS prev_sessions/);
+    expect(final).toMatch(/SUM\(CASE WHEN [^)]*cur = 1 AND syn = 1[^)]*\) AS synthetic_sessions/);
   });
 
-  it("Q3 drops synthetics from every count except synthetic_sessions and data_through_us", () => {
-    const cols = summaryColumns(summarySql(s, CS));
-    const bot = "(session_type IS NULL OR session_type <> 'synthetics')";
-    for (const alias of [
-      "sessions",
-      "prev_sessions",
-      "views",
-      "va_rows",
-      "usr_email__values",
-      "usr_email__sessions",
-    ])
-      expect(cols[alias], alias).toContain(bot);
-    expect(cols.synthetic_sessions).not.toContain(bot);
-    expect(cols.data_through_us).not.toContain(bot);
-    expect(summarySql(s, CS)).toMatch(
-      /WHERE application_id = 'web' AND session_id IS NOT NULL LIMIT 1$/,
-    );
-  });
-
-  it("Q3 without session_type adds no synthetics clause to any column", () => {
-    const cols = summaryColumns(summarySql(scope({ schema: { usr_email: true } }), CS));
-    expect(Object.keys(cols)).toContain("usr_email__sessions");
-    for (const [alias, expr] of Object.entries(cols))
-      expect(expr, alias).not.toContain("session_type");
-  });
-
-  it("Q3 without session_type or candidates reports zero synthetics and no identity pairs", () => {
+  it("P5-R8: Q3 without session_type or candidates never reads session_type and has no identity pairs", () => {
     const sql = summarySql(scope(), CS);
-    expect(sql).toContain("0 AS synthetic_sessions");
+    expect(sql).toContain("AS synthetic_sessions");
+    expect(sql).not.toContain("session_type");
     expect(sql).not.toContain("__values");
   });
 
-  it("Q3 keeps env and version filters", () => {
+  it("P5-R8: Q3 keeps env and version filters in its per-session pass", () => {
     const sql = summarySql({ ...s, env: ["prod"] }, CS);
     expect(sql).toContain(
-      "WHERE application_id = 'web' AND session_id IS NOT NULL AND env IN ('prod') LIMIT 1",
+      "WHERE application_id = 'web' AND session_id IS NOT NULL AND env IN ('prod') GROUP BY session_id",
     );
   });
 
@@ -475,30 +414,11 @@ describe("entry/exit and step picker builders (G3, G4)", () => {
   const s = scope({ schema: { usr_email: true, action_target_name: true } });
   const id = { field: "usr_email" as const, excluded: [] };
 
-  it("Q6 entryExit equals the proven shape plus the key tie-break, one row per session", () => {
-    // One session is one entry, in its first view's window, and one exit, in its last view's window.
-    const expected = amendPk(PROVEN.Q6_ENTRY_EXIT_IDENTITY)
-      .replace(
-        "CASE WHEN _timestamp >= {cs} THEN 1 ELSE 0 END AS cur,",
-        "CASE WHEN MIN(CASE WHEN type = 'view' THEN _timestamp END) >= {cs} THEN 1 ELSE 0 END AS ce, CASE WHEN MAX(CASE WHEN type = 'view' THEN _timestamp END) >= {cs} THEN 1 ELSE 0 END AS cx,",
-      )
-      .replace(
-        "s1 AS (SELECT sid, cur, u, unnest(",
-        "s1 AS (SELECT sid, u, unnest(make_array(ce, cx)) AS cur, unnest(",
-      )
-      .replace(
-        "GROUP BY session_id, CASE WHEN _timestamp >= {cs} THEN 1 ELSE 0 END)",
-        "GROUP BY session_id)",
-      )
-      .replace("ORDER BY rank_key DESC LIMIT 1000", "ORDER BY rank_key DESC, k LIMIT 1000");
-    expect(norm(entryExitSql(s, CS, id), s)).toBe(norm(expected, s));
-  });
-
-  it("Q6 without identity drops the users columns", () => {
+  it("P5-R14: Q6 without identity drops the users columns and groups per view", () => {
     const sql = entryExitSql(s, CS, null);
     expect(sql).not.toContain("users");
     expect(sql).not.toContain("usr_email");
-    expect(sql).toContain(`WHERE ${scopeClause(s)} AND (type = 'view') GROUP BY session_id`);
+    expect(sql).toContain(`WHERE ${scopeClause(s)} AND type = 'view' GROUP BY session_id, view_id`);
   });
 
   it("Q9 stepPicker equals the proven shape with the design tie-break and term limit", () => {
@@ -1046,15 +966,13 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
     );
   });
 
-  it("R5: Q15 equals the proven shape for a depth-2 branch plus a NULL user_label (AC-26)", () => {
+  it("Q15 equals the proven shape for a depth-2 branch (AC-26)", () => {
     const sql = branchSessionsSql(s, null, def, "s1 = 'x' AND s2 = 'y'", 2, 0, opts);
     const errorsApart = PROVEN.Q15_BRANCH.replace(
       "LAG(key) OVER (PARTITION BY sid ORDER BY t, key) AS pk",
       "LAG(key) OVER (PARTITION BY sid, CASE WHEN ty = 'error' THEN 1 ELSE 0 END ORDER BY t, key) AS pk",
     );
-    expect(sql).toContain("CAST(NULL AS VARCHAR) AS user_label");
-    expect(sql.split("\n").at(-1)!.split(" FROM ")[0]).toMatch(/\buser_label\b/);
-    expect(norm(withoutNullLabel(sql), s)).toBe(norm(errorsApart, s));
+    expect(norm(sql, s)).toBe(norm(errorsApart, s));
     expect(branchSessionsSql(s, null, def, "TRUE", 0, 1, opts)).toContain(
       "SELECT sid, t0 AS step_t",
     );
@@ -1120,288 +1038,6 @@ describe("paths builders (G6, AC-23, AC-24, AC-25, AC-26)", () => {
     expect(branchSessionsSql(s, null, def, "TRUE", 1, 0, { events: [], sample: 2 })).toContain(
       "md5(session_id)",
     );
-  });
-});
-
-describe("paths drawer user label (o2-enterprise#2851)", () => {
-  const s = scope({
-    schema: {
-      action_id: true,
-      usr_email: true,
-      session_has_replay: true,
-      action_target_name: true,
-    },
-  });
-  const id = { field: "usr_email" as const, excluded: ["bot@x.com"] };
-  const u = identityExpr(id);
-  const events: NamedEvent[] = [
-    {
-      id: "ev",
-      app: "web",
-      name: "E",
-      rules: [{ t: "view", op: "prefix", value: "/web/l" }],
-      version: 1,
-      createdBy: "",
-      createdAt: 0,
-      updatedBy: "",
-      updatedAt: 0,
-    },
-  ];
-  const opts = { events, sample: 1 as const };
-  const base = {
-    anchor: { kind: "p" as const, key: "/web/logs" },
-    direction: "next" as const,
-    depth: 3,
-    include: "all" as const,
-    cohort: null,
-  };
-  const funnel = {
-    steps: [
-      { kind: "p" as const, key: "/a" },
-      { kind: "c" as const, key: "b" },
-    ],
-    unit: "sessions" as const,
-    window: "session" as const,
-    breakdown: null,
-  };
-  const anchors = {
-    page: base,
-    click: { ...base, anchor: { kind: "c" as const, key: "menu-link-/logs-item" } },
-    event: { ...base, anchor: { kind: "e" as const, key: "ev" } },
-  };
-  const cohorts = {
-    sessions: { ...base, anchor: null, cohort: { funnel, stepIndex: 1, side: "dropped" as const } },
-    users: {
-      ...base,
-      anchor: null,
-      cohort: {
-        funnel: { ...funnel, unit: "users" as const, window: "1d" as const },
-        stepIndex: 1,
-        side: "dropped" as const,
-      },
-    },
-  };
-  const all = { ...anchors, ...cohorts };
-  const branch = (i: typeof id | null, d: PathsDef, o: BuildOpts = opts) =>
-    branchSessionsSql(s, i, d, "TRUE", 1, 0, o);
-  const projection = (sql: string) => sql.split("\n").at(-1)!.split(" FROM ")[0];
-  const escRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const mask = (sql: string) =>
-    sql.replace(/'(?:[^']|'')*'/g, (m) => `'${"x".repeat(m.length - 2)}'`);
-  const unwrap = (x: string): string => {
-    const t = x.trim();
-    const m = mask(t);
-    if (!m.startsWith("(")) return t;
-    let depth = 0;
-    for (let i = 0; i < m.length; i++) {
-      depth += m[i] === "(" ? 1 : m[i] === ")" ? -1 : 0;
-      if (depth === 0) return i === m.length - 1 ? unwrap(t.slice(1, -1)) : t;
-    }
-    return t;
-  };
-  const splitTop = (x: string, sep: string): string[] => {
-    const m = mask(x);
-    const out: string[] = [];
-    let depth = 0;
-    let from = 0;
-    for (let i = 0; i < m.length; i++) {
-      if (depth === 0 && m.startsWith(sep, i)) {
-        out.push(x.slice(from, i));
-        from = i + sep.length;
-        i += sep.length - 1;
-        continue;
-      }
-      depth += m[i] === "(" ? 1 : m[i] === ")" ? -1 : 0;
-    }
-    out.push(x.slice(from));
-    return out;
-  };
-  const whereClauses = (sql: string): { at: number; text: string }[] => {
-    const m = mask(sql);
-    const out: { at: number; text: string }[] = [];
-    for (const w of m.matchAll(/\bWHERE /g)) {
-      const start = w.index! + 6;
-      let depth = 0;
-      let i = start;
-      for (; i < m.length; i++) {
-        depth += m[i] === "(" ? 1 : m[i] === ")" ? -1 : 0;
-        if (depth < 0 || (depth === 0 && /^ (?:GROUP BY|ORDER BY|LIMIT) /.test(m.slice(i, i + 10))))
-          break;
-      }
-      out.push({ at: w.index!, text: sql.slice(start, i) });
-    }
-    return out;
-  };
-  const scanClause = (sql: string) =>
-    whereClauses(sql).find((w) => sql.slice(0, w.at).endsWith('FROM "_rumdata" '));
-  const outsideUidSelect = (sql: string, at: number): boolean => {
-    const m = mask(sql);
-    const uid = m.lastIndexOf(`${UID} AS uid`, at);
-    if (uid < 0) return false;
-    let depth = 0;
-    for (const ch of m.slice(uid, at)) {
-      depth += ch === "(" ? 1 : ch === ")" ? -1 : 0;
-      if (depth < 0) return true;
-    }
-    return false;
-  };
-  const rowFilters = (sql: string) => {
-    const d = sql.indexOf("\nd AS (");
-    const scan = scanClause(sql);
-    return whereClauses(sql).filter((w) => w.at < d && w.at !== scan?.at);
-  };
-  const conjuncts = (text: string): string[] | null =>
-    splitTop(text, " OR ").length > 1 ? null : splitTop(text, " AND ").map(unwrap);
-  const identityAdmitted = (sql: string, scopeSql: string, idExpr: string): boolean => {
-    const scan = scanClause(sql);
-    if (!scan || !scan.text.startsWith(`${scopeSql} AND `)) return false;
-    const rest = scan.text.slice(scopeSql.length + 5);
-    if (unwrap(rest) === rest.trim() || splitTop(scan.text, " OR ").length > 1) return false;
-    return splitTop(unwrap(rest), " OR ").some((p) => p.trim() === `${idExpr} IS NOT NULL`);
-  };
-  // Identity-only rows must be dropped after the uid window and before d, or a NULL key breaks the LAG dedup.
-  const pathRowFilterProblem = (sql: string, types: string): string | null => {
-    const e = escRe(types);
-    const flag = new RegExp(
-      `CASE WHEN (?:${e}|\\(${e}\\)) THEN 1(?: ELSE 0)? END\\)? AS (\\w+)`,
-    ).exec(sql);
-    if (!flag) return "the Sankey row predicate is not kept as a per-row flag";
-    const test = new RegExp(`^${flag[1]} (?:= 1|> 0|IS NOT NULL)$`);
-    const ok = rowFilters(sql).some(
-      (w) => conjuncts(w.text)?.some((c) => test.test(c)) && outsideUidSelect(sql, w.at),
-    );
-    return ok ? null : "no WHERE drops non-path rows outside the uid window and before d";
-  };
-  const CLICK_COL = "(?:k|atn)";
-  const NON_EMPTY = `(?:COALESCE\\(${CLICK_COL}, ''\\) <> ''|${CLICK_COL} <> ''|NULLIF\\(${CLICK_COL}, ''\\) IS NOT NULL|LENGTH\\(${CLICK_COL}\\) > 0)`;
-  const EMPTY_GUARD = new RegExp(
-    [
-      `^${NON_EMPTY}$`,
-      `^ty <> 'action' OR ${NON_EMPTY}$`,
-      `^NOT \\(ty = 'action' AND \\((?:${CLICK_COL} = '' OR ${CLICK_COL} IS NULL|${CLICK_COL} IS NULL OR ${CLICK_COL} = '')\\)\\)$`,
-      `^NOT \\(ty = 'action' AND COALESCE\\(${CLICK_COL}, ''\\) = ''\\)$`,
-    ].join("|"),
-  );
-  const hasEmptyClickGuard = (sql: string): boolean =>
-    rowFilters(sql).some((w) => conjuncts(w.text)?.some((c) => EMPTY_GUARD.test(c)));
-  const pathWhereClauses = (sql: string): string[] => rowFilters(sql).map((w) => w.text);
-  const UID =
-    "FIRST_VALUE(u0) OVER (PARTITION BY sid ORDER BY CASE WHEN u0 IS NULL THEN 1 ELSE 0 END, ut)";
-
-  it.each(Object.entries(anchors))(
-    "R1: the %s-anchored drawer selects user_label, with or without an identity",
-    (_, d) => {
-      expect(projection(branch(null, d))).toMatch(/\buser_label\b/);
-      expect(projection(branch(id, d))).toMatch(/\buser_label\b/);
-    },
-  );
-
-  it.each(Object.entries(cohorts))(
-    "R2: the %s-unit funnel-cohort drawer selects user_label, with or without an identity",
-    (_, d) => {
-      expect(projection(branch(null, d))).toMatch(/\buser_label\b/);
-      expect(projection(branch(id, d))).toMatch(/\buser_label\b/);
-    },
-  );
-
-  it.each(Object.entries(all))(
-    "R3: the %s drawer labels a session with its first non-excluded identity value",
-    (_, d) => {
-      const sql = branch(id, d);
-      expect(sql).toContain(
-        `first_value(${u} ORDER BY CASE WHEN ${u} IS NULL THEN 1 ELSE 0 END, date) AS u0`,
-      );
-      expect(sql).toContain(`MIN(CASE WHEN ${u} IS NOT NULL THEN date END) AS ut`);
-      expect(sql).toContain("IN ('bot@x.com') THEN NULL");
-      expect(sql).toContain(`${UID} AS uid`);
-      expect(sql).toContain("MAX(uid) AS user_label");
-      expect(sql).not.toContain("CAST(NULL AS VARCHAR) AS user_label");
-    },
-  );
-
-  it.each(["all", "pages", "clicks"] as const)(
-    "R4: an anchored drawer under include %s also reads identity from rows outside the path filter",
-    (include) => {
-      for (const d of Object.values(anchors)) {
-        expect(identityAdmitted(branch(id, { ...d, include }), scopeClause(s), u)).toBe(true);
-      }
-    },
-  );
-
-  it.each(Object.entries(all))(
-    "R5: without an identity the %s drawer labels every session NULL and reads no identity",
-    (_, d) => {
-      const sql = branch(null, d);
-      expect(sql).toContain("CAST(NULL AS VARCHAR) AS user_label");
-      expect(sql).not.toContain("usr_email");
-      expect(sql).not.toContain(UID);
-    },
-  );
-
-  it("R5: without an identity the cohort drawer is unchanged apart from user_label", () => {
-    const sql = branchSessionsSql(s, null, cohorts.sessions, "s1 = 'x'", 1, 0, opts);
-    expect(norm(withoutNullLabel(sql), s)).toBe(norm(PATHS.BRANCH_COHORT_SESSIONS, s));
-  });
-
-  for (const [name, d] of Object.entries(anchors)) {
-    it.each(["all", "pages", "clicks"] as const)(
-      `R6: identity-only rows of the ${name}-anchored drawer under include %s never become path steps`,
-      (include) => {
-        const dd = { ...d, include };
-        const head = `${scopeClause(s)} AND `;
-        const plain = scanClause(branch(null, dd))?.text ?? "";
-        expect(plain.startsWith(head)).toBe(true);
-        expect(pathRowFilterProblem(branch(id, dd), plain.slice(head.length))).toBeNull();
-      },
-    );
-  }
-
-  it("R6: drawer sampling still applies with an identity", () => {
-    for (const d of [anchors.page, cohorts.sessions]) {
-      expect(branch(id, d, { events, sample: 2 })).toContain(scopeClause(s, 2));
-    }
-  });
-
-  it.each(Object.entries(all))(
-    "R7: the %s Sankey query is byte-identical to its pre-#2851 output",
-    (name, d) => {
-      const fixture: Record<string, string> = {
-        page: PATHS.PATHS_ANCHOR_PAGE,
-        click: PATHS.PATHS_ANCHOR_CLICK,
-        event: PATHS.PATHS_ANCHOR_EVENT,
-        sessions: PATHS.PATHS_COHORT_SESSIONS,
-        users: PATHS.PATHS_COHORT_USERS,
-      };
-      expect(norm(pathsSql(s, id, d, opts), s)).toBe(norm(fixture[name], s));
-    },
-  );
-
-  it.each(Object.entries(anchors))(
-    "R7: the %s-anchored Sankey query ignores the identity",
-    (_, d) => {
-      expect(pathsSql(s, id, d, opts)).toBe(pathsSql(s, null, d, opts));
-    },
-  );
-
-  it.each(Object.entries(all))(
-    "R8: the %s drawer with an identity reads _rumdata once, join-free",
-    (_, d) => {
-      expect(() => assertJoinFree(branch(id, d))).not.toThrow();
-      expect(() => assertJoinFree(branch(id, d, { events, sample: 4 }))).not.toThrow();
-    },
-  );
-
-  it("R9: a sessions-unit cohort drawer never turns an identity-only, unnamed click into a c: step", () => {
-    const sql = branch(id, cohorts.sessions);
-    expect(sql).toContain(UID);
-    expect(hasEmptyClickGuard(sql)).toBe(true);
-  });
-
-  it("R6: the users-unit cohort drawer filters path rows exactly as the Sankey does", () => {
-    const flow = pathWhereClauses(pathsSql(s, id, cohorts.users, opts)).map((w) =>
-      w.replace("ty IN ('view', 'action')", "(ty IN ('view', 'action') OR ty = 'error')"),
-    );
-    expect(pathWhereClauses(branch(id, cohorts.users))).toEqual(flow);
   });
 });
 
@@ -1635,6 +1271,9 @@ describe("alert-bound builders (no SELECT *)", () => {
   });
 });
 
+// P5 builders (§4.1, §4.6, §4.7) that are not exported yet.
+const P5_NEW = QUERIES as unknown as Record<string, (...args: unknown[]) => string>;
+
 describe("assertJoinFree over every builder (AC-55)", () => {
   const s = scope({
     schema: {
@@ -1766,6 +1405,10 @@ describe("assertJoinFree over every builder (AC-55)", () => {
       QUERIES.featuresSql(s, CS, id, [ev]),
       QUERIES.featuresSql(s, CS, null, [ev]),
     ],
+    errorPickerSql: () => [P5_NEW.errorPickerSql(s), P5_NEW.errorPickerSql(s, "fa'il")],
+    unnamedClicksSql: () => [P5_NEW.unnamedClicksSql(s)],
+    userAgentSuggestionSql: () => [P5_NEW.userAgentSuggestionSql(s)],
+    namedEventPreviewSql: () => [P5_NEW.namedEventPreviewSql(s, ev)],
   };
 
   it("covers every exported *Sql builder", () => {
@@ -1850,16 +1493,11 @@ describe("mobile view_name fallback reaches a column the CTE actually selects (o
     expect(sql).not.toContain("NULLIF(view_name, '')");
   });
 
-  it("Q6 entryExit carries fvn/lvn for the first and last view", () => {
+  it("P5-R14: Q6 entryExit carries view_name per view for the page key, not the raw column", () => {
     const sql = entryExitSql(s, CS, id);
-    expect(sql).toContain(
-      "substr(MIN(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_name END), 14) AS fvn",
-    );
-    expect(sql).toContain(
-      "substr(MAX(CASE WHEN type = 'view' THEN CAST(date AS VARCHAR) || view_name END), 14) AS lvn",
-    );
-    expect(sql).toContain("NULLIF(fvn, '')");
-    expect(sql).toContain("NULLIF(lvn, '')");
+    const v0 = sql.slice(0, sql.indexOf("\n"));
+    expect(v0).toContain("view_name");
+    expect(sql).not.toContain("AS fvn");
     expect(sql).not.toContain("NULLIF(view_name, '')");
   });
 
@@ -2014,6 +1652,1053 @@ describe("mobile view_name fallback reaches a column the CTE actually selects (o
         },
       ]),
     ]) {
+      expect(() => assertJoinFree(sql)).not.toThrow();
+    }
+  });
+});
+
+// P5 (gap fixes, web SQL builders). Assumed scope fields: `exclusions` (§4.0), `xall`, `apps: string[]`,
+// `appExclusions` (each compared app's settings by app id), `newSince` (new-users range start, ms).
+describe("P5 gap fixes: SQL builders", () => {
+  const FIELDS =
+    "action_error_count action_id action_target_name action_type application_id date env error_id error_message error_type geo_info_city geo_info_country session_has_replay session_id session_type type user_agent_device_family user_agent_os_family user_agent_user_agent_family usr_email usr_name version view_error_count view_frustration_count view_id view_referrer view_time_spent view_url".split(
+      " ",
+    );
+  const FULL: Record<string, boolean> = Object.fromEntries(FIELDS.map((f) => [f, true]));
+  const BUILTIN = {
+    version: 1,
+    families: ["HeadlessChrome", "PhantomJS", "Spider"],
+    devices: ["Spider"],
+  };
+  const FAMILY_HALF =
+    "(user_agent_user_agent_family IS NULL OR user_agent_user_agent_family NOT IN ('HeadlessChrome', 'PhantomJS', 'Spider'))";
+  const DEVICE_HALF =
+    "(user_agent_device_family IS NULL OR user_agent_device_family NOT IN ('Spider'))";
+  const BUILTIN_PRED = `${FAMILY_HALF} AND ${DEVICE_HALF}`;
+  const STAFF = { field: "usr_email", op: "suffix", values: ["@openobserve.ai"] };
+  const STAFF_XI =
+    "MAX(CASE WHEN usr_email IS NOT NULL AND ends_with(usr_email, '@openobserve.ai') THEN 1 ELSE 0 END) AS xi";
+  const STAFF_ROW = "(usr_email IS NULL OR NOT ends_with(usr_email, '@openobserve.ai'))";
+  const COUNTRY = { field: "geo_info_country", op: "eq", values: ["XX"] };
+  const COUNTRY_PRED = "(geo_info_country IS NULL OR geo_info_country <> 'XX')";
+  const IGNORED = [
+    { op: "eq", value: "/web/login" },
+    { op: "eq", value: "/web/cb" },
+  ];
+  const IGN_K = "NOT (k IN ('/web/login', '/web/cb'))";
+  type Rules = {
+    bots?: boolean;
+    builtinBots?: typeof BUILTIN;
+    sessions?: unknown[];
+    pages?: unknown[];
+  };
+  const rules = (r: Rules = {}) => ({
+    bots: true,
+    builtinBots: BUILTIN,
+    sessions: [],
+    pages: [],
+    ...r,
+  });
+  const ruled = (
+    r: Rules = {},
+    patch: Record<string, unknown> = {},
+    schema: Record<string, boolean> = FULL,
+  ): AnalyticsScope =>
+    ({
+      app: "web",
+      env: [],
+      version: [],
+      schema,
+      exclusions: rules(r),
+      ...patch,
+    }) as AnalyticsScope;
+  const noRules = (schema: Record<string, boolean> = FULL) => ruled({ bots: false }, {}, schema);
+  const NEW = QUERIES as unknown as Record<string, (...args: unknown[]) => string>;
+  const opts = { events: [] as NamedEvent[], sample: 1 as const };
+  const id = { field: "usr_email" as const, excluded: [] };
+  const p = (key: string, f?: Record<string, unknown>) =>
+    ({ kind: "p", key, ...(f ? { f } : {}) }) as StepRefP5;
+  type StepRefP5 = { kind: "p" | "c" | "e" | "r"; key: string; f?: Record<string, unknown> };
+  type DefP5 = {
+    steps: StepRefP5[];
+    unit: "sessions" | "users";
+    window: "session" | "1h" | "1d" | "7d";
+    breakdown: string | null;
+    x?: unknown[];
+  };
+  const fdef = (patch: Partial<DefP5> = {}) =>
+    ({
+      steps: [p("/web"), p("/web/logs"), p("/web/billings"), p("/web/settings")],
+      unit: "sessions",
+      window: "session",
+      breakdown: null,
+      ...patch,
+    }) as unknown as Parameters<typeof funnelSql>[2];
+  const BETWEEN = { step: p("/web/ingestion"), a: 2, b: 3 };
+  const WITHIN = { step: p("/web/ingestion"), a: 2, withinMs: 1000 };
+  const named = (rulesList: unknown[], eid = "ev1aaaaaaaaa"): NamedEvent =>
+    ({
+      id: eid,
+      app: "web",
+      name: "Ev",
+      rules: rulesList,
+      version: 1,
+      createdBy: "",
+      createdAt: 0,
+      updatedBy: "",
+      updatedAt: 0,
+    }) as NamedEvent;
+  const evStep = { kind: "e" as const, key: "ev1aaaaaaaaa" };
+
+  // Returns one CTE's body by balanced parentheses, skipping quoted literals.
+  const cte = (sql: string, name: string): string => {
+    const m = new RegExp(`(?:^|WITH |\\n)${name} +AS \\(`).exec(sql);
+    if (!m) return "";
+    const start = m.index + m[0].length;
+    let depth = 1;
+    let quoted = false;
+    for (let i = start; i < sql.length; i++) {
+      const ch = sql[i];
+      if (ch === "'") quoted = !quoted;
+      else if (!quoted && ch === "(") depth++;
+      else if (!quoted && ch === ")" && --depth === 0) return sql.slice(start, i);
+    }
+    return sql.slice(start);
+  };
+  // Returns the select item aliased `alias`, walking back to its top-level comma.
+  const item = (text: string, alias: string): string => {
+    const m = new RegExp(` AS ${alias}(?=,| FROM|$)`).exec(text);
+    if (!m) return "";
+    let depth = 0;
+    let quoted = false;
+    for (let i = m.index - 1; i >= 0; i--) {
+      const ch = text[i];
+      if (ch === "'") quoted = !quoted;
+      else if (!quoted && ch === ")") depth++;
+      else if (!quoted && ch === "(") {
+        if (depth === 0) return text.slice(i + 1, m.index).trim();
+        depth--;
+      } else if (!quoted && depth === 0 && ch === ",") return text.slice(i + 1, m.index).trim();
+      if (!quoted && depth === 0 && text.slice(i, i + 7) === "SELECT ")
+        return text.slice(i + 7, m.index).trim();
+    }
+    return text.slice(0, m.index).trim();
+  };
+  const scans = (sql: string) => sql.split('FROM "_rumdata"').length - 1;
+  const tail = (sql: string) => sql.slice(sql.lastIndexOf("\n") + 1);
+
+  describe("session exclusions (§4.1)", () => {
+    it.each([
+      ["eq", ["o'k"], "(geo_info_country IS NULL OR geo_info_country <> 'o''k')"],
+      ["in", ["a", "b"], "(geo_info_country IS NULL OR geo_info_country NOT IN ('a', 'b'))"],
+      ["prefix", ["v"], "(geo_info_country IS NULL OR NOT starts_with(geo_info_country, 'v'))"],
+      ["suffix", ["v"], "(geo_info_country IS NULL OR NOT ends_with(geo_info_country, 'v'))"],
+      ["contains", ["v"], "(geo_info_country IS NULL OR strpos(geo_info_country, 'v') = 0)"],
+      ["regex", ["^v$"], "(geo_info_country IS NULL OR NOT regexp_like(geo_info_country, '^v$'))"],
+    ])("P5-R2: a %s rule emits its NULL-safe predicate in scopeClause", (op, values, pred) => {
+      const s = ruled({ bots: false, sessions: [{ field: "geo_info_country", op, values }] });
+      expect(scopeClause(s)).toContain(pred);
+    });
+
+    it("P5-R2: every scopeClause caller carries the rule predicate", () => {
+      const s = ruled({ bots: false, sessions: [COUNTRY] });
+      const sqls = [
+        pagesSql(s, CS, null),
+        clicksSql(s, CS, null),
+        entryExitSql(s, CS, null),
+        stepPickerSql(s),
+        trendSql(s, null, "1 day", "UTC", [], []),
+        funnelSql(s, null, fdef(), opts),
+        identityTopSql(s, "usr_email"),
+        activeUsersSql(s, id, CS),
+        featuresSql(s, CS, null, [named([{ t: "view", op: "eq", value: "/web" }])]),
+        clickPagesSql(s, CS, ["save"]),
+        nextStepsSql(s, null, fdef(), opts),
+        pathsSql(
+          s,
+          null,
+          { anchor: p("/web") as never, direction: "next", depth: 2, include: "all", cohort: null },
+          opts,
+        ),
+        retentionSql(s, id, { start: null, ret: null, per: "week", mode: "on" }, [1, 2, 3], opts),
+      ];
+      for (const sql of sqls) expect(sql).toContain(COUNTRY_PRED);
+    });
+
+    it("P5-R3: bots on emits the §4.0 canonical built-in predicate verbatim; bots off emits none", () => {
+      expect(scopeClause(ruled())).toBe(
+        `application_id = 'web' AND session_id IS NOT NULL AND (session_type IS NULL OR session_type <> 'synthetics') AND ${BUILTIN_PRED}`,
+      );
+      expect(scopeClause(ruled({ bots: false }))).not.toContain("user_agent_");
+    });
+
+    it("P5-R3: the built-in predicate is built from the server's builtinBots list", () => {
+      const s = ruled({ builtinBots: { version: 2, families: ["Foo", "Bar"], devices: ["Baz"] } });
+      expect(scopeClause(s)).toContain(
+        "(user_agent_user_agent_family IS NULL OR user_agent_user_agent_family NOT IN ('Foo', 'Bar')) AND (user_agent_device_family IS NULL OR user_agent_device_family NOT IN ('Baz'))",
+      );
+      expect(scopeClause(s)).not.toContain("HeadlessChrome");
+    });
+
+    it("P5-R4: each built-in half and each rule is gated on its field being in the schema", () => {
+      const noDevice = { ...FULL, user_agent_device_family: false };
+      const s = ruled(
+        { sessions: [{ field: "geo_info_city", op: "eq", values: ["x"] }] },
+        {},
+        {
+          ...noDevice,
+          geo_info_city: false,
+        },
+      );
+      const sql = scopeClause(s);
+      expect(sql).toContain(FAMILY_HALF);
+      expect(sql).not.toContain("user_agent_device_family");
+      expect(sql).not.toContain("geo_info_city");
+      const noFamily = { ...FULL, user_agent_user_agent_family: false };
+      expect(scopeClause(ruled({}, {}, noFamily))).toContain(DEVICE_HALF);
+      expect(scopeClause(ruled({}, {}, noFamily))).not.toContain("user_agent_user_agent_family");
+    });
+
+    it("P5-R5: xall reproduces the no-rules SQL byte-for-byte across builders", () => {
+      const r = { sessions: [STAFF, COUNTRY] };
+      const xall = ruled(r, { xall: true });
+      const base = noRules();
+      const builds: ((s: AnalyticsScope) => string)[] = [
+        (s) => scopeClause(s),
+        (s) => funnelSql(s, null, fdef(), opts),
+        (s) => trendSql(s, null, "1 day", "UTC", [], []),
+        (s) => clicksSql(s, CS, null),
+        (s) =>
+          retentionSql(s, id, { start: null, ret: null, per: "week", mode: "on" }, [1, 2, 3], opts),
+      ];
+      for (const b of builds) {
+        expect(b(ruled(r))).not.toBe(b(base));
+        expect(b(xall)).toBe(b(base));
+      }
+    });
+
+    it("P5-R5: ignored pages still apply under xall", () => {
+      const sql = pagesSql(
+        ruled({ sessions: [COUNTRY], pages: IGNORED }, { xall: true }),
+        CS,
+        null,
+      );
+      expect(sql).toContain(IGN_K);
+      expect(sql).not.toContain(COUNTRY_PRED);
+      expect(sql).not.toContain("user_agent_");
+    });
+
+    it.each<[string, (s: AnalyticsScope) => string]>([
+      ["funnelCtes", (s) => funnelSql(s, null, fdef(), opts)],
+      ["fullChainCtes", (s) => nextStepsSql(s, null, fdef(), opts)],
+      [
+        "pathCtes",
+        (s) =>
+          pathsSql(
+            s,
+            null,
+            {
+              anchor: p("/web") as never,
+              direction: "next",
+              depth: 3,
+              include: "all",
+              cohort: null,
+            },
+            opts,
+          ),
+      ],
+      ["pagesSql", (s) => pagesSql(s, CS, null)],
+      ["entryExitSql", (s) => entryExitSql(s, CS, null)],
+      [
+        "featuresSql",
+        (s) => featuresSql(s, CS, null, [named([{ t: "view", op: "eq", value: "/web" }])]),
+      ],
+      ["stepPickerSql", (s) => stepPickerSql(s)],
+    ])(
+      "P5-R6: %s runs the identity session pass in its first grouped CTE with a widened row filter",
+      (_name, build) => {
+        const sql = build(ruled({ bots: false, sessions: [STAFF] }));
+        const first = sql.slice(0, sql.indexOf("\n"));
+        expect(first).toContain(STAFF_XI);
+        expect(first).toContain("OR usr_email IS NOT NULL");
+        expect(sql).toContain("MAX(xi) OVER (PARTITION BY sid) AS xs");
+        expect(sql).toContain("xs = 0");
+        expect(sql).not.toContain(STAFF_ROW);
+      },
+    );
+
+    it("P5-R6: both trendSql forms add a per-session group and filter xs = 0", () => {
+      const s = ruled({ bots: false, sessions: [STAFF] });
+      for (const sql of [
+        trendSql(s, null, "1 day", "UTC", [], []),
+        trendSql(s, null, "1 day", "UTC", [p("/web") as never], []),
+      ]) {
+        expect(sql).toContain(STAFF_XI);
+        expect(sql).toContain("MAX(xi) OVER (PARTITION BY");
+        expect(sql).toContain("xs = 0");
+        expect(sql).not.toContain(STAFF_ROW);
+      }
+    });
+
+    it("P5-R6: retentionCtes adds session_id to its first group for the session pass", () => {
+      const s = ruled({ bots: false, sessions: [STAFF] });
+      const sql = retentionSql(
+        s,
+        id,
+        { start: null, ret: null, per: "week", mode: "on" },
+        [1000, 2000, 3000],
+        opts,
+      );
+      const a = cte(sql, "a");
+      expect(a).toContain(STAFF_XI);
+      expect(a.slice(a.lastIndexOf("GROUP BY"))).toContain("session_id");
+      expect(sql).toContain("xs = 0");
+    });
+
+    it("P5-R7: identity rules use the row form only in clicks, click pages, active users and identity top", () => {
+      const s = ruled({ bots: false, sessions: [STAFF] });
+      for (const sql of [
+        clicksSql(s, CS, null),
+        clickPagesSql(s, CS, ["save"]),
+        activeUsersSql(s, id, CS),
+        identityTopSql(s, "usr_email"),
+      ]) {
+        expect(sql).toContain(STAFF_ROW);
+        expect(sql).not.toContain(" AS xi");
+      }
+    });
+
+    describe("P5-R8: summarySql flags", () => {
+      const schema = { ...FULL, usr_id: true };
+      const sql = summarySql(ruled({ sessions: [STAFF, COUNTRY] }, {}, schema), CS);
+      const g = cte(sql, "g");
+      const final = tail(sql);
+
+      it("P5-R8: keeps every session in g and carries the rules as xb and xr flags", () => {
+        const where = g.slice(g.indexOf("WHERE"));
+        expect(where).not.toContain("user_agent_");
+        expect(where).not.toContain(COUNTRY_PRED);
+        expect(item(g, "xb")).toContain(BUILTIN_PRED);
+        expect(item(g, "xr")).toContain(COUNTRY_PRED);
+        expect(item(g, "xr")).toContain("ends_with(usr_email, '@openobserve.ai')");
+      });
+
+      it("P5-R8: returns sessions, prev_sessions, total_sessions and builtin_kept_sessions from the flags", () => {
+        expect(item(final, "sessions")).toContain("xb = 0 AND xr = 0");
+        expect(item(final, "prev_sessions")).toContain("xb = 0 AND xr = 0");
+        expect(item(final, "total_sessions")).not.toMatch(/\bx[br] = 0/);
+        expect(item(final, "builtin_kept_sessions")).toContain("xb = 0");
+        expect(item(final, "builtin_kept_sessions")).not.toContain("xr = 0");
+      });
+
+      it("P5-R8: views is rule-filtered; synthetics, va_rows and data_through_us are not", () => {
+        expect(item(final, "views")).toContain("xb = 0 AND xr = 0");
+        for (const alias of ["synthetic_sessions", "va_rows", "data_through_us"])
+          expect(item(final, alias)).not.toMatch(/\bx[br]\b/);
+      });
+
+      it("P5-R8: emits __values/__sessions for every present identity field from the gv CTE", () => {
+        expect(cte(sql, "gv")).not.toBe("");
+        for (const f of ["usr_id", "usr_email"]) {
+          expect(item(final, `${f}__values`)).toContain("xb = 0 AND xr = 0");
+          expect(item(final, `${f}__sessions`)).toContain("xb = 0 AND xr = 0");
+        }
+        expect(final).not.toContain("usr_anonymous_id__values");
+        expect(scans(sql)).toBe(1);
+        expect(() => assertJoinFree(sql)).not.toThrow();
+      });
+
+      it("P5-R8: xb is constant 0 with bots off, and both flags are 0 under xall", () => {
+        const off = cte(summarySql(ruled({ bots: false, sessions: [COUNTRY] }), CS), "g");
+        expect(item(off, "xb")).toBe("0");
+        expect(item(off, "xr")).toContain(COUNTRY_PRED);
+        const all = cte(summarySql(ruled({ sessions: [STAFF, COUNTRY] }, { xall: true }), CS), "g");
+        expect(item(all, "xb")).toBe("0");
+        expect(item(all, "xr")).toBe("0");
+      });
+    });
+
+    it("P5-R9: funnelAlertSql and funnelPanelSql emit the current rules' predicate", () => {
+      const s = ruled({ sessions: [COUNTRY] });
+      for (const sql of [
+        funnelAlertSql(s, null, fdef(), 50, opts),
+        funnelPanelSql(s, fdef(), opts),
+      ]) {
+        expect(sql).toContain(BUILTIN_PRED);
+        expect(sql).toContain(COUNTRY_PRED);
+      }
+    });
+
+    it("P5-R10: Q7_FUNNEL_EXCLUDED, with the version-1 device form and the widened row filter", () => {
+      const s = ruled(
+        {
+          builtinBots: {
+            version: 0,
+            families: ["HeadlessChrome", "PhantomJS"],
+            devices: ["Spider"],
+          },
+          sessions: [STAFF],
+        },
+        { app: "o2-prod-eu1" },
+      );
+      const def = fdef({ steps: [p("/web"), p("/web/billings/plans")] });
+      const expected = (PROVEN as Record<string, string>).Q7_FUNNEL_EXCLUDED.replace(
+        "user_agent_device_family <> 'Spider'",
+        "user_agent_device_family NOT IN ('Spider')",
+      ).replace(
+        "AND (type = 'view') GROUP BY",
+        "AND (type = 'view' OR usr_email IS NOT NULL) GROUP BY",
+      );
+      expect(funnelSql(s, null, def, opts)).toBe(expected);
+    });
+
+    it("P5-R11: userAgentSuggestionSql ranks top 15 family/device pairs over the scope without exclusions", () => {
+      const s = ruled({ sessions: [COUNTRY, STAFF] });
+      const sql = NEW.userAgentSuggestionSql(s);
+      expect(sql).toContain("GROUP BY user_agent_user_agent_family, user_agent_device_family");
+      expect(sql).toContain("COUNT(DISTINCT session_id) AS sessions");
+      expect(sql).toContain("ORDER BY sessions DESC LIMIT 15");
+      expect(sql).toContain(scopeClause(noRules()));
+      expect(sql).not.toContain(FAMILY_HALF);
+      expect(sql).not.toContain(COUNTRY_PRED);
+      expect(sql).not.toContain("ends_with(usr_email");
+    });
+  });
+
+  describe("ignored pages (§4.2)", () => {
+    const pagesFull = [
+      ...IGNORED,
+      { op: "prefix", value: "/web/org/" },
+      { op: "regex", value: "^/web/cb" },
+    ];
+
+    it("P5-R12: ignoredPagePredicate emits NOT (IN OR starts_with OR regexp_like) on the key", () => {
+      const sql = pagesSql(ruled({ bots: false, pages: pagesFull }), CS, null);
+      expect(sql).toContain(
+        "NOT (k IN ('/web/login', '/web/cb') OR starts_with(k, '/web/org/') OR regexp_like(k, '^/web/cb'))",
+      );
+    });
+
+    it("P5-R13: pagesSql filters ignored keys after computing the key and before the aggregate", () => {
+      const sql = pagesSql(ruled({ bots: false, pages: IGNORED }), CS, null);
+      expect(cte(sql, "g")).toContain(`FROM v WHERE k IS NOT NULL AND ${IGN_K} GROUP BY k`);
+    });
+
+    it("P5-R13: stepPickerSql filters ignored keys for page rows only", () => {
+      const sql = stepPickerSql(ruled({ bots: false, pages: IGNORED }));
+      expect(tail(sql)).toContain(
+        "WHERE k IS NOT NULL AND k <> '' AND NOT (kind = 'p' AND (k IN ('/web/login', '/web/cb')))",
+      );
+    });
+
+    it("P5-R13: pathTail drops ignored p: keys before the LAG dedup, NULL-safe in the attrs form", () => {
+      const s = ruled({ bots: false, pages: IGNORED });
+      const def = {
+        anchor: p("/web") as never,
+        direction: "next" as const,
+        depth: 3,
+        include: "all" as const,
+        cohort: null,
+      };
+      const flow = pathsSql(s, null, def, opts);
+      expect(flow).toContain(
+        "d AS (SELECT *, LAG(key) OVER (PARTITION BY sid ORDER BY t, key) AS pk FROM e WHERE NOT (key IN ('p:/web/login', 'p:/web/cb')))",
+      );
+      const branch = branchSessionsSql(s, null, def, "s1 = 'p:/web'", 1, 0, opts);
+      expect(cte(branch, "d")).toContain(
+        "FROM e WHERE key IS NULL OR NOT (key IN ('p:/web/login', 'p:/web/cb'))",
+      );
+      const pre = pathsSql(
+        ruled({ bots: false, pages: [{ op: "prefix", value: "/web/org/" }] }),
+        null,
+        def,
+        opts,
+      );
+      expect(cte(pre, "d")).toContain("substr(key, 3)");
+    });
+
+    it("P5-R13: pathTail prefix and regex rules match the page text of p: keys only", () => {
+      const def = {
+        anchor: p("/web") as never,
+        direction: "next" as const,
+        depth: 3,
+        include: "all" as const,
+        cohort: null,
+      };
+      for (const rule of [
+        { op: "prefix", value: "/web/org/" },
+        { op: "regex", value: "^/web/cb" },
+      ]) {
+        const d = cte(pathsSql(ruled({ bots: false, pages: [rule] }), null, def, opts), "d");
+        const where = d.includes(" WHERE ") ? d.slice(d.lastIndexOf(" WHERE ")) : "";
+        expect(where).toContain("substr(key, 3)");
+        expect(where).toContain(`'${rule.value}'`);
+        expect(where).toContain("'p:'");
+      }
+    });
+
+    it("P5-R13: A -> ignored -> A collapses to one A under the pathTail filter and LAG dedup", () => {
+      const sql = pathsSql(
+        ruled({ bots: false, pages: IGNORED }),
+        null,
+        { anchor: p("/web") as never, direction: "next", depth: 3, include: "all", cohort: null },
+        opts,
+      );
+      const where = /FROM e WHERE NOT \(key IN \(([^)]*)\)\)/.exec(cte(sql, "d"));
+      expect(where).not.toBeNull();
+      const ignored = [...(where?.[1] ?? "").matchAll(/'([^']*)'/g)].map((m) => m[1]);
+      const kept = ["p:/a", "p:/web/login", "p:/a"].filter((k) => !ignored.includes(k));
+      const deduped = kept.filter((k, i) => i === 0 || kept[i - 1] !== k);
+      expect(deduped).toEqual(["p:/a"]);
+    });
+
+    it("P5-R14: entryExitSql without identity is the per-view shape of the spike fixture", () => {
+      const fixture = (PROVEN as Record<string, string>).Q6_ENTRY_EXIT_PER_VIEW;
+      const cs = Number(/>= (\d+) THEN/.exec(fixture)?.[1]);
+      const s = ruled({ bots: false }, { app: "o2-prod-eu1" });
+      expect(entryExitSql(s, cs, null)).toBe(fixture);
+      expect(
+        entryExitSql(
+          { ...s, exclusions: rules({ bots: false, pages: IGNORED }) } as AnalyticsScope,
+          cs,
+          null,
+        ),
+      ).toBe(
+        fixture.replace(
+          "v AS (SELECT * FROM v1 WHERE k IS NOT NULL)",
+          `v AS (SELECT * FROM v1 WHERE k IS NOT NULL AND ${IGN_K})`,
+        ),
+      );
+    });
+
+    it("P5-R14: with identity, entryExitSql combines view and identity rows in v0 and filters xs = 0 AND vid IS NOT NULL", () => {
+      const sql = entryExitSql(ruled({ bots: false, sessions: [STAFF], pages: IGNORED }), CS, id);
+      const v0 = cte(sql, "v0");
+      expect(v0).toContain("OR NULLIF(usr_email, '') IS NOT NULL");
+      expect(v0).toContain(STAFF_XI);
+      expect(v0).toContain(" AS u0");
+      expect(cte(sql, "v")).toBe(
+        `SELECT * FROM v1 WHERE xs = 0 AND vid IS NOT NULL AND k IS NOT NULL AND ${IGN_K}`,
+      );
+    });
+
+    it("P5-R15: funnels never apply ignored pages", () => {
+      const def = fdef({ steps: [p("/web/login"), p("/web")] });
+      expect(funnelSql(ruled({ pages: IGNORED }), null, def, opts)).toBe(
+        funnelSql(ruled(), null, def, opts),
+      );
+    });
+  });
+
+  describe("exclusion steps and step filters (§4.3)", () => {
+    const s = ruled({ bots: false });
+
+    it("P5-R16: a between-steps exclusion in the sid partition gates steps b and later on ex1 = 0", () => {
+      const sql = funnelSql(s, null, fdef({ x: [BETWEEN] }), opts);
+      const conds = "t, m1 = 1, m2 = 1, m3 = 1, m4 = 1";
+      for (const frag of [
+        "CASE WHEN ty = 'view' AND k = '/web/ingestion' THEN 1 ELSE 0 END AS mx1",
+        `sequence_step_match(0, 2, ${conds}) OVER (PARTITION BY sid) AS va1`,
+        `sequence_step_match(0, 3, ${conds}) OVER (PARTITION BY sid) AS vb1`,
+        "MIN(CASE WHEN va1 THEN t END) OVER (PARTITION BY sid) AS ta1",
+        "MIN(CASE WHEN vb1 THEN t END) OVER (PARTITION BY sid) AS tb1",
+        "MAX(CASE WHEN mx1 = 1 AND t > ta1 AND t < tb1 THEN 1 ELSE 0 END) AS ex1",
+        "CASE WHEN f[2] IS NOT NULL THEN 1 ELSE 0 END AS r2",
+        "CASE WHEN f[3] IS NOT NULL AND ex1 = 0 THEN 1 ELSE 0 END AS r3",
+        "CASE WHEN f[4] IS NOT NULL AND ex1 = 0 THEN 1 ELSE 0 END AS r4",
+        "f[2] AS d2",
+        "CASE WHEN ex1 = 0 THEN f[3] END AS d3",
+        "CASE WHEN ex1 = 0 THEN f[4] END AS d4",
+        "CASE WHEN f[3] IS NOT NULL AND ex1 = 1 THEN 1 ELSE 0 END AS xr1",
+      ])
+        expect(sql).toContain(frag);
+      expect(sql).not.toContain("CASE WHEN ex1 = 0 THEN f[2] END");
+    });
+
+    it("P5-R17: Users pu counts xr1 only for users with no clean reach of step b", () => {
+      const sql = funnelSql(s, id, fdef({ unit: "users", x: [BETWEEN] }), opts);
+      expect(cte(sql, "pu")).toContain("CASE WHEN MAX(r3) = 0 THEN MAX(xr1) ELSE 0 END AS xr1");
+    });
+
+    it("P5-R17: the breakdown sums xr1 per dim", () => {
+      const sql = funnelSql(s, null, fdef({ breakdown: "browser", x: [BETWEEN] }), opts);
+      expect(tail(sql)).toContain("SUM(xr1)");
+      expect(tail(sql)).toContain("GROUP BY dim");
+    });
+
+    it("P5-R17, P5-R18: the windowed Users path bounds the span and computes ex1/xr1 in su", () => {
+      const sql = funnelSql(s, id, fdef({ unit: "users", window: "7d", x: [BETWEEN] }), opts);
+      const part = "COALESCE(uid, 's:' || sid)";
+      const conds = "t, m1 = 1, m2 = 1, m3 = 1, m4 = 1";
+      expect(sql).toContain(
+        `sequence_step_match(604800000, 2, ${conds}) OVER (PARTITION BY ${part}) AS va1`,
+      );
+      expect(sql).toContain(
+        `sequence_step_match(604800000, 3, ${conds}) OVER (PARTITION BY ${part}) AS vb1`,
+      );
+      expect(sql).toContain(`MIN(CASE WHEN vb1 THEN t END) OVER (PARTITION BY ${part}) AS tb1`);
+      expect(sql).toContain(
+        `MAX(CASE WHEN va1 AND t < tb1 AND t >= tb1 - 604800000 THEN t END) OVER (PARTITION BY ${part}) AS ta1`,
+      );
+      expect(cte(sql, "su")).toContain(" AS ex1");
+      expect(cte(sql, "su")).toContain("xr1");
+      expect(cte(sql, "pu")).toContain("xr1");
+    });
+
+    it.each(["session", "7d"] as const)(
+      "P5-R18: Users x2 (window %s) keeps exclusion rows and gains only the mx flags",
+      (window) => {
+        const steps = [p("/web"), p("/web/logs", { minMs: 1000 }), p("/web/billings")];
+        const sql = funnelSql(s, id, fdef({ unit: "users", window, steps, x: [BETWEEN] }), opts);
+        const x2 = cte(sql, "x2");
+        expect(x2).toContain("OR mx1 = 1");
+        const cols = x2.slice(0, x2.indexOf(" FROM "));
+        expect(cols).toMatch(/\bmx1\b/);
+        expect(cols).not.toContain("vts");
+      },
+    );
+
+    it("P5-R19: a within-N exclusion gates step a with a NULL-safe flag over a RANGE frame and adds a count column", () => {
+      const sql = funnelSql(s, null, fdef({ x: [WITHIN] }), opts);
+      expect(sql).toContain(
+        "x0f AS (SELECT *, CASE WHEN ty = 'view' AND k = '/web/ingestion' THEN 1 ELSE 0 END AS mx1 FROM x0)",
+      );
+      expect(sql).toContain(
+        "MIN(CASE WHEN mx1 = 1 THEN t END) OVER (PARTITION BY sid ORDER BY t RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) AS nx1",
+      );
+      expect(sql).toContain(
+        "CASE WHEN ty = 'view' AND k = '/web/logs' AND (nx1 IS NULL OR nx1 - t > 1000) THEN 1 ELSE 0 END AS m2",
+      );
+      const aliases = (q: string) => new Set([...tail(q).matchAll(/ AS (\w+)/g)].map((m) => m[1]));
+      const plain = aliases(funnelSql(s, null, fdef(), opts));
+      expect([...aliases(sql)].filter((a) => !plain.has(a)).length).toBeGreaterThan(0);
+    });
+
+    it("P5-R20: minMs adds vts to x00 and gates the page flag on nanoseconds", () => {
+      const steps = [p("/web"), p("/web/logs", { minMs: 1000 })];
+      const sql = funnelSql(s, null, fdef({ steps }), opts);
+      expect(cte(sql, "x00")).toContain("MAX(view_time_spent) AS vts");
+      expect(sql).toContain(
+        "CASE WHEN ty = 'view' AND k = '/web/logs' AND vts >= 1000000000 THEN 1 ELSE 0 END AS m2",
+      );
+    });
+
+    it("P5-R20: frustrated and errored filters read the per-view maxima; a funnel without filters gets none", () => {
+      const fr = funnelSql(
+        s,
+        null,
+        fdef({ steps: [p("/web"), p("/web/logs", { frustrated: true })] }),
+        opts,
+      );
+      expect(fr).toContain("MAX(view_frustration_count) > 0");
+      const er = funnelSql(
+        s,
+        null,
+        fdef({ steps: [p("/web"), p("/web/logs", { errored: true })] }),
+        opts,
+      );
+      expect(er).toContain("MAX(view_error_count) > 0");
+      const none = funnelSql(s, null, fdef(), opts);
+      for (const col of ["view_time_spent", "view_frustration_count", "view_error_count"])
+        expect(none).not.toContain(col);
+    });
+
+    it("P5-R21: exclusion pages and clicks enter the scan, never the sequence conditions", () => {
+      const page = funnelSql(s, null, fdef({ x: [BETWEEN] }), opts);
+      expect(cte(page, "x0")).toContain("= '/web/ingestion'");
+      const click = funnelSql(
+        s,
+        null,
+        fdef({ x: [{ step: { kind: "c", key: "cancel-btn" }, a: 1, b: 2 }] }),
+        opts,
+      );
+      expect(cte(click, "x00")).toContain("= 'cancel-btn'");
+      for (const sql of [page, click]) {
+        const calls = [...sql.matchAll(/sequence_step_(?:times|match)\(([^)]*)\)/g)];
+        expect(calls.length).toBeGreaterThan(0);
+        for (const c of calls) expect(c[1]).not.toContain("mx");
+      }
+      expect(page).toContain("sequence_step_times(0, t, m1 = 1, m2 = 1, m3 = 1, m4 = 1) AS f");
+    });
+
+    it.each<[string, (d: Parameters<typeof funnelSql>[2]) => string]>([
+      ["nextStepsSql", (d) => nextStepsSql(s, null, d, opts)],
+      [
+        "dropoffNextSql",
+        (d) => dropoffNextSql(s, null, { funnel: d, stepIndex: 3, side: "dropped" }, opts),
+      ],
+      ["dropoffHealthSql", (d) => dropoffHealthSql(s, null, d, 3, opts)],
+      [
+        "cohortSessionsSql",
+        (d) => cohortSessionsSql(s, null, { funnel: d, stepIndex: 3, side: "dropped" }, 0, opts),
+      ],
+      [
+        "cohort paths",
+        (d) =>
+          pathsSql(
+            s,
+            null,
+            {
+              anchor: null,
+              direction: "next",
+              depth: 2,
+              include: "all",
+              cohort: { funnel: d, stepIndex: 3, side: "dropped" },
+            },
+            opts,
+          ),
+      ],
+    ])(
+      "P5-R22: %s carries the exclusion flags, the ex1 gate, the step filters and error rows",
+      (_n, build) => {
+        const steps = [
+          p("/web"),
+          p("/web/logs", { minMs: 1000 }),
+          p("/web/billings"),
+          { kind: "r", key: "Failed to fetch billing info" } as StepRefP5,
+        ];
+        const sql = build(fdef({ steps, x: [BETWEEN] }));
+        expect(sql).toContain(" AS mx1");
+        expect(sql).toContain("ex1 = 0");
+        expect(cte(sql, "xw")).not.toBe("");
+        expect(cte(sql, "xrr")).not.toBe("");
+        expect(sql).toContain("vts >= 1000000000");
+        expect(sql.slice(0, sql.indexOf("\n"))).toContain(
+          "starts_with(error_message, 'Failed to fetch billing info')",
+        );
+        expect(scans(sql)).toBe(1);
+        expect(() => assertJoinFree(sql)).not.toThrow();
+      },
+    );
+
+    it("P5-R23: funnelPanelSql carries the exclusion", () => {
+      const sql = funnelPanelSql(s, fdef({ x: [BETWEEN] }), opts);
+      expect(sql).toContain(" AS ex1");
+      expect(sql).toContain("CASE WHEN f[3] IS NOT NULL AND ex1 = 0 THEN 1 ELSE 0 END AS r3");
+    });
+
+    it("P5-R23: funnelAlertSql carries the exclusion", () => {
+      const sql = funnelAlertSql(s, null, fdef({ x: [BETWEEN] }), 50, opts);
+      expect(sql).toContain(" AS ex1");
+      expect(sql).toContain("CASE WHEN f[3] IS NOT NULL AND ex1 = 0 THEN 1 ELSE 0 END AS r3");
+    });
+  });
+
+  describe("rule ops, error steps, compare apps, new users (§4.4-§4.10)", () => {
+    const s = ruled({ bots: false });
+    const PKV = pageKeyExpr("view_url", FULL);
+    const PKU = pageKeyExpr("url", FULL);
+    const CKA = clickKeyExpr("action_target_name");
+    const PARAM = {
+      t: "view",
+      op: "param",
+      name: "new_user_login",
+      value: "true",
+      onPage: "/web/cb",
+    };
+    const REF = { t: "view", op: "ref", value: "checkout.stripe.com" };
+    const REF_RE = String.raw`'^https?://([^/]*\.)?checkout\.stripe\.com(/|:|$)'`;
+
+    it("P5-R24: param and ref rules emit the §4.4 raw and grouped predicates", () => {
+      const ev = [named([PARAM, REF])];
+      const raw = stepPredicateRaw(evStep, s, ev);
+      expect(raw).toContain(
+        `(type = 'view' AND strpos(view_url, 'new_user_login=') > 0 AND regexp_like(view_url, '[?#&]new_user_login=true(&|#|$)') AND ${PKV} = '/web/cb')`,
+      );
+      expect(raw).toContain(
+        `(type = 'view' AND strpos(view_referrer, 'checkout.stripe.com') > 0 AND regexp_like(view_referrer, ${REF_RE}))`,
+      );
+      const grouped = stepPredicateGrouped(evStep, s, ev);
+      expect(grouped).toContain(
+        `(ty = 'view' AND regexp_like(url, '[?#&]new_user_login=true(&|#|$)') AND ${PKU} = '/web/cb')`,
+      );
+      expect(grouped).toContain(`(ty = 'view' AND regexp_like(ref, ${REF_RE}))`);
+    });
+
+    it("P5-R24: values are regex-escaped then quote-escaped; a param without a value matches its name alone", () => {
+      expect(NEW.escapeRegex("a.b?c")).toBe(String.raw`a\.b\?c`);
+      const esc = stepPredicateRaw(evStep, s, [
+        named([{ t: "view", op: "param", name: "q.x", value: "it's?" }]),
+      ]);
+      expect(esc).toContain(String.raw`regexp_like(view_url, '[?#&]q\.x=it''s\?(&|#|$)')`);
+      const bare = stepPredicateGrouped(evStep, s, [
+        named([{ t: "view", op: "param", name: "new_user_login" }]),
+      ]);
+      expect(bare).toContain("regexp_like(url, '[?#&]new_user_login(=|&|#|$)')");
+    });
+
+    it("P5-R25: param rules carry url and ref rules carry view_referrer through funnel, chain, features and trend", () => {
+      const def = fdef({ steps: [p("/web"), evStep] });
+      const paramEv = [named([{ ...PARAM, onPage: undefined }])];
+      const pf = funnelSql(s, null, def, { events: paramEv, sample: 1 });
+      expect(cte(pf, "x0").slice(0, cte(pf, "x0").indexOf(" FROM "))).toMatch(/, url\b/);
+      const refEv = [named([REF])];
+      for (const sql of [
+        funnelSql(s, null, def, { events: refEv, sample: 1 }),
+        nextStepsSql(s, null, def, { events: refEv, sample: 1 }),
+        featuresSql(s, CS, null, refEv),
+      ]) {
+        expect(sql).toContain("MIN(view_referrer) AS ref");
+        expect(sql).toContain(`regexp_like(ref, ${REF_RE})`);
+      }
+      expect(trendSql(s, null, "1 day", "UTC", [evStep], refEv)).toContain(
+        `regexp_like(view_referrer, ${REF_RE})`,
+      );
+    });
+
+    it("P5-R26: click prefix, contains and regex ops emit the §4.5 predicates", () => {
+      const ev = [
+        named([
+          { t: "action", op: "prefix", value: "o2-table-expand-" },
+          { t: "action", op: "contains", value: "copy-btn" },
+          { t: "action", op: "regex", value: "-copy-btn$" },
+        ]),
+      ];
+      const raw = stepPredicateRaw(evStep, s, ev);
+      expect(raw).toContain(
+        `(type = 'action' AND action_target_name <> '' AND strpos(action_target_name, 'o2-table-expand-') > 0 AND starts_with(${CKA}, 'o2-table-expand-'))`,
+      );
+      expect(raw).toContain(`strpos(${CKA}, 'copy-btn') > 0`);
+      expect(raw).toContain(`regexp_like(${CKA}, '-copy-btn$')`);
+      expect(stepPredicateGrouped(evStep, s, ev)).toContain(
+        "(ty = 'action' AND starts_with(k, 'o2-table-expand-'))",
+      );
+    });
+
+    it("P5-R26: the strpos prefilter is dropped when the value holds a mask token", () => {
+      const raw = stepPredicateRaw(evStep, s, [
+        named([{ t: "action", op: "prefix", value: "row-:num-" }]),
+      ]);
+      expect(raw).toContain(`starts_with(${CKA}, 'row-:num-')`);
+      expect(raw).not.toContain("strpos(action_target_name,");
+    });
+
+    const ERR = "Failed to fetch billing info";
+    const errStep = { kind: "r", key: ERR } as never;
+
+    it("P5-R27: an error step brings error rows into x00 and x0 and flags them on em", () => {
+      const sql = funnelSql(s, null, fdef({ steps: [p("/web"), errStep] }), opts);
+      const x00 = cte(sql, "x00");
+      expect(x00).toContain(`(type = 'error' AND starts_with(error_message, '${ERR}'))`);
+      expect(x00).toContain("MIN(error_message) AS em");
+      expect(x00).toContain("WHEN type = 'error' THEN CAST(date AS VARCHAR)");
+      const x0 = cte(sql, "x0");
+      expect(x0.slice(0, x0.indexOf(" FROM "))).toMatch(/\bem\b/);
+      expect(x0.slice(x0.indexOf(" WHERE "))).toContain("ty = 'error'");
+      expect(sql).toContain(
+        `CASE WHEN ty = 'error' AND starts_with(em, '${ERR}') THEN 1 ELSE 0 END AS m2`,
+      );
+      expect(funnelSql(s, null, fdef(), opts)).not.toContain(" AS em");
+    });
+
+    it("P5-R27: the r step predicates, Paths and Retention anchors match on the message prefix", () => {
+      expect(stepPredicateRaw(errStep, s, [])).toContain(
+        `type = 'error' AND starts_with(error_message, '${ERR}')`,
+      );
+      expect(stepPredicateGrouped(errStep, s, [])).toContain(
+        `ty = 'error' AND starts_with(em, '${ERR}')`,
+      );
+      const paths = pathsSql(
+        s,
+        null,
+        { anchor: errStep, direction: "next", depth: 2, include: "all", cohort: null },
+        opts,
+      );
+      expect(paths).toContain(`starts_with(error_message, '${ERR}')`);
+      const ret = retentionSql(
+        s,
+        id,
+        { start: errStep, ret: null, per: "week", mode: "on" },
+        [1000, 2000, 3000],
+        opts,
+      );
+      expect(ret).toContain(`starts_with(error_message, '${ERR}')`);
+    });
+
+    it("P5-R27: an error rule on a named event brings error rows into the scan", () => {
+      const ev = [named([{ t: "error", op: "prefix", value: "Failed" }])];
+      const x00 = cte(
+        funnelSql(s, null, fdef({ steps: [p("/web"), evStep] }), { events: ev, sample: 1 }),
+        "x00",
+      );
+      expect(x00).toContain("type = 'error'");
+      expect(x00).toContain("error_message");
+    });
+
+    it("P5-R28: errorPickerSql lists the top 50 message prefixes by sessions, with an escaped search term", () => {
+      expect(NEW.errorPickerSql(s)).toBe(
+        `SELECT substr(error_message, 1, 120) AS k, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${scopeClause(s)} AND type = 'error' GROUP BY 1 ORDER BY sessions DESC LIMIT 50`,
+      );
+      expect(NEW.errorPickerSql(s, "Fe'tch")).toContain(
+        "AND strpos(lower(error_message), 'fe''tch') > 0",
+      );
+    });
+
+    it("P5-R29: stepPickerSql reads MIN(action_type) AS at", () => {
+      expect(stepPickerSql(s)).toContain("MIN(action_type) AS at");
+    });
+
+    describe("P5-R30: compare apps", () => {
+      const b = rules({
+        bots: false,
+        sessions: [{ field: "usr_email", op: "suffix", values: ["@b.io"] }],
+      });
+      const sa = ruled(
+        { sessions: [STAFF], pages: IGNORED },
+        { apps: ["b"], appExclusions: { b } },
+      );
+
+      it("P5-R30: scopeClause lists every app and ORs each app's row rules, an empty branch as the app alone", () => {
+        const sql = scopeClause(sa);
+        expect(sql).toMatch(/application_id IN \(('web', 'b'|'b', 'web')\)/);
+        expect(sql).toContain(
+          `((application_id = 'web' AND ${BUILTIN_PRED}) OR application_id = 'b')`,
+        );
+      });
+
+      it("P5-R30: identity rules become one flag per app in a single MAX(CASE)", () => {
+        expect(funnelSql(sa, null, fdef(), opts)).toContain(
+          "MAX(CASE WHEN application_id = 'web' AND usr_email IS NOT NULL AND ends_with(usr_email, '@openobserve.ai') THEN 1 WHEN application_id = 'b' AND usr_email IS NOT NULL AND ends_with(usr_email, '@b.io') THEN 1 ELSE 0 END) AS xi",
+        );
+      });
+
+      it("P5-R30: the first grouped CTE carries the app and applies each app's ignored pages", () => {
+        const sql = pagesSql(sa, CS, null);
+        expect(cte(sql, "v0")).toContain("MIN(application_id) AS app");
+        expect(sql).toContain(`((app = 'web' AND ${IGN_K}) OR app = 'b')`);
+      });
+    });
+
+    it("P5-R31: a named-event step under compared apps uses the primary app's definition once", () => {
+      const ev = [named([{ t: "view", op: "eq", value: "/web/only-primary" }])];
+      const def = fdef({ steps: [p("/web"), evStep] });
+      const o = { events: ev, sample: 1 as const };
+      const single = funnelSql(s, null, def, o);
+      const compared = funnelSql(
+        ruled({ bots: false }, { apps: ["b"], appExclusions: { b: rules({ bots: false }) } }),
+        null,
+        def,
+        o,
+      );
+      const count = (q: string) => q.split("'/web/only-primary'").length - 1;
+      expect(compared).toMatch(/application_id IN \(/);
+      expect(count(compared)).toBe(count(single));
+      const flag = item(cte(compared, "x1"), "m2");
+      expect(flag).toContain("'/web/only-primary'");
+      expect(flag).not.toContain("app");
+    });
+
+    it("P5-R31: DIMENSIONS gains app, so a funnel breaks down by application_id", () => {
+      expect((QUERIES.DIMENSIONS as Record<string, string>).app).toBe("application_id");
+      const sql = funnelSql(s, null, fdef({ breakdown: "app" }), opts);
+      expect(cte(sql, "x00")).toContain("MIN(application_id) AS dim");
+    });
+
+    it("P5-R32: new users keep only units first seen on or after the range start", () => {
+      const RS = 1788000000000;
+      const sn = ruled({ bots: false }, { newSince: RS });
+      const sql = funnelSql(sn, id, fdef({ unit: "users", window: "7d" }), opts);
+      expect(cte(sql, "x00")).toContain("MIN(date) AS t0");
+      expect(sql).toContain(
+        "fs AS (SELECT *, MIN(t0) OVER (PARTITION BY COALESCE(uid, 's:' || sid)) AS first_t FROM x1)",
+      );
+      expect(cte(sql, "x2")).toContain(`first_t >= ${RS}`);
+      const paths = pathsSql(
+        sn,
+        id,
+        { anchor: p("/web") as never, direction: "next", depth: 2, include: "all", cohort: null },
+        opts,
+      );
+      expect(paths).toContain(`>= ${RS}`);
+      const ret = retentionSql(
+        sn,
+        id,
+        { start: null, ret: null, per: "week", mode: "on" },
+        [1000, 2000, 3000],
+        opts,
+      );
+      expect(ret).toContain(`>= ${RS}`);
+    });
+
+    it("P5-R34: namedEventPreviewSql applies the scope's exclusions", () => {
+      const sql = NEW.namedEventPreviewSql(
+        ruled({ sessions: [COUNTRY] }),
+        named([{ t: "view", op: "eq", value: "/web" }]),
+      );
+      expect(sql).toContain(BUILTIN_PRED);
+      expect(sql).toContain(COUNTRY_PRED);
+    });
+
+    it("P5-R32: the new-users search range starts 30 days before the selected start", () => {
+      const DAY = 86400000000;
+      const range = { startUs: 1790000000000000, endUs: 1790600000000000 };
+      const widened = (
+        MODEL as unknown as Record<string, (r: typeof range) => typeof range>
+      ).newUsersSearchRange(range);
+      expect(widened).toEqual({ startUs: range.startUs - 30 * DAY, endUs: range.endUs });
+    });
+
+    it("P5-R33: unnamedClicksSql counts container-named clicks per page, top 20", () => {
+      expect(NEW.unnamedClicksSql(s)).toBe(
+        `SELECT ${PKV} AS pg, COUNT(*) AS clicks, COUNT(CASE WHEN regexp_like(action_target_name, '-(page|content|dialog|layout|container|panel|wrapper|section)$') THEN 1 END) AS unnamed FROM "_rumdata" WHERE ${scopeClause(s)} AND type = 'action' AND action_target_name <> '' GROUP BY 1 ORDER BY unnamed DESC LIMIT 20`,
+      );
+    });
+  });
+
+  it("P5-R10: every builder with rules reads _rumdata once and passes assertJoinFree", () => {
+    const s = ruled({ sessions: [STAFF, COUNTRY], pages: IGNORED });
+    const ev = [
+      named([
+        { t: "view", op: "param", name: "q", value: "1" },
+        { t: "view", op: "ref", value: "x.com" },
+        { t: "action", op: "prefix", value: "btn-" },
+        { t: "error", op: "contains", value: "boom" },
+      ]),
+    ];
+    const o = { events: ev, sample: 1 as const };
+    const steps = [p("/web"), p("/web/logs", { minMs: 1000 }), evStep, { kind: "r", key: "boom" }];
+    const defs = (["session", "7d"] as const).flatMap((window) =>
+      (["sessions", "users"] as const).map((unit) =>
+        fdef({ steps: steps as never, unit, window, x: [BETWEEN, WITHIN] }),
+      ),
+    );
+    const path = {
+      anchor: p("/web") as never,
+      direction: "next" as const,
+      depth: 3,
+      include: "all" as const,
+      cohort: null,
+    };
+    const ret = { start: p("/web") as never, ret: null, per: "week" as const, mode: "on" as const };
+    const sqls = [
+      summarySql(s, CS),
+      identityTopSql(s, "usr_email"),
+      entryExitSql(s, CS, id),
+      stepPickerSql(s),
+      pagesSql(s, CS, id),
+      clicksSql(s, CS, id),
+      clickPagesSql(s, CS, ["a"]),
+      trendSql(s, id, "1 day", "UTC", [], []),
+      trendSql(s, id, "1 day", "UTC", [p("/web") as never], o.events),
+      activeUsersSql(s, id, CS),
+      featuresSql(s, CS, id, ev),
+      pathsSql(s, id, path, o),
+      branchSessionsSql(s, id, path, "s1 = 'p:/web'", 1, 0, o),
+      retentionSql(s, id, ret, [1, 2, 3], o),
+      retentionCellUsersSql(s, id, ret, [1, 2, 3], 0, 1, o),
+      NEW.errorPickerSql(s),
+      NEW.unnamedClicksSql(s),
+      ...defs.flatMap((d) => [
+        funnelSql(s, id, d, o),
+        funnelPanelSql(s, d, o),
+        funnelAlertSql(s, id, d, 50, o),
+        nextStepsSql(s, id, d, o),
+        dropoffHealthSql(s, id, d, 2, o),
+        cohortSessionsSql(s, id, { funnel: d, stepIndex: 2, side: "dropped" }, 0, o),
+      ]),
+    ];
+    for (const sql of sqls) {
+      expect(scans(sql)).toBe(1);
       expect(() => assertJoinFree(sql)).not.toThrow();
     }
   });
