@@ -359,9 +359,15 @@ describe("useProductAnalytics", () => {
     pa.initFromRoute({ app: "web", from: "100", to: "200" });
     pa.resolveRange();
     const k1 = pa.scopeKey.value;
-    expect(k1).toBe("org1|web|||100|200|0|0");
+    for (const part of ["org1", "web", "100", "200"]) expect(k1).toContain(part);
     pa.setScope({ includeAllIdentities: true });
-    expect(pa.scopeKey.value).toBe("org1|web|||100|200|1|0");
+    const k2 = pa.scopeKey.value;
+    expect(k2).not.toBe(k1);
+    pa.setScope({ includeAllIdentities: false, exact: true });
+    const k3 = pa.scopeKey.value;
+    expect(new Set([k1, k2, k3]).size).toBe(3);
+    pa.setScope({ exact: false, app: "other" });
+    expect(new Set([k1, k2, k3, pa.scopeKey.value]).size).toBe(4);
   });
 
   it("remembers an explicitly picked app per org", () => {
@@ -693,5 +699,206 @@ describe("useProductAnalytics", () => {
     expect(ok.options.map((o) => o.key)).toEqual(["/a"]);
     vi.mocked(searchService.search).mockRejectedValueOnce({ response: { status: 403 } });
     expect((await pa.searchPicker("x")).status).toBe("forbidden");
+  });
+});
+
+describe("pa gap fixes: app settings in the scope (P6)", () => {
+  const RANGE = { from: "1759000000000000", to: "1759600000000000" };
+  const settings = (app: string, over: Record<string, unknown> = {}) => ({
+    id: null,
+    app,
+    bots: true,
+    builtinBots: {
+      version: 1,
+      families: ["HeadlessChrome", "PhantomJS", "Spider"],
+      devices: ["Spider"],
+    },
+    sessions: [],
+    pages: [],
+    version: 0,
+    rulesHash: "aaaaaaaaaaaaaaaa",
+    createdBy: null,
+    createdAt: null,
+    updatedBy: null,
+    updatedAt: null,
+    ...over,
+  });
+  let byApp: Record<string, ReturnType<typeof settings>> = {};
+  let log: string[] = [];
+  const getAppSettings = vi.fn();
+  const service = api.service as unknown as Record<string, unknown>;
+
+  const sqls = () =>
+    vi
+      .mocked(searchService.search)
+      .mock.calls.map(
+        (c) => (c[0] as unknown as { query: { query: { sql: string } } }).query.query.sql,
+      );
+  const summaryRuns = () => sqls().filter((q) => /va_rows/.test(q)).length;
+  const appProbeRuns = () => sqls().filter((q) => /AS app, COUNT/.test(q)).length;
+
+  const keyFor = async (query: Record<string, unknown>) => {
+    resetProductAnalytics();
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web", ...RANGE, ...query });
+    await pa.loadScope();
+    return pa.scopeKey.value;
+  };
+
+  beforeEach(() => {
+    vi.mocked(searchService.search).mockReset();
+    mockGetStream.mockReset();
+    window.localStorage.clear();
+    resetProductAnalytics();
+    setSchema(["application_id", "session_id", "usr_email", "env", "session_type"]);
+    byApp = { web: settings("web") };
+    log = [];
+    getAppSettings.mockReset().mockImplementation(async (_org: string, app: string) => {
+      log.push(`settings:${app}`);
+      return { data: byApp[app] ?? settings(app) };
+    });
+    service.getAppSettings = getAppSettings;
+    vi.mocked(searchService.search).mockImplementation((async (args: {
+      query: { query: { sql: string } };
+    }) => {
+      const sql = args.query.query.sql;
+      if (/AS app, COUNT/.test(sql)) {
+        log.push("apps");
+        return {
+          data: {
+            hits: [
+              { app: "web", sessions: 10 },
+              { app: "other", sessions: 5 },
+            ],
+          },
+        };
+      }
+      if (/va_rows/.test(sql)) {
+        log.push("summary");
+        return { data: { hits: [SUMMARY] } };
+      }
+      return { data: { hits: [] } };
+    }) as never);
+  });
+
+  it("P6-R6: settings load for the picked app after the app probe and before the summary", async () => {
+    const pa = useProductAnalytics();
+    pa.initFromRoute({});
+    await pa.loadScope();
+    expect(getAppSettings).toHaveBeenCalledWith("org1", "web");
+    expect(log.indexOf("apps")).toBeLessThan(log.indexOf("settings:web"));
+    expect(log.indexOf("settings:web")).toBeLessThan(log.indexOf("summary"));
+  });
+
+  it("P6-R6: nothing rule-dependent runs and the scope is not loaded while the settings are still loading", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((r) => (release = r));
+    getAppSettings.mockImplementationOnce(async (_org: string, app: string) => {
+      await held;
+      return { data: settings(app) };
+    });
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web", ...RANGE });
+    const done = pa.loadScope();
+    await flushPromises();
+    expect(getAppSettings).toHaveBeenCalled();
+    expect(summaryRuns()).toBe(0);
+    expect(pa.scopeStatus.value).not.toBe("ok");
+    let joinedSettled = false;
+    const joined = pa.loadScope().then(() => (joinedSettled = true));
+    const before = sqls().length;
+    await pa.loadPicker();
+    await flushPromises();
+    expect(joinedSettled).toBe(false);
+    expect(sqls()).toHaveLength(before);
+    release();
+    await Promise.all([done, joined]);
+    expect(summaryRuns()).toBe(1);
+    expect(pa.scopeStatus.value).toBe("ok");
+  });
+
+  it("P6-R6: exposes the app's settings as exclusions on the scope and reloads them on an app change", async () => {
+    const rule = { field: "usr_email", op: "suffix", values: ["@openobserve.ai"] };
+    const page = { op: "eq", value: "/web/login" };
+    byApp.web = settings("web", { sessions: [rule], pages: [page], rulesHash: "1111111111111111" });
+    byApp.other = settings("other", { bots: false, rulesHash: "2222222222222222" });
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web" });
+    await pa.loadScope();
+    expect(pa.scope.value).toMatchObject({
+      exclusions: { bots: true, sessions: [rule], pages: [page], rulesHash: "1111111111111111" },
+    });
+    pa.setScope({ app: "other" }, true);
+    await pa.loadScope();
+    expect(getAppSettings).toHaveBeenLastCalledWith("org1", "other");
+    expect(pa.scope.value).toMatchObject({
+      exclusions: { bots: false, rulesHash: "2222222222222222" },
+    });
+  });
+
+  it("P6-R7: scopeKey changes with the rules hash and with the ignored pages", async () => {
+    const base = await keyFor({});
+    byApp.web = settings("web", { rulesHash: "bbbbbbbbbbbbbbbb" });
+    expect(await keyFor({})).not.toBe(base);
+    byApp.web = settings("web", { pages: [{ op: "eq", value: "/web/login" }] });
+    expect(await keyFor({})).not.toBe(base);
+  });
+
+  it("P6-R7: scopeKey changes with xall and new", async () => {
+    const base = await keyFor({});
+    expect(await keyFor({ xall: "1" })).not.toBe(base);
+    expect(await keyFor({ new: "1" })).not.toBe(base);
+  });
+
+  it("P6-R7: scopeKey holds the sorted compared apps with each app's rules hash", async () => {
+    const base = await keyFor({});
+    const ab = await keyFor({ apps: ["a", "b"] });
+    expect(ab).not.toBe(base);
+    expect(await keyFor({ apps: ["b", "a"] })).toBe(ab);
+    byApp.b = settings("b", { rulesHash: "cccccccccccccccc" });
+    expect(await keyFor({ apps: ["a", "b"] })).not.toBe(ab);
+    byApp.b = settings("b", { pages: [{ op: "prefix", value: "/web/org/" }] });
+    expect(await keyFor({ apps: ["a", "b"] })).not.toBe(ab);
+  });
+
+  it("P6-R7: an xall change re-runs the summary without a forced reload", async () => {
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web", ...RANGE });
+    await pa.loadScope();
+    expect(summaryRuns()).toBe(1);
+    pa.initFromRoute({ app: "web", ...RANGE, xall: "1" });
+    await pa.loadScope();
+    expect(summaryRuns()).toBe(2);
+    expect(appProbeRuns()).toBe(1);
+  });
+
+  it.each([
+    ["apps", { apps: ["a", "b"] }],
+    ["new", { new: "1" }],
+  ])("P6-R7: changing %s re-runs the summary without a forced reload", async (_n, extra) => {
+    const pa = useProductAnalytics();
+    pa.initFromRoute({ app: "web", ...RANGE });
+    await pa.loadScope();
+    expect(summaryRuns()).toBe(1);
+    pa.initFromRoute({ app: "web", ...RANGE, ...extra });
+    await pa.loadScope();
+    expect(summaryRuns()).toBe(2);
+    expect(appProbeRuns()).toBe(1);
+  });
+
+  it("P6-R10: a failed settings read compiles no query and exposes an error state", async () => {
+    for (const failure of [{ response: { status: 403, data: {} } }, new Error("Network Error")]) {
+      resetProductAnalytics();
+      vi.mocked(searchService.search).mockClear();
+      getAppSettings.mockReset().mockRejectedValue(failure);
+      const pa = useProductAnalytics();
+      pa.initFromRoute({ app: "web" });
+      await pa.loadScope();
+      expect(summaryRuns()).toBe(0);
+      expect(["error", "forbidden"]).toContain(pa.scopeStatus.value);
+      const before = sqls().length;
+      await pa.loadPicker();
+      expect(sqls()).toHaveLength(before);
+    }
   });
 });
