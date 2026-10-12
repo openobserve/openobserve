@@ -16,6 +16,7 @@
 import { extractStatusFromTemplate, extractStatusFromLog } from "@/utils/logs/statusParser";
 import type { I18nKey } from "@/types/i18n";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
+import { stripSqlComments } from "@/utils/query/sqlComments";
 
 /**
  * Extract constant (non-variable) string segments from a pattern template.
@@ -289,7 +290,8 @@ export const buildPatternSetSqlQuery = (options: PatternSetSqlOptions): string =
 
   const terms: string[] = [];
 
-  const trimmedBase = baseFilter?.trim();
+  // A -- comment runs to the end of its line and would swallow the closing paren and every pattern term.
+  const trimmedBase = baseFilter === undefined ? undefined : stripSqlComments(baseFilter).trim();
   if (trimmedBase) terms.push(`(${trimmedBase})`);
 
   if (includeClauses.length) {

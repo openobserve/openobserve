@@ -179,6 +179,8 @@ pub struct StateTransition {
     /// disappearance transition: a group that stopped being returned has no
     /// value, and recording 0 would render as a real measurement.
     pub value: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_value: Option<String>,
     /// Rendered labels, duplicated from the state row on purpose: the state row
     /// is reaped after the grace period (M-7) while transitions are retained,
     /// and `group_key` is a hash. Without this, history outlives the only thing
@@ -438,6 +440,7 @@ pub fn apply_outcome(
         // Filled by the per-group planner, which is the only caller that has
         // an observed value and a label set.
         value: None,
+        rule_value: None,
         group_labels: None,
     });
 
@@ -794,6 +797,7 @@ mod tests {
                 to_level: Some(AlertLevel::Critical),
                 at: 1_750_000_000_000_007,
                 value: Some(42.5),
+                rule_value: None,
                 group_labels: Some("host=web-1,env=prod".to_string()),
             }),
         }

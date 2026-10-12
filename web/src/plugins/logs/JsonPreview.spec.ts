@@ -65,7 +65,8 @@ vi.mock("@/services/search", async (importOriginal) => {
   });
 });
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn(() => "mock-image-url"),
   getUUID: vi.fn(() => "mock-uuid-123"),
   generateTraceContext: vi.fn(() => ({
@@ -1081,6 +1082,61 @@ describe("JsonPreview Component", () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("View Trace");
       expect(result[0].resolvedUrl).toBe("https://traces.example.com/trace-abc-123");
+    });
+
+    it("never puts a held filter's raw text into a cross-link query", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      const { data, meta } = wrapper.vm.searchObj;
+      const saved = {
+        query: data.query,
+        crossLinkQuery: data.crossLinkQuery,
+        streamResults: data.streamResults,
+        selectedStream: data.stream.selectedStream,
+        sqlMode: meta.sqlMode,
+      };
+      data.crossLinks = {
+        stream_links: [
+          {
+            name: "Query",
+            url: "https://example.com/q?sql=${query}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+        org_links: [],
+      };
+      data.stream.selectedStream = ["stream1"];
+      data.streamResults = {
+        list: [
+          {
+            name: "stream1",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+              { name: "is_error", type: "Boolean" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      meta.sqlMode = false;
+      data.query = "status=500 -404 AND is_error";
+      data.crossLinkQuery = "";
+      await wrapper.setProps({ value: { ...mockValue, field1: "val123" } });
+      try {
+        expect(wrapper.vm.getCrossLinksForField("field1")[0].resolvedUrl).toBe(
+          "https://example.com/q?sql=",
+        );
+        data.query = "status=500";
+        expect(wrapper.vm.getCrossLinksForField("field1")[0].resolvedUrl).toBe(
+          "https://example.com/q?sql=status%3D500",
+        );
+      } finally {
+        data.query = saved.query;
+        data.crossLinkQuery = saved.crossLinkQuery;
+        data.streamResults = saved.streamResults;
+        data.stream.selectedStream = saved.selectedStream;
+        meta.sqlMode = saved.sqlMode;
+      }
     });
 
     it("should fall back to org links when stream does not cover the field", async () => {

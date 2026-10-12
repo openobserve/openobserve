@@ -166,6 +166,14 @@ describe("useHistogram Composable", () => {
     });
   });
 
+  describe("generateHistogramSkeleton", () => {
+    it("skips the skeleton instead of throwing when the run built no request", () => {
+      (mockState.searchObj.data as any).customDownloadQueryObj = {};
+      mockState.searchObj.data.queryResults.aggs = [{ zo_sql_key: "2026-04-24T10:00:00" }];
+      expect(() => wrapper.vm.generateHistogramSkeleton()).not.toThrow();
+    });
+  });
+
   // --------------------------------------------------------------------------
   // getHistogramTitle — pins the rendered en-US sentence
   // --------------------------------------------------------------------------

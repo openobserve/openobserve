@@ -282,6 +282,12 @@ export const BADGE_GROUPS = {
       warning: { variant: "amber-soft", labelKey: "components.badge.logLevel.warn" },
       error: { variant: "error-soft", labelKey: "common.error" },
       fatal: { variant: "purple-soft", labelKey: "components.badge.logLevel.fatal" },
+      emergency: { variant: "purple-soft", labelKey: "components.badge.logLevel.emergency" },
+      alert: { variant: "error-soft", labelKey: "components.badge.logLevel.alert" },
+      critical: { variant: "error-soft", labelKey: "components.badge.logLevel.critical" },
+      notice: { variant: "success-soft", labelKey: "components.badge.logLevel.notice" },
+      ok: { variant: "success-soft", labelKey: "components.badge.logLevel.ok" },
+      unknown: { variant: "default-soft", labelKey: "components.badge.logLevel.unknown" },
     },
   },
 

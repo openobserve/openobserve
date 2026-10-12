@@ -70,6 +70,12 @@
       "title": "Seleziona uno stream per iniziare",
       "description": "Scegli uno stream, quindi esegui la query per esplorarne i dati. Perfeziona i risultati con filtri e un intervallo di tempo personalizzato."
     },
+    "searchCancelled": {
+      "title": "Ricerca annullata",
+      "description": "Nessun risultato caricato. Esegui la query per caricare gli eventi.",
+      "action": "Esegui query",
+      "actionDesc": "Esegui di nuovo la stessa query"
+    },
     "noQueryApplied": {
       "title": "Esegui una query per visualizzare i log",
       "description": "Modifica i filtri e fai clic su «Esegui query» per caricare gli eventi per questo stream.",
@@ -1036,9 +1042,115 @@
     "savedFunctionNotFound": "Funzione non trovata!",
     "exportLogs": "Esporta log",
     "runQuery": "Esegui query",
+    "runQueryPendingLabel": "Esegui query, modifiche non ancora applicate",
     "refreshCacheAndRunQuery": "Aggiorna la cache ed esegui la query",
     "liveModeTooltip": "Query automatica sulle modifiche al filtro/orario",
     "autoRunEnabled": "Esecuzione automatica abilitata",
+    "queryActions": {
+      "runEditedFirst": "Esegui prima la query modificata",
+      "runFirst": "Esegui prima la tua query",
+      "usesEditedQuery": "Usa la query modificata (non ancora eseguita)",
+      "usesUnrunQuery": "Usa la tua query (non ancora eseguita)",
+      "downloadsShownResults": "Scarica i risultati mostrati, non la tua modifica",
+      "downloadsLastRun": "Usa la query eseguita per ultima, non la tua modifica"
+    },
+    "noFtsRecovery": {
+      "title": "I campi di ricerca full-text non sono configurati per {stream}",
+      "description": "Cerca i valori dei campi oppure cancella l'intera query per vedere i log in questo intervallo di tempo.",
+      "searchField": "Cerca in un campo specifico",
+      "searchFieldHint": "Scegli un campo per la ricerca, mantenendo le parole escluse.",
+      "clearRun": "Mostra i log senza questa ricerca",
+      "clearRunHint": "Cancella l'intera query ed esegui nello stesso intervallo di tempo.",
+      "editPermission": "Serve l'autorizzazione per modificare le impostazioni dello stream.",
+      "scope": "Cerca in {stream} nell'intervallo di tempo corrente.",
+      "singleStreamScope": "Cerca solo in {stream}; {otherStreams} verranno deselezionati.",
+      "stream": "Stream",
+      "field": "Campo",
+      "match": "Corrispondenza",
+      "value": "Valore",
+      "contains": "Contiene testo",
+      "equals": "Uguale a",
+      "preview": "Anteprima del filtro",
+      "replacement": "Sostituisce l'intera query con un filtro di campo e mantiene le parole escluse. Non è richiesto alcun campo full-text.",
+      "run": "Esegui ricerca per campo",
+      "close": "Chiudi ricerca per campo",
+      "skipped": "{stream} è stato ignorato perché non ha campi di ricerca full-text configurati.",
+      "resultsScope": "Questi risultati provengono solo da {streams}.",
+      "noFields": "Questo stream non ha campi disponibili per una ricerca per campo.",
+      "valueRequired": "Inserisci un valore da cercare.",
+      "fieldRequired": "Scegli un campo in cui cercare.",
+      "invalidValue": "Inserisci un valore valido per questo campo.",
+      "configureHint": "Rende veloce la ricerca full-text per questo stream."
+    },
+    "autoRunPersistNeedsRun": "Esegui prima la query: questa azione salva o condivide ciò che hai eseguito",
+    "autoRunSearchAroundActive": "Visualizzazione dei record attorno a una riga: esegui la query per tornare ai risultati",
+    "autoRunStaleTooltip": "Esegui la query per aggiornare i risultati",
+    "searchCancelledNotice": "Ricerca annullata.",
+    "linePermalink": {
+      "disabledFunction": "Disattiva la funzione per collegare una singola riga",
+      "disabledTimestampRewrite": "Questa query riscrive il timestamp",
+      "disabledNotSingleLines": "Le righe di questa query non sono singole righe di log",
+      "disabledNoTimestamp": "Questa riga non ha un timestamp",
+      "disabledEnrichmentTable": "Le righe della tabella di arricchimento non possono essere collegate",
+      "toastNotUnique": "Copiato un link al timestamp; questa riga non può essere identificata in modo univoco.",
+      "toastWideStream": "Questo stream è troppo ampio per collegare esattamente una riga; copiato un link al timestamp",
+      "bannerInvalid": "Questo link non è valido; viene mostrata solo la ricerca condivisa",
+      "bannerDenied": "Non hai accesso allo stream {stream}.",
+      "bannerStreamMissing": "Lo stream {stream} non esiste più",
+      "bannerError": "Impossibile caricare la riga di log condivisa.",
+      "bannerIncomplete": "Impossibile cercare tutte le righe con questo timestamp",
+      "bannerGone": "Questa riga di log non è più disponibile. Potrebbe aver superato la conservazione dello stream o essere stata eliminata.",
+      "bannerGoneRetention": "Questa riga di log non è più disponibile. Potrebbe aver superato la conservazione dello stream ({days} giorno) o essere stata eliminata. | Questa riga di log non è più disponibile. Potrebbe aver superato la conservazione dello stream ({days} giorni) o essere stata eliminata.",
+      "bannerFound": "Visualizzazione di una riga di log condivisa",
+      "bannerAmbiguous": "{count} riga con questo timestamp; non è stato possibile identificare la riga esatta | {count} righe con questo timestamp; non è stato possibile identificare la riga esatta",
+      "bannerChanged": "La riga potrebbe essere cambiata da quando è stato creato il link",
+      "actionShowLines": "Mostra queste righe",
+      "actionShowInContext": "Mostra nel contesto",
+      "bannerAmbiguousTieHeavy": "{count} riga condivide questo timestamp e lo stream non ha _o2_id, quindi non è stato possibile identificare la riga esatta. Le righe con quel timestamp sono evidenziate. | {count} righe condividono questo timestamp e lo stream non ha _o2_id, quindi non è stato possibile identificare la riga esatta. Le righe con quel timestamp sono evidenziate.",
+      "bannerDismiss": "Ignora",
+      "copyLink": "Copia link",
+      "copyLinkTooltip": "Copia un link a questa riga di log",
+      "copyLinkMenu": "Copia link a questa riga di log",
+      "toastCopied": "Link alla riga di log copiato",
+      "toastCopiedValid": "Link alla riga di log copiato · valido per {days} giorno | Link alla riga di log copiato · valido per {days} giorni",
+      "toastLookupFailed": "Impossibile trovare questa riga; è stato copiato un link al timestamp",
+      "toastShortFailed": "Impossibile abbreviare il link; è stato copiato il link completo",
+      "toastFailed": "Impossibile creare un link a questa riga di log",
+      "toastScopeChanged": "L'organizzazione o lo stream è cambiato durante la creazione del link; non è stato copiato nulla",
+      "popoverTitle": "Link a questa riga di log",
+      "popoverDesc": "Il browser ha bloccato la copia automatica. Seleziona il link e copialo, oppure usa il pulsante.",
+      "pageNotice": "Questo link era alla pagina {page}.",
+      "pageGo": "Vai alla pagina {page}",
+      "pageGoLast": "Vai all'ultima pagina ({page})"
+    },
+    "autoRunPendingDot": "Esegui la query per applicare le ultime modifiche",
+    "autoRunAppliesTo": "Si applica a Log e Tracce",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "Questa ricerca analizzerebbe circa {size}",
+    "autoRunGuardLinkTitle": "Questo link analizzerebbe circa {size}",
+    "autoRunGuardDescAutoRun": "{scope}. Auto Run in pausa per permetterti di restringerla prima.",
+    "autoRunGuardDescPaused": "{scope}. In pausa per permetterti di restringerla prima.",
+    "autoRunGuardDescLink": "Aperto da un link · {scope}. Controlla l'ambito, poi eseguilo.",
+    "autoRunGuardHint": "Disattiva Auto Run per applicare manualmente le modifiche a filtri e periodo.",
+    "autoRunGuardUnknownTitle": "Dimensione sconosciuta per questa finestra",
+    "autoRunGuardUnknownDesc": "{streams} non ha ancora statistiche di dimensione, quindi Auto Run esegue solo finestre di 1 ora o meno.",
+    "autoRunGuardUnknownManyDesc": "{count} stream non ha ancora statistiche di dimensione, quindi Auto Run attende te. {scope}. | {count} stream non hanno ancora statistiche di dimensione, quindi Auto Run attende te. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Pronto per l'esecuzione su più regioni",
+    "autoRunGuardSuperClusterDesc": "La dimensione della ricerca non può ancora essere stimata su un cluster multi-regione, quindi Auto Run attende te. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Stream non disponibile",
+    "autoRunGuardUnresolvedDesc": "Lo stream {streams} non esiste o non hai accesso.",
+    "autoRunGuardBanner": "Questa modifica analizzerebbe circa {size} ({scope}), quindi Auto Run è in pausa. I risultati sottostanti provengono dalla query precedente.",
+    "autoRunGuardBannerPaused": "Questa modifica analizzerebbe circa {size} ({scope}), quindi è in pausa. I risultati sottostanti provengono dalla query precedente.",
+    "autoRunGuardBannerUnknown": "Dimensione sconosciuta per questa finestra ({scope}), quindi è in pausa. I risultati sottostanti provengono dalla query precedente.",
+    "autoRunGuardBannerRefresh": "L'aggiornamento automatico analizzerebbe circa {size} per aggiornamento ({scope}), quindi è in pausa finché non lo esegui una volta. I risultati sottostanti provengono dalla query precedente.",
+    "autoRunGuardRunAnyway": "Esegui comunque",
+    "autoRunGuardRunQuery": "Esegui la query",
+    "autoRunGuardNarrow": "Restringi a {period}",
+    "autoRunGuardNarrowWithSize": "Restringi a {period} (~{size})",
+    "autoRunGuardSearchJob": "Esegui come job di ricerca",
+    "autoRunGuardSelectStream": "Seleziona uno stream",
+    "searchJobNoPermission": "Non hai l'autorizzazione per creare job di ricerca",
     "turnOnLiveMode": "Attiva la modalità Live",
     "turnOffLiveMode": "Disattiva la modalità Live",
     "autoRefreshWithValue": "Aggiornamento automatico: {value}",
@@ -1251,6 +1363,7 @@
     "histogramSearchQueryCancelled": "La query di ricerca dell'istogramma è stata annullata",
     "histogramUnavailableForQueries": "Istogramma non disponibile per query CTE, DISTINCT, UNION, JOIN e LIMIT.",
     "invalidDateFormat": "Formato data non valido.",
+    "missingStreamAndNoFts": "Uno o più campi filtro non esistono in \"{missingStreams}\", quindi non viene eseguita alcuna ricerca nello stream indicato.\n Non cercati: {noFtsStreams} (nessun campo full-text).",
     "missingStreamFilterFields": "Uno o più campi filtro non esistono in \"{streams}\", quindi non viene eseguita alcuna ricerca nello stream menzionato.\n",
     "noColumnFoundInStream": "Nessuna colonna trovata nello stream selezionato.",
     "noStreamFoundInOrganization": "Nessuno stream trovato nell'organizzazione selezionata!",
@@ -1271,7 +1384,19 @@
     "aliasNotAllowed": "L'alias '{alias}' non è consentito.",
     "commonGroupFields": "Campi di gruppo comuni",
     "queryRangeHours": "{count} ora | {count} ore",
-    "menuGroupAlerts": "Avvisi"
+    "menuGroupAlerts": "Avvisi",
+    "freeTextChooseFirst": "Scegli prima come cercare il testo",
+    "freeTextScanLogsOnly": "La modalità scansione funziona solo nella vista dei log; imposta un campo full-text per usare qui la ricerca testuale",
+    "freeTextSearchedFields": "Ricerca full-text in: {fields} (tutte le parole, in qualsiasi ordine)",
+    "freeTextPreview": "Ricerca full-text in: {fields} (tutte le parole, in qualsiasi ordine)\n\nEseguita come {sql}",
+    "freeTextRunsAs": "Eseguita come {sql}",
+    "freeTextNotSearched": "Non cercati: {streams} (nessun campo full-text).",
+    "freeTextSetField": "Configura i campi di ricerca full-text",
+    "freeTextNoFtsTitle": "\"{stream}\" non ha campi full-text",
+    "freeTextNoFtsTitleMulti": "Gli stream selezionati non hanno campi full-text",
+    "freeTextNoTextFields": "Questo stream non ha campi di testo da cercare.",
+    "freeTextNoTextFieldsNamed": "Non cercati: {streams} (nessun campo di testo).",
+    "freeTextBuildNotice": "Questo filtro contiene una ricerca testuale; modificalo in SQL."
   },
   "menu": {
     "upgradeToProPlan": "Passa al piano PRO",
@@ -7645,6 +7770,11 @@
     "SearchSQLCancelled": "Errore: Search SQL è stato annullato."
   },
   "alerts": {
+    "promRuleMode": "Modalità regola",
+    "promRulePreview": "{count} serie restituite corrispondono ora. Ogni serie deve completare il periodo di attesa prima di attivarsi.",
+    "promRuleModeDescription": "Corrisponde quando l'espressione restituisce una qualsiasi serie. Scegli avviso Singolo o Multiplo quando il periodo di attesa è zero; un periodo di attesa abilita automaticamente l'avviso Multiplo. Lascia lo stream vuoto per dedurre uno stream di metriche referenziato.",
+    "promRuleModePendingMulti": "Un periodo di attesa richiede un timer indipendente per ogni serie, quindi l'avviso Multiplo non può essere disabilitato.",
+    "promRuleModeConflict": "La modalità regola non può usare soglie di valore Critical o Warning; un periodo di attesa richiede l'avviso Multiplo.",
     "allAlerts": "Tutti gli avvisi",
     "compositeAlert": "Composito",
     "import": {
@@ -8580,6 +8710,8 @@
         "alertDescription": "Il testo della descrizione dell'avviso",
         "alertStartTime": "Orario di inizio finestra (ISO 8601)",
         "alertEndTime": "Orario di fine finestra (ISO 8601)",
+        "alertStartTimeMillis": "Ora di inizio della finestra in millisecondi epoch",
+        "alertEndTimeMillis": "Ora di fine della finestra in millisecondi epoch",
         "alertUrl": "Link a OpenObserve per indagare",
         "alertTriggerTime": "Quando è scattato l'avviso (ISO 8601)",
         "alertTriggerTimeMillis": "Orario di attivazione in millisecondi epoch",
@@ -9178,6 +9310,8 @@
         "noQueries": "Questo pannello non ha una query da cui creare un avviso.",
         "noConstants": "I pattern selezionati non hanno un testo distintivo su cui basare la corrispondenza.",
         "sqlModeFilterDropped": "La tua query SQL non è stata trasferita — l'avviso corrisponde solo ai pattern selezionati.",
+        "textFilterDropped": "Il filtro di ricerca non è stato trasferito perché questo stream non ha campi di ricerca full-text (FTS). Aggiungilo alla query dell'avviso se ti serve.",
+        "heldFilterDropped": "Il filtro di ricerca non è stato trasferito perché richiede prima la scelta \"Esegui come\" nella pagina dei log. Aggiungilo alla query dell'avviso se ti serve.",
         "patternsUnusable": "Nessuno dei pattern in questa pagina ha un testo distintivo su cui basare la corrispondenza, quindi l'avviso usa solo la tua ricerca.",
         "dbmRollupLag": "I numeri del database vengono aggregati ogni {minutes} minuti, quindi questo avviso può scattare solo con quella frequenza — non è una pagina in tempo reale.",
         "dbmFingerprintVersion": "Questo avviso è vincolato alla forma esatta di una query. Se il modo in cui le query vengono raggruppate dovesse cambiare, l'avviso potrebbe smettere di corrispondere e dovrebbe essere ricreato.",
@@ -11779,7 +11913,21 @@
     "eventClusterAriaLabelPlural": "{count} eventi, {errors} errori",
     "eventMarkerTooltip": "Evento: {name}",
     "exceptionMarkerTooltip": "Eccezione: {type}",
-    "spanEventFallback": "evento dello span"
+    "spanEventFallback": "evento dello span",
+    "spanNav": {
+      "firstSpan": "Primo span",
+      "lastSpan": "Ultimo span",
+      "position": "Span {index} di {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "Traccia {row} di {count}, pagina {page}",
+      "spanPosition": "Span {row} di {count}, pagina {page}",
+      "firstResult": "Primo risultato",
+      "lastResult": "Ultimo risultato",
+      "loadingPage": "Caricamento pagina {page}",
+      "pageFailed": "Impossibile caricare la pagina {page}",
+      "pageEmpty": "La pagina {page} non ha risultati"
+    }
   },
   "aiToolset": {
     "header": "Set di strumenti AI",
@@ -15012,11 +15160,12 @@
     "noStream": {
       "title": "Scegli uno stream per iniziare a esplorare",
       "description": "Scegli uno stream, quindi premi <strong>Esegui query</strong>. Puoi perfezionare con filtri, una funzione VRL e un intervallo di tempo personalizzato una volta arrivati i risultati.",
+      "descriptionAutoRun": "Scegli uno stream per visualizzarne i log più recenti. Una volta arrivati i risultati, puoi affinare con filtri, una funzione VRL e un intervallo di tempo personalizzato.",
       "selectStream": "Seleziona uno stream",
       "selectStreamDesc": "Sfoglia gli stream di log, tracce, metriche e RUM",
       "queryGuide": "Leggi la guida alle domande",
       "queryGuideDesc": "Filtri, modalità SQL, VRL e visualizzazioni salvate",
-      "recent": "Recenti:"
+      "recent": "Usati di recente:"
     },
     "noEvents": {
       "title": "Nessun evento trovato",
@@ -15065,12 +15214,40 @@
       "sendToAiChat": "Invia alla chat AI",
       "contentCopiedSuccessfully": "Contenuto copiato con successo!"
     },
+    "severity": {
+      "srText": "Gravità {level}",
+      "srTextInferred": "Gravità {level}, dedotta",
+      "inferredLabel": "{level} · dedotta",
+      "popoverTitle": "Gravità: {level}",
+      "popoverAriaLabel": "Evidenza della gravità",
+      "evidence": "Evidenza",
+      "fromField": "Dal campo {field}",
+      "inferredFrom": "Dedotta dal testo di {field}.",
+      "notSearchable": "Non ricercabile; l'istogramma non la utilizza.",
+      "noLevelField": "Nessun campo di livello in questa riga e nessun campo di testo da analizzare.",
+      "noLevelWordInField": "Nessun campo di livello in questa riga e nessuna parola di livello in {field}.",
+      "notInSelectedColumns": "Campo di livello non presente nelle colonne selezionate",
+      "levels": {
+        "emergency": "emergency",
+        "alert": "alert",
+        "critical": "critical",
+        "error": "error",
+        "warning": "warning",
+        "notice": "notice",
+        "info": "info",
+        "debug": "debug",
+        "trace": "trace",
+        "ok": "ok",
+        "unknown": "sconosciuto"
+      }
+    },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La query SELECT * non è supportata per la visualizzazione.",
       "fixErrorsAndRetry": "Ci sono alcuni errori, correggili e riprova."
     },
     "buildQueryPage": {
-      "validationErrors": "Ci sono alcuni errori, correggili e riprova."
+      "validationErrors": "Ci sono alcuni errori, correggili e riprova.",
+      "parserLoadFailed": "Impossibile caricare il parser delle query, quindi il filtro di ricerca non può essere aggiunto al grafico. Le esecuzioni sono in pausa finché non viene caricato."
     },
     "searchHistory": {
       "sqlQueryLabel": "Query SQL :",
@@ -15272,6 +15449,18 @@
     },
     "logsNoEventsState": {
       "lastData": "Ultimi dati: {formatted} ({zone})"
+    },
+    "rowNav": {
+      "autoRefreshEdge": "L'aggiornamento automatico è attivo; disattivalo per cambiare pagina",
+      "position": "Log {row} di {count}, pagina {page}",
+      "positionLabel": "Log {row} di {count} · Pagina {page}",
+      "loadingPage": "Caricamento pagina {page}…",
+      "loadingPageAnnouncement": "Caricamento pagina {page}",
+      "resultsChanged": "Risultati modificati",
+      "notInPage": "Non nella pagina corrente",
+      "loadingResults": "Caricamento risultati…",
+      "previousLog": "Log precedente",
+      "nextLog": "Log successivo"
     }
   },
   "queryError": {
@@ -15306,7 +15495,10 @@
     "traceId": "ID traccia:",
     "askAi": "Chiedi all'IA di risolvere la mia query",
     "showDetail": "Mostra dettagli",
-    "hideDetail": "Nascondi dettagli"
+    "hideDetail": "Nascondi dettagli",
+    "runAs": "Esegui come",
+    "searchTextFor": "Cerca il testo \"{text}\"",
+    "searchTextDesc": "Cerca l'intero input come un'unica frase"
   },
   "refreshButton": {
     "justNow": "proprio ora",
@@ -17204,7 +17396,17 @@
       "oncallEscalate": "Inoltra",
       "oncallSnooze": "Posticipa",
       "oncallResolve": "Risolvi",
-      "functionsImport": "Importa funzione"
+      "functionsImport": "Importa funzione",
+      "logsNextRow": "Log successivo (apre i dettagli)",
+      "logsPrevRow": "Log precedente (apre i dettagli)",
+      "logsRowFocusMove": "Sposta lo stato attivo tra le righe",
+      "logsRowOpen": "Apri la riga attiva",
+      "logsDetailClose": "Chiudi i dettagli e torna alla riga",
+      "tracesNextRow": "Seleziona la traccia successiva",
+      "tracesPrevRow": "Seleziona la traccia precedente",
+      "tracesRowOpen": "Apri la traccia selezionata",
+      "traceNextVisibleSpan": "Span visibile successivo",
+      "tracePrevVisibleSpan": "Span visibile precedente"
     }
   },
   "components": {
@@ -17577,7 +17779,13 @@
         "debug": "Debug",
         "info": "Info",
         "warn": "WARN",
-        "fatal": "Fatale"
+        "fatal": "Fatale",
+        "emergency": "Emergenza",
+        "alert": "Avviso",
+        "critical": "Critico",
+        "notice": "Nota",
+        "ok": "OK",
+        "unknown": "Sconosciuto"
       },
       "pipelineRunOutcome": {
         "firing": "Attivo",

@@ -70,6 +70,12 @@
       "title": "Selecteer een stream om aan de slag te gaan",
       "description": "Kies een stream en voer vervolgens uw zoekopdracht uit om de bijbehorende gegevens te verkennen. Verfijn de resultaten met filters en een aangepast tijdbereik."
     },
+    "searchCancelled": {
+      "title": "Zoeken geannuleerd",
+      "description": "Er zijn geen resultaten geladen. Voer de query uit om gebeurtenissen te laden.",
+      "action": "Query uitvoeren",
+      "actionDesc": "Dezelfde query opnieuw uitvoeren"
+    },
     "noQueryApplied": {
       "title": "Voer een query uit om logboeken te bekijken",
       "description": "Pas je filters aan en klik op 'Query uitvoeren' om gebeurtenissen voor deze stream te laden.",
@@ -1036,9 +1042,115 @@
     "savedFunctionNotFound": "Functie niet gevonden!",
     "exportLogs": "Logboeken exporteren",
     "runQuery": "Query uitvoeren",
+    "runQueryPendingLabel": "Query uitvoeren, wijzigingen nog niet toegepast",
     "refreshCacheAndRunQuery": "Cache verversen en query uitvoeren",
     "liveModeTooltip": "Query automatisch uitvoeren bij wijzigingen in filter/tijd",
     "autoRunEnabled": "Automatisch uitvoeren ingeschakeld",
+    "queryActions": {
+      "runEditedFirst": "Voer eerst je bewerkte query uit",
+      "runFirst": "Voer eerst je query uit",
+      "usesEditedQuery": "Gebruikt je bewerkte query (nog niet uitgevoerd)",
+      "usesUnrunQuery": "Gebruikt je query (nog niet uitgevoerd)",
+      "downloadsShownResults": "Downloadt de getoonde resultaten, niet je bewerking",
+      "downloadsLastRun": "Gebruikt de query die het laatst is uitgevoerd, niet je bewerking"
+    },
+    "noFtsRecovery": {
+      "title": "Volledige-tekstzoekvelden zijn niet geconfigureerd voor {stream}",
+      "description": "Zoek veldwaarden, of wis de hele query om logboeken in dit tijdbereik te bekijken.",
+      "searchField": "Een specifiek veld doorzoeken",
+      "searchFieldHint": "Kies een veld voor het zoeken, met behoud van uitgesloten woorden.",
+      "clearRun": "Logboeken tonen zonder deze zoekopdracht",
+      "clearRunHint": "Wis de hele query en voer deze uit in hetzelfde tijdbereik.",
+      "editPermission": "Je hebt toestemming nodig om stream-instellingen te bewerken.",
+      "scope": "Zoek {stream} in het huidige tijdbereik.",
+      "singleStreamScope": "Zoek alleen {stream}; {otherStreams} wordt gedeselecteerd.",
+      "stream": "Stream",
+      "field": "Veld",
+      "match": "Overeenkomst",
+      "value": "Waarde",
+      "contains": "Bevat tekst",
+      "equals": "Is gelijk aan",
+      "preview": "Filtervoorbeeld",
+      "replacement": "Dit vervangt de hele query door een veldfilter en behoudt uitgesloten woorden. Er is geen volledig-tekstveld vereist.",
+      "run": "Veldzoekopdracht uitvoeren",
+      "close": "Veldzoekopdracht sluiten",
+      "skipped": "{stream} is overgeslagen omdat er geen volledige-tekstzoekvelden zijn geconfigureerd.",
+      "resultsScope": "Deze resultaten zijn alleen afkomstig van {streams}.",
+      "noFields": "Deze stream heeft geen velden beschikbaar voor een veldzoekopdracht.",
+      "valueRequired": "Voer een waarde in om te zoeken.",
+      "fieldRequired": "Kies een veld om te zoeken.",
+      "invalidValue": "Voer een geldige waarde in voor dit veld.",
+      "configureHint": "Maakt volledige-tekstzoekopdrachten snel voor deze stream."
+    },
+    "autoRunPersistNeedsRun": "Voer eerst de query uit: deze actie slaat op of deelt wat je hebt uitgevoerd",
+    "autoRunSearchAroundActive": "Er worden records rond een regel getoond: voer de query uit om terug te keren naar de resultaten",
+    "autoRunStaleTooltip": "Voer de query uit om de resultaten bij te werken",
+    "searchCancelledNotice": "Zoeken geannuleerd.",
+    "linePermalink": {
+      "disabledFunction": "Schakel de functie uit om één regel te koppelen",
+      "disabledTimestampRewrite": "Deze query herschrijft de tijdstempel",
+      "disabledNotSingleLines": "Rijen uit deze query zijn geen afzonderlijke logregels",
+      "disabledNoTimestamp": "Deze rij heeft geen tijdstempel",
+      "disabledEnrichmentTable": "Rijen van verrijkingstabellen kunnen niet worden gekoppeld",
+      "toastNotUnique": "Er is een link naar de tijdstempel gekopieerd; deze regel kon niet uniek worden geïdentificeerd.",
+      "toastWideStream": "Deze stream is te breed om één regel exact te koppelen; er is een link naar de tijdstempel gekopieerd",
+      "bannerInvalid": "Deze link is misvormd; alleen de gedeelde zoekopdracht wordt getoond",
+      "bannerDenied": "Je hebt geen toegang tot stream {stream}.",
+      "bannerStreamMissing": "Stream {stream} bestaat niet meer",
+      "bannerError": "Kan de gedeelde logregel niet laden.",
+      "bannerIncomplete": "Kan niet elke regel op dit tijdstip doorzoeken",
+      "bannerGone": "Deze logregel is niet meer beschikbaar. Mogelijk is deze voorbij de bewaartermijn van de stream of verwijderd.",
+      "bannerGoneRetention": "Deze logregel is niet meer beschikbaar. Mogelijk is deze voorbij de bewaartermijn van de stream ({days} dag) of verwijderd. | Deze logregel is niet meer beschikbaar. Mogelijk is deze voorbij de bewaartermijn van de stream ({days} dagen) of verwijderd.",
+      "bannerFound": "Er wordt een gedeelde logregel weergegeven",
+      "bannerAmbiguous": "{count} regel op dit tijdstip; de exacte regel kon niet worden geïdentificeerd | {count} regels op dit tijdstip; de exacte regel kon niet worden geïdentificeerd",
+      "bannerChanged": "De regel is mogelijk gewijzigd sinds de link is gemaakt",
+      "actionShowLines": "Deze regels weergeven",
+      "actionShowInContext": "In context weergeven",
+      "bannerAmbiguousTieHeavy": "{count} regel deelt dit tijdstip en de stream heeft geen _o2_id, dus de exacte regel kon niet worden geïdentificeerd. Regels op dat tijdstip zijn gemarkeerd. | {count} regels delen dit tijdstip en de stream heeft geen _o2_id, dus de exacte regel kon niet worden geïdentificeerd. Regels op dat tijdstip zijn gemarkeerd.",
+      "bannerDismiss": "Sluiten",
+      "copyLink": "Link kopiëren",
+      "copyLinkTooltip": "Kopieer een link naar deze logregel",
+      "copyLinkMenu": "Link naar deze logregel kopiëren",
+      "toastCopied": "Link naar logregel gekopieerd",
+      "toastCopiedValid": "Link naar logregel gekopieerd · {days} dag geldig | Link naar logregel gekopieerd · {days} dagen geldig",
+      "toastLookupFailed": "Kan deze regel niet opzoeken; een link naar het tijdstip is gekopieerd",
+      "toastShortFailed": "Kan de link niet inkorten; in plaats daarvan is de volledige link gekopieerd",
+      "toastFailed": "Kan geen link naar deze logregel maken",
+      "toastScopeChanged": "De organisatie of stream is gewijzigd tijdens het maken van de link; er is niets gekopieerd",
+      "popoverTitle": "Link naar deze logregel",
+      "popoverDesc": "Je browser heeft automatisch kopiëren geblokkeerd. Selecteer de link en kopieer deze, of gebruik de knop.",
+      "pageNotice": "Deze link stond op pagina {page}.",
+      "pageGo": "Ga naar pagina {page}",
+      "pageGoLast": "Ga naar de laatste pagina ({page})"
+    },
+    "autoRunPendingDot": "Voer de query uit om de nieuwste wijzigingen toe te passen",
+    "autoRunAppliesTo": "Geldt voor Logboeken en Traces",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "Deze zoekopdracht zou ongeveer {size} scannen",
+    "autoRunGuardLinkTitle": "Deze link zou ongeveer {size} scannen",
+    "autoRunGuardDescAutoRun": "{scope}. Automatisch uitvoeren is gepauzeerd zodat je het eerst kunt beperken.",
+    "autoRunGuardDescPaused": "{scope}. Gepauzeerd zodat je het eerst kunt beperken.",
+    "autoRunGuardDescLink": "Geopend via een link · {scope}. Controleer het bereik en voer het dan uit.",
+    "autoRunGuardHint": "Schakel Automatisch uitvoeren uit om filter- en tijdwijzigingen handmatig toe te passen.",
+    "autoRunGuardUnknownTitle": "Grootte onbekend voor dit venster",
+    "autoRunGuardUnknownDesc": "{streams} heeft nog geen groottestatistieken, dus Automatisch uitvoeren voert alleen vensters van 1 uur of minder uit.",
+    "autoRunGuardUnknownManyDesc": "{count} stream heeft nog geen groottestatistieken, dus Automatisch uitvoeren wacht op jou. {scope}. | {count} streams hebben nog geen groottestatistieken, dus Automatisch uitvoeren wacht op jou. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Klaar om in meerdere regio's uit te voeren",
+    "autoRunGuardSuperClusterDesc": "De zoekgrootte kan nog niet worden geschat op een cluster met meerdere regio's, dus Automatisch uitvoeren wacht op jou. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Stream niet beschikbaar",
+    "autoRunGuardUnresolvedDesc": "Stream {streams} bestaat niet of je hebt er geen toegang toe.",
+    "autoRunGuardBanner": "Deze wijziging zou ongeveer {size} scannen ({scope}), dus Automatisch uitvoeren is gepauzeerd. De onderstaande resultaten zijn van de vorige query.",
+    "autoRunGuardBannerPaused": "Deze wijziging zou ongeveer {size} scannen ({scope}), dus is gepauzeerd. De onderstaande resultaten zijn van de vorige query.",
+    "autoRunGuardBannerUnknown": "Grootte onbekend voor dit venster ({scope}), dus is gepauzeerd. De onderstaande resultaten zijn van de vorige query.",
+    "autoRunGuardBannerRefresh": "Automatisch vernieuwen zou ongeveer {size} per vernieuwing scannen ({scope}), dus is gepauzeerd totdat je dit eenmaal uitvoert. De onderstaande resultaten zijn van de vorige query.",
+    "autoRunGuardRunAnyway": "Toch uitvoeren",
+    "autoRunGuardRunQuery": "Query uitvoeren",
+    "autoRunGuardNarrow": "Beperken tot {period}",
+    "autoRunGuardNarrowWithSize": "Beperk tot {period} (~{size})",
+    "autoRunGuardSearchJob": "Uitvoeren als zoektaak",
+    "autoRunGuardSelectStream": "Selecteer een stream",
+    "searchJobNoPermission": "Je hebt geen toestemming om zoektaken te maken",
     "turnOnLiveMode": "Live-modus inschakelen",
     "turnOffLiveMode": "Live-modus uitschakelen",
     "autoRefreshWithValue": "Automatisch verversen: {value}",
@@ -1251,6 +1363,7 @@
     "histogramSearchQueryCancelled": "Histogramzoekopdracht is geannuleerd",
     "histogramUnavailableForQueries": "Histogram niet beschikbaar voor CTE's, DISTINCT-, UNION-, JOIN- en LIMIT-query's.",
     "invalidDateFormat": "Ongeldige datumnotatie.",
+    "missingStreamAndNoFts": "Een of meer filtervelden bestaan niet in \"{missingStreams}\", daarom wordt er niet gezocht in de genoemde stream.\n Niet doorzocht: {noFtsStreams} (geen full-text velden).",
     "missingStreamFilterFields": "Een of meer filtervelden bestaan niet in \"{streams}\", daarom wordt er geen zoekopdracht uitgevoerd in de genoemde stream.\n",
     "noColumnFoundInStream": "Geen kolom gevonden in geselecteerde stream.",
     "noStreamFoundInOrganization": "Geen stream gevonden in geselecteerde organisatie!",
@@ -1271,7 +1384,19 @@
     "aliasNotAllowed": "Alias '{alias}' is niet toegestaan.",
     "commonGroupFields": "Algemene groepsvelden",
     "queryRangeHours": "{count} uur | {count} uur",
-    "menuGroupAlerts": "Waarschuwingen"
+    "menuGroupAlerts": "Waarschuwingen",
+    "freeTextChooseFirst": "Kies eerst hoe je tekst wilt doorzoeken",
+    "freeTextScanLogsOnly": "Scanmodus werkt alleen in de logboekenweergave; stel een full-text veld in om hier tekstzoekopdracht te gebruiken",
+    "freeTextSearchedFields": "Full-text zoeken in: {fields} (alle woorden, willekeurige volgorde)",
+    "freeTextPreview": "Full-text zoeken in: {fields} (alle woorden, willekeurige volgorde)\n\nWordt uitgevoerd als {sql}",
+    "freeTextRunsAs": "Wordt uitgevoerd als {sql}",
+    "freeTextNotSearched": "Niet doorzocht: {streams} (geen full-text velden).",
+    "freeTextSetField": "Full-text zoekvelden configureren",
+    "freeTextNoFtsTitle": "\"{stream}\" heeft geen full-text velden",
+    "freeTextNoFtsTitleMulti": "De geselecteerde streams hebben geen full-text velden",
+    "freeTextNoTextFields": "Deze stream heeft geen tekstvelden om te doorzoeken.",
+    "freeTextNoTextFieldsNamed": "Niet doorzocht: {streams} (geen tekstvelden).",
+    "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL."
   },
   "menu": {
     "upgradeToProPlan": "Upgrade naar PRO Plan",
@@ -7645,6 +7770,11 @@
     "SearchSQLCancelled": "Fout: Search SQL is geannuleerd."
   },
   "alerts": {
+    "promRuleMode": "Regelmodus",
+    "promRulePreview": "{count} geretourneerde reeksen komen nu overeen. Elke reeks moet de wachtperiode voltooien voordat deze afgaat.",
+    "promRuleModeDescription": "Komt overeen wanneer de expressie een willekeurige reeks retourneert. Kies Enkel of Multi-alarm wanneer de wachtperiode nul is; een wachtperiode schakelt automatisch Multi-alarm in. Laat de stream leeg om een gerefereerde metriekenstream af te leiden.",
+    "promRuleModePendingMulti": "Een wachtperiode vereist een onafhankelijke timer voor elke reeks, dus Multi-alarm kan niet worden uitgeschakeld.",
+    "promRuleModeConflict": "De regelmodus kan geen Critical- of Warning-waardegrenzen gebruiken; een wachtperiode vereist Multi-alarm.",
     "allAlerts": "Alle alarmen",
     "compositeAlert": "Samengesteld",
     "import": {
@@ -8580,6 +8710,8 @@
         "alertDescription": "De beschrijvingstekst van de alert",
         "alertStartTime": "Starttijd van het venster (ISO 8601)",
         "alertEndTime": "Eindtijd van het venster (ISO 8601)",
+        "alertStartTimeMillis": "Starttijd van het venster in epoch milliseconden",
+        "alertEndTimeMillis": "Eindtijd van het venster in epoch milliseconden",
         "alertUrl": "Link terug naar OpenObserve om te onderzoeken",
         "alertTriggerTime": "Wanneer de alert werd geactiveerd (ISO 8601)",
         "alertTriggerTimeMillis": "Triggentijd in epoch-milliseconden",
@@ -9178,6 +9310,8 @@
         "noQueries": "Dit paneel heeft geen query om een waarschuwing van te maken.",
         "noConstants": "De geselecteerde patronen hebben geen onderscheidende tekst om op te matchen.",
         "sqlModeFilterDropped": "Je SQL-query is niet overgenomen — de waarschuwing komt alleen overeen met de geselecteerde patronen.",
+        "textFilterDropped": "Je zoekfilter is niet overgenomen omdat deze stream geen velden voor volledige tekstzoekopdracht (FTS) heeft. Voeg het toe aan de alarmquery als je het nodig hebt.",
+        "heldFilterDropped": "Je zoekfilter is niet overgenomen omdat er eerst een keuze voor 'Uitvoeren als' op de logboekenpagina nodig is. Voeg het toe aan de alarmquery als je het nodig hebt.",
         "patternsUnusable": "Geen van de patronen op deze pagina heeft onderscheidende tekst om op te matchen, dus de waarschuwing gebruikt alleen je zoekopdracht.",
         "dbmRollupLag": "Databasenummers worden elke {minutes} minuten geaggregeerd, dus deze melding kan alleen zo vaak afgaan — het is geen realtime pagina.",
         "dbmFingerprintVersion": "Deze melding is vastgepind aan de exacte vorm van één query. Als de manier waarop queries worden gegroepeerd ooit verandert, kan de melding niet meer overeenkomen en moet deze opnieuw worden aangemaakt.",
@@ -11779,7 +11913,21 @@
     "eventClusterAriaLabelPlural": "{count} gebeurtenissen, {errors} fouten",
     "eventMarkerTooltip": "Gebeurtenis: {name}",
     "exceptionMarkerTooltip": "Uitzondering: {type}",
-    "spanEventFallback": "span-gebeurtenis"
+    "spanEventFallback": "span-gebeurtenis",
+    "spanNav": {
+      "firstSpan": "Eerste span",
+      "lastSpan": "Laatste span",
+      "position": "Span {index} van {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "Trace {row} van {count}, pagina {page}",
+      "spanPosition": "Span {row} van {count}, pagina {page}",
+      "firstResult": "Eerste resultaat",
+      "lastResult": "Laatste resultaat",
+      "loadingPage": "Pagina {page} laden",
+      "pageFailed": "Kan pagina {page} niet laden",
+      "pageEmpty": "Pagina {page} heeft geen resultaten"
+    }
   },
   "aiToolset": {
     "header": "AI-toolsets",
@@ -15012,11 +15160,12 @@
     "noStream": {
       "title": "Kies een stream om te beginnen met verkennen",
       "description": "Kies een stream en druk vervolgens op <strong>Query uitvoeren</strong>. Je kunt verfijnen met filters, een VRL-functie en een aangepast tijdbereik zodra de resultaten binnen zijn.",
+      "descriptionAutoRun": "Kies een stream om de nieuwste logboeken te bekijken. Je kunt verfijnen met filters, een VRL-functie en een aangepast tijdbereik zodra de resultaten binnenkomen.",
       "selectStream": "Selecteer een stream",
       "selectStreamDesc": "Blader door logboeken, traces, metrieken en RUM-streams.",
       "queryGuide": "Lees de handleiding voor zoekopdrachten",
       "queryGuideDesc": "Filters, SQL-modus, VRL en opgeslagen weergaven",
-      "recent": "Recent:"
+      "recent": "Laatst gebruikt:"
     },
     "noEvents": {
       "title": "Geen gebeurtenissen gevonden",
@@ -15065,12 +15214,40 @@
       "sendToAiChat": "Verzenden naar AI-chat",
       "contentCopiedSuccessfully": "Inhoud succesvol gekopieerd!"
     },
+    "severity": {
+      "srText": "Ernst {level}",
+      "srTextInferred": "Ernst {level}, afgeleid",
+      "inferredLabel": "{level} · afgeleid",
+      "popoverTitle": "Ernst: {level}",
+      "popoverAriaLabel": "Bewijs voor ernst",
+      "evidence": "Bewijs",
+      "fromField": "Uit veld {field}",
+      "inferredFrom": "Afgeleid uit de tekst van {field}.",
+      "notSearchable": "Niet doorzoekbaar; het histogram gebruikt het niet.",
+      "noLevelField": "Geen niveauveld op deze rij, en geen tekstveld om te scannen.",
+      "noLevelWordInField": "Geen niveauveld op deze rij, en geen niveauwoord in {field}.",
+      "notInSelectedColumns": "Niveauveld niet in de geselecteerde kolommen",
+      "levels": {
+        "emergency": "noodgeval",
+        "alert": "alarm",
+        "critical": "kritiek",
+        "error": "fout",
+        "warning": "waarschuwing",
+        "notice": "kennisgeving",
+        "info": "info",
+        "debug": "debug",
+        "trace": "trace",
+        "ok": "ok",
+        "unknown": "onbekend"
+      }
+    },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Select *-query wordt niet ondersteund voor visualisatie.",
       "fixErrorsAndRetry": "Er zijn enkele fouten, corrigeer deze en probeer het opnieuw"
     },
     "buildQueryPage": {
-      "validationErrors": "Er zijn enkele fouten, corrigeer deze en probeer het opnieuw"
+      "validationErrors": "Er zijn enkele fouten, corrigeer deze en probeer het opnieuw",
+      "parserLoadFailed": "Kan de queryparser niet laden, dus het zoekfilter kan niet aan de grafiek worden toegevoegd. Uitvoeringen zijn gepauzeerd totdat deze is geladen."
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL-query :",
@@ -15272,6 +15449,18 @@
     },
     "logsNoEventsState": {
       "lastData": "Laatste gegevens: {formatted} ({zone})"
+    },
+    "rowNav": {
+      "autoRefreshEdge": "Automatisch vernieuwen staat aan; schakel het uit om van pagina te wisselen",
+      "position": "Log {row} van {count}, pagina {page}",
+      "positionLabel": "Log {row} van {count} · Pagina {page}",
+      "loadingPage": "Pagina {page} laden…",
+      "loadingPageAnnouncement": "Pagina {page} wordt geladen",
+      "resultsChanged": "Resultaten zijn gewijzigd",
+      "notInPage": "Niet op de huidige pagina",
+      "loadingResults": "Resultaten laden…",
+      "previousLog": "Vorige log",
+      "nextLog": "Volgende log"
     }
   },
   "queryError": {
@@ -15306,7 +15495,10 @@
     "traceId": "Trace-ID:",
     "askAi": "Vraag AI om mijn vraag op te lossen",
     "showDetail": "Details weergeven",
-    "hideDetail": "Details verbergen"
+    "hideDetail": "Details verbergen",
+    "runAs": "Uitvoeren als",
+    "searchTextFor": "Zoek naar tekst \"{text}\"",
+    "searchTextDesc": "Doorzoek de hele invoer als één frase"
   },
   "refreshButton": {
     "justNow": "net nu",
@@ -17204,7 +17396,17 @@
       "oncallEscalate": "Escaleren",
       "oncallSnooze": "Snoozen",
       "oncallResolve": "Oplossen",
-      "functionsImport": "Functie importeren"
+      "functionsImport": "Functie importeren",
+      "logsNextRow": "Volgende log (opent details)",
+      "logsPrevRow": "Vorige log (opent details)",
+      "logsRowFocusMove": "Focus tussen rijen verplaatsen",
+      "logsRowOpen": "Open de gefocuste rij",
+      "logsDetailClose": "Sluit details en keer terug naar de rij",
+      "tracesNextRow": "Volgende trace selecteren",
+      "tracesPrevRow": "Vorige trace selecteren",
+      "tracesRowOpen": "Open de geselecteerde trace",
+      "traceNextVisibleSpan": "Volgende zichtbare span",
+      "tracePrevVisibleSpan": "Vorige zichtbare span"
     }
   },
   "components": {
@@ -17577,7 +17779,13 @@
         "debug": "Debug",
         "info": "Info",
         "warn": "WARN",
-        "fatal": "Fataal"
+        "fatal": "Fataal",
+        "emergency": "Noodgeval",
+        "alert": "Alarm",
+        "critical": "Kritiek",
+        "notice": "Melding",
+        "ok": "OK",
+        "unknown": "Onbekend"
       },
       "pipelineRunOutcome": {
         "firing": "Actief",

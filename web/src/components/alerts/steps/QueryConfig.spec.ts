@@ -891,6 +891,68 @@ describe("QueryConfig.vue", () => {
       await flushPromises();
     });
 
+    it("rule mode clears thresholds, keeps Single at zero pending and preserves frequency", async () => {
+      const previousFrequency = hostForm().state.values.trigger_condition.frequency;
+      hostForm().setFieldValue("query_condition.promql_warning_value", 4);
+      await flushPromises();
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      const value = hostForm().state.values;
+      expect(value.query_condition.promql_rule_mode).toBe(true);
+      expect(value.query_condition.promql_condition).toBeNull();
+      expect(value.query_condition.promql_warning_value).toBeNull();
+      expect(value.query_condition.promql_multi_alert).toBe(false);
+      expect(value.trigger_condition.frequency).toBe(previousFrequency);
+      expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(false);
+      expect(await submit()).toBe(true);
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_rule_mode).toBe(false);
+      expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(true);
+    });
+
+    it("locks Multi only while rule mode has a pending duration", async () => {
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      const toggle = () => wrapper.findComponent({ name: "AlertMultiToggle" });
+      expect(toggle().props("disabled")).toBe(false);
+      hostForm().setFieldValue("pending_period_sec", 4);
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(true);
+      expect(toggle().props("disabled")).toBe(true);
+      expect(wrapper.find('[data-test-value="false"]').attributes("disabled")).toBeDefined();
+      hostForm().setFieldValue("query_condition.promql_multi_alert", false);
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(true);
+      expect(await submit()).toBe(true);
+      hostForm().setFieldValue("pending_period_sec", 0);
+      await flushPromises();
+      expect(toggle().props("disabled")).toBe(false);
+      await wrapper.find('[data-test-value="false"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(false);
+      expect(await submit()).toBe(true);
+    });
+
+    it.each(["custom", "sql"])("keeps rule mode valid after a %s tab round trip", async (tab) => {
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      wrapper.vm.localTab = tab;
+      await setQCProps({ tab });
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(false);
+      hostForm().setFieldValue("trigger_condition.threshold", 3);
+      hostForm().setFieldValue("trigger_condition.warning_threshold", 2);
+      wrapper.vm.localTab = "promql";
+      await setQCProps({ tab: "promql" });
+      await flushPromises();
+      const query = hostForm().state.values.query_condition;
+      expect(query.promql_rule_mode).toBe(true);
+      expect(query.promql_multi_alert).toBe(false);
+      expect(query.promql_condition).toBeNull();
+      expect(await submit()).toBe(true);
+    });
+
     it("passes with a complete promql condition (§4 restore)", async () => {
       hostForm().setFieldValue("query_condition.promql_condition", {
         operator: ">=",
