@@ -17,6 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <OPageLayout :title="raw(headerBasedOnRoute())" icon="paid" bleed>
+    <!-- Only Usage is redesigned, so only its title carries the tag; inside the title line as Workflows does. -->
+    <template v-if="isUsageRoute" #title>
+      <span class="inline-flex items-center gap-2">
+        {{ raw(headerBasedOnRoute()) }}
+        <BetaBadge />
+      </span>
+    </template>
     <template #actions>
       <div v-if="isOrgGroupRoute" class="flex items-center gap-2">
         <OButton
@@ -149,6 +156,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import BillingService from "@/services/billings";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import TrialPeriod from "./TrialPeriod.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -159,6 +167,7 @@ export default defineComponent({
     OSplitter,
     OButton,
     TrialPeriod,
+    BetaBadge,
   },
   setup() {
     const { t } = useI18nTyped();
