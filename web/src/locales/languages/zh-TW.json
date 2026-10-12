@@ -70,6 +70,12 @@
       "title": "請選擇一個串流以開始",
       "description": "從左側下拉選單中選擇一個串流，然後按下「執行查詢」即可開始探索。您也可以套用額外的篩選條件並調整日期範圍。"
     },
+    "searchCancelled": {
+      "title": "搜尋已取消",
+      "description": "未載入任何結果。執行查詢以載入事件。",
+      "action": "執行查詢",
+      "actionDesc": "再次執行相同的查詢"
+    },
     "noQueryApplied": {
       "title": "執行查詢以查看結果",
       "description": "調整您的篩選條件並點擊「執行查詢」以載入此串流的事件。",
@@ -1036,9 +1042,115 @@
     "savedFunctionNotFound": "找不到函式。",
     "exportLogs": "匯出日誌",
     "runQuery": "執行查詢",
+    "runQueryPendingLabel": "執行查詢，變更尚未套用",
     "refreshCacheAndRunQuery": "重新整理快取並執行查詢",
     "liveModeTooltip": "篩選條件或時間變更時自動執行查詢",
     "autoRunEnabled": "已啟用自動執行",
+    "queryActions": {
+      "runEditedFirst": "請先執行您編輯過的查詢",
+      "runFirst": "請先執行您的查詢",
+      "usesEditedQuery": "使用您編輯過的查詢（尚未執行）",
+      "usesUnrunQuery": "使用您的查詢（尚未執行）",
+      "downloadsShownResults": "下載顯示的結果，而非您的編輯",
+      "downloadsLastRun": "使用上次執行的查詢，而非您的編輯"
+    },
+    "noFtsRecovery": {
+      "title": "未為 {stream} 設定全文搜尋欄位",
+      "description": "搜尋欄位值，或清除整個查詢以查看此時間範圍內的日誌。",
+      "searchField": "搜尋特定欄位",
+      "searchFieldHint": "選擇要搜尋的欄位，並保留排除的字詞。",
+      "clearRun": "顯示不含此搜尋的日誌",
+      "clearRunHint": "清除整個查詢並在相同時間範圍內執行。",
+      "editPermission": "您需要權限才能編輯串流設定。",
+      "scope": "在目前時間範圍內搜尋 {stream}。",
+      "singleStreamScope": "僅搜尋 {stream}；{otherStreams} 將被取消選取。",
+      "stream": "串流",
+      "field": "欄位",
+      "match": "符合",
+      "value": "值",
+      "contains": "包含文字",
+      "equals": "等於",
+      "preview": "篩選預覽",
+      "replacement": "這會以欄位篩選取代整個查詢，並保留排除的字詞。無需全文欄位。",
+      "run": "執行欄位搜尋",
+      "close": "關閉欄位搜尋",
+      "skipped": "已略過 {stream}，因其未設定全文搜尋欄位。",
+      "resultsScope": "這些結果僅來自 {streams}。",
+      "noFields": "此串流沒有可用於欄位搜尋的欄位。",
+      "valueRequired": "輸入要搜尋的值。",
+      "fieldRequired": "選擇要搜尋的欄位。",
+      "invalidValue": "為此欄位輸入有效的值。",
+      "configureHint": "讓此串流的全文搜尋更快速。"
+    },
+    "autoRunPersistNeedsRun": "請先執行查詢：此操作會儲存或分享您所執行的內容",
+    "autoRunSearchAroundActive": "顯示某一行周圍的記錄：執行查詢以返回結果",
+    "autoRunStaleTooltip": "執行查詢以更新結果",
+    "searchCancelledNotice": "搜尋已取消。",
+    "linePermalink": {
+      "disabledFunction": "關閉函式以連結單一行",
+      "disabledTimestampRewrite": "此查詢會重寫時間戳記",
+      "disabledNotSingleLines": "此查詢的列不是單一日誌行",
+      "disabledNoTimestamp": "此列沒有時間戳記",
+      "disabledEnrichmentTable": "無法連結擴充表格的列",
+      "toastNotUnique": "已複製時間戳記的連結；無法唯一識別此行。",
+      "toastWideStream": "此串流太寬，無法精確連結單一行；已複製時間戳記的連結",
+      "bannerInvalid": "此連結格式錯誤；僅顯示分享的搜尋",
+      "bannerDenied": "您沒有存取串流 {stream} 的權限。",
+      "bannerStreamMissing": "串流 {stream} 已不存在",
+      "bannerError": "無法載入共享的日誌行。",
+      "bannerIncomplete": "無法搜尋此時間戳記的每一行",
+      "bannerGone": "此日誌行已不再可用。可能已超過串流的保留期限或被刪除。",
+      "bannerGoneRetention": "此日誌行已不再可用。可能已超過串流的保留期限（{days} 天）或被刪除。 | 此日誌行已不再可用。可能已超過串流的保留期限（{days} 天）或被刪除。",
+      "bannerFound": "顯示共享的日誌行",
+      "bannerAmbiguous": "此時間戳記有 {count} 行；無法識別確切的行 | 此時間戳記有 {count} 行；無法識別確切的行",
+      "bannerChanged": "自從建立連結以來，該行可能已變更",
+      "actionShowLines": "顯示這些行",
+      "actionShowInContext": "在上下文中顯示",
+      "bannerAmbiguousTieHeavy": "此時間戳記有 {count} 行共用，且串流沒有 _o2_id，因此無法識別確切的行。該時間戳記的行已醒目顯示。 | 此時間戳記有 {count} 行共用，且串流沒有 _o2_id，因此無法識別確切的行。該時間戳記的行已醒目顯示。",
+      "bannerDismiss": "關閉",
+      "copyLink": "複製連結",
+      "copyLinkTooltip": "複製此日誌行的連結",
+      "copyLinkMenu": "複製此日誌行的連結",
+      "toastCopied": "日誌行連結已複製",
+      "toastCopiedValid": "日誌行連結已複製 · 有效期為 {days} 天 | 日誌行連結已複製 · 有效期為 {days} 天",
+      "toastLookupFailed": "無法查詢此行；已複製時間戳記的連結",
+      "toastShortFailed": "無法縮短連結；已改為複製完整連結",
+      "toastFailed": "無法建立此日誌行的連結",
+      "toastScopeChanged": "建立連結時組織或串流已變更；未複製任何內容",
+      "popoverTitle": "此日誌行的連結",
+      "popoverDesc": "您的瀏覽器封鎖了自動複製。請選取連結並複製，或使用按鈕。",
+      "pageNotice": "此連結位於第 {page} 頁。",
+      "pageGo": "前往第 {page} 頁",
+      "pageGoLast": "前往最後一頁（{page}）"
+    },
+    "autoRunPendingDot": "執行查詢以套用最新變更",
+    "autoRunAppliesTo": "適用於日誌和追蹤",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "此搜尋將掃描約 {size}",
+    "autoRunGuardLinkTitle": "此連結將掃描約 {size}",
+    "autoRunGuardDescAutoRun": "{scope}。已暫停自動執行，以便您先縮小範圍。",
+    "autoRunGuardDescPaused": "{scope}。已暫停，以便您先縮小範圍。",
+    "autoRunGuardDescLink": "從連結開啟 · {scope}。請檢閱範圍，然後執行。",
+    "autoRunGuardHint": "關閉自動執行以手動套用篩選條件和時間變更。",
+    "autoRunGuardUnknownTitle": "此時間範圍的大小未知",
+    "autoRunGuardUnknownDesc": "{streams} 尚無大小統計資料，因此自動執行只會在其上執行 1 小時或更短的時間範圍。",
+    "autoRunGuardUnknownManyDesc": "{count} 個串流尚無大小統計資料，因此自動執行會等待您。{scope}。 | {count} 個串流尚無大小統計資料，因此自動執行會等待您。{scope}。",
+    "autoRunGuardSuperClusterTitle": "準備好跨區域執行",
+    "autoRunGuardSuperClusterDesc": "尚無法在多區域叢集上估算搜尋大小，因此自動執行會等待您。{scope}。",
+    "autoRunGuardUnresolvedTitle": "串流無法使用",
+    "autoRunGuardUnresolvedDesc": "串流 {streams} 不存在，或者您無權存取。",
+    "autoRunGuardBanner": "此變更將掃描約 {size}（{scope}），因此已暫停自動執行。以下結果來自先前的查詢。",
+    "autoRunGuardBannerPaused": "此變更將掃描約 {size}（{scope}），因此已暫停。以下結果來自先前的查詢。",
+    "autoRunGuardBannerUnknown": "此時間範圍（{scope}）的大小未知，因此已暫停。以下結果來自先前的查詢。",
+    "autoRunGuardBannerRefresh": "自動重新整理每次將掃描約 {size}（{scope}），因此在您執行一次之前會暫停。以下結果來自先前的查詢。",
+    "autoRunGuardRunAnyway": "仍要執行",
+    "autoRunGuardRunQuery": "執行查詢",
+    "autoRunGuardNarrow": "縮小至 {period}",
+    "autoRunGuardNarrowWithSize": "縮小至 {period}（約 {size}）",
+    "autoRunGuardSearchJob": "以搜尋作業執行",
+    "autoRunGuardSelectStream": "選擇串流",
+    "searchJobNoPermission": "您沒有建立搜尋作業的權限",
     "turnOnLiveMode": "開啟自動執行",
     "turnOffLiveMode": "關閉自動執行",
     "autoRefreshWithValue": "自動重新整理：{value}",
@@ -1251,6 +1363,7 @@
     "histogramSearchQueryCancelled": "直方圖搜尋查詢已取消",
     "histogramUnavailableForQueries": "直方圖不適用於 CTE、DISTINCT、UNION、JOIN 和 LIMIT 查詢。",
     "invalidDateFormat": "無效的日期格式。",
+    "missingStreamAndNoFts": "「{missingStreams}」中有一或多個篩選欄位不存在，因此不會在該串流中執行搜尋。\n未搜尋：{noFtsStreams}（沒有全文欄位）。",
     "missingStreamFilterFields": "一個或多個篩選欄位不存在於 \"{streams}\" 中，因此不會在所述的串流中執行搜尋。\n",
     "noColumnFoundInStream": "在選取的串流中找不到任何欄位。",
     "noStreamFoundInOrganization": "在選取的組織中找不到任何串流！",
@@ -1271,7 +1384,19 @@
     "aliasNotAllowed": "不允許使用別名 '{alias}'。",
     "commonGroupFields": "通用群組欄位",
     "queryRangeHours": "{count} 小時 | {count} 小時",
-    "menuGroupAlerts": "警示"
+    "menuGroupAlerts": "警示",
+    "freeTextChooseFirst": "請先選擇文字搜尋方式",
+    "freeTextScanLogsOnly": "掃描模式僅適用於日誌檢視；請設定全文欄位以在此使用文字搜尋",
+    "freeTextSearchedFields": "全文搜尋範圍：{fields}（所有字詞，不限順序）",
+    "freeTextPreview": "全文搜尋範圍：{fields}（所有字詞，不限順序）\n\n以 {sql} 執行",
+    "freeTextRunsAs": "以 {sql} 執行",
+    "freeTextNotSearched": "未搜尋：{streams}（沒有全文欄位）。",
+    "freeTextSetField": "設定全文搜尋欄位",
+    "freeTextNoFtsTitle": "「{stream}」沒有全文欄位",
+    "freeTextNoFtsTitleMulti": "選取的串流沒有全文欄位",
+    "freeTextNoTextFields": "此串流沒有可供搜尋的文字欄位。",
+    "freeTextNoTextFieldsNamed": "未搜尋：{streams}（沒有文字欄位）。",
+    "freeTextBuildNotice": "此篩選條件包含文字搜尋；請在 SQL 中編輯。"
   },
   "menu": {
     "upgradeToProPlan": "升級至 PRO 方案",
@@ -11641,7 +11766,21 @@
     "eventClusterAriaLabelPlural": "{count} 個事件，{errors} 個錯誤",
     "eventMarkerTooltip": "事件：{name}",
     "exceptionMarkerTooltip": "例外：{type}",
-    "spanEventFallback": "span 事件"
+    "spanEventFallback": "span 事件",
+    "spanNav": {
+      "firstSpan": "第一個 Span",
+      "lastSpan": "最後一個 Span",
+      "position": "第 {index} 個 Span，共 {count} 個：{name}"
+    },
+    "rowNav": {
+      "tracePosition": "第 {row} 個追蹤，共 {count} 個，第 {page} 頁",
+      "spanPosition": "第 {row} 個 Span，共 {count} 個，第 {page} 頁",
+      "firstResult": "第一筆結果",
+      "lastResult": "最後一筆結果",
+      "loadingPage": "正在載入第 {page} 頁",
+      "pageFailed": "無法載入第 {page} 頁",
+      "pageEmpty": "第 {page} 頁沒有結果"
+    }
   },
   "aiToolset": {
     "header": "AI 工具集",
@@ -14874,11 +15013,12 @@
     "noStream": {
       "title": "選擇一個串流以開始探索",
       "description": "選擇一個串流，然後按下<strong>執行查詢</strong>。結果出現後，您可使用篩選條件、VRL 函式與自訂時間範圍進行精煉。",
+      "descriptionAutoRun": "選擇串流以查看其最新日誌。結果出現後，您可以使用篩選條件、VRL 函式和自訂時間範圍進一步調整。",
       "selectStream": "選擇串流",
       "selectStreamDesc": "瀏覽日誌、追蹤、指標與 RUM 串流",
       "queryGuide": "閱讀查詢指南",
       "queryGuideDesc": "篩選條件、SQL 模式、VRL 與已儲存的檢視",
-      "recent": "最近："
+      "recent": "上次使用："
     },
     "noEvents": {
       "title": "找不到事件",
@@ -14927,12 +15067,40 @@
       "sendToAiChat": "傳送至 AI 聊天",
       "contentCopiedSuccessfully": "內容複製成功！"
     },
+    "severity": {
+      "srText": "嚴重性 {level}",
+      "srTextInferred": "嚴重性 {level}，推斷",
+      "inferredLabel": "{level} · 推斷",
+      "popoverTitle": "嚴重性：{level}",
+      "popoverAriaLabel": "嚴重性依據",
+      "evidence": "依據",
+      "fromField": "來自欄位 {field}",
+      "inferredFrom": "從 {field} 文字推斷。",
+      "notSearchable": "無法搜尋；直方圖不會使用它。",
+      "noLevelField": "此資料列沒有層級欄位，也沒有可掃描的文字欄位。",
+      "noLevelWordInField": "此資料列沒有層級欄位，且 {field} 中沒有層級字詞。",
+      "notInSelectedColumns": "層級欄位不在選取的資料行中",
+      "levels": {
+        "emergency": "緊急",
+        "alert": "警示",
+        "critical": "嚴重",
+        "error": "錯誤",
+        "warning": "警告",
+        "notice": "注意",
+        "info": "資訊",
+        "debug": "偵錯",
+        "trace": "追蹤",
+        "ok": "正常",
+        "unknown": "未知"
+      }
+    },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "不支援視覺化的 Select * 查詢。",
       "fixErrorsAndRetry": "存在一些錯誤，請修正後再試一次"
     },
     "buildQueryPage": {
-      "validationErrors": "存在一些錯誤，請修正後再試一次"
+      "validationErrors": "存在一些錯誤，請修正後再試一次",
+      "parserLoadFailed": "無法載入查詢解析器，因此無法將搜尋篩選條件加入圖表。在載入完成前，執行會暫停。"
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL 查詢：",
@@ -15134,6 +15302,18 @@
     },
     "logsNoEventsState": {
       "lastData": "最新資料：{formatted} ({zone})"
+    },
+    "rowNav": {
+      "autoRefreshEdge": "自動重新整理已開啟；請關閉後才能切換頁面",
+      "position": "第 {row} 筆日誌，共 {count} 筆，第 {page} 頁",
+      "positionLabel": "第 {row} 筆日誌，共 {count} 筆 · 第 {page} 頁",
+      "loadingPage": "正在載入第 {page} 頁…",
+      "loadingPageAnnouncement": "正在載入第 {page} 頁",
+      "resultsChanged": "結果已變更",
+      "notInPage": "不在目前頁面中",
+      "loadingResults": "正在載入結果…",
+      "previousLog": "上一筆日誌",
+      "nextLog": "下一筆日誌"
     }
   },
   "queryError": {
@@ -15168,7 +15348,10 @@
     "traceId": "Trace ID：",
     "askAi": "詢問 AI 以修正我的查詢",
     "showDetail": "顯示詳細資料",
-    "hideDetail": "隱藏詳細資料"
+    "hideDetail": "隱藏詳細資料",
+    "runAs": "執行身分",
+    "searchTextFor": "搜尋文字「{text}」",
+    "searchTextDesc": "將整段輸入視為一個詞組搜尋"
   },
   "refreshButton": {
     "justNow": "剛剛",
@@ -17066,7 +17249,17 @@
       "oncallEscalate": "升級",
       "oncallSnooze": "延後",
       "oncallResolve": "解決",
-      "functionsImport": "匯入函式"
+      "functionsImport": "匯入函式",
+      "logsNextRow": "下一筆日誌（開啟詳細資料）",
+      "logsPrevRow": "上一筆日誌（開啟詳細資料）",
+      "logsRowFocusMove": "在列之間移動焦點",
+      "logsRowOpen": "開啟焦點所在的列",
+      "logsDetailClose": "關閉詳細資料並返回該列",
+      "tracesNextRow": "選取下一筆追蹤",
+      "tracesPrevRow": "選取上一筆追蹤",
+      "tracesRowOpen": "開啟選取的追蹤",
+      "traceNextVisibleSpan": "下一個可見的 Span",
+      "tracePrevVisibleSpan": "上一個可見的 Span"
     }
   },
   "components": {
@@ -17439,7 +17632,13 @@
         "debug": "除錯",
         "info": "資訊",
         "warn": "警告",
-        "fatal": "致命"
+        "fatal": "致命",
+        "emergency": "緊急",
+        "alert": "警示",
+        "critical": "嚴重",
+        "notice": "通知",
+        "ok": "正常",
+        "unknown": "未知"
       },
       "pipelineRunOutcome": {
         "firing": "觸發中",

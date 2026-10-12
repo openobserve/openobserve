@@ -70,6 +70,12 @@
       "title": "Chọn một luồng để bắt đầu",
       "description": "Chọn một luồng, sau đó chạy truy vấn để khám phá dữ liệu của nó. Tinh chỉnh kết quả bằng bộ lọc và khoảng thời gian tùy chỉnh."
     },
+    "searchCancelled": {
+      "title": "Đã hủy tìm kiếm",
+      "description": "Chưa có kết quả nào được tải. Chạy truy vấn để tải các sự kiện.",
+      "action": "Chạy truy vấn",
+      "actionDesc": "Chạy lại cùng truy vấn đó"
+    },
     "noQueryApplied": {
       "title": "Chạy truy vấn để xem kết quả",
       "description": "Điều chỉnh bộ lọc và nhấp 'Chạy truy vấn' để tải sự kiện cho luồng này.",
@@ -1036,9 +1042,115 @@
     "savedFunctionNotFound": "Không tìm thấy hàm.",
     "exportLogs": "Xuất logs",
     "runQuery": "Chạy truy vấn",
+    "runQueryPendingLabel": "Chạy truy vấn, thay đổi chưa được áp dụng",
     "refreshCacheAndRunQuery": "Làm mới bộ nhớ đệm và Chạy truy vấn",
     "liveModeTooltip": "Tự động chạy truy vấn khi thay đổi bộ lọc/thời gian",
     "autoRunEnabled": "Đã bật tự động chạy",
+    "queryActions": {
+      "runEditedFirst": "Hãy chạy truy vấn đã chỉnh sửa của bạn trước",
+      "runFirst": "Hãy chạy truy vấn của bạn trước",
+      "usesEditedQuery": "Dùng truy vấn đã chỉnh sửa của bạn (chưa chạy)",
+      "usesUnrunQuery": "Dùng truy vấn của bạn (chưa chạy)",
+      "downloadsShownResults": "Tải xuống kết quả đang hiển thị, không phải bản chỉnh sửa của bạn",
+      "downloadsLastRun": "Dùng truy vấn đã chạy lần cuối, không phải bản chỉnh sửa của bạn"
+    },
+    "noFtsRecovery": {
+      "title": "Chưa cấu hình trường tìm kiếm toàn văn cho {stream}",
+      "description": "Tìm kiếm giá trị của trường, hoặc xóa toàn bộ truy vấn để xem nhật ký trong khoảng thời gian này.",
+      "searchField": "Tìm kiếm một trường cụ thể",
+      "searchFieldHint": "Chọn một trường để tìm kiếm, giữ nguyên các từ bị loại trừ.",
+      "clearRun": "Hiển thị nhật ký mà không dùng tìm kiếm này",
+      "clearRunHint": "Xóa toàn bộ truy vấn và chạy trong cùng khoảng thời gian.",
+      "editPermission": "Bạn cần quyền để chỉnh sửa cài đặt stream.",
+      "scope": "Tìm kiếm {stream} trong khoảng thời gian hiện tại.",
+      "singleStreamScope": "Chỉ tìm kiếm {stream}; {otherStreams} sẽ bị bỏ chọn.",
+      "stream": "Stream",
+      "field": "Trường",
+      "match": "Khớp",
+      "value": "Giá trị",
+      "contains": "Chứa văn bản",
+      "equals": "Bằng",
+      "preview": "Xem trước bộ lọc",
+      "replacement": "Thao tác này thay thế toàn bộ truy vấn bằng bộ lọc theo trường và giữ nguyên các từ bị loại trừ. Không cần trường tìm kiếm toàn văn.",
+      "run": "Chạy tìm kiếm theo trường",
+      "close": "Đóng tìm kiếm theo trường",
+      "skipped": "{stream} đã bị bỏ qua vì chưa cấu hình trường tìm kiếm toàn văn.",
+      "resultsScope": "Các kết quả này chỉ đến từ {streams}.",
+      "noFields": "Stream này không có trường nào để tìm kiếm theo trường.",
+      "valueRequired": "Nhập một giá trị để tìm kiếm.",
+      "fieldRequired": "Chọn một trường để tìm kiếm.",
+      "invalidValue": "Nhập một giá trị hợp lệ cho trường này.",
+      "configureHint": "Giúp tìm kiếm toàn văn nhanh hơn cho stream này."
+    },
+    "autoRunPersistNeedsRun": "Hãy chạy truy vấn trước: thao tác này lưu hoặc chia sẻ những gì bạn đã chạy",
+    "autoRunSearchAroundActive": "Đang hiển thị các bản ghi xung quanh một dòng: chạy truy vấn để quay lại kết quả",
+    "autoRunStaleTooltip": "Chạy truy vấn để cập nhật kết quả",
+    "searchCancelledNotice": "Đã hủy tìm kiếm.",
+    "linePermalink": {
+      "disabledFunction": "Tắt hàm để liên kết một dòng",
+      "disabledTimestampRewrite": "Truy vấn này ghi lại dấu thời gian",
+      "disabledNotSingleLines": "Các hàng từ truy vấn này không phải là từng dòng nhật ký riêng lẻ",
+      "disabledNoTimestamp": "Hàng này không có dấu thời gian",
+      "disabledEnrichmentTable": "Không thể liên kết các hàng của bảng làm giàu",
+      "toastNotUnique": "Đã sao chép liên kết đến dấu thời gian; không thể xác định duy nhất dòng này.",
+      "toastWideStream": "Stream này quá rộng để liên kết chính xác một dòng; đã sao chép liên kết đến dấu thời gian",
+      "bannerInvalid": "Liên kết này không hợp lệ; chỉ hiển thị tìm kiếm được chia sẻ",
+      "bannerDenied": "Bạn không có quyền truy cập stream {stream}.",
+      "bannerStreamMissing": "Stream {stream} không còn tồn tại",
+      "bannerError": "Không thể tải dòng nhật ký được chia sẻ.",
+      "bannerIncomplete": "Không thể tìm kiếm mọi dòng tại mốc thời gian này",
+      "bannerGone": "Dòng nhật ký này không còn khả dụng. Có thể nó đã vượt quá thời gian lưu trữ của stream hoặc đã bị xóa.",
+      "bannerGoneRetention": "Dòng nhật ký này không còn khả dụng. Có thể nó đã vượt quá thời gian lưu trữ của stream ({days} ngày) hoặc đã bị xóa. | Dòng nhật ký này không còn khả dụng. Có thể nó đã vượt quá thời gian lưu trữ của stream ({days} ngày) hoặc đã bị xóa.",
+      "bannerFound": "Đang hiển thị một dòng nhật ký được chia sẻ",
+      "bannerAmbiguous": "{count} dòng tại mốc thời gian này; không thể xác định chính xác dòng nào | {count} dòng tại mốc thời gian này; không thể xác định chính xác dòng nào",
+      "bannerChanged": "Dòng này có thể đã thay đổi kể từ khi liên kết được tạo",
+      "actionShowLines": "Hiển thị các dòng này",
+      "actionShowInContext": "Hiển thị trong ngữ cảnh",
+      "bannerAmbiguousTieHeavy": "{count} dòng có cùng mốc thời gian này và stream không có _o2_id, nên không thể xác định chính xác dòng nào. Các dòng tại mốc thời gian đó được tô sáng. | {count} dòng có cùng mốc thời gian này và stream không có _o2_id, nên không thể xác định chính xác dòng nào. Các dòng tại mốc thời gian đó được tô sáng.",
+      "bannerDismiss": "Bỏ qua",
+      "copyLink": "Sao chép liên kết",
+      "copyLinkTooltip": "Sao chép liên kết đến dòng nhật ký này",
+      "copyLinkMenu": "Sao chép liên kết đến dòng nhật ký này",
+      "toastCopied": "Đã sao chép liên kết đến dòng nhật ký",
+      "toastCopiedValid": "Đã sao chép liên kết đến dòng nhật ký · có hiệu lực trong {days} ngày | Đã sao chép liên kết đến dòng nhật ký · có hiệu lực trong {days} ngày",
+      "toastLookupFailed": "Không thể tra cứu dòng này; đã sao chép liên kết đến mốc thời gian",
+      "toastShortFailed": "Không thể rút ngắn liên kết; thay vào đó đã sao chép liên kết đầy đủ",
+      "toastFailed": "Không thể tạo liên kết đến dòng nhật ký này",
+      "toastScopeChanged": "Tổ chức hoặc stream đã thay đổi trong khi liên kết đang được tạo; không có gì được sao chép",
+      "popoverTitle": "Liên kết đến dòng nhật ký này",
+      "popoverDesc": "Trình duyệt của bạn đã chặn sao chép tự động. Hãy chọn liên kết và sao chép, hoặc dùng nút bên dưới.",
+      "pageNotice": "Liên kết này nằm ở trang {page}.",
+      "pageGo": "Đi đến trang {page}",
+      "pageGoLast": "Đi đến trang cuối ({page})"
+    },
+    "autoRunPendingDot": "Chạy truy vấn để áp dụng các thay đổi mới nhất",
+    "autoRunAppliesTo": "Áp dụng cho Nhật ký và Trace",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "Tìm kiếm này sẽ quét khoảng {size}",
+    "autoRunGuardLinkTitle": "Liên kết này sẽ quét khoảng {size}",
+    "autoRunGuardDescAutoRun": "{scope}. Tự động chạy đã tạm dừng để bạn thu hẹp phạm vi trước.",
+    "autoRunGuardDescPaused": "{scope}. Đã tạm dừng để bạn thu hẹp phạm vi trước.",
+    "autoRunGuardDescLink": "Mở từ liên kết · {scope}. Xem lại phạm vi, rồi chạy.",
+    "autoRunGuardHint": "Tắt Tự động chạy để áp dụng thay đổi bộ lọc và thời gian theo cách thủ công.",
+    "autoRunGuardUnknownTitle": "Không xác định được kích thước cho khoảng thời gian này",
+    "autoRunGuardUnknownDesc": "{streams} chưa có thống kê kích thước, nên Tự động chạy chỉ chạy các khoảng thời gian từ 1 giờ trở xuống trên đó.",
+    "autoRunGuardUnknownManyDesc": "{count} stream chưa có thống kê kích thước, nên Tự động chạy chờ bạn. {scope}. | {count} stream chưa có thống kê kích thước, nên Tự động chạy chờ bạn. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Sẵn sàng chạy trên nhiều vùng",
+    "autoRunGuardSuperClusterDesc": "Chưa thể ước tính kích thước tìm kiếm trên cụm đa vùng, nên Tự động chạy chờ bạn. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Stream không khả dụng",
+    "autoRunGuardUnresolvedDesc": "Stream {streams} không tồn tại hoặc bạn không có quyền truy cập.",
+    "autoRunGuardBanner": "Thay đổi này sẽ quét khoảng {size} ({scope}), nên Tự động chạy đã tạm dừng. Kết quả bên dưới là từ truy vấn trước đó.",
+    "autoRunGuardBannerPaused": "Thay đổi này sẽ quét khoảng {size} ({scope}), nên đã tạm dừng. Kết quả bên dưới là từ truy vấn trước đó.",
+    "autoRunGuardBannerUnknown": "Không xác định được kích thước cho khoảng thời gian này ({scope}), nên đã tạm dừng. Kết quả bên dưới là từ truy vấn trước đó.",
+    "autoRunGuardBannerRefresh": "Tự động làm mới sẽ quét khoảng {size} mỗi lần làm mới ({scope}), nên đã tạm dừng cho đến khi bạn chạy một lần. Kết quả bên dưới là từ truy vấn trước đó.",
+    "autoRunGuardRunAnyway": "Vẫn chạy",
+    "autoRunGuardRunQuery": "Chạy truy vấn",
+    "autoRunGuardNarrow": "Thu hẹp còn {period}",
+    "autoRunGuardNarrowWithSize": "Thu hẹp về {period} (~{size})",
+    "autoRunGuardSearchJob": "Chạy dưới dạng tác vụ tìm kiếm",
+    "autoRunGuardSelectStream": "Chọn một stream",
+    "searchJobNoPermission": "Bạn không có quyền tạo tác vụ tìm kiếm",
     "turnOnLiveMode": "Bật Tự động chạy",
     "turnOffLiveMode": "Tắt Tự động chạy",
     "autoRefreshWithValue": "Tự động làm mới: {value}",
@@ -1251,6 +1363,7 @@
     "histogramSearchQueryCancelled": "Truy vấn tìm kiếm histogram đã bị hủy",
     "histogramUnavailableForQueries": "Histogram không khả dụng cho các truy vấn CTE, DISTINCT, UNION, JOIN và LIMIT.",
     "invalidDateFormat": "Định dạng ngày không hợp lệ.",
+    "missingStreamAndNoFts": "Một hoặc nhiều trường lọc không tồn tại trong \"{missingStreams}\", do đó không thực hiện tìm kiếm trong stream được đề cập.\n Không tìm kiếm: {noFtsStreams} (không có trường toàn văn).",
     "missingStreamFilterFields": "Một hoặc nhiều trường lọc không tồn tại trong \"{streams}\", do đó không có tìm kiếm nào được thực hiện trong stream được đề cập.\n",
     "noColumnFoundInStream": "Không tìm thấy cột nào trong stream đã chọn.",
     "noStreamFoundInOrganization": "Không tìm thấy stream nào trong tổ chức đã chọn!",
@@ -1271,7 +1384,19 @@
     "aliasNotAllowed": "Bí danh '{alias}' không được phép.",
     "commonGroupFields": "Các trường nhóm chung",
     "queryRangeHours": "{count} giờ | {count} giờ",
-    "menuGroupAlerts": "Cảnh báo"
+    "menuGroupAlerts": "Cảnh báo",
+    "freeTextChooseFirst": "Trước tiên hãy chọn cách tìm kiếm văn bản",
+    "freeTextScanLogsOnly": "Chế độ quét chỉ hoạt động trong chế độ xem nhật ký; hãy đặt trường toàn văn để dùng tìm kiếm văn bản ở đây",
+    "freeTextSearchedFields": "Tìm kiếm toàn văn trong: {fields} (mọi từ, không phân biệt thứ tự)",
+    "freeTextPreview": "Tìm kiếm toàn văn trong: {fields} (mọi từ, không phân biệt thứ tự)\n\nChạy dưới dạng {sql}",
+    "freeTextRunsAs": "Chạy dưới dạng {sql}",
+    "freeTextNotSearched": "Không tìm kiếm: {streams} (không có trường toàn văn).",
+    "freeTextSetField": "Cấu hình trường tìm kiếm toàn văn",
+    "freeTextNoFtsTitle": "\"{stream}\" không có trường toàn văn",
+    "freeTextNoFtsTitleMulti": "Các stream đã chọn không có trường toàn văn",
+    "freeTextNoTextFields": "Stream này không có trường văn bản nào để tìm kiếm.",
+    "freeTextNoTextFieldsNamed": "Không tìm kiếm: {streams} (không có trường văn bản).",
+    "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL."
   },
   "menu": {
     "upgradeToProPlan": "Nâng cấp lên gói PRO",
@@ -11646,7 +11771,21 @@
     "eventClusterAriaLabelPlural": "{count} sự kiện, {errors} lỗi",
     "eventMarkerTooltip": "Sự kiện: {name}",
     "exceptionMarkerTooltip": "Ngoại lệ: {type}",
-    "spanEventFallback": "sự kiện span"
+    "spanEventFallback": "sự kiện span",
+    "spanNav": {
+      "firstSpan": "Span đầu tiên",
+      "lastSpan": "Span cuối cùng",
+      "position": "Span {index} trên {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "Trace {row} trên {count}, trang {page}",
+      "spanPosition": "Span {row} trên {count}, trang {page}",
+      "firstResult": "Kết quả đầu tiên",
+      "lastResult": "Kết quả cuối cùng",
+      "loadingPage": "Đang tải trang {page}",
+      "pageFailed": "Không thể tải trang {page}",
+      "pageEmpty": "Trang {page} không có kết quả"
+    }
   },
   "aiToolset": {
     "header": "Bộ công cụ AI",
@@ -14879,11 +15018,12 @@
     "noStream": {
       "title": "Chọn một luồng để bắt đầu khám phá",
       "description": "Chọn một luồng, sau đó nhấn <strong>Chạy truy vấn</strong>. Bạn có thể tinh chỉnh với bộ lọc, hàm VRL và phạm vi thời gian tùy chỉnh khi có kết quả.",
+      "descriptionAutoRun": "Chọn một stream để xem nhật ký mới nhất của stream đó. Bạn có thể tinh chỉnh bằng bộ lọc, hàm VRL và khoảng thời gian tùy chỉnh sau khi có kết quả.",
       "selectStream": "Chọn một luồng",
       "selectStreamDesc": "Duyệt các stream nhật ký, trace, chỉ số và RUM",
       "queryGuide": "Đọc hướng dẫn truy vấn",
       "queryGuideDesc": "Bộ lọc, chế độ SQL, VRL & chế độ xem đã lưu",
-      "recent": "Gần đây:"
+      "recent": "Dùng gần đây nhất:"
     },
     "noEvents": {
       "title": "Không tìm thấy sự kiện nào",
@@ -14932,12 +15072,40 @@
       "sendToAiChat": "Gửi đến AI Chat",
       "contentCopiedSuccessfully": "Đã sao chép nội dung thành công!"
     },
+    "severity": {
+      "srText": "Mức độ nghiêm trọng {level}",
+      "srTextInferred": "Mức độ nghiêm trọng {level}, suy ra",
+      "inferredLabel": "{level} · suy ra",
+      "popoverTitle": "Mức độ nghiêm trọng: {level}",
+      "popoverAriaLabel": "Bằng chứng về mức độ nghiêm trọng",
+      "evidence": "Bằng chứng",
+      "fromField": "Từ trường {field}",
+      "inferredFrom": "Suy ra từ văn bản của {field}.",
+      "notSearchable": "Không thể tìm kiếm; biểu đồ tần suất không sử dụng nó.",
+      "noLevelField": "Hàng này không có trường mức độ và cũng không có trường văn bản để quét.",
+      "noLevelWordInField": "Hàng này không có trường mức độ và cũng không có từ chỉ mức độ trong {field}.",
+      "notInSelectedColumns": "Trường mức độ không nằm trong các cột đã chọn",
+      "levels": {
+        "emergency": "khẩn cấp",
+        "alert": "báo động",
+        "critical": "nghiêm trọng",
+        "error": "lỗi",
+        "warning": "cảnh báo",
+        "notice": "lưu ý",
+        "info": "thông tin",
+        "debug": "gỡ lỗi",
+        "trace": "trace",
+        "ok": "OK",
+        "unknown": "không xác định"
+      }
+    },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "Truy vấn Select * không được hỗ trợ cho trực quan hóa.",
       "fixErrorsAndRetry": "Có một số lỗi, vui lòng sửa và thử lại"
     },
     "buildQueryPage": {
-      "validationErrors": "Có một số lỗi, vui lòng sửa và thử lại"
+      "validationErrors": "Có một số lỗi, vui lòng sửa và thử lại",
+      "parserLoadFailed": "Không thể tải trình phân tích truy vấn nên không thể thêm bộ lọc tìm kiếm vào biểu đồ. Các lần chạy bị tạm dừng cho đến khi tải xong."
     },
     "searchHistory": {
       "sqlQueryLabel": "Truy vấn SQL:",
@@ -15139,6 +15307,18 @@
     },
     "logsNoEventsState": {
       "lastData": "Dữ liệu cuối: {formatted} ({zone})"
+    },
+    "rowNav": {
+      "autoRefreshEdge": "Tự động làm mới đang bật; hãy tắt để chuyển trang",
+      "position": "Nhật ký {row} / {count}, trang {page}",
+      "positionLabel": "Nhật ký {row} / {count} · Trang {page}",
+      "loadingPage": "Đang tải trang {page}…",
+      "loadingPageAnnouncement": "Đang tải trang {page}",
+      "resultsChanged": "Kết quả đã thay đổi",
+      "notInPage": "Không có trong trang hiện tại",
+      "loadingResults": "Đang tải kết quả…",
+      "previousLog": "Nhật ký trước",
+      "nextLog": "Nhật ký tiếp theo"
     }
   },
   "queryError": {
@@ -15173,7 +15353,10 @@
     "traceId": "Trace ID:",
     "askAi": "Yêu cầu AI sửa truy vấn của tôi",
     "showDetail": "Hiển thị chi tiết",
-    "hideDetail": "Ẩn chi tiết"
+    "hideDetail": "Ẩn chi tiết",
+    "runAs": "Chạy với tư cách",
+    "searchTextFor": "Tìm văn bản cho \"{text}\"",
+    "searchTextDesc": "Tìm toàn bộ nội dung nhập như một cụm từ"
   },
   "refreshButton": {
     "justNow": "vừa xong",
@@ -17071,7 +17254,17 @@
       "oncallEscalate": "Leo thang",
       "oncallSnooze": "Tạm hoãn",
       "oncallResolve": "Giải quyết",
-      "functionsImport": "Nhập hàm"
+      "functionsImport": "Nhập hàm",
+      "logsNextRow": "Nhật ký tiếp theo (mở chi tiết)",
+      "logsPrevRow": "Nhật ký trước (mở chi tiết)",
+      "logsRowFocusMove": "Di chuyển tiêu điểm giữa các hàng",
+      "logsRowOpen": "Mở hàng đang có tiêu điểm",
+      "logsDetailClose": "Đóng chi tiết và quay lại hàng",
+      "tracesNextRow": "Chọn trace tiếp theo",
+      "tracesPrevRow": "Chọn trace trước",
+      "tracesRowOpen": "Mở trace đã chọn",
+      "traceNextVisibleSpan": "Span hiển thị tiếp theo",
+      "tracePrevVisibleSpan": "Span hiển thị trước"
     }
   },
   "components": {
@@ -17444,7 +17637,13 @@
         "debug": "Gỡ lỗi",
         "info": "Thông tin",
         "warn": "CẢNH BÁO",
-        "fatal": "Nghiêm trọng"
+        "fatal": "Nghiêm trọng",
+        "emergency": "Khẩn cấp",
+        "alert": "Cảnh báo",
+        "critical": "Nghiêm trọng",
+        "notice": "Thông báo",
+        "ok": "OK",
+        "unknown": "Không xác định"
       },
       "pipelineRunOutcome": {
         "firing": "Đang kích hoạt",
