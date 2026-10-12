@@ -713,7 +713,7 @@ describe("SessionsList — OSS builds (neither isEnterprise nor isCloud is 'true
     expect(wrapper.find("[data-test='sessions-list-filter-mode']").exists()).toBe(true);
     const agentItem = wrapper.find("[data-test='sessions-list-filter-mode-agent']");
     expect(agentItem.exists()).toBe(true);
-    expect((agentItem.element as HTMLButtonElement).disabled).toBe(true);
+    expect(agentItem.attributes("icon-right")).toBe("lock");
   });
 
   it("forces Stream mode even when the URL asks for Agent mode", async () => {

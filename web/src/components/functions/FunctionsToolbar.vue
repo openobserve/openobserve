@@ -112,7 +112,12 @@
                 </template>
                 {{ transformTypeOptions[1]?.label }}
                 <template v-if="transformTypeOptions[1]?.disabled" #icon-right>
-                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                  <OIcon
+                    name="lock"
+                    size="sm"
+                    class="text-warning-600"
+                    data-test="function-transform-type-js-lock"
+                  />
                 </template>
                 <template v-else #icon-right>
                   <OIcon
