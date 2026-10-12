@@ -30,6 +30,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-funnel-users-fallback"
       />
       <OBanner
+        v-if="pa.state.includeExcluded"
+        variant="warning"
+        dense
+        :content="includedBanner"
+        data-test="rum-analytics-funnel-included-banner"
+      >
+        <template #actions>
+          <OButton
+            v-if="appFilters.hiddenFailed.value"
+            variant="ghost"
+            size="sm"
+            data-test="rum-analytics-funnel-hidden-count-retry-btn"
+            @click="appFilters.retryHidden()"
+            >{{ t("common.retry") }}</OButton
+          >
+          <OButton
+            variant="ghost"
+            size="sm"
+            data-test="rum-analytics-funnel-hide-hidden-btn"
+            @click="appFilters.setIncludeHidden(router, false)"
+            >{{ t("rum.analytics.appFilters.hideHidden") }}</OButton
+          >
+        </template>
+      </OBanner>
+      <OBanner
         v-if="pa.savedFunnelMissing.value"
         variant="warning"
         dense
@@ -327,9 +352,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </template>
             </OEmptyState>
-            <FunnelBuilder
+            <FunnelLayout
               :def="def"
               :result="result"
+              :removed="removed"
               :suggestions="suggestions"
               :suggestions-state="suggestionsState"
               :state="funnelPanel"
@@ -340,9 +366,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :unit-label="unitLabel"
               :unit-noun="unitNoun"
               :hide-time="!!def.breakdown"
-              @update:def="(d) => (pa.funnel.value = d)"
+              :app="pa.state.app"
+              :app-filters="appFilters.counts.value"
+              :include-hidden="pa.state.includeExcluded"
+              :settings="layoutSettings"
+              @update:def="(d: FunnelDef) => (pa.funnel.value = d)"
               @dropoff="openDropoff"
               @suggestions-retry="retrySuggestions"
+              @include-hidden="appFilters.setIncludeHidden(router, true)"
+              @edit-app-filters="emit('open-exclusions')"
             />
             <span
               v-if="def.x?.length"
@@ -420,7 +452,6 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
-import FunnelBuilder from "@/components/rum/productAnalytics/FunnelBuilder.vue";
 import FunnelBreakdown from "@/components/rum/productAnalytics/FunnelBreakdown.vue";
 import KeySequence from "@/components/rum/productAnalytics/KeySequence.vue";
 import DropoffDrawer from "@/components/rum/productAnalytics/DropoffDrawer.vue";
@@ -434,12 +465,19 @@ import useFunnelDraft, {
   trackSessionEdits,
 } from "@/composables/rum/useFunnelDraft";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
+import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
+import {
+  FUNNEL_LAYOUTS,
+  funnelLayoutName,
+} from "@/components/rum/productAnalytics/funnelLayouts/registry";
+import type { FunnelLayoutSetting } from "@/components/rum/productAnalytics/funnelLayouts/types";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import useAnalyticsSearch, { type PanelState } from "@/composables/rum/useAnalyticsSearch";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
+  exclusionRemoved,
   foldBreakdown,
   formatCount,
   formatDuration,
@@ -467,12 +505,18 @@ import { buildPrefillFromRumFunnel } from "@/utils/alerts/prefill/fromRumFunnel"
 defineOptions({ name: "AnalyticsFunnels" });
 
 const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
+// Read once per mount, so switching the layout takes a reload of the tab, never a live swap.
+const FunnelLayout = defineAsyncComponent(
+  FUNNEL_LAYOUTS[funnelLayoutName(window._o2_paFunnelLayout)],
+);
 
 const DEBOUNCE_MS = 300;
 
+const emit = defineEmits<{ "open-exclusions": [] }>();
 const { t } = useI18nTyped();
 const router = useRouter();
 const pa = useProductAnalytics();
+const appFilters = useAppFilterCounts();
 const funnelDraft = useFunnelDraft();
 trackSessionEdits();
 const runner = useAnalyticsSearch();
@@ -600,6 +644,36 @@ const result = computed<FunnelResult | null>(() => {
   const row = funnelPanel.value.rows[0] as Record<string, number> | undefined;
   return row ? toFunnelResult(row, effectiveDef.value) : null;
 });
+
+// Rows from an earlier run index another exclusion list, so they count only for the funnel on screen.
+const removed = computed<(number | null)[]>(() =>
+  funnelPanel.value.status === "ok" && funnelPanel.value.key === funnelKey.value
+    ? exclusionRemoved(funnelPanel.value.rows, def.value.x?.length ?? 0)
+    : [],
+);
+
+const includedBanner = computed<I18nText>(() => {
+  const n = appFilters.hiddenTotal.value;
+  return n === null
+    ? t("rum.analytics.appFilters.includedBannerPending")
+    : t("rum.analytics.appFilters.includedBanner", { count: addCommasToNumber(n) }, n);
+});
+
+const layoutSettings = computed<FunnelLayoutSetting[]>(() => [
+  { id: "unit", label: t("rum.analytics.funnel.countBy"), value: unitLabel.value },
+  {
+    id: "window",
+    label: t("rum.analytics.funnel.railWindow"),
+    value:
+      windowOptions.value.find((o) => o.value === effectiveDef.value.window)?.label ??
+      t("rum.analytics.funnel.windowSession"),
+  },
+  {
+    id: "breakdown",
+    label: t("rum.analytics.funnel.railBreakdown"),
+    value: def.value.breakdown ? dimLabel.value : t("rum.analytics.funnel.noBreakdown"),
+  },
+]);
 
 const firstUnits = computed(() => result.value?.steps[0]?.units ?? 0);
 const lastUnits = computed(() => result.value?.steps[result.value.steps.length - 1]?.units ?? 0);

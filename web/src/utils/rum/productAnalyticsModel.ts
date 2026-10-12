@@ -159,6 +159,8 @@ export interface FunnelStepResult {
   medianMs: number | null;
   p90Ms: number | null;
 }
+export type ExclusionProblem =
+  { kind: "anchor"; a: number } | { kind: "inside"; step: number; b: number };
 export interface FunnelResult {
   steps: FunnelStepResult[];
   step1Sessions: number | null;
@@ -803,6 +805,7 @@ export function decodeDef(param: string | undefined): unknown {
 
 const STEP_OPTION_KEYS = ["min", "fr", "er"];
 const EXCLUSION_KEYS = ["s", "a", "b", "w"];
+const FUNNEL_KEYS = ["s", "u", "w", "b", "x"];
 
 const onlyKeys = (raw: Record<string, unknown>, keys: readonly string[]): boolean =>
   Object.keys(raw).every((k) => keys.includes(k));
@@ -846,19 +849,42 @@ export function stepRefParam(step: StepRef): unknown[] {
   ];
 }
 
-const parseExclusion = (raw: unknown, n: number): ExclusionStep | null => {
+const sameTarget = (x: StepRef, s: StepRef | undefined): boolean =>
+  !!s && x.kind === s.kind && x.key === s.key;
+
+/** Why an exclusion can never hold for these steps, or null when it can. */
+export function exclusionProblem(steps: StepRef[], x: ExclusionStep): ExclusionProblem | null {
+  if (x.b === undefined) {
+    // Mirrors the server: a within row on step a's own page would match step a itself.
+    return x.step.kind === "p" && sameTarget(x.step, steps[x.a - 1])
+      ? { kind: "anchor", a: x.a }
+      : null;
+  }
+  if (x.step.kind !== "p" && x.step.kind !== "c") return null;
+  // Every session reaching b passed each step strictly inside the span, so excluding one removes them all.
+  for (let k = x.a + 1; k < x.b; k++) {
+    if (sameTarget(x.step, steps[k - 1])) return { kind: "inside", step: k, b: x.b };
+  }
+  return null;
+}
+
+const parseExclusion = (raw: unknown, steps: StepRef[]): ExclusionStep | null => {
   if (!isRecord(raw) || !onlyKeys(raw, EXCLUSION_KEYS)) return null;
   const step = parseStepRef(raw.s);
   const { a, b, w } = raw;
+  const n = steps.length;
   if (!step || typeof a !== "number" || !Number.isInteger(a) || a < 1) return null;
   if ((b === undefined) === (w === undefined)) return null;
+  let x: ExclusionStep | null = null;
   if (b !== undefined)
-    return typeof b === "number" && Number.isInteger(b) && a < b && b <= n ? { step, a, b } : null;
-  return isMs(w) && w > 0 && a <= n ? { step, a, withinMs: w } : null;
+    x = typeof b === "number" && Number.isInteger(b) && a < b && b <= n ? { step, a, b } : null;
+  else x = isMs(w) && w > 0 && a <= n ? { step, a, withinMs: w } : null;
+  return x && !exclusionProblem(steps, x) ? x : null;
 };
 
+// An unknown key must fail the whole definition, so an older build never drops a setting it cannot apply.
 export function parseFunnelDef(raw: unknown): FunnelDef | null {
-  if (!isRecord(raw) || !Array.isArray(raw.s)) return null;
+  if (!isRecord(raw) || !Array.isArray(raw.s) || !onlyKeys(raw, FUNNEL_KEYS)) return null;
   if (!raw.s.length || raw.s.length > MAX_FUNNEL_STEPS) return null;
   const steps = raw.s.map(parseStepRef);
   if (steps.some((s) => s === null)) return null;
@@ -871,7 +897,7 @@ export function parseFunnelDef(raw: unknown): FunnelDef | null {
   if (b !== null && !Object.prototype.hasOwnProperty.call(DIMENSIONS, b as string)) return null;
   const xs = raw.x === undefined ? [] : raw.x;
   if (!Array.isArray(xs) || xs.length > MAX_EXCLUSIONS) return null;
-  const x = xs.map((e) => parseExclusion(e, steps.length));
+  const x = xs.map((e) => parseExclusion(e, steps as StepRef[]));
   if (x.some((e) => e === null)) return null;
   return {
     steps: steps as StepRef[],
@@ -968,9 +994,10 @@ export function parseSavedFunnelDraft(draft: {
 }
 
 const parseCohort = (raw: unknown): FunnelCohort | null => {
-  const funnel = parseFunnelDef(raw);
-  if (!funnel || !isRecord(raw)) return null;
-  const k = raw.k;
+  if (!isRecord(raw)) return null;
+  const { k, ...def } = raw;
+  const funnel = parseFunnelDef(def);
+  if (!funnel) return null;
   if (typeof k !== "number" || !Number.isInteger(k) || k < 1 || k >= funnel.steps.length)
     return null;
   return { funnel: { ...funnel, breakdown: null }, stepIndex: k, side: "dropped" };
@@ -1281,6 +1308,18 @@ export function toFunnelResult(hit: Record<string, number>, def: FunnelDef): Fun
     step1Sessions: users ? num(hit.s1_sessions) : null,
     leftOut: users ? num(hit.left_out) : null,
   };
+}
+
+/** Units each exclusion removed, summed over the result rows; null where the run carried no xr column. */
+export function exclusionRemoved(
+  rows: Record<string, unknown>[],
+  count: number,
+): (number | null)[] {
+  return Array.from({ length: count }, (_, i) => {
+    const col = `xr${i + 1}`;
+    if (!rows.length || !rows.some((r) => r[col] !== undefined && r[col] !== null)) return null;
+    return rows.reduce((sum, r) => sum + num(r[col]), 0);
+  });
 }
 
 export function foldBreakdown(
