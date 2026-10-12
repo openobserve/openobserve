@@ -3139,6 +3139,7 @@
       "colorDark": "Dark mode",
       "colorInvalid": "Enter a hex color such as #1D4ED8.",
       "messageTooLong": "Keep it under 300 characters.",
+      "messageLinkInvalid": "Links in the message must start with http:// or https://.",
       "icon": "Icon",
       "links": "Link buttons",
       "addLink": "Add link button",
@@ -3174,8 +3175,9 @@
     },
     "list": {
       "subtitle": "Notices shown at the top of the app for every organization, or only the ones you choose.",
-      "liveNow": "Live right now (all targeted organizations)",
+      "liveNow": "Live right now",
       "liveNowEmpty": "No banner is showing right now.",
+      "liveOnlyFor": "Only for {orgs}",
       "statusHeader": "Status",
       "status": {
         "live": "Live",
@@ -3273,9 +3275,23 @@
       "deleteHint": "Banners already using it keep their look.",
       "deleted": "Style “{name}” deleted",
       "custom": "Custom",
-      "customHelp": "Pick your own icon, text size and colours. Shown in the same place as Info banners.",
+      "customHelp": "Pick your own icon, text size and colours.",
       "savedHelp": "A saved custom style. Pick Custom to change its look for this banner.",
-      "saveHint": "Saves this icon, text size and colours under a name, so you can reuse them."
+      "saveHint": "Saves this icon, text size and colours under a name, so you can reuse them.",
+      "critical": "Treat as critical",
+      "criticalHelp": "Shown above other banners, announced to screen readers, and hides promotions while live."
+    },
+    "icons": {
+      "info": "Info",
+      "warning": "Warning",
+      "error": "Error",
+      "campaign": "Megaphone",
+      "build": "Maintenance",
+      "schedule": "Clock",
+      "rocket-launch": "Launch",
+      "lightbulb": "Tip",
+      "security": "Security",
+      "update": "Update"
     }
   },
   "ticket": {

@@ -261,9 +261,33 @@ export function draftsFromConfig(parsed: unknown): BannerDraft[] {
     .map(draftFromAuthored);
 }
 
+/** Every banner key this editor writes; any other key on a stored banner is carried through untouched. */
+const EDITED_KEYS = new Set([
+  "message",
+  "id",
+  "variant",
+  "starts_at",
+  "ends_at",
+  "duration",
+  "dismissible",
+  "cta",
+  "ctas",
+  "orgs",
+  "text_size",
+  "colors",
+  "icon",
+  "style",
+]);
+
 /** One draft as authored JSON, with defaults left out so the stored config stays short. */
-export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
-  const banner: Record<string, unknown> = { message: draft.message.trim() };
+export function authoredFromDraft(
+  draft: BannerDraft,
+  stored: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const banner: Record<string, unknown> = Object.fromEntries(
+    Object.entries(stored).filter(([key]) => !EDITED_KEYS.has(key)),
+  );
+  banner.message = draft.message.trim();
 
   if (draft.id.trim()) banner.id = draft.id.trim();
   if (draft.variant !== "info") banner.variant = draft.variant;
@@ -296,16 +320,19 @@ export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
   return banner;
 }
 
-export function configFromDrafts(drafts: BannerDraft[]): { banners: Record<string, unknown>[] } {
-  return { banners: drafts.map(authoredFromDraft) };
-}
-
 /** Where a banner is in its display window, judged against the viewer's clock. */
 export type BannerStatus = "live" | "scheduled" | "ended";
 
+// A span with no explicit start is anchored to whenever the server last read it, so it is treated as open-ended.
+function endMs(draft: BannerDraft, start: number | null): number | null {
+  if (draft.end === "at" && draft.endsAt) return new Date(draft.endsAt).getTime();
+  const span = draft.end === "after" ? parseDurationMs(draft.duration) : null;
+  return span !== null && start !== null ? start + span : null;
+}
+
 export function bannerStatus(draft: BannerDraft, now: number = Date.now()): BannerStatus {
   const start = draft.start === "at" && draft.startsAt ? new Date(draft.startsAt).getTime() : null;
-  const end = draft.end === "at" && draft.endsAt ? new Date(draft.endsAt).getTime() : null;
+  const end = endMs(draft, start);
 
   if (start !== null && now < start) return "scheduled";
   if (end !== null && now >= end) return "ended";
@@ -328,6 +355,16 @@ export function isHiddenByCritical(
 
   const covered = new Set(critical.flatMap((d) => d.orgs));
   return draft.orgs.every((org) => covered.has(org));
+}
+
+/** A stored banner without its label pointing at `styleId`, which is about to be deleted. */
+export function withoutStyle(
+  banner: Record<string, unknown>,
+  styleId: string,
+): Record<string, unknown> {
+  if (banner.style !== styleId) return banner;
+  const { style: _style, ...rest } = banner;
+  return rest;
 }
 
 export function stylesFromConfig(parsed: unknown): BannerStyle[] {

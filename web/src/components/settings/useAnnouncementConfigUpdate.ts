@@ -27,9 +27,24 @@ import {
 /** Thrown by a change when the part of the config it edits moved since the page loaded it. */
 export class AnnouncementConflictError extends Error {}
 
-/** Same-document comparison: both sides come straight from the stored JSON. */
-export const sameAuthored = (a: unknown, b: unknown) =>
-  a !== undefined && JSON.stringify(a) === JSON.stringify(b);
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Whether `stored` is `original` with its `duration` pinned to an `ends_at`, as every save does. */
+const isPinnedFrom = (stored: unknown, original: unknown) => {
+  if (!isRecord(stored) || !isRecord(original)) return false;
+  if (typeof original.duration !== "string" || "duration" in stored) return false;
+  if (typeof stored.ends_at !== "string") return false;
+
+  const { duration: _duration, ...authored } = original;
+  const { ends_at: _endsAt, ...pinned } = stored;
+  return JSON.stringify(pinned) === JSON.stringify(authored);
+};
+
+/** Same stored banner, tolerating the server's own duration pinning so a save by this page is not a conflict. */
+export const sameAuthored = (stored: unknown, original: unknown) =>
+  stored !== undefined &&
+  (JSON.stringify(stored) === JSON.stringify(original) || isPinnedFrom(stored, original));
 
 /** Read-modify-write of the whole stored config, re-read first so a concurrent save is not lost. */
 export function useAnnouncementConfigUpdate() {

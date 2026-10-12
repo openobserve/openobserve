@@ -103,6 +103,27 @@ describe("AnnouncementBannerList", () => {
     );
   });
 
+  it("names the organizations a live banner is limited to", async () => {
+    service.getConfig.mockResolvedValue({
+      data: { banners: [{ message: "Everyone" }, { message: "Scoped", orgs: ["acme", "beta"] }] },
+    });
+    await mountList();
+
+    const labels = document.querySelectorAll('[data-test="announcement-list-live-audience"]');
+    expect([...labels].map((el) => el.textContent?.trim())).toEqual(["Only for acme, beta"]);
+  });
+
+  it("ends a banner whose span from its start has passed", async () => {
+    service.getConfig.mockResolvedValue({
+      data: { banners: [{ message: "Past", starts_at: iso(-2 * HOUR), duration: "1h" }] },
+    });
+    await mountList();
+
+    expect(
+      document.querySelector('[data-test="announcement-list-status-0"]')?.textContent?.trim(),
+    ).toBe("Ended");
+  });
+
   it("removes a banner after confirmation and saves the rest", async () => {
     await mountList();
 

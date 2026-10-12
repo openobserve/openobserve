@@ -19,7 +19,6 @@ import {
   authoredFromDraft,
   authoredFromStyle,
   bannerStatus,
-  configFromDrafts,
   draftFromAuthored,
   draftsFromConfig,
   emptyDraft,
@@ -209,6 +208,10 @@ describe("authoredFromDraft", () => {
   });
 });
 
+const roundTrip = (config: { banners: Record<string, unknown>[] }) => ({
+  banners: draftsFromConfig(config).map((draft, i) => authoredFromDraft(draft, config.banners[i])),
+});
+
 describe("the form/JSON round trip", () => {
   it("returns the same config it was given", () => {
     const config = {
@@ -220,15 +223,30 @@ describe("the form/JSON round trip", () => {
       ],
     };
 
-    expect(configFromDrafts(draftsFromConfig(config))).toEqual(config);
+    expect(roundTrip(config)).toEqual(config);
   });
 
   it("survives a second trip unchanged", () => {
     // Convergence matters: an author toggling between Form and JSON must not
     // watch their config drift a little further on every switch.
-    const once = configFromDrafts(draftsFromConfig({ banners: [{ message: "Stable" }] }));
+    const once = roundTrip({ banners: [{ message: "Stable" }] });
 
-    expect(configFromDrafts(draftsFromConfig(once))).toEqual(once);
+    expect(roundTrip(once)).toEqual(once);
+  });
+
+  it("keeps banner keys it does not edit", () => {
+    const stored = {
+      message: "m",
+      future_field: { a: 1 },
+      cta: { text: "Old", url: "https://x.dev" },
+    };
+    const authored = authoredFromDraft(draftFromAuthored(stored), stored);
+
+    expect(authored).toEqual({
+      message: "m",
+      future_field: { a: 1 },
+      ctas: [{ text: "Old", url: "https://x.dev" }],
+    });
   });
 });
 
@@ -267,7 +285,7 @@ describe("appearance", () => {
       ],
     };
 
-    expect(configFromDrafts(draftsFromConfig(config))).toEqual(config);
+    expect(roundTrip(config)).toEqual(config);
   });
 });
 
@@ -287,6 +305,18 @@ describe("bannerStatus", () => {
       bannerStatus(at('{"startsAt":"2026-10-08T11:00","endsAt":"2026-10-08T13:00"}'), now),
     ).toBe("live");
     expect(bannerStatus(emptyDraft(), now)).toBe("live");
+  });
+
+  it("ends a span counted from an explicit start", () => {
+    const draft = {
+      ...emptyDraft(),
+      start: "at" as const,
+      startsAt: "2026-10-08T10:00",
+      end: "after" as const,
+    };
+
+    expect(bannerStatus({ ...draft, duration: "1h" }, now)).toBe("ended");
+    expect(bannerStatus({ ...draft, duration: "4h" }, now)).toBe("live");
   });
 });
 

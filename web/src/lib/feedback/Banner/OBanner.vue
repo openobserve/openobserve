@@ -55,9 +55,10 @@ const props = withDefaults(defineProps<Props>(), {
 
 const slots = useSlots();
 
+// Medium is the bar's own default scale, so a banner with no size set looks the same as before sizes existed.
 const TEXT_SIZE_CLASS = {
-  small: "text-compact",
-  medium: "text-sm",
+  small: "text-xs",
+  medium: "text-compact",
   large: "text-base",
 } as const;
 

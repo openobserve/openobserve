@@ -77,6 +77,7 @@ import { BANNER_COLOR_PRESETS, type BannerColorPreset } from "@/constants/themes
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import { CUSTOM_CHOICE, DEFAULT_CHOICE } from "@/utils/announcementAppearance";
+import { useRovingRadio } from "./useRovingRadio";
 
 const props = defineProps<{
   /** `default`, `custom`, or a preset key. */
@@ -91,35 +92,11 @@ const { t } = useI18nTyped();
 /** Choices in visual order, matching the option refs. */
 const CHOICES = [DEFAULT_CHOICE, ...BANNER_COLOR_PRESETS.map((p) => p.key), CUSTOM_CHOICE];
 
-const NEXT_KEYS: Record<string, number> = {
-  ArrowRight: 1,
-  ArrowDown: 1,
-  ArrowLeft: -1,
-  ArrowUp: -1,
-};
-
-const options: (HTMLElement | null)[] = [];
-
-const setOption = (index: number, el: unknown) => {
-  const node = (el as { $el?: HTMLElement } | null)?.$el ?? (el as HTMLElement | null);
-  options[index] = node ?? null;
-};
-
-// One Tab stop for the whole group, as a radiogroup promises; arrows move between choices.
-const tabStop = (choice: string) => {
-  const selected = CHOICES.includes(props.modelValue) ? props.modelValue : DEFAULT_CHOICE;
-  return choice === selected ? 0 : -1;
-};
-
-const onKeydown = (event: KeyboardEvent) => {
-  const step = NEXT_KEYS[event.key];
-  if (!step) return;
-  event.preventDefault();
-  const current = Math.max(0, CHOICES.indexOf(props.modelValue));
-  const next = (current + step + CHOICES.length) % CHOICES.length;
-  emit("update:modelValue", CHOICES[next]);
-  options[next]?.focus();
-};
+const { setOption, tabStop, onKeydown } = useRovingRadio(
+  () => CHOICES,
+  () => props.modelValue,
+  (choice) => emit("update:modelValue", choice),
+);
 
 const presetLabel = (key: string) => t(`announcements.colorPresets.${key}` as I18nKey);
 

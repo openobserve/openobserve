@@ -60,6 +60,15 @@ describe("OBanner — textSize and colors", () => {
     expect(large.html()).not.toContain("text-compact");
   });
 
+  it("matches the bar's default scale at medium", () => {
+    const medium = mount(OBanner, {
+      props: { bar: true, textSize: "medium" },
+      slots: { default: "m" },
+      global: { stubs },
+    });
+    expect(medium.classes()).toContain("text-compact");
+  });
+
   it("paints runtime colours in place of the variant's tokens", () => {
     const wrapper = mount(OBanner, {
       props: { bar: true, variant: "info", colors: { background: "#1E3A8A", text: "#FFFFFF" } },

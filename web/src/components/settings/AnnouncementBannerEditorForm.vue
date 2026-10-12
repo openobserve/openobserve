@@ -207,16 +207,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   role="radiogroup"
                   :aria-label="t('announcements.editor.sections.style')"
                   data-test="announcement-editor-variant"
+                  @keydown="styleRadio.onKeydown"
                 >
                   <OButton
-                    v-for="option in styleOptions"
+                    v-for="(option, position) in styleOptions"
                     :key="option.value"
+                    :ref="(el) => styleRadio.setOption(position, el)"
                     variant="outline"
                     size="sm"
                     role="radio"
                     :icon-left="option.icon"
                     :active="styleChoice === option.value"
                     :aria-checked="styleChoice === option.value"
+                    :tabindex="styleRadio.tabStop(option.value)"
                     :data-test="`announcement-editor-style-${option.testId}`"
                     @click="chooseStyle(option.value)"
                     >{{ option.label }}</OButton
@@ -228,6 +231,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ styleHelp }}
                 </span>
+
+                <div v-if="isLookOnly" class="flex flex-col gap-1">
+                  <OSwitch
+                    :model-value="values.variant === 'critical'"
+                    :label="t('announcements.styles.critical')"
+                    data-test="announcement-editor-style-critical"
+                    @update:model-value="setCritical"
+                  />
+                  <span class="text-text-secondary text-xs">
+                    {{ t("announcements.styles.criticalHelp") }}
+                  </span>
+                </div>
 
                 <div
                   v-if="styleChoice === CUSTOM_STYLE"
@@ -259,18 +274,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       role="radiogroup"
                       :aria-label="t('announcements.form.icon')"
                       data-test="announcement-editor-icon"
+                      @keydown="iconRadio.onKeydown"
                     >
                       <OButton
-                        v-for="icon in BANNER_ICONS"
+                        v-for="(icon, position) in BANNER_ICONS"
                         :key="icon"
+                        :ref="(el) => iconRadio.setOption(position, el)"
                         variant="outline"
                         size="icon-sm"
                         role="radio"
                         :icon-left="icon"
-                        :active="(values.icon || severityIcon) === icon"
-                        :aria-checked="(values.icon || severityIcon) === icon"
-                        :aria-label="icon"
-                        :title="icon"
+                        :active="shownIcon === icon"
+                        :aria-checked="shownIcon === icon"
+                        :tabindex="iconRadio.tabStop(icon)"
+                        :aria-label="iconLabel(icon)"
+                        :title="iconLabel(icon)"
                         :data-test="`announcement-editor-icon-${icon}`"
                         @click="form.setFieldValue('icon', icon)"
                       />
@@ -540,7 +558,7 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import {
   BANNER_ICONS,
   CUSTOM_CHOICE,
@@ -560,6 +578,7 @@ import type { BannerVariantName } from "@/utils/announcementOrder";
 import {
   MESSAGE_MAX_LENGTH,
   makeBannerSchema,
+  messageChars,
   type BannerForm,
 } from "./AnnouncementBannerEditor.schema";
 import AnnouncementBannerPreviewPanel, {
@@ -576,6 +595,7 @@ import {
   isHiddenByCritical,
   newBannerId,
   parseDurationMs,
+  withoutStyle,
   type BannerDraft,
   type BannerStyle,
 } from "./announcementDrafts";
@@ -584,6 +604,7 @@ import {
   sameAuthored,
   useAnnouncementConfigUpdate,
 } from "./useAnnouncementConfigUpdate";
+import { useRovingRadio } from "./useRovingRadio";
 
 const props = defineProps<{
   /** The banner being edited, already converted from the stored config. */
@@ -627,7 +648,7 @@ const EMOJIS = [
 
 // Captured once: the parent's copies refresh when a style is saved, and the conflict check must not move with them.
 const index = props.index;
-const original = props.original;
+let original = props.original;
 
 const isNew = computed(() => index === null);
 const splitPct = ref(55);
@@ -726,15 +747,14 @@ const form = useOForm<BannerForm>({
     const draft = draftFromValues(values);
     if (isNew.value && !draft.id) draft.id = newBannerId();
     if (resetDismissals.value) draft.id = newBannerId();
-    const banner = authoredFromDraft(draft);
 
     try {
       await update((latest) => {
         const banners = [...latest.banners];
         if (index === null) {
-          banners.push(banner);
+          banners.push(authoredFromDraft(draft));
         } else if (sameAuthored(banners[index], original)) {
-          banners[index] = banner;
+          banners[index] = authoredFromDraft(draft, banners[index]);
         } else {
           throw new AnnouncementConflictError();
         }
@@ -755,7 +775,7 @@ const form = useOForm<BannerForm>({
 const values = form.useStore((state) => state.values);
 const isDirty = form.useStore((state) => state.isDirty);
 
-const messageLength = computed(() => (values.value.message ?? "").length);
+const messageLength = computed(() => messageChars(values.value.message ?? ""));
 
 const STATUS_LABEL_KEYS = {
   live: "announcements.editor.statusLive",
@@ -856,7 +876,15 @@ const initialStyleChoice = () => {
 // View state: a Custom look that happens to match the defaults must still read as Custom.
 const styleChoice = ref<string>(initialStyleChoice());
 
-const severityIcon = computed(() => bannerIcon(values.value.variant));
+const shownIcon = computed(() => values.value.icon || bannerIcon(values.value.variant));
+
+const iconLabel = (icon: string) => t(`announcements.icons.${icon}` as I18nKey);
+
+const iconRadio = useRovingRadio(
+  () => BANNER_ICONS,
+  () => shownIcon.value,
+  (icon) => form.setFieldValue("icon", icon),
+);
 
 const styleOptions = computed<{ value: string; label: string; icon: IconName; testId: string }[]>(
   () => [
@@ -881,6 +909,14 @@ const styleOptions = computed<{ value: string; label: string; icon: IconName; te
   ],
 );
 
+const isLookOnly = computed(() => styleChoice.value === CUSTOM_STYLE || !!selectedStyle.value);
+
+const styleRadio = useRovingRadio(
+  () => styleOptions.value.map((option) => option.value),
+  () => styleChoice.value,
+  (choice) => chooseStyle(choice),
+);
+
 const styleHelp = computed(() => {
   if (styleChoice.value === CUSTOM_STYLE) return t("announcements.styles.customHelp");
   if (selectedStyle.value) return t("announcements.styles.savedHelp");
@@ -898,18 +934,16 @@ const applyLook = (look: Pick<BannerStyle, "icon" | "textSize" | "colorLight" | 
   colorChoice.value = colorChoiceFor(look.colorLight, look.colorDark);
 };
 
+// Custom and saved styles change only the look; severity still drives ordering, screen readers and promo hiding.
 const chooseStyle = (choice: string) => {
   styleChoice.value = choice;
   if (choice === CUSTOM_STYLE) {
-    // Starts from whatever is showing, so switching to Custom never makes the banner jump.
     form.setFieldValue("styleId", "");
-    if (values.value.variant !== "info") form.setFieldValue("variant", "info");
     return;
   }
 
   const style = props.styles.find((s) => `${STYLE_CHOICE_PREFIX}${s.id}` === choice);
   if (style) {
-    form.setFieldValue("variant", "info");
     applyLook(style);
     form.setFieldValue("styleId", style.id);
     return;
@@ -917,6 +951,10 @@ const chooseStyle = (choice: string) => {
   form.setFieldValue("variant", choice as BannerVariantName);
   form.setFieldValue("styleId", "");
   applyLook({ icon: "", textSize: DEFAULT_TEXT_SIZE, colorLight: "", colorDark: "" });
+};
+
+const setCritical = (on: unknown) => {
+  form.setFieldValue("variant", on ? "critical" : "info");
 };
 
 const chooseColor = (choice: string) => {
@@ -970,7 +1008,9 @@ const deleteStyle = async () => {
     await update((latest) => ({
       ...latest,
       styles: latest.styles.filter((s) => s.id !== style.id),
+      banners: latest.banners.map((banner) => withoutStyle(banner, style.id)),
     }));
+    if (original) original = withoutStyle(original, style.id);
     // The banner keeps the look it copied, now as its own custom look.
     form.setFieldValue("styleId", "");
     styleChoice.value = CUSTOM_STYLE;

@@ -120,6 +120,17 @@ describe("makeBannerSchema", () => {
     ).toContain("links");
   });
 
+  it("rejects a message link that is not http(s), as the API does", () => {
+    expect(issuesFor(draft({ message: "[x](javascript:alert(1))" }))).toEqual(["message"]);
+    expect(issuesFor(draft({ message: "<mailto:a@b.c>" }))).toEqual(["message"]);
+    expect(issuesFor(draft({ message: "[docs](https://x.dev) and <https://y.dev>" }))).toEqual([]);
+  });
+
+  it("counts an emoji as one character, as the API does", () => {
+    expect(issuesFor(draft({ message: "🚨".repeat(300) }))).toEqual([]);
+    expect(issuesFor(draft({ message: "🚨".repeat(301) }))).toEqual(["message"]);
+  });
+
   it("rejects a colour that is not #RRGGBB, and allows none", () => {
     expect(issuesFor(draft({ message: "m", colorLight: "red", colorDark: "#FFF" }))).toEqual([
       "colorLight",
@@ -401,6 +412,94 @@ describe("AnnouncementBannerEditorForm", () => {
     expect(savedConfig().styles).toEqual([
       { id: expect.stringMatching(/^style-/), name: "Maintenance", icon: "build" },
     ]);
+  });
+
+  it("keeps a critical banner critical when it is restyled", async () => {
+    const wrapper = await mountForm({ message: "Down", variant: "critical" }, null, null, {
+      styles: [release],
+    });
+    (wrapper.vm as any).chooseStyle("custom");
+    await flushPromises();
+    expect((wrapper.vm as any).form.state.values.variant).toBe("critical");
+
+    (wrapper.vm as any).chooseStyle("style:style-1");
+    await flushPromises();
+    expect((wrapper.vm as any).form.state.values.variant).toBe("critical");
+  });
+
+  it("makes a custom banner critical from its switch", async () => {
+    const wrapper = await mountForm({ message: "Down" });
+    (wrapper.vm as any).chooseStyle("custom");
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>(
+        '[data-test="announcement-editor-style-critical"] button, [data-test="announcement-editor-style-critical"][role="switch"]',
+      )!
+      .click();
+    await flushPromises();
+
+    expect((wrapper.vm as any).form.state.values).toMatchObject({
+      variant: "critical",
+      dismissible: false,
+    });
+  });
+
+  it("moves through the styles with the arrow keys", async () => {
+    const wrapper = await mountForm({ message: "m" });
+    const group = document.querySelector<HTMLElement>('[data-test="announcement-editor-variant"]')!;
+    group.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    await flushPromises();
+
+    expect((wrapper.vm as any).form.state.values.variant).toBe("warning");
+    expect(document.activeElement?.getAttribute("data-test")).toBe(
+      "announcement-editor-style-warning",
+    );
+  });
+
+  it("keeps fields it does not edit on the stored banner", async () => {
+    const original = { message: "Second", variant: "warning", future: 1 };
+    service.getConfig.mockResolvedValue({ data: { banners: [stored[0], original] } });
+    const wrapper = await mountForm({ message: "Second, edited", variant: "warning" }, 1, original);
+    await submit(wrapper);
+
+    expect(savedBanners()[1]).toEqual({ message: "Second, edited", variant: "warning", future: 1 });
+  });
+
+  it("does not report its own duration pinning as a conflict", async () => {
+    const original = { message: "Timed", duration: "4h" };
+    const pinned = { message: "Timed", ends_at: "2026-10-12T16:00:00+00:00" };
+    service.getConfig.mockResolvedValue({ data: { banners: [stored[0], pinned] } });
+    const wrapper = await mountForm({ message: "Timed, edited" }, 1, original);
+    await submit(wrapper);
+
+    expect(service.setConfig).toHaveBeenCalled();
+  });
+
+  it("drops the label from banners using a style that is deleted", async () => {
+    const labelled = { message: "Second", style: "style-1" };
+    service.getConfig.mockResolvedValue({
+      data: { banners: [stored[0], labelled], styles: [{ id: "style-1", name: "Release" }] },
+    });
+    const wrapper = await mountForm({ message: "Second", styleId: "style-1" }, 1, labelled, {
+      styles: [release],
+    });
+    document.querySelector<HTMLElement>('[data-test="announcement-editor-delete-style"]')!.click();
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>(
+        '[data-test="announcement-editor-delete-style-dialog"] [data-test="o-dialog-primary-btn"]',
+      )!
+      .click();
+    await flushPromises();
+    expect(savedConfig()).toMatchObject({
+      banners: [stored[0], { message: "Second" }],
+      styles: [],
+    });
+
+    service.getConfig.mockResolvedValue({ data: { banners: [stored[0], { message: "Second" }] } });
+    service.setConfig.mockClear();
+    await submit(wrapper);
+    expect(service.setConfig).toHaveBeenCalled();
   });
 
   it("warns only when a critical banner reaches every org the promotion targets", async () => {

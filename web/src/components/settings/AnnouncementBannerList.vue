@@ -32,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
-      <!-- What every user sees right now, painted by the same bar the app uses. -->
       <div
         class="border-border-default flex shrink-0 flex-col gap-2 border-b px-4 py-3"
         data-test="announcement-list-live"
@@ -44,20 +43,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="liveBanners.length"
           class="rounded-default border-border-default overflow-hidden border"
         >
-          <AnnouncementBar
-            v-for="banner in liveBanners"
-            :key="banner.index"
-            :message="banner.draft.message"
-            :variant="banner.draft.variant"
-            :text-size="banner.draft.textSize"
-            :colors="{ light: banner.draft.colorLight, dark: banner.draft.colorDark }"
-            :icon="banner.draft.icon"
-            :mode="isDark ? 'dark' : 'light'"
-            :inert-actions="{
-              links: banner.draft.links.map((link) => link.text),
-              dismissible: banner.draft.dismissible,
-            }"
-          />
+          <template v-for="banner in liveBanners" :key="banner.index">
+            <span
+              v-if="banner.draft.orgs.length"
+              class="text-text-secondary bg-surface-subtle block px-4 py-1 text-xs"
+              data-test="announcement-list-live-audience"
+            >
+              {{ t("announcements.list.liveOnlyFor", { orgs: banner.draft.orgs.join(", ") }) }}
+            </span>
+            <AnnouncementBar
+              :message="banner.draft.message"
+              :variant="banner.draft.variant"
+              :text-size="banner.draft.textSize"
+              :colors="{ light: banner.draft.colorLight, dark: banner.draft.colorDark }"
+              :icon="banner.draft.icon"
+              :mode="isDark ? 'dark' : 'light'"
+              :inert-actions="{
+                links: banner.draft.links.map((link) => link.text),
+                dismissible: banner.draft.dismissible,
+              }"
+            />
+          </template>
         </div>
         <span v-else class="text-text-secondary text-sm" data-test="announcement-list-live-empty">
           {{ t("announcements.list.liveNowEmpty") }}

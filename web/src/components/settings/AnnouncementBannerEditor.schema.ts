@@ -24,7 +24,17 @@ export const MESSAGE_MAX_LENGTH = 300;
 /** A longer button label pushes the message into a narrow column on phones. */
 export const CTA_MAX_LENGTH = 30;
 
-const isHttpUrl = (value: string) => /^https?:\/\//.test(value.trim());
+const isHttpUrl = (value: string) => /^https?:\/\//i.test(value.trim());
+
+/** Counted in code points, as the API counts them, so an emoji is one character and not two. */
+export const messageChars = (value: string) => [...value].length;
+
+// Mirrors the API's link check: `[text](target)` and `<scheme:target>` autolinks.
+const MESSAGE_LINK_TARGET = /\]\(\s*<?([^)\s>]*)|<([A-Za-z][A-Za-z0-9+.-]*:[^>\s]*)>/g;
+
+/** Whether every link written into the message points at an http(s) address. */
+export const messageLinksSafe = (message: string) =>
+  [...message.matchAll(MESSAGE_LINK_TARGET)].every((match) => isHttpUrl(match[1] ?? match[2]));
 
 /** The same rules the API enforces, checked here so an author is told at the field. */
 export const makeBannerSchema = (t: (_key: string) => string) =>
@@ -35,7 +45,10 @@ export const makeBannerSchema = (t: (_key: string) => string) =>
         .string()
         .trim()
         .min(1, { message: t("announcements.form.messageRequired") })
-        .max(MESSAGE_MAX_LENGTH, { message: t("announcements.form.messageTooLong") }),
+        .refine((value) => messageChars(value) <= MESSAGE_MAX_LENGTH, {
+          message: t("announcements.form.messageTooLong"),
+        })
+        .refine(messageLinksSafe, { message: t("announcements.form.messageLinkInvalid") }),
       variant: z.enum(["info", "warning", "critical", "promo"]),
       start: z.enum(["now", "at"]),
       startsAt: z.string().optional(),
