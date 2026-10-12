@@ -28,10 +28,25 @@ import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchem
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
 import type { TranslateFn } from "@/types/i18n";
-import type { Ref } from "vue";
+import { toRaw, type Ref } from "vue";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 
 let moment: any;
 let momentInitialized = false;
+
+export interface LoadedDashboardVersion {
+  hash: string;
+  updatedAt: number | null;
+  snapshot: any;
+}
+
+const loadedDashboardVersions = new Map<string, LoadedDashboardVersion>();
+
+// A dashboard object that lost a save conflict keeps saving against its own base hash, so a stale screen can never silently overwrite.
+const staleDashboardHashes = new WeakMap<object, string>();
+
+// A conflict closed without a choice keeps every later save on the old base hash, so it reopens the dialog instead of saving silently.
+const unresolvedDashboardConflicts = new Map<string, LoadedDashboardVersion>();
 
 const importMoment = async () => {
   if (!momentInitialized) {
@@ -508,6 +523,16 @@ export const updatePanel = async (
   );
 };
 
+const clearUnresolvedDashboardConflict = (dashboardId: any) => {
+  unresolvedDashboardConflicts.delete(String(dashboardId));
+  if (dashboardSaveConflictState.unresolvedDashboardId === String(dashboardId))
+    dashboardSaveConflictState.unresolvedDashboardId = "";
+};
+
+// The dashboard model serialises camelCase; snake_case is kept for older servers.
+const updatedAtOf = (data: any): number | null =>
+  Number(data?.updatedAt ?? data?.updated_at) || null;
+
 const retrieveAndStoreDashboardData = async (
   store: any,
   dashboardId: any,
@@ -520,6 +545,13 @@ const retrieveAndStoreDashboardData = async (
   const hash = apiResponse.data.hash.toString();
 
   const convertedData = convertDashboardSchemaVersion(dashboardData);
+
+  loadedDashboardVersions.clear();
+  loadedDashboardVersions.set(String(dashboardId), {
+    hash,
+    updatedAt: updatedAtOf(apiResponse.data),
+    snapshot: JSON.parse(JSON.stringify(convertedData ?? null)),
+  });
 
   store.dispatch("setAllDashboardListHash", {
     [dashboardId]: hash,
@@ -539,14 +571,25 @@ export const updateDashboard = async (
   dashboardId: any,
   currentDashboardData: any,
   folderId: any,
+  hash?: string,
 ) => {
+  const isObject = !!currentDashboardData && typeof currentDashboardData === "object";
+  // The server only stamps updatedAt on create and stores the client's value on update, so the save carries its own time.
+  const body = isObject
+    ? { ...toRaw(currentDashboardData), updatedAt: Date.now() * 1000 }
+    : currentDashboardData;
   const res = await dashboardService.save(
     org,
     dashboardId,
-    currentDashboardData,
+    body,
     folderId,
-    store.state.organizationData.allDashboardListHash[dashboardId],
+    hash ??
+      (isObject ? staleDashboardHashes.get(toRaw(currentDashboardData)) : undefined) ??
+      unresolvedDashboardConflicts.get(String(dashboardId))?.hash ??
+      store.state.organizationData.allDashboardListHash[dashboardId],
   );
+  if (isObject) staleDashboardHashes.delete(toRaw(currentDashboardData));
+  clearUnresolvedDashboardConflict(dashboardId);
 
   const apiResponse = await dashboardService.get_Dashboard(
     store.state.selectedOrganization.identifier,
@@ -558,6 +601,41 @@ export const updateDashboard = async (
   await getAllDashboards(store, folderId, true);
 
   return res;
+};
+
+/** The server version the cached dashboard was last loaded from, captured before any in-place edit. */
+export const getLoadedDashboardVersion = (dashboardId: any): LoadedDashboardVersion | null =>
+  loadedDashboardVersions.get(String(dashboardId)) ?? null;
+
+export const markDashboardStale = (dashboardData: any, hash: string | undefined) => {
+  if (!dashboardData || typeof dashboardData !== "object" || !hash) return;
+  staleDashboardHashes.set(toRaw(dashboardData), hash);
+};
+
+export const getUnresolvedDashboardConflict = (dashboardId: any) =>
+  unresolvedDashboardConflicts.get(String(dashboardId)) ?? null;
+
+export const setUnresolvedDashboardConflict = (
+  dashboardId: any,
+  base: LoadedDashboardVersion | null,
+) => {
+  if (base) unresolvedDashboardConflicts.set(String(dashboardId), base);
+  else clearUnresolvedDashboardConflict(dashboardId);
+};
+
+/** Re-fetches a dashboard into the store, replacing the cached copy and its hash. */
+export const fetchLatestDashboard = async (store: any, dashboardId: any, folderId: any) => {
+  const apiResponse = await dashboardService.get_Dashboard(
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    folderId,
+  );
+  const data = await retrieveAndStoreDashboardData(store, dashboardId, folderId, apiResponse);
+  return {
+    data,
+    hash: apiResponse.data.hash.toString() as string,
+    updatedAt: updatedAtOf(apiResponse.data),
+  };
 };
 
 // Helper function to ensure variables structure exists with proper defaults
@@ -584,6 +662,7 @@ export const getDashboard = async (store: any, dashboardId: any, folderId: any) 
   let dashboardJson = store.state.organizationData.allDashboardData[dashboardId];
 
   if (!dashboardJson && dashboardId) {
+    clearUnresolvedDashboardConflict(dashboardId);
     const apiResponse = await dashboardService.get_Dashboard(
       store.state.selectedOrganization.identifier,
       dashboardId,

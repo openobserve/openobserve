@@ -227,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
+    <DashboardSaveConflictDialog v-if="dashboardSaveConflict.mounted" />
   </div>
 </template>
 
@@ -263,6 +264,7 @@ import {
   nextTick,
   onBeforeMount,
   provide,
+  defineAsyncComponent,
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -290,6 +292,7 @@ import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import useStreams from "@/composables/useStreams";
 import { userDataStreams } from "@/utils/internalStreams";
 import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 import {
   FIRST_DATA_NOTICE,
   useFirstDataNotice,
@@ -343,6 +346,9 @@ export default defineComponent({
     ODrawer,
     OButton,
     FirstDataNotice,
+    DashboardSaveConflictDialog: defineAsyncComponent(
+      () => import("@/components/dashboards/DashboardSaveConflictDialog.vue"),
+    ),
   },
   methods: {
     navigateToDocs() {
@@ -1582,6 +1588,7 @@ export default defineComponent({
       isDark,
       t,
       raw,
+      dashboardSaveConflict: dashboardSaveConflictState,
       firstDataNotice,
       layoutMixin,
       router,
