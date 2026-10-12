@@ -42,10 +42,13 @@ pub(crate) async fn process_unmute(msg: Message) -> Result<()> {
         infra::errors::Error::Message(format!("[INCIDENTS] Failed to deserialize unmute: {e}"))
     })?;
     log::debug!("[SUPER_CLUSTER:incidents] Unmute org={org_id} id={incident_id}");
-    if let Some(downtime_id) = alert_incidents::get(&org_id, &incident_id)
-        .await?
-        .and_then(|incident| incident.muted_by_downtime_id)
-    {
+    // The primary, not a lagging replica: a missing incident redelivers until its Create lands.
+    let Some(incident) = alert_incidents::get_rw(&org_id, &incident_id).await? else {
+        return Err(infra::errors::Error::Message(format!(
+            "[INCIDENTS] unmute for {org_id}/{incident_id} arrived before the incident; retrying"
+        )));
+    };
+    if let Some(downtime_id) = incident.muted_by_downtime_id {
         alert_incidents::clear_muted_by_downtime_id(&org_id, &incident_id, &downtime_id).await?;
     }
     Ok(())

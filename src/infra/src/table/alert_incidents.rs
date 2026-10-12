@@ -84,6 +84,20 @@ pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
+/// [get] on the primary, for a write that must not act on a lagging replica.
+pub async fn get_rw(
+    org_id: &str,
+    id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = get_orm_client_rw().await;
+
+    alert_incidents::Entity::find_by_id(id)
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
 /// Create a new incident
 pub async fn create(
     org_id: &str,
