@@ -443,6 +443,9 @@ pub struct QueryResult {
 pub enum ApiFuncResponse<T: Serialize> {
     Success {
         data: T,
+        /// Prometheus API: non-empty when the result may be incomplete.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        warnings: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
@@ -457,7 +460,15 @@ pub enum ApiFuncResponse<T: Serialize> {
 
 impl<T: Serialize> ApiFuncResponse<T> {
     pub fn ok(data: T, trace_id: Option<String>) -> Self {
-        ApiFuncResponse::Success { data, trace_id }
+        Self::ok_with_warnings(data, vec![], trace_id)
+    }
+
+    pub fn ok_with_warnings(data: T, warnings: Vec<String>, trace_id: Option<String>) -> Self {
+        ApiFuncResponse::Success {
+            data,
+            warnings,
+            trace_id,
+        }
     }
 
     pub fn err_bad_data(error: impl ToString, trace_id: Option<String>) -> Self {
@@ -698,6 +709,15 @@ mod tests {
         let err = ApiFuncResponse::<()>::err_internal("fail", Some("trace-xyz".to_string()));
         let json2 = serde_json::to_string(&err).unwrap();
         assert!(json2.contains("trace-xyz"));
+    }
+
+    #[test]
+    fn test_api_func_response_with_warnings() {
+        let ok = ApiFuncResponse::ok_with_warnings(1, vec!["node down".to_string()], None);
+        assert_eq!(
+            serde_json::to_string(&ok).unwrap(),
+            r#"{"status":"success","data":1,"warnings":["node down"]}"#
+        );
     }
 
     #[test]

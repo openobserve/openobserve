@@ -185,7 +185,7 @@ pub async fn instant(
     let trace_id = config::ider::generate_trace_id();
     let resp =
         promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
-    match resp {
+    match resp.value {
         Value::Vector(v) => Ok(v),
         Value::Instant(i) => Ok(vec![i]),
         Value::None => Ok(vec![]),

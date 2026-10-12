@@ -30,6 +30,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use infra::cluster::get_cached_online_ingester_nodes;
+use parking_lot::Mutex;
 use promql::{
     ScanContext,
     utils::{apply_label_selector, apply_matchers},
@@ -49,7 +50,10 @@ use search::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-#[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
+#[tracing::instrument(
+    name = "promql:search:grpc:wal:create_context",
+    skip(trace_id, warnings)
+)]
 pub(crate) async fn create_context(
     trace_id: &str,
     org_id: &str,
@@ -57,6 +61,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
+    warnings: &Mutex<Vec<String>>,
 ) -> Result<Vec<ScanContext>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
@@ -74,7 +79,7 @@ pub(crate) async fn create_context(
     }
 
     // get wal record batches
-    let (stats, batches, schema) = get_wal_batches(
+    let (stats, batches, schema, partial_err) = get_wal_batches(
         trace_id,
         org_id,
         stream_name,
@@ -84,6 +89,10 @@ pub(crate) async fn create_context(
         label_selector,
     )
     .await?;
+    if !partial_err.is_empty() {
+        log::warn!("[trace_id {trace_id}] promql->wal->search: partial result: {partial_err}");
+        warnings.lock().push(partial_err);
+    }
 
     if batches.is_empty() {
         return Ok(vec![ScanContext::table(
@@ -144,13 +153,19 @@ async fn get_wal_batches(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>)> {
+) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>, String)> {
     let cfg = get_config();
-    let nodes = get_cached_online_ingester_nodes().await;
-    if nodes.is_none() && nodes.as_deref().unwrap().is_empty() {
-        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
-    }
-    let nodes = nodes.unwrap();
+    let Some(nodes) = get_cached_online_ingester_nodes()
+        .await
+        .filter(|nodes| !nodes.is_empty())
+    else {
+        return Ok((
+            ScanStats::new(),
+            vec![],
+            Arc::new(Schema::empty()),
+            String::new(),
+        ));
+    };
 
     let ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
@@ -167,7 +182,12 @@ async fn get_wal_batches(
                 .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
         )?,
         Err(_) => {
-            return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
+            return Ok((
+                ScanStats::new(),
+                vec![],
+                Arc::new(Schema::empty()),
+                String::new(),
+            ));
         }
     };
 
@@ -175,7 +195,14 @@ async fn get_wal_batches(
 
     match apply_label_selector(df, &schema, &label_selector) {
         Some(dataframe) => df = dataframe,
-        None => return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty()))),
+        None => {
+            return Ok((
+                ScanStats::new(),
+                vec![],
+                Arc::new(Schema::empty()),
+                String::new(),
+            ));
+        }
     }
 
     let plan = df.logical_plan();
@@ -214,7 +241,7 @@ async fn get_wal_batches(
     let ret = datafusion::physical_plan::collect(physical_plan.clone(), ctx.task_ctx()).await;
     let mut visit = ScanStatsVisitor::new();
     let _ = visit_execution_plan(physical_plan.as_ref(), &mut visit);
-    let (batches, stats, ..) = if let Err(e) = ret {
+    let (batches, stats, partial_err) = if let Err(e) = ret {
         log::error!("[trace_id {trace_id}] promql->wal->search: datafusion collect error: {e}");
         Err(e)
     } else {
@@ -223,7 +250,12 @@ async fn get_wal_batches(
     }?;
 
     if batches.is_empty() {
-        return Ok((ScanStats::new(), vec![], Arc::new(Schema::empty())));
+        return Ok((
+            ScanStats::new(),
+            vec![],
+            Arc::new(Schema::empty()),
+            partial_err,
+        ));
     }
 
     // remove the metadata
@@ -241,7 +273,7 @@ async fn get_wal_batches(
             batch.columns().to_vec(),
         )?);
     }
-    Ok((stats, new_batches, schema))
+    Ok((stats, new_batches, schema, partial_err))
 }
 
 #[cfg(test)]
