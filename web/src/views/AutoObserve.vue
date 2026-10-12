@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :ledger="ledger"
         :highlight-id="highlightId"
         @update-entry="updateEntry"
+        @open-incident="openIncident"
       />
       <AutoObservePolicyTab v-else-if="tab === 'policy'" />
       <AutoObserveHowItWorksTab
@@ -199,6 +200,11 @@ const openExample = (target: string, focusId?: string) => {
 const openIssue = (issue: Issue) => {
   selectedIssue.value = issue;
   drawerOpen.value = true;
+};
+
+const openIncident = (incidentId: string) => {
+  const issue = issues.value.find((i) => i.id === incidentId) ?? issueByIncident(incidentId);
+  if (issue) openIssue(issue);
 };
 
 const linkedIssue = typeof route.query.issue === "string" ? route.query.issue : null;

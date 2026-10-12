@@ -155,7 +155,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import type { DayKey } from "../data/facts";
+import { daysBefore, type DayKey } from "../data/facts";
 import type { LedgerEntry } from "../fixtures";
 import ChangeRow from "./ChangeRow.vue";
 import { useDecisions } from "./useDecisions";
@@ -164,6 +164,7 @@ import {
   CHANGE_FILTERS,
   FILTER_DOT,
   FILTER_LABEL,
+  TRUST_WINDOW_DAYS,
   byNewest,
   filterOf,
   toChanges,
@@ -186,7 +187,12 @@ const filter = ref<ChangeFilter>("all");
 const opened = reactive<Record<string, boolean>>({});
 const flashId = ref<string | null>(null);
 
-const changes = computed(() => toChanges(props.ledger, store.phases).sort(byNewest));
+// The list covers the header's window; a change opened by link stays visible even when older.
+const changes = computed(() =>
+  toChanges(props.ledger, store.phases)
+    .filter((c) => daysBefore(c.day) < TRUST_WINDOW_DAYS || c.entry.id === props.highlightId)
+    .sort(byNewest),
+);
 const matches = (change: Change, f: ChangeFilter) => f === "all" || filterOf(change.kind) === f;
 
 const dayGroups = computed(() => {
