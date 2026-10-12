@@ -214,7 +214,7 @@ fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Val
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations array is required with valid destination names. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations must name existing destinations and may be empty. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
     )
 )]
 pub async fn create_alert(
@@ -4218,14 +4218,6 @@ mod tests {
     }
 
     #[test]
-    fn test_alert_destination_missing_is_bad_request() {
-        assert_eq!(
-            status(AlertError::AlertDestinationMissing),
-            StatusCode::BAD_REQUEST
-        );
-    }
-
-    #[test]
     fn test_alert_id_missing_is_bad_request() {
         assert_eq!(status(AlertError::AlertIdMissing), StatusCode::BAD_REQUEST);
     }
@@ -4733,14 +4725,14 @@ mod tests {
             let (status, body) = create(
                 "sa_org1",
                 &caller,
-                json!({"name": "a4", "stream_type": "logs", "stream_name": "secret",
+                json!({"name": "a:4", "stream_type": "logs", "stream_name": "secret",
                        "query_condition": {"type": "sql", "sql": "SELECT * FROM secret"}}),
             )
             .await;
             assert_eq!(status, StatusCode::BAD_REQUEST);
             assert_eq!(
                 body["message"],
-                AlertError::AlertDestinationMissing.to_string()
+                AlertError::AlertNameOfgaUnsupported.to_string()
             );
         }
 
