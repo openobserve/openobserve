@@ -357,14 +357,28 @@ pub async fn insert_if_parent_unchanged_with<C: ConnectionTrait + TransactionTra
     if txn.get_database_backend() != sea_orm::DatabaseBackend::Sqlite {
         parent = parent.lock(LockType::Update);
     }
-    let unchanged = parent.one(&txn).await?.is_some_and(|p| {
+    let Some(stored) = parent.one(&txn).await?.filter(|p| {
         p.updated_at == expected_updated_at && p.cancelled_at.is_none() && p.deleted_at.is_none()
-    });
-    if !unchanged || continued_with(&txn, row, parent_id).await? {
+    }) else {
+        txn.rollback().await?;
+        return Ok(false);
+    };
+    if continued_with(&txn, row, parent_id).await? {
         txn.rollback().await?;
         return Ok(false);
     }
     put_with(&txn, row).await?;
+    // A request naming the parent's old version gets a 409, so a double submit extends once.
+    Entity::update_many()
+        .col_expr(Column::Version, Expr::value(stored.version + 1))
+        .col_expr(
+            Column::UpdatedAt,
+            Expr::value(row.updated_at.max(stored.updated_at + 1)),
+        )
+        .filter(Column::Org.eq(&row.org))
+        .filter(Column::Id.eq(parent_id))
+        .exec(&txn)
+        .await?;
     txn.commit().await?;
     Ok(true)
 }
@@ -1257,32 +1271,37 @@ mod tests {
             get_with(&db, "acme", "f1").await.unwrap(),
             Some(follow_up.clone())
         );
+        let bumped = Downtime {
+            version: parent.version + 1,
+            updated_at: 2,
+            ..parent.clone()
+        };
         assert_eq!(
             get_with(&db, "acme", "p1").await.unwrap(),
-            Some(parent.clone())
+            Some(bumped.clone())
         );
         let mut second = downtime("f3", Repeat::None, Some(11 * DAY));
         second.notifications = follow_up.notifications.clone();
         assert!(
-            !insert_if_parent_unchanged_with(&db, &second, "p1", 1)
+            !insert_if_parent_unchanged_with(&db, &second, "p1", 2)
                 .await
                 .unwrap()
         );
         assert_eq!(get_with(&db, "acme", "f3").await.unwrap(), None);
 
-        let mut cancelled = parent.clone();
+        let mut cancelled = bumped.clone();
         cancelled.cancelled_at = Some(10 * DAY + 1);
         cancelled.cancelled_by = Some("lin".to_string());
-        cancelled.updated_at = 2;
-        assert!(put_if_unchanged_with(&db, &cancelled, 1).await.unwrap());
+        cancelled.updated_at = 3;
+        assert!(put_if_unchanged_with(&db, &cancelled, 2).await.unwrap());
         let late = downtime("f2", Repeat::None, Some(11 * DAY));
         assert!(
-            !insert_if_parent_unchanged_with(&db, &late, "p1", 1)
+            !insert_if_parent_unchanged_with(&db, &late, "p1", 2)
                 .await
                 .unwrap()
         );
         assert!(
-            !insert_if_parent_unchanged_with(&db, &late, "p1", 2)
+            !insert_if_parent_unchanged_with(&db, &late, "p1", 3)
                 .await
                 .unwrap()
         );

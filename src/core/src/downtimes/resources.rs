@@ -39,7 +39,8 @@ pub async fn resources(
     let pairs = lookup_pairs(req)?;
     let records = values::registry_records(org, &pairs).await?;
     if values::is_priority(org, &req.refine_by).await? {
-        let found = values::registry_values(&records, &req.refine_by, &pairs);
+        let readable = values::searchable_records(org, user_id, &records).await;
+        let found = values::registry_values(&readable, &req.refine_by, &pairs);
         return Ok(respond(&req.refine_by, found, "registry"));
     }
     let plan = SearchPlan {
@@ -186,6 +187,24 @@ mod tests {
             lookup_pairs(&none),
             Err(DowntimeError::BadRequest(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn a_registry_stream_the_user_cannot_search_is_absent_from_the_resources() {
+        let records = vec![
+            record("node-1", 1, "app_logs"),
+            record("node-2", 2, "secret_logs"),
+        ];
+        let readable =
+            values::readable_records(&records, async |_, stream: &str| stream != "secret_logs")
+                .await;
+        let resp = respond(
+            "host",
+            values::registry_values(&readable, "host", &[]),
+            "registry",
+        );
+        let hosts: Vec<&str> = resp.values.iter().map(|v| v.value.as_str()).collect();
+        assert_eq!(hosts, ["node-1"]);
     }
 
     #[test]

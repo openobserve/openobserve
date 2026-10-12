@@ -331,7 +331,7 @@ fn delete_applies(stored: RowVersion, version: i64, deleted_at: i64) -> bool {
     }
 }
 
-/// A failed plan writes nothing, so the queue redelivers, as a failed `queue_remeasures` does.
+/// Only a failed SLO list fails the plan; it writes nothing, so the queue redelivers.
 async fn remeasure_plan<'a>(
     planned: &PlannedPut,
     planner: &(dyn Fn(Option<Downtime>, Downtime) -> PlanFuture<'a> + Sync),
@@ -400,7 +400,7 @@ mod tests {
         slo::{CountSource, SliConfig, Slo, SloDefinition, slice::Writer},
     };
     use infra::table::{
-        entity::{downtimes as entity, folders, slo_backfill_jobs, slo_status},
+        entity::{downtimes as entity, folders, slo_backfill_jobs, slo_status, slos},
         slo as slo_table,
     };
     use sea_orm::{Database, DatabaseConnection, EntityTrait, Schema, Set};
@@ -942,6 +942,63 @@ mod tests {
         }
     }
 
+    /// The planner of a region that lists its SLOs from `db`, as `plan_for_downtime` does.
+    fn listing_planner<'a>(
+        db: &'a DatabaseConnection,
+    ) -> impl Fn(Option<Downtime>, Downtime) -> PlanFuture<'a> + Sync + 'a {
+        move |before, after| {
+            Box::pin(async move {
+                let slos: Vec<_> = table::slos::list(db, &after.org, None)
+                    .await?
+                    .into_iter()
+                    .map(|slo| (slo, HashMap::new()))
+                    .collect();
+                corrections::plan_remeasures(db, &slos, before.as_ref(), &after).await
+            })
+        }
+    }
+
+    async fn create_slos_table(db: &DatabaseConnection) {
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(slos::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+    }
+
+    /// Files a copy of `slo` under `id` with `sli_config` stored as given.
+    async fn store_slo(
+        db: &DatabaseConnection,
+        slo: &Slo,
+        id: &str,
+        sli_config: serde_json::Value,
+    ) {
+        slos::Entity::insert(slos::ActiveModel {
+            id: Set(id.to_string()),
+            org: Set(slo.org.clone()),
+            folder_id: Set(slo.folder_id.clone()),
+            name: Set(id.to_string()),
+            description: Set(None),
+            sli_type: Set(0),
+            sli_config: Set(sli_config),
+            target: Set(slo.target),
+            window_secs: Set(slo.definition.window_secs),
+            slice_interval_secs: Set(slo.definition.slice_interval_secs as i32),
+            group_by: Set(None),
+            tags: Set(None),
+            enabled: Set(true),
+            owner: Set(None),
+            definition_generation: Set(slo.definition_generation),
+            generation_reset_time: Set(None),
+            groups_estimate: Set(None),
+            groups_reserved: Set(slo.groups_reserved),
+            created_at: Set(0),
+            updated_at: Set(0),
+            last_edited_by: Set(None),
+        })
+        .exec(db)
+        .await
+        .unwrap();
+    }
+
     async fn jobs(db: &DatabaseConnection) -> Vec<slo_backfill_jobs::Model> {
         slo_backfill_jobs::Entity::find().all(db).await.unwrap()
     }
@@ -1032,6 +1089,67 @@ mod tests {
         assert!(jobs(&db).await.is_empty());
 
         let planner = planner_over(&db, &slos);
+        assert!(
+            apply_put(&db, &replicated, &planner)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            Some(replicated)
+        );
+        assert_eq!(jobs(&db).await.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn an_undecodable_slo_still_stores_the_put_and_queues_the_other_slos() {
+        let (db, slos) = slo_db().await;
+        create_slos_table(&db).await;
+        let s1 = &slos[0].0;
+        let config = serde_json::to_value(&s1.definition.sli_config).unwrap();
+        store_slo(&db, s1, "s1", config.clone()).await;
+        store_slo(&db, s1, "bad", serde_json::json!({"kind": "unknown"})).await;
+        // `s2` decodes, but its status row does not, so planning it fails on its own.
+        store_slo(&db, s1, "s2", config).await;
+        db.execute_unprepared(
+            "INSERT INTO slo_status (slo_id, group_key, definition_generation, burn_windows, \
+             watermark_end) VALUES ('s2', '', 1, 'not json', 72000)",
+        )
+        .await
+        .unwrap();
+
+        let replicated = slo_downtime();
+        let planner = listing_planner(&db);
+        let written = apply_put(&db, &replicated, &planner)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(written.plan.jobs().len(), 1);
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            Some(replicated)
+        );
+        let jobs = jobs(&db).await;
+        assert_eq!(jobs.len(), 1);
+        assert_eq!(jobs[0].slo_id, "s1");
+    }
+
+    #[tokio::test]
+    async fn a_failed_slo_list_stores_nothing_and_its_redelivery_does() {
+        let (db, slos) = slo_db().await;
+        let replicated = slo_downtime();
+        let planner = listing_planner(&db);
+        assert!(apply_put(&db, &replicated, &planner).await.is_err());
+        assert_eq!(
+            table::downtimes::get_with(&db, "acme", "d1").await.unwrap(),
+            None
+        );
+
+        create_slos_table(&db).await;
+        let s1 = &slos[0].0;
+        let config = serde_json::to_value(&s1.definition.sli_config).unwrap();
+        store_slo(&db, s1, "s1", config).await;
         assert!(
             apply_put(&db, &replicated, &planner)
                 .await

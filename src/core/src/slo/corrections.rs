@@ -87,7 +87,7 @@ pub fn apply(
     added + restore_corrected(slices, windows, corrected_before, sli_type, params)
 }
 
-/// Plans a re-measure of the windows the change moves for every SLO it covers; an error plans none.
+/// Plans a re-measure of the windows the change moves; only a failed SLO list is an error.
 pub async fn plan_for_downtime(
     org: &str,
     before: Option<&Downtime>,
@@ -102,7 +102,7 @@ pub async fn plan_for_downtime(
     plan_remeasures(get_orm_client_rw().await, &covered, before, after).await
 }
 
-/// The re-measure of every SLO the edit moves a window of; one failed read fails the plan.
+/// The re-measure of every SLO the edit moves a window of; a failed read skips only that SLO.
 pub async fn plan_remeasures(
     db: &DatabaseConnection,
     slos: &[(Slo, HashMap<String, String>)],
@@ -111,7 +111,19 @@ pub async fn plan_remeasures(
 ) -> Result<RemeasurePlan, anyhow::Error> {
     let mut plan = RemeasurePlan::default();
     for (slo, dims) in slos {
-        let Some((start, end)) = remeasure_slo(db, slo, dims, before, after).await? else {
+        let range = match remeasure_slo(db, slo, dims, before, after).await {
+            Ok(range) => range,
+            Err(e) => {
+                log::error!(
+                    "[slo] could not plan the re-measure of SLO {} for downtime {}/{}, skipping it: {e}",
+                    slo.id,
+                    after.org,
+                    after.id
+                );
+                continue;
+            }
+        };
+        let Some((start, end)) = range else {
             continue;
         };
         plan.jobs.push(jobs::Remeasure {

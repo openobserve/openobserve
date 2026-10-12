@@ -30,6 +30,8 @@ use infra::{
     },
 };
 use sea_orm::ConnectionTrait;
+#[cfg(feature = "enterprise")]
+pub use super_cluster::replicates;
 
 /// `org -> rows`. Replaced whole per org, so a reader never sees a partial org.
 static DOWNTIMES: LazyLock<RwLock<HashMap<String, Arc<Vec<Downtime>>>>> =
@@ -79,6 +81,14 @@ pub async fn set_if_parent_unchanged(
     }
     reload_org(&downtime.org).await?;
     Ok(true)
+}
+
+/// Sends the stored row to the other regions, for a write that changed it as a side effect.
+pub async fn replicate(org: &str, id: &str) {
+    #[cfg(feature = "enterprise")]
+    super_cluster::emit_stored(org, id).await;
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org, id);
 }
 
 /// Deletes the row only while it is still at `stored`; false when another write moved it first.
@@ -276,17 +286,17 @@ fn remove_org(org: &str) {
 mod super_cluster {
     use config::{get_config, meta::downtimes::Downtime};
     use o2_enterprise::enterprise::{
-        common::config::get_config as get_o2_config, super_cluster::queue,
+        common::config::{O2Config, get_config as get_o2_config},
+        super_cluster::queue,
     };
 
-    /// A region that is not upgraded cannot read byte 93, so nothing is sent until the flag is on.
-    fn enabled() -> bool {
-        let o2 = get_o2_config();
-        o2.super_cluster.enabled && o2.downtimes.enabled && !get_config().common.local_mode
+    /// A region without downtimes cannot read bytes 93 and 94, so sending waits for its own switch.
+    pub fn replicates() -> bool {
+        replicates_with(&get_o2_config(), get_config().common.local_mode)
     }
 
     pub(super) async fn emit_put(downtime: &Downtime) {
-        if !enabled() {
+        if !replicates() {
             return;
         }
         if let Err(e) = queue::downtimes_put(&downtime.org, downtime).await {
@@ -298,13 +308,31 @@ mod super_cluster {
         }
     }
 
+    pub(super) async fn emit_stored(org: &str, id: &str) {
+        if !replicates() {
+            return;
+        }
+        match super::table::get_rw(org, id).await {
+            Ok(Some(row)) => emit_put(&row).await,
+            Ok(None) => {}
+            Err(e) => log::error!("[DOWNTIMES] super cluster put {org}/{id} failed: {e}"),
+        }
+    }
+
     pub(super) async fn emit_delete(org: &str, id: &str, version: i64, deleted_at: i64) {
-        if !enabled() {
+        if !replicates() {
             return;
         }
         if let Err(e) = queue::downtimes_delete(org, id, version, deleted_at).await {
             log::error!("[DOWNTIMES] super cluster delete {org}/{id} failed: {e}");
         }
+    }
+
+    pub(super) fn replicates_with(o2: &O2Config, local_mode: bool) -> bool {
+        o2.super_cluster.enabled
+            && o2.downtimes.enabled
+            && o2.downtimes.replication_enabled
+            && !local_mode
     }
 }
 
@@ -412,5 +440,26 @@ mod tests {
             ]
         );
         assert!(ownership_backfill(&[]).is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_super_cluster_replicates_downtimes_only_with_its_own_switch_on() {
+        let mut o2 = o2_enterprise::enterprise::common::config::O2Config::init().unwrap();
+        o2.super_cluster.enabled = true;
+        o2.downtimes.enabled = true;
+        o2.downtimes.replication_enabled = false;
+        assert!(
+            !super_cluster::replicates_with(&o2, false),
+            "a put, a delete, an un-mute and a downtime folder publish nothing"
+        );
+        o2.downtimes.replication_enabled = true;
+        assert!(super_cluster::replicates_with(&o2, false));
+        assert!(!super_cluster::replicates_with(&o2, true));
+        o2.downtimes.enabled = false;
+        assert!(!super_cluster::replicates_with(&o2, false));
+        o2.downtimes.enabled = true;
+        o2.super_cluster.enabled = false;
+        assert!(!super_cluster::replicates_with(&o2, false));
     }
 }

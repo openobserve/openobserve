@@ -132,10 +132,7 @@ pub async fn save_folder(
     set_ownership(org_id, folder_type_ofga, Authz::new(&folder.folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
             org_id,
             _id,
@@ -181,10 +178,7 @@ pub async fn ensure_default_folder(
     .await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_create(
             org_id,
             _id,
@@ -219,10 +213,7 @@ pub async fn update_folder(
     let (_, folder) = table::folders::put(org_id, None, folder, folder_type).await?;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_update(
             org_id,
             folder_id,
@@ -414,10 +405,7 @@ pub async fn delete_folder(
     remove_ownership(org_id, folder_type_ofga, Authz::new(folder_id)).await;
 
     #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
+    if publishes(folder_type) {
         let _ = o2_enterprise::enterprise::super_cluster::queue::folders_delete(
             org_id,
             folder_id,
@@ -427,6 +415,15 @@ pub async fn delete_folder(
     }
 
     Ok(())
+}
+
+/// A downtime folder travels with the rows filed in it, so it waits for downtime replication too.
+#[cfg(feature = "enterprise")]
+fn publishes(folder_type: FolderType) -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && (folder_type != FolderType::Downtimes || crate::downtimes::replicates())
 }
 
 /// OpenFGA object type that owns folders of the given kind.

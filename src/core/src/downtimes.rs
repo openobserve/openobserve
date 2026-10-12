@@ -357,6 +357,7 @@ pub async fn extend(
     {
         return Err(changed_meanwhile());
     }
+    db::downtimes::replicate(org, &before.id).await;
     db::authz::set_ownership(org, "downtimes", db::downtimes::ownership(&follow_up)).await;
     notify::deliver_in_background(before.clone(), extended_event(window.start, new_end));
     plan.trigger(&follow_up.id).await;
@@ -2782,6 +2783,71 @@ mod tests {
         let won = finish_delete(async { Ok(true) }, async { cleaned = true }).await;
         assert!(won.is_ok());
         assert!(cleaned);
+    }
+
+    #[tokio::test]
+    async fn a_second_extend_with_the_parents_first_version_is_a_409() {
+        use infra::table::{
+            downtimes::{self as table, Guard},
+            entity::{downtimes as entity, folders},
+        };
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(entity::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        let default = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create_with(&db, "acme", default, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let mut parent = daily("02:00", 3_600);
+        parent.version = 1;
+        parent.updated_at = 1;
+        table::put_with(&db, &parent).await.unwrap();
+        let now = 2 * HOUR + HOUR / 2;
+        let ask = ExtendDowntimeRequest {
+            version: Some(1),
+            ..by(1_800)
+        };
+
+        // The first click: the parent is at the version the form loaded, so a follow-up is made.
+        let read = table::get_with(&db, "acme", "d1").await.unwrap().unwrap();
+        check_version(ask.version, &read).unwrap();
+        let window = extendable_window(&read, now).unwrap();
+        let end = extended_end(window.end, &ask, now).unwrap();
+        let first = follow_up(&read, window.end, end, "ops", now);
+        let guard = Guard::ParentUnchanged {
+            parent_id: "d1",
+            updated_at: read.updated_at,
+        };
+        assert!(
+            table::write_with(&db, &first, guard, &[], now)
+                .await
+                .unwrap()
+        );
+
+        // The second click names the same version and must not extend the follow-up again.
+        let again = table::get_with(&db, "acme", "d1").await.unwrap().unwrap();
+        assert!(matches!(
+            check_version(ask.version, &again),
+            Err(DowntimeError::Conflict(_))
+        ));
+        let stored = table::get_with(&db, "acme", &first.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.schedule.ends_at, Some(window.end + HOUR / 2));
     }
 
     fn body_of(head: &str) -> &'static str {

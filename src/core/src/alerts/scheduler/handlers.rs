@@ -88,7 +88,7 @@ async fn persist_alert_run_state(
 ) -> bool {
     use config::meta::alerts::state::{ROLLUP_GROUP_KEY, apply_outcome};
 
-    // Every delivery path persists here, the grouped, deduplicated and pending ones included.
+    // Every delivery path persists here, the grouped and deduplicated ones included.
     #[cfg(feature = "enterprise")]
     if clears_recorded_mute(outcome) {
         clear_recorded_mute(&alert.org_id, alert_id).await;
@@ -2771,13 +2771,10 @@ fn records_delivery_state(alert_level_delivery: bool, delivery: &DeliveryDecisio
     alert_level_delivery && delivery.resets_silence()
 }
 
-/// A run that matched and was not suppressed ends any Muted chip a firing recorded.
+/// A delivered firing ends the Muted chip; a pending run persists before the downtime decision.
 #[cfg(feature = "enterprise")]
 fn clears_recorded_mute(outcome: &RunOutcome) -> bool {
-    matches!(
-        outcome,
-        RunOutcome::Firing | RunOutcome::NotifyFailed | RunOutcome::Pending
-    )
+    matches!(outcome, RunOutcome::Firing | RunOutcome::NotifyFailed)
 }
 
 /// The Muted chip of a condition-scoped downtime, recorded or cleared at run time.
@@ -8663,10 +8660,33 @@ mod tests {
     fn only_an_unsuppressed_matched_run_clears_the_recorded_mute() {
         assert!(clears_recorded_mute(&RunOutcome::Firing));
         assert!(clears_recorded_mute(&RunOutcome::NotifyFailed));
-        assert!(clears_recorded_mute(&RunOutcome::Pending));
+        assert!(!clears_recorded_mute(&RunOutcome::Pending));
         assert!(!clears_recorded_mute(&RunOutcome::Suppressed));
         assert!(!clears_recorded_mute(&RunOutcome::Normal));
         assert!(!clears_recorded_mute(&RunOutcome::Skipped));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_pending_run_inside_a_window_keeps_the_recorded_mute() {
+        // Suppressed records the mute, Normal withholds the recovery, then the alert matches again.
+        let mut recorded = None;
+        let mut escalations_closed = 0;
+        for outcome in [
+            RunOutcome::Suppressed,
+            RunOutcome::Normal,
+            RunOutcome::Pending,
+        ] {
+            if matches!(outcome, RunOutcome::Suppressed) {
+                recorded = Some("d1");
+            }
+            // As `clear_recorded_mute`: a cleared record recovers the muted on-call escalations.
+            if clears_recorded_mute(&outcome) && recorded.take().is_some() {
+                escalations_closed += 1;
+            }
+        }
+        assert_eq!(recorded, Some("d1"));
+        assert_eq!(escalations_closed, 0);
     }
 
     #[cfg(feature = "enterprise")]

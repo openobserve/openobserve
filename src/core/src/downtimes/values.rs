@@ -35,7 +35,10 @@ use o2_enterprise::enterprise::{
     service_streams::{meta::ServiceMetadata, storage::ServiceStorage},
 };
 
-use super::{DowntimeError, matching::Inventory};
+use super::{
+    DowntimeError,
+    matching::{Inventory, Visibility},
+};
 
 /// The suggestion list stops here, and the search runs only while fewer values are known.
 pub const MAX_VALUES: usize = 50;
@@ -123,9 +126,11 @@ pub async fn values(
     let pairs = narrowing_pairs(req.condition.as_ref(), &req.key);
     let prefix = normalize_value(&req.prefix);
     let inventory = super::inventory::cached(org).await?;
+    let visibility = super::access::visibility(org, user_id).await?;
     let records = registry_records(org, &pairs).await?;
-    let mut known = inventory_values(&inventory, &req.key, &pairs);
-    known.extend(registry_values(&records, &req.key, &pairs));
+    let mut known = inventory_values(&inventory, &visibility, &req.key, &pairs);
+    let readable = searchable_records(org, user_id, &records).await;
+    known.extend(registry_values(&readable, &req.key, &pairs));
     let may_search = !is_priority(org, &req.key).await?;
     let plan = SearchPlan {
         key: &req.key,
@@ -219,15 +224,20 @@ pub async fn is_priority(org: &str, key: &str) -> Result<bool, DowntimeError> {
         .any(|d| d == key))
 }
 
-/// One value per `dims[key]` of the items that carry every pair, with how many carry it.
+/// One value per `dims[key]` of the visible items that carry every pair, with how many carry it.
 pub fn inventory_values(
     inventory: &Inventory,
+    visibility: &Visibility,
     key: &str,
     pairs: &[(String, String)],
 ) -> Vec<Found> {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     for module in IDENTITY_MODULES {
-        for item in inventory.items(module) {
+        let visible = inventory
+            .items(module)
+            .iter()
+            .filter(|item| visibility.sees(module, &item.folder_id));
+        for item in visible {
             let Some(value) = item.dims.get(key) else {
                 continue;
             };
@@ -276,6 +286,47 @@ pub fn registry_values(
             })
         })
         .collect()
+}
+
+/// The records whose every stream the caller may search, as the search fallback checks them.
+pub async fn searchable_records(
+    org: &str,
+    user_id: &str,
+    records: &[ServiceMetadata],
+) -> Vec<ServiceMetadata> {
+    readable_records(records, async |stream_type, stream| {
+        may_search(org, user_id, stream_type, stream).await
+    })
+    .await
+}
+
+/// A record is kept only when it lists a stream and `may_read` allows each; one check per stream.
+pub async fn readable_records(
+    records: &[ServiceMetadata],
+    may_read: impl AsyncFn(StreamType, &str) -> bool,
+) -> Vec<ServiceMetadata> {
+    let mut allowed: HashMap<(StreamType, String), bool> = HashMap::new();
+    let mut kept = Vec::new();
+    for record in records {
+        let streams = streams_of(record);
+        let mut readable = !streams.is_empty();
+        for (stream_type, stream) in streams {
+            let key = (stream_type, stream);
+            let may = match allowed.get(&key) {
+                Some(may) => *may,
+                None => {
+                    let may = may_read(key.0, &key.1).await;
+                    allowed.insert(key, may);
+                    may
+                }
+            };
+            readable &= may;
+        }
+        if readable {
+            kept.push(record.clone());
+        }
+    }
+    kept
 }
 
 /// Every log, metric and trace stream of the org, with the group fields it carries.
@@ -373,7 +424,7 @@ pub async fn search_values(
     let timeout_secs = plan.deadline.as_secs().max(1) as i64;
     let rows = plan.rows_per_stream;
     run_parallel(queries, plan.deadline, move |query| async move {
-        if !may_search(org, user_id, &query).await {
+        if !may_search(org, user_id, query.stream_type, &query.stream).await {
             return (vec![], false);
         }
         match run_search(org, &query, start, end, rows, timeout_secs).await {
@@ -581,22 +632,18 @@ fn stream_query(
     })
 }
 
-async fn may_search(org: &str, user_id: &str, query: &StreamQuery) -> bool {
+async fn may_search(org: &str, user_id: &str, stream_type: StreamType, stream: &str) -> bool {
     let denied = crate::authz::check_stream_permissions(
-        &query.stream,
+        stream,
         org,
         user_id,
-        &query.stream_type,
+        &stream_type,
         crate::authz::StreamPermissionResourceType::Search,
     )
     .await
     .is_some();
     if denied {
-        log::debug!(
-            "[DOWNTIMES] values: {user_id} may not search {}/{}; skipped",
-            query.stream_type,
-            query.stream
-        );
+        log::debug!("[DOWNTIMES] values: {user_id} may not search {stream_type}/{stream}; skipped");
     }
     !denied
 }
@@ -688,7 +735,10 @@ mod tests {
     };
     use o2_enterprise::enterprise::service_streams::meta::ServiceStreams;
 
-    use super::{super::matching::Item, *};
+    use super::{
+        super::matching::{Item, Visibility},
+        *,
+    };
 
     fn eq(key: &str, value: &str) -> DimensionCondition {
         DimensionCondition::Pair {
@@ -861,7 +911,7 @@ mod tests {
 
     #[tokio::test]
     async fn prefix_pay_lists_the_payments_services_and_not_checkout() {
-        let known = inventory_values(&acme_inventory(), "service", &[]);
+        let known = inventory_values(&acme_inventory(), &Visibility::default(), "service", &[]);
         let resp = answer("pay", known, false, no_search).await;
         assert_eq!(
             resp.values,
@@ -883,6 +933,23 @@ mod tests {
         assert!(!resp.partial);
     }
 
+    #[tokio::test]
+    async fn a_user_with_one_alert_folder_and_no_stream_access_sees_that_folders_values_only() {
+        let mut inventory = acme_inventory();
+        inventory.alerts[1].folder_id = "mine".to_string();
+        let visibility = Visibility {
+            alert_folders: Some(HashSet::from(["mine".to_string()])),
+            synthetics_folders: None,
+        };
+        let records = vec![record("payments-api", "node-2", 2, "app_logs", &[])];
+        let readable = readable_records(&records, async |_, _| false).await;
+        let mut known = inventory_values(&inventory, &visibility, "host", &[]);
+        known.extend(registry_values(&readable, "host", &[]));
+        let resp = answer("", known, false, no_search).await;
+        let values: Vec<&str> = resp.values.iter().map(|v| v.value.as_str()).collect();
+        assert_eq!(values, ["node-1"]);
+    }
+
     #[test]
     fn narrowing_by_service_drops_the_hosts_of_other_services() {
         let condition = DimensionCondition::Group {
@@ -894,10 +961,11 @@ mod tests {
             pairs,
             vec![("service".to_string(), "payments-api".to_string())]
         );
-        let inventory: Vec<String> = inventory_values(&acme_inventory(), "host", &pairs)
-            .into_iter()
-            .map(|f| f.value)
-            .collect();
+        let inventory: Vec<String> =
+            inventory_values(&acme_inventory(), &Visibility::default(), "host", &pairs)
+                .into_iter()
+                .map(|f| f.value)
+                .collect();
         assert_eq!(inventory, ["node-1"]);
         let records = vec![
             record("payments-api", "node-1", 1, "app_logs", &[]),

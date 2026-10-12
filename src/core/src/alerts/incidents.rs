@@ -1365,7 +1365,7 @@ async fn unmute_for_firing(
         }
     }
     #[cfg(feature = "enterprise")]
-    if publishes_unmute()
+    if db::downtimes::replicates()
         && let Err(e) =
             o2_enterprise::enterprise::super_cluster::queue::incidents_unmute(org_id, &incident.id)
                 .await
@@ -1398,13 +1398,6 @@ async fn join_then_unmute<T>(
 ) -> Result<(T, bool), infra::errors::Error> {
     let joined = join.await?;
     Ok((joined, unmute().await))
-}
-
-/// A region that is not upgraded cannot read the Unmute byte, so it is sent only with the flag on.
-#[cfg(feature = "enterprise")]
-fn publishes_unmute() -> bool {
-    let o2 = o2_enterprise::enterprise::common::config::get_config();
-    o2.super_cluster.enabled && o2.downtimes.enabled && !config::get_config().common.local_mode
 }
 
 /// The chip and the resolved comment name the downtime that mutes the incident now.
