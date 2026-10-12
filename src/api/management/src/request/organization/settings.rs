@@ -169,7 +169,6 @@ pub async fn create(
             child_orgs.into_iter().map(|v| v.member_org_id).collect();
         allowed_orgs.insert(org_id.clone());
         for mapping in &mut mappings {
-            use o2_openfga::authorizer::roles::get_all_roles;
             use openobserve_core::org_domain_ownership;
 
             let domain = mapping.domain.trim().to_lowercase();
@@ -207,7 +206,7 @@ pub async fn create(
                     mapping.base_role, mapping.org_id
                 ));
             }
-            if let Some(mut claim) = mapping.role_claim_name.as_mut() {
+            if let Some(claim) = mapping.role_claim_name.as_mut() {
                 if claim.trim().is_empty() {
                     return MetaHttpResponse::bad_request("role claim name must not be empty");
                 }

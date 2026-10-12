@@ -13,11 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#[cfg(feature = "cloud")]
-use openobserve_core::{
-    organization::list_org_users_by_user,
-    self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
-};
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use {
     crate::common::meta::user::RoleOrg,
@@ -47,16 +42,19 @@ use {
 };
 #[cfg(feature = "cloud")]
 use {
-    config::{DEFAULT_ORG, META_ORG_ID, meta::user::UserRole, utils::rand::generate_random_string},
+    config::{DEFAULT_ORG, meta::user::UserRole, utils::rand::generate_random_string},
     db::org_status,
     db::{org_users, organization::get_org_setting},
-    o2_enterprise::enterprise::cloud::billing_group::list_billing_group_members_of,
     o2_enterprise::enterprise::cloud::org_invites,
+    o2_enterprise::enterprise::{cloud::billing_group, domain_management::meta::AccessDecision},
     o2_openfga::authorizer::authz::get_add_user_to_org_tuples,
     o2_openfga::authorizer::roles::{
         check_and_get_crole_tuple_for_new_user, get_roles_for_org_user,
         get_user_crole_removal_tuples,
     },
+    openobserve_core::org_domain_ownership::get_cached_org_for_domain,
+    openobserve_core::organization::list_org_users_by_user,
+    openobserve_core::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
     std::{collections::HashSet, str::FromStr as _},
 };
 
@@ -854,19 +852,20 @@ pub async fn process_domain_org_mapping(
     is_new_user: bool,
 ) -> Result<bool, anyhow::Error> {
     // split email to get the domain
-    let Some((_, domain)) = user_email.to_lowercase().split_once("@") else {
+    let Some((_, domain)) = user_email.split_once("@") else {
         log::warn!(
             "user email {user_email} could not be split correctly at @, skipping org domain mapping"
         );
         return Ok(false);
     };
+    let domain = domain.trim().to_lowercase();
 
     let Some(org_id) = get_cached_org_for_domain(&domain).await else {
         log::info!("no cached domain org mapping found for user {user_email}, continuing normally");
         return Ok(false);
     };
 
-    let org_settings = get_org_setting(org_id).await?;
+    let org_settings = get_org_setting(&org_id).await?;
     let mappings = org_settings.domain_org_mappings;
 
     let decision = org_settings.domain_management_config.evaluate(user_email);
@@ -885,302 +884,152 @@ pub async fn process_domain_org_mapping(
         //     }
         // }
 
-        log::info!(
-            "user {user_email} blocked by domain management config of org {org_id}, removing orgs {orgs_to_remove:?}"
-        );
+        log::info!("user {user_email} blocked by domain management config of org {org_id}");
+        return Ok(false);
     }
 
-    let Some(mapped) = mappings
+    let mut allowed_orgs: HashSet<_> = billing_group::list_billing_group_members_of(&org_id)
+        .await?
         .into_iter()
-        .find(|m| m.domain.to_lowercase() == domain)
-    else {
-        log::info!("no domain org mapping found for user {user_email}, continuing normally");
-        return Ok(false);
-    };
-    if org_status::is_blocked(&mapped.org_id) {
+        .map(|v| v.member_org_id)
+        .collect();
+    allowed_orgs.insert(org_id.clone());
+
+    let mapped_orgs: Vec<_> = mappings
+        .into_iter()
+        .filter(|m| m.domain.to_lowercase() == domain && allowed_orgs.contains(&m.org_id))
+        .collect();
+
+    if mapped_orgs.is_empty() {
         log::info!(
-            "user {user_email} supposed to be mapped to org {} but org status is blocked, so skipping",
+            "domain {domain} is owned by {org_id} but no mapping found, processing user {user_email} normally"
+        );
+        return Ok(false);
+    }
+
+    let mut added = 0;
+
+    // TODO: YJDoc2: decide how to handle non mapped orgs, additively or add-sub
+
+    for mapped in mapped_orgs {
+        if org_status::is_blocked(&mapped.org_id) {
+            log::info!(
+                "user {user_email} supposed to be mapped to org {} but org status is blocked, so skipping",
+                mapped.org_id
+            );
+            continue;
+        }
+        log::info!(
+            "found domain org mapping {} for user {user_email}, processing",
             mapped.org_id
         );
-        return Ok(false);
-    }
-
-    log::info!("found domain org mapping for user {user_email}, processing");
-    let base_role = UserRole::from_str(&mapped.base_role).map_err(|e| {
-        anyhow::anyhow!(
-            "error parsing domain org role {} to user role : {e:?}",
-            mapped.base_role
-        )
-    })?;
-
-    let need_to_add_user = org_users::get_optional(&mapped.org_id, user_email)
-        .await?
-        .is_none();
-
-    if is_new_user || need_to_add_user {
-        let mut new_tuples = Vec::new();
-        get_add_user_to_org_tuples(
-            &mapped.org_id,
-            user_email,
-            &mapped.base_role,
-            &mut new_tuples,
-        );
-        update_tuples(new_tuples, vec![]).await?;
-        org_users::add(
-            &mapped.org_id,
-            user_email,
-            base_role,
-            &generate_random_string(16),
-            Some(format!("rum{}", generate_random_string(16))),
-        )
-        .await?;
-    }
-    if let Some(claim_name) = mapped.role_claim_name
-        && let Some(v) = claims.get(&claim_name)
-        && let Some(arr) = v.as_array()
-    {
-        let mut roles = HashSet::new();
-        for claim in arr {
-            if let Some(role) = claim.as_str() {
-                roles.insert(format_role_name_only(role));
-            }
-        }
-        let existing_roles = get_roles_for_org_user(&mapped.org_id, user_email).await;
-
-        let mut add_roles = Vec::new();
-        let mut add_tuples = Vec::new();
-        let mut remove_tuples = Vec::new();
-
-        for role in &existing_roles {
-            if !roles.contains(role) {
-                let name = format_role_name(&mapped.org_id, role);
-                get_user_crole_removal_tuples(user_email, &name, &mut remove_tuples);
-            }
-        }
-        for role in &roles {
-            if !existing_roles.contains(role) {
-                add_roles.push(format_role_name(&mapped.org_id, role))
-            }
-        }
-        if !add_roles.is_empty() {
-            check_and_get_crole_tuple_for_new_user(
-                user_email,
-                &mapped.org_id,
-                add_roles,
-                mapped.create_missing_roles,
-                &mut add_tuples,
+        let base_role = UserRole::from_str(&mapped.base_role).map_err(|e| {
+            anyhow::anyhow!(
+                "error parsing domain org role {} to user role : {e:?}",
+                mapped.base_role
             )
-            .await;
-        }
+        })?;
 
-        if !add_tuples.is_empty() || !remove_tuples.is_empty() {
-            if let Err(e) = update_tuples(add_tuples, remove_tuples).await {
+        let need_to_add_user = org_users::get_optional(&mapped.org_id, user_email)
+            .await?
+            .is_none();
+
+        if is_new_user || need_to_add_user {
+            let mut new_tuples = Vec::new();
+            get_add_user_to_org_tuples(
+                &mapped.org_id,
+                user_email,
+                &mapped.base_role,
+                &mut new_tuples,
+            );
+            update_tuples(new_tuples, vec![]).await?;
+            org_users::add(
+                &mapped.org_id,
+                user_email,
+                base_role,
+                &generate_random_string(16),
+                Some(format!("rum{}", generate_random_string(16))),
+            )
+            .await?;
+        }
+        if let Some(claim_name) = mapped.role_claim_name
+            && let Some(v) = claims.get(&claim_name)
+            && let Some(arr) = v.as_array()
+        {
+            let mut roles = HashSet::new();
+            for claim in arr {
+                if let Some(role) = claim.as_str() {
+                    roles.insert(format_role_name_only(role));
+                }
+            }
+            let existing_roles = get_roles_for_org_user(&mapped.org_id, user_email).await;
+
+            let mut add_roles = Vec::new();
+            let mut add_tuples = Vec::new();
+            let mut remove_tuples = Vec::new();
+
+            for role in &existing_roles {
+                if !roles.contains(role) {
+                    let name = format_role_name(&mapped.org_id, role);
+                    get_user_crole_removal_tuples(user_email, &name, &mut remove_tuples);
+                }
+            }
+            for role in &roles {
+                if !existing_roles.contains(role) {
+                    add_roles.push(format_role_name(&mapped.org_id, role))
+                }
+            }
+            if !add_roles.is_empty() {
+                check_and_get_crole_tuple_for_new_user(
+                    user_email,
+                    &mapped.org_id,
+                    add_roles,
+                    mapped.create_missing_roles,
+                    &mut add_tuples,
+                )
+                .await;
+            }
+
+            if !add_tuples.is_empty() || !remove_tuples.is_empty() {
+                if let Err(e) = update_tuples(add_tuples, remove_tuples).await {
+                    log::error!(
+                        "error updating claim based role tuples for user {user_email} org {} : {e}",
+                        mapped.org_id
+                    );
+                }
+            }
+        }
+        log::info!(
+            "user {user_email} mapped to org {} successfully via domain org mapping",
+            mapped.org_id
+        );
+        if need_to_add_user {
+            log::info!(
+                "deleting any invites for {user_email} in org {} as added via org mapping",
+                mapped.org_id
+            );
+            if let Err(e) =
+                org_invites::delete_invites_for_user(&mapped.org_id, &user_email.to_lowercase())
+                    .await
+            {
                 log::error!(
-                    "error updating claim based role tuples for user {user_email} org {} : {e}",
+                    "error in deleting invites for user {user_email} for org {} after joining via domain mapping : {e}",
                     mapped.org_id
                 );
             }
         }
+        added += 1;
     }
 
-    log::info!(
-        "user {user_email} mapped to org {} successfully via domain org mapping",
-        mapped.org_id
-    );
-    if need_to_add_user {
+    if added == 0 {
         log::info!(
-            "deleting any invites for {user_email} in org {} as added via org mapping",
-            mapped.org_id
+            "no mapped orgs were viable, so skipped processing domain mapping for user {user_email} from org {org_id}"
         );
-        if let Err(e) =
-            org_invites::delete_invites_for_user(&mapped.org_id, &user_email.to_lowercase()).await
-        {
-            log::error!(
-                "error in deleting invites for user {user_email} for org {} after joining via domain mapping : {e}",
-                mapped.org_id
-            );
-        }
+        return Ok(false);
     }
+
     log::info!("domain org mapping for user {user_email} successfully processed");
     Ok(true)
-
-    // let Some(mapped) = mappings.iter().find(|v| v.domain.to_lowercase() == domain) else {
-    //     log::warn!(
-    //         "mapping for domain {domain} cached, but not found in settings, skipping for user
-    // {user_email}"     );
-    //     return Ok(false);
-    // };
-
-    // log::info!("found domain org mapping for user {user_email} via org {org_id}, processing");
-    // if !is_new_user {
-    //     let orgs = list_orgs_by_user(user_email).await?;
-    //     for org in orgs {
-    //         existing_orgs.insert(org.org_id);
-    //     }
-    //     existing_roles = get_roles_for_user(user_email).await;
-    // }
-
-    // let mut parsed_orgs = HashMap::new();
-    // let mut prased_roles = vec![];
-
-    // let mut add_orgs = HashSet::new();
-    // let mut remove_orgs = HashSet::new();
-
-    // if !org_settings.claim_parser_function.is_empty() {
-    //     let Some((orgs, roles)) = process_custom_claim_parsing(&claims, &org_id).await else {
-    //         log::info!(
-    //             "no claims returned by the sso parser fn for org {org_id} domain {domain},
-    // skipping user {user_email}"         );
-    //         return Ok(false);
-    //     };
-    //     mapped_via_sso_parser = true;
-    //     parsed_orgs = orgs.into_iter().map(|v| (v.org_name.clone(), v)).collect();
-    //     prased_roles = roles;
-    // } else {
-    //     let user_role = if let Some(v) = &mapped.role_name
-    //         && matches!(v.as_str(), "admin" | "editor" | "viewer" | "user")
-    //     {
-    //         UserRole::from_str(v.as_str()).unwrap()
-    //     } else {
-    //         UserRole::User
-    //     };
-    //     mapped_via_sso_parser = false;
-    //     parsed_orgs.insert(
-    //         mapped.org_id.clone(),
-    //         UserOrg {
-    //             name: mapped.org_id.clone(),
-    //             org_name: mapped.org_id.clone(),
-    //             token: Default::default(),
-    //             rum_token: None,
-    //             role: user_role,
-    //         },
-    //     );
-    //     if let Some(role) = &mapped.role_name {
-    //         prased_roles = vec![format_role_name(&mapped.org_id, role)];
-    //     } else {
-    //         prased_roles = vec![format_role_name(
-    //             &mapped.org_id,
-    //             &UserRole::User.to_string(),
-    //         )];
-    //     }
-    // }
-
-    // // first add the user entry itself to the ofga, as a member of the mapped org with
-    // // mapped base role
-    // let mut remove_tuples = Vec::new();
-
-    // for org in parsed_orgs.keys() {
-    //     if !existing_orgs.contains(org) && allowed_orgs.contains(org) {
-    //         add_orgs.insert(org);
-    //     }
-    // }
-
-    // for org in &allowed_orgs {
-    //     if existing_orgs.contains(org) && !parsed_orgs.contains_key(org) {
-    //         remove_orgs.insert(org.clone());
-    //     }
-    // }
-
-    // for role in existing_roles {
-    //     if let Some((org, _)) = role.split_once("/") {
-    //         // only deal with roles of the orgs allowed via mapping
-    //         if !allowed_orgs.contains(org) {
-    //             continue;
-    //         }
-    //         // NOTE: even if this removed the default roles like admin etc,
-    //         // it won't be reflected in org users table for existing orgs
-    //         // so that might show incorrect info
-    //         if mapped_via_sso_parser && !prased_roles.contains(&role) {
-    //             get_user_crole_removal_tuples(user_email, &role, &mut remove_tuples);
-    //         }
-    //     }
-    // }
-
-    // let mut role_map = HashMap::new();
-    // for parsed_role in prased_roles {
-    //     if let Some((org, role)) = parsed_role.split_once("/") {
-    //         // if the role org is not one of allowed, or it is the one that
-    //         // is getting removed, do not consider that role
-    //         if !allowed_orgs.contains(org) || remove_orgs.contains(org) {
-    //             continue;
-    //         }
-    //         let roles: &mut Vec<String> = role_map.entry(org.to_string()).or_default();
-    //         if !matches!(role, "admin" | "editor" | "viewer" | "user") {
-    //             roles.push(role.to_string());
-    //         }
-    //     }
-    // }
-
-    // update_tuples(vec![], remove_tuples).await.inspect_err(|e|{
-    //     log::error!("error in processing domain mapping for user {user_email}, error whiel
-    // updating tuples : {e}"); })?;
-
-    // for org in remove_orgs {
-    //     if let Err(e) = remove_user_from_org(&org, user_email,
-    // &config.auth.root_user_email).await {         log::error!(
-    //             "error removing user {user_email} from org {org} while updating sso domain
-    // maapings : {e}"         );
-    //         continue;
-    //     }
-
-    //     if let Err(e) = org_invites::delete_invites_for_user(&org,
-    // &user_email.to_lowercase()).await     {
-    //         log::error!(
-    //             "error in deleting invites for user {user_email} for org {org} after updating sso
-    // mapped domain mapping : {e}",         );
-    //     }
-    // }
-
-    // let mut add_tuples = Vec::new();
-
-    // for (org, roles) in role_map {
-    //     let role = parsed_orgs
-    //         .get(&org)
-    //         .map(|v| v.role.clone())
-    //         .unwrap_or(UserRole::User);
-
-    //     if !existing_orgs.contains(&org) {
-    //         if let Err(e) = users::add_user_to_org(
-    //             &org,
-    //             user_email,
-    //             UserOrgRole {
-    //                 base_role: role,
-    //                 custom_role: if roles.is_empty() { None } else { Some(roles) },
-    //             },
-    //             &config.auth.root_user_email,
-    //         )
-    //         .await
-    //         {
-    //             log::error!(
-    //                 "error in adding user {user_email} to org {org} via sso domain mapping : {e}"
-    //             );
-    //         }
-    //     } else {
-    //         roles.iter().for_each(|crole| {
-    //             add_tuples.push(get_user_crole_tuple(&org, crole, user_email));
-    //         });
-    //     }
-    // }
-
-    // if let Err(e) = update_tuples(add_tuples, vec![]).await {
-    //     log::error!(
-    //         "error updating role tuples for user {user_email} via domain org mapping : {e}"
-    //     );
-    // }
-
-    // log::info!(
-    //     "user {user_email} joined org {} succesfully via domain org mapping, deleting any
-    // invites",     mapped.org_id
-    // );
-    // for org in add_orgs {
-    //     if let Err(e) = delete_invites_for_user(&org, user_email).await {
-    //         log::error!(
-    //             "error deleting user invites from org {org} after being domain mapped via org
-    // {org_id} : {e}"         );
-    //     }
-    // }
-    // log::info!("domain org mapping for user {user_email} successfully processed");
-    // Ok(true)
 }
 
 #[cfg(feature = "cloud")]
@@ -1383,7 +1232,7 @@ pub async fn check_and_add_to_org(
 ///
 /// Returns Some((source_orgs, custom_roles)) if custom parsing succeeded
 /// Returns None if custom parsing is disabled or not available
-#[cfg(feature = "enterprise")]
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 async fn process_custom_claim_parsing(
     claims: &HashMap<String, Value>,
     org_id: &str,
