@@ -8,6 +8,7 @@ import { isEqual } from "lodash-es";
 import { addPanel, getDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
+import { DEFAULT_SQL_X_FIELD, DEFAULT_SQL_Y_FIELD_COUNT } from "@/utils/dashboard/defaultFields";
 import { createI18n } from "vue-i18n";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
@@ -4892,23 +4893,48 @@ describe("AddPanel.vue", () => {
         initChartData: vi.fn(),
       };
       wrapper.vm.panelEditorRef = editor;
-      wrapper.vm.dashboardPanelData.data.queries[0].query = "SELECT count(*) FROM default";
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.filter = {
-        filterType: "group",
-        conditions: [
-          { filterType: "condition", type: "condition", column: "level", operator: "=", value: "" },
-        ],
-      };
+      wrapper.vm.dashboardPanelData.data.queries[0].query = "";
 
       wrapper.vm.runQuery();
 
       expect(editor.reportValidationErrors).toHaveBeenCalledTimes(1);
       expect(editor.reportValidationErrors.mock.calls[0][0]).toContain(
-        "dashboard.utils.filterConditionValueRequired",
+        "dashboard.utils.queryIsEmpty",
       );
       expect(editor.runQuery).not.toHaveBeenCalled();
       expect(editor.initChartData).not.toHaveBeenCalled();
-      wrapper.vm.dashboardPanelData.data.queries[0].fields.filter.conditions = [];
+    });
+
+    it("still runs Apply with a filter that has no value yet, which the query drops", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const editor = { reportValidationErrors: vi.fn(), runQuery: vi.fn(), initChartData: vi.fn() };
+      wrapper.vm.panelEditorRef = editor;
+      const query = wrapper.vm.dashboardPanelData.data.queries[0];
+      // The mocked panel's map/sankey placeholders are objects; a real line panel has them null.
+      Object.assign(query.fields, { source: null, target: null, latitude: null, longitude: null });
+      query.fields.x = [DEFAULT_SQL_X_FIELD()];
+      query.fields.y = [DEFAULT_SQL_Y_FIELD_COUNT()];
+      query.query = "SELECT count(*) FROM default";
+      query.fields.filter = {
+        filterType: "group",
+        conditions: [
+          {
+            filterType: "condition",
+            type: "condition",
+            column: { field: "level" },
+            operator: "=",
+            value: "",
+          },
+        ],
+      };
+      wrapper.vm.shouldRefreshWithoutCache = false;
+
+      wrapper.vm.runQuery(true);
+
+      expect(editor.reportValidationErrors).not.toHaveBeenCalled();
+      expect(wrapper.vm.shouldRefreshWithoutCache).toBe(true);
+      query.fields.filter = { conditions: [] };
     });
 
     it("still runs a custom SQL query that fails validation, as Apply always has", async () => {

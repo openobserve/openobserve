@@ -278,6 +278,21 @@ describe("usePanelLivePreview", () => {
       scope.stop();
     });
 
+    it("runs a skipped edit once the builder turns valid without a payload change", async () => {
+      const { panel, run, live, valid, scope } = setup({ valid: false });
+      live.arm();
+      panel.queries[0].query = "SELECT a, b FROM default";
+      await nextTick();
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
+      expect(run).not.toHaveBeenCalled();
+
+      valid.value = true;
+      await nextTick();
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+      expect(run).toHaveBeenCalledTimes(1);
+      scope.stop();
+    });
+
     it("pauses the whole panel while a tab has typed query text", async () => {
       const { panel, run, live, scope } = setup();
       live.arm();

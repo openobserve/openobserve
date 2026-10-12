@@ -269,6 +269,7 @@ import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
+import { conditionsInQuery } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview";
 import {
   validateConditions,
@@ -1650,8 +1651,6 @@ export default defineComponent({
           "dashboard",
         );
         if (panel.queryType !== "promql") validateJoinFields(t, query?.joins, errors);
-        // validatePanel lets a filter without a value through; the generated SQL just drops it.
-        validateConditions(t, query?.fields?.filter?.conditions ?? [], errors);
         if ((query?.query ?? "").trim() === "") {
           errors.push(t("dashboard.utils.queryIsEmpty", { index: index + 1 }));
         }
@@ -1663,6 +1662,12 @@ export default defineComponent({
     const collectBuilderErrors = (): string[] => {
       const errors: string[] = [];
       validatePanel(errors, true);
+      // A half-built filter that reaches the query (e.g. IN with no value) waits for its value.
+      dashboardPanelData.data.queries.forEach((query: any) => {
+        if (query?.customQuery) return;
+        const conditions = query?.fields?.filter?.conditions ?? [];
+        validateConditions(t, conditionsInQuery(conditions, dashboardPanelData), errors);
+      });
       return [...errors, ...collectBuilderTabErrors()];
     };
 

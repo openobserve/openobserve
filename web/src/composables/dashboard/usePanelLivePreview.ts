@@ -165,8 +165,10 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
     );
   });
 
+  const isBuilderValid = computed(() => options.isBuilderValid());
+
   const isIncomplete = computed(
-    () => isArmed.value && !isTypedPending.value && isOutdated.value && !options.isBuilderValid(),
+    () => isArmed.value && !isTypedPending.value && isOutdated.value && !isBuilderValid.value,
   );
 
   const isPending = computed(
@@ -228,6 +230,11 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
       if (isArmed.value) schedule();
     },
   );
+
+  // A run skipped while the builder was incomplete is due once it is valid, even if the payload did not change.
+  watch(isBuilderValid, (valid) => {
+    if (valid && isArmed.value) schedule();
+  });
 
   watch(options.isLoading, (loading) => {
     if (loading) {
