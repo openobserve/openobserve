@@ -25,9 +25,10 @@ const store = createStore({
 });
 // Content renders only after its trigger is clicked, so a test must open one step's options to see them.
 const popoverStub = {
+  emits: ["update:open"],
   data: () => ({ shown: false }),
   template:
-    '<div><div @click="shown = true"><slot name="trigger" /></div><slot v-if="shown" /></div>',
+    '<div><div @click="shown = true; $emit(\'update:open\', true)"><slot name="trigger" /></div><slot v-if="shown" /></div>',
 };
 
 const IDLE = { status: "idle", rows: [], error: null } as never;
@@ -77,6 +78,8 @@ describe("FunnelLayoutInline: exclusion steps and step filters", () => {
         appFilters: null,
         includeHidden: false,
         settings: [],
+        filterFields: ["geo_info_country"],
+        filterValues: { field: null, status: "idle", rows: [] },
         ...extra,
       },
       global: {
@@ -300,5 +303,34 @@ describe("FunnelLayoutInline: exclusion steps and step filters", () => {
     await w.find('[data-test="rum-analytics-funnel-app-filters-edit"]').trigger("click");
     expect(w.emitted("include-hidden")).toHaveLength(1);
     expect(w.emitted("edit-app-filters")).toHaveLength(1);
+  });
+
+  it("renders Filter all steps on the card, with chips, and asks the owner for a field's values", async () => {
+    const def = {
+      ...defWith([]),
+      f: [{ field: "geo_info_country", op: "in", values: ["India"] }],
+    } as FunnelDef;
+    const w = mountLayout(def, { filterFields: ["geo_info_country", "usr_email"] });
+    const section = w.find('[data-test="rum-analytics-funnel-filter-all"]');
+    expect(section.text()).toContain("Filter all steps");
+    expect(
+      section.find('[data-test="rum-analytics-funnel-filter-geo_info_country"]').text(),
+    ).toContain("Country is one of India");
+    await w.find('[data-test="rum-analytics-funnel-add-filter-btn"]').trigger("click");
+    await w
+      .find('[data-test="rum-analytics-funnel-field-picker-field-usr_email"]')
+      .trigger("click");
+    expect(
+      w.find('[data-test="rum-analytics-funnel-field-picker-field-geo_info_country"]').exists(),
+    ).toBe(false);
+    expect(w.emitted("filter-values")).toEqual([["usr_email"]]);
+  });
+
+  it("shows a step's view conditions as chips under the step", () => {
+    const vc = [{ t: "param", key: "utm_source", op: "eq", values: ["ads"] }];
+    const w = mountLayout(defWith([], [{ kind: "p", key: "/web", f: { vc } }, steps[1]]));
+    expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').text()).toContain(
+      "utm_source = ads",
+    );
   });
 });

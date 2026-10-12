@@ -25,10 +25,15 @@ import {
 } from "@/utils/rum/productAnalyticsModel";
 
 export type StepKind = "p" | "c" | "e" | "r";
+/** A page step's "only when": a URL parameter, or the referrer host, equals one of `values`. */
+export type ViewCond =
+  | { t: "param"; key: string; op: "eq"; values: string[] }
+  | { t: "ref"; op: "eq"; values: string[] };
 export interface StepFilters {
   minMs?: number;
   frustrated?: true;
   errored?: true;
+  vc?: ViewCond[];
 }
 export interface StepRef {
   kind: StepKind;
@@ -67,7 +72,10 @@ export interface FunnelDef {
   window: FunnelWindow;
   breakdown: BreakdownDim | null;
   x?: ExclusionStep[];
+  f?: FunnelFilter[];
 }
+/** Filter all steps: keeps a session whose field matches one of the values; NULL never matches. */
+export type FunnelFilter = SessionRule;
 export interface FunnelCohort {
   funnel: FunnelDef;
   stepIndex: number;
@@ -373,6 +381,8 @@ const appFlag = (
 interface SessionPass {
   xi: string;
   widen: string;
+  over: string[];
+  keep: string[];
 }
 
 const PASS_XS = "MAX(xi) OVER (PARTITION BY sid) AS xs";
@@ -383,7 +393,45 @@ const sessionPass = (scope: AnalyticsScope): SessionPass | null => {
   if (!rules.length) return null;
   const xi = appFlag(scope, (ex) => savedRules(scope, ex, true).flatMap(ruleMatches));
   const fields = [...new Set(rules.map((r) => r.field))];
-  return { xi: `${xi} AS xi`, widen: fields.map((f) => ` OR ${f} IS NOT NULL`).join("") };
+  return {
+    xi: `${xi} AS xi`,
+    widen: fields.map((f) => ` OR ${f} IS NOT NULL`).join(""),
+    over: [PASS_XS],
+    keep: ["xs = 0"],
+  };
+};
+
+// A field the stream lacks is NULL on every row, so it matches nothing.
+const filterMatch = (scope: AnalyticsScope, r: FunnelFilter): string =>
+  has(scope, r.field) ? `(${anyOf(ruleMatches(r))})` : "(1 = 0)";
+
+const funnelFilters = (def: FunnelDef, identity: boolean): FunnelFilter[] =>
+  (def.f ?? []).filter((r) => isIdentityRule(r) === identity);
+
+/** Filter all steps on fields every row carries, as WHERE predicates so rows are pruned early. */
+const funnelFilterKeeps = (scope: AnalyticsScope, def: FunnelDef): string =>
+  funnelFilters(def, false)
+    .map((r) => ` AND ${filterMatch(scope, r)}`)
+    .join("");
+
+// Identity filters flag the whole session, like identity rules, because its first views carry no identity yet.
+const funnelPass = (scope: AnalyticsScope, def: FunnelDef): SessionPass | null => {
+  const base = sessionPass(scope);
+  const ids = funnelFilters(def, true);
+  if (!ids.length) return base;
+  const n = range1(ids.length);
+  const fields = [...new Set(ids.map((r) => r.field))].filter((f) => has(scope, f));
+  return {
+    xi: [
+      ...(base ? [base.xi] : []),
+      ...ids.map(
+        (r, i) => `MAX(CASE WHEN ${filterMatch(scope, r)} THEN 1 ELSE 0 END) AS ki${i + 1}`,
+      ),
+    ].join(", "),
+    widen: `${base?.widen ?? ""}${fields.map((f) => ` OR ${f} IS NOT NULL`).join("")}`,
+    over: [...(base?.over ?? []), ...n.map((i) => `MAX(ki${i}) OVER (PARTITION BY sid) AS ks${i}`)],
+    keep: [...(base?.keep ?? []), ...n.map((i) => `ks${i} = 1`)],
+  };
 };
 
 const filtered = (
@@ -395,13 +443,10 @@ const filtered = (
   unit = "sid",
 ): string => {
   const cols = [
-    ...(pass ? [PASS_XS] : []),
+    ...(pass?.over ?? []),
     ...(newSince !== null ? [`MIN(t0) OVER (PARTITION BY ${unit}) AS first_t`] : []),
   ];
-  const conds = [
-    ...(pass ? ["xs = 0"] : []),
-    ...(newSince !== null ? [`first_t >= ${newSince}`] : []),
-  ];
+  const conds = [...(pass?.keep ?? []), ...(newSince !== null ? [`first_t >= ${newSince}`] : [])];
   if (where) conds.push(conds.length ? `(${where})` : where);
   const from = cols.length ? `(SELECT *, ${cols.join(", ")} FROM ${src}) ${alias}` : src;
   return conds.length ? `${from} WHERE ${conds.join(" AND ")}` : from;
@@ -656,6 +701,12 @@ export function identityTopSql(scope: AnalyticsScope, field: IdentityField): str
     ],
     "SELECT u, s, total_s, n_values FROM r ORDER BY s DESC, u LIMIT 3",
   );
+}
+
+/** A Filter all steps field's top values with their sessions, shaped like identityTopSql. */
+export function filterValuesSql(scope: AnalyticsScope, field: FunnelFilter["field"]): string {
+  if (!has(scope, field)) throw new Error(`Field ${field} is not in the stream`);
+  return `SELECT ${field} AS v, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${rowScope(scope)} AND ${field} IS NOT NULL AND ${field} <> '' GROUP BY ${field} ORDER BY sessions DESC, v LIMIT 20`;
 }
 
 /** Top browser and device families over the scope without any exclusion, for the likely-bot suggestions. */
@@ -1010,14 +1061,18 @@ const stepEvents = (steps: StepRef[], events: NamedEvent[]): NamedEvent[] =>
 const eventRules = (steps: StepRef[], events: NamedEvent[]): NamedRule[] =>
   stepEvents(steps, events).flatMap((e) => e.rules);
 
+const hasCond = (steps: StepRef[], t: ViewCond["t"]): boolean =>
+  steps.some((s) => s.f?.vc?.some((c) => c.t === t));
+
 // On-page and URL parameter rules read the row's own URL, so the grouped rows must keep it.
 const needsUrl = (steps: StepRef[], events: NamedEvent[]): boolean =>
+  hasCond(steps, "param") ||
   eventRules(steps, events).some(
     (r) => ("onPage" in r && !!r.onPage) || (r.t === "view" && r.op === "param"),
   );
 
 const needsRef = (steps: StepRef[], events: NamedEvent[]): boolean =>
-  eventRules(steps, events).some((r) => r.t === "view" && r.op === "ref");
+  hasCond(steps, "ref") || eventRules(steps, events).some((r) => r.t === "view" && r.op === "ref");
 
 const actionRowPredicates = (
   scope: AnalyticsScope,
@@ -1100,12 +1155,38 @@ const scannedSteps = (def: FunnelDef): StepRef[] => [
 const flag = (pred: string, alias: string): string =>
   `CASE WHEN ${pred} THEN 1 ELSE 0 END AS ${alias}`;
 
+// A grouped view row keeps its URL as `url` and its referrer as `ref`, as the named-event rules read them.
+const viewCondGrouped = (c: ViewCond, scope: AnalyticsScope): string => {
+  if (c.t === "ref" && !has(scope, "view_referrer")) return "(1 = 0)";
+  const hits = c.values.map((v) =>
+    c.t === "param"
+      ? `regexp_like(url, ${lit(paramPattern(c.key, v))})`
+      : `regexp_like(ref, ${lit(refPattern(v))})`,
+  );
+  return hits.length === 1 ? `(${hits[0]})` : anyOf(hits);
+};
+
+/** A view condition on raw rows, prefiltered like the named-event param and referrer rules. */
+export function viewCondRaw(c: ViewCond, scope: AnalyticsScope): string {
+  if (c.t === "param") {
+    const hits = c.values.map((v) => `regexp_like(view_url, ${lit(paramPattern(c.key, v))})`);
+    return `(strpos(view_url, ${lit(`${c.key}=`)}) > 0 AND ${anyOf(hits)})`;
+  }
+  if (!has(scope, "view_referrer")) return "(1 = 0)";
+  const hits = c.values.map(
+    (v) =>
+      `(strpos(view_referrer, ${lit(v)}) > 0 AND regexp_like(view_referrer, ${lit(refPattern(v))}))`,
+  );
+  return `(${anyOf(hits)})`;
+}
+
 // view_time_spent is in nanoseconds.
-const filterConds = (f: StepFilters | undefined): string =>
+const filterConds = (f: StepFilters | undefined, scope: AnalyticsScope): string =>
   [
     ...(f?.minMs !== undefined ? [`vts >= ${f.minMs * 1000000}`] : []),
     ...(f?.frustrated ? ["vf = 1"] : []),
     ...(f?.errored ? ["ve = 1"] : []),
+    ...(f?.vc ?? []).map((c) => viewCondGrouped(c, scope)),
   ]
     .map((c) => ` AND ${c}`)
     .join("");
@@ -1116,7 +1197,8 @@ const stepFlags = (
   events: NamedEvent[],
   ungated: boolean,
 ): string => {
-  const step = (s: StepRef) => `${stepPredicateGrouped(s, scope, events)}${filterConds(s.f)}`;
+  const step = (s: StepRef) =>
+    `${stepPredicateGrouped(s, scope, events)}${filterConds(s.f, scope)}`;
   const near = (i: number) =>
     withinOf(def)
       .filter((x) => x.e.a === i)
@@ -1304,7 +1386,7 @@ const funnelCtes = (
   const all = scannedSteps(def);
   const url = needsUrl(all, events);
   const vnAvail = has(scope, "view_name");
-  const pass = sessionPass(scope);
+  const pass = funnelPass(scope, def);
   const extra = scanCols(scope, def, events);
   const errors = errorRowPredicates(scope, all, events);
   const newSince = users ? (scope.newSince ?? null) : null;
@@ -1349,7 +1431,7 @@ const funnelCtes = (
   const x0Where = `ty = 'action' OR (ty = 'view' AND (${keep}))${errorKeep}${users ? " OR u0 IS NOT NULL" : ""}`;
   const near = withinCtes(scope, def, events);
   const ctes = [
-    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)} AND (${rowFilter}${pass?.widen ?? ""}) GROUP BY session_id, type, ${groupKey(scope, errors.length > 0)})`,
+    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope)}${funnelFilterKeeps(scope, def)} AND (${rowFilter}${pass?.widen ?? ""}) GROUP BY session_id, type, ${groupKey(scope, errors.length > 0)})`,
     `x0 AS (SELECT sid, t, ty, ${k}${carry.map((c) => `, ${c}`).join("")} FROM ${filtered("x00", pass, x0Where)})`,
     ...near,
     `x1 AS (SELECT sid, t, ty, k${dim ? ", dim" : ""}, ${stepFlags(scope, def, events, true)}, ${users ? `${UID_WINDOW} AS uid` : "CAST(NULL AS VARCHAR) AS uid"}${newSince !== null ? ", t0" : ""} FROM ${near.length ? "x1a" : "x0"})`,
@@ -1517,6 +1599,44 @@ export function funnelAlertSql(
   );
 }
 
+/** Sessions that opened step 1 (`opened`) and those of them inside Filter all steps (`kept`), for "Why N?". */
+export function whyEnteredSql(scope: AnalyticsScope, def: FunnelDef, opts: BuildOpts): string {
+  const s1 = def.steps[0];
+  const conds = (s1.f?.vc ?? []).map((c) => ` AND ${viewCondRaw(c, scope)}`).join("");
+  const opened = `(${stepPredicateRaw(s1, scope, opts.events)}${conds})`;
+  const keeps = funnelFilters(def, false).map((r) => filterMatch(scope, r));
+  const kept = [opened, ...keeps].join(" AND ");
+  const base = sessionPass(scope);
+  const ids = funnelFilters(def, true);
+  const fields = [...new Set(ids.map((r) => r.field))].filter((f) => has(scope, f));
+  const widen = `${base?.widen ?? ""}${fields.map((f) => ` OR ${f} IS NOT NULL`).join("")}`;
+  const g = [
+    "session_id AS sid",
+    `MAX(CASE WHEN ${opened} THEN 1 ELSE 0 END) AS o1`,
+    `MAX(CASE WHEN ${kept} THEN 1 ELSE 0 END) AS k1`,
+    ...ids.map((r, i) => `MAX(CASE WHEN ${filterMatch(scope, r)} THEN 1 ELSE 0 END) AS ki${i + 1}`),
+    ...(base ? [base.xi] : []),
+  ];
+  const inFilter = ["k1 = 1", ...ids.map((_, i) => `ki${i + 1} = 1`)].join(" AND ");
+  return withCtes(
+    [
+      `g AS (SELECT ${g.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND (${opened}${widen}) GROUP BY session_id)`,
+    ],
+    `SELECT SUM(o1) AS opened, SUM(CASE WHEN ${inFilter} THEN 1 ELSE 0 END) AS kept FROM g${base ? " WHERE xi = 0" : ""} LIMIT 1`,
+  );
+}
+
+/** The scope stored SQL compiles with: the app and its filters, never the page's env, version, compared apps or new users. */
+export function storedFunnelScope(scope: AnalyticsScope): AnalyticsScope {
+  return {
+    app: scope.app,
+    env: [],
+    version: [],
+    schema: scope.schema,
+    ...(scope.exclusions ? { exclusions: scope.exclusions } : {}),
+  };
+}
+
 interface FullChainOpts {
   errors: boolean;
   label: boolean;
@@ -1540,7 +1660,7 @@ const fullChainCtes = (
   const all = scannedSteps(def);
   const url = needsUrl(all, events);
   const vnAvail = has(scope, "view_name");
-  const pass = sessionPass(scope);
+  const pass = funnelPass(scope, def);
   const extra = scanCols(scope, def, events);
   const app = comparing(scope);
   const between = betweenOf(def);
@@ -1579,7 +1699,7 @@ const fullChainCtes = (
     .join("");
   const near = withinCtes(scope, def, events);
   const ctes = [
-    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, users ? 1 : o.sample)} AND (type IN (${types}) OR ${actionClickExpr(scope)}${errorRows}${identityRows}${pass?.widen ?? ""}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} WHEN type = 'error' THEN CAST(date AS VARCHAR) ELSE type END)`,
+    `x00 AS (SELECT ${cols.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, users ? 1 : o.sample)}${funnelFilterKeeps(scope, def)} AND (type IN (${types}) OR ${actionClickExpr(scope)}${errorRows}${identityRows}${pass?.widen ?? ""}) GROUP BY session_id, type, CASE WHEN type = 'view' THEN view_id WHEN type = 'action' THEN ${actionKey(scope)} WHEN type = 'error' THEN CAST(date AS VARCHAR) ELSE type END)`,
     idf
       ? `x0 AS (SELECT sid, ty, t, hr${fr}, u0, ut${carry}, ${k} FROM ${filtered("x00", pass)})`
       : `x0 AS (SELECT sid, ty, t, hr${fr}${carry}, ${k} FROM ${filtered("x00", pass, "ty IN ('view', 'action', 'error')")})`,

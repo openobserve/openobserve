@@ -42,6 +42,8 @@ pub const MAX_SESSION_RULES: usize = 20;
 pub const MAX_PAGE_RULES: usize = 20;
 pub const MAX_RULE_VALUES: usize = 20;
 pub const MAX_EXCLUSIONS: usize = 5;
+pub const MAX_FUNNEL_FILTERS: usize = 10;
+pub const MAX_VIEW_CONDS: usize = 5;
 /// One day in ms, the bound of an exclusion window and of a step's time on page.
 pub const MAX_STEP_MS: i64 = 86_400_000;
 pub const MAX_PARAM_NAME_LENGTH: usize = 128;
@@ -246,7 +248,7 @@ impl From<AppSettingsRow> for AppSettings {
     }
 }
 
-/// A funnel as the web's `funnelParam` writes it: steps, unit, window, breakdown, exclusions.
+/// A funnel as the web's `funnelParam` writes it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FunnelDef {
@@ -261,6 +263,9 @@ pub struct FunnelDef {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Vec<Object>>)]
     pub x: Option<Vec<Exclusion>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Vec<Object>>)]
+    pub f: Option<Vec<FunnelFilter>>,
 }
 
 /// `[kind, key]` or `[kind, key, options]`.
@@ -292,7 +297,7 @@ impl Step {
     }
 }
 
-/// A page step's filters: time on page in ms, frustrated (`fr: 1`), errored (`er: 1`).
+/// A page step's filters: time on page (ms), `fr: 1`, `er: 1` and view conditions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StepOpts {
@@ -302,6 +307,23 @@ pub struct StepOpts {
     pub fr: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub er: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vc: Option<Vec<ViewCond>>,
+}
+
+/// A page step's view condition: a URL parameter, or the referrer host, equals one of `values`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "t", rename_all = "lowercase", deny_unknown_fields)]
+pub enum ViewCond {
+    Param {
+        key: String,
+        op: MatchOp,
+        values: Vec<String>,
+    },
+    Ref {
+        op: MatchOp,
+        values: Vec<String>,
+    },
 }
 
 /// A step that must not occur between steps `a` and `b`, or within `w` ms after step `a`.
@@ -314,6 +336,15 @@ pub struct Exclusion {
     pub b: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub w: Option<i64>,
+}
+
+/// Filter all steps: keeps only sessions whose `field` matches one of `values`; NULL never matches.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FunnelFilter {
+    pub field: SessionField,
+    pub op: MatchOp,
+    pub values: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -660,6 +691,7 @@ pub fn validate_def(def: &FunnelDef) -> Result<(serde_json::Value, Vec<String>),
         validate_step(step, &mut event_ids)?;
     }
     validate_exclusions(def, &mut event_ids)?;
+    validate_filters(def.f.as_deref())?;
     let unit = def.u.as_deref().unwrap_or("sessions");
     if unit != "sessions" && unit != "users" {
         return Err(invalid_def("u must be sessions or users".to_string()));
@@ -692,6 +724,7 @@ pub fn validate_def(def: &FunnelDef) -> Result<(serde_json::Value, Vec<String>),
         ),
         b: def.b.clone(),
         x: def.x.clone(),
+        f: def.f.clone(),
     };
     let stored = serde_json::to_value(stored).map_err(|e| RumPaError::Internal {
         message: e.to_string(),
@@ -811,6 +844,67 @@ fn validate_step(step: &Step, event_ids: &mut Vec<String>) -> Result<(), RumPaEr
         .any(|flag| flag.is_some_and(|f| f != 1))
     {
         return Err(invalid_def("fr and er are 1 when set".to_string()));
+    }
+    validate_view_conds(opts.vc.as_deref())
+}
+
+/// Reuses the named-event param and referrer checks, so credential parameters stay refused.
+fn validate_view_conds(conds: Option<&[ViewCond]>) -> Result<(), RumPaError> {
+    let Some(conds) = conds else {
+        return Ok(());
+    };
+    if conds.is_empty() || conds.len() > MAX_VIEW_CONDS {
+        return Err(invalid_def(format!(
+            "a step has 1 to {MAX_VIEW_CONDS} view conditions"
+        )));
+    }
+    for cond in conds {
+        let (op, values) = match cond {
+            ViewCond::Param { op, values, .. } | ViewCond::Ref { op, values } => (*op, values),
+        };
+        if op != MatchOp::Eq {
+            return Err(invalid_def("a view condition takes eq".to_string()));
+        }
+        if values.is_empty() || values.len() > MAX_RULE_VALUES {
+            return Err(invalid_def(format!(
+                "a view condition has 1 to {MAX_RULE_VALUES} values"
+            )));
+        }
+        for value in values {
+            let checked = match cond {
+                ViewCond::Param { key, .. } => validate_view(ViewOp::Param, Some(value), Some(key)),
+                ViewCond::Ref { .. } => validate_view(ViewOp::Ref, Some(value), None),
+            };
+            checked.map_err(as_def)?;
+        }
+    }
+    Ok(())
+}
+
+// Env and version stay page-wide, so a saved funnel never carries its own scope.
+fn validate_filters(filters: Option<&[FunnelFilter]>) -> Result<(), RumPaError> {
+    let Some(filters) = filters else {
+        return Ok(());
+    };
+    if filters.len() > MAX_FUNNEL_FILTERS {
+        return Err(invalid_def(format!(
+            "a funnel has at most {MAX_FUNNEL_FILTERS} filters"
+        )));
+    }
+    for filter in filters {
+        if matches!(filter.field, SessionField::Env | SessionField::Version) {
+            return Err(invalid_def(
+                "a funnel filter cannot use env or version".to_string(),
+            ));
+        }
+        if filter.values.is_empty() || filter.values.len() > MAX_RULE_VALUES {
+            return Err(invalid_def(format!(
+                "a funnel filter has 1 to {MAX_RULE_VALUES} values"
+            )));
+        }
+        for value in &filter.values {
+            validate_match_value(value, filter.op == MatchOp::Regex).map_err(as_def)?;
+        }
     }
     Ok(())
 }
@@ -991,6 +1085,14 @@ fn invalid_rules(message: String) -> RumPaError {
 
 fn invalid_def(message: String) -> RumPaError {
     RumPaError::InvalidDefinition(message)
+}
+
+/// A rule check reused inside a funnel definition reports as the definition's error.
+fn as_def(e: RumPaError) -> RumPaError {
+    match e {
+        RumPaError::InvalidRules(message) => invalid_def(message),
+        other => other,
+    }
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -1618,6 +1720,144 @@ mod tests {
         }
         for op in ["in", "suffix"] {
             assert_eq!(rule_code(error(op)), "invalid_rules", "{op}");
+        }
+    }
+
+    /// Steps `/a`, `/b` with the given filters.
+    fn with_f(f: serde_json::Value) -> Result<(serde_json::Value, Vec<String>), RumPaError> {
+        validate_def(&fdef(
+            serde_json::json!({"s": [["p", "/a"], ["p", "/b"]], "f": f}),
+        ))
+    }
+
+    /// Steps `/a` with the given view conditions, then `/b`.
+    fn with_vc(vc: serde_json::Value) -> Result<(serde_json::Value, Vec<String>), RumPaError> {
+        validate_def(&fdef(
+            serde_json::json!({"s": [["p", "/a", {"vc": vc}], ["p", "/b"]]}),
+        ))
+    }
+
+    #[test]
+    fn p4_f_a_funnel_filter_is_stored_and_rejects_unknown_fields() {
+        let filter =
+            serde_json::json!({"field": "geo_info_country", "op": "in", "values": ["India"]});
+        let (stored, _) = with_f(serde_json::json!([filter.clone()])).unwrap();
+        assert_eq!(stored["f"], serde_json::json!([filter]), "{stored}");
+        let (plain, _) = with_f(serde_json::Value::Null).unwrap();
+        assert!(plain.get("f").is_none(), "{plain}");
+        for bad in [
+            serde_json::json!([{"field": "geo_info_country", "op": "in", "values": ["x"], "x": 1}]),
+            serde_json::json!([{"field": "user_agent", "op": "in", "values": ["x"]}]),
+            serde_json::json!([{"field": "geo_info_country", "op": "like", "values": ["x"]}]),
+        ] {
+            let def = serde_json::json!({"s": [["p", "/a"], ["p", "/b"]], "f": bad});
+            assert!(serde_json::from_value::<FunnelDef>(def).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn p4_f_at_most_ten_filters_of_one_to_twenty_values() {
+        let one = |n: usize| {
+            let values: Vec<String> = (0..n).map(|i| format!("v{i}")).collect();
+            serde_json::json!({"field": "usr_email", "op": "eq", "values": values})
+        };
+        assert_eq!(def_code(with_f(serde_json::json!(vec![one(1); 10]))), "ok");
+        assert_eq!(def_code(with_f(serde_json::json!([one(20)]))), "ok");
+        for f in [
+            serde_json::json!(vec![one(1); 11]),
+            serde_json::json!([one(0)]),
+            serde_json::json!([one(21)]),
+            serde_json::json!([{"field": "usr_email", "op": "eq", "values": [""]}]),
+        ] {
+            assert_eq!(def_code(with_f(f.clone())), "invalid_definition", "{f}");
+        }
+    }
+
+    #[test]
+    fn p4_f_env_and_version_are_refused() {
+        for field in ["env", "version"] {
+            let f = serde_json::json!([{"field": field, "op": "in", "values": ["prod"]}]);
+            assert_eq!(def_code(with_f(f)), "invalid_definition", "{field}");
+        }
+        for field in SESSION_FIELDS
+            .iter()
+            .filter(|f| !matches!(**f, "env" | "version"))
+        {
+            let f = serde_json::json!([{"field": field, "op": "in", "values": ["x"]}]);
+            assert_eq!(def_code(with_f(f)), "ok", "{field}");
+        }
+    }
+
+    #[test]
+    fn p4_f_a_regex_value_compiles_in_the_engine() {
+        let regex =
+            |v: &str| serde_json::json!([{"field": "usr_email", "op": "regex", "values": [v]}]);
+        assert_eq!(def_code(with_f(regex("@acme\\.com$"))), "ok");
+        assert_eq!(def_code(with_f(regex("(a"))), "invalid_definition");
+        assert_eq!(
+            def_code(with_f(regex(&"a".repeat(257)))),
+            "invalid_definition"
+        );
+    }
+
+    #[test]
+    fn p4_vc_param_and_ref_conditions_ride_in_the_step() {
+        let vc = serde_json::json!([
+            {"t": "param", "key": "utm_source", "op": "eq", "values": ["ads", "mail"]},
+            {"t": "ref", "op": "eq", "values": ["google.com"]}
+        ]);
+        let (stored, _) = with_vc(vc.clone()).unwrap();
+        assert_eq!(stored["s"][0][2]["vc"], vc, "{stored}");
+        for bad in [
+            serde_json::json!([{"t": "load", "values": ["x"]}]),
+            serde_json::json!([{"t": "param", "key": "a", "op": "eq", "values": ["x"], "x": 1}]),
+            serde_json::json!([{"t": "ref", "key": "a", "op": "eq", "values": ["a.com"]}]),
+            serde_json::json!([{"t": "param", "op": "eq", "values": ["x"]}]),
+        ] {
+            let def = serde_json::json!({"s": [["p", "/a", {"vc": bad}], ["p", "/b"]]});
+            assert!(serde_json::from_value::<FunnelDef>(def).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn p4_vc_limits_ops_and_page_steps_only() {
+        let param = |key: &str, op: &str, values: serde_json::Value| serde_json::json!({"t": "param", "key": key, "op": op, "values": values});
+        let ok = param("utm_source", "eq", serde_json::json!(["ads"]));
+        assert_eq!(
+            def_code(with_vc(serde_json::json!(vec![ok.clone(); 5]))),
+            "ok"
+        );
+        let twenty: Vec<String> = (0..20).map(|i| format!("v{i}")).collect();
+        assert_eq!(
+            def_code(with_vc(serde_json::json!([param(
+                "utm_source",
+                "eq",
+                twenty.into()
+            )]))),
+            "ok"
+        );
+        let too_many: Vec<String> = (0..21).map(|i| format!("v{i}")).collect();
+        for vc in [
+            serde_json::json!(vec![ok.clone(); 6]),
+            serde_json::json!([]),
+            serde_json::json!([param("utm_source", "eq", serde_json::json!([]))]),
+            serde_json::json!([param("utm_source", "eq", too_many.into())]),
+            serde_json::json!([param("utm_source", "prefix", serde_json::json!(["a"]))]),
+            serde_json::json!([param("utm source", "eq", serde_json::json!(["a"]))]),
+            serde_json::json!([{"t": "ref", "op": "eq", "values": ["Google.com"]}]),
+            serde_json::json!([{"t": "ref", "op": "contains", "values": ["google.com"]}]),
+        ] {
+            assert_eq!(def_code(with_vc(vc.clone())), "invalid_definition", "{vc}");
+        }
+        let on_click = fdef(serde_json::json!({"s": [["c", "Buy", {"vc": [ok]}], ["p", "/b"]]}));
+        assert_eq!(def_code(validate_def(&on_click)), "invalid_definition");
+    }
+
+    #[test]
+    fn p4_vc_credential_parameters_are_refused() {
+        for key in CREDENTIAL_PARAMS {
+            let vc = serde_json::json!([{"t": "param", "key": key, "op": "eq", "values": ["x"]}]);
+            assert_eq!(def_code(with_vc(vc)), "invalid_definition", "{key}");
         }
     }
 }

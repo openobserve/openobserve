@@ -17,7 +17,8 @@ import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import type { AppFilterCounts } from "@/composables/rum/useAppFilterCounts";
 import type { I18nText } from "@/types/i18n";
-import type { FunnelResult, NamedEvent } from "@/utils/rum/productAnalyticsModel";
+import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
+import type { FunnelResult, NamedEvent, SessionField } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef, SampleRatio, StepRef } from "@/utils/rum/productAnalyticsQueries";
 
 export interface FunnelLayoutSetting {
@@ -44,6 +45,8 @@ export interface FunnelLayoutProps {
   appFilters: AppFilterCounts | null;
   includeHidden: boolean;
   settings: FunnelLayoutSetting[];
+  filterFields: readonly SessionField[];
+  filterValues: FilterValuesState;
 }
 
 export interface FunnelLayoutEmits {
@@ -52,4 +55,5 @@ export interface FunnelLayoutEmits {
   "suggestions-retry": [];
   "include-hidden": [];
   "edit-app-filters": [];
+  "filter-values": [SessionField];
 }

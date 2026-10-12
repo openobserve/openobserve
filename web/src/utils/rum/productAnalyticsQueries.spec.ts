@@ -1409,6 +1409,15 @@ describe("assertJoinFree over every builder (AC-55)", () => {
     unnamedClicksSql: () => [P5_NEW.unnamedClicksSql(s)],
     userAgentSuggestionSql: () => [P5_NEW.userAgentSuggestionSql(s)],
     namedEventPreviewSql: () => [P5_NEW.namedEventPreviewSql(s, ev)],
+    filterValuesSql: () => [QUERIES.filterValuesSql(s, "usr_email")],
+    whyEnteredSql: () =>
+      defs.map((d) =>
+        QUERIES.whyEnteredSql(
+          s,
+          { ...d, f: [{ field: "usr_email", op: "in", values: ["a@x.io"] }] },
+          opts,
+        ),
+      ),
   };
 
   it("covers every exported *Sql builder", () => {

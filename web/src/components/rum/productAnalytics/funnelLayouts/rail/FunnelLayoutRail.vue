@@ -64,6 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @suggestions-retry="emit('suggestions-retry')"
         />
       </section>
+      <FunnelFilterBar
+        :def="def"
+        :fields="filterFields"
+        :values="filterValues"
+        stacked
+        @update:def="(d) => emit('update:def', d)"
+        @filter-values="(f) => emit('filter-values', f)"
+      />
       <ExclusionSection
         :def="def"
         :removed="removed"
@@ -124,6 +132,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import FunnelStepsTable from "@/components/rum/productAnalytics/funnelParts/FunnelStepsTable.vue";
 import FunnelAddStep from "@/components/rum/productAnalytics/funnelParts/FunnelAddStep.vue";
 import ExclusionSection from "@/components/rum/productAnalytics/funnelParts/ExclusionSection.vue";
+import FunnelFilterBar from "@/components/rum/productAnalytics/funnelParts/FunnelFilterBar.vue";
 import AppFiltersSummary from "@/components/rum/productAnalytics/funnelParts/AppFiltersSummary.vue";
 import StepConditionPopover from "@/components/rum/productAnalytics/funnelParts/StepConditionPopover.vue";
 import RailStepLine from "@/components/rum/productAnalytics/funnelLayouts/rail/RailStepLine.vue";

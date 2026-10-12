@@ -457,6 +457,24 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
       expectOpenUntouched(before);
     });
 
+    it("Duplicate compiles its sql without the page's env, so the copy matches what the funnel remembers (D4)", async () => {
+      usePerformance().performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: { usr_email: { name: "usr_email" }, env: { name: "env" } },
+      };
+      api.seedFunnel("web", "Alpha", PARAM);
+      await mountPage();
+      useProductAnalytics().setScope({ env: ["prod"] });
+      await settle();
+      await action(0, "duplicate").trigger("click");
+      await settle();
+      await fillAndSubmit();
+      const [body] = api.bodies("createFunnel");
+      expect(body.sql).toContain('FROM "_rumdata"');
+      expect(body.sql).not.toContain("env IN");
+      expect(useProductAnalytics().scope.value.env).toEqual(["prod"]);
+    });
+
     it("Duplicate is off while a step's event is deleted, saying why (CR-11)", async () => {
       api.seedEvent("web", "Logs page", { id: EV });
       api.seedFunnel("web", "Gone", {

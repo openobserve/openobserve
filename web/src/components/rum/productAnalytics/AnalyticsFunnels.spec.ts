@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { defineComponent, h, KeepAlive, ref, type Ref } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
@@ -82,6 +82,7 @@ import i18n from "@/locales";
 import { assertJoinFree } from "@/utils/rum/productAnalyticsQueries";
 import { decodeDef, encodeDef } from "@/utils/rum/productAnalyticsModel";
 import { alertCreationDialog } from "@/composables/alerts/useAlertCreation";
+import { FUNNEL_LAYOUTS } from "@/components/rum/productAnalytics/funnelLayouts/registry";
 
 type Hit = Record<string, unknown>;
 type Route = [RegExp, Hit[] | ((sql: string) => Hit[] | Promise<Hit[]>)];
@@ -186,6 +187,11 @@ const store = createStore({
 });
 
 describe("AnalyticsFunnels", () => {
+  // The layout loads lazily, and its first transform under a parallel run can outlast one settle().
+  beforeAll(async () => {
+    await Promise.all(Object.values(FUNNEL_LAYOUTS).map((load) => load()));
+  }, 60000);
+
   let router: Router;
   let wrapper: VueWrapper | null = null;
 
@@ -1943,6 +1949,165 @@ describe("AnalyticsFunnels", () => {
           .find('[data-test="rum-analytics-funnel-bar-removed"]')
           .exists(),
       ).toBe(true);
+    });
+  });
+
+  describe("phase 2: Filter all steps, Why N?, stored SQL without page scope", () => {
+    const at = (dt: string) => wrapper!.find(`[data-test="${dt}"]`);
+    const layout = () => wrapper!.findComponent({ name: "FunnelLayoutInline" });
+    const twoSteps = async () => {
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+    };
+    const withSchema = (fields: string[]) => {
+      const { performanceState } = usePerformance();
+      performanceState.data.streams._rumdata = {
+        name: "_rumdata",
+        schema: Object.fromEntries(fields.map((f) => [f, { name: f }])),
+      };
+    };
+
+    it("refuses any definition change past a link's length, not only an added step", async () => {
+      await mountFunnels();
+      await twoSteps();
+      const pa = useProductAnalytics();
+      const before = pa.funnel.value;
+      const many = Array.from({ length: 20 }, (_, i) => `${"v".repeat(400)}${i}`);
+      layout().vm.$emit("update:def", {
+        ...before,
+        f: (["geo_info_city", "usr_email", "usr_id"] as const).map((field) => ({
+          field,
+          op: "in",
+          values: many,
+        })),
+      });
+      await settle();
+      expect(pa.funnel.value).toBe(before);
+      expect(toastSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining("too long") }),
+      );
+      layout().vm.$emit("update:def", {
+        ...before,
+        f: [{ field: "geo_info_city", op: "in", values: ["Pune"] }],
+      });
+      await settle();
+      expect(pa.funnel.value.f).toEqual([{ field: "geo_info_city", op: "in", values: ["Pune"] }]);
+    });
+
+    it("a filter applies to the live funnel query", async () => {
+      withSchema(["usr_email", "geo_info_country"]);
+      await mountFunnels();
+      await twoSteps();
+      layout().vm.$emit("update:def", {
+        ...useProductAnalytics().funnel.value,
+        f: [{ field: "geo_info_country", op: "in", values: ["India"] }],
+      });
+      await settle();
+      expect(funnelSqls().at(-1)).toContain(
+        "(geo_info_country IS NOT NULL AND geo_info_country IN ('India'))",
+      );
+    });
+
+    it("the layout's filter-values request runs the value query and hands the rows back", async () => {
+      withSchema(["usr_email", "geo_info_country"]);
+      routes = [[/SELECT geo_info_country AS v/, [{ v: "India", sessions: 212 }]], ...baseRoutes()];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      expect(layout().props("filterFields")).toEqual(["geo_info_country", "usr_email"]);
+      layout().vm.$emit("filter-values", "geo_info_country");
+      await settle();
+      expect(layout().props("filterValues")).toEqual({
+        field: "geo_info_country",
+        status: "ok",
+        rows: [{ value: "India", sessions: 212 }],
+      });
+    });
+
+    it("Why N? runs its own query only when opened, and its lines add up to the entry count", async () => {
+      routes = [
+        [
+          /va_rows/,
+          [{ ...SUMMARY, total_sessions: 600, builtin_kept_sessions: 520, sessions: 500 }],
+        ],
+        [/AS opened/, [{ opened: 230, kept: 200 }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      const whySql = () => sqls().filter((q) => q.includes("AS opened"));
+      expect(whySql()).toHaveLength(0);
+      const why = wrapper!.findComponent({ name: "WhyEnteredPopover" });
+      expect(at("rum-analytics-funnel-why-btn").text()).toBe("Why 200?");
+      why.vm.$emit("open", true);
+      await settle();
+      expect(whySql()).toHaveLength(1);
+      const lines = why.props("lines") as { lines: { id: string; count: number }[] };
+      expect(lines.lines.map((l) => [l.id, l.count])).toEqual([
+        ["app", 600],
+        ["synthetic", 0],
+        ["bots", 80],
+        ["appFilters", 20],
+        ["step1", 270],
+        ["entered", 200],
+      ]);
+      expect(why.props("estimated")).toBe(false);
+    });
+
+    it("while Why N? is open, edits rerun its query once they settle, not per keystroke", async () => {
+      routes = [[/AS opened/, [{ opened: 230, kept: 200 }]], ...baseRoutes()];
+      respond();
+      await mountFunnels();
+      await twoSteps();
+      const whySql = () => sqls().filter((q) => q.includes("AS opened"));
+      wrapper!.findComponent({ name: "WhyEnteredPopover" }).vm.$emit("open", true);
+      await settle();
+      expect(whySql()).toHaveLength(1);
+      const pa = useProductAnalytics();
+      for (const v of ["a", "ab", "abc"]) {
+        pa.funnel.value = {
+          ...pa.funnel.value,
+          f: [{ field: "usr_email", op: "in", values: [v] }],
+        };
+        await flushPromises();
+      }
+      expect(whySql()).toHaveLength(1);
+      await settle();
+      expect(whySql()).toHaveLength(2);
+      expect(whySql()[1]).toContain("'abc'");
+    });
+
+    it("Why N? is not offered while the funnel counts users", async () => {
+      await mountFunnels();
+      await twoSteps();
+      expect(wrapper!.findComponent({ name: "WhyEnteredPopover" }).exists()).toBe(true);
+      useProductAnalytics().funnel.value = { ...useProductAnalytics().funnel.value, unit: "users" };
+      await settle();
+      expect(wrapper!.findComponent({ name: "WhyEnteredPopover" }).exists()).toBe(false);
+    });
+
+    it("stored SQL and the dashboard panel leave out the page's env, while the live funnel keeps it", async () => {
+      withSchema(["usr_email", "env"]);
+      await mountFunnels();
+      await twoSteps();
+      const compile = wrapper!.findComponent({ name: "SavedFunnelBar" }).props("compileSql") as (
+        d: unknown,
+      ) => string;
+      const plain = compile(useProductAnalytics().funnel.value);
+      useProductAnalytics().setScope({ env: ["prod"] });
+      await settle();
+      expect(funnelSqls().at(-1)).toContain("env IN ('prod')");
+      expect(compile(useProductAnalytics().funnel.value)).toBe(plain);
+      expect(plain).not.toContain("env IN");
+      await at("rum-analytics-funnel-add-dashboard-btn").trigger("click");
+      await flushPromises();
+      const panels = wrapper!.findComponent({ name: "AddToDashboard" }).props("panels") as {
+        queries: { query: string }[];
+      }[];
+      expect(panels[0].queries[0].query).not.toContain("env IN");
     });
   });
 });

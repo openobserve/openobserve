@@ -56,6 +56,14 @@ export default function useStepLabels(
       : []),
     ...(s.f?.frustrated ? [t("rum.analytics.funnel.filterFrustratedTag")] : []),
     ...(s.f?.errored ? [t("rum.analytics.funnel.filterErroredTag")] : []),
+    ...(s.f?.vc ?? []).map((c) =>
+      c.t === "param"
+        ? t("rum.analytics.funnel.condParamTag", {
+            key: raw(c.key),
+            values: raw(c.values.join(" | ")),
+          })
+        : t("rum.analytics.funnel.condRefTag", { values: raw(c.values.join(" | ")) }),
+    ),
   ];
 
   return { labelOf, kindLabel, kindVariant, filterChips };
