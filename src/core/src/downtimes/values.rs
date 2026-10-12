@@ -294,17 +294,25 @@ pub async fn searchable_records(
     user_id: &str,
     records: &[ServiceMetadata],
 ) -> Vec<ServiceMetadata> {
-    readable_records(records, async |stream_type, stream| {
-        may_search(org, user_id, stream_type, stream).await
+    let (org, user_id) = (org.to_string(), user_id.to_string());
+    readable_records(records, move |stream_type, stream| {
+        let (org, user_id) = (org.clone(), user_id.clone());
+        async move { may_search(&org, &user_id, stream_type, &stream).await }
     })
     .await
 }
 
 /// A record is kept only when it lists a stream and `may_read` allows each; one check per stream.
-pub async fn readable_records(
+/// A plain `Fn` returning a future, not an `AsyncFn`: the latter's call lifetime makes the
+/// handler future's `Send` bound "not general enough" under the router.
+pub async fn readable_records<F, Fut>(
     records: &[ServiceMetadata],
-    may_read: impl AsyncFn(StreamType, &str) -> bool,
-) -> Vec<ServiceMetadata> {
+    may_read: F,
+) -> Vec<ServiceMetadata>
+where
+    F: Fn(StreamType, String) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
     let mut allowed: HashMap<(StreamType, String), bool> = HashMap::new();
     let mut kept = Vec::new();
     for record in records {
@@ -315,7 +323,7 @@ pub async fn readable_records(
             let may = match allowed.get(&key) {
                 Some(may) => *may,
                 None => {
-                    let may = may_read(key.0, &key.1).await;
+                    let may = may_read(key.0, key.1.clone()).await;
                     allowed.insert(key, may);
                     may
                 }
@@ -942,7 +950,7 @@ mod tests {
             synthetics_folders: None,
         };
         let records = vec![record("payments-api", "node-2", 2, "app_logs", &[])];
-        let readable = readable_records(&records, async |_, _| false).await;
+        let readable = readable_records(&records, |_, _| async { false }).await;
         let mut known = inventory_values(&inventory, &visibility, "host", &[]);
         known.extend(registry_values(&readable, "host", &[]));
         let resp = answer("", known, false, no_search).await;

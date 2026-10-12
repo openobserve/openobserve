@@ -195,9 +195,10 @@ mod tests {
             record("node-1", 1, "app_logs"),
             record("node-2", 2, "secret_logs"),
         ];
-        let readable =
-            values::readable_records(&records, async |_, stream: &str| stream != "secret_logs")
-                .await;
+        let readable = values::readable_records(&records, |_, stream: String| async move {
+            stream != "secret_logs"
+        })
+        .await;
         let resp = respond(
             "host",
             values::registry_values(&readable, "host", &[]),
