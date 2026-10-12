@@ -323,6 +323,12 @@ pub async fn extend(
         let current_end = follow_up.schedule.ends_at.unwrap_or(window.end);
         let new_end = extended_end(current_end, req, now)?;
         let after = extend_once(org, user_id, &follow_up, new_end, now).await?;
+        if !db::downtimes::bump_parent(&before, now).await? {
+            log::warn!(
+                "[downtimes] {org}/{} changed while its follow-up was extended",
+                before.id
+            );
+        }
         notify::deliver_in_background(before.clone(), extended_event(window.start, new_end));
         return Ok(ExtendDowntimeResponse {
             created_id: Some(after.id.clone()),
@@ -2848,6 +2854,103 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(stored.schedule.ends_at, Some(window.end + HOUR / 2));
+    }
+
+    #[tokio::test]
+    async fn extending_a_follow_up_bumps_the_parent_so_a_stale_third_click_is_a_409() {
+        use infra::table::{
+            downtimes::{self as table, Guard, RowVersion},
+            entity::{downtimes as entity, folders},
+        };
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(folders::Entity),
+            schema.create_table_from_entity(entity::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        let default = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create_with(&db, "acme", default, FolderType::Downtimes)
+            .await
+            .unwrap();
+        let mut parent = daily("02:00", 3_600);
+        parent.version = 1;
+        parent.updated_at = 1;
+        table::put_with(&db, &parent).await.unwrap();
+        let now = 2 * HOUR + HOUR / 2;
+        let ask = |version| ExtendDowntimeRequest {
+            version: Some(version),
+            ..by(1_800)
+        };
+        let parent_now = || async { table::get_with(&db, "acme", "d1").await.unwrap().unwrap() };
+
+        // First click creates the follow-up and bumps the parent to version 2.
+        let read = parent_now().await;
+        check_version(ask(1).version, &read).unwrap();
+        let window = extendable_window(&read, now).unwrap();
+        let end = extended_end(window.end, &ask(1), now).unwrap();
+        let created = follow_up(&read, window.end, end, "ops", now);
+        let guard = Guard::ParentUnchanged {
+            parent_id: "d1",
+            updated_at: read.updated_at,
+        };
+        assert!(
+            table::write_with(&db, &created, guard, &[], now)
+                .await
+                .unwrap()
+        );
+
+        // Second click at the refreshed version extends the follow-up and bumps the parent again.
+        let read = parent_now().await;
+        assert_eq!(read.version, 2);
+        check_version(ask(2).version, &read).unwrap();
+        let live = table::get_with(&db, "acme", &created.id)
+            .await
+            .unwrap()
+            .unwrap();
+        let end = extended_end(live.schedule.ends_at.unwrap(), &ask(2), now).unwrap();
+        let longer = extended_once(&live, end, "ops", now + 1);
+        assert!(
+            table::put_if_unchanged_with(&db, &longer, live.updated_at)
+                .await
+                .unwrap()
+        );
+        let stored = RowVersion {
+            version: read.version,
+            updated_at: read.updated_at,
+            deleted: false,
+        };
+        assert!(
+            table::bump_parent_with(&db, "acme", "d1", stored, now + 1)
+                .await
+                .unwrap()
+        );
+
+        // A third click that still names version 2 is refused, and the follow-up was extended
+        // twice.
+        let read = parent_now().await;
+        assert_eq!(read.version, 3);
+        assert!(matches!(
+            check_version(ask(2).version, &read),
+            Err(DowntimeError::Conflict(_))
+        ));
+        let stored = table::get_with(&db, "acme", &created.id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.schedule.ends_at, Some(window.end + HOUR));
+        assert!(
+            body_of("pub async fn extend(").contains("db::downtimes::bump_parent(&before, now)")
+        );
     }
 
     fn body_of(head: &str) -> &'static str {

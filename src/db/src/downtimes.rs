@@ -83,6 +83,21 @@ pub async fn set_if_parent_unchanged(
     Ok(true)
 }
 
+/// Bumps the parent of an extended follow-up, then tells this region's nodes and the other regions.
+pub async fn bump_parent(parent: &Downtime, at: i64) -> Result<bool, anyhow::Error> {
+    let stored = table::RowVersion {
+        version: parent.version,
+        updated_at: parent.updated_at,
+        deleted: false,
+    };
+    if !table::bump_parent(&parent.org, &parent.id, stored, at).await? {
+        return Ok(false);
+    }
+    reload_org(&parent.org).await?;
+    replicate(&parent.org, &parent.id).await;
+    Ok(true)
+}
+
 /// Sends the stored row to the other regions, for a write that changed it as a side effect.
 pub async fn replicate(org: &str, id: &str) {
     #[cfg(feature = "enterprise")]

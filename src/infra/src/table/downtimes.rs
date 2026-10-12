@@ -368,19 +368,48 @@ pub async fn insert_if_parent_unchanged_with<C: ConnectionTrait + TransactionTra
         return Ok(false);
     }
     put_with(&txn, row).await?;
-    // A request naming the parent's old version gets a 409, so a double submit extends once.
-    Entity::update_many()
+    let stored = RowVersion {
+        version: stored.version,
+        updated_at: stored.updated_at,
+        deleted: false,
+    };
+    bump_parent_with(&txn, &row.org, parent_id, stored, row.updated_at).await?;
+    txn.commit().await?;
+    Ok(true)
+}
+
+/// [bump_parent_with] on the read-write pool.
+pub async fn bump_parent(
+    org: &str,
+    parent_id: &str,
+    stored: RowVersion,
+    at: i64,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    bump_parent_with(client, org, parent_id, stored, at).await
+}
+
+/// Moves only the parent's version and time on, so a request at its old version gets a 409.
+pub async fn bump_parent_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    parent_id: &str,
+    stored: RowVersion,
+    at: i64,
+) -> Result<bool, errors::Error> {
+    let res = Entity::update_many()
         .col_expr(Column::Version, Expr::value(stored.version + 1))
         .col_expr(
             Column::UpdatedAt,
-            Expr::value(row.updated_at.max(stored.updated_at + 1)),
+            Expr::value(at.max(stored.updated_at + 1)),
         )
-        .filter(Column::Org.eq(&row.org))
+        .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(parent_id))
-        .exec(&txn)
+        .filter(Column::UpdatedAt.eq(stored.updated_at))
+        .filter(Column::DeletedAt.is_null())
+        .exec(conn)
         .await?;
-    txn.commit().await?;
-    Ok(true)
+    Ok(res.rows_affected == 1)
 }
 
 /// Whether a live follow-up already continues the parent from `row`'s start; the parent lock
