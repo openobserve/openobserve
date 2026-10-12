@@ -23,18 +23,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md focus-visible:ring-[0.125rem] max-md:min-h-0 max-md:max-w-full max-md:basis-full max-md:py-2"
+    :aria-disabled="unavailable || undefined"
+    @click="handleClick"
+    :class="[
+      'group rounded-default border-border-default bg-surface-base focus-visible:ring-accent/40 relative flex min-h-16 min-w-0 flex-1 basis-56 items-center border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none focus-visible:ring-[0.125rem] max-md:min-h-0 max-md:basis-full max-md:py-2',
+      size === 'compact' ? 'max-w-80 gap-2 max-md:max-w-80' : 'max-w-72 gap-3 max-md:max-w-full',
+      unavailable
+        ? 'cursor-not-allowed'
+        : 'hover:border-accent hover:bg-tabs-hover-bg cursor-pointer hover:shadow-md',
+    ]"
   >
     <span
-      class="rounded-default bg-tabs-active-bg text-tabs-active-text group-hover:bg-accent group-hover:text-text-inverse relative inline-flex h-10 w-10 shrink-0 items-center justify-center transition-colors max-md:size-8"
+      :class="[
+        'rounded-default relative inline-flex shrink-0 items-center justify-center transition-colors max-md:size-8',
+        size === 'compact' ? 'size-8' : 'size-10',
+        unavailable
+          ? 'bg-section-header-bg text-text-disabled'
+          : 'bg-tabs-active-bg text-tabs-active-text group-hover:bg-accent group-hover:text-text-inverse',
+      ]"
     >
       <OIcon :name="icon" size="md" />
     </span>
 
     <span class="relative min-w-0 flex-1">
-      <span :title="label" class="text-text-heading block text-sm font-medium wrap-break-word">{{
-        label
-      }}</span>
+      <span
+        :title="$slots.label ? undefined : label"
+        :class="[
+          'block text-sm font-medium wrap-break-word',
+          unavailable ? 'text-text-disabled' : 'text-text-heading',
+          size === 'compact' && 'md:whitespace-nowrap',
+        ]"
+        ><slot name="label">{{ label }}</slot></span
+      >
       <span v-if="sublabel" class="text-text-secondary block text-xs leading-snug">{{
         sublabel
       }}</span>
@@ -54,10 +74,26 @@ import type { I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
-defineProps<{
-  icon: IconName | (string & {});
-  label: I18nText;
-  sublabel?: I18nText;
-  hideChevron?: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    icon: IconName | (string & {});
+    label: I18nText;
+    sublabel?: I18nText;
+    hideChevron?: boolean;
+    /** Fits action choices in a compact empty state. */
+    size?: "default" | "compact";
+    /** Keeps the reason focusable while preventing the unavailable action. */
+    unavailable?: boolean;
+  }>(),
+  { size: "default", unavailable: false },
+);
+
+const emit = defineEmits<{ click: [event: MouseEvent] }>();
+const handleClick = (event: MouseEvent) => {
+  if (props.unavailable) {
+    event.preventDefault();
+    return;
+  }
+  emit("click", event);
+};
 </script>

@@ -70,6 +70,12 @@
       "title": "Selecciona una transmisión para empezar",
       "description": "Elige una transmisión y, a continuación, ejecuta la consulta para explorar sus datos. Refina los resultados con filtros y un intervalo de tiempo personalizado."
     },
+    "searchCancelled": {
+      "title": "Búsqueda cancelada",
+      "description": "No se cargaron resultados. Ejecuta la consulta para cargar eventos.",
+      "action": "Ejecutar consulta",
+      "actionDesc": "Ejecutar la misma consulta de nuevo"
+    },
     "noQueryApplied": {
       "title": "Ejecute una consulta para ver los registros",
       "description": "Ajusta los filtros y haz clic en «Ejecutar consulta» para cargar los eventos de esta transmisión.",
@@ -1036,9 +1042,115 @@
     "savedFunctionNotFound": "¡No se encontró la función!",
     "exportLogs": "Exportar registros",
     "runQuery": "Ejecutar consulta",
+    "runQueryPendingLabel": "Ejecutar consulta; los cambios aún no se han aplicado",
     "refreshCacheAndRunQuery": "Actualizar la caché y ejecutar la consulta",
     "liveModeTooltip": "Consulta de ejecución automática sobre cambios de filtro/hora",
     "autoRunEnabled": "Ejecución automática habilitada",
+    "queryActions": {
+      "runEditedFirst": "Ejecuta primero tu consulta editada",
+      "runFirst": "Ejecuta primero tu consulta",
+      "usesEditedQuery": "Usa tu consulta editada (aún no ejecutada)",
+      "usesUnrunQuery": "Usa tu consulta (aún no ejecutada)",
+      "downloadsShownResults": "Descarga los resultados mostrados, no tu edición",
+      "downloadsLastRun": "Usa la consulta que se ejecutó por última vez, no tu edición"
+    },
+    "noFtsRecovery": {
+      "title": "Los campos de búsqueda de texto completo no están configurados para {stream}",
+      "description": "Busca valores de campos o borra toda la consulta para ver los logs en este rango de tiempo.",
+      "searchField": "Buscar un campo específico",
+      "searchFieldHint": "Elige un campo para la búsqueda, manteniendo las palabras excluidas.",
+      "clearRun": "Mostrar logs sin esta búsqueda",
+      "clearRunHint": "Borra toda la consulta y ejecútala en el mismo rango de tiempo.",
+      "editPermission": "Necesitas permiso para editar la configuración del stream.",
+      "scope": "Busca en {stream} en el rango de tiempo actual.",
+      "singleStreamScope": "Busca solo en {stream}; {otherStreams} se deseleccionará.",
+      "stream": "Stream",
+      "field": "Campo",
+      "match": "Coincidencia",
+      "value": "Valor",
+      "contains": "Contiene texto",
+      "equals": "Igual a",
+      "preview": "Vista previa del filtro",
+      "replacement": "Esto reemplaza toda la consulta por un filtro de campo y mantiene las palabras excluidas. No se requiere ningún campo de texto completo.",
+      "run": "Ejecutar búsqueda por campo",
+      "close": "Cerrar búsqueda por campo",
+      "skipped": "Se omitió {stream} porque no tiene campos de búsqueda de texto completo configurados.",
+      "resultsScope": "Estos resultados son solo de {streams}.",
+      "noFields": "Este stream no tiene campos disponibles para una búsqueda por campo.",
+      "valueRequired": "Introduce un valor para buscar.",
+      "fieldRequired": "Elige un campo para buscar.",
+      "invalidValue": "Introduce un valor válido para este campo.",
+      "configureHint": "Hace que la búsqueda de texto completo sea rápida para este stream."
+    },
+    "autoRunPersistNeedsRun": "Ejecuta primero la consulta: esta acción guarda o comparte lo que ejecutaste",
+    "autoRunSearchAroundActive": "Mostrando registros alrededor de una línea: ejecuta la consulta para volver a los resultados",
+    "autoRunStaleTooltip": "Ejecuta la consulta para actualizar los resultados",
+    "searchCancelledNotice": "Búsqueda cancelada.",
+    "linePermalink": {
+      "disabledFunction": "Desactiva la función para enlazar una sola línea",
+      "disabledTimestampRewrite": "Esta consulta reescribe la marca de tiempo",
+      "disabledNotSingleLines": "Las filas de esta consulta no son líneas de log individuales",
+      "disabledNoTimestamp": "Esta fila no tiene marca de tiempo",
+      "disabledEnrichmentTable": "Las filas de la tabla de enriquecimiento no se pueden enlazar",
+      "toastNotUnique": "Se copió un enlace a la marca de tiempo; esta línea no se pudo identificar de forma única.",
+      "toastWideStream": "Este stream es demasiado amplio para enlazar una línea con exactitud; se copió un enlace a la marca de tiempo",
+      "bannerInvalid": "Este enlace está mal formado; solo se muestra la búsqueda compartida",
+      "bannerDenied": "No tienes acceso al stream {stream}.",
+      "bannerStreamMissing": "El stream {stream} ya no existe",
+      "bannerError": "No se pudo cargar la línea de log compartida.",
+      "bannerIncomplete": "No se pudieron buscar todas las líneas en esta marca de tiempo",
+      "bannerGone": "Esta línea de log ya no está disponible. Es posible que haya superado la retención del stream o que se haya eliminado.",
+      "bannerGoneRetention": "Esta línea de log ya no está disponible. Es posible que haya superado la retención del stream ({days} día) o que se haya eliminado. | Esta línea de log ya no está disponible. Es posible que haya superado la retención del stream ({days} días) o que se haya eliminado.",
+      "bannerFound": "Mostrando una línea de log compartida",
+      "bannerAmbiguous": "{count} línea en esta marca de tiempo; no se pudo identificar la línea exacta | {count} líneas en esta marca de tiempo; no se pudo identificar la línea exacta",
+      "bannerChanged": "Es posible que la línea haya cambiado desde que se creó el enlace",
+      "actionShowLines": "Mostrar estas líneas",
+      "actionShowInContext": "Mostrar en contexto",
+      "bannerAmbiguousTieHeavy": "{count} línea comparte esta marca de tiempo y el stream no tiene _o2_id, por lo que no se pudo identificar la línea exacta. Las líneas en esa marca de tiempo están resaltadas. | {count} líneas comparten esta marca de tiempo y el stream no tiene _o2_id, por lo que no se pudo identificar la línea exacta. Las líneas en esa marca de tiempo están resaltadas.",
+      "bannerDismiss": "Descartar",
+      "copyLink": "Copiar enlace",
+      "copyLinkTooltip": "Copiar un enlace a esta línea de log",
+      "copyLinkMenu": "Copiar enlace a esta línea de log",
+      "toastCopied": "Enlace a la línea de log copiado",
+      "toastCopiedValid": "Enlace a la línea de log copiado · válido durante {days} día | Enlace a la línea de log copiado · válido durante {days} días",
+      "toastLookupFailed": "No se pudo buscar esta línea; se copió un enlace a la marca de tiempo",
+      "toastShortFailed": "No se pudo acortar el enlace; se copió el enlace completo en su lugar",
+      "toastFailed": "No se pudo crear un enlace a esta línea de log",
+      "toastScopeChanged": "La organización o el stream cambiaron mientras se creaba el enlace; no se copió nada",
+      "popoverTitle": "Enlace a esta línea de log",
+      "popoverDesc": "Tu navegador bloqueó la copia automática. Selecciona el enlace y cópialo, o usa el botón.",
+      "pageNotice": "Este enlace estaba en la página {page}.",
+      "pageGo": "Ir a la página {page}",
+      "pageGoLast": "Ir a la última página ({page})"
+    },
+    "autoRunPendingDot": "Ejecutar consulta para aplicar los últimos cambios",
+    "autoRunAppliesTo": "Se aplica a Logs y Trazas",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "Esta búsqueda escanearía aproximadamente {size}",
+    "autoRunGuardLinkTitle": "Este enlace escanearía aproximadamente {size}",
+    "autoRunGuardDescAutoRun": "{scope}. La ejecución automática se pausó para que puedas acotarla primero.",
+    "autoRunGuardDescPaused": "{scope}. Pausada para que puedas acotarla primero.",
+    "autoRunGuardDescLink": "Abierto desde un enlace · {scope}. Revisa el alcance y luego ejecútala.",
+    "autoRunGuardHint": "Desactiva la ejecución automática para aplicar los cambios de filtro y tiempo manualmente.",
+    "autoRunGuardUnknownTitle": "Tamaño desconocido para esta ventana",
+    "autoRunGuardUnknownDesc": "{streams} aún no tiene estadísticas de tamaño, por lo que la ejecución automática solo ejecuta ventanas de 1 hora o menos en él.",
+    "autoRunGuardUnknownManyDesc": "{count} stream aún no tiene estadísticas de tamaño, por lo que la ejecución automática te espera. {scope}. | {count} streams aún no tienen estadísticas de tamaño, por lo que la ejecución automática te espera. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Listo para ejecutarse en varias regiones",
+    "autoRunGuardSuperClusterDesc": "El tamaño de la búsqueda aún no se puede estimar en un clúster multirregión, por lo que la ejecución automática te espera. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Stream no disponible",
+    "autoRunGuardUnresolvedDesc": "El stream {streams} no existe o no tienes acceso a él.",
+    "autoRunGuardBanner": "Este cambio escanearía aproximadamente {size} ({scope}), por lo que la ejecución automática se pausó. Los resultados a continuación son de la consulta anterior.",
+    "autoRunGuardBannerPaused": "Este cambio escanearía aproximadamente {size} ({scope}), por lo que está pausado. Los resultados a continuación son de la consulta anterior.",
+    "autoRunGuardBannerUnknown": "Tamaño desconocido para esta ventana ({scope}), por lo que está pausado. Los resultados a continuación son de la consulta anterior.",
+    "autoRunGuardBannerRefresh": "La actualización automática escanearía aproximadamente {size} por actualización ({scope}), por lo que está pausada hasta que la ejecutes una vez. Los resultados a continuación son de la consulta anterior.",
+    "autoRunGuardRunAnyway": "Ejecutar de todos modos",
+    "autoRunGuardRunQuery": "Ejecutar consulta",
+    "autoRunGuardNarrow": "Acotar a {period}",
+    "autoRunGuardNarrowWithSize": "Acotar a {period} (~{size})",
+    "autoRunGuardSearchJob": "Ejecutar como trabajo de búsqueda",
+    "autoRunGuardSelectStream": "Selecciona un stream",
+    "searchJobNoPermission": "No tienes permiso para crear trabajos de búsqueda",
     "turnOnLiveMode": "Activa el modo Live",
     "turnOffLiveMode": "Desactivar el modo Live",
     "autoRefreshWithValue": "Actualización automática: {value}",
@@ -1251,6 +1363,7 @@
     "histogramSearchQueryCancelled": "La consulta de búsqueda del histograma fue cancelada",
     "histogramUnavailableForQueries": "Histograma no disponible para consultas con CTE, DISTINCT, UNION, JOIN y LIMIT.",
     "invalidDateFormat": "Formato de fecha no válido.",
+    "missingStreamAndNoFts": "Uno o más campos de filtro no existen en \"{missingStreams}\", por lo que no se realiza ninguna búsqueda en el stream mencionado.\n No se buscó en: {noFtsStreams} (sin campos de texto completo).",
     "missingStreamFilterFields": "Uno o más campos de filtro no existen en \"{streams}\", por lo tanto no se realiza ninguna búsqueda en el flujo mencionado.\n",
     "noColumnFoundInStream": "No se encontró ninguna columna en el flujo seleccionado.",
     "noStreamFoundInOrganization": "¡No se encontró ningún flujo en la organización seleccionada!",
@@ -1271,7 +1384,19 @@
     "aliasNotAllowed": "El alias '{alias}' no está permitido.",
     "commonGroupFields": "Campos de grupo comunes",
     "queryRangeHours": "{count} hora | {count} horas",
-    "menuGroupAlerts": "Alertas"
+    "menuGroupAlerts": "Alertas",
+    "freeTextChooseFirst": "Elige primero cómo buscar texto",
+    "freeTextScanLogsOnly": "El modo de escaneo solo funciona en la vista de logs; configura un campo de texto completo para usar la búsqueda de texto aquí",
+    "freeTextSearchedFields": "Búsqueda de texto completo en: {fields} (todas las palabras, en cualquier orden)",
+    "freeTextPreview": "Búsqueda de texto completo en: {fields} (todas las palabras, en cualquier orden)\n\nSe ejecuta como {sql}",
+    "freeTextRunsAs": "Se ejecuta como {sql}",
+    "freeTextNotSearched": "No se buscó en: {streams} (sin campos de texto completo).",
+    "freeTextSetField": "Configurar campos de búsqueda de texto completo",
+    "freeTextNoFtsTitle": "\"{stream}\" no tiene campos de texto completo",
+    "freeTextNoFtsTitleMulti": "Los streams seleccionados no tienen campos de texto completo",
+    "freeTextNoTextFields": "Este stream no tiene campos de texto que buscar.",
+    "freeTextNoTextFieldsNamed": "No se buscó en: {streams} (sin campos de texto).",
+    "freeTextBuildNotice": "Este filtro tiene búsqueda de texto; edítalo en SQL."
   },
   "menu": {
     "upgradeToProPlan": "Actualizar al Plan PRO",
@@ -9045,6 +9170,8 @@
         "noQueries": "Este panel no tiene una consulta desde la cual crear una alerta.",
         "noConstants": "Los patrones seleccionados no tienen texto distintivo para coincidir.",
         "sqlModeFilterDropped": "Tu consulta SQL no se transfirió — la alerta solo coincide con los patrones seleccionados.",
+        "textFilterDropped": "Tu filtro de búsqueda no se conservó porque este stream no tiene campos de búsqueda de texto completo (FTS). Añádelo a la consulta de la alerta si lo necesitas.",
+        "heldFilterDropped": "Tu filtro de búsqueda no se conservó porque primero necesita una opción Ejecutar como en la página de Logs. Añádelo a la consulta de la alerta si lo necesitas.",
         "patternsUnusable": "Ninguno de los patrones en esta página tiene texto distintivo para coincidir, por lo que la alerta usa solo tu búsqueda.",
         "dbmRollupLag": "Los números de la base de datos se agregan cada {minutes} minutos, por lo que esta alerta solo puede dispararse con esa frecuencia — no es una página en tiempo real.",
         "dbmFingerprintVersion": "Esta alerta está fijada a la forma exacta de una consulta. Si la forma en que se agrupan las consultas cambia alguna vez, la alerta puede dejar de coincidir y debe recrearse.",
@@ -11646,7 +11773,21 @@
     "eventClusterAriaLabelPlural": "{count} eventos, {errors} errores",
     "eventMarkerTooltip": "Evento: {name}",
     "exceptionMarkerTooltip": "Excepción: {type}",
-    "spanEventFallback": "evento de span"
+    "spanEventFallback": "evento de span",
+    "spanNav": {
+      "firstSpan": "Primer span",
+      "lastSpan": "Último span",
+      "position": "Span {index} de {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "Traza {row} de {count}, página {page}",
+      "spanPosition": "Span {row} de {count}, página {page}",
+      "firstResult": "Primer resultado",
+      "lastResult": "Último resultado",
+      "loadingPage": "Cargando página {page}",
+      "pageFailed": "No se pudo cargar la página {page}",
+      "pageEmpty": "La página {page} no tiene resultados"
+    }
   },
   "aiToolset": {
     "header": "Conjuntos de herramientas de IA",
@@ -14879,11 +15020,12 @@
     "noStream": {
       "title": "Elige un arroyo para empezar a explorar",
       "description": "Elige una transmisión y, a continuación, pulsa <strong>Ejecutar consulta</strong>. Puedes refinarla con filtros, una función de VRL y un intervalo de tiempo personalizado una vez que recibas los resultados.",
+      "descriptionAutoRun": "Elige un stream para ver sus logs más recientes. Puedes refinar con filtros, una función VRL y un rango de tiempo personalizado una vez que lleguen los resultados.",
       "selectStream": "Selecciona una transmisión",
       "selectStreamDesc": "Explora streams de logs, traces, métricas y RUM",
       "queryGuide": "Lea la guía de consultas",
       "queryGuideDesc": "Filtros, modo SQL, VRL y vistas guardadas",
-      "recent": "Reciente:"
+      "recent": "Último usado:"
     },
     "noEvents": {
       "title": "No se encontraron eventos",
@@ -14932,12 +15074,40 @@
       "sendToAiChat": "Enviar al chat de IA",
       "contentCopiedSuccessfully": "¡Contenido copiado exitosamente!"
     },
+    "severity": {
+      "srText": "Severidad {level}",
+      "srTextInferred": "Severidad {level}, inferida",
+      "inferredLabel": "{level} · inferida",
+      "popoverTitle": "Severidad: {level}",
+      "popoverAriaLabel": "Evidencia de severidad",
+      "evidence": "Evidencia",
+      "fromField": "Del campo {field}",
+      "inferredFrom": "Inferida del texto de {field}.",
+      "notSearchable": "No es buscable; el histograma no lo usa.",
+      "noLevelField": "No hay campo de nivel en esta fila y no hay campo de texto que escanear.",
+      "noLevelWordInField": "No hay campo de nivel en esta fila ni una palabra de nivel en {field}.",
+      "notInSelectedColumns": "El campo de nivel no está en las columnas seleccionadas",
+      "levels": {
+        "emergency": "emergencia",
+        "alert": "alerta",
+        "critical": "crítico",
+        "error": "error",
+        "warning": "advertencia",
+        "notice": "aviso",
+        "info": "info",
+        "debug": "debug",
+        "trace": "traza",
+        "ok": "ok",
+        "unknown": "desconocido"
+      }
+    },
     "visualizeLogsQuery": {
       "selectAllNotSupported": "La consulta SELECT * no es compatible con la visualización.",
       "fixErrorsAndRetry": "Hay algunos errores, corrígelos e inténtalo de nuevo"
     },
     "buildQueryPage": {
-      "validationErrors": "Hay algunos errores, corrígelos e inténtalo de nuevo"
+      "validationErrors": "Hay algunos errores, corrígelos e inténtalo de nuevo",
+      "parserLoadFailed": "No se pudo cargar el analizador de consultas, por lo que el filtro de búsqueda no se puede añadir al gráfico. Las ejecuciones están en pausa hasta que se cargue."
     },
     "searchHistory": {
       "sqlQueryLabel": "Consulta SQL :",
@@ -15139,6 +15309,18 @@
     },
     "logsNoEventsState": {
       "lastData": "Últimos datos: {formatted} ({zone})"
+    },
+    "rowNav": {
+      "autoRefreshEdge": "La actualización automática está activada; desactívala para cambiar de página",
+      "position": "Log {row} de {count}, página {page}",
+      "positionLabel": "Log {row} de {count} · Página {page}",
+      "loadingPage": "Cargando página {page}…",
+      "loadingPageAnnouncement": "Cargando página {page}",
+      "resultsChanged": "Los resultados cambiaron",
+      "notInPage": "No está en la página actual",
+      "loadingResults": "Cargando resultados…",
+      "previousLog": "Log anterior",
+      "nextLog": "Log siguiente"
     }
   },
   "queryError": {
@@ -15173,7 +15355,10 @@
     "traceId": "ID de trace:",
     "askAi": "Pedir a la IA que corrija mi consulta",
     "showDetail": "Mostrar detalles",
-    "hideDetail": "Ocultar detalles"
+    "hideDetail": "Ocultar detalles",
+    "runAs": "Ejecutar como",
+    "searchTextFor": "Buscar el texto \"{text}\"",
+    "searchTextDesc": "Buscar toda la entrada como una sola frase"
   },
   "refreshButton": {
     "justNow": "justo ahora",
@@ -17071,7 +17256,17 @@
       "oncallEscalate": "Escalar",
       "oncallSnooze": "Posponer",
       "oncallResolve": "Resolver",
-      "functionsImport": "Importar función"
+      "functionsImport": "Importar función",
+      "logsNextRow": "Log siguiente (abre los detalles)",
+      "logsPrevRow": "Log anterior (abre los detalles)",
+      "logsRowFocusMove": "Mover el foco entre filas",
+      "logsRowOpen": "Abrir la fila enfocada",
+      "logsDetailClose": "Cerrar los detalles y volver a la fila",
+      "tracesNextRow": "Seleccionar la traza siguiente",
+      "tracesPrevRow": "Seleccionar la traza anterior",
+      "tracesRowOpen": "Abrir la traza seleccionada",
+      "traceNextVisibleSpan": "Span visible siguiente",
+      "tracePrevVisibleSpan": "Span visible anterior"
     }
   },
   "components": {
@@ -17444,7 +17639,13 @@
         "debug": "Depuración",
         "info": "Información",
         "warn": "ADVERTENCIA",
-        "fatal": "Fatal"
+        "fatal": "Fatal",
+        "emergency": "Emergencia",
+        "alert": "Alerta",
+        "critical": "Crítico",
+        "notice": "Aviso",
+        "ok": "OK",
+        "unknown": "Desconocido"
       },
       "pipelineRunOutcome": {
         "firing": "En disparo",

@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import SearchResult from "@/plugins/logs/SearchResult.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { resetLogsAutoRunForTests } from "@/composables/useLogs/logsAutoRun";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -42,10 +43,23 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
   __esModule: true,
   default: {
     name: "OTable",
-    props: ["columns", "data", "loading", "streaming", "wrap", "rowKey", "virtualScroll"],
+    props: [
+      "columns",
+      "data",
+      "loading",
+      "streaming",
+      "wrap",
+      "rowKey",
+      "virtualScroll",
+      "rowClass",
+      "getRowStatusColor",
+    ],
     template:
       '<div data-test="otable-stub">' +
       '<div v-if="$slots[\'loading-banner\']" data-test="otable-stub-has-loading-banner-slot" />' +
+      '<div v-for="(r, i) in (data || [])" :key="i" data-test="otable-stub-row" :class="rowClass ? rowClass(r) : \'\'" :data-row-status-color="getRowStatusColor ? getRowStatusColor(r) : \'\'">' +
+      '<div v-for="c in (columns || [])" :key="c.id" :data-test="\'otable-stub-cell-\' + c.id"><slot :name="\'cell-\' + c.id" :row="r" :value="r[c.id]" /></div>' +
+      "</div>" +
       "</div>",
   },
 }));
@@ -63,6 +77,7 @@ describe("SearchResult Component", () => {
   let wrapper: any;
 
   beforeEach(async () => {
+    resetLogsAutoRunForTests();
     // jsdom does not implement HTMLElement.scrollTo
     HTMLElement.prototype.scrollTo = vi.fn();
 
@@ -1005,6 +1020,72 @@ describe("SearchResult Component", () => {
       expect(wrapper.find('[data-test="otable-stub-has-loading-banner-slot"]').exists()).toBe(true);
     });
   });
+  describe("severity spine, row class and timestamp sr text (A7)", () => {
+    const render = async (rows: any[]) => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.meta.quickMode = false;
+      wrapper.vm.searchObj.data.resultGrid.columns = [
+        { id: "_timestamp", header: "_timestamp" },
+        { id: "message", header: "message" },
+      ];
+      wrapper.vm.searchObj.data.queryResults = { hits: rows };
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+      return wrapper.findAll('[data-test="otable-stub-row"]');
+    };
+
+    it("AC-A1.1: an inferred row gets the message classes, the solid field spine and inferred sr text", async () => {
+      const [row] = await render([
+        { _timestamp: "2026-10-06 12:00:01", message: "2026-10-06 12:00:01 ERROR payment failed" },
+      ]);
+      expect(row.classes()).toEqual(
+        expect.arrayContaining(["o2-log-level-error", "o2-log-level-src-message"]),
+      );
+      expect(row.attributes("data-row-status-color")).toBe(
+        "var(--color-log-severity-error-indicator)",
+      );
+      const cell = row.find('[data-test="otable-stub-cell-_timestamp"]');
+      expect(cell.find('[data-test="log-row-timestamp-value"]').text()).toBe("2026-10-06 12:00:01");
+      const sr = cell.find('[data-test="log-row-severity-sr"]');
+      expect(sr.text()).toBe("Severity error, inferred");
+      expect(sr.classes()).toEqual(expect.arrayContaining(["sr-only", "select-none"]));
+    });
+
+    it("AC-A1.2: a row with no evidence is unknown with a transparent spine", async () => {
+      const [row] = await render([{ _timestamp: "t", message: "user logged in" }]);
+      expect(row.classes()).toEqual(
+        expect.arrayContaining(["o2-log-level-unknown", "o2-log-level-src-none"]),
+      );
+      expect(row.attributes("data-row-status-color")).toBe("transparent");
+      expect(row.find('[data-test="log-row-severity-sr"]').text()).toBe("Severity unknown");
+    });
+
+    it("J-A2: HTTP rows resolve from status with a solid token spine", async () => {
+      const rows = await render([
+        { _timestamp: "a", status: 503 },
+        { _timestamp: "b", status: 404 },
+        { _timestamp: "c", status: 200 },
+      ]);
+      const levels = rows.map((r: any) =>
+        r.classes().find((c: string) => /^o2-log-level-(?!src)/.test(c)),
+      );
+      expect(levels).toEqual(["o2-log-level-error", "o2-log-level-warning", "o2-log-level-ok"]);
+      rows.forEach((r: any) => expect(r.classes()).toContain("o2-log-level-src-http"));
+      expect(rows[0].attributes("data-row-status-color")).toBe(
+        "var(--color-log-severity-error-indicator)",
+      );
+      expect(rows[0].find('[data-test="log-row-severity-sr"]').text()).toBe("Severity error");
+    });
+
+    it("renders the sr text in the timestamp column only", async () => {
+      const [row] = await render([{ _timestamp: "t", message: "[WARN] x" }]);
+      expect(row.findAll('[data-test="log-row-severity-sr"]')).toHaveLength(1);
+      const message = row.find('[data-test="otable-stub-cell-message"]');
+      expect(message.find('[data-test="log-row-severity-sr"]').exists()).toBe(false);
+      expect(message.find('[data-test="log-row-timestamp-value"]').exists()).toBe(false);
+    });
+  });
+
   describe("results progress bar (#14303)", () => {
     const progressBars = () => wrapper.findAllComponents({ name: "LoadingProgress" });
     const barsLoading = () => progressBars().filter((bar: any) => bar.props("loading") === true);
