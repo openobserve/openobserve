@@ -613,6 +613,13 @@ async fn prom_search(
     let trace_id = config::ider::generate_trace_id();
     let resp =
         promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
+    if !resp.warnings.is_empty() {
+        anyhow::bail!(
+            "SLO PromQL query returned a partial result: {} trace : {trace_id}",
+            resp.warnings.join(", ")
+        );
+    }
+    let resp = resp.value;
     let config::meta::promql::value::Value::Matrix(matrix) = resp else {
         // The same rule as a partial SQL response: an unusable result is an
         // ERROR that fails the pass, so coverage falls — never an empty
