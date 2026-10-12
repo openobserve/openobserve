@@ -18,7 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="announcement-list" data-test="announcement-banners-settings">
     <div class="announcement-list-header">
       <div>
-        <div class="q-table__title tw:font-[600]" data-test="announcement-banners-title">
+        <div
+          class="q-table__title tw:font-[600]"
+          data-test="announcement-banners-title"
+        >
           {{ t("announcements.list.title") }}
         </div>
         <div class="announcement-list-subtitle">
@@ -35,7 +38,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <div v-if="errorMessage" class="announcement-list-error" data-test="announcement-banners-error">
+    <div
+      v-if="errorMessage"
+      class="announcement-list-error"
+      data-test="announcement-banners-error"
+    >
       <q-icon name="error" size="16px" />
       <span>{{ errorMessage }}</span>
     </div>
@@ -49,16 +56,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="announcement-list-section-title">
           {{ t("announcements.list.liveNow") }}
         </div>
-        <div class="announcement-list-live" data-test="announcement-banners-preview">
+        <div
+          class="announcement-list-live"
+          data-test="announcement-banners-preview"
+        >
           <template v-for="(banner, position) in liveBanners" :key="position">
             <div
               v-if="banner.orgs.length"
               class="announcement-list-live-audience"
               data-test="announcement-list-live-audience"
             >
-              {{ t("announcements.list.liveOnlyFor", { orgs: banner.orgs.join(", ") }) }}
+              {{
+                t("announcements.list.liveOnlyFor", {
+                  orgs: banner.orgs.join(", "),
+                })
+              }}
             </div>
-            <AnnouncementBannerStrip :banner="banner" :mode="themeMode" preview />
+            <AnnouncementBannerStrip
+              :banner="banner"
+              :mode="themeMode"
+              preview
+            />
           </template>
           <div
             v-if="!liveBanners.length"
@@ -80,7 +98,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="announcement-list-empty"
           data-test="announcement-banners-list-empty"
         >
-          <q-icon name="campaign" size="2.5rem" class="announcement-list-empty-icon" />
+          <q-icon
+            name="campaign"
+            size="2.5rem"
+            class="announcement-list-empty-icon"
+          />
           <div class="announcement-list-empty-title">
             {{ t("announcements.list.emptyTitle") }}
           </div>
@@ -108,7 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :pagination="{ rowsPerPage: 0 }"
           class="o2-quasar-table o2-row-md"
           data-test="announcement-banners-list"
-          @row-click="(_event: Event, row: ListRow) => openEditor({ index: row.index })"
+          @row-click="
+            (_event: Event, row: ListRow) => openEditor({ index: row.index })
+          "
         >
           <template #body-cell-message="props">
             <q-td :props="props" class="announcement-list-message-cell">
@@ -225,26 +249,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onActivated, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar, type QTableColumn } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import AnnouncementBannerStrip from "@/components/announcements/AnnouncementBannerStrip.vue";
-import { notifyAnnouncementsChanged } from "@/composables/useAnnouncementBanners";
+import {
+  announcementServerNow,
+  notifyAnnouncementsChanged,
+} from "@/composables/useAnnouncementBanners";
 import announcements from "@/services/announcements";
 import { presetFor, type ThemeMode } from "@/utils/announcementAppearance";
 import { renderBannerMarkdown } from "@/utils/announcementMarkdown";
-import { orderBanners } from "@/utils/announcementOrder";
+import { bannerRank } from "@/utils/announcementOrder";
 import {
   formatSpan,
   formatStamp,
+  AnnouncementConflictError,
   isShowingNow,
   isUnchangedAt,
   listStatuses,
   remainingMs,
   removeBanner,
+  updateConfig,
   type ListStatus,
 } from "./announcementConfig";
 import {
@@ -277,15 +306,20 @@ const styleNames = ref(new Map<string, string>());
 const isLoaded = ref(false);
 const errorMessage = ref("");
 const pendingDelete = ref<number | null>(null);
-const nowMs = ref(Date.now());
+const nowMs = ref(announcementServerNow());
 
 const metaOrg = computed(() => store.state.zoConfig?.meta_org);
 
-const themeMode = computed<ThemeMode>(() => (store.state.theme === "dark" ? "dark" : "light"));
+const themeMode = computed<ThemeMode>(() =>
+  store.state.theme === "dark" ? "dark" : "light",
+);
 
 const PHONE_HIDDEN_COLUMNS = ["severity", "schedule", "audience", "appearance"];
 
 const DELETE_EXCERPT_LENGTH = 60;
+
+/** Statuses like "ends in 5m" and Live/Ended flips go stale without a refresh. */
+const STATUS_TICK_MS = 30_000;
 
 const COLUMN_STYLES: Record<string, string | undefined> = {
   schedule: "white-space: normal; min-width: 11rem",
@@ -293,7 +327,16 @@ const COLUMN_STYLES: Record<string, string | undefined> = {
 };
 
 const columns = computed<QTableColumn[]>(() =>
-  (["message", "severity", "status", "schedule", "audience", "appearance"] as const)
+  (
+    [
+      "message",
+      "severity",
+      "status",
+      "schedule",
+      "audience",
+      "appearance",
+    ] as const
+  )
     .map(
       (name): QTableColumn => ({
         name,
@@ -301,7 +344,9 @@ const columns = computed<QTableColumn[]>(() =>
         label: t(`announcements.list.columns.${name}`),
         align: "left",
         classes: PHONE_HIDDEN_COLUMNS.includes(name) ? "gt-xs" : undefined,
-        headerClasses: PHONE_HIDDEN_COLUMNS.includes(name) ? "gt-xs" : undefined,
+        headerClasses: PHONE_HIDDEN_COLUMNS.includes(name)
+          ? "gt-xs"
+          : undefined,
         style: COLUMN_STYLES[name],
       }),
     )
@@ -313,7 +358,13 @@ const columns = computed<QTableColumn[]>(() =>
     }),
 );
 
-const scheduleSummary = ({ start, startsAt, end, duration, endsAt }: BannerDraft) => {
+const scheduleSummary = ({
+  start,
+  startsAt,
+  end,
+  duration,
+  endsAt,
+}: BannerDraft) => {
   const from = start === "at" && startsAt ? formatStamp(startsAt) : "";
   const to = end === "at" && endsAt ? formatStamp(endsAt, true) : "";
 
@@ -323,7 +374,8 @@ const scheduleSummary = ({ start, startsAt, end, duration, endsAt }: BannerDraft
       : t("announcements.list.forDuration", { duration });
   }
   if (from && to) return t("announcements.list.between", { from, to });
-  if (from) return t("announcements.list.from", { from: formatStamp(startsAt, true) });
+  if (from)
+    return t("announcements.list.from", { from: formatStamp(startsAt, true) });
   if (to) return t("announcements.list.until", { to });
   return t("announcements.list.always");
 };
@@ -339,9 +391,14 @@ const audienceSummary = ({ orgs }: BannerDraft) =>
     ? t("announcements.list.someOrgs", { count: orgs.length }, orgs.length)
     : t("announcements.list.allOrgs");
 
-const appearanceSummary = ({ textSize, colorLight, colorDark }: BannerDraft) => {
+const appearanceSummary = ({
+  textSize,
+  colorLight,
+  colorDark,
+}: BannerDraft) => {
   const size = t(`announcements.editor.textSizes.${textSize}`);
-  if (!colorLight && !colorDark) return `${size} · ${t("announcements.list.colorSeverity")}`;
+  if (!colorLight && !colorDark)
+    return `${size} · ${t("announcements.list.colorSeverity")}`;
   const preset = presetFor(colorLight, colorDark);
   const color = preset
     ? t(`announcements.editor.colorPresets.${preset.key}`)
@@ -371,20 +428,25 @@ const rows = computed<ListRow[]>(() =>
   })),
 );
 
+// Statuses already mark promotions a critical banner hides per org, so only the severity order is applied here.
 const liveBanners = computed(() =>
-  orderBanners(
-    entries.value
-      .filter(
-        ({ index, draft }) =>
-          isShowingNow(draft, nowMs.value) && statuses.value.get(index) !== "hidden",
-      )
-      .map(({ draft }) => ({ ...previewFromDraft(draft), orgs: draft.orgs })),
-  ),
+  entries.value
+    .filter(
+      ({ index, draft }) =>
+        isShowingNow(draft, nowMs.value) &&
+        statuses.value.get(index) !== "hidden",
+    )
+    .map(({ draft }) => ({ ...previewFromDraft(draft), orgs: draft.orgs }))
+    .sort((a, b) => bannerRank(b.variant) - bannerRank(a.variant)),
 );
 
 const pendingDeleteExcerpt = computed(() => {
-  const entry = entries.value.find(({ index }) => index === pendingDelete.value);
-  const text = (entry?.draft.message ?? "").replace(/[*_`~]|\[|\]\([^)]*\)/g, "").trim();
+  const entry = entries.value.find(
+    ({ index }) => index === pendingDelete.value,
+  );
+  const text = (entry?.draft.message ?? "")
+    .replace(/[*_`~]|\[|\]\([^)]*\)/g, "")
+    .trim();
   return text.length > DELETE_EXCERPT_LENGTH
     ? `${text.slice(0, DELETE_EXCERPT_LENGTH).trimEnd()}…`
     : text;
@@ -398,7 +460,9 @@ const openEditor = (query: { index?: number; duplicate?: number } = {}) => {
     name: "announcementBannerEditor",
     query: {
       org_identifier: store.state.selectedOrganization?.identifier,
-      ...Object.fromEntries(Object.entries(query).map(([key, value]) => [key, String(value)])),
+      ...Object.fromEntries(
+        Object.entries(query).map(([key, value]) => [key, String(value)]),
+      ),
     },
   });
 };
@@ -410,10 +474,13 @@ const load = async () => {
     styleNames.value = new Map(
       stylesFromConfig(response?.data).map((style) => [style.id, style.name]),
     );
-    nowMs.value = Date.now();
+    nowMs.value = announcementServerNow();
     errorMessage.value = "";
   } catch (error: any) {
-    errorMessage.value = serverMessage(error, t("announcements.list.loadFailed"));
+    errorMessage.value = serverMessage(
+      error,
+      t("announcements.list.loadFailed"),
+    );
   } finally {
     isLoaded.value = true;
   }
@@ -426,17 +493,11 @@ const confirmDelete = async () => {
   const original = entries.value.find((entry) => entry.index === index)?.raw;
 
   try {
-    const latest = (await announcements.getConfig(metaOrg.value))?.data;
-    if (!isUnchangedAt(latest, index, original)) {
-      q.notify({
-        type: "negative",
-        message: t("announcements.list.conflict"),
-        timeout: 5000,
-      });
-      await load();
-      return;
-    }
-    await announcements.setConfig(metaOrg.value, removeBanner(latest, index));
+    await updateConfig(metaOrg.value, (latest) => {
+      if (!isUnchangedAt(latest, index, original))
+        throw new AnnouncementConflictError();
+      return removeBanner(latest, index);
+    });
     notifyAnnouncementsChanged();
     q.notify({
       type: "positive",
@@ -445,15 +506,29 @@ const confirmDelete = async () => {
     });
     await load();
   } catch (error: any) {
+    const conflict = error instanceof AnnouncementConflictError;
     q.notify({
       type: "negative",
-      message: serverMessage(error, t("announcements.list.deleteFailed")),
+      message: conflict
+        ? t("announcements.list.conflict")
+        : serverMessage(error, t("announcements.list.deleteFailed")),
       timeout: 5000,
     });
+    if (conflict) await load();
   }
 };
 
-onMounted(load);
+let statusTimer: ReturnType<typeof setInterval> | undefined;
+
+onMounted(() => {
+  void load();
+  statusTimer = setInterval(
+    () => (nowMs.value = announcementServerNow()),
+    STATUS_TICK_MS,
+  );
+});
+onActivated(() => (nowMs.value = announcementServerNow()));
+onBeforeUnmount(() => clearInterval(statusTimer));
 
 defineExpose({ rows, liveBanners, confirmDelete, pendingDelete, reload: load });
 </script>

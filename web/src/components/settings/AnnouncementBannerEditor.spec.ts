@@ -27,7 +27,9 @@ const notify = vi.fn();
 const push = vi.fn();
 const notifyChanged = vi.fn();
 const route = { query: {} as Record<string, string> };
-let leaveGuard: ((to: unknown, from: unknown, next: (_v?: boolean) => void) => void) | undefined;
+let leaveGuard:
+  | ((to: unknown, from: unknown, next: (_v?: boolean) => void) => void)
+  | undefined;
 
 vi.mock("@/services/announcements", () => ({
   default: {
@@ -82,7 +84,8 @@ async function mountEditor(query: Record<string, string> = {}) {
   return wrapper;
 }
 
-const savedConfig = () => setConfig.mock.calls[0][1] as { banners: Record<string, unknown>[] };
+const savedConfig = () =>
+  setConfig.mock.calls[0][1] as { banners: Record<string, unknown>[] };
 
 describe("AnnouncementBannerEditor", () => {
   beforeEach(() => {
@@ -98,14 +101,18 @@ describe("AnnouncementBannerEditor", () => {
   it("opens a new banner with an empty form", async () => {
     const wrapper = await mountEditor();
 
-    expect(wrapper.get('[data-test="announcement-editor-title"]').text()).toBe("Add banner");
+    expect(wrapper.get('[data-test="announcement-editor-title"]').text()).toBe(
+      "Add banner",
+    );
     expect((wrapper.vm as any).form.message).toBe("");
   });
 
   it("loads the banner named by ?index", async () => {
     const wrapper = await mountEditor({ index: "1" });
 
-    expect(wrapper.get('[data-test="announcement-editor-title"]').text()).toBe("Edit banner");
+    expect(wrapper.get('[data-test="announcement-editor-title"]').text()).toBe(
+      "Edit banner",
+    );
     expect((wrapper.vm as any).form.message).toBe("Second");
     expect((wrapper.vm as any).form.textSize).toBe("large");
   });
@@ -113,7 +120,9 @@ describe("AnnouncementBannerEditor", () => {
   it("blocks save and shows field errors when the draft is invalid", async () => {
     const wrapper = await mountEditor();
 
-    await wrapper.get('[data-test="announcement-editor-save"]').trigger("click");
+    await wrapper
+      .get('[data-test="announcement-editor-save"]')
+      .trigger("click");
     await flushPromises();
 
     expect(setConfig).not.toHaveBeenCalled();
@@ -136,8 +145,12 @@ describe("AnnouncementBannerEditor", () => {
         colors: { light: "#DBEAFE" },
       },
     ]);
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: "positive" }));
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "announcementBanners" }));
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "positive" }),
+    );
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "announcementBanners" }),
+    );
   });
 
   it("replaces only the edited banner and leaves the others untouched", async () => {
@@ -175,7 +188,9 @@ describe("AnnouncementBannerEditor", () => {
 
   it("duplicates into a new banner with a fresh dismissal key", async () => {
     const wrapper = await mountEditor({ duplicate: "1" });
-    expect(wrapper.get('[data-test="announcement-editor-title"]').text()).toBe("Add banner");
+    expect(wrapper.get('[data-test="announcement-editor-title"]').text()).toBe(
+      "Add banner",
+    );
 
     await (wrapper.vm as any).save();
 
@@ -199,17 +214,21 @@ describe("AnnouncementBannerEditor", () => {
     await (wrapper.vm as any).save();
     await flushPromises();
 
-    expect(wrapper.get('[data-test="announcement-editor-error"]').text()).toContain(
-      "banners[2].cta.url: bad",
-    );
+    expect(
+      wrapper.get('[data-test="announcement-editor-error"]').text(),
+    ).toContain("banners[2].cta.url: bad");
     expect(push).not.toHaveBeenCalled();
   });
 
   it("returns to the list when ?index names a banner that no longer exists", async () => {
     await mountEditor({ index: "7" });
 
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: "negative" }));
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "announcementBanners" }));
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "negative" }),
+    );
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "announcementBanners" }),
+    );
   });
 
   it("asks in the app's dialog before leaving with unsaved changes", async () => {
@@ -225,7 +244,9 @@ describe("AnnouncementBannerEditor", () => {
     await flushPromises();
 
     expect(next).toHaveBeenLastCalledWith(false);
-    const discard = document.querySelector('[data-test="announcement-editor-discard"]');
+    const discard = document.querySelector(
+      '[data-test="announcement-editor-discard"]',
+    );
     expect(discard?.classList.contains("bg-negative")).toBe(true);
     expect(document.body.textContent).toContain("Keep editing");
 
@@ -239,7 +260,10 @@ describe("AnnouncementBannerEditor", () => {
     const wrapper = await mountEditor({ index: "1" });
     getConfig.mockResolvedValue({
       data: {
-        banners: [STORED.banners[0], { message: "Changed elsewhere", id: "second" }],
+        banners: [
+          STORED.banners[0],
+          { message: "Changed elsewhere", id: "second" },
+        ],
       },
     });
     (wrapper.vm as any).form.message = "Mine";
@@ -248,10 +272,12 @@ describe("AnnouncementBannerEditor", () => {
     await flushPromises();
 
     expect(setConfig).not.toHaveBeenCalled();
-    expect(wrapper.get('[data-test="announcement-editor-error"]').text()).toContain(
-      "changed by someone else",
-    );
-    await wrapper.get('[data-test="announcement-editor-reload"]').trigger("click");
+    expect(
+      wrapper.get('[data-test="announcement-editor-error"]').text(),
+    ).toContain("changed by someone else");
+    await wrapper
+      .get('[data-test="announcement-editor-reload"]')
+      .trigger("click");
     await flushPromises();
     expect((wrapper.vm as any).form.message).toBe("Changed elsewhere");
   });
@@ -269,7 +295,9 @@ describe("AnnouncementBannerEditor", () => {
     const wrapper = await mountEditor();
     expect((wrapper.vm as any).form.dismissible).toBe(true);
 
-    await wrapper.get('[data-test="announcement-editor-variant-critical"]').trigger("click");
+    await wrapper
+      .get('[data-test="announcement-editor-variant-critical"]')
+      .trigger("click");
 
     expect((wrapper.vm as any).form.variant).toBe("critical");
     expect((wrapper.vm as any).form.dismissible).toBe(false);
@@ -277,7 +305,8 @@ describe("AnnouncementBannerEditor", () => {
 
   it("names the save button after what saving does", async () => {
     const wrapper = await mountEditor();
-    const label = () => wrapper.get('[data-test="announcement-editor-save"]').text();
+    const label = () =>
+      wrapper.get('[data-test="announcement-editor-save"]').text();
     const local = (offsetMs: number) => {
       const d = new Date(Date.now() + offsetMs);
       const pad = (n: number) => String(n).padStart(2, "0");
@@ -324,7 +353,9 @@ describe("AnnouncementBannerEditor", () => {
     await (wrapper.vm as any).save();
 
     expect(setConfig).not.toHaveBeenCalled();
-    expect((wrapper.vm as any).errors.orgs).toBe("Pick at least one organization.");
+    expect((wrapper.vm as any).errors.orgs).toBe(
+      "Pick at least one organization.",
+    );
   });
 
   it("re-validates as fields change once a save was attempted", async () => {
@@ -340,7 +371,11 @@ describe("AnnouncementBannerEditor", () => {
 
   it("assigns a fresh id when asked to show the banner again to people who dismissed it", async () => {
     const wrapper = await mountEditor({ index: "0" });
-    expect(wrapper.find('[data-test="announcement-editor-reset-dismissals"]').exists()).toBe(true);
+    expect(
+      wrapper
+        .find('[data-test="announcement-editor-reset-dismissals"]')
+        .exists(),
+    ).toBe(true);
 
     (wrapper.vm as any).resetDismissals = true;
     await (wrapper.vm as any).save();
@@ -360,19 +395,27 @@ describe("AnnouncementBannerEditor", () => {
   it("previews an empty message as a muted placeholder, not as content", async () => {
     const wrapper = await mountEditor();
 
-    const edited = wrapper.get('[data-test="announcement-editor-preview-light"]');
-    expect(edited.get('[data-test="announcement-bar-placeholder"]').text()).toBe(
-      "Your message will appear here",
+    const edited = wrapper.get(
+      '[data-test="announcement-editor-preview-light"]',
     );
-    expect(edited.find('[data-test="announcement-bar-message"]').exists()).toBe(false);
+    expect(
+      edited.get('[data-test="announcement-bar-placeholder"]').text(),
+    ).toBe("Your message will appear here");
+    expect(edited.find('[data-test="announcement-bar-message"]').exists()).toBe(
+      false,
+    );
   });
 
   it("previews the draft in both themes", async () => {
     const wrapper = await mountEditor({ index: "1" });
 
     for (const mode of ["light", "dark"]) {
-      const frame = wrapper.get(`[data-test="announcement-editor-preview-${mode}"]`);
-      expect(frame.get(".announcement-bar").classes()).toContain("announcement-bar--text-large");
+      const frame = wrapper.get(
+        `[data-test="announcement-editor-preview-${mode}"]`,
+      );
+      expect(frame.get(".announcement-bar").classes()).toContain(
+        "announcement-bar--text-large",
+      );
       expect(frame.text()).toContain("Second");
     }
   });
@@ -393,10 +436,14 @@ describe("AnnouncementBannerEditor", () => {
     const hidden = '[data-test="announcement-editor-preview-hidden"]';
 
     getConfig.mockResolvedValue(config(["a"]));
-    expect((await mountEditor({ index: "1" })).find(hidden).exists()).toBe(true);
+    expect((await mountEditor({ index: "1" })).find(hidden).exists()).toBe(
+      true,
+    );
 
     getConfig.mockResolvedValue(config());
-    expect((await mountEditor({ index: "1" })).find(hidden).exists()).toBe(false);
+    expect((await mountEditor({ index: "1" })).find(hidden).exists()).toBe(
+      false,
+    );
   });
 
   const STYLED = {
@@ -459,9 +506,96 @@ describe("AnnouncementBannerEditor", () => {
     const wrapper = await mountEditor();
     (wrapper.vm as any).chooseStyle("custom");
     await flushPromises();
-    await wrapper.find('[data-test="announcement-editor-style-critical"]').trigger("click");
+    await wrapper
+      .find('[data-test="announcement-editor-style-critical"]')
+      .trigger("click");
 
-    expect((wrapper.vm as any).form).toMatchObject({ variant: "critical", dismissible: false });
+    expect((wrapper.vm as any).form).toMatchObject({
+      variant: "critical",
+      dismissible: false,
+    });
+  });
+
+  it("returns to the earlier severity when the critical switch is turned off", async () => {
+    const wrapper = await mountEditor();
+    (wrapper.vm as any).chooseStyle("promo");
+    (wrapper.vm as any).chooseStyle("custom");
+    (wrapper.vm as any).setCritical(true);
+    expect((wrapper.vm as any).form.variant).toBe("critical");
+
+    (wrapper.vm as any).setCritical(false);
+    expect((wrapper.vm as any).form.variant).toBe("promo");
+  });
+
+  it("restores a custom look after passing through other styles", async () => {
+    getConfig.mockResolvedValue({ data: structuredClone(STYLED) });
+    const wrapper = await mountEditor();
+    (wrapper.vm as any).chooseStyle("custom");
+    Object.assign((wrapper.vm as any).form, {
+      icon: "build",
+      colorLight: "#123456",
+    });
+    (wrapper.vm as any).chooseStyle("style:style-1");
+    (wrapper.vm as any).chooseStyle("warning");
+    (wrapper.vm as any).chooseStyle("custom");
+
+    expect((wrapper.vm as any).form).toMatchObject({
+      icon: "build",
+      colorLight: "#123456",
+    });
+  });
+
+  it("saves a banner whose saved style was deleted while it was open", async () => {
+    let current: Record<string, unknown> = {
+      ...structuredClone(STYLED),
+      banners: [STORED.banners[0], { ...STORED.banners[1], style: "style-1" }],
+    };
+    getConfig.mockImplementation(async () => ({
+      data: structuredClone(current),
+    }));
+    setConfig.mockImplementation(
+      async (_org: string, next: Record<string, unknown>) => {
+        current = next;
+        return { data: {} };
+      },
+    );
+    const wrapper = await mountEditor({ index: "1" });
+    await (wrapper.vm as any).deleteStyle();
+    (wrapper.vm as any).form.message = "Second, edited";
+    await (wrapper.vm as any).save();
+
+    expect(setConfig).toHaveBeenCalledTimes(2);
+    expect((current.banners as Record<string, unknown>[])[1]).toMatchObject({
+      message: "Second, edited",
+    });
+  });
+
+  it("re-reads and re-applies when another save lands between its read and write", async () => {
+    getConfig
+      .mockResolvedValueOnce({
+        data: { ...structuredClone(STORED), revision: 4 },
+      })
+      .mockResolvedValueOnce({
+        data: { ...structuredClone(STORED), revision: 4 },
+      })
+      .mockResolvedValue({
+        data: {
+          banners: [...STORED.banners, { message: "Theirs" }],
+          revision: 5,
+        },
+      });
+    setConfig
+      .mockRejectedValueOnce({ response: { status: 409 } })
+      .mockResolvedValue({ data: {} });
+    const wrapper = await mountEditor();
+    (wrapper.vm as any).form.message = "Mine";
+    await (wrapper.vm as any).save();
+
+    expect(setConfig).toHaveBeenCalledTimes(2);
+    expect(setConfig.mock.calls[1][1]).toMatchObject({
+      banners: [...STORED.banners, { message: "Theirs" }, { message: "Mine" }],
+      revision: 5,
+    });
   });
 
   it("shows the look controls only for a custom style", async () => {
@@ -478,9 +612,13 @@ describe("AnnouncementBannerEditor", () => {
     const wrapper = await mountEditor();
     (wrapper.vm as any).form.message = "m";
     for (let i = 0; i < 3; i++) {
-      await wrapper.get('[data-test="announcement-editor-add-link"]').trigger("click");
+      await wrapper
+        .get('[data-test="announcement-editor-add-link"]')
+        .trigger("click");
     }
-    expect(wrapper.find('[data-test="announcement-editor-add-link"]').exists()).toBe(false);
+    expect(
+      wrapper.find('[data-test="announcement-editor-add-link"]').exists(),
+    ).toBe(false);
     (wrapper.vm as any).form.links = [
       { text: "Status", url: "https://s.io" },
       { text: "Docs", url: "https://d.io" },
@@ -499,7 +637,9 @@ describe("AnnouncementBannerEditor", () => {
     (wrapper.vm as any).chooseStyle("custom");
     (wrapper.vm as any).form.icon = "build";
     await flushPromises();
-    await wrapper.get('[data-test="announcement-editor-save-style"]').trigger("click");
+    await wrapper
+      .get('[data-test="announcement-editor-save-style"]')
+      .trigger("click");
     await flushPromises();
     const name = document.querySelector<HTMLInputElement>(
       '[data-test="announcement-editor-style-name"]',
@@ -508,7 +648,9 @@ describe("AnnouncementBannerEditor", () => {
     name.dispatchEvent(new Event("input"));
     await flushPromises();
     document
-      .querySelector<HTMLElement>('[data-test="announcement-editor-save-style-confirm"]')!
+      .querySelector<HTMLElement>(
+        '[data-test="announcement-editor-save-style-confirm"]',
+      )!
       .click();
     await flushPromises();
 

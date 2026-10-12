@@ -15,6 +15,7 @@
 
 import { isEqual } from "lodash-es";
 
+import announcements from "@/services/announcements";
 import {
   authoredFromDraft,
   authoredFromStyle,
@@ -26,6 +27,12 @@ import {
 } from "./announcementDrafts";
 
 const MINUTE_MS = 60_000;
+
+/** Saves that keep losing the race to other saves give up rather than retry forever. */
+const MAX_SAVE_ATTEMPTS = 3;
+
+/** How far ahead of this browser a server pin can plausibly be anchored, for clock skew. */
+const PIN_ANCHOR_SLACK_MS = 5 * MINUTE_MS;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
@@ -41,6 +48,9 @@ export type AnnouncementConfig = Record<string, unknown> & {
   banners: unknown[];
 };
 
+/** Thrown when the part of the config a change edits moved since the page loaded it. */
+export class AnnouncementConflictError extends Error {}
+
 function instantMs(value: string): number | null {
   if (!value) return null;
   const ms = new Date(value).getTime();
@@ -48,7 +58,10 @@ function instantMs(value: string): number | null {
 }
 
 function withBanners(source: unknown, banners: unknown[]): AnnouncementConfig {
-  const base = source && typeof source === "object" ? (source as Record<string, unknown>) : {};
+  const base =
+    source && typeof source === "object"
+      ? (source as Record<string, unknown>)
+      : {};
   return { ...base, banners };
 }
 
@@ -83,7 +96,9 @@ export function isHiddenByCritical(
 ): boolean {
   if (draft.variant !== "promo" || !isShowingNow(draft, nowMs)) return false;
 
-  const critical = others.filter((d) => d.variant === "critical" && isShowingNow(d, nowMs));
+  const critical = others.filter(
+    (d) => d.variant === "critical" && isShowingNow(d, nowMs),
+  );
   if (critical.some((d) => !d.orgs.length)) return true;
   if (!critical.length || !draft.orgs.length) return false;
 
@@ -92,10 +107,15 @@ export function isHiddenByCritical(
 }
 
 /** Each entry's list status, with promotions a critical banner hides from all their orgs marked hidden. */
-export function listStatuses(entries: IndexedDraft[], nowMs: number): Map<number, ListStatus> {
+export function listStatuses(
+  entries: IndexedDraft[],
+  nowMs: number,
+): Map<number, ListStatus> {
   return new Map(
     entries.map(({ index, draft }) => {
-      const others = entries.filter((entry) => entry.index !== index).map((entry) => entry.draft);
+      const others = entries
+        .filter((entry) => entry.index !== index)
+        .map((entry) => entry.draft);
       const hidden = isHiddenByCritical(draft, others, nowMs);
       return [index, hidden ? "hidden" : bannerStatus(draft, nowMs)];
     }),
@@ -146,11 +166,28 @@ export function saveIntent(draft: BannerDraft, nowMs: number): SaveIntent {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** Whether `stored.ends_at` is where the server would have pinned `original`'s duration. */
+function isPinnedEnd(
+  stored: Record<string, unknown>,
+  original: Record<string, unknown>,
+): boolean {
+  const span = parseDurationMs(String(original.duration));
+  const anchor = Date.parse(String(stored.ends_at)) - (span ?? NaN);
+  if (Number.isNaN(anchor)) return false;
+  if (typeof original.starts_at === "string") {
+    return Math.abs(anchor - Date.parse(original.starts_at)) < 1000;
+  }
+  // Unstarted, the pin is anchored to an unknown save time; only an anchor in the future is provably not a pin.
+  return anchor <= Date.now() + PIN_ANCHOR_SLACK_MS;
+}
+
 /** Whether `stored` is `original` with its `duration` pinned to an `ends_at`, as every save does. */
 function isPinnedFrom(stored: unknown, original: unknown): boolean {
   if (!isRecord(stored) || !isRecord(original)) return false;
-  if (typeof original.duration !== "string" || "duration" in stored) return false;
-  if (typeof stored.ends_at !== "string") return false;
+  if (typeof original.duration !== "string" || "duration" in stored)
+    return false;
+  if (typeof stored.ends_at !== "string" || !isPinnedEnd(stored, original))
+    return false;
 
   const { duration: _duration, ...authored } = original;
   const { ends_at: _endsAt, ...pinned } = stored;
@@ -158,22 +195,29 @@ function isPinnedFrom(stored: unknown, original: unknown): boolean {
 }
 
 /** True when the latest config still holds `original` at `index`, so a write cannot clobber someone else's edit. */
-export function isUnchangedAt(latest: unknown, index: number, original: unknown): boolean {
+export function isUnchangedAt(
+  latest: unknown,
+  index: number,
+  original: unknown,
+): boolean {
   const banners = rawBanners(latest);
   if (index >= banners.length) return false;
-  return isEqual(banners[index], original) || isPinnedFrom(banners[index], original);
+  return (
+    isEqual(banners[index], original) || isPinnedFrom(banners[index], original)
+  );
 }
 
-/** The config with `draft` stored at `index`, or appended when `index` is null; others pass through untouched. */
+/** The config with `draft` stored at `index`, or appended (keeping `base`'s unedited keys) when `index` is null. */
 export function upsertBanner(
   source: unknown,
   index: number | null,
   draft: BannerDraft,
+  base: Record<string, unknown> = {},
 ): AnnouncementConfig {
   const banners = [...rawBanners(source)];
 
   if (index == null || index < 0 || index >= banners.length) {
-    banners.push(authoredFromDraft(draft));
+    banners.push(authoredFromDraft(draft, base));
   } else {
     const stored = banners[index];
     banners[index] = authoredFromDraft(draft, isRecord(stored) ? stored : {});
@@ -182,7 +226,10 @@ export function upsertBanner(
   return withBanners(source, banners);
 }
 
-export function removeBanner(source: unknown, index: number): AnnouncementConfig {
+export function removeBanner(
+  source: unknown,
+  index: number,
+): AnnouncementConfig {
   return withBanners(
     source,
     rawBanners(source).filter((_, position) => position !== index),
@@ -195,7 +242,10 @@ function rawStyles(source: unknown): unknown[] {
 }
 
 /** The config with `style` appended to its saved styles; banners and other keys pass through. */
-export function addStyle(source: unknown, style: BannerStyle): AnnouncementConfig {
+export function addStyle(
+  source: unknown,
+  style: BannerStyle,
+): AnnouncementConfig {
   return {
     ...withBanners(source, rawBanners(source)),
     styles: [...rawStyles(source), authoredFromStyle(style)],
@@ -211,8 +261,31 @@ export function removeStyle(source: unknown, id: string): AnnouncementConfig {
   });
   return {
     ...withBanners(source, banners),
-    styles: rawStyles(source).filter((style) => (style as { id?: unknown })?.id !== id),
+    styles: rawStyles(source).filter(
+      (style) => (style as { id?: unknown })?.id !== id,
+    ),
   };
+}
+
+/** Read-modify-write of the whole config; the server refuses a write based on a stale read, which is re-read and re-applied. */
+export async function updateConfig(
+  org: string,
+  change: (latest: unknown) => AnnouncementConfig,
+): Promise<AnnouncementConfig> {
+  for (let attempt = 1; ; attempt++) {
+    const latest = (await announcements.getConfig(org))?.data;
+    const next = {
+      ...change(latest),
+      revision: (latest as { revision?: unknown })?.revision,
+    };
+    try {
+      await announcements.setConfig(org, next);
+      return next;
+    } catch (error: any) {
+      if (error?.response?.status !== 409) throw error;
+      if (attempt >= MAX_SAVE_ATTEMPTS) throw new AnnouncementConflictError();
+    }
+  }
 }
 
 /** The stored index named by a route query value, or null when it is absent or not an integer. */

@@ -78,7 +78,12 @@ export interface BannerStyle {
   colorDark: string;
 }
 
-export const VARIANTS: BannerVariantName[] = ["info", "warning", "critical", "promo"];
+export const VARIANTS: BannerVariantName[] = [
+  "info",
+  "warning",
+  "critical",
+  "promo",
+];
 
 /** More buttons than this crowd the message out of a bar on a laptop; the server holds the same cap. */
 export const MAX_LINKS = 3;
@@ -109,7 +114,8 @@ export function hasCustomLook(
   draft: Pick<BannerDraft, "icon" | "textSize" | "colorLight" | "colorDark">,
 ): boolean {
   return (
-    !!(draft.icon || draft.colorLight || draft.colorDark) || draft.textSize !== DEFAULT_TEXT_SIZE
+    !!(draft.icon || draft.colorLight || draft.colorDark) ||
+    draft.textSize !== DEFAULT_TEXT_SIZE
   );
 }
 
@@ -118,24 +124,34 @@ export function newBannerId(prefix = "banner"): string {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-const DURATION_UNIT_MS: Record<string, number> = {
-  s: 1000,
-  m: 60_000,
-  h: 3_600_000,
-  d: 86_400_000,
-  w: 604_800_000,
-};
+/** Largest first, as the API requires them in a compound span like `"1h30m"`. */
+const DURATION_UNITS: [string, number][] = [
+  ["y", 31_536_000_000],
+  ["w", 604_800_000],
+  ["d", 86_400_000],
+  ["h", 3_600_000],
+  ["m", 60_000],
+  ["s", 1000],
+  ["ms", 1],
+];
 
-/** Milliseconds in a span like `"90m"`, or null when it is not one. */
+/** Milliseconds in a span the API accepts (`"90m"`, `"1h30m"`, bare seconds), or null when it is not one. */
 export function parseDurationMs(value: string): number | null {
-  const match = /^\s*(\d+(?:\.\d+)?)\s*([smhdw])\s*$/i.exec(value);
-  if (!match) return null;
+  const text = value.trim();
+  if (/^\d+$/.test(text)) return Number(text) * 1000 || null;
+  if (!/^(\d+(ms|[ywdhms]))+$/.test(text)) return null;
 
-  const amount = Number(match[1]);
-  const unit = DURATION_UNIT_MS[match[2].toLowerCase()];
-  if (!amount || !unit) return null;
-
-  return amount * unit;
+  let total = 0;
+  let previous = -1;
+  for (const [, amount, unit] of Array.from(
+    text.matchAll(/(\d+)(ms|[ywdhms])/g),
+  )) {
+    const position = DURATION_UNITS.findIndex(([name]) => name === unit);
+    if (position <= previous) return null;
+    previous = position;
+    total += Number(amount) * DURATION_UNITS[position][1];
+  }
+  return total || null;
 }
 
 function pad(value: number): string {
@@ -207,9 +223,16 @@ function str(value: unknown): string {
 }
 
 function linksFromAuthored(banner: AuthoredBanner): BannerLink[] {
-  const authored = Array.isArray(banner.ctas) ? banner.ctas : banner.cta ? [banner.cta] : [];
+  const authored = Array.isArray(banner.ctas)
+    ? banner.ctas
+    : banner.cta
+      ? [banner.cta]
+      : [];
   return authored
-    .filter((cta): cta is Record<string, unknown> => typeof cta === "object" && cta !== null)
+    .filter(
+      (cta): cta is Record<string, unknown> =>
+        typeof cta === "object" && cta !== null,
+    )
     .map((cta) => ({ text: str(cta.text), url: str(cta.url) }))
     .filter((link) => link.text);
 }
@@ -235,11 +258,14 @@ export function draftFromAuthored(banner: AuthoredBanner): BannerDraft {
     draft.duration = duration;
   }
 
-  if (typeof banner.dismissible === "boolean") draft.dismissible = banner.dismissible;
+  if (typeof banner.dismissible === "boolean")
+    draft.dismissible = banner.dismissible;
   draft.links = linksFromAuthored(banner);
 
   if (Array.isArray(banner.orgs)) {
-    draft.orgs = banner.orgs.filter((org): org is string => typeof org === "string");
+    draft.orgs = banner.orgs.filter(
+      (org): org is string => typeof org === "string",
+    );
   }
 
   if (isTextSize(banner.text_size)) draft.textSize = banner.text_size;
@@ -273,7 +299,9 @@ export function rawBanners(parsed: unknown): unknown[] {
 /** Drafts for every usable banner, keeping the stored index so edits address the right entry. */
 export function indexedDraftsFromConfig(parsed: unknown): IndexedDraft[] {
   return rawBanners(parsed).flatMap((banner, index) =>
-    typeof banner === "object" && banner !== null && str((banner as AuthoredBanner).message).trim()
+    typeof banner === "object" &&
+    banner !== null &&
+    str((banner as AuthoredBanner).message).trim()
       ? [
           {
             index,
@@ -308,12 +336,14 @@ const EDITED_KEYS = new Set([
   "style",
 ]);
 
-/**
- * One draft as authored JSON.
- *
- * Defaults are omitted rather than written out, so the stored config stays the
- * short document a person would have written by hand.
- */
+/** The stored instant when the picker still shows it, so a minute-precision input does not move it. */
+function keptInstant(stored: unknown, local: string): string {
+  return typeof stored === "string" && toLocalInput(stored) === local
+    ? stored
+    : toRfc3339(local);
+}
+
+/** One draft as authored JSON, with defaults left out so the stored config stays short. */
 export function authoredFromDraft(
   draft: BannerDraft,
   stored: Record<string, unknown> = {},
@@ -326,26 +356,34 @@ export function authoredFromDraft(
   if (draft.id.trim()) banner.id = draft.id.trim();
   if (draft.variant !== "info") banner.variant = draft.variant;
 
-  if (draft.start === "at" && draft.startsAt) banner.starts_at = toRfc3339(draft.startsAt);
+  if (draft.start === "at" && draft.startsAt) {
+    banner.starts_at = keptInstant(stored.starts_at, draft.startsAt);
+  }
   // The server pins this to an absolute `ends_at` on save, so later saves cannot restart it.
   if (draft.end === "after" && parseDurationMs(draft.duration)) {
     banner.duration = draft.duration.trim();
   }
-  if (draft.end === "at" && draft.endsAt) banner.ends_at = toRfc3339(draft.endsAt);
+  if (draft.end === "at" && draft.endsAt)
+    banner.ends_at = keptInstant(stored.ends_at, draft.endsAt);
 
   if (!draft.dismissible) banner.dismissible = false;
 
   const links = draft.links
     .map((link) => ({ text: link.text.trim(), url: link.url.trim() }))
     .filter((link) => link.text && link.url);
-  if (links.length) banner.ctas = links;
+  if (links.length) {
+    banner.ctas = links;
+    // The API accepts the first button mirrored here, which a server or UI that predates `ctas` keeps on save.
+    banner.cta = links[0];
+  }
 
   if (draft.orgs.length) banner.orgs = [...draft.orgs];
 
   if (draft.textSize !== DEFAULT_TEXT_SIZE) banner.text_size = draft.textSize;
 
   const colors: Record<string, string> = {};
-  if (isHexColor(draft.colorLight)) colors.light = draft.colorLight.toUpperCase();
+  if (isHexColor(draft.colorLight))
+    colors.light = draft.colorLight.toUpperCase();
   if (isHexColor(draft.colorDark)) colors.dark = draft.colorDark.toUpperCase();
   if (Object.keys(colors).length) banner.colors = colors;
 
@@ -360,25 +398,38 @@ export function stylesFromConfig(parsed: unknown): BannerStyle[] {
   if (!Array.isArray(styles)) return [];
 
   return styles
-    .filter((style): style is Record<string, any> => typeof style === "object" && style !== null)
+    .filter(
+      (style): style is Record<string, any> =>
+        typeof style === "object" && style !== null,
+    )
     .filter((style) => str(style.id) && str(style.name))
     .map((style) => ({
       id: str(style.id),
       name: str(style.name),
       icon: isBannerIcon(style.icon) ? style.icon : "",
-      textSize: isTextSize(style.text_size) ? style.text_size : DEFAULT_TEXT_SIZE,
-      colorLight: isHexColor(style.colors?.light) ? style.colors.light.toUpperCase() : "",
-      colorDark: isHexColor(style.colors?.dark) ? style.colors.dark.toUpperCase() : "",
+      textSize: isTextSize(style.text_size)
+        ? style.text_size
+        : DEFAULT_TEXT_SIZE,
+      colorLight: isHexColor(style.colors?.light)
+        ? style.colors.light.toUpperCase()
+        : "",
+      colorDark: isHexColor(style.colors?.dark)
+        ? style.colors.dark.toUpperCase()
+        : "",
     }));
 }
 
 export function authoredFromStyle(style: BannerStyle): Record<string, unknown> {
-  const authored: Record<string, unknown> = { id: style.id, name: style.name.trim() };
+  const authored: Record<string, unknown> = {
+    id: style.id,
+    name: style.name.trim(),
+  };
   if (style.icon) authored.icon = style.icon;
   if (style.textSize !== DEFAULT_TEXT_SIZE) authored.text_size = style.textSize;
 
   const colors: Record<string, string> = {};
-  if (isHexColor(style.colorLight)) colors.light = style.colorLight.toUpperCase();
+  if (isHexColor(style.colorLight))
+    colors.light = style.colorLight.toUpperCase();
   if (isHexColor(style.colorDark)) colors.dark = style.colorDark.toUpperCase();
   if (Object.keys(colors).length) authored.colors = colors;
 

@@ -30,35 +30,58 @@ function mountField(colorLight = "", colorDark = "") {
 }
 
 const selected = (wrapper: ReturnType<typeof mountField>) =>
-  wrapper.findAll(".announcement-swatch.is-selected").map((node) => node.attributes("data-test"));
+  wrapper
+    .findAll(".announcement-swatch.is-selected")
+    .map((node) => node.attributes("data-test"));
+
+const lastEmit = (
+  wrapper: { emitted: (_e: string) => unknown[][] | undefined },
+  event: string,
+) => wrapper.emitted(event)?.slice(-1)[0];
 
 describe("AnnouncementAppearanceField", () => {
   it("starts on Severity default when no colour is stored", () => {
-    expect(selected(mountField())).toEqual(["announcement-editor-color-default"]);
+    expect(selected(mountField())).toEqual([
+      "announcement-editor-color-default",
+    ]);
   });
 
   it("reopens a stored preset pair on its swatch", () => {
-    expect(selected(mountField("#dbeafe", "#1E3A8A"))).toEqual(["announcement-editor-color-blue"]);
+    expect(selected(mountField("#dbeafe", "#1E3A8A"))).toEqual([
+      "announcement-editor-color-blue",
+    ]);
   });
 
   it("reopens any other pair as Custom with both pickers", () => {
     const wrapper = mountField("#123456", "");
 
     expect(selected(wrapper)).toEqual(["announcement-editor-color-custom"]);
-    expect(wrapper.find('[data-test="announcement-editor-colorLight-picker"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="announcement-editor-colorDark-picker"]').exists()).toBe(true);
+    expect(
+      wrapper
+        .find('[data-test="announcement-editor-colorLight-picker"]')
+        .exists(),
+    ).toBe(true);
+    expect(
+      wrapper
+        .find('[data-test="announcement-editor-colorDark-picker"]')
+        .exists(),
+    ).toBe(true);
   });
 
   it("writes a preset's light and dark pair, and clears both for Match severity", async () => {
     const wrapper = mountField();
 
-    await wrapper.get('[data-test="announcement-editor-color-slate"]').trigger("click");
-    expect(wrapper.emitted("update:colorLight")?.at(-1)).toEqual(["#1E293B"]);
-    expect(wrapper.emitted("update:colorDark")?.at(-1)).toEqual(["#E2E8F0"]);
+    await wrapper
+      .get('[data-test="announcement-editor-color-slate"]')
+      .trigger("click");
+    expect(lastEmit(wrapper, "update:colorLight")).toEqual(["#1E293B"]);
+    expect(lastEmit(wrapper, "update:colorDark")).toEqual(["#E2E8F0"]);
 
-    await wrapper.get('[data-test="announcement-editor-color-default"]').trigger("click");
-    expect(wrapper.emitted("update:colorLight")?.at(-1)).toEqual([""]);
-    expect(wrapper.emitted("update:colorDark")?.at(-1)).toEqual([""]);
+    await wrapper
+      .get('[data-test="announcement-editor-color-default"]')
+      .trigger("click");
+    expect(lastEmit(wrapper, "update:colorLight")).toEqual([""]);
+    expect(lastEmit(wrapper, "update:colorDark")).toEqual([""]);
   });
 
   it("offers all nine presets", () => {
@@ -75,18 +98,28 @@ describe("AnnouncementAppearanceField", () => {
       "slate",
       "brand",
     ]) {
-      expect(wrapper.find(`[data-test="announcement-editor-color-${key}"]`).exists()).toBe(true);
+      expect(
+        wrapper.find(`[data-test="announcement-editor-color-${key}"]`).exists(),
+      ).toBe(true);
     }
   });
 
   it("is one Tab stop that arrow keys move through, and Enter selects", async () => {
     const wrapper = mount(AnnouncementAppearanceField, {
-      props: { textSize: "medium", colorLight: "", colorDark: "", icon: "", errors: {} },
+      props: {
+        textSize: "medium",
+        colorLight: "",
+        colorDark: "",
+        icon: "",
+        errors: {},
+      },
       global: { plugins: [i18n] },
       attachTo: document.body,
     });
     const tabStops = () =>
-      wrapper.findAll('[role="radio"]').filter((node) => node.attributes("tabindex") === "0");
+      wrapper
+        .findAll('[role="radio"]')
+        .filter((node) => node.attributes("tabindex") === "0");
 
     expect(tabStops().map((node) => node.attributes("data-test"))).toEqual([
       "announcement-editor-color-default",
@@ -111,9 +144,11 @@ describe("AnnouncementAppearanceField", () => {
     await group.trigger("keydown", { key: "ArrowRight" });
     (document.activeElement as HTMLButtonElement).click();
     await wrapper.vm.$nextTick();
-    expect(wrapper.emitted("update:colorLight")?.at(-1)).toEqual(["#DBEAFE"]);
+    expect(lastEmit(wrapper, "update:colorLight")).toEqual(["#DBEAFE"]);
     expect(
-      wrapper.get('[data-test="announcement-editor-color-blue"]').attributes("aria-checked"),
+      wrapper
+        .get('[data-test="announcement-editor-color-blue"]')
+        .attributes("aria-checked"),
     ).toBe("true");
     wrapper.unmount();
   });

@@ -29,15 +29,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <q-icon name="arrow_back_ios_new" size="1rem" />
         </button>
         <div>
-          <div class="text-h6 announcement-editor-title" data-test="announcement-editor-title">
-            {{ isNew ? t("announcements.editor.addTitle") : t("announcements.editor.editTitle") }}
+          <div
+            class="text-h6 announcement-editor-title"
+            data-test="announcement-editor-title"
+          >
+            {{
+              isNew
+                ? t("announcements.editor.addTitle")
+                : t("announcements.editor.editTitle")
+            }}
           </div>
           <div
             v-if="currentStatus"
             class="announcement-editor-subtitle"
             data-test="announcement-editor-status"
           >
-            {{ t("announcements.editor.currentStatus", { status: currentStatus }) }}
+            {{
+              t("announcements.editor.currentStatus", { status: currentStatus })
+            }}
           </div>
         </div>
       </div>
@@ -97,8 +106,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="announcement-editor-section-title">
             {{ t("announcements.editor.messageSection") }} *
           </div>
-          <AnnouncementMessageField v-model="form.message" :error="errors.message" />
-          <span class="announcement-editor-label">{{ t("announcements.editor.links") }}</span>
+          <AnnouncementMessageField
+            v-model="form.message"
+            :error="errors.message"
+          />
+          <span class="announcement-editor-label">{{
+            t("announcements.editor.links")
+          }}</span>
           <div
             v-for="(link, position) in form.links"
             :key="position"
@@ -171,7 +185,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="announcement-editor-variant"
             @update:model-value="chooseStyle"
           />
-          <span class="announcement-editor-hint" data-test="announcement-editor-variant-help">
+          <span
+            class="announcement-editor-hint"
+            data-test="announcement-editor-variant-help"
+          >
             {{ styleHelp }}
           </span>
           <div v-if="isLookOnly" class="announcement-editor-critical">
@@ -180,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="announcement-editor-switch"
               :label="t('announcements.editor.styleCritical')"
               data-test="announcement-editor-style-critical"
-              @update:model-value="(on: boolean) => setVariant(on ? 'critical' : 'info')"
+              @update:model-value="setCritical"
             />
             <span class="announcement-editor-hint">
               {{ t("announcements.editor.styleCriticalHelp") }}
@@ -217,7 +234,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon="delete"
             color="negative"
             class="announcement-editor-add-link"
-            :label="t('announcements.editor.deleteStyle', { name: selectedStyle.name })"
+            :label="
+              t('announcements.editor.deleteStyle', {
+                name: selectedStyle.name,
+              })
+            "
             data-test="announcement-editor-delete-style"
             @click="deleteStyleOpen = true"
           />
@@ -260,7 +281,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="announcement-editor-orgs"
           />
 
-          <span class="announcement-editor-label">{{ t("announcements.editor.starts") }}</span>
+          <span class="announcement-editor-label">{{
+            t("announcements.editor.starts")
+          }}</span>
           <q-btn-toggle
             v-model="form.start"
             class="announcement-editor-toggle"
@@ -285,7 +308,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="announcement-editor-starts-at"
           />
 
-          <span class="announcement-editor-label">{{ t("announcements.editor.ends") }}</span>
+          <span class="announcement-editor-label">{{
+            t("announcements.editor.ends")
+          }}</span>
           <q-btn-toggle
             v-model="form.end"
             class="announcement-editor-toggle"
@@ -295,7 +320,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="endOptions"
             data-test="announcement-editor-end"
           />
-          <div v-if="form.end === 'after'" class="announcement-editor-duration-row">
+          <div
+            v-if="form.end === 'after'"
+            class="announcement-editor-duration-row"
+          >
             <q-btn
               v-for="span in DURATION_PICKS"
               :key="span.value"
@@ -336,7 +364,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error-message="errors.endsAt"
             data-test="announcement-editor-ends-at"
           />
-          <span class="announcement-editor-hint" data-test="announcement-editor-schedule-summary">
+          <span
+            class="announcement-editor-hint"
+            data-test="announcement-editor-schedule-summary"
+          >
             {{ scheduleHint }}
           </span>
 
@@ -357,11 +388,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="announcement-editor-preview">
-        <AnnouncementBannerPreview :banner="previewBanner" :hidden="hiddenByCritical" />
+        <AnnouncementBannerPreview
+          :banner="previewBanner"
+          :hidden="hiddenByCritical"
+        />
       </div>
     </div>
 
-    <q-dialog v-model="saveStyleOpen" data-test="announcement-editor-save-style-dialog">
+    <q-dialog
+      v-model="saveStyleOpen"
+      data-test="announcement-editor-save-style-dialog"
+    >
       <q-card class="announcement-editor-leave-card">
         <q-card-section>
           <div class="text-h6">
@@ -407,7 +444,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="deleteStyleOpen" data-test="announcement-editor-delete-style-dialog">
+    <q-dialog
+      v-model="deleteStyleOpen"
+      data-test="announcement-editor-delete-style-dialog"
+    >
       <q-card class="announcement-editor-leave-card">
         <q-card-section>
           <div class="text-h6">
@@ -442,7 +482,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </q-card>
     </q-dialog>
 
-    <q-dialog v-model="leaveDialogOpen" data-test="announcement-editor-leave-dialog">
+    <q-dialog
+      v-model="leaveDialogOpen"
+      data-test="announcement-editor-leave-dialog"
+    >
       <q-card class="announcement-editor-leave-card">
         <q-card-section>
           <div class="text-h6">{{ t("announcements.editor.leaveTitle") }}</div>
@@ -474,7 +517,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import { useQuasar } from "quasar";
 import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
@@ -482,12 +533,17 @@ import { useStore } from "vuex";
 
 import { notifyAnnouncementsChanged } from "@/composables/useAnnouncementBanners";
 import announcements from "@/services/announcements";
-import { DEFAULT_TEXT_SIZE, isBannerIcon, materialIconName } from "@/utils/announcementAppearance";
+import {
+  DEFAULT_TEXT_SIZE,
+  isBannerIcon,
+  materialIconName,
+} from "@/utils/announcementAppearance";
 import type { BannerVariantName } from "@/utils/announcementOrder";
 import AnnouncementAppearanceField from "./AnnouncementAppearanceField.vue";
 import AnnouncementBannerPreview from "./AnnouncementBannerPreview.vue";
 import AnnouncementMessageField from "./AnnouncementMessageField.vue";
 import {
+  AnnouncementConflictError,
   addStyle,
   formatStamp,
   isHiddenByCritical,
@@ -496,7 +552,9 @@ import {
   parseIndexQuery,
   removeStyle,
   saveIntent,
+  updateConfig,
   upsertBanner,
+  type AnnouncementConfig,
 } from "./announcementConfig";
 import {
   MAX_LINKS,
@@ -507,12 +565,17 @@ import {
   newBannerId,
   parseDurationMs,
   previewFromDraft,
+  rawBanners,
   stylesFromConfig,
   type BannerDraft,
   type BannerStyle,
   type IndexedDraft,
 } from "./announcementDrafts";
-import { CTA_TEXT_MAX, validateBanner, type BannerErrors } from "./announcementValidation";
+import {
+  CTA_TEXT_MAX,
+  validateBanner,
+  type BannerErrors,
+} from "./announcementValidation";
 
 const VARIANT_ICONS: Record<string, string> = {
   info: "info",
@@ -523,8 +586,6 @@ const VARIANT_ICONS: Record<string, string> = {
 
 const STYLE_CHOICE_PREFIX = "style:";
 const CUSTOM_STYLE = "custom";
-
-class BannerConflictError extends Error {}
 
 const { t } = useI18n();
 const q = useQuasar();
@@ -556,6 +617,18 @@ const styleName = ref("");
 const styleError = ref("");
 let leaveConfirmed = false;
 
+// The banner a duplicate was copied from, whose keys this editor does not edit carry over.
+let duplicateBase: Record<string, unknown> = {};
+
+// Switching styles resets the look, so a custom look is kept to restore on return.
+let customLook: Pick<
+  BannerDraft,
+  "icon" | "textSize" | "colorLight" | "colorDark"
+> | null = null;
+
+// The severity "Treat as critical" returns to when switched off.
+let calmVariant: BannerVariantName = "info";
+
 const metaOrg = computed(() => store.state.zoConfig?.meta_org);
 
 const isNew = computed(() => editIndex.value == null);
@@ -567,9 +640,13 @@ const snapshot = () =>
     reset: resetDismissals.value,
   });
 
-const isDirty = computed(() => isLoaded.value && snapshot() !== savedSnapshot.value);
+const isDirty = computed(
+  () => isLoaded.value && snapshot() !== savedSnapshot.value,
+);
 
-const editedEntry = computed(() => entries.value.find((entry) => entry.index === editIndex.value));
+const editedEntry = computed(() =>
+  entries.value.find((entry) => entry.index === editIndex.value),
+);
 
 const currentStatus = computed(() => {
   if (editIndex.value == null) return "";
@@ -586,14 +663,20 @@ const saveLabel = computed(() => {
 });
 
 const orgOptions = computed(() =>
-  (store.state.organizations ?? []).map((org: { identifier: string; name?: string }) => ({
-    label:
-      org.name && org.name !== org.identifier ? `${org.name} (${org.identifier})` : org.identifier,
-    value: org.identifier,
-  })),
+  (store.state.organizations ?? []).map(
+    (org: { identifier: string; name?: string }) => ({
+      label:
+        org.name && org.name !== org.identifier
+          ? `${org.name} (${org.identifier})`
+          : org.identifier,
+      value: org.identifier,
+    }),
+  ),
 );
 
-const selectedStyle = computed(() => styles.value.find((style) => style.id === form.styleId));
+const selectedStyle = computed(() =>
+  styles.value.find((style) => style.id === form.styleId),
+);
 
 // View state: a Custom look that happens to match the defaults must still read as Custom.
 const styleChoice = ref<string>("info");
@@ -606,7 +689,8 @@ const initialStyleChoice = (draft: BannerDraft) => {
 };
 
 const styleHelp = computed(() => {
-  if (styleChoice.value === CUSTOM_STYLE) return t("announcements.editor.customStyleHelp");
+  if (styleChoice.value === CUSTOM_STYLE)
+    return t("announcements.editor.customStyleHelp");
   if (selectedStyle.value) return t("announcements.editor.savedStyleHelp");
   return t(`announcements.variantHelp.${form.variant}`);
 });
@@ -620,7 +704,9 @@ const styleOptions = computed(() => [
   })),
   ...styles.value.map((style) => ({
     label: style.name,
-    icon: isBannerIcon(style.icon) ? materialIconName(style.icon) : VARIANT_ICONS.info,
+    icon: isBannerIcon(style.icon)
+      ? materialIconName(style.icon)
+      : VARIANT_ICONS.info,
     value: `${STYLE_CHOICE_PREFIX}${style.id}`,
     attrs: { "data-test": `announcement-editor-style-${style.id}` },
   })),
@@ -655,7 +741,9 @@ const previewBanner = computed(() => previewFromDraft(form));
 const hiddenByCritical = computed(() =>
   isHiddenByCritical(
     { ...form, orgs: audience.value === "some" ? form.orgs : [] },
-    entries.value.filter((entry) => entry.index !== editIndex.value).map((entry) => entry.draft),
+    entries.value
+      .filter((entry) => entry.index !== editIndex.value)
+      .map((entry) => entry.draft),
     Date.now(),
   ),
 );
@@ -663,15 +751,24 @@ const hiddenByCritical = computed(() =>
 /** One line saying when the banner will actually be up, so the two choices read as a sentence. */
 const scheduleHint = computed(() => {
   const stamp = (ms: number) => formatStamp(new Date(ms).toISOString());
-  const startMs = form.start === "at" && form.startsAt ? new Date(form.startsAt).getTime() : null;
+  const startMs =
+    form.start === "at" && form.startsAt
+      ? new Date(form.startsAt).getTime()
+      : null;
   const from = startMs ? stamp(startMs) : t("announcements.editor.hintPublish");
 
   let until = t("announcements.editor.hintRemoved");
-  const spanMs = form.end === "after" ? parseDurationMs(form.duration ?? "") : null;
+  const spanMs =
+    form.end === "after" ? parseDurationMs(form.duration ?? "") : null;
   if (spanMs) until = stamp((startMs ?? Date.now()) + spanMs);
-  if (form.end === "at" && form.endsAt) until = stamp(new Date(form.endsAt).getTime());
+  if (form.end === "at" && form.endsAt)
+    until = stamp(new Date(form.endsAt).getTime());
 
-  return t("announcements.editor.scheduleHint", { from, until, zone: timeZone });
+  return t("announcements.editor.scheduleHint", {
+    from,
+    until,
+    zone: timeZone,
+  });
 });
 
 const serverMessage = (error: any, fallback: string) =>
@@ -687,21 +784,36 @@ const validate = (): BannerErrors => {
 
 const setVariant = (variant: BannerVariantName) => {
   // An outage notice should stay up; the author can still turn dismissal back on.
-  if (variant === "critical" && form.variant !== "critical") form.dismissible = false;
+  if (variant === "critical" && form.variant !== "critical")
+    form.dismissible = false;
   form.variant = variant;
 };
 
-const isLookOnly = computed(() => styleChoice.value === CUSTOM_STYLE || !!selectedStyle.value);
+const setCritical = (on: boolean) => {
+  if (form.variant !== "critical") calmVariant = form.variant;
+  setVariant(on ? "critical" : calmVariant);
+};
+
+const isLookOnly = computed(
+  () => styleChoice.value === CUSTOM_STYLE || !!selectedStyle.value,
+);
 
 // Custom and saved styles change only the look; severity still drives ordering, screen readers and promo hiding.
 const chooseStyle = (choice: string) => {
+  if (styleChoice.value === CUSTOM_STYLE && choice !== CUSTOM_STYLE) {
+    const { icon, textSize, colorLight, colorDark } = form;
+    customLook = { icon, textSize, colorLight, colorDark };
+  }
   styleChoice.value = choice;
   if (choice === CUSTOM_STYLE) {
     form.styleId = "";
+    if (customLook) Object.assign(form, customLook);
     return;
   }
 
-  const style = styles.value.find((s) => `${STYLE_CHOICE_PREFIX}${s.id}` === choice);
+  const style = styles.value.find(
+    (s) => `${STYLE_CHOICE_PREFIX}${s.id}` === choice,
+  );
   if (style) {
     Object.assign(form, {
       icon: style.icon,
@@ -744,6 +856,8 @@ const seedForm = (draft: BannerDraft) => {
   styleChoice.value = initialStyleChoice(draft);
   audience.value = draft.orgs.length ? "some" : "all";
   resetDismissals.value = false;
+  customLook = null;
+  calmVariant = draft.variant === "critical" ? "info" : draft.variant;
   errors.value = {};
   saveAttempted.value = false;
   savedSnapshot.value = snapshot();
@@ -755,7 +869,10 @@ const load = async () => {
     entries.value = indexedDraftsFromConfig(response?.data);
     styles.value = stylesFromConfig(response?.data);
   } catch (error: any) {
-    errorMessage.value = serverMessage(error, t("announcements.list.loadFailed"));
+    errorMessage.value = serverMessage(
+      error,
+      t("announcements.list.loadFailed"),
+    );
     return;
   }
 
@@ -776,9 +893,18 @@ const load = async () => {
   }
 
   editIndex.value = index != null && found ? index : null;
+  duplicateBase =
+    index == null &&
+    found &&
+    typeof found.raw === "object" &&
+    found.raw !== null
+      ? (found.raw as Record<string, unknown>)
+      : {};
   // A copy gets a fresh dismissal key, so dismissing one never hides the other.
   seedForm(
-    found ? { ...found.draft, id: index != null ? found.draft.id : newBannerId() } : emptyDraft(),
+    found
+      ? { ...found.draft, id: index != null ? found.draft.id : newBannerId() }
+      : emptyDraft(),
   );
   isLoaded.value = true;
 };
@@ -813,12 +939,17 @@ const draftToSave = (): BannerDraft => ({
 });
 
 const write = async () => {
-  const latest = (await announcements.getConfig(metaOrg.value))?.data;
   const index = editIndex.value;
-  if (index != null && !isUnchangedAt(latest, index, editedEntry.value?.raw)) {
-    throw new BannerConflictError();
-  }
-  await announcements.setConfig(metaOrg.value, upsertBanner(latest, index, draftToSave()));
+  const draft = draftToSave();
+  await updateConfig(metaOrg.value, (latest) => {
+    if (
+      index != null &&
+      !isUnchangedAt(latest, index, editedEntry.value?.raw)
+    ) {
+      throw new AnnouncementConflictError();
+    }
+    return upsertBanner(latest, index, draft, duplicateBase);
+  });
 };
 
 const scrollToFirstError = async () => {
@@ -843,7 +974,7 @@ const save = async () => {
     leaveConfirmed = true;
     goToList();
   } catch (error: any) {
-    hasConflict.value = error instanceof BannerConflictError;
+    hasConflict.value = error instanceof AnnouncementConflictError;
     errorMessage.value = hasConflict.value
       ? t("announcements.editor.conflict")
       : serverMessage(error, t("announcements.editor.saveFailed"));
@@ -873,12 +1004,10 @@ const openSaveStyle = () => {
 };
 
 /** Writes only the saved styles, re-reading first so banners saved elsewhere meanwhile survive. */
-const writeStyles = async (change: (latest: unknown) => unknown) => {
+const writeStyles = async (change: (latest: unknown) => AnnouncementConfig) => {
   isSaving.value = true;
   try {
-    const latest = (await announcements.getConfig(metaOrg.value))?.data;
-    const next = change(latest);
-    await announcements.setConfig(metaOrg.value, next);
+    const next = await updateConfig(metaOrg.value, change);
     styles.value = stylesFromConfig(next);
   } finally {
     isSaving.value = false;
@@ -905,7 +1034,10 @@ const saveStyle = async () => {
       timeout: 3000,
     });
   } catch (error: any) {
-    styleError.value = serverMessage(error, t("announcements.editor.saveFailed"));
+    styleError.value = serverMessage(
+      error,
+      t("announcements.editor.saveFailed"),
+    );
   }
 };
 
@@ -914,6 +1046,12 @@ const deleteStyle = async () => {
   if (!style) return;
   try {
     await writeStyles((latest) => removeStyle(latest, style.id));
+    // The stored banner lost its label too, so the conflict check on save must expect that.
+    const entry = editedEntry.value;
+    if (entry)
+      entry.raw = rawBanners(
+        removeStyle({ banners: [entry.raw] }, style.id),
+      )[0];
     // The banner keeps the look it copied, now as its own custom look.
     form.styleId = "";
     styleChoice.value = CUSTOM_STYLE;
@@ -957,6 +1095,8 @@ defineExpose({
   resetDismissals,
   saveLabel,
   chooseStyle,
+  setCritical,
+  deleteStyle,
   styles,
 });
 </script>

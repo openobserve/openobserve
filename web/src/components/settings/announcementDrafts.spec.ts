@@ -38,7 +38,15 @@ describe("parseDurationMs", () => {
     expect(parseDurationMs("")).toBeNull();
     expect(parseDurationMs("soon")).toBeNull();
     expect(parseDurationMs("0h")).toBeNull();
-    expect(parseDurationMs("5")).toBeNull();
+    expect(parseDurationMs("1.5h")).toBeNull();
+    expect(parseDurationMs("4H")).toBeNull();
+    expect(parseDurationMs("30m1h")).toBeNull();
+    expect(parseDurationMs("1h30")).toBeNull();
+  });
+
+  it("reads compound spans and bare seconds, as the API does", () => {
+    expect(parseDurationMs("1h30m")).toBe(90 * 60_000);
+    expect(parseDurationMs("90")).toBe(90_000);
   });
 });
 
@@ -106,7 +114,11 @@ describe("draftFromAuthored", () => {
   it("reads a duration-only banner as ending after a span", () => {
     const draft = draftFromAuthored({ message: "Back soon", duration: "90m" });
 
-    expect(draft).toMatchObject({ start: "now", end: "after", duration: "90m" });
+    expect(draft).toMatchObject({
+      start: "now",
+      end: "after",
+      duration: "90m",
+    });
   });
 
   it("keeps starts_at + duration as a set start that ends after a span", () => {
@@ -129,7 +141,9 @@ describe("draftFromAuthored", () => {
   });
 
   it("ignores a variant it does not recognise", () => {
-    expect(draftFromAuthored({ message: "m", variant: "chartreuse" }).variant).toBe("info");
+    expect(
+      draftFromAuthored({ message: "m", variant: "chartreuse" }).variant,
+    ).toBe("info");
   });
 
   it("picks up link buttons from either field, and the orgs", () => {
@@ -145,7 +159,10 @@ describe("draftFromAuthored", () => {
     expect(draft.links.map((link) => link.text)).toEqual(["Status", "Docs"]);
     expect(draft.orgs).toEqual(["acme"]);
     expect(
-      draftFromAuthored({ message: "m", cta: { text: "Go", url: "https://g.io" } }).links,
+      draftFromAuthored({
+        message: "m",
+        cta: { text: "Go", url: "https://g.io" },
+      }).links,
     ).toEqual([{ text: "Go", url: "https://g.io" }]);
   });
 });
@@ -159,7 +176,12 @@ describe("draftsFromConfig", () => {
 
   it("drops entries with no message, which could not be saved anyway", () => {
     const drafts = draftsFromConfig({
-      banners: [{ message: "keep" }, { message: "  " }, null, { variant: "info" }],
+      banners: [
+        { message: "keep" },
+        { message: "  " },
+        null,
+        { variant: "info" },
+      ],
     });
 
     expect(drafts.map((d) => d.message)).toEqual(["keep"]);
@@ -167,7 +189,12 @@ describe("draftsFromConfig", () => {
 
   it("keeps each draft's stored index so an edit replaces the right entry", () => {
     const entries = indexedDraftsFromConfig({
-      banners: [{ message: "  " }, { message: "second" }, null, { message: "fourth" }],
+      banners: [
+        { message: "  " },
+        { message: "second" },
+        null,
+        { message: "fourth" },
+      ],
     });
 
     expect(entries.map((entry) => [entry.index, entry.draft.message])).toEqual([
@@ -248,13 +275,17 @@ describe("authoredFromDraft", () => {
     expect(authoredFromDraft(draft)).toEqual({
       message: "m",
       ctas: [{ text: "Status", url: "https://s.io" }],
+      cta: { text: "Status", url: "https://s.io" },
     });
   });
 
   it("writes dismissible only when it is false", () => {
-    expect(authoredFromDraft({ ...emptyDraft(), message: "m" }).dismissible).toBeUndefined();
     expect(
-      authoredFromDraft({ ...emptyDraft(), message: "m", dismissible: false }).dismissible,
+      authoredFromDraft({ ...emptyDraft(), message: "m" }).dismissible,
+    ).toBeUndefined();
+    expect(
+      authoredFromDraft({ ...emptyDraft(), message: "m", dismissible: false })
+        .dismissible,
     ).toBe(false);
   });
 });
@@ -290,8 +321,10 @@ describe("authoredFromDraft appearance", () => {
   });
 });
 
-const roundTrip = (config: unknown) => ({
-  banners: draftsFromConfig(config).map((draft) => authoredFromDraft(draft)),
+const roundTrip = (config: { banners: Record<string, unknown>[] }) => ({
+  banners: draftsFromConfig(config).map((draft, i) =>
+    authoredFromDraft(draft, config.banners[i]),
+  ),
 });
 
 describe("the form/JSON round trip", () => {
@@ -303,8 +336,10 @@ describe("the form/JSON round trip", () => {
           message: "Webinar",
           variant: "promo",
           ctas: [{ text: "Join", url: "https://x.dev" }],
+          cta: { text: "Join", url: "https://x.dev" },
         },
         { message: "Scoped", orgs: ["acme"] },
+        { message: "Pinned", ends_at: "2030-01-01T00:00:00.123456+00:00" },
         {
           message: "Styled",
           text_size: "large",

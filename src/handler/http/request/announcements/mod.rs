@@ -29,11 +29,7 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// The stored `system_settings` value.
 ///
-/// Both halves are kept: `source` is what the operator typed, `resolved` is what
-/// readers consume. Normalization is lossy in a way that matters to the author —
-/// it turns `"2026-08-12T07:30:00+05:30"` into microseconds and `"1h"` into an
-/// absolute end — so the editor is served the source verbatim instead of a
-/// round-tripped rewrite of it.
+/// `source` as authored (durations pinned), `resolved` for readers, `revision` counting saves.
 #[cfg(feature = "enterprise")]
 mod storage {
     use config::meta::system_settings::{SettingScope, SystemSetting};
@@ -47,18 +43,54 @@ mod storage {
     const SOURCE_FIELD: &str = "source";
     /// Key holding the normalized banners inside the stored envelope.
     const RESOLVED_FIELD: &str = "resolved";
+    /// Key holding the save counter, in the envelope and in the config the editor round-trips.
+    pub const REVISION_FIELD: &str = "revision";
+
+    const WRITE_LOCK_KEY: &str = "/announcements/config/write";
+
+    /// Serializes saves on one node; the distributed lock only covers a cluster.
+    static LOCAL_WRITE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    pub struct Stored {
+        pub source: serde_json::Value,
+        resolved: Option<serde_json::Value>,
+        pub revision: u64,
+    }
+
+    impl Stored {
+        fn from_raw(raw: serde_json::Value) -> Self {
+            // A value written before the envelope existed (or seeded) is itself the source.
+            let Some(source) = raw.get(SOURCE_FIELD) else {
+                return Self {
+                    source: raw,
+                    resolved: None,
+                    revision: 0,
+                };
+            };
+            Self {
+                source: source.clone(),
+                resolved: raw.get(RESOLVED_FIELD).cloned(),
+                revision: raw
+                    .get(REVISION_FIELD)
+                    .and_then(|r| r.as_u64())
+                    .unwrap_or(0),
+            }
+        }
+    }
 
     pub fn envelope(
         source: &serde_json::Value,
         resolved: &AnnouncementBanners,
+        revision: u64,
     ) -> serde_json::Value {
         serde_json::json!({
             SOURCE_FIELD: source,
             RESOLVED_FIELD: resolved,
+            REVISION_FIELD: revision,
         })
     }
 
-    /// Read the stored value, if any.
+    /// Read the stored value through the settings cache, if any.
     async fn read_raw() -> Result<Option<serde_json::Value>, infra::errors::Error> {
         let setting = db::system_settings::get(
             &SettingScope::Org,
@@ -70,24 +102,36 @@ mod storage {
         Ok(setting.map(|s| s.setting_value))
     }
 
-    /// The authored JSON, for the editor. Absent when nothing has been saved yet.
+    /// The stored envelope from the database, as another node's save may not be cached here yet.
+    pub async fn read_stored_fresh() -> Result<Option<Stored>, infra::errors::Error> {
+        let setting = infra::table::system_settings::get(
+            &SettingScope::Org,
+            Some(config::META_ORG_ID),
+            None,
+            ANNOUNCEMENT_BANNERS_KEY,
+        )
+        .await
+        .map_err(|e| infra::errors::Error::Message(e.to_string()))?;
+        Ok(setting.map(|s| Stored::from_raw(s.setting_value)))
+    }
+
+    /// The authored JSON plus its revision, for the editor. Absent when nothing has been saved yet.
     pub async fn read_source() -> Result<Option<serde_json::Value>, infra::errors::Error> {
-        let Some(raw) = read_raw().await? else {
+        let Some(stored) = read_raw().await?.map(Stored::from_raw) else {
             return Ok(None);
         };
-        // A value written before the envelope existed (or seeded directly into the table) is itself
-        // the source.
-        let Some(source) = raw.get(SOURCE_FIELD) else {
-            return Ok(Some(raw));
-        };
         // Envelopes saved before durations were pinned still hold one; show the end it resolved to.
-        let resolved = raw
-            .get(RESOLVED_FIELD)
-            .and_then(|r| serde_json::from_value::<AnnouncementBanners>(r.clone()).ok());
-        Ok(Some(match resolved {
-            Some(resolved) => announcements::pin_durations(source, &resolved),
-            None => source.clone(),
-        }))
+        let resolved = stored
+            .resolved
+            .and_then(|r| serde_json::from_value::<AnnouncementBanners>(r).ok());
+        let mut source = match resolved {
+            Some(resolved) => announcements::pin_durations(&stored.source, &resolved),
+            None => stored.source,
+        };
+        if let Some(obj) = source.as_object_mut() {
+            obj.insert(REVISION_FIELD.into(), stored.revision.into());
+        }
+        Ok(Some(source))
     }
 
     /// The normalized banners, for readers.
@@ -105,8 +149,23 @@ mod storage {
                 .map_err(|e| infra::errors::Error::Message(e.to_string()));
         }
 
-        announcements::normalize(&raw, now)
+        // Every message is already stored, so rules newer than the seeded config cannot hide it.
+        announcements::normalize_edit(&raw, Some(&raw), now)
             .map_err(|e| infra::errors::Error::Message(e.to_string()))
+    }
+
+    /// Run `save` while no other save of the config can, on this node or any other.
+    pub async fn with_write_lock<T>(
+        save: impl std::future::Future<Output = T>,
+    ) -> Result<T, infra::errors::Error> {
+        let _local = LOCAL_WRITE_LOCK.lock().await;
+        let locker = infra::dist_lock::lock(WRITE_LOCK_KEY, 0).await?;
+        let result = save.await;
+        // The save has already happened, so a failed unlock must not report it as failed.
+        if let Err(e) = infra::dist_lock::unlock(&locker).await {
+            log::error!("Error unlocking announcement banners: {e}");
+        }
+        Ok(result)
     }
 
     pub async fn write(value: serde_json::Value) -> Result<(), infra::errors::Error> {
@@ -129,6 +188,56 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), infra::errors::Error> {
         )));
     }
     Ok(())
+}
+
+/// Validate `body` against the stored config and save it, under [`storage::with_write_lock`].
+#[cfg(feature = "enterprise")]
+async fn save_config(mut body: serde_json::Value) -> Response {
+    use o2_enterprise::enterprise::announcements;
+
+    let stored = match storage::read_stored_fresh().await {
+        Ok(stored) => stored,
+        Err(e) => {
+            log::error!("Error reading announcement banners: {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+    };
+    let revision = stored.as_ref().map_or(0, |s| s.revision);
+
+    // A body without a revision comes from a client that predates it, and is saved as before.
+    let based_on = body
+        .as_object_mut()
+        .and_then(|obj| obj.remove(storage::REVISION_FIELD))
+        .and_then(|r| r.as_u64());
+    if based_on.is_some_and(|r| r != revision) {
+        return MetaHttpResponse::conflict(
+            "The announcement banners were changed by someone else. Reload and try again.",
+        );
+    }
+
+    let now = chrono::Utc::now().timestamp_micros();
+    // Rejected here, a typo cannot silently blank every banner until the window it covered has
+    // passed.
+    let resolved =
+        match announcements::normalize_edit(&body, stored.as_ref().map(|s| &s.source), now) {
+            Ok(resolved) => resolved,
+            Err(e) => return MetaHttpResponse::bad_request(e),
+        };
+
+    let banner_count = resolved.banners.len();
+    let source = announcements::pin_durations(&body, &resolved);
+    let revision = revision + 1;
+    if let Err(e) = storage::write(storage::envelope(&source, &resolved, revision)).await {
+        log::error!("Error saving announcement banners: {e}");
+        return MetaHttpResponse::internal_error(e);
+    }
+
+    // Returned so the caller sees what relative durations resolved to.
+    MetaHttpResponse::json(serde_json::json!({
+        "message": format!("Saved {banner_count} announcement banner(s)"),
+        "resolved": resolved,
+        "revision": revision,
+    }))
 }
 
 /// Get the banners this organization should currently display
@@ -202,7 +311,7 @@ pub async fn get_announcements(Path(org_id): Path<String>) -> Response {
     description = "Retrieves the announcement banner JSON exactly as it was authored, for editing. \
                    Only accessible from the meta organization. Unlike the read endpoint, this returns \
                    every configured banner including scheduled and expired ones, with timestamps in \
-                   their original authored form.",
+                   their original authored form, plus the `revision` to send back when saving.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name (must be meta org)"),
@@ -251,7 +360,8 @@ pub async fn get_announcements_config(Path(org_id): Path<String>) -> Response {
                    organization. The body is validated and normalized before storage: timestamps must \
                    be RFC 3339 with a UTC offset, and relative durations are resolved to absolute \
                    instants at write time. An empty banner list removes every banner. Validation \
-                   errors name the offending banner index and field.",
+                   errors name the offending banner index and field. A body carrying the `revision` \
+                   it was read at is refused with 409 when the config has been saved since.",
     security(("Authorization" = [])),
     request_body(content = Object, description = "Announcement banner configuration", content_type = "application/json"),
     params(
@@ -261,6 +371,7 @@ pub async fn get_announcements_config(Path(org_id): Path<String>) -> Response {
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Bad Request", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 409, description = "Conflict", content_type = "application/json", body = ()),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -277,32 +388,12 @@ pub async fn set_announcements_config(
     }
 
     #[cfg(feature = "enterprise")]
-    {
-        use o2_enterprise::enterprise::announcements;
-
-        let now = chrono::Utc::now().timestamp_micros();
-
-        // Reject malformed input here rather than at render time: a typo that
-        // silently blanked every banner would not be noticed until the window it
-        // was meant to cover had already passed.
-        let resolved = match announcements::normalize(&body, now) {
-            Ok(resolved) => resolved,
-            Err(e) => return MetaHttpResponse::bad_request(e),
-        };
-
-        let banner_count = resolved.banners.len();
-        let source = announcements::pin_durations(&body, &resolved);
-        if let Err(e) = storage::write(storage::envelope(&source, &resolved)).await {
-            log::error!("Error saving announcement banners: {e}");
-            return MetaHttpResponse::internal_error(e);
+    match storage::with_write_lock(save_config(body)).await {
+        Ok(response) => response,
+        Err(e) => {
+            log::error!("Error locking announcement banners: {e}");
+            MetaHttpResponse::internal_error(e)
         }
-
-        // The normalized form goes back with the response so the caller can see
-        // what the relative durations actually resolved to.
-        MetaHttpResponse::json(serde_json::json!({
-            "message": format!("Saved {banner_count} announcement banner(s)"),
-            "resolved": resolved,
-        }))
     }
 
     #[cfg(not(feature = "enterprise"))]

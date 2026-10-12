@@ -18,8 +18,14 @@ import { useStore } from "vuex";
 
 import config from "@/aws-exports";
 import announcements from "@/services/announcements";
-import type { BannerColors, BannerTextSize } from "@/utils/announcementAppearance";
-import { orderBanners, type BannerVariantName } from "@/utils/announcementOrder";
+import type {
+  BannerColors,
+  BannerTextSize,
+} from "@/utils/announcementAppearance";
+import {
+  orderBanners,
+  type BannerVariantName,
+} from "@/utils/announcementOrder";
 
 export type BannerVariant = BannerVariantName;
 
@@ -58,11 +64,19 @@ const DISMISSED_STORAGE_KEY = "o2_dismissed_announcements";
 // Module scope so a save in Settings reaches the bar mounted in the layout.
 const configVersion = ref(0);
 
+/** Server time minus browser time, in ms; shared so the settings list judges status by the same clock. */
+const clockSkewMs = ref(0);
+
+/** The server's clock as last measured by the live bar, in ms. */
+export const announcementServerNow = () => Date.now() + clockSkewMs.value;
+
 function readDismissed(): string[] {
   try {
     const stored = window.localStorage.getItem(DISMISSED_STORAGE_KEY);
     const parsed = stored ? JSON.parse(stored) : [];
-    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === "string") : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((id) => typeof id === "string")
+      : [];
   } catch {
     // Private mode or a corrupted entry — treat as nothing dismissed.
     return [];
@@ -95,13 +109,13 @@ export function useAnnouncementBanners() {
   const banners = ref<Banner[]>([]);
   const dismissedIds = ref<string[]>(readDismissed());
 
-  /** Server time minus browser time, in ms. */
-  const clockSkewMs = ref(0);
   let pollTimer: ReturnType<typeof setInterval> | undefined;
   let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
 
   const isEnterprise = computed(() => config.isEnterprise === "true");
-  const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
+  const orgIdentifier = computed(
+    () => store.state.selectedOrganization?.identifier,
+  );
 
   const serverNowMicros = () => (Date.now() + clockSkewMs.value) * 1000;
 
@@ -119,7 +133,8 @@ export function useAnnouncementBanners() {
   const visibleBanners = computed(() => {
     const nowMicros = serverNowMicros();
     return banners.value.filter(
-      (banner) => isActive(banner, nowMicros) && !dismissedIds.value.includes(banner.id),
+      (banner) =>
+        isActive(banner, nowMicros) && !dismissedIds.value.includes(banner.id),
     );
   });
 
@@ -143,7 +158,8 @@ export function useAnnouncementBanners() {
     clearBoundaryTimer();
     if (nextBoundaryMicros == null) return;
 
-    const delayMs = nextBoundaryMicros / 1000 - (Date.now() + clockSkewMs.value);
+    const delayMs =
+      nextBoundaryMicros / 1000 - (Date.now() + clockSkewMs.value);
     if (delayMs <= 0 || delayMs > MAX_TIMER_MS) return;
 
     // +1s of slack so the refetch lands just past the boundary rather than
@@ -169,7 +185,9 @@ export function useAnnouncementBanners() {
 
       // Already most-severe-first from the server; the order is kept as-is so
       // every node and every tab agrees on which banner sits on top.
-      banners.value = Array.isArray(data.banners) ? (data.banners as Banner[]) : [];
+      banners.value = Array.isArray(data.banners)
+        ? (data.banners as Banner[])
+        : [];
 
       armBoundaryTimer(data.next_boundary ?? undefined);
     } catch {

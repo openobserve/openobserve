@@ -93,7 +93,9 @@ describe("AnnouncementBannerList", () => {
   it("computes each banner's status against the clock", async () => {
     const wrapper = await mountList();
     const status = (index: number) =>
-      wrapper.get(`[data-test="announcement-banners-row-status-${index}"]`).text();
+      wrapper
+        .get(`[data-test="announcement-banners-row-status-${index}"]`)
+        .text();
 
     expect(status(0)).toBe("Live");
     expect(status(1)).toBe("Live");
@@ -115,28 +117,36 @@ describe("AnnouncementBannerList", () => {
   });
 
   it("renders the message as markdown in the table", async () => {
-    const message = (await mountList()).get('[data-test="announcement-banners-row-message-0"]');
+    const message = (await mountList()).get(
+      '[data-test="announcement-banners-row-message-0"]',
+    );
 
     expect(message.find("strong").text()).toBe("today");
   });
 
-  it("shows only live banners in server order, hiding promos under a critical", async () => {
+  it("shows only live banners by severity, keeping a promo for orgs the critical one misses", async () => {
     const wrapper = await mountList();
     const live = wrapper
       .get('[data-test="announcement-banners-preview"]')
       .findAll('[data-test="announcement-bar-message"]')
       .map((node) => node.text());
 
-    expect(live).toEqual(["Outage", "Window"]);
+    expect(live).toEqual(["Outage", "Window", "Webinar today"]);
   });
 
   it("shows one empty state with an add action when nothing is authored", async () => {
     getConfig.mockResolvedValue({ data: { banners: [] } });
     const wrapper = await mountList();
 
-    expect(wrapper.find('[data-test="announcement-banners-list-empty"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="announcement-banners-preview-empty"]').exists()).toBe(true);
-    await wrapper.get('[data-test="announcement-banners-empty-add-btn"]').trigger("click");
+    expect(
+      wrapper.find('[data-test="announcement-banners-list-empty"]').exists(),
+    ).toBe(true);
+    expect(
+      wrapper.find('[data-test="announcement-banners-preview-empty"]').exists(),
+    ).toBe(true);
+    await wrapper
+      .get('[data-test="announcement-banners-empty-add-btn"]')
+      .trigger("click");
 
     expect(push).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -149,8 +159,12 @@ describe("AnnouncementBannerList", () => {
   it("opens the editor for edit and duplicate", async () => {
     const wrapper = await mountList();
 
-    await wrapper.get('[data-test="announcement-banners-row-edit-2"]').trigger("click");
-    await wrapper.get('[data-test="announcement-banners-row-duplicate-3"]').trigger("click");
+    await wrapper
+      .get('[data-test="announcement-banners-row-edit-2"]')
+      .trigger("click");
+    await wrapper
+      .get('[data-test="announcement-banners-row-duplicate-3"]')
+      .trigger("click");
 
     expect(push.mock.calls[0][0].query).toEqual({
       org_identifier: "_meta",
@@ -165,14 +179,20 @@ describe("AnnouncementBannerList", () => {
   it("confirms with a destructive button quoting the message", async () => {
     const wrapper = await mountList();
 
-    await wrapper.get('[data-test="announcement-banners-row-delete-0"]').trigger("click");
+    await wrapper
+      .get('[data-test="announcement-banners-row-delete-0"]')
+      .trigger("click");
     await flushPromises();
 
     expect(document.body.textContent).toContain("Delete this banner?");
     expect(
-      document.querySelector('[data-test="announcement-banners-delete-message"]')?.textContent,
+      document.querySelector(
+        '[data-test="announcement-banners-delete-message"]',
+      )?.textContent,
     ).toContain("“Webinar today” It disappears for everyone immediately.");
-    const confirm = document.querySelector('[data-test="announcement-banners-delete-confirm"]');
+    const confirm = document.querySelector(
+      '[data-test="announcement-banners-delete-confirm"]',
+    );
     expect(confirm?.textContent).toContain("Delete");
     expect(confirm?.classList.contains("bg-negative")).toBe(true);
     wrapper.unmount();
@@ -181,7 +201,9 @@ describe("AnnouncementBannerList", () => {
   it("deletes from the latest config immediately and reloads", async () => {
     const wrapper = await mountList();
 
-    await wrapper.get('[data-test="announcement-banners-row-delete-1"]').trigger("click");
+    await wrapper
+      .get('[data-test="announcement-banners-row-delete-1"]')
+      .trigger("click");
     expect((wrapper.vm as any).pendingDelete).toBe(1);
     await (wrapper.vm as any).confirmDelete();
 
@@ -194,7 +216,9 @@ describe("AnnouncementBannerList", () => {
       "Over",
       "Window",
     ]);
-    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: "positive" }));
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "positive" }),
+    );
     expect(getConfig).toHaveBeenCalledTimes(3);
     wrapper.unmount();
   });
@@ -203,7 +227,10 @@ describe("AnnouncementBannerList", () => {
     const wrapper = await mountList();
     getConfig.mockResolvedValue({
       data: {
-        banners: [{ message: "Someone else's", variant: "promo" }, ...STORED.banners.slice(1)],
+        banners: [
+          { message: "Someone else's", variant: "promo" },
+          ...STORED.banners.slice(1),
+        ],
       },
     });
     (wrapper.vm as any).pendingDelete = 0;
@@ -243,6 +270,8 @@ describe("AnnouncementBannerList", () => {
     });
     const wrapper = await mountList();
 
-    expect(wrapper.get('[data-test="announcement-banners-error"]').text()).toContain("forbidden");
+    expect(
+      wrapper.get('[data-test="announcement-banners-error"]').text(),
+    ).toContain("forbidden");
   });
 });

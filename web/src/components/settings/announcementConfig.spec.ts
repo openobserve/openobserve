@@ -31,7 +31,11 @@ import {
   saveIntent,
   upsertBanner,
 } from "./announcementConfig";
-import { emptyDraft, type BannerDraft, type IndexedDraft } from "./announcementDrafts";
+import {
+  emptyDraft,
+  type BannerDraft,
+  type IndexedDraft,
+} from "./announcementDrafts";
 
 const NOW = new Date(2026, 7, 12, 12, 0).getTime();
 
@@ -47,13 +51,20 @@ describe("bannerStatus", () => {
   });
 
   it("reads a banner that ends after a span as live", () => {
-    expect(bannerStatus(draft({ end: "after", duration: "1h" }), NOW)).toBe("live");
+    expect(bannerStatus(draft({ end: "after", duration: "1h" }), NOW)).toBe(
+      "live",
+    );
   });
 
   it("ends a span counted from an explicit start", () => {
     const from = (duration: string) =>
       bannerStatus(
-        draft({ start: "at", startsAt: "2026-08-12T10:00", end: "after", duration }),
+        draft({
+          start: "at",
+          startsAt: "2026-08-12T10:00",
+          end: "after",
+          duration,
+        }),
         NOW,
       );
     expect(from("1h")).toBe("ended");
@@ -83,7 +94,9 @@ describe("bannerStatus", () => {
 
   it("counts live and always-on banners as showing now", () => {
     expect(isShowingNow(draft(), NOW)).toBe(true);
-    expect(isShowingNow(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW)).toBe(false);
+    expect(
+      isShowingNow(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW),
+    ).toBe(false);
   });
 });
 
@@ -97,7 +110,11 @@ describe("upsertBanner", () => {
   };
 
   it("replaces the banner at the index and leaves the others byte-for-byte", () => {
-    const next = upsertBanner(stored, 1, draft({ message: "edited", variant: "critical" }));
+    const next = upsertBanner(
+      stored,
+      1,
+      draft({ message: "edited", variant: "critical" }),
+    );
 
     expect(next.banners).toEqual([
       { message: "first", duration: "1h" },
@@ -114,11 +131,17 @@ describe("upsertBanner", () => {
   });
 
   it("appends when the index no longer exists", () => {
-    expect(upsertBanner(stored, 9, draft({ message: "late" })).banners).toHaveLength(3);
+    expect(
+      upsertBanner(stored, 9, draft({ message: "late" })).banners,
+    ).toHaveLength(3);
   });
 
   it("sends a picked duration as typed", () => {
-    const next = upsertBanner({ banners: [] }, null, draft({ end: "after", duration: "30m" }));
+    const next = upsertBanner(
+      { banners: [] },
+      null,
+      draft({ end: "after", duration: "30m" }),
+    );
 
     expect(next.banners[0]).toEqual({ message: "m", duration: "30m" });
   });
@@ -139,21 +162,48 @@ describe("upsertBanner", () => {
 describe("upsertBanner keeps unknown keys", () => {
   it("carries banner fields the editor does not edit", () => {
     const source = {
-      banners: [{ message: "a", future: { x: 1 }, cta: { text: "Go", url: "https://x.dev" } }],
+      banners: [
+        {
+          message: "a",
+          future: { x: 1 },
+          cta: { text: "Go", url: "https://x.dev" },
+        },
+      ],
     };
-    const edited = { ...emptyDraft(), message: "b", links: [{ text: "Go", url: "https://x.dev" }] };
+    const edited = {
+      ...emptyDraft(),
+      message: "b",
+      links: [{ text: "Go", url: "https://x.dev" }],
+    };
 
     expect(upsertBanner(source, 0, edited).banners[0]).toEqual({
       message: "b",
       future: { x: 1 },
       ctas: [{ text: "Go", url: "https://x.dev" }],
+      cta: { text: "Go", url: "https://x.dev" },
     });
+  });
+
+  it("keeps a duplicated banner's unedited fields", () => {
+    const appended = upsertBanner(
+      { banners: [] },
+      null,
+      draft({ message: "copy" }),
+      {
+        message: "orig",
+        future: 1,
+      },
+    );
+    expect(appended.banners[0]).toEqual({ message: "copy", future: 1 });
   });
 });
 
 describe("removeBanner", () => {
   it("removes only the banner at the index", () => {
-    const next = removeBanner({ banners: [{ message: "a" }, { message: "b" }] }, 0);
+    const next = removeBanner(
+      { banners: [{ message: "a" }, { message: "b" }] },
+      0,
+    );
 
     expect(next.banners).toEqual([{ message: "b" }]);
   });
@@ -174,7 +224,10 @@ describe("parseIndexQuery", () => {
 });
 
 describe("listStatuses", () => {
-  const entry = (index: number, overrides: Partial<BannerDraft>): IndexedDraft => ({
+  const entry = (
+    index: number,
+    overrides: Partial<BannerDraft>,
+  ): IndexedDraft => ({
     index,
     draft: draft(overrides),
     raw: {},
@@ -230,7 +283,9 @@ describe("remainingMs and formatSpan", () => {
 
     expect(remainingMs(live, NOW)).toBe(2 * 3_600_000);
     expect(remainingMs(draft(), NOW)).toBeNull();
-    expect(remainingMs(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW)).toBeNull();
+    expect(
+      remainingMs(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW),
+    ).toBeNull();
   });
 
   it("formats spans compactly", () => {
@@ -247,7 +302,9 @@ describe("formatStamp", () => {
     const plain = formatStamp("2026-08-12T09:05");
 
     expect(plain).toMatch(/09:05/);
-    expect(formatStamp("2026-08-12T09:05", true).length).toBeGreaterThan(plain.length);
+    expect(formatStamp("2026-08-12T09:05", true).length).toBeGreaterThan(
+      plain.length,
+    );
     expect(formatStamp("nope")).toBe("");
   });
 });
@@ -255,12 +312,18 @@ describe("formatStamp", () => {
 describe("saveIntent", () => {
   it("publishes what will show on save", () => {
     expect(saveIntent(draft(), NOW)).toBe("publish");
-    expect(saveIntent(draft({ end: "after", duration: "2h" }), NOW)).toBe("publish");
+    expect(saveIntent(draft({ end: "after", duration: "2h" }), NOW)).toBe(
+      "publish",
+    );
   });
 
   it("schedules a future start and only stores an ended window", () => {
-    expect(saveIntent(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW)).toBe("schedule");
-    expect(saveIntent(draft({ end: "at", endsAt: "2026-08-12T11:00" }), NOW)).toBe("save");
+    expect(
+      saveIntent(draft({ start: "at", startsAt: "2026-08-13T00:00" }), NOW),
+    ).toBe("schedule");
+    expect(
+      saveIntent(draft({ end: "at", endsAt: "2026-08-12T11:00" }), NOW),
+    ).toBe("save");
   });
 });
 
@@ -272,13 +335,49 @@ describe("isUnchangedAt", () => {
   });
 
   it("treats a duration the server pinned to ends_at as unchanged", () => {
-    const pinned = { banners: [{ message: "a", ends_at: "2026-08-12T16:00:00+00:00" }] };
-    expect(isUnchangedAt(pinned, 0, { message: "a", duration: "4h" })).toBe(true);
-    expect(isUnchangedAt(pinned, 0, { message: "edited", duration: "4h" })).toBe(false);
+    const pinned = {
+      banners: [{ message: "a", ends_at: "2026-08-12T16:00:00+00:00" }],
+    };
+    expect(isUnchangedAt(pinned, 0, { message: "a", duration: "4h" })).toBe(
+      true,
+    );
+    expect(
+      isUnchangedAt(pinned, 0, { message: "edited", duration: "4h" }),
+    ).toBe(false);
+  });
+
+  it("does not take someone else's end for a pin", () => {
+    const later = new Date(Date.now() + 9 * 3_600_000).toISOString();
+    expect(
+      isUnchangedAt({ banners: [{ message: "a", ends_at: later }] }, 0, {
+        message: "a",
+        duration: "4h",
+      }),
+    ).toBe(false);
+
+    const scheduled = {
+      message: "a",
+      starts_at: "2030-01-01T00:00:00Z",
+      duration: "4h",
+    };
+    const pinned = {
+      message: "a",
+      starts_at: scheduled.starts_at,
+      ends_at: "2030-01-01T04:00:00Z",
+    };
+    const other = {
+      message: "a",
+      starts_at: scheduled.starts_at,
+      ends_at: "2030-01-01T02:00:00Z",
+    };
+    expect(isUnchangedAt({ banners: [pinned] }, 0, scheduled)).toBe(true);
+    expect(isUnchangedAt({ banners: [other] }, 0, scheduled)).toBe(false);
   });
 
   it("rejects an entry that changed or no longer exists", () => {
-    expect(isUnchangedAt(latest, 1, { message: "b", variant: "warning" })).toBe(false);
+    expect(isUnchangedAt(latest, 1, { message: "b", variant: "warning" })).toBe(
+      false,
+    );
     expect(isUnchangedAt(latest, 2, { message: "c" })).toBe(false);
   });
 });
@@ -298,9 +397,15 @@ describe("isHiddenByCritical", () => {
 
   it("hides a promotion only where a live critical banner also shows", () => {
     expect(isHiddenByCritical(promo([]), [critical([])], NOW_MS)).toBe(true);
-    expect(isHiddenByCritical(promo(["a"]), [critical(["a", "b"])], NOW_MS)).toBe(true);
-    expect(isHiddenByCritical(promo(["a", "c"]), [critical(["a"])], NOW_MS)).toBe(false);
-    expect(isHiddenByCritical(promo([]), [critical(["a"])], NOW_MS)).toBe(false);
+    expect(
+      isHiddenByCritical(promo(["a"]), [critical(["a", "b"])], NOW_MS),
+    ).toBe(true);
+    expect(
+      isHiddenByCritical(promo(["a", "c"]), [critical(["a"])], NOW_MS),
+    ).toBe(false);
+    expect(isHiddenByCritical(promo([]), [critical(["a"])], NOW_MS)).toBe(
+      false,
+    );
   });
 });
 
