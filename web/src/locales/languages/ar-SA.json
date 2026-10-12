@@ -8445,6 +8445,8 @@
         "alertDescription": "نص وصف التنبيه",
         "alertStartTime": "وقت بدء النافذة (ISO 8601)",
         "alertEndTime": "وقت نهاية النافذة (ISO 8601)",
+        "alertStartTimeMillis": "وقت بداية النافذة بالمللي ثانية منذ الحقبة",
+        "alertEndTimeMillis": "وقت نهاية النافذة بالمللي ثانية منذ الحقبة",
         "alertUrl": "الرابط إلى OpenObserve للتحقيق",
         "alertTriggerTime": "عندما تم إطلاق التنبيه (ISO 8601)",
         "alertTriggerTimeMillis": "زمن الزناد في عصر العصر",
