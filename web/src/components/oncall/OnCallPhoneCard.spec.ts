@@ -302,7 +302,9 @@ describe("OnCallPhoneCard", () => {
     expect(find(w, "state").text()).toBe("Verified");
     expect(find(w, "number").text()).toBe(PHONE);
     expect(find(w, "change").exists()).toBe(true);
-    expect(w.text()).toContain("Press 4 during a call to acknowledge.");
+    expect(w.text()).toContain(
+      "During a call, press 4 to acknowledge, 6 to resolve, or 8 to escalate.",
+    );
   });
 
   it("verified without press-4: acknowledge from the text's link", async () => {

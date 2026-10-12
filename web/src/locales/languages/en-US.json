@@ -21873,7 +21873,7 @@
     "phoneResend": "Resend code",
     "phoneResendIn": "Resend in {time}",
     "phoneCodeSentTo": "Code sent to {phone}. It works for 10 minutes.",
-    "phoneVerifiedPress4": "Pages that use SMS or Voice text and call this number. Press 4 during a call to acknowledge.",
+    "phoneVerifiedPress4": "Pages that use SMS or Voice text and call this number. During a call, press 4 to acknowledge, 6 to resolve, or 8 to escalate.",
     "phoneVerifiedAckLink": "Pages that use SMS or Voice text and call this number. Acknowledge from the link in the text.",
     "phoneChangedHint": "Pages will not text or call this number until you confirm it.",
     "phoneNoProvider": "This organisation has no phone provider yet, so pages reach you by email.",
