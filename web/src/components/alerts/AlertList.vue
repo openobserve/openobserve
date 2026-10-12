@@ -3352,6 +3352,16 @@ export default defineComponent({
       }
     });
     // Persist filter state to Vuex so it survives navigation to add/edit screens
+    // Closing the editor remounts FolderList, whose first emit would otherwise clear the active search as a same-folder click.
+    watch([showAddAlertDialog, showImportAlertDialog], ([adding, importing]) => {
+      if (
+        !adding &&
+        !importing &&
+        (searchQuery.value || filterQuery.value || searchAcrossFolders.value)
+      ) {
+        isRestoringState.value = true;
+      }
+    });
     watch(
       [
         searchQuery,
