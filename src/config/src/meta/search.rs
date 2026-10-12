@@ -1848,6 +1848,8 @@ pub enum StreamResponses {
     },
     PromqlResponse {
         data: super::promql::QueryResult,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        warnings: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         trace_id: Option<String>,
     },
