@@ -9170,6 +9170,8 @@
         "noQueries": "Este painel não tem consulta para criar um alerta.",
         "noConstants": "Os padrões selecionados não têm texto distintivo para corresponder.",
         "sqlModeFilterDropped": "Sua consulta SQL não foi mantida — o alerta corresponde apenas aos padrões selecionados.",
+        "textFilterDropped": "Seu filtro de pesquisa não foi transferido porque este stream não tem campos de pesquisa de texto completo (FTS). Adicione-o à consulta do alerta se precisar.",
+        "heldFilterDropped": "Seu filtro de pesquisa não foi transferido porque ele precisa primeiro de uma opção \"Executar como\" na página de registros. Adicione-o à consulta do alerta se precisar.",
         "patternsUnusable": "Nenhum dos padrões nesta página tem texto distintivo para corresponder, portanto o alerta usa apenas sua pesquisa.",
         "dbmRollupLag": "Os números do banco de dados são agregados a cada {minutes} minutos, então este alerta só pode disparar com essa frequência — não é uma página em tempo real.",
         "dbmFingerprintVersion": "Este alerta está fixado na forma exata de uma consulta. Se a maneira como as consultas são agrupadas mudar, o alerta pode parar de corresponder e deve ser recriado.",

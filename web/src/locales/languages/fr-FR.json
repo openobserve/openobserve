@@ -9170,6 +9170,8 @@
         "noQueries": "Ce panneau n'a aucune requête pour créer une alerte.",
         "noConstants": "Les motifs sélectionnés n'ont aucun texte distinctif à faire correspondre.",
         "sqlModeFilterDropped": "Votre requête SQL n'a pas été reportée — l'alerte ne correspond qu'aux motifs sélectionnés.",
+        "textFilterDropped": "Votre filtre de recherche n'a pas été reporté car ce flux n'a pas de champs de recherche en texte intégral (FTS). Ajoutez-le à la requête d'alerte si vous en avez besoin.",
+        "heldFilterDropped": "Votre filtre de recherche n'a pas été reporté car il nécessite d'abord un choix « Exécuter en tant que » sur la page des logs. Ajoutez-le à la requête d'alerte si vous en avez besoin.",
         "patternsUnusable": "Aucun des motifs de cette page n'a de texte distinctif à faire correspondre, donc l'alerte n'utilise que votre recherche.",
         "dbmRollupLag": "Les chiffres de la base de données sont agrégés toutes les {minutes} minutes, donc cette alerte ne peut se déclencher qu'à cette fréquence — ce n'est pas une page en temps réel.",
         "dbmFingerprintVersion": "Cette alerte est épinglée à la forme exacte d'une requête. Si la façon dont les requêtes sont regroupées change, l'alerte peut cesser de correspondre et doit être recréée.",

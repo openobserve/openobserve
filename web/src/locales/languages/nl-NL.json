@@ -9170,6 +9170,8 @@
         "noQueries": "Dit paneel heeft geen query om een waarschuwing van te maken.",
         "noConstants": "De geselecteerde patronen hebben geen onderscheidende tekst om op te matchen.",
         "sqlModeFilterDropped": "Je SQL-query is niet overgenomen — de waarschuwing komt alleen overeen met de geselecteerde patronen.",
+        "textFilterDropped": "Je zoekfilter is niet overgenomen omdat deze stream geen velden voor volledige tekstzoekopdracht (FTS) heeft. Voeg het toe aan de alarmquery als je het nodig hebt.",
+        "heldFilterDropped": "Je zoekfilter is niet overgenomen omdat er eerst een keuze voor 'Uitvoeren als' op de logboekenpagina nodig is. Voeg het toe aan de alarmquery als je het nodig hebt.",
         "patternsUnusable": "Geen van de patronen op deze pagina heeft onderscheidende tekst om op te matchen, dus de waarschuwing gebruikt alleen je zoekopdracht.",
         "dbmRollupLag": "Databasenummers worden elke {minutes} minuten geaggregeerd, dus deze melding kan alleen zo vaak afgaan — het is geen realtime pagina.",
         "dbmFingerprintVersion": "Deze melding is vastgepind aan de exacte vorm van één query. Als de manier waarop queries worden gegroepeerd ooit verandert, kan de melding niet meer overeenkomen en moet deze opnieuw worden aangemaakt.",

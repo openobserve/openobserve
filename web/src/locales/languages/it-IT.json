@@ -9170,6 +9170,8 @@
         "noQueries": "Questo pannello non ha una query da cui creare un avviso.",
         "noConstants": "I pattern selezionati non hanno un testo distintivo su cui basare la corrispondenza.",
         "sqlModeFilterDropped": "La tua query SQL non è stata trasferita — l'avviso corrisponde solo ai pattern selezionati.",
+        "textFilterDropped": "Il filtro di ricerca non è stato trasferito perché questo stream non ha campi di ricerca full-text (FTS). Aggiungilo alla query dell'avviso se ti serve.",
+        "heldFilterDropped": "Il filtro di ricerca non è stato trasferito perché richiede prima la scelta \"Esegui come\" nella pagina dei log. Aggiungilo alla query dell'avviso se ti serve.",
         "patternsUnusable": "Nessuno dei pattern in questa pagina ha un testo distintivo su cui basare la corrispondenza, quindi l'avviso usa solo la tua ricerca.",
         "dbmRollupLag": "I numeri del database vengono aggregati ogni {minutes} minuti, quindi questo avviso può scattare solo con quella frequenza — non è una pagina in tempo reale.",
         "dbmFingerprintVersion": "Questo avviso è vincolato alla forma esatta di una query. Se il modo in cui le query vengono raggruppate dovesse cambiare, l'avviso potrebbe smettere di corrispondere e dovrebbe essere ricreato.",

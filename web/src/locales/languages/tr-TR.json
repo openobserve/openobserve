@@ -9170,6 +9170,8 @@
         "noQueries": "Bu panelde uyarı oluşturmak için bir sorgu yok.",
         "noConstants": "Seçilen desenlerin eşleşecek ayırt edici bir metni yok.",
         "sqlModeFilterDropped": "SQL sorgunuz aktarılmadı — uyarı yalnızca seçilen desenlerle eşleşir.",
+        "textFilterDropped": "Arama filtreniz taşınamadı çünkü bu akışta tam metin arama (FTS) alanı yok. Gerekirse uyarı sorgusuna ekleyin.",
+        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin.",
         "patternsUnusable": "Bu sayfadaki desenlerin hiçbirinde eşleşecek ayırt edici metin yok, bu nedenle uyarı yalnızca aramanızı kullanır.",
         "dbmRollupLag": "Veritabanı sayıları her {minutes} dakikada bir toplanır, bu nedenle bu uyarı yalnızca bu sıklıkta tetiklenebilir — gerçek zamanlı bir sayfa değildir.",
         "dbmFingerprintVersion": "Bu uyarı, bir sorgunun tam biçimine sabitlenmiştir. Sorguların gruplanma şekli değişirse, uyarı eşleşmeyi durdurabilir ve yeniden oluşturulmalıdır.",

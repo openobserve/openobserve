@@ -9170,6 +9170,8 @@
         "noQueries": "Dieses Panel hat keine Abfrage, aus der ein Alert erstellt werden kann.",
         "noConstants": "Die ausgewählten Muster haben keinen markanten Text, mit dem abgeglichen werden kann.",
         "sqlModeFilterDropped": "Ihre SQL-Abfrage wurde nicht übernommen — der Alert stimmt nur mit den ausgewählten Mustern überein.",
+        "textFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dieser Stream keine Volltextsuchfelder (FTS) hat. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen.",
+        "heldFilterDropped": "Ihr Suchfilter wurde nicht übernommen, da dafür zuerst eine Auswahl unter „Ausführen als“ auf der Logs-Seite erforderlich ist. Fügen Sie ihn der Alarmabfrage hinzu, wenn Sie ihn benötigen.",
         "patternsUnusable": "Keines der Muster auf dieser Seite hat markanten Text, mit dem abgeglichen werden kann, daher verwendet der Alert nur Ihre Suche.",
         "dbmRollupLag": "Datenbankkennzahlen werden alle {minutes} Minuten aggregiert, daher kann dieser Alarm nur so oft auslösen — er ist keine Echtzeitseite.",
         "dbmFingerprintVersion": "Dieser Alarm ist an die exakte Form einer Abfrage gebunden. Wenn sich die Gruppierung von Abfragen jemals ändert, kann der Alarm nicht mehr übereinstimmen und sollte neu erstellt werden.",

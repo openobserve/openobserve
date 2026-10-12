@@ -9170,6 +9170,8 @@
         "noQueries": "Este panel no tiene una consulta desde la cual crear una alerta.",
         "noConstants": "Los patrones seleccionados no tienen texto distintivo para coincidir.",
         "sqlModeFilterDropped": "Tu consulta SQL no se transfirió — la alerta solo coincide con los patrones seleccionados.",
+        "textFilterDropped": "Tu filtro de búsqueda no se conservó porque este stream no tiene campos de búsqueda de texto completo (FTS). Añádelo a la consulta de la alerta si lo necesitas.",
+        "heldFilterDropped": "Tu filtro de búsqueda no se conservó porque primero necesita una opción Ejecutar como en la página de Logs. Añádelo a la consulta de la alerta si lo necesitas.",
         "patternsUnusable": "Ninguno de los patrones en esta página tiene texto distintivo para coincidir, por lo que la alerta usa solo tu búsqueda.",
         "dbmRollupLag": "Los números de la base de datos se agregan cada {minutes} minutos, por lo que esta alerta solo puede dispararse con esa frecuencia — no es una página en tiempo real.",
         "dbmFingerprintVersion": "Esta alerta está fijada a la forma exacta de una consulta. Si la forma en que se agrupan las consultas cambia alguna vez, la alerta puede dejar de coincidir y debe recrearse.",

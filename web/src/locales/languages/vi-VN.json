@@ -9170,6 +9170,8 @@
         "noQueries": "Bảng điều khiển này không có truy vấn để tạo cảnh báo.",
         "noConstants": "Các mẫu đã chọn không có văn bản đặc trưng để khớp.",
         "sqlModeFilterDropped": "Truy vấn SQL của bạn không được giữ lại — cảnh báo chỉ khớp với các mẫu đã chọn.",
+        "textFilterDropped": "Bộ lọc tìm kiếm của bạn không được chuyển sang vì stream này không có trường tìm kiếm toàn văn (FTS). Hãy thêm nó vào truy vấn cảnh báo nếu bạn cần.",
+        "heldFilterDropped": "Bộ lọc tìm kiếm của bạn không được chuyển sang vì trước tiên nó cần một lựa chọn Run as trên trang nhật ký. Hãy thêm nó vào truy vấn cảnh báo nếu bạn cần.",
         "patternsUnusable": "Không có mẫu nào trên trang này có văn bản đặc trưng để khớp, vì vậy cảnh báo chỉ sử dụng tìm kiếm của bạn.",
         "dbmRollupLag": "Các số liệu cơ sở dữ liệu được tổng hợp mỗi {minutes} phút, vì vậy cảnh báo này chỉ có thể kích hoạt với tần suất đó — đây không phải là trang thời gian thực.",
         "dbmFingerprintVersion": "Cảnh báo này được gắn với cấu trúc chính xác của một truy vấn. Nếu cách các truy vấn được nhóm thay đổi, cảnh báo có thể ngừng khớp và nên được tạo lại.",

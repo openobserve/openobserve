@@ -9170,6 +9170,8 @@
         "noQueries": "Ten panel nie ma zapytania, na podstawie którego można utworzyć alert.",
         "noConstants": "Wybrane wzorce nie mają charakterystycznego tekstu do dopasowania.",
         "sqlModeFilterDropped": "Twoje zapytanie SQL nie zostało przeniesione — alert dopasowuje tylko wybrane wzorce.",
+        "textFilterDropped": "Twój filtr wyszukiwania nie został przeniesiony, ponieważ ten strumień nie ma pól wyszukiwania pełnotekstowego (FTS). Dodaj go do zapytania alertu, jeśli jest potrzebny.",
+        "heldFilterDropped": "Twój filtr wyszukiwania nie został przeniesiony, ponieważ najpierw wymaga wyboru „Uruchom jako” na stronie logów. Dodaj go do zapytania alertu, jeśli jest potrzebny.",
         "patternsUnusable": "Żaden ze wzorców na tej stronie nie ma charakterystycznego tekstu do dopasowania, więc alert używa tylko Twojego wyszukiwania.",
         "dbmRollupLag": "Liczby bazy danych są agregowane co {minutes} minut, więc ten alert może odpalać się tylko tak często — to nie jest strona w czasie rzeczywistym.",
         "dbmFingerprintVersion": "Ten alert jest przypięty do dokładnego kształtu jednego zapytania. Jeśli sposób grupowania zapytań kiedykolwiek się zmieni, alert może przestać pasować i należy go utworzyć ponownie.",

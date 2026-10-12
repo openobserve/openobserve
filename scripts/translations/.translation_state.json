@@ -3915,6 +3915,7 @@
         "dbmRollupLag": "d16184639f26a155",
         "dbmServerVantage": "b8527d8d6ab0ed3b",
         "emptyQuery": "0cbe88fd61c513c9",
+        "heldFilterDropped": "e5f38f23a67f218e",
         "histogramNotSupported": "31c694f252fe4d6c",
         "joinSingleStream": "80d612948932c0a9",
         "limitStripped": "bf53b4a418baaa4a",
@@ -3929,6 +3930,7 @@
         "rumFunnelSteps": "a88faa6224339ef2",
         "savedFunctionCopied": "9910ad637d3c9e37",
         "sqlModeFilterDropped": "91395d8105dd72fd",
+        "textFilterDropped": "1af3560e95f9e483",
         "unresolvedQuery": "4cd999a9b4222ad7",
         "unsupportedPanelType": "1f9928c4b86b85bb"
       }
