@@ -18,6 +18,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import EnrichmentTableList from "./EnrichmentTableList.vue";
+import streamService from "@/services/stream";
+import analytics from "@/services/product_analytics";
 
 // ── Hoist mocks so they can be referenced in vi.mock factories ─────────────────
 
@@ -64,7 +66,7 @@ vi.mock("@/services/stream", async (importOriginal) => {
   });
 });
 
-vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
 vi.mock("@/utils/zincutils", () => ({
   formatSizeFromMB: vi.fn((v) => v + " MB"),
@@ -94,7 +96,11 @@ vi.mock("vue-router", () => ({
 // ── Component stubs ────────────────────────────────────────────────────────────
 
 const globalStubs = {
-  AddEnrichmentTable: { template: '<div data-test="add-enrichment-table-stub" />' },
+  AddEnrichmentTable: {
+    name: "AddEnrichmentTable",
+    template: '<div data-test="add-enrichment-table-stub" />',
+    props: ["open", "modelValue", "isUpdating"],
+  },
   NoData: { template: '<div data-test="no-data-stub">No Data</div>' },
   ConfirmDialog: {
     template: '<div data-test="confirm-dialog-stub" />',
@@ -322,20 +328,6 @@ describe("EnrichmentTableList", () => {
       expect(vm.visibleRows.length).toBe(1);
       expect(vm.visibleRows[0].name).toBe("url_table");
     });
-
-    it("resultTotal updates when visibleRows changes", async () => {
-      const wrapper = mountComponent();
-      await flushPromises();
-
-      setupTables(wrapper);
-      const vm = wrapper.vm as any;
-      vm.selectedFilter = "uploaded";
-
-      // Allow computed + watcher to flush
-      await flushPromises();
-
-      expect(vm.resultTotal).toBe(1);
-    });
   });
 
   // ── text search ────────────────────────────────────────────────────────────
@@ -407,6 +399,23 @@ describe("EnrichmentTableList", () => {
       vm.showAddUpdateFn({});
 
       expect(vm.showAddJSTransformDialog).toBe(true);
+    });
+
+    it("opens the form as a dialog over the list and remounts it on each open", async () => {
+      const wrapper = mountComponent();
+      await flushPromises();
+      const vm = wrapper.vm as any;
+
+      vm.showAddUpdateFn(null);
+      await flushPromises();
+      const firstKey = vm.formKey;
+      expect(wrapper.find('[data-test="enrichment-tables-list-table"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "AddEnrichmentTable" }).props("open")).toBe(true);
+
+      vm.hideForm();
+      vm.showAddUpdateFn({ name: "t1" });
+      await flushPromises();
+      expect(vm.formKey).toBe(firstKey + 1);
     });
 
     it("showAddUpdateFn(null) sets isUpdated to false (new)", async () => {
@@ -502,6 +511,67 @@ describe("EnrichmentTableList", () => {
     });
   });
 
+  describe("stream_deleted analytics", () => {
+    const trackedDeletes = () =>
+      vi.mocked(analytics.track).mock.calls.filter((c) => c[0] === "stream_deleted");
+
+    it("tracks a confirmed single delete", async () => {
+      vi.mocked(streamService.delete).mockResolvedValue({ data: { code: 200 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.showDeleteDialogFn(makeTable({ name: "t1" }));
+
+      vm.deleteLookupTable();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([
+        ["stream_deleted", { stream_type: "enrichment_tables", count: 1 }],
+      ]);
+    });
+
+    it("does not track a single delete the server did not confirm", async () => {
+      vi.mocked(streamService.delete).mockResolvedValue({ data: { code: 500 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.showDeleteDialogFn(makeTable({ name: "t1" }));
+
+      vm.deleteLookupTable();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([]);
+    });
+
+    it("tracks one event per bulk delete, counting only confirmed deletions", async () => {
+      vi.mocked(streamService.delete)
+        .mockResolvedValueOnce({ data: { code: 200 } } as any)
+        .mockRejectedValueOnce({ response: { status: 500 } })
+        .mockResolvedValueOnce({ data: { code: 200 } } as any);
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.selectedEnrichmentTables = ["a", "b", "c"].map((name) => makeTable({ name }));
+
+      vm.bulkDeleteEnrichmentTables();
+      await flushPromises();
+
+      expect(trackedDeletes()).toEqual([
+        ["stream_deleted", { stream_type: "enrichment_tables", count: 2 }],
+      ]);
+    });
+
+    it("does not track a bulk delete in which every delete failed", async () => {
+      vi.mocked(streamService.delete).mockRejectedValue({ response: { status: 500 } });
+      const vm = mountComponent().vm as any;
+      await flushPromises();
+      vm.selectedEnrichmentTables = ["a", "b"].map((name) => makeTable({ name }));
+
+      vm.bulkDeleteEnrichmentTables();
+      await flushPromises();
+
+      expect(streamService.delete).toHaveBeenCalledTimes(2);
+      expect(trackedDeletes()).toEqual([]);
+    });
+  });
+
   // ── page persistence across editor round trip (OTable pagination-reset fix) ─
 
   describe("page persistence across editor round trip (OTable pagination-reset fix)", () => {
@@ -558,7 +628,7 @@ describe("EnrichmentTableList", () => {
       expect(restorePage).toHaveBeenCalledWith(3);
     });
 
-    it("keeps the page after Cancel unmounts and remounts OTable via the AddEnrichmentTable v-if swap", async () => {
+    it("keeps OTable mounted on its page while the form dialog is open and after Cancel", async () => {
       mockGetStreams.mockResolvedValue(manyTables);
       const wrapper = mountComponent();
       await flushPromises();
@@ -568,9 +638,9 @@ describe("EnrichmentTableList", () => {
       await flushPromises();
       expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
 
-      vm.showAddJSTransformDialog = true;
+      vm.showAddUpdateFn(null);
       await flushPromises();
-      expect(vm.oTableRef).toBeNull();
+      expect(vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
 
       vm.hideForm();
       await flushPromises();

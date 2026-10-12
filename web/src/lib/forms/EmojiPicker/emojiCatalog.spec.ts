@@ -148,6 +148,7 @@ describe("emojiCatalog", () => {
       CategrafConfig: "categraf",
       NightingaleConfig: "nightingale",
       VMagentConfig: "vmagent",
+      GpuConfig: "nvidia",
       KubernetesConfig: "kubernetes",
       LinuxConfig: "linux",
       MacOSConfig: "macos",

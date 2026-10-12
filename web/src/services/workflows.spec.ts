@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import workflows from "@/services/workflows";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -726,6 +729,91 @@ describe("workflows service", () => {
       await workflows.createWorkflow({ org_identifier: "o", data: {} });
 
       expect(http).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("product analytics", () => {
+    const cases: Array<[string, string, () => Promise<any>, string, Record<string, any>?]> = [
+      [
+        "createWorkflow",
+        "post",
+        () => workflows.createWorkflow({ org_identifier: "o", data: {} }),
+        "workflow_created",
+        { draft: false },
+      ],
+      [
+        "createWorkflow (draft)",
+        "post",
+        () => workflows.createWorkflow({ org_identifier: "o", data: {}, draft: true }),
+        "workflow_created",
+        { draft: true },
+      ],
+      [
+        "deleteWorkflow",
+        "delete",
+        () => workflows.deleteWorkflow({ org_identifier: "o", id: "w" }),
+        "workflow_deleted",
+        { draft: false, count: 1 },
+      ],
+      [
+        "promoteWorkflow",
+        "post",
+        () =>
+          workflows.promoteWorkflow({ org_identifier: "o", id: "w", trigger_type: "AlertFired" }),
+        "workflow_published",
+      ],
+      [
+        "testWorkflow",
+        "post",
+        () => workflows.testWorkflow({ org_identifier: "o", workflow: {}, inputs: [] }),
+        "workflow_test_run_completed",
+        { from_node: false },
+      ],
+      [
+        "testWorkflow (from node)",
+        "post",
+        () =>
+          workflows.testWorkflow({ org_identifier: "o", workflow: {}, inputs: [], from_node: "n" }),
+        "workflow_test_run_completed",
+        { from_node: true },
+      ],
+      [
+        "retryWorkflow",
+        "post",
+        () => workflows.retryWorkflow({ org_identifier: "o", id: "w", run_id: "r" }),
+        "workflow_run_retried",
+        { from_node: false },
+      ],
+    ];
+
+    it.each(cases)(
+      "%s tracks its event once the request resolves",
+      async (_n, verb, call, event, props) => {
+        const response = { data: {} };
+        mockHttpInstance[verb].mockResolvedValue(response);
+
+        await expect(call()).resolves.toBe(response);
+
+        expect(analytics.track).toHaveBeenCalledTimes(1);
+        if (props) expect(analytics.track).toHaveBeenCalledWith(event, props);
+        else expect(analytics.track).toHaveBeenCalledWith(event);
+      },
+    );
+
+    it.each(cases)("%s does not track when the request rejects", async (_n, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track updateWorkflow, which also flushes test state in the background", async () => {
+      mockHttpInstance.put.mockResolvedValue({ data: {} });
+
+      await workflows.updateWorkflow({ org_identifier: "o", id: "w", data: {} });
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

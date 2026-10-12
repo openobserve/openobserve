@@ -139,11 +139,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
             </div>
           </template>
-          <template #bottom>
-            <span class="text-xs font-normal max-md:hidden">
-              {{ resultTotal }} {{ t("invitation.pendingInvitations") }}
-            </span>
-          </template>
         </OTable>
       </div>
     </div>
@@ -298,7 +293,6 @@ export default defineComponent({
         meta: { align: "center", actionCount: 2, actionSize: "pill" },
       },
     ];
-    const resultTotal = ref<number>(0);
     const loading = ref(false);
     const forbidden = ref(false);
 
@@ -322,7 +316,6 @@ export default defineComponent({
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
         }));
-        resultTotal.value = response.data.data.length;
         dismiss();
       } catch (error) {
         const e = error as { response?: { status?: number; data?: { message?: string } } };
@@ -466,7 +459,6 @@ export default defineComponent({
       invitations,
       filterQuery,
       columns,
-      resultTotal,
       loading,
       forbidden,
       confirmAccept,

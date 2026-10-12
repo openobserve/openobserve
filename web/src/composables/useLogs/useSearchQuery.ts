@@ -36,6 +36,10 @@ import {
   referencesStreamName,
   replaceStreamNameRefsInWhere,
 } from "@/utils/logs/streamNameColumn";
+import {
+  pruneInterestingFields,
+  selectableInterestingFields,
+} from "@/utils/logs/interestingFields";
 
 // Walk the WHERE clause AST and replace column references whose name matches
 // a key in the fieldMapping (original field → stream-specific field).
@@ -121,11 +125,11 @@ export const useSearchQuery = (t: TranslateFn) => {
 
     const queryReq: SearchRequestPayload | null = buildSearch();
 
-    // Update highlight query on run-query
+    // Keep the query's case: str_match and re_match highlight case-sensitively.
     if (searchObj.meta.sqlMode) {
-      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase().split("where")?.[1] || "";
+      searchObj.data.highlightQuery = searchObj.data.query.split(/where/i)?.[1] || "";
     } else {
-      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase();
+      searchObj.data.highlightQuery = searchObj.data.query;
     }
 
     if (queryReq === null) {
@@ -316,27 +320,16 @@ export const useSearchQuery = (t: TranslateFn) => {
         req["clusters"] = searchObj.meta.clusters;
       }
 
-      const streamFieldNames: any = searchObj.data.stream.selectedStreamFields.map(
-        (item: any) => item.name,
-      );
-
-      // In read-only mode, create a filtered copy; in normal mode, mutate in place
-      let interestingFields: string[];
-      if (readOnly) {
-        // Read-only: Create a filtered copy without mutating
-        interestingFields = searchObj.data.stream.interestingFieldList.filter((fieldName: string) =>
-          streamFieldNames.includes(fieldName),
-        );
-      } else {
-        // Normal mode: Mutate the array in place
-        for (let i = searchObj.data.stream.interestingFieldList.length - 1; i >= 0; i--) {
-          const fieldName = searchObj.data.stream.interestingFieldList[i];
-          if (!streamFieldNames.includes(fieldName)) {
-            searchObj.data.stream.interestingFieldList.splice(i, 1);
-          }
-        }
-        interestingFields = searchObj.data.stream.interestingFieldList;
-      }
+      // Read-only must not mutate the list; see interestingFields.ts for the predicate.
+      const interestingFields: string[] = readOnly
+        ? selectableInterestingFields(
+            searchObj.data.stream.interestingFieldList,
+            searchObj.data.stream.selectedStreamFields,
+          )
+        : pruneInterestingFields(
+            searchObj.data.stream.interestingFieldList,
+            searchObj.data.stream.selectedStreamFields,
+          );
 
       // Replace field list placeholder with appropriate values
       if (interestingFields.length > 0 && searchObj.meta.quickMode && !ignoreQuickMode) {

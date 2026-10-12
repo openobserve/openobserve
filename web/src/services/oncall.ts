@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import http from "./http";
+import analytics from "./product_analytics";
 import type {
   OwnershipRule,
   OwnershipStats,
@@ -76,7 +77,13 @@ const oncall = {
   }: {
     org_identifier: string;
     data: { name: string; timezone: string; description?: string | null };
-  }) => http().post<OnCallTeam>(`/api/${org_identifier}/oncall/teams`, data),
+  }) =>
+    http()
+      .post<OnCallTeam>(`/api/${org_identifier}/oncall/teams`, data)
+      .then((res) => {
+        analytics.track("oncall_team_created");
+        return res;
+      }),
 
   updateTeam: ({
     org_identifier,
@@ -146,10 +153,15 @@ const oncall = {
     team_id: string;
     data: Record<string, unknown> & { preset: string };
   }) =>
-    http().post<OnCallSchedule>(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/schedule/from-preset`,
-      data,
-    ),
+    http()
+      .post<OnCallSchedule>(
+        `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/schedule/from-preset`,
+        data,
+      )
+      .then((res) => {
+        analytics.track("oncall_schedule_saved", { source: "preset", preset: data.preset });
+        return res;
+      }),
 
   getSchedule: ({ org_identifier, team_id }: { org_identifier: string; team_id: string }) =>
     http().get<OnCallSchedule | null>(
@@ -212,10 +224,15 @@ const oncall = {
       l0?: L0Policy;
     };
   }) =>
-    http().put<OnCallPolicy>(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,
-      data,
-    ),
+    http()
+      .put<OnCallPolicy>(
+        `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/policy`,
+        data,
+      )
+      .then((res) => {
+        analytics.track("oncall_escalation_policy_saved");
+        return res;
+      }),
 
   /// `include_resolved` is off by default: the home screen is what still needs
   /// somebody, and closed pages would bury it within a day.
@@ -307,7 +324,13 @@ const oncall = {
   }: {
     org_identifier: string;
     data: { team_id: string; dimensions: Record<string, string> };
-  }) => http().post<OwnershipRule>(`/api/${org_identifier}/oncall/ownership`, data),
+  }) =>
+    http()
+      .post<OwnershipRule>(`/api/${org_identifier}/oncall/ownership`, data)
+      .then((res) => {
+        analytics.track("oncall_ownership_rule_created");
+        return res;
+      }),
 
   /// Repoint an existing rule. Takes the same body as create; 404 on an
   /// unknown id, 409 when another team already owns the path.
@@ -852,10 +875,17 @@ const oncall = {
     team_id: string;
     priority?: number;
   }) =>
-    http().post<TestPageResult>(
-      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/test-page`,
-      priority === undefined ? {} : { priority },
-    ),
+    http()
+      .post<TestPageResult>(
+        `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/test-page`,
+        priority === undefined ? {} : { priority },
+      )
+      .then((res) => {
+        analytics.track("oncall_test_page_sent", {
+          reached_anyone: res.data?.reached_anyone === true,
+        });
+        return res;
+      }),
 
   /// Cause counts over a window. The ONLY analytics endpoint that exists —
   /// there is no time-to-ack or time-to-resolve aggregate, by design.

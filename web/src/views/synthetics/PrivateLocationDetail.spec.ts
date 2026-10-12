@@ -159,6 +159,9 @@ function mountPage() {
 
 describe("PrivateLocationDetail", () => {
   let wrapper: VueWrapper;
+  // The page title carries a cut-off tooltip of its own, so pick the one wrapping the status badge.
+  const statusBadgeTooltip = () =>
+    wrapper.findAll(".otooltip-stub").find((tip) => tip.find(".obadge-stub").exists());
 
   const defaultDetail = {
     data: {
@@ -261,7 +264,7 @@ describe("PrivateLocationDetail", () => {
       wrapper = mountPage();
       await flushPromises();
 
-      const tooltip = wrapper.find(".otooltip-stub");
+      const tooltip = statusBadgeTooltip()!;
       expect(tooltip.text()).toBe("synthetics.privateLocations.status.unknown");
       expect(tooltip.attributes("data-content")).toBe(
         "synthetics.privateLocations.status.unknownHint",
@@ -294,7 +297,7 @@ describe("PrivateLocationDetail", () => {
       wrapper = mountPage();
       await flushPromises();
 
-      expect(wrapper.find(".otooltip-stub").exists()).toBe(false);
+      expect(statusBadgeTooltip()).toBeUndefined();
       expect(wrapper.find(".obadge-stub").text()).toBe(
         "synthetics.privateLocations.status.pending",
       );

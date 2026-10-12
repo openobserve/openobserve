@@ -210,6 +210,7 @@ import {
   getImageURL,
 } from "@/utils/zincutils";
 import { redirectUser } from "@/utils/common";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -287,11 +288,27 @@ export default defineComponent({
       return store.state.zoConfig.native_login_enabled;
     });
 
+    // Dex opens on its Create account tab when the request carries screen_hint=signup.
+    const withSignupHint = (url: string): string => {
+      if (router.currentRoute.value.query.mode !== "signup") return url;
+      try {
+        const target = new URL(url, window.location.origin);
+        if (target.searchParams.has("screen_hint")) return url;
+        // Appending to the raw search keeps the existing params byte-for-byte; re-serialising would re-encode them.
+        target.search = target.search
+          ? `${target.search}&screen_hint=signup`
+          : "?screen_hint=signup";
+        return target.toString();
+      } catch {
+        return url;
+      }
+    };
+
     const loginWithSSo = async () => {
       try {
         authService.get_dex_login().then((res) => {
           if (res) {
-            window.location.href = res;
+            window.location.href = withSignupHint(res);
             return;
           }
         });
@@ -349,6 +366,7 @@ export default defineComponent({
                 if (store.state.zoConfig?.rum?.enabled) {
                   // Set user information first
                   openobserveRum.setUser({
+                    id: userInfo.email,
                     name: userInfo.given_name + " " + userInfo.family_name,
                     email: userInfo.email,
                   });
@@ -384,7 +402,8 @@ export default defineComponent({
                   await organizationsService
                     .os_list(0, 100000, "id", false, "", "default")
                     .then((res: any) => {
-                      orgOptions.value = res.data.data.map(
+                      const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+                      orgOptions.value = labeledOrgs.map(
                         (data: {
                           id: any;
                           name: any;
@@ -395,7 +414,9 @@ export default defineComponent({
                           search_threshold: any;
                           CustomerBillingObj: any;
                           status: any;
+                          label: string;
                         }) => {
+                          // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
                           let optiondata: any = {
                             label: data.name,
                             id: data.id,
@@ -431,7 +452,7 @@ export default defineComponent({
                             tempDefaultOrg = optiondata;
                           }
 
-                          return optiondata;
+                          return { ...optiondata, label: data.label };
                         },
                       );
 
@@ -496,6 +517,7 @@ export default defineComponent({
       showSSO,
       showInternalLogin,
       loginWithSSo,
+      withSignupHint,
       config,
       autoRedirectDexLogin,
       isDark,

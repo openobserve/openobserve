@@ -351,4 +351,16 @@ describe("OnCallMyDeliveries", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("Nothing unread");
   });
+
+  /// A phone's action column is one icon wide, so the label goes screen-reader-only there rather than being clipped.
+  it("keeps the row action named when a phone shows only its icon", async () => {
+    service.myDeliveries.mockResolvedValue({
+      data: { total: 1, unread: 1, deliveries: [delivery({ read: false })] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+
+    const button = wrapper.find('[data-test="oncall-my-delivery-toggle-ev_88"]');
+    expect(button.find(".max-md\\:sr-only").text()).toBe("Mark read");
+  });
 });

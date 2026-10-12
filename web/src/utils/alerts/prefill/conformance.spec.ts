@@ -33,6 +33,7 @@ import { buildPrefillFromLibrary } from "./fromLibrary";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { buildDbmPrefill } from "./fromDbm";
 import { buildDbmLockPrefill } from "./fromDbmLocks";
+import { buildPrefillFromRumFunnel } from "./fromRumFunnel";
 
 interface AdapterCase {
   /** Registered source id. */
@@ -172,6 +173,34 @@ const ADAPTERS: AdapterCase[] = [
     // rather than failing, and says so via `dbmNoInstance`.
     degenerate: () => buildDbmLockPrefill({ kind: "blocking" }),
     blocks: false,
+  },
+  {
+    name: "rumfunnel",
+    healthy: () =>
+      buildPrefillFromRumFunnel({
+        scope: { app: "web", env: [], version: [], schema: { action_id: true } },
+        id: null,
+        def: {
+          steps: [
+            { kind: "p", key: "/web" },
+            { kind: "p", key: "/web/logs" },
+          ],
+          unit: "sessions",
+          window: "session",
+          breakdown: null,
+        },
+        events: [],
+        belowPct: 50,
+        timeRange: { type: "relative", relativeTimePeriod: "1d" },
+      }),
+    degenerate: () =>
+      buildPrefillFromRumFunnel({
+        scope: { app: "", env: [], version: [], schema: {} },
+        id: null,
+        def: { steps: [], unit: "sessions", window: "session", breakdown: null },
+        events: [],
+        belowPct: Number.NaN,
+      }),
   },
 ];
 

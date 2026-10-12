@@ -5,6 +5,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { useChatHistory } from "@/composables/useChatHistory";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 const emit = defineEmits<{
@@ -166,12 +167,13 @@ function formatTime(ts: string): string {
         @click="selectChat(chat.id)"
       >
         <div class="min-w-0 flex-1">
-          <div
-            class="text-text-body truncate text-[0.8125em] leading-[1.35]"
+          <OTruncatedText
+            as="div"
+            class="text-text-body text-[0.8125em] leading-[1.35]"
             :class="{ 'font-medium': activeChatId === chat.id }"
           >
             {{ chat.title }}
-          </div>
+          </OTruncatedText>
           <div class="text-text-secondary mt-[0.0625em] text-[0.6875em]">
             {{ formatTime(chat.timestamp) }}
           </div>

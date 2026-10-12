@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { annotationService } from "@/services/dashboard_annotations";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -50,6 +53,28 @@ describe("dashboard_annotations service", () => {
   });
 
   describe("create_timed_annotations", () => {
+    it("tracks dashboard_annotation_created once the request resolves", async () => {
+      const response = { data: {} };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(
+        annotationService.create_timed_annotations("org", "dash", [{ title: "t" }]),
+      ).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_annotation_created");
+    });
+
+    it("does not track dashboard_annotation_created when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(
+        annotationService.create_timed_annotations("org", "dash", [{ title: "t" }]),
+      ).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
     it("should make POST request with timed_annotations payload and Content-Type header", async () => {
       const org_id = "org123";
       const dashboard_id = "dash-abc";

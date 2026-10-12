@@ -23,6 +23,7 @@ import {
 import useSuggestions from "@/composables/useSuggestions";
 import { parsePromQlQuery } from "@/utils/query/promQLUtils";
 import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
+import analytics from "@/services/product_analytics";
 
 /**
  * Composable for Natural Language to SQL Query transformation
@@ -613,6 +614,7 @@ export function useNLQuery(t: TranslateFn) {
 
         // If SQL was successfully extracted, return it (this is the primary goal)
         if (extractedSQL) {
+          analytics.track("ai_query_generated");
           return extractedSQL;
         }
 

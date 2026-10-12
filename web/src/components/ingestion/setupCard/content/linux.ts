@@ -42,6 +42,7 @@ export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): Rich
   const icon = envIcons();
   return {
     provider: {
+      id: "linux",
       name: raw("Linux"),
       tagline: t("ingestion.setupCard.taglineLinux"),
       logo: getImageURL("images/common/linux.svg"),

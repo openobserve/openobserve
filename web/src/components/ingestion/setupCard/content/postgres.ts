@@ -80,6 +80,7 @@ export default function postgresCard(subs: CardSubstitutions, t: TranslateFn): R
   const tool = sharedToolIcons();
   return {
     provider: {
+      id: "postgres",
       name: raw("Postgres"),
       tagline: t("ingestion.setupCard.postgresqlTagline"),
       logo: getImageURL("images/ingestion/postgres.png"),

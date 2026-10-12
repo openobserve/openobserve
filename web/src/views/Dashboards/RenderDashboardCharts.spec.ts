@@ -14,9 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { shallowMount } from "@vue/test-utils";
+import { flushPromises, shallowMount } from "@vue/test-utils";
+import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
+import { LIVE_COMMIT_DEBOUNCE_MS } from "@/composables/dashboard/useVariablesManager";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -71,6 +73,7 @@ const mockGridStackInstance = {
   destroy: vi.fn(),
   removeAll: vi.fn(),
   makeWidget: vi.fn(),
+  batchUpdate: vi.fn(),
   getGridItems: vi.fn().mockReturnValue([]),
   float: vi.fn(),
   setAnimation: vi.fn(),
@@ -333,6 +336,36 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    it("registers and mounts a panel that joins an already-built tab", async () => {
+      const io = installFakeIntersectionObserver({ autoVisible: true });
+      try {
+        const panel = (id: string) => ({
+          id,
+          title: id,
+          type: "line",
+          layout: { x: 0, y: 0, w: 6, h: 4, i: id },
+          queries: [],
+        });
+        const dashboard = (ids: string[]) => ({
+          ...defaultProps.dashboardData,
+          tabs: [{ tabId: "default", name: "Default Tab", panels: ids.map(panel) }],
+        });
+        wrapper = createWrapper({ dashboardData: dashboard(["panel-a"]) });
+        await flushPromises();
+        await wrapper.setProps({ dashboardData: dashboard(["panel-a", "panel-b"]) });
+        await flushPromises();
+        await vi.waitFor(() => expect(wrapper.vm.shouldMountPanel("panel-b")).toBe(true));
+        // Unregistered, the item has no grid size and collapses at tablet and desktop widths.
+        const added = wrapper.find('[gs-id="panel-b"]').element;
+        expect(mockGridStackInstance.makeWidget).toHaveBeenCalledWith(
+          added,
+          expect.objectContaining({ id: "panel-b" }),
+        );
+      } finally {
+        io.restore();
+      }
+    });
+
     it("should pass correct props to PanelContainer components", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
@@ -457,6 +490,116 @@ describe("RenderDashboardCharts", () => {
     });
   });
 
+  describe("variable commits", () => {
+    const chainDashboard = () => ({
+      ...defaultProps.dashboardData,
+      variables: {
+        showDynamicFilters: false,
+        list: [
+          { name: "env", type: "custom", scope: "global", value: "prod", options: [] },
+          {
+            name: "service",
+            type: "query_values",
+            scope: "global",
+            query_data: { field: "service", filter: [{ filter: "env=$env" }] },
+          },
+          {
+            name: "pod",
+            type: "query_values",
+            scope: "global",
+            query_data: { field: "pod", filter: [{ filter: "service=$service" }] },
+          },
+        ],
+      },
+    });
+
+    const mountWith = (provide: Record<string, any> = {}) =>
+      shallowMount(RenderDashboardCharts, {
+        props: { ...defaultProps, dashboardData: chainDashboard() },
+        global: {
+          plugins: [i18n, store, router],
+          provide,
+          mocks: {
+            $t: (key) => key,
+            $route: { params: {}, query: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: { ODialog: ODialogStub },
+        },
+      });
+
+    const loaded = (v: any, value: any) => {
+      v.value = value;
+      v.isLoading = false;
+      v.isVariableLoadingPending = false;
+      v.isVariablePartialLoaded = true;
+    };
+
+    it("first load commits once, after the whole variable chain has loaded", async () => {
+      wrapper = mountWith();
+      await flushPromises();
+      const manager = wrapper.vm.getVariablesManager();
+      const commits = vi.fn();
+      manager.onAutoCommit(commits);
+      const [env, service, pod] = manager.variablesData.global;
+
+      loaded(env, "prod");
+      loaded(service, "api");
+      pod.isVariableLoadingPending = true;
+      await flushPromises();
+      expect(commits).not.toHaveBeenCalled();
+      expect(manager.committedVariablesData.global[1].value).not.toBe("api");
+
+      loaded(pod, "api-1");
+      await flushPromises();
+      expect(commits).toHaveBeenCalledTimes(1);
+      expect(manager.committedVariablesData.global.map((v: any) => v.value)).toEqual([
+        "prod",
+        "api",
+        "api-1",
+      ]);
+    });
+
+    it("follows the dashboard's Auto Run state", async () => {
+      const autoRun = ref(true);
+      wrapper = mountWith({ dashboardAutoRun: autoRun });
+      const manager = wrapper.vm.getVariablesManager();
+      expect(manager.isLiveMode.value).toBe(true);
+
+      autoRun.value = false;
+      await flushPromises();
+      expect(manager.isLiveMode.value).toBe(false);
+    });
+
+    it("an Auto Run apply drops a panel's own refresh snapshot", async () => {
+      wrapper = mountWith({ dashboardAutoRun: ref(true) });
+      await flushPromises();
+      const manager = wrapper.vm.getVariablesManager();
+      const [env, service, pod] = manager.variablesData.global;
+      loaded(env, "prod");
+      loaded(service, "api");
+      loaded(pod, "api-1");
+      await flushPromises();
+      const podFor = (panelId: string) =>
+        wrapper.vm.getMergedVariablesForPanel(panelId).values.find((v: any) => v.name === "pod")
+          ?.value;
+
+      await wrapper.vm.refreshPanelRequest("panel-1");
+      expect(podFor("panel-1")).toBe("api-1");
+
+      manager.updateVariableValue("pod", "global", undefined, undefined, "api-2");
+      await new Promise((r) => setTimeout(r, LIVE_COMMIT_DEBOUNCE_MS + 20));
+      await flushPromises();
+
+      expect(podFor("panel-1")).toBe("api-2");
+    });
+
+    it("stays in Refresh-to-apply mode when no Auto Run state is provided", () => {
+      wrapper = mountWith();
+      expect(wrapper.vm.getVariablesManager().isLiveMode.value).toBe(false);
+    });
+  });
+
   describe("Tab Management", () => {
     it("should render TabList when showTabs is true", () => {
       wrapper = createWrapper({ showTabs: true });
@@ -495,9 +638,8 @@ describe("RenderDashboardCharts", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    // Variables scope the ACTIVE tab, so rendering them above the strip made them
-    // read as page chrome and moved the tab bar whenever their height changed.
-    it("renders the global variables strip BELOW the tab list, not above it", () => {
+    // Global variables apply dashboard-wide, so the strip sits above the tab bar.
+    it("renders the global variables strip ABOVE the tab list, not below it", () => {
       wrapper = createWrapper({
         showTabs: true,
         dashboardData: {
@@ -515,7 +657,7 @@ describe("RenderDashboardCharts", () => {
 
       expect(tabsAt).toBeGreaterThan(-1);
       expect(varsAt).toBeGreaterThan(-1);
-      expect(tabsAt).toBeLessThan(varsAt);
+      expect(varsAt).toBeLessThan(tabsAt);
     });
   });
 

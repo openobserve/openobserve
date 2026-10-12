@@ -147,6 +147,11 @@ export const useRolePermissionTree = (deps: TreeDeps) => {
       resource.permission.AllowPost.show = false;
       resource.permission.AllowPut.show = false;
     }
+    if (resource.resourceName === "rum_analytics") {
+      // Reads of /rum/analytics are checked on logs:_rumdata, so OpenFGA defines no GET or LIST here.
+      resource.permission.AllowList.show = false;
+      resource.permission.AllowGet.show = false;
+    }
     if (resource.resourceName === "prompt") {
       // Prompt deletion is archival and label deletion is a pointer update.
       resource.permission.AllowDelete.show = false;

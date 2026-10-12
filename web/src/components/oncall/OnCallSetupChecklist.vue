@@ -42,12 +42,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="oncall-setup-banner"
   >
     <span class="flex min-w-0 items-center gap-x-3">
-      <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase">
+      <span class="text-text-secondary text-2xs shrink-0 tracking-wide uppercase max-md:hidden">
         {{ t("oncall.setupFinish") }}
       </span>
-      <span class="text-text-body min-w-0 truncate text-sm" data-test="oncall-setup-next">
+      <OTruncatedText
+        class="text-text-body text-sm max-lg:line-clamp-2 max-lg:whitespace-normal"
+        data-test="oncall-setup-next"
+      >
         {{ t("oncall.setupNextStep", { step: nextStep.title }) }}
-      </span>
+      </OTruncatedText>
     </span>
 
     <template #actions>
@@ -191,6 +194,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { I18nText } from "@/types/i18n";

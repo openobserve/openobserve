@@ -29,7 +29,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       table-id="status-pages-table"
       :enable-column-resize="true"
       :column-visibility="defaultColumnVisibility"
-      :footer-title="t('statusPages.footerTitle')"
       data-test="status-pages-table"
       :horizontal-scroll="true"
       show-index

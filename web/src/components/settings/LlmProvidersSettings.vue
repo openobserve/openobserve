@@ -56,7 +56,6 @@
           row-key="id"
           :loading="isLoading"
           :forbidden="forbidden"
-          :footer-title="t('llmProviders.title')"
           :global-filter="searchQuery"
           :show-global-filter="false"
           :default-columns="false"

@@ -34,7 +34,7 @@ pub use timestamp_selected::is_timestamp_selected;
 pub use visitors::TimestampVisitor;
 pub use where_fragment::{validate_optional_where_fragment, validate_where_fragment};
 
-pub const AGGREGATE_UDF_LIST: [&str; 17] = [
+pub const AGGREGATE_UDF_LIST: [&str; 19] = [
     "min",
     "max",
     "avg",
@@ -52,6 +52,8 @@ pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "approx_percentile_cont_with_weight",
     "approx_topk",
     "approx_topk_distinct",
+    "sequence_depth",
+    "sequence_step_times",
 ];
 
 pub fn quote_identifier(value: &str) -> String {

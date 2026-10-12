@@ -199,7 +199,6 @@ const OTableStub = {
   template: `
     <div data-test="o2-table-stub">
       <slot name="empty" />
-      <slot name="bottom" :total-rows="totalCount" />
     </div>
   `,
 };

@@ -322,9 +322,10 @@ async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), an
                         anyhow::anyhow!("Failed to load function '{}': {}", function_params.name, e)
                     })?;
 
-                if function.is_vrl() {
+                // A null trans_type is neither VRL nor JS, yet save_function validates it as VRL.
+                if !function.is_js() {
                     return Err(anyhow::anyhow!(
-                        "Vrl functions cannot be used in workflows. Function '{}' is a VRL function. Please use JS functions instead.",
+                        "Only JavaScript functions can be used in workflows. Function '{}' is not a JavaScript function. Please use JS functions instead.",
                         function_params.name
                     ));
                 }

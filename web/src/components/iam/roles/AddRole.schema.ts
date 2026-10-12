@@ -15,10 +15,10 @@ export const makeAddRoleSchema = (t: (_key: string, _params?: Record<string, unk
       .min(1, t("iam.role.name.required"))
       .regex(roleNameRegex, t("iam.role.name.invalidChars"))
       .max(100, t("common.nameMaxLength", { max: 100 })),
-    // "Start from" preset: "custom" = empty role; "readonly" = seed read-only
-    // perms, "dbm" = seed the DB Monitoring viewer streams and "k8s" = seed the
-    // curated Kubernetes metric streams, each once on EditRole. Defaults to "custom".
-    startFrom: z.enum(["custom", "readonly", "dbm", "k8s"]).default("custom"),
+    // Every preset other than "custom" is seeded once, as pending grants, when EditRole opens.
+    startFrom: z
+      .enum(["custom", "readonly", "dbm", "k8s", "rum_viewer", "rum_editor"])
+      .default("custom"),
   });
 
 export type AddRoleForm = z.infer<ReturnType<typeof makeAddRoleSchema>>;

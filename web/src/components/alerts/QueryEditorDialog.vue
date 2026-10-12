@@ -216,10 +216,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
                         <OIcon name="error-outline" size="xs" class="shrink-0" />
-                        <span
-                          class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
-                          >{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span
-                        >
+                        <OTruncatedText class="flex-1">{{
+                          localSqlQueryErrorMsg || sqlQueryErrorMsg
+                        }}</OTruncatedText>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
                         <OSpinner size="xs" class="shrink-0" />
@@ -242,13 +241,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span>{{ t("alerts.queryEditor.eventsFound", sqlResultCount) }}</span>
                       </template>
                     </div>
-                    <OTooltip
-                      v-if="sqlStatusState === 'sql-status-bar--error'"
-                      side="top"
-                      align="center"
-                      :max-width="'32.5rem'"
-                      :content="raw(localSqlQueryErrorMsg || sqlQueryErrorMsg)"
-                    />
                   </div>
                 </div>
 
@@ -550,6 +542,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = defineProps({

@@ -413,6 +413,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import pipelinesService from "../../services/pipelines";
+import analytics from "@/services/product_analytics";
 import useStreams from "@/composables/useStreams";
 import jstransform from "@/services/jstransform";
 import usePipelines from "@/composables/usePipelines";
@@ -685,14 +686,18 @@ export default defineComponent({
 
       let allPipelinesCreated = true;
       let anyPipelineCreated = false;
+      let createdCount = 0;
       isPipelineImporting.value = true;
 
       // Process each object in the array
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
-        if (success) anyPipelineCreated = true;
-        else allPipelinesCreated = false;
+        if (success) {
+          anyPipelineCreated = true;
+          createdCount++;
+        } else allPipelinesCreated = false;
       }
+      if (createdCount > 0) analytics.track("pipeline_imported", { count: createdCount });
 
       // Once per batch, not per item: the list stays mounted here, so N invalidations refetch it N times.
       if (anyPipelineCreated) {

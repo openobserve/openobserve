@@ -165,14 +165,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Name column: badges for type/preview -->
               <template #cell-name="{ row }">
-                <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
-                <OTag
-                  v-if="row.dashboards?.[0]?.report_type === 'png'"
-                  type="reportTag"
-                  value="png"
-                  class="ms-1"
-                />
-                <OTag v-if="row.imagePreview" type="reportTag" value="preview" class="ms-1" />
+                <div class="flex min-w-0 items-center">
+                  <OTruncatedText :data-test="`report-list-name-cell-${row.name}`">{{
+                    row.name
+                  }}</OTruncatedText>
+                  <OTag
+                    v-if="row.dashboards?.[0]?.report_type === 'png'"
+                    type="reportTag"
+                    value="png"
+                    class="ms-1 shrink-0"
+                  />
+                  <OTag
+                    v-if="row.imagePreview"
+                    type="reportTag"
+                    value="preview"
+                    class="ms-1 shrink-0"
+                  />
+                </div>
               </template>
 
               <!-- Owner column -->
@@ -303,39 +312,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdown>
               </template>
 
-              <!-- Table footer: pagination + bulk actions -->
-              <template #bottom>
-                <div class="flex h-12 w-full items-center justify-between">
-                  <!-- Left: count + action buttons grouped together -->
-                  <div class="flex items-center gap-2">
-                    <div
-                      class="flex items-center text-xs font-normal whitespace-nowrap max-md:hidden"
-                    >
-                      {{ resultTotal }} {{ t("reports.header") }}
-                    </div>
-                    <OButton
-                      v-if="selectedReports.length > 0"
-                      data-test="report-list-move-reports-btn"
-                      icon-left="drive-file-move"
-                      variant="outline"
-                      size="sm-action"
-                      @click="moveMultipleReports"
-                    >
-                      {{ t("common.move") }}
-                    </OButton>
-                    <OButton
-                      v-if="selectedReports.length > 0"
-                      data-test="report-list-delete-reports-btn"
-                      icon-left="delete"
-                      variant="outline-destructive"
-                      size="sm-action"
-                      :loading="bulkDeleteLoading"
-                      @click="openBulkDeleteDialog"
-                    >
-                      {{ t("common.delete") }}
-                    </OButton>
-                  </div>
-                </div>
+              <template #selection-actions>
+                <OButton
+                  data-test="report-list-move-reports-btn"
+                  icon-left="drive-file-move"
+                  variant="outline"
+                  size="sm"
+                  @click="moveMultipleReports"
+                >
+                  {{ t("common.move") }}
+                </OButton>
+                <OButton
+                  data-test="report-list-delete-reports-btn"
+                  icon-left="delete"
+                  variant="outline-destructive"
+                  size="sm"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                >
+                  {{ t("common.delete") }}
+                </OButton>
               </template>
             </OTable>
           </div>
@@ -405,6 +401,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -496,8 +493,6 @@ const tabs = reactive([
   { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
   { label: t("reports.cached"), value: "cached", icon: "database" },
 ]);
-
-const resultTotal = ref<number>(0);
 
 const deleteDialog = ref({
   show: false,
@@ -669,7 +664,6 @@ const invalidateFolderCache = (_folderId?: string, siblingsOnly = false) => {
 
 const filterReports = () => {
   reportsTableRows.value = [...(staticReportsList.value as any[])];
-  resultTotal.value = reportsTableRows.value.length;
 };
 
 onBeforeMount(async () => {
@@ -778,13 +772,6 @@ const visibleRows = computed(() => {
   if (!filterQuery.value || searchAcrossFolders.value) return reportsTableRows.value ?? [];
   return filterData(reportsTableRows.value ?? [], filterQuery.value);
 });
-watch(
-  visibleRows,
-  (rows) => {
-    resultTotal.value = rows.length;
-  },
-  { immediate: true },
-);
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 const createNewReport = () => {

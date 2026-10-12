@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import Billing from "@/enterprise/components/billings/Billing.vue";
 import i18n from "@/locales";
@@ -66,6 +66,7 @@ vi.mock("@/services/billings", async (importOriginal) => {
 
 // Import after mocking
 import BillingService from "@/services/billings";
+import config from "@/aws-exports";
 
 describe("Billing Component", () => {
   let wrapper: any = null;
@@ -221,6 +222,122 @@ describe("Billing Component", () => {
     });
   });
 
+  describe("trial landing and strip", () => {
+    const DAY_US = 24 * 60 * 60 * 1_000_000;
+    let savedSettings: any;
+
+    const mountAt = async (routeName: string, provider: string, expiry?: number) => {
+      wrapper?.unmount();
+      wrapper = null;
+      mockRouter.push.mockClear();
+      mockRouter.currentRoute.value.name = routeName;
+      mockRouter.currentRoute.value.query = {};
+      store.state.organizationData.organizationSettings = {
+        ...savedSettings,
+        free_trial_expiry: expiry,
+      };
+      (BillingService.list_subscription as any).mockClear();
+      (BillingService.list_subscription as any).mockResolvedValue({ data: { provider } });
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: { template: "<div></div>", props: ["tabs", "activeTab"] },
+          },
+        },
+      });
+      await flushPromises();
+      return testWrapper;
+    };
+
+    beforeEach(() => {
+      savedSettings = { ...store.state.organizationData.organizationSettings };
+    });
+
+    afterEach(() => {
+      store.state.organizationData.organizationSettings = savedSettings;
+    });
+
+    it("lands a trial org on Usage", async () => {
+      const w = await mountAt("billings", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("usage");
+      expect(mockRouter.push).toHaveBeenCalledTimes(1);
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/billings/usage" }),
+      );
+      w.unmount();
+    });
+
+    it("lands an org without free_trial_expiry on Plans exactly as today", async () => {
+      const w = await mountAt("billings", "stripe", undefined);
+
+      expect(w.vm.billingtab).toBe("plans");
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        path: "/billings/plans",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+      w.unmount();
+    });
+
+    it("lands an AWS-billed trial org on Plans", async () => {
+      const w = await mountAt("billings", "aws", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("plans");
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/billings/plans" }),
+      );
+      w.unmount();
+    });
+
+    it("keeps an explicit Plans route on Plans for a trial org", async () => {
+      const w = await mountAt("plans", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("plans");
+      w.unmount();
+    });
+
+    it("shows the trial strip on Usage with the provider it already loaded", async () => {
+      const w = await mountAt("usage", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      const strip = w.find('[data-test="trial-period-container"]');
+      expect(strip.exists()).toBe(true);
+      expect(strip.attributes("data-tone")).toBe("info");
+      expect(w.find('[data-test="trial-period-compare-plans-btn"]').exists()).toBe(true);
+      expect(w.find('[data-test="trial-period-end-rule"]').exists()).toBe(true);
+      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
+      w.unmount();
+    });
+
+    it("renders each billing tab id exactly once", async () => {
+      (config as { isCloud?: string }).isCloud = "true";
+      const w = await mountAt("usage", "stripe", undefined);
+
+      for (const id of [
+        "billing-tab-plans",
+        "billing-tab-usage",
+        "billing-tab-invoices",
+        "billing-tab-group",
+      ]) {
+        expect(w.findAll(`[data-test="${id}"]`)).toHaveLength(1);
+      }
+      w.unmount();
+      delete (config as { isCloud?: string }).isCloud;
+    });
+
+    it("hides the trial strip for an AWS-billed org", async () => {
+      const w = await mountAt("usage", "aws", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.find('[data-test="trial-period-container"]').exists()).toBe(false);
+      w.unmount();
+    });
+  });
+
   describe("headerBasedOnRoute Function", () => {
     it("should return usage label when route is usage", () => {
       mockRouter.currentRoute.value.name = "usage";
@@ -349,6 +466,145 @@ describe("Billing Component", () => {
     it("should handle empty store state gracefully", () => {
       expect(wrapper.vm.store).toBeDefined();
       expect(wrapper.vm.store.state).toBeDefined();
+    });
+  });
+
+  describe("fetchBillingInfo — billing info TypeError/401 regression", () => {
+    it("does not throw and keeps the provider when the response has no customer_id", async () => {
+      // Reproduces the production TypeError: the real /billing/info response
+      // for an org with no active plan omits customer_id entirely.
+      (BillingService.list_subscription as any).mockResolvedValue({
+        data: { provider: "stripe" },
+      });
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      // Previously this threw inside the try block, which reset the
+      // provider to "" and hid the Invoice tab even though the fetch had
+      // actually succeeded.
+      expect(testWrapper.vm.billingProvider).toBe("stripe");
+      expect(testWrapper.vm.isPaidUser).toBe(false);
+      expect(testWrapper.vm.showInvoiceTab).toBe(true);
+
+      testWrapper.unmount();
+    });
+
+    it("treats a non-empty customer_id as a paid user", async () => {
+      (BillingService.list_subscription as any).mockResolvedValue({
+        data: { provider: "stripe", customer_id: "cus_123" },
+      });
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      expect(testWrapper.vm.isPaidUser).toBe(true);
+
+      testWrapper.unmount();
+    });
+
+    it("does not log a 401 as an error — it's an expected session-expiry race already handled globally", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const unauthorizedError: any = new Error("Request failed with status code 401");
+      unauthorizedError.response = { status: 401 };
+      (BillingService.list_subscription as any).mockRejectedValue(unauthorizedError);
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+      expect(testWrapper.vm.billingProvider).toBe("");
+
+      consoleErrorSpy.mockRestore();
+      testWrapper.unmount();
+    });
+
+    it("still logs non-401 billing errors", async () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      (BillingService.list_subscription as any).mockRejectedValue(new Error("Network error"));
+
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: {
+              template: "<div></div>",
+              props: ["tabs", "activeTab"],
+              emits: ["update:activeTab"],
+            },
+          },
+        },
+      });
+
+      await testWrapper.vm.$nextTick();
+      await testWrapper.vm.$nextTick();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Failed to fetch billing info:",
+        expect.any(Error),
+      );
+
+      consoleErrorSpy.mockRestore();
+      testWrapper.unmount();
     });
   });
 });

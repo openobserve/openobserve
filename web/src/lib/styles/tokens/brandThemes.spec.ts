@@ -130,3 +130,60 @@ describe("brand theme focus rings", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/** The light rail paints its active and hover labels with this token. */
+const NAV_LABEL = "--color-nav-label-accent";
+
+/** The active pill sits on the page surface; the hover tile on the tabs hover tint. */
+const NAV_LABEL_BACKGROUNDS = ["--color-surface-base", "--color-tabs-hover-bg"];
+
+/** The group chevron keeps the shared accent, judged as non-text. */
+const NAV_CHEVRON = "--color-accent";
+
+const TEXT_MIN = 4.5;
+
+const LIGHT_CASES = CASES.filter((c) => c.mode === "light");
+
+describe("brand theme rail labels (AC-13)", () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute("style");
+    document.body.removeAttribute("style");
+  });
+
+  it.each(LIGHT_CASES)(
+    "keeps the active and hover label at 4.5:1 under $name",
+    ({ themeColor, mode }) => {
+      const scope = scopeFor(themeColor, mode);
+      const surface = resolveColor(SURFACE_BASE, scope)!;
+      const label = resolveColor(NAV_LABEL, scope);
+      expect(label).not.toBeNull();
+
+      const offenders = NAV_LABEL_BACKGROUNDS.map((bg) => {
+        const paint = composite(resolveColor(bg, scope)!, surface);
+        const ratio = contrastRatio(composite(label!, paint), paint);
+        return ratio < TEXT_MIN
+          ? `${NAV_LABEL} on ${bg}: ${ratio.toFixed(2)}:1 (need ${TEXT_MIN})`
+          : null;
+      }).filter((line): line is string => line !== null);
+      expect(offenders).toEqual([]);
+    },
+  );
+
+  it.each(LIGHT_CASES)("keeps the chevron at 3:1 under $name", ({ themeColor, mode }) => {
+    const scope = scopeFor(themeColor, mode);
+    const surface = resolveColor(SURFACE_BASE, scope)!;
+    const chevron = resolveColor(NAV_CHEVRON, scope)!;
+    expect(contrastRatio(composite(chevron, surface), surface)).toBeGreaterThanOrEqual(
+      FOCUS_RING_MIN,
+    );
+  });
+
+  // The dark rail is BASE: the label token resolves to the shared accent there.
+  it.each(CASES.filter((c) => c.mode === "dark"))(
+    "leaves the dark label on --color-accent under $name",
+    ({ themeColor, mode }) => {
+      const scope = scopeFor(themeColor, mode);
+      expect(resolveColor(NAV_LABEL, scope)).toEqual(resolveColor(NAV_CHEVRON, scope));
+    },
+  );
+});

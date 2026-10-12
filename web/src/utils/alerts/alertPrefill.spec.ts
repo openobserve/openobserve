@@ -170,6 +170,19 @@ describe("normalizePrefill — invariants", () => {
     expect(isPrefillBlocked(result)).toBe(true);
   });
 
+  it("blocks PromQL still carrying a dashboard variable such as $__rate_interval", () => {
+    const blocked = normalizePrefill(
+      basePrefill({ queryType: "promql", sql: undefined, promql: "rate(x[$__rate_interval])" }),
+    );
+    expect(warningKeys(blocked)).toContain("unresolvedQuery");
+    expect(isPrefillBlocked(blocked)).toBe(true);
+
+    const resolved = normalizePrefill(
+      basePrefill({ queryType: "promql", sql: undefined, promql: "rate(x[1m])" }),
+    );
+    expect(warningKeys(resolved)).not.toContain("unresolvedQuery");
+  });
+
   it("blocks when there is no stream and no candidates", () => {
     const result = normalizePrefill(basePrefill({ streamName: "" }));
     expect(warningKeys(result)).toContain("noStream");

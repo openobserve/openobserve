@@ -61,6 +61,8 @@ vi.mock("@/services/config", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 vi.mock("@/composables/useLoading", () => ({
   useLoading: (fn: Function) => ({
     execute: fn,
@@ -85,6 +87,7 @@ import organizations from "@/services/organizations";
 import settingsService from "@/services/settings";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
+import analytics from "@/services/product_analytics";
 
 const mockOrganizations = organizations as any;
 const mockSettingsService = settingsService as any;
@@ -357,6 +360,28 @@ describe("General", () => {
         variant: "error",
         message: "Server error",
       });
+    });
+
+    it("tracks org_general_settings_saved once the save succeeds", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(analytics.track).toHaveBeenCalledWith("org_general_settings_saved", {
+        custom_theme: false,
+      });
+    });
+
+    it("does not track org_general_settings_saved when the save fails", async () => {
+      mockOrganizations.post_organization_settings.mockRejectedValue({ message: "Server error" });
+
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
 
     it("should handle save error without message", async () => {

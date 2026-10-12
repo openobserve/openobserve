@@ -97,7 +97,10 @@
                  rest with everybody above. Offering an empty picker instead
                  read as a required field nobody knew how to fill. -->
             <template v-if="row.optional && !overridden[row.key]">
-              <OText variant="meta" class="min-w-0 flex-1">
+              <OText
+                variant="meta"
+                class="min-w-0 flex-1 max-md:order-last max-md:basis-full max-md:ps-4"
+              >
                 {{ t("oncall.presetCatchAllDefault") }}
               </OText>
               <OButton

@@ -118,6 +118,7 @@ import { groupsQuery } from "@/services/iam.queries";
 import { rolesQuery } from "@/services/iam.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { saveServiceAccountMutation } from "@/services/service_accounts.queries";
+import analytics from "@/services/product_analytics";
 import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, computed, ref, watch } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -357,6 +358,7 @@ export default defineComponent({
           const res = await this.saveServiceAccount.mutateAsync({
             payload: { email, first_name: value.first_name },
           });
+          analytics.track("service_account_created");
 
           // Fan out access grants AFTER the account exists — but do NOT await
           // them here: the show-once token must never be held hostage by a

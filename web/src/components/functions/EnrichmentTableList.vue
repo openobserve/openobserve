@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
-      v-if="!showAddJSTransformDialog"
       :title="t('function.enrichmentTables')"
       icon="dataset"
       :subtitle="t('function.enrichmentTablesSubtitle')"
@@ -360,36 +359,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <template #bottom>
-              <div class="flex w-full items-center justify-between py-2">
-                <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
-                  {{ resultTotal }} {{ t("function.enrichmentTables") }}
-                </div>
-                <OButton
-                  v-if="selectedEnrichmentTables.length > 0"
-                  data-test="enrichment-tables-bulk-delete-btn"
-                  variant="outline-destructive"
-                  size="sm"
-                  icon-left="delete"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                >
-                  {{ t("common.delete") }}
-                </OButton>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="enrichment-tables-bulk-delete-btn"
+                variant="outline-destructive"
+                size="sm"
+                icon-left="delete"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("common.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
       </div>
     </OPageLayout>
-    <div v-else>
-      <AddEnrichmentTable
-        v-model="formData"
-        :isUpdating="isUpdated"
-        @update:list="refreshList"
-        @cancel:hideform="hideForm"
-      />
-    </div>
+    <!-- Keyed per open: the form reads its defaults from modelValue only at setup. -->
+    <AddEnrichmentTable
+      :key="formKey"
+      :open="showAddJSTransformDialog"
+      v-model="formData"
+      :isUpdating="isUpdated"
+      @update:list="refreshList"
+      @cancel:hideform="hideForm"
+    />
     <ConfirmDialog
       :title="t('function.deleteEnrichmentTableTitle')"
       :message="t('function.deleteEnrichmentTableConfirm')"
@@ -481,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
-import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
+import { computed, defineComponent, onBeforeMount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -491,7 +485,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
@@ -547,6 +541,7 @@ export default defineComponent({
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
+    const formKey = ref(0);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -563,7 +558,6 @@ export default defineComponent({
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
-    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
     const currentPage = ref(1);
     const onPageChange = (page: number) => {
       currentPage.value = page;
@@ -811,7 +805,6 @@ export default defineComponent({
         });
 
         jsTransforms.value = Array.from(allTables.values());
-        resultTotal.value = jsTransforms.value.length;
         dismiss();
       } catch (err: any) {
         console.info("Error while fetching enrichment tables", err);
@@ -830,7 +823,6 @@ export default defineComponent({
       }
     };
 
-    const resultTotal = ref<number>(0);
     const maxRecordToReturn = ref<number>(100);
     const selectedPerPage = ref<number>(20);
     const selectedEnrichmentTable = ref<any>(null);
@@ -846,6 +838,7 @@ export default defineComponent({
     };
 
     const addLookupTable = () => {
+      formKey.value += 1;
       showAddJSTransformDialog.value = true;
     };
 
@@ -884,7 +877,7 @@ export default defineComponent({
       }
       addLookupTable();
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: action,
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -926,6 +919,7 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
+            analytics.track("stream_deleted", { stream_type: "enrichment_tables", count: 1 });
             toast({
               message: t("toastMessages.functions.deletedSuccessfully", {
                 name: selectedDelete.value.name,
@@ -947,7 +941,7 @@ export default defineComponent({
           }
         });
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Delete Enrichment Table",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -999,6 +993,12 @@ export default defineComponent({
             }
           });
 
+          if (successfulDeletions > 0) {
+            analytics.track("stream_deleted", {
+              stream_type: "enrichment_tables",
+              count: successfulDeletions,
+            });
+          }
           if (successfulDeletions > 0 && failedDeletions === 0) {
             toast({
               message: t("toastMessages.functions.successfullyDeletedEnrichmentTables", {
@@ -1137,15 +1137,6 @@ export default defineComponent({
     });
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     useShortcuts([
       {
         id: "enrichmentTablesRefresh",
@@ -1175,7 +1166,6 @@ export default defineComponent({
       fetching,
       lastUpdatedAt,
       forbidden,
-      resultTotal,
       refreshList,
       perPageOptionsList,
       selectedPerPage,
@@ -1187,6 +1177,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
+      formKey,
       delete: "delete",
       filterQuery,
       filterData,
@@ -1226,7 +1217,6 @@ export default defineComponent({
         (newVal != oldVal || this.jsTransforms.value == undefined) &&
         this.router.currentRoute.value.name == "pipeline"
       ) {
-        this.resultTotal = 0;
         this.jsTransforms = [];
         this.getLookupTables(true);
       }

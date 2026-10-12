@@ -197,6 +197,8 @@ impl MetricEdge {
 pub struct MetricNode {
     pub server: String,
     pub requests_server: f64,
+    /// `None` when the error-count query failed, so readers fall back instead of showing 0 errors.
+    pub errors_server: Option<f64>,
     pub p50_ns: Option<u64>,
     pub p95_ns: Option<u64>,
     pub p99_ns: Option<u64>,

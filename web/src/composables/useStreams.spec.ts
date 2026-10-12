@@ -862,6 +862,26 @@ describe("useStreams Composable", () => {
       expect(mockStore.dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
     });
 
+    it("should not set isDataIngested for internal streams or non-user types", () => {
+      mockStore.state.organizationData.isDataIngested = false;
+
+      streamsInstance.setStreams("logs", [
+        { name: "usage", stream_type: "logs" },
+        { name: "_o2_db_stats", stream_type: "logs" },
+      ]);
+      streamsInstance.setStreams("metadata", [{ name: "default", stream_type: "metadata" }]);
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
+    });
+
+    it("should set isDataIngested for a RUM stream", () => {
+      mockStore.state.organizationData.isDataIngested = false;
+
+      streamsInstance.setStreams("logs", [{ name: "_rumdata", stream_type: "logs" }]);
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", true);
+    });
+
     it("should handle deepEqual with nested objects", () => {
       const obj1 = { a: { b: { c: 1 } } };
       const obj2 = { a: { b: { c: 1 } } };

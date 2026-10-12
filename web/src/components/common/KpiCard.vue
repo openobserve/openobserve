@@ -35,12 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="label && !lgUp ? String(label) : undefined"
   >
     <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
-      <div
-        class="min-w-0 truncate max-lg:hidden"
+      <OTruncatedText
+        as="div"
+        :tooltip="$slots.label ? false : undefined"
+        class="max-lg:hidden"
         :class="labelClass || 'text-2xs text-text-secondary leading-normal font-semibold'"
       >
         <slot name="label">{{ label }}</slot>
-      </div>
+      </OTruncatedText>
       <span
         v-if="icon || $slots.icon"
         class="rounded-default inline-flex shrink-0 items-center justify-center"
@@ -76,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { raw, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import useBreakpoint from "@/composables/useBreakpoint";
 

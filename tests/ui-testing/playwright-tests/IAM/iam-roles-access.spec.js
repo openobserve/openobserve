@@ -10,29 +10,39 @@
 // custom role grants is the whole of that account's access. Creating these as
 // `admin` would make every assertion pass for the wrong reason.
 //
-// ENTERPRISE ONLY (rbac_enabled). Artifacts are namespaced `ui_auto_*`.
+// ENTERPRISE ONLY (rbac_enabled). Artifacts live under this file's OWN namespace
+// (see NS below) — never the shared `ui_auto`, which the parallel specs would share.
 
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const {
-    PREFIX, req, listRoles, listUsers, createRole, setRolePerms, createGroupApi, setGroup,
-    sweepRoles, sweepUsers, loginAs, MEMBER_PASSWORD, uniq, org,
+    ns, req, listRoles, listUsers, createRole, setRolePerms, createGroupApi, setGroup,
+    makeTracker, loginAs, MEMBER_PASSWORD, uniq, org,
 } = require('./iam-fixtures.js');
+
+// This file's own namespace. Every artifact it creates lives under it, and its
+// sweeps delete only it: the eleven IAM specs run in parallel and, through a
+// shared `ui_auto` prefix, used to delete each other's fixtures mid-test.
+const NS = ns('acc');
+
+// What this spec made, so teardown deletes exactly that — never a prefix sweep,
+// which is what had the IAM specs deleting each other's fixtures mid-test.
+const made = makeTracker();
 
 const obj = (resource) => `${resource}:_all_${org()}`;
 
 // One account per access shape, so a test never inherits another's grants.
-const U_READER = `${PREFIX}_a_reader@example.com`;   // role:AllowList+AllowGet
-const U_ADMIN = `${PREFIX}_a_admin@example.com`;     // role+group AllowAll
-const U_NONE = `${PREFIX}_a_none@example.com`;       // no IAM grants at all
-const U_GROUPS = `${PREFIX}_a_groups@example.com`;   // group:AllowAll, no role grant
-const U_VIAGRP = `${PREFIX}_a_viagrp@example.com`;   // reaches its grant via a group
+const U_READER = `${NS}_a_reader@example.com`;   // role:AllowList+AllowGet
+const U_ADMIN = `${NS}_a_admin@example.com`;     // role+group AllowAll
+const U_NONE = `${NS}_a_none@example.com`;       // no IAM grants at all
+const U_GROUPS = `${NS}_a_groups@example.com`;   // group:AllowAll, no role grant
+const U_VIAGRP = `${NS}_a_viagrp@example.com`;   // reaches its grant via a group
 
-const R_READER = `${PREFIX}_a_role_reader`;
-const R_ADMIN = `${PREFIX}_a_role_admin`;
-const R_GROUPS = `${PREFIX}_a_role_groups`;
-const R_VIAGRP = `${PREFIX}_a_role_viagrp`;
-const G_CARRIER = `${PREFIX}_a_group_carrier`;
+const R_READER = `${NS}_a_role_reader`;
+const R_ADMIN = `${NS}_a_role_admin`;
+const R_GROUPS = `${NS}_a_role_groups`;
+const R_VIAGRP = `${NS}_a_role_viagrp`;
+const G_CARRIER = `${NS}_a_group_carrier`;
 
 let sessions = [];
 const signIn = async (browser, email) => {
@@ -48,11 +58,15 @@ const gotoIam = async (page) => {
 };
 
 test.describe('IAM · access control', { tag: '@enterprise' }, () => {
+    // Serial, NOT parallel. the five accounts, four roles and the carrier group are made once in beforeAll and reused; A-08/A-09 deliberately mutate G_CARRIER and restore it.
+    // `fullyParallel: true` races individual TESTS, so the per-file namespaces in
+    // iam-fixtures.js only stop files colliding — this stops a file colliding with
+    // itself. Cost: a failure here skips the rest of the file rather than running them.
+    test.describe.configure({ mode: 'serial' });
+
     test.beforeAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            await sweepRoles(page);
-            await sweepUsers(page);
 
             const probe = await req(page, 'GET', '/roles');
             test.skip(probe.status === 403 || probe.status === 404, 'roles API unavailable — RBAC off');
@@ -62,11 +76,17 @@ test.describe('IAM · access control', { tag: '@enterprise' }, () => {
                 [U_NONE, null], [U_GROUPS, R_GROUPS], [U_VIAGRP, null],
             ]) {
                 // Base role `user` grants nothing on its own.
+                made.user(email);
                 await req(page, 'POST', '/users', {
                     email, password: MEMBER_PASSWORD,
                     first_name: 'IAM', last_name: 'Access', role: 'user',
                 });
-                if (role) await createRole(page, role);
+                // Braces matter: U_NONE and U_VIAGRP pass role=null on purpose, and an
+                // unguarded createRole(page, null) is a 422.
+                if (role) {
+                    made.role(role);
+                    await createRole(page, role);
+                }
             }
 
             await setRolePerms(page, R_READER,
@@ -89,10 +109,12 @@ test.describe('IAM · access control', { tag: '@enterprise' }, () => {
             });
 
             // U_VIAGRP holds R_VIAGRP ONLY through G_CARRIER — never directly.
+            made.role(R_VIAGRP);
             await createRole(page, R_VIAGRP);
             await setRolePerms(page, R_VIAGRP,
                 [{ object: obj('role'), permission: 'AllowList' },
                  { object: obj('role'), permission: 'AllowGet' }]);
+            made.group(G_CARRIER);
             await createGroupApi(page, G_CARRIER);
             await setGroup(page, G_CARRIER, { add_roles: [R_VIAGRP], add_users: [U_VIAGRP] });
 
@@ -110,14 +132,12 @@ test.describe('IAM · access control', { tag: '@enterprise' }, () => {
     test.afterAll(async ({ browser }) => {
         const page = await browser.newPage();
         try {
-            const roles = await sweepRoles(page);
-            const users = await sweepUsers(page);
+            const gone = await made.cleanup(page);
+            const roles = gone.roles;
+            const users = gone.users;
             testLogger.info(`teardown removed ${roles.length} roles, ${users.length} users`);
-            const left = [
-                ...(await listRoles(page)).filter((r) => r.startsWith(PREFIX)),
-                ...(await listUsers(page)).map((u) => u.email).filter((e) => e.startsWith(PREFIX)),
-            ];
-            if (left.length) throw new Error(`teardown left artifacts behind: ${left}`);
+            const left = await made.survivors(page);
+            if (left.length) throw new Error(`teardown left its own artifacts behind: ${left}`);
         } finally {
             await page.close();
         }
@@ -141,7 +161,7 @@ test.describe('IAM · access control', { tag: '@enterprise' }, () => {
         // silently succeeding is not.
         const btn = page.locator('[data-test="iam-roles-add-role-btn"]');
         if (await btn.isVisible({ timeout: 5000 }).catch(() => false)) {
-            const res = await req(page, 'POST', '/roles', { role: `${PREFIX}_a_denied_${uniq()}` });
+            const res = await req(page, 'POST', '/roles', { role: `${NS}_a_denied_${uniq()}` });
             expect(res.status, 'a List/Get-only user was allowed to create a role').toBeGreaterThanOrEqual(400);
         }
     });
@@ -151,7 +171,7 @@ test.describe('IAM · access control', { tag: '@enterprise' }, () => {
     }, async ({ browser }) => {
         const page = await signIn(browser, U_ADMIN);
         await gotoIam(page);
-        const name = `${PREFIX}_a_made_${uniq()}`;
+        const name = `${NS}_a_made_${uniq()}`;
 
         const created = await req(page, 'POST', '/roles', { role: name });
         expect(created.status).toBeLessThan(400);
@@ -200,7 +220,7 @@ test.describe('IAM · access control', { tag: '@enterprise' }, () => {
         // group:AllowAll must not imply anything about `role`.
         const groups = await req(page, 'GET', '/groups');
         expect(groups.status).toBeLessThan(400);
-        const roles = await req(page, 'POST', '/roles', { role: `${PREFIX}_a_leak_${uniq()}` });
+        const roles = await req(page, 'POST', '/roles', { role: `${NS}_a_leak_${uniq()}` });
         expect(roles.status, 'group:AllowAll leaked into role creation').toBeGreaterThanOrEqual(400);
     });
 
@@ -256,11 +276,13 @@ test.describe('IAM · access control', { tag: '@enterprise' }, () => {
         tag: ['@iam', '@iamRolesAccess', '@P0', '@all']
     }, async ({ browser }) => {
         const root = await browser.newPage();
-        const doomed = `${PREFIX}_a_role_doomed`;
-        const victim = `${PREFIX}_a_victim@example.com`;
+        const doomed = `${NS}_a_role_doomed`;
+        const victim = `${NS}_a_victim@example.com`;
         try {
+            made.role(doomed);
             await createRole(root, doomed);
             await setRolePerms(root, doomed, [{ object: obj('role'), permission: 'AllowList' }]);
+            made.user(victim);
             await req(root, 'POST', '/users', {
                 email: victim, password: MEMBER_PASSWORD,
                 first_name: 'IAM', last_name: 'Victim', role: 'user',

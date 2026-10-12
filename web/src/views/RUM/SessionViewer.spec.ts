@@ -49,6 +49,8 @@ const queryPayload = vi.hoisted(() => ({
   build: null as any,
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+
 vi.mock("@/composables/useQuery", () => ({
   default: () => ({
     buildQueryPayload: (queryPayload.build ??= vi.fn(() => ({ query: { sql: "" }, aggs: {} }))),
@@ -56,6 +58,26 @@ vi.mock("@/composables/useQuery", () => ({
     parseQuery: vi.fn().mockReturnValue({}),
   }),
 }));
+
+// Null passes getStream through to the real composable; a test sets it to answer stream lookups itself.
+const streamsMock = vi.hoisted(() => ({
+  getStream: null as null | ((name: string, type: string, schema: boolean) => Promise<unknown>),
+}));
+vi.mock("@/composables/useStreams", async (importOriginal) => {
+  const actual = await importOriginal<{ default: (...a: unknown[]) => Record<string, unknown> }>();
+  return {
+    default: (...a: unknown[]) => {
+      const real = actual.default(...a);
+      return {
+        ...real,
+        getStream: (...b: [string, string, boolean]) =>
+          streamsMock.getStream
+            ? streamsMock.getStream(...b)
+            : (real.getStream as (...c: unknown[]) => Promise<unknown>)(...b),
+      };
+    },
+  };
+});
 
 // Shared so a test can add the view columns the schema guard looks for.
 const replaySchema = vi.hoisted(() => ({
@@ -157,8 +179,10 @@ import store from "@/test/unit/helpers/store";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import searchService from "@/services/search";
+import i18n from "@/locales";
 import { ACTIVE_WINDOW_MS } from "@/utils/rum/sessionReplayLive";
 import { b64DecodeUnicode } from "@/utils/zincutils";
+import analytics from "@/services/product_analytics";
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -243,8 +267,18 @@ function mountSessionViewer(router = createTestRouter()) {
           },
         }),
         PlayerEventsSidebar: {
+          name: "PlayerEventsSidebar",
           template: '<div data-test="stub-player-events-sidebar" />',
-          props: ["events", "sessionDetails", "sessionId", "currentTime", "startTime", "endTime"],
+          props: [
+            "events",
+            "sessionDetails",
+            "sessionId",
+            "currentTime",
+            "startTime",
+            "endTime",
+            "rumWindowUs",
+            "markedTimestamps",
+          ],
         },
         EventDetailDrawer: {
           template: '<div data-test="stub-event-detail-drawer" />',
@@ -303,6 +337,35 @@ describe("SessionViewer.vue", () => {
       const pending = mountSessionViewer(router);
       expect(pending.text()).toContain("Unknown User");
       pending.unmount();
+    });
+  });
+
+  describe("session_replay_played analytics", () => {
+    const emitState = (state: string) =>
+      wrapper.findComponent('[data-test="stub-video-player"]').vm.$emit("playback-state", state);
+
+    it("tracks once when playback first starts, not on later resumes", async () => {
+      emitState("paused");
+      await wrapper.vm.$nextTick();
+      expect(analytics.track).not.toHaveBeenCalled();
+
+      emitState("playing");
+      await wrapper.vm.$nextTick();
+      emitState("paused");
+      await wrapper.vm.$nextTick();
+      emitState("playing");
+      await wrapper.vm.$nextTick();
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("session_replay_played", {
+        platform: "browser",
+      });
+    });
+
+    it("does not track a replay that failed to load", async () => {
+      emitState("failed");
+      await wrapper.vm.$nextTick();
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 
@@ -843,14 +906,16 @@ describe("SessionViewer.vue — no replay recorded", () => {
     wrapper.unmount();
   });
 
-  it("issues only the session lookup, not the segment or event fetches", async () => {
+  it("issues the session lookup and the RUM events probe, not the segment or event fetches", async () => {
     const wrapper = await mountUnrecorded();
 
     const sqlCalls = vi
       .mocked(searchService.search)
       .mock.calls.map((call) => (call[0] as any).query.query.sql as string);
-    expect(sqlCalls).toHaveLength(1);
+    expect(sqlCalls).toHaveLength(2);
     expect(sqlCalls[0]).toContain("min(start)");
+    expect(sqlCalls[1]).toContain("MIN(date) AS start_time");
+    expect(sqlCalls[1]).toContain('FROM "_rumdata"');
     wrapper.unmount();
   });
 
@@ -2435,5 +2500,228 @@ describe("SessionViewer.vue — sessions still being recorded (G9)", () => {
     expect((failed.vm as any).loadState).toBe("error");
     expect(failed.find('[data-test="session-viewer-live-badge"]').exists()).toBe(false);
     failed.unmount();
+  });
+});
+
+describe("SessionViewer.vue — events-only view for a session with no replay (AC-19)", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const EVENT = {
+    type: "view",
+    view_id: "v1",
+    date: 1692884400000,
+    view_url: "https://a.com/x",
+    view_loading_type: "initial_load",
+  };
+
+  const seen: string[] = [];
+
+  async function mountEventsOnly() {
+    vi.clearAllMocks();
+    seen.length = 0;
+    vi.mocked(searchService.search).mockImplementation((async (params: any) => {
+      const sql: string = params.query.query.sql;
+      seen.push(sql);
+      if (sql.includes("min(start)")) return { data: { hits: [] } };
+      if (sql.includes("MIN(date) AS start_time")) {
+        return {
+          data: {
+            hits: [
+              {
+                start_time: 1692884313968,
+                end_time: 1692884769270,
+                user_email: null,
+                source: "browser",
+              },
+            ],
+          },
+        };
+      }
+      return { data: { hits: [EVENT] } };
+    }) as any);
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-events",
+      query: {
+        start_time: "1692884400000000",
+        end_time: "1692884400000000",
+        event_time: "1692884400000",
+        from: "analytics",
+      },
+    });
+    const wrapper = mountSessionViewer(router);
+    for (let i = 0; i < 5; i++) await flush();
+    return wrapper;
+  }
+
+  it("shows the RUM event timeline without a player instead of the dead end", async () => {
+    const wrapper = await mountEventsOnly();
+    expect(wrapper.find('[data-test="session-viewer-no-replay"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="session-viewer-events-only"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="stub-player-events-sidebar"]').exists()).toBe(true);
+    expect(
+      seen.some((q) => q.includes('"_sessionreplay" where') && q.includes("order by start asc")),
+    ).toBe(false);
+    const events = seen.find((q) => q.includes('from "_rumdata"') && q.includes("type='view'"));
+    expect(events).toContain("order by date asc");
+    wrapper.unmount();
+  });
+
+  it("hands the Traces tab the route window padded by a day, not the device-clock bounds", async () => {
+    const wrapper = await mountEventsOnly();
+    const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
+    expect(sidebar.props("rumWindowUs")).toEqual({
+      start: 1692884400000000 - 86_400_000_000,
+      end: 1692884400000000 + 86_400_000_000,
+    });
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — events-only fallback never hides a failure (W23)", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const seen: string[] = [];
+  let probe: () => Promise<unknown>;
+  const savedFields = replaySchema.fields;
+
+  async function mountNoReplay() {
+    vi.clearAllMocks();
+    seen.length = 0;
+    vi.mocked(searchService.search).mockImplementation((async (params: any) => {
+      const sql: string = params.query.query.sql;
+      seen.push(sql);
+      if (sql.includes("min(start)")) return { data: { hits: [] } };
+      if (sql.includes("MIN(date) AS start_time")) return probe();
+      return { data: { hits: [] } };
+    }) as any);
+    const router = createTestRouter();
+    await router.push({ path: "/rum/sessions/session-x", query: { from: "analytics" } });
+    const wrapper = mountSessionViewer(router);
+    for (let i = 0; i < 6; i++) await flush();
+    return wrapper;
+  }
+
+  beforeEach(() => {
+    probe = async () => ({
+      data: { hits: [{ start_time: 1, end_time: 2, user_email: null, source: "browser" }] },
+    });
+    streamsMock.getStream = async () => ({ name: "_rumdata", schema: [{ name: "source" }] });
+  });
+
+  afterEach(() => {
+    streamsMock.getStream = null;
+    replaySchema.fields = savedFields;
+  });
+
+  it("a 403 or 5xx on the events probe shows the error state, not No replay recorded", async () => {
+    probe = async () => {
+      throw { response: { status: 403, data: { message: "forbidden" } } };
+    };
+    const wrapper = await mountNoReplay();
+    expect(wrapper.find('[data-test="session-viewer-no-replay"]').exists()).toBe(false);
+    expect((wrapper.vm as any).loadState).toBe("error");
+    wrapper.unmount();
+  });
+
+  it("a transient replay-schema failure shows the error state, not the events-only view", async () => {
+    replaySchema.fields = undefined as never;
+    streamsMock.getStream = async () => {
+      throw new Error("network down");
+    };
+    const wrapper = await mountNoReplay();
+    expect(wrapper.find('[data-test="session-viewer-events-only"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="session-viewer-no-replay"]').exists()).toBe(false);
+    expect((wrapper.vm as any).loadState).toBe("error");
+    wrapper.unmount();
+  });
+
+  it("a replay stream confirmed missing still opens the events-only view", async () => {
+    replaySchema.fields = undefined as never;
+    streamsMock.getStream = async (name) => {
+      if (name === "_sessionreplay")
+        throw new Error(
+          i18n.global.t("logStream.streamNotFoundForType", { stream: name, type: "logs" }),
+        );
+      return { name, schema: [{ name: "source" }] };
+    };
+    const wrapper = await mountNoReplay();
+    expect(wrapper.find('[data-test="session-viewer-events-only"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("reads the _rumdata columns before probing, so it never names one the stream lacks", async () => {
+    const wrapper = await mountNoReplay();
+    const sql = seen.find((q) => q.includes("MIN(date) AS start_time"))!;
+    expect(sql).toContain("MIN(source)");
+    expect(sql).not.toContain("usr_email");
+    wrapper.unmount();
+  });
+});
+
+describe("SessionViewer.vue — opened from a funnel (AC-18)", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  async function mountFromFunnel(extra: Record<string, string> = {}) {
+    vi.clearAllMocks();
+    vi.mocked(searchService.search).mockImplementation((async (params: any) => {
+      const sql: string = params.query.query.sql;
+      return {
+        data: {
+          hits: sql.includes("min(start)")
+            ? [{ start_time: 1692884313968, end_time: 1692884769270, session_id: "session-abc" }]
+            : [],
+        },
+      };
+    }) as any);
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-abc",
+      query: {
+        start_time: "1692884400000000",
+        end_time: "1692884400000000",
+        event_time: "1692884400000",
+        from: "analytics",
+        af_step: "1",
+        af_label: "/web/logs",
+        af_kind: "p",
+        ...extra,
+      },
+    });
+    const wrapper = mountSessionViewer(router);
+    for (let i = 0; i < 4; i++) await flush();
+    return { wrapper, router };
+  }
+
+  it("names the step the session dropped after and marks the step event", async () => {
+    const { wrapper } = await mountFromFunnel();
+    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);
+    const strip = wrapper.find('[data-test="session-viewer-analytics-context"]');
+    expect(strip.text()).toContain("Dropped after step 1");
+    expect(strip.text()).toContain("/web/logs");
+    const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
+    expect(sidebar.props("markedTimestamps")).toEqual([1692884400000]);
+    wrapper.unmount();
+  });
+
+  it("gives the replay sidebar no rumWindowUs, so its trace search is unchanged", async () => {
+    const { wrapper } = await mountFromFunnel();
+    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);
+    const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
+    expect(sidebar.props("rumWindowUs")).toBeFalsy();
+    wrapper.unmount();
+  });
+
+  it("Back returns to the analytics view with router.back", async () => {
+    const { wrapper, router } = await mountFromFunnel();
+    const back = vi.spyOn(router, "back").mockImplementation(() => undefined);
+    await wrapper.find('[data-test="session-viewer-analytics-back-btn"]').trigger("click");
+    expect(back).toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("drops an oversize or unknown-kind label instead of rendering it", async () => {
+    const { wrapper } = await mountFromFunnel({ af_kind: "x" });
+    expect(wrapper.find('[data-test="session-viewer-analytics-context"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 });

@@ -152,6 +152,22 @@ mod tests {
     }
 
     #[test]
+    fn test_ungrouped_sequence_aggregates_are_complex() {
+        assert!(
+            is_complex_query("SELECT sequence_depth(0, ts, a = 1, b = 1) AS d FROM t").unwrap()
+        );
+        assert!(
+            is_complex_query("SELECT sequence_step_times(60, ts, a = 1, b = 1) FROM t").unwrap()
+        );
+        assert!(
+            is_complex_query(
+                "SELECT sequence_step_match(0, 1, ts, a = 1) OVER (PARTITION BY s) AS m FROM t"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn test_is_complex_query_having_join_union_subquery() {
         assert!(
             is_complex_query("SELECT x, count(*) FROM t GROUP BY x HAVING count(*) > 1").unwrap()

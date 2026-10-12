@@ -54,9 +54,6 @@ async function setupDashboardAndOpenVariables(page, pm, dashboardName) {
  */
 async function openDashboardWithPanels(page, dashboardName) {
   const scopedVars = new DashboardVariablesScoped(page);
-  // Use getByTitle (via page object) instead of XPath string concatenation —
-  // Playwright handles all escaping internally so dashboard names with special
-  // characters (quotes, brackets, etc.) are matched safely.
   await scopedVars.getDashboardTitleLocator(dashboardName).first().click();
   await scopedVars
     .getPanelContainerLocator()

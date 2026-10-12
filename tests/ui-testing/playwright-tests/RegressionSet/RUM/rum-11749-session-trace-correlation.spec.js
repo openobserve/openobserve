@@ -58,9 +58,11 @@ function rumRows({ sessionId, viewId, now, requests }) {
   const rows = [{ ...base, _timestamp: (now - 60000) * 1000, date: now - 60000, type: 'view', usr_id: 'e2e-user' }];
   requests.forEach((req, index) => {
     const at = now - 60000 + (index + 1) * 500;
+    const isLast = index === requests.length - 1;
     rows.push({
       ...base,
-      _timestamp: at * 1000,
+      // Arrives 20 s after its device-clock date, past MAX(date), as late ingest does live.
+      _timestamp: (isLast ? at + 20000 : at) * 1000,
       date: at,
       type: 'resource',
       resource_url: req.url,

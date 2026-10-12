@@ -149,6 +149,12 @@ export class MetricsPage {
         this.shareSuccessToast = page.locator('[data-test-variant="success"][data-test-message*="Link Copied"]');
         this.shareErrorToast = page.locator('[data-test-variant="error"][data-test-message*="Error shortening link"]');
         this.toastMessage = page.locator('[data-test="o-toast-message"]');
+
+        // Query history drawer (QueryHistoryDrawer.vue)
+        this.historyButton = page.locator('[data-test="metrics-history-btn"]');
+        this.historyTable = page.locator('[data-test="metrics-history-table"]');
+        this.historySearch = page.locator('[data-test="metrics-history-search"] input');
+        this.historyStarredOnly = page.locator('[data-test="metrics-history-starred-only"]');
     }
 
     /**
@@ -2756,4 +2762,39 @@ export class MetricsPage {
         return await loader.isVisible({ timeout: 1000 }).catch(() => false);
     }
 
+
+    async openQueryHistory() {
+        await this.historyButton.click();
+        await this.historyTable.waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    /** Resolves once the filtered list answers: a click landing mid-re-render is lost. */
+    async searchQueryHistory(text) {
+        const listed = this.page.waitForResponse(
+            (res) => res.url().includes('/query_history?') && res.url().includes(`q=${encodeURIComponent(text)}`),
+        );
+        await this.historySearch.fill(text);
+        await listed;
+    }
+
+    /** The history row whose query cell is exactly `query`. */
+    historyRow(query) {
+        return this.historyTable.locator('[data-test^="o2-table-row-"]').filter({
+            has: this.page.locator('[data-test="o2-table-cell-query"]', { hasText: query }),
+        });
+    }
+
+    /** A row's star toggle; its data-test carries the entry id, so match the prefix. */
+    historyStarButton(query) {
+        return this.historyRow(query).locator('[data-test^="metrics-history-star-"]');
+    }
+
+    async deleteHistoryEntry(query) {
+        await this.historyRow(query).locator('[data-test^="metrics-history-delete-"]').click();
+    }
+
+    /** Clicking a row's query cell loads the entry into the open editor. */
+    async loadHistoryEntry(query) {
+        await this.historyRow(query).locator('[data-test="o2-table-cell-query"]').click();
+    }
 }

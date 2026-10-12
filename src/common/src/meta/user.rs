@@ -484,7 +484,15 @@ pub struct AuthTokensExt {
 impl AuthTokensExt {
     /// Checks if the token is still valid or not
     pub fn has_expired(&self) -> bool {
-        chrono::Utc::now().timestamp() - self.request_time > self.expires_in
+        Self::is_expired(self.request_time, self.expires_in)
+    }
+
+    /// Both values are caller-supplied, so an age that does not fit in an `i64` counts as expired.
+    pub fn is_expired(request_time: i64, expires_in: i64) -> bool {
+        chrono::Utc::now()
+            .timestamp()
+            .checked_sub(request_time)
+            .is_none_or(|age| age > expires_in)
     }
 }
 
@@ -800,6 +808,21 @@ mod tests {
         assert_eq!(tokens.refresh_token, "refresh123");
         assert_eq!(tokens.request_time, 1234567890);
         assert_eq!(tokens.expires_in, 3600);
+    }
+
+    #[test]
+    fn auth_ext_expiry_survives_extreme_times() {
+        let token = |request_time: i64, expires_in: i64| AuthTokensExt {
+            auth_ext: String::new(),
+            refresh_token: String::new(),
+            request_time,
+            expires_in,
+        };
+        let now = chrono::Utc::now().timestamp();
+        assert!(token(i64::MIN, 300).has_expired());
+        assert!(token(i64::MIN, i64::MAX).has_expired());
+        assert!(token(now - 301, 300).has_expired());
+        assert!(!token(now, 300).has_expired());
     }
 
     #[test]

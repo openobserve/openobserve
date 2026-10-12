@@ -47,6 +47,7 @@ const install = `curl -O ${AGENTS_REPO}/mac/install.sh \\
 export default function macosCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   return {
     provider: {
+      id: "macos",
       name: raw("macOS"),
       tagline: t("ingestion.setupCard.taglineMacos"),
       logo: getImageURL("images/common/macos.png"),

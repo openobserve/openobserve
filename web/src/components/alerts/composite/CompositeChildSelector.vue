@@ -7,6 +7,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { type CompositeChildOption, letterFor } from "./expression";
 
@@ -111,9 +112,9 @@ const childLink = (child: CompositeChildOption): string =>
           :data-test="`alerts-composite-child-select-${id}`"
           @update:model-value="replace(index, $event as string)"
         />
-        <span v-else class="min-w-0 flex-1 truncate font-mono text-xs" :title="id">
+        <OTruncatedText v-else class="flex-1 font-mono text-xs">
           {{ raw(id) }}
-        </span>
+        </OTruncatedText>
 
         <OTag
           v-if="byId.get(id)?.alert_type"

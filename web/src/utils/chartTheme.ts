@@ -37,8 +37,19 @@ const FALLBACKS: Record<string, string> = {
   "--color-text-body": "#404040",
   "--color-text-secondary": "#737373",
   "--color-border-default": "#d4d4d4",
+  "--color-border-strong": "#a3a3a3",
   "--color-border-subtle": "#ededed",
+  "--color-border-control": "#949494",
   "--color-surface-base": "#ffffff",
+  "--color-surface-overlay": "#ffffff",
+  "--color-map-card-header": "#e5e5e5",
+  "--color-map-seq-1": "#05a92e",
+  "--color-map-seq-2": "#819307",
+  "--color-map-seq-3": "#a57c04",
+  "--color-map-seq-4": "#bd6100",
+  "--color-map-seq-5": "#d72601",
+  "--color-status-positive": "#208a3c",
+  "--color-surface-subtle": "#f5f5f5",
   "--color-white": "#ffffff",
   "--color-tooltip-text": "#262626",
   "--color-tooltip-bg": "#ffffff",
@@ -89,6 +100,7 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-table-23": "#FFE6E6",
   "--color-chart-table-24": "#E8F4FD",
   "--color-chart-gridline": "rgba(0, 0, 0, 0.2)",
+  "--color-chart-band": "rgba(115, 115, 115, 0.22)",
   // --color-chart-crosshair-bg is deliberately absent: it is dark-only, and the empty
   // string light returns is what makes ECharts use its own auto default (base.css:262).
   // Trace span palette (HEX/canvas variant), light values.
@@ -129,6 +141,9 @@ const FALLBACKS: Record<string, string> = {
   "--color-json-number": "#2563eb",
   "--color-json-object": "#4b5563",
   "--color-json-string": "#047857",
+  "--color-latency-p95": "#0a4ce8",
+  "--color-progress-bar-default": "#3f7994",
+  "--color-progress-bar-neutral": "#a3a3a3",
 };
 
 /**

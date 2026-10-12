@@ -46,6 +46,8 @@ use crate::{
         example = json!({
             "from": "Over the web",
             "company": "Monster Inc.",
+            "first_source": "kubernetes",
+            "skipped": false,
         }),
     ),
     responses(
@@ -62,25 +64,14 @@ pub async fn handle_new_attribution_event(
     axum::Json(req_body): axum::Json<NewUserAttribution>,
 ) -> Response {
     let email = user_email.user_id.as_str();
-    let new_usr_attribution = req_body;
 
     // Send new user info to ActiveCampaign via segment proxy
     log::info!("sending track event to segment");
-    let segment_event_data = HashMap::from([
-        (
-            "from".to_string(),
-            json::Value::String(new_usr_attribution.from),
-        ),
-        (
-            "company".to_string(),
-            json::Value::String(new_usr_attribution.company),
-        ),
-        ("email".to_string(), json::Value::String(email.to_string())),
-        (
-            "created_at".to_string(),
-            json::Value::String(chrono::Local::now().format("%Y-%m-%d").to_string()),
-        ),
-    ]);
+    let segment_event_data = attribution_event_data(
+        req_body,
+        email,
+        &chrono::Local::now().format("%Y-%m-%d").to_string(),
+    );
     let mut telemetry_instance = telemetry::Telemetry::new();
     telemetry_instance
         .send_track_event(
@@ -101,4 +92,61 @@ pub async fn handle_new_attribution_event(
         .await;
 
     MetaHttpResponse::ok("Success")
+}
+
+fn attribution_event_data(
+    attribution: NewUserAttribution,
+    email: &str,
+    created_at: &str,
+) -> HashMap<String, json::Value> {
+    HashMap::from([
+        ("from".to_string(), json::Value::String(attribution.from)),
+        (
+            "company".to_string(),
+            json::Value::String(attribution.company),
+        ),
+        (
+            "first_source".to_string(),
+            attribution
+                .first_source
+                .map_or(json::Value::Null, json::Value::String),
+        ),
+        (
+            "skipped".to_string(),
+            json::Value::Bool(attribution.skipped),
+        ),
+        ("email".to_string(), json::Value::String(email.to_string())),
+        (
+            "created_at".to_string(),
+            json::Value::String(created_at.to_string()),
+        ),
+    ])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_attribution_forwards_first_source_and_skipped() {
+        let attribution: NewUserAttribution = json::from_str(
+            r#"{"from":"","company":"","first_source":"kubernetes","skipped":true}"#,
+        )
+        .unwrap();
+        let data = attribution_event_data(attribution, "a@b.c", "2026-10-07");
+        assert_eq!(data["first_source"], json::json!("kubernetes"));
+        assert_eq!(data["skipped"], json::json!(true));
+        assert_eq!(data["email"], json::json!("a@b.c"));
+        assert_eq!(data["created_at"], json::json!("2026-10-07"));
+    }
+
+    #[test]
+    fn test_attribution_without_the_new_fields_still_parses() {
+        let attribution: NewUserAttribution =
+            json::from_str(r#"{"from":"web","company":"Acme"}"#).unwrap();
+        let data = attribution_event_data(attribution, "a@b.c", "2026-10-07");
+        assert_eq!(data["first_source"], json::Value::Null);
+        assert_eq!(data["skipped"], json::json!(false));
+        assert_eq!(data["from"], json::json!("web"));
+    }
 }

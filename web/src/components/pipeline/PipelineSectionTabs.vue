@@ -78,6 +78,7 @@ const routeToSection: Record<string, string> = {
   pipelineHistory: "streamPipelines",
   pipelineBackfill: "streamPipelines",
   functionList: "functions",
+  importFunction: "functions",
   enrichmentTables: "enrichmentTables",
 };
 

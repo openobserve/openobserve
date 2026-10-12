@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
-          :footer-title="t('cipherKey.header')"
           sorting="client"
           filter-mode="client"
           :default-columns="false"
@@ -130,10 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
             </ODropdown>
           </template>
-          <template v-if="selectedKeys.length > 0" #bottom>
-            <span class="text-text-body text-xs font-medium">
-              {{ t("settings.cipherKeysPage.selected", { count: selectedKeys.length }) }}
-            </span>
+          <template #selection-actions>
             <OButton
               data-test="cipher-keys-list-delete-keys-btn"
               variant="outline-destructive"
@@ -275,7 +271,6 @@ export default defineComponent({
         meta: { align: "center", actionCount: 2 },
       },
     ];
-    const resultTotal = ref<number>(0);
 
     const confirmDelete: Ref<{
       visible: boolean;
@@ -356,7 +351,6 @@ export default defineComponent({
       }
 
       tabledata.value = data;
-      resultTotal.value = responseData.length;
     };
 
     // The table is the query now: anything that invalidates the cipher-keys
@@ -491,15 +485,6 @@ export default defineComponent({
       return filterData(tabledata.value || [], filterQuery.value);
     });
 
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(
-      visibleRows,
-      (newVisibleRows) => {
-        resultTotal.value = newVisibleRows.length;
-      },
-      { immediate: true },
-    );
-
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -577,7 +562,6 @@ export default defineComponent({
       showAddDialog,
       addCipherKey,
       getData,
-      resultTotal,
       filterQuery,
       hideAddDialog,
       cancelDeleteCipherKey,

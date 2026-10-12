@@ -70,11 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <dd class="m-0 mt-1 flex flex-col gap-1.5">
             <div v-for="entry in facet.values" :key="entry.value" class="flex flex-col gap-0.5">
               <div class="flex min-w-0 items-baseline justify-between gap-2">
-                <span
-                  class="text-text-body min-w-0 truncate"
-                  :title="entry.value"
+                <OTruncatedText
+                  class="text-text-body"
                   :data-test="`rum-error-facet-${facet.key}-value`"
-                  >{{ entry.value }}</span
+                  >{{ entry.value }}</OTruncatedText
                 >
                 <span
                   class="text-text-secondary shrink-0 tabular-nums"
@@ -97,6 +96,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { FacetKey, FacetValue } from "@/utils/rum/errorDetailQueries";
 
 const props = defineProps<{

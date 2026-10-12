@@ -131,6 +131,7 @@ export default function otlpTracesCard(subs: CardSubstitutions, t: TranslateFn):
 
   return {
     provider: {
+      id: "otlpTraces",
       name: t("ingestion.setupCard.providerNameOtlpTraces"),
       tagline: t("ingestion.setupCard.taglineOtlpTraces"),
       logo: getImageURL("images/ingestion/otlp.svg"),

@@ -28,8 +28,7 @@ use super::engine::Engine;
 use crate::{
     DEFAULT_LOOKBACK, TableProvider,
     ast::{
-        result_order::top_level_sort_descending, selector_visitor::MetricSelectorVisitor,
-        visitor::walk_expr,
+        result_order::top_level_order, selector_visitor::MetricSelectorVisitor, visitor::walk_expr,
     },
     micros, micros_since_epoch,
 };
@@ -89,7 +88,7 @@ impl PromqlContext {
         }
 
         let ctx = Arc::new(self.clone());
-        let sort_descending = top_level_sort_descending(&stmt.expr);
+        let order = top_level_order(&stmt.expr);
         let expr = Arc::new(stmt.expr);
         let is_instant = self.start == self.end;
 
@@ -120,8 +119,8 @@ impl PromqlContext {
         };
 
         let mut sorted_value = final_value;
-        match sort_descending {
-            Some(descending) if is_instant => sorted_value.sort_by_value(descending),
+        match order {
+            Some(order) if is_instant => order.apply(&mut sorted_value),
             _ => sorted_value.sort(),
         }
         Ok((
@@ -269,7 +268,7 @@ fn shape_instant_result(
     // in its window, so the matrix evaluation produced is already the answer. Collapsing it
     // would keep an arbitrary one of those samples and drop the rest.
     if expr.value_type() == ValueType::Matrix {
-        return (value, Some("matrix".to_string()));
+        return (without_stale_markers(value), Some("matrix".to_string()));
     }
 
     match value {
@@ -293,6 +292,22 @@ fn shape_instant_result(
         Value::None => (Value::None, Some("vector".to_string())),
         other => (other, result_type_exec),
     }
+}
+
+/// A range selector's samples as the answer shows them: stale markers are not samples.
+fn without_stale_markers(value: Value) -> Value {
+    let Value::Matrix(mut matrix) = value else {
+        return value;
+    };
+    // a series left with no sample is dropped, one that had none (exemplars only) is kept
+    matrix.retain_mut(|series| {
+        let loaded = series.samples.len();
+        series
+            .samples
+            .retain(|sample| !config::meta::promql::is_stale_marker(sample.value));
+        loaded == 0 || !series.samples.is_empty()
+    });
+    Value::Matrix(matrix)
 }
 
 #[cfg(test)]
@@ -457,6 +472,25 @@ mod tests {
     }
 
     #[test]
+    fn test_instant_range_selector_leaves_out_stale_markers() {
+        let stale = f64::from_bits(config::meta::promql::STALE_NAN_BITS);
+        let value = Value::Matrix(vec![
+            RangeValue::new(
+                Labels::default(),
+                vec![Sample::new(1000, 14.0), Sample::new(3000, stale)],
+            ),
+            RangeValue::new(Labels::default(), vec![Sample::new(2000, stale)]),
+        ]);
+        let (value, _) = shaped("m[5m]", value);
+
+        let Value::Matrix(series) = &value else {
+            panic!("expected a matrix");
+        };
+        assert_eq!(series.len(), 1, "a series of only a marker has no samples");
+        assert_eq!(samples(&value), vec![(1000, 14.0)]);
+    }
+
+    #[test]
     fn test_instant_subquery_keeps_the_whole_window() {
         let (value, result_type) = shaped("m[5m:1m]", window_of_two());
 
@@ -530,5 +564,74 @@ mod tests {
         let timestamps = exemplar_timestamps("rate(test_metric[1m])", rows).await;
 
         assert_eq!(timestamps, times.to_vec());
+    }
+
+    /// Instance values of an instant (`start == end`) or range query's result, in result order.
+    async fn instances(query: &str, end_offset: i64) -> Vec<String> {
+        let query_ctx = crate::engine::tests::create_test_query_ctx("test", "test_org", 30);
+        let mut ctx =
+            PromqlContext::new(query_ctx, crate::engine::tests::SimpleMockProvider, vec![]);
+        let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
+        let stmt = EvalStmt {
+            expr: parser::parse(query).unwrap(),
+            start: at(WINDOW_START),
+            end: at(WINDOW_START + end_offset),
+            interval: Duration::from_secs(60),
+            lookback_delta: DEFAULT_LOOKBACK,
+        };
+        let (value, ..) = ctx.exec("test", stmt).await.unwrap();
+        let labels: Vec<_> = match value {
+            Value::Vector(vector) => vector.into_iter().map(|v| v.labels).collect(),
+            Value::Matrix(matrix) => matrix.into_iter().map(|m| m.labels).collect(),
+            other => panic!("unexpected result: {other:?}"),
+        };
+        labels
+            .iter()
+            .map(|labels| {
+                format!(
+                    "{}{}",
+                    labels.get_value("instance"),
+                    labels.get_value("zone")
+                )
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_sort_by_label_orders_an_instant_query_naturally() {
+        let series = |instance: &str, zone: &str, value: f64| {
+            format!(
+                r#"label_replace(label_replace(vector({value}), "instance", "{instance}", "", ""), "zone", "{zone}", "", "")"#
+            )
+        };
+        let input = [
+            series("host10", "a", 1.0),
+            series("host2", "b", 3.0),
+            series("host1", "a", 2.0),
+            series("host2", "a", 4.0),
+        ]
+        .join(" or ");
+        for (query, expected) in [
+            (
+                format!(r#"sort_by_label({input}, "instance")"#),
+                ["host1a", "host2a", "host2b", "host10a"],
+            ),
+            (
+                format!(r#"(sort_by_label_desc({input}, "instance"))"#),
+                ["host10a", "host2b", "host2a", "host1a"],
+            ),
+            (
+                format!(r#"sort_by_label({input}, "zone", "instance")"#),
+                ["host1a", "host2a", "host10a", "host2b"],
+            ),
+        ] {
+            assert_eq!(instances(&query, 0).await, expected, "{query}");
+        }
+        // a range query keeps the label order every range result has
+        let query = format!(r#"sort_by_label_desc({input}, "instance")"#);
+        assert_eq!(
+            instances(&query, 2 * MINUTE).await,
+            ["host1a", "host10a", "host2a", "host2b"]
+        );
     }
 }

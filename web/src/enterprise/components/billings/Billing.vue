@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ORouteTab
                 exact
                 name="plans"
+                data-test="billing-tab-plans"
                 :to="
                   '/billings/plans?org_identifier=' + store.state.selectedOrganization.identifier
                 "
@@ -53,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ORouteTab
                 exact
                 name="usage"
+                data-test="billing-tab-usage"
                 :to="
                   '/billings/usage?org_identifier=' + store.state.selectedOrganization.identifier
                 "
@@ -63,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="showInvoiceTab"
                 exact
                 name="invoice_history"
+                data-test="billing-tab-invoices"
                 :to="
                   '/billings/invoice_history?org_identifier=' +
                   store.state.selectedOrganization.identifier
@@ -74,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="config.isCloud == 'true'"
                 exact
                 name="billing_group"
+                data-test="billing-tab-group"
                 :to="
                   '/billings/billing_group?org_identifier=' +
                   store.state.selectedOrganization.identifier
@@ -112,6 +116,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex h-full w-full flex-col pt-2">
           <div class="flex min-h-0 flex-1 gap-2.5 pe-2.5 pb-2.5">
             <div class="h-full min-w-0 flex-1 overflow-y-auto">
+              <TrialPeriod
+                v-if="isUsageRoute && billingInfoLoaded"
+                current-page="usage"
+                :provider="billingProvider"
+                class="ms-2 me-3 mb-3"
+              />
               <router-view title=""> </router-view>
             </div>
           </div>
@@ -138,6 +148,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import BillingService from "@/services/billings";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import TrialPeriod from "./TrialPeriod.vue";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -147,6 +158,7 @@ export default defineComponent({
     ORouteTab,
     OSplitter,
     OButton,
+    TrialPeriod,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -164,6 +176,13 @@ export default defineComponent({
     const billingProvider = ref(""); // empty until loaded
     const isPaidUser = ref(false);
     const billingInfoLoaded = ref(false);
+    // Same rule TrialPeriod uses to show its strip.
+    const isTrialOrg = computed(() => {
+      const expiry = store.state.organizationData?.organizationSettings?.free_trial_expiry;
+      return (
+        expiry !== undefined && expiry !== null && expiry !== "" && billingProvider.value !== "aws"
+      );
+    });
 
     // Fetch billing info to determine provider
     const fetchBillingInfo = async () => {
@@ -172,9 +191,14 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
         );
         billingProvider.value = res.data?.provider || "";
-        isPaidUser.value = res.data?.customer_id.length > 0;
-      } catch (e) {
-        console.error("Failed to fetch billing info:", e);
+        isPaidUser.value = (res.data?.customer_id?.length ?? 0) > 0;
+      } catch (e: any) {
+        // A 401 here is already handled globally (http.ts logs the user out
+        // and reloads) — logging it too just adds noise for an expected
+        // session-expiry race, not a real failure.
+        if (e?.response?.status !== 401) {
+          console.error("Failed to fetch billing info:", e);
+        }
         billingProvider.value = "";
       } finally {
         billingInfoLoaded.value = true;
@@ -208,7 +232,13 @@ export default defineComponent({
       // Fetch billing info to determine provider type
       await fetchBillingInfo();
 
-      if (
+      if (router.currentRoute.value.name == "billings" && isTrialOrg.value) {
+        billingtab.value = "usage";
+        router.push({
+          path: "/billings/usage",
+          query: { org_identifier: store.state.selectedOrganization.identifier },
+        });
+      } else if (
         router.currentRoute.value.name == "billings" ||
         router.currentRoute.value.name == "plans"
       ) {
@@ -264,6 +294,7 @@ export default defineComponent({
       showSidebar,
       lastSplitterPosition,
       showInvoiceTab,
+      billingInfoLoaded,
       billingProvider,
       isPaidUser,
     };

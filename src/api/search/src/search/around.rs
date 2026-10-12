@@ -22,7 +22,7 @@ use config::{
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
-    utils::{base64, json},
+    utils::{base64, json, sql::quote_identifier},
 };
 use hashbrown::HashMap;
 use search::sql::rewriter::{
@@ -43,7 +43,6 @@ pub(crate) async fn around(
     stream_name: &str,
     stream_type: StreamType,
     query: Query<HashMap<String, String>>,
-    sql: Option<String>,
     body: Option<bytes::Bytes>,
     user_id: Option<String>,
 ) -> Result<config::meta::search::Response, infra::errors::Error> {
@@ -63,30 +62,7 @@ pub(crate) async fn around(
         query_fn = Some(format!("{vrl_function} \n ."));
     }
 
-    // For around search, we only use the stream name and ignore any SQL query
-    // Extract stream name from SQL if provided, otherwise use the stream_name parameter
-    let actual_stream_name = if let Some(sql) = sql.as_ref() {
-        // Extract stream name from SQL
-        config::meta::sql::resolve_stream_names_with_type(sql)
-            .ok()
-            .and_then(|tables| tables.first().map(|t| t.to_string()))
-            .unwrap_or_else(|| stream_name.to_string())
-    } else if let Some(sql_param) = query.get("sql") {
-        // Decode and extract stream name from SQL parameter
-        base64::decode_url(sql_param)
-            .ok()
-            .and_then(|sql| {
-                config::meta::sql::resolve_stream_names_with_type(&sql)
-                    .ok()
-                    .and_then(|tables| tables.first().map(|t| t.to_string()))
-            })
-            .unwrap_or_else(|| stream_name.to_string())
-    } else {
-        stream_name.to_string()
-    };
-
-    // Build the base SQL using only the stream name
-    let mut around_sql = format!("SELECT * FROM \"{}\" ", actual_stream_name);
+    let mut around_sql = around_base_sql(stream_name);
 
     // check playload
     let mut filters = HashMap::new();
@@ -115,6 +91,7 @@ pub(crate) async fn around(
     let around_size = query
         .get("size")
         .map_or(10, |v| v.parse::<i64>().unwrap_or(10));
+    let (fw_size, bw_size) = around_subquery_sizes(around_size)?;
 
     let regions = query.get("regions").map_or(vec![], |regions| {
         regions
@@ -155,7 +132,7 @@ pub(crate) async fn around(
         query: config::meta::search::Query {
             sql: fw_sql,
             from: 0,
-            size: around_size / 2,
+            size: fw_size,
             start_time: around_start_time,
             end_time: around_key,
             quick_mode: false,
@@ -195,7 +172,7 @@ pub(crate) async fn around(
         query: config::meta::search::Query {
             sql: bw_sql,
             from: 0,
-            size: around_size / 2,
+            size: bw_size,
             start_time: around_key,
             end_time: around_end_time,
             quick_mode: false,
@@ -290,4 +267,109 @@ pub(crate) async fn around(
     .await;
 
     Ok(resp)
+}
+
+fn around_subquery_sizes(around_size: i64) -> Result<(i64, i64), infra::errors::Error> {
+    if around_size <= 0 {
+        return Err(infra::errors::Error::ErrorCode(
+            infra::errors::ErrorCodes::InvalidParams("size must be a positive integer".to_string()),
+        ));
+    }
+    // size<=0 would reach the search layer as "use the default limit", so halves clamp at 1.
+    Ok((
+        (around_size / 2 + around_size % 2).max(1),
+        (around_size / 2).max(1),
+    ))
+}
+
+/// The stream an around search reads, so the one to authorize, which `sql` overrides.
+pub(crate) fn resolve_around_stream(
+    stream_name: &str,
+    sql: Option<&str>,
+    query: &HashMap<String, String>,
+) -> String {
+    let sql = match sql {
+        Some(sql) => Some(sql.to_string()),
+        None => query.get("sql").and_then(|v| base64::decode_url(v).ok()),
+    };
+    sql.and_then(|sql| {
+        config::meta::sql::resolve_stream_names_with_type(&sql)
+            .ok()
+            .and_then(|tables| tables.first().map(|t| t.to_string()))
+    })
+    .unwrap_or_else(|| stream_name.to_string())
+}
+
+pub(crate) fn around_base_sql(stream_name: &str) -> String {
+    format!("SELECT * FROM {} ", quote_identifier(stream_name))
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::sql::resolve_stream_names;
+
+    use super::*;
+
+    fn sql_query(sql: &str) -> HashMap<String, String> {
+        HashMap::from([("sql".to_string(), base64::encode_url(sql))])
+    }
+
+    // Regression: size=1 once produced two sub-queries of size 0, expanded to ~1000 rows each.
+    #[test]
+    fn test_around_subquery_sizes_reject_non_positive_and_clamp_halves() {
+        assert!(around_subquery_sizes(0).is_err());
+        assert!(around_subquery_sizes(-5).is_err());
+        assert_eq!(around_subquery_sizes(1).unwrap(), (1, 1));
+        assert_eq!(around_subquery_sizes(2).unwrap(), (1, 1));
+        assert_eq!(around_subquery_sizes(3).unwrap(), (2, 1));
+        assert_eq!(around_subquery_sizes(10).unwrap(), (5, 5));
+        assert_eq!(around_subquery_sizes(1000001).unwrap(), (500001, 500000));
+        // i64::MAX must not overflow (+1 would panic in debug / wrap in release)
+        assert_eq!(
+            around_subquery_sizes(i64::MAX).unwrap(),
+            (i64::MAX / 2 + 1, i64::MAX / 2)
+        );
+    }
+
+    #[test]
+    fn test_resolve_around_stream_uses_sql_param_table() {
+        let query = sql_query("SELECT * FROM \"foreign_stream\"");
+        assert_eq!(
+            resolve_around_stream("allowed", None, &query),
+            "foreign_stream"
+        );
+    }
+
+    #[test]
+    fn test_resolve_around_stream_uses_explicit_sql_table() {
+        let query = sql_query("SELECT * FROM \"other\"");
+        assert_eq!(
+            resolve_around_stream("allowed", Some("SELECT * FROM foreign_stream"), &query),
+            "foreign_stream"
+        );
+    }
+
+    #[test]
+    fn test_resolve_around_stream_falls_back_to_path() {
+        assert_eq!(
+            resolve_around_stream("allowed", None, &HashMap::new()),
+            "allowed"
+        );
+        let query = sql_query("not sql at all");
+        assert_eq!(resolve_around_stream("allowed", None, &query), "allowed");
+    }
+
+    #[test]
+    fn test_around_base_sql_reads_only_the_resolved_stream() {
+        let name = resolve_around_stream(
+            "allowed",
+            Some("SELECT * FROM \"allowed\"\" , \"\"foreign_stream\""),
+            &HashMap::new(),
+        );
+        assert_eq!(name, "allowed\" , \"foreign_stream");
+        assert_eq!(
+            resolve_stream_names(&around_base_sql(&name)).unwrap(),
+            vec![name]
+        );
+    }
 }

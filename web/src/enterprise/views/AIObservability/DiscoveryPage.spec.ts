@@ -91,7 +91,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     template: `<div class="o-table" :data-table-id="tableId" :data-total="totalCount"
       :data-page="currentPage" :data-pagination="pagination"
       :data-columns="(columns || []).map(c => c.id).join(',')">
-      <slot name="toolbar" /><slot name="bottom" /></div>`,
+      <slot name="toolbar" /><slot name="selection-actions" /><slot name="footer-note" /></div>`,
   },
 }));
 

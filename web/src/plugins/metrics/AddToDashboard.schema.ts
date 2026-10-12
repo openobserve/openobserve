@@ -22,8 +22,8 @@ export const makeAddToDashboardSchema = (t: TranslateFn) =>
 
 export type AddToDashboardForm = z.infer<ReturnType<typeof makeAddToDashboardSchema>>;
 
-// Static (create-only) defaults. Typed against the inferred form type so it
+// Create-only defaults; a caller may pre-fill the title. Typed against the inferred form type so it
 // can't drift from the schema. The component binds `:default-values`.
-export const addToDashboardDefaults = (): AddToDashboardForm => ({
-  panelTitle: "",
+export const addToDashboardDefaults = (panelTitle = ""): AddToDashboardForm => ({
+  panelTitle,
 });

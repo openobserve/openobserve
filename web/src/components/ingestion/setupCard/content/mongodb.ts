@@ -63,6 +63,7 @@ export default function mongodbCard(subs: CardSubstitutions, t: TranslateFn): Ri
   const tool = sharedToolIcons();
   return {
     provider: {
+      id: "mongoDB",
       name: raw("MongoDB"),
       tagline: t("ingestion.setupCard.mongodbTagline"),
       logo: getImageURL("images/ingestion/mongodb.svg"),

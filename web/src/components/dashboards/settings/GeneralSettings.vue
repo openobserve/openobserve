@@ -39,14 +39,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-general-setting-description"
         />
 
-        <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
+        <div
+          v-if="dateTimeValue"
+          class="flex flex-col items-start gap-1"
+          data-test="dashboard-general-setting-datetime-picker"
+        >
           <label class="text-compact text-input-label-text leading-tight font-medium">{{
             t("dashboard.defaultDuration")
           }}</label>
           <DateTimePickerDashboard
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="my-2 h-7.5"
+            class="h-7.5"
             size="sm"
             :initialTimezone="initialTimezone"
             v-model="dateTimeValue"

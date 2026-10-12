@@ -190,11 +190,6 @@ describe("InvitationList - fetchPendingInvitations", () => {
     expect((wrapper.vm as any).invitations.length).toBe(2);
   });
 
-  it("sets resultTotal to the number of invitations", async () => {
-    const wrapper = await mountInvitationList();
-    expect((wrapper.vm as any).resultTotal).toBe(2);
-  });
-
   // Row numbering moved to OTable's built-in show-index (no '#' data field).
 
   it("formats the expiry for each invitation", async () => {

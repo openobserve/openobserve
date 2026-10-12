@@ -70,6 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="assignment" size="sm" class="o-tab__icon shrink-0" />
           <span class="o-tab__label truncate">{{ t("iam.editRole.moduleOverviewTitle") }}</span>
         </OTab>
+        <OTab :name="ALL_MODULES_KEY" class="w-full" data-test="edit-role-module-rail-all-modules">
+          <OIcon :name="ALL_MODULES_ICON" size="sm" class="o-tab__icon shrink-0" />
+          <span class="o-tab__label truncate">{{ t("iam.editRole.allModulesTitle") }}</span>
+        </OTab>
 
         <template v-for="group in visibleGroups" :key="group.id">
           <!-- Header behaviour mirrors GroupedFieldList (logs/traces IndexList): click to fold, chevron shows state. -->
@@ -79,9 +83,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`edit-role-module-rail-group-${group.id}`"
             @click="toggleGroup(group.id)"
           >
-            <span class="min-w-0 flex-1 truncate">
+            <OTruncatedText class="flex-1">
               {{ group.label }} {{ countLabel(group.modules.length) }}
-            </span>
+            </OTruncatedText>
             <OButton
               variant="ghost"
               size="icon-xs"
@@ -146,6 +150,8 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { ALL_MODULES_ICON, ALL_MODULES_KEY } from "@/components/iam/roles/roleModules";
 
 export type RailModule = {
   key: string;

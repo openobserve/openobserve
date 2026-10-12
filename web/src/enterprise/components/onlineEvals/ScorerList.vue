@@ -10,7 +10,6 @@
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
-        :footer-title="t('onlineEvals.scorer.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
         :page-size="20"
@@ -107,20 +106,15 @@
           </div>
         </template>
 
-        <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal max-md:hidden">
-            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
-          </span>
+        <template #selection-actions>
           <OButton
-            v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="ms-3"
             icon-left="download"
             data-test="scorer-bulk-export-btn"
             @click="handleBulkExport"
           >
-            {{ t("onlineEvals.scorer.export.bulkButton") }} ({{ selectedIds.length }})
+            {{ t("common.export") }}
           </OButton>
         </template>
 

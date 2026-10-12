@@ -226,26 +226,25 @@ describe("OperationsList", () => {
   });
 
   describe("Drag and Drop", () => {
-    it("should handle drag update", () => {
-      const operations = [...mockOperations];
-      wrapper = createWrapper({ operations });
+    const sum = { id: PromqlStepId.Sum, params: [[]] };
+    const abs = { id: PromqlStepId.Abs, params: [] };
 
-      const reordered = [mockOperations[1], mockOperations[0]];
-      wrapper.vm.handleDragUpdate(reordered);
+    it("should handle drag update", () => {
+      wrapper = createWrapper({ operations: [sum, abs] });
+
+      wrapper.vm.handleDragUpdate([abs, sum]);
 
       // Check that update:operations event was emitted with reordered operations
       const emitted = wrapper.emitted("update:operations");
       expect(emitted).toBeTruthy();
-      expect(emitted![0][0][0].id).toBe(PromqlStepId.Sum);
-      expect(emitted![0][0][1].id).toBe(PromqlStepId.Rate);
+      expect(emitted![0][0][0].id).toBe(PromqlStepId.Abs);
+      expect(emitted![0][0][1].id).toBe(PromqlStepId.Sum);
     });
 
     it("should emit update event on drag", () => {
-      const operations = [...mockOperations];
-      wrapper = createWrapper({ operations });
+      wrapper = createWrapper({ operations: [sum, abs] });
 
-      const reordered = [mockOperations[1], mockOperations[0]];
-      wrapper.vm.handleDragUpdate(reordered);
+      wrapper.vm.handleDragUpdate([abs, sum]);
 
       expect(wrapper.emitted("update:operations")).toBeTruthy();
     });
@@ -512,6 +511,76 @@ describe("OperationsList", () => {
 
       const dragHandle = wrapper.find(".drag-handle");
       expect(dragHandle.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+    });
+  });
+
+  describe("retired steps", () => {
+    it("are not offered in the picker", async () => {
+      wrapper = createWrapper({ operations: [] });
+      await wrapper.find('[data-test="promql-add-operation"]').trigger("click");
+      expect(wrapper.find('[data-test="promql-operation-option-pi"]').exists()).toBe(false);
+      expect(
+        wrapper.find(`[data-test="promql-operation-option-${PromqlStepId.Deg}"]`).exists(),
+      ).toBe(true);
+    });
+  });
+
+  describe("range functions only as the first step", () => {
+    const rateOption = () =>
+      wrapper.find(`[data-test="promql-operation-option-${PromqlStepId.Rate}"]`);
+    const open = async () => {
+      await wrapper.find('[data-test="promql-add-operation"]').trigger("click");
+    };
+
+    it("offers a range function while the chain is empty", async () => {
+      wrapper = createWrapper({ operations: [] });
+      await open();
+      expect(rateOption().attributes("aria-disabled")).toBe("false");
+      await rateOption().trigger("click");
+      expect(wrapper.emitted("update:operations")![0][0][0].id).toBe(PromqlStepId.Rate);
+    });
+
+    it("disables a range function once the chain has a step", async () => {
+      wrapper = createWrapper({ operations: [{ id: PromqlStepId.Sum, params: [[]] }] });
+      await open();
+      expect(rateOption().attributes("aria-disabled")).toBe("true");
+      await rateOption().trigger("click");
+      expect(wrapper.emitted("update:operations")).toBeUndefined();
+      const sumOption = wrapper.find(`[data-test="promql-operation-option-${PromqlStepId.Avg}"]`);
+      expect(sumOption.attributes("aria-disabled")).toBe("false");
+    });
+
+    it("explains the blocked group in place, not only on hover", async () => {
+      wrapper = createWrapper({ operations: [{ id: PromqlStepId.Sum, params: [[]] }] });
+      await open();
+      const group = wrapper.find('[data-test="operations-list-category-Rate & range"]');
+      expect(group.text()).not.toContain("First step only");
+      expect(group.find('[data-test="operations-list-range-first-note"]').text()).toBe(
+        "A range function reads the raw samples, so it can only be the first step. Remove the other steps to add one.",
+      );
+    });
+
+    it("explains a blocked range function when its name is hovered", async () => {
+      wrapper = createWrapper({ operations: [{ id: PromqlStepId.Sum, params: [[]] }] });
+      await open();
+      rateOption().element.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 800));
+      await wrapper.vm.$nextTick();
+      expect(document.querySelector('[data-test="o-tooltip-content"]')?.textContent).toContain(
+        "A range function can only be the first step",
+      );
+    });
+
+    it("says nothing extra while a range function can still be added", async () => {
+      wrapper = createWrapper({ operations: [] });
+      await open();
+      expect(wrapper.find('[data-test="operations-list-range-first-note"]').exists()).toBe(false);
+    });
+
+    it("refuses a reorder that moves a range function off the first step", () => {
+      wrapper = createWrapper();
+      wrapper.vm.handleDragUpdate([mockOperations[1], mockOperations[0]]);
+      expect(wrapper.emitted("update:operations")).toBeUndefined();
     });
   });
 });

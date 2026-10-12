@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 export interface CreateBackfillJobRequest {
   start_time: string | number; // ISO 8601 string or microseconds
@@ -72,6 +73,9 @@ const backfill = {
   }): Promise<CreateBackfillJobResponse> => {
     const url = `/api/${org_id}/pipelines/${pipeline_id}/backfill`;
     const response = await http().post(url, data);
+    analytics.track("pipeline_backfill_started", {
+      delete_before_backfill: !!data.delete_before_backfill,
+    });
     return response.data;
   },
 

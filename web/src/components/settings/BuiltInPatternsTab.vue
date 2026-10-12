@@ -112,12 +112,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   +{{ pattern.tags.length - 3 }}
                 </OTag>
               </div>
-              <div
-                class="text-compact text-text-secondary line-clamp-1 font-mono leading-[1.4] break-all"
+              <OTruncatedText
+                as="div"
+                class="text-compact text-text-secondary font-mono leading-[1.4] break-all"
               >
-                {{ pattern.pattern.substring(0, 100)
-                }}{{ pattern.pattern.length > 100 ? "..." : "" }}
-              </div>
+                {{ pattern.pattern }}
+              </OTruncatedText>
             </div>
 
             <div class="ms-auto flex shrink-0 items-center">
@@ -203,12 +203,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 px-3 py-1"
             >
               <div class="flex min-w-0 flex-1 flex-col">
-                <span
-                  class="text-muted-foreground block text-xs text-wrap"
+                <OTruncatedText
+                  :lines="3"
+                  class="text-muted-foreground text-xs text-wrap"
                   style="word-break: break-all"
                 >
-                  {{ example.substring(0, 200) }}{{ example.length > 200 ? "..." : "" }}
-                </span>
+                  {{ example }}
+                </OTruncatedText>
               </div>
             </li>
           </ul>
@@ -233,6 +234,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -266,6 +268,7 @@ export default defineComponent({
     OSearchInput,
     OCheckbox,
     OTooltip,
+    OTruncatedText,
     OTextarea,
   },
   emits: ["import-patterns"],

@@ -21,11 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="lgUp ? undefined : label"
   >
     <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
-      <div
-        class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold max-lg:hidden"
+      <OTruncatedText
+        as="div"
+        class="text-2xs text-text-secondary leading-normal font-semibold max-lg:hidden"
       >
         {{ label }}
-      </div>
+      </OTruncatedText>
       <span
         v-if="icon"
         class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
@@ -67,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { I18nText } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 

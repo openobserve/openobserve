@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import awsMarketplace from "@/services/awsMarketplace";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -277,5 +280,27 @@ describe("awsMarketplace service", () => {
       expect(mockHttpInstance.post).toHaveBeenCalledTimes(1);
       expect(mockHttpInstance.get).toHaveBeenCalledTimes(2);
     });
+  });
+});
+
+describe("awsMarketplace product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after linkSubscription succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await awsMarketplace.linkSubscription("org1", "tok");
+    expect(analytics.track).toHaveBeenCalledWith("marketplace_subscription_linked", {
+      marketplace: "aws",
+    });
+  });
+
+  it("does not track when linkSubscription fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(awsMarketplace.linkSubscription("org1", "tok")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

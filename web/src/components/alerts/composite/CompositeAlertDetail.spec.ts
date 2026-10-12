@@ -155,13 +155,16 @@ describe("CompositeAlertDetail", () => {
     ).toBe(false);
   });
 
-  it("preserves a long child name in the link title while truncating visually", () => {
+  it("keeps a long child name in full in the link while truncating visually", () => {
     const longName = `Checkout ${"regional-database-failover-".repeat(12)}`;
     const base = makeDetail();
     const child = (base.children as Array<Record<string, unknown>>)[0];
     const wrapper = mountDetail(makeDetail({ children: [{ ...child, name: longName }] }));
     const link = wrapper.find('[data-test="alerts-composite-detail-child-link-id-a"]');
 
-    expect(link.attributes("title")).toBe(longName);
+    expect(link.element.tagName).toBe("A");
+    expect(link.classes()).toContain("truncate");
+    expect(link.attributes("title")).toBeUndefined();
+    expect(link.text()).toBe(longName);
   });
 });

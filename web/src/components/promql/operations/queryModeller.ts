@@ -25,6 +25,15 @@ import {
 } from "../types";
 import { buildPromqlStepCatalog } from "./index";
 
+const SCALAR_PRECEDENCE: Partial<Record<string, number>> = {
+  [PromqlStepId.Addition]: 1,
+  [PromqlStepId.Subtraction]: 1,
+  [PromqlStepId.MultiplyBy]: 2,
+  [PromqlStepId.DivideBy]: 2,
+  [PromqlStepId.Modulo]: 2,
+  [PromqlStepId.Exponent]: 3,
+};
+
 class PromqlRendererImpl implements PromqlRenderer {
   private operations: Map<string, PromqlStepSpec>;
 
@@ -73,7 +82,7 @@ class PromqlRendererImpl implements PromqlRenderer {
 
     // Handle quantile_over_time first (special case with 2 params)
     if (id === PromqlStepId.QuantileOverTime) {
-      const quantile = params[0] || 0.95;
+      const quantile = params[0] ?? 0.95;
       const range = params[1] || "$__interval";
       return `${id}(${quantile}, ${innerExpr}[${range}])`;
     }
@@ -129,7 +138,7 @@ class PromqlRendererImpl implements PromqlRenderer {
 
     // Handle histogram_quantile
     if (id === PromqlStepId.HistogramQuantile) {
-      const quantile = params[0] || 0.95;
+      const quantile = params[0] ?? 0.95;
       return `${id}(${quantile}, ${innerExpr})`;
     }
 
@@ -172,6 +181,8 @@ class PromqlRendererImpl implements PromqlRenderer {
     ) {
       if (id === PromqlStepId.Clamp) {
         return `${id}(${innerExpr}, ${params[0]}, ${params[1]})`;
+      } else if (id === PromqlStepId.ClampMax || id === PromqlStepId.ClampMin) {
+        return `${id}(${innerExpr}, ${params[0]})`;
       } else if (id === PromqlStepId.Round && params[0] && params[0] !== 1) {
         return `${id}(${innerExpr}, ${params[0]})`;
       }
@@ -200,8 +211,18 @@ class PromqlRendererImpl implements PromqlRenderer {
     // innermost and the last one outermost.
     // Example: [max, rate, sum] renders as: sum(rate(max(...)))
     let currentExpr = queryStr;
-    for (let i = 0; i < query.operations.length; i++) {
-      currentExpr = this.renderOperation(query.operations[i], currentExpr);
+    let inner: number | undefined;
+    for (const operation of query.operations) {
+      const id = normalizeStepId(operation.id);
+      // An unknown step renders nothing, so the expression it was given stays the inner one.
+      if (!this.operations.has(id)) continue;
+      const outer = SCALAR_PRECEDENCE[id];
+      // A binary input binds looser than (or as loose as) the operator now wrapping it.
+      if (inner !== undefined && outer !== undefined && inner <= outer) {
+        currentExpr = `(${currentExpr})`;
+      }
+      currentExpr = this.renderOperation(operation, currentExpr);
+      inner = outer;
     }
 
     return currentExpr;
@@ -216,7 +237,7 @@ class PromqlRendererImpl implements PromqlRenderer {
 
   /** Every step in one group of the picker. */
   getStepsForGroup(group: string): PromqlStepSpec[] {
-    return Array.from(this.operations.values()).filter((op) => op.group === group);
+    return Array.from(this.operations.values()).filter((op) => op.group === group && !op.retired);
   }
 
   /** The picker's groups, in declaration order. */

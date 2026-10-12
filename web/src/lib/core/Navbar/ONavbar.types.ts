@@ -39,6 +39,11 @@ export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol
   "o-navbar-rail-indicator-active",
 );
 
+/** Provided by ONavbar so a teleported flyout item can mark its click as rail-started. */
+export const RailNavigationMarkKey: InjectionKey<(event: MouseEvent) => void> = Symbol(
+  "o-navbar-rail-navigation-mark",
+);
+
 /**
  * A flyout sub-item. These mirror the target page's own in-page section nav
  * EXACTLY — same label (i18n key), same icon, same category grouping — so the
@@ -86,6 +91,8 @@ export interface SubnavChild {
    * flyout when the page itself would hide it.
    */
   gate?: string;
+  /** Shows the shared "Beta" tag (see BetaBadge.vue) next to this child's label. */
+  beta?: boolean;
 }
 
 /** Context for evaluating subnav `gate` predicates (see navGroups.ts). */
@@ -120,7 +127,7 @@ export interface NavGateContext {
  */
 export type RailEntry =
   | { type: "link"; item: NavItem }
-  | { type: "linkGroup"; item: NavItem; children: SubnavChild[] }
+  | { type: "linkGroup"; item: NavItem; children: SubnavChild[]; filtered?: SubnavChild[] }
   | {
       type: "group";
       key: string;

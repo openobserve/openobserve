@@ -131,9 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.enter.prevent="toggleDashboard(dashboard)"
               @keydown.space.prevent="toggleDashboard(dashboard)"
             >
-              <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">{{
+              <OTruncatedText class="text-text-heading flex-1 text-sm font-medium">{{
                 dashboard.displayName
-              }}</span>
+              }}</OTruncatedText>
               <OCheckbox
                 :model-value="isSelected(dashboard)"
                 size="sm"
@@ -227,6 +227,7 @@ import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import dashboardsService from "@/services/dashboards";
+import analytics from "@/services/product_analytics";
 import {
   useDashboardGallery,
   getCategoryInfo,
@@ -248,12 +249,14 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 type GitHubDashboard = GalleryDashboard;
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
   components: {
+    OTruncatedText,
     AddFolder,
     OButton,
     OText,
@@ -543,6 +546,7 @@ export default defineComponent({
 
               // Import dashboard
               await dashboardsService.create(orgId, dashboardJson, folderId);
+              analytics.track("dashboard_created");
               successCount++;
             } catch (err) {
               failCount++;
@@ -560,6 +564,9 @@ export default defineComponent({
           }
         }
 
+        if (successCount > 0) {
+          analytics.track("dashboard_imported", { source: "library", count: successCount });
+        }
         // A cancelled batch shows no summary — the drawer is already gone.
         if (importCancelled) return;
 

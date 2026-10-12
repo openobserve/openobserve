@@ -83,10 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-name="{ row }">
             <div class="item-name flex items-center gap-1.5">
-              <span class="block overflow-hidden text-ellipsis whitespace-nowrap">
-                {{ row.name }}
-              </span>
-              <OTooltip v-if="row.name.length > 30" :content="row.name" />
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
               <!-- Dependency indicator: icon + count of variables this one depends
                    on. OTooltip WRAPS the chip (default-slot mode) so the whole chip
                    is the hover target — child mode would anchor only to the count. -->
@@ -277,6 +274,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL, TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "VariableSettings",
@@ -294,6 +292,7 @@ export default defineComponent({
     OTag,
     OTooltip,
     OTable,
+    OTruncatedText,
   },
   emits: ["save"],
   setup(props, { emit }) {

@@ -203,8 +203,11 @@ export interface DimensionAnalyticsSummary {
  * Get semantic field groups for field name translation
  * Uses the existing alerts/deduplication/semantic-groups API
  */
-export const getSemanticGroups = (org_identifier: string): Promise<{ data: FieldAlias[] }> => {
-  return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
+export const getSemanticGroups = (
+  org_identifier: string,
+  options?: { silentForbidden?: boolean },
+): Promise<{ data: FieldAlias[] }> => {
+  return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`, options);
 };
 
 export const updateSemanticGroups = (
@@ -302,8 +305,9 @@ export const saveIdentityConfig = (
  */
 export const getIdentityConfig = (
   orgIdentifier: string,
+  options?: { silentForbidden?: boolean },
 ): Promise<{ data: ServiceIdentityConfig }> => {
-  return http().get(`/api/${orgIdentifier}/service_streams/config/identity`);
+  return http().get(`/api/${orgIdentifier}/service_streams/config/identity`, options);
 };
 
 /**

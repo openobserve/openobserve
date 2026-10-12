@@ -219,6 +219,17 @@ export const useSearchResponseHandler = () => {
     searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
+  // Carries histogram-owned fields through the streaming_aggs reassignment below, which otherwise drops them when a concurrent search run overlaps the still-streaming histogram (see histogramStreamCapture.spec.ts).
+  const preserveHistogramFields = () => ({
+    aggs: searchObj.data?.queryResults?.aggs,
+    order_by: searchObj.data?.queryResults?.order_by,
+    histogram_interval: searchObj.data?.queryResults?.histogram_interval,
+    visualization_histogram_interval:
+      searchObj.data?.queryResults?.visualization_histogram_interval,
+    histogram_breakdown_field: searchObj.data?.queryResults?.histogram_breakdown_field,
+    converted_histogram_query: searchObj.data?.queryResults?.converted_histogram_query,
+  });
+
   const handleStreamingMetadata = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
@@ -250,6 +261,7 @@ export const useSearchResponseHandler = () => {
             (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
           hits: searchObj.data?.queryResults?.hits || [],
           streaming_aggs: response.content?.streaming_aggs,
+          ...preserveHistogramFields(),
         };
       } else if (isPagination) {
         searchObj.data.queryResults.from = response.content.results.from;

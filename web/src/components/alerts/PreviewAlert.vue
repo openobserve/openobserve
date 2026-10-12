@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch, onMounted, computed, nextTick, reactive, onBeforeMount } from "vue";
+import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
 import {
   cleanAggregationQuery,
@@ -1148,6 +1149,23 @@ const evaluatePromqlSeries = (dataSeries: any[]) => {
   const hasWarningBand = warning !== null;
 
   const criticalGate = evaluateCountGate(criticalCount);
+  const forecast = props.formData._ui?.forecast;
+  if (forecast) {
+    // The summary states nothing until the horizon is usable, and the verdict must not contradict it.
+    if (critical === null || !isForecastHorizonValid(critical)) {
+      evaluationStatus.value = null;
+      return;
+    }
+    evaluationStatus.value = {
+      wouldTrigger: criticalGate.passes,
+      reason: t("alerts.forecast.previewReason", {
+        count: criticalCount,
+        threshold: forecast.T,
+        horizon: t("alerts.forecast.dayCount", { n: critical }, critical),
+      }),
+    };
+    return;
+  }
   if (criticalGate.passes) {
     setEvaluationStatus({
       count: criticalCount,
@@ -1271,6 +1289,12 @@ const refreshData = () => {
     props.selectedTab === "sql" ||
     (props.selectedTab === "custom" && props.isAggregationEnabled)
   ) {
+    // The editor can mount (and this watcher fire) before the user has
+    // picked a stream — result_schema 400s on a stream-less/invalid query,
+    // so wait until the form actually has one.
+    if (!props.formData.stream_name || !props.formData.stream_type) {
+      return;
+    }
     // Use result_schema API to get query structure
     fetchQuerySchema();
     return;
@@ -1294,8 +1318,10 @@ const refreshData = () => {
     // the legend renders as "{}". Name it after what the alert measures — the
     // same fallback AlertGroupChart uses. Consulted only when a series has no
     // name of its own to give: labels that identify it always win.
-    dashboardPanelData.data.queries[0].config.promql_legend_fallback =
-      props.formData.stream_name || t("alerts.preview");
+    const forecast = props.formData._ui?.forecast;
+    dashboardPanelData.data.queries[0].config.promql_legend_fallback = forecast
+      ? t("alerts.forecast.previewSeries", { threshold: forecast.T })
+      : props.formData.stream_name || t("alerts.preview");
     dashboardPanelData.data.queryType = "promql";
     dashboardPanelData.data.type = "line"; // Default chart type for PromQL time-series
 

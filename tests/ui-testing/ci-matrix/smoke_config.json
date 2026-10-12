@@ -180,6 +180,12 @@
       "web/src/services/sourcemaps.*",
       "tests/ui-testing/pages/rumPages/**"
     ],
+    "RUM-Analytics": [
+      "web/src/components/rum/productAnalytics/**",
+      "web/src/views/RUM/**",
+      "web/src/services/rumProductAnalytics.*",
+      "tests/ui-testing/pages/rumPages/**"
+    ],
     "Streams": [
       "web/src/components/logstream/**",
       "web/src/components/ingestion/**",

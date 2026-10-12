@@ -16,7 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   The one entry point for "create an alert from here", in whichever shape the
-  host surface needs: a dropdown item, a button, or a bare icon button.
+  host surface needs: a dropdown item, a button, a page-header toolbar button,
+  or a bare icon button.
 
   A surface supplies `source` and `build`; this owns the label, icon, disabled
   tooltip, confirm dialog, and the hand-off to the alert form. That is what
@@ -60,6 +61,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OButton>
 
   <OButton
+    v-else-if="variant === 'toolbar'"
+    variant="outline"
+    size="sm-toolbar"
+    :disabled="!!disabledReason"
+    :icon-left="source_.icon"
+    :aria-label="label"
+    :data-test="dataTest"
+    @click="onActivate"
+  >
+    <span class="max-md:hidden">{{ label }}</span>
+    <OTooltip v-if="disabledReason || isMobile" :content="disabledReason || label" />
+  </OButton>
+
+  <OButton
     v-else
     variant="ghost"
     size="sm"
@@ -84,6 +99,7 @@ import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefi
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
 import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const props = withDefaults(
   defineProps<{
@@ -94,7 +110,7 @@ const props = withDefaults(
      * and again if the dialog re-parameterises it (see rebuildAlertPrefill).
      */
     build: (options?: AlertBuildOptions) => AlertPrefill;
-    variant?: "menu-item" | "button" | "icon";
+    variant?: "menu-item" | "button" | "toolbar" | "icon";
     /** Non-null disables the control and is shown as the tooltip reason. */
     disabledReason?: I18nText | null;
     /** Folder the alert lands in. */
@@ -112,6 +128,8 @@ const props = withDefaults(
 
 const { t } = useI18nTyped();
 const { openAlertCreation } = useAlertCreation();
+// The tooltip names the button only where its label is hidden.
+const { isMobile } = useBreakpoint();
 
 const source_ = computed(() => getAlertSource(props.source));
 const label = computed(() => t(source_.value.labelKey));

@@ -56,6 +56,7 @@ use serde_json::Map;
 pub mod agent_signals;
 pub mod inferred;
 pub mod otel;
+pub mod red_insights;
 pub mod service_graph;
 pub mod session;
 #[cfg(test)]
@@ -697,6 +698,22 @@ pub async fn handle_otlp_request(
         Some(name) => format_stream_name(name.to_string()),
         None => "default".to_owned(),
     };
+    // Refused before the pipelines run: a remote-stream destination writes inside them.
+    #[cfg(feature = "vectorscan")]
+    if let Some(reason) = crate::ingestion::sdr_fail_closed_refusal(
+        org_id,
+        StreamType::Traces,
+        &[(&traces_stream_name, 0)],
+        |_| false,
+    )
+    .await
+    {
+        return Ok(otlp_rejection_response(
+            req_type,
+            http::StatusCode::SERVICE_UNAVAILABLE,
+            reason,
+        ));
+    }
 
     let now = now_micros();
     let min_ts = now - cfg.limit.ingest_allowed_upto_micro;
@@ -1191,6 +1208,26 @@ pub async fn handle_otlp_request(
         );
     }
 
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Traces, &streams, |_| {
+                false
+            })
+            .await
+        {
+            return Ok(otlp_rejection_response(
+                req_type,
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                reason,
+            ));
+        }
+    }
+
     // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
     // Span attributes are flattened to top-level string fields (see
     // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
@@ -1519,6 +1556,25 @@ pub async fn ingest_json(
         );
     }
 
+    #[cfg(feature = "vectorscan")]
+    {
+        let streams: Vec<(&str, u64)> = json_data_by_stream
+            .iter()
+            .map(|(stream, data)| (stream.as_str(), data.0.len() as u64))
+            .collect();
+        if let Some(reason) =
+            crate::ingestion::sdr_fail_closed_refusal(org_id, StreamType::Traces, &streams, |_| {
+                false
+            })
+            .await
+        {
+            return Ok(MetaHttpResponse::error_with_header(
+                http::StatusCode::SERVICE_UNAVAILABLE,
+                reason,
+            ));
+        }
+    }
+
     // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
     // Span attributes are flattened to top-level string fields (see
     // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
@@ -1678,26 +1734,35 @@ async fn write_traces_by_stream(
     user_email: &str,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
-        // for cloud, we want to sent event when user creates a new stream
-        #[cfg(feature = "cloud")]
-        if get_stream(org_id, &traces_stream_name, StreamType::Traces)
-            .await
-            .is_none()
+        if crate::ingestion::checks_for_new_stream(org_id)
+            && !infra::schema::exists(org_id, StreamType::Traces, &traces_stream_name).await
         {
-            let org = super::organization::get_org(org_id).await.unwrap();
+            // for cloud, we want to sent event when user creates a new stream
+            #[cfg(feature = "cloud")]
+            if get_stream(org_id, &traces_stream_name, StreamType::Traces)
+                .await
+                .is_none()
+            {
+                let org = super::organization::get_org(org_id).await.unwrap();
 
-            super::self_reporting::cloud_events::enqueue_cloud_event(
-                super::self_reporting::cloud_events::CloudEvent {
-                    org_id: org.identifier.clone(),
-                    org_name: org.name.clone(),
-                    org_type: org.org_type.clone(),
-                    user: None,
-                    event: super::self_reporting::cloud_events::EventType::StreamCreated,
-                    subscription_type: None,
-                    stream_name: Some(traces_stream_name.clone()),
-                },
-            )
-            .await;
+                super::self_reporting::cloud_events::enqueue_cloud_event(
+                    super::self_reporting::cloud_events::CloudEvent {
+                        org_id: org.identifier.clone(),
+                        org_name: org.name.clone(),
+                        org_type: org.org_type.clone(),
+                        user: None,
+                        event: super::self_reporting::cloud_events::EventType::StreamCreated,
+                        subscription_type: None,
+                        stream_name: Some(traces_stream_name.clone()),
+                    },
+                )
+                .await;
+            }
+            super::onboarding::on_user_stream_created(
+                org_id,
+                StreamType::Traces,
+                &traces_stream_name,
+            );
         }
 
         let mut req_stats = match write_traces(org_id, &traces_stream_name, json_data).await {

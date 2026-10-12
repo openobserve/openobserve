@@ -161,19 +161,19 @@ describe("dateTimeUtils", () => {
     it("converts days offset correctly", () => {
       const result = convertOffsetToSeconds("1d", endTimestamp);
       expect(result.seconds).toBe(86400000); // 1 day in ms
-      expect(result.periodAsStr).toBe("1 Days ago");
+      expect(result.periodAsStr).toBe("1 Day ago");
     });
 
     it("converts weeks offset correctly (7 days)", () => {
       const result = convertOffsetToSeconds("1w", endTimestamp);
       expect(result.seconds).toBe(604800000); // 7 days in ms
-      expect(result.periodAsStr).toBe("1 Weeks ago");
+      expect(result.periodAsStr).toBe("1 Week ago");
     });
 
     it("converts months offset correctly", () => {
       const result = convertOffsetToSeconds("1M", endTimestamp);
       expect(result.seconds).toBeGreaterThan(0);
-      expect(result.periodAsStr).toBe("1 Months ago");
+      expect(result.periodAsStr).toBe("1 Month ago");
     });
 
     it("returns 0 seconds for invalid unit", () => {

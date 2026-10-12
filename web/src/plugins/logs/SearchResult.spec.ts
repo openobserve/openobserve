@@ -107,7 +107,6 @@ describe("SearchResult Component", () => {
           CellActions: true,
           O2AIContextAddBtn: true,
           PatternDetailsDialog: true,
-          TracesAnalysisDashboard: true,
           ODrawer: oDrawerStub,
         },
       },
@@ -758,25 +757,22 @@ describe("SearchResult Component", () => {
     });
   });
 
-  describe("Volume Analysis Dashboard", () => {
-    it("should open volume analysis dashboard", () => {
-      wrapper.vm.showVolumeAnalysisDashboard = false;
-      wrapper.vm.openVolumeAnalysisDashboard();
-      expect(wrapper.vm.showVolumeAnalysisDashboard).toBe(true);
+  describe("Drill down (formerly the Insights drawer)", () => {
+    it("no longer renders an Insights button in the results toolbar", async () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.queryResults.hits = [{ _timestamp: 1, message: "a" }];
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="logs-analyze-dimensions-button"]').exists()).toBe(false);
     });
 
-    it("should close volume analysis dashboard", () => {
-      wrapper.vm.showVolumeAnalysisDashboard = true;
-      wrapper.vm.closeVolumeAnalysisDashboard();
-      expect(wrapper.vm.showVolumeAnalysisDashboard).toBe(false);
-    });
-
-    it("openVolumeAnalysisDashboard is a function", () => {
-      expect(typeof wrapper.vm.openVolumeAnalysisDashboard).toBe("function");
-    });
-
-    it("closeVolumeAnalysisDashboard is a function", () => {
-      expect(typeof wrapper.vm.closeVolumeAnalysisDashboard).toBe("function");
+    it("keeps exposing the histogram brush state the Drill down page reads", () => {
+      expect(wrapper.vm.hasHistogramSelection).toBe(false);
+      expect(wrapper.vm.originalTimeRangeBeforeSelection).toBeNull();
+      expect(wrapper.vm.volumeAnalysisTimeRange).toEqual({
+        startTime: wrapper.vm.searchObj.data.datetime.startTime,
+        endTime: wrapper.vm.searchObj.data.datetime.endTime,
+      });
     });
   });
 

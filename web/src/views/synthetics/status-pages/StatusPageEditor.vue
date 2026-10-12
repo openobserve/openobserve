@@ -77,9 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("statusPages.publicUrl")
               }}</span>
               <div class="flex items-center gap-2">
-                <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">{{
+                <OTruncatedText class="text-text-body flex-1 font-mono text-xs">{{
                   publicUrl
-                }}</span>
+                }}</OTruncatedText>
                 <OButton
                   variant="outline"
                   size="sm"
@@ -388,6 +388,7 @@ import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";

@@ -63,3 +63,70 @@ pub mod instance {
         db::put("/instance/", data, db::NO_NEED_WATCH, None).await
     }
 }
+
+pub mod grpc_token {
+    use infra::errors::Result;
+
+    // its own module, not a key under /instance/: NATS get falls back to a prefix scan there
+    const KEY: &str = "/internal_grpc_token/";
+
+    pub async fn get() -> Result<Option<String>> {
+        super::secret::get(KEY).await
+    }
+
+    pub async fn get_or_create(candidate: &str) -> Result<String> {
+        super::secret::get_or_create(KEY, candidate).await
+    }
+}
+
+pub mod ext_auth_salt {
+    use infra::errors::Result;
+
+    const KEY: &str = "/ext_auth_salt/";
+
+    pub async fn get() -> Result<Option<String>> {
+        super::secret::get(KEY).await
+    }
+
+    pub async fn get_or_create(candidate: &str) -> Result<String> {
+        super::secret::get_or_create(KEY, candidate).await
+    }
+}
+
+mod secret {
+    use bytes::Bytes;
+    use infra::{
+        db::{NO_NEED_WATCH, get_db},
+        errors::{Error, Result},
+    };
+
+    pub(super) async fn get(key: &str) -> Result<Option<String>> {
+        let value = get_db().await.get_if_exists(key).await?;
+        Ok(value
+            .map(|v| String::from_utf8_lossy(&v).trim().to_string())
+            .filter(|v| !v.is_empty()))
+    }
+
+    /// Returns the stored value, which is `candidate` only when nothing was stored yet.
+    pub(super) async fn get_or_create(key: &str, candidate: &str) -> Result<String> {
+        let value = Bytes::from(candidate.to_string());
+        let owned_key = key.to_string();
+        get_db()
+            .await
+            .get_for_update(
+                key,
+                NO_NEED_WATCH,
+                None,
+                Box::new(move |existing| {
+                    Ok(match existing {
+                        Some(_) => None,
+                        None => Some((None, Some((owned_key, value, None)))),
+                    })
+                }),
+            )
+            .await?;
+        get(key)
+            .await?
+            .ok_or_else(|| Error::Message(format!("{key} is missing after create")))
+    }
+}

@@ -126,25 +126,23 @@ describe("ErrorIssueCell", () => {
   });
 
   // -------------------------------------------------------------------------
-  // message — title attribute for truncation
+  // message — truncation with an overflow-only tooltip
   // -------------------------------------------------------------------------
 
-  describe("message title attribute", () => {
-    it("sets title attribute to the full error_message", () => {
-      expect(wrapper.find('[data-test="rum-error-issue-cell-message"]').attributes("title")).toBe(
-        "Cannot read property 'foo' of undefined",
-      );
+  describe("message truncation", () => {
+    it("truncates the message without a native title attribute", () => {
+      const message = wrapper.find('[data-test="rum-error-issue-cell-message"]');
+      expect(message.classes()).toContain("truncate");
+      expect(message.attributes("title")).toBeUndefined();
     });
 
-    it("title attribute matches full message for very long strings", () => {
+    it("renders the full message text for very long strings", () => {
       // Arrange
       const longMsg = "A".repeat(300);
       const w = mountCell({ ...baseIssue, error_message: longMsg });
 
       // Assert
-      expect(w.find('[data-test="rum-error-issue-cell-message"]').attributes("title")).toBe(
-        longMsg,
-      );
+      expect(w.find('[data-test="rum-error-issue-cell-message"]').text()).toBe(longMsg);
 
       w.unmount();
     });

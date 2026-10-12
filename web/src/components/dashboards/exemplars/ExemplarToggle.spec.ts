@@ -51,7 +51,7 @@ describe("ExemplarToggle", () => {
       '[data-test="dashboard-panel-exemplars-toggle"]',
     );
     expect(button.attributes("data-swaps-variant")).toBe("percentiles");
-    expect(button.attributes("aria-label")).toContain("Switches this card to percentiles");
+    expect(button.attributes("aria-label")).toContain("Switches this chart to percentiles");
   });
 });
 

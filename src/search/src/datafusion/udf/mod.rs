@@ -108,7 +108,8 @@ pub fn stringify_json_value(field: &json::Value) -> String {
         serde_json::Value::Bool(b) => b.to_string(),
         serde_json::Value::Number(n) => match n.as_f64() {
             Some(f) => f.to_string(),
-            None => n.as_i64().unwrap().to_string(),
+            // arbitrary_precision numbers outside i64/f64 range (e.g. 1e400) have neither.
+            None => n.to_string(),
         },
         serde_json::Value::String(s) => s.clone(),
         _ => json::to_string(field).expect("failed to stringify json field"),
@@ -167,5 +168,11 @@ mod tests {
         let val = serde_json::json!([1, 2, 3]);
         let s = stringify_json_value(&val);
         assert!(s.contains('1') && s.contains('2') && s.contains('3'));
+    }
+
+    #[test]
+    fn test_stringify_number_beyond_i64_range_does_not_panic() {
+        let val: serde_json::Value = serde_json::from_str("1e400").unwrap();
+        assert_eq!(stringify_json_value(&val), "1e+400");
     }
 }
