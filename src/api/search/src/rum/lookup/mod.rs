@@ -15,7 +15,6 @@
 
 mod plan;
 mod query;
-mod response;
 
 use std::time::Duration;
 
@@ -29,14 +28,10 @@ use config::{get_config, meta::stream::StreamType};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use plan::PagePlan;
-use query::LookupContext;
-pub use query::RumQuery;
-pub use response::{
-    RumBridge, RumLookupDiagnostics, RumLookupResponse, RumLookupStatus, RumLookupTruncated,
-    RumQueryDiagnostics, RumQueryError, RumQueryErrorKind,
-};
+use query::{LookupContext, RumQuery};
+pub use query::{RumQueryError, RumQueryErrorKind, RumQueryResult, RumQueryStats};
 use search_service::query_range::get_settings_max_query_range;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 use tracing::Span;
 use utoipa::ToSchema;
@@ -52,7 +47,6 @@ const TRACE_ID_HEX_LENGTH: usize = 32;
 const BRIDGE_LEAD_US: i64 = 60_000_000;
 const BRIDGE_LAG_US: i64 = 300_000_000;
 const HOUR_US: i64 = 3_600_000_000;
-const MAX_TIMEOUT_SECS: i64 = 24 * 3600;
 
 /// Body of a trace-to-RUM lookup.
 #[derive(Debug, Deserialize, ToSchema)]
@@ -62,9 +56,57 @@ pub struct RumLookupRequest {
     pub start_time: i64,
     /// Latest end of the backend spans, in microseconds.
     pub end_time: i64,
-    /// Budget for the whole lookup in seconds; defaults to the query timeout.
-    #[serde(default)]
-    pub timeout: Option<i64>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RumLookupStatus {
+    Found,
+    NotFound,
+    /// The stream is missing or has no trace id column, so nothing was queried.
+    #[default]
+    Unavailable,
+    /// A query failed, timed out or returned partial results.
+    Incomplete,
+}
+
+/// One result per query; a query that did not run because it had no ids is `null`.
+#[derive(Debug, Default, Serialize, ToSchema)]
+pub struct RumLookupResponse {
+    pub status: RumLookupStatus,
+    /// Some query was cut at its limit or did not complete.
+    pub partial: bool,
+    /// Wall time of the whole lookup, in milliseconds.
+    pub took: usize,
+    pub traced_resources: Option<RumQueryResult>,
+    pub views: Option<RumQueryResult>,
+    pub actions: Option<RumQueryResult>,
+    pub context_events: Option<RumQueryResult>,
+}
+
+impl RumLookupResponse {
+    /// Derives `status` and `partial` from the query results.
+    fn finish(mut self) -> Self {
+        let results = [
+            &self.traced_resources,
+            &self.views,
+            &self.actions,
+            &self.context_events,
+        ];
+        let incomplete = results.into_iter().flatten().any(|r| r.error.is_some());
+        let truncated = results.into_iter().flatten().any(|r| r.truncated);
+        let found = self
+            .traced_resources
+            .as_ref()
+            .is_some_and(|r| !r.hits.is_empty());
+        self.status = match (incomplete, found) {
+            (true, _) => RumLookupStatus::Incomplete,
+            (false, true) => RumLookupStatus::Found,
+            (false, false) => RumLookupStatus::NotFound,
+        };
+        self.partial = incomplete || truncated;
+        self
+    }
 }
 
 /// RumLookup
@@ -106,21 +148,16 @@ pub async fn lookup(
     if let Err(response) = check_search_allowed(&org_id).await {
         return response;
     }
-    // Bounded so the deadline arithmetic cannot overflow.
-    let budget = req
-        .timeout
-        .unwrap_or(get_config().limit.query_timeout as i64)
-        .min(MAX_TIMEOUT_SECS);
     let ctx = LookupContext {
         trace_id: get_or_create_trace_id(&headers, &Span::none()),
         trace_columns: trace_id_columns(&org_id).await,
-        deadline: started + Duration::from_secs(budget as u64),
+        deadline: started + Duration::from_secs(get_config().limit.query_timeout),
         max_query_range_us: max_query_range_us(&org_id, &user_id).await,
         org_id,
         user_id,
     };
     let mut response = run_lookup(&ctx, &req).await;
-    response.diagnostics.took = started.elapsed().as_millis() as usize;
+    response.took = started.elapsed().as_millis() as usize;
     log::info!(
         "[trace_id {}] rum lookup {}/{} status {:?}, partial {}, took {} ms",
         ctx.trace_id,
@@ -128,41 +165,37 @@ pub async fn lookup(
         RUM_DATA_STREAM,
         response.status,
         response.partial,
-        response.diagnostics.took
+        response.took
     );
     Json(response).into_response()
 }
 
 async fn run_lookup(ctx: &LookupContext, req: &RumLookupRequest) -> RumLookupResponse {
+    let mut response = RumLookupResponse::default();
     if ctx.trace_columns.is_empty() {
-        return RumLookupResponse::new(RumLookupStatus::Unavailable);
+        return response;
     }
-    let mut response = RumLookupResponse::new(RumLookupStatus::NotFound);
     let bridge_range = (
         req.start_time.saturating_sub(BRIDGE_LEAD_US),
         req.end_time.saturating_add(BRIDGE_LAG_US),
     );
     let trace_ids = trace_id_variants(&req.trace_id);
-    if let Some(bridge) = ctx
+    response.traced_resources = ctx
         .run(RumQuery::TracedResources, &trace_ids, bridge_range)
-        .await
-    {
-        response.record(bridge);
+        .await;
+    let traced = response
+        .traced_resources
+        .as_ref()
+        .map_or(&[][..], |r| r.hits.as_slice());
+    if !traced.is_empty() {
+        let plan = PagePlan::from_bridge(traced, req.end_time);
+        (response.views, response.actions, response.context_events) = tokio::join!(
+            ctx.run(RumQuery::Views, &plan.view_ids, plan.range),
+            ctx.run(RumQuery::Actions, &plan.action_ids, plan.range),
+            ctx.run(RumQuery::ContextEvents, &plan.view_ids, plan.range),
+        );
     }
-    if response.bridge.traced_resources.is_empty() {
-        return response.finish(false);
-    }
-
-    let plan = PagePlan::from_bridge(&response.bridge.traced_resources, req.end_time);
-    let (views, actions, context_events) = tokio::join!(
-        ctx.run(RumQuery::Views, &plan.view_ids, plan.range),
-        ctx.run(RumQuery::Actions, &plan.action_ids, plan.range),
-        ctx.run(RumQuery::ContextEvents, &plan.view_ids, plan.range),
-    );
-    for outcome in [views, actions, context_events].into_iter().flatten() {
-        response.record(outcome);
-    }
-    response.finish(true)
+    response.finish()
 }
 
 fn validate(req: &RumLookupRequest) -> Result<(), &'static str> {
@@ -174,9 +207,6 @@ fn validate(req: &RumLookupRequest) -> Result<(), &'static str> {
     }
     if req.start_time > req.end_time {
         return Err("start_time must not be greater than end_time");
-    }
-    if req.timeout.is_some_and(|timeout| timeout <= 0) {
-        return Err("timeout must be positive");
     }
     Ok(())
 }
@@ -256,6 +286,18 @@ mod tests {
 
     use super::*;
 
+    fn result(hits: usize, truncated: bool, error: Option<RumQueryErrorKind>) -> RumQueryResult {
+        RumQueryResult {
+            hits: (0..hits).map(|i| json!({"i": i})).collect(),
+            truncated,
+            error: error.map(|kind| RumQueryError {
+                kind,
+                message: String::new(),
+            }),
+            stats: None,
+        }
+    }
+
     pub(super) fn search_response(hits: usize) -> SearchResponse {
         let mut response = SearchResponse::new(0, hits as i64);
         response.hits = (0..hits).map(|i| json!({"i": i})).collect();
@@ -289,16 +331,66 @@ mod tests {
 
     #[test]
     fn test_validate() {
-        let request = |trace_id: &str, start_time, end_time, timeout| RumLookupRequest {
+        let request = |trace_id: &str, start_time, end_time| RumLookupRequest {
             trace_id: trace_id.to_string(),
             start_time,
             end_time,
-            timeout,
         };
-        assert!(validate(&request("abc", 1, 2, None)).is_ok());
-        assert!(validate(&request(" ", 1, 2, None)).is_err());
-        assert!(validate(&request("abc", 0, 2, None)).is_err());
-        assert!(validate(&request("abc", 3, 2, None)).is_err());
-        assert!(validate(&request("abc", 1, 2, Some(0))).is_err());
+        assert!(validate(&request("abc", 1, 2)).is_ok());
+        assert!(validate(&request(" ", 1, 2)).is_err());
+        assert!(validate(&request("abc", 0, 2)).is_err());
+        assert!(validate(&request("abc", 3, 2)).is_err());
+    }
+
+    #[test]
+    fn test_finish_status() {
+        let finish = |traced, views| {
+            RumLookupResponse {
+                traced_resources: Some(traced),
+                views,
+                ..Default::default()
+            }
+            .finish()
+        };
+
+        let found = finish(result(1, false, None), Some(result(2, false, None)));
+        assert_eq!(found.status, RumLookupStatus::Found);
+        assert!(!found.partial);
+
+        let not_found = finish(result(0, false, None), None);
+        assert_eq!(not_found.status, RumLookupStatus::NotFound);
+        assert!(!not_found.partial);
+
+        let failed = finish(result(0, false, Some(RumQueryErrorKind::Timeout)), None);
+        assert_eq!(failed.status, RumLookupStatus::Incomplete);
+        assert!(failed.partial);
+
+        let view_failed = finish(
+            result(1, false, None),
+            Some(result(0, false, Some(RumQueryErrorKind::Failed))),
+        );
+        assert_eq!(view_failed.status, RumLookupStatus::Incomplete);
+
+        let truncated = finish(result(1, false, None), Some(result(50, true, None)));
+        assert_eq!(truncated.status, RumLookupStatus::Found);
+        assert!(truncated.partial);
+    }
+
+    #[test]
+    fn test_response_shape() {
+        let response = serde_json::to_value(RumLookupResponse::default()).unwrap();
+        assert_eq!(response["status"], "unavailable");
+        assert_eq!(response["partial"], false);
+        assert_eq!(response["traced_resources"], json!(null));
+
+        let response = serde_json::to_value(RumLookupResponse {
+            views: Some(result(1, true, Some(RumQueryErrorKind::Partial))),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(response["views"]["hits"], json!([{"i": 0}]));
+        assert_eq!(response["views"]["truncated"], true);
+        assert_eq!(response["views"]["error"]["kind"], "partial");
+        assert_eq!(response["views"]["stats"], json!(null));
     }
 }

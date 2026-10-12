@@ -18,28 +18,22 @@ use std::time::Duration;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::{
-        search::{
-            Query, Request, RequestEncoding, Response as SearchResponse, SearchEventType,
-            default_use_cache,
-        },
+        search::{Query, Request, Response as SearchResponse, SearchEventType, default_use_cache},
         stream::StreamType,
         traces::session::{key_in_predicate, quote_identifier, quote_sql_string},
     },
     utils::json,
 };
+use infra::errors::{Error, ErrorCodes};
 use search_service as SearchService;
 use serde::Serialize;
 use tokio::time::Instant;
 use utoipa::ToSchema;
 
-use super::{
-    HOUR_US, RUM_DATA_STREAM,
-    response::{RumQueryDiagnostics, RumQueryError, RumQueryErrorKind},
-};
+use super::{HOUR_US, RUM_DATA_STREAM};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum RumQuery {
+#[derive(Clone, Copy, Debug)]
+pub(super) enum RumQuery {
     TracedResources,
     Views,
     Actions,
@@ -105,33 +99,114 @@ impl RumQuery {
         Request {
             query: Query {
                 sql,
-                from: 0,
                 size: self.limit() as i64 + 1,
                 start_time: range.0,
                 end_time: range.1,
-                quick_mode: false,
-                query_type: String::new(),
-                track_total_hits: false,
-                uses_zo_fn: false,
-                query_fn: None,
-                skip_wal: false,
-                sampling_config: None,
-                sampling_ratio: None,
-                streaming_output: false,
-                streaming_id: None,
-                histogram_interval: 0,
-                timezone: None,
+                ..Default::default()
             },
-            encoding: RequestEncoding::Empty,
-            regions: vec![],
-            clusters: vec![],
             timeout: budget.as_millis().div_ceil(1000) as i64,
             search_type: Some(SearchEventType::RUM),
-            search_event_context: None,
             use_cache: default_use_cache(),
-            clear_cache: false,
-            local_mode: None,
-            agent_options: None,
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RumQueryErrorKind {
+    Timeout,
+    Cancelled,
+    Failed,
+    Partial,
+}
+
+impl From<&Error> for RumQueryErrorKind {
+    fn from(error: &Error) -> Self {
+        match error {
+            Error::ErrorCode(ErrorCodes::SearchTimeout(_)) => Self::Timeout,
+            Error::ErrorCode(ErrorCodes::SearchCancelQuery(_)) => Self::Cancelled,
+            _ => Self::Failed,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RumQueryError {
+    pub kind: RumQueryErrorKind,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RumQueryStats {
+    pub start_time: i64,
+    pub end_time: i64,
+    /// Wall time of the sub-query as seen by the lookup, in milliseconds.
+    pub took: usize,
+    pub search_took: usize,
+    pub wait_in_queue: usize,
+    pub scan_files: usize,
+    pub scan_size: usize,
+    pub scan_records: usize,
+    pub cached_ratio: usize,
+    pub result_cache_ratio: usize,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RumQueryResult {
+    #[schema(value_type = Vec<Object>)]
+    pub hits: Vec<json::Value>,
+    /// The query hit its limit, so more rows were left out.
+    pub truncated: bool,
+    pub error: Option<RumQueryError>,
+    /// Absent when the search did not return.
+    pub stats: Option<RumQueryStats>,
+}
+
+impl RumQueryResult {
+    fn failed(kind: RumQueryErrorKind, message: String) -> Self {
+        Self {
+            hits: Vec::new(),
+            truncated: false,
+            error: Some(RumQueryError { kind, message }),
+            stats: None,
+        }
+    }
+
+    /// Cuts the `limit + 1` sentinel row, which only signals truncation.
+    fn from_response(
+        query: RumQuery,
+        range: (i64, i64),
+        took: Duration,
+        mut response: SearchResponse,
+    ) -> Self {
+        let truncated = response.hits.len() > query.limit();
+        response.hits.truncate(query.limit());
+        let error = response.is_partial.then(|| RumQueryError {
+            kind: RumQueryErrorKind::Partial,
+            message: if response.function_error.is_empty() {
+                "search returned partial results".to_string()
+            } else {
+                response.function_error.join("; ")
+            },
+        });
+        let stats = RumQueryStats {
+            start_time: range.0,
+            end_time: range.1,
+            took: took.as_millis() as usize,
+            search_took: response.took_detail.search_took,
+            wait_in_queue: response.took_detail.wait_in_queue,
+            scan_files: response.scan_files,
+            scan_size: response.scan_size,
+            scan_records: response.scan_records,
+            cached_ratio: response.cached_ratio,
+            result_cache_ratio: response.result_cache_ratio,
+        };
+        Self {
+            hits: response.hits,
+            truncated,
+            error,
+            stats: Some(stats),
         }
     }
 }
@@ -152,15 +227,14 @@ impl LookupContext {
         query: RumQuery,
         ids: &[String],
         range: (i64, i64),
-    ) -> Option<QueryOutcome> {
+    ) -> Option<RumQueryResult> {
         if ids.is_empty() {
             return None;
         }
         let started = Instant::now();
         let remaining = self.deadline.saturating_duration_since(started);
         if remaining.is_zero() {
-            return Some(QueryOutcome::failed(
-                query,
+            return Some(RumQueryResult::failed(
                 RumQueryErrorKind::Timeout,
                 "lookup deadline passed before the query started".to_string(),
             ));
@@ -183,8 +257,7 @@ impl LookupContext {
         // The search's own timeout starts only at execution, after file listing and queueing.
         let Ok(response) = tokio::time::timeout(remaining, search).await else {
             self.cancel(trace_id);
-            return Some(QueryOutcome::failed(
-                query,
+            return Some(RumQueryResult::failed(
                 RumQueryErrorKind::Timeout,
                 format!(
                     "no result within the {} ms left of the lookup budget",
@@ -193,8 +266,10 @@ impl LookupContext {
             ));
         };
         Some(match response {
-            Ok(response) => QueryOutcome::from_response(query, range, started.elapsed(), response),
-            Err(e) => QueryOutcome::failed(query, RumQueryErrorKind::from(&e), e.to_string()),
+            Ok(response) => {
+                RumQueryResult::from_response(query, range, started.elapsed(), response)
+            }
+            Err(e) => RumQueryResult::failed(RumQueryErrorKind::from(&e), e.to_string()),
         })
     }
 
@@ -227,71 +302,6 @@ impl LookupContext {
                 max_range_us / HOUR_US
             ),
         )
-    }
-}
-
-pub(super) struct QueryOutcome {
-    pub(super) query: RumQuery,
-    pub(super) hits: Vec<json::Value>,
-    pub(super) truncated: bool,
-    pub(super) error: Option<RumQueryError>,
-    pub(super) diagnostics: Option<RumQueryDiagnostics>,
-}
-
-impl QueryOutcome {
-    pub(super) fn failed(query: RumQuery, kind: RumQueryErrorKind, message: String) -> Self {
-        Self {
-            query,
-            hits: Vec::new(),
-            truncated: false,
-            error: Some(RumQueryError {
-                query,
-                kind,
-                message,
-            }),
-            diagnostics: None,
-        }
-    }
-
-    /// Cuts the `limit + 1` sentinel row, which only signals truncation.
-    pub(super) fn from_response(
-        query: RumQuery,
-        range: (i64, i64),
-        took: Duration,
-        mut response: SearchResponse,
-    ) -> Self {
-        let truncated = response.hits.len() > query.limit();
-        response.hits.truncate(query.limit());
-        let error = response.is_partial.then(|| RumQueryError {
-            query,
-            kind: RumQueryErrorKind::Partial,
-            message: if response.function_error.is_empty() {
-                "search returned partial results".to_string()
-            } else {
-                response.function_error.join("; ")
-            },
-        });
-        let diagnostics = RumQueryDiagnostics {
-            query,
-            start_time: range.0,
-            end_time: range.1,
-            took: took.as_millis() as usize,
-            search_took: response.took_detail.search_took,
-            wait_in_queue: response.took_detail.wait_in_queue,
-            scan_files: response.scan_files,
-            scan_size: response.scan_size,
-            scan_records: response.scan_records,
-            cached_ratio: response.cached_ratio,
-            result_cache_ratio: response.result_cache_ratio,
-            hits: response.hits.len(),
-        };
-        Self {
-            query,
-            hits: response.hits,
-            truncated,
-            error,
-            diagnostics: Some(diagnostics),
-        }
     }
 }
 
@@ -343,6 +353,17 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_request_asks_for_one_row_past_the_limit() {
+        let request =
+            RumQuery::Views.request("SELECT 1".to_string(), (1, 2), Duration::from_millis(1500));
+        assert_eq!(request.query.size, 51);
+        assert_eq!(request.query.from, 0);
+        assert_eq!((request.query.start_time, request.query.end_time), (1, 2));
+        assert_eq!(request.timeout, 2);
+        assert_eq!(request.search_type, Some(SearchEventType::RUM));
+    }
+
     #[tokio::test]
     async fn test_run_skips_a_query_without_ids() {
         assert!(
@@ -355,34 +376,35 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_reports_a_spent_budget_as_timeout() {
-        let outcome = context(0)
+        let result = context(0)
             .run(RumQuery::Views, &["v1".to_string()], (1, 2))
             .await
             .unwrap();
-        assert_eq!(outcome.error.unwrap().kind, RumQueryErrorKind::Timeout);
-        assert!(outcome.hits.is_empty());
+        assert_eq!(result.error.unwrap().kind, RumQueryErrorKind::Timeout);
+        assert!(result.hits.is_empty());
+        assert!(result.stats.is_none());
     }
 
     #[test]
-    fn test_outcome_drops_the_sentinel_row() {
-        let outcome = QueryOutcome::from_response(
+    fn test_result_drops_the_sentinel_row() {
+        let result = RumQueryResult::from_response(
             RumQuery::Views,
             (1, 2),
             Duration::ZERO,
             search_response(51),
         );
-        assert!(outcome.truncated);
-        assert_eq!(outcome.hits.len(), 50);
-        assert!(outcome.error.is_none());
+        assert!(result.truncated);
+        assert_eq!(result.hits.len(), 50);
+        assert!(result.error.is_none());
 
-        let outcome = QueryOutcome::from_response(
+        let result = RumQueryResult::from_response(
             RumQuery::Views,
             (1, 2),
             Duration::ZERO,
             search_response(50),
         );
-        assert!(!outcome.truncated);
-        assert_eq!(outcome.hits.len(), 50);
+        assert!(!result.truncated);
+        assert_eq!(result.hits.len(), 50);
     }
 
     #[test]
@@ -390,12 +412,12 @@ mod tests {
         let mut response = search_response(1);
         response.is_partial = true;
         response.function_error = vec!["range clamped".to_string()];
-        let outcome =
-            QueryOutcome::from_response(RumQuery::Actions, (1, 2), Duration::ZERO, response);
-        let error = outcome.error.unwrap();
+        let result =
+            RumQueryResult::from_response(RumQuery::Actions, (1, 2), Duration::ZERO, response);
+        let error = result.error.unwrap();
         assert_eq!(error.kind, RumQueryErrorKind::Partial);
         assert_eq!(error.message, "range clamped");
-        assert_eq!(outcome.hits.len(), 1);
+        assert_eq!(result.hits.len(), 1);
     }
 
     #[test]

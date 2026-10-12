@@ -30,8 +30,8 @@ impl PagePlan {
         let mut view_ids: Vec<String> = Vec::new();
         let mut action_ids: Vec<String> = Vec::new();
         for hit in traced_resources {
-            if let Some(id) = id_string(&hit["view_id"]) {
-                push_unique(&mut view_ids, id);
+            if let Some(id) = hit["view_id"].as_str().filter(|id| !id.is_empty()) {
+                push_unique(&mut view_ids, id.to_string());
             }
             for id in parse_action_ids(&hit["action_id"]) {
                 push_unique(&mut action_ids, id);
@@ -58,14 +58,6 @@ fn push_unique(ids: &mut Vec<String>, id: String) {
     }
 }
 
-fn id_string(value: &json::Value) -> Option<String> {
-    match value {
-        json::Value::String(id) if !id.is_empty() => Some(id.clone()),
-        json::Value::Number(id) if id.as_f64() != Some(0.0) => Some(id.to_string()),
-        _ => None,
-    }
-}
-
 /// RUM `date` is in milliseconds, as a number or a numeric string.
 fn date_us(value: &json::Value) -> Option<i64> {
     let ms = match value {
@@ -76,21 +68,12 @@ fn date_us(value: &json::Value) -> Option<i64> {
     (ms > 0.0).then_some((ms * 1000.0) as i64)
 }
 
-/// `action_id` is stored as a JSON array encoded in a string.
+/// `action_id` is stored as a JSON array of strings encoded in a string.
 fn parse_action_ids(value: &json::Value) -> Vec<String> {
-    let Some(encoded) = value.as_str().filter(|encoded| !encoded.is_empty()) else {
-        return Vec::new();
-    };
-    match json::from_str::<json::Value>(encoded) {
-        Ok(json::Value::Array(ids)) => ids
-            .into_iter()
-            .map(|id| match id {
-                json::Value::String(id) => id,
-                other => other.to_string(),
-            })
-            .collect(),
-        _ => Vec::new(),
-    }
+    value
+        .as_str()
+        .and_then(|encoded| json::from_str(encoded).ok())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]
