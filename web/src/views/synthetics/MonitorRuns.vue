@@ -721,15 +721,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Runs table -->
               <OCard class="p-0">
                 <OTable
+                  ref="runsTableRef"
                   :columns="runColumns"
                   :data="visibleRuns"
                   :loading="runsLoading"
                   pagination="client"
-                  :page-size="10"
+                  :page-size="pageSize"
                   :page-size-options="[10, 20, 25, 50]"
+                  :current-page="currentPage"
                   sorting="client"
-                  sort-by="last_run_at"
-                  sort-order="desc"
+                  :sort-by="sortBy"
+                  :sort-order="sortOrder"
+                  @update:current-page="currentPage = $event"
+                  @update:page-size="pageSize = $event"
+                  @update:sort-by="sortBy = $event"
+                  @update:sort-order="sortOrder = $event"
                   row-key="id"
                   :show-global-filter="false"
                   :enable-column-resize="true"
@@ -1128,6 +1134,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { useListViewState } from "@/composables/useListViewState";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -1290,7 +1297,24 @@ function locationIcon(region: string): string {
 }
 
 // ── State ────────────────────────────────────────────────────────────────
-const activeTab = ref("overview");
+// Keyed by monitor so the filters outlive this component when the user leaves the results page and comes back.
+const savedView = useListViewState(`synthetic-runs:${props.monitorId}`, {
+  activeTab: "overview",
+  statusFilter: "all",
+  browserFilter: "all",
+  deviceFilter: "all",
+  locationFilter: "all",
+  durationFilter: "all",
+  failedStepFilter: "all",
+  locatorFilter: "",
+  actionFilter: "all",
+  errorFilter: null as string | null,
+  currentPage: 1,
+  pageSize: 10,
+  sortBy: "last_run_at",
+  sortOrder: "desc" as "asc" | "desc",
+});
+const activeTab = ref(savedView.activeTab);
 
 // ── Monitor type — derived from the prop set by parent's fetchCheck() call ──
 const isBrowser = computed(() => props.checkType === "browser");
@@ -1322,15 +1346,70 @@ const windowLabel = computed(() =>
     ? formatWindowLabel(timeRangeMicros.value.startTime, timeRangeMicros.value.endTime)
     : t("synthetics.runs.window24h"),
 );
-const statusFilter = ref("all");
-const browserFilter = ref("all");
-const deviceFilter = ref("all");
-const locationFilter = ref("all");
-const durationFilter = ref("all");
-const failedStepFilter = ref("all");
-const locatorFilter = ref("");
-const actionFilter = ref("all");
-const errorFilter = ref<string | null>(null);
+const statusFilter = ref(savedView.statusFilter);
+const browserFilter = ref(savedView.browserFilter);
+const deviceFilter = ref(savedView.deviceFilter);
+const locationFilter = ref(savedView.locationFilter);
+const durationFilter = ref(savedView.durationFilter);
+const failedStepFilter = ref(savedView.failedStepFilter);
+const locatorFilter = ref(savedView.locatorFilter);
+const actionFilter = ref(savedView.actionFilter);
+const errorFilter = ref<string | null>(savedView.errorFilter);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const runsTableRef = ref<any>(null);
+
+watch([statusFilter, browserFilter, deviceFilter, locationFilter, errorFilter], () => {
+  currentPage.value = 1;
+});
+watch(
+  [
+    activeTab,
+    statusFilter,
+    browserFilter,
+    deviceFilter,
+    locationFilter,
+    durationFilter,
+    failedStepFilter,
+    locatorFilter,
+    actionFilter,
+    errorFilter,
+    currentPage,
+    pageSize,
+    sortBy,
+    sortOrder,
+  ],
+  () => {
+    Object.assign(savedView, {
+      activeTab: activeTab.value,
+      statusFilter: statusFilter.value,
+      browserFilter: browserFilter.value,
+      deviceFilter: deviceFilter.value,
+      locationFilter: locationFilter.value,
+      durationFilter: durationFilter.value,
+      failedStepFilter: failedStepFilter.value,
+      locatorFilter: locatorFilter.value,
+      actionFilter: actionFilter.value,
+      errorFilter: errorFilter.value,
+      currentPage: currentPage.value,
+      pageSize: pageSize.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+    });
+  },
+);
+// The first runs load lands after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(
+  () => synthetics.runsLoading.value,
+  (isLoading) => {
+    if (isLoading || pageRestored) return;
+    pageRestored = true;
+    setTimeout(() => runsTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+);
 
 // ── Smart empty state helpers ──────────────────────────────────────────
 const hasActiveFilters = computed(
