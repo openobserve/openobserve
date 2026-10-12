@@ -948,7 +948,7 @@ mod tests {
     ) -> impl Fn(Option<Downtime>, Downtime) -> PlanFuture<'a> + Sync + 'a {
         move |before, after| {
             Box::pin(async move {
-                let slos: Vec<_> = table::slos::list(db, &after.org, None)
+                let slos: Vec<_> = table::slos::list_decodable(db, &after.org)
                     .await?
                     .into_iter()
                     .map(|slo| (slo, HashMap::new()))

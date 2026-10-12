@@ -322,13 +322,11 @@ pub async fn extend(
         access::authorize_row(org, user_id, &follow_up, "PUT").await?;
         let current_end = follow_up.schedule.ends_at.unwrap_or(window.end);
         let new_end = extended_end(current_end, req, now)?;
-        let after = extend_once(org, user_id, &follow_up, new_end, now).await?;
+        // The parent bump comes first: a request that read the parent meanwhile loses here.
         if !db::downtimes::bump_parent(&before, now).await? {
-            log::warn!(
-                "[downtimes] {org}/{} changed while its follow-up was extended",
-                before.id
-            );
+            return Err(changed_meanwhile());
         }
+        let after = extend_once(org, user_id, &follow_up, new_end, now).await?;
         notify::deliver_in_background(before.clone(), extended_event(window.start, new_end));
         return Ok(ExtendDowntimeResponse {
             created_id: Some(after.id.clone()),

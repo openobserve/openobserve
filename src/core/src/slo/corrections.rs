@@ -93,7 +93,7 @@ pub async fn plan_for_downtime(
     before: Option<&Downtime>,
     after: &Downtime,
 ) -> Result<RemeasurePlan, anyhow::Error> {
-    let slos = infra::table::slos::list(get_orm_client_ro().await, org, None).await?;
+    let slos = infra::table::slos::list_decodable(get_orm_client_ro().await, org).await?;
     let mut covered = Vec::with_capacity(slos.len());
     for slo in slos.into_iter().filter(|slo| slo.enabled) {
         let dims = crate::alerts::downtimes::dimensions_for_slo(&slo).await;

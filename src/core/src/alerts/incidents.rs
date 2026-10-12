@@ -1562,7 +1562,10 @@ async fn create_new_incident(
             serde_json::to_value(group_values)?,
             triggered_at,
             Some(title),
-            muted_by.map(str::to_string),
+            // Without replication the other region never gets the un-mute, so it gets no mute.
+            muted_by
+                .filter(|_| db::downtimes::replicates())
+                .map(str::to_string),
         )
         .await
     {

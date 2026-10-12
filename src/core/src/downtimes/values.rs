@@ -302,9 +302,7 @@ pub async fn searchable_records(
     .await
 }
 
-/// A record is kept only when it lists a stream and `may_read` allows each; one check per stream.
-/// A plain `Fn` returning a future, not an `AsyncFn`: the latter's call lifetime makes the
-/// handler future's `Send` bound "not general enough" under the router.
+/// A record is kept only when `may_read` allows each of its streams; a plain `Fn` keeps it `Send`.
 pub async fn readable_records<F, Fut>(
     records: &[ServiceMetadata],
     may_read: F,
