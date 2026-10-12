@@ -92,19 +92,13 @@ fn rule_results(
         ));
     };
     let mut rows = Vec::with_capacity(series.len());
-    let mut rule_series_rows = std::collections::HashMap::with_capacity(series.len());
     let mut raw_values = std::collections::HashMap::with_capacity(series.len());
     let mut observations = Vec::with_capacity(series.len());
     for series in series {
-        let labels: std::collections::BTreeMap<String, String> = series
+        let mut row: Map<String, Value> = series
             .labels
             .iter()
-            .map(|l| (l.name.to_string(), l.value.to_string()))
-            .collect();
-        let key = config::meta::alerts::grouping::group_key(&labels);
-        let mut row: Map<String, Value> = labels
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone().into()))
+            .map(|l| (l.name.clone(), l.value.clone().into()))
             .collect();
         let value = match series.sample.value {
             v if v.is_nan() => "NaN".to_string(),
@@ -112,11 +106,12 @@ fn rule_results(
             v if v == f64::NEG_INFINITY => "-Inf".to_string(),
             v => v.to_string(),
         };
-        raw_values.insert(key.clone(), value.clone());
-        observations.push(GroupObservation::new(labels, 0.0));
         row.insert("_timestamp".into(), at.into());
-        row.insert("value".into(), value.into());
-        rule_series_rows.insert(key, row.clone());
+        row.insert("value".into(), value.clone().into());
+        let labels = config::meta::alerts::dispatch::promql_series_labels(&row);
+        let key = config::meta::alerts::grouping::group_key(&labels);
+        raw_values.insert(key, value);
+        observations.push(GroupObservation::new(labels, 0.0));
         rows.push(row);
     }
     let level = (!rows.is_empty()).then_some(AlertLevel::Critical);
@@ -156,7 +151,6 @@ fn rule_results(
         level,
         data: level.map(|_| rows),
         rule_value,
-        rule_series_rows: multi_alert.then_some(rule_series_rows),
         group_label,
         group_classification,
         ..Default::default()
@@ -229,7 +223,6 @@ mod tests {
         };
         let first = rule_results(vector(&[f64::NAN, f64::INFINITY]), 600, 1, false).unwrap();
         assert!(first.group_classification.is_none());
-        assert!(first.rule_series_rows.is_none());
         assert_eq!(first.data.as_ref().unwrap().len(), 2);
         let initial = apply_rule_rollup_outcome(
             "single-rule",
@@ -355,14 +348,14 @@ mod tests {
         }
     }
     #[test]
-    fn rule_dispatch_keeps_legal_reserved_output_labels_as_distinct_identities() {
+    fn rule_dispatch_reuses_existing_series_row_index() {
         use config::meta::alerts::{
             TriggerCondition,
-            dispatch::plan_dispatch,
+            dispatch::{plan_dispatch, rows_by_series_key},
             grouping::{group_key, group_template_vars},
             prom_rule::plan_rule_updates,
         };
-        for label in ["value", "_timestamp"] {
+        for label in ["host", "pod"] {
             let result = rule_results(
                 PromValue::Vector(
                     [("a", f64::NAN), ("b", f64::INFINITY)]
@@ -380,7 +373,7 @@ mod tests {
             .unwrap();
             let classification = result.group_classification.unwrap();
             assert_eq!(classification.groups.len(), 2);
-            let payloads = result.rule_series_rows.unwrap();
+            let payloads = rows_by_series_key(result.data.as_ref().unwrap());
             assert_eq!(payloads.len(), 2);
             let plan = plan_rule_updates(
                 "rule",
