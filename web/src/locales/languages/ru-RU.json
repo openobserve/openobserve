@@ -8445,6 +8445,8 @@
         "alertDescription": "Текст описания оповещения",
         "alertStartTime": "Время начала окна (ISO 8601)",
         "alertEndTime": "Время окончания окна (ISO 8601)",
+        "alertStartTimeMillis": "Время начала окна в epoch-миллисекундах",
+        "alertEndTimeMillis": "Время окончания окна в epoch-миллисекундах",
         "alertUrl": "Ссылка для перехода в OpenObserve для расследования",
         "alertTriggerTime": "Когда сработало оповещение (ISO 8601)",
         "alertTriggerTimeMillis": "Время срабатывания в миллисекундах эпохи",

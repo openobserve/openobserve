@@ -8445,6 +8445,8 @@
         "alertDescription": "Description de l'alerte",
         "alertStartTime": "Début de la fenêtre (ISO 8601)",
         "alertEndTime": "Fin de la fenêtre (ISO 8601)",
+        "alertStartTimeMillis": "Heure de début de la fenêtre en millisecondes epoch",
+        "alertEndTimeMillis": "Heure de fin de la fenêtre en millisecondes epoch",
         "alertUrl": "Lien vers OpenObserve pour enquêter",
         "alertTriggerTime": "Déclenchement de l'alerte (ISO 8601)",
         "alertTriggerTimeMillis": "Heure de déclenchement en millisecondes epoch",

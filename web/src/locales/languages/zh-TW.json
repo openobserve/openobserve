@@ -8440,6 +8440,8 @@
         "alertDescription": "警示的描述文字",
         "alertStartTime": "視窗開始時間（ISO 8601）",
         "alertEndTime": "視窗結束時間（ISO 8601）",
+        "alertStartTimeMillis": "視窗開始時間（以 epoch 毫秒為單位）",
+        "alertEndTimeMillis": "視窗結束時間（以 epoch 毫秒為單位）",
         "alertUrl": "返回 OpenObserve 調查的連結",
         "alertTriggerTime": "警示觸發時間（ISO 8601）",
         "alertTriggerTimeMillis": "觸發時間（epoch 毫秒）",

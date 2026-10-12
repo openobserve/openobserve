@@ -8445,6 +8445,8 @@
         "alertDescription": "アラートの説明テキスト",
         "alertStartTime": "ウィンドウ開始時刻（ISO 8601）",
         "alertEndTime": "ウィンドウ終了時刻（ISO 8601）",
+        "alertStartTimeMillis": "ウィンドウ開始時刻（エポックミリ秒）",
+        "alertEndTimeMillis": "ウィンドウ終了時刻（エポックミリ秒）",
         "alertUrl": "調査のためにOpenObserveに戻るリンク",
         "alertTriggerTime": "アラート発火時刻（ISO 8601）",
         "alertTriggerTimeMillis": "トリガー時刻（エポックミリ秒）",

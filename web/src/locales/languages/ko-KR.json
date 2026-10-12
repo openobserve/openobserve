@@ -8445,6 +8445,8 @@
         "alertDescription": "알림 설명 텍스트",
         "alertStartTime": "창 시작 시간 (ISO 8601)",
         "alertEndTime": "창 종료 시간 (ISO 8601)",
+        "alertStartTimeMillis": "윈도우 시작 시간(에포크 밀리초)",
+        "alertEndTimeMillis": "윈도우 종료 시간(에포크 밀리초)",
         "alertUrl": "조사를 위해 OpenObserve로 돌아가는 링크",
         "alertTriggerTime": "알림이 발생한 시간 (ISO 8601)",
         "alertTriggerTimeMillis": "에포크 밀리초 단위의 트리거 시간",

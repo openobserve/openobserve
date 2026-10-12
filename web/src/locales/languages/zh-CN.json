@@ -8445,6 +8445,8 @@
         "alertDescription": "告警的描述文本",
         "alertStartTime": "窗口开始时间（ISO 8601）",
         "alertEndTime": "窗口结束时间（ISO 8601）",
+        "alertStartTimeMillis": "窗口开始时间（epoch 毫秒）",
+        "alertEndTimeMillis": "窗口结束时间（epoch 毫秒）",
         "alertUrl": "返回 OpenObserve 调查的链接",
         "alertTriggerTime": "告警触发时间（ISO 8601）",
         "alertTriggerTimeMillis": "触发时间（epoch 毫秒）",

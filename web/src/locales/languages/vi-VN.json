@@ -8445,6 +8445,8 @@
         "alertDescription": "Văn bản mô tả của cảnh báo",
         "alertStartTime": "Thời gian bắt đầu cửa sổ (ISO 8601)",
         "alertEndTime": "Thời gian kết thúc cửa sổ (ISO 8601)",
+        "alertStartTimeMillis": "Thời gian bắt đầu cửa sổ tính bằng epoch millis",
+        "alertEndTimeMillis": "Thời gian kết thúc cửa sổ tính bằng epoch millis",
         "alertUrl": "Liên kết trở lại OpenObserve để điều tra",
         "alertTriggerTime": "Thời điểm cảnh báo kích hoạt (ISO 8601)",
         "alertTriggerTimeMillis": "Thời gian kích hoạt theo epoch millis",
