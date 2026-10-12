@@ -73,7 +73,6 @@ pub(super) fn decode_frame(
     Ok(raw)
 }
 
-/// Returns the next `len` bytes at `pos` and advances past them.
 pub(super) fn take<'a>(bytes: &'a [u8], pos: &mut usize, len: usize) -> Result<&'a [u8]> {
     let data = bytes
         .get(*pos..pos.saturating_add(len))

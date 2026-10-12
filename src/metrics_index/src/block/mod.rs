@@ -219,7 +219,7 @@ impl Index {
         ensure!(block < self.blocks.len(), "block index out of bounds");
         let Some(column) = self.labels.column_by_name(name) else {
             ensure!(
-                self.header.source_schema.field_with_name(name).is_err(),
+                self.header.source_schema.column_with_name(name).is_none(),
                 "label was not projected: {name}"
             );
             return Ok(None);
