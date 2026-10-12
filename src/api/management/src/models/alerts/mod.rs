@@ -437,6 +437,7 @@ pub struct QueryCondition {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub promql_multi_alert: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    /// Match returned PromQL series by presence without separate value thresholds.
     pub promql_rule_mode: bool,
 
     /// Aggregation configuration for "custom" query type.
@@ -1811,6 +1812,19 @@ mod tests {
             .unwrap();
             let meta = meta_alerts::alert::Alert::from(api);
             assert_eq!(meta.query_condition.promql_multi_alert, pending > 0);
+            assert_eq!(
+                meta.trigger_condition.operator,
+                meta_alerts::Operator::GreaterThanEquals
+            );
+            assert_eq!(meta.trigger_condition.threshold, 1);
+            assert!(
+                meta_alerts::grouping::validate_multi_alert(
+                    &meta.query_condition,
+                    &meta.trigger_condition,
+                    false,
+                )
+                .is_ok()
+            );
             let response = Alert::from((meta, None));
             assert_eq!(response.query_condition.promql_multi_alert, pending > 0);
         }

@@ -50,14 +50,16 @@ impl MigrationTrait for Migration {
             ("alert_state_transitions", "rule_value"),
             ("alerts", "query_promql_rule_mode"),
         ] {
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(Alias::new(table))
-                        .drop_column(Alias::new(column))
-                        .to_owned(),
-                )
-                .await?;
+            if manager.has_column(table, column).await? {
+                manager
+                    .alter_table(
+                        Table::alter()
+                            .table(Alias::new(table))
+                            .drop_column(Alias::new(column))
+                            .to_owned(),
+                    )
+                    .await?;
+            }
         }
         Ok(())
     }
@@ -108,6 +110,23 @@ mod tests {
             row.try_get::<Option<bool>>("", "query_promql_rule_mode")
                 .unwrap(),
             None
+        );
+        db.execute_unprepared("ALTER TABLE alerts DROP COLUMN query_promql_rule_mode")
+            .await
+            .unwrap();
+        Migration.down(&manager).await.unwrap();
+        Migration.down(&manager).await.unwrap();
+        assert!(
+            !manager
+                .has_column("alerts", "query_promql_rule_mode")
+                .await
+                .unwrap()
+        );
+        assert!(
+            !manager
+                .has_column("alert_state_transitions", "rule_value")
+                .await
+                .unwrap()
         );
     }
 }

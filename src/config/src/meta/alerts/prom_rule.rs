@@ -25,6 +25,7 @@ use super::{
 };
 use crate::meta::self_reporting::usage::RunOutcome;
 
+/// Only complete evaluations can reset per-series pending or resolve absent series.
 pub fn plan_rule_updates(
     alert_id: &str,
     classification: &GroupClassification,
@@ -43,25 +44,27 @@ pub fn plan_rule_updates(
         .is_some_and(|s| matches!(s.last_outcome, Some(RunOutcome::Error)));
     let mut updates = Vec::new();
     let mut retained = HashSet::new();
-    let mut firing = false;
+    let mut firing = 0usize;
     for group in &classification.groups {
         let key = group_key(&group.labels);
         retained.insert(key.clone());
-        let mut prev = previous.get(&key).cloned();
-        if interrupted
-            && let Some(p) = prev.as_mut()
-            && p.last_outcome == Some(RunOutcome::Pending)
-        {
-            p.since = p
-                .since
-                .map(|since| since.saturating_add(at.saturating_sub(p.last_seen.unwrap_or(at))));
-        }
-        let outcome = rule_outcome(prev.as_ref(), at, pending_sec);
-        firing |= outcome == RunOutcome::Firing;
+        let prev = previous.get(&key);
+        let resumed = prev
+            .filter(|p| interrupted && p.last_outcome == Some(RunOutcome::Pending))
+            .map(|p| {
+                let mut state = p.clone();
+                state.since = state.since.map(|since| {
+                    since.saturating_add(at.saturating_sub(state.last_seen.unwrap_or(at)))
+                });
+                state
+            });
+        let prev = resumed.as_ref().or(prev);
+        let outcome = rule_outcome(prev, at, pending_sec);
+        firing += usize::from(outcome == RunOutcome::Firing);
         let mut update = apply_outcome(
             alert_id,
             &key,
-            prev.as_ref(),
+            prev,
             outcome,
             Some(AlertLevel::Critical),
             at,
@@ -82,7 +85,7 @@ pub fn plan_rule_updates(
     }
     let outcome = if classification.groups.is_empty() {
         RunOutcome::Normal
-    } else if firing {
+    } else if firing > 0 {
         RunOutcome::Firing
     } else {
         RunOutcome::Pending
@@ -102,7 +105,7 @@ pub fn plan_rule_updates(
     );
     if let Some(s) = rollup.state.as_mut() {
         s.groups_observed = Some(classification.groups.len());
-        s.groups_firing = Some(classification.groups.len());
+        s.groups_firing = Some(firing);
         s.groups_observed_is_lower_bound = Some(false);
         s.groups_firing_is_lower_bound = Some(false);
     }
@@ -113,6 +116,7 @@ pub fn plan_rule_updates(
     }
 }
 
+/// Preserve severity on errors and retain PromQL sample text on rollup transitions.
 pub fn apply_rule_rollup_outcome(
     alert_id: &str,
     previous: Option<&AlertState>,
@@ -209,18 +213,22 @@ mod tests {
     fn pending_is_per_series_and_requires_continuous_matches() {
         let mut previous = HashMap::new();
         run(&mut previous, &["a"], 0, 240);
+        assert_eq!(previous[ROLLUP_GROUP_KEY].groups_firing, Some(0));
         assert_eq!(
             state(&previous, "a").last_outcome,
             Some(RunOutcome::Pending)
         );
         run(&mut previous, &["a", "b"], 180, 240);
+        assert_eq!(previous[ROLLUP_GROUP_KEY].groups_firing, Some(0));
         run(&mut previous, &["a", "b"], 240, 240);
+        assert_eq!(previous[ROLLUP_GROUP_KEY].groups_firing, Some(1));
         assert_eq!(state(&previous, "a").last_outcome, Some(RunOutcome::Firing));
         assert_eq!(
             state(&previous, "b").last_outcome,
             Some(RunOutcome::Pending)
         );
         let absent = run(&mut previous, &[], 300, 240);
+        assert_eq!(previous[ROLLUP_GROUP_KEY].groups_firing, Some(0));
         assert_eq!(state(&previous, "a").level, Some(AlertLevel::Ok));
         assert_eq!(state(&previous, "b").last_outcome, Some(RunOutcome::Normal));
         assert!(

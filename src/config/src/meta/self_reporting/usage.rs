@@ -303,6 +303,7 @@ pub struct TriggerData {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actual_value: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// PromQL sample text preserves special floats that cannot populate numeric actual_value.
     pub rule_value: Option<String>,
     /// The threshold that matched. `None` on `normal` rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]

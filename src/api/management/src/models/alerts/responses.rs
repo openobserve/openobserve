@@ -410,6 +410,7 @@ pub struct AlertGroupTransitionItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// PromQL sample text preserves NaN and infinities; absent outside rule-mode transitions.
     pub rule_value: Option<String>,
 }
 

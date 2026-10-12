@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { conditionSummary } from "./runOutcome";
-import { alertConditionText } from "./alertCondition";
+import { alertConditionText, alertWarningConditionText } from "./alertCondition";
 
 describe("PromQL rule display", () => {
   it.each(["NaN", "+Inf", "-Inf", "0", "0.125"])("preserves %s in history", (value) => {
@@ -17,5 +17,12 @@ describe("PromQL rule display", () => {
         query_condition: { type: "promql", promql_rule_mode: true, promql: "foo > 4" },
       }),
     ).toBe("foo > 4");
+  });
+  it("has no warning condition in rule mode", () => {
+    expect(
+      alertWarningConditionText({
+        query_condition: { type: "promql", promql_rule_mode: true, promql: "foo > 4" },
+      }),
+    ).toBe("—");
   });
 });

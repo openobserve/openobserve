@@ -276,8 +276,7 @@ async fn sweep_alert(
             .trigger_condition
             .group_resolve_threshold_micros(state.last_seen.unwrap_or(now), k);
 
-        let fate = fate_for_alert(alert, state, now, resolve_after, grace);
-        match fate {
+        match fate_for_alert(alert, state, now, resolve_after, grace) {
             GroupFate::Keep => {}
             GroupFate::Resolve => {
                 let update = resolve_group_update(alert_id, &state.group_key, state, now);
@@ -305,10 +304,11 @@ async fn sweep_alert(
     Ok((resolved, reaped, 0))
 }
 
-/// Whether the alert still evaluates per group. Must agree with every other
-/// layer — `multi_alert_enabled()` covers both the aggregation opt-in and the
-/// PromQL per-series opt-in; checking only `aggregation.multi_alert` here
-/// would make this sweep wipe a per-series alert's state rows every pass.
+/// PromQL series grouping also keeps per-group state rows alive.
+fn still_multi(alert: Option<&Alert>) -> bool {
+    alert.is_some_and(|a| a.query_condition.multi_alert_enabled())
+}
+
 fn fate_for_alert(
     alert: &Alert,
     state: &AlertState,
@@ -320,10 +320,6 @@ fn fate_for_alert(
         GroupFate::Resolve if alert.query_condition.promql_rule_mode => GroupFate::Keep,
         fate => fate,
     }
-}
-
-fn still_multi(alert: Option<&Alert>) -> bool {
-    alert.is_some_and(|a| a.query_condition.multi_alert_enabled())
 }
 
 /// `alert_id -> Alert` from the in-memory cache.

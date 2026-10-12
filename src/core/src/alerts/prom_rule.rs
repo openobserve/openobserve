@@ -101,8 +101,6 @@ fn rule_results(
         ));
     };
     let mut rows = Vec::with_capacity(series.len());
-    let mut raw_values = std::collections::HashMap::with_capacity(series.len());
-    let mut observations = Vec::with_capacity(series.len());
     for series in series {
         let mut row: Map<String, Value> = series
             .labels
@@ -116,23 +114,21 @@ fn rule_results(
             v => v.to_string(),
         };
         row.insert("_timestamp".into(), at.into());
-        row.insert("value".into(), value.clone().into());
-        let labels = config::meta::alerts::dispatch::promql_series_labels(&row);
-        let key = config::meta::alerts::grouping::group_key(&labels);
-        raw_values.insert(key, value);
-        observations.push(GroupObservation::new(labels, 0.0));
+        row.insert("value".into(), value.into());
         rows.push(row);
     }
     let level = (!rows.is_empty()).then_some(AlertLevel::Critical);
-    let mut rule_value = rows
-        .first()
-        .and_then(|r| r.get("value"))
-        .and_then(Value::as_str)
-        .map(str::to_string);
-    let mut group_label = observations
-        .first()
-        .map(|g| config::meta::alerts::grouping::render_labels(&g.labels));
     let group_classification = if multi_alert {
+        let mut raw_values = std::collections::HashMap::with_capacity(rows.len());
+        let observations = rows
+            .iter()
+            .map(|row| {
+                let labels = config::meta::alerts::dispatch::promql_series_labels(row);
+                let key = config::meta::alerts::grouping::group_key(&labels);
+                raw_values.insert(key, row["value"].as_str().unwrap().to_string());
+                GroupObservation::new(labels, 0.0)
+            })
+            .collect();
         let mut classification =
             classify_groups_by(observations, |_| Some(AlertLevel::Critical), cap);
         for group in &mut classification.groups {
@@ -148,12 +144,29 @@ fn rule_results(
                 "Incomplete PromQL rule evaluation: returned series exceed alert_max_groups"
             ));
         }
-        let first = classification.groups.first();
-        rule_value = first.and_then(|g| g.rule_value.clone());
-        group_label = first.map(|g| config::meta::alerts::grouping::render_labels(&g.labels));
         Some(classification)
     } else {
         None
+    };
+    let (rule_value, group_label) = if let Some(classification) = &group_classification {
+        let first = classification.groups.first();
+        (
+            first.and_then(|g| g.rule_value.clone()),
+            first.map(|g| config::meta::alerts::grouping::render_labels(&g.labels)),
+        )
+    } else {
+        let first = rows.first();
+        (
+            first
+                .and_then(|r| r.get("value"))
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            first.map(|r| {
+                config::meta::alerts::grouping::render_labels(
+                    &config::meta::alerts::dispatch::promql_series_labels(r),
+                )
+            }),
+        )
     };
     Ok(TriggerEvalResults {
         end_time: at,

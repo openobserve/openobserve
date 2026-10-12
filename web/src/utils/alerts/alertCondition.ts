@@ -59,7 +59,7 @@ export function alertConditionText(alert: any): string {
 export function alertWarningConditionText(alert: any): string {
   const qc = queryConditionOf(alert);
   if (qc?.type === "promql") {
-    if (qc.promql_rule_mode) return qc.promql || EMPTY;
+    if (qc.promql_rule_mode) return EMPTY;
     return isBlank(qc.promql_warning_value)
       ? EMPTY
       : `${qc.promql_condition?.operator || ""} ${qc.promql_warning_value}`.trim();
