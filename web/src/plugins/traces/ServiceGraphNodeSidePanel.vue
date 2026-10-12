@@ -172,7 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="service-graph-node-panel-tabs-row"
         >
           <OTabs
-            v-model="activeTab"
+            :model-value="activeTab"
+            @update:model-value="onTabChange"
             dense
             align="left"
             class="w-[calc(100%-2rem)]! flex-1 font-bold"
@@ -191,15 +192,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="isAgentBehaviorContext"
               name="behavior"
               :label="t('aiObservability.behavior.node.tabLabel')"
-              :disable="!agentBehaviorAccess.allowed"
               :suffix-icon="!agentBehaviorAccess.allowed ? 'lock' : undefined"
               class="capitalize"
               data-test="service-graph-node-panel-tab-behavior"
-            />
-            <LockedFeatureTooltip
-              v-if="isAgentBehaviorContext && !agentBehaviorAccess.allowed"
-              :message="agentBehaviorAccess.message"
-              :title="t('aiObservability.behavior.node.tabLabel')"
             />
             <OTab
               v-for="cfg in activeResourceTabConfigs"
@@ -606,7 +601,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { defineComponent, computed, ref, watch, defineAsyncComponent, type PropType } from "vue";
 import { useStore } from "vuex";
@@ -919,7 +914,6 @@ export default defineComponent({
     ServiceCatalogBarCell,
     AgentNodeBehaviorTab,
     OAgentBadges,
-    LockedFeatureTooltip,
   },
   props: {
     selectedNode: {
@@ -1610,6 +1604,18 @@ export default defineComponent({
     const showBehaviorTab = computed(
       () => isAgentBehaviorContext.value && agentBehaviorAccess.value.allowed,
     );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+    // OTabs is controlled (`:model-value`), so refusing to advance `activeTab`
+    // here is what keeps the locked Behavior tab from becoming active —
+    // clicking it opens the upgrade dialog instead of switching.
+    function onTabChange(name: string | number) {
+      if (name === "behavior" && !agentBehaviorAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
+      activeTab.value = String(name);
+    }
 
     // env/version for the clicked agent node. The graph topology doesn't carry
     // these, so resolve them from the discovered-agents registry: fetch the
@@ -2566,6 +2572,7 @@ export default defineComponent({
       isInferred,
       isAgentBehaviorContext,
       agentBehaviorAccess,
+      onTabChange,
       showBehaviorTab,
       behaviorAgentName,
       agentEnvVersion,

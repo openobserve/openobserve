@@ -56,18 +56,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OToggleGroupItem
           value="agent"
           size="sm"
-          :disabled="!showAgentToggle"
           :icon-right="!showAgentToggle ? 'lock' : undefined"
         >
           {{ labels.agent }}
         </OToggleGroupItem>
         <OToggleGroupItem value="stream" size="sm">{{ labels.stream }}</OToggleGroupItem>
       </OToggleGroup>
-      <LockedFeatureTooltip
-        v-if="!showAgentToggle && agentToggleLockedMessage"
-        :message="agentToggleLockedMessage"
-        :title="raw(labels.agent)"
-      />
     </template>
 
     <!-- Explicit if/else on isStreamMode itself (not on a descendant's own
@@ -142,7 +136,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import StreamAgentCountBadge from "@/components/shared/StreamAgentCountBadge.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AgentScopeCascade from "./AgentScopeCascade.vue";
 
 type FilterMode = "stream" | "agent";
@@ -259,8 +253,17 @@ const activeStreamModel = computed({
   set: (value: string) => emit("update:activeStream", value),
 });
 
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+// OToggleGroup is controlled (`:model-value`), so refusing to emit the mode
+// change here is what keeps the locked Agent toggle from actually switching —
+// clicking it opens the upgrade dialog instead.
 const onFilterModeChange = (value: unknown) => {
   const mode = value as FilterMode;
+  if (mode === "agent" && !props.showAgentToggle) {
+    openUpgradeDialog();
+    return;
+  }
   emit("update:filterMode", mode);
   emit("filter-mode-change", mode);
 };

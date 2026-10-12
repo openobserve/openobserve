@@ -77,11 +77,11 @@ describe("useManagementRoutes", () => {
       expect(Array.isArray(routes)).toBe(true);
     });
 
-    // Settings + the shared locked-feature redirect target (always registered
-    // — see "enterpriseFeatureLocked" below).
-    it("should return exactly two top-level routes", () => {
+    // Settings + the shared locked-feature redirect target + the Enterprise
+    // Features page (all always registered — see the tests below).
+    it("should return exactly three top-level routes", () => {
       const routes = useManagementRoutes();
-      expect(routes).toHaveLength(2);
+      expect(routes).toHaveLength(3);
     });
 
     it("should return routes with settings as the main route", () => {
@@ -223,6 +223,14 @@ describe("useManagementRoutes", () => {
       expect(lockedRoute).toBeDefined();
       expect(lockedRoute.path).toBe("enterprise-locked");
       expect(lockedRoute.component).toBeDefined();
+    });
+
+    it("should have an enterpriseFeatures route registered", () => {
+      const featuresRoute = routes.find((r: any) => r.name === "enterpriseFeatures");
+      expect(featuresRoute).toBeDefined();
+      expect(featuresRoute.path).toBe("enterprise-features");
+      expect(featuresRoute.component).toBeDefined();
+      expect(typeof featuresRoute.beforeEnter).toBe("function");
     });
 
     it("should have beforeEnter hook for general route", () => {

@@ -89,16 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             icon-left="compare-arrows"
-            icon-right="lock"
-            disabled
             data-test="llm-insights-compare-locked"
+            @click="openUpgradeDialog"
           >
+            <template #icon-right
+              ><OIcon name="lock" size="sm" class="text-warning-600"
+            /></template>
             {{ t("traces.lLMInsightsDashboard.compareEntry") }}
           </OButton>
-          <LockedFeatureTooltip
-            :message="genAiAgentMappingAccess.message"
-            :title="t('traces.lLMInsightsDashboard.compareEntry')"
-          />
         </template>
         <!-- Exit compare lives in the SAME spot as the enter affordance, so the
              two toggle in place — the user leaves compare where they entered it. -->
@@ -341,7 +339,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
 import { useVersionCompare } from "./composables/useVersionCompare";
 import analytics from "@/services/product_analytics";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { buildFeatureGateContext, checkFeatureAccess } from "@/utils/enterpriseFeatures";
 
 const { t } = useI18nTyped();
@@ -420,6 +418,7 @@ const genAiAgentMappingAccess = checkFeatureAccess(
   "genAiAgentMapping",
   buildFeatureGateContext(store.state.zoConfig),
 );
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 // Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
 // page lands on Agent for consistency. Only an explicit `?type=stream` URL param
 // overrides it (a stale saved preference must not silently land on Stream).

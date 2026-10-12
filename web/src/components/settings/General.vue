@@ -190,30 +190,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.customLogoText") }}
           </span>
           <template v-if="!customBrandingAccess.allowed">
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2" @click.capture="onLockedBrandingClick">
               <OInput
                 class="w-62.5"
-                disabled
                 model-value=""
                 :placeholder="t('settings.noTextAvailable')"
                 data-test="settings_ent_logo_custom_text_locked"
               >
                 <template v-slot:icon-right>
-                  <OIcon name="lock" size="sm" />
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
                 </template>
               </OInput>
             </div>
-            <LockedFeatureTooltip
-              :message="customBrandingAccess.message"
-              :title="t('settings.customLogoText')"
-            />
           </template>
           <template v-else>
             <div
               v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
               class="flex items-center gap-2"
             >
-              <OInput class="w-62.5" data-test="settings_ent_logo_custom_text" v-model="customText" />
+              <OInput
+                class="w-62.5"
+                data-test="settings_ent_logo_custom_text"
+                v-model="customText"
+              />
               <div class="flex gap-x-2">
                 <OButton
                   type="button"
@@ -261,24 +260,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
           <template v-if="!customBrandingAccess.allowed">
-            <div class="flex items-start gap-2">
+            <div class="flex items-start gap-2" @click.capture="onLockedBrandingClick">
               <OFile
                 data-test="setting_ent_custom_logo_img_file_upload_locked"
-                disabled
                 :label="t('settings.dragDropUpload')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
                 :help-text="t('settings.fileFormatConstraint')"
                 class="o2-file-input mx-0"
               >
                 <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" />
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
                 </template>
               </OFile>
             </div>
-            <LockedFeatureTooltip
-              :message="customBrandingAccess.message"
-              :title="raw(`${t('settings.customLogoTitle')} (${t('settings.lightMode')})`)"
-            />
           </template>
           <template v-else>
             <div
@@ -352,24 +346,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
           <template v-if="!customBrandingAccess.allowed">
-            <div class="flex items-start gap-2">
+            <div class="flex items-start gap-2" @click.capture="onLockedBrandingClick">
               <OFile
                 data-test="setting_ent_custom_logo_dark_img_file_upload_locked"
-                disabled
                 :label="t('settings.dragDropUpload')"
                 accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
                 :help-text="t('settings.fileFormatConstraint')"
                 class="o2-file-input mx-0"
               >
                 <template v-slot:prepend>
-                  <OIcon name="lock" size="sm" />
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
                 </template>
               </OFile>
             </div>
-            <LockedFeatureTooltip
-              :message="customBrandingAccess.message"
-              :title="raw(`${t('settings.customLogoTitle')} (${t('settings.darkMode')})`)"
-            />
           </template>
           <template v-else>
             <div
@@ -685,8 +674,8 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeGeneralSettingsSchema, type GeneralSettingsForm } from "./General.schema";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -717,7 +706,6 @@ export default defineComponent({
     OForm,
     OFormInput,
     OColor,
-    LockedFeatureTooltip,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -729,6 +717,12 @@ export default defineComponent({
     // Self-hosted-only (cloudOffers: false) — pure Cloud gets `visible: false`
     // (hidden, matching today's real behavior), OSS gets locked-but-visible.
     const customBrandingAccess = useLockedAffordance("customBranding");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    function onLockedBrandingClick(event: MouseEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      openUpgradeDialog();
+    }
 
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
@@ -1508,6 +1502,7 @@ export default defineComponent({
       orgScope,
       orgScopeLoading,
       customBrandingAccess,
+      onLockedBrandingClick,
     };
   },
 });

@@ -179,23 +179,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="trace-details-annotate-trace-btn"
               />
               <!-- TraceAnnotateMenu has no disabled affordance of its own, so a
-                   locked edition gets a disabled stand-in button instead. -->
+                   locked edition gets a stand-in button that opens the
+                   upgrade dialog instead. -->
               <OButton
                 v-else
                 variant="outline"
                 size="icon-xs"
-                disabled
-                icon-right="lock"
                 :aria-label="t('aiObservability.traceActions.annotate.button')"
                 data-test="trace-details-annotate-trace-btn"
+                @click="openUpgradeDialog"
               >
                 <OIcon name="fact-check" size="sm" />
+                <template #icon-right
+                  ><OIcon name="lock" size="xs" class="text-warning-600"
+                /></template>
               </OButton>
-              <LockedFeatureTooltip
-                v-if="!queuesAccess.allowed"
-                :message="queuesAccess.message"
-                :title="t('aiObservability.traceActions.annotate.button')"
-              />
             </template>
 
             <OButton
@@ -203,23 +201,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-dataset-trace-btn"
               variant="outline"
               size="icon-xs"
-              :disabled="!queuesAccess.allowed"
-              :icon-right="!queuesAccess.allowed ? 'lock' : undefined"
               :aria-label="t('aiObservability.traceActions.dataset.button')"
               @click="openTraceDataset"
             >
               <OIcon name="table-chart" size="sm" />
+              <template v-if="!queuesAccess.allowed" #icon-right>
+                <OIcon name="lock" size="xs" class="text-warning-600" />
+              </template>
               <OTooltip
                 v-if="queuesAccess.allowed"
                 side="bottom"
                 :content="t('aiObservability.traceActions.dataset.button')"
               />
             </OButton>
-            <LockedFeatureTooltip
-              v-if="canAnnotateContext && !queuesAccess.allowed"
-              :message="queuesAccess.message"
-              :title="t('aiObservability.traceActions.dataset.button')"
-            />
 
             <!-- Share button -->
             <ShareButton
@@ -1053,7 +1047,7 @@ import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
@@ -1318,7 +1312,6 @@ export default defineComponent({
     ManualEvaluationDialog,
     TraceAnnotateMenu,
     AddToDatasetDrawer,
-    LockedFeatureTooltip,
   },
 
   emits: ["searchQueryUpdated", "close", "spanSelected"],
@@ -1873,6 +1866,7 @@ export default defineComponent({
     // Annotating a trace is the same capability as queuing it into AI
     // Observability's review Queues, so it shares that gate.
     const queuesAccess = useLockedAffordance("queues");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
     // Fully resolved — used wherever the OLD hide-entirely boolean fed a
     // downstream prop (e.g. the sidebar's own annotate buttons), which must
     // stay hidden rather than render unlocked-looking controls it can't lock itself.
@@ -1932,6 +1926,10 @@ export default defineComponent({
     };
 
     const openTraceDataset = () => {
+      if (!queuesAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       datasetTarget.value = traceTarget();
       datasetOpen.value = true;
     };
@@ -3513,6 +3511,7 @@ export default defineComponent({
       canAnnotate,
       canAnnotateContext,
       queuesAccess,
+      openUpgradeDialog,
       traceEvaluationRange,
       datasetOpen,
       datasetTarget,

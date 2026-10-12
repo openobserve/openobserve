@@ -127,7 +127,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-patterns-toggle"
               value="patterns"
               size="sm"
-              :disabled="!patternsAccess.allowed"
               :tooltip="
                 patternsAccess.allowed && toolbarToggleIconOnly
                   ? t('search.showPatternsLabel')
@@ -139,15 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
               <template v-if="!patternsAccess.allowed" #icon-right>
-                <OIcon name="lock" size="xs" class="shrink-0" />
+                <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
               </template>
             </OToggleGroupItem>
-            <LockedFeatureTooltip
-              v-if="!patternsAccess.allowed"
-              :message="patternsAccess.message"
-              icon="layers"
-              :title="t('search.showPatternsLabel')"
-            />
           </OToggleGroup>
           <!-- reset filters button — moves into More menu at very narrow widths -->
           <OButton
@@ -751,13 +744,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownGroup :label="t('search.menuGroupSchedule')">
             <template v-if="!scheduledSearchAccess.allowed" #label-action>
-              <OIcon name="lock" size="xs" class="text-text-secondary" />
+              <OIcon name="lock" size="xs" class="text-warning-600" />
             </template>
 
             <ODropdownItem
               data-test="search-scheduler-create-new-btn"
-              :disabled="!scheduledSearchAccess.allowed"
-              @select="createScheduleJob"
+              @select="scheduledSearchAccess.allowed ? createScheduleJob() : openUpgradeDialog()"
             >
               <template #icon-left>
                 <span
@@ -777,8 +769,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <ODropdownItem
               data-test="search-scheduler-list-btn"
-              :disabled="!scheduledSearchAccess.allowed"
-              @select="routeToSearchSchedule"
+              @select="
+                scheduledSearchAccess.allowed ? routeToSearchSchedule() : openUpgradeDialog()
+              "
             >
               <template #icon-left>
                 <span
@@ -796,12 +789,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </ODropdownItem>
           </ODropdownGroup>
-          <LockedFeatureTooltip
-            v-if="!scheduledSearchAccess.allowed"
-            :message="scheduledSearchAccess.message"
-            icon="schedule"
-            :title="t('search.menuGroupSchedule')"
-          />
 
           <ODropdownSeparator />
 
@@ -1800,7 +1787,7 @@ import searchService from "@/services/search";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
@@ -1963,7 +1950,6 @@ export default defineComponent({
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
-    LockedFeatureTooltip,
     OFormToggleGroup,
     OSpinner,
     OTooltip,
@@ -2106,6 +2092,7 @@ export default defineComponent({
     const scheduledSearchAccess = computed(() =>
       checkFeatureAccess("scheduledSearch", buildFeatureGateContext(store.state.zoConfig)),
     );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
     const orgIdForWrites = useOrgId();
     const createSavedView = useMutation(() => createSavedViewMutation(orgIdForWrites.value));
     const updateSavedView = useMutation(() => updateSavedViewMutation(orgIdForWrites.value));
@@ -4304,10 +4291,11 @@ export default defineComponent({
     };
 
     const onLogsVisualizeToggleUpdate = async (value: any) => {
-      // Defense in depth: the toggle item's own `disabled` already blocks this,
-      // but that attribute can be stripped via devtools — re-check the gate
-      // here so a locked view can never actually be switched into.
+      // OToggleGroup is controlled (`:model-value`), so refusing to advance
+      // here is what keeps the locked Patterns view from becoming active —
+      // clicking it opens the upgrade dialog instead of switching.
       if (value === "patterns" && !patternsAccess.value.allowed) {
+        openUpgradeDialog();
         return;
       }
 
@@ -4859,6 +4847,7 @@ export default defineComponent({
       config,
       patternsAccess,
       scheduledSearchAccess,
+      openUpgradeDialog,
       handleRegionsSelection,
       handleQuickMode,
       handleHistogramMode,

@@ -229,7 +229,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-toolbar"
-              :disabled="!aiAccess.allowed"
               @click="toggleAIChat"
               data-test="menu-link-ai-item"
               :aria-label="t('menu.aiAssistant')"
@@ -245,9 +244,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-if="!aiAccess.allowed"
                 aria-hidden="true"
-                class="bg-surface-overlay text-text-secondary border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+                class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
               >
-                <OIcon name="lock" size="xs" class="size-2.5!" />
+                <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
               </span>
               <OTooltip
                 v-if="aiAccess.allowed"
@@ -257,13 +256,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 shortcut-id="aiChatToggle"
               />
             </OButton>
-            <LockedFeatureTooltip
-              v-if="!aiAccess.allowed"
-              :message="aiAccess.message"
-              icon="auto-awesome"
-              :title="t('menu.aiAssistant')"
-              side="bottom"
-            />
           </template>
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
@@ -486,7 +478,6 @@ import OrganizationSelector from "./OrganizationSelector.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -505,7 +496,6 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-    LockedFeatureTooltip,
     ODropdown,
     ODropdownItem,
     ODropdownSeparator,
@@ -743,9 +733,10 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
-      // Defense in depth — the button's own `disabled` already blocks this,
-      // but that attribute can be stripped via devtools.
-      if (!aiAccess.value.allowed) return;
+      if (!aiAccess.value.allowed) {
+        openEnterpriseDialog();
+        return;
+      }
       emit("toggleAIChat");
     };
 

@@ -4297,6 +4297,17 @@
   },
   "enterpriseFeature": {
     "lockedTitle": "Enterprise feature",
+    "featuresPageTitle": "Enterprise features",
+    "category": {
+      "security": "Security & Compliance",
+      "scale": "Scale & Performance",
+      "ai": "AI & Automation",
+      "analysis": "Analysis & Data Flow"
+    },
+    "legendBeta": "Early access",
+    "legendHa": "High availability",
+    "docsFooter": "Every feature links to its docs.",
+    "viewAllDocs": "View all documentation",
     "locked": "Unlock {feature} with OpenObserve Enterprise.",
     "availableIn": "Available in OpenObserve Enterprise",
     "rbacDisabled": "RBAC is turned off for this organization. Ask your administrator to enable it.",

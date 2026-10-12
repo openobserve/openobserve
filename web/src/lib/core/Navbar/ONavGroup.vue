@@ -67,7 +67,6 @@ import { findContentFocusTarget } from "./railFocus";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useTrialPaywall } from "@/composables/useTrialPaywall";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import {
   checkFeatureAccess,
   buildFeatureGateContext,
@@ -508,19 +507,6 @@ function onDocumentPointerDown(event: PointerEvent) {
   if (wrapperRef.value?.contains(target) || flyoutRef.value?.contains(target)) {
     return;
   }
-  // A locked child's tooltip (LockedFeatureTooltip) is ALSO teleported to
-  // <body>, outside flyoutRef's own subtree — without this, pointerdown on
-  // its Upgrade button reads as an outside click, closes (and unmounts) the
-  // flyout on the spot, and the click event that was about to fire next has
-  // nothing left to land on. `pointerdown` fires before `click`, so this has
-  // to be checked here, not just guarded in a click handler.
-  //
-  // Scoped to the Upgrade CTA specifically (not every open `o-tooltip-content`
-  // in the app) — an unrelated tooltip open elsewhere while this flyout is
-  // also open must not exempt clicks on IT from closing this flyout too.
-  if (target instanceof Element && target.closest('[data-test="locked-feature-upgrade-cta"]')) {
-    return;
-  }
   close();
 }
 
@@ -627,6 +613,8 @@ const markRailNavigation = inject(RailNavigationMarkKey, null);
 function onChildClick(event: MouseEvent, child: SubnavChild & { locked?: boolean }) {
   if (child.locked) {
     event.preventDefault();
+    close();
+    router.push({ name: "enterpriseFeatures" }).catch(() => {});
     return;
   }
   markRailNavigation?.(event);
@@ -723,14 +711,12 @@ function onChildMouseenter(event: MouseEvent) {
               role="menuitem"
               :to="child.locked ? undefined : childTo(child)"
               :tabindex="child.locked ? 0 : undefined"
-              class="nav-group-item rounded-default flex items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+              class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
               :class="[
                 flyoutTextClass,
-                child.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 isChildActive(child) ? 'bg-select-item-selected-bg font-medium' : '',
               ]"
               :aria-current="isChildActive(child) ? 'page' : undefined"
-              :aria-disabled="child.locked || undefined"
               :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
               :aria-describedby="
                 isChildPaywalled(child) ? itemDescriptionId(child, 'inline-') : undefined
@@ -749,7 +735,8 @@ function onChildMouseenter(event: MouseEvent) {
                 v-if="isChildPaywalled(child) || child.locked"
                 name="lock"
                 size="xs"
-                class="text-text-secondary ms-auto shrink-0"
+                class="ms-auto shrink-0"
+                :class="child.locked ? 'text-warning-600' : 'text-text-secondary'"
                 :data-test="`${childDataTest(child)}-lock`"
                 aria-hidden="true"
               />
@@ -760,17 +747,6 @@ function onChildMouseenter(event: MouseEvent) {
                 >{{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}</span
               >
             </component>
-            <!-- Sibling, not nested — see MenuLink.vue for why. mouseenter/leave
-                 reuse the flyout's own close-timer handlers so hovering the
-                 teleported tooltip doesn't let the flyout close from under it. -->
-            <LockedFeatureTooltip
-              v-if="child.locked && child.lockedMessage"
-              :message="child.lockedMessage"
-              :icon="child.icon"
-              :title="child.title ? raw(child.title) : t(child.titleKey)"
-              @mouseenter="clearTimers"
-              @mouseleave="scheduleClose"
-            />
           </template>
         </div>
 
@@ -785,15 +761,13 @@ function onChildMouseenter(event: MouseEvent) {
             role="menuitem"
             :to="block.child.locked ? undefined : childTo(block.child)"
             :tabindex="block.child.locked ? 0 : undefined"
-            class="nav-group-item rounded-default flex items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
             :class="[
               flyoutTextClass,
-              block.child.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
               block.spaced ? 'mt-2' : '',
               isChildActive(block.child) ? 'bg-select-item-selected-bg font-medium' : '',
             ]"
             :aria-current="isChildActive(block.child) ? 'page' : undefined"
-            :aria-disabled="block.child.locked || undefined"
             :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
             :aria-describedby="
               isChildPaywalled(block.child) ? itemDescriptionId(block.child, 'inline-') : undefined
@@ -812,7 +786,8 @@ function onChildMouseenter(event: MouseEvent) {
               v-if="isChildPaywalled(block.child) || block.child.locked"
               name="lock"
               size="xs"
-              class="text-text-secondary ms-auto shrink-0"
+              class="ms-auto shrink-0"
+              :class="block.child.locked ? 'text-warning-600' : 'text-text-secondary'"
               :data-test="`${childDataTest(block.child)}-lock`"
               aria-hidden="true"
             />
@@ -823,14 +798,6 @@ function onChildMouseenter(event: MouseEvent) {
               >{{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}</span
             >
           </component>
-          <LockedFeatureTooltip
-            v-if="block.child.locked && block.child.lockedMessage"
-            :message="block.child.lockedMessage"
-            :icon="block.child.icon"
-            :title="block.child.title ? raw(block.child.title) : t(block.child.titleKey)"
-            @mouseenter="clearTimers"
-            @mouseleave="scheduleClose"
-          />
         </template>
       </template>
     </div>
@@ -901,19 +868,15 @@ function onChildMouseenter(event: MouseEvent) {
                 role="menuitem"
                 :to="child.locked ? undefined : childTo(child)"
                 :tabindex="child.locked ? 0 : undefined"
-                class="nav-group-item rounded-default focus-visible:ring-accent flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+                class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
                 :class="[
                   flyoutTextClass,
-                  child.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                   childIndex > 0 ? 'mt-0.5' : '',
                   isChildActive(child)
                     ? 'bg-select-item-selected-bg font-medium'
-                    : child.locked
-                      ? ''
-                      : 'hover:bg-dropdown-item-hover-bg',
+                    : 'hover:bg-dropdown-item-hover-bg',
                 ]"
                 :aria-current="isChildActive(child) ? 'page' : undefined"
-                :aria-disabled="child.locked || undefined"
                 :data-paywalled="isChildPaywalled(child) ? 'true' : undefined"
                 :aria-describedby="isChildPaywalled(child) ? itemDescriptionId(child) : undefined"
                 @click="onChildClick($event, child)"
@@ -933,7 +896,8 @@ function onChildMouseenter(event: MouseEvent) {
                   v-if="isChildPaywalled(child) || child.locked"
                   name="lock"
                   size="xs"
-                  class="text-text-secondary ms-auto shrink-0"
+                  class="ms-auto shrink-0"
+                  :class="child.locked ? 'text-warning-600' : 'text-text-secondary'"
                   :data-test="`${childDataTest(child)}-lock`"
                   aria-hidden="true"
                 />
@@ -944,17 +908,6 @@ function onChildMouseenter(event: MouseEvent) {
                   >{{ t("menu.trialPageNeedsPlan", { page: childLabel(child) }) }}</span
                 >
               </component>
-              <!-- Sibling, not nested — see the comment on the mobile block
-                   above. mouseenter/leave keep the flyout's close timer paused
-                   while hovering the teleported tooltip — see that comment too. -->
-              <LockedFeatureTooltip
-                v-if="child.locked && child.lockedMessage"
-                :message="child.lockedMessage"
-                :icon="child.icon"
-                :title="child.title ? raw(child.title) : t(child.titleKey)"
-                @mouseenter="clearTimers"
-                @mouseleave="scheduleClose"
-              />
             </template>
           </div>
 
@@ -969,21 +922,17 @@ function onChildMouseenter(event: MouseEvent) {
               role="menuitem"
               :to="block.child.locked ? undefined : childTo(block.child)"
               :tabindex="block.child.locked ? 0 : undefined"
-              class="nav-group-item rounded-default focus-visible:ring-accent flex items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
+              class="nav-group-item rounded-default focus-visible:ring-accent flex cursor-pointer items-center gap-2.5 px-3 py-1.5 text-sm transition-colors duration-150 outline-none select-none [text-decoration:none]! focus-visible:ring-2 focus-visible:ring-inset"
               :class="[
                 flyoutTextClass,
-                block.child.locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
                 // Matches the pt-4 a header gets, so leaving a run and starting
                 // one look like the same size of break.
                 block.spaced ? 'mt-3' : '',
                 isChildActive(block.child)
                   ? 'bg-select-item-selected-bg font-medium'
-                  : block.child.locked
-                    ? ''
-                    : 'hover:bg-dropdown-item-hover-bg',
+                  : 'hover:bg-dropdown-item-hover-bg',
               ]"
               :aria-current="isChildActive(block.child) ? 'page' : undefined"
-              :aria-disabled="block.child.locked || undefined"
               :data-paywalled="isChildPaywalled(block.child) ? 'true' : undefined"
               :aria-describedby="
                 isChildPaywalled(block.child) ? itemDescriptionId(block.child) : undefined
@@ -1003,7 +952,8 @@ function onChildMouseenter(event: MouseEvent) {
                 v-if="isChildPaywalled(block.child) || block.child.locked"
                 name="lock"
                 size="xs"
-                class="text-text-secondary ms-auto shrink-0"
+                class="ms-auto shrink-0"
+                :class="block.child.locked ? 'text-warning-600' : 'text-text-secondary'"
                 :data-test="`${childDataTest(block.child)}-lock`"
                 aria-hidden="true"
               />
@@ -1014,14 +964,6 @@ function onChildMouseenter(event: MouseEvent) {
                 >{{ t("menu.trialPageNeedsPlan", { page: childLabel(block.child) }) }}</span
               >
             </component>
-            <LockedFeatureTooltip
-              v-if="block.child.locked && block.child.lockedMessage"
-              :message="block.child.lockedMessage"
-              :icon="block.child.icon"
-              :title="block.child.title ? raw(block.child.title) : t(block.child.titleKey)"
-              @mouseenter="clearTimers"
-              @mouseleave="scheduleClose"
-            />
           </template>
         </template>
       </div>

@@ -81,6 +81,19 @@ const useManagementRoutes = () => {
     },
   });
 
+  // Full-page listing of every enterprise feature (the same offer the header's
+  // "Get enterprise for free" button shows in a modal) — a locked left-nav
+  // item or left-side tab now routes here on click instead of a hover tooltip.
+  routes.push({
+    path: "enterprise-features",
+    name: "enterpriseFeatures",
+    component: () => import("@/views/EnterpriseFeatures.vue"),
+    meta: { titleKey: "enterpriseFeature.featuresPageTitle" },
+    beforeEnter(to: any, from: any, next: any) {
+      routeGuard(to, from, next);
+    },
+  });
+
   // Public synthetics locations are the registry the Lambda venue dispatches
   // against, and synthetics ships in OSS — so this registers in every build. The
   // page itself lists public rows only; private locations stay enterprise.

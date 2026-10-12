@@ -54,14 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               class="o2-hub-card group rounded-default border-border-default bg-surface-panel hover:border-accent hover:bg-surface-subtle focus-visible:ring-accent flex items-start gap-3 border p-4 text-left transition-colors outline-none focus-visible:ring-2"
-              :class="
-                item.locked
-                  ? 'hover:border-border-default hover:bg-surface-panel cursor-not-allowed opacity-60'
-                  : ''
-              "
-              :aria-disabled="item.locked || undefined"
               :data-test="item.dataTest || `section-hub-card-${item.key}`"
-              @click="!item.locked && router.push(item.to)"
+              @click="item.locked ? openUpgradeDialog() : router.push(item.to)"
             >
               <span
                 class="rounded-default bg-surface-subtle text-text-secondary group-hover:bg-tabs-hover-bg group-hover:text-accent mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
@@ -77,9 +71,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span class="flex min-w-0 flex-col">
                 <span
-                  class="text-text-heading group-hover:text-accent text-sm font-semibold transition-colors"
-                  >{{ item.label }}</span
-                >
+                  class="text-text-heading group-hover:text-accent flex items-center gap-1.5 text-sm font-semibold transition-colors"
+                  >{{ item.label }}
+                  <OIcon v-if="item.locked" name="lock" size="xs" class="text-warning-600" />
+                </span>
                 <span
                   v-if="item.description"
                   class="text-text-secondary mt-0.5 text-xs leading-snug"
@@ -87,17 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </span>
             </button>
-            <!-- Sibling, not nested — see the comment on this pattern in
-               MenuLink.vue / ONavGroup.vue: child-mode OTooltip anchors to the
-               element immediately before it, so it must follow the whole card,
-               not sit inside it. -->
-            <LockedFeatureTooltip
-              v-if="item.locked && item.lockedMessage"
-              :message="item.lockedMessage"
-              :icon="item.icon"
-              :title="item.label"
-              :show-upgrade-cta="item.lockedShowUpgradeCta !== false"
-            />
           </template>
         </div>
       </section>
@@ -110,10 +94,11 @@ import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const router = useRouter();
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 export interface SectionHubItem {
   key: string;
@@ -124,13 +109,13 @@ export interface SectionHubItem {
   visible?: boolean;
   /**
    * Present but unreachable — an enterprise/cloud-only section in a build
-   * that doesn't unlock it. Shown dimmed with `lockedMessage` as a tooltip
-   * instead of being filtered out (see `visible`). Set from
+   * that doesn't unlock it. Shown normally (gold lock badge, no dimming)
+   * instead of being filtered out (see `visible`); clicking opens the
+   * enterprise upgrade dialog instead of routing to `to`. Set from
    * `checkFeatureAccess()` in utils/enterpriseFeatures.ts.
    */
   locked?: boolean;
   lockedMessage?: I18nText;
-  /** False suppresses the tooltip's "Upgrade" CTA — set when upgrading wouldn't actually unlock it (e.g. RBAC off, not unavailable). Defaults true. */
   lockedShowUpgradeCta?: boolean;
   dataTest?: string;
 }

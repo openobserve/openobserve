@@ -1037,6 +1037,11 @@ describe("ONavGroup", () => {
         routes: [
           { path: "/", name: "home", component: { template: "<div />" } },
           { path: "/traces", name: "traces", component: { template: "<div />" } },
+          {
+            path: "/enterprise-features",
+            name: "enterpriseFeatures",
+            component: { template: "<div />" },
+          },
         ],
       });
       router.push(path);
@@ -1065,21 +1070,19 @@ describe("ONavGroup", () => {
       const el = w.get('[data-test="nav-group-item-traces-service-graph-locked"]');
       expect(el.element.tagName).toBe("DIV");
       expect(el.attributes("href")).toBeUndefined();
-      expect(el.attributes("aria-disabled")).toBe("true");
       wrapper = w;
     });
 
-    // The actual bug reported: clicking the locked item while viewing an
-    // unrelated page (e.g. Logs) must NOT navigate anywhere — not to Service
-    // Graph, and not to a fallback tab like Spans.
-    it("does not navigate when the locked child is clicked", async () => {
+    // Clicking a locked item must never navigate to its real destination
+    // (Service Graph) — it redirects to the Enterprise Features page instead.
+    it("redirects to the Enterprise Features page, not the real destination, when the locked child is clicked", async () => {
       const { wrapper: w, router } = await mountLocked("/");
       expect(router.currentRoute.value.fullPath).toBe("/");
 
       await w.get('[data-test="nav-group-item-traces-service-graph-locked"]').trigger("click");
       await flushPromises();
 
-      expect(router.currentRoute.value.fullPath).toBe("/");
+      expect(router.currentRoute.value.name).toBe("enterpriseFeatures");
       wrapper = w;
     });
 

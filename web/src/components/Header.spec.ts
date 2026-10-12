@@ -484,10 +484,10 @@ describe("Header Component", () => {
 
       await aiWrapper.vm.$nextTick();
 
-      // Visible, but disabled — upsell, not a hidden feature.
+      // Visible and clickable — upsell, not a hidden or disabled feature.
       const aiButton = aiWrapper.find('[data-test="menu-link-ai-item"]');
       expect(aiButton.exists()).toBe(true);
-      expect(aiButton.attributes("disabled")).toBeDefined();
+      expect(aiButton.attributes("disabled")).toBeUndefined();
 
       aiWrapper.unmount();
     });

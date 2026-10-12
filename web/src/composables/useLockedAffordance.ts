@@ -24,14 +24,15 @@ import {
 
 /**
  * One-line replacement for the `buildFeatureGateContext` + `checkFeatureAccess`
- * pair every locked in-page control (a disabled button/tab/toggle/menu item +
- * `LockedFeatureTooltip`) was hand-deriving separately. Reactive to
- * `store.state.zoConfig` so a key like `rbac`, whose predicate depends on a
- * runtime flag rather than just the build edition, updates correctly if
- * `zoConfig` resolves after mount — plain non-reactive callers of
- * `checkFeatureAccess` computed once at setup don't get that for free.
+ * pair every locked in-page control (a button/tab/toggle/menu item that opens
+ * `EnterpriseUpgradeDialog` on click instead of performing its real action)
+ * was hand-deriving separately. Reactive to `store.state.zoConfig` so a key
+ * like `rbac`, whose predicate depends on a runtime flag rather than just the
+ * build edition, updates correctly if `zoConfig` resolves after mount — plain
+ * non-reactive callers of `checkFeatureAccess` computed once at setup don't
+ * get that for free.
  *
- * Template usage: `v-if="!workflowsLock.allowed"` + `:message="workflowsLock.message"`
+ * Template usage: `v-if="!workflowsLock.allowed"` + `@click="workflowsLock.allowed ? action() : open()"`
  * (a `ComputedRef` auto-unwraps in templates; use `.value` in script).
  */
 export function useLockedAffordance(key: FeatureKey): ComputedRef<FeatureAccess> {

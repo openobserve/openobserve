@@ -160,21 +160,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="tab.value"
                         size="sm"
                         :icon-left="tab.icon"
-                        :disabled="tab.locked"
                         :title="lgUp && !tab.locked ? undefined : tab.label"
                         :data-test="`alert-list-tab-${tab.value}`"
                       >
                         <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                         <template v-if="tab.locked" #icon-right>
-                          <OIcon name="lock" size="xs" class="shrink-0" />
+                          <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
                         </template>
                       </OToggleGroupItem>
-                      <LockedFeatureTooltip
-                        v-if="tab.locked"
-                        :message="t('enterpriseFeature.pitch.anomalyDetection')"
-                        :icon="tab.icon"
-                        :title="tab.label"
-                      />
                     </template>
                   </OToggleGroup>
                   <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
@@ -968,7 +961,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert } from "@/ts/interfaces/index";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
@@ -1021,7 +1014,6 @@ export default defineComponent({
     MoveAcrossFolders,
     OToggleGroup,
     OToggleGroupItem,
-    LockedFeatureTooltip,
     OInput,
     OTooltip,
     SelectFolderDropDown,
@@ -1241,12 +1233,14 @@ export default defineComponent({
       () => store.state.zoConfig.build_type !== "opensource" && config.isEnterprise === "true",
     );
     const anomalyDetectionTabVisible = computed(
-      () => !anomalyDetectionEntitled.value || store.state.zoConfig.anomaly_detection_enabled === true,
+      () =>
+        !anomalyDetectionEntitled.value || store.state.zoConfig.anomaly_detection_enabled === true,
     );
     const isAnomalyDetectionEnabled = computed(
       () =>
         anomalyDetectionEntitled.value && store.state.zoConfig.anomaly_detection_enabled === true,
     );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     // Initialize activeTab from URL query parameter, default to "all".
     // Prevent forcing anomalyDetection tab when the feature is not available.
@@ -2238,9 +2232,13 @@ export default defineComponent({
     };
 
     const onAlertTabChange = async (tab: string) => {
-      // Defense in depth — the toggle item's own `disabled` already blocks
-      // this, but that attribute can be stripped via devtools.
-      if (tab === "anomalyDetection" && !isAnomalyDetectionEnabled.value) return;
+      // OToggleGroup is controlled (`:model-value`), so refusing to advance
+      // `activeTab` here is what keeps a locked tab from becoming active —
+      // clicking it opens the upgrade dialog instead of switching.
+      if (tab === "anomalyDetection" && !isAnomalyDetectionEnabled.value) {
+        openUpgradeDialog();
+        return;
+      }
       activeTab.value = tab;
       const apiType =
         tab === "realTime" ? "realtime" : tab === "anomalyDetection" ? "anomaly_detection" : tab;

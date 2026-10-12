@@ -155,7 +155,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon-toolbar"
-        :disabled="!aiAccess.allowed"
         @click="toggleJsonEditorAIChat"
         data-test="menu-link-ai-item"
         class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
@@ -170,18 +169,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-if="!aiAccess.allowed"
           aria-hidden="true"
-          class="bg-surface-overlay text-text-secondary border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+          class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
         >
-          <OIcon name="lock" size="xs" class="size-2.5!" />
+          <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
         </span>
       </OButton>
-      <LockedFeatureTooltip
-        v-if="!aiAccess.allowed"
-        :message="aiAccess.message"
-        icon="auto-awesome"
-        :title="t('menu.aiAssistant')"
-        side="bottom"
-      />
     </template>
     <JsonEditor
       :data="pipelineObj.currentSelectedPipeline"
@@ -237,8 +229,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -485,6 +477,7 @@ const associatedFunctions: Ref<string[]> = ref([]);
 // `config.isEnterprise` check had for free); `ai_enabled` stays a separate
 // runtime-flag hide layered on top, same as Header.vue's AI chat toggle.
 const aiAccess = useLockedAffordance("aiAssistant");
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 const jsonEditorAiButtonVisible = computed(
   () => !aiAccess.value.allowed || Boolean(store.state.zoConfig.ai_enabled),
 );
@@ -498,6 +491,10 @@ const jsonEditorAiBtnLogo = computed(() => {
     : getImageURL("images/common/ai_icon_gradient.svg");
 });
 const toggleJsonEditorAIChat = () => {
+  if (!aiAccess.value.allowed) {
+    openUpgradeDialog();
+    return;
+  }
   store.dispatch("setIsAiChatEnabled", !store.state.isAiChatEnabled);
 };
 

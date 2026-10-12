@@ -89,6 +89,7 @@ import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const mockOrganizations = organizations as any;
 const mockSettingsService = settingsService as any;
@@ -440,9 +441,9 @@ describe("General", () => {
       expect(wrapper.find("#enterpriseFeature").exists()).toBe(true);
       const lockedText = wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]');
       expect(lockedText.exists()).toBe(true);
-      // OInput's own `data-test` lands on its wrapper div (inheritAttrs: false);
-      // `disabled` is only a real attribute on the input it renders inside.
-      expect(lockedText.find("input").attributes("disabled")).toBeDefined();
+      // Clickable (not disabled) — the wrapping row opens the upgrade dialog
+      // on click instead of the field being an inert disabled control.
+      expect(lockedText.find("input").attributes("disabled")).toBeUndefined();
       expect(
         wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload_locked"]').exists(),
       ).toBe(true);
@@ -451,9 +452,21 @@ describe("General", () => {
       ).toBe(true);
       // The functional controls must not render alongside the locked ones.
       expect(wrapper.find('[data-test="settings_ent_logo_custom_text"]').exists()).toBe(false);
-      expect(
-        wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("opens the upgrade dialog when a locked branding row is clicked", async () => {
+      mockStore.state.zoConfig.meta_org = "test-org";
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const wrapper = createWrapper();
+
+      const { isOpen, close } = useEnterpriseUpgradeDialog();
+      close();
+      await wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]').trigger("click");
+      expect(isOpen.value).toBe(true);
     });
 
     it("should hide the branding section entirely on a pure Cloud build", () => {
@@ -471,9 +484,9 @@ describe("General", () => {
       config.isCloud = "false";
       const wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="settings_ent_logo_custom_text_locked"]').exists()).toBe(
+        false,
+      );
       expect(
         wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload_locked"]').exists(),
       ).toBe(false);

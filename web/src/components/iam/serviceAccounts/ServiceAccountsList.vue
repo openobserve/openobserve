@@ -126,19 +126,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-roles="{ row }">
             <span
               :data-test="`service-accounts-roles-${row.email}`"
-              class="inline-flex min-w-0 items-center gap-1 truncate text-xs"
-              :class="rbacAccess.allowed ? 'text-text-secondary' : 'text-text-disabled'"
+              class="text-text-secondary inline-flex min-w-0 items-center gap-1 truncate text-xs"
+              :class="{ 'cursor-pointer': !rbacAccess.allowed }"
               :title="rbacAccess.allowed ? serviceAccountRolesText(row.email) : rbacAccess.message"
+              @click="!rbacAccess.allowed && openUpgradeDialog()"
               >{{ serviceAccountRolesText(row.email) }}
-              <OIcon v-if="!rbacAccess.allowed" name="lock" size="xs" class="shrink-0" />
+              <OIcon
+                v-if="!rbacAccess.allowed"
+                name="lock"
+                size="xs"
+                class="text-warning-600 shrink-0"
+              />
             </span>
-            <LockedFeatureTooltip
-              v-if="!rbacAccess.allowed"
-              :message="rbacAccess.message"
-              :show-upgrade-cta="rbacAccess.ctaRelevant"
-              icon="shield"
-              :title="t('iam.roles')"
-            />
           </template>
 
           <template #cell-token="{ row }">
@@ -478,7 +477,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-accounts-list-token-add-to-role"
                 :to="roleLinkTarget"
                 class="group rounded-default border-border-default text-text-body hover:border-primary hover:bg-primary/5 inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors"
-                :class="{ 'cursor-not-allowed opacity-60 hover:border-border-default hover:bg-transparent': !rbacAccess.allowed }"
                 @click="onQuickLinkClick"
               >
                 <OIcon name="shield" size="sm" class="text-primary shrink-0" />
@@ -486,21 +484,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   :name="rbacAccess.allowed ? 'arrow-right' : 'lock'"
                   size="sm"
-                  class="text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                  :class="
+                    rbacAccess.allowed
+                      ? 'text-text-secondary group-hover:translate-x-0.5'
+                      : 'text-warning-600'
+                  "
+                  class="shrink-0 transition-transform"
                 />
               </router-link>
-              <LockedFeatureTooltip
-                v-if="!rbacAccess.allowed"
-                :message="rbacAccess.message"
-                :show-upgrade-cta="rbacAccess.ctaRelevant"
-                icon="shield"
-                :title="t('iam.roles')"
-              />
               <router-link
                 data-test="service-accounts-list-token-add-to-group"
                 :to="groupLinkTarget"
                 class="group rounded-default border-border-default text-text-body hover:border-primary hover:bg-primary/5 inline-flex items-center gap-1.5 border px-2.5 py-1.5 text-xs transition-colors"
-                :class="{ 'cursor-not-allowed opacity-60 hover:border-border-default hover:bg-transparent': !rbacAccess.allowed }"
                 @click="onQuickLinkClick"
               >
                 <OIcon name="group" size="sm" class="text-primary shrink-0" />
@@ -508,16 +503,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   :name="rbacAccess.allowed ? 'arrow-right' : 'lock'"
                   size="sm"
-                  class="text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                  :class="
+                    rbacAccess.allowed
+                      ? 'text-text-secondary group-hover:translate-x-0.5'
+                      : 'text-warning-600'
+                  "
+                  class="shrink-0 transition-transform"
                 />
               </router-link>
-              <LockedFeatureTooltip
-                v-if="!rbacAccess.allowed"
-                :message="rbacAccess.message"
-                :show-upgrade-cta="rbacAccess.ctaRelevant"
-                icon="group"
-                :title="t('iam.groups')"
-              />
             </div>
           </div>
 
@@ -563,8 +556,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AddServiceAccount from "./AddServiceAccount.vue";
 import {
   isSyntheticServiceAccountEmail,
@@ -621,7 +614,6 @@ export default defineComponent({
     OTabPanels,
     OTabPanel,
     OSpinner,
-    LockedFeatureTooltip,
   },
   emits: [],
   setup() {
@@ -715,6 +707,7 @@ export default defineComponent({
     // for the Groups/Roles rail — reused here so the quick-add links and the
     // Roles column lock instead of vanish when rbac isn't allowed.
     const rbacAccess = useLockedAffordance("rbac");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     // Step 2 framing: unlocked nudges toward the Groups page (with a link
     // below); locked still shows the links (disabled, with the lock tooltip)
@@ -724,11 +717,12 @@ export default defineComponent({
       return t("serviceAccounts.tokenReveal.nextStepOss");
     });
 
-    // Quick-add links stay visible but inert when locked — matches the rail's
-    // locked-nav-item convention (disabled, no navigation, tooltip explains why).
+    // Quick-add links stay visible when locked — clicking opens the upgrade
+    // dialog instead of navigating to Roles/Groups.
     const onQuickLinkClick = (e: Event) => {
       if (!rbacAccess.value.allowed) {
         e.preventDefault();
+        openUpgradeDialog();
         return;
       }
       isShowToken.value = false;
@@ -1323,6 +1317,7 @@ export default defineComponent({
       tokenEnvSnippet,
       tokenNextStepHint,
       rbacAccess,
+      openUpgradeDialog,
       onQuickLinkClick,
       groupLinkTarget,
       roleLinkTarget,

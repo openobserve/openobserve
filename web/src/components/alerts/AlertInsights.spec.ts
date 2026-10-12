@@ -17,6 +17,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const mockPush = vi.fn();
 vi.mock("vue-router", () => ({
@@ -142,14 +143,24 @@ describe("AlertInsights - rendering", () => {
     expect(w.find('[data-test="tab-overview"]').exists()).toBe(true);
   });
 
-  it("shows enterprise tabs locked (not hidden) when isEnterprise is false", async () => {
+  it("shows enterprise tabs locked (not hidden) when isEnterprise is false, as clickable (not disabled) controls", async () => {
     const w = await mountComp();
     const frequencyTab = w.find('[data-test="tab-frequency"]');
     const correlationTab = w.find('[data-test="tab-correlation"]');
     expect(frequencyTab.exists()).toBe(true);
-    expect(frequencyTab.attributes("aria-disabled")).toBe("true");
     expect(correlationTab.exists()).toBe(true);
-    expect(correlationTab.attributes("aria-disabled")).toBe("true");
+    // No longer a disabled control — it's clickable, and opens the upgrade
+    // dialog (via onTabsChange) instead of switching tabs.
+    expect(frequencyTab.attributes("aria-disabled")).toBeUndefined();
+    expect(correlationTab.attributes("aria-disabled")).toBeUndefined();
+  });
+
+  it("opens the upgrade dialog instead of switching when a locked tab is selected", async () => {
+    const w = await mountComp();
+    const { isOpen, close } = useEnterpriseUpgradeDialog();
+    close();
+    (w.vm as any).onTabsChange("frequency");
+    expect(isOpen.value).toBe(true);
   });
 
   it("renders the quality tab", async () => {

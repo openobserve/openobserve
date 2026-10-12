@@ -129,19 +129,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Locked: no license to unlock Incidents, shown instead of omitted so
          the capability is discoverable from a build that can't enable it. -->
-    <section v-else-if="!incidentsAccess.allowed" class="mb-5" data-test="overview-incidents-locked">
+    <section
+      v-else-if="!incidentsAccess.allowed"
+      class="mb-5"
+      data-test="overview-incidents-locked"
+    >
       <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.activeIncidents") }}
         </div>
       </div>
       <div
-        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+        class="border-border-default bg-surface-subtle rounded-default flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5"
+        @click="openUpgradeDialog"
       >
-        <OIcon name="lock" size="md" class="text-text-secondary shrink-0" />
+        <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
         <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
       </div>
-      <LockedFeatureTooltip :message="incidentsAccess.message" :title="t('overview.activeIncidents')" />
     </section>
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
@@ -315,12 +319,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="border-border-default bg-surface-subtle rounded-default flex items-center gap-3 border border-[0.0625em] px-4 py-5"
+        class="border-border-default bg-surface-subtle rounded-default flex cursor-pointer items-center gap-3 border border-[0.0625em] px-4 py-5"
+        @click="openUpgradeDialog"
       >
-        <OIcon name="lock" size="md" class="text-text-secondary shrink-0" />
+        <OIcon name="lock" size="md" class="text-warning-600 shrink-0" />
         <span class="text-text-secondary text-sm">{{ incidentsAccess.message }}</span>
       </div>
-      <LockedFeatureTooltip :message="incidentsAccess.message" :title="t('overview.services')" />
     </section>
 
     <!-- Service node side panel (latency / RED charts) -->
@@ -649,8 +653,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
 import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
@@ -664,6 +668,7 @@ const router = useRouter();
 // Services shares this same gate — it's the service-graph half of the same
 // enterprise/cloud bundle as Incidents, with no upsell story of its own.
 const incidentsAccess = useLockedAffordance("incidents");
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 const isIncidentsEnabled = computed(
   () => incidentsAccess.value.allowed && store.state.zoConfig?.incidents_enabled === true,
 );

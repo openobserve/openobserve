@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Unified View Toggle: Service Graph / Traces / Spans -->
           <OToggleGroup
             :model-value="searchObj.meta.searchMode"
-            @update:model-value="$emit('update:searchMode', $event)"
+            @update:model-value="onSearchModeChange"
           >
             <OToggleGroupItem
               data-test="traces-search-mode-spans-btn"
@@ -57,7 +57,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="traces-service-graph-toggle"
               value="service-graph"
               size="sm"
-              :disabled="!serviceGraphAccess.allowed"
               :icon-right="!serviceGraphAccess.allowed ? 'lock' : undefined"
               :tooltip="
                 serviceGraphAccess.allowed && shouldHideToggleText
@@ -68,12 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
               <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
             </OToggleGroupItem>
-            <LockedFeatureTooltip
-              v-if="serviceGraphAccess.visible && !serviceGraphAccess.allowed"
-              :message="serviceGraphAccess.message"
-              icon="share"
-              :title="t('traces.serviceGraphTab')"
-            />
             <OToggleGroupItem
               data-test="traces-search-mode-services-catalog-btn"
               value="services-catalog"
@@ -597,7 +590,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
@@ -655,7 +648,6 @@ export default defineComponent({
     OSwitch,
     OSelect,
     OTooltip,
-    LockedFeatureTooltip,
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     SyntaxGuide,
     TracesSavedViewsMenuItems,
@@ -1284,6 +1276,16 @@ export default defineComponent({
         !!searchObj.searchApplied,
     );
     const serviceGraphAccess = useLockedAffordance("enterprise");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+    // OToggleGroup is controlled, so refusing to emit here keeps a locked Service Graph from switching.
+    const onSearchModeChange = (value: unknown) => {
+      if (value === "service-graph" && !serviceGraphAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
+      emit("update:searchMode", value);
+    };
 
     const leftBaseWidth = computed(() => {
       const textKey = shouldHideToggleText.value ? "icon" : "text";
@@ -1366,6 +1368,7 @@ export default defineComponent({
       quickUpdateSavedView,
       confirmUpdateSavedView,
       serviceGraphAccess,
+      onSearchModeChange,
     };
   },
   computed: {

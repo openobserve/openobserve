@@ -89,16 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="outline"
         size="sm"
         class="ms-2"
-        disabled
-        icon-left="lock"
+        @click="openUpgradeDialog"
       >
+        <template #icon-left><OIcon name="lock" size="sm" class="text-warning-600" /></template>
         {{ t("workflow.create") }}
       </OButton>
-      <LockedFeatureTooltip
-        :message="workflowsLockMessage ?? raw('')"
-        icon="schema"
-        :title="t('menu.workflows')"
-      />
     </template>
   </div>
 </template>
@@ -109,7 +104,9 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 interface Option {
   label: I18nText;

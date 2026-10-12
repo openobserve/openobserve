@@ -64,22 +64,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="session-detail-annotate-btn"
           />
           <!-- TraceAnnotateMenu has no disabled affordance of its own, so a
-               locked edition gets a disabled stand-in button instead. -->
+               locked edition gets a stand-in button that opens the upgrade
+               dialog instead. -->
           <OButton
             v-else
             variant="outline"
             size="sm"
-            disabled
-            icon-right="lock"
             data-test="session-detail-annotate-btn"
+            @click="openUpgradeDialog"
           >
             {{ t("aiObservability.traceActions.annotate.button") }}
+            <template #icon-right
+              ><OIcon name="lock" size="sm" class="text-warning-600"
+            /></template>
           </OButton>
-          <LockedFeatureTooltip
-            v-if="!queuesAccess.allowed"
-            :message="queuesAccess.message"
-            :title="t('aiObservability.traceActions.annotate.button')"
-          />
         </template>
         <OButton
           v-if="canManualEvaluate"
@@ -962,7 +960,7 @@ import SessionRibbon from "./SessionRibbon.vue";
 import ThreadView from "./ThreadView.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
 import config from "@/aws-exports";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
@@ -1060,6 +1058,7 @@ const canAnnotateContext = computed(() => {
 // Annotating a session is the same capability as queuing it into AI
 // Observability's review Queues, so it shares that gate.
 const queuesAccess = useLockedAffordance("queues");
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the
 // real trace rows returned by the session-detail API.

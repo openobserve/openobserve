@@ -95,46 +95,46 @@
             <OSeparator v-if="transformTypeOptions[1]" vertical class="my-1.5" />
 
             <!-- JavaScript — shown locked (not hidden) in builds that don't
-                 unlock it; see isJsAllowed in AddFunction.vue. -->
-            <OToggleGroupItem
+                 unlock it; see isJsAllowed in AddFunction.vue. The toggle
+                 writes straight to form state on click, so a locked click is
+                 caught on this wrapper BEFORE it reaches the item — removing
+                 `disabled` there would let it write "1" to the form. -->
+            <span
               v-if="transformTypeOptions[1]"
-              value="1"
-              data-test="function-transform-type-js-option"
-              :disabled="transformTypeOptions[1]?.disabled"
+              class="contents"
+              @click.capture="
+                transformTypeOptions[1]?.disabled ? onLockedJsClick($event) : undefined
+              "
             >
-              <template #icon-left>
-                <OBadge size="xs" shape="rounded" variant="amber-soft">{{ raw("JS") }}</OBadge>
-              </template>
-              {{ transformTypeOptions[1]?.label }}
-              <template v-if="transformTypeOptions[1]?.disabled" #icon-right>
-                <OIcon name="lock" size="sm" class="opacity-70" />
-              </template>
-              <template v-else #icon-right>
-                <OIcon
-                  name="info-outline"
-                  size="sm"
-                  class="cursor-pointer opacity-70"
-                  data-test="function-transform-type-js-info"
-                >
-                  <OTooltip>
-                    <template #content>
-                      <div class="flex flex-col">
-                        <div class="mb-1 font-semibold">
-                          {{ raw("JavaScript") }} {{ t("function.tipLabel") }}
+              <OToggleGroupItem value="1" data-test="function-transform-type-js-option">
+                <template #icon-left>
+                  <OBadge size="xs" shape="rounded" variant="amber-soft">{{ raw("JS") }}</OBadge>
+                </template>
+                {{ transformTypeOptions[1]?.label }}
+                <template v-if="transformTypeOptions[1]?.disabled" #icon-right>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+                <template v-else #icon-right>
+                  <OIcon
+                    name="info-outline"
+                    size="sm"
+                    class="cursor-pointer opacity-70"
+                    data-test="function-transform-type-js-info"
+                  >
+                    <OTooltip>
+                      <template #content>
+                        <div class="flex flex-col">
+                          <div class="mb-1 font-semibold">
+                            {{ raw("JavaScript") }} {{ t("function.tipLabel") }}
+                          </div>
+                          <div>{{ t("function.jsFunctionHint") }}</div>
                         </div>
-                        <div>{{ t("function.jsFunctionHint") }}</div>
-                      </div>
-                    </template>
-                  </OTooltip>
-                </OIcon>
-              </template>
-            </OToggleGroupItem>
-            <LockedFeatureTooltip
-              v-if="transformTypeOptions[1]?.disabled"
-              :message="t('enterpriseFeature.locked', { feature: raw('JavaScript') })"
-              icon="function"
-              :title="raw('JavaScript')"
-            />
+                      </template>
+                    </OTooltip>
+                  </OIcon>
+                </template>
+              </OToggleGroupItem>
+            </span>
           </OFormToggleGroup>
 
           <!-- Forced-language hosts get no toggle, so the tip for the locked
@@ -252,15 +252,22 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { toggleFullscreen } from "@/utils/dom";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 const { t } = useI18nTyped();
 
 const router = useRouter();
 
 const store = useStore();
 const { isDark } = useTheme();
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+function onLockedJsClick(event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  openUpgradeDialog();
+}
 
 defineProps({
   disableName: {

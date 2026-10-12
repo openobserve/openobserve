@@ -37,6 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
           <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
           <div
+            v-if="locked"
+            class="bg-surface-base absolute -top-1 -right-1 z-1 flex h-3.5 w-3.5 items-center justify-center rounded-full"
+          >
+            <OIcon name="lock" size="xs" class="text-warning-600" />
+          </div>
+          <div
             v-if="badge && badge > 0"
             class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md"
             aria-live="polite"
@@ -88,12 +94,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
   </OTooltip>
-  <LockedFeatureTooltip
-    v-if="locked && lockedMessage"
-    :message="lockedMessage"
-    :icon="icon || undefined"
-    :title="title"
-  />
 </template>
 
 <script lang="ts">
@@ -106,7 +106,6 @@ import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 // A disabled reka tooltip drops its trigger listeners but keeps a pending hover-open timer; onClose() is the only way to cancel it.
@@ -132,7 +131,7 @@ const TooltipSilencer = defineComponent({
 
 export default defineComponent({
   name: "MenuLink",
-  components: { OIcon, OTooltip, TooltipSilencer, LockedFeatureTooltip },
+  components: { OIcon, OTooltip, TooltipSilencer },
   // Attrs are re-bound onto the tile element by hand: the tooltip wrapper is a fragment.
   inheritAttrs: false,
   props: {
@@ -319,7 +318,7 @@ export default defineComponent({
 
     // A group tile never gets a tooltip: its flyout opens on the same edge and shows the title.
     const tooltipText = computed<I18nText | "">(() => {
-      if (props.asTrigger || props.submenu || props.locked) return "";
+      if (props.asTrigger || props.submenu) return "";
       if (props.paywalled) return paywallText.value;
       return isTruncated.value ? props.title : "";
     });
@@ -350,11 +349,10 @@ export default defineComponent({
           : `menu-link-${props.link}-item`,
         "aria-label": ariaLabel.value,
         "data-truncated": isTruncated.value ? "true" : undefined,
-        "aria-disabled": props.locked || undefined,
       };
       if (props.locked) {
         // A plain `div` carries no native tabindex — add one so keyboard
-        // users can still reach it (and its tooltip) by Tab.
+        // users can still reach it (and trigger its click) by Tab.
         return { ...common, role: "link", tabindex: 0 };
       }
       // Set only when present: an explicit undefined would erase the tooltip's own describedby.
@@ -398,7 +396,7 @@ export default defineComponent({
       // Sit above the rail's sliding pill so icon/label stay readable.
       slideActive.value ? "z-10" : "",
       props.locked
-        ? "cursor-not-allowed opacity-60 text-tabs-inactive-text border-s-2 border-transparent bg-transparent"
+        ? "cursor-pointer text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg"
         : isActive.value
           ? activePillClass.value
           : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
@@ -417,6 +415,7 @@ export default defineComponent({
     const onRootClick = (event: MouseEvent) => {
       if (props.locked) {
         event.preventDefault();
+        router.push({ name: "enterpriseFeatures" }).catch(() => {});
         return;
       }
       if (props.external) {

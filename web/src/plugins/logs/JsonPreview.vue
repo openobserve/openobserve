@@ -25,20 +25,18 @@
         size="xs"
         variant="outline"
         class="me-2 mb-1.5"
-        :disabled="!correlationAccess.allowed"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
         <OIcon name="link" size="xs" class="me-1" />{{ t("search.viewRelated") }}
-        <OIcon v-if="!correlationAccess.allowed" name="lock" size="xs" class="ms-1" />
+        <OIcon
+          v-if="!correlationAccess.allowed"
+          name="lock"
+          size="xs"
+          class="text-warning-600 ms-1"
+        />
         <OTooltip v-if="correlationAccess.allowed" :content="t('search.viewRelatedTooltip')" />
       </OButton>
-      <LockedFeatureTooltip
-        v-if="showViewRelatedBtn && !correlationAccess.allowed"
-        :message="correlationAccess.message"
-        icon="link"
-        :title="t('search.viewRelated')"
-      />
       <!-- Stream picker and its action read as one control, sized to sit level
            with the toolbar buttons above rather than towering over them. -->
       <div
@@ -149,7 +147,6 @@
           <ODropdownItem
             v-if="store.state.zoConfig.ai_enabled"
             data-test="send-to-ai-chat-btn"
-            :disabled="!aiAssistantAccess.allowed"
             @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
           >
             <template #icon-left>
@@ -157,18 +154,11 @@
             </template>
             {{ t("logs.jsonPreview.sendToAiChat") }}
             <template v-if="!aiAssistantAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="shrink-0" />
+              <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
             </template>
           </ODropdownItem>
-          <LockedFeatureTooltip
-            v-if="store.state.zoConfig.ai_enabled && !aiAssistantAccess.allowed"
-            :message="aiAssistantAccess.message"
-            icon="smart-toy"
-            :title="t('logs.jsonPreview.sendToAiChat')"
-          />
           <ODropdownItem
             data-test="redirect-to-regex-pattern-btn"
-            :disabled="!regexPatternsAccess.allowed"
             @select.stop="createRegexPatternFromLogs(key, value[key])"
           >
             <template #icon-left>
@@ -176,15 +166,9 @@
             </template>
             {{ t("regex_patterns.create_regex_pattern_field") }}
             <template v-if="!regexPatternsAccess.allowed" #icon-right>
-              <OIcon name="lock" size="xs" class="shrink-0" />
+              <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
             </template>
           </ODropdownItem>
-          <LockedFeatureTooltip
-            v-if="!regexPatternsAccess.allowed"
-            :message="regexPatternsAccess.message"
-            icon="pattern"
-            :title="t('regex_patterns.create_regex_pattern_field')"
-          />
         </ODropdown>
 
         <span class="ps-1" :data-test="`log-expand-detail-key-${key}`">
@@ -281,7 +265,7 @@ import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
 import config from "@/aws-exports";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
@@ -371,7 +355,6 @@ export default {
     OTooltip,
     OInput,
     OSelect,
-    LockedFeatureTooltip,
   },
   emits: [
     "copy",
@@ -539,8 +522,8 @@ export default {
     let multiStreamFields: any = ref([]);
 
     const showViewRelatedBtn = ref(false);
-    // Shown locked (not hidden) in builds that don't unlock it — see
-    // LockedFeatureTooltip's doc comment for the shared pattern.
+    // Shown locked (not hidden) in builds that don't unlock it — clicking
+    // opens the enterprise upgrade dialog instead of the real action.
     const correlationAccess = computed(() =>
       checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
     );
@@ -553,6 +536,7 @@ export default {
     const regexPatternsAccess = computed(() =>
       checkFeatureAccess("regexPatterns", buildFeatureGateContext(store.state.zoConfig)),
     );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     // Initialize service correlation composable
     const { isCorrelationAvailable } = useServiceCorrelation();
@@ -757,9 +741,10 @@ export default {
     };
 
     const openCorrelation = () => {
-      // Defense in depth — the button's own `disabled` already blocks this,
-      // but that attribute can be stripped via devtools.
-      if (!correlationAccess.value.allowed) return;
+      if (!correlationAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       emit("show-correlation", props.value);
     };
 
@@ -792,6 +777,10 @@ export default {
     };
 
     const sendToAiChat = (value: string, append: boolean = true) => {
+      if (!aiAssistantAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       emit("closeTable");
       emit("sendToAiChat", value, append);
     };
@@ -817,6 +806,10 @@ export default {
     });
 
     const createRegexPatternFromLogs = (key: string, value: string) => {
+      if (!regexPatternsAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       emit("closeTable");
       // Prompt text handed to the assistant — model input, deliberately English.
       const promptToBeAdded = raw(

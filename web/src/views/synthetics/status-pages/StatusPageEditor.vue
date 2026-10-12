@@ -129,19 +129,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="text-text-label text-sm font-medium">{{
                           t("statusPages.fields.logo")
                         }}</span>
-                        <template v-if="!logoUploadEnabled">
-                          <OIcon
-                            name="lock"
-                            size="xs"
-                            aria-hidden="true"
-                            data-test="status-page-logo-lock"
-                          />
-                          <LockedFeatureTooltip
-                            :message="t('statusPages.fields.logoLocked')"
-                            icon="image"
-                            :title="t('statusPages.fields.logo')"
-                          />
-                        </template>
+                        <OIcon
+                          v-if="!logoUploadEnabled"
+                          name="lock"
+                          size="xs"
+                          class="text-warning-600"
+                          aria-hidden="true"
+                          data-test="status-page-logo-lock"
+                        />
                       </div>
 
                       <p
@@ -177,16 +172,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           />
                         </OButton>
                       </div>
-                      <OFile
+                      <div
                         v-else
-                        class="min-w-0"
-                        :disabled="!logoUploadEnabled"
-                        :model-value="null"
-                        :placeholder="t('statusPages.fields.logoUpload')"
-                        accept=".png, .jpg, .jpeg, .gif, .svg, image/*"
-                        data-test="status-page-logo-upload"
-                        @update:model-value="onLogoFileSelected"
-                      />
+                        class="contents"
+                        @click.capture="!logoUploadEnabled ? onLockedLogoClick($event) : undefined"
+                      >
+                        <OFile
+                          class="min-w-0"
+                          :model-value="null"
+                          :placeholder="t('statusPages.fields.logoUpload')"
+                          accept=".png, .jpg, .jpeg, .gif, .svg, image/*"
+                          data-test="status-page-logo-upload"
+                          @update:model-value="onLogoFileSelected"
+                        />
+                      </div>
                     </div>
 
                     <OFormColor
@@ -394,7 +393,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import OFile from "@/lib/forms/File/OFile.vue";
 import type { FileValue } from "@/lib/forms/File/OFile.types";
 import StatusPagePreview from "./StatusPagePreview.vue";
@@ -442,6 +441,12 @@ const orgIdentifier = computed<string>(
 const logoUploadEnabled = computed(
   () => config.isCloud === "true" || config.isEnterprise === "true",
 );
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+function onLockedLogoClick(event: MouseEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+  openUpgradeDialog();
+}
 
 // Self-hosted enterprise only, never cloud: the org-wide logo (Settings →
 // General) is an on-prem-org concept, so defaulting/overriding a status
@@ -546,9 +551,10 @@ function readFileAsBase64(file: File): Promise<string> {
 }
 
 async function onLogoFileSelected(value: FileValue) {
-  // Defense in depth — the file input's own `disabled` already blocks this,
-  // but that attribute can be stripped via devtools.
-  if (!logoUploadEnabled.value) return;
+  if (!logoUploadEnabled.value) {
+    openUpgradeDialog();
+    return;
+  }
   const file = Array.isArray(value) ? value[0] : value;
   if (!file) return;
   try {

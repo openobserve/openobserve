@@ -19,7 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Single Tab Row -->
     <div class="flex shrink-0 items-center justify-between">
       <div class="-mb-0.75 flex items-center gap-2">
-        <OTabs v-model="tab" align="left" reorderable @reorder="onTabReorder">
+        <OTabs
+          :model-value="tab"
+          align="left"
+          reorderable
+          @update:model-value="onTabChange"
+          @reorder="onTabReorder"
+        >
           <!-- Host-injected leading tabs (e.g. Insights) shown before the built-in tabs. -->
           <OTab
             v-for="lt in leadingTabs"
@@ -37,13 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="tabItem.dataTest"
               :name="tabItem.name"
               :label="tabItem.label"
-              :disable="tabItem.locked"
               :suffix-icon="tabItem.locked ? 'lock' : undefined"
-            />
-            <LockedFeatureTooltip
-              v-if="tabItem.locked"
-              :message="correlationAccess.message"
-              :title="tabItem.label"
             />
           </template>
         </OTabs>
@@ -519,7 +519,7 @@ import TelemetryCorrelationDashboard from "@/plugins/correlation/TelemetryCorrel
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";
 import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -542,7 +542,6 @@ export default defineComponent({
     OCardSection,
     OTabs,
     OTab,
-    LockedFeatureTooltip,
     OTabPanels,
     OTabPanel,
     EqualIcon,
@@ -698,7 +697,11 @@ export default defineComponent({
       (newInitialTab) => {
         // Defense in depth: a locked correlation tab is disabled in the UI,
         // but a caller could still pass one directly as `initialTab`.
-        if (newInitialTab && newInitialTab.startsWith("correlated-") && !correlationAccess.value.allowed) {
+        if (
+          newInitialTab &&
+          newInitialTab.startsWith("correlated-") &&
+          !correlationAccess.value.allowed
+        ) {
           return;
         }
         if (newInitialTab) {
@@ -731,9 +734,10 @@ export default defineComponent({
     watch(tab, (newTab, oldTab) => {
       const isCorrelationTab = newTab.startsWith("correlated-");
 
-      // Defense in depth: a locked correlation tab is disabled in the UI (and
-      // can't become active via click), but `tab` could still be reassigned
-      // programmatically/via devtools — bounce back rather than load data.
+      // Defense in depth: `onTabChange` is what actually keeps a locked
+      // correlation tab from becoming active on click, but `tab` could still
+      // be reassigned programmatically/via devtools — bounce back rather
+      // than load data.
       if (isCorrelationTab && !correlationAccess.value.allowed) {
         tab.value = oldTab && !oldTab.startsWith("correlated-") ? oldTab : "json";
         return;
@@ -815,6 +819,18 @@ export default defineComponent({
     const correlationAccess = computed(() =>
       checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
     );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+    // OTabs is controlled (`:model-value`), so refusing to advance `tab` here
+    // is what keeps a locked correlation tab from becoming active — clicking
+    // it opens the upgrade dialog instead of switching.
+    function onTabChange(name: string | number) {
+      if (String(name).startsWith("correlated-") && !correlationAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
+      tab.value = String(name);
+    }
 
     // Tab bar is drag-to-reorder (same pattern as the home page): the list of
     // tabs that *may* be shown is derived from config, while the user's chosen
@@ -1176,6 +1192,7 @@ export default defineComponent({
       detailSearchQuery,
       serviceStreamsEnabled,
       correlationAccess,
+      onTabChange,
       tabOrder,
       onTabReorder,
       config,

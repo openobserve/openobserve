@@ -389,13 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div class="px-page-edge span_details_tabs">
-      <OTabs
-        :model-value="activeTabModel"
-        @update:model-value="$emit('update:activeTab', $event)"
-        dense
-        align="left"
-        data-test="trace-details-sidebar-tabs"
-      >
+      <OTabs v-model="activeTabModel" dense align="left" data-test="trace-details-sidebar-tabs">
         <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
         <OTab
           v-if="canPreviewSpan"
@@ -450,29 +444,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="serviceStreamsEnabled"
           name="correlated-logs"
           :label="t('correlation.correlatedLogs')"
-          :disable="!correlationAccess.allowed"
           :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-logs"
           class="font-normal! capitalize"
-        />
-        <LockedFeatureTooltip
-          v-if="serviceStreamsEnabled && !correlationAccess.allowed"
-          :message="correlationAccess.message"
-          :title="t('correlation.correlatedLogs')"
         />
         <OTab
           v-if="serviceStreamsEnabled"
           name="correlated-metrics"
           :label="t('correlation.correlatedMetrics')"
-          :disable="!correlationAccess.allowed"
           :suffix-icon="!correlationAccess.allowed ? 'lock' : undefined"
           data-test="trace-details-sidebar-tabs-correlated-metrics"
           class="font-normal! capitalize"
-        />
-        <LockedFeatureTooltip
-          v-if="serviceStreamsEnabled && !correlationAccess.allowed"
-          :message="correlationAccess.message"
-          :title="t('correlation.correlatedMetrics')"
         />
       </OTabs>
     </div>
@@ -1004,7 +986,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -1205,7 +1187,6 @@ export default defineComponent({
     OTruncatedText,
     OCollapsible,
     OEmptyState,
-    LockedFeatureTooltip,
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
@@ -1284,7 +1265,19 @@ export default defineComponent({
 
     const activeTabModel = computed({
       get: () => props.activeTab,
-      set: (value: string) => emit("update:activeTab", value),
+      // OTabs is controlled (`:model-value`), so refusing to emit here is
+      // what keeps a locked correlation tab from becoming active — clicking
+      // it opens the upgrade dialog instead of switching.
+      set: (value: string) => {
+        if (
+          (value === "correlated-logs" || value === "correlated-metrics") &&
+          !correlationAccess.value.allowed
+        ) {
+          openUpgradeDialog();
+          return;
+        }
+        emit("update:activeTab", value);
+      },
     });
 
     const navigateToError = () => {
@@ -2747,6 +2740,7 @@ export default defineComponent({
     };
 
     const correlationAccess = useLockedAffordance("correlation");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     return {
       t,

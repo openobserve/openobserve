@@ -113,7 +113,7 @@
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
         variant="ghost"
         size="icon-toolbar"
-        :disabled="props.disableAi || !aiAccess.allowed"
+        :disabled="props.disableAi"
         @click="onAiToggleClick"
         class="group text-text-inverse! rounded-default bg-gradient-ai-subtle! hover:bg-gradient-ai! hover:shadow-ai-accent/35! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [transition:background_0.3s_ease,box-shadow_0.3s_ease]! hover:shadow-md"
         :style="props.hasExpandButton ? { right: '2.375rem' } : { right: '0.25rem' }"
@@ -126,9 +126,9 @@
         <span
           v-if="!aiAccess.allowed"
           aria-hidden="true"
-          class="bg-surface-overlay text-text-secondary border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+          class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
         >
-          <OIcon name="lock" size="xs" class="size-2.5!" />
+          <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
         </span>
         <OTooltip
           v-if="aiAccess.allowed"
@@ -137,12 +137,6 @@
           "
         />
       </OButton>
-      <LockedFeatureTooltip
-        v-if="aiFeatureVisible && !hideNlToggle && !isAIMode && !aiAccess.allowed"
-        :message="aiAccess.message"
-        icon="auto-awesome"
-        :title="t('menu.aiAssistant')"
-      />
     </div>
   </div>
 </template>
@@ -161,7 +155,7 @@ import { useChatHistory } from "@/composables/useChatHistory";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import LockedFeatureTooltip from "@/components/common/LockedFeatureTooltip.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 
 type Language = "sql" | "promql" | "vrl" | "javascript";
@@ -250,10 +244,12 @@ const nlpMode = computed({
     }
   },
 });
-// Defense in depth — the toggle's own `disabled` already blocks this, but
-// that attribute can be stripped via devtools.
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 const onAiToggleClick = () => {
-  if (!aiAccess.value.allowed) return;
+  if (!aiAccess.value.allowed) {
+    openUpgradeDialog();
+    return;
+  }
   nlpMode.value = true;
 };
 const isNaturalLanguageDetected = ref(false);
