@@ -22282,6 +22282,7 @@
         "parallel": "Parallel",
         "gate": "Gate",
         "p2p4": "P2–P3",
+        "p1Short": "P1",
         "p1Desc": "Pages at once and investigates alongside; the cause follows in the same thread. Gate is not allowed for P1.",
         "gateDesc": "Hold the page until the investigation lands, for up to 2 minutes. Fails open: if triage times out or fails, it pages anyway, says the investigation is still running or failed, and the cause follows in the thread."
       },
@@ -22332,6 +22333,18 @@
         "p4": "P4",
         "p4Desc": "Goes into the Friday summary.",
         "summary": "Friday summary"
+      },
+      "nav": {
+        "coverage": "Coverage",
+        "alerts": "Alert changes",
+        "fixes": "Fixes",
+        "investigation": "Investigation & paging",
+        "channels": "Channels"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} connected"
       }
     },
     "notInDemo": "Not available in this demo",
