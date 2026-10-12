@@ -56,7 +56,7 @@ export interface LogsPrefillInput {
   /** Whether the last run returned any rows — drives an informational note. */
   hasResults?: boolean;
   /** The filter was held, so `resolvedSql` reads the stream without it. */
-  textFilterDropped?: boolean;
+  heldFilterDropped?: boolean;
 }
 
 /**
@@ -70,7 +70,7 @@ export const logsAlertSnapshot = (
   searchObj: any,
   resolvedSql: string,
   timezone?: string,
-  textFilterDropped?: boolean,
+  heldFilterDropped?: boolean,
 ): LogsPrefillInput => ({
   streamNames: searchObj?.data?.stream?.selectedStream ?? [],
   streamType: searchObj?.data?.stream?.streamType ?? "logs",
@@ -89,7 +89,7 @@ export const logsAlertSnapshot = (
     : null,
   timezone,
   hasResults: (searchObj?.data?.queryResults?.hits?.length ?? 0) > 0,
-  ...(textFilterDropped ? { textFilterDropped } : {}),
+  ...(heldFilterDropped ? { heldFilterDropped } : {}),
 });
 
 /** Count the streams a SQL statement reads, to spot joins we can't represent. */
@@ -121,8 +121,8 @@ export const buildPrefillFromLogs = (input: LogsPrefillInput): AlertPrefill => {
   // fragment, and only the resolved payload is a runnable statement — say so,
   // because the alert's query will not look like what the user typed.
   let sql = input.sqlMode ? input.rawQuery : input.resolvedSql;
-  if (input.textFilterDropped) {
-    warnings.push(warn("textFilterDropped", "warning"));
+  if (input.heldFilterDropped) {
+    warnings.push(warn("heldFilterDropped", "warning"));
   } else if (!input.sqlMode && (input.rawQuery ?? "").trim()) {
     warnings.push(warn("convertedToSql", "info"));
   }
@@ -146,7 +146,7 @@ export const buildPrefillFromLogs = (input: LogsPrefillInput): AlertPrefill => {
 
   // An alert with no filter fires on literally every record in the stream.
   // Legitimate occasionally, a mistake usually — either way, say it out loud.
-  if (!(input.rawQuery ?? "").trim() || input.textFilterDropped) {
+  if (!(input.rawQuery ?? "").trim() || input.heldFilterDropped) {
     warnings.push(warn("broadMatch", "warning"));
   }
 

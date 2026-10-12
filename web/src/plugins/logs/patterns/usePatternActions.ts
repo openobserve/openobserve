@@ -150,17 +150,16 @@ export const usePatternActions = () => {
    * so it cannot be spliced in front of the pattern terms; we say so instead of
    * silently dropping the user's query.
    */
-  const patternsBaseFilter = (rawQuery: string): { filter: string; dropped: boolean } => {
+  const patternsBaseFilter = (rawQuery: string): { filter: string; dropped?: "held" | "noFts" } => {
     const stream = searchObj.data.stream.selectedStream?.[0];
-    if (!rawQuery || !stream) return { filter: rawQuery, dropped: false };
+    if (!rawQuery || !stream) return { filter: rawQuery };
     const ctx = buildFilterContext(searchObj as any, store.state.zoConfig);
     const plan = planStreamsFilter(rawQuery, [stream], ctx);
-    if (isHeldPlan(plan)) return { filter: "", dropped: true };
-    if (plan.kind === "sql") return { filter: plan.filter, dropped: false };
-    if (plan.kind !== "freeText" || !ctx.targets[stream])
-      return { filter: rawQuery, dropped: false };
+    if (isHeldPlan(plan)) return { filter: "", dropped: "held" };
+    if (plan.kind === "sql") return { filter: plan.filter };
+    if (plan.kind !== "freeText" || !ctx.targets[stream]) return { filter: rawQuery };
     const rendered = renderPlan(plan, ctx.targets[stream], ctx.knownFields);
-    return rendered === null ? { filter: "", dropped: true } : { filter: rendered, dropped: false };
+    return rendered === null ? { filter: "", dropped: "noFts" } : { filter: rendered };
   };
 
   const buildPatternsAlertPrefill = (options: AlertBuildOptions = {}) => {
@@ -181,7 +180,8 @@ export const usePatternActions = () => {
       mode: options.patternMode ?? "exclude",
       baseFilter: base?.filter,
       baseFilterDropped: sqlMode && !!rawQuery,
-      textFilterDropped: !!base?.dropped,
+      textFilterDropped: base?.dropped === "noFts",
+      heldFilterDropped: base?.dropped === "held",
       datetime: dt
         ? {
             type: dt.type,

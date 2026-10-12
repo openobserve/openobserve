@@ -1215,6 +1215,8 @@ describe("freeTextFilter", () => {
   describe("review round 2 on #15234", () => {
     const NO_FTS = { targetMode: "blocked", allTargetsFts: false } as const;
     const held = (raw: string) => ({ kind: "unclassified", filter: raw, held: true });
+    const BOOLEANS: ReadonlySet<string> = new Set(["is_error"]);
+    const BOOL = { booleanFields: BOOLEANS };
 
     it.each([
       ["status=500 --404"],
@@ -1307,16 +1309,78 @@ describe("freeTextFilter", () => {
       ["status=500 AND is_error -debug", "status=500 AND is_error AND NOT match_all('debug')"],
       ["is_error -404", "is_error AND NOT match_all('404')"],
       ["(status=500 AND is_error -404)", "(status=500 AND is_error AND NOT match_all('404'))"],
+      ["(is_error -404) OR status=500", "(is_error AND NOT match_all('404')) OR status=500"],
     ])("holds a -term after a bare boolean field in either order: %s", (raw, run) => {
-      expect(planFilter(raw, FIELDS)).toEqual(held(raw));
-      expect(planFilter(raw, FIELDS, NO_FTS)).toEqual(held(raw));
-      expect(suggestRecovery(raw, FIELDS, true).runSuggestion).toBe(run);
+      expect(planFilter(raw, FIELDS, BOOL)).toEqual(held(raw));
+      expect(planFilter(raw, FIELDS, { ...NO_FTS, ...BOOL })).toEqual(held(raw));
+      expect(suggestRecovery(raw, FIELDS, true, DEFAULT_TOKEN_LIMITS, BOOLEANS).runSuggestion).toBe(
+        run,
+      );
     });
 
     it("keeps a bare boolean field before a sub-minimum -term as typed", () => {
-      expect(planFilter("status=500 AND is_error -1", FIELDS)).toEqual({
+      expect(planFilter("status=500 AND is_error -1", FIELDS, BOOL)).toEqual({
         kind: "sql",
         filter: "status=500 AND is_error -1",
+      });
+    });
+
+    it.each([
+      ["(took -100) > 5"],
+      ["(_timestamp -1000000) > 0"],
+      ["(code -404) = 0 OR is_error"],
+      ["status=500 AND (took -100) BETWEEN 1 AND 9"],
+      ["took -100"],
+      ["level -debug"],
+      ["msg -timeout"],
+    ])("leaves a -term after a field the schema does not type Boolean as typed: %s", (raw) => {
+      const fields = new Set([...FIELDS, "took", "code", "msg"]);
+      expect(planFilter(raw, fields, BOOL)).toEqual({ kind: "sql", filter: raw });
+      expect(planFilter(raw, fields, { ...NO_FTS, ...BOOL })).toEqual({ kind: "sql", filter: raw });
+      for (const allFts of [true, false]) {
+        expect(
+          suggestRecovery(raw, fields, allFts, DEFAULT_TOKEN_LIMITS, BOOLEANS).runSuggestion,
+        ).toBeNull();
+      }
+    });
+
+    it.each([
+      ["(took -100) > 5"],
+      ["(_timestamp -1000000) > 0"],
+      ["(code -404) = 0 OR is_error"],
+      ["status=500 AND (took -100) BETWEEN 1 AND 9"],
+      ["(is_error -404) = false"],
+      ["NOT (is_error -404) > 0"],
+      ["5 < (is_error -404)"],
+      ["((is_error -404)) * 2 > 0"],
+    ])(
+      "never splits a -term inside an operand a comparison consumes, even a boolean's: %s",
+      (raw) => {
+        const fields = new Set([...FIELDS, "took", "code"]);
+        const booleanFields = new Set(["is_error", "took", "code", "_timestamp"]);
+        expect(planFilter(raw, fields, { booleanFields })).toEqual({ kind: "sql", filter: raw });
+        expect(planFilter(raw, fields, { ...NO_FTS, booleanFields })).toEqual({
+          kind: "sql",
+          filter: raw,
+        });
+      },
+    );
+
+    it.each([["is_error -404"], ["status=500 AND is_error -404"]])(
+      "leaves a -term after a field with no Boolean type as typed: %s",
+      (raw) => {
+        expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter: raw });
+        expect(planFilter(raw, FIELDS, NO_FTS)).toEqual({ kind: "sql", filter: raw });
+      },
+    );
+
+    it("holds a -term before a --word after a boolean field, and keeps the field's own --word", () => {
+      expect(planFilter("is_error -404 --note", FIELDS, BOOL)).toEqual(
+        held("is_error -404 --note"),
+      );
+      expect(planFilter("is_error --note", FIELDS, BOOL)).toEqual({
+        kind: "sql",
+        filter: "is_error --note",
       });
     });
 

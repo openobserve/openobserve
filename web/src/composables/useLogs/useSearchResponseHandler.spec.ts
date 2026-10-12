@@ -211,6 +211,19 @@ describe("useSearchResponseHandler", () => {
     responseHandler = useSearchResponseHandler();
   });
 
+  describe("handleHistogramStreamingHits", () => {
+    it("skips the fill instead of throwing when the run built no request", () => {
+      (mockState.searchObj.data as any).customDownloadQueryObj = {};
+      const response: any = {
+        content: { results: { hits: [{ zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 1 }] } },
+      };
+      expect(() =>
+        responseHandler.handleHistogramStreamingHits({ meta: {} } as any, response),
+      ).not.toThrow();
+      expect(mockState.searchObj.data.queryResults.aggs).toHaveLength(1);
+    });
+  });
+
   describe("constructErrorMessage", () => {
     it("should construct error message with default message", () => {
       const result = responseHandler.constructErrorMessage({

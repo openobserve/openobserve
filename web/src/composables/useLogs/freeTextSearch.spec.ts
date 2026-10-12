@@ -136,6 +136,15 @@ describe("buildFilterContext", () => {
     expect(planStreamsFilter("a", ["raw"], ctxBlocked).kind).toBe("freeText");
   });
 
+  it("types a field Boolean only when every selected stream that has it says Boolean", () => {
+    const bool = [{ name: "is_error", type: "Boolean" }];
+    const utf8 = [{ name: "is_error", type: "Utf8" }];
+    const mixed = buildFilterContext(makeSearchObj("", [fts("app", bool), fts("api")]), zoConfig);
+    expect([...(mixed.booleanFields ?? [])]).toEqual(["is_error"]);
+    const clash = makeSearchObj("", [fts("app", bool), fts("api", utf8)]);
+    expect(buildFilterContext(clash, zoConfig).booleanFields?.has("is_error")).toBe(false);
+  });
+
   it("reads the token limits from /config and falls back to 2 and 64", () => {
     const obj = makeSearchObj("timeout", [fts("app")]);
     const strict = buildFilterContext(obj, { ...zoConfig, inverted_index_min_token_length: 8 });
@@ -274,6 +283,42 @@ describe("freeTextWhereByStream and filterForParsing", () => {
       expect(isFilterHeld(obj, zoConfig)).toBe(false);
     },
   );
+
+  it.each([
+    ["is_error -404", "Boolean", true],
+    ["status=500 AND is_error -404", "Boolean", true],
+    ["is_error -404 --note", "Boolean", true],
+    ["is_error -404", "Utf8", false],
+    ["status=500 AND is_error -404", "Utf8", false],
+  ])("holds %s only when the schema types is_error %s: %s", (raw, type, held) => {
+    const extra = [
+      { name: "status", type: "Int64" },
+      { name: "is_error", type },
+    ];
+    expect(isFilterHeld(makeSearchObj(raw, [fts("app", extra)]), zoConfig)).toBe(held);
+  });
+
+  it.each([
+    "(took -100) > 5",
+    "(_timestamp -1000000) > 0",
+    "(code -404) = 0 OR is_error",
+    "status=500 AND (took -100) BETWEEN 1 AND 9",
+    "took -100",
+    "level -debug",
+    "msg -timeout",
+  ])("never holds or offers Run as for a -term after a non-boolean field: %s", (raw) => {
+    const extra = [
+      { name: "_timestamp", type: "Int64" },
+      { name: "status", type: "Int64" },
+      { name: "took", type: "Int64" },
+      { name: "code", type: "Int64" },
+      { name: "msg", type: "Utf8" },
+      { name: "is_error", type: "Boolean" },
+    ];
+    const obj = makeSearchObj(raw, [fts("app", extra)]);
+    expect(isFilterHeld(obj, zoConfig)).toBe(false);
+    expect(recoveryCardsFor(obj, zoConfig).runSuggestion).toBeNull();
+  });
 
   it("gives a cross-link no query for a held filter, never the raw text", () => {
     const extra = [

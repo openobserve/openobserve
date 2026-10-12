@@ -159,11 +159,12 @@ describe("buildPrefillFromLogs", () => {
           logs({
             rawQuery: "status=500 -404 AND is_error",
             resolvedSql: 'select * from "k8s_logs"',
-            textFilterDropped: true,
+            heldFilterDropped: true,
           }),
         ),
       );
-      expect(keys(p)).toContain("textFilterDropped");
+      expect(keys(p)).toContain("heldFilterDropped");
+      expect(keys(p)).not.toContain("textFilterDropped");
       expect(keys(p)).toContain("broadMatch");
       expect(keys(p)).not.toContain("convertedToSql");
       expect(isPrefillBlocked(p)).toBe(false);
@@ -248,10 +249,10 @@ describe("logsAlertSnapshot", () => {
   });
 
   it("carries the dropped-filter flag through to the adapter", () => {
-    expect(logsAlertSnapshot(searchObj(), "SELECT 1", undefined, true).textFilterDropped).toBe(
+    expect(logsAlertSnapshot(searchObj(), "SELECT 1", undefined, true).heldFilterDropped).toBe(
       true,
     );
-    expect(logsAlertSnapshot(searchObj(), "SELECT 1").textFilterDropped).toBeFalsy();
+    expect(logsAlertSnapshot(searchObj(), "SELECT 1").heldFilterDropped).toBeFalsy();
   });
 
   it("feeds the adapter end to end", () => {

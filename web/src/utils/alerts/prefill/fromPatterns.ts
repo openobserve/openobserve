@@ -65,8 +65,10 @@ export interface PatternsPrefillInput {
    */
   baseFilter?: string;
   baseFilterDropped?: boolean;
-  /** The filter's text cannot run on the stream, or it is held, so the caller passes no base filter. */
+  /** The filter's text cannot run on a stream with no FTS fields, so the caller passes no base filter. */
   textFilterDropped?: boolean;
+  /** The filter is held for a Run as choice, so the caller passes no base filter. */
+  heldFilterDropped?: boolean;
   datetime?: PrefillTimeRange | null;
   timezone?: string;
   /** "count" (the registry default for this source) alerts on how many, not which. */
@@ -75,6 +77,9 @@ export interface PatternsPrefillInput {
 
 const usable = (templates: string[]) =>
   templates.filter((t) => extractConstantsFromPattern(t).length > 0);
+
+const filterDropped = (input: PatternsPrefillInput) =>
+  !!(input.baseFilterDropped || input.textFilterDropped || input.heldFilterDropped);
 
 export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPrefill => {
   const warnings: AlertPrefillWarning[] = [];
@@ -106,7 +111,9 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
       effectiveMode = "none";
       // Only worth saying when patterns existed but none could be used; a page
       // with no patterns at all needs no explanation.
-      if (requested.length) warnings.push(warn("patternsUnusable", "info"));
+      if (requested.length && !filterDropped(input)) {
+        warnings.push(warn("patternsUnusable", "info"));
+      }
     }
   }
 
@@ -123,10 +130,14 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
   if (input.textFilterDropped) {
     warnings.push(warn("textFilterDropped", "warning"));
   }
+  if (input.heldFilterDropped) {
+    warnings.push(warn("heldFilterDropped", "warning"));
+  }
 
   // Excluding without a base filter means "everything except these" — legitimate
   // but close to the whole stream.
-  if (effectiveMode === "exclude" && applied.length && !baseFilter) {
+  const matchesPatterns = effectiveMode === "include" && applied.length > 0;
+  if (!baseFilter && !matchesPatterns) {
     warnings.push(warn("broadMatch", "warning"));
   }
 

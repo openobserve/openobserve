@@ -428,7 +428,8 @@ describe("usePatternActions", () => {
         withStatusStream(query, () => {
           for (const patternMode of ["include", "exclude"] as const) {
             const prefill = usePatternActions().buildPatternsAlertPrefill({ patternMode });
-            expect(keysOf(prefill)).toContain("textFilterDropped");
+            expect(keysOf(prefill)).toContain("heldFilterDropped");
+            expect(keysOf(prefill)).not.toContain("textFilterDropped");
             expect(prefill.sql).not.toContain("404");
             expect(prefill.sql).not.toContain("is_error");
           }
@@ -462,6 +463,7 @@ describe("usePatternActions", () => {
             `SELECT count(*) AS cnt FROM 'test-stream' WHERE NOT (${PATTERN_TERMS})`,
           );
           expect(keysOf(prefill)).toContain("textFilterDropped");
+          expect(keysOf(prefill)).not.toContain("heldFilterDropped");
           const include = usePatternActions().buildPatternsAlertPrefill({ patternMode: "include" });
           expect(include.sql).not.toContain(query);
           expect(keysOf(include)).toContain("textFilterDropped");
@@ -476,6 +478,7 @@ describe("usePatternActions", () => {
         const prefill = usePatternActions().buildPatternsAlertPrefill();
         expect(prefill.sql).toContain("(status=500 AND NOT match_all('404'))");
         expect(keysOf(prefill)).not.toContain("textFilterDropped");
+        expect(keysOf(prefill)).not.toContain("heldFilterDropped");
       });
     });
 

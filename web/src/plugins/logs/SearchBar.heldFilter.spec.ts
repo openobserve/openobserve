@@ -15,11 +15,14 @@
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import { defineComponent } from "vue";
+import { useI18n } from "vue-i18n";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import searchService from "@/services/search";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
+import useSearchQuery from "@/composables/useLogs/useSearchQuery";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -33,6 +36,14 @@ const stream = {
   ],
   settings: { full_text_search_keys: ["body"] },
 };
+
+const QueryProbe = defineComponent({
+  setup() {
+    const { t } = useI18n();
+    return { getQueryReq: useSearchQuery(t).getQueryReq };
+  },
+  template: "<div />",
+});
 
 describe("SearchBar — a held filter never reaches an alert or a download", () => {
   let wrapper: VueWrapper<any> | undefined;
@@ -74,7 +85,8 @@ describe("SearchBar — a held filter never reaches an alert or a download", () 
       const prefill = wrapper!.vm.buildAlertPrefill();
       const keys = prefill.warnings.map((w: any) => w.key);
       expect(prefill.sql).toBe('select * from "fts_a"');
-      expect(keys).toContain("textFilterDropped");
+      expect(keys).toContain("heldFilterDropped");
+      expect(keys).not.toContain("textFilterDropped");
       expect(keys).not.toContain("convertedToSql");
       expect(prefill.sql).not.toContain("404");
     },
@@ -84,14 +96,26 @@ describe("SearchBar — a held filter never reaches an alert or a download", () 
     wrapper!.vm.searchObj.data.query = "status=500 -404";
     const prefill = wrapper!.vm.buildAlertPrefill();
     expect(prefill.sql).toBe(`select * from "fts_a"  WHERE status = 500 AND NOT match_all('404')`);
-    expect(prefill.warnings.map((w: any) => w.key)).not.toContain("textFilterDropped");
+    expect(prefill.warnings.map((w: any) => w.key)).not.toContain("heldFilterDropped");
   });
 
-  it("refuses a download when no request was built for the current filter", () => {
-    const search = vi.spyOn(searchService, "search");
-    wrapper!.vm.searchObj.data.customDownloadQueryObj = {};
+  it("refuses a download after a held run, even right after a run that built one", () => {
+    const search = vi
+      .spyOn(searchService, "search")
+      .mockResolvedValue({ data: { hits: [] } } as any);
+    const probe = mount(QueryProbe, {
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    const { searchObj } = wrapper!.vm;
     wrapper!.vm.downloadCustomInitialNumber = 1;
+    searchObj.data.query = "status=500";
+    expect(probe.vm.getQueryReq(false)).not.toBeNull();
     wrapper!.vm.downloadRangeData();
-    expect(search).not.toHaveBeenCalled();
+    expect(search).toHaveBeenCalledTimes(1);
+    searchObj.data.query = "status=500 AND is_error -404";
+    expect(probe.vm.getQueryReq(false)).toBeNull();
+    wrapper!.vm.downloadRangeData();
+    expect(search).toHaveBeenCalledTimes(1);
+    probe.unmount();
   });
 });

@@ -1364,6 +1364,36 @@ describe("useSearchQuery › free text (item 1)", () => {
     },
   );
 
+  it("drops the previous run's download request when no stream is selected", () => {
+    select(withStatus(ftsStream("fts_a")));
+    mockState.searchObj.data.query = "status=500";
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getQueryReq(false)).not.toBeNull();
+    expect((mockState.searchObj.data as any).customDownloadQueryObj?.query?.sql).toContain(
+      "status = 500",
+    );
+    mockState.searchObj.data.stream.selectedStream = [];
+    expect(getQueryReq(false)).toBeNull();
+    expect((mockState.searchObj.data as any).customDownloadQueryObj?.query).toBeUndefined();
+  });
+
+  it.each([
+    "(took -100) > 5",
+    "(_timestamp -1000000) > 0",
+    "(code -404) = 0 OR is_error",
+    "status=500 AND (took -100) BETWEEN 1 AND 9",
+  ])("runs valid arithmetic on a non-boolean field instead of holding it: %s", (raw) => {
+    const stream = withStatus(ftsStream("fts_a"));
+    stream.schema.push({ name: "took", type: "Int64" }, { name: "code", type: "Int64" });
+    select(stream);
+    mockState.searchObj.data.query = raw;
+    const { getQueryReq } = useSearchQuery(gt);
+    const sql = getSql(getQueryReq(false));
+    expect(sql).toContain("WHERE");
+    expect(sql).not.toContain("match_all");
+    expect((mockState.searchObj.data as any).errorCode).not.toBe(20001);
+  });
+
   it("builds the alert's stream-only request for a held filter when asked for no filter", () => {
     select(withStatus(ftsStream("fts_a")));
     mockState.searchObj.data.query = "status=500 -404 AND is_error";

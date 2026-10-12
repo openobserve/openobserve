@@ -87,6 +87,8 @@ const MATCH_ALL_CALL = /^match_all\(\s*'(?:[^']|'')*'\s*\)$/i;
 
 const NUMERIC_LITERAL = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
 
+const NO_FIELDS: ReadonlySet<string> = new Set();
+
 const PREDICATE_OPERATORS = new Set([
   "=",
   "!=",
@@ -147,6 +149,7 @@ export interface PlanFilterOptions {
   targetMode?: TextSearchTarget["mode"];
   tokenLimits?: TokenLimits;
   allTargetsFts?: boolean;
+  booleanFields?: ReadonlySet<string>;
 }
 
 export interface SchemaField {
@@ -183,6 +186,7 @@ export interface FreeTextContext {
   fieldNames: ReadonlySet<string>;
   targets: Readonly<Record<string, TextSearchTarget>>;
   tokenLimits?: TokenLimits;
+  booleanFields?: ReadonlySet<string>;
 }
 
 export interface StreamLookup {
@@ -216,6 +220,7 @@ interface SuggestionTally {
 interface TermRule {
   names: ReadonlySet<string>;
   limits: TokenLimits;
+  booleans: ReadonlySet<string>;
 }
 
 interface MixState extends TermRule {
@@ -225,6 +230,12 @@ interface MixState extends TermRule {
 interface ParseState {
   pos: number;
   rule: TermRule;
+}
+
+interface SegmentSpan {
+  tokens: Lexed[];
+  first: number;
+  end: number;
 }
 
 interface FieldValuePair {
@@ -258,14 +269,15 @@ let sharedParser: SqlParser | null = null;
 
 export function planFilter(
   raw: string,
-  booleanFields: ReadonlySet<string>,
+  fieldNames: ReadonlySet<string>,
   options: PlanFilterOptions = {},
 ): FilterPlan {
   const lexed = lexFilter(raw);
   if (lexed === null) return { kind: "unclassified", filter: raw };
   const rule: TermRule = {
-    names: withImplicitFields(booleanFields),
+    names: withImplicitFields(fieldNames),
     limits: options.tokenLimits ?? DEFAULT_TOKEN_LIMITS,
+    booleans: options.booleanFields ?? NO_FIELDS,
   };
   if (lexed.length === 0) return { kind: "sql", filter: raw };
   const tokens = withImplicitAnds(lexed, raw, rule);
@@ -383,7 +395,11 @@ export function materializeFreeText(
   if (targets.length === 0 || targets.some((target) => !target)) return null;
   const allFts = targets.every((target) => target.mode === "fts");
   const targetMode = allFts ? "fts" : "blocked";
-  const plan = planFilter(raw, ctx.fieldNames, { targetMode, tokenLimits: ctx.tokenLimits });
+  const plan = planFilter(raw, ctx.fieldNames, {
+    targetMode,
+    tokenLimits: ctx.tokenLimits,
+    booleanFields: ctx.booleanFields,
+  });
   if (plan.kind !== "freeText") return raw;
   return allFts ? renderNode(plan.root) : null;
 }
@@ -402,9 +418,10 @@ export function appendConjunct(
 
 export function suggestRecovery(
   raw: string,
-  booleanFields: ReadonlySet<string>,
+  fieldNames: ReadonlySet<string>,
   allStreamsFts: boolean,
   tokenLimits: TokenLimits = DEFAULT_TOKEN_LIMITS,
+  booleanFields: ReadonlySet<string> = NO_FIELDS,
 ): RecoveryCards {
   const trimmed = raw.trim();
   const tokens = lexFilter(raw);
@@ -417,7 +434,11 @@ export function suggestRecovery(
   }
 
   const tally: SuggestionTally = { text: 0, fieldValue: 0, sql: 0, predicates: 0 };
-  const rule: TermRule = { names: withImplicitFields(booleanFields), limits: tokenLimits };
+  const rule: TermRule = {
+    names: withImplicitFields(fieldNames),
+    limits: tokenLimits,
+    booleans: booleanFields,
+  };
   const node = buildSuggestionExpr(withImplicitAnds(tokens, raw, rule), raw, rule, tally);
   const structural =
     node !== null && tally.text + tally.fieldValue > 0 && tally.sql + tally.fieldValue > 0;
@@ -432,10 +453,10 @@ export function suggestRecovery(
 
 export function freeTextRanges(
   raw: string,
-  booleanFields: ReadonlySet<string>,
+  fieldNames: ReadonlySet<string>,
   options: PlanFilterOptions = {},
 ): TextRange[] {
-  if (planFilter(raw, booleanFields, options).kind !== "freeText") return [];
+  if (planFilter(raw, fieldNames, options).kind !== "freeText") return [];
   return (lexFilter(raw) ?? [])
     .filter(({ tok }) => tok.t === "word" || tok.t === "squote" || tok.t === "dquote")
     .map(({ start, end }) => ({ start, end }));
@@ -729,6 +750,16 @@ function matchingParen(tokens: Lexed[], open: number): number {
   return -1;
 }
 
+function matchingOpenParen(tokens: Lexed[], close: number): number {
+  let depth = 0;
+  for (let i = close; i >= 0; i--) {
+    if (tokens[i].tok.t === "rparen") depth++;
+    if (tokens[i].tok.t === "lparen") depth--;
+    if (depth === 0) return i;
+  }
+  return -1;
+}
+
 function mergeCaseSpans(tokens: Lexed[] | null, raw: string): Lexed[] | null {
   if (tokens === null) return null;
   const out: Lexed[] = [];
@@ -962,18 +993,20 @@ function mixRoot(tokens: Lexed[], raw: string, rule: TermRule): PlanNode | null 
 function withImplicitAnds(tokens: Lexed[], raw: string, rule: TermRule): Lexed[] {
   const out: Lexed[] = [];
   let segment = 0;
+  let first = 0;
   let between = false;
-  for (const lexed of tokens) {
+  for (const [index, lexed] of tokens.entries()) {
     const betweenAnd = between && isKeyword(lexed, "AND");
     if (isKeyword(lexed, "BETWEEN")) between = true;
     if (betweenAnd) between = false;
     if (!betweenAnd && isSegmentBoundary(lexed)) {
-      splitTrailingExclusions(out, segment, raw, rule);
+      splitTrailingExclusions(out, segment, raw, rule, { tokens, first, end: index });
       segment = out.length + 1;
+      first = index + 1;
     }
     out.push(lexed);
   }
-  splitTrailingExclusions(out, segment, raw, rule);
+  splitTrailingExclusions(out, segment, raw, rule, { tokens, first, end: tokens.length });
   return out;
 }
 
@@ -984,13 +1017,20 @@ function isSegmentBoundary(lexed: Lexed): boolean {
   );
 }
 
-function splitTrailingExclusions(out: Lexed[], start: number, raw: string, rule: TermRule): void {
+function splitTrailingExclusions(
+  out: Lexed[],
+  start: number,
+  raw: string,
+  rule: TermRule,
+  span: SegmentSpan,
+): void {
   let k = out.length;
   while (k - 1 > start && isTrailingExclusion(out[k - 1], out[k - 2], rule)) k--;
   if (k === out.length) return;
   const left = out.slice(start, k);
-  if (isBareFieldOperand(left, rule)) {
-    if (out.slice(k).some(({ tok }) => tok.t === "word" && tok.text.startsWith("--"))) return;
+  if (isBareBooleanField(left, rule)) {
+    // SQL reads a --word right after the field as a comment, so that run keeps it as typed.
+    if (isDashWord(out[k]) || !isCompleteConjunct(span.tokens, span.first, span.end)) return;
   } else if (left.every(isOperandToken) || whereShape(sliceOf(left, raw)) !== "predicate") {
     return;
   }
@@ -998,11 +1038,42 @@ function splitTrailingExclusions(out: Lexed[], start: number, raw: string, rule:
   out.splice(k, 0, { tok: { t: "kw", text: "AND" }, start: at, end: at });
 }
 
-// A lone field before a -term is a boolean conjunct, so SQL would subtract from it.
-function isBareFieldOperand(left: Lexed[], rule: TermRule): boolean {
+// Only a Boolean field is a conjunct on its own; any other field before a -term is arithmetic.
+function isBareBooleanField(left: Lexed[], rule: TermRule): boolean {
   if (left.length !== 1 || left[0].tok.t !== "word") return false;
   const { text } = left[0].tok;
-  return exclusionOf(left[0].tok, rule) === null && isFieldLikeWord(text, rule.names);
+  const { booleans } = rule;
+  return (
+    exclusionOf(left[0].tok, rule) === null &&
+    (booleans.has(text) || booleans.has(asciiLower(text)))
+  );
+}
+
+function isDashWord(lexed: Lexed): boolean {
+  return lexed.tok.t === "word" && lexed.tok.text.startsWith("--");
+}
+
+// A comparison or arithmetic after an enclosing paren consumes the segment, so its -term subtracts.
+function isCompleteConjunct(tokens: Lexed[], first: number, end: number): boolean {
+  let open = first - 1;
+  let close = end;
+  for (;;) {
+    while (isKeyword(tokens[open], "NOT")) open--;
+    const opens = tokens[open]?.tok.t === "lparen";
+    const closes = tokens[close]?.tok.t === "rparen";
+    if (!opens && !isConjunctEdge(tokens[open])) return false;
+    if (!closes && !isConjunctEdge(tokens[close])) return false;
+    if (!opens && !closes) return true;
+    const groupOpen = opens ? open : matchingOpenParen(tokens, close);
+    const groupClose = opens ? matchingParen(tokens, open) : close;
+    if (groupOpen < 0 || groupClose < 0) return false;
+    open = groupOpen - 1;
+    close = groupClose + 1;
+  }
+}
+
+function isConjunctEdge(lexed: Lexed | undefined): boolean {
+  return lexed === undefined || isKeyword(lexed, "AND") || isKeyword(lexed, "OR");
 }
 
 function isTrailingExclusion(lexed: Lexed, prev: Lexed, rule: TermRule): boolean {

@@ -381,6 +381,7 @@ export const useSearchQuery = (t: TranslateFn) => {
       searchObj.data.stream.selectedStream.length == 0
     ) {
       searchObj.loading = false;
+      searchObj.data.customDownloadQueryObj = {} as SearchRequestPayload;
       return null;
     }
 

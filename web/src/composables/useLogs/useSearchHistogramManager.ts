@@ -214,10 +214,12 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
 
   const generateHistogramFillData = (response: any) => {
     let date = new Date();
+    const range = searchObj.data.customDownloadQueryObj?.query;
+    if (!range) return;
 
-    const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
+    const startDateTime = range.start_time / 1000;
 
-    const endDateTime = searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+    const endDateTime = range.end_time / 1000;
 
     const nowString = response.content.results.hits[0].zo_sql_key;
     const now = new Date(nowString);

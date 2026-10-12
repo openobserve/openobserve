@@ -107,6 +107,8 @@ export function buildFilterContext(
 ): FilterResolveContext {
   const selected = searchObj.data.stream.selectedStream ?? [];
   const fieldNames = new Set<string>(selected);
+  const booleans = new Set<string>();
+  const nonBooleans = new Set<string>();
   const targets: Record<string, TextSearchTarget> = {};
   let textEnabled = selected.length > 0;
   for (const name of selected) {
@@ -117,7 +119,9 @@ export function buildFilterContext(
       continue;
     }
     for (const field of [...entry.schema, ...(entry.removedSchemaFields ?? [])]) {
-      if (field?.name) fieldNames.add(field.name);
+      if (!field?.name) continue;
+      fieldNames.add(field.name);
+      (field.type === "Boolean" ? booleans : nonBooleans).add(field.name);
     }
     targets[name] = streamTextTarget(
       entry,
@@ -129,6 +133,7 @@ export function buildFilterContext(
     fieldNames,
     targets,
     tokenLimits: tokenLimitsFromConfig(zoConfig),
+    booleanFields: new Set([...booleans].filter((name) => !nonBooleans.has(name))),
     knownFields: new Set(
       (searchObj.data.stream.selectedStreamFields ?? []).map((field) => field.name),
     ),
@@ -149,6 +154,7 @@ export function planStreamsFilter(
     targetMode: targetModeOf(targets),
     tokenLimits: ctx.tokenLimits,
     allTargetsFts: targets.every((target) => target.mode === "fts"),
+    booleanFields: ctx.booleanFields,
   });
 }
 
@@ -265,6 +271,7 @@ export function freeTextDecorations(
   const ranges = freeTextRanges(raw, ctx.fieldNames, {
     targetMode: targetModeOf(targets as TextSearchTarget[]),
     tokenLimits: ctx.tokenLimits,
+    booleanFields: ctx.booleanFields,
   });
   const hover = t("search.freeTextPreview", { fields: fields.join(", "), sql: rendered });
   return ranges.length ? { ranges, hover } : null;
@@ -341,7 +348,7 @@ export function recoveryCardsFor(
   const streams = searchObj.data.stream.selectedStream ?? [];
   const allFts =
     streams.length > 0 && streams.every((stream) => ctx.targets[stream]?.mode === "fts");
-  return suggestRecovery(raw, ctx.fieldNames, allFts, ctx.tokenLimits);
+  return suggestRecovery(raw, ctx.fieldNames, allFts, ctx.tokenLimits, ctx.booleanFields);
 }
 
 export function searchTextReplacement(

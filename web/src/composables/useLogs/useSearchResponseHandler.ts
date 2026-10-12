@@ -357,10 +357,15 @@ export const useSearchResponseHandler = () => {
       searchObj.data.queryResults.aggs = [];
     }
 
-    if (searchObj.data.queryResults.aggs.length == 0 && response.content.results.hits.length > 0) {
+    const range = searchObj.data.customDownloadQueryObj?.query;
+    if (
+      range &&
+      searchObj.data.queryResults.aggs.length == 0 &&
+      response.content.results.hits.length > 0
+    ) {
       let date = new Date();
-      const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
-      const endDateTime = searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+      const startDateTime = range.start_time / 1000;
+      const endDateTime = range.end_time / 1000;
       const nowString = response.content.results.hits[0].zo_sql_key;
       const now = new Date(nowString);
       const day = String(now.getDate()).padStart(2, "0");
