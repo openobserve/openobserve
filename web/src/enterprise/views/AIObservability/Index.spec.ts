@@ -15,13 +15,14 @@
 //
 // @vitest-environment jsdom
 //
-// AIObservabilityShell's rail is the single source of truth for what's
-// reachable in the AI Observability module. On a true OSS build, only
-// LLM Insights + Sessions have OSS-registered routes (see
-// web/src/composables/router.ts) — everything else here (Agent Graph/
-// Behavior, Discovery, Queues, Datasets, Playground, Experiments, Remote
-// Tasks, Quality, Eval Jobs, Scorers, Score Configs) would 404, so the rail
-// must not link to any of it.
+// AIObservabilityShell's rail shows every section on every build — on a true
+// OSS build, everything beyond Monitor's LLM Insights + Sessions renders
+// LOCKED (lock icon + pitch-card tooltip) rather than being hidden, so OSS
+// users can discover the rest of the module instead of never knowing it
+// exists. All of it is still reachable (not a 404): `web/src/composables/
+// router.ts` registers every one of these routes too, each gated with
+// `withFeatureGate` so OSS actually landing on one redirects to the shared
+// locked-feature page instead of breaking.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
@@ -69,12 +70,30 @@ async function mountShell() {
   });
 }
 
+interface RailItem {
+  key: string;
+  to: unknown;
+  locked?: boolean;
+  lockedMessage?: unknown;
+}
+
 function groupsOf(wrapper: Awaited<ReturnType<typeof mountShell>>) {
   return wrapper.findComponent(SectionRailStub).props("groups") as Array<{
     label: string;
-    items: Array<{ key: string; to: unknown }>;
+    items: RailItem[];
   }>;
 }
+
+function itemsOf(wrapper: Awaited<ReturnType<typeof mountShell>>) {
+  return groupsOf(wrapper).flatMap((g) => g.items);
+}
+
+const ALL_GROUP_LABELS = [
+  "aiObservability.sections.monitor",
+  "aiObservability.sections.evaluate",
+  "aiObservability.sections.experiment",
+  "aiObservability.sections.annotate",
+];
 
 beforeEach(() => {
   vi.resetModules();
@@ -83,53 +102,93 @@ beforeEach(() => {
 });
 
 describe("AIObservabilityShell — OSS builds (isEnterprise and isCloud both false)", () => {
-  it("shows only the Monitor group, with exactly LLM Insights + Sessions", async () => {
+  it("still shows every group and every item — nothing is hidden", async () => {
     const wrapper = await mountShell();
     const groups = groupsOf(wrapper);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].label).toBe("aiObservability.sections.monitor");
-    expect(groups[0].items.map((i) => i.key)).toEqual(["llmInsights", "sessions"]);
+    expect(groups.map((g) => g.label)).toEqual(ALL_GROUP_LABELS);
+    // Rendered in group order (Monitor, Evaluate, Experiment, Annotate —
+    // see `sectionGroupOrder`), not AI_OBSERVABILITY_SECTIONS's flat order.
+    const keys = itemsOf(wrapper).map((i) => i.key);
+    expect(keys).toEqual([
+      "llmInsights",
+      "sessions",
+      "agentGraph",
+      "agentBehavior",
+      "quality",
+      "jobs",
+      "scorers",
+      "scoreConfigs",
+      "prompts",
+      "playground",
+      "experiments",
+      "remoteTasks",
+      "discovery",
+      "queues",
+      "datasets",
+    ]);
   });
 
-  it("does not link to Agent Graph or Agent Behavior — Monitor's other two items have no OSS route", async () => {
+  it("leaves LLM Insights + Sessions unlocked — OSS serves them for real", async () => {
     const wrapper = await mountShell();
-    const keys = groupsOf(wrapper).flatMap((g) => g.items.map((i) => i.key));
-    expect(keys).not.toContain("agentGraph");
-    expect(keys).not.toContain("agentBehavior");
+    const items = itemsOf(wrapper);
+    const llmInsights = items.find((i) => i.key === "llmInsights")!;
+    const sessions = items.find((i) => i.key === "sessions")!;
+    expect(llmInsights.locked).toBeFalsy();
+    expect(sessions.locked).toBeFalsy();
   });
 
-  it("hides Annotate, Experiment, and Evaluate entirely", async () => {
+  it("locks every other item with a message, instead of hiding it", async () => {
     const wrapper = await mountShell();
-    const labels = groupsOf(wrapper).map((g) => g.label);
-    expect(labels).not.toContain("aiObservability.sections.annotate");
-    expect(labels).not.toContain("aiObservability.sections.experiment");
-    expect(labels).not.toContain("aiObservability.sections.evaluate");
+    const items = itemsOf(wrapper);
+    const lockedKeys = [
+      "agentGraph",
+      "agentBehavior",
+      "discovery",
+      "queues",
+      "datasets",
+      "prompts",
+      "playground",
+      "experiments",
+      "remoteTasks",
+      "quality",
+      "jobs",
+      "scorers",
+      "scoreConfigs",
+    ];
+    for (const key of lockedKeys) {
+      const item = items.find((i) => i.key === key)!;
+      expect(item.locked, `${key} should be locked on a true OSS build`).toBe(true);
+      expect(item.lockedMessage, `${key} should carry a lockedMessage`).toBeTruthy();
+    }
   });
 
-  it("points LLM Insights and Sessions at the same route names the enterprise rail uses", async () => {
+  it("points every item at the route name the enterprise rail uses too — same registry, same names", async () => {
     const wrapper = await mountShell();
-    const items = groupsOf(wrapper)[0].items;
-    expect((items[0].to as any).name).toBe("aiLLMInsights");
-    expect((items[1].to as any).name).toBe("aiSessions");
+    const items = itemsOf(wrapper);
+    expect((items.find((i) => i.key === "llmInsights")!.to as any).name).toBe("aiLLMInsights");
+    expect((items.find((i) => i.key === "sessions")!.to as any).name).toBe("aiSessions");
+    expect((items.find((i) => i.key === "agentGraph")!.to as any).name).toBe("aiAgentGraph");
+    // The four Evaluate tabs all share one route, distinguished by `tab`.
+    for (const key of ["quality", "jobs", "scorers", "scoreConfigs"]) {
+      const to = items.find((i) => i.key === key)!.to as any;
+      expect(to.name).toBe("aiEvaluations");
+      expect(to.query.tab).toBe(key);
+    }
   });
 });
 
 describe("AIObservabilityShell — enterprise/cloud builds", () => {
-  it("shows every group and every item when isEnterprise is true", async () => {
+  it("shows every group and every item, all unlocked, when isEnterprise is true", async () => {
     mockIsEnterprise = "true";
     const wrapper = await mountShell();
     const groups = groupsOf(wrapper);
-    expect(groups.map((g) => g.label)).toEqual([
-      "aiObservability.sections.monitor",
-      "aiObservability.sections.evaluate",
-      "aiObservability.sections.experiment",
-      "aiObservability.sections.annotate",
-    ]);
+    expect(groups.map((g) => g.label)).toEqual(ALL_GROUP_LABELS);
     const monitorKeys = groups[0].items.map((i) => i.key);
     expect(monitorKeys).toEqual(["llmInsights", "sessions", "agentGraph", "agentBehavior"]);
+    expect(itemsOf(wrapper).every((i) => !i.locked)).toBe(true);
   });
 
-  it("shows every group and every item when isCloud is true, even with isEnterprise false", async () => {
+  it("shows every group and every item, all unlocked, when isCloud is true, even with isEnterprise false", async () => {
     mockIsCloud = "true";
     const wrapper = await mountShell();
     const groups = groupsOf(wrapper);
@@ -140,5 +199,6 @@ describe("AIObservabilityShell — enterprise/cloud builds", () => {
       "agentGraph",
       "agentBehavior",
     ]);
+    expect(itemsOf(wrapper).every((i) => !i.locked)).toBe(true);
   });
 });

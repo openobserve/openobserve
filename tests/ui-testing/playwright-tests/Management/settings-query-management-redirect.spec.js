@@ -3,10 +3,9 @@
 // Settings Query Management Redirect — navigation/gating E2E tests.
 //
 // Query Management ("Running Queries") is an enterprise-only, meta-org-only
-// settings section. On an OSS build the route is never registered and the
-// sidebar tab is hidden, so the observable behavior is: (1) the Query
+// settings section. On an OSS build the observable behavior is: (1) the Query
 // Management tab is absent from the Settings rail, and (2) a direct URL to
-// /settings/query_management falls through to the 404 page. The runtime
+// /settings/query_management redirects to the enterprise-locked page. The runtime
 // "redirect back to General Settings" guard (PR #14803) is enterprise-only
 // dead code on OSS, so it is recorded as a fixme gap rather than exercised.
 
@@ -40,16 +39,16 @@ test.describe("Settings Query Management Redirect testcases", () => {
     testLogger.info('Query Management tab correctly absent from the OSS Settings rail');
   });
 
-  test("should render the 404 page when navigating directly to /settings/query_management on OSS", {
+  test("should redirect to the enterprise-locked page when navigating directly to /settings/query_management on OSS", {
     tag: ['@query-management-redirect', '@all', '@oss', '@P0']
   }, async ({ page }) => {
     const edition = await pm.editionFeaturesPage.detectEdition();
     test.skip(edition !== 'opensource', `Runs only on OSS build (detected: ${edition})`);
 
     await pm.queryManagementPage.navigateToQueryManagement(orgId);
-    await pm.queryManagementPage.expect404Page();
+    await pm.queryManagementPage.expectEnterpriseLockedPage();
 
-    testLogger.info('Direct Query Management URL correctly falls through to 404 on OSS');
+    testLogger.info('Direct Query Management URL correctly redirects to the enterprise-locked page on OSS');
   });
 
   test("redirects Query Management back to General Settings outside the meta org (enterprise)", {

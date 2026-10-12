@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     :title="t('panel.layout')"
     :secondary-button-label="t('dashboard.cancel')"
-    :primary-button-label="t('dashboard.save')"
+    :primary-button-label="t('dashboard.layoutEdit.apply')"
     form-id="panel-layout-settings-form"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"

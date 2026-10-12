@@ -451,9 +451,10 @@ describe("EnterpriseUpgradeDialog", () => {
       expect(openSpy).toHaveBeenCalledWith("https://o2.ws/contact_us", "_blank");
     });
 
-    it("openFeatureLink opens the provided URL in a new tab", () => {
+    it("clicking a feature item opens its doc link in a new tab", () => {
       const wrapper = createWrapper();
-      (wrapper.vm as any).openFeatureLink("https://o2.ws/sso");
+      const items = wrapper.findAll('[data-test="enterprise-upgrade-feature-item"]');
+      items[0].trigger("click");
       expect(openSpy).toHaveBeenCalledWith("https://o2.ws/sso", "_blank");
     });
 

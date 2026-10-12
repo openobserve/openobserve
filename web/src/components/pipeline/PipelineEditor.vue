@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('pipeline.editPipelineJSON')"
     persistent
   >
-    <template v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled" #header-right>
+    <template v-if="jsonEditorAiButtonVisible" #header-right>
       <OButton
         variant="ghost"
         size="icon-toolbar"
@@ -166,6 +166,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :src="jsonEditorAiBtnLogo"
           class="header-icon size-5 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
         />
+        <span
+          v-if="!aiAccess.allowed"
+          aria-hidden="true"
+          class="bg-surface-overlay border-surface-base absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border shadow-sm"
+        >
+          <OIcon name="lock" size="xs" class="text-warning-600 size-2.5!" />
+        </span>
       </OButton>
     </template>
     <JsonEditor
@@ -219,8 +226,11 @@ import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
@@ -249,7 +259,6 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
 import useStreams from "@/composables/useStreams";
 import usePipelines from "@/composables/usePipelines";
 
-import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { savePipelineMutation } from "@/services/pipelines.queries";
 import { useMutation } from "@tanstack/vue-query";
@@ -373,6 +382,9 @@ const nodeTypes: any = [
     isSectionHeader: false,
   },
 ];
+// Remote Destination's gate — same FeatureKey Settings → Pipeline
+// Destinations already uses (see settings/index.vue's pipelineDestinationsAccess).
+const pipelineDestinationsAccess = useLockedAffordance("pipelineDestinations");
 const functions = ref<{ [key: string]: Function }>({});
 
 const {
@@ -461,6 +473,14 @@ const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
 const associatedFunctions: Ref<string[]> = ref([]);
 
+// Edition check via the registry (fixes a missing-Cloud bug the old raw
+// `config.isEnterprise` check had for free); `ai_enabled` stays a separate
+// runtime-flag hide layered on top, same as Header.vue's AI chat toggle.
+const aiAccess = useLockedAffordance("aiAssistant");
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+const jsonEditorAiButtonVisible = computed(
+  () => !aiAccess.value.allowed || Boolean(store.state.zoConfig.ai_enabled),
+);
 const isJsonEditorAiHovered = ref(false);
 const jsonEditorAiBtnLogo = computed(() => {
   if (isJsonEditorAiHovered.value || store.state.isAiChatEnabled) {
@@ -471,6 +491,10 @@ const jsonEditorAiBtnLogo = computed(() => {
     : getImageURL("images/common/ai_icon_gradient.svg");
 });
 const toggleJsonEditorAIChat = () => {
+  if (!aiAccess.value.allowed) {
+    openUpgradeDialog();
+    return;
+  }
   store.dispatch("setIsAiChatEnabled", !store.state.isAiChatEnabled);
 };
 
@@ -568,7 +592,11 @@ watch(
 );
 
 onBeforeMount(() => {
-  if (config.isEnterprise == "true") {
+  // Self-hosted-only (cloudOffers: false) — a pure-Cloud build reports
+  // `visible: false` so the node stays entirely absent there, matching
+  // today's real behavior; OSS gets it LOCKED instead of omitted so the
+  // capability is discoverable while building a pipeline.
+  if (pipelineDestinationsAccess.value.visible) {
     nodeTypes.push({
       label: t("pipeline.remoteNode"),
       subtype: "remote_stream",
@@ -576,6 +604,8 @@ onBeforeMount(() => {
       icon: "img:" + externalOutputImage,
       tooltip: t("pipeline.destinationExternalTooltip"),
       isSectionHeader: false,
+      locked: !pipelineDestinationsAccess.value.allowed,
+      lockedMessage: pipelineDestinationsAccess.value.message,
     });
   }
   const route = router.currentRoute.value;
