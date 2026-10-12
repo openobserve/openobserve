@@ -33,7 +33,7 @@ use tokio::time::Instant;
 use utoipa::ToSchema;
 
 use super::{
-    HOUR_US,
+    HOUR_US, RUM_DATA_STREAM,
     response::{RumQueryDiagnostics, RumQueryError, RumQueryErrorKind},
 };
 
@@ -65,7 +65,7 @@ impl RumQuery {
     }
 
     /// `ids` are trace id variants for the traced resources, else view or action ids.
-    fn sql(self, stream: &str, trace_columns: &[&str], ids: &[String]) -> String {
+    fn sql(self, trace_columns: &[&str], ids: &[String]) -> String {
         let ids_in = |column: &str| key_in_predicate(column, ids.iter().map(String::as_str));
         let (filter, order) = match self {
             Self::TracedResources => {
@@ -96,7 +96,7 @@ impl RumQuery {
         };
         format!(
             "SELECT * FROM {} WHERE {filter} ORDER BY {TIMESTAMP_COL_NAME} {order}",
-            quote_identifier(stream)
+            quote_identifier(RUM_DATA_STREAM)
         )
     }
 
@@ -138,7 +138,6 @@ impl RumQuery {
 
 pub(super) struct LookupContext {
     pub(super) org_id: String,
-    pub(super) stream: String,
     pub(super) user_id: String,
     pub(super) trace_id: String,
     pub(super) trace_columns: Vec<&'static str>,
@@ -167,10 +166,10 @@ impl LookupContext {
             ));
         }
         let (range, range_error) = self.clamp_range(range);
-        let sql = query.sql(&self.stream, &self.trace_columns, ids);
+        let sql = query.sql(&self.trace_columns, ids);
         let request = query.request(sql, range, remaining);
         let trace_id = format!("{}-{}", self.trace_id, query.as_str());
-        let response = SearchService::cache::search(
+        let search = SearchService::cache::search(
             &trace_id,
             &self.org_id,
             StreamType::Logs,
@@ -180,12 +179,40 @@ impl LookupContext {
             false,
             None,
             false,
-        )
-        .await;
+        );
+        // The search's own timeout starts only at execution, after file listing and queueing.
+        let Ok(response) = tokio::time::timeout(remaining, search).await else {
+            self.cancel(trace_id);
+            return Some(QueryOutcome::failed(
+                query,
+                RumQueryErrorKind::Timeout,
+                format!(
+                    "no result within the {} ms left of the lookup budget",
+                    remaining.as_millis()
+                ),
+            ));
+        };
         Some(match response {
             Ok(response) => QueryOutcome::from_response(query, range, started.elapsed(), response),
             Err(e) => QueryOutcome::failed(query, RumQueryErrorKind::from(&e), e.to_string()),
         })
+    }
+
+    /// Dropping a search skips its cleanup, so a timed-out one is cancelled to free its slot.
+    fn cancel(&self, trace_id: String) {
+        #[cfg(feature = "enterprise")]
+        {
+            let org_id = self.org_id.clone();
+            tokio::spawn(async move {
+                if let Err(e) = SearchService::cancel_query(&org_id, &trace_id).await {
+                    log::warn!(
+                        "[trace_id {trace_id}] rum lookup could not cancel a timed-out query: {e}"
+                    );
+                }
+            });
+        }
+        #[cfg(not(feature = "enterprise"))]
+        let _ = trace_id;
     }
 
     fn clamp_range(&self, range: (i64, i64)) -> ((i64, i64), String) {
@@ -276,7 +303,6 @@ mod tests {
     fn context(max_query_range_us: i64) -> LookupContext {
         LookupContext {
             org_id: String::new(),
-            stream: "_rumdata".to_string(),
             user_id: String::new(),
             trace_id: String::new(),
             trace_columns: vec![],
@@ -289,14 +315,13 @@ mod tests {
     fn test_traced_resources_sql_covers_every_column_and_variant() {
         assert_eq!(
             RumQuery::TracedResources.sql(
-                "_rumdata",
                 &["_o2_trace_id", "_oo_trace_id"],
                 &["0abc".to_string(), "abc".to_string()]
             ),
             "SELECT * FROM \"_rumdata\" WHERE (_o2_trace_id = '0abc' OR _o2_trace_id = 'abc' OR _oo_trace_id = '0abc' OR _oo_trace_id = 'abc') ORDER BY _timestamp ASC"
         );
         assert_eq!(
-            RumQuery::TracedResources.sql("_rumdata", &["_oo_trace_id"], &["it's".to_string()]),
+            RumQuery::TracedResources.sql(&["_oo_trace_id"], &["it's".to_string()]),
             "SELECT * FROM \"_rumdata\" WHERE (_oo_trace_id = 'it''s') ORDER BY _timestamp ASC"
         );
     }
@@ -305,15 +330,15 @@ mod tests {
     fn test_page_queries_keep_their_filters_and_order() {
         let ids = vec!["v1".to_string(), "v'2".to_string()];
         assert_eq!(
-            RumQuery::Views.sql("_rumdata", &[], &ids),
+            RumQuery::Views.sql(&[], &ids),
             "SELECT * FROM \"_rumdata\" WHERE \"view_id\" IN ('v1', 'v''2') AND type = 'view' ORDER BY _timestamp DESC"
         );
         assert_eq!(
-            RumQuery::Actions.sql("_rumdata", &[], &["a1".to_string()]),
+            RumQuery::Actions.sql(&[], &["a1".to_string()]),
             "SELECT * FROM \"_rumdata\" WHERE \"action_id\" IN ('a1') AND type = 'action' ORDER BY _timestamp ASC"
         );
         assert_eq!(
-            RumQuery::ContextEvents.sql("_rumdata", &[], &ids),
+            RumQuery::ContextEvents.sql(&[], &ids),
             "SELECT * FROM \"_rumdata\" WHERE \"view_id\" IN ('v1', 'v''2') AND type IN ('error', 'resource', 'long_task', 'action') ORDER BY _timestamp ASC"
         );
     }
@@ -326,6 +351,16 @@ mod tests {
                 .await
                 .is_none()
         );
+    }
+
+    #[tokio::test]
+    async fn test_run_reports_a_spent_budget_as_timeout() {
+        let outcome = context(0)
+            .run(RumQuery::Views, &["v1".to_string()], (1, 2))
+            .await
+            .unwrap();
+        assert_eq!(outcome.error.unwrap().kind, RumQueryErrorKind::Timeout);
+        assert!(outcome.hits.is_empty());
     }
 
     #[test]

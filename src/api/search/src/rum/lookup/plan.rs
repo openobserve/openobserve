@@ -25,24 +25,22 @@ pub(super) struct PagePlan {
 }
 
 impl PagePlan {
-    /// Views come from every traced resource, the actions and time anchor from the first one.
+    /// Ids come from every traced resource, the time anchor from the first one.
     pub(super) fn from_bridge(traced_resources: &[json::Value], trace_end: i64) -> Self {
         let mut view_ids: Vec<String> = Vec::new();
-        for id in traced_resources
-            .iter()
-            .filter_map(|hit| id_string(&hit["view_id"]))
-        {
-            if !view_ids.contains(&id) {
-                view_ids.push(id);
+        let mut action_ids: Vec<String> = Vec::new();
+        for hit in traced_resources {
+            if let Some(id) = id_string(&hit["view_id"]) {
+                push_unique(&mut view_ids, id);
+            }
+            for id in parse_action_ids(&hit["action_id"]) {
+                push_unique(&mut action_ids, id);
             }
         }
-        let first = traced_resources.first();
-        let anchor = first
+        let anchor = traced_resources
+            .first()
             .and_then(|hit| date_us(&hit["date"]))
             .unwrap_or(trace_end);
-        let action_ids = first
-            .map(|hit| parse_action_ids(&hit["action_id"]))
-            .unwrap_or_default();
         Self {
             view_ids,
             action_ids,
@@ -51,6 +49,12 @@ impl PagePlan {
                 anchor.saturating_add(PAGE_VIEW_WINDOW_US),
             ),
         }
+    }
+}
+
+fn push_unique(ids: &mut Vec<String>, id: String) {
+    if !ids.contains(&id) {
+        ids.push(id);
     }
 }
 
@@ -100,12 +104,12 @@ mod tests {
         let traced = vec![
             json!({"view_id": "v1", "date": 1_700_000_000_000i64, "action_id": "[\"a1\",\"a2\"]"}),
             json!({"view_id": "v2", "action_id": "[\"a3\"]"}),
-            json!({"view_id": "v1"}),
+            json!({"view_id": "v1", "action_id": "[\"a2\"]"}),
             json!({"view_id": ""}),
         ];
         let plan = PagePlan::from_bridge(&traced, 5);
         assert_eq!(plan.view_ids, vec!["v1", "v2"]);
-        assert_eq!(plan.action_ids, vec!["a1", "a2"]);
+        assert_eq!(plan.action_ids, vec!["a1", "a2", "a3"]);
         assert_eq!(
             plan.range,
             (

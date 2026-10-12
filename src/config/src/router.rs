@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 37] = [
+const QUERIER_ROUTES: [(&str, usize); 38] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
@@ -30,6 +30,7 @@ const QUERIER_ROUTES: [(&str, usize); 37] = [
     ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
     ("traces/time_range", 3),    // /api/{org_id}/{stream_name}/traces/time_range
     ("traces/time_range", 2),    // /api/{org_id}/traces/time_range
+    ("rum/lookup", 2),           // /api/{org_id}/rum/lookup
     ("clusters", 1),             // /api/clusters
     ("query_manager", 2),        // /api/{org_id}/query_manager/...
     ("_search", 2),              // /api/{org_id}/_search
@@ -158,6 +159,10 @@ mod tests {
         // Test streams route
         assert!(is_querier_route("/api/org1/streams"));
         assert!(is_querier_route("/api/org1/streams/mystream"));
+
+        // Test RUM lookup route
+        assert!(is_querier_route("/api/org1/rum/lookup"));
+        assert!(!is_querier_route("/api/org1/rum/analytics/funnels"));
 
         // Test prometheus routes
         assert!(is_querier_route("/api/org1/prometheus/api/v1/query"));

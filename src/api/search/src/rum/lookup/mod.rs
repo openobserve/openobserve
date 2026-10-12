@@ -27,7 +27,7 @@ use axum::{
 };
 use config::{get_config, meta::stream::StreamType};
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{auth::UserEmail, rum::RUM_DATA_STREAM};
+use openobserve_core::auth::UserEmail;
 use plan::PagePlan;
 use query::LookupContext;
 pub use query::RumQuery;
@@ -45,6 +45,7 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
+const RUM_DATA_STREAM: &str = "_rumdata";
 const TRACE_ID_FIELDS: [&str; 2] = ["_o2_trace_id", "_oo_trace_id"];
 const TRACE_ID_HEX_LENGTH: usize = 32;
 // A browser request starts before the trace but is stamped on completion, so the tail is longer.
@@ -61,9 +62,6 @@ pub struct RumLookupRequest {
     pub start_time: i64,
     /// Latest end of the backend spans, in microseconds.
     pub end_time: i64,
-    /// RUM data stream; defaults to `_rumdata`.
-    #[serde(default)]
-    pub rum_stream: Option<String>,
     /// Budget for the whole lookup in seconds; defaults to the query timeout.
     #[serde(default)]
     pub timeout: Option<i64>,
@@ -104,15 +102,8 @@ pub async fn lookup(
     if let Err(message) = validate(&req) {
         return MetaHttpResponse::bad_request(message);
     }
-    let stream = req
-        .rum_stream
-        .as_deref()
-        .map(str::trim)
-        .filter(|stream| !stream.is_empty())
-        .unwrap_or(RUM_DATA_STREAM)
-        .to_string();
     let user_id = user_email.user_id;
-    if let Err(response) = check_permission(&org_id, &stream, &user_id).await {
+    if let Err(response) = check_search_allowed(&org_id).await {
         return response;
     }
     // Bounded so the deadline arithmetic cannot overflow.
@@ -122,11 +113,10 @@ pub async fn lookup(
         .min(MAX_TIMEOUT_SECS);
     let ctx = LookupContext {
         trace_id: get_or_create_trace_id(&headers, &Span::none()),
-        trace_columns: trace_id_columns(&org_id, &stream).await,
+        trace_columns: trace_id_columns(&org_id).await,
         deadline: started + Duration::from_secs(budget as u64),
-        max_query_range_us: max_query_range_us(&org_id, &stream, &user_id).await,
+        max_query_range_us: max_query_range_us(&org_id, &user_id).await,
         org_id,
-        stream,
         user_id,
     };
     let mut response = run_lookup(&ctx, &req).await;
@@ -135,7 +125,7 @@ pub async fn lookup(
         "[trace_id {}] rum lookup {}/{} status {:?}, partial {}, took {} ms",
         ctx.trace_id,
         ctx.org_id,
-        ctx.stream,
+        RUM_DATA_STREAM,
         response.status,
         response.partial,
         response.diagnostics.took
@@ -191,32 +181,32 @@ fn validate(req: &RumLookupRequest) -> Result<(), &'static str> {
     Ok(())
 }
 
-async fn check_permission(org_id: &str, stream: &str, user_id: &str) -> Result<(), Response> {
+/// The gates `_search` applies; access to the RUM stream itself is checked by the route table.
+async fn check_search_allowed(org_id: &str) -> Result<(), Response> {
+    #[cfg(feature = "cloud")]
+    match openobserve_core::organization::is_org_in_free_trial_period(org_id).await {
+        Ok(false) => {
+            return Err(MetaHttpResponse::forbidden(format!(
+                "org {org_id} has expired its trial period"
+            )));
+        }
+        Err(e) => return Err(MetaHttpResponse::forbidden(e.to_string())),
+        Ok(true) => {}
+    }
     #[cfg(feature = "enterprise")]
-    {
-        if let Err(e) = search_service::check_search_allowed(org_id, Some(stream)) {
-            return Err(MetaHttpResponse::too_many_requests(e.to_string()));
-        }
-        if let Some(response) = openobserve_core::authz::check_stream_permissions(
-            stream,
-            org_id,
-            user_id,
-            &StreamType::Logs,
-            openobserve_core::authz::StreamPermissionResourceType::Search,
-        )
-        .await
-        {
-            return Err(response);
-        }
+    if let Err(e) = search_service::check_search_allowed(org_id, Some(RUM_DATA_STREAM)) {
+        return Err(MetaHttpResponse::too_many_requests(e.to_string()));
     }
     #[cfg(not(feature = "enterprise"))]
-    let _ = (org_id, stream, user_id);
+    let _ = org_id;
     Ok(())
 }
 
 /// Matches `_search`, which clamps only streams that have settings.
-async fn max_query_range_us(org_id: &str, stream: &str, user_id: &str) -> i64 {
-    let Some(settings) = infra::schema::get_settings(org_id, stream, StreamType::Logs).await else {
+async fn max_query_range_us(org_id: &str, user_id: &str) -> i64 {
+    let Some(settings) =
+        infra::schema::get_settings(org_id, RUM_DATA_STREAM, StreamType::Logs).await
+    else {
         return 0;
     };
     get_settings_max_query_range(settings.max_query_range, org_id, Some(user_id))
@@ -225,11 +215,11 @@ async fn max_query_range_us(org_id: &str, stream: &str, user_id: &str) -> i64 {
 }
 
 /// The trace id columns the stream has; naming a missing column fails the whole query.
-async fn trace_id_columns(org_id: &str, stream: &str) -> Vec<&'static str> {
-    let schema = match infra::schema::get_cache(org_id, stream, StreamType::Logs).await {
+async fn trace_id_columns(org_id: &str) -> Vec<&'static str> {
+    let schema = match infra::schema::get_cache(org_id, RUM_DATA_STREAM, StreamType::Logs).await {
         Ok(schema) => schema,
         Err(e) => {
-            log::warn!("[RUM] lookup could not load the schema of {org_id}/{stream}: {e}");
+            log::warn!("[RUM] lookup could not load the schema of {org_id}/{RUM_DATA_STREAM}: {e}");
             return Vec::new();
         }
     };
@@ -303,7 +293,6 @@ mod tests {
             trace_id: trace_id.to_string(),
             start_time,
             end_time,
-            rum_stream: None,
             timeout,
         };
         assert!(validate(&request("abc", 1, 2, None)).is_ok());
