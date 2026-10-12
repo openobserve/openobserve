@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
       <AutoObserveAnalysis
         v-if="tab === 'analysis'"
+        ref="analysisRef"
         :issue="issue"
         :entry="proposalEntry"
         @approve="approve"
@@ -170,45 +171,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     t("autoobserve.confidence.uncalibrated")
                   }}</span>
                 </div>
-              </OCardSection>
-            </OCard>
-            <OCard variant="glass" data-test="autoobserve-issue-evidence">
-              <OCardSection role="header" dense>
-                <OIcon name="fact-check" size="sm" class="text-text-secondary" />
-                <OText variant="panel-title">{{ t("autoobserve.drawer.evidence") }}</OText>
-              </OCardSection>
-              <OCardSection role="body" dense>
-                <ul class="flex flex-col">
-                  <li
-                    v-for="(ev, i) in issue.evidence"
-                    :key="i"
-                    class="border-border-subtle flex items-start gap-3 border-b py-2.5 last:border-b-0"
-                  >
-                    <OIcon
-                      :name="EVIDENCE_ICON[ev.kind]"
-                      size="sm"
-                      class="text-text-secondary mt-0.5"
-                    />
-                    <div class="flex min-w-0 flex-1 flex-col gap-1">
-                      <div class="flex items-center gap-2">
-                        <span class="text-text-heading text-sm font-medium">{{ ev.title }}</span>
-                        <span v-if="ev.count" class="text-text-secondary ms-auto text-xs">{{
-                          ev.count
-                        }}</span>
-                      </div>
-                      <OText variant="mono" class="break-all">{{ ev.detail }}</OText>
-                    </div>
-                    <div v-if="ev.points" class="w-40 shrink-0">
-                      <OSparkline
-                        :points="sparkPoints(ev)"
-                        :shape="ev.projected ? 'bar' : 'area'"
-                        size="sm"
-                        :tone="ev.projected ? 'warning' : 'danger'"
-                        :aria-label="raw(ev.detail)"
-                      />
-                    </div>
-                  </li>
-                </ul>
+                <ProblemSpark
+                  v-if="problem"
+                  :chart="problem.chart"
+                  :outcome="problem.outcome"
+                  size="card"
+                  class="border-border-subtle flex border-t pt-3"
+                  data-test="autoobserve-issue-chart"
+                />
+                <OButton
+                  v-if="issue.evidence.length"
+                  variant="ghost-primary"
+                  size="xs"
+                  class="self-start"
+                  data-test="autoobserve-issue-see-evidence"
+                  @click="seeEvidence"
+                >
+                  {{ t("autoobserve.drawer.seeEvidence", { count: issue.evidence.length }) }}
+                </OButton>
               </OCardSection>
             </OCard>
             <OCard
@@ -339,7 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -354,19 +334,20 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import AutoObserveUnfoldGraph from "./AutoObserveUnfoldGraph.vue";
 import AutoObserveAnalysis from "./AutoObserveAnalysis.vue";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import ProblemSpark from "./v2/ProblemSpark.vue";
+import { overridesFor, problemsFor } from "./v2/fixtures";
+import { useDecisions } from "./v2/useDecisions";
+import { PROBLEMS } from "./data/facts";
+import { useScenario } from "./data/useScenario";
 import {
   CONFIDENCE_LABEL,
   DEMO_DATE,
   LEDGER_STATUS,
-  sparkPoints,
-  type Evidence,
   type Issue,
   type LedgerEntry,
 } from "./fixtures";
@@ -394,6 +375,23 @@ watch(
     unfoldFocus.value = undefined;
   },
 );
+
+const analysisRef = ref<InstanceType<typeof AutoObserveAnalysis>>();
+const seeEvidence = async () => {
+  tab.value = "analysis";
+  await nextTick();
+  analysisRef.value?.scrollToTrail();
+};
+
+const { scenario } = useScenario();
+const decisions = useDecisions();
+// Built exactly like the Standard row, so a fix approved in either view redraws this chart too.
+const problem = computed(() => {
+  const fact = Object.values(PROBLEMS).find((f) => f.incidentId === props.issue?.id);
+  if (!fact) return undefined;
+  const overrides = overridesFor(scenario.value, decisions.decisions, decisions.phases);
+  return problemsFor(overrides)[fact.id];
+});
 
 const openUnfold = (cardId: string) => {
   unfoldFocus.value = cardId;
@@ -467,12 +465,6 @@ const rcaHtml = computed(() => {
     p(issue.nextStep),
   ].join("")}</div>`;
 });
-
-const EVIDENCE_ICON: Record<Evidence["kind"], IconName> = {
-  log: "article",
-  trace: "account-tree",
-  metric: "show-chart",
-};
 
 const blast = computed(() => {
   if (!props.issue) return [];

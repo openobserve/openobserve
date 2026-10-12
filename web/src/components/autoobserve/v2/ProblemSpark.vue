@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <span class="flex-col gap-1 sm:items-end">
+  <span class="flex-col gap-1" :class="{ 'sm:items-end': size !== 'card' }">
     <span
       role="img"
       :aria-label="t(chart.label)"
-      class="relative block h-9 w-full sm:w-36"
-      :class="OUTCOME[outcome].ink"
+      class="relative block w-full"
+      :class="[size === 'card' ? 'h-18' : 'h-9 sm:w-36', OUTCOME[outcome].ink]"
     >
       <svg
         viewBox="0 0 100 100"
@@ -79,7 +79,11 @@ import { useI18nTyped } from "@/types/i18n";
 import type { ProblemChart, ProblemOutcome } from "./fixtures";
 import { OUTCOME } from "./outcome";
 
-const props = defineProps<{ chart: ProblemChart; outcome: ProblemOutcome }>();
+const props = defineProps<{
+  chart: ProblemChart;
+  outcome: ProblemOutcome;
+  size?: "row" | "card";
+}>();
 
 const { t } = useI18nTyped();
 

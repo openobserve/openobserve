@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </section>
     </div>
 
-    <section :class="CARD" data-test="autoobserve-analysis-trail">
+    <section ref="trailEl" :class="CARD" data-test="autoobserve-analysis-trail">
       <DrawerSection :title="t('autoobserve.analysis.trail')">
         <ol class="flex flex-col">
           <li v-for="(step, i) in trail" :key="step.key" class="group/step flex gap-3">
@@ -479,6 +479,9 @@ const trail = computed<TrailStep[]>(() => {
     }));
   return [...fromEvidence, ...fromCards].sort((a, b) => order(a.card) - order(b.card));
 });
+
+const trailEl = ref<HTMLElement>();
+defineExpose({ scrollToTrail: () => trailEl.value?.scrollIntoView({ block: "start" }) });
 
 const reportOpen = ref(false);
 watch(
