@@ -235,4 +235,28 @@ describe("useFreeTextPreview (AC-BW.8)", () => {
     expect(obj.data.freeTextDecorations).toBeNull();
     scope.stop();
   });
+
+  it("previews a digit-led -term as an exclusion over its whole range", async () => {
+    const obj = makeSearchObj();
+    obj.data.query = "error -404";
+    const scope = effectScope();
+    scope.run(() =>
+      useFreeTextPreview(
+        obj,
+        () => config,
+        () => obj.data.query,
+        gt,
+      ),
+    );
+    vi.advanceTimersByTime(150);
+    await nextTick();
+    expect(obj.data.freeTextDecorations?.hover).toContain(
+      "match_all('error') AND NOT match_all('404')",
+    );
+    expect(obj.data.freeTextDecorations?.ranges).toEqual([
+      { start: 0, end: 5 },
+      { start: 6, end: 10 },
+    ]);
+    scope.stop();
+  });
 });

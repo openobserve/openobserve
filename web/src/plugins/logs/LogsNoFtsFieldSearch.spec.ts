@@ -49,6 +49,17 @@ describe("no-FTS field recovery", () => {
       "((message IS NOT NULL AND str_match_ignore_case(message, 'debug')) AND NOT (message IS NOT NULL AND str_match_ignore_case(message, 'message')))",
     ],
     ["-refused", "", "NOT (message IS NOT NULL AND str_match_ignore_case(message, 'refused'))"],
+    ["-404", "", "NOT (message IS NOT NULL AND str_match_ignore_case(message, '404'))"],
+    [
+      "NOT connection refused",
+      "refused",
+      "(NOT (message IS NOT NULL AND str_match_ignore_case(message, 'connection')) AND (message IS NOT NULL AND str_match_ignore_case(message, 'refused')))",
+    ],
+    [
+      "NOT (connection refused)",
+      "",
+      "NOT (((message IS NOT NULL AND str_match_ignore_case(message, 'connection')) AND (message IS NOT NULL AND str_match_ignore_case(message, 'refused'))))",
+    ],
     [
       "-debug -info",
       "",

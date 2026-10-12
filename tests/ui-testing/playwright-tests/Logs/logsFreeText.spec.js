@@ -186,12 +186,13 @@ test.describe('Logs bare-word search (item 1)', () => {
     await expect(page.locator('.monaco-hover:not(.hidden)').first()).toContainText("Runs as match_all('timeout')");
   });
 
-  test('minus words exclude while minus numbers remain text (AC-BW.9)', {
+  test('minus words and minus numbers both exclude (AC-BW.9)', {
     tag: ['@freeText', '@logs'],
   }, async ({ page, request }) => {
-    for (const [raw, where, total] of [
-      ['-debug', "NOT match_all('debug')", 32],
-      ['-500', "match_all('-500')", 8],
+    // The excluded text is '-500', not '500': a rendered timestamp can contain 500.
+    for (const [raw, where, total, excluded] of [
+      ['-debug', "NOT match_all('debug')", 32, 'debug'],
+      ['-500', "NOT match_all('500')", 32, '-500'],
     ]) {
       const searches = await open(page, FTS, raw);
       const sql = await run(page, searches);
@@ -200,8 +201,7 @@ test.describe('Logs bare-word search (item 1)', () => {
       expect(await apiTotal(request, sql)).toBe(total);
       const dataRows = page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]');
       await expect(dataRows.first()).toBeVisible({ timeout: 30000 });
-      if (raw === '-debug') await expect(dataRows.first()).not.toContainText('debug');
-      else await expect(dataRows.first()).toContainText('-500');
+      await expect(dataRows.first()).not.toContainText(excluded);
     }
   });
 

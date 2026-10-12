@@ -134,7 +134,14 @@ describe("freeTextFilter", () => {
         "match_all('timeout') AND (match_all('error') OR match_all('refused'))",
       ],
       ["500", "match_all('500')"],
-      ["-500", "match_all('-500')"],
+      ["-500", "NOT match_all('500')"],
+      ["error -404", "match_all('error') AND NOT match_all('404')"],
+      ["-5xx", "NOT match_all('5xx')"],
+      ["-_internal", "NOT match_all('_internal')"],
+      ["-200ms", "NOT match_all('200ms')"],
+      ["-0xdeadbeef", "NOT match_all('0xdeadbeef')"],
+      ["NOT connection refused", "NOT match_all('connection') AND match_all('refused')"],
+      ["NOT (connection refused)", "NOT (match_all('connection') AND match_all('refused'))"],
       ["user@example.com", "match_all('user@example.com')"],
       ["10.0.0.1", "match_all('10.0.0.1')"],
       ["/api/v1/users", "match_all('/api/v1/users')"],
@@ -329,7 +336,8 @@ describe("freeTextFilter", () => {
       ["-'debug'", "NOT match_all('debug')"],
       ["-ошибка", "NOT match_all('ошибка')"],
       ["-über", "NOT match_all('über')"],
-      ["-500", "match_all('-500')"],
+      ["-500", "NOT match_all('500')"],
+      ["-404", "NOT match_all('404')"],
       ["ERR-42", "match_all('ERR-42')"],
       ["error--timeout", "match_all('error--timeout')"],
       ["error---timeout", "match_all('error---timeout')"],
@@ -374,6 +382,57 @@ describe("freeTextFilter", () => {
           filter: `${renderFts(raw)} AND code=500`,
         }),
     );
+
+    it.each([
+      ["error -404 AND status=500", "match_all('error') AND NOT match_all('404') AND status=500"],
+      ["-5xx AND status=500", "NOT match_all('5xx') AND status=500"],
+      ["status > -1 AND error", "status > -1 AND match_all('error')"],
+      ["status = -1 AND -404", "status = -1 AND NOT match_all('404')"],
+    ])("excludes a digit-led -term in a predicate mix: %s", (raw, filter) => {
+      expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter });
+    });
+
+    it.each([
+      ["-"],
+      ["--"],
+      ["- 404"],
+      ["-5"],
+      ["-_timestamp"],
+      ["status = -1"],
+      ["status=-1"],
+      ["status > -1.5"],
+      ["a - -1 > 0"],
+      ["status IN (-1, -2)"],
+      ["error AND -1"],
+    ])("keeps bare dashes and SQL negative literals as typed: %s", (raw) => {
+      expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter: raw });
+    });
+
+    it("binds NOT to the next single term, and to the whole group only when bracketed", () => {
+      const bare = planFilter("NOT connection refused", FIELDS);
+      expect(bare).toMatchObject({
+        kind: "freeText",
+        root: {
+          k: "and",
+          children: [
+            { k: "not", child: { k: "text", value: "connection" } },
+            { k: "text", value: "refused" },
+          ],
+        },
+      });
+      expect(planFilter("NOT (connection refused)", FIELDS)).toMatchObject({
+        kind: "freeText",
+        root: { k: "not", child: { k: "group", child: { k: "and" } } },
+      });
+      expect(planFilter("NOT connection refused AND status=500", FIELDS)).toEqual({
+        kind: "sql",
+        filter: "NOT match_all('connection') AND match_all('refused') AND status=500",
+      });
+      expect(planFilter("NOT (connection refused) AND status=500", FIELDS)).toEqual({
+        kind: "sql",
+        filter: "NOT (match_all('connection') AND match_all('refused')) AND status=500",
+      });
+    });
 
     it("applies configured token limits to Unicode exclusions", () => {
       expect(planFilter("-über", FIELDS, { tokenLimits: { min: 4, max: 64 } })).toEqual({
@@ -603,6 +662,17 @@ describe("freeTextFilter", () => {
         "((match_all('timeout') OR match_all('refused'))) AND status=500",
       ],
       ["NOT timeout AND status=500", "NOT match_all('timeout') AND status=500"],
+      [
+        "NOT connection refused AND status=500",
+        "NOT match_all('connection') AND match_all('refused') AND status=500",
+      ],
+      [
+        "NOT (connection refused) AND status=500",
+        "NOT (match_all('connection') AND match_all('refused')) AND status=500",
+      ],
+      ["NOT a b status=500", "NOT match_all('a') AND match_all('b') AND status=500"],
+      ["error -404 AND status=500", "match_all('error') AND NOT match_all('404') AND status=500"],
+      ["-'debug' status=500", "NOT match_all('debug') AND status=500"],
       ["timeout error status=500", "match_all('timeout') AND match_all('error') AND status=500"],
       [
         "status=500 timeout 'two words'",
@@ -640,6 +710,7 @@ describe("freeTextFilter", () => {
       ["timeout AND", "timeout AND"],
       ["timeout AND status =", "timeout AND status ="],
       ["s.is_error timeout", "s.is_error timeout"],
+      ["-level status=500", "-level status=500"],
     ])("%s gets only the Search text card", (raw, candidate) => {
       expect(suggestRecovery(raw, FIELDS, true)).toEqual({
         runSuggestion: null,

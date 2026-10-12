@@ -1238,7 +1238,8 @@ describe("useSearchQuery › free text (item 1)", () => {
   it.each([
     ["-debug", "NOT match_all('debug')"],
     ["error -debug", "match_all('error') AND NOT match_all('debug')"],
-    ["-500", "match_all('-500')"],
+    ["-500", "NOT match_all('500')"],
+    ["error -404", "match_all('error') AND NOT match_all('404')"],
     ["limit 50", "match_all('limit') AND match_all('50')"],
   ])("produces the exact request for %s without changing the query", (raw, where) => {
     select(ftsStream("fts_a"));

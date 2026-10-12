@@ -348,6 +348,10 @@ describe("recovery terms and editor comment preservation", () => {
     ['-"connection refused"', ""],
     ['"connection refused" -debug', "connection refused"],
     ["NOT NOT debug", "debug"],
+    ["-404", ""],
+    ["error -404", "error"],
+    ["NOT connection refused", "refused"],
+    ["NOT (connection refused)", ""],
   ])("prefills one positive unit for %s", (query, expected) => {
     expect(noFtsRecoveryTerm(makeSearchObj(query, [noFts("raw")]), zoConfig)).toBe(expected);
   });

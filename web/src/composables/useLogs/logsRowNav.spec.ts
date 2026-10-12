@@ -169,6 +169,34 @@ describe("logsRowNav drawer-close rule and crossing signals (4a §3.2.2, §3.2.7
     disposeSecond();
   });
 
+  it("the last registered handler owns failures until it is disposed (one live logs surface)", () => {
+    const obj = makeSearchObj();
+    obj.meta.resultGrid!.navigation!.pendingPageSelection = {
+      page: 2,
+      position: "first",
+      requestId: null,
+    };
+    const a = vi.fn();
+    const b = vi.fn();
+    const disposeA = setPageNavFailureHandler(a);
+    const disposeB = setPageNavFailureHandler(b);
+    failPendingPageNavigation(obj);
+    expect(a).not.toHaveBeenCalled();
+    expect(b).toHaveBeenCalledTimes(1);
+
+    disposeA();
+    failPendingPageNavigation(obj);
+    expect(a).not.toHaveBeenCalled();
+    expect(b).toHaveBeenCalledTimes(2);
+
+    disposeB();
+    failPendingPageNavigation(obj);
+    expect(a).not.toHaveBeenCalled();
+    expect(b).toHaveBeenCalledTimes(2);
+    expect(obj.meta.resultGrid!.navigation!.pendingPageSelection).toBeNull();
+    expect(obj.meta.showDetailTab).toBe(false);
+  });
+
   it("does nothing when no crossing is pending", () => {
     const obj = makeSearchObj();
     const handler = vi.fn();

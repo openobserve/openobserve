@@ -541,7 +541,7 @@ function filterComments(raw: string): string[] {
 
 function isExcludedToken(tok: Token): boolean {
   return tok.t === "word"
-    ? /^-\p{L}/u.test(tok.text)
+    ? /^-[\p{L}\p{N}_]/u.test(tok.text)
     : (tok.t === "squote" || tok.t === "dquote") && tok.negated === true;
 }
 
@@ -953,7 +953,7 @@ function buildMixUnit(tokens: Lexed[], raw: string, state: MixState): PlanNode |
   if (tokens.length === 0) return null;
   if (isKeyword(tokens[0], "NOT")) {
     const child = buildMixUnit(tokens.slice(1), raw, state);
-    return child === null ? null : { k: "not", child };
+    return child === null ? null : negateFirst(child);
   }
   if (tokens[0].tok.t === "lparen" && matchingParen(tokens, 0) === tokens.length - 1) {
     const child = buildMixExpr(tokens.slice(1, -1), raw, state);
@@ -971,6 +971,13 @@ function buildMixUnit(tokens: Lexed[], raw: string, state: MixState): PlanNode |
   return children.length === 1 ? children[0] : { k: "and", children };
 }
 
+// SQL binds NOT tighter than AND, so a bare NOT negates only the first operand of the run after it.
+function negateFirst(node: PlanNode): PlanNode {
+  if (node.k !== "and") return { k: "not", child: node };
+  const [first, ...rest] = node.children;
+  return { k: "and", children: [negateFirst(first), ...rest] };
+}
+
 function mixTextUnit(lexed: Lexed, next: Lexed | undefined, state: MixState): PlanNode | null {
   const { tok } = lexed;
   if (tok.t === "opaque") return { k: "sql", text: tok.text };
@@ -981,7 +988,10 @@ function mixTextUnit(lexed: Lexed, next: Lexed | undefined, state: MixState): Pl
     return null;
   const negated = isExcludedToken(tok);
   const value = negated && tok.t === "word" ? tok.text.slice(1) : tok.text;
-  if (tok.t === "word" && (NUMERIC_LITERAL.test(value) || isFieldLikeWord(value, state.names)))
+  if (
+    tok.t === "word" &&
+    ((!negated && NUMERIC_LITERAL.test(value)) || isFieldLikeWord(value, state.names))
+  )
     return null;
   if (value === "" || !hasIndexToken(value, state.limits)) return null;
   state.units++;
@@ -1022,7 +1032,7 @@ function buildSuggestionUnit(
   if (tokens.length === 0) return null;
   if (isKeyword(tokens[0], "NOT")) {
     const child = buildSuggestionUnit(tokens.slice(1), raw, names, tally);
-    return child === null ? null : { k: "not", child };
+    return child === null ? null : negateFirst(child);
   }
   if (tokens[0].tok.t === "lparen" && matchingParen(tokens, 0) === tokens.length - 1) {
     const child = buildSuggestionExpr(tokens.slice(1, -1), raw, names, tally);
@@ -1045,8 +1055,8 @@ function buildOperandRun(
     const node = operandNode(tok, names);
     if (node === null) return null;
     children.push(node);
-    if (node.k === "text") counts.text++;
-    else counts.fieldValue++;
+    if (node.k === "sql") counts.fieldValue++;
+    else counts.text++;
   }
   tally.text += counts.text;
   tally.fieldValue += counts.fieldValue;
@@ -1054,6 +1064,12 @@ function buildOperandRun(
 }
 
 function operandNode(tok: Token, names: ReadonlySet<string>): PlanNode | null {
+  if ((tok.t === "word" || tok.t === "squote" || tok.t === "dquote") && isExcludedToken(tok)) {
+    const value = tok.t === "word" ? tok.text.slice(1) : tok.text;
+    return value === "" || isFieldLikeWord(value, names)
+      ? null
+      : { k: "not", child: { k: "text", value } };
+  }
   if (tok.t === "squote") return tok.text === "" ? null : { k: "text", value: tok.text };
   if (tok.t === "dquote")
     return names.has(tok.text) || tok.text === "" ? null : { k: "text", value: tok.text };
