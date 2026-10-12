@@ -1217,6 +1217,55 @@ describe("Dashboards.vue", () => {
     });
   });
 
+  describe("ready-made dashboards", () => {
+    const openImport = vi.fn();
+    const offersRefresh = vi.fn();
+    // This spec mocks document.createElement, so it drives the exposed API; ReadyMadeOffers.spec mounts the real banner + dialog.
+    const offersStub = {
+      name: "ReadyMadeOffers",
+      emits: ["installed"],
+      setup(_props: unknown, { expose }: any) {
+        expose({ openImport, refresh: offersRefresh, hasDataFound: true });
+        return {};
+      },
+      template: '<div data-test-stub="ready-made-offers" />',
+    };
+    const mountWithOffers = async () => {
+      const config = buildGlobalConfig(store, router, i18n);
+      wrapper = shallowMount(Dashboards, {
+        global: {
+          ...config,
+          stubs: { ...config.stubs, ReadyMadeOffers: offersStub },
+        },
+      });
+      await flushPromises();
+    };
+
+    it("mounts the offers and opens their dialog from the Import menu", async () => {
+      await mountWithOffers();
+      expect(wrapper.findComponent({ name: "ReadyMadeOffers" }).exists()).toBe(true);
+      // The menu's "Data found" tag reads the offers' exposed state.
+      expect(wrapper.vm.readyMadeRef.hasDataFound).toBe(true);
+      wrapper.vm.openReadyMade();
+      expect(openImport).toHaveBeenCalledTimes(1);
+    });
+
+    it("Refresh forces the offers' reads too", async () => {
+      await mountWithOffers();
+      offersRefresh.mockClear();
+      await wrapper.vm.refreshDashboards();
+      expect(offersRefresh).toHaveBeenCalledWith(true);
+    });
+
+    it("an install reloads the current folder from the server", async () => {
+      await mountWithOffers();
+      vi.mocked(commons.getAllDashboards).mockClear();
+      wrapper.findComponent({ name: "ReadyMadeOffers" }).vm.$emit("installed");
+      await flushPromises();
+      expect(commons.getAllDashboards).toHaveBeenCalledWith(store, expect.anything(), true);
+    });
+  });
+
   describe("product analytics", () => {
     const mountDashboards = async () => {
       wrapper = shallowMount(Dashboards, { global: buildGlobalConfig(store, router, i18n) });

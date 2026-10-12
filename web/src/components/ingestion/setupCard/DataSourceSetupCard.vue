@@ -45,6 +45,15 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { CardSubstitutions } from "./types";
 import { getDataSourceCard } from "./registry";
 import { HOST_AGENT_SLUGS } from "./content/osAgent";
+import {
+  READY_MADE_SOURCE_BY_SETUP_SLUG,
+  getReadyMadeSource,
+} from "@/composables/readyMade/catalog";
+import {
+  installReadyMade,
+  type ReadyMadeInstallResult,
+} from "@/composables/readyMade/installReadyMade";
+import { useReadyMadeDetection } from "@/composables/readyMade/useReadyMadeDetection";
 
 const props = defineProps<{
   /**
@@ -154,8 +163,84 @@ const onOpenSetupDashboard = async () => {
   openDashboard(org, target);
 };
 
+const readyMadeSourceId = computed(() => READY_MADE_SOURCE_BY_SETUP_SLUG[props.slug]);
+// Only Kubernetes re-checks its metrics; the slug is fixed for the card's lifetime.
+const readyMadeDetection =
+  readyMadeSourceId.value === "kubernetes" ? useReadyMadeDetection() : null;
+const readyMadeTarget = ref<{ org: string; id: string; folderId: string } | null>(null);
+
+const rememberReadyMade = (org: string, result: ReadyMadeInstallResult) => {
+  if (result.status === "error") return null;
+  const first = result.dashboards[0];
+  readyMadeTarget.value = { org, id: first.dashboardId, folderId: first.folderId };
+  return readyMadeTarget.value;
+};
+
+const onReadyMadeDetected = async () => {
+  const sourceId = readyMadeSourceId.value;
+  if (!sourceId) return;
+  const org = store.state.selectedOrganization?.identifier ?? "";
+  // Kubernetes Test passes on logs alone; without the metrics its Cluster dashboard would open empty.
+  if (sourceId === "kubernetes") {
+    const detected = await readyMadeDetection?.detect({ force: true }).catch(() => null);
+    if (!detected?.includes("kubernetes")) return;
+  }
+  const result = await installReadyMade(org, sourceId, {
+    userId: store.state.userInfo?.email,
+  });
+  // The user didn't invoke the install, so a failure here stays silent.
+  const target = rememberReadyMade(org, result);
+  if (!target || result.status === "error") return;
+  const count = result.dashboards.length;
+  const params = { name: getReadyMadeSource(sourceId).name, folder: result.folderName, count };
+  toast({
+    variant: "success",
+    message:
+      result.status === "created"
+        ? t("dashboard.readyMade.addedOne", params, count)
+        : t("dashboard.readyMade.existsOne", params, count),
+    timeout: 5000,
+    action: {
+      label: t("dashboard.readyMade.open"),
+      handler: () => openDashboard(org, target),
+    },
+  });
+};
+
+const onOpenReadyMade = async () => {
+  const sourceId = readyMadeSourceId.value;
+  if (!sourceId) return;
+  const org = store.state.selectedOrganization?.identifier ?? "";
+  let target = readyMadeTarget.value?.org === org ? readyMadeTarget.value : null;
+  if (!target) {
+    const result = await installReadyMade(org, sourceId, {
+      userId: store.state.userInfo?.email,
+    });
+    if (result.status === "error") {
+      // User-invoked path: the failure must be visible and name its cause.
+      const count = getReadyMadeSource(sourceId).dashboards.length;
+      toast({
+        variant: "error",
+        message:
+          result.kind === "forbidden"
+            ? t("dashboard.readyMade.forbidden")
+            : t(
+                "ingestion.setupCard.readyMadeFailed",
+                { name: getReadyMadeSource(sourceId).name },
+                count,
+              ),
+      });
+      return;
+    }
+    if (result.status === "created") analytics.track("dashboard_created");
+    target = rememberReadyMade(org, result);
+  }
+  if (target) openDashboard(org, target);
+};
+
 const onDetected = async (count: number) => {
   emit("detected", count);
+  if (readyMadeSourceId.value) return onReadyMadeDetected();
   if (setupDashboard.value) return onSetupDashboardDetected();
   if (!isHostAgentSlug.value) return;
   // Captured at detect time — an org switch before the toast click must not retarget.
@@ -181,6 +266,7 @@ const onDetected = async (count: number) => {
 
 const onStepAction = async (actionId: string) => {
   if (actionId === "open-setup-dashboard") return onOpenSetupDashboard();
+  if (actionId === "open-ready-made-dashboard") return onOpenReadyMade();
   if (actionId !== "view-host-dashboard" || !isHostAgentSlug.value) return;
   const org = store.state.selectedOrganization?.identifier ?? "";
   let target = importedDashboard.value?.org === org ? importedDashboard.value : null;

@@ -32,6 +32,15 @@ import i18n from "@/locales";
 const { useCuratedPageMock } = vi.hoisted(() => ({ useCuratedPageMock: vi.fn() }));
 vi.mock("./useCuratedPage", () => ({ useCuratedPage: useCuratedPageMock }));
 
+const { installReadyMadeMock, toastMock } = vi.hoisted(() => ({
+  installReadyMadeMock: vi.fn(),
+  toastMock: vi.fn(),
+}));
+vi.mock("@/composables/readyMade/installReadyMade", () => ({
+  installReadyMade: installReadyMadeMock,
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+
 // The values query's transport, stubbed at the LAST seam before the network so
 // buildQueryContext — the code that turns a `filter` row into SQL — runs for real.
 const { streamingMock } = vi.hoisted(() => ({ streamingMock: vi.fn(async () => {}) }));
@@ -169,7 +178,10 @@ const dateTimeStub = defineComponent({
 });
 
 const passthrough = (name: string) =>
-  defineComponent({ name, template: "<div><slot name='actions' /><slot /></div>" });
+  defineComponent({
+    name,
+    template: "<div><slot name='actions-overflow' /><slot name='actions' /><slot /></div>",
+  });
 
 /** Stands in for the OSelect tree only — the props under test stay real. */
 const querySelectorStub = defineComponent({
@@ -2197,5 +2209,140 @@ describe("CuratedPageView", () => {
 
       expect((wrapper.vm as any).stripExpanded).toBe(false);
     });
+  });
+});
+
+describe("CuratedPageView — Edit as dashboard", () => {
+  let wrapper: VueWrapper<any>;
+  let router: any;
+
+  const k8sCopies = (status: string) => ({
+    status,
+    sourceId: "kubernetes",
+    folderId: "f-k8s",
+    folderName: "Kubernetes",
+    dashboards: ["cluster", "node", "pod", "workload"].map((key) => ({
+      key,
+      title: `Kubernetes / ${key}`,
+      dashboardId: `k8s-${key}`,
+      folderId: "f-k8s",
+      folderName: "Kubernetes",
+    })),
+  });
+
+  const mountPage = async (workload = "kubernetes", over: Record<string, any> = {}) => {
+    useCuratedPageMock.mockReturnValue(makeState(over));
+    const store = createStore({
+      state: { selectedOrganization: { identifier: "test-org" }, timezone: "UTC", theme: "light" },
+    });
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: { template: "<div />" } },
+        { path: "/infra/kubernetes", component: { template: "<div />" } },
+        { path: "/dashboards/view", component: { template: "<div />" } },
+      ],
+    });
+    await router.push({ path: "/infra/kubernetes", query: { "var-cluster": "from-url" } });
+    await router.isReady();
+    vi.spyOn(router, "push");
+    const w = mount(CuratedPageView, {
+      props: { workload },
+      global: {
+        plugins: [store, router, i18n],
+        stubs: {
+          RenderDashboardCharts: renderChartsStub,
+          DataSourceSetupCard: setupCardStub,
+          DateTime: dateTimeStub,
+          OPageLayout: passthrough("OPageLayout"),
+          teleport: true,
+        },
+      },
+    });
+    await flushPromises();
+    return w;
+  };
+  const button = () => wrapper.find('[data-test="curated-edit-as-dashboard"]');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    installReadyMadeMock.mockResolvedValue(k8sCopies("created"));
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it("shows on the rendered Kubernetes page only", async () => {
+    wrapper = await mountPage();
+    expect(button().exists()).toBe(true);
+    wrapper.unmount();
+    wrapper = await mountPage("kubernetes", { face: ref("undetected"), dashboard: ref(null) });
+    expect(button().exists()).toBe(false);
+    wrapper.unmount();
+    wrapper = await mountPage("hosts");
+    expect(button().exists()).toBe(false);
+  });
+
+  it("installs if needed and opens Kubernetes / Cluster with the page's cluster and namespace picks", async () => {
+    wrapper = await mountPage();
+    const manager = {
+      variablesData: { global: [] },
+      commitAll: vi.fn(),
+      getUrlParams: () => ({
+        "var-cluster": "prod-eu-1",
+        "var-namespace": ["payments", "checkout"],
+        "var-pod": "ignored",
+      }),
+    };
+    wrapper
+      .findComponent({ name: "RenderDashboardCharts" })
+      .vm.$emit("variablesManagerReady", manager);
+    await flushPromises();
+    await button().trigger("click");
+    await flushPromises();
+    expect(installReadyMadeMock).toHaveBeenCalledWith("test-org", "kubernetes", {
+      userId: undefined,
+    });
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/dashboards/view",
+      query: {
+        org_identifier: "test-org",
+        dashboard: "k8s-cluster",
+        folder: "f-k8s",
+        "var-cluster": "prod-eu-1",
+        "var-namespace": ["payments", "checkout"],
+      },
+    });
+    expect(toastMock.mock.calls[0][0].variant).toBe("success");
+  });
+
+  it("falls back to the URL picks before the pickers are ready, and stays quiet when the copies exist", async () => {
+    installReadyMadeMock.mockResolvedValue(k8sCopies("exists"));
+    wrapper = await mountPage();
+    await button().trigger("click");
+    await flushPromises();
+    expect(router.push.mock.calls.at(-1)[0].query["var-cluster"]).toBe("from-url");
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["forbidden", "dashboard.readyMade.forbidden"],
+    ["generic", "ingestion.setupCard.readyMadeFailed"],
+  ])("names a %s failure and stays on the page", async (kind, key) => {
+    installReadyMadeMock.mockResolvedValue({ status: "error", kind, message: "" });
+    wrapper = await mountPage();
+    await button().trigger("click");
+    await flushPromises();
+    const expected =
+      kind === "forbidden"
+        ? (i18n.global as any).t(key)
+        : (i18n.global as any).t(key, { name: "Kubernetes" }, 4);
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: expected }),
+    );
+    expect(router.push).not.toHaveBeenCalledWith(
+      expect.objectContaining({ path: "/dashboards/view" }),
+    );
   });
 });

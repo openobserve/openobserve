@@ -39,6 +39,10 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import analytics from "@/services/product_analytics";
+import { getReadyMadeSource } from "@/composables/readyMade/catalog";
+import { installReadyMade } from "@/composables/readyMade/installReadyMade";
 import type { WorkloadId } from "@/composables/useWorkloadDetection";
 import { curatedPacks } from "./packs";
 import { FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./packs/kubernetes.page";
@@ -632,6 +636,72 @@ const openDashboardsList = () => {
   router.push({ name: "dashboards", query });
 };
 
+// ── Edit as dashboard ───────────────────────────────────────────────────────
+
+// Only Kubernetes has ready-made copies, and only a rendered page has picks to carry over.
+const showEditAsDashboard = computed(() => props.workload === "kubernetes" && !!dashboard.value);
+const editingAsDashboard = ref(false);
+const kubernetesSource = getReadyMadeSource("kubernetes");
+
+/** The page's cluster/namespace picks, in the dashboard's own `var-` URL shape. */
+const scopeParams = (): Record<string, string | string[]> => {
+  const params: Record<string, any> = variablesManager.value?.getUrlParams({ useLive: false }) ?? {
+    ...route.query,
+  };
+  const picked: Record<string, string | string[]> = {};
+  for (const key of ["var-cluster", "var-namespace"]) {
+    const value = params[key];
+    if (value !== undefined && value !== null && value !== "") picked[key] = value;
+  }
+  return picked;
+};
+
+const editAsDashboard = async () => {
+  if (editingAsDashboard.value) return;
+  editingAsDashboard.value = true;
+  const org = orgId.value;
+  try {
+    const result = await installReadyMade(org, "kubernetes", {
+      userId: store.state.userInfo?.email,
+    });
+    if (result.status === "error") {
+      const count = kubernetesSource.dashboards.length;
+      toast({
+        variant: "error",
+        message:
+          result.kind === "forbidden"
+            ? t("dashboard.readyMade.forbidden")
+            : t("ingestion.setupCard.readyMadeFailed", { name: kubernetesSource.name }, count),
+      });
+      return;
+    }
+    if (result.status === "created") {
+      analytics.track("dashboard_created");
+      const count = result.dashboards.length;
+      toast({
+        variant: "success",
+        message: t(
+          "dashboard.readyMade.addedOne",
+          { name: kubernetesSource.name, folder: result.folderName, count },
+          count,
+        ),
+      });
+    }
+    const cluster = result.dashboards[0];
+    await router.push({
+      path: "/dashboards/view",
+      query: {
+        org_identifier: org,
+        dashboard: cluster.dashboardId,
+        folder: cluster.folderId,
+        ...scopeParams(),
+      },
+    });
+  } finally {
+    editingAsDashboard.value = false;
+  }
+};
+
 // ── Range, focus and org-switch triggers ────────────────────────────────────
 
 let rangeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -690,7 +760,19 @@ watch(
 </script>
 
 <template>
-  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon" bleed>
+  <OPageLayout :title="t(manifest.titleKey)" :icon="manifest.icon" bleed overflow-first>
+    <template v-if="showEditAsDashboard" #actions-overflow>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="dashboard-customize"
+        :loading="editingAsDashboard"
+        data-test="curated-edit-as-dashboard"
+        @click="editAsDashboard"
+      >
+        {{ t("infra.curated.editAsDashboard") }}
+      </OButton>
+    </template>
     <template #actions>
       <div class="flex items-center gap-2">
         <DateTime

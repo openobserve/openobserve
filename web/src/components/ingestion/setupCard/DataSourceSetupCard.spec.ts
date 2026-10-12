@@ -23,10 +23,23 @@ import { ref } from "vue";
 import DataSourceSetupCard from "./DataSourceSetupCard.vue";
 import i18n from "@/locales";
 
-const { importHostMetricsDashboard, importSetupDashboard, toastMock } = vi.hoisted(() => ({
+const {
+  importHostMetricsDashboard,
+  importSetupDashboard,
+  toastMock,
+  installReadyMade,
+  detectReadyMade,
+} = vi.hoisted(() => ({
   importHostMetricsDashboard: vi.fn(),
   importSetupDashboard: vi.fn(),
   toastMock: vi.fn(),
+  installReadyMade: vi.fn(),
+  detectReadyMade: vi.fn(),
+}));
+
+vi.mock("@/composables/readyMade/installReadyMade", () => ({ installReadyMade }));
+vi.mock("@/composables/readyMade/useReadyMadeDetection", () => ({
+  useReadyMadeDetection: () => ({ detect: detectReadyMade }),
 }));
 
 vi.mock("@/composables/useSetupDashboardImport", async (importOriginal) => ({
@@ -435,5 +448,167 @@ describe("DataSourceSetupCard — companion dashboard (NVIDIA GPU) wiring", () =
     renderer().vm.$emit("step-action", "open-setup-dashboard");
     await flushPromises();
     expect(importSetupDashboard).not.toHaveBeenCalled();
+  });
+});
+
+describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
+  let wrapper: VueWrapper<any>;
+  let router: any;
+
+  const mountCard = (slug: string) => {
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: { organizationPasscode: "pc" },
+        theme: "light",
+      },
+    });
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: { template: "<div />" } },
+        { path: "/dashboards/view", name: "viewDashboard", component: { template: "<div />" } },
+      ],
+    });
+    vi.spyOn(router, "push");
+    return mount(DataSourceSetupCard, {
+      props: { slug },
+      global: { plugins: [store, router, i18n], stubs: { SetupCardRenderer: rendererStub } },
+    });
+  };
+  const renderer = () => wrapper.findComponent({ name: "SetupCardRenderer" });
+  const tp = (key: string, named: Record<string, unknown>, count: number) =>
+    (i18n.global as any).t(key, named, count);
+
+  const installed = (sourceId: string, count = 1, status = "created") => ({
+    status,
+    sourceId,
+    folderId: "f-1",
+    folderName: sourceId === "kubernetes" ? "Kubernetes" : "PostgreSQL",
+    dashboards: Array.from({ length: count }, (_, i) => ({
+      key: `k${i}`,
+      title: `t${i}`,
+      dashboardId: `dash-${i}`,
+      folderId: "f-1",
+      folderName: "x",
+    })),
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    installReadyMade.mockResolvedValue(installed("postgresql"));
+    detectReadyMade.mockResolvedValue(["kubernetes"]);
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it.each([
+    ["postgres", "postgresql"],
+    ["mySQL", "mysql"],
+    ["mariaDB", "mysql"],
+    ["redis", "redis"],
+  ])("Test on the %s card installs %s silently and toasts the folder", async (slug, sourceId) => {
+    wrapper = mountCard(slug);
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(installReadyMade).toHaveBeenCalledWith("test-org", sourceId, { userId: "t@e.com" });
+    expect(detectReadyMade).not.toHaveBeenCalled();
+    const arg = toastMock.mock.calls[0][0];
+    expect(arg.variant).toBe("success");
+    arg.action.handler();
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "test-org", dashboard: "dash-0", folder: "f-1" },
+    });
+  });
+
+  it("names the dashboard and folder in the toast", async () => {
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(toastMock.mock.calls[0][0].message).toBe(
+      tp("dashboard.readyMade.addedOne", { name: "PostgreSQL", folder: "PostgreSQL", count: 1 }, 1),
+    );
+  });
+
+  it("stays silent when the Test-time install fails", async () => {
+    installReadyMade.mockResolvedValue({ status: "error", kind: "forbidden", message: "" });
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("Kubernetes installs on Test only when its metrics rule passes", async () => {
+    detectReadyMade.mockResolvedValue([]);
+    wrapper = mountCard("kubernetes");
+    renderer().vm.$emit("detected", 1);
+    await flushPromises();
+    expect(detectReadyMade).toHaveBeenCalledWith({ force: true });
+    expect(installReadyMade).not.toHaveBeenCalled();
+
+    detectReadyMade.mockResolvedValue(["kubernetes"]);
+    installReadyMade.mockResolvedValue(installed("kubernetes", 4));
+    renderer().vm.$emit("detected", 1);
+    await flushPromises();
+    expect(installReadyMade).toHaveBeenCalledWith("test-org", "kubernetes", { userId: "t@e.com" });
+    expect(toastMock.mock.calls[0][0].message).toBe(
+      tp("dashboard.readyMade.addedOne", { name: "Kubernetes", folder: "Kubernetes", count: 4 }, 4),
+    );
+  });
+
+  it("the Kubernetes step button always installs and opens Cluster, rule or not", async () => {
+    detectReadyMade.mockResolvedValue([]);
+    installReadyMade.mockResolvedValue(installed("kubernetes", 4));
+    wrapper = mountCard("kubernetes");
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    expect(detectReadyMade).not.toHaveBeenCalled();
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "test-org", dashboard: "dash-0", folder: "f-1" },
+    });
+  });
+
+  it("the step button reuses the Test-time install", async () => {
+    wrapper = mountCard("redis");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    expect(installReadyMade).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["forbidden", "dashboard.readyMade.forbidden"],
+    ["generic", "ingestion.setupCard.readyMadeFailed"],
+  ])("the step button names a %s failure", async (kind, key) => {
+    installReadyMade.mockResolvedValue({ status: "error", kind, message: "" });
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    const expected =
+      kind === "forbidden" ? (i18n.global as any).t(key) : tp(key, { name: "PostgreSQL" }, 1);
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: expected }),
+    );
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("leaves Host Metrics and NVIDIA flows alone", async () => {
+    wrapper = mountCard("linux");
+    renderer().vm.$emit("detected", 2);
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    expect(installReadyMade).not.toHaveBeenCalled();
+    wrapper.unmount();
+    wrapper = mountCard("nvidiaDcgm");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(installReadyMade).not.toHaveBeenCalled();
   });
 });
