@@ -827,9 +827,15 @@ describe("useManagementRoutes", () => {
       expect(typeof findRoute().component).toBe("function");
     });
 
-    it("is absent in an OSS build", () => {
+    it("is registered in an OSS build but sends the reader to the locked-feature page", () => {
       config.isEnterprise = "false";
-      expect(findRoute()).toBeUndefined();
+      config.isCloud = "false";
+      const next = vi.fn();
+      findRoute().beforeEnter({ query: {}, fullPath: "/settings/telephony" }, {}, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "enterpriseFeatureLocked" }),
+      );
+      expect(vi.mocked(routeGuard)).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -851,63 +857,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud, since config comparison is strict
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud, since config comparison is strict
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud, since config comparison is strict
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud, since config comparison is strict
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise-only-but-locked (incl. passwordPolicy) — all always registered outside pure cloud
+      expect(routes[0].children).toHaveLength(22); // 5 base (incl. alert_sources redirect) + syntheticsLocations + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 12 enterprise-only-but-locked (incl. passwordPolicy, telephonySettings) — all always registered outside pure cloud
     });
 
     it("should return the same structure on multiple calls", () => {

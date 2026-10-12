@@ -208,6 +208,7 @@ export default defineComponent({
       const domainManagementAccess = checkFeatureAccess("domainManagement", featureGateCtx);
       const passwordPolicyAccess = checkFeatureAccess("passwordPolicy", featureGateCtx);
       const pipelineDestinationsAccess = checkFeatureAccess("pipelineDestinations", featureGateCtx);
+      const oncallAccess = checkFeatureAccess("oncall", featureGateCtx);
       const storageSettingsAccess = checkFeatureAccess("storageSettings", featureGateCtx);
       const modelPricingAccess = checkFeatureAccess("modelPricing", featureGateCtx);
       const correlationSettingsAccess = checkFeatureAccess("correlationSettings", featureGateCtx);
@@ -319,7 +320,9 @@ export default defineComponent({
           icon: "call",
           to: { name: "telephonySettings", query: { org_identifier: org } },
           // The route guard's rule: only an explicit `oncall_enabled: false` closes it.
-          visible: isEnt && z.oncall_enabled !== false,
+          visible: z.oncall_enabled !== false && oncallAccess.visible,
+          locked: !oncallAccess.allowed,
+          lockedMessage: oncallAccess.message,
           dataTest: "telephony-settings-tab",
           group: "Destinations",
         },
