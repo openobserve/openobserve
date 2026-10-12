@@ -142,6 +142,13 @@ describe("buildPrefillFromPatterns", () => {
       const p = buildPrefillFromPatterns(patterns({ baseFilterDropped: true }));
       expect(keys(p)).toContain("sqlModeFilterDropped");
     });
+
+    it("says so when a text filter could not be carried over, and never as the SQL-mode note", () => {
+      const p = buildPrefillFromPatterns(patterns({ textFilterDropped: true, mode: "include" }));
+      expect(keys(p)).toContain("textFilterDropped");
+      expect(keys(p)).not.toContain("sqlModeFilterDropped");
+      expect(keys(buildPrefillFromPatterns(patterns()))).not.toContain("textFilterDropped");
+    });
   });
 
   describe("shape", () => {

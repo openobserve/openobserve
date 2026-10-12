@@ -65,6 +65,8 @@ export interface PatternsPrefillInput {
    */
   baseFilter?: string;
   baseFilterDropped?: boolean;
+  /** The filter's text cannot run on the stream, or it is held, so the caller passes no base filter. */
+  textFilterDropped?: boolean;
   datetime?: PrefillTimeRange | null;
   timezone?: string;
   /** "count" (the registry default for this source) alerts on how many, not which. */
@@ -117,6 +119,9 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
   const baseFilter = input.baseFilter?.trim();
   if (input.baseFilterDropped) {
     warnings.push(warn("sqlModeFilterDropped", "warning"));
+  }
+  if (input.textFilterDropped) {
+    warnings.push(warn("textFilterDropped", "warning"));
   }
 
   // Excluding without a base filter means "everything except these" — legitimate

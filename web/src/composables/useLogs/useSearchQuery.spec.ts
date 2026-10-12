@@ -1336,6 +1336,43 @@ describe("useSearchQuery › free text (item 1)", () => {
     },
   );
 
+  it.each(["status=500 AND is_error -404", "is_error AND status=500 -404"])(
+    "holds a -term after a bare boolean field in either order: %s",
+    (raw) => {
+      select(withStatus(ftsStream("fts_a")));
+      mockState.searchObj.data.query = raw;
+      const { getQueryReq } = useSearchQuery(gt);
+      expect(getQueryReq(false)).toBeNull();
+      expect((mockState.searchObj.data as any).errorCode).toBe(20001);
+      expect(mockState.searchObj.data.query).toBe(raw);
+    },
+  );
+
+  it.each([false, true])(
+    "drops the previous run's download request when a held run builds none (page: %s)",
+    (isPagination) => {
+      select(withStatus(ftsStream("fts_a")));
+      mockState.searchObj.data.query = "status=500";
+      const { getQueryReq } = useSearchQuery(gt);
+      expect(getQueryReq(false)).not.toBeNull();
+      expect((mockState.searchObj.data as any).customDownloadQueryObj?.query?.sql).toContain(
+        "status = 500",
+      );
+      mockState.searchObj.data.query = "status=500 -404 AND is_error";
+      expect(getQueryReq(isPagination)).toBeNull();
+      expect((mockState.searchObj.data as any).customDownloadQueryObj?.query).toBeUndefined();
+    },
+  );
+
+  it("builds the alert's stream-only request for a held filter when asked for no filter", () => {
+    select(withStatus(ftsStream("fts_a")));
+    mockState.searchObj.data.query = "status=500 -404 AND is_error";
+    const { buildSearch } = useSearchQuery(gt);
+    expect(buildSearch(true, true)).toBeNull();
+    expect(getSql(buildSearch(true, true, ""))).toBe(`select * from "fts_a" `);
+    expect(mockState.searchObj.data.query).toBe("status=500 -404 AND is_error");
+  });
+
   it("holds a filter in a read-only build without touching the error state", () => {
     select(withStatus(ftsStream("fts_a")));
     mockState.searchObj.data.query = "status=500 -404 AND is_error";

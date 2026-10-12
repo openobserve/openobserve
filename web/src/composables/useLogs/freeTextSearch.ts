@@ -211,6 +211,15 @@ export function isFilterHeld(
   return isHeldPlan(planStreamsFilter(raw, streams, buildFilterContext(searchObj, zoConfig)));
 }
 
+// A held filter's typed text reads its -term as subtraction, so its cross-link carries no query.
+export function crossLinkQueryText(
+  searchObj: FreeTextSearchObj & { data: { crossLinkQuery?: string } },
+  zoConfig: FreeTextZoConfig | null | undefined,
+): string {
+  if (searchObj.data.crossLinkQuery) return searchObj.data.crossLinkQuery;
+  return isFilterHeld(searchObj, zoConfig) ? "" : searchObj.data.query || "";
+}
+
 export function freeTextWhereByStream(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,

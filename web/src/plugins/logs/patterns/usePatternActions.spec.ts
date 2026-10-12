@@ -420,6 +420,65 @@ describe("usePatternActions", () => {
       },
     );
 
+    const keysOf = (prefill: any) => prefill.warnings.map((w: any) => w.key);
+
+    it.each(["status=500 -404 AND is_error", "status=500 AND is_error -404"])(
+      "warns that a held filter was dropped, in include mode too: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          for (const patternMode of ["include", "exclude"] as const) {
+            const prefill = usePatternActions().buildPatternsAlertPrefill({ patternMode });
+            expect(keysOf(prefill)).toContain("textFilterDropped");
+            expect(prefill.sql).not.toContain("404");
+            expect(prefill.sql).not.toContain("is_error");
+          }
+        });
+      },
+    );
+
+    it.each(["status=500 -404", "timeout"])(
+      "carries no base filter and warns when the text cannot run on a no-FTS stream: %s",
+      (query) => {
+        (mockSearchObj.data as any).streamResults = {
+          list: [
+            {
+              name: "test-stream",
+              schema: [
+                { name: "msg_text", type: "Utf8" },
+                { name: "status", type: "Int64" },
+              ],
+              settings: {},
+            },
+          ],
+        };
+        (mockSearchObj.data.stream as any).selectedStreamFields = [
+          { name: "msg_text" },
+          { name: "status" },
+        ];
+        mockSearchObj.data.query = query;
+        try {
+          const prefill = usePatternActions().buildPatternsAlertPrefill();
+          expect(prefill.sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE NOT (${PATTERN_TERMS})`,
+          );
+          expect(keysOf(prefill)).toContain("textFilterDropped");
+          const include = usePatternActions().buildPatternsAlertPrefill({ patternMode: "include" });
+          expect(include.sql).not.toContain(query);
+          expect(keysOf(include)).toContain("textFilterDropped");
+        } finally {
+          delete (mockSearchObj.data as any).streamResults;
+        }
+      },
+    );
+
+    it("does not warn about a dropped filter when the filter is carried", () => {
+      withStatusStream("status=500 -404", () => {
+        const prefill = usePatternActions().buildPatternsAlertPrefill();
+        expect(prefill.sql).toContain("(status=500 AND NOT match_all('404'))");
+        expect(keysOf(prefill)).not.toContain("textFilterDropped");
+      });
+    });
+
     it.each(["status=500 --404", "status=500 -- note"])(
       "keeps the pattern terms when the filter ends in a comment: %s",
       (query) => {

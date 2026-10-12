@@ -413,6 +413,8 @@ export const useSearchQuery = (t: TranslateFn) => {
     if (queryReq === null) {
       searchObj.loading = false;
       searchObj.data.errorCode = 0;
+      // Download re-sends this request, which belongs to an earlier filter than the one shown.
+      searchObj.data.customDownloadQueryObj = {} as SearchRequestPayload;
       if (searchObj.data.freeTextBlocked) return null;
       if (!notificationMsg.value) {
         notificationMsg.value = t("search.searchQueryEmptyOrInvalid");
@@ -532,9 +534,10 @@ export const useSearchQuery = (t: TranslateFn) => {
   const buildSearch = (
     readOnly: boolean = false,
     ignoreQuickMode: boolean = false,
+    filterOverride?: string,
   ): SearchRequestPayload | null => {
     try {
-      let query = searchObj.data.query.trim();
+      let query = (filterOverride ?? searchObj.data.query).trim();
 
       // Only clear error messages in normal mode
       if (!readOnly) {

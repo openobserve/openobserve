@@ -1860,7 +1860,7 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
-import { buildFilterContext } from "@/composables/useLogs/freeTextSearch";
+import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
 import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
@@ -4860,10 +4860,11 @@ export default defineComponent({
      * only the row count matters.
      */
     const buildLogsAlertPrefill = () => {
-      const payload = buildSearch(true, true);
+      const held = isFilterHeld(searchObj, store.state.zoConfig);
+      const payload = buildSearch(true, true, held ? "" : undefined);
 
       return buildPrefillFromLogs(
-        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone),
+        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone, held),
       );
     };
 

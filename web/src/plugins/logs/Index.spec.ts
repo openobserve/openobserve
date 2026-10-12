@@ -221,7 +221,6 @@ vi.mock("@/composables/useLogs", async () => {
   };
 });
 
-// Records the error toasts the page raises; the real notifier still runs.
 const errorToasts = vi.hoisted(() => [] as unknown[]);
 vi.mock("@/composables/useNotifications", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -560,7 +559,12 @@ describe("Logs Index", async () => {
       expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "", freeText: true });
     });
 
-    const HELD = ["status=500 -404 AND is_error", "status=500 -debug AND is_error"];
+    const HELD = [
+      "status=500 -404 AND is_error",
+      "status=500 -debug AND is_error",
+      "status=500 AND is_error -404",
+      "is_error AND status=500 -404",
+    ];
     const withHeldFields = (entry: any) => ({
       ...entry,
       schema: [
@@ -585,11 +589,11 @@ describe("Logs Index", async () => {
       },
     );
 
-    it.each(HELD)("Build gets no WHERE and its notice for a held filter: %s", (query) => {
+    it.each(HELD)("Build gets no WHERE and the held notice for a held filter: %s", (query) => {
       select(withHeldFields(stream("fts_a", true)));
       wrapper.vm.searchObj.meta.sqlMode = false;
       wrapper.vm.searchObj.data.query = query;
-      expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "", freeText: true });
+      expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "", freeText: true, held: true });
     });
 
     it("Build gets the rendered WHERE for a pure-text filter", () => {

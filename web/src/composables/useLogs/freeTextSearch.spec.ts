@@ -20,6 +20,7 @@ import {
   filterForParsing,
   freeTextDecorations,
   freeTextHighlight,
+  crossLinkQueryText,
   freeTextWhereByStream,
   isFilterHeld,
   noFtsStreams,
@@ -251,7 +252,12 @@ describe("freeTextWhereByStream and filterForParsing", () => {
     ]);
   });
 
-  it.each(["status=500 -404 AND is_error", "status=500 -debug AND is_error"])(
+  it.each([
+    "status=500 -404 AND is_error",
+    "status=500 -debug AND is_error",
+    "status=500 AND is_error -404",
+    "is_error AND status=500 -404",
+  ])(
     "skips every stream of the values path for a held filter, never running it as typed: %s",
     (raw) => {
       const extra = [
@@ -268,6 +274,21 @@ describe("freeTextWhereByStream and filterForParsing", () => {
       expect(isFilterHeld(obj, zoConfig)).toBe(false);
     },
   );
+
+  it("gives a cross-link no query for a held filter, never the raw text", () => {
+    const extra = [
+      { name: "status", type: "Int64" },
+      { name: "is_error", type: "Boolean" },
+    ];
+    const obj: any = makeSearchObj("status=500 -404 AND is_error", [fts("app", extra)]);
+    obj.data.crossLinkQuery = "";
+    expect(crossLinkQueryText(obj, zoConfig)).toBe("");
+    obj.data.crossLinkQuery = 'select * from "app" WHERE level = 1';
+    expect(crossLinkQueryText(obj, zoConfig)).toBe('select * from "app" WHERE level = 1');
+    obj.data.crossLinkQuery = "";
+    obj.data.query = "level='x'";
+    expect(crossLinkQueryText(obj, zoConfig)).toBe("level='x'");
+  });
 
   it("returns null for SQL filters, which keep today's values path", () => {
     expect(freeTextWhereByStream(makeSearchObj("level='x'", [fts("app")]), zoConfig)).toBeNull();

@@ -150,21 +150,24 @@ export const usePatternActions = () => {
    * so it cannot be spliced in front of the pattern terms; we say so instead of
    * silently dropping the user's query.
    */
-  const patternsBaseFilter = (rawQuery: string): string => {
+  const patternsBaseFilter = (rawQuery: string): { filter: string; dropped: boolean } => {
     const stream = searchObj.data.stream.selectedStream?.[0];
-    if (!rawQuery || !stream) return rawQuery;
+    if (!rawQuery || !stream) return { filter: rawQuery, dropped: false };
     const ctx = buildFilterContext(searchObj as any, store.state.zoConfig);
     const plan = planStreamsFilter(rawQuery, [stream], ctx);
-    if (isHeldPlan(plan)) return "";
-    if (plan.kind === "sql") return plan.filter;
-    if (plan.kind !== "freeText" || !ctx.targets[stream]) return rawQuery;
-    return renderPlan(plan, ctx.targets[stream], ctx.knownFields) ?? rawQuery;
+    if (isHeldPlan(plan)) return { filter: "", dropped: true };
+    if (plan.kind === "sql") return { filter: plan.filter, dropped: false };
+    if (plan.kind !== "freeText" || !ctx.targets[stream])
+      return { filter: rawQuery, dropped: false };
+    const rendered = renderPlan(plan, ctx.targets[stream], ctx.knownFields);
+    return rendered === null ? { filter: "", dropped: true } : { filter: rendered, dropped: false };
   };
 
   const buildPatternsAlertPrefill = (options: AlertBuildOptions = {}) => {
     const dt = (searchObj.data as any).datetime;
     const sqlMode = !!searchObj.meta.sqlMode;
     const rawQuery = (searchObj.data.query ?? "").trim();
+    const base = sqlMode ? null : patternsBaseFilter(rawQuery);
 
     const all = patternsState.value.patterns?.patterns ?? [];
     const visible = visiblePatterns(all);
@@ -176,8 +179,9 @@ export const usePatternActions = () => {
       totalCount: all.length,
       filtered: visible.length !== all.length,
       mode: options.patternMode ?? "exclude",
-      baseFilter: sqlMode ? undefined : patternsBaseFilter(rawQuery),
+      baseFilter: base?.filter,
       baseFilterDropped: sqlMode && !!rawQuery,
+      textFilterDropped: !!base?.dropped,
       datetime: dt
         ? {
             type: dt.type,

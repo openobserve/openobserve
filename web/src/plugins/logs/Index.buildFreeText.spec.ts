@@ -94,6 +94,7 @@ const ftsStream = {
     { name: "body", type: "Utf8" },
     { name: "level", type: "Utf8" },
     { name: "code", type: "Int64" },
+    { name: "is_error", type: "Boolean" },
   ],
   settings: { full_text_search_keys: ["body"] },
 };
@@ -165,6 +166,26 @@ describe(
 
       expect(panelRuns).toEqual([]);
       expect(sentRequests).toEqual([]);
+    });
+
+    it.each(["code=500 -404 AND is_error", "code=500 AND is_error -404"])(
+      "never sends a held filter to the refused SQL toggle: %s",
+      async (query) => {
+        await openBuildWith(query);
+        const notice = wrapper.find('[data-test="logs-build-free-text-notice"]').text();
+        expect(notice).toContain("Search query is empty or invalid.");
+        expect(notice).not.toContain("edit it in SQL");
+        const runButton = wrapper.find('[data-test="logs-search-bar-visualize-refresh-btn"]');
+        expect(runButton.attributes("disabled")).toBeDefined();
+        expect(panelRuns).toEqual([]);
+      },
+    );
+
+    it("keeps the edit-in-SQL notice for a text filter the SQL toggle accepts", async () => {
+      await openBuildWith("NOT timeout");
+      expect(wrapper.find('[data-test="logs-build-free-text-notice"]').text()).toContain(
+        "edit it in SQL",
+      );
     });
 
     it("blocks an unsupported negated mix without issuing an unfiltered chart", async () => {

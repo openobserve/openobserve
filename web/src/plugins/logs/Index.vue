@@ -592,6 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isSqlMode="searchObj.meta.sqlMode"
               :whereClause="buildWhereForBuild.where"
               :freeTextFilter="buildWhereForBuild.freeText"
+              :heldFilter="buildWhereForBuild.held"
               @apply="onBuildApply"
               @cancel="onBuildCancel"
               @queryGenerated="onBuildQueryGenerated"
@@ -2130,7 +2131,7 @@ export default defineComponent({
       const ctx = buildFilterContext(searchObj, store.state.zoConfig);
       const plan = stream ? planStreamsFilter(raw.trim(), [stream], ctx) : null;
       if (!stream || !plan) return { where: raw, freeText: false };
-      if (isHeldPlan(plan)) return { where: "", freeText: true };
+      if (isHeldPlan(plan)) return { where: "", freeText: true, held: true };
       if (plan.kind !== "freeText") {
         return { where: plan.filter, freeText: plan.filter !== raw.trim() };
       }

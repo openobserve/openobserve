@@ -643,6 +643,7 @@ import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
+import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
 import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -1290,7 +1291,7 @@ export default defineComponent({
     ): string => {
       const startTime = searchObj.data.datetime?.startTime || 0;
       const endTime = searchObj.data.datetime?.endTime || 0;
-      const query = searchObj.data.crossLinkQuery || searchObj.data.query || "";
+      const query = crossLinkQueryText(searchObj, store.state.zoConfig);
 
       return urlTemplate
         .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))

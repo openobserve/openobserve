@@ -1140,7 +1140,6 @@ describe("freeTextFilter", () => {
       ["x = 5 -1"],
       ["status = -404"],
       ["status=500-404"],
-      ["is_error -404"],
       ["status=500 -level"],
     ])("leaves arithmetic and incomplete predicates as typed: %s", (raw) => {
       expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter: raw });
@@ -1300,6 +1299,25 @@ describe("freeTextFilter", () => {
     ])("holds a -term mix it cannot build instead of splicing an operand: %s", (raw, run) => {
       expect(planFilter(raw, FIELDS)).toEqual(held(raw));
       expect(suggestRecovery(raw, FIELDS, true).runSuggestion).toBe(run);
+    });
+
+    it.each([
+      ["status=500 AND is_error -404", "status=500 AND is_error AND NOT match_all('404')"],
+      ["is_error AND status=500 -404", "is_error AND status=500 AND NOT match_all('404')"],
+      ["status=500 AND is_error -debug", "status=500 AND is_error AND NOT match_all('debug')"],
+      ["is_error -404", "is_error AND NOT match_all('404')"],
+      ["(status=500 AND is_error -404)", "(status=500 AND is_error AND NOT match_all('404'))"],
+    ])("holds a -term after a bare boolean field in either order: %s", (raw, run) => {
+      expect(planFilter(raw, FIELDS)).toEqual(held(raw));
+      expect(planFilter(raw, FIELDS, NO_FTS)).toEqual(held(raw));
+      expect(suggestRecovery(raw, FIELDS, true).runSuggestion).toBe(run);
+    });
+
+    it("keeps a bare boolean field before a sub-minimum -term as typed", () => {
+      expect(planFilter("status=500 AND is_error -1", FIELDS)).toEqual({
+        kind: "sql",
+        filter: "status=500 AND is_error -1",
+      });
     });
 
     it("never holds a filter without an implicit AND", () => {

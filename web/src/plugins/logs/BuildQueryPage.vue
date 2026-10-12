@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       dense
       data-test="logs-build-free-text-notice"
     >
-      {{ t("search.freeTextBuildNotice") }}
+      {{ heldFilter ? t("search.searchQueryEmptyOrInvalid") : t("search.freeTextBuildNotice") }}
     </OBanner>
     <OBanner
       v-if="parserLoadFailed || retryingParser"
@@ -157,6 +157,8 @@ interface Props {
   /** Raw WHERE clause text from non-SQL mode */
   whereClause?: string;
   freeTextFilter?: boolean;
+  /** The SQL toggle refuses a held filter, so the notice must not send the user there. */
+  heldFilter?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -167,6 +169,7 @@ const props = withDefaults(defineProps<Props>(), {
   isSqlMode: true,
   whereClause: "",
   freeTextFilter: false,
+  heldFilter: false,
 });
 
 // Emits

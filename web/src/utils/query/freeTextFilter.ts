@@ -989,9 +989,20 @@ function splitTrailingExclusions(out: Lexed[], start: number, raw: string, rule:
   while (k - 1 > start && isTrailingExclusion(out[k - 1], out[k - 2], rule)) k--;
   if (k === out.length) return;
   const left = out.slice(start, k);
-  if (left.every(isOperandToken) || whereShape(sliceOf(left, raw)) !== "predicate") return;
+  if (isBareFieldOperand(left, rule)) {
+    if (out.slice(k).some(({ tok }) => tok.t === "word" && tok.text.startsWith("--"))) return;
+  } else if (left.every(isOperandToken) || whereShape(sliceOf(left, raw)) !== "predicate") {
+    return;
+  }
   const at = out[k].start;
   out.splice(k, 0, { tok: { t: "kw", text: "AND" }, start: at, end: at });
+}
+
+// A lone field before a -term is a boolean conjunct, so SQL would subtract from it.
+function isBareFieldOperand(left: Lexed[], rule: TermRule): boolean {
+  if (left.length !== 1 || left[0].tok.t !== "word") return false;
+  const { text } = left[0].tok;
+  return exclusionOf(left[0].tok, rule) === null && isFieldLikeWord(text, rule.names);
 }
 
 function isTrailingExclusion(lexed: Lexed, prev: Lexed, rule: TermRule): boolean {
