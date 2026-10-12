@@ -9,6 +9,7 @@ import { addPanel, getDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
 import useDashboardPanel from "@/composables/dashboard/useDashboardPanel";
 import { DEFAULT_SQL_X_FIELD, DEFAULT_SQL_Y_FIELD_COUNT } from "@/utils/dashboard/defaultFields";
+import config from "@/aws-exports";
 import { createI18n } from "vue-i18n";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
@@ -5060,6 +5061,73 @@ describe("AddPanel.vue", () => {
       await nextTick();
 
       expect(chartStart(wrapper)).toBe(2_000_000);
+    });
+  });
+
+  describe("Apply menu", () => {
+    const mountForMenu = async () => {
+      const w = mount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { dashboard: "test-dashboard" }, params: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: {
+            OPageHeader: true,
+            PanelEditor: true,
+            DateTimePickerDashboard: true,
+            QueryInspector: true,
+            AddSettingVariable: true,
+            ConfigDrawer: true,
+          },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      return w;
+    };
+
+    const startQuery = async (w: any) => {
+      w.vm.$.provides.variablesAndPanelsDataLoadingState.searchRequestTraceIds = {
+        panel: ["trace-1"],
+      };
+      await nextTick();
+    };
+
+    afterEach(() => {
+      delete (config as any).isEnterprise;
+    });
+
+    it("offers the Apply menu on OSS only when Auto Run is available", async () => {
+      (config as any).isEnterprise = "false";
+      wrapper = await mountForMenu();
+      expect(wrapper.vm.showApplyMenu).toBe(false);
+
+      store.state.zoConfig.auto_query_enabled = true;
+      await nextTick();
+
+      expect(wrapper.vm.showApplyMenu).toBe(true);
+    });
+
+    it("always offers the Apply menu on enterprise, for Refresh Cache & Apply", async () => {
+      (config as any).isEnterprise = "true";
+      wrapper = await mountForMenu();
+      expect(wrapper.vm.showApplyMenu).toBe(true);
+    });
+
+    it("turns Apply into a red Cancel while a query runs on enterprise", async () => {
+      (config as any).isEnterprise = "true";
+      wrapper = await mountForMenu();
+      await startQuery(wrapper);
+      expect(wrapper.vm.applyVariant).toBe("destructive");
+    });
+
+    it("keeps Apply out of red on OSS while a query runs, which it cannot cancel", async () => {
+      (config as any).isEnterprise = "false";
+      wrapper = await mountForMenu();
+      await startQuery(wrapper);
+      expect(wrapper.vm.applyVariant).not.toBe("destructive");
     });
   });
 });

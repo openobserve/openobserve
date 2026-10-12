@@ -102,11 +102,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="isSavingPanel"
               >{{ t("panel.save") }}</OButton
             >
-            <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+            <OButtonGroup
+              v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+              radius="lg"
+            >
               <OButton
                 v-if="config.isEnterprise === 'false'"
-                :variant="livePreview.isPending.value ? 'warning' : 'primary'"
+                :variant="applyVariant"
                 size="sm-action"
+                :class="{ 'border-e-button-group-divider': showApplyMenu }"
                 data-test="dashboard-apply"
                 :loading="searchRequestTraceIds.length > 0"
                 :disabled="searchRequestTraceIds.length > 0"
@@ -114,43 +118,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("panel.apply") }}
                 <OTooltip :content="applyTooltip" shortcut-id="panelEditorRun" />
               </OButton>
-              <OButtonGroup v-if="config.isEnterprise === 'true'" radius="lg">
-                <OButton
-                  :data-test="
-                    searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'
-                  "
-                  :variant="applyVariant"
-                  size="sm-action"
-                  class="border-e-button-group-divider"
-                  @click="onApplyBtnClick"
-                >
-                  {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
-                  <OTooltip
-                    v-if="searchRequestTraceIds.length === 0"
-                    :content="applyTooltip"
-                    shortcut-id="panelEditorRun"
-                  />
-                </OButton>
+              <OButton
+                v-else
+                :data-test="
+                  searchRequestTraceIds.length > 0 ? 'dashboard-cancel' : 'dashboard-apply'
+                "
+                :variant="applyVariant"
+                size="sm-action"
+                class="border-e-button-group-divider"
+                @click="onApplyBtnClick"
+              >
+                {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
+                <OTooltip
+                  v-if="searchRequestTraceIds.length === 0"
+                  :content="applyTooltip"
+                  shortcut-id="panelEditorRun"
+                />
+              </OButton>
 
-                <ODropdown side="bottom" align="end">
-                  <template #trigger>
-                    <OButton
-                      :variant="applyVariant"
-                      size="icon-sm"
-                      class="h-8.5!"
-                      :disabled="searchRequestTraceIds.length > 0"
-                      icon-left="keyboard-arrow-down"
-                    />
-                  </template>
-                  <ODropdownItem @select="runQuery(true)">
-                    <div class="flex items-center gap-2">
-                      <OIcon name="refresh" size="xs" />
-                      <span>{{ t("dashboard.addPanel.refreshCacheAndApply") }}</span>
-                    </div>
+              <ODropdown v-if="showApplyMenu" side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    :variant="applyVariant"
+                    size="icon-sm"
+                    class="h-8.5!"
+                    :disabled="searchRequestTraceIds.length > 0"
+                    data-test="dashboard-apply-options-btn"
+                    icon-left="keyboard-arrow-down"
+                  />
+                </template>
+                <ODropdownItem v-if="config.isEnterprise === 'true'" @select="runQuery(true)">
+                  <div class="flex items-center gap-2">
+                    <OIcon name="refresh" size="xs" />
+                    <span>{{ t("dashboard.addPanel.refreshCacheAndApply") }}</span>
+                  </div>
+                </ODropdownItem>
+                <template v-if="isAutoRunAvailable">
+                  <ODropdownSeparator v-if="config.isEnterprise === 'true'" />
+                  <ODropdownItem
+                    data-test="dashboard-panel-auto-run-toggle-btn"
+                    @select="toggleAutoRun"
+                  >
+                    <template #icon-left>
+                      <OIcon
+                        :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                        size="sm"
+                        :class="isAutoRunOn ? 'text-accent' : ''"
+                      />
+                    </template>
+                    <span>
+                      <div class="font-medium">
+                        {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                      </div>
+                      <div class="text-text-secondary text-xs">
+                        {{ t("search.liveModeTooltip") }}
+                      </div>
+                    </span>
                   </ODropdownItem>
-                </ODropdown>
-              </OButtonGroup>
-            </template>
+                </template>
+              </ODropdown>
+            </OButtonGroup>
           </template>
           <template #actions-overflow>
             <template v-if="isMobile">
@@ -297,6 +324,7 @@ import { buildPanelAutoName } from "@/utils/autoName";
 import { makeAddPanelSchema, type AddPanelForm } from "./AddPanel.schema";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 
@@ -317,6 +345,7 @@ export default defineComponent({
     OFormInlineEdit,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OTooltip,
     DateTimePickerDashboard,
     AddSettingVariable,
@@ -1703,7 +1732,7 @@ export default defineComponent({
     };
 
     // Same switch as the dashboard's Auto Run: ZO_AUTO_QUERY_ENABLED plus the user's on/off choice.
-    const { isAutoRunOn } = useAutoRunToggle();
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
 
     const livePreview = usePanelLivePreview({
       panel: () => dashboardPanelData.data,
@@ -1726,9 +1755,16 @@ export default defineComponent({
     const isOutDated = computed(() => livePreview.isPending.value);
 
     const applyVariant = computed(() => {
-      if (searchRequestTraceIds.value.length > 0) return "destructive";
+      // Only enterprise can cancel a query, so only there does Apply turn into a red Cancel.
+      if (config.isEnterprise === "true" && searchRequestTraceIds.value.length > 0) {
+        return "destructive";
+      }
       return livePreview.isPending.value ? "warning" : "primary";
     });
+
+    const showApplyMenu = computed(
+      () => config.isEnterprise === "true" || isAutoRunAvailable.value,
+    );
 
     const applyTooltip = computed(() => {
       switch (livePreview.applyState.value) {
@@ -1932,6 +1968,10 @@ export default defineComponent({
       onApplyBtnClick,
       livePreview,
       isBuilderValidSilently,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
+      showApplyMenu,
       applyVariant,
       applyTooltip,
       shouldRefreshWithoutCache,
