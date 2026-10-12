@@ -32,6 +32,7 @@ const fakes = vi.hoisted(() => ({
   cancelStream: null as any,
   deleteRunningQueries: null as any,
   traceCounter: 0,
+  streamLookup: null as any,
 }));
 
 vi.mock("./usePanelCache", () => ({
@@ -69,7 +70,7 @@ vi.mock("./useAnnotations", () => ({
 
 vi.mock("@/utils/query/sqlUtils", () => ({
   addLabelsToSQlQuery: async (query: string) => query,
-  getStreamFromQuery: async () => "logs",
+  getStreamFromQuery: (...args: any[]) => fakes.streamLookup(...args),
 }));
 
 vi.mock("@/composables/useLogs/logsUtils", () => ({
@@ -121,11 +122,24 @@ const sqlPanel = (config: Record<string, any> = {}) => ({
 const RELATIVE = { valueType: "relative", relativeTimePeriod: "15m" };
 const ABSOLUTE = { valueType: "absolute", startTime: 1, endTime: 2 };
 
-// Mirrors ViewDashboard's gate: Auto Run on and the panel's effective range relative.
+// Mirrors ViewDashboard's provide: the Auto Run toggle plus the panel's effective range.
 const createVisit = (autoRun = { value: true }, globalTime: any = RELATIVE, query: any = {}) =>
-  createDashboardFreshOnOpen(
-    (panel) => autoRun.value && isEffectivePanelTimeRelative(panel, query, globalTime),
-  );
+  createDashboardFreshOnOpen({
+    isAutoRunOn: () => autoRun.value,
+    isRelativeRange: (panel) => isEffectivePanelTimeRelative(panel, query, globalTime),
+  });
+
+const AUTO_RUN_OFF = { value: false };
+
+const AD_HOC_FILTER = [
+  {
+    type: "dynamic_filters",
+    name: "Dynamic filters",
+    value: [{ name: "service", operator: "=", value: "api" }],
+    isLoading: false,
+    isVariableLoadingPending: false,
+  },
+];
 
 const mounted: VueWrapper[] = [];
 
@@ -134,11 +148,13 @@ const mountPanel = ({
   panel = sqlPanel(),
   time = windowEndingAt(NOW),
   withoutCache = false,
+  variables = [],
 }: {
   visit?: DashboardFreshOnOpen | null;
   panel?: any;
   time?: any;
   withoutCache?: boolean;
+  variables?: any[];
 } = {}) => {
   let loader: any;
   const selectedTimeObj = ref(time);
@@ -148,7 +164,7 @@ const mountPanel = ({
       loader = usePanelDataLoader(
         ref(panel),
         selectedTimeObj,
-        ref({ isVariablesLoading: false, values: [] }),
+        ref({ isVariablesLoading: false, values: variables }),
         chartPanelRef,
         ref(false),
         ref("dashboards"),
@@ -196,9 +212,16 @@ const endStream = (streamIndex: number) => {
 };
 
 // A cold load in its own earlier visit leaves a complete entry in the cache.
-const seedCache = async (value: number, time = windowEndingAt(NOW - 10 * 60 * 1000)) => {
+const seedCache = async (
+  value: number,
+  {
+    time = windowEndingAt(NOW - 10 * 60 * 1000),
+    visit = createVisit(),
+    variables = [] as any[],
+  } = {},
+) => {
   vi.setSystemTime(time.end_time);
-  const { wrapper } = mountPanel({ visit: createVisit(), time });
+  const { wrapper } = mountPanel({ visit, time, variables });
   await settle();
   sendHits(fakes.streams.length - 1, value);
   endStream(fakes.streams.length - 1);
@@ -218,6 +241,7 @@ describe("usePanelDataLoader: fresh on open", () => {
     fakes.streams.length = 0;
     fakes.cancelStream = vi.fn();
     fakes.deleteRunningQueries = vi.fn().mockResolvedValue({});
+    fakes.streamLookup = async () => "logs";
     global.IntersectionObserver = vi.fn(function (this: any, callback: any) {
       this.observe = () => callback([{ isIntersecting: true }]);
       this.disconnect = vi.fn();
@@ -260,10 +284,12 @@ describe("usePanelDataLoader: fresh on open", () => {
     });
 
     it("leaves an absolute global range on its cached result", async () => {
-      await seedCache(10);
-      mountPanel({ visit: createVisit({ value: true }, ABSOLUTE) });
+      const absolute = createVisit({ value: true }, ABSOLUTE);
+      await seedCache(10, { time: windowEndingAt(NOW), visit: absolute });
+      const { loader } = mountPanel({ visit: absolute });
       await settle();
 
+      expect(loader.data.value).toEqual([hits(10)]);
       expect(fakes.streams).toHaveLength(0);
     });
 
@@ -511,6 +537,139 @@ describe("usePanelDataLoader: fresh on open", () => {
       await settle();
 
       expect(fakes.streams).toHaveLength(2);
+    });
+  });
+
+  describe("an interrupted run keeps the last complete entry", () => {
+    // A restored panel with Auto Run off, then a time change: a normal run, not a held refresh.
+    const startNormalRun = async (visit: DashboardFreshOnOpen | null, variables: any[] = []) => {
+      const panel = mountPanel({ visit, variables });
+      await settle();
+      expect(panel.loader.data.value).toEqual([hits(10)]);
+      panel.selectedTimeObj.value = windowEndingAt(NOW + 60_000);
+      await settle();
+      return panel;
+    };
+
+    it("when the view unmounts mid-run", async () => {
+      await seedCache(10, { visit: createVisit(AUTO_RUN_OFF) });
+      const entryBefore = fakes.cache.get("panel-1");
+      const { wrapper } = await startNormalRun(createVisit(AUTO_RUN_OFF));
+      sendHits(0, 42);
+
+      wrapper.unmount();
+      await settle();
+
+      expect(fakes.saves).toHaveLength(0);
+      expect(fakes.cache.get("panel-1")).toBe(entryBefore);
+    });
+
+    it("when a first load is interrupted, by writing nothing", async () => {
+      const { wrapper } = mountPanel({ visit: createVisit() });
+      await settle();
+      sendHits(0, 42);
+
+      wrapper.unmount();
+      await settle();
+
+      expect(fakes.cache.size).toBe(0);
+    });
+
+    it("when the run is cancelled", async () => {
+      await seedCache(10, { visit: createVisit(AUTO_RUN_OFF) });
+      const entryBefore = fakes.cache.get("panel-1");
+      await startNormalRun(createVisit(AUTO_RUN_OFF));
+      sendHits(0, 42);
+
+      window.dispatchEvent(new Event("cancelQuery"));
+      await settle();
+
+      expect(fakes.saves).toHaveLength(0);
+      expect(fakes.cache.get("panel-1")).toBe(entryBefore);
+    });
+
+    it("when the executor drops an aborted run before it streams", async () => {
+      const visit = createVisit(AUTO_RUN_OFF);
+      await seedCache(10, { visit, variables: AD_HOC_FILTER });
+      const entryBefore = fakes.cache.get("panel-1");
+      let finishLookup: (stream: string) => void = () => {};
+      fakes.streamLookup = () => new Promise((resolve) => (finishLookup = resolve));
+      const { wrapper } = await startNormalRun(visit, AD_HOC_FILTER);
+
+      wrapper.unmount();
+      finishLookup("logs");
+      await settle();
+
+      expect(fakes.streams).toHaveLength(0);
+      expect(fakes.saves).toHaveLength(0);
+      expect(fakes.cache.get("panel-1")).toBe(entryBefore);
+    });
+
+    it("when an editor run outside the dashboard view is interrupted", async () => {
+      await seedCache(10);
+      const entryBefore = fakes.cache.get("panel-1");
+      const { wrapper } = await startNormalRun(null);
+      sendHits(0, 42);
+
+      wrapper.unmount();
+      await settle();
+
+      expect(fakes.saves).toHaveLength(0);
+      expect(fakes.cache.get("panel-1")).toBe(entryBefore);
+    });
+  });
+
+  describe("absolute ranges restore only their own window", () => {
+    const absolute = () => createVisit({ value: true }, ABSOLUTE);
+    const earlier = () => windowEndingAt(NOW - 5 * 60_000);
+
+    it("restores the exact same window", async () => {
+      await seedCache(10, { time: earlier(), visit: absolute() });
+      const { loader } = mountPanel({ visit: absolute(), time: earlier() });
+      await settle();
+
+      expect(loader.data.value).toEqual([hits(10)]);
+      expect(fakes.streams).toHaveLength(0);
+    });
+
+    it("loads another window of the same length instead of restoring it", async () => {
+      await seedCache(10, { time: earlier(), visit: absolute() });
+      const { loader } = mountPanel({ visit: absolute(), time: windowEndingAt(NOW) });
+      await settle();
+
+      expect(fakes.streams).toHaveLength(1);
+      expect(loader.data.value).not.toEqual([hits(10)]);
+      expect(loader.isRefreshingInBackground.value).toBe(false);
+      sendHits(0, 7);
+      endStream(0);
+      expect(loader.data.value).toEqual([hits(7)]);
+    });
+
+    it("applies to a panel's own absolute time under a relative global range", async () => {
+      const panel = sqlPanel({
+        panel_time_enabled: true,
+        panel_time_range: { type: "absolute", startTime: 1, endTime: 2 },
+      });
+      const first = mountPanel({ visit: createVisit(), panel, time: earlier() });
+      await settle();
+      endStream(0);
+      await settle();
+      first.wrapper.unmount();
+      fakes.streams.length = 0;
+
+      mountPanel({ visit: createVisit(), panel, time: windowEndingAt(NOW) });
+      await settle();
+
+      expect(fakes.streams).toHaveLength(1);
+    });
+
+    it("keeps restoring a relative range from an earlier window", async () => {
+      await seedCache(10);
+      const { loader } = mountPanel({ visit: createVisit(AUTO_RUN_OFF) });
+      await settle();
+
+      expect(loader.data.value).toEqual([hits(10)]);
+      expect(fakes.streams).toHaveLength(0);
     });
   });
 });

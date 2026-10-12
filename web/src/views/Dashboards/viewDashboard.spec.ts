@@ -520,6 +520,20 @@ describe("ViewDashboard", () => {
         expect(freshOnOpen.appliesTo(relativePanel)).toBe(false);
       });
 
+      it("reports each panel's effective range whether or not Auto Run is on", async () => {
+        setAutoQuery(false);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const globalPanel = { id: "P2", config: {} };
+
+        wrapper.vm.selectedDate = { valueType: "absolute", startTime: 1, endTime: 2 };
+        expect(freshOnOpen.isRelativeRange(globalPanel)).toBe(false);
+        expect(freshOnOpen.isRelativeRange(relativePanel)).toBe(true);
+
+        wrapper.vm.selectedDate = { valueType: "relative", relativeTimePeriod: "15m" };
+        expect(freshOnOpen.isRelativeRange(globalPanel)).toBe(true);
+      });
+
       it("never applies while the server flag is off", async () => {
         setAutoQuery(false);
         wrapper = mountWithToolbar();

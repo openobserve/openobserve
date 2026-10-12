@@ -623,10 +623,11 @@ export default defineComponent({
     const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
     provide("dashboardAutoRun", isAutoRunOn);
 
-    const freshOnOpen = createDashboardFreshOnOpen(
-      (panel) =>
-        isAutoRunOn.value && isEffectivePanelTimeRelative(panel, route.query, selectedDate.value),
-    );
+    const freshOnOpen = createDashboardFreshOnOpen({
+      isAutoRunOn: () => isAutoRunOn.value,
+      isRelativeRange: (panel) =>
+        isEffectivePanelTimeRelative(panel, route.query, selectedDate.value),
+    });
     provide(DASHBOARD_FRESH_ON_OPEN, freshOnOpen);
     // A cross-dashboard drilldown keeps this view mounted, so each dashboard it opens is a new visit.
     watch(

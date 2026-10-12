@@ -180,18 +180,18 @@ export const usePanelDataLoader = (
 
   const refreshAfterRestore = usePanelRefreshAfterRestore({ state, panelSchema, dashboardId });
 
+  const writeStateToCache = async (cacheTimeRange: { start_time: number; end_time: number }) => {
+    // Restore rejects an incomplete state, so writing one would only delete the last complete entry.
+    if (state.loading || state.isPartialData) return;
+    await savePanelCache(getCacheKey(), { ...toRaw(state) }, cacheTimeRange);
+  };
+
   const saveCurrentStateToCache = async () => {
-    // Anything saved during a held refresh is partial and would replace the good restored entry.
-    if (refreshAfterRestore.isHolding()) return;
     refreshAfterRestore.markIfComplete();
-    await savePanelCache(
-      getCacheKey(),
-      { ...toRaw(state) },
-      {
-        start_time: selectedTimeObj?.value?.start_time?.getTime(),
-        end_time: selectedTimeObj?.value?.end_time?.getTime(),
-      },
-    );
+    await writeStateToCache({
+      start_time: selectedTimeObj?.value?.start_time?.getTime(),
+      end_time: selectedTimeObj?.value?.end_time?.getTime(),
+    });
   };
 
   // The window the displayed data was produced with — the executed range on a
@@ -209,11 +209,7 @@ export const usePanelDataLoader = (
       // Write through, or the cached panel entry restores the stale list. Keep
       // the entry's cacheTimeRange as the data's window — the picker may have
       // moved since the displayed result was produced.
-      await savePanelCache(
-        getCacheKey(),
-        { ...toRaw(state) },
-        { start_time: window.start, end_time: window.end },
-      );
+      await writeStateToCache({ start_time: window.start, end_time: window.end });
     } catch (error) {
       console.error("Failed to refresh annotations:", error);
     }
@@ -746,13 +742,6 @@ export const usePanelDataLoader = (
       }
       abortController.abort();
     }
-    // Save current state to cache only if still loading on unmount ΓÇö
-    // MUST come after isPartialData is set above so the cache stores the correct flag.
-    // (handles tab-switch / navigate-away mid-load scenario)
-    // If loading is already done, the end/complete handlers already saved the cache.
-    if (state.loading) {
-      saveCurrentStateToCache();
-    }
     if (observer) {
       observer.disconnect();
     }
@@ -838,7 +827,8 @@ export const usePanelDataLoader = (
       tempPanelCacheValue &&
       Object.keys(tempPanelCacheValue).length > 0 &&
       cacheKeysMatch &&
-      !cachedIncompleteLoad
+      !cachedIncompleteLoad &&
+      refreshAfterRestore.acceptsCachedWindow(cache.cacheTimeRange, selectedTimeObj?.value)
     ) {
       // const cache = getPanelCache();
       state.data = markRaw(tempPanelCacheValue.data ?? []);

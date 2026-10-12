@@ -35,9 +35,12 @@ const restoredState = () =>
     isOperationCancelled: false,
   });
 
-const setup = (applies = true) => {
+const setup = ({ autoRun = true, relative = true } = {}) => {
   const state = restoredState();
-  const visit = createDashboardFreshOnOpen(() => applies);
+  const visit = createDashboardFreshOnOpen({
+    isAutoRunOn: () => autoRun,
+    isRelativeRange: () => relative,
+  });
   let refresh: any;
   const Panel = defineComponent({
     setup() {
@@ -60,6 +63,8 @@ const setup = (applies = true) => {
   return { state, visit, refresh };
 };
 
+const WINDOW = { start_time: new Date(1_000_000), end_time: new Date(1_900_000) };
+
 // Simulates an executor starting the refresh run.
 const startRun = (state: any, refresh: any) => {
   refresh.holdIfQueued();
@@ -74,18 +79,18 @@ describe("usePanelRefreshAfterRestore", () => {
 
     expect(refresh.queueRefresh()).toBe(false);
     refresh.holdIfQueued();
-    expect(refresh.isHolding()).toBe(false);
+    expect(refresh.isRefreshingInBackground.value).toBe(false);
   });
 
   it("holds only a queued refresh", () => {
     const { state, refresh } = setup();
 
     refresh.holdIfQueued();
-    expect(refresh.isHolding()).toBe(false);
+    expect(refresh.isRefreshingInBackground.value).toBe(false);
 
     expect(refresh.queueRefresh()).toBe(true);
     startRun(state, refresh);
-    expect(refresh.isHolding()).toBe(true);
+    expect(refresh.isRefreshingInBackground.value).toBe(true);
     expect(refresh.shownResult.data.value).toEqual([["restored"]]);
   });
 
@@ -113,6 +118,33 @@ describe("usePanelRefreshAfterRestore", () => {
     expect(state.data).toEqual([["restored"]]);
     expect(state.lastTriggeredAt).toBe(1000);
     expect(refresh.release(true)).toBe(false);
+  });
+
+  it("accepts any cached window for a relative range and outside dashboards", () => {
+    const { refresh } = setup();
+    const outside = usePanelRefreshAfterRestore({
+      state: restoredState(),
+      panelSchema: ref({ id: "P1" }),
+    });
+
+    expect(refresh.acceptsCachedWindow({ start_time: 1, end_time: 2 }, WINDOW)).toBe(true);
+    expect(outside.acceptsCachedWindow({ start_time: 1, end_time: 2 }, WINDOW)).toBe(true);
+  });
+
+  it("accepts only the exact window for an absolute range, whatever the auto-run setting", () => {
+    const { refresh } = setup({ autoRun: false, relative: false });
+    const sameWindow = {
+      start_time: WINDOW.start_time.getTime(),
+      end_time: WINDOW.end_time.getTime(),
+    };
+    const sameLengthLater = {
+      start_time: sameWindow.start_time + 60_000,
+      end_time: sameWindow.end_time + 60_000,
+    };
+
+    expect(refresh.acceptsCachedWindow(sameWindow, WINDOW)).toBe(true);
+    expect(refresh.acceptsCachedWindow(sameLengthLater, WINDOW)).toBe(false);
+    expect(refresh.acceptsCachedWindow(undefined, WINDOW)).toBe(false);
   });
 
   it("marks only a complete, error-free result as refreshed", () => {

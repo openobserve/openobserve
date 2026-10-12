@@ -45,7 +45,14 @@ type PanelLoaderState = Record<HeldKey, any> & {
   isOperationCancelled: boolean;
 };
 
-/** Re-queries a dashboard panel restored from cache while the restored result stays on screen. */
+type TimeWindow = { start_time?: unknown; end_time?: unknown } | null | undefined;
+
+const toMs = (time: unknown) => (time instanceof Date ? time.getTime() : Number(time));
+
+const isSameWindow = (a: TimeWindow, b: TimeWindow) =>
+  toMs(a?.start_time) === toMs(b?.start_time) && toMs(a?.end_time) === toMs(b?.end_time);
+
+/** Dashboard-view restore policy: an absolute range restores only its own window; a relative one restores, then re-queries. */
 export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
   state,
   panelSchema,
@@ -61,6 +68,11 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
   let queued = false;
   // The executors keep writing to state; this is what the panel shows until the run settles.
   const heldResult = ref<Pick<S, HeldKey> | null>(null);
+
+  // The cache key has no time range, so another absolute window of the same length would pass for this one.
+  const acceptsCachedWindow = (cachedWindow: TimeWindow, selectedWindow: TimeWindow) =>
+    freshOnOpen?.isRelativeRange(panelSchema.value) !== false ||
+    isSameWindow(cachedWindow, selectedWindow);
 
   // A restore from another window length is not fresh, even for a panel already refreshed this visit.
   const queueRefresh = () => {
@@ -97,11 +109,11 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
     { flush: "sync" },
   );
 
-  const isHolding = () => heldResult.value !== null;
+  const isRefreshingInBackground = computed(() => heldResult.value !== null);
 
   // "Refresh cache & reload" stays set for the visit, but this refresh must read the server cache.
   const clearCacheUnlessHolding = (shouldRefreshWithoutCache?: Ref<any>) =>
-    computed(() => !isHolding() && !!shouldRefreshWithoutCache?.value);
+    computed(() => !isRefreshingInBackground.value && !!shouldRefreshWithoutCache?.value);
 
   // Any complete result cached this visit is fresh, whichever run produced it.
   const markIfComplete = () => {
@@ -126,13 +138,13 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
   ) as { [K in HeldKey]: WritableComputedRef<S[K]> };
 
   return {
+    acceptsCachedWindow,
     queueRefresh,
     holdIfQueued,
     release,
-    isHolding,
     clearCacheUnlessHolding,
     markIfComplete,
     shownResult,
-    isRefreshingInBackground: computed(() => heldResult.value !== null),
+    isRefreshingInBackground,
   };
 };
