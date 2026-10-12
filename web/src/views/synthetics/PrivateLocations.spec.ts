@@ -42,6 +42,10 @@ vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "org-1" } } }),
 }));
 
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "org-1" } } },
+}));
+
 vi.mock("@/utils/synthetics/format", () => ({
   formatTimeAgoUs: vi.fn((us: number) => `formatted-${us}`),
 }));
@@ -49,6 +53,7 @@ vi.mock("@/utils/synthetics/format", () => ({
 // ── Component under test ───────────────────────────────────────────────────
 
 import PrivateLocations from "./PrivateLocations.vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -107,12 +112,21 @@ const OTableStub = {
     "pagination",
     "pageSize",
     "pageSizeOptions",
+    "currentPage",
+    "sortBy",
+    "sortOrder",
     "showGlobalFilter",
     "persistColumns",
     "tableId",
     "enableColumnResize",
   ],
-  emits: ["row-click"],
+  emits: [
+    "row-click",
+    "update:currentPage",
+    "update:pageSize",
+    "update:sortBy",
+    "update:sortOrder",
+  ],
 };
 
 const OButtonStub = {
@@ -176,10 +190,52 @@ describe("PrivateLocations", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRouterPush.mockReset();
+    resetListViewState();
   });
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("list view state", () => {
+    const seed = () =>
+      useListViewState("synthetics-private-locations", {
+        search: "",
+        currentPage: 1,
+        pageSize: 20,
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+      });
+
+    it("restores search, page, page size and sort", () => {
+      Object.assign(seed(), {
+        search: "eu",
+        currentPage: 2,
+        pageSize: 10,
+        sortBy: "label",
+        sortOrder: "desc",
+      });
+      wrapper = makeWrapper({ locations: [makeLocation({ label: "eu-1", region: "eu" })] });
+      const table = wrapper.findComponent(OTableStub);
+      expect(table.props("currentPage")).toBe(2);
+      expect(table.props("pageSize")).toBe(10);
+      expect(table.props("sortBy")).toBe("label");
+      expect(table.props("sortOrder")).toBe("desc");
+      expect((wrapper.find("input").element as HTMLInputElement).value).toBe("eu");
+    });
+
+    it("saves search and table changes", async () => {
+      wrapper = makeWrapper({ locations: [makeLocation()] });
+      await wrapper.find("input").setValue("abc");
+      const table = wrapper.findComponent(OTableStub);
+      table.vm.$emit("update:currentPage", 3);
+      table.vm.$emit("update:sortBy", "label");
+      await wrapper.vm.$nextTick();
+      const saved = seed();
+      expect(saved.search).toBe("abc");
+      expect(saved.currentPage).toBe(3);
+      expect(saved.sortBy).toBe("label");
+    });
   });
 
   describe("rendering", () => {

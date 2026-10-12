@@ -63,6 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:current-page="onPageChange"
             :page-size="pageSize"
             :page-size-options="pageSizeOptions"
+            @update:page-size="pageSize = $event"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             selection="multiple"
             v-model:selected-ids="selectedFunctionIds"
             show-index
@@ -297,6 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import { useI18nTyped, raw } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -367,7 +373,14 @@ export default defineComponent({
     const { searchObj } = searchState();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
-    const filterQuery = ref("");
+    const viewState = useListViewState("functions", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       {
@@ -408,8 +421,8 @@ export default defineComponent({
 
     const orgId = useOrgId();
 
-    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not FunctionList itself.
-    const currentPage = ref(1);
+    // View-state seeded because the import route destroys the whole list, not just the OTable branch.
+    const currentPage = ref(viewState.currentPage);
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
@@ -506,7 +519,19 @@ export default defineComponent({
     // Bound to the refresh button: always reaches the server.
     const refreshJSTransforms = () => functions.refetch();
 
-    const pageSize = ref(20);
+    const pageSize = ref(viewState.pageSize);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    watch(filterQuery, () => (currentPage.value = 1));
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     const pageSizeOptions = [20, 50, 100, 250, 500];
 
     const selectedFunctionIds = ref<string[]>([]);
@@ -939,6 +964,8 @@ export default defineComponent({
       refreshList,
       pageSize,
       pageSizeOptions,
+      sortBy,
+      sortOrder,
       addTransform,
       deleteFn,
       isUpdated,

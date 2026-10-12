@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <OTable
+      ref="oTableRef"
       :error="loadError"
       :frame="false"
       :data="filteredTeams"
@@ -48,7 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :show-global-filter="false"
       :enable-column-resize="true"
       data-test="oncall-teams-table"
+      :page-size="pageSize"
+      :current-page="currentPage"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
       @row-click="openTeam"
+      @update:current-page="currentPage = $event"
+      @update:page-size="pageSize = $event"
+      @update:sort-by="sortBy = $event"
+      @update:sort-order="sortOrder = $event"
     >
       <template #toolbar>
         <div class="flex w-full items-center gap-2 max-md:contents">
@@ -298,6 +307,7 @@ import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useListViewState } from "@/composables/useListViewState";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import { queryClient } from "@/composables/query/queryClient";
@@ -328,7 +338,19 @@ const loading = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const loadError = ref<string | null>(null);
 const notAvailable = ref(false);
-const search = ref("");
+const savedView = useListViewState("oncall-teams", {
+  search: "",
+  currentPage: 1,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const search = ref(savedView.search);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const oTableRef = ref<any>(null);
 const formOpen = ref(false);
 const editingTeam = ref<OnCallTeam | null>(null);
 const teamToDelete = ref<OnCallTeam | null>(null);
@@ -456,6 +478,26 @@ const filteredTeams = computed(() => {
       ...(onCallByTeam.value[team.id] ?? []).map((slot) => slot.user_email),
     ].some((field) => field.toLowerCase().includes(q)),
   );
+});
+
+watch(search, () => {
+  currentPage.value = 1;
+});
+watch([search, currentPage, pageSize, sortBy, sortOrder], () => {
+  Object.assign(savedView, {
+    search: search.value,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+// The first load lands after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(loading, (isLoading) => {
+  if (isLoading || pageRestored) return;
+  pageRestored = true;
+  setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
 });
 
 async function fetchTeams(force = false) {
