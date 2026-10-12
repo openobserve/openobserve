@@ -13,7 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
+
+// The Kubernetes loader renders from the org's live streams, so it reads the kind-cluster fixture here.
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const { k8sStreamList, k8sSchemaEntry } = await import("./__fixtures__/k8sStreams");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      nameList: vi.fn(async () => ({ data: { list: k8sStreamList() } })),
+      schema: vi.fn(async (_org: string, name: string) => ({ data: k8sSchemaEntry(name) })),
+    },
+  });
+});
+vi.mock("@/utils/semanticGroupsCache", () => ({
+  loadSemanticGroups: vi.fn(async () => []),
+  clearSemanticGroupsCacheForOrg: vi.fn(),
+  getCachedSemanticGroups: vi.fn(() => null),
+}));
+
 import {
   READY_MADE_SOURCES,
   READY_MADE_SOURCE_BY_SETUP_SLUG,
@@ -129,6 +147,9 @@ describe("ready-made catalog", () => {
   });
 
   describe("bundled content", () => {
+    // The Kubernetes chunk pulls in the curated engine; a cold transform inside the test outlasts its timeout.
+    beforeAll(() => import("./kubernetesDashboards"), 60_000);
+
     it.each(["postgresql", "mysql", "redis", "otelcol"] as const)(
       "%s loads one v8 document carrying its marker",
       async (id) => {

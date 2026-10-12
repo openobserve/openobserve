@@ -42,6 +42,11 @@ const { getStreams, toastMock } = vi.hoisted(() => ({ getStreams: vi.fn(), toast
 vi.mock("@/composables/useStreams", () => ({ default: () => ({ getStreams }) }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/composables/readyMade/kubernetesDashboards", async () => ({
+  buildKubernetesDashboards: (
+    await import("@/composables/readyMade/__fixtures__/kubernetesDashboardsStub")
+  ).stubKubernetesDashboards,
+}));
 vi.mock("@/utils/commons", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/commons")>()),
   getFoldersList: vi.fn().mockResolvedValue([]),

@@ -23,6 +23,10 @@ vi.mock("@/services/settings", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), { default: {} });
 });
+vi.mock("./kubernetesDashboards", async () => ({
+  buildKubernetesDashboards: (await import("./__fixtures__/kubernetesDashboardsStub"))
+    .stubKubernetesDashboards,
+}));
 
 import dashboards from "@/services/dashboards";
 import settings from "@/services/settings";
