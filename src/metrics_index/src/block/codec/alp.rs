@@ -18,8 +18,8 @@
 
 use anyhow::{Context, Result, ensure};
 
-use super::{EXACT_LIMIT, int_delta, pack::get_u64};
-use crate::block::compact::{get_varint, put_varint};
+use super::{EXACT_LIMIT, int_delta};
+use crate::block::compact::{get_u64, get_varint, put_varint};
 
 const MAX_EXPONENT: usize = 18;
 const POW10: [f64; MAX_EXPONENT + 1] = [

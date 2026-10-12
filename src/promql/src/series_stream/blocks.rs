@@ -762,7 +762,7 @@ async fn load_entry(
     sidecar: &str,
     cached: Option<Arc<CachedIndex>>,
 ) -> Result<Arc<CachedIndex>> {
-    Ok(metrics_index::fetch_parsed_index(
+    metrics_index::fetch_parsed_index(
         &file.account,
         sidecar,
         parent.metadata(),
@@ -770,7 +770,7 @@ async fn load_entry(
         labels,
         cached,
     )
-    .await?)
+    .await
 }
 
 pub(crate) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
@@ -1247,7 +1247,7 @@ mod tests {
         .unwrap()
     }
     fn file(rows: &[Row]) -> (FileKey, Vec<u8>) {
-        file_batch(batch(rows), vec!["group".into()])
+        file_batch(batch(rows))
     }
 
     #[tokio::test]
@@ -1288,7 +1288,7 @@ mod tests {
         );
     }
 
-    fn file_batch(batch: RecordBatch, label_columns: Vec<String>) -> (FileKey, Vec<u8>) {
+    fn file_batch(batch: RecordBatch) -> (FileKey, Vec<u8>) {
         let records = batch.num_rows();
         let timestamps = batch
             .column_by_name("_timestamp")
@@ -1307,16 +1307,11 @@ mod tests {
             rows: records as u64,
             compressed_size: 123,
         };
-        let mut writer = BlockWriter::new(
-            Vec::new(),
-            batch.schema(),
-            label_columns,
-            parent.metadata(),
-            2,
-        )
-        .unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), batch.schema(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let bytes = writer.finish().unwrap();
+        let bytes = writer
+            .finish_for_vortex(parent.metadata(), batch.schema())
+            .unwrap();
         let mut file = FileKey::new(
             0,
             String::new(),
@@ -1953,10 +1948,7 @@ mod tests {
         fields.push(Arc::new(Field::new("env", DataType::Utf8, true)));
         let mut arrays = source.columns().to_vec();
         arrays.push(Arc::new(StringArray::from(vec!["prod", "prod"])));
-        let new = file_batch(
-            RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap(),
-            vec!["group".into(), "env".into()],
-        );
+        let new = file_batch(RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap());
         let fixture = Fixture::new(&[old.clone(), new.clone()], false).await;
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "env", "prod")]);
         let prepared = prepare(
@@ -2463,7 +2455,7 @@ mod tests {
             original.columns()[..3].to_vec(),
         )
         .unwrap();
-        let absent = file_batch(absent, vec![]);
+        let absent = file_batch(absent);
         let null = file(&[(1, 30, 3.0, None), (1, 40, 4.0, None)]);
         let empty = file(&[(1, 30, 3.0, Some("")), (1, 40, 4.0, Some(""))]);
         let fixture = Fixture::new(&[absent.clone(), null.clone(), empty.clone()], false).await;
@@ -2681,7 +2673,7 @@ mod tests {
         assert!(cached.is_none());
         assert!(!complete);
         let partial = Arc::new(CachedIndex {
-            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            index: Arc::new(entry.index.project(&[]).unwrap()),
             binding: entry.binding.clone(),
         });
         cache.insert(key.clone(), partial, weight.total).unwrap();
@@ -2712,7 +2704,7 @@ mod tests {
         let cache = Mutex::new(cache);
         let (key, entry, weight) = cache_entry();
         let partial = Arc::new(CachedIndex {
-            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            index: Arc::new(entry.index.project(&[]).unwrap()),
             binding: entry.binding.clone(),
         });
         let lookup = {
