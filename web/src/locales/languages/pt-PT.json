@@ -1386,7 +1386,6 @@
     "sessionReplayResumesOnItsOwn": "A reprodução é retomada automaticamente",
     "sessionReplayLoadingUpTo": "Carregando até {time}…",
     "sessionReplaySinglePageHint": "Esta sessão tem apenas uma página, então tudo antes de {time} precisa ser carregado primeiro",
-    "sessionReplayShowing": "Exibindo: {page}",
     "sessionReplayNowShowingTab": "Agora exibindo outra aba: {page}",
     "sessionReplayTabGap": "A gravação desta aba tem uma lacuna a partir de {time}. Até que a página mude, a tela pode não corresponder ao que o usuário viu.",
     "sessionReplayMissingTab": "O usuário mudou para outra aba que esta reprodução não pode exibir. A tela mostra a aba anterior.",

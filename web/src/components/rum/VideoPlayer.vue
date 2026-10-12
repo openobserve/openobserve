@@ -144,14 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="px-1">/</div>
             <div data-test="video-player-duration">{{ playerState.duration }}</div>
           </div>
-          <span
-            v-if="showingLabel"
-            class="border-border-default text-text-body ms-3 max-w-64 truncate rounded-full border px-2 text-xs"
-            :title="shownSwitch?.href"
-            data-test="video-player-showing"
-          >
-            {{ t("rum.sessionReplayShowing", { page: showingLabel }) }}
-          </span>
           <ReplayStatusChip
             class="ms-3"
             :load-state="loadState"
@@ -474,8 +466,6 @@ const pageLabel = (href: string | undefined) => {
     return href;
   }
 };
-
-const showingLabel = computed(() => (multiTab.value ? pageLabel(shownSwitch.value?.href) : ""));
 
 const tabNotice = computed(() => {
   if (switchAtPlayhead.value?.reason === "missing") return t("rum.sessionReplayMissingTab");

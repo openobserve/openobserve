@@ -1430,14 +1430,14 @@ describe("VideoPlayer", () => {
       await flushPromises();
       await known.setProps({ segments });
       await flushPromises();
-      expect(known.find('[data-test="video-player-showing"]').exists()).toBe(false);
+      expect((known.vm as any).multiTab).toBe(false);
       known.unmount();
 
       const unknown = mountComponent();
       await flushPromises();
       await unknown.setProps({ segments });
       await flushPromises();
-      expect(unknown.find('[data-test="video-player-showing"]').exists()).toBe(true);
+      expect((unknown.vm as any).multiTab).toBe(true);
       unknown.unmount();
     });
 
@@ -1468,26 +1468,6 @@ describe("VideoPlayer", () => {
       expect(rebuiltA).toHaveLength(2);
       expect(rebuiltA[0].data).toBe(rebuiltA[1].data);
       wrapper.unmount();
-    });
-
-    it("shows the Showing chip only for sessions with concurrent views", async () => {
-      const single = mountComponent();
-      await flushPromises();
-      await single.setProps({ segments: [seg("A", 0, opening(T, "A"))] });
-      await flushPromises();
-      expect(single.find('[data-test="video-player-showing"]').exists()).toBe(false);
-      single.unmount();
-
-      const multi = mountComponent();
-      await flushPromises();
-      await multi.setProps({
-        segments: [seg("A", 0, opening(T, "A")), seg("B", 0, opening(T + 1000, "B"))],
-      });
-      await flushPromises();
-      const chip = multi.find('[data-test="video-player-showing"]');
-      expect(chip.exists()).toBe(true);
-      expect(chip.text()).toContain("https://app.test/A");
-      multi.unmount();
     });
 
     it("emits a gap notice while the shown view is stale", async () => {

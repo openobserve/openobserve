@@ -1386,7 +1386,6 @@
     "sessionReplayResumesOnItsOwn": "La lecture reprend automatiquement",
     "sessionReplayLoadingUpTo": "Chargement jusqu'à {time}…",
     "sessionReplaySinglePageHint": "Cette session comporte une seule page, donc tout ce qui précède {time} doit être chargé d'abord",
-    "sessionReplayShowing": "Affichage : {page}",
     "sessionReplayNowShowingTab": "Affichage d'un autre onglet : {page}",
     "sessionReplayTabGap": "L'enregistrement de cet onglet comporte une lacune à partir de {time}. Tant que la page ne change pas, l'écran peut ne pas correspondre à ce que l'utilisateur a vu.",
     "sessionReplayMissingTab": "L'utilisateur est passé à un autre onglet que cette relecture ne peut pas afficher. L'écran affiche l'onglet précédent.",

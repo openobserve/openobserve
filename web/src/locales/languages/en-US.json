@@ -1386,7 +1386,6 @@
     "sessionReplayResumesOnItsOwn": "Playback resumes on its own",
     "sessionReplayLoadingUpTo": "Loading up to {time}…",
     "sessionReplaySinglePageHint": "This session has one page, so everything before {time} has to load first",
-    "sessionReplayShowing": "Showing: {page}",
     "sessionReplayNowShowingTab": "Now showing another tab: {page}",
     "sessionReplayTabGap": "This tab's recording has a gap from {time}. Until the page changes, the screen may not match what the user saw.",
     "sessionReplayMissingTab": "The user moved to another tab that this replay can't show. The screen shows the previous tab.",
