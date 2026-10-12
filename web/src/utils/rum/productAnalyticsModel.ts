@@ -28,6 +28,7 @@ import {
   type ExclusionStep,
   type FunnelCohort,
   type FunnelDef,
+  type FunnelFilter,
   type FunnelUnit,
   type FunnelWindow,
   type Granularity,
@@ -38,6 +39,7 @@ import {
   type RetentionMode,
   type SampleRatio,
   type StepFilters,
+  type ViewCond,
   type StepKind,
   type StepRef,
 } from "@/utils/rum/productAnalyticsQueries";
@@ -340,11 +342,26 @@ export const CONTAINER_SUFFIXES = [
 const BOT_LIKE =
   /(bot|crawl|spider|headless|monitor|pinger|preview|scan|check|lighthouse|pagespeed|selenium|puppeteer|playwright)/i;
 const COVERING_OPS: readonly MatchOp[] = ["eq", "in", "prefix", "suffix", "contains"];
-const CREDENTIAL_PARAMS = ["id_token", "access_token", "code", "token"];
+export const CREDENTIAL_PARAMS = ["id_token", "access_token", "code", "token"];
 const PARAM_NAME = /^[A-Za-z0-9_.-]{1,128}$/;
 const REF_HOST = /^[a-z0-9.-]+$/;
 export const MAX_COMPARED_APPS = 10;
 const MAX_EXCLUSIONS = 5;
+export const MAX_FUNNEL_FILTERS = 10;
+export const MAX_FILTER_VALUES = 20;
+export const MAX_VIEW_CONDS = 5;
+/** Session fields Filter all steps can use; env and version stay page-wide. */
+export const FILTER_FIELDS: readonly SessionField[] = [
+  "geo_info_country",
+  "geo_info_city",
+  "user_agent_user_agent_family",
+  "user_agent_os_family",
+  "user_agent_device_family",
+  "usr_id",
+  "usr_email",
+  "usr_anonymous_id",
+];
+const MATCH_OPS: readonly MatchOp[] = ["eq", "in", "prefix", "suffix", "contains", "regex"];
 const MAX_STEP_MS = 86400000;
 const NEW_USERS_LOOKBACK_US = 30 * 86400000000;
 const MIN_REMAINING_VALUES = 3;
@@ -803,9 +820,12 @@ export function decodeDef(param: string | undefined): unknown {
   }
 }
 
-const STEP_OPTION_KEYS = ["min", "fr", "er"];
+const STEP_OPTION_KEYS = ["min", "fr", "er", "vc"];
 const EXCLUSION_KEYS = ["s", "a", "b", "w"];
-const FUNNEL_KEYS = ["s", "u", "w", "b", "x"];
+const FUNNEL_KEYS = ["s", "u", "w", "b", "x", "f"];
+const FILTER_KEYS = ["field", "op", "values"];
+const PARAM_COND_KEYS = ["t", "key", "op", "values"];
+const REF_COND_KEYS = ["t", "op", "values"];
 
 const onlyKeys = (raw: Record<string, unknown>, keys: readonly string[]): boolean =>
   Object.keys(raw).every((k) => keys.includes(k));
@@ -813,17 +833,54 @@ const onlyKeys = (raw: Record<string, unknown>, keys: readonly string[]): boolea
 const isMs = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= MAX_STEP_MS;
 
+const valueList = (v: unknown, ok: (x: unknown) => boolean): v is string[] =>
+  Array.isArray(v) && v.length > 0 && v.length <= MAX_FILTER_VALUES && v.every(ok);
+
+// Mirrors the server: eq only, the named-event parameter and host checks, credential parameters refused.
+const parseViewCond = (raw: unknown): ViewCond | null => {
+  if (!isRecord(raw) || raw.op !== "eq") return null;
+  if (raw.t === "param") {
+    const key = raw.key;
+    if (!onlyKeys(raw, PARAM_COND_KEYS) || typeof key !== "string" || !PARAM_NAME.test(key))
+      return null;
+    if (CREDENTIAL_PARAMS.includes(key) || !valueList(raw.values, isKey)) return null;
+    return { t: "param", key, op: "eq", values: [...raw.values] };
+  }
+  if (raw.t !== "ref" || !onlyKeys(raw, REF_COND_KEYS)) return null;
+  const host = (v: unknown) => isKey(v) && REF_HOST.test(v);
+  return valueList(raw.values, host) ? { t: "ref", op: "eq", values: [...raw.values] } : null;
+};
+
+const parseViewConds = (raw: unknown): ViewCond[] | null => {
+  if (!Array.isArray(raw) || !raw.length || raw.length > MAX_VIEW_CONDS) return null;
+  const conds = raw.map(parseViewCond);
+  return conds.every((c) => c !== null) ? (conds as ViewCond[]) : null;
+};
+
 // An unknown option must fail the whole definition, so an older build never drops a filter it cannot apply.
 const parseStepFilters = (raw: unknown): StepFilters | null => {
   if (!isRecord(raw) || !onlyKeys(raw, STEP_OPTION_KEYS)) return null;
   if (raw.min !== undefined && !isMs(raw.min)) return null;
   if ((raw.fr !== undefined && raw.fr !== 1) || (raw.er !== undefined && raw.er !== 1)) return null;
+  const vc = raw.vc === undefined ? undefined : parseViewConds(raw.vc);
+  if (vc === null) return null;
   return {
     ...(raw.min !== undefined ? { minMs: raw.min as number } : {}),
     ...(raw.fr === 1 ? { frustrated: true as const } : {}),
     ...(raw.er === 1 ? { errored: true as const } : {}),
+    ...(vc ? { vc } : {}),
   };
 };
+
+/** One Filter all steps row as the server accepts it, or null. */
+export function parseFunnelFilter(raw: unknown): FunnelFilter | null {
+  if (!isRecord(raw) || !onlyKeys(raw, FILTER_KEYS)) return null;
+  const { field, op, values } = raw;
+  if (!FILTER_FIELDS.includes(field as SessionField)) return null;
+  if (!MATCH_OPS.includes(op as MatchOp)) return null;
+  if (!valueList(values, (v) => matchValue(op, v))) return null;
+  return { field: field as SessionField, op: op as MatchOp, values: [...values] };
+}
 
 export function parseStepRef(raw: unknown): StepRef | null {
   if (!Array.isArray(raw) || (raw.length !== 2 && raw.length !== 3)) return null;
@@ -835,9 +892,14 @@ export function parseStepRef(raw: unknown): StepRef | null {
   return f ? { kind, key, f } : null;
 }
 
+const viewCondParam = (c: ViewCond): Record<string, unknown> =>
+  c.t === "param"
+    ? { t: "param", key: c.key, op: c.op, values: [...c.values] }
+    : { t: "ref", op: c.op, values: [...c.values] };
+
 export function stepRefParam(step: StepRef): unknown[] {
   if (!step.f) return [step.kind, step.key];
-  const { minMs, frustrated, errored } = step.f;
+  const { minMs, frustrated, errored, vc } = step.f;
   return [
     step.kind,
     step.key,
@@ -845,6 +907,7 @@ export function stepRefParam(step: StepRef): unknown[] {
       ...(minMs !== undefined ? { min: minMs } : {}),
       ...(frustrated ? { fr: 1 } : {}),
       ...(errored ? { er: 1 } : {}),
+      ...(vc?.length ? { vc: vc.map(viewCondParam) } : {}),
     },
   ];
 }
@@ -899,12 +962,17 @@ export function parseFunnelDef(raw: unknown): FunnelDef | null {
   if (!Array.isArray(xs) || xs.length > MAX_EXCLUSIONS) return null;
   const x = xs.map((e) => parseExclusion(e, steps as StepRef[]));
   if (x.some((e) => e === null)) return null;
+  const fs = raw.f === undefined ? [] : raw.f;
+  if (!Array.isArray(fs) || fs.length > MAX_FUNNEL_FILTERS) return null;
+  const f = fs.map(parseFunnelFilter);
+  if (f.some((e) => e === null)) return null;
   return {
     steps: steps as StepRef[],
     unit,
     window: unit === "sessions" ? "session" : (w as FunnelWindow),
     breakdown: b as BreakdownDim | null,
     x: x as ExclusionStep[],
+    ...(f.length ? { f: f as FunnelFilter[] } : {}),
   };
 }
 
@@ -921,6 +989,8 @@ export function funnelParam(def: FunnelDef): Record<string, unknown> {
       a: e.a,
       ...(e.b !== undefined ? { b: e.b } : { w: e.withinMs }),
     }));
+  if (def.f?.length)
+    out.f = def.f.map((r) => ({ field: r.field, op: r.op, values: [...r.values] }));
   return out;
 }
 

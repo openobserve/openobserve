@@ -43,6 +43,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </span>
     </div>
+    <FunnelFilterBar
+      :def="def"
+      :fields="filterFields"
+      :values="filterValues"
+      @update:def="(d) => emit('update:def', d)"
+      @filter-values="(f) => emit('filter-values', f)"
+    />
     <ExclusionSection
       :def="def"
       :removed="removed"
@@ -65,6 +72,7 @@ import { computed } from "vue";
 import FunnelStepsTable from "@/components/rum/productAnalytics/funnelParts/FunnelStepsTable.vue";
 import FunnelAddStep from "@/components/rum/productAnalytics/funnelParts/FunnelAddStep.vue";
 import ExclusionSection from "@/components/rum/productAnalytics/funnelParts/ExclusionSection.vue";
+import FunnelFilterBar from "@/components/rum/productAnalytics/funnelParts/FunnelFilterBar.vue";
 import AppFiltersSummary from "@/components/rum/productAnalytics/funnelParts/AppFiltersSummary.vue";
 import { removedByStep } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
 import type {
