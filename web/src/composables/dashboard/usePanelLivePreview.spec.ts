@@ -339,17 +339,21 @@ describe("usePanelLivePreview", () => {
       scope.stop();
     });
 
-    it("skips an incomplete builder without turning Apply yellow", async () => {
+    it("skips an incomplete builder and turns Apply yellow at once, asking to finish the fields", async () => {
       const { panel, run, live, valid, scope } = setup({ valid: false });
       live.arm();
       panel.queries[0].query = "SELECT a FROM default";
       await nextTick();
+      expect(live.isPending.value).toBe(true);
+      expect(live.applyState.value).toBe("incomplete");
       vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
       expect(run).not.toHaveBeenCalled();
-      expect(live.isPending.value).toBe(false);
-      expect(live.applyState.value).toBe("incomplete");
+
       valid.value = true;
-      expect(live.isPending.value).toBe(true);
+      await nextTick();
+      expect(live.isPending.value).toBe(false);
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+      expect(run).toHaveBeenCalledTimes(1);
       scope.stop();
     });
 

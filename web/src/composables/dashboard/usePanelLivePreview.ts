@@ -178,11 +178,9 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
     () => isArmed.value && !isTypedPending.value && isOutdated.value && !isBuilderValid.value,
   );
 
-  // A change live preview is about to run itself is not waiting on Apply.
+  // The chart is behind the editor, unless live preview is about to catch it up itself.
   const isPending = computed(
-    () =>
-      isArmed.value &&
-      (isTypedPending.value || (isOutdated.value && !isIncomplete.value && !isRunQueued.value)),
+    () => isArmed.value && (isTypedPending.value || (isOutdated.value && !isRunQueued.value)),
   );
 
   const applyState = computed<LivePreviewApplyState>(() => {
@@ -231,7 +229,7 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
 
   const schedule = () => {
     clearTimer();
-    if (!autoRun() || isSlowPaused.value) return;
+    if (!autoRun() || isSlowPaused.value || !isBuilderValid.value) return;
     setTimer(setTimeout(fire, debounceMs));
   };
 
