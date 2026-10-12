@@ -49,6 +49,31 @@ export const maxParenDepth = (text: string): number => {
   return max;
 };
 
+export const lexicalParenDepth = (sql: string): number => {
+  const n = sql.length;
+  let depth = 0;
+  let max = 0;
+  let i = 0;
+  while (i < n) {
+    const ch = sql[i];
+    if (ch === "'" || ch === '"' || ch === "`") {
+      i = skipQuoted(sql, i);
+      if (i < 0) return Infinity;
+    } else if (ch === "-" && sql[i + 1] === "-") {
+      while (i < n && sql[i] !== "\n") i++;
+    } else if (ch === "/" && sql[i + 1] === "*") {
+      const end = sql.indexOf("*/", i + 2);
+      if (end < 0) return Infinity;
+      i = end + 2;
+    } else {
+      if (ch === "(") max = Math.max(max, ++depth);
+      else if (ch === ")" && --depth < 0) return Infinity;
+      i++;
+    }
+  }
+  return depth === 0 ? max : Infinity;
+};
+
 /**
  * Replaces every top-level WHERE predicate with `1 = 1` so callers that read only the
  * SELECT list or FROM aliases can parse without paying the predicate's nesting cost.
@@ -134,3 +159,14 @@ export const stripWherePredicate = (sql: string): string => {
   }
   return out + sql.slice(prev);
 };
+
+function skipQuoted(sql: string, start: number): number {
+  const quote = sql[start];
+  let i = start + 1;
+  while (i < sql.length) {
+    if (sql[i] !== quote) i++;
+    else if (sql[i + 1] === quote) i += 2;
+    else return i + 1;
+  }
+  return -1;
+}

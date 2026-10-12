@@ -61,7 +61,6 @@ const props = withDefaults(defineProps<DialogProps>(), {
   showClose: true,
   width: undefined,
   maxHeight: undefined,
-  initialFocus: "primary",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",

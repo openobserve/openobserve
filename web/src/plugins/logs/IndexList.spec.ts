@@ -483,7 +483,7 @@ describe("Index List", async () => {
   it("handles multi stream selection correctly", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
   });
 
   it("resets selected fields correctly", async () => {
@@ -565,7 +565,7 @@ describe("Index List", async () => {
   it("handles multiple stream selection", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
   });
 
   it("validates stream field values structure", async () => {
@@ -991,7 +991,7 @@ describe("Index List", async () => {
 
       wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
 
-      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
     });
   });
 
@@ -1526,7 +1526,7 @@ describe("Index List", async () => {
   it("handles multi stream selection correctly", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
   });
 
   it("resets selected fields correctly", async () => {
@@ -1628,7 +1628,7 @@ describe("Index List", async () => {
   it("handles multiple stream selection", async () => {
     wrapper.vm.searchObj.data.stream.selectedStream = ["stream1"];
     wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
-    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+    expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
   });
 
   it("validates stream field values structure", async () => {
@@ -2054,7 +2054,7 @@ describe("Index List", async () => {
 
       wrapper.vm.handleStreamSelection(wrapper.vm.searchObj.data.stream.selectedStream);
 
-      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("");
+      expect(wrapper.vm.onStreamChange).toHaveBeenCalledWith("", { origin: "selector" });
     });
   });
 

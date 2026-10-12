@@ -217,6 +217,7 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { filterForParsing } from "@/composables/useLogs/freeTextSearch";
 
 const props = defineProps({
   fields: {
@@ -307,7 +308,10 @@ const extractColName = (col: any): string | null => {
   return null;
 };
 
-function walkFilters(query: string): {
+function walkFilters(
+  query: string,
+  fieldNames: ReadonlySet<string>,
+): {
   include: Record<string, string[]>;
   exclude: Record<string, string[]>;
 } {
@@ -316,7 +320,7 @@ function walkFilters(query: string): {
   if (!query?.trim()) return { include, exclude };
 
   try {
-    const parsed = fnParsedSQL(`select * from stream where ${query}`);
+    const parsed = fnParsedSQL(`select * from stream where ${filterForParsing(query, fieldNames)}`);
     if (!parsed?.where) return { include, exclude };
 
     const push = (target: Record<string, string[]>, field: string, value: string) => {
@@ -365,7 +369,12 @@ function walkFilters(query: string): {
   return { include, exclude };
 }
 
-const parsedFilters = computed(() => walkFilters((props as any).query));
+const parsedFilters = computed(() =>
+  walkFilters(
+    (props as any).query,
+    new Set<string>(((props as any).fields ?? []).map((field: any) => field?.name)),
+  ),
+);
 const activeIncludeFilterValues = computed(() => parsedFilters.value.include);
 const activeExcludeFilterValues = computed(() => parsedFilters.value.exclude);
 

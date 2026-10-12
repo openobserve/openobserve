@@ -566,6 +566,12 @@
       "description": "静默期会让告警、异常检测和合成监控检查继续运行，并在您设定的时间窗口内停止发送通知。",
       "action": "安排静默期",
       "actionDesc": "一次性、每天或每周。如需快速静音，请使用告警列表中的“静音”。"
+    },
+    "searchCancelled": {
+      "title": "搜索已取消",
+      "description": "未加载任何结果。请运行查询以加载事件。",
+      "action": "运行查询",
+      "actionDesc": "再次运行同一查询"
     }
   },
   "common": {
@@ -1277,7 +1283,126 @@
     "aliasNotAllowed": "不允许使用别名 '{alias}'。",
     "commonGroupFields": "常用分组字段",
     "queryRangeHours": "{count} 小时 | {count} 小时",
-    "menuGroupAlerts": "告警"
+    "menuGroupAlerts": "告警",
+    "runQueryPendingLabel": "运行查询，更改尚未应用",
+    "queryActions": {
+      "runEditedFirst": "请先运行编辑后的查询",
+      "runFirst": "请先运行查询",
+      "usesEditedQuery": "使用您编辑后的查询(尚未运行)",
+      "usesUnrunQuery": "使用您的查询(尚未运行)",
+      "downloadsShownResults": "下载当前显示的结果，而非您编辑的内容",
+      "downloadsLastRun": "使用上次运行的查询，而非您编辑的内容"
+    },
+    "noFtsRecovery": {
+      "title": "{stream} 未配置全文搜索字段",
+      "description": "搜索字段值，或清空整个查询以查看此时间范围内的日志。",
+      "searchField": "搜索指定字段",
+      "searchFieldHint": "选择用于搜索的字段，并保留排除词。",
+      "clearRun": "不应用此搜索显示日志",
+      "clearRunHint": "清空整个查询并在相同时间范围内运行。",
+      "editPermission": "您需要权限才能编辑数据流设置。",
+      "scope": "在当前时间范围内搜索 {stream}。",
+      "singleStreamScope": "仅搜索 {stream}；将取消选择 {otherStreams}。",
+      "stream": "数据流",
+      "field": "字段",
+      "match": "匹配",
+      "value": "值",
+      "contains": "包含文本",
+      "equals": "等于",
+      "preview": "过滤器预览",
+      "replacement": "这会将整个查询替换为字段过滤器，并保留排除词。无需全文搜索字段。",
+      "run": "运行字段搜索",
+      "close": "关闭字段搜索",
+      "skipped": "已跳过 {stream}，因为它未配置全文搜索字段。",
+      "resultsScope": "这些结果仅来自 {streams}。",
+      "noFields": "此数据流没有可用于字段搜索的字段。",
+      "valueRequired": "请输入要搜索的值。",
+      "fieldRequired": "请选择要搜索的字段。",
+      "invalidValue": "请输入此字段的有效值。",
+      "configureHint": "使此数据流的全文搜索更快。"
+    },
+    "autoRunPersistNeedsRun": "请先运行查询：此操作会保存或分享您运行的结果",
+    "autoRunSearchAroundActive": "正在显示某一行附近的记录：运行查询以返回结果",
+    "autoRunStaleTooltip": "运行查询以更新结果",
+    "searchCancelledNotice": "搜索已取消。",
+    "linePermalink": {
+      "disabledFunction": "关闭函数以链接单行",
+      "disabledTimestampRewrite": "此查询重写了时间戳",
+      "disabledNotSingleLines": "此查询返回的行不是单条日志行",
+      "disabledNoTimestamp": "此行没有时间戳",
+      "disabledEnrichmentTable": "无法链接富化表的行",
+      "toastNotUnique": "已复制指向时间戳的链接；无法唯一标识此行。",
+      "toastWideStream": "此数据流字段过多，无法精确链接单行；已复制指向时间戳的链接",
+      "bannerInvalid": "此链接格式有误；仅显示分享的搜索",
+      "bannerDenied": "您没有访问数据流 {stream} 的权限。",
+      "bannerStreamMissing": "数据流 {stream} 已不存在",
+      "bannerError": "无法加载共享的日志行。",
+      "bannerIncomplete": "无法检索此时间戳下的所有日志行",
+      "bannerGone": "此日志行已不可用。可能已超出数据流的保留期限或被删除。",
+      "bannerGoneRetention": "此日志行已不可用。可能已超出数据流的保留期限（{days} 天）或被删除。 | 此日志行已不可用。可能已超出数据流的保留期限（{days} 天）或被删除。",
+      "bannerFound": "正在显示共享的日志行",
+      "bannerAmbiguous": "此时间戳下有 {count} 行日志，无法确定具体是哪一行 | 此时间戳下有 {count} 行日志，无法确定具体是哪一行",
+      "bannerChanged": "自创建链接以来，该行可能已发生变化",
+      "actionShowLines": "显示这些行",
+      "actionShowInContext": "在上下文中显示",
+      "bannerAmbiguousTieHeavy": "有 {count} 行日志共享此时间戳，且该数据流没有 _o2_id，因此无法确定具体是哪一行。该时间戳下的日志行已高亮显示。 | 有 {count} 行日志共享此时间戳，且该数据流没有 _o2_id，因此无法确定具体是哪一行。该时间戳下的日志行已高亮显示。",
+      "bannerDismiss": "关闭",
+      "copyLink": "复制链接",
+      "copyLinkTooltip": "复制指向此日志行的链接",
+      "copyLinkMenu": "复制指向此日志行的链接",
+      "toastCopied": "已复制日志行链接",
+      "toastCopiedValid": "已复制日志行链接 · 有效期 {days} 天 | 已复制日志行链接 · 有效期 {days} 天",
+      "toastLookupFailed": "无法查找此行；已复制指向该时间戳的链接",
+      "toastShortFailed": "无法缩短链接；已改为复制完整链接",
+      "toastFailed": "无法创建指向此日志行的链接",
+      "toastScopeChanged": "创建链接期间组织或数据流发生了变化；未复制任何内容",
+      "popoverTitle": "此日志行的链接",
+      "popoverDesc": "您的浏览器阻止了自动复制。请选中链接并复制，或使用按钮。",
+      "pageNotice": "此链接位于第 {page} 页。",
+      "pageGo": "转到第 {page} 页",
+      "pageGoLast": "转到最后一页（{page}）"
+    },
+    "autoRunPendingDot": "运行查询以应用最新更改",
+    "autoRunAppliesTo": "适用于日志和追踪",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "此搜索将扫描约 {size}",
+    "autoRunGuardLinkTitle": "此链接将扫描约 {size}",
+    "autoRunGuardDescAutoRun": "{scope}。已暂停自动运行，以便您先缩小范围。",
+    "autoRunGuardDescPaused": "{scope}。已暂停，以便您先缩小范围。",
+    "autoRunGuardDescLink": "通过链接打开 · {scope}。请检查范围，然后运行。",
+    "autoRunGuardHint": "关闭自动运行，以手动应用过滤器和时间更改。",
+    "autoRunGuardUnknownTitle": "此时间窗口的大小未知",
+    "autoRunGuardUnknownDesc": "{streams} 尚无大小统计信息，因此自动运行仅在其上运行不超过 1 小时的时间窗口。",
+    "autoRunGuardUnknownManyDesc": "{count} 个数据流尚无大小统计信息，因此自动运行会等待您操作。{scope}。 | {count} 个数据流尚无大小统计信息，因此自动运行会等待您操作。{scope}。",
+    "autoRunGuardSuperClusterTitle": "已可就绪跨区域运行",
+    "autoRunGuardSuperClusterDesc": "多区域集群上尚无法估算搜索大小，因此自动运行会等待您操作。{scope}。",
+    "autoRunGuardUnresolvedTitle": "数据流不可用",
+    "autoRunGuardUnresolvedDesc": "数据流 {streams} 不存在，或您无权访问。",
+    "autoRunGuardBanner": "此更改将扫描约 {size}（{scope}），因此已暂停自动运行。下方结果来自上一次查询。",
+    "autoRunGuardBannerPaused": "此更改将扫描约 {size}（{scope}），因此已暂停。下方结果来自上一次查询。",
+    "autoRunGuardBannerUnknown": "此时间窗口（{scope}）的大小未知，因此已暂停。下方结果来自上一次查询。",
+    "autoRunGuardBannerRefresh": "自动刷新每次将扫描约 {size}（{scope}），因此在您运行一次之前将保持暂停。下方结果来自上一次查询。",
+    "autoRunGuardRunAnyway": "仍然运行",
+    "autoRunGuardRunQuery": "运行查询",
+    "autoRunGuardNarrow": "缩小到 {period}",
+    "autoRunGuardNarrowWithSize": "缩小到 {period}（约 {size}）",
+    "autoRunGuardSearchJob": "作为搜索任务运行",
+    "autoRunGuardSelectStream": "选择数据流",
+    "searchJobNoPermission": "您没有创建搜索任务的权限",
+    "missingStreamAndNoFts": "一个或多个过滤器字段在 \"{missingStreams}\" 中不存在，因此不会在提到的数据流中执行搜索。\n 未搜索：{noFtsStreams}（无全文检索字段）。",
+    "freeTextChooseFirst": "请先选择文本搜索方式",
+    "freeTextScanLogsOnly": "扫描模式仅在日志视图中可用；请设置全文检索字段以在此处使用文本搜索",
+    "freeTextSearchedFields": "全文检索范围：{fields}（所有词，顺序不限）",
+    "freeTextPreview": "全文检索范围：{fields}（所有词，顺序不限）\n\n以 {sql} 运行",
+    "freeTextRunsAs": "以 {sql} 运行",
+    "freeTextNotSearched": "未搜索：{streams}（无全文检索字段）。",
+    "freeTextSetField": "配置全文检索字段",
+    "freeTextNoFtsTitle": "\"{stream}\" 没有全文检索字段",
+    "freeTextNoFtsTitleMulti": "所选数据流没有全文检索字段",
+    "freeTextNoTextFields": "此数据流没有可搜索的文本字段。",
+    "freeTextNoTextFieldsNamed": "未搜索：{streams}（无文本字段）。",
+    "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。"
   },
   "menu": {
     "upgradeToProPlan": "升级到 PRO 计划",
@@ -9061,7 +9186,9 @@
         "dbmLockSampling": "锁活动按时间间隔采样，因此两次采样之间发生并解除的争用不会被记录。没有触发告警并不证明没有阻塞。",
         "dbmNoInstance": "未识别到单个数据库实例，因此此告警会监控此引擎的每个实例。",
         "rumFunnelSnapshot": "此告警保留了漏斗 SQL 的副本。之后对漏斗或其命名事件的编辑不会更改它。",
-        "rumFunnelSteps": "漏斗至少需要两个步骤才能对转化进行告警。"
+        "rumFunnelSteps": "漏斗至少需要两个步骤才能对转化进行告警。",
+        "textFilterDropped": "您的搜索过滤器未带入，因为此数据流没有全文搜索（FTS）字段。如需使用，请将其添加到告警查询中。",
+        "heldFilterDropped": "您的搜索过滤器未带入，因为它需要先在日志页面选择运行身份。如需使用，请将其添加到告警查询中。"
       }
     },
     "saveFailed": "无法保存告警。",
@@ -12149,7 +12276,21 @@
     "eventClusterAriaLabelPlural": "{count} 个事件，{errors} 个错误",
     "eventMarkerTooltip": "事件：{name}",
     "exceptionMarkerTooltip": "异常：{type}",
-    "spanEventFallback": "Span 事件"
+    "spanEventFallback": "Span 事件",
+    "spanNav": {
+      "firstSpan": "第一个 Span",
+      "lastSpan": "最后一个 Span",
+      "position": "Span {index}/{count}：{name}"
+    },
+    "rowNav": {
+      "tracePosition": "追踪 {row}/{count}，第 {page} 页",
+      "spanPosition": "Span {row}/{count}，第 {page} 页",
+      "firstResult": "第一个结果",
+      "lastResult": "最后一个结果",
+      "loadingPage": "正在加载第 {page} 页",
+      "pageFailed": "无法加载第 {page} 页",
+      "pageEmpty": "第 {page} 页没有结果"
+    }
   },
   "aiToolset": {
     "header": "AI 工具集",
@@ -15386,7 +15527,8 @@
       "selectStreamDesc": "浏览日志、追踪、指标和 RUM 数据流",
       "queryGuide": "阅读查询指南",
       "queryGuideDesc": "过滤器、SQL 模式、VRL 和保存的视图",
-      "recent": "最近："
+      "recent": "最近使用：",
+      "descriptionAutoRun": "选择一个数据流以查看其最新日志。结果返回后，您可以使用过滤器、VRL 函数和自定义时间范围进一步细化。"
     },
     "noEvents": {
       "title": "未找到事件",
@@ -15440,7 +15582,8 @@
       "fixErrorsAndRetry": "存在一些错误，请修复后重试"
     },
     "buildQueryPage": {
-      "validationErrors": "存在一些错误，请修复后重试"
+      "validationErrors": "存在一些错误，请修复后重试",
+      "parserLoadFailed": "无法加载查询解析器，因此无法将搜索过滤器添加到图表中。加载完成前，运行将暂停。"
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL查询：",
@@ -15642,6 +15785,45 @@
     },
     "logsNoEventsState": {
       "lastData": "最新数据：{formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "严重级别 {level}",
+      "srTextInferred": "严重级别 {level}，推断得出",
+      "inferredLabel": "{level} · 推断",
+      "popoverTitle": "严重级别：{level}",
+      "popoverAriaLabel": "严重级别依据",
+      "evidence": "依据",
+      "fromField": "来自字段 {field}",
+      "inferredFrom": "从 {field} 文本推断得出。",
+      "notSearchable": "不可搜索；直方图不使用它。",
+      "noLevelField": "此行没有级别字段，也没有可扫描的文本字段。",
+      "noLevelWordInField": "此行没有级别字段，{field} 中也没有级别词。",
+      "notInSelectedColumns": "级别字段不在所选列中",
+      "levels": {
+        "emergency": "紧急",
+        "alert": "告警",
+        "critical": "严重",
+        "error": "错误",
+        "warning": "警告",
+        "notice": "通知",
+        "info": "信息",
+        "debug": "调试",
+        "trace": "追踪",
+        "ok": "正常",
+        "unknown": "未知"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "自动刷新已开启；请关闭后再切换页面",
+      "position": "第 {row} 条日志，共 {count} 条，第 {page} 页",
+      "positionLabel": "第 {row} 条日志，共 {count} 条 · 第 {page} 页",
+      "loadingPage": "正在加载第 {page} 页…",
+      "loadingPageAnnouncement": "正在加载第 {page} 页",
+      "resultsChanged": "结果已变化",
+      "notInPage": "不在当前页",
+      "loadingResults": "正在加载结果…",
+      "previousLog": "上一条日志",
+      "nextLog": "下一条日志"
     }
   },
   "queryError": {
@@ -15676,7 +15858,10 @@
     "traceId": "追踪编号：",
     "askAi": "让 AI 修复我的查询",
     "showDetail": "显示详情",
-    "hideDetail": "隐藏细节"
+    "hideDetail": "隐藏细节",
+    "runAs": "运行身份",
+    "searchTextFor": "搜索文本“{text}”",
+    "searchTextDesc": "将整个输入作为短语进行搜索"
   },
   "refreshButton": {
     "justNow": "刚才",
@@ -17577,7 +17762,17 @@
       "oncallResolve": "解决",
       "downtimesCreate": "新建停机",
       "downtimesRefresh": "刷新停机",
-      "functionsImport": "导入函数"
+      "functionsImport": "导入函数",
+      "logsNextRow": "下一条日志（打开详情）",
+      "logsPrevRow": "上一条日志（打开详情）",
+      "logsRowFocusMove": "在行之间移动焦点",
+      "logsRowOpen": "打开聚焦的行",
+      "logsDetailClose": "关闭详情并返回该行",
+      "tracesNextRow": "选择下一条追踪",
+      "tracesPrevRow": "选择上一条追踪",
+      "tracesRowOpen": "打开选中的追踪",
+      "traceNextVisibleSpan": "下一个可见 Span",
+      "tracePrevVisibleSpan": "上一个可见 Span"
     }
   },
   "components": {
@@ -17950,7 +18145,13 @@
         "debug": "调试",
         "info": "信息",
         "warn": "警告",
-        "fatal": "致命"
+        "fatal": "致命",
+        "emergency": "紧急",
+        "alert": "告警",
+        "critical": "严重",
+        "notice": "注意",
+        "ok": "OK",
+        "unknown": "未知"
       },
       "pipelineRunOutcome": {
         "firing": "触发中",

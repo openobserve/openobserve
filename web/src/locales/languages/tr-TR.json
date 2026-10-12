@@ -566,6 +566,12 @@
       "description": "Bir kesinti; uyarıların, anomali algılamalarının ve sentetik kontrollerin çalışmaya devam etmesini sağlar ve planladığınız bir zaman aralığı boyunca bildirimlerini durdurur.",
       "action": "Kesinti planla",
       "actionDesc": "Tek seferlik, günlük veya haftalık. Hızlıca sessize almak için uyarı listesindeki Sessize Al seçeneğini kullanın."
+    },
+    "searchCancelled": {
+      "title": "Arama iptal edildi",
+      "description": "Hiçbir sonuç yüklenmedi. Olayları yüklemek için sorguyu çalıştırın.",
+      "action": "Sorguyu çalıştır",
+      "actionDesc": "Aynı sorguyu tekrar çalıştır"
     }
   },
   "common": {
@@ -1277,7 +1283,126 @@
     "aliasNotAllowed": "Takma ad '{alias}' izin verilmiyor.",
     "commonGroupFields": "Ortak Grup Alanları",
     "queryRangeHours": "{count} saat | {count} saat",
-    "menuGroupAlerts": "Uyarılar"
+    "menuGroupAlerts": "Uyarılar",
+    "runQueryPendingLabel": "Sorguyu çalıştır, değişiklikler henüz uygulanmadı",
+    "queryActions": {
+      "runEditedFirst": "Önce düzenlediğiniz sorguyu çalıştırın",
+      "runFirst": "Önce sorgunuzu çalıştırın",
+      "usesEditedQuery": "Düzenlediğiniz sorguyu kullanır (henüz çalıştırılmadı)",
+      "usesUnrunQuery": "Sorgunuzu kullanır (henüz çalıştırılmadı)",
+      "downloadsShownResults": "Düzenlemenizi değil, gösterilen sonuçları indirir",
+      "downloadsLastRun": "Düzenlemenizi değil, en son çalıştırılan sorguyu kullanır"
+    },
+    "noFtsRecovery": {
+      "title": "{stream} için tam metin arama alanları yapılandırılmamış",
+      "description": "Alan değerlerini arayın veya bu zaman aralığındaki günlükleri görmek için tüm sorguyu temizleyin.",
+      "searchField": "Belirli bir alanda ara",
+      "searchFieldHint": "Hariç tutulan sözcükleri koruyarak arama için bir alan seçin.",
+      "clearRun": "Bu arama olmadan günlükleri göster",
+      "clearRunHint": "Tüm sorguyu temizleyin ve aynı zaman aralığında çalıştırın.",
+      "editPermission": "Akış ayarlarını düzenlemek için izniniz olmalı.",
+      "scope": "{stream} akışını geçerli zaman aralığında arayın.",
+      "singleStreamScope": "Yalnızca {stream} arayın; {otherStreams} seçimi kaldırılacak.",
+      "stream": "Akış",
+      "field": "Alan",
+      "match": "Eşleşme",
+      "value": "Değer",
+      "contains": "Metin içerir",
+      "equals": "Eşittir",
+      "preview": "Filtre önizlemesi",
+      "replacement": "Bu, tüm sorguyu bir alan filtresiyle değiştirir ve hariç tutulan sözcükleri korur. Tam metin alanı gerekmez.",
+      "run": "Alan aramasını çalıştır",
+      "close": "Alan aramasını kapat",
+      "skipped": "{stream} atlandı çünkü yapılandırılmış tam metin arama alanı yok.",
+      "resultsScope": "Bu sonuçlar yalnızca {streams} akışlarından geliyor.",
+      "noFields": "Bu akışta alan araması için kullanılabilir alan yok.",
+      "valueRequired": "Aramak için bir değer girin.",
+      "fieldRequired": "Aramak için bir alan seçin.",
+      "invalidValue": "Bu alan için geçerli bir değer girin.",
+      "configureHint": "Bu akış için tam metin aramasını hızlandırır."
+    },
+    "autoRunPersistNeedsRun": "Önce sorguyu çalıştırın: bu işlem çalıştırdığınızı kaydeder veya paylaşır",
+    "autoRunSearchAroundActive": "Bir satırın etrafındaki kayıtlar gösteriliyor: sonuçlara dönmek için sorguyu çalıştırın",
+    "autoRunStaleTooltip": "Sonuçları güncellemek için sorguyu çalıştırın",
+    "searchCancelledNotice": "Arama iptal edildi.",
+    "linePermalink": {
+      "disabledFunction": "Tek bir satırı bağlamak için fonksiyonu kapatın",
+      "disabledTimestampRewrite": "Bu sorgu zaman damgasını yeniden yazar",
+      "disabledNotSingleLines": "Bu sorgudan gelen satırlar tek günlük satırları değil",
+      "disabledNoTimestamp": "Bu satırın zaman damgası yok",
+      "disabledEnrichmentTable": "Zenginleştirme tablosu satırları bağlanamaz",
+      "toastNotUnique": "Zaman damgasına bir bağlantı kopyalandı; bu satır benzersiz şekilde tanımlanamadı.",
+      "toastWideStream": "Bu akış tek bir satırı tam olarak bağlamak için çok geniş; zaman damgasına bir bağlantı kopyalandı",
+      "bannerInvalid": "Bu bağlantı hatalı biçimlendirilmiş; yalnızca paylaşılan arama gösteriliyor",
+      "bannerDenied": "{stream} akışına erişiminiz yok.",
+      "bannerStreamMissing": "{stream} akışı artık mevcut değil",
+      "bannerError": "Paylaşılan günlük satırı yüklenemedi.",
+      "bannerIncomplete": "Bu zaman damgasındaki her satır aranamadı",
+      "bannerGone": "Bu günlük satırı artık kullanılamıyor. Akışın saklama süresi geçmiş veya silinmiş olabilir.",
+      "bannerGoneRetention": "Bu günlük satırı artık kullanılamıyor. Akışın saklama süresi ({days} gün) geçmiş veya silinmiş olabilir. | Bu günlük satırı artık kullanılamıyor. Akışın saklama süresi ({days} gün) geçmiş veya silinmiş olabilir.",
+      "bannerFound": "Paylaşılan bir günlük satırı gösteriliyor",
+      "bannerAmbiguous": "Bu zaman damgasında {count} satır var; tam satır belirlenemedi | Bu zaman damgasında {count} satır var; tam satır belirlenemedi",
+      "bannerChanged": "Bağlantı oluşturulduğundan beri satır değişmiş olabilir",
+      "actionShowLines": "Bu satırları göster",
+      "actionShowInContext": "Bağlamda göster",
+      "bannerAmbiguousTieHeavy": "Bu zaman damgasını {count} satır paylaşıyor ve akışta _o2_id yok, bu nedenle tam satır belirlenemedi. O zaman damgasındaki satırlar vurgulanır. | Bu zaman damgasını {count} satır paylaşıyor ve akışta _o2_id yok, bu nedenle tam satır belirlenemedi. O zaman damgasındaki satırlar vurgulanır.",
+      "bannerDismiss": "Kapat",
+      "copyLink": "Bağlantıyı kopyala",
+      "copyLinkTooltip": "Bu günlük satırına bir bağlantı kopyala",
+      "copyLinkMenu": "Bu günlük satırına bağlantı kopyala",
+      "toastCopied": "Günlük satırına bağlantı kopyalandı",
+      "toastCopiedValid": "Günlük satırına bağlantı kopyalandı · {days} gün geçerli | Günlük satırına bağlantı kopyalandı · {days} gün geçerli",
+      "toastLookupFailed": "Bu satır aranamadı; zaman damgasına bir bağlantı kopyalandı",
+      "toastShortFailed": "Bağlantı kısaltılamadı; bunun yerine tam bağlantı kopyalandı",
+      "toastFailed": "Bu günlük satırına bağlantı oluşturulamadı",
+      "toastScopeChanged": "Bağlantı oluşturulurken organizasyon veya akış değişti; hiçbir şey kopyalanmadı",
+      "popoverTitle": "Bu günlük satırına bağlantı",
+      "popoverDesc": "Tarayıcınız otomatik kopyalamayı engelledi. Bağlantıyı seçip kopyalayın veya düğmeyi kullanın.",
+      "pageNotice": "Bu bağlantı {page}. sayfadaydı.",
+      "pageGo": "{page}. sayfaya git",
+      "pageGoLast": "Son sayfaya git ({page})"
+    },
+    "autoRunPendingDot": "En son değişiklikleri uygulamak için sorguyu çalıştır",
+    "autoRunAppliesTo": "Günlükler ve İzler için geçerlidir",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "Bu arama yaklaşık {size} tarayacak",
+    "autoRunGuardLinkTitle": "Bu bağlantı yaklaşık {size} tarayacak",
+    "autoRunGuardDescAutoRun": "{scope}. Önce daraltabilmeniz için Otomatik Çalıştırma duraklatıldı.",
+    "autoRunGuardDescPaused": "{scope}. Önce daraltabilmeniz için duraklatıldı.",
+    "autoRunGuardDescLink": "Bir bağlantıdan açıldı · {scope}. Kapsamı gözden geçirin, ardından çalıştırın.",
+    "autoRunGuardHint": "Filtre ve zaman değişikliklerini elle uygulamak için Otomatik Çalıştırmayı kapatın.",
+    "autoRunGuardUnknownTitle": "Bu pencere için boyut bilinmiyor",
+    "autoRunGuardUnknownDesc": "{streams} için henüz boyut istatistiği yok, bu nedenle Otomatik Çalıştırma yalnızca 1 saat veya daha kısa pencereleri çalıştırır.",
+    "autoRunGuardUnknownManyDesc": "{count} akış için henüz boyut istatistiği yok, bu nedenle Otomatik Çalıştırma sizi bekler. {scope}. | {count} akış için henüz boyut istatistiği yok, bu nedenle Otomatik Çalıştırma sizi bekler. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Bölgeler arası çalıştırmaya hazır",
+    "autoRunGuardSuperClusterDesc": "Çok bölgeli bir kümede arama boyutu henüz tahmin edilemiyor, bu nedenle Otomatik Çalıştırma sizi bekler. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Akış kullanılamıyor",
+    "autoRunGuardUnresolvedDesc": "{streams} akışı mevcut değil veya erişiminiz yok.",
+    "autoRunGuardBanner": "Bu değişiklik yaklaşık {size} ({scope}) tarayacak, bu nedenle Otomatik Çalıştırma duraklatıldı. Aşağıdaki sonuçlar önceki sorgudan.",
+    "autoRunGuardBannerPaused": "Bu değişiklik yaklaşık {size} ({scope}) tarayacak, bu nedenle duraklatıldı. Aşağıdaki sonuçlar önceki sorgudan.",
+    "autoRunGuardBannerUnknown": "Bu pencere için boyut bilinmiyor ({scope}), bu nedenle duraklatıldı. Aşağıdaki sonuçlar önceki sorgudan.",
+    "autoRunGuardBannerRefresh": "Otomatik yenileme her yenilemede yaklaşık {size} ({scope}) tarayacak, bu nedenle bunu bir kez çalıştırana kadar duraklatıldı. Aşağıdaki sonuçlar önceki sorgudan.",
+    "autoRunGuardRunAnyway": "Yine de çalıştır",
+    "autoRunGuardRunQuery": "Sorguyu çalıştır",
+    "autoRunGuardNarrow": "{period} olarak daralt",
+    "autoRunGuardNarrowWithSize": "{period} aralığına daralt (~{size})",
+    "autoRunGuardSearchJob": "Arama işi olarak çalıştır",
+    "autoRunGuardSelectStream": "Bir akış seçin",
+    "searchJobNoPermission": "Arama işi oluşturma izniniz yok",
+    "missingStreamAndNoFts": "\"{missingStreams}\" içinde bir veya daha fazla filtre alanı mevcut değil, bu nedenle belirtilen akışta arama yapılmaz.\n Aranmadı: {noFtsStreams} (tam metin alanı yok).",
+    "freeTextChooseFirst": "Önce metnin nasıl aranacağını seçin",
+    "freeTextScanLogsOnly": "Tarama modu yalnızca günlükler görünümünde çalışır; burada metin araması kullanmak için bir tam metin alanı ayarlayın",
+    "freeTextSearchedFields": "Tam metin araması: {fields} (tüm kelimeler, herhangi bir sırayla)",
+    "freeTextPreview": "Tam metin araması: {fields} (tüm kelimeler, herhangi bir sırayla)\n\n{sql} olarak çalışır",
+    "freeTextRunsAs": "{sql} olarak çalışır",
+    "freeTextNotSearched": "Aranmadı: {streams} (tam metin alanı yok).",
+    "freeTextSetField": "Tam metin arama alanlarını yapılandır",
+    "freeTextNoFtsTitle": "\"{stream}\" için tam metin alanı yok",
+    "freeTextNoFtsTitleMulti": "Seçilen akışlarda tam metin alanı yok",
+    "freeTextNoTextFields": "Bu akışta aranacak metin alanı yok.",
+    "freeTextNoTextFieldsNamed": "Aranmadı: {streams} (metin alanı yok).",
+    "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin."
   },
   "menu": {
     "upgradeToProPlan": "PRO Planına Yükselt",
@@ -9061,7 +9186,9 @@
         "dbmLockSampling": "Kilit etkinliği aralıklarla örneklenir, bu nedenle iki örnek arasında başlayıp sona eren çekişme asla kaydedilmedi. Sessiz bir uyarı, engelleme olmadığının kanıtı değildir.",
         "dbmNoInstance": "Tek bir veritabanı örneği tanımlanmadı, bu nedenle bu uyarı bu motorun her örneğini izler.",
         "rumFunnelSnapshot": "Bu uyarı, huninin SQL'inin bir kopyasını tutar. Hunide veya adlandırılmış olaylarında sonradan yapılan düzenlemeler bunu değiştirmez.",
-        "rumFunnelSteps": "Bir huninin dönüşüm üzerine uyarı verebilmesi için en az iki adıma ihtiyacı vardır."
+        "rumFunnelSteps": "Bir huninin dönüşüm üzerine uyarı verebilmesi için en az iki adıma ihtiyacı vardır.",
+        "textFilterDropped": "Arama filtreniz taşınamadı çünkü bu akışta tam metin arama (FTS) alanı yok. Gerekirse uyarı sorgusuna ekleyin.",
+        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin."
       }
     },
     "saveFailed": "Uyarı kaydedilemedi.",
@@ -12149,7 +12276,21 @@
     "eventClusterAriaLabelPlural": "{count} olay, {errors} hata",
     "eventMarkerTooltip": "Olay: {name}",
     "exceptionMarkerTooltip": "İstisna: {type}",
-    "spanEventFallback": "span olayı"
+    "spanEventFallback": "span olayı",
+    "spanNav": {
+      "firstSpan": "İlk span",
+      "lastSpan": "Son span",
+      "position": "Span {index} / {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "İz {row} / {count}, sayfa {page}",
+      "spanPosition": "Span {row} / {count}, sayfa {page}",
+      "firstResult": "İlk sonuç",
+      "lastResult": "Son sonuç",
+      "loadingPage": "Sayfa {page} yükleniyor",
+      "pageFailed": "Sayfa {page} yüklenemedi",
+      "pageEmpty": "Sayfa {page} sonuç içermiyor"
+    }
   },
   "aiToolset": {
     "header": "Yapay Zeka Araç Setleri",
@@ -15386,7 +15527,8 @@
       "selectStreamDesc": "Günlükler, trace'ler, metrikler ve Gerçek Kullanıcı İzleme stream'lerine göz atın",
       "queryGuide": "Sorgu kılavuzunu okuyun",
       "queryGuideDesc": "Filtreler, SQL modu, VRL ve kaydedilmiş görünümler",
-      "recent": "En son:"
+      "recent": "Son kullanılan:",
+      "descriptionAutoRun": "En son günlüklerini görmek için bir akış seçin. Sonuçlar geldikten sonra filtreler, bir VRL işlevi ve özel bir zaman aralığı ile daraltabilirsiniz."
     },
     "noEvents": {
       "title": "Olay bulunamadı",
@@ -15440,7 +15582,8 @@
       "fixErrorsAndRetry": "Bazı hatalar var, lütfen düzeltip tekrar deneyin."
     },
     "buildQueryPage": {
-      "validationErrors": "Bazı hatalar var, lütfen düzeltip tekrar deneyin."
+      "validationErrors": "Bazı hatalar var, lütfen düzeltip tekrar deneyin.",
+      "parserLoadFailed": "Sorgu ayrıştırıcısı yüklenemedi, bu nedenle arama filtresi grafiğe eklenemiyor. Yüklenene kadar çalıştırmalar duraklatıldı."
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL Sorgusu :",
@@ -15642,6 +15785,45 @@
     },
     "logsNoEventsState": {
       "lastData": "Son veri: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "Önem derecesi {level}",
+      "srTextInferred": "Önem derecesi {level}, tahmin edildi",
+      "inferredLabel": "{level} · tahmin edildi",
+      "popoverTitle": "Önem derecesi: {level}",
+      "popoverAriaLabel": "Önem derecesi kanıtı",
+      "evidence": "Kanıt",
+      "fromField": "{field} alanından",
+      "inferredFrom": "{field} metninden tahmin edildi.",
+      "notSearchable": "Aranamaz; histogram bunu kullanmaz.",
+      "noLevelField": "Bu satırda düzey alanı yok ve taranacak metin alanı da yok.",
+      "noLevelWordInField": "Bu satırda düzey alanı yok ve {field} içinde düzey sözcüğü yok.",
+      "notInSelectedColumns": "Düzey alanı seçili sütunlarda değil",
+      "levels": {
+        "emergency": "acil durum",
+        "alert": "alarm",
+        "critical": "kritik",
+        "error": "hata",
+        "warning": "uyarı",
+        "notice": "bildirim",
+        "info": "bilgi",
+        "debug": "hata ayıklama",
+        "trace": "iz",
+        "ok": "Tamam",
+        "unknown": "Bilinmiyor"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "Otomatik yenileme açık; sayfaları değiştirmek için kapatın",
+      "position": "Günlük {row}/{count}, sayfa {page}",
+      "positionLabel": "Günlük {row}/{count} · Sayfa {page}",
+      "loadingPage": "Sayfa {page} yükleniyor…",
+      "loadingPageAnnouncement": "Sayfa {page} yükleniyor",
+      "resultsChanged": "Sonuçlar değişti",
+      "notInPage": "Geçerli sayfada değil",
+      "loadingResults": "Sonuçlar yükleniyor…",
+      "previousLog": "Önceki günlük",
+      "nextLog": "Sonraki günlük"
     }
   },
   "queryError": {
@@ -15676,7 +15858,10 @@
     "traceId": "Trace ID:",
     "askAi": "AI'dan sorgumu düzeltmesini isteyin",
     "showDetail": "Ayrıntıları göster",
-    "hideDetail": "Ayrıntıları gizle"
+    "hideDetail": "Ayrıntıları gizle",
+    "runAs": "Şu olarak çalıştır",
+    "searchTextFor": "\"{text}\" için metin ara",
+    "searchTextDesc": "Tüm girdiyi tek bir ifade olarak ara"
   },
   "refreshButton": {
     "justNow": "Hemen şimdi",
@@ -17577,7 +17762,17 @@
       "oncallResolve": "Çöz",
       "downtimesCreate": "Yeni kesinti",
       "downtimesRefresh": "Kesintileri yenile",
-      "functionsImport": "Fonksiyonu içe aktar"
+      "functionsImport": "Fonksiyonu içe aktar",
+      "logsNextRow": "Sonraki günlük (ayrıntıları açar)",
+      "logsPrevRow": "Önceki günlük (ayrıntıları açar)",
+      "logsRowFocusMove": "Satırlar arasında odağı taşı",
+      "logsRowOpen": "Odaklanan satırı aç",
+      "logsDetailClose": "Ayrıntıları kapat ve satıra dön",
+      "tracesNextRow": "Sonraki izi seç",
+      "tracesPrevRow": "Önceki izi seç",
+      "tracesRowOpen": "Seçili izi aç",
+      "traceNextVisibleSpan": "Sonraki görünür Span",
+      "tracePrevVisibleSpan": "Önceki görünür Span"
     }
   },
   "components": {
@@ -17950,7 +18145,13 @@
         "debug": "Hata Ayıklama",
         "info": "Bilgi",
         "warn": "UYARI",
-        "fatal": "Ölümcül"
+        "fatal": "Ölümcül",
+        "emergency": "Acil",
+        "alert": "Uyarı",
+        "critical": "Kritik",
+        "notice": "Bildirim",
+        "ok": "Tamam",
+        "unknown": "Bilinmiyor"
       },
       "pipelineRunOutcome": {
         "firing": "Tetiklendi",

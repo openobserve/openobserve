@@ -566,6 +566,12 @@
       "description": "다운타임은 알림, 이상 탐지, Synthetics 검사가 계속 실행되도록 유지하면서 예약한 시간 동안 해당 알림 전송을 중지합니다.",
       "action": "다운타임 예약",
       "actionDesc": "일회성, 매일 또는 매주. 빠르게 음소거하려면 알림 목록에서 음소거를 사용하세요."
+    },
+    "searchCancelled": {
+      "title": "검색 취소됨",
+      "description": "결과가 로드되지 않았습니다. 쿼리를 실행하여 이벤트를 로드하세요.",
+      "action": "쿼리 실행",
+      "actionDesc": "동일한 쿼리를 다시 실행"
     }
   },
   "common": {
@@ -1277,7 +1283,126 @@
     "aliasNotAllowed": "별칭 '{alias}'은(는) 허용되지 않습니다.",
     "commonGroupFields": "공통 그룹 필드",
     "queryRangeHours": "{count}시간 | {count}시간",
-    "menuGroupAlerts": "알림"
+    "menuGroupAlerts": "알림",
+    "runQueryPendingLabel": "쿼리 실행, 변경 사항이 아직 적용되지 않음",
+    "queryActions": {
+      "runEditedFirst": "먼저 수정한 쿼리를 실행하세요",
+      "runFirst": "먼저 쿼리를 실행하세요",
+      "usesEditedQuery": "수정한 쿼리를 사용합니다 (아직 실행되지 않음)",
+      "usesUnrunQuery": "쿼리를 사용합니다 (아직 실행되지 않음)",
+      "downloadsShownResults": "수정 사항이 아닌 표시된 결과를 다운로드합니다",
+      "downloadsLastRun": "수정 사항이 아닌 마지막으로 실행된 쿼리를 사용합니다"
+    },
+    "noFtsRecovery": {
+      "title": "{stream}에 전체 텍스트 검색 필드가 구성되어 있지 않습니다",
+      "description": "필드 값을 검색하거나 전체 쿼리를 지워 이 시간 범위의 로그를 확인하세요.",
+      "searchField": "특정 필드 검색",
+      "searchFieldHint": "제외 단어를 유지하면서 검색할 필드를 선택하세요.",
+      "clearRun": "이 검색 없이 로그 표시",
+      "clearRunHint": "전체 쿼리를 지우고 동일한 시간 범위에서 실행합니다.",
+      "editPermission": "스트림 설정을 편집할 권한이 필요합니다.",
+      "scope": "현재 시간 범위에서 {stream}을 검색합니다.",
+      "singleStreamScope": "{stream}만 검색하며, {otherStreams} 선택이 해제됩니다.",
+      "stream": "스트림",
+      "field": "필드",
+      "match": "일치",
+      "value": "값",
+      "contains": "텍스트 포함",
+      "equals": "같음",
+      "preview": "필터 미리보기",
+      "replacement": "전체 쿼리를 필드 필터로 대체하며 제외 단어는 유지됩니다. 전체 텍스트 필드는 필요하지 않습니다.",
+      "run": "필드 검색 실행",
+      "close": "필드 검색 닫기",
+      "skipped": "{stream}에 전체 텍스트 검색 필드가 구성되어 있지 않아 건너뛰었습니다.",
+      "resultsScope": "이 결과는 {streams}에서만 가져온 것입니다.",
+      "noFields": "이 스트림에는 필드 검색에 사용할 수 있는 필드가 없습니다.",
+      "valueRequired": "검색할 값을 입력하세요.",
+      "fieldRequired": "검색할 필드를 선택하세요.",
+      "invalidValue": "이 필드에 유효한 값을 입력하세요.",
+      "configureHint": "이 스트림의 전체 텍스트 검색을 빠르게 합니다."
+    },
+    "autoRunPersistNeedsRun": "먼저 쿼리를 실행하세요: 이 작업은 실행한 내용을 저장하거나 공유합니다",
+    "autoRunSearchAroundActive": "특정 라인 주변의 레코드를 표시 중입니다: 쿼리를 실행하여 결과로 돌아가세요",
+    "autoRunStaleTooltip": "쿼리를 실행하여 결과를 업데이트하세요",
+    "searchCancelledNotice": "검색이 취소되었습니다.",
+    "linePermalink": {
+      "disabledFunction": "단일 라인을 링크하려면 함수를 끄세요",
+      "disabledTimestampRewrite": "이 쿼리는 타임스탬프를 재작성합니다",
+      "disabledNotSingleLines": "이 쿼리의 행은 단일 로그 라인이 아닙니다",
+      "disabledNoTimestamp": "이 행에는 타임스탬프가 없습니다",
+      "disabledEnrichmentTable": "보강 테이블 행은 링크할 수 없습니다",
+      "toastNotUnique": "타임스탬프 링크를 복사했습니다. 이 라인은 고유하게 식별할 수 없습니다.",
+      "toastWideStream": "이 스트림은 너무 넓어 하나의 라인을 정확히 링크할 수 없습니다. 타임스탬프 링크를 복사했습니다",
+      "bannerInvalid": "이 링크가 잘못되었습니다. 공유된 검색만 표시합니다",
+      "bannerDenied": "{stream} 스트림에 대한 액세스 권한이 없습니다.",
+      "bannerStreamMissing": "스트림 {stream}이(가) 더 이상 존재하지 않습니다",
+      "bannerError": "공유된 로그 라인을 불러올 수 없습니다.",
+      "bannerIncomplete": "이 타임스탬프의 모든 라인을 검색할 수 없습니다",
+      "bannerGone": "이 로그 라인은 더 이상 사용할 수 없습니다. 스트림 보존 기간이 지났거나 삭제되었을 수 있습니다.",
+      "bannerGoneRetention": "이 로그 라인은 더 이상 사용할 수 없습니다. 스트림 보존 기간({days}일)이 지났거나 삭제되었을 수 있습니다. | 이 로그 라인은 더 이상 사용할 수 없습니다. 스트림 보존 기간({days}일)이 지났거나 삭제되었을 수 있습니다.",
+      "bannerFound": "공유된 로그 라인을 표시하는 중",
+      "bannerAmbiguous": "이 타임스탬프에 {count}개의 라인이 있으며 정확한 라인을 식별할 수 없습니다 | 이 타임스탬프에 {count}개의 라인이 있으며 정확한 라인을 식별할 수 없습니다",
+      "bannerChanged": "링크가 생성된 이후 라인이 변경되었을 수 있습니다",
+      "actionShowLines": "이 라인들 표시",
+      "actionShowInContext": "컨텍스트에서 표시",
+      "bannerAmbiguousTieHeavy": "이 타임스탬프를 공유하는 라인이 {count}개 있고 스트림에 _o2_id가 없어 정확한 라인을 식별할 수 없습니다. 해당 타임스탬프의 라인이 강조 표시됩니다. | 이 타임스탬프를 공유하는 라인이 {count}개 있고 스트림에 _o2_id가 없어 정확한 라인을 식별할 수 없습니다. 해당 타임스탬프의 라인이 강조 표시됩니다.",
+      "bannerDismiss": "닫기",
+      "copyLink": "링크 복사",
+      "copyLinkTooltip": "이 로그 라인에 대한 링크 복사",
+      "copyLinkMenu": "이 로그 라인 링크 복사",
+      "toastCopied": "로그 라인 링크가 복사되었습니다",
+      "toastCopiedValid": "로그 라인 링크가 복사되었습니다 · {days}일 동안 유효 | 로그 라인 링크가 복사되었습니다 · {days}일 동안 유효",
+      "toastLookupFailed": "이 라인을 조회할 수 없어 타임스탬프에 대한 링크를 복사했습니다",
+      "toastShortFailed": "링크를 단축할 수 없어 전체 링크를 대신 복사했습니다",
+      "toastFailed": "이 로그 라인에 대한 링크를 만들 수 없습니다",
+      "toastScopeChanged": "링크를 생성하는 동안 조직 또는 스트림이 변경되어 아무것도 복사되지 않았습니다",
+      "popoverTitle": "이 로그 라인에 대한 링크",
+      "popoverDesc": "브라우저가 자동 복사를 차단했습니다. 링크를 선택하여 복사하거나 버튼을 사용하세요.",
+      "pageNotice": "이 링크는 페이지 {page}에 있었습니다.",
+      "pageGo": "페이지 {page}(으)로 이동",
+      "pageGoLast": "마지막 페이지({page})(으)로 이동"
+    },
+    "autoRunPendingDot": "최신 변경 사항을 적용하려면 쿼리 실행",
+    "autoRunAppliesTo": "로그와 트레이스에 적용됩니다",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "이 검색은 약 {size}을(를) 스캔합니다",
+    "autoRunGuardLinkTitle": "이 링크는 약 {size}을(를) 스캔합니다",
+    "autoRunGuardDescAutoRun": "{scope}. 먼저 범위를 좁힐 수 있도록 자동 실행이 일시 중지되었습니다.",
+    "autoRunGuardDescPaused": "{scope}. 먼저 범위를 좁힐 수 있도록 일시 중지되었습니다.",
+    "autoRunGuardDescLink": "링크에서 열림 · {scope}. 범위를 확인한 후 실행하세요.",
+    "autoRunGuardHint": "필터 및 시간 변경을 수동으로 적용하려면 자동 실행을 끄세요.",
+    "autoRunGuardUnknownTitle": "이 기간의 크기를 알 수 없습니다",
+    "autoRunGuardUnknownDesc": "{streams}에 아직 크기 통계가 없어 자동 실행은 1시간 이하의 기간만 실행합니다.",
+    "autoRunGuardUnknownManyDesc": "{count}개의 스트림에 아직 크기 통계가 없어 자동 실행이 대기합니다. {scope}. | {count}개의 스트림에 아직 크기 통계가 없어 자동 실행이 대기합니다. {scope}.",
+    "autoRunGuardSuperClusterTitle": "여러 리전에서 실행할 준비가 되었습니다",
+    "autoRunGuardSuperClusterDesc": "다중 리전 클러스터에서는 아직 검색 크기를 추정할 수 없어 자동 실행이 대기합니다. {scope}.",
+    "autoRunGuardUnresolvedTitle": "스트림을 사용할 수 없음",
+    "autoRunGuardUnresolvedDesc": "스트림 {streams}이(가) 존재하지 않거나 액세스 권한이 없습니다.",
+    "autoRunGuardBanner": "이 변경은 약 {size}({scope})을(를) 스캔하므로 자동 실행이 일시 중지되었습니다. 아래 결과는 이전 쿼리의 결과입니다.",
+    "autoRunGuardBannerPaused": "이 변경은 약 {size}({scope})을(를) 스캔하므로 일시 중지되었습니다. 아래 결과는 이전 쿼리의 결과입니다.",
+    "autoRunGuardBannerUnknown": "이 기간({scope})의 크기를 알 수 없어 일시 중지되었습니다. 아래 결과는 이전 쿼리의 결과입니다.",
+    "autoRunGuardBannerRefresh": "자동 새로 고침은 새로 고침할 때마다 약 {size}({scope})을(를) 스캔하므로 한 번 실행할 때까지 일시 중지됩니다. 아래 결과는 이전 쿼리의 결과입니다.",
+    "autoRunGuardRunAnyway": "그래도 실행",
+    "autoRunGuardRunQuery": "쿼리 실행",
+    "autoRunGuardNarrow": "{period}(으)로 좁히기",
+    "autoRunGuardNarrowWithSize": "{period}(으)로 좁히기 (~{size})",
+    "autoRunGuardSearchJob": "검색 작업으로 실행",
+    "autoRunGuardSelectStream": "스트림 선택",
+    "searchJobNoPermission": "검색 작업을 생성할 권한이 없습니다",
+    "missingStreamAndNoFts": "하나 이상의 필터 필드가 \"{missingStreams}\"에 존재하지 않으므로 해당 스트림에서는 검색이 수행되지 않습니다.\n 검색하지 않음: {noFtsStreams}(전체 텍스트 필드 없음).",
+    "freeTextChooseFirst": "먼저 텍스트 검색 방법을 선택하세요",
+    "freeTextScanLogsOnly": "스캔 모드는 로그 보기에서만 작동합니다. 여기에서 텍스트 검색을 사용하려면 전체 텍스트 필드를 설정하세요",
+    "freeTextSearchedFields": "전체 텍스트 검색 대상: {fields} (모든 단어, 순서 무관)",
+    "freeTextPreview": "전체 텍스트 검색 대상: {fields} (모든 단어, 순서 무관)\n\n{sql}(으)로 실행",
+    "freeTextRunsAs": "{sql}(으)로 실행",
+    "freeTextNotSearched": "검색하지 않음: {streams}(전체 텍스트 필드 없음).",
+    "freeTextSetField": "전체 텍스트 검색 필드 구성",
+    "freeTextNoFtsTitle": "\"{stream}\"에 전체 텍스트 필드가 없습니다",
+    "freeTextNoFtsTitleMulti": "선택한 스트림에 전체 텍스트 필드가 없습니다",
+    "freeTextNoTextFields": "이 스트림에는 검색할 텍스트 필드가 없습니다.",
+    "freeTextNoTextFieldsNamed": "검색하지 않음: {streams}(텍스트 필드 없음).",
+    "freeTextBuildNotice": "이 필터에는 텍스트 검색이 있습니다. SQL에서 편집하세요."
   },
   "menu": {
     "upgradeToProPlan": "PRO 플랜으로 업그레이드",
@@ -9061,7 +9186,9 @@
         "dbmLockSampling": "잠금 활동은 일정 간격으로 샘플링되므로 두 샘플 사이에 시작되고 해소된 경합은 기록되지 않습니다. 조용한 알림은 차단이 없었다는 증거가 아닙니다.",
         "dbmNoInstance": "단일 데이터베이스 인스턴스가 식별되지 않았으므로 이 알림은 이 엔진의 모든 인스턴스를 감시합니다.",
         "rumFunnelSnapshot": "이 알림은 퍼널의 SQL 사본을 유지합니다. 나중에 퍼널이나 명명된 이벤트를 편집해도 변경되지 않습니다.",
-        "rumFunnelSteps": "퍼널이 전환에 대해 알림을 보내려면 단계가 최소 두 개 필요합니다."
+        "rumFunnelSteps": "퍼널이 전환에 대해 알림을 보내려면 단계가 최소 두 개 필요합니다.",
+        "textFilterDropped": "이 스트림에 전체 텍스트 검색(FTS) 필드가 없어 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요.",
+        "heldFilterDropped": "로그 페이지에서 먼저 Run as를 선택해야 하므로 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요."
       }
     },
     "saveFailed": "경고를 저장할 수 없습니다.",
@@ -12149,7 +12276,21 @@
     "eventClusterAriaLabelPlural": "{count} 이벤트, {errors} 오류",
     "eventMarkerTooltip": "이벤트: {name}",
     "exceptionMarkerTooltip": "예외: {type}",
-    "spanEventFallback": "Span 이벤트"
+    "spanEventFallback": "Span 이벤트",
+    "spanNav": {
+      "firstSpan": "첫 번째 Span",
+      "lastSpan": "마지막 Span",
+      "position": "Span {index}/{count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "트레이스 {row}/{count}, 페이지 {page}",
+      "spanPosition": "Span {row}/{count}, 페이지 {page}",
+      "firstResult": "첫 번째 결과",
+      "lastResult": "마지막 결과",
+      "loadingPage": "페이지 {page} 로드 중",
+      "pageFailed": "페이지 {page}을(를) 로드할 수 없습니다",
+      "pageEmpty": "페이지 {page}에 결과가 없습니다"
+    }
   },
   "aiToolset": {
     "header": "AI 툴셋",
@@ -15386,7 +15527,8 @@
       "selectStreamDesc": "로그, 트레이스, 메트릭 및 실제 사용자 모니터링 스트림 찾아보기",
       "queryGuide": "쿼리 가이드 읽기",
       "queryGuideDesc": "필터, SQL 모드, VRL 및 저장된 뷰",
-      "recent": "최근:"
+      "recent": "최근 사용:",
+      "descriptionAutoRun": "스트림을 선택하면 최신 로그를 볼 수 있습니다. 결과가 들어오면 필터, VRL 함수, 사용자 지정 시간 범위로 세부 조정할 수 있습니다."
     },
     "noEvents": {
       "title": "이벤트 없음",
@@ -15440,7 +15582,8 @@
       "fixErrorsAndRetry": "오류가 있습니다. 수정 후 다시 시도하세요."
     },
     "buildQueryPage": {
-      "validationErrors": "오류가 있습니다. 수정 후 다시 시도하세요."
+      "validationErrors": "오류가 있습니다. 수정 후 다시 시도하세요.",
+      "parserLoadFailed": "쿼리 파서를 로드할 수 없어 검색 필터를 차트에 추가할 수 없습니다. 로드될 때까지 실행이 일시 중지됩니다."
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL 쿼리:",
@@ -15642,6 +15785,45 @@
     },
     "logsNoEventsState": {
       "lastData": "마지막 데이터: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "심각도 {level}",
+      "srTextInferred": "심각도 {level}, 추론됨",
+      "inferredLabel": "{level} · 추론됨",
+      "popoverTitle": "심각도: {level}",
+      "popoverAriaLabel": "심각도 근거",
+      "evidence": "근거",
+      "fromField": "필드 {field}에서",
+      "inferredFrom": "{field} 텍스트에서 추론되었습니다.",
+      "notSearchable": "검색할 수 없음. 히스토그램에서 사용하지 않습니다.",
+      "noLevelField": "이 행에 레벨 필드가 없고 스캔할 텍스트 필드도 없습니다.",
+      "noLevelWordInField": "이 행에 레벨 필드가 없고 {field}에 레벨 단어도 없습니다.",
+      "notInSelectedColumns": "레벨 필드가 선택한 열에 없습니다",
+      "levels": {
+        "emergency": "긴급",
+        "alert": "경보",
+        "critical": "치명적",
+        "error": "오류",
+        "warning": "경고",
+        "notice": "알림",
+        "info": "정보",
+        "debug": "디버그",
+        "trace": "트레이스",
+        "ok": "정상",
+        "unknown": "알 수 없음"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "자동 새로 고침이 켜져 있습니다. 페이지를 변경하려면 끄세요.",
+      "position": "로그 {row}/{count}, 페이지 {page}",
+      "positionLabel": "로그 {row}/{count} · 페이지 {page}",
+      "loadingPage": "페이지 {page} 로드 중…",
+      "loadingPageAnnouncement": "페이지 {page} 로드 중",
+      "resultsChanged": "결과가 변경되었습니다",
+      "notInPage": "현재 페이지에 없음",
+      "loadingResults": "결과 로드 중…",
+      "previousLog": "이전 로그",
+      "nextLog": "다음 로그"
     }
   },
   "queryError": {
@@ -15676,7 +15858,10 @@
     "traceId": "트레이스 ID:",
     "askAi": "AI에게 쿼리 수정 요청하기",
     "showDetail": "세부 정보 보기",
-    "hideDetail": "세부 정보 숨기기"
+    "hideDetail": "세부 정보 숨기기",
+    "runAs": "다른 사용자로 실행",
+    "searchTextFor": "\"{text}\"에 대한 텍스트 검색",
+    "searchTextDesc": "전체 입력을 하나의 구문으로 검색"
   },
   "refreshButton": {
     "justNow": "바로 지금",
@@ -17577,7 +17762,17 @@
       "oncallResolve": "해결",
       "downtimesCreate": "새 다운타임",
       "downtimesRefresh": "다운타임 새로고침",
-      "functionsImport": "함수 가져오기"
+      "functionsImport": "함수 가져오기",
+      "logsNextRow": "다음 로그(세부 정보 열기)",
+      "logsPrevRow": "이전 로그(세부 정보 열기)",
+      "logsRowFocusMove": "행 간에 포커스 이동",
+      "logsRowOpen": "포커스된 행 열기",
+      "logsDetailClose": "세부 정보를 닫고 해당 행으로 돌아가기",
+      "tracesNextRow": "다음 트레이스 선택",
+      "tracesPrevRow": "이전 트레이스 선택",
+      "tracesRowOpen": "선택한 트레이스 열기",
+      "traceNextVisibleSpan": "다음 표시된 Span",
+      "tracePrevVisibleSpan": "이전 표시된 Span"
     }
   },
   "components": {
@@ -17950,7 +18145,13 @@
         "debug": "디버그",
         "info": "정보",
         "warn": "경고",
-        "fatal": "치명적"
+        "fatal": "치명적",
+        "emergency": "긴급",
+        "alert": "경보",
+        "critical": "심각",
+        "notice": "주의",
+        "ok": "정상",
+        "unknown": "알 수 없음"
       },
       "pipelineRunOutcome": {
         "firing": "발화 중",

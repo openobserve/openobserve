@@ -355,7 +355,7 @@ import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
-import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import { resolveLogSeverity, severityIndicatorColor } from "@/utils/logs/statusParser";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -1190,8 +1190,8 @@ watch(
   { immediate: true },
 );
 
-const getCorrelatedRowStatusColor = (row: any): string | undefined =>
-  extractStatusFromLog(row)?.color;
+const getCorrelatedRowStatusColor = (row: any): string =>
+  severityIndicatorColor(resolveLogSeverity(row));
 
 // Row identity is the row's position in the current page, NOT its `_timestamp`:
 // a timestamp repeats across rows ingested in the same batch, and keying on it

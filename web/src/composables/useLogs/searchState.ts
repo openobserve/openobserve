@@ -18,6 +18,9 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { gt, raw, type I18nText } from "@/types/i18n";
 import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
+import { resetTransient } from "@/utils/logs/transientSearchKeys";
+import type { FreeTextBlocked, FreeTextDecorations } from "@/composables/useLogs/freeTextSearch";
+import type { PageLoad, PageRequest } from "@/utils/pageCrossing";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
@@ -138,6 +141,9 @@ export interface ResultGrid {
   columns: unknown[];
   colOrder: { [key: string]: string[] };
   colSizes: { [key: string]: unknown };
+  hitsSettled?: boolean;
+  pageRequest?: PageRequest | null;
+  pageLoad?: PageLoad | null;
 }
 
 export interface SearchAroundData {
@@ -154,7 +160,7 @@ export interface SearchObjectData {
   errorCode: number;
   countErrorMsg: string;
   filterErrMsg: string;
-  missingStreamMessage: string;
+  missingStreamMessage: I18nText;
   additionalErrorMsg?: string;
   savedViewFilterFields?: string;
   stream: StreamData;
@@ -203,6 +209,9 @@ export interface SearchObjectData {
     column?: number;
     error: string;
   }>;
+  freeTextBlocked?: FreeTextBlocked | null;
+  freeTextExcluded?: string[];
+  freeTextDecorations?: FreeTextDecorations | null;
 }
 
 export interface SearchObject {
@@ -310,6 +319,7 @@ export const searchState = () => {
           refreshInterval: 0,
         }),
       );
+      resetTransient(searchObj as unknown as Record<string, unknown>);
 
       // Initialize data with default histogram structure
       searchObj.data = JSON.parse(
@@ -340,6 +350,9 @@ export const searchState = () => {
       // Restore cached query results and histogram data
       searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
       searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
+      searchObj.data.resultGrid.pageRequest = null;
+      searchObj.data.resultGrid.pageLoad = null;
+      searchObj.data.resultGrid.hitsSettled = true;
       // Restore histogram — breakdownSeries was serialized as an entries array
       // (Map is not JSON-serializable), so reconstruct the Map here.
       const savedBreakdown = state.data.histogram.breakdownSeries;

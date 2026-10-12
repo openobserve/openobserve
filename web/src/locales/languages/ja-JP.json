@@ -566,6 +566,12 @@
       "description": "ダウンタイムは、指定した時間枠の間、アラート、異常検知、合成モニタリングチェックを実行したまま、それらの通知を停止します。",
       "action": "ダウンタイムをスケジュール",
       "actionDesc": "1 回限り、毎日、または毎週。すぐにミュートするには、アラート一覧の [ミュート] を使用します。"
+    },
+    "searchCancelled": {
+      "title": "検索がキャンセルされました",
+      "description": "結果が読み込まれていません。クエリを実行してイベントを読み込んでください。",
+      "action": "クエリを実行",
+      "actionDesc": "同じクエリをもう一度実行します"
     }
   },
   "common": {
@@ -1277,7 +1283,126 @@
     "aliasNotAllowed": "エイリアス '{alias}' は許可されていません。",
     "commonGroupFields": "共通グループフィールド",
     "queryRangeHours": "{count} 時間 | {count} 時間",
-    "menuGroupAlerts": "アラート"
+    "menuGroupAlerts": "アラート",
+    "runQueryPendingLabel": "クエリを実行、変更はまだ適用されていません",
+    "queryActions": {
+      "runEditedFirst": "先に編集したクエリを実行してください",
+      "runFirst": "先にクエリを実行してください",
+      "usesEditedQuery": "編集したクエリを使用します（まだ実行されていません）",
+      "usesUnrunQuery": "クエリを使用します（まだ実行されていません）",
+      "downloadsShownResults": "表示中の結果をダウンロードします（編集内容ではありません）",
+      "downloadsLastRun": "最後に実行したクエリを使用します（編集内容ではありません）"
+    },
+    "noFtsRecovery": {
+      "title": "{stream} に全文検索フィールドが設定されていません",
+      "description": "フィールド値を検索するか、クエリ全体をクリアしてこの時間範囲のログを表示してください。",
+      "searchField": "特定のフィールドを検索",
+      "searchFieldHint": "除外語を保持したまま、検索するフィールドを選択します。",
+      "clearRun": "この検索なしでログを表示",
+      "clearRunHint": "クエリ全体をクリアし、同じ時間範囲で実行します。",
+      "editPermission": "ストリーム設定を編集する権限が必要です。",
+      "scope": "現在の時間範囲で {stream} を検索します。",
+      "singleStreamScope": "{stream} のみを検索します。{otherStreams} は選択解除されます。",
+      "stream": "ストリーム",
+      "field": "フィールド",
+      "match": "一致",
+      "value": "値",
+      "contains": "テキストを含む",
+      "equals": "等しい",
+      "preview": "フィルタープレビュー",
+      "replacement": "クエリ全体をフィールドフィルターに置き換え、除外語を保持します。全文検索フィールドは不要です。",
+      "run": "フィールド検索を実行",
+      "close": "フィールド検索を閉じる",
+      "skipped": "{stream} は全文検索フィールドが設定されていないためスキップされました。",
+      "resultsScope": "これらの結果は {streams} のみからのものです。",
+      "noFields": "このストリームにはフィールド検索に使用できるフィールドがありません。",
+      "valueRequired": "検索する値を入力してください。",
+      "fieldRequired": "検索するフィールドを選択してください。",
+      "invalidValue": "このフィールドに有効な値を入力してください。",
+      "configureHint": "このストリームの全文検索を高速化します。"
+    },
+    "autoRunPersistNeedsRun": "先にクエリを実行してください。この操作は実行した内容を保存または共有します",
+    "autoRunSearchAroundActive": "ある行の前後のレコードを表示中です。クエリを実行して結果に戻ってください",
+    "autoRunStaleTooltip": "クエリを実行して結果を更新します",
+    "searchCancelledNotice": "検索がキャンセルされました。",
+    "linePermalink": {
+      "disabledFunction": "単一の行をリンクするには関数をオフにしてください",
+      "disabledTimestampRewrite": "このクエリはタイムスタンプを書き換えます",
+      "disabledNotSingleLines": "このクエリの行は単一のログ行ではありません",
+      "disabledNoTimestamp": "この行にはタイムスタンプがありません",
+      "disabledEnrichmentTable": "エンリッチメントテーブルの行はリンクできません",
+      "toastNotUnique": "タイムスタンプへのリンクをコピーしました。この行を一意に特定できませんでした。",
+      "toastWideStream": "このストリームは列が多すぎて 1 行を正確にリンクできないため、タイムスタンプへのリンクをコピーしました",
+      "bannerInvalid": "このリンクは不正です。共有された検索のみを表示しています",
+      "bannerDenied": "ストリーム {stream} へのアクセス権がありません。",
+      "bannerStreamMissing": "ストリーム {stream} は存在しなくなりました",
+      "bannerError": "共有されたログ行を読み込めませんでした。",
+      "bannerIncomplete": "このタイムスタンプのすべての行を検索できませんでした",
+      "bannerGone": "このログ行は利用できなくなりました。ストリームの保持期間を過ぎたか、削除された可能性があります。",
+      "bannerGoneRetention": "このログ行は利用できなくなりました。ストリームの保持期間（{days} 日）を過ぎたか、削除された可能性があります。 | このログ行は利用できなくなりました。ストリームの保持期間（{days} 日）を過ぎたか、削除された可能性があります。",
+      "bannerFound": "共有されたログ行を表示しています",
+      "bannerAmbiguous": "このタイムスタンプに {count} 行ありますが、正確な行を特定できませんでした | このタイムスタンプに {count} 行ありますが、正確な行を特定できませんでした",
+      "bannerChanged": "リンクの作成後にこの行が変更された可能性があります",
+      "actionShowLines": "これらの行を表示",
+      "actionShowInContext": "コンテキスト内で表示",
+      "bannerAmbiguousTieHeavy": "このタイムスタンプを共有する行が {count} 件あり、ストリームに _o2_id がないため、正確な行を特定できませんでした。そのタイムスタンプの行はハイライトされています。 | このタイムスタンプを共有する行が {count} 件あり、ストリームに _o2_id がないため、正確な行を特定できませんでした。そのタイムスタンプの行はハイライトされています。",
+      "bannerDismiss": "閉じる",
+      "copyLink": "リンクをコピー",
+      "copyLinkTooltip": "このログ行へのリンクをコピー",
+      "copyLinkMenu": "このログ行へのリンクをコピー",
+      "toastCopied": "ログ行へのリンクをコピーしました",
+      "toastCopiedValid": "ログ行へのリンクをコピーしました · {days} 日間有効 | ログ行へのリンクをコピーしました · {days} 日間有効",
+      "toastLookupFailed": "この行を検索できませんでした。タイムスタンプへのリンクをコピーしました",
+      "toastShortFailed": "リンクを短縮できませんでした。代わりに完全なリンクをコピーしました",
+      "toastFailed": "このログ行へのリンクを作成できませんでした",
+      "toastScopeChanged": "リンクの作成中に組織またはストリームが変更されたため、何もコピーされませんでした",
+      "popoverTitle": "このログ行へのリンク",
+      "popoverDesc": "ブラウザが自動コピーをブロックしました。リンクを選択してコピーするか、ボタンを使用してください。",
+      "pageNotice": "このリンクは {page} ページにありました。",
+      "pageGo": "{page} ページへ移動",
+      "pageGoLast": "最後のページ（{page}）へ移動"
+    },
+    "autoRunPendingDot": "クエリを実行して最新の変更を適用",
+    "autoRunAppliesTo": "ログとトレースに適用されます",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "この検索は約 {size} をスキャンします",
+    "autoRunGuardLinkTitle": "このリンクは約 {size} をスキャンします",
+    "autoRunGuardDescAutoRun": "{scope}。先に絞り込めるよう、自動実行を一時停止しました。",
+    "autoRunGuardDescPaused": "{scope}。先に絞り込めるよう一時停止しました。",
+    "autoRunGuardDescLink": "リンクから開きました · {scope}。スコープを確認してから実行してください。",
+    "autoRunGuardHint": "フィルターと時間の変更を手動で適用するには、自動実行をオフにしてください。",
+    "autoRunGuardUnknownTitle": "このウィンドウのサイズは不明です",
+    "autoRunGuardUnknownDesc": "{streams} にはまだサイズ統計がないため、自動実行は 1 時間以下のウィンドウのみを実行します。",
+    "autoRunGuardUnknownManyDesc": "{count} 個のストリームにはまだサイズ統計がないため、自動実行は待機します。{scope}。 | {count} 個のストリームにはまだサイズ統計がないため、自動実行は待機します。{scope}。",
+    "autoRunGuardSuperClusterTitle": "リージョンをまたいで実行する準備ができました",
+    "autoRunGuardSuperClusterDesc": "マルチリージョンクラスターではまだ検索サイズを見積もれないため、自動実行は待機します。{scope}。",
+    "autoRunGuardUnresolvedTitle": "ストリームを利用できません",
+    "autoRunGuardUnresolvedDesc": "ストリーム {streams} は存在しないか、アクセス権がありません。",
+    "autoRunGuardBanner": "この変更は約 {size}（{scope}）をスキャンするため、自動実行を一時停止しました。以下の結果は前回のクエリのものです。",
+    "autoRunGuardBannerPaused": "この変更は約 {size}（{scope}）をスキャンするため、一時停止しています。以下の結果は前回のクエリのものです。",
+    "autoRunGuardBannerUnknown": "このウィンドウ（{scope}）のサイズが不明なため、一時停止しています。以下の結果は前回のクエリのものです。",
+    "autoRunGuardBannerRefresh": "自動更新は 1 回の更新あたり約 {size}（{scope}）をスキャンするため、一度実行するまで一時停止しています。以下の結果は前回のクエリのものです。",
+    "autoRunGuardRunAnyway": "そのまま実行",
+    "autoRunGuardRunQuery": "クエリを実行",
+    "autoRunGuardNarrow": "{period} に絞り込む",
+    "autoRunGuardNarrowWithSize": "{period} に絞り込む (~{size})",
+    "autoRunGuardSearchJob": "検索ジョブとして実行",
+    "autoRunGuardSelectStream": "ストリームを選択",
+    "searchJobNoPermission": "検索ジョブを作成する権限がありません",
+    "missingStreamAndNoFts": "1 つ以上のフィルタフィールドが「{missingStreams}」に存在しないため、該当するストリームでは検索が実行されません。\n 未検索: {noFtsStreams}（全文検索フィールドなし）。",
+    "freeTextChooseFirst": "先にテキストの検索方法を選択してください",
+    "freeTextScanLogsOnly": "スキャンモードはログビューでのみ動作します。ここでテキスト検索を使用するには、全文検索フィールドを設定してください",
+    "freeTextSearchedFields": "全文検索対象: {fields}（すべての単語、任意の順序）",
+    "freeTextPreview": "全文検索対象: {fields}（すべての単語、任意の順序）\n\n{sql} として実行",
+    "freeTextRunsAs": "{sql} として実行",
+    "freeTextNotSearched": "未検索: {streams}（全文検索フィールドなし）。",
+    "freeTextSetField": "全文検索フィールドを設定",
+    "freeTextNoFtsTitle": "「{stream}」には全文検索フィールドがありません",
+    "freeTextNoFtsTitleMulti": "選択したストリームには全文検索フィールドがありません",
+    "freeTextNoTextFields": "このストリームには検索可能なテキストフィールドがありません。",
+    "freeTextNoTextFieldsNamed": "未検索: {streams}（テキストフィールドなし）。",
+    "freeTextBuildNotice": "このフィルタにはテキスト検索が含まれています。SQL で編集してください。"
   },
   "menu": {
     "upgradeToProPlan": "PROプランにアップグレード",
@@ -9061,7 +9186,9 @@
         "dbmLockSampling": "ロックアクティビティは間隔でサンプリングされるため、2つのサンプルの間に発生して解消された競合は記録されません。アラートが出ないことは、ブロックがなかったことの証明にはなりません。",
         "dbmNoInstance": "単一のデータベースインスタンスが特定されなかったため、このアラートはこのエンジンのすべてのインスタンスを監視します。",
         "rumFunnelSnapshot": "このアラートはファネルの SQL のコピーを保持します。後でファネルやその名前付きイベントを編集しても、このアラートは変更されません。",
-        "rumFunnelSteps": "ファネルでコンバージョンをアラートするには、少なくとも 2 つのステップが必要です。"
+        "rumFunnelSteps": "ファネルでコンバージョンをアラートするには、少なくとも 2 つのステップが必要です。",
+        "textFilterDropped": "このストリームには全文検索（FTS）フィールドがないため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。",
+        "heldFilterDropped": "ログページで先に「Run as」を選択する必要があるため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。"
       }
     },
     "saveFailed": "アラートを保存できませんでした。",
@@ -12149,7 +12276,21 @@
     "eventClusterAriaLabelPlural": "{count} イベント, {errors} エラー",
     "eventMarkerTooltip": "イベント: {name}",
     "exceptionMarkerTooltip": "例外: {type}",
-    "spanEventFallback": "スパンイベント"
+    "spanEventFallback": "スパンイベント",
+    "spanNav": {
+      "firstSpan": "最初のスパン",
+      "lastSpan": "最後のスパン",
+      "position": "スパン {index} / {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "トレース {row} / {count}、ページ {page}",
+      "spanPosition": "スパン {row} / {count}、ページ {page}",
+      "firstResult": "最初の結果",
+      "lastResult": "最後の結果",
+      "loadingPage": "ページ {page} を読み込み中",
+      "pageFailed": "ページ {page} を読み込めませんでした",
+      "pageEmpty": "ページ {page} に結果がありません"
+    }
   },
   "aiToolset": {
     "header": "AI ツールセット",
@@ -15386,7 +15527,8 @@
       "selectStreamDesc": "ログ、トレース、メトリクス、RUM ストリームを参照",
       "queryGuide": "クエリガイドを読む",
       "queryGuideDesc": "フィルター、SQL モード、VRL、保存済みビュー",
-      "recent": "最近:"
+      "recent": "最近使用:",
+      "descriptionAutoRun": "ストリームを選択すると最新のログが表示されます。結果が届いたら、フィルタ、VRL 関数、カスタム時間範囲で絞り込めます。"
     },
     "noEvents": {
       "title": "イベントが見つかりません",
@@ -15440,7 +15582,8 @@
       "fixErrorsAndRetry": "いくつかのエラーがあります。修正して再試行してください。"
     },
     "buildQueryPage": {
-      "validationErrors": "いくつかのエラーがあります。修正して再試行してください。"
+      "validationErrors": "いくつかのエラーがあります。修正して再試行してください。",
+      "parserLoadFailed": "クエリパーサーを読み込めなかったため、検索フィルターをチャートに追加できません。読み込まれるまで実行は一時停止します。"
     },
     "searchHistory": {
       "sqlQueryLabel": "SQLクエリ:",
@@ -15642,6 +15785,45 @@
     },
     "logsNoEventsState": {
       "lastData": "最終データ: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "重大度 {level}",
+      "srTextInferred": "重大度 {level}、推測",
+      "inferredLabel": "{level} · 推測",
+      "popoverTitle": "重大度: {level}",
+      "popoverAriaLabel": "重大度の根拠",
+      "evidence": "根拠",
+      "fromField": "フィールド {field} から",
+      "inferredFrom": "{field} のテキストから推測。",
+      "notSearchable": "検索できません。ヒストグラムでは使用されません。",
+      "noLevelField": "この行にはレベルフィールドがなく、スキャンできるテキストフィールドもありません。",
+      "noLevelWordInField": "この行にはレベルフィールドがなく、{field} にもレベルを示す単語がありません。",
+      "notInSelectedColumns": "レベルフィールドが選択した列にありません",
+      "levels": {
+        "emergency": "緊急",
+        "alert": "アラート",
+        "critical": "クリティカル",
+        "error": "エラー",
+        "warning": "警告",
+        "notice": "通知",
+        "info": "情報",
+        "debug": "デバッグ",
+        "trace": "トレース",
+        "ok": "OK",
+        "unknown": "不明"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "自動更新がオンになっています。ページを変更するにはオフにしてください",
+      "position": "ログ {row} / {count}、ページ {page}",
+      "positionLabel": "ログ {row} / {count} · ページ {page}",
+      "loadingPage": "ページ {page} を読み込み中…",
+      "loadingPageAnnouncement": "ページ {page} を読み込み中",
+      "resultsChanged": "結果が変更されました",
+      "notInPage": "現在のページにありません",
+      "loadingResults": "結果を読み込み中…",
+      "previousLog": "前のログ",
+      "nextLog": "次のログ"
     }
   },
   "queryError": {
@@ -15676,7 +15858,10 @@
     "traceId": "トレース ID:",
     "askAi": "AI にクエリの修正を依頼する",
     "showDetail": "詳細を表示",
-    "hideDetail": "詳細を非表示にする"
+    "hideDetail": "詳細を非表示にする",
+    "runAs": "実行者",
+    "searchTextFor": "「{text}」のテキストを検索",
+    "searchTextDesc": "入力全体を 1 つのフレーズとして検索"
   },
   "refreshButton": {
     "justNow": "たった今",
@@ -17577,7 +17762,17 @@
       "oncallResolve": "解決",
       "downtimesCreate": "新規ダウンタイム",
       "downtimesRefresh": "ダウンタイムを更新",
-      "functionsImport": "関数をインポート"
+      "functionsImport": "関数をインポート",
+      "logsNextRow": "次のログ（詳細を開く）",
+      "logsPrevRow": "前のログ（詳細を開く）",
+      "logsRowFocusMove": "行間でフォーカスを移動",
+      "logsRowOpen": "フォーカスされた行を開く",
+      "logsDetailClose": "詳細を閉じて行に戻る",
+      "tracesNextRow": "次のトレースを選択",
+      "tracesPrevRow": "前のトレースを選択",
+      "tracesRowOpen": "選択したトレースを開く",
+      "traceNextVisibleSpan": "次の表示中のスパン",
+      "tracePrevVisibleSpan": "前の表示中のスパン"
     }
   },
   "components": {
@@ -17950,7 +18145,13 @@
         "debug": "デバッグ",
         "info": "情報",
         "warn": "警告",
-        "fatal": "致命的"
+        "fatal": "致命的",
+        "emergency": "緊急",
+        "alert": "アラート",
+        "critical": "重大",
+        "notice": "通知",
+        "ok": "OK",
+        "unknown": "不明"
       },
       "pipelineRunOutcome": {
         "firing": "発火中",

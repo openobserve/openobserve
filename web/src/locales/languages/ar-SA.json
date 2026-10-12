@@ -566,6 +566,12 @@
       "description": "تحافظ فترة التوقف على تشغيل التنبيهات وكشف الشذوذ وفحوصات الصناعات الاصطناعية وتوقف إشعاراتها خلال نافذة زمنية تحددها.",
       "action": "جدولة فترة توقف",
       "actionDesc": "لمرة واحدة، يوميًا أو أسبوعيًا. لكتم سريع، استخدم كتم في قائمة التنبيهات."
+    },
+    "searchCancelled": {
+      "title": "تم إلغاء البحث",
+      "description": "لم يتم تحميل أي نتائج. شغّل الاستعلام لتحميل الأحداث.",
+      "action": "تشغيل الاستعلام",
+      "actionDesc": "شغّل الاستعلام نفسه مرة أخرى"
     }
   },
   "common": {
@@ -1277,7 +1283,126 @@
     "aliasNotAllowed": "الاسم المستعار '{alias}' غير مسموح به.",
     "commonGroupFields": "حقول المجموعات المشتركة",
     "queryRangeHours": "{count} ساعة | {count} ساعة",
-    "menuGroupAlerts": "تنبيهات"
+    "menuGroupAlerts": "تنبيهات",
+    "runQueryPendingLabel": "تشغيل الاستعلام، لم يتم تطبيق التغييرات بعد",
+    "queryActions": {
+      "runEditedFirst": "شغّل استعلامك المُحرَّر أولًا",
+      "runFirst": "شغّل استعلامك أولًا",
+      "usesEditedQuery": "يستخدم استعلامك المُحرَّر (لم يُشغَّل بعد)",
+      "usesUnrunQuery": "يستخدم استعلامك (لم يُشغَّل بعد)",
+      "downloadsShownResults": "يُنزّل النتائج المعروضة، وليس تعديلك",
+      "downloadsLastRun": "يستخدم الاستعلام الذي شُغّل آخر مرة، وليس تعديلك"
+    },
+    "noFtsRecovery": {
+      "title": "لم يتم تكوين حقول البحث النصي الكامل لـ {stream}",
+      "description": "ابحث في قيم الحقول، أو امسح الاستعلام بالكامل لعرض السجلات في هذا النطاق الزمني.",
+      "searchField": "ابحث في حقل معيّن",
+      "searchFieldHint": "اختر حقلًا للبحث، مع الاحتفاظ بالكلمات المستبعدة.",
+      "clearRun": "عرض السجلات بدون هذا البحث",
+      "clearRunHint": "امسح الاستعلام بالكامل وشغّله في النطاق الزمني نفسه.",
+      "editPermission": "تحتاج إلى إذن لتعديل إعدادات الجدول.",
+      "scope": "ابحث في {stream} ضمن النطاق الزمني الحالي.",
+      "singleStreamScope": "ابحث في {stream} فقط؛ سيتم إلغاء تحديد {otherStreams}.",
+      "stream": "الجدول",
+      "field": "الحقل",
+      "match": "مطابقة",
+      "value": "القيمة",
+      "contains": "يحتوي على نص",
+      "equals": "يساوي",
+      "preview": "معاينة التصفية",
+      "replacement": "يستبدل هذا الاستعلام بالكامل بعامل تصفية حقل، مع الاحتفاظ بالكلمات المستبعدة. لا يُشترَط وجود حقل بحث نصي كامل.",
+      "run": "تشغيل بحث الحقل",
+      "close": "إغلاق بحث الحقل",
+      "skipped": "تم تخطي {stream} لأنه لا يحتوي على حقول بحث نصي كامل مُكوَّنة.",
+      "resultsScope": "هذه النتائج من {streams} فقط.",
+      "noFields": "لا يحتوي هذا الجدول على حقول متاحة لبحث الحقل.",
+      "valueRequired": "أدخل قيمة للبحث.",
+      "fieldRequired": "اختر حقلًا للبحث.",
+      "invalidValue": "أدخل قيمة صالحة لهذا الحقل.",
+      "configureHint": "يُسرّع البحث النصي الكامل لهذا الجدول."
+    },
+    "autoRunPersistNeedsRun": "شغّل الاستعلام أولًا: هذا الإجراء يحفظ أو يشارك ما شغّلته.",
+    "autoRunSearchAroundActive": "عرض السجلات حول سطر: شغّل الاستعلام للعودة إلى النتائج",
+    "autoRunStaleTooltip": "شغّل الاستعلام لتحديث النتائج",
+    "searchCancelledNotice": "تم إلغاء البحث.",
+    "linePermalink": {
+      "disabledFunction": "أوقف الدالة لربط سطر واحد",
+      "disabledTimestampRewrite": "يعيد هذا الاستعلام كتابة الطابع الزمني",
+      "disabledNotSingleLines": "الصفوف من هذا الاستعلام ليست أسطر سجلات فردية",
+      "disabledNoTimestamp": "لا يحتوي هذا الصف على طابع زمني",
+      "disabledEnrichmentTable": "لا يمكن ربط صفوف جدول الإثراء",
+      "toastNotUnique": "تم نسخ رابط إلى الطابع الزمني؛ تعذّر التعريف الفريد لهذا السطر.",
+      "toastWideStream": "هذا الجدول واسع جدًا لربط سطر واحد بدقة؛ تم نسخ رابط إلى الطابع الزمني",
+      "bannerInvalid": "هذا الرابط مشوّه؛ يتم عرض البحث المُشارَك فقط",
+      "bannerDenied": "ليس لديك صلاحية الوصول إلى الجدول {stream}.",
+      "bannerStreamMissing": "لم يعد الجدول {stream} موجودًا",
+      "bannerError": "تعذّر تحميل سطر السجل المشترك.",
+      "bannerIncomplete": "تعذّر البحث في كل سطر عند هذا الطابع الزمني",
+      "bannerGone": "لم يعد سطر السجل هذا متاحًا. قد يكون تجاوز مدة الاحتفاظ في الجدول أو محذوفًا.",
+      "bannerGoneRetention": "لم يعد سطر السجل هذا متاحًا. قد يكون تجاوز مدة الاحتفاظ في الجدول ({days} يوم) أو محذوفًا. | لم يعد سطر السجل هذا متاحًا. قد يكون تجاوز مدة الاحتفاظ في الجدول ({days} أيام) أو محذوفًا.",
+      "bannerFound": "عرض سطر سجل مشترك",
+      "bannerAmbiguous": "{count} سطر عند هذا الطابع الزمني؛ تعذّر تحديد السطر الدقيق | {count} أسطر عند هذا الطابع الزمني؛ تعذّر تحديد السطر الدقيق",
+      "bannerChanged": "قد يكون السطر قد تغيّر منذ إنشاء الرابط",
+      "actionShowLines": "عرض هذه الأسطر",
+      "actionShowInContext": "عرض في السياق",
+      "bannerAmbiguousTieHeavy": "{count} سطر يشترك في هذا الطابع الزمني ولا يحتوي الجدول على _o2_id، لذا تعذّر تحديد السطر الدقيق. يتم تمييز الأسطر عند ذلك الطابع الزمني. | {count} أسطر تشترك في هذا الطابع الزمني ولا يحتوي الجدول على _o2_id، لذا تعذّر تحديد السطر الدقيق. يتم تمييز الأسطر عند ذلك الطابع الزمني.",
+      "bannerDismiss": "تجاهل",
+      "copyLink": "نسخ الرابط",
+      "copyLinkTooltip": "نسخ رابط إلى سطر السجل هذا",
+      "copyLinkMenu": "نسخ رابط إلى سطر السجل هذا",
+      "toastCopied": "تم نسخ الرابط إلى سطر السجل",
+      "toastCopiedValid": "تم نسخ الرابط إلى سطر السجل · صالح لمدة {days} يوم | تم نسخ الرابط إلى سطر السجل · صالح لمدة {days} أيام",
+      "toastLookupFailed": "تعذّر البحث عن هذا السطر؛ تم نسخ رابط إلى الطابع الزمني",
+      "toastShortFailed": "تعذّر تقصير الرابط؛ تم نسخ الرابط الكامل بدلًا من ذلك",
+      "toastFailed": "تعذّر إنشاء رابط إلى سطر السجل هذا",
+      "toastScopeChanged": "تغيّرت المؤسسة أو الجدول أثناء إنشاء الرابط؛ لم يتم نسخ أي شيء",
+      "popoverTitle": "رابط إلى سطر السجل هذا",
+      "popoverDesc": "حجب متصفحك النسخ التلقائي. حدّد الرابط وانسخه، أو استخدم الزر.",
+      "pageNotice": "كان هذا الرابط في الصفحة {page}.",
+      "pageGo": "الانتقال إلى الصفحة {page}",
+      "pageGoLast": "الانتقال إلى الصفحة الأخيرة ({page})"
+    },
+    "autoRunPendingDot": "شغّل الاستعلام لتطبيق أحدث التغييرات",
+    "autoRunAppliesTo": "ينطبق على السجلات وآثار",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "سيفحص هذا البحث حوالي {size}",
+    "autoRunGuardLinkTitle": "سيفحص هذا الرابط حوالي {size}",
+    "autoRunGuardDescAutoRun": "{scope}. تم إيقاف التشغيل التلقائي مؤقتًا حتى تتمكن من تضييق النطاق أولًا.",
+    "autoRunGuardDescPaused": "{scope}. تم الإيقاف مؤقتًا حتى تتمكن من تضييق النطاق أولًا.",
+    "autoRunGuardDescLink": "تم الفتح من رابط · {scope}. راجع النطاق، ثم شغّله.",
+    "autoRunGuardHint": "أوقف التشغيل التلقائي لتطبيق تغييرات التصفية والوقت يدويًا.",
+    "autoRunGuardUnknownTitle": "الحجم غير معروف لهذه النافذة",
+    "autoRunGuardUnknownDesc": "لا يملك {streams} إحصاءات حجم بعد، لذا يشغّل التشغيل التلقائي النوافذ التي مدتها ساعة واحدة أو أقل فقط عليه.",
+    "autoRunGuardUnknownManyDesc": "{count} جدول ليس لديه إحصاءات حجم بعد، لذا ينتظرك التشغيل التلقائي. {scope}. | {count} جداول ليس لديها إحصاءات حجم بعد، لذا ينتظرك التشغيل التلقائي. {scope}.",
+    "autoRunGuardSuperClusterTitle": "جاهز للتشغيل عبر المناطق",
+    "autoRunGuardSuperClusterDesc": "لا يمكن تقدير حجم البحث على عنقود متعدد المناطق بعد، لذا ينتظرك التشغيل التلقائي. {scope}.",
+    "autoRunGuardUnresolvedTitle": "الجدول غير متاح",
+    "autoRunGuardUnresolvedDesc": "الجدول {streams} غير موجود أو ليس لديك صلاحية الوصول إليه.",
+    "autoRunGuardBanner": "سيفحص هذا التغيير حوالي {size} ({scope})، لذا توقف التشغيل التلقائي مؤقتًا. النتائج أدناه من الاستعلام السابق.",
+    "autoRunGuardBannerPaused": "سيفحص هذا التغيير حوالي {size} ({scope})، لذا تم إيقافه مؤقتًا. النتائج أدناه من الاستعلام السابق.",
+    "autoRunGuardBannerUnknown": "الحجم غير معروف لهذه النافذة ({scope})، لذا تم إيقافه مؤقتًا. النتائج أدناه من الاستعلام السابق.",
+    "autoRunGuardBannerRefresh": "سيؤدي التحديث التلقائي إلى فحص حوالي {size} لكل تحديث ({scope})، لذا تم إيقافه مؤقتًا حتى تشغّله مرة واحدة. النتائج أدناه من الاستعلام السابق.",
+    "autoRunGuardRunAnyway": "التشغيل على أي حال",
+    "autoRunGuardRunQuery": "تشغيل الاستعلام",
+    "autoRunGuardNarrow": "تضييق النطاق إلى {period}",
+    "autoRunGuardNarrowWithSize": "تضييق النطاق إلى {period} (~{size})",
+    "autoRunGuardSearchJob": "التشغيل كمهمة بحث",
+    "autoRunGuardSelectStream": "اختر جدولًا",
+    "searchJobNoPermission": "ليس لديك إذن لإنشاء مهام البحث",
+    "missingStreamAndNoFts": "حقل تصفية واحد أو أكثر غير موجود في \"{missingStreams}\"، لذلك لا يتم إجراء أي بحث في الجدول المذكور.\n لم يتم البحث: {noFtsStreams} (لا توجد حقول نص كامل).",
+    "freeTextChooseFirst": "اختر طريقة البحث في النص أولاً",
+    "freeTextScanLogsOnly": "يعمل وضع المسح في عرض السجلات فقط؛ عيّن حقل نص كامل لاستخدام البحث النصي هنا",
+    "freeTextSearchedFields": "البحث النصي الكامل في: {fields} (جميع الكلمات، بأي ترتيب)",
+    "freeTextPreview": "البحث النصي الكامل في: {fields} (جميع الكلمات، بأي ترتيب)\n\nيُشغَّل بصيغة {sql}",
+    "freeTextRunsAs": "يُشغَّل بصيغة {sql}",
+    "freeTextNotSearched": "لم يتم البحث: {streams} (لا توجد حقول نص كامل).",
+    "freeTextSetField": "تكوين حقول البحث النصي الكامل",
+    "freeTextNoFtsTitle": "لا يحتوي \"{stream}\" على حقول نص كامل",
+    "freeTextNoFtsTitleMulti": "لا تحتوي الجداول المحددة على حقول نص كامل",
+    "freeTextNoTextFields": "لا يحتوي هذا الجدول على حقول نصية للبحث.",
+    "freeTextNoTextFieldsNamed": "لم يتم البحث: {streams} (لا توجد حقول نصية).",
+    "freeTextBuildNotice": "يحتوي هذا المُرشِّح على بحث نصي؛ حرّره في SQL."
   },
   "menu": {
     "upgradeToProPlan": "الترقية إلى خطة PRO",
@@ -9061,7 +9186,9 @@
         "dbmLockSampling": "يتم أخذ عينة من نشاط القفل على فترة، لذا لم يتم تسجيل النزاع الذي بدأ وتم تنظيفه بين عينتين. التنبيه الهادئ ليس دليلا على عدم وجود حجب.",
         "dbmNoInstance": "لم يتم تحديد أي نسخة قاعدة بيانات واحدة، لذا يراقب هذا التنبيه كل نسخة من هذا المحرك.",
         "rumFunnelSnapshot": "يحتفظ هذا التنبيه بنسخة من SQL الخاصة بالقمع. التعديلات اللاحقة على القمع أو أحداثه المسماة لا تغيّرها.",
-        "rumFunnelSteps": "يحتاج القمع إلى خطوتين على الأقل قبل أن يمكنه التنبيه عند التحويل."
+        "rumFunnelSteps": "يحتاج القمع إلى خطوتين على الأقل قبل أن يمكنه التنبيه عند التحويل.",
+        "textFilterDropped": "لم يتم نقل مرشح البحث الخاص بك لأن هذا الجدول لا يحتوي على حقول البحث النصي الكامل (FTS). أضفه إلى استعلام التنبيه إذا كنت بحاجة إليه.",
+        "heldFilterDropped": "لم يتم نقل مرشح البحث الخاص بك لأنه يحتاج أولاً إلى خيار التشغيل باسم في صفحة السجلات. أضفه إلى استعلام التنبيه إذا كنت بحاجة إليه."
       }
     },
     "saveFailed": "لم أتمكن من حفظ التنبيه.",
@@ -12149,7 +12276,21 @@
     "eventClusterAriaLabelPlural": "{count} أحداث، {errors} الأخطاء",
     "eventMarkerTooltip": "الحدث: {name}",
     "exceptionMarkerTooltip": "الاستثناء: {type}",
-    "spanEventFallback": "حدث سبان"
+    "spanEventFallback": "حدث سبان",
+    "spanNav": {
+      "firstSpan": "أول Span",
+      "lastSpan": "آخر Span",
+      "position": "Span {index} من {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "الأثر {row} من {count}، الصفحة {page}",
+      "spanPosition": "Span {row} من {count}، الصفحة {page}",
+      "firstResult": "أول نتيجة",
+      "lastResult": "آخر نتيجة",
+      "loadingPage": "جارٍ تحميل الصفحة {page}",
+      "pageFailed": "تعذّر تحميل الصفحة {page}",
+      "pageEmpty": "لا تحتوي الصفحة {page} على نتائج"
+    }
   },
   "aiToolset": {
     "header": "مجموعات أدوات الذكاء الاصطناعي",
@@ -15386,7 +15527,8 @@
       "selectStreamDesc": "تصفح السجلات، التتبعات، المقاييس والتدفقات RUM",
       "queryGuide": "اقرأ دليل الاستعلامات",
       "queryGuideDesc": "الفلاتر، وضع SQL، VRL وعرض الحفظ",
-      "recent": "حديث:"
+      "recent": "آخر استخدام:",
+      "descriptionAutoRun": "اختر جدولًا لعرض أحدث سجلاته. يمكنك التحسين باستخدام عوامل التصفية ودالة VRL ونطاق زمني مخصص بعد ظهور النتائج."
     },
     "noEvents": {
       "title": "لم يتم العثور على أحداث",
@@ -15440,7 +15582,8 @@
       "fixErrorsAndRetry": "هناك بعض الأخطاء، يرجى تصحيحها والمحاولة مرة أخرى"
     },
     "buildQueryPage": {
-      "validationErrors": "هناك بعض الأخطاء، يرجى تصحيحها والمحاولة مرة أخرى"
+      "validationErrors": "هناك بعض الأخطاء، يرجى تصحيحها والمحاولة مرة أخرى",
+      "parserLoadFailed": "تعذّر تحميل محلّل الاستعلام، لذا لا يمكن إضافة عامل تصفية البحث إلى المخطط. تم إيقاف التشغيل مؤقتًا حتى يتم التحميل."
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL استعلام:",
@@ -15642,6 +15785,45 @@
     },
     "logsNoEventsState": {
       "lastData": "البيانات الأخيرة: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "الخطورة {level}",
+      "srTextInferred": "الخطورة {level}، مُستنتَجة",
+      "inferredLabel": "{level} · مُستنتَجة",
+      "popoverTitle": "الخطورة: {level}",
+      "popoverAriaLabel": "دليل الخطورة",
+      "evidence": "الدليل",
+      "fromField": "من الحقل {field}",
+      "inferredFrom": "مُستنتَجة من نص {field}.",
+      "notSearchable": "غير قابل للبحث؛ لا يستخدمه المدرج التكراري.",
+      "noLevelField": "لا يوجد حقل مستوى في هذا الصف، ولا حقل نصي للمسح.",
+      "noLevelWordInField": "لا يوجد حقل مستوى في هذا الصف، ولا كلمة مستوى في {field}.",
+      "notInSelectedColumns": "حقل المستوى غير موجود في الأعمدة المحددة",
+      "levels": {
+        "emergency": "طارئ",
+        "alert": "تنبيه",
+        "critical": "حرج",
+        "error": "خطأ",
+        "warning": "تحذير",
+        "notice": "إشعار",
+        "info": "معلومات",
+        "debug": "تنقيح",
+        "trace": "تتبع",
+        "ok": "سليم",
+        "unknown": "غير معروف"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "التحديث التلقائي مفعّل؛ أوقفه لتغيير الصفحات",
+      "position": "السجل {row} من {count}، الصفحة {page}",
+      "positionLabel": "السجل {row} من {count} · الصفحة {page}",
+      "loadingPage": "جارٍ تحميل الصفحة {page}…",
+      "loadingPageAnnouncement": "جارٍ تحميل الصفحة {page}",
+      "resultsChanged": "تغيّرت النتائج",
+      "notInPage": "ليس في الصفحة الحالية",
+      "loadingResults": "جارٍ تحميل النتائج…",
+      "previousLog": "السجل السابق",
+      "nextLog": "السجل التالي"
     }
   },
   "queryError": {
@@ -15676,7 +15858,10 @@
     "traceId": "معرف التتبع:",
     "askAi": "اطلب من الذكاء الاصطناعي إصلاح استعلامي",
     "showDetail": "عرض التفاصيل",
-    "hideDetail": "إخفاء التفاصيل"
+    "hideDetail": "إخفاء التفاصيل",
+    "runAs": "التشغيل باسم",
+    "searchTextFor": "البحث عن النص \"{text}\"",
+    "searchTextDesc": "البحث في المدخل بأكمله كعبارة واحدة"
   },
   "refreshButton": {
     "justNow": "الآن فقط",
@@ -17577,7 +17762,17 @@
       "oncallResolve": "حل",
       "downtimesCreate": "فترة توقف جديدة",
       "downtimesRefresh": "تحديث فترات التوقف",
-      "functionsImport": "استيراد دالة"
+      "functionsImport": "استيراد دالة",
+      "logsNextRow": "السجل التالي (يفتح التفاصيل)",
+      "logsPrevRow": "السجل السابق (يفتح التفاصيل)",
+      "logsRowFocusMove": "نقل التركيز بين الصفوف",
+      "logsRowOpen": "فتح الصف الذي عليه التركيز",
+      "logsDetailClose": "إغلاق التفاصيل والعودة إلى الصف",
+      "tracesNextRow": "تحديد الأثر التالي",
+      "tracesPrevRow": "تحديد الأثر السابق",
+      "tracesRowOpen": "فتح الأثر المحدد",
+      "traceNextVisibleSpan": "Span المرئي التالي",
+      "tracePrevVisibleSpan": "Span المرئي السابق"
     }
   },
   "components": {
@@ -17950,7 +18145,13 @@
         "debug": "تصحيح الأخطاء",
         "info": "معلومات",
         "warn": "تحذير",
-        "fatal": "قاتل"
+        "fatal": "قاتل",
+        "emergency": "طارئ",
+        "alert": "تنبيه",
+        "critical": "حرج",
+        "notice": "إشعار",
+        "ok": "سليم",
+        "unknown": "غير معروف"
       },
       "pipelineRunOutcome": {
         "firing": "الفصل",
