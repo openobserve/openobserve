@@ -37,6 +37,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <nav class="flex flex-wrap items-center gap-1" data-test="autoobserve2-nav">
       <ViewSwitch class="me-1" />
+      <div
+        class="items-center"
+        :class="searchOpen ? 'flex' : 'hidden sm:flex'"
+        data-test="autoobserve2-nav-search"
+      >
+        <label :for="SEARCH_ID" class="sr-only">{{ t("autoobserve2.nav.searchLabel") }}</label>
+        <OInput
+          :id="SEARCH_ID"
+          v-model="search"
+          size="sm"
+          class="w-44"
+          :placeholder="t('autoobserve2.nav.searchPlaceholder')"
+          data-test="autoobserve2-nav-search-input"
+          @keydown.enter="submit"
+          @blur="collapse"
+        >
+          <template #icon-left>
+            <OIcon name="search" size="sm" class="text-text-secondary" />
+          </template>
+        </OInput>
+      </div>
+      <OButton
+        v-if="!searchOpen"
+        variant="ghost-muted"
+        size="icon-sm"
+        class="sm:hidden"
+        :aria-label="t('autoobserve2.nav.searchLabel')"
+        data-test="autoobserve2-nav-search-open"
+        @click="openSearch"
+      >
+        <OIcon name="search" size="sm" />
+      </OButton>
       <OButton
         variant="ghost-muted"
         size="sm"
@@ -71,10 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ViewSwitch from "./ViewSwitch.vue";
 import { DEMO_DATE } from "../data/facts";
@@ -82,9 +115,31 @@ import { LAST_CHECKED } from "./fixtures";
 
 const emit = defineEmits<{
   open: [drawer: "history" | "settings" | "howItWorks"];
+  search: [query: string];
 }>();
 
 const { t, locale } = useI18nTyped();
+
+const SEARCH_ID = "autoobserve2-nav-search-field";
+
+const search = ref("");
+// Below the sm breakpoint the field hides behind an icon button until asked for.
+const searchOpen = ref(false);
+
+const openSearch = async () => {
+  searchOpen.value = true;
+  await nextTick();
+  document.getElementById(SEARCH_ID)?.focus();
+};
+
+const collapse = () => {
+  if (!search.value.trim()) searchOpen.value = false;
+};
+
+const submit = () => {
+  const query = search.value.trim();
+  if (query) emit("search", query);
+};
 
 // The date follows the demo dataset so "Today" in every entry matches it; the greeting follows the viewer.
 const today = computed(() =>

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 export type Scenario = "demo" | "allClear" | "incident" | "cantSee" | "noBaseline";
-export type Period = "week" | "month";
+export type Period = "week" | "month" | "quarter";
 export type DayKey =
   | "today"
   | "monday"
@@ -22,6 +22,11 @@ export type DayKey =
   | "wednesday"
   | "thursday"
   | "friday"
+  | "jul18"
+  | "jul30"
+  | "aug13"
+  | "aug26"
+  | "sep4"
   | "sep12"
   | "sep23"
   | "sep24"
@@ -286,6 +291,11 @@ export const DAY_DATE: Record<DayKey, string> = {
   wednesday: "2026-10-07",
   thursday: "2026-10-08",
   friday: "2026-10-09",
+  jul18: "2026-07-18",
+  jul30: "2026-07-30",
+  aug13: "2026-08-13",
+  aug26: "2026-08-26",
+  sep4: "2026-09-04",
   sep12: "2026-09-12",
   sep23: "2026-09-23",
   sep24: "2026-09-24",
@@ -2426,6 +2436,697 @@ export const PROBLEMS: Record<string, ProblemFact> = {
       },
     ],
   },
+  lagSep: {
+    id: "lagSep",
+    incidentId: "INC-1033",
+    title: "New products missing from search: search-indexer fell behind on catalog updates",
+    service: "search-indexer",
+    services: ["search-indexer", "catalog"],
+    upstream: ["catalog"],
+    downstream: ["search"],
+    severity: "p3",
+    day: "sep4",
+    time: "14:06",
+    seconds: "21",
+    outcome: "resolved",
+    resolvedAt: "14:46",
+    resolvedIn: 40,
+    destination: SEARCH,
+    notifiedAt: "14:08",
+    firings: [
+      {
+        detector: "search-indexer-log-patterns",
+        service: "search-indexer",
+        count: 9,
+        times: ["14:01", "14:03", "14:05", "14:07"],
+        signal: "log",
+        name: "Consumer rebalance logs",
+        peak: "a rebalance every 2 min",
+        threshold: "none before 14:00",
+      },
+      {
+        detector: "search-indexer-consumer-lag",
+        service: "search-indexer",
+        count: 5,
+        times: ["14:06", "14:10", "14:20", "14:30"],
+        signal: "metric",
+        name: "Consumer lag on catalog-updates",
+        peak: "48,000 messages",
+        threshold: "baseline under 300",
+        charted: true,
+        via: "partitions paused",
+      },
+    ],
+    steps: [
+      {
+        at: "13:58",
+        by: "event",
+        title: "Deploy",
+        detail: "search-indexer 1.12.0 cut max.poll.interval from 5 min to 30 s",
+        variant: "info",
+        service: "search-indexer",
+      },
+      {
+        at: "14:06",
+        by: "event",
+        title: "Detector fired",
+        detail: "search-indexer-consumer-lag crossed its baseline",
+        variant: "destructive",
+      },
+      {
+        at: "14:08",
+        by: "me",
+        title: "Notified with cause",
+        detail: "#oncall-search",
+        variant: "primary",
+      },
+      {
+        at: "14:39",
+        by: "team",
+        title: "Rolled back",
+        detail: "search-indexer back to 1.11.4",
+        variant: "muted",
+      },
+      {
+        at: "14:46",
+        by: "event",
+        title: "Resolved",
+        detail: "Lag back under 300 messages",
+        variant: "success",
+      },
+    ],
+    chart: {
+      metric: "consumer lag on catalog-updates",
+      unit: "messages",
+      points: [
+        180, 210, 190, 240, 3100, 9800, 16400, 22900, 29100, 34600, 39800, 44100, 47200, 48000,
+        41300, 30200, 18900, 8700, 2100, 260, 200, 190, 220, 180,
+      ],
+      detectedAt: 4,
+      actionAt: 13,
+      peak: 48000,
+    },
+    cause:
+      "search-indexer 1.12.0 cut the Kafka poll interval to 30 s. Large batches took longer than that, so the consumer kept getting removed from its group, and every rejoin paused all partitions.",
+    summary:
+      "New and changed products took up to 40 minutes to show up in search while the indexer fell behind.",
+    likelyCause:
+      "Rebalances started 3 minutes after search-indexer 1.12.0 went out, one about every 2 minutes. The new 30 s poll interval is shorter than the 45 s a large catalog batch takes, so the broker removed the consumer mid-batch.",
+    confidence: 86,
+    nextStep:
+      "Resolved by rolling back. Keep the poll interval above the slowest batch, or cap the batch size.",
+    verdict:
+      "A shorter poll interval made the indexer drop out of its consumer group on every large batch.",
+    impact: ["Search showed stale products for up to 40 minutes"],
+    hypotheses: [
+      {
+        name: "Poll interval too short in 1.12.0",
+        verdict: "confirmed",
+        reason:
+          "Every rebalance followed a batch that ran past 30 s; none happened on 1.11.4, before or after.",
+      },
+      {
+        name: "More catalog updates than usual",
+        verdict: "ruled_out",
+        reason: "catalog published about 1,900 updates a minute, its normal weekday rate.",
+      },
+      {
+        name: "Broker trouble",
+        verdict: "ruled_out",
+        reason: "Other consumers on the same brokers kept up with no lag.",
+      },
+    ],
+    comparison: {
+      metric: "Consumer lag on catalog-updates",
+      rows: [
+        { label: "search-indexer 1.12.0", value: 48000, shown: "48,000", kind: "affected" },
+        { label: "Usual", value: 300, shown: "under 300", kind: "healthy" },
+      ],
+    },
+    evidence: [
+      {
+        kind: "metric",
+        title: "Metric deviation on search-indexer",
+        detail: "consumer lag 48,000 messages (baseline under 300)",
+        chart: true,
+      },
+      {
+        kind: "log",
+        title: "Consumer rebalance logs",
+        detail: "member removed from group: poll interval exceeded",
+        count: "9 rebalances",
+        card: "search-indexer-log-patterns",
+      },
+    ],
+  },
+  poolAug: {
+    id: "poolAug",
+    incidentId: "INC-1032",
+    title: "Checkout connection pool exhausted during the refund export: payments timing out",
+    service: "checkout",
+    services: ["checkout"],
+    upstream: ["api-gateway"],
+    downstream: ["payments-api"],
+    severity: "p2",
+    day: "aug26",
+    time: "02:04",
+    seconds: "47",
+    outcome: "resolved",
+    resolvedAt: "02:17",
+    resolvedIn: 13,
+    destination: PAYMENTS,
+    pagedAt: "02:06",
+    firings: [
+      {
+        detector: "checkout-pool-saturation",
+        service: "checkout",
+        count: 4,
+        times: ["02:04", "02:07", "02:10", "02:13"],
+        signal: "metric",
+        name: "Pool in use",
+        peak: "50 of 50, 0 idle",
+        threshold: "limit 50",
+      },
+      {
+        detector: "checkout-errors",
+        service: "checkout",
+        count: 3,
+        times: ["02:05", "02:09", "02:13"],
+        signal: "metric",
+        name: "Timed-out payments",
+        peak: "8% of payments",
+        threshold: "baseline 0%",
+        charted: true,
+        via: "pool empty",
+      },
+    ],
+    steps: [
+      {
+        at: "01:58",
+        by: "event",
+        title: "Refund export started",
+        detail: "Nightly refund export, about 3 times its usual size after the end-of-month sale",
+        variant: "info",
+      },
+      {
+        at: "02:04",
+        by: "event",
+        title: "Detector fired",
+        detail: "checkout-pool-saturation: 50 of 50 connections",
+        variant: "destructive",
+      },
+      {
+        at: "02:06",
+        by: "me",
+        title: "Paged with cause",
+        detail: "#oncall-payments",
+        variant: "destructive",
+      },
+      {
+        at: "02:17",
+        by: "event",
+        title: "Resolved",
+        detail: "The export finished and its connections came back",
+        variant: "success",
+      },
+    ],
+    chart: {
+      metric: "timed-out payments",
+      unit: "%",
+      points: [
+        0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0.1, 4.8, 7.2, 7.9, 7.6, 7.8, 7.4, 7.7, 6.9, 2.2, 0.3, 0,
+        0.1, 0, 0, 0, 0,
+      ],
+      detectedAt: 10,
+      peak: 7.9,
+    },
+    cause:
+      "The nightly refund export held 44 of checkout's 50 database connections until it finished, so payments had none left. Later traced to the CHK-482 connection leak.",
+    summary:
+      "About 1 in 12 payments timed out for 13 minutes while the refund export held checkout's database connections.",
+    likelyCause:
+      "Pool 50 of 50, 0 idle. 44 connections were held by the refund export, which ran 3 times its usual size after the end-of-month sale. They all came back when it finished at 02:17, so I couldn't tell a leak from a long export.",
+    confidence: 72,
+    nextStep:
+      "Resolved by itself when the export finished. On 23 Sep the same pattern was traced to a leak in RefundExporter.export() and filed as CHK-482.",
+    verdict:
+      "The refund export held almost every checkout database connection, so payments waited for one and timed out.",
+    impact: ["1 in 12 payments timed out"],
+    hypotheses: [
+      {
+        name: "Refund export holding connections",
+        verdict: "confirmed",
+        reason: "44 of 50 connections were held by the refund export from 02:01 until it ended.",
+      },
+      {
+        name: "Leaked connections",
+        verdict: "open",
+        reason:
+          "All 44 came back when the export finished, so a leak and a slow export looked the same.",
+      },
+      {
+        name: "payments-api slow",
+        verdict: "ruled_out",
+        reason: "Payments time out waiting for a free connection, before any call to payments-api.",
+      },
+    ],
+    comparison: {
+      metric: "checkout's 50 database connections",
+      rows: [
+        { label: "Held by the refund export", value: 44, shown: "44", kind: "affected" },
+        { label: "Left for payments", value: 6, shown: "6", kind: "healthy" },
+        { label: "Pool limit", value: 50, shown: "50", kind: "limit" },
+      ],
+    },
+    evidence: [
+      {
+        kind: "metric",
+        title: "Metric deviation on checkout",
+        detail: "pool connections in use: 50 of 50, 0 idle",
+        card: "checkout-pool-saturation",
+      },
+      {
+        kind: "metric",
+        title: "Payment timeouts on checkout",
+        detail: "about 1 in 12 payments (8%) at worst, 0 after the export finished",
+        chart: true,
+      },
+    ],
+  },
+  throttleAug: {
+    id: "throttleAug",
+    incidentId: "INC-1031",
+    title: "Fraud checks slowed by CPU throttling from a batch job on the same nodes",
+    service: "fraud-check",
+    services: ["fraud-check", "checkout"],
+    upstream: ["checkout"],
+    downstream: [],
+    severity: "p4",
+    day: "aug13",
+    time: "11:20",
+    seconds: "09",
+    outcome: "held",
+    resolvedAt: "11:55",
+    resolvedIn: 35,
+    destination: DIGEST_DESTINATION,
+    firings: [
+      {
+        detector: "fraud-check-cpu-throttling",
+        service: "fraud-check",
+        count: 4,
+        times: ["11:18", "11:25", "11:35", "11:45"],
+        signal: "metric",
+        name: "CPU throttled",
+        peak: "62% of periods",
+        threshold: "baseline under 5%",
+      },
+      {
+        detector: "fraud-check-latency",
+        service: "fraud-check",
+        count: 5,
+        times: ["11:20", "11:25", "11:30", "11:40", "11:50"],
+        signal: "metric",
+        name: "p95 fraud score time",
+        peak: "1.4 s",
+        threshold: "baseline 0.18 s",
+        charted: true,
+        via: "less CPU",
+      },
+    ],
+    steps: [
+      {
+        at: "11:15",
+        by: "event",
+        title: "Batch job scheduled",
+        detail: "billing-worker monthly reconciliation landed on the 3 nodes running fraud-check",
+        variant: "info",
+        service: "fraud-check",
+      },
+      {
+        at: "11:20",
+        by: "event",
+        title: "Detector fired",
+        detail: "fraud-check-latency crossed its baseline",
+        variant: "destructive",
+      },
+      {
+        at: "11:21",
+        by: "me",
+        title: "Held for the Friday summary",
+        detail: "P4: checkout still went through, just slower",
+        variant: "muted",
+      },
+      {
+        at: "11:55",
+        by: "event",
+        title: "Resolved",
+        detail: "The batch job finished and fraud-check got its CPU back",
+        variant: "success",
+      },
+    ],
+    chart: {
+      metric: "p95 fraud score time",
+      unit: "s",
+      points: [
+        0.18, 0.17, 0.19, 0.18, 0.18, 0.62, 1.1, 1.3, 1.4, 1.3, 1.2, 1.4, 1.3, 1.3, 1.2, 1.4, 1.3,
+        1.1, 0.4, 0.19, 0.18, 0.18, 0.17, 0.18,
+      ],
+      detectedAt: 5,
+      peak: 1.4,
+    },
+    cause:
+      "A billing-worker batch job was scheduled onto the same 3 nodes as fraud-check and used their spare CPU, so fraud-check hit its CPU limit and was throttled.",
+    summary:
+      "Fraud checks took up to 1.4 seconds instead of 0.2 for 35 minutes. Checkout still went through, just slower.",
+    likelyCause:
+      "fraud-check pods were CPU-throttled in 62% of periods while billing-worker's reconciliation ran on the same nodes. fraud-check's own traffic and code didn't change.",
+    confidence: 84,
+    nextStep:
+      "Resolved by itself when the batch job finished. Keep batch jobs off the nodes that run checkout's services, or give fraud-check a CPU request that matches its use.",
+    verdict: "A noisy neighbour: a batch job took the CPU that fraud-check usually borrows.",
+    impact: ["Checkout about 1 s slower"],
+    hypotheses: [
+      {
+        name: "CPU taken by a batch job on the same nodes",
+        verdict: "confirmed",
+        reason: "Throttling started at 11:18, 3 minutes after billing-worker's batch landed there.",
+      },
+      {
+        name: "More checkout traffic",
+        verdict: "ruled_out",
+        reason: "Fraud check requests stayed at their usual 140 a second.",
+      },
+      {
+        name: "Slow fraud model",
+        verdict: "ruled_out",
+        reason: "Pods on other nodes scored in 0.18 s throughout.",
+      },
+    ],
+    comparison: {
+      metric: "p95 fraud score time, by node",
+      rows: [
+        {
+          label: "3 nodes shared with the batch job",
+          value: 1.4,
+          shown: "1.4 s",
+          kind: "affected",
+        },
+        { label: "Other nodes", value: 0.18, shown: "0.18 s", kind: "healthy" },
+      ],
+    },
+    evidence: [
+      {
+        kind: "metric",
+        title: "Metric deviation on fraud-check",
+        detail: "p95 1.4 s (baseline 0.18 s)",
+        chart: true,
+      },
+      {
+        kind: "metric",
+        title: "CPU throttling on fraud-check",
+        detail: "throttled in 62% of periods (baseline under 5%)",
+        card: "fraud-check-cpu-throttling",
+      },
+    ],
+  },
+  tlsJul: {
+    id: "tlsJul",
+    incidentId: "INC-1030",
+    title: "Invoices stopped sending: invoice-service's client certificate for billing-api expired",
+    service: "invoice-service",
+    services: ["invoice-service", "billing-api"],
+    upstream: ["billing-worker"],
+    downstream: ["billing-api"],
+    severity: "p2",
+    day: "jul30",
+    time: "09:01",
+    seconds: "14",
+    outcome: "resolved",
+    resolvedAt: "09:44",
+    resolvedIn: 43,
+    destination: PLATFORM,
+    pagedAt: "09:03",
+    firings: [
+      {
+        detector: "invoice-service-log-patterns",
+        service: "invoice-service",
+        count: 6,
+        times: ["09:00", "09:05", "09:15", "09:25"],
+        signal: "log",
+        name: "TLS handshake errors",
+        peak: "certificate expired",
+        threshold: "none before 09:00",
+      },
+      {
+        detector: "invoice-service-errors",
+        service: "invoice-service",
+        count: 8,
+        times: ["09:01", "09:05", "09:15", "09:30"],
+        signal: "metric",
+        name: "Failed invoice sends",
+        peak: "100% of sends",
+        threshold: "baseline 0.2%",
+        charted: true,
+        via: "mTLS refused",
+      },
+    ],
+    steps: [
+      {
+        at: "09:00",
+        by: "event",
+        title: "Certificate expired",
+        detail: "invoice-service's client certificate for billing-api, issued a year ago",
+        variant: "info",
+        service: "invoice-service",
+      },
+      {
+        at: "09:01",
+        by: "event",
+        title: "Detector fired",
+        detail: "invoice-service-errors crossed its baseline",
+        variant: "destructive",
+      },
+      {
+        at: "09:03",
+        by: "me",
+        title: "Paged with cause",
+        detail: "#platform-alerts",
+        variant: "destructive",
+      },
+      {
+        at: "09:41",
+        by: "team",
+        title: "Certificate renewed",
+        detail: "New client certificate loaded on invoice-service",
+        variant: "muted",
+      },
+      {
+        at: "09:44",
+        by: "event",
+        title: "Resolved",
+        detail: "Queued invoices sent",
+        variant: "success",
+      },
+    ],
+    chart: {
+      metric: "failed invoice sends",
+      unit: "%",
+      points: [
+        0.2, 0.1, 0.2, 0.2, 0.1, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+        100, 12, 0.3, 0.2, 0.1, 0.2,
+      ],
+      detectedAt: 5,
+      actionAt: 18,
+      peak: 100,
+    },
+    cause:
+      "invoice-service's client certificate for billing-api expired at 09:00, so billing-api refused every connection from it.",
+    summary:
+      "No invoices went out for 43 minutes. They queued and were all sent once the certificate was renewed.",
+    likelyCause:
+      'Every failed send is a TLS handshake billing-api rejected with "certificate expired". The certificate was issued a year ago to the minute, and nothing renews it.',
+    confidence: 95,
+    nextStep:
+      "Resolved by renewing the certificate. Renew client certificates automatically, well before they expire.",
+    verdict: "An expired client certificate cut invoice-service off from billing-api.",
+    impact: ["About 2,300 invoices sent up to 43 minutes late"],
+    hypotheses: [
+      {
+        name: "Expired client certificate",
+        verdict: "confirmed",
+        reason:
+          'billing-api rejected every handshake from invoice-service with "certificate expired" from 09:00.',
+      },
+      {
+        name: "billing-api down",
+        verdict: "ruled_out",
+        reason: "billing-api served its other callers normally the whole time.",
+      },
+    ],
+    comparison: {
+      metric: "Calls to billing-api that failed",
+      rows: [
+        { label: "From invoice-service", value: 100, shown: "all", kind: "affected" },
+        { label: "From other services", value: 0.2, shown: "0.2%", kind: "healthy" },
+      ],
+    },
+    evidence: [
+      {
+        kind: "metric",
+        title: "Metric deviation on invoice-service",
+        detail: "failed sends 100% (baseline 0.2%)",
+        chart: true,
+      },
+      {
+        kind: "log",
+        title: "TLS handshake errors",
+        detail: "billing-api: certificate expired",
+        card: "invoice-service-log-patterns",
+      },
+    ],
+  },
+  dnsJul: {
+    id: "dnsJul",
+    incidentId: "INC-1029",
+    title: "Cart prices missing: currency lookups failed after a DNS config change",
+    service: "cart",
+    services: ["cart", "currency"],
+    upstream: ["api-gateway"],
+    downstream: ["currency"],
+    severity: "p3",
+    day: "jul18",
+    time: "16:22",
+    seconds: "40",
+    outcome: "resolved",
+    resolvedAt: "16:53",
+    resolvedIn: 31,
+    destination: PLATFORM,
+    notifiedAt: "16:24",
+    firings: [
+      {
+        detector: "cart-log-patterns",
+        service: "cart",
+        count: 7,
+        times: ["16:21", "16:25", "16:35", "16:45"],
+        signal: "log",
+        name: "DNS lookup failures",
+        peak: "currency.internal: no such host",
+        threshold: "none before 16:21",
+      },
+      {
+        detector: "cart-errors",
+        service: "cart",
+        count: 6,
+        times: ["16:22", "16:30", "16:40", "16:50"],
+        signal: "metric",
+        name: "Cart loads without prices",
+        peak: "1 in 4 loads",
+        threshold: "baseline 0.1%",
+        charted: true,
+        via: "lookup failed",
+      },
+    ],
+    steps: [
+      {
+        at: "16:20",
+        by: "event",
+        title: "DNS config changed",
+        detail: "The internal zone was dropped from 2 of the 4 cluster DNS servers",
+        variant: "info",
+        service: "cart",
+      },
+      {
+        at: "16:22",
+        by: "event",
+        title: "Detector fired",
+        detail: "cart-errors crossed its baseline",
+        variant: "destructive",
+      },
+      {
+        at: "16:24",
+        by: "me",
+        title: "Notified with cause",
+        detail: "#platform-alerts",
+        variant: "primary",
+      },
+      {
+        at: "16:51",
+        by: "team",
+        title: "Config reverted",
+        detail: "Internal zone back on all 4 DNS servers",
+        variant: "muted",
+      },
+      {
+        at: "16:53",
+        by: "event",
+        title: "Resolved",
+        detail: "Cart prices back to normal",
+        variant: "success",
+      },
+    ],
+    chart: {
+      metric: "cart loads without prices",
+      unit: "%",
+      points: [
+        0.1, 0.1, 0.1, 0.2, 0.1, 24, 26, 25, 23, 25, 26, 24, 25, 24, 26, 25, 24, 25, 3.1, 0.2, 0.1,
+        0.1, 0.1, 0.1,
+      ],
+      detectedAt: 5,
+      actionAt: 17,
+      peak: 26,
+    },
+    cause:
+      "A DNS config change at 16:20 dropped the internal zone from 2 of the 4 cluster DNS servers, so about half of cart's lookups for currency failed.",
+    summary:
+      "About 1 in 4 cart loads showed no prices for 31 minutes. Orders still went through at checkout.",
+    likelyCause:
+      'cart logged "no such host" for currency.internal only on lookups answered by the 2 changed DNS servers. Lookups on the other 2 worked, and currency itself was healthy.',
+    confidence: 89,
+    nextStep:
+      "Resolved by reverting the DNS change. Roll DNS changes out one server at a time and check internal names resolve.",
+    verdict:
+      "Half the cluster's DNS servers stopped answering for internal names, so cart couldn't find currency.",
+    impact: ["1 in 4 cart loads showed no prices"],
+    hypotheses: [
+      {
+        name: "DNS config change",
+        verdict: "confirmed",
+        reason: "Every failed lookup was answered by one of the 2 servers changed at 16:20.",
+      },
+      {
+        name: "currency down",
+        verdict: "ruled_out",
+        reason: "currency answered every request that reached it, at its usual speed.",
+      },
+      {
+        name: "cart deploy",
+        verdict: "ruled_out",
+        reason: "cart hadn't changed since 14 July.",
+      },
+    ],
+    comparison: {
+      metric: "Lookups for currency.internal that failed, by DNS server",
+      rows: [
+        { label: "2 changed servers", value: 100, shown: "all", kind: "affected" },
+        { label: "2 unchanged servers", value: 0, shown: "none", kind: "healthy" },
+      ],
+    },
+    evidence: [
+      {
+        kind: "metric",
+        title: "Metric deviation on cart",
+        detail: "cart loads without prices 25% (baseline 0.1%)",
+        chart: true,
+      },
+      {
+        kind: "log",
+        title: "DNS lookup failures",
+        detail: "currency.internal: no such host",
+        count: "about 3,000 a minute",
+        card: "cart-log-patterns",
+      },
+    ],
+  },
 };
 
 const SERVICE_KINDS: Record<string, ServiceKind> = {
@@ -2627,6 +3328,28 @@ const SCENARIO_BASE: Record<Scenario, Omit<ScenarioFact, "services" | "streams">
         ],
         oldAlertPages: 161,
       },
+      quarter: {
+        problems: [
+          "search",
+          "ordersDisk",
+          "email",
+          "pool",
+          "checkout",
+          "recs",
+          "queue",
+          "push",
+          "poolOct",
+          "login",
+          "uploads",
+          "poolSep",
+          "lagSep",
+          "poolAug",
+          "throttleAug",
+          "tlsJul",
+          "dnsJul",
+        ],
+        oldAlertPages: 448,
+      },
     },
     weekFirings: 1284,
     requests: [
@@ -2641,6 +3364,7 @@ const SCENARIO_BASE: Record<Scenario, Omit<ScenarioFact, "services" | "streams">
     periods: {
       week: { problems: [], oldAlertPages: 9 },
       month: { problems: ["login", "uploads"], oldAlertPages: 34 },
+      quarter: { problems: ["login", "uploads", "tlsJul", "dnsJul"], oldAlertPages: 97 },
     },
     weekFirings: 640,
     requests: [],
@@ -2656,6 +3380,23 @@ const SCENARIO_BASE: Record<Scenario, Omit<ScenarioFact, "services" | "streams">
         problems: ["checkoutNow", "search", "ordersDisk", "email", "checkout", "login", "uploads"],
         oldAlertPages: 176,
       },
+      quarter: {
+        problems: [
+          "checkoutNow",
+          "search",
+          "ordersDisk",
+          "email",
+          "checkout",
+          "login",
+          "uploads",
+          "lagSep",
+          "poolAug",
+          "throttleAug",
+          "tlsJul",
+          "dnsJul",
+        ],
+        oldAlertPages: 463,
+      },
     },
     weekFirings: 1530,
     requests: [
@@ -2669,6 +3410,20 @@ const SCENARIO_BASE: Record<Scenario, Omit<ScenarioFact, "services" | "streams">
     periods: {
       week: { problems: ["email", "checkout"], oldAlertPages: 31 },
       month: { problems: ["email", "checkout", "login", "uploads"], oldAlertPages: 140 },
+      quarter: {
+        problems: [
+          "email",
+          "checkout",
+          "login",
+          "uploads",
+          "lagSep",
+          "poolAug",
+          "throttleAug",
+          "tlsJul",
+          "dnsJul",
+        ],
+        oldAlertPages: 412,
+      },
     },
     weekFirings: 1021,
     requests: [],
@@ -2682,6 +3437,7 @@ const SCENARIO_BASE: Record<Scenario, Omit<ScenarioFact, "services" | "streams">
     periods: {
       week: { problems: ["gateway"], oldAlertPages: null },
       month: { problems: ["gateway"], oldAlertPages: null },
+      quarter: { problems: ["gateway"], oldAlertPages: null },
     },
     weekFirings: 214,
     requests: [],

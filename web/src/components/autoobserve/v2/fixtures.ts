@@ -54,6 +54,7 @@ export type ProblemOutcome = Outcome | "fixing" | "contained";
 export type HistoryTone = Outcome | "neutral" | "fix";
 export type PriorityFilter = "all" | Severity;
 export type ProblemRange = "24h" | "7d" | "30d";
+export type IssuesRange = "7d" | "30d" | "90d";
 
 // Problems whose state has changed on the page because the viewer approved a fix; answered holds ledger ids.
 export interface FixOverrides {
@@ -140,8 +141,14 @@ export interface DestinationOption {
 
 export const PRIORITY_FILTERS: PriorityFilter[] = ["all", "p1", "p2", "p3", "p4"];
 export const PROBLEM_RANGES: ProblemRange[] = ["24h", "7d", "30d"];
+export const ISSUES_RANGES: IssuesRange[] = ["7d", "30d", "90d"];
 
-const RANGE_DAYS: Record<ProblemRange, number> = { "24h": 1, "7d": 7, "30d": 30 };
+const RANGE_DAYS: Record<ProblemRange | IssuesRange, number> = {
+  "24h": 1,
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
 const DAY_MS = 86400000;
 const DEMO_DAY = Date.UTC(...DEMO_DATE);
 
@@ -164,6 +171,11 @@ export const DAY_LABEL: Record<DayKey, I18nKey> = {
   wednesday: "autoobserve2.days.wednesday",
   thursday: "autoobserve2.days.thursday",
   friday: "autoobserve2.days.friday",
+  jul18: "autoobserve2.days.jul18",
+  jul30: "autoobserve2.days.jul30",
+  aug13: "autoobserve2.days.aug13",
+  aug26: "autoobserve2.days.aug26",
+  sep4: "autoobserve2.days.sep4",
   sep12: "autoobserve2.days.sep12",
   sep23: "autoobserve2.days.sep23",
   sep24: "autoobserve2.days.sep24",
@@ -242,7 +254,7 @@ export const say = (t: TranslateFn, m: Msg): I18nText => {
 };
 
 // A range starts at the demo's clock time that many days back, so 24 hours reaches into yesterday.
-export const inRange = (problem: Problem, range: ProblemRange) => {
+export const inRange = (problem: Problem, range: ProblemRange | IssuesRange) => {
   const start = new Date(DEMO_DAY - RANGE_DAYS[range] * DAY_MS).toISOString().slice(0, 10);
   return problem.absolute >= `${start} ${DEMO_NOW}`;
 };

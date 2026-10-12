@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mx-auto flex max-w-[47.5rem] flex-col gap-6 px-4 pt-6 pb-12 sm:pt-8"
       :class="suggestions.length ? '@min-[60rem]:max-w-[68rem] @min-[60rem]:px-6' : ''"
     >
-      <TopBar @open="openNamed" />
+      <TopBar @open="openNamed" @search="searchIssues" />
       <!-- Below the breakpoint both columns dissolve into one ordered list, so suggestions follow the problems. -->
       <div
         class="grid grid-cols-1 gap-6 @min-[60rem]:items-start @min-[60rem]:justify-center @min-[60rem]:gap-8"
@@ -168,23 +168,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("autoobserve2.issuesPage.back") }}
         </OButton>
-        <div class="flex min-w-0 flex-col gap-1.5">
-          <h1
-            class="text-text-heading text-2xl leading-tight font-semibold tracking-tight"
-            data-test="autoobserve2-issues-title"
-          >
-            {{ t("autoobserve2.issuesPage.title") }}
-          </h1>
-          <p
-            class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
-            data-test="autoobserve2-issues-sentence"
-          >
-            {{ t("autoobserve2.issuesPage.sentence") }}
-          </p>
+        <div
+          class="flex flex-col gap-3 @min-[60rem]:flex-row @min-[60rem]:items-end @min-[60rem]:justify-between @min-[60rem]:gap-8"
+        >
+          <div class="flex min-w-0 flex-col gap-1.5">
+            <h1
+              class="text-text-heading text-2xl leading-tight font-semibold tracking-tight"
+              data-test="autoobserve2-issues-title"
+            >
+              {{ t("autoobserve2.issuesPage.title") }}
+            </h1>
+            <p
+              class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
+              data-test="autoobserve2-issues-sentence"
+            >
+              {{
+                t("autoobserve2.issuesPage.sentence", {
+                  within: t(ISSUES_RANGE_WITHIN[issuesRange]),
+                })
+              }}
+            </p>
+          </div>
+          <ODropdown align="end">
+            <template #trigger>
+              <button
+                type="button"
+                class="hover:bg-surface-subtle-hover focus-visible:ring-focus-ring-accent rounded-default text-text-heading inline-flex shrink-0 items-center gap-1 self-start px-2 py-1 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none @min-[60rem]:self-auto"
+                data-test="autoobserve2-issues-range"
+              >
+                {{ t(ISSUES_RANGE_LABEL[issuesRange]) }}
+                <OIcon name="expand-more" size="sm" class="text-text-secondary" />
+              </button>
+            </template>
+            <ODropdownItem
+              v-for="option in ISSUES_RANGES"
+              :key="option"
+              role="menuitemradio"
+              :aria-checked="option === issuesRange"
+              :data-test="`autoobserve2-issues-range-${option}`"
+              @select="setIssuesRange(option)"
+            >
+              <span class="flex-1">{{ t(ISSUES_RANGE_LABEL[option]) }}</span>
+              <template #icon-right>
+                <OIcon
+                  name="check"
+                  size="sm"
+                  :class="option === issuesRange ? 'text-text-heading' : 'invisible'"
+                />
+              </template>
+            </ODropdownItem>
+          </ODropdown>
         </div>
       </header>
       <div
-        class="bg-surface-base border-border-subtle rounded-surface flex min-h-0 flex-1 overflow-hidden border shadow-xs"
+        class="bg-surface-base border-border-subtle rounded-surface flex min-h-0 overflow-hidden border shadow-xs"
       >
         <AutoObserveIssuesTab
           :issues="issues"
@@ -224,11 +261,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
 import ThisWeek from "@/components/autoobserve/v2/ThisWeek.vue";
 import Suggestions from "@/components/autoobserve/v2/Suggestions.vue";
@@ -252,9 +291,10 @@ import { isChange } from "@/components/autoobserve/v2/changes";
 import SettingsDrawer from "@/components/autoobserve/v2/SettingsDrawer.vue";
 import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import { useScenario } from "@/components/autoobserve/data/useScenario";
-import { PROBLEMS } from "@/components/autoobserve/data/facts";
+import { PROBLEMS, problemsIn } from "@/components/autoobserve/data/facts";
 import { useDecisions } from "@/components/autoobserve/v2/useDecisions";
 import {
+  ISSUES_RANGES,
   SCENARIOS,
   PRIORITY_FILTERS,
   PROBLEM_RANGES,
@@ -268,6 +308,7 @@ import {
   problemsFor,
   say,
   scenarioData,
+  type IssuesRange,
   type PriorityFilter,
   type Problem,
   type ProblemRange,
@@ -275,6 +316,18 @@ import {
 } from "@/components/autoobserve/v2/fixtures";
 
 const HOW_IT_WORKS_SEEN = "autoobserve2.howItWorksSeen";
+
+const ISSUES_RANGE_LABEL: Record<IssuesRange, I18nKey> = {
+  "7d": "autoobserve2.issuesPage.ranges.week",
+  "30d": "autoobserve2.issuesPage.ranges.month",
+  "90d": "autoobserve2.issuesPage.ranges.quarter",
+};
+
+const ISSUES_RANGE_WITHIN: Record<IssuesRange, I18nKey> = {
+  "7d": "autoobserve2.issuesPage.within.week",
+  "30d": "autoobserve2.issuesPage.within.month",
+  "90d": "autoobserve2.issuesPage.within.quarter",
+};
 
 const { t, locale } = useI18nTyped();
 const route = useRoute();
@@ -291,7 +344,16 @@ const byId = computed(() => problemsFor(overrides.value));
 const suggestions = computed(() => data.value.requests.filter((r) => r.kind !== "fixNow"));
 
 const problems = computed(() => data.value.problems.map((id) => byId.value[id]).sort(byPriority));
-const issues = computed(() => issuesFor(scenario.value, t, overrides.value.fixed, "month"));
+const issuesRange = computed<IssuesRange>(() => {
+  const value = route.query.issuesRange as IssuesRange;
+  return ISSUES_RANGES.includes(value) ? value : "30d";
+});
+const issues = computed(() =>
+  issuesFor(scenario.value, t, overrides.value.fixed, "quarter").filter((issue) => {
+    const problem = Object.values(byId.value).find((p) => p.incidentId === issue.id);
+    return problem ? inRange(problem, issuesRange.value) : false;
+  }),
+);
 const history = computed(() => [
   ...logEntries(scenario.value, store.log),
   ...historyFor(scenario.value),
@@ -357,7 +419,14 @@ const coverageSentence = computed(() => {
 
 // A full page lives in the URL, so reload and browser Back/Forward land on it.
 const PAGES = ["coverage", "activity", "issues"] as const;
-const PAGE_QUERY = { page: undefined, focus: undefined, filter: undefined, change: undefined };
+const PAGE_QUERY = {
+  page: undefined,
+  focus: undefined,
+  filter: undefined,
+  change: undefined,
+  q: undefined,
+  issuesRange: undefined,
+};
 const COVERAGE_FILTER_STATES: Record<string, CellState[]> = {
   watching: ["watched"],
   learning: ["learning"],
@@ -405,6 +474,18 @@ const openActivity = (change?: string) => {
 
 const openIssuesPage = () => {
   void router.push({ query: { ...route.query, ...DRAWER_QUERY, ...PAGE_QUERY, page: "issues" } });
+};
+
+const searchIssues = (q: string) => {
+  void router.push({
+    query: { ...route.query, ...DRAWER_QUERY, ...PAGE_QUERY, page: "issues", q },
+  });
+};
+
+const setIssuesRange = (value: IssuesRange) => {
+  void router.replace({
+    query: { ...route.query, issuesRange: value === "30d" ? undefined : value },
+  });
 };
 
 const openChange = (ledgerId: string) => {
@@ -504,7 +585,7 @@ onMounted(async () => {
   }
   const drawer = route.query.drawer;
   const problemId = typeof route.query.problem === "string" ? route.query.problem : "";
-  const knownProblem = data.value.problems.includes(problemId);
+  const knownProblem = problemsIn(scenario.value, "quarter").some((p) => p.id === problemId);
   if (page.value) howOpen.value = false;
   // Only a drawer the current scenario can show reopens; anything else is dropped from the URL.
   if (drawer === "problem" && knownProblem) {

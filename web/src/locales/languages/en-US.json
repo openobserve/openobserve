@@ -22132,6 +22132,7 @@
       "recent": "Resolved",
       "all": "All",
       "heldForDigest": "Held for Friday's summary",
+      "colId": "Incident",
       "colTitle": "Problem",
       "colSeverity": "Severity",
       "colServices": "Affected services",
@@ -22140,7 +22141,21 @@
       "colCause": "Cause",
       "emptyTitle": "Nothing here",
       "emptyDescription": "No problems match this filter.",
-      "subsetNote": "{shown} shown. This demo shows a selection of this week's {total} incidents."
+      "subsetNote": "{shown} shown. This demo shows a selection of this week's {total} incidents.",
+      "searchLabel": "Search issues",
+      "searchPlaceholder": "Search issues, services, causes or INC-…",
+      "noMatch": "No issues match “{query}”",
+      "clearSearch": "Clear search",
+      "matchCount": "No issues match | 1 issue matches | {count} issues match",
+      "colSignal": "Signal",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → now",
+      "minutes": "{count} min",
+      "grouped": "{count} alert → 1 incident | {count} alerts → 1 incident",
+      "confidence": "{level} confidence",
+      "proposed": "Proposed",
+      "reversible": "reversible",
+      "proposalFor": "Proposed fix for {title}"
     },
     "drawer": {
       "rca": "Root cause",
@@ -22391,7 +22406,9 @@
     "nav": {
       "history": "History",
       "settings": "Settings",
-      "howItWorks": "How it works"
+      "howItWorks": "How it works",
+      "searchLabel": "Search issues",
+      "searchPlaceholder": "Search issues"
     },
     "recent": {
       "ranges": {
@@ -22427,6 +22444,11 @@
       "wednesday": "Wednesday",
       "thursday": "Thursday",
       "friday": "Friday",
+      "jul18": "18 July",
+      "jul30": "30 July",
+      "aug13": "13 August",
+      "aug26": "26 August",
+      "sep4": "4 September",
       "sep12": "12 September",
       "sep24": "24 September",
       "sep30": "30 September",
@@ -22556,6 +22578,48 @@
         "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
         "chartCaption": "timeouts · 1 in 9 peak",
         "chartLabel": "Payment timeouts rose to about 1 in 9 at 10:05 and recovered 2 minutes after the fix at 10:08"
+      },
+      "lagSep": {
+        "title": "New products took up to 40 minutes to show up in search",
+        "summary": "search-indexer fell behind on catalog updates after version 1.12.0 shortened how long it may take per batch. Your team rolled it back and it caught up 40 minutes after it began.",
+        "notify1": "New and changed products are missing from search: search-indexer is about 48,000 catalog updates behind, since 14:06.",
+        "notify2": "Cause: search-indexer 1.12.0 went out at 13:58 and cut the Kafka poll interval to 30 s. Large batches take about 45 s, so the consumer keeps getting removed from its group.",
+        "notify3": "Rolling back to 1.11.4 should let it catch up. Search itself still works; it just shows older products.",
+        "chartCaption": "consumer lag · 48,000 peak",
+        "chartLabel": "Consumer lag rose from about 200 to 48,000 messages from 14:06 and drained after the rollback at 14:39"
+      },
+      "poolAug": {
+        "title": "Checkout ran out of database connections during the refund export",
+        "summary": "The nightly refund export held almost all of checkout's database connections, and about 1 in 12 payments timed out. It cleared when the export finished, 13 minutes after it began.",
+        "notify1": "Checkout has run out of database connections, and about 1 in 12 payments are timing out, since 02:04.",
+        "notify2": "Cause: 44 of 50 connections are held by the nightly refund export, which is about 3 times its usual size after the end-of-month sale.",
+        "notify3": "It should clear when the export finishes. If it doesn't, stopping the export will free the connections.",
+        "chartCaption": "timeouts · 1 in 12 peak",
+        "chartLabel": "Payment timeouts rose to about 1 in 12 at 02:04 and recovered by themselves when the export finished at 02:17"
+      },
+      "throttleAug": {
+        "title": "Fraud checks were slow for 35 minutes",
+        "summary": "A batch job landed on the same servers and took their spare CPU, so fraud checks took up to 1.4 seconds. Checkout still worked, just slower, and it recovered when the job finished, so I held it for Friday's summary.",
+        "chartCaption": "p95 fraud check · 1.4 s peak",
+        "chartLabel": "p95 fraud check time rose from 0.18 s to 1.4 s at 11:20 and recovered by itself when the batch job finished at 11:55"
+      },
+      "tlsJul": {
+        "title": "Invoices stopped sending for 43 minutes",
+        "summary": "invoice-service's certificate for billing-api expired, so every invoice failed to send. Your team renewed it, and the queued invoices all went out.",
+        "notify1": "No invoices are going out: every send from invoice-service is failing, since 09:01.",
+        "notify2": "Cause: invoice-service's client certificate for billing-api expired at 09:00, and billing-api rejects every connection from it.",
+        "notify3": "Renewing the certificate should fix it. Invoices are queuing, not lost.",
+        "chartCaption": "failed sends · all of them",
+        "chartLabel": "Failed invoice sends jumped from 0.2% to 100% at 09:01 and fell back to normal after the certificate was renewed at 09:41"
+      },
+      "dnsJul": {
+        "title": "Cart prices went missing for 1 in 4 people",
+        "summary": "A DNS change stopped half the cluster's DNS servers answering for internal names, so cart couldn't reach currency. Your team reverted it 31 minutes after it began.",
+        "notify1": "About 1 in 4 cart loads show no prices, since 16:22.",
+        "notify2": "Cause: a DNS config change at 16:20 dropped the internal zone from 2 of the 4 cluster DNS servers, so cart can't find currency.internal on those lookups.",
+        "notify3": "Reverting the DNS change should fix it. Orders still go through at checkout.",
+        "chartCaption": "missing prices · 1 in 4 peak",
+        "chartLabel": "Cart loads without prices rose from 0.1% to about 1 in 4 at 16:22 and fell back to normal when the DNS change was reverted at 16:51"
       }
     },
     "drawer": {
@@ -22650,8 +22714,18 @@
     },
     "issuesPage": {
       "title": "All issues",
-      "sentence": "Every problem I opened in the last 30 days. Pick one to see what happened and what I did about it.",
-      "back": "Back"
+      "sentence": "Every problem I opened {within}. Pick one to see what happened and what I did about it.",
+      "back": "Back",
+      "ranges": {
+        "week": "Last 7 days",
+        "month": "Last 30 days",
+        "quarter": "Last 90 days"
+      },
+      "within": {
+        "week": "in the last 7 days",
+        "month": "in the last 30 days",
+        "quarter": "in the last 90 days"
+      }
     },
     "activityPage": {
       "title": "What I've changed",

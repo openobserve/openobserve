@@ -141,6 +141,13 @@ export interface UnfoldCard {
 
 export interface Issue {
   id: string;
+  problemId: string;
+  day: DayKey;
+  time: string;
+  // Absent while the problem is open, or when it was held without an end.
+  endedAt?: string;
+  minutes?: number;
+  alerts: number;
   title: I18nText;
   severity: Severity;
   services: string[];
@@ -250,6 +257,11 @@ const DAY_LABEL: Record<DayKey, I18nKey> = {
   wednesday: "autoobserve2.days.wednesday",
   thursday: "autoobserve2.days.thursday",
   friday: "autoobserve2.days.friday",
+  jul18: "autoobserve2.days.jul18",
+  jul30: "autoobserve2.days.jul30",
+  aug13: "autoobserve2.days.aug13",
+  aug26: "autoobserve2.days.aug26",
+  sep4: "autoobserve2.days.sep4",
   sep12: "autoobserve2.days.sep12",
   sep23: "autoobserve2.days.sep23",
   sep24: "autoobserve2.days.sep24",
@@ -420,11 +432,19 @@ const unfoldFor = (fact: ProblemFact, t: TranslateFn, fixed: boolean): UnfoldCar
 };
 
 // An open problem runs until now on the pinned demo clock; one the viewer fixed on the page has no running clock.
-const durationOf = (fact: ProblemFact, t: TranslateFn, fixed: boolean): I18nText | undefined => {
-  if (fact.resolvedIn) return t("autoobserve.analysis.lasted", { count: fact.resolvedIn });
+const minutesOf = (fact: ProblemFact, fixed: boolean): number | undefined => {
+  if (fact.resolvedIn) return fact.resolvedIn;
   const [from, now] = [minuteOf(fact.time), minuteOf(DEMO_NOW)];
   if (fact.outcome !== "active" || fixed || from === null || now === null) return undefined;
-  return t("autoobserve.analysis.soFar", { count: now - from });
+  return now - from;
+};
+
+const durationOf = (fact: ProblemFact, t: TranslateFn, fixed: boolean): I18nText | undefined => {
+  const count = minutesOf(fact, fixed);
+  if (count === undefined) return undefined;
+  return fact.resolvedIn
+    ? t("autoobserve.analysis.lasted", { count })
+    : t("autoobserve.analysis.soFar", { count });
 };
 
 const analysisFor = (fact: ProblemFact, t: TranslateFn, fixed: boolean): Analysis => ({
@@ -463,8 +483,15 @@ const toIssue = (fact: ProblemFact, t: TranslateFn, fixedIds: string[] = []): Is
     : Array.from({ length: 3 }, (_, i) => t(k(`autoobserve2.problems.${fact.id}.notify${i + 1}`)));
   const messageAt =
     fact.pagedAt ?? fact.notifiedAt ?? fact.steps.find((s) => s.by === "me")?.at ?? fact.time;
+  const fixed = fixedIds.includes(fact.id);
   return {
     id: fact.incidentId,
+    problemId: fact.id,
+    day: fact.day,
+    time: fact.time,
+    endedAt: fact.resolvedAt ?? (fixed ? DEMO_NOW : undefined),
+    minutes: minutesOf(fact, fixed),
+    alerts: groupedFirings(fact),
     title: raw(fact.title),
     severity: fact.severity,
     services: fact.services,
