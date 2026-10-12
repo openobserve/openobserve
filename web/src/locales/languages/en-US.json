@@ -23742,7 +23742,7 @@
     "active": "Active",
     "account": "Account",
     "fromNumber": "From number",
-    "press4": "Press 4 to acknowledge",
+    "press4": "Call keys: 4 acknowledge, 6 resolve, 8 escalate",
     "press4Available": "Available",
     "press4NotAvailable": "Not available",
     "press4NotAvailableHint": "Calls ask people to acknowledge from the link in their text.",

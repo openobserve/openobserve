@@ -121,7 +121,7 @@ describe("TelephonySettings", () => {
       expect(card).toContain("ACte…0001");
       expect(card).not.toContain(SID);
       expect(card).toContain("+18335550100");
-      expect(words("press4")).toBe("Press 4 to acknowledge Available");
+      expect(words("press4")).toBe("Call keys: 4 acknowledge, 6 resolve, 8 escalate Available");
       expect(q("update")).not.toBeNull();
       expect(q("disconnect")).not.toBeNull();
       expect(q("hero")).toBeNull();
@@ -130,7 +130,7 @@ describe("TelephonySettings", () => {
     it("5d: without a callback URL press 4 reads not available, with the link fallback", async () => {
       await render({ ...CONNECTED, press4_available: false });
       expect(words("press4")).toBe(
-        "Press 4 to acknowledge Not available Calls ask people to acknowledge from the link in their text.",
+        "Call keys: 4 acknowledge, 6 resolve, 8 escalate Not available Calls ask people to acknowledge from the link in their text.",
       );
     });
 
@@ -145,7 +145,7 @@ describe("TelephonySettings", () => {
       expect(card).toContain(
         "Texts and calls already work. Set by the operator; nothing to do here.",
       );
-      expect(words("press4")).toBe("Press 4 to acknowledge Available");
+      expect(words("press4")).toBe("Call keys: 4 acknowledge, 6 resolve, 8 escalate Available");
       expect(q("hero")).toBeNull();
 
       await click("use-own");
