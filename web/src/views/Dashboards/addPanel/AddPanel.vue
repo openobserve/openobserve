@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
               <OButton
                 v-if="config.isEnterprise === 'false'"
-                :variant="livePreview.isPending.value ? 'warning' : 'outline'"
+                :variant="livePreview.isPending.value ? 'warning' : 'primary'"
                 size="sm-action"
                 data-test="dashboard-apply"
                 :loading="searchRequestTraceIds.length > 0"
@@ -121,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   :variant="applyVariant"
                   size="sm-action"
+                  class="border-e-button-group-divider"
                   @click="onApplyBtnClick"
                 >
                   {{ searchRequestTraceIds.length > 0 ? t("panel.cancel") : t("panel.apply") }}
@@ -1728,7 +1729,7 @@ export default defineComponent({
 
     const applyVariant = computed(() => {
       if (searchRequestTraceIds.value.length > 0) return "destructive";
-      return livePreview.isPending.value ? "warning" : "outline";
+      return livePreview.isPending.value ? "warning" : "primary";
     });
 
     const applyTooltip = computed(() => {
