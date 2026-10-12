@@ -420,6 +420,15 @@ export const useVariablesManager = (t: TranslateFn) => {
     return result;
   };
 
+  // A value ready without a fetch never reaches onVariablePartiallyLoaded, so its first fetch would look like a change.
+  const recordLoadedAgainst = (vars: (VariableRuntimeState | undefined)[]) => {
+    vars.forEach((v) => {
+      if (!v) return;
+      const key = getVariableKey(v.name, v.scope, v.tabId, v.panelId);
+      childrenLoadedAgainst.set(key, cloneDeep(v.value));
+    });
+  };
+
   const canVariableLoad = (variable: VariableRuntimeState): boolean => {
     const key = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
 
@@ -507,6 +516,16 @@ export const useVariablesManager = (t: TranslateFn) => {
         variablesData.panels[varState.panelId!].push(varState);
       }
     });
+
+    // Only defaults that never fetch on their own; anything else still owes its children a first load.
+    recordLoadedAgainst(
+      expandedVars.filter(
+        (v) =>
+          v.type === "query_values" &&
+          v.isVariablePartialLoaded &&
+          v.loadOptionsWithAllDefault !== true,
+      ),
+    );
 
     // Step 3: Build dependency graph
     dependencyGraph.value = buildScopedDependencyGraph(expandedVars, panelTabMapping.value);
@@ -1088,6 +1107,8 @@ export const useVariablesManager = (t: TranslateFn) => {
       }
     });
 
+    const allVars = getAllVariablesFlat();
+    recordLoadedAgainst(restoredKeys.map((key) => findVariableByKey(key, allVars)));
     scheduleChildrenOfRestored(restoredKeys);
   };
 
