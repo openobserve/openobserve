@@ -1,0 +1,27 @@
+[
+  {
+    "title": "should render the announcement banners settings page with the add banner action — not wired: web/src/composables/shared/useManagementRoutes.ts:70",
+    "action": "new",
+    "verifies": "the Announcement Banners settings page renders with the Add banner action visible"
+  },
+  {
+    "title": "should create and publish a new announcement banner — not wired: web/src/composables/shared/useManagementRoutes.ts:70",
+    "action": "new",
+    "verifies": "a new banner is created, appears in the list as Live, and shows in the live preview strip"
+  },
+  {
+    "title": "should edit an existing announcement banner — not wired: web/src/composables/shared/useManagementRoutes.ts:70",
+    "action": "new",
+    "verifies": "editing an existing banner updates its message in the list"
+  },
+  {
+    "title": "should block saving a banner with an empty message — not wired: web/src/composables/shared/useManagementRoutes.ts:70",
+    "action": "new",
+    "verifies": "saving with an empty message is rejected and the message field is flagged as required"
+  },
+  {
+    "title": "should delete an announcement banner after confirmation — not wired: web/src/composables/shared/useManagementRoutes.ts:70",
+    "action": "new",
+    "verifies": "deleting a banner via the confirm dialog removes it from the list"
+  }
+]

@@ -1,0 +1,32 @@
+{
+  "feature_slug": "announcement-banners",
+  "feature_title": "Announcement Banners",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "announcementBanners.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/announcementBanners.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/AnnouncementBannerList.vue",
+    "web/src/components/settings/AnnouncementBannerEditor.vue",
+    "web/src/components/settings/AnnouncementBannerPreview.vue",
+    "web/src/components/settings/AnnouncementAppearanceField.vue",
+    "web/src/components/settings/AnnouncementMessageField.vue",
+    "web/src/components/announcements/AnnouncementBanner.vue",
+    "web/src/components/announcements/AnnouncementBannerStrip.vue",
+    "web/src/composables/useAnnouncementBanners.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The diff touches three path groups: enterprise-owned backend modules under o2_enterprise/src/enterprise/announcements/ (meta.rs, mod.rs), an OSS handler at src/handler/http/request/announcements/mod.rs gated behind #[cfg(feature = \"enterprise\")], and shared Vue UI under web/src/** that both editions build. Because the change spans an enterprise layer plus an OSS implementation with shared UI, edition is 'both'. Enterprise keyword evidence (the feature lives in an enterprise-gated announcements module) corroborates, but the path evidence is what drives the call.",
+    "skip": "Not skipping. There is no explicit opt-out: feature_hint.txt and trigger_comment.txt are both empty (no tests-added label or skip comment). The change is user-facing — it adds /settings/announcements and /settings/announcements/edit routes plus a full banner list/editor/preview UI and a visible banner strip, so none of the automatic skip conditions apply.",
+    "e2e": "E2E is warranted: this adds a substantial new settings-management flow (create/edit/list/delete announcement banners with markdown message, CTA links, appearance, icons, colors, text size, styles, drafts, and validation) and new display components (AnnouncementBanner.vue, AnnouncementBannerStrip.vue) rendered to users. The editor also introduces revision-based 409 conflict handling that a UI test should exercise.",
+    "area": "The bulk of the UI changes live under web/src/components/settings/ (a management/settings area) and there is no dedicated Settings folder in the Playwright tree. The closest existing home is GeneralTests, which already hosts analogous org-level management tests such as logoManagement.spec.js, theme-management.spec.js, and org.spec.js.",
+    "group": "GeneralTests is the matrix shard whose run_files already contain the sibling org/management/settings specs (org.spec.js, usersOrg.spec.js, logoManagement.spec.js, theme-management.spec.js); its ACTUAL_FOLDER maps 1:1 to the GeneralTests directory, so the new spec joins it without a new group.",
+    "existing_tests": "No Playwright E2E specs in the diff — no files under tests/ui-testing/playwright-tests/ were changed or added. The diff does add many *.spec.ts files under web/src/** (e.g. AnnouncementBannerEditor.spec.ts, announcementValidation.spec.ts), but those are Vitest unit tests, not E2E coverage, so existing_tests_in_diff stays false."
+  }
+}
