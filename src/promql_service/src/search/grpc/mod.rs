@@ -30,7 +30,6 @@ use config::{
 use datafusion::error::DataFusionError;
 use hashbrown::HashSet;
 use infra::errors::Result;
-use parking_lot::Mutex;
 use promql::{
     DEFAULT_LOOKBACK, ScanContext, TableProvider,
     ast::{
@@ -60,7 +59,6 @@ struct GroupPlan {
 struct StorageProvider {
     trace_id: String,
     need_wal: bool,
-    warnings: Arc<Mutex<Vec<String>>>,
 }
 
 #[async_trait]
@@ -102,7 +100,6 @@ impl TableProvider for StorageProvider {
                 time_range,
                 matchers,
                 label_selector,
-                &self.warnings,
             )
             .await?;
             for ctx in wal_ctx_list {
@@ -410,18 +407,16 @@ pub async fn search_inner(
         is_super_cluster: req.is_super_cluster,
         search_event_context: req.search_event_context.clone().map(Into::into),
     });
-    let warnings = Arc::new(Mutex::new(Vec::new()));
     let mut ctx = PromqlContext::new(
         query_ctx,
         StorageProvider {
             trace_id: trace_id.to_string(),
             need_wal: req.need_wal,
-            warnings: Arc::clone(&warnings),
         },
         query.label_selector.clone(),
     );
 
-    let (value, result_type, mut scan_stats) = if query.query_exemplars {
+    let (value, result_type, mut scan_stats, warnings) = if query.query_exemplars {
         ctx.query_exemplars(&trace_id, eval_stmt).await?
     } else {
         ctx.exec(&trace_id, eval_stmt).await?
@@ -436,7 +431,6 @@ pub async fn search_inner(
 
     scan_stats.format_to_mb();
     let took = start.elapsed().as_millis() as i64;
-    let warnings = std::mem::take(&mut *warnings.lock());
     Ok((value, result_type, scan_stats, took, warnings))
 }
 

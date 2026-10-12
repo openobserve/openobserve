@@ -9504,7 +9504,6 @@ dependencies = [
  "log",
  "metrics_index",
  "o2_enterprise",
- "parking_lot 0.12.5",
  "promql",
  "promql-parser",
  "prost 0.14.4",

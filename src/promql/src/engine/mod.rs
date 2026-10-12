@@ -228,14 +228,14 @@ pub(crate) mod tests {
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::{
-            AggregateExpr, BinaryExpr, Call, Extension, Function, FunctionArgs, MatrixSelector,
-            NumberLiteral, Offset, ParenExpr, StringLiteral, SubqueryExpr, UnaryExpr,
-            VectorSelector, token, value::ValueType,
+            AggregateExpr, BinaryExpr, Call, EvalStmt, Extension, Function, FunctionArgs,
+            MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, SubqueryExpr,
+            UnaryExpr, VectorSelector, token, value::ValueType,
         },
     };
 
     use super::*;
-    use crate::exec::PromqlContext;
+    use crate::{DEFAULT_LOOKBACK, exec::PromqlContext};
 
     const T0: i64 = 1_640_995_200_000_000;
 
@@ -1285,5 +1285,65 @@ pub(crate) mod tests {
             assert_eq!(series[0].samples.len(), 1, "{query}");
             assert_eq!(series[0].samples[0].value, expected, "{query}");
         }
+    }
+
+    /// Serves the two-instance data as if one node behind every context had failed.
+    struct PartialProvider(TwoInstanceProvider);
+
+    #[async_trait::async_trait]
+    impl crate::TableProvider for PartialProvider {
+        async fn create_context(
+            &self,
+            org_id: &str,
+            stream_name: &str,
+            time_range: (i64, i64),
+            matchers: Matchers,
+            label_selector: HashSet<String>,
+            filters: &mut [(String, Vec<String>)],
+            streaming: bool,
+        ) -> Result<Vec<crate::ScanContext>> {
+            let ctxs = self
+                .0
+                .create_context(
+                    org_id,
+                    stream_name,
+                    time_range,
+                    matchers,
+                    label_selector,
+                    filters,
+                    streaming,
+                )
+                .await?;
+            Ok(ctxs
+                .into_iter()
+                .map(|ctx| ctx.with_warnings(vec!["ingester down".to_string()]))
+                .collect())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exec_returns_scan_context_warnings_with_the_data() {
+        let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
+        let stmt = |query: &str| EvalStmt {
+            expr: promql_parser::parser::parse(query).unwrap(),
+            start: at(T0),
+            end: at(T0),
+            interval: Duration::ZERO,
+            lookback_delta: DEFAULT_LOOKBACK,
+        };
+        let query_ctx = create_test_query_ctx("test_trace", "test_org", 30);
+
+        let mut ctx = PromqlContext::new(query_ctx.clone(), two_instance_provider(), vec![]);
+        let (_, _, _, warnings) = ctx.exec("test_trace", stmt("m")).await.unwrap();
+        assert!(warnings.is_empty());
+
+        let mut ctx =
+            PromqlContext::new(query_ctx, PartialProvider(two_instance_provider()), vec![]);
+        let (value, _, _, warnings) = ctx.exec("test_trace", stmt("m + m")).await.unwrap();
+        let Value::Vector(series) = value else {
+            panic!("expected a vector");
+        };
+        assert_eq!(series.len(), 2);
+        assert_eq!(warnings, vec!["ingester down"; 2]);
     }
 }

@@ -30,7 +30,6 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use infra::cluster::get_cached_online_ingester_nodes;
-use parking_lot::Mutex;
 use promql::{
     ScanContext,
     utils::{apply_label_selector, apply_matchers},
@@ -50,10 +49,7 @@ use search::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-#[tracing::instrument(
-    name = "promql:search:grpc:wal:create_context",
-    skip(trace_id, warnings)
-)]
+#[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
     trace_id: &str,
     org_id: &str,
@@ -61,7 +57,6 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
-    warnings: &Mutex<Vec<String>>,
 ) -> Result<Vec<ScanContext>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
@@ -89,18 +84,23 @@ pub(crate) async fn create_context(
         label_selector,
     )
     .await?;
-    if !partial_err.is_empty() {
+    let warnings = if partial_err.is_empty() {
+        vec![]
+    } else {
         log::warn!("[trace_id {trace_id}] promql->wal->search: partial result: {partial_err}");
-        warnings.lock().push(partial_err);
-    }
+        vec![partial_err]
+    };
 
     if batches.is_empty() {
-        return Ok(vec![ScanContext::table(
-            SessionContext::new(),
-            Arc::new(Schema::empty()),
-            ScanStats::default(),
-            true,
-        )]);
+        return Ok(vec![
+            ScanContext::table(
+                SessionContext::new(),
+                Arc::new(Schema::empty()),
+                ScanStats::default(),
+                true,
+            )
+            .with_warnings(warnings),
+        ]);
     }
 
     log::info!(
@@ -116,7 +116,7 @@ pub(crate) async fn create_context(
     let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
-    resp.push(ScanContext::table(ctx, schema, stats, true));
+    resp.push(ScanContext::table(ctx, schema, stats, true).with_warnings(warnings));
 
     Ok(resp)
 }
