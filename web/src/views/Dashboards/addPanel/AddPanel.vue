@@ -256,6 +256,8 @@ import { debounce, isEqual } from "lodash-es";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
+import type { ConflictOutcome } from "@/composables/dashboard/dashboardSaveConflictState";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
@@ -333,8 +335,8 @@ export default defineComponent({
     if (!injectedManager) {
       provide("variablesManager", variablesManager);
     }
-    const { showErrorNotification, showConfictErrorNotificationWithRefreshBtn } =
-      useNotifications();
+    const { showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const {
       dashboardPanelData,
       resetDashboardPanelData,
@@ -1265,6 +1267,50 @@ export default defineComponent({
       }
     };
 
+    const finishPanelSave = async (dashId: string) => {
+      analytics.track("dashboard_panel_saved", {
+        chart_type: dashboardPanelData.data.type,
+        is_new: !editMode.value,
+      });
+
+      isUnsavedTrackingActive = false;
+
+      // The author sees the value just saved, not an older view-mode override of this panel.
+      clearExemplarOverride(
+        exemplarOverrideKey(
+          store.state.selectedOrganization.identifier,
+          dashId,
+          String(dashboardPanelData.data.id),
+        ),
+      );
+
+      // Clear variables created during session since panel is being saved
+      variablesCreatedInSession.value = [];
+      variablesWithCurrentPanel.value = [];
+
+      await nextTick();
+      return router.push({
+        path: "/dashboards/view",
+        query: {
+          ...routeQueryParamsOnMount,
+          org_identifier: store.state.selectedOrganization.identifier,
+          dashboard: dashId,
+          folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+        },
+      });
+    };
+
+    const onPanelConflictResolved = async (dashId: string, outcome: ConflictOutcome) => {
+      // Reload discards my edit, so the editor must not prompt; the view then shows exactly what is saved.
+      if (outcome === "reloaded") {
+        isUnsavedTrackingActive = false;
+        await goBack();
+        return;
+      }
+      await finishPanelSave(dashId);
+    };
+
     const savePanelChangesToDashboard = async (dashId: string) => {
       // Left generic: these errors are never cleared before this guard, so they can be stale.
       if (dashboardPanelData.data.type === "custom_chart" && errorData.errors.length > 0) {
@@ -1400,47 +1446,27 @@ export default defineComponent({
             return;
           }
         }
-        analytics.track("dashboard_panel_saved", {
-          chart_type: dashboardPanelData.data.type,
-          is_new: !editMode.value,
-        });
-
-        isUnsavedTrackingActive = false;
-
-        // The author sees the value just saved, not an older view-mode override of this panel.
-        clearExemplarOverride(
-          exemplarOverrideKey(
-            store.state.selectedOrganization.identifier,
-            dashId,
-            String(dashboardPanelData.data.id),
-          ),
-        );
-
-        // Clear variables created during session since panel is being saved
-        variablesCreatedInSession.value = [];
-        variablesWithCurrentPanel.value = [];
-
-        await nextTick();
-        return router.push({
-          path: "/dashboards/view",
-          query: {
-            ...routeQueryParamsOnMount,
-            org_identifier: store.state.selectedOrganization.identifier,
-            dashboard: dashId,
-            folder: route.query.folder ?? "default",
-            tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
-          },
-        });
+        return await finishPanelSave(dashId);
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              (editMode.value
-                ? t("dashboard.addPanel.errorUpdatingPanel")
-                : t("dashboard.addPanel.errorCreatingPanel")),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: dashId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine:
+              editMode.value && variablesCreatedInSession.value.length > 0
+                ? currentDashboardData.data
+                : undefined,
+            panelId: String(dashboardPanelData.data.id),
+            change: t(
+              editMode.value
+                ? "dashboard.saveConflict.change.editedPanel"
+                : "dashboard.saveConflict.change.addedPanel",
+              {
+                name: dashboardPanelData.data.title,
+              },
+            ),
+            onResolved: (outcome) => onPanelConflictResolved(dashId, outcome),
+          });
         } else {
           showErrorNotification(
             error?.message ??

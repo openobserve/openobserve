@@ -3,7 +3,13 @@ import { mount, shallowMount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import AddPanel from "./AddPanel.vue";
 import { createStore } from "vuex";
-import { createRouter, createWebHistory, onBeforeRouteLeave, useRoute } from "vue-router";
+import {
+  createRouter,
+  createWebHistory,
+  onBeforeRouteLeave,
+  useRoute,
+  useRouter,
+} from "vue-router";
 import { isEqual } from "lodash-es";
 import { addPanel, getDashboard, updatePanel } from "@/utils/commons";
 import analytics from "@/services/product_analytics";
@@ -131,6 +137,14 @@ vi.mock("@/aws-exports", () => ({
 vi.mock("lodash-es", () => ({
   debounce: vi.fn((fn) => fn),
   isEqual: vi.fn(),
+}));
+
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
+  }),
 }));
 
 // Mock vue-router hooks
@@ -4799,6 +4813,68 @@ describe("AddPanel.vue", () => {
 
       expect(updatePanel).toHaveBeenCalled();
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("save conflict", () => {
+    const mountEditor = async () => {
+      vi.mocked(useRoute).mockReturnValue({
+        query: { dashboard: "d1", panelId: "p1", tab: "t1", folder: "f1" },
+        params: {},
+      } as any);
+      vi.mocked(getDashboard).mockResolvedValue({
+        title: "d",
+        tabs: [{ tabId: "t1", panels: [] }],
+      });
+      wrapper = shallowMount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          stubs: { PanelEditor: true, DateTimePickerDashboard: true, QueryInspector: true },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      wrapper.vm.dashboardPanelData.data.id = "p1";
+      wrapper.vm.dashboardPanelData.data.title = "Latency";
+      wrapper.vm.dashboardPanelData.data.type = "bar";
+      mockOpenConflict.mockClear();
+    };
+
+    afterEach(() => {
+      vi.mocked(useRoute).mockReset();
+    });
+
+    it("opens the conflict dialog with my panel and a description of my change", async () => {
+      vi.mocked(updatePanel).mockRejectedValue({ response: { status: 409 } });
+      await mountEditor();
+
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dashboardId: "d1",
+          folderId: "f1",
+          panelId: "p1",
+          change: "dashboard.saveConflict.change.editedPanel",
+        }),
+      );
+    });
+
+    it("Reload leaves the editor for the view, so the screen shows what is saved", async () => {
+      vi.mocked(updatePanel).mockRejectedValue({ response: { status: 409 } });
+      await mountEditor();
+      const routerInstance = vi.mocked(useRouter).mock.results.at(-1)!.value;
+      await wrapper.vm.savePanelChangesToDashboard("d1");
+      const { onResolved } = mockOpenConflict.mock.calls[0][0];
+
+      await onResolved("reloaded");
+
+      expect(routerInstance.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/view",
+          query: expect.objectContaining({ dashboard: "d1" }),
+        }),
+      );
     });
   });
 
