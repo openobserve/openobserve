@@ -91,6 +91,12 @@ fn create_domains_stmt() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
+        .col(
+            ColumnDef::new(OrgDomainOwnership::MetaMapped)
+                .boolean()
+                .not_null()
+                .default(false)
+        )
         .to_owned()
 }
 
@@ -119,4 +125,5 @@ enum OrgDomainOwnership {
     LastCheckedAt,
     CreatedAt,
     UpdatedAt,
+    MetaMapped,
 }

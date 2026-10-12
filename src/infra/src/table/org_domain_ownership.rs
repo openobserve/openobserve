@@ -87,6 +87,7 @@ pub async fn save_org_domain_mapping(record: OwnershipRecord) -> Result<(), anyh
         last_checked_at: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
+        meta_mapped: Set(false),
     };
     OrgDomainOwnership::insert(m).exec(client).await?;
     Ok(())

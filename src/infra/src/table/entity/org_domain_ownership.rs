@@ -17,6 +17,7 @@ pub struct Model {
     pub last_checked_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
+    pub meta_mapped: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
