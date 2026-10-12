@@ -27,7 +27,7 @@ import {
 } from "./patternUtils";
 import { buildPrefillFromPatterns } from "@/utils/alerts/prefill/fromPatterns";
 import { buildFilterContext, planStreamsFilter } from "@/composables/useLogs/freeTextSearch";
-import { renderPlan } from "@/utils/query/freeTextFilter";
+import { isHeldPlan, renderPlan } from "@/utils/query/freeTextFilter";
 import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 
 /**
@@ -155,6 +155,7 @@ export const usePatternActions = () => {
     if (!rawQuery || !stream) return rawQuery;
     const ctx = buildFilterContext(searchObj as any, store.state.zoConfig);
     const plan = planStreamsFilter(rawQuery, [stream], ctx);
+    if (isHeldPlan(plan)) return "";
     if (plan.kind === "sql") return plan.filter;
     if (plan.kind !== "freeText" || !ctx.targets[stream]) return rawQuery;
     return renderPlan(plan, ctx.targets[stream], ctx.knownFields) ?? rawQuery;

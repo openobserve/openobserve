@@ -119,6 +119,20 @@ describe("IndexList with a free-text filter (item 1)", () => {
     );
   });
 
+  it.each(["status=500 -404 AND is_error", "status=500 -debug AND is_error"])(
+    "skips the values query for a held filter instead of running it as subtraction: %s",
+    async (query) => {
+      const held = stream("fts_a", true);
+      held.schema.push({ name: "status", type: "Int64" }, { name: "is_error", type: "Boolean" });
+      select(held);
+      searchObj.data.query = query;
+      await wrapper.vm.openFilterCreator({}, { name: "level", ftsKey: false, streams: ["fts_a"] });
+      expect(valuesSql()).toEqual([]);
+      expect(wrapper.vm.fieldValues.level.isLoading).toBe(false);
+      expect(wrapper.vm.fieldValues.level.errMsg).toBe("Search query is empty or invalid.");
+    },
+  );
+
   it("keeps today's values SQL for a field filter", async () => {
     select(stream("fts_a", true));
     searchObj.data.query = "level='error'";

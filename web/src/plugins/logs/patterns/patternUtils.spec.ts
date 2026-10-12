@@ -347,6 +347,26 @@ describe("buildPatternSetSqlQuery", () => {
     expect(buildPatternSetSqlQuery({ streamName: "k8s_logs" })).toBe("SELECT * FROM 'k8s_logs'");
   });
 
+  it.each(["status=500 --404", "status=500 -- note", "status=500\n-- note"])(
+    "strips a comment from the base filter so it cannot swallow the pattern terms: %j",
+    (baseFilter) => {
+      expect(
+        buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter, excludes: [ERROR_PATTERN] }),
+      ).toBe(
+        "SELECT * FROM 'k8s_logs' WHERE (status=500) AND NOT (match_all('Connection refused to upstream'))",
+      );
+    },
+  );
+
+  it("keeps -- inside a string literal of the base filter, and drops a comment-only base", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "msg = 'a -- b'" })).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (msg = 'a -- b')",
+    );
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "-- note" })).toBe(
+      "SELECT * FROM 'k8s_logs'",
+    );
+  });
+
   it("ignores a whitespace-only base filter", () => {
     expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "   " })).toBe(
       "SELECT * FROM 'k8s_logs'",

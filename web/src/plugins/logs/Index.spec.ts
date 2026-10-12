@@ -221,6 +221,24 @@ vi.mock("@/composables/useLogs", async () => {
   };
 });
 
+// Records the error toasts the page raises; the real notifier still runs.
+const errorToasts = vi.hoisted(() => [] as unknown[]);
+vi.mock("@/composables/useNotifications", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    default: () => {
+      const api = actual.default();
+      return {
+        ...api,
+        showErrorNotification: (message: unknown, options?: unknown) => {
+          errorToasts.push(message);
+          return api.showErrorNotification(message, options);
+        },
+      };
+    },
+  };
+});
+
 vi.mock("@/composables/useLogs/usePatterns", () => ({
   default: () => ({
     extractPatterns: vi.fn().mockResolvedValue(undefined),
@@ -539,6 +557,38 @@ describe("Logs Index", async () => {
         freeText: true,
       });
       select(stream("nofts_b", false));
+      expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "", freeText: true });
+    });
+
+    const HELD = ["status=500 -404 AND is_error", "status=500 -debug AND is_error"];
+    const withHeldFields = (entry: any) => ({
+      ...entry,
+      schema: [
+        ...entry.schema,
+        { name: "status", type: "Int64" },
+        { name: "is_error", type: "Boolean" },
+      ],
+    });
+
+    it.each(HELD)(
+      "SQL toggle is refused for a held filter, never writing subtraction: %s",
+      async (query) => {
+        select(withHeldFields(stream("fts_a", true)), withHeldFields(stream("fts_d", true)));
+        wrapper.vm.searchObj.meta.sqlMode = true;
+        wrapper.vm.searchObj.data.query = query;
+        errorToasts.length = 0;
+        await wrapper.vm.setQuery(true);
+        expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false);
+        expect(wrapper.vm.searchObj.data.query).toBe(query);
+        expect(wrapper.vm.searchObj.data.freeTextBlocked).toBeNull();
+        expect(errorToasts).toEqual(["Search query is empty or invalid."]);
+      },
+    );
+
+    it.each(HELD)("Build gets no WHERE and its notice for a held filter: %s", (query) => {
+      select(withHeldFields(stream("fts_a", true)));
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.query = query;
       expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "", freeText: true });
     });
 

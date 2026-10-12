@@ -744,6 +744,7 @@ import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import { fieldSearchPredicate, type NoFtsFieldSubmission } from "./LogsNoFtsFieldSearch.schema";
 import {
   isAuthoredStatement,
+  isHeldPlan,
   renderPlan,
   preserveFilterComments,
 } from "@/utils/query/freeTextFilter";
@@ -1786,6 +1787,12 @@ export default defineComponent({
           const toggleStreams: string[] = searchObj.data.stream.selectedStream;
           const toggleCtx = buildFilterContext(searchObj, store.state.zoConfig);
           const togglePlan = planStreamsFilter(currentQuery.trim(), toggleStreams, toggleCtx);
+          if (isHeldPlan(togglePlan)) {
+            searchObj.meta.sqlModeEditTransition = true;
+            searchObj.meta.sqlMode = false;
+            showErrorNotification(t("search.searchQueryEmptyOrInvalid"));
+            return;
+          }
           const textWhere =
             togglePlan.kind === "freeText" ||
             (togglePlan.kind === "sql" && togglePlan.filter !== currentQuery.trim())
@@ -2123,6 +2130,7 @@ export default defineComponent({
       const ctx = buildFilterContext(searchObj, store.state.zoConfig);
       const plan = stream ? planStreamsFilter(raw.trim(), [stream], ctx) : null;
       if (!stream || !plan) return { where: raw, freeText: false };
+      if (isHeldPlan(plan)) return { where: "", freeText: true };
       if (plan.kind !== "freeText") {
         return { where: plan.filter, freeText: plan.filter !== raw.trim() };
       }

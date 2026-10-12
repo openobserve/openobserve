@@ -21,6 +21,7 @@ import {
   freeTextDecorations,
   freeTextHighlight,
   freeTextWhereByStream,
+  isFilterHeld,
   noFtsStreams,
   noFtsRecoveryTerm,
   noFtsRecoveryStreams,
@@ -249,6 +250,24 @@ describe("freeTextWhereByStream and filterForParsing", () => {
       ["app", "status = 500 AND NOT match_all('404')"],
     ]);
   });
+
+  it.each(["status=500 -404 AND is_error", "status=500 -debug AND is_error"])(
+    "skips every stream of the values path for a held filter, never running it as typed: %s",
+    (raw) => {
+      const extra = [
+        { name: "status", type: "Int64" },
+        { name: "is_error", type: "Boolean" },
+      ];
+      const obj = makeSearchObj(raw, [fts("app", extra), fts("api", extra)]);
+      expect(isFilterHeld(obj, zoConfig)).toBe(true);
+      expect([...(freeTextWhereByStream(obj, zoConfig) ?? new Map())]).toEqual([
+        ["app", "FALSE"],
+        ["api", "FALSE"],
+      ]);
+      obj.meta.sqlMode = true;
+      expect(isFilterHeld(obj, zoConfig)).toBe(false);
+    },
+  );
 
   it("returns null for SQL filters, which keep today's values path", () => {
     expect(freeTextWhereByStream(makeSearchObj("level='x'", [fts("app")]), zoConfig)).toBeNull();

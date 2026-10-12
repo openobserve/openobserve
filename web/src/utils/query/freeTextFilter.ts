@@ -300,6 +300,11 @@ export function renderPlan(
   return renderNode(plan.root);
 }
 
+// A held filter must reach no consumer: its raw text reads the -term as subtraction.
+export function isHeldPlan(plan: FilterPlan): boolean {
+  return plan.kind === "unclassified" && plan.held === true;
+}
+
 export function preserveFilterComments(raw: string, rendered: string): string {
   const missing: string[] = [];
   const remaining = filterComments(rendered);

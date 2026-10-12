@@ -17,6 +17,7 @@ import type { I18nText } from "@/types/i18n";
 
 import {
   freeTextRanges,
+  isHeldPlan,
   phrasePlan,
   preserveFilterComments,
   type PlanNode,
@@ -200,6 +201,16 @@ export function rewrittenFilter(
   return rendered === null ? null : preserveFilterComments(raw, rendered);
 }
 
+export function isFilterHeld(
+  searchObj: FreeTextSearchObj,
+  zoConfig: FreeTextZoConfig | null | undefined,
+): boolean {
+  if (searchObj.meta.sqlMode) return false;
+  const streams = searchObj.data.stream.selectedStream ?? [];
+  const raw = (searchObj.data.query ?? "").trim();
+  return isHeldPlan(planStreamsFilter(raw, streams, buildFilterContext(searchObj, zoConfig)));
+}
+
 export function freeTextWhereByStream(
   searchObj: FreeTextSearchObj,
   zoConfig: FreeTextZoConfig | null | undefined,
@@ -209,7 +220,8 @@ export function freeTextWhereByStream(
   const streams = searchObj.data.stream.selectedStream ?? [];
   const raw = (searchObj.data.query ?? "").trim();
   const plan = planStreamsFilter(raw, streams, ctx);
-  // Only an unrewritten SQL plan may take the raw values path; a rewritten one would run as typed.
+  if (isHeldPlan(plan)) return new Map(streams.map((stream) => [stream, "FALSE"]));
+  // The raw values path runs the typed text, so it is only for plans the grid also runs as typed.
   if (plan.kind === "unclassified" || (plan.kind === "sql" && plan.filter === raw)) return null;
   return new Map(
     streams.map((stream) => [

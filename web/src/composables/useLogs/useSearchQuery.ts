@@ -47,6 +47,7 @@ import {
 } from "@/utils/logs/interestingFields";
 import {
   appendConjunct,
+  isHeldPlan,
   materializeFreeText,
   renderPlan,
   stripCommentLines,
@@ -57,6 +58,7 @@ import {
   buildFilterContext,
   freeTextDecorations,
   freeTextHighlight,
+  isFilterHeld,
   markFreeTextBlocked,
   planStreamsFilter,
   type FilterResolveContext,
@@ -241,10 +243,6 @@ const rewriteArmWhere = (
   return at < 0 ? where : unparsed.slice(at).replace(/^\sWHERE\s/i, "");
 };
 
-function isHeldPlan(plan: FilterPlan): boolean {
-  return plan.kind === "unclassified" && plan.held === true;
-}
-
 // Arms are joined on one line, where a -- comment would swallow every later arm and the ORDER BY.
 function commentFree(where: string): string {
   return stripSqlComments(where).trim();
@@ -343,15 +341,7 @@ export const useSearchQuery = (t: TranslateFn) => {
   const filterContext = (): FilterResolveContext =>
     buildFilterContext(searchObj, store.state.zoConfig);
 
-  const filterHeld = (): boolean =>
-    !searchObj.meta.sqlMode &&
-    isHeldPlan(
-      planStreamsFilter(
-        (searchObj.data.query ?? "").trim(),
-        searchObj.data.stream.selectedStream,
-        filterContext(),
-      ),
-    );
+  const filterHeld = (): boolean => isFilterHeld(searchObj, store.state.zoConfig);
 
   const rejectFilter = (e: unknown, readOnly: boolean): null => {
     if (e instanceof NonSqlLimitError) {

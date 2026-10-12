@@ -297,7 +297,11 @@ import { bumpSelectionToken, currentSelectionToken } from "@/composables/useLogs
 import { compareStreamsByLatest } from "@/utils/logs/estimateScanMb";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { filterForParsing, freeTextWhereByStream } from "@/composables/useLogs/freeTextSearch";
+import {
+  filterForParsing,
+  freeTextWhereByStream,
+  isFilterHeld,
+} from "@/composables/useLogs/freeTextSearch";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -1056,6 +1060,11 @@ export default defineComponent({
           }
         }
 
+        if (isFilterHeld(searchObj, store.state.zoConfig)) {
+          fieldValues.value[name]["isLoading"] = false;
+          fieldValues.value[name]["errMsg"] = t("search.searchQueryEmptyOrInvalid");
+          return;
+        }
         const textWhere = freeTextWhereByStream(searchObj, store.state.zoConfig);
         if (textWhere && streams.every((stream: string) => textWhere.get(stream) === "FALSE")) {
           fieldValues.value[name]["isLoading"] = false;

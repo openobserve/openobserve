@@ -379,6 +379,58 @@ describe("usePatternActions", () => {
       }
     });
 
+    const PATTERN_TERMS =
+      "(match_all('Connection refused to upstream')) OR (match_all('Health probe succeeded for endpoint'))";
+
+    const withStatusStream = (query: string, run: () => void) => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [
+          {
+            name: "test-stream",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+              { name: "is_error", type: "Boolean" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [
+        { name: "body" },
+        { name: "status" },
+        { name: "is_error" },
+      ];
+      mockSearchObj.data.query = query;
+      try {
+        run();
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+      }
+    };
+
+    it.each(["status=500 -404 AND is_error", "status=500 -debug AND is_error"])(
+      "carries no base filter for a held filter, never subtraction: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          expect(usePatternActions().buildPatternsAlertPrefill().sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE NOT (${PATTERN_TERMS})`,
+          );
+        });
+      },
+    );
+
+    it.each(["status=500 --404", "status=500 -- note"])(
+      "keeps the pattern terms when the filter ends in a comment: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          expect(usePatternActions().buildPatternsAlertPrefill().sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE (status=500) AND NOT (${PATTERN_TERMS})`,
+          );
+        });
+      },
+    );
+
     it("says so when a SQL-mode query cannot be spliced in", () => {
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.data.query = 'SELECT * FROM "test-stream"';
