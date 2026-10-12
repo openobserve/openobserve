@@ -17,6 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OContent y class="min-h-0 flex-1 overflow-auto" data-test="autoobserve-how">
     <div class="mx-auto flex w-full max-w-7xl flex-col gap-10 pb-10">
+      <p
+        v-if="scenario !== 'demo'"
+        class="text-text-secondary pt-4 text-center text-xs"
+        data-test="autoobserve-how-demo-note"
+      >
+        {{ t("autoobserve.howItWorks.demoNote") }}
+      </p>
       <section class="flex flex-col gap-6 pt-4" data-test="autoobserve-how-hero">
         <div class="flex flex-col gap-2 text-center">
           <div class="flex items-center justify-center gap-2">
@@ -209,7 +216,9 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import AutoObserveHowItWorksMachine from "./AutoObserveHowItWorksMachine.vue";
-import { BUDGETS, FUNNEL } from "./fixtures";
+import { FUNNEL, type Scenario } from "./fixtures";
+
+defineProps<{ scenario: Scenario }>();
 
 const emit = defineEmits<{ go: [tab: string, focusId?: string] }>();
 const step = defineModel<number>("step", { default: 0 });
@@ -288,8 +297,6 @@ const EXPLAIN: { title: I18nKey; body: I18nKey }[] = [
   },
 ];
 
-const firingsLabel = FUNNEL.incident.firings.toLocaleString();
-const notifications = (
-  BUDGETS.reduce((sum, b) => sum + b.used.incident, 0) + FUNNEL.incident.exemptDeliveries
-).toLocaleString();
+const firingsLabel = (FUNNEL.demo.oldAlertPages ?? 0).toLocaleString();
+const notifications = FUNNEL.demo.pages.toLocaleString();
 </script>

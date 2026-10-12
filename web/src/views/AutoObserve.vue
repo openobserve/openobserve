@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #actions>
         <div class="flex items-center gap-2">
+          <ViewSwitch />
           <OTag variant="purple-soft" size="sm" :label="t('autoobserve.demo')" />
           <OToggleGroup
             mobile-dropdown
@@ -33,11 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve-scenario"
             @update:model-value="(v) => setScenario(v as Scenario)"
           >
-            <OToggleGroupItem value="quiet" size="sm" data-test="autoobserve-scenario-quiet">
-              {{ t("autoobserve.scenarioQuiet") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="incident" size="sm" data-test="autoobserve-scenario-incident">
-              {{ t("autoobserve.scenarioIncident") }}
+            <OToggleGroupItem
+              v-for="s in SCENARIOS"
+              :key="s"
+              :value="s"
+              size="sm"
+              :data-test="`autoobserve-scenario-${s}`"
+            >
+              {{ t(SCENARIO_LABEL[s]) }}
             </OToggleGroupItem>
           </OToggleGroup>
         </div>
@@ -56,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="openIssues.length"
               variant="error-soft"
               size="xs"
-              :label="raw(openIssues.length)"
+              :label="raw(String(openIssues.length))"
             />
           </OTab>
           <OTab name="coverage" data-test="autoobserve-tab-coverage">
@@ -70,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="awaitingCount"
               variant="warning-soft"
               size="xs"
-              :label="raw(awaitingCount)"
+              :label="raw(String(awaitingCount))"
             />
           </OTab>
           <OTab name="policy" data-test="autoobserve-tab-policy">
@@ -98,7 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :scenario="scenario"
         @open-issue="openIssue"
       />
-      <AutoObserveCoverageTab v-else-if="tab === 'coverage'" :ledger="ledger" />
+      <AutoObserveCoverageTab
+        v-else-if="tab === 'coverage'"
+        :ledger="ledger"
+        :scenario="scenario"
+      />
       <AutoObserveActivityTab
         v-else-if="tab === 'activity'"
         :key="scenario"
@@ -109,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <AutoObservePolicyTab v-else-if="tab === 'policy'" />
       <AutoObserveHowItWorksTab
         v-else
+        :scenario="scenario"
         v-model:step="howStep"
         v-model:overview="howOverview"
         @go="openExample"
@@ -125,7 +134,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -141,34 +151,31 @@ import AutoObserveActivityTab from "@/components/autoobserve/AutoObserveActivity
 import AutoObservePolicyTab from "@/components/autoobserve/AutoObservePolicyTab.vue";
 import AutoObserveHowItWorksTab from "@/components/autoobserve/AutoObserveHowItWorksTab.vue";
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
-import {
-  issuesFor,
-  ledgerFor,
-  type Issue,
-  type LedgerEntry,
-  type Scenario,
-} from "@/components/autoobserve/fixtures";
+import ViewSwitch from "@/components/autoobserve/v2/ViewSwitch.vue";
+import { issuesFor, type Issue, type Scenario } from "@/components/autoobserve/fixtures";
+import { SCENARIOS, problemsIn } from "@/components/autoobserve/data/facts";
+import { useScenario } from "@/components/autoobserve/data/useScenario";
+import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
+import { SCENARIO_LABEL } from "@/components/autoobserve/v2/fixtures";
 
 const { t } = useI18nTyped();
 
-const scenario = ref<Scenario>("quiet");
-const tab = ref("status");
-// One state per entry id, so an entry present in both scenarios keeps its edits across a switch.
-const entries = reactive<Record<string, LedgerEntry>>(
-  Object.fromEntries(ledgerFor("incident").map((e) => [e.id, e])),
-);
-const ledger = computed(() => ledgerFor(scenario.value).map((e) => entries[e.id]));
+const { scenario, setScenario: setSharedScenario } = useScenario();
+const route = useRoute();
+const router = useRouter();
+const tab = ref(typeof route.query.tab === "string" ? route.query.tab : "status");
+const { overrides, ledger, updateEntry, issueByIncident } = useIssueLedger(scenario, t);
 const drawerOpen = ref(false);
 const selectedIssue = ref<Issue | null>(null);
 
-const issues = computed(() => issuesFor(scenario.value));
+const issues = computed(() => issuesFor(scenario.value, t, overrides.value.fixed));
 const openIssues = computed(() =>
   issues.value.filter((i) => i.status !== "resolved" && !i.deferred),
 );
 const awaitingCount = computed(() => ledger.value.filter((e) => e.status === "awaiting").length);
 
 const setScenario = (next: Scenario) => {
-  scenario.value = next;
+  void setSharedScenario(next);
   drawerOpen.value = false;
 };
 
@@ -176,17 +183,16 @@ const highlightId = ref<string | undefined>();
 const howStep = ref(0);
 const howOverview = ref(false);
 
-// The walkthrough tells the incident-day story, so the selector follows it while the tab is open.
 watch(tab, (next) => {
-  if (next === "howItWorks") setScenario("incident");
   if (next !== "activity") highlightId.value = undefined;
 });
 
+// Following a "See it in" link is an explicit jump to the example, which lives in the demo week.
 const openExample = (target: string, focusId?: string) => {
-  setScenario("incident");
+  setScenario("demo");
   if (target === "activity") highlightId.value = focusId;
   tab.value = target;
-  const issue = target === "issues" && issues.value.find((i) => i.id === focusId);
+  const issue = target === "issues" && issuesFor("demo", t).find((i) => i.id === focusId);
   if (issue) openIssue(issue);
 };
 
@@ -195,7 +201,14 @@ const openIssue = (issue: Issue) => {
   drawerOpen.value = true;
 };
 
-const updateEntry = (id: string, patch: Partial<LedgerEntry>) => {
-  entries[id] = { ...entries[id], ...patch };
-};
+const linkedIssue = typeof route.query.issue === "string" ? route.query.issue : null;
+// Only an incident the current scenario contains opens; any other link is dropped from the URL.
+const knownIssue =
+  linkedIssue && problemsIn(scenario.value, "month").some((p) => p.incidentId === linkedIssue);
+if (linkedIssue && knownIssue) {
+  const issue = issues.value.find((i) => i.id === linkedIssue) ?? issueByIncident(linkedIssue);
+  if (issue) openIssue(issue);
+} else if (linkedIssue) {
+  void router.replace({ query: { ...route.query, issue: undefined } });
+}
 </script>

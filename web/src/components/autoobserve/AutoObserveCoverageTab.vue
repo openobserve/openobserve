@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex min-h-0 min-w-0 flex-1 flex-col max-lg:min-h-150">
       <OTable
-        :data="COVERAGE"
+        :data="rows"
         :columns="columns"
         :frame="false"
         row-key="service"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #toolbar>
           <div class="flex w-full min-w-0 flex-wrap items-center gap-3">
             <span class="text-text-secondary text-xs">{{
-              t("autoobserve.coverage.showing", { shown: COVERAGE.length, total: SERVICES_TOTAL })
+              t("autoobserve.coverage.showing", { shown: rows.length, total: stats4.total })
             }}</span>
             <div class="ms-auto flex flex-wrap items-center gap-2">
               <OTag
@@ -182,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OCardSection role="header" dense>
           <OText variant="panel-title">{{ t("autoobserve.coverage.plan") }}</OText>
           <span class="text-text-secondary ms-auto text-xs">{{
-            t("autoobserve.coverage.pending", { count: pendingCount })
+            t("autoobserve.coverage.blockedCount", { count: plan.length }, plan.length)
           }}</span>
         </OCardSection>
         <OCardSection role="body" dense>
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OCardSection role="body" dense>
           <ul class="flex flex-col">
             <li
-              v-for="s in STREAMS"
+              v-for="s in streams"
               :key="s.stream"
               class="border-border-subtle flex items-center gap-2 border-b py-2 text-sm last:border-b-0"
             >
@@ -229,7 +229,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex min-w-0 flex-1 flex-col">
                 <OText variant="mono">{{ s.stream }}</OText>
                 <span v-if="s.lastScanned" class="text-text-secondary text-xs">{{
-                  t("autoobserve.coverage.scanned", { time: raw(s.lastScanned), count: s.services })
+                  t(
+                    s.stale ? "autoobserve.coverage.scannedStale" : "autoobserve.coverage.scanned",
+                    { time: raw(s.lastScanned), count: s.services },
+                    s.services,
+                  )
                 }}</span>
                 <span v-else class="text-icon-chip-warning-text text-xs">{{
                   t("autoobserve.coverage.notScanned")
@@ -260,20 +264,18 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import {
-  COVERAGE,
-  COVERAGE_PLAN,
   LEDGER_STATUS,
-  DETECTOR_CEILING,
-  SERVICES_TOTAL,
   SIGNAL_LABEL,
   SIGNALS,
-  SERVICES_LEARNING,
-  STREAMS,
-  gapServices,
+  coverageFor,
+  coverageStats,
+  planFor,
+  streamsFor,
   type CellState,
   type CoverageCell,
   type CoverageRow,
   type LedgerEntry,
+  type Scenario,
   type Signal,
 } from "./fixtures";
 
@@ -291,20 +293,22 @@ const STATE_LABEL: Record<CellState, I18nKey> = {
   gap: "autoobserve.coverage.gap",
   na: "autoobserve.coverage.na",
 };
-const props = defineProps<{ ledger: LedgerEntry[] }>();
+const props = defineProps<{
+  ledger: LedgerEntry[];
+  scenario: Scenario;
+  initial?: { service: string; signal: Signal };
+}>();
+
+const rows = computed(() => coverageFor(props.scenario, t));
+const streams = computed(() => streamsFor(props.scenario, t));
+const stats4 = computed(() => coverageStats(props.scenario));
 
 const plan = computed(() =>
-  COVERAGE_PLAN.map((item) => {
-    const entry = item.ledgerId ? props.ledger.find((e) => e.id === item.ledgerId) : undefined;
-    return {
-      ...item,
-      variant: entry ? LEDGER_STATUS[entry.status].variant : ("warning-soft" as BadgeVariant),
-      stateLabel: entry
-        ? t(LEDGER_STATUS[entry.status].key)
-        : t("autoobserve.coverage.planBlocked"),
-      done: !!entry && ["auto_applied", "approved", "kept"].includes(entry.status),
-    };
-  }),
+  planFor(props.scenario).map((item) => ({
+    ...item,
+    variant: "warning-soft" as BadgeVariant,
+    stateLabel: t("autoobserve.coverage.planBlocked"),
+  })),
 );
 const ledgerTag = (id: string) => {
   const entry = props.ledger.find((e) => e.id === id);
@@ -312,16 +316,13 @@ const ledgerTag = (id: string) => {
     ? { variant: LEDGER_STATUS[entry.status].variant, label: t(LEDGER_STATUS[entry.status].key) }
     : null;
 };
-const pendingCount = computed(() => plan.value.filter((i) => !i.done).length);
-const gapServiceCount = gapServices().length;
 
-const selected = ref<{ service: string; signal: Signal }>({
-  service: "payments",
-  signal: "saturation",
-});
+const selected = ref<{ service: string; signal: Signal }>(
+  props.initial ?? { service: "checkout", signal: "errors" },
+);
 
 const selectedCell = computed(
-  () => COVERAGE.find((r) => r.service === selected.value.service)?.cells[selected.value.signal],
+  () => rows.value.find((r) => r.service === selected.value.service)?.cells[selected.value.signal],
 );
 
 const isSelected = (service: string, signal: Signal) =>
@@ -348,28 +349,26 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "watched",
     label: t("autoobserve.status.servicesWatched"),
-    value: SERVICES_TOTAL - SERVICES_LEARNING - gapServiceCount,
-    sub: t("autoobserve.status.ofTotal", { total: SERVICES_TOTAL }),
+    value: stats4.value.fullyWatched,
+    sub: t("autoobserve.status.ofTotal", { total: stats4.value.total }),
     tone: "success",
   },
   {
     key: "learning",
     label: t("autoobserve.status.learning"),
-    value: SERVICES_LEARNING,
+    value: stats4.value.learning,
     tone: "info",
   },
   {
     key: "gaps",
     label: t("autoobserve.status.gaps"),
-    value: gapServiceCount,
+    value: stats4.value.gaps,
     tone: "warning",
   },
   {
     key: "detectors",
     label: t("autoobserve.coverage.detectors"),
-    value: t("autoobserve.coverage.ratio", { used: DETECTOR_CEILING, limit: DETECTOR_CEILING }),
-    sub: t("autoobserve.coverage.ceilingTip"),
-    subIcon: "info-outline",
+    value: stats4.value.detectors,
     tone: "orange",
   },
 ]);

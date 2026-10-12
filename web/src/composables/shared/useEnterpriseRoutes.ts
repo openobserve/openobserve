@@ -397,11 +397,15 @@ const useEnterpriseRoutes = () => {
     routes.push({
       path: "autoobserve",
       name: "autoobserve",
-      component: () => import("@/views/AutoObserve.vue"),
+      component: () => import("@/views/AutoObserveHome.vue"),
       meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+    });
+    routes.push({
+      path: "auto-observe-2",
+      redirect: (to: any) => ({ name: "autoobserve", query: to.query }),
     });
   }
 

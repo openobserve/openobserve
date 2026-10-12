@@ -71,7 +71,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div class="ms-auto flex items-center gap-3">
               <span class="text-text-secondary text-xs">{{
-                t("autoobserve.activity.confidence", { value: entry.confidence })
+                t("autoobserve.activity.confidence", {
+                  value: t(CONFIDENCE_LABEL[entry.confidence]),
+                })
+              }}</span>
+              <span class="text-text-muted text-xs">{{
+                t("autoobserve.confidence.uncalibrated")
               }}</span>
               <span class="text-text-secondary text-xs">{{ entry.when }}</span>
               <OTag
@@ -141,6 +146,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("autoobserve.activity.neverSilent")
               }}</span>
               <div class="ms-auto flex items-center gap-2">
+                <OButton
+                  v-if="entry.decided"
+                  variant="outline"
+                  size="sm"
+                  icon-left="undo"
+                  :data-test="`autoobserve-ledger-${entry.id}-undo-decision`"
+                  @click="emit('update-entry', entry.id, { status: 'awaiting' })"
+                >
+                  {{ t("autoobserve.activity.undo") }}
+                </OButton>
                 <OButton
                   v-if="entry.status === 'auto_applied'"
                   variant="outline"
@@ -228,6 +243,7 @@ import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import {
+  CONFIDENCE_LABEL,
   LEDGER_STATUS,
   LOOP_LABEL,
   type LedgerEntry,
@@ -251,11 +267,12 @@ const emit = defineEmits<{ "update-entry": [id: string, patch: Partial<LedgerEnt
 
 const { t } = useI18nTyped();
 
-const LOOPS: Loop[] = ["coverage", "calibration", "investigation"];
+const LOOPS: Loop[] = ["coverage", "calibration", "investigation", "action"];
 const LOOP_VARIANT: Record<Loop, BadgeVariant> = {
   coverage: "teal-soft",
   calibration: "indigo-soft",
   investigation: "orange-soft",
+  action: "purple-soft",
 };
 
 const loop = ref<Loop | "all">("all");

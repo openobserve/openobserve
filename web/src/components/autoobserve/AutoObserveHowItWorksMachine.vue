@@ -471,7 +471,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { BUDGETS, FUNNEL, issuesFor } from "./fixtures";
+import { MACHINE_EXAMPLE, PROBLEMS, RETUNE, scenarioFacts } from "./data/facts";
+import { CONFIDENCE_LABEL, FUNNEL, issueFor } from "./fixtures";
 
 const emit = defineEmits<{ go: [tab: string, focusId?: string] }>();
 
@@ -504,32 +505,45 @@ const LEDGER_TOP = 248;
 const LEDGER_BOTTOM = LEDGER_TOP + 54;
 const COMING_X = 1016;
 
-const incident = issuesFor("incident").find((i) => i.id === "INC-1042");
-const facts = incident?.facts;
-const problemIncidents = issuesFor("incident").filter((i) => i.id === incident?.id).length;
+const incident = issueFor(MACHINE_EXAMPLE, t);
+const exampleFact = PROBLEMS[MACHINE_EXAMPLE];
+const facts = incident.facts;
+const problemIncidents = 1;
 // One message per notification thread: follow-ups land in the same thread, not as new messages.
-const problemMessages = new Set(incident?.thread.length ? [incident.channel] : []).size;
-const problemFirings = incident?.firings.reduce((n, f) => n + f.count, 0) ?? 0;
-const notifications =
-  BUDGETS.reduce((sum, b) => sum + b.used.incident, 0) + FUNNEL.incident.exemptDeliveries;
+const problemMessages = new Set(incident.thread.length ? [incident.channel] : []).size;
+const problemFirings = incident.firings.reduce((n, f) => n + f.count, 0);
+const week = FUNNEL.demo;
+const notifications = week.pages;
+const stepAt = (title: string) => exampleFact.steps.find((s) => s.title.startsWith(title))?.at;
 const story = {
-  id: raw(incident?.id),
+  id: raw(incident.id),
+  severity: raw(incident.severity.toUpperCase()),
   count: problemFirings,
-  confidence: incident?.confidence ?? 0,
-  firstAt: raw(incident?.firings[0]?.sampleTimes[0]),
-  firstDetector: raw(incident?.firings[0]?.detector),
-  services: raw([...new Set(incident?.firings.map((f) => f.service))].join(", ")),
-  openedAt: raw(incident?.thread[0]?.at),
-  rcaAt: raw(incident?.thread[1]?.at),
-  groupedAt: raw(incident?.timeline[incident.timeline.length - 1]?.at),
+  confidence: raw(String(t(CONFIDENCE_LABEL[incident.confidence])).toLowerCase()),
+  firstAt: raw(incident.firings[0]?.sampleTimes[0]),
+  firstDetector: raw(incident.firings[0]?.detector),
+  services: raw([...new Set(incident.firings.map((f) => f.service))].join(", ")),
+  openedAt: raw(exampleFact.time),
+  rcaAt: raw(stepAt("Investigation landed")),
+  pagedAt: raw(exampleFact.pagedAt),
+  groupedAt: raw(
+    incident.firings
+      .flatMap((f) => f.sampleTimes)
+      .sort()
+      .slice(-1)[0],
+  ),
   service: raw(facts?.deployService),
   version: raw(facts?.version),
   pods: facts?.pods ?? 0,
   alert: raw(facts?.alert),
-  from: facts?.thresholdFrom ?? 0,
-  to: facts?.thresholdTo ?? 0,
-  firings: FUNNEL.incident.firings.toLocaleString(),
-  held: FUNNEL.incident.heldForDigest,
+  limit: facts?.dbLimit ?? 0,
+  firings: week.firings.toLocaleString(),
+  held: week.heldForDigest,
+  retuneAlert: raw(RETUNE.alert),
+  retuneHost: raw(RETUNE.host),
+  retuneFrom: RETUNE.from,
+  retuneTo: RETUNE.to,
+  retuneFired: RETUNE.fired,
 };
 
 const step = defineModel<number>("step", { default: 0 });
@@ -582,7 +596,7 @@ const stages = computed<Stage[]>(() => [
     short: t("autoobserve.howItWorks.machine.incident.short", story),
     caption: t("autoobserve.howItWorks.machine.incident.caption", story),
     tab: "issues",
-    focus: incident?.id,
+    focus: incident.id,
   },
   {
     key: "calibrate",
@@ -591,7 +605,7 @@ const stages = computed<Stage[]>(() => [
     short: t("autoobserve.howItWorks.machine.calibrate.short"),
     caption: t("autoobserve.howItWorks.machine.calibrate.caption", story),
     tab: "activity",
-    focus: "L-313",
+    focus: scenarioFacts("demo").requests.find((r) => r.kind === "retune")?.ledgerId,
   },
   {
     key: "investigate",
@@ -600,7 +614,7 @@ const stages = computed<Stage[]>(() => [
     short: t("autoobserve.howItWorks.machine.investigate.short", story),
     caption: t("autoobserve.howItWorks.machine.investigate.caption", story),
     tab: "issues",
-    focus: incident?.id,
+    focus: incident.id,
   },
   {
     key: "you",
@@ -609,7 +623,7 @@ const stages = computed<Stage[]>(() => [
     short: t("autoobserve.howItWorks.machine.you.short"),
     caption: t("autoobserve.howItWorks.machine.you.caption", story),
     tab: "activity",
-    focus: incident?.proposal?.ledgerId,
+    focus: incident.proposal?.ledgerId,
   },
 ]);
 
@@ -674,7 +688,7 @@ const counterRows = computed(() => [
       },
       {
         key: "incidents",
-        value: FUNNEL.incident.incidents.toLocaleString(),
+        value: week.incidents.toLocaleString(),
         label: t("autoobserve.howItWorks.machine.counterIncidents"),
         lit: [3],
       },

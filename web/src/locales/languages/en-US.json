@@ -21929,21 +21929,21 @@
       "coming": "Coming",
       "hero": {
         "eyebrow": "How AutoObserve works",
-        "promise": "Send your data. OpenObserve finds the problems and tells you, with the cause attached. When it says nothing, nothing is wrong.",
+        "promise": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
         "withoutTitle": "Without AutoObserve",
-        "withoutCount": "pings this week if every firing paged you",
+        "withoutCount": "pages this week from your old alerts",
         "without1": "You write the alerts, then keep tuning them",
         "without2": "You watch dashboards to notice when something breaks",
         "without3": "Every ping asks the same question: is this one real?",
         "withTitle": "With AutoObserve",
-        "withCount": "notifications this week, each explained — the cause attached, or following in the thread for P1 or when triage times out or fails",
+        "withCount": "pages this week, each explained — the cause attached, or following in the thread for P1 or when triage times out or fails",
         "with1": "Nothing to set up: every service is found, and gaps are reported",
         "with2": "One notification per problem, not one per symptom",
         "with3": "Each one says what broke, where, since when, and why — the cause included when ready, or following in the same thread"
       },
       "machine": {
         "title": "The machine, one problem at a time",
-        "subtitle": "Follow {id}, the checkout payments failure (P1), from raw data to the one message the on-call received.",
+        "subtitle": "Follow {id}, the checkout payments failure ({severity}), from raw data to the one message the on-call received.",
         "prev": "Previous",
         "next": "Next",
         "play": "Play",
@@ -21958,7 +21958,7 @@
         "counterNotifications": "notifications",
         "counterMessage": "message, with its cause",
         "learnBack": "What would have caught it earlier?",
-        "learnBackProposal": "Lower {alert} from {from}% to {to}%",
+        "learnBackProposal": "Make {alert} count all pods against payments-db's limit of {limit}",
         "phase2Action": "Action — fixes what it safely can (phase 2)",
         "phase2Outcome": "Outcome — learns what worked (phase 2)",
         "data": {
@@ -21969,59 +21969,59 @@
         "coverage": {
           "name": "Coverage",
           "short": "Found; gaps reported",
-          "caption": "Every service in the data is found, and checks are picked from the library by what its data contains: learned anomaly baselines for requests, errors and latency, and fixed-threshold guardrails while it learns. New detectors go through the proposal gate, and gaps are reported."
+          "caption": "Every service in the data is found, and checks are picked from the library by what its data contains: learned anomaly baselines for requests, errors and latency, and fixed-threshold guardrails while it learns. New detectors apply on their own as soon as a service appears, with a review window, and gaps are reported."
         },
         "detect": {
           "name": "Detect",
           "short": "{count} for this problem",
-          "caption": "Detectors fire when something changes. This week they fired {firings} times. For this problem the first firing came from {firstDetector} at {firstAt}, followed by firings from {services}."
+          "caption": "Detectors fire when something changes. This week they fired {firings} times; most were blips under 2 minutes that cleared on their own, and the rest were grouped into incidents. For this problem the first firing came from {firstDetector} at {firstAt}, followed by firings from {services}."
         },
         "calibrate": {
           "name": "Calibrate",
-          "short": "Budgets, digest, dedup",
-          "caption": "For P2–P4 problems, budgets, the digest and deduplication decide what reaches people: this week {held} problems waited for the digest instead of paging. Being over budget is treated as a defect: for #oncall-payments AutoObserve proposes grouping three payments retry alerts into one incident and delivering them through it. P1 skips the budget and the wait; grouping still applies."
+          "short": "Routing, digest, dedup",
+          "caption": "Severity decides what reaches people: P1 and P2 page, P3 sends a message that doesn't page, and P4 waits for the Friday summary; deduplication applies to all. This week {held} problems waited for the summary. Noise is treated as a defect: the \"{retuneAlert}\" alert on {retuneHost} fired {retuneFired} times and nobody needed to act, and its growth leaves days of headroom, so AutoObserve proposes raising it from {retuneFrom}% to {retuneTo}%."
         },
         "incident": {
           "name": "Incident",
           "short": "First firing opens it",
-          "caption": "The first firing opens {id} at {openedAt}. It is P1, so the page goes out at once. Later firings keep joining the same problem — {count} by {groupedAt} — and it stays one incident with one page."
+          "caption": "The first firing opens {id} at {openedAt}. It is {severity}, so the page waits for the investigation. Later firings keep joining the same problem — {count} by {groupedAt} — and it stays one incident with one page."
         },
         "investigate": {
           "name": "Investigate",
-          "short": "Cause at {confidence}%",
-          "caption": "The page for {id} already went out at {openedAt}. The SRE agent now finds the likely cause — {service} {version} raised the connection pool size, and {pods} pods asked for more connections than postgres-primary allows — and posts it in the same thread at {rcaAt}, with {confidence}% confidence. For P2–P4 the page would have waited for this step, or paged without the cause if triage timed out or failed; the cause then follows in the thread."
+          "short": "Cause found, {confidence} confidence",
+          "caption": "The SRE agent finds the likely cause at {rcaAt}, with {confidence} confidence (no calibrated score yet): {service} {version} raised each pod's connection pool from 20 to 50, and {pods} pods together asked for more than payments-db's {limit} connections. payments-db is a coverage gap, so its limit is inferred from where connections levelled off and the error it returned. The page goes out at {pagedAt} with the cause attached. A P1 would have paged at once, with the cause following in the thread."
         },
         "you": {
           "name": "You",
           "short": "One message",
-          "caption": "The on-call has one message for the problem, with the cause in its thread. Afterwards the agent asks what would have caught it earlier and files a proposal: lower the {alert} threshold from {from}% to {to}%. It goes to the proposal gate like any other change."
+          "caption": "The on-call has one message for the problem, with the cause in its thread. Afterwards the agent asks what would have caught it earlier. The {alert} alert compared each pod with its own pool, so it never fired; the proposal makes it count all pods against payments-db's limit of {limit}. It goes to the proposal gate like any other change."
         },
         "exitPresent": "Exit full screen",
         "rowProblem": "This problem",
         "rowWeek": "This week",
         "counterIncident": "incident",
         "counterHeld": "held for the digest",
-        "p1Path": "P1: pages at once — skips the budget and the wait; cause follows in the thread",
-        "p2Path": "P2–P4: budget applies; page waits for the cause,",
+        "p1Path": "P1: pages at once, without waiting; cause follows in the thread",
+        "p2Path": "P2–P3: waits for the cause;",
         "ledger": {
           "number": "Behind it",
           "name": "Proposals → gate",
           "short": "Off · Suggest · Auto",
           "applied": "Applied with snapshot + review window",
-          "caption": "Every change any part of AutoObserve wants to make becomes a proposal in one ledger. The gate handles each by its action class: Off discards it, Suggest queues it for one-click approval, Auto applies it with a snapshot and a review window."
+          "caption": "Every change any part of AutoObserve wants to make becomes a proposal in one ledger. The gate handles each by its action class: Off never acts and only tells you what it would do, Suggest queues it for one-click approval, Auto applies it with a snapshot and a review window."
         },
         "announce": "Step {n} of {total}: {stage}",
-        "p2PathExtra": "or pages without it if triage times out or fails",
+        "p2PathExtra": "or goes out without it if triage times out",
         "investigateToYou": "cause posted in the same thread"
       },
       "trust": {
         "title": "Why you can trust it",
         "silenceTitle": "Silence you can check",
-        "silenceBody": "Coverage shows what watches every service and signal. Gaps and unscanned streams are reported as findings, never skipped silently, so a quiet day means healthy, not blind.",
+        "silenceBody": "Coverage shows what watches every service and signal. Gaps and unscanned streams are reported as findings, never skipped silently, so a quiet day means nothing it watches is wrong, and you can see exactly what that covers.",
         "undoTitle": "Every automatic config change can be rolled back",
         "undoBody": "Each automatic configuration change keeps a snapshot of the prior state and enters a review window: kept if its checks pass, rolled back if they fail. Meanwhile the old configuration keeps being evaluated silently, so anything the change would have hidden still shows up.",
         "levelTitle": "Clear rules on what it changes",
-        "levelBody": "Every action class has a level. Off discards its proposals, Suggest queues them for one-click approval, and Auto applies them with a snapshot and a review window. Phase 1 ships fixed defaults."
+        "levelBody": "Every action class has a level. Off never acts on its own and only tells you what it would do, Suggest queues each change for one-click approval, and Auto applies it with a snapshot and a review window. Phase 1 ships fixed defaults."
       },
       "roadmap": {
         "title": "What's next",
@@ -22030,31 +22030,29 @@
         "phase2": "Phase 2",
         "action": "Action, including production remediation",
         "outcome": "Outcome",
-        "phase2Body": "Will fix what it safely can through a governed gate, and each kind of action will earn more autonomy as its measured outcomes justify it.",
+        "phase2Body": "Will fix what it safely can through a governed gate. Each kind of action earns autonomy from its measured outcomes; a fix that doesn't help counts against it, and a fix that keeps being needed is reported as a bug, not automated.",
         "next": "Next",
         "afterThat": "After that"
       },
       "explain": {
         "title": "In plain words",
         "sendTitle": "What happens when you send data",
-        "sendBody": "New streams are scanned on first ingest, and every stream is swept within a fixed window. Fixed-threshold checks go live at once; learned baselines go live once there is enough history. While a service learns, it is covered by an error-ratio ceiling and a freshness check.",
+        "sendBody": "New streams are scanned from their first ingest, and every stream is swept within a fixed window. A large first ingest can take a while to scan, and until it finishes the stream is reported as unknown, not covered. Fixed-threshold checks go live at once; learned baselines go live once there is enough history. While a service learns, it is covered by an error-ratio ceiling and a freshness check.",
         "spamTitle": "Why it won't spam you",
-        "spamBody": "Each destination has a weekly budget. Once it is spent, lower-severity problems wait for the digest instead of paging; P1 never waits and never counts against a budget. P2–P4 pages wait for the cause, or go out without it if triage times out or fails, and the cause then follows in the thread. Being over budget is treated as a defect, so AutoObserve proposes a fix for the noise behind it.",
+        "spamBody": "Severity decides the route: P1 and P2 always page, P3 sends a message as soon as it's ready that never pages anyone, and P4 goes into the Friday summary. P2 and P3 wait up to 2 minutes for the cause, or go out without it if triage times out or fails, and the cause then follows in the thread. Noisy alerts are treated as defects, so AutoObserve proposes retunes for them.",
         "wrongTitle": "What if it's wrong",
         "wrongBody": "An automatic change that makes things worse is rolled back by its review window (see above), and you can undo it yourself from Activity at any time. Anything waiting for approval changes nothing until you approve it.",
         "changesTitle": "What it changes on its own",
-        "changesBody": "Coverage creates detectors and matching library alerts on its own. Among changes to existing alerts, only destination repairs and deduplication apply automatically. Retiring an alert is never automatic, and alerts you built are never changed silently. Phase-2 production actions such as a rollback cannot be undone, so each will state its own recovery rule."
+        "changesBody": "Coverage creates detectors and matching library alerts on its own. Among changes to existing alerts, only deduplication applies on its own. Retiring an alert is never automatic, and alerts you built are never changed silently. Some production actions, like a restart, can't be undone. Others, like a rollback, are reversed by redeploying. Each states its own recovery rule."
       },
-      "exampleWeek": "Example week: incident day",
-      "conceptPreview": "Concept preview"
+      "exampleWeek": "Example week: demo week",
+      "conceptPreview": "Concept preview",
+      "demoNote": "This example comes from the demo week."
     },
     "title": "AutoObserve",
-    "subtitle": "Send your data. OpenObserve finds the problems and tells you, with the cause attached. When it says nothing, nothing is wrong.",
+    "subtitle": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
     "demo": "Demo",
-    "scenarioQuiet": "Quiet day",
-    "scenarioIncident": "Incident day",
     "phase2": "Phase 2",
-    "percent": "{value}%",
     "tabs": {
       "status": "Status",
       "issues": "Issues",
@@ -22066,7 +22064,8 @@
     "loops": {
       "coverage": "Coverage",
       "calibration": "Calibration",
-      "investigation": "Investigation"
+      "investigation": "Investigation",
+      "action": "Action"
     },
     "signals": {
       "requests": "Requests",
@@ -22087,41 +22086,52 @@
     "status": {
       "quietHeadline": "All quiet. No incidents.",
       "incidentHeadline": "{count} problem needs you. | {count} problems need you.",
-      "quietSub": "{gaps} coverage gaps and {streams} unscanned stream need a look, and {proposals} proposals are waiting — listed below.",
       "incidentSub": "Each problem is one incident. The cause is attached, or follows in the same thread while the investigation is still running.",
-      "deferred": "{count} low-severity problem held for tonight's digest — {destination} budget {used}/{limit} spent. | {count} low-severity problems held for tonight's digest — {destination} budget {used}/{limit} spent.",
-      "p1NeverDeferred": "P1 problems are never deferred and never count against a budget.",
+      "deferred": "{count} low-severity (P4) problem held for Friday's summary. P4 problems go there by severity. | {count} low-severity (P4) problems held for Friday's summary. P4 problems go there by severity.",
+      "p1NeverDeferred": "P1 and P2 always page. P3 sends a message that doesn't page, and P4 waits for Friday's summary.",
       "servicesWatched": "Fully watched",
       "ofTotal": "of {total}",
       "learning": "Learning",
       "gaps": "Coverage gaps",
-      "notificationsThisWeek": "Budget used",
-      "usedOf": "{used} of {limit}",
       "changesThisWeek": "Changes made",
       "noiseTitle": "Noise absorbed this week",
-      "firings": "detector firings",
-      "incidents": "incidents",
-      "notifications": "notifications",
-      "noiseHint": "Detectors fire constantly. AutoObserve groups firings into incidents and only notifies when a problem needs a person.",
+      "firings": "detector firing | detector firings",
+      "incidents": "incident | incidents",
+      "notifications": "notification | notifications",
+      "noiseHint": "Most detector firings are brief blips that clear on their own. I group the rest into incidents and notify only when a person is needed.",
       "openProblems": "Open problems",
-      "nothingOpen": "Nothing open. The last problem was resolved yesterday at 17:06.",
+      "nothingOpen": "Nothing open. The last problem was resolved {when}.",
       "viewAll": "View all",
-      "budgets": "Notification budgets",
-      "budgetSpent": "Spent",
-      "budgetHint": "Past the weekly budget, non-P1 problems go to the evening digest instead of paging.",
       "recentActivity": "Recent activity",
       "coverageGaps": "Coverage gaps",
       "gapTitle": "{service} · {signal}",
       "streamTitle": "Stream {stream}",
       "thisWeek": "this week",
-      "selfCheck": "AutoObserve pipeline healthy · discovery, detection and incidents all ran in the last 5 min"
+      "selfCheck": "AutoObserve pipeline healthy · discovery, detection and incidents all ran in the last minute | AutoObserve pipeline healthy · discovery, detection and incidents all ran in the last {count} minutes",
+      "nothingOpenEver": "Nothing open, and nothing to resolve yet.",
+      "quietSubClear": "No coverage gaps, every stream is scanned, and no proposals are waiting.",
+      "blindHeadline": "Partly blind: 1 service can't be seen right now. | Partly blind: {count} services can't be seen right now.",
+      "subGaps": "1 coverage gap | {count} coverage gaps",
+      "subStreams": "1 unscanned stream | {count} unscanned streams",
+      "subAnd": " and ",
+      "subNeedLook": "{items} needs a look. | {items} need a look.",
+      "subProposals": "1 proposal is waiting. | {count} proposals are waiting.",
+      "pagesThisWeek": "Pages sent",
+      "pagesCount": "1 page | {count} pages",
+      "routingTitle": "Where I sent things this week",
+      "routingHint": "Severity decides the route: P1 and P2 page, P3 gets a message that doesn't page, and P4 goes into Friday's summary.",
+      "fridaySummary": "Friday's summary",
+      "messagesCount": "1 message | {count} messages",
+      "problemsCount": "1 problem | {count} problems",
+      "asksCount": "1 request for an OK | {count} requests for an OK",
+      "messagesNoPage": "Messages (no page)"
     },
     "issues": {
       "subtitle": "Incidents grouped and investigated by the SRE agent. One notification per problem; the cause is attached, or follows in the same thread if triage times out or fails.",
       "open": "Open",
       "recent": "Resolved",
       "all": "All",
-      "heldForDigest": "Held for digest",
+      "heldForDigest": "Held for Friday's summary",
       "colTitle": "Problem",
       "colSeverity": "Severity",
       "colServices": "Affected services",
@@ -22137,7 +22147,7 @@
       "rcaSummary": "Summary",
       "likelyCause": "Likely cause",
       "confidence": "Confidence",
-      "confidenceValue": "Confidence: {value}%",
+      "confidenceValue": "Confidence: {value} (no calibrated score yet)",
       "nextStep": "Suggested next step",
       "evidence": "Evidence",
       "blastRadius": "Blast radius",
@@ -22147,14 +22157,15 @@
       "none": "None",
       "timeline": "Timeline",
       "notification": "Notification sent",
-      "notSent": "Slack page deferred to tonight's digest (budget spent). Recorded in the in-product inbox.",
+      "notSent": "No page: this low-severity problem was held for the Friday summary. Recorded in the in-product inbox.",
       "sender": "AutoObserve",
       "threadReply": "replied in thread",
       "p1Note": "P1 pages immediately, before the investigation lands. The cause follows in the same thread.",
-      "gateNote": "P2–P4 notifications wait for the investigation, so the first message usually carries the cause. If triage times out or fails, the message says the investigation is still running or failed, and the cause follows in the same thread.",
+      "gateNote": "P2 and P3 notifications wait up to 2 minutes for the investigation, so the first message usually carries the cause. If triage times out or fails, the message says the investigation is still running or failed, and the cause follows in the same thread. P4 problems don't notify anyone; they go into the Friday summary.",
       "caughtEarlier": "What would have caught this earlier",
       "analyzedAt": "Investigation landed at {time}.",
-      "triggersSample": "Showing {shown} of {total} firings"
+      "triggersSample": "Showing {shown} of {total} firings",
+      "waitingForOk": "Waiting for your OK"
     },
     "coverage": {
       "showing": "Showing {shown} of {total} services",
@@ -22178,23 +22189,22 @@
       "predicateUnmatched": "{predicate} — not matched",
       "reason": "Why",
       "history": "{days} of {total} days of history",
-      "plan": "Coverage plan",
-      "pending": "{count} pending",
+      "plan": "What I can't watch yet",
       "planBlocked": "Blocked",
       "streams": "Streams scanned",
-      "scanned": "Scanned {time} · {count} services",
-      "notScanned": "Not yet scanned — unknown, not covered",
-      "ratio": "{used}/{limit}",
-      "ceilingTip": "Org detector ceiling reached. New detectors wait in the coverage plan.",
+      "scanned": "Scanned {time} · 1 service | Scanned {time} · {count} services",
+      "notScanned": "First scan in progress — unknown, not covered until it finishes",
       "guardrails": "Guardrails active while learning: error-ratio ceiling · freshness check (fires if the stream stops)",
-      "alsoWatchedBy": "Also watched by"
+      "alsoWatchedBy": "Also watched by",
+      "scannedStale": "{time} · 1 service | {time} · {count} services",
+      "blockedCount": "1 can't be watched yet | {count} can't be watched yet"
     },
     "activity": {
       "allLoops": "All loops",
       "allStatuses": "All statuses",
       "ledgerHint": "Every change AutoObserve proposes or makes is recorded here.",
       "userBuilt": "User-built alert",
-      "confidence": "Confidence {value}%",
+      "confidence": "Confidence: {value}",
       "evidence": "Evidence:",
       "before": "Before",
       "after": "After",
@@ -22212,50 +22222,50 @@
       "rejectedToast": "Rejected. Recorded against this action class.",
       "emptyTitle": "No entries",
       "emptyDescription": "Nothing in the ledger matches these filters.",
-      "reviewWindow": "In review for {window} — kept automatically if its checks pass, rolled back if they fail. The prior configuration keeps being evaluated silently, so anything this change would have hidden still shows up. Undo restores the prior state now."
+      "reviewWindow": "In review for {window} — kept automatically if its checks pass, rolled back if they fail. The prior configuration keeps being evaluated silently, so anything this change would have hidden still shows up. Undo restores the prior state now.",
+      "approvedNote": "Approved by you at {time}.",
+      "applyingNote": "Approved by you at {time}; applying it now.",
+      "appliedNote": "Approved by you at {time} and applied.",
+      "declinedNote": "Declined by you."
     },
     "policy": {
-      "actionClasses": "Action classes",
-      "gateHint": "Only destination repairs and deduplication apply automatically, with a prior-state snapshot and a review window: kept if their checks pass, rolled back if they fail. Everything else waits for one-click approval.",
+      "gateHint": "Among changes to existing alerts, only deduplication applies on its own, with a prior-state snapshot and a review window: kept if its checks pass, rolled back if they fail. Everything else waits for one-click approval.",
       "off": "Off",
       "suggest": "Suggest",
       "auto": "Auto",
       "phase2Title": "Action — remediation",
-      "phase2Hint": "Remediation in production arrives in phase 2. Every class is Off until phase 2.",
+      "phase2Hint": "Production fixes. Each class earns its level from its measured track record and never acts above it.",
       "investigation": "Investigation",
-      "budgets": "Notification budgets",
-      "budgetsHint": "Weekly budget per destination. Problems past the budget go to the evening digest.",
-      "budgetsP1": "P1 is exempt from budgets.",
-      "kindSlack": "Slack",
-      "kindPagerDuty": "PagerDuty",
-      "kindEmail": "Email",
       "outcomesTitle": "Outcomes",
-      "outcomesBody": "AutoObserve measures what each action did: did the error rate recover, did the page stop, was it undone. Classes that keep landing well earn more autonomy, one class at a time.",
-      "outcomesExample": "Autonomy is earned per action class, and production actions cannot be undone. Once Rollback deploy's measured outcomes show it restores health without follow-up incidents, it can move from Suggest to Auto.",
+      "outcomesBody": "AutoObserve measures what each action did: did the error rate recover, did the page stop, was it undone. A class that keeps landing well earns more autonomy, one class at a time; a miss counts against it, and a fix that keeps being needed is reported as a bug instead of automated.",
+      "outcomesExample": "ScaleQueueWorkers moved to Auto after 7 approved scale-outs worked. Its one miss, on 2 October, added a pre-check, and a second miss moves it back to Suggest. AbortRollout waits for your OK; RollbackDeploy stays Off until it has a track record.",
       "triage": {
         "parallel": "Parallel",
         "gate": "Gate",
-        "p2p4": "P2–P4",
+        "p2p4": "P2–P3",
         "p1Desc": "Pages at once and investigates alongside; the cause follows in the same thread. Gate is not allowed for P1.",
-        "gateDesc": "Hold the page until the investigation lands. Fails open: if triage times out or fails, it pages anyway, says the investigation is still running or failed, and the cause follows in the thread."
+        "gateDesc": "Hold the page until the investigation lands, for up to 2 minutes. Fails open: if triage times out or fails, it pages anyway, says the investigation is still running or failed, and the cause follows in the thread."
       },
       "classes": {
-        "RepairDestination": "Fix a destination that is failing to deliver (renamed channel, expired token).",
         "EnableDeduplication": "Turn on deduplication for an alert that repeats within minutes.",
         "CreateDetector": "Create an anomaly detector on a service's requests, errors or latency.",
         "RaiseThreshold": "Raise a threshold that fires on healthy days.",
         "LengthenEvaluationWindow": "Lengthen the window of an alert that flaps.",
-        "FixAlertQuery": "Correct an alert query that can never match.",
+        "FixAlertQuery": "Correct an alert query that measures the wrong thing or can never match.",
         "AttachDestination": "Attach a destination to a detector that fires into nowhere.",
         "AddLibraryAlert": "Add a scheduled alert from the library where its predicate matches.",
         "MoveToIncidentDelivery": "Deliver a user-built alert through its incident instead of its own route.",
         "ReviewForDeletion": "Propose retiring an alert nobody acts on.",
         "RollbackDeploy": "Roll back the deploy that caused a problem.",
         "ScaleService": "Scale a saturated service out.",
-        "RestartPod": "Restart a stuck or leaking pod.",
+        "RestartPod": "Restart a pod that stopped serving while its replicas are healthy; a repeat opens a bug instead.",
         "ToggleFeatureFlag": "Turn off the feature flag behind a problem.",
         "RunRunbookStep": "Run a step from the service's runbook.",
-        "LowerThreshold": "Lower a threshold that fired too late to warn before an incident."
+        "LowerThreshold": "Lower a threshold that fired too late to warn before an incident.",
+        "RevertConfigChange": "Put back a recent setting change a problem started with, when the replicas without it are healthy.",
+        "EvictLeakedConnections": "Close connections a service checked out and never returned (found by leak detection), leaving queries in flight alone. Each one is linked to the leak's bug.",
+        "AbortRollout": "Send traffic back to the previous version when only the new version's pods fail mid-rollout. Resumable in one click.",
+        "ScaleQueueWorkers": "Add workers to a backed-up queue, up to a cap; scale back on its own if the drain rate doesn't improve."
       },
       "triageHint": "L0 triage per severity. Fixed in phase 1.",
       "channels": "Channels",
@@ -22264,16 +22274,558 @@
       "channelDefault": "Default for every org. Always on.",
       "alwaysOn": "Always on",
       "channelSlack": "Slack {channel}",
-      "channelPagerDuty": "PagerDuty · {service}",
       "channelConnectedDesc": "Connected. Optional; the inbox and email work without it.",
       "connected": "Connected",
       "defaultsNote": "Phase 1 ships fixed product defaults. Per-org overrides come later.",
       "groupCoverage": "Coverage — creates detectors automatically",
-      "groupCoverageHint": "New services get anomaly detectors and the matching library alerts on their own. Each creation is recorded, can be undone, and goes through a review window.",
+      "groupCoverageHint": "Every new service gets anomaly detectors and the matching library alerts as soon as it appears, with basic safety checks while it learns. Each creation is recorded, can be undone, and goes through a review window.",
       "groupCalibration": "Calibration — changes to existing alerts",
-      "budgetValue": "{limit} per week",
-      "budgetValueDigest": "{limit} per week · overflow to digest"
+      "channelEmail": "Email {address}",
+      "paging": "Paging",
+      "pagingHint": "Severity decides how a problem reaches people.",
+      "routing": {
+        "p1p2": "P1 and P2",
+        "p1p2Desc": "Hurts customers. Pages on-call at any hour.",
+        "page": "Page",
+        "p3": "P3",
+        "p3Desc": "A Slack message sent as soon as it's ready. Never pages anyone.",
+        "message": "Message",
+        "p4": "P4",
+        "p4Desc": "Goes into the Friday summary.",
+        "summary": "Friday summary"
+      }
     },
-    "notInDemo": "Not available in this demo"
+    "notInDemo": "Not available in this demo",
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "uncalibrated": "no calibrated score yet"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "Demo",
+    "scenarioLabel": "Demo scenario",
+    "scenarios": {
+      "demo": "Demo week",
+      "allClear": "All clear",
+      "incident": "Active incident",
+      "cantSee": "Can't see",
+      "noBaseline": "No baseline"
+    },
+    "nav": {
+      "history": "History",
+      "settings": "Settings",
+      "howItWorks": "How it works"
+    },
+    "recent": {
+      "title": "Last 7 days",
+      "all": "All",
+      "none": "No {priority} problems in the last 7 days."
+    },
+    "noProblems": {
+      "week": "No problems in the last 7 days. I checked {count} service around the clock. | No problems in the last 7 days. I checked {count} services around the clock."
+    },
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "seeAll": "See all {count}",
+    "showFewer": "Show fewer",
+    "days": {
+      "today": "Today",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "sep12": "12 September",
+      "sep24": "24 September",
+      "sep30": "30 September",
+      "oct1": "1 October",
+      "oct2": "2 October",
+      "sep23": "23 September"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db will run out of disk in about 3 days",
+        "summary": "Its disk is filling about 18 GB a day since Thursday's orders release turned up audit logging, so it fills around Wednesday morning. When it does, checkout, orders and refunds will start failing. Nothing is broken yet, so I sent your team a heads-up instead of paging.",
+        "notify1": "orders-db will run out of disk in about 3 days, around Wednesday 11:00.",
+        "notify2": "Cause: since orders 3.8.0 went out on Thursday, audit logging writes about 18 GB a day. Before that the disk grew about 6 GB a day.",
+        "notify3": "Turn audit logging back down or add disk space before Wednesday. When it fills, checkout, orders and refunds will fail. Nothing is broken yet, so this is a heads-up, not a page."
+      },
+      "search": {
+        "title": "Search is slow and search-2 keeps crashing",
+        "titleFixed": "Search was slow while search-2 kept crashing",
+        "summary": "About 1 in 5 searches take over 3 seconds, since 10:27. A setting changed on search-2 at 10:16 makes it run out of memory. I've paged on-call, and it's still happening.",
+        "notify1": "Search is slow: about 1 in 5 searches take over 3 seconds, since 10:27.",
+        "notify2": "Cause: a setting changed on search-2 at 10:16 fills its memory. It has crashed about 10 times since 10:20. The other 4 nodes don't have the change and are fine.",
+        "notify3": "Putting the old setting back should fix it, and I can undo it. Reply \"revert\" and I'll do it. Whoever made the change should check why.",
+        "summaryFixed": "It started at 10:27, because a setting changed on search-2 filled its memory. You approved putting the old setting back, so I did, and searches are back to normal.",
+        "summaryFixing": "It started at 10:27, because a setting changed on search-2 fills its memory. You approved putting the old setting back, so I'm doing that now."
+      },
+      "checkout": {
+        "title": "1 in 12 payments failed after a deploy",
+        "summary": "payments-api 2.3.1 asked the payments database for more connections than it allows. Rolling back fixed it 18 minutes after the failures began.",
+        "notify1": "Checkout is failing about 1 in 12 payments, since 14:02.",
+        "notify2": "Likely cause: payments-api 2.3.1 went out at 14:01 and raised its connection pool from 20 to 50 per server. 6 servers × 50 is more than the 200 the payments database allows.",
+        "notify3": "Rolling back to 2.3.0 is the quickest fix."
+      },
+      "pool": {
+        "title": "Checkout ran out of database connections",
+        "summary": "Leaked connections used up all the free ones, and payments started timing out. You approved clearing them, so I did. Payments recovered 2 minutes later.",
+        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 11:18.",
+        "notify2": "Cause: 48 of 50 connections are held by refund exports that never returned them. It's the CHK-482 leak, third time in two weeks.",
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it."
+      },
+      "email": {
+        "title": "Order emails ran up to 9 minutes late",
+        "summary": "All the mail workers were replaced at once overnight, and the queue caught up by itself within about 20 minutes. This was minor, so it went into Friday's summary."
+      },
+      "recs": {
+        "title": "Recommendations got slower for 15 minutes",
+        "summary": "They went from a quarter of a second to almost a second. The nightly cache rebuild had been started by hand during the afternoon, and it finished by itself. I held it for Friday's summary."
+      },
+      "login": {
+        "title": "Sign-in was slow for about 25 minutes",
+        "summary": "1 in 8 people waited more than 5 seconds. The session cache ran out of space after a traffic spike and signed some people out. Your team added space and it recovered.",
+        "notify1": "Sign-in is slow: about 1 in 8 people wait over 5 seconds, since 10:12.",
+        "notify2": "Cause: the session cache is full after traffic doubled at 10:05.",
+        "notify3": "Adding space to the cache should fix it."
+      },
+      "queue": {
+        "title": "Orders backed up in the queue",
+        "summary": "About 4,000 were waiting at the worst. I added workers as you've allowed, but it didn't help, so I put them back and paged on-call. The real cause was a database index that a migration left broken; your team fixed it 40 minutes after it began.",
+        "notify1": "Orders are backing up: about 4,000 waiting, since 21:30.",
+        "notify2": "I added workers at 21:33, as you've allowed, but it didn't help, so I've put them back.",
+        "notify3": "Order lookups are about 40 times slower since the 21:20 database migration. Check the orders_by_status index first."
+      },
+      "uploads": {
+        "title": "Image uploads failed for 1 in 40 people",
+        "summary": "It lasted 10 minutes, because a certificate expired before one server had loaded its replacement. It sorted itself out, so I held it for Friday's summary."
+      },
+      "push": {
+        "title": "Push notifications arrived 2 minutes late",
+        "summary": "It lasted half an hour, while the provider that delivers them was slow. Minor, so it waited for Friday's summary."
+      },
+      "checkoutNow": {
+        "title": "Checkout is failing 1 in 6 payments",
+        "titleFixed": "Checkout failed 1 in 6 payments",
+        "summary": "It started at 10:43, and I'm still looking into why. So far it lines up with version 2.4.0 going out at 10:41, and I've paged on-call.",
+        "notify1": "Checkout is failing about 1 in 6 payments, since 10:43.",
+        "notify2": "I'm still looking into why. So far it lines up with checkout 2.4.0 going out at 10:41.",
+        "notify3": "Only the servers on 2.4.0 are failing. Reply \"stop\" and I'll send traffic back to the old version; the old servers have room for it. I can't see payments-db directly, so I haven't ruled it out.",
+        "summaryFixing": "It started at 10:43, right after version 2.4.0 went out. You approved stopping the rollout, so I'm sending traffic back to the old version now.",
+        "summaryFixed": "It started at 10:43, after version 2.4.0 went out. You approved stopping the rollout, and failures stopped once traffic went back to the old version. Why 2.4.0 fails is still for your team to find."
+      },
+      "gateway": {
+        "title": "The API rejected 1 in 30 requests",
+        "summary": "It started after a config change. Your team reverted it, and it was back to normal 13 minutes after it began.",
+        "notify1": "The API is rejecting about 1 in 30 requests, since 15:22.",
+        "notify2": "Likely cause: a config change at 15:20 shortened how long sign-in tokens last.",
+        "notify3": "Reverting that change should fix it."
+      },
+      "poolSep": {
+        "title": "Checkout ran out of database connections",
+        "summary": "Leaked connections used up all the free ones, and payments started timing out. I traced the leak to refund exports, and you approved clearing the leaked connections. Payments recovered 2 minutes later.",
+        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 15:42.",
+        "notify2": "Cause: 47 of 50 connections are held by refund exports that never returned them. It looks like a leak in the refund export code.",
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it."
+      },
+      "poolOct": {
+        "title": "Checkout ran out of database connections again",
+        "summary": "It was the same refund-export leak (CHK-482). You approved clearing the leaked connections, and payments recovered 2 minutes later.",
+        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 10:05.",
+        "notify2": "Cause: 46 of 50 connections are held by refund exports. It's the CHK-482 leak again, second time in 8 days.",
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it."
+      }
+    },
+    "drawer": {
+      "worked": "Worked",
+      "didntHelp": "Didn't help",
+      "now": "Now"
+    },
+    "needs": {
+      "heading": "One thing I need from you | {count} things I need from you",
+      "undo": "Undo",
+      "retune": {
+        "body": "The \"{alert}\" alert on {host} went off {fired} times this month, and nobody needed to act. The disk climbs to about 85% during nightly cleanup and is back near 70% by morning. Even on its busiest day, it would take more than 3 days to fill from 90%. I'd like to raise it to {to}%. I'll still warn you if the disk is ever on track to fill within a day.",
+        "yes": "Yes, change it",
+        "no": "Leave it",
+        "doneYes": "Done. I raised it to {to}%. The fill warning stays on.",
+        "doneNo": "Okay, I'll leave it at {from}%."
+      },
+      "fixNow": {
+        "search": {
+          "body": "Search is slow because a setting changed on node search-2 at 10:16 fills its memory, so it keeps crashing. The other 4 nodes still have the old setting and are fine. May I put it back? I can undo this.",
+          "yes": "Put it back",
+          "no": "I'll handle it",
+          "doneYes": "Done. Putting it back now.",
+          "doneNo": "Okay, it's yours. I'll keep watching.",
+          "doneSettled": "Done. search-2 is back and searches are normal."
+        },
+        "checkoutNow": {
+          "body": "Checkout is failing about 1 in 6 payments, and only the servers on 2.4.0 are failing. The 6 servers on the old version have room for all the traffic. May I stop the rollout and send traffic back to them? 2.4.0 stays deployed for your team to look at.",
+          "yes": "Stop the rollout",
+          "no": "I'll handle it",
+          "doneYes": "Done. Stopping the rollout now.",
+          "doneNo": "Okay, it's yours. I'll keep watching.",
+          "doneSettled": "Done. Payments are back to normal."
+        }
+      },
+      "fromNowOn": {
+        "body": "{done} times now, a new version made only its own servers fail while it was rolling out. Each time I asked to send traffic back to the old version, and the failures stopped within 2 minutes. May I do that on my own during a rollout from now on? I'll leave the new version in place for your team, and tell them straight away.",
+        "yes": "Yes, on its own",
+        "no": "Keep asking me",
+        "doneYes": "Done. I'll stop bad rollouts on my own and tell you each time.",
+        "doneNo": "Okay, I'll keep asking you first."
+      },
+      "labels": {
+        "fixNow": "Fix now",
+        "fromNowOn": "Let me handle this",
+        "retune": "Quieter alert"
+      },
+      "empty": {
+        "title": "Nothing needs you right now",
+        "body": "I'll ask here when there's a decision for you to make.",
+        "allVisible": "I can see every service you send me, so nothing I watch is wrong right now.",
+        "stillLearning": "I can see everything you send me, but I'm still learning what normal looks like for most of it."
+      },
+      "allAnswered": "Nothing else needs you right now"
+    },
+    "footer": {
+      "text": "I check myself too: if I stop working, you'll hear about it.",
+      "seeAll": "See everything I watch",
+      "seeChanges": "See everything I've changed"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1 minute ago | {count} minutes ago",
+        "stale": "No new data for 1 minute (since {since}) | No new data for {count} minutes (since {since})"
+      },
+      "summaryWatching": "I'm watching {watched} of your {total} services.",
+      "summaryAll": "I'm watching all {total} of your services.",
+      "summaryWithClauses": "{head} {clauses}.",
+      "clauseLearning": "{count} is still learning | {count} are still learning",
+      "clauseUnseen": "there's one I can't see | there are {count} I can't see",
+      "legend": {
+        "watching": "Fully watched",
+        "learning": "Learning",
+        "unseen": "Can't see"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "I'm watching all {total} of your services, and I'm still learning what normal looks like for each of them."
+    },
+    "coveragePage": {
+      "title": "Everything I watch",
+      "back": "Back"
+    },
+    "activityPage": {
+      "title": "What I've changed",
+      "stats": {
+        "window": "Last 7 days",
+        "made": "Change | Changes",
+        "worked": "Worked",
+        "review": "In review",
+        "undone": "Undone"
+      },
+      "filters": {
+        "all": "All",
+        "fixes": "Fixes",
+        "watching": "Watching",
+        "tuning": "Alert tuning"
+      },
+      "status": {
+        "applying": "Applying now",
+        "worked": "Worked",
+        "done": "Done",
+        "review": "In review",
+        "reviewDays": "In review · {count} day left | In review · {count} days left",
+        "didntHelp": "Didn't help",
+        "undone": "Undone"
+      },
+      "actions": {
+        "undo": "Undo",
+        "showDetails": "Show details",
+        "hideDetails": "Hide details"
+      },
+      "details": {
+        "name": "Change",
+        "target": "On",
+        "confidence": "Confidence",
+        "saw": "What I saw",
+        "recurring": "This fix keeps being needed for the same leak ({bug}), so I'll always ask first until it's fixed.",
+        "undoDecided": "Undo takes this back, and I'll ask you again."
+      },
+      "toast": {
+        "undone": "Undone. It's back the way it was.",
+        "undoDecided": "Undone. I'll ask you again."
+      },
+      "empty": {
+        "filter": "Nothing here right now.",
+        "scenario": "I haven't changed anything yet. When I make a change, you'll see it here."
+      },
+      "entries": {
+        "L-313": {
+          "done": "Stopped checkout's 2.4.0 rollout",
+          "why": "Only the 6 servers on 2.4.0 are failing; the 6 on the old version can take all the traffic.",
+          "from": "6 of 12 pods",
+          "to": "no traffic",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "Put search-2's cache setting back to 10%",
+          "why": "It went up to 60% at 10:16, and search-2 has been running out of memory since.",
+          "from": "60%",
+          "to": "10%",
+          "on": "cache size · search-2"
+        },
+        "L-309": {
+          "done": "Raised the 'disk 80%' alert on ingest-3 to 90%",
+          "why": "It went off 41 times this month and nobody needed to act. The fill warning stays on.",
+          "from": "80%",
+          "to": "90%",
+          "on": "disk alert · ingest-3"
+        },
+        "L-310": {
+          "done": "Started watching returns, exchanges and gift-cards",
+          "why": "Found them this morning. Learning what's normal for them over 7 days.",
+          "from": "not watched",
+          "to": "watched",
+          "on": "3 services"
+        },
+        "L-314": {
+          "done": "Started watching 6 services I found this morning",
+          "why": "They showed up in your traces today. Learning what's normal for them over 7 days.",
+          "from": "not watched",
+          "to": "watched",
+          "on": "6 services"
+        },
+        "L-311": {
+          "done": "Got your OK to stop bad rollouts on my own",
+          "why": "I stopped 6 with your approval in 60 days; errors were back to normal within 2 minutes each time.",
+          "from": "ask first",
+          "to": "on my own",
+          "on": "stopping rollouts"
+        },
+        "L-304": {
+          "done": "Cleared checkout's 48 leaked database connections",
+          "why": "Payments were timing out. They were back to normal 2 minutes later.",
+          "from": "50 of 50 in use",
+          "to": "2 in use",
+          "on": "checkout pool"
+        },
+        "L-299": {
+          "done": "Cleared checkout's 46 leaked database connections",
+          "why": "The same leak as 23 September. Payments were back to normal 2 minutes later.",
+          "from": "50 of 50 in use",
+          "to": "4 in use",
+          "on": "checkout pool"
+        },
+        "L-296": {
+          "done": "Cleared checkout's 47 leaked database connections",
+          "why": "A new leak, so I filed it with the checkout team as CHK-482 afterwards.",
+          "from": "50 of 50 in use",
+          "to": "3 in use",
+          "on": "checkout pool"
+        },
+        "L-301": {
+          "done": "Started watching billing-api, billing-worker and invoice-service",
+          "why": "Found them in your traces. Still learning what's normal for them.",
+          "from": "not watched",
+          "to": "watched",
+          "on": "3 services"
+        },
+        "L-307": {
+          "done": "Fixed the payments-api connection alert so it counts all servers",
+          "why": "It checked each server on its own, so it never went off during Tuesday's outage.",
+          "from": "each pod over 95%",
+          "to": "all pods over 85%",
+          "on": "connection alert"
+        },
+        "L-302": {
+          "done": "Grouped the 3 checkout latency alerts into one",
+          "why": "They went off together 94% of the time, so one slowdown paged you 3 times.",
+          "from": "3 alerts",
+          "to": "1",
+          "on": "checkout latency"
+        },
+        "L-303": {
+          "done": "Raised the 'disk 80%' alert on ingest-1 to 90%",
+          "why": "It went off 29 times in 30 days and nobody needed to act. The fill warning stays on.",
+          "from": "80%",
+          "to": "90%",
+          "on": "disk alert · ingest-1"
+        },
+        "L-305": {
+          "done": "Added 4 orders-consumer workers to clear a backlog",
+          "why": "It didn't help, so I scaled back to 4 and paged on-call 3 minutes later.",
+          "from": "4 workers",
+          "to": "8 workers",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "Got your OK to add queue workers on my own",
+          "why": "You approved it 7 times during traffic bursts, and the backlog cleared every time.",
+          "from": "ask first",
+          "to": "on my own",
+          "on": "adding queue workers"
+        },
+        "L-312": {
+          "done": "Started watching the 18 services I found when you connected",
+          "why": "Learning what's normal for each one. Their alerts start once that's ready.",
+          "from": "not watched",
+          "to": "watched",
+          "on": "18 services"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "History",
+      "seeChange": "See the change",
+      "filters": {
+        "all": "All",
+        "problems": "Problems",
+        "changes": "Changes",
+        "fixes": "Fixes",
+        "decisions": "Your decisions"
+      },
+      "empty": "Nothing here yet.",
+      "entries": {
+        "checkoutNowPaged": "I paged on-call about checkout failing payments.",
+        "searchPaged": "I paged on-call about search being slow.",
+        "searchAsked": "I asked whether I may put search-2's cache setting back.",
+        "euStopped": "Nothing has arrived from the {cluster} cluster since this time. I told you here and in Slack.",
+        "fridaySummary": "I sent Friday's summary with {count} minor problem. | I sent Friday's summary with {count} minor problems.",
+        "emailHeld": "I held a minor problem with order emails for Friday's summary.",
+        "poolFixed": "I closed checkout's leaked database connections. Payments recovered 2 minutes later.",
+        "poolApproved": "You approved closing checkout's leaked database connections.",
+        "billingWatch": "I started watching billing-api, billing-worker and invoice-service.",
+        "checkoutPaged": "I paged on-call about checkout failing payments.",
+        "recsHeld": "I held a minor problem with recommendations for Friday's summary.",
+        "diskApproved": "You approved raising the disk alert on ingest-1 to {to}%.",
+        "latencyGrouped": "I grouped the three checkout slowness alerts into one, so a single slowdown pages once.",
+        "queueFixed": "I added orders queue workers, but the queue kept growing, so I put them back and paged on-call.",
+        "loginPaged": "I paged on-call about slow sign-in.",
+        "queuePermission": "You allowed me to add queue workers on my own, up to 8.",
+        "gatewayPaged": "I paged on-call about the API rejecting requests.",
+        "found18": "I found {count} services and started learning what normal looks like for them.",
+        "connected": "You connected me to your data.",
+        "thresholdApproved": "You approved making the payments-api connection alert count all servers against the database's limit of 200.",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "You approved putting search-2's setting back.",
+              "no": "You said you'd handle search-2 yourself.",
+              "undoYes": "You undid putting search-2's setting back. I re-applied 60%, so search-2 will start running out of memory again; I've told on-call.",
+              "cancel": "You cancelled putting search-2's setting back before I applied it. search-2 is still running out of memory; I've told on-call.",
+              "undoNo": "You took back saying you'd handle search-2 yourself."
+            },
+            "checkoutNow": {
+              "yes": "You approved stopping the checkout 2.4.0 rollout.",
+              "no": "You said you'd handle the checkout rollout yourself.",
+              "undoYes": "You undid stopping the 2.4.0 rollout. Traffic is going to 2.4.0 again, so payments may start failing again; I've told on-call and I'm watching.",
+              "cancel": "You cancelled stopping the 2.4.0 rollout before I did it. Payments are still failing; I've told on-call.",
+              "undoNo": "You took back saying you'd handle the checkout rollout yourself."
+            }
+          },
+          "retune": {
+            "yes": "You approved raising the disk alert on ingest-3 to 90%.",
+            "no": "You said not now to raising the disk alert on ingest-3.",
+            "undoYes": "You undid raising the disk alert on ingest-3. It's back at 80%, so it will start going off on healthy nights again.",
+            "undoNo": "You took back your not-now on the disk alert on ingest-3."
+          },
+          "fromNowOn": {
+            "yes": "You approved letting me stop bad rollouts on my own.",
+            "no": "You said not now to letting me stop bad rollouts on my own.",
+            "undoYes": "You took back letting me stop bad rollouts on my own.",
+            "undoNo": "You took back your not-now on letting me stop bad rollouts on my own."
+          }
+        },
+        "fixedNow": {
+          "search": "I put search-2's setting back. Searches are back to normal.",
+          "checkoutNow": "I sent traffic back to the old version, and failures stopped. Why 2.4.0 fails is still for your team to find; I've kept it deployed for them."
+        },
+        "checkoutNowAsked": "I asked whether I may stop the checkout 2.4.0 rollout.",
+        "newWatch": "I found {count} new services this morning (returns, exchanges and gift-cards) and started watching them right away.",
+        "foundWatch": "I found {count} new services this morning and started watching them right away."
+      }
+    },
+    "settingsDrawer": {
+      "title": "Settings",
+      "reach": "Where should I reach you?",
+      "destSlack": "Slack: {channel}",
+      "destEmail": "Email: {address}",
+      "autonomy": "How much should I do on my own?",
+      "tell": "Tell me",
+      "ask": "Ask me first",
+      "fix": "Fix it, then tell me",
+      "tellHint": "I'll tell you what I would do, and leave the doing to you.",
+      "askHint": "I'll ask before each fix, and do it when you say yes.",
+      "fixHint": "For kinds of fix with a solid track record, I'll go ahead within the limits you set, and tell you straight after.",
+      "advanced": "Advanced",
+      "perKind": "Each kind of fix",
+      "digestDay": "Summary day",
+      "excluded": "Services I should ignore",
+      "excludedNone": "None",
+      "kinds": {
+        "pool": "Close leaked database connections",
+        "queueWorker": "Add queue workers during a backlog",
+        "retune": "Raise a noisy alert's threshold",
+        "rollback": "Roll back a deploy",
+        "record": "Done {done} times, worked {worked} times.",
+        "keptRecord": "Done {done} times, kept {worked} times.",
+        "noRecord": "Never done yet, so I won't do it on my own until it has a track record.",
+        "revertConfig": "Undo a recent setting change",
+        "abortRollout": "Stop a bad rollout",
+        "recurringRecord": "Done {done} times, all for the same leak ({bug}). I'll keep asking until it's fixed."
+      },
+      "weekdays": {
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday"
+      },
+      "saved": "Saved",
+      "noDestination": "I won't be able to reach anyone.",
+      "routing": "When I page you",
+      "routingNote": "I page for anything that hurts customers. Smaller things get a message that won't wake anyone, and the smallest go into Friday's summary."
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "intro": "Here's what I do, in five steps.",
+      "gotIt": "Got it",
+      "s1Title": "I find your services",
+      "s1": "I look through the data you already send and find every service in it. When a new one appears, I start watching it the same day; you don't need to ask.",
+      "s2Title": "I watch them",
+      "s2": "I learn what normal looks like for each service: its errors, slowness and traffic for each hour of the day, with weekly patterns sharpening over time. Until I know, I use basic safety checks.",
+      "s3Title": "I stay quiet unless it's real",
+      "s3": "Most odd moments aren't problems. I page your team when something hurts customers, send a message that won't wake anyone for smaller issues, and keep minor things for the Friday summary.",
+      "s4Title": "I explain every page",
+      "s4": "Every message says what broke, since when, and my best read on why, with how sure I am.",
+      "s5Title": "I fix what you've allowed",
+      "s5": "I only fix things you've said I may. A fix that works earns a little trust, and one that doesn't help counts against me. If I keep needing the same fix, that's a bug I report to your team, not a habit I automate."
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "Checked 1 minute ago | Checked {count} minutes ago"
+    },
+    "outcome": {
+      "active": "Happening now",
+      "fixed": "Fixed by AutoObserve",
+      "resolved": "Resolved in {minutes} min",
+      "held": "In Friday's summary",
+      "fixing": "Fixing it now",
+      "contained": "Contained by AutoObserve",
+      "predicted": "Predicted"
+    },
+    "view": {
+      "standard": "Standard",
+      "nerd": "Nerd",
+      "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
+      "nerdTooltip": "Nerd view shows every detector, loop and setting in full"
+    },
+    "rail": {
+      "more": "More below"
+    }
   }
 }

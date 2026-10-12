@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="cls.id"
           :disabled="group.key === 'action'"
           :label="raw(cls.id)"
-          :description="t(CLASS_DESC[cls.id])"
+          :description="classDescription(cls.id)"
           :data-test="`autoobserve-policy-${cls.id}`"
         >
           <OTag :variant="MODE_VARIANT[cls.mode]" size="sm" :label="t(MODE_LABEL[cls.mode])" />
@@ -59,24 +59,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OSettingRow>
       </OFormSection>
 
-      <OFormSection :title="t('autoobserve.policy.budgets')" data-test="autoobserve-policy-budgets">
-        <p class="text-text-secondary py-1 text-xs">{{ t("autoobserve.policy.budgetsHint") }}</p>
+      <OFormSection :title="t('autoobserve.policy.paging')" data-test="autoobserve-policy-paging">
+        <p class="text-text-secondary py-1 text-xs">{{ t("autoobserve.policy.pagingHint") }}</p>
         <OSettingRow
-          v-for="b in BUDGETS"
-          :key="b.id"
-          :label="b.destination"
-          :description="t(KIND_LABEL[b.kind])"
-          :data-test="`autoobserve-policy-budget-${b.id}`"
+          v-for="row in routingRows"
+          :key="row.key"
+          :label="row.label"
+          :description="row.description"
+          :data-test="`autoobserve-policy-routing-${row.key}`"
         >
-          <span class="text-text-body text-sm">{{
-            b.digest
-              ? t("autoobserve.policy.budgetValueDigest", { limit: b.limit })
-              : t("autoobserve.policy.budgetValue", { limit: b.limit })
-          }}</span>
+          <OTag :variant="row.variant" size="sm" :label="row.mode" />
         </OSettingRow>
-        <p class="text-text-secondary flex items-center gap-1 py-2 text-xs">
-          <OIcon name="info-outline" size="xs" />{{ t("autoobserve.policy.budgetsP1") }}
-        </p>
       </OFormSection>
 
       <OFormSection
@@ -122,12 +115,14 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import { ACTION_CLASSES, BUDGETS, type Budget, type PolicyMode } from "./fixtures";
+import { CHANNELS, actionClassesFor, type PolicyMode } from "./fixtures";
+import { useAutonomy, useCompletedFixes } from "./v2/useDecisions";
+import { recordFor, say } from "./v2/fixtures";
+import { AUTONOMY } from "./data/facts";
 
 const { t } = useI18nTyped();
 
 const CLASS_DESC: Record<string, I18nKey> = {
-  RepairDestination: "autoobserve.policy.classes.RepairDestination",
   EnableDeduplication: "autoobserve.policy.classes.EnableDeduplication",
   CreateDetector: "autoobserve.policy.classes.CreateDetector",
   RaiseThreshold: "autoobserve.policy.classes.RaiseThreshold",
@@ -141,6 +136,10 @@ const CLASS_DESC: Record<string, I18nKey> = {
   RollbackDeploy: "autoobserve.policy.classes.RollbackDeploy",
   ScaleService: "autoobserve.policy.classes.ScaleService",
   RestartPod: "autoobserve.policy.classes.RestartPod",
+  RevertConfigChange: "autoobserve.policy.classes.RevertConfigChange",
+  EvictLeakedConnections: "autoobserve.policy.classes.EvictLeakedConnections",
+  AbortRollout: "autoobserve.policy.classes.AbortRollout",
+  ScaleQueueWorkers: "autoobserve.policy.classes.ScaleQueueWorkers",
   ToggleFeatureFlag: "autoobserve.policy.classes.ToggleFeatureFlag",
   RunRunbookStep: "autoobserve.policy.classes.RunRunbookStep",
 };
@@ -154,10 +153,16 @@ const MODE_VARIANT: Record<PolicyMode, BadgeVariant> = {
   suggest: "warning-soft",
   auto: "blue-soft",
 };
-const KIND_LABEL: Record<Budget["kind"], I18nKey> = {
-  slack: "autoobserve.policy.kindSlack",
-  pagerduty: "autoobserve.policy.kindPagerDuty",
-  email: "autoobserve.policy.kindEmail",
+const autonomy = useAutonomy();
+const completedFixes = useCompletedFixes();
+const classes = computed(() => actionClassesFor(autonomy));
+
+// Classes with a track record show it, including fixes the viewer approved on the page.
+const classDescription = (id: string) => {
+  const fact = AUTONOMY.find((a) => a.actionClass === id);
+  const description = t(CLASS_DESC[id]);
+  if (!fact || fact.kind === "retune") return description;
+  return raw(`${description} ${say(t, recordFor(fact, completedFixes.value[fact.kind]))}`);
 };
 
 const groups = computed(() => [
@@ -165,19 +170,19 @@ const groups = computed(() => [
     key: "coverage",
     title: t("autoobserve.policy.groupCoverage"),
     hint: t("autoobserve.policy.groupCoverageHint"),
-    classes: ACTION_CLASSES.filter((c) => c.group === "coverage"),
+    classes: classes.value.filter((c) => c.group === "coverage"),
   },
   {
     key: "calibration",
     title: t("autoobserve.policy.groupCalibration"),
     hint: t("autoobserve.policy.gateHint"),
-    classes: ACTION_CLASSES.filter((c) => c.group === "calibration"),
+    classes: classes.value.filter((c) => c.group === "calibration"),
   },
   {
     key: "action",
     title: t("autoobserve.policy.phase2Title"),
     hint: t("autoobserve.policy.phase2Hint"),
-    classes: ACTION_CLASSES.filter((c) => c.group === "action"),
+    classes: classes.value.filter((c) => c.group === "action"),
   },
 ]);
 
@@ -198,6 +203,30 @@ const triageRows = computed(() => [
   },
 ]);
 
+const routingRows = computed(() => [
+  {
+    key: "p1-p2",
+    label: t("autoobserve.policy.routing.p1p2"),
+    description: t("autoobserve.policy.routing.p1p2Desc"),
+    mode: t("autoobserve.policy.routing.page"),
+    variant: "error-soft" as BadgeVariant,
+  },
+  {
+    key: "p3",
+    label: t("autoobserve.policy.routing.p3"),
+    description: t("autoobserve.policy.routing.p3Desc"),
+    mode: t("autoobserve.policy.routing.message"),
+    variant: "warning-soft" as BadgeVariant,
+  },
+  {
+    key: "p4",
+    label: t("autoobserve.policy.routing.p4"),
+    description: t("autoobserve.policy.routing.p4Desc"),
+    mode: t("autoobserve.policy.routing.summary"),
+    variant: "default-soft" as BadgeVariant,
+  },
+]);
+
 const channels = computed(() => [
   {
     key: "inbox",
@@ -213,19 +242,15 @@ const channels = computed(() => [
     state: t("autoobserve.policy.alwaysOn"),
     variant: "success-soft" as BadgeVariant,
   },
-  {
-    key: "slack-oncall-payments",
-    label: t("autoobserve.policy.channelSlack", { channel: raw("#oncall-payments") }),
+  ...CHANNELS.map((d) => ({
+    key: d.id,
+    label:
+      d.kind === "slack"
+        ? t("autoobserve.policy.channelSlack", { channel: raw(d.name) })
+        : t("autoobserve.policy.channelEmail", { address: raw(d.name) }),
     description: t("autoobserve.policy.channelConnectedDesc"),
     state: t("autoobserve.policy.connected"),
     variant: "blue-soft" as BadgeVariant,
-  },
-  {
-    key: "pagerduty-payments",
-    label: t("autoobserve.policy.channelPagerDuty", { service: raw("payments") }),
-    description: t("autoobserve.policy.channelConnectedDesc"),
-    state: t("autoobserve.policy.connected"),
-    variant: "blue-soft" as BadgeVariant,
-  },
+  })),
 ]);
 </script>

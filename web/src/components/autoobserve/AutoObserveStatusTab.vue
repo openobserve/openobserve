@@ -21,13 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OCardSection role="body" class="flex items-start gap-4">
           <div
             class="flex size-12 shrink-0 items-center justify-center rounded-full"
-            :class="
-              quiet
-                ? 'bg-icon-chip-success-bg text-icon-chip-success-text'
-                : 'bg-icon-chip-error-bg text-icon-chip-error-text'
-            "
+            :class="HERO[heroState].chip"
           >
-            <OIcon :name="quiet ? 'check-circle' : 'report-problem'" size="lg" />
+            <OIcon :name="HERO[heroState].icon" size="lg" />
           </div>
           <div class="flex min-w-0 flex-col gap-1">
             <OText
@@ -36,33 +32,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-heading text-2xl!"
               data-test="autoobserve-headline"
             >
-              {{
-                quiet
-                  ? t("autoobserve.status.quietHeadline")
-                  : t(
-                      "autoobserve.status.incidentHeadline",
-                      { count: openIssues.length },
-                      openIssues.length,
-                    )
-              }}
+              {{ headline }}
             </OText>
             <p class="text-text-secondary text-sm">
-              {{
-                quiet
-                  ? t("autoobserve.status.quietSub", {
-                      gaps: gapServiceCount,
-                      streams: unscannedCount,
-                      proposals: proposalCount,
-                    })
-                  : t("autoobserve.status.incidentSub")
-              }}
+              {{ sub }}
             </p>
             <p
               class="text-text-secondary flex items-center gap-1 text-xs"
               data-test="autoobserve-self-check"
             >
               <OIcon name="check-circle" size="xs" class="text-icon-chip-success-text" />
-              {{ t("autoobserve.status.selfCheck") }}
+              {{
+                t(
+                  "autoobserve.status.selfCheck",
+                  { count: LAST_CHECKED_MINUTES },
+                  LAST_CHECKED_MINUTES,
+                )
+              }}
             </p>
           </div>
           <OButton
@@ -78,24 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OCard>
 
       <OBanner
-        v-if="deferred.length && spentBudget"
+        v-if="deferred.length"
         variant="info"
         icon="schedule"
         data-test="autoobserve-status-deferred"
       >
         <p class="text-sm font-medium">
-          {{
-            t(
-              "autoobserve.status.deferred",
-              {
-                count: deferred.length,
-                destination: raw(spentBudget.destination),
-                used: spentBudget.used[scenario],
-                limit: spentBudget.limit,
-              },
-              deferred.length,
-            )
-          }}
+          {{ t("autoobserve.status.deferred", { count: deferred.length }, deferred.length) }}
         </p>
         <p class="text-xs">{{ t("autoobserve.status.p1NeverDeferred") }}</p>
       </OBanner>
@@ -141,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCardSection>
           <OCardSection role="body" class="pt-0">
             <p v-if="!openIssues.length" class="text-text-secondary text-sm">
-              {{ t("autoobserve.status.nothingOpen") }}
+              {{ nothingOpen }}
             </p>
             <ul v-else class="flex flex-col">
               <li
@@ -170,31 +145,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCardSection>
         </OCard>
 
-        <OCard variant="outlined" data-test="autoobserve-status-budgets">
+        <OCard variant="outlined" data-test="autoobserve-status-routing">
           <OCardSection role="header">
-            <OText variant="panel-title">{{ t("autoobserve.status.budgets") }}</OText>
+            <OText variant="panel-title">{{ t("autoobserve.status.routingTitle") }}</OText>
           </OCardSection>
           <OCardSection role="body" class="flex flex-col gap-3 pt-0">
-            <div v-for="b in BUDGETS" :key="b.id" class="flex flex-col gap-1">
-              <div class="flex items-center gap-2 text-sm">
-                <span class="text-text-body">{{ b.destination }}</span>
-                <OTag
-                  v-if="b.used[scenario] >= b.limit"
-                  variant="warning-soft"
-                  size="xs"
-                  :label="t('autoobserve.status.budgetSpent')"
-                />
-                <span class="text-text-secondary ms-auto text-xs">
-                  {{ t("autoobserve.status.usedOf", { used: b.used[scenario], limit: b.limit }) }}
-                </span>
-              </div>
-              <OProgressBar
-                :value="Math.min(1, b.used[scenario] / b.limit)"
-                size="xs"
-                :variant="b.used[scenario] >= b.limit ? 'warning' : 'default'"
-              />
-            </div>
-            <p class="text-text-secondary text-xs">{{ t("autoobserve.status.budgetHint") }}</p>
+            <ul class="flex flex-col gap-1.5">
+              <li
+                v-for="row in routing"
+                :key="row.key"
+                class="flex items-center gap-2 text-sm"
+                :data-test="`autoobserve-status-routing-${row.key}`"
+              >
+                <span class="text-text-body">{{ row.label }}</span>
+                <span class="text-text-secondary ms-auto text-xs tabular-nums">{{
+                  row.count
+                }}</span>
+              </li>
+            </ul>
+            <p class="text-text-secondary text-xs">{{ t("autoobserve.status.routingHint") }}</p>
           </OCardSection>
         </OCard>
 
@@ -276,20 +245,20 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import { LAST_CHECKED_MINUTES, problemsIn, scenarioFacts } from "./data/facts";
 import {
-  BUDGETS,
-  COVERAGE,
   FUNNEL,
+  PAGES_BY_DESTINATION,
   LEDGER_STATUS,
-  SERVICES_LEARNING,
-  SERVICES_TOTAL,
   SIGNAL_LABEL,
   SIGNALS,
-  STREAMS,
-  gapServices,
-  unscannedStreams,
+  THIS_WEEK_LEDGER,
+  coverageFor,
+  coverageStats,
+  lastResolved,
+  streamsFor,
   type Issue,
   type LedgerEntry,
   type Scenario,
@@ -308,23 +277,110 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 
-const quiet = computed(() => props.scenario === "quiet");
+const HERO: Record<"incident" | "blind" | "quiet", { chip: string; icon: IconName }> = {
+  incident: { chip: "bg-icon-chip-error-bg text-icon-chip-error-text", icon: "report-problem" },
+  blind: { chip: "bg-icon-chip-warning-bg text-icon-chip-warning-text", icon: "visibility-off" },
+  quiet: { chip: "bg-icon-chip-success-bg text-icon-chip-success-text", icon: "check-circle" },
+};
+
+const thisWeek = new Set(THIS_WEEK_LEDGER);
 const funnelNumbers = computed(() => FUNNEL[props.scenario]);
-const gapServiceCount = gapServices().length;
-const unscannedCount = unscannedStreams().length;
-const fullyWatched = SERVICES_TOTAL - SERVICES_LEARNING - gapServiceCount;
-const proposalCount = computed(() => props.ledger.filter((e) => e.status === "awaiting").length);
-const notificationsUsed = computed(() =>
-  BUDGETS.reduce((sum, b) => sum + b.used[props.scenario], 0),
+const coverage = computed(() => coverageStats(props.scenario));
+const streams = computed(() => streamsFor(props.scenario, t));
+const gapServiceCount = computed(() => coverage.value.gaps);
+const unscannedCount = computed(() => streams.value.filter((s) => !s.lastScanned).length);
+const stalled = computed(() =>
+  scenarioFacts(props.scenario).gaps.find((g) => g.kind === "stalled"),
 );
-const budgetTotal = computed(() => BUDGETS.reduce((sum, b) => sum + b.limit, 0));
+const proposalCount = computed(() => props.ledger.filter((e) => e.status === "awaiting").length);
+const heroState = computed(() => {
+  if (openIssues.value.length) return "incident";
+  return stalled.value ? "blind" : "quiet";
+});
+const headline = computed(() => {
+  if (heroState.value === "incident") {
+    const count = openIssues.value.length;
+    return t("autoobserve.status.incidentHeadline", { count }, count);
+  }
+  if (heroState.value === "blind") {
+    return t(
+      "autoobserve.status.blindHeadline",
+      { count: gapServiceCount.value },
+      gapServiceCount.value,
+    );
+  }
+  return t("autoobserve.status.quietHeadline");
+});
+const sub = computed(() => {
+  if (heroState.value === "incident") return t("autoobserve.status.incidentSub");
+  if (!gapServiceCount.value && !unscannedCount.value && !proposalCount.value) {
+    return t("autoobserve.status.quietSubClear");
+  }
+  const gaps = gapServiceCount.value;
+  const streamCount = unscannedCount.value;
+  const items = [
+    ...(gaps ? [t("autoobserve.status.subGaps", { count: gaps }, gaps)] : []),
+    ...(streamCount
+      ? [t("autoobserve.status.subStreams", { count: streamCount }, streamCount)]
+      : []),
+  ];
+  const parts = items.length
+    ? [
+        t(
+          "autoobserve.status.subNeedLook",
+          { items: items.join(t("autoobserve.status.subAnd")) },
+          gaps + streamCount,
+        ),
+      ]
+    : [];
+  if (proposalCount.value) {
+    parts.push(
+      t("autoobserve.status.subProposals", { count: proposalCount.value }, proposalCount.value),
+    );
+  }
+  return parts.join(" ");
+});
+const nothingOpen = computed(() => {
+  const when = lastResolved(props.scenario, t);
+  return when
+    ? t("autoobserve.status.nothingOpen", { when })
+    : t("autoobserve.status.nothingOpenEver");
+});
+const routing = computed(() => [
+  ...PAGES_BY_DESTINATION.map((d) => {
+    const pages = d.pages[props.scenario];
+    const asks = d.asks[props.scenario];
+    const parts = [t("autoobserve.status.pagesCount", { count: pages }, pages)];
+    if (asks) parts.push(t("autoobserve.status.asksCount", { count: asks }, asks));
+    return { key: d.id, label: d.destination, count: parts.join(", ") };
+  }),
+  {
+    key: "messages",
+    label: t("autoobserve.status.messagesNoPage"),
+    count: (() => {
+      const n = problemsIn(props.scenario, "week").filter((p) => p.severity === "p3").length;
+      return t("autoobserve.status.messagesCount", { count: n }, n);
+    })(),
+  },
+  {
+    key: "summary",
+    label: t("autoobserve.status.fridaySummary"),
+    count: t(
+      "autoobserve.status.problemsCount",
+      { count: funnelNumbers.value.heldForDigest },
+      funnelNumbers.value.heldForDigest,
+    ),
+  },
+]);
 const openIssues = computed(() =>
   props.issues.filter((i) => i.status !== "resolved" && !i.deferred),
 );
 const deferred = computed(() => props.issues.filter((i) => i.deferred));
-const spentBudget = computed(() => BUDGETS.find((b) => b.used[props.scenario] >= b.limit));
 const changesThisWeek = computed(
-  () => props.ledger.filter((e) => ["auto_applied", "kept", "approved"].includes(e.status)).length,
+  () =>
+    props.ledger.filter(
+      (e) => thisWeek.has(e.id) && ["auto_applied", "kept", "approved"].includes(e.status),
+    ).length,
 );
 const recentActivity = computed(() => props.ledger.slice(0, 5));
 
@@ -332,33 +388,30 @@ const stats = computed<StatItem[]>(() => [
   {
     key: "watched",
     label: t("autoobserve.status.servicesWatched"),
-    value: fullyWatched,
-    sub: t("autoobserve.status.ofTotal", { total: SERVICES_TOTAL }),
+    value: coverage.value.fullyWatched,
+    sub: t("autoobserve.status.ofTotal", { total: coverage.value.total }),
     icon: "visibility",
     tone: "success",
   },
   {
     key: "learning",
     label: t("autoobserve.status.learning"),
-    value: SERVICES_LEARNING,
+    value: coverage.value.learning,
     icon: "hourglass-empty",
     tone: "info",
   },
   {
     key: "gaps",
     label: t("autoobserve.status.gaps"),
-    value: gapServiceCount,
+    value: gapServiceCount.value,
     icon: "warning-amber",
     tone: "warning",
   },
   {
     key: "notifications",
-    label: t("autoobserve.status.notificationsThisWeek"),
+    label: t("autoobserve.status.pagesThisWeek"),
     sub: t("autoobserve.status.thisWeek"),
-    value: t("autoobserve.coverage.ratio", {
-      used: notificationsUsed.value,
-      limit: budgetTotal.value,
-    }),
+    value: funnelNumbers.value.pages,
     icon: "notifications",
     tone: "primary",
   },
@@ -376,25 +429,37 @@ const funnel = computed(() => [
   {
     key: "firings",
     value: funnelNumbers.value.firings.toLocaleString(),
-    label: t("autoobserve.status.firings"),
+    label: t(
+      "autoobserve.status.firings",
+      { count: funnelNumbers.value.firings },
+      funnelNumbers.value.firings,
+    ),
     tone: "text-text-secondary",
   },
   {
     key: "incidents",
     value: funnelNumbers.value.incidents.toLocaleString(),
-    label: t("autoobserve.status.incidents"),
+    label: t(
+      "autoobserve.status.incidents",
+      { count: funnelNumbers.value.incidents },
+      funnelNumbers.value.incidents,
+    ),
     tone: "text-text-body",
   },
   {
     key: "notifications",
-    value: (notificationsUsed.value + funnelNumbers.value.exemptDeliveries).toLocaleString(),
-    label: t("autoobserve.status.notifications"),
+    value: funnelNumbers.value.pages.toLocaleString(),
+    label: t(
+      "autoobserve.status.notifications",
+      { count: funnelNumbers.value.pages },
+      funnelNumbers.value.pages,
+    ),
     tone: "text-text-heading",
   },
 ]);
 
 const gaps = computed(() => {
-  const rows = COVERAGE.flatMap((row) => {
+  const rows = coverageFor(props.scenario, t).flatMap((row) => {
     const signals = SIGNALS.filter((s) => row.cells[s].state === "gap");
     if (!signals.length) return [];
     return [
@@ -408,11 +473,13 @@ const gaps = computed(() => {
       },
     ];
   });
-  const unscanned = STREAMS.filter((s) => !s.lastScanned).map((s) => ({
-    key: s.stream,
-    title: t("autoobserve.status.streamTitle", { stream: raw(s.stream) }),
-    reason: t("autoobserve.coverage.notScanned"),
-  }));
+  const unscanned = streams.value
+    .filter((s) => !s.lastScanned)
+    .map((s) => ({
+      key: s.stream,
+      title: t("autoobserve.status.streamTitle", { stream: raw(s.stream) }),
+      reason: t("autoobserve.coverage.notScanned"),
+    }));
   return [...unscanned, ...rows];
 });
 </script>
