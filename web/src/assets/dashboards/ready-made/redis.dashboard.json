@@ -2,7 +2,7 @@
   "version": 8,
   "dashboardId": "",
   "title": "Redis / Overview",
-  "description": "",
+  "description": "Clients, commands, hit ratio, memory and CPU for Redis servers reporting through the OpenTelemetry redis receiver.",
   "role": "ready-made:redis/overview:1",
   "owner": "",
   "created": "2026-10-12T00:00:00.000Z",
@@ -12,14 +12,13 @@
       "name": "Overview",
       "panels": [
         {
-          "id": "Panel_ID1000001",
+          "id": "redis_note",
           "type": "markdown",
-          "title": "Placeholder",
+          "title": "",
           "description": "",
           "config": {
             "show_legends": false,
-            "legends_position": null,
-            "decimals": 2
+            "legends_position": null
           },
           "queryType": "sql",
           "queries": [
@@ -40,12 +39,7 @@
                 }
               },
               "config": {
-                "promql_legend": "",
-                "layer_type": "scatter",
-                "weight_fixed": 1,
-                "limit": 0,
-                "min": 0,
-                "max": 100
+                "promql_legend": ""
               }
             }
           ],
@@ -53,11 +47,947 @@
             "x": 0,
             "y": 0,
             "w": 192,
-            "h": 8,
-            "i": 1
+            "h": 4,
+            "i": 0
           },
           "htmlContent": "",
-          "markdownContent": "Placeholder"
+          "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note."
+        },
+        {
+          "id": "redis_uptime",
+          "type": "metric",
+          "title": "Uptime",
+          "description": "Time since the server started; a drop means it restarted. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "seconds",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "min(redis_uptime)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_uptime",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 1
+          }
+        },
+        {
+          "id": "redis_clients",
+          "type": "metric",
+          "title": "Clients",
+          "description": "Connected clients, not counting replicas. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(redis_clients_connected)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_clients_connected",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 2
+          }
+        },
+        {
+          "id": "redis_memory_used",
+          "type": "metric",
+          "title": "Memory used",
+          "description": "Bytes allocated by Redis. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(redis_memory_used)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_memory_used",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 4,
+            "w": 64,
+            "h": 6,
+            "i": 3
+          }
+        },
+        {
+          "id": "redis_commands_rate",
+          "type": "metric",
+          "title": "Commands/s",
+          "description": "Commands processed per second, averaged over 5 minutes. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(redis_commands_processed[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_commands_processed",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 4
+          }
+        },
+        {
+          "id": "redis_hit_ratio",
+          "type": "metric",
+          "title": "Hit ratio",
+          "description": "Key lookups that found the key, over 5 minutes. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum(rate(redis_keyspace_hits[5m])) / (sum(rate(redis_keyspace_hits[5m])) + sum(rate(redis_keyspace_misses[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_keyspace_hits",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 5
+          }
+        },
+        {
+          "id": "redis_keys",
+          "type": "metric",
+          "title": "Keys",
+          "description": "Keys across all databases. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": false,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(redis_db_keys)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_db_keys",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 128,
+            "y": 10,
+            "w": 64,
+            "h": 6,
+            "i": 6
+          }
+        },
+        {
+          "id": "redis_rejected_connections",
+          "type": "line",
+          "title": "Rejected connections/s",
+          "description": "Connections refused because maxclients was reached. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 3,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(redis_connections_rejected[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_connections_rejected",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "rejected"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 7
+          }
+        },
+        {
+          "id": "redis_evicted_keys",
+          "type": "line",
+          "title": "Evicted keys/s",
+          "description": "Keys removed because maxmemory was reached. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 3,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(redis_keys_evicted[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_keys_evicted",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "evicted"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 16,
+            "w": 96,
+            "h": 14,
+            "i": 8
+          }
+        },
+        {
+          "id": "redis_commands",
+          "type": "line",
+          "title": "Commands/s",
+          "description": "Commands processed per second. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(redis_commands_processed[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_commands_processed",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "commands"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 30,
+            "w": 96,
+            "h": 16,
+            "i": 9
+          }
+        },
+        {
+          "id": "redis_hits_misses",
+          "type": "line",
+          "title": "Key hits and misses/s",
+          "description": "Key lookups that found the key (hits) and that did not (misses), per second. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(redis_keyspace_hits[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_keyspace_hits",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "hits"
+              }
+            },
+            {
+              "query": "sum(rate(redis_keyspace_misses[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_keyspace_misses",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "misses"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 30,
+            "w": 96,
+            "h": 16,
+            "i": 10
+          }
+        },
+        {
+          "id": "redis_network",
+          "type": "line",
+          "title": "Network I/O",
+          "description": "Bytes read from and written to the network per second. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(redis_net_input[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_net_input",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "in"
+              }
+            },
+            {
+              "query": "sum(rate(redis_net_output[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_net_output",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "out"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 46,
+            "w": 96,
+            "h": 16,
+            "i": 11
+          }
+        },
+        {
+          "id": "redis_connections_received",
+          "type": "line",
+          "title": "New connections/s",
+          "description": "Connections accepted per second; a high rate means clients are not reusing connections. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(rate(redis_connections_received[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_connections_received",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "accepted"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 46,
+            "w": 96,
+            "h": 16,
+            "i": 12
+          }
+        },
+        {
+          "id": "redis_memory",
+          "type": "line",
+          "title": "Memory",
+          "description": "Bytes allocated by Redis (used), resident in RAM as the OS sees it (rss), and the highest used so far (peak). Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(redis_memory_used)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_memory_used",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "used"
+              }
+            },
+            {
+              "query": "sum(redis_memory_rss)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_memory_rss",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "rss"
+              }
+            },
+            {
+              "query": "sum(redis_memory_peak)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_memory_peak",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "peak"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 62,
+            "w": 96,
+            "h": 16,
+            "i": 13
+          }
+        },
+        {
+          "id": "redis_fragmentation",
+          "type": "line",
+          "title": "Memory fragmentation ratio",
+          "description": "RSS divided by used memory. Well above 1.5 means fragmentation; below 1 means Redis is swapping. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 2,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max(redis_memory_fragmentation_ratio)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_memory_fragmentation_ratio",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "fragmentation ratio"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 62,
+            "w": 96,
+            "h": 16,
+            "i": 14
+          }
+        },
+        {
+          "id": "redis_cpu",
+          "type": "line",
+          "title": "CPU",
+          "description": "CPU used by the server and its background children, as a percent of one core. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum by (state)(rate(redis_cpu_time{state=~\"^(sys|user|sys_children|user_children)$\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_cpu_time",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{state}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 78,
+            "w": 96,
+            "h": 16,
+            "i": 15
+          }
+        },
+        {
+          "id": "redis_keys_by_db",
+          "type": "line",
+          "title": "Keys by database",
+          "description": "Keys per database, and how many of them have an expiry set. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (db)(redis_db_keys)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_db_keys",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "db{db} keys"
+              }
+            },
+            {
+              "query": "sum by (db)(redis_db_expires)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_db_expires",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "db{db} with expiry"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 78,
+            "w": 96,
+            "h": 16,
+            "i": 16
+          }
+        },
+        {
+          "id": "redis_clients_over_time",
+          "type": "line",
+          "title": "Clients",
+          "description": "Connected clients, not counting replicas, and clients waiting on a blocking command such as BLPOP. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 1,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum(redis_clients_connected)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_clients_connected",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "connected"
+              }
+            },
+            {
+              "query": "sum(redis_clients_blocked)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_clients_blocked",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "blocked"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 94,
+            "w": 96,
+            "h": 16,
+            "i": 17
+          }
+        },
+        {
+          "id": "redis_unsaved_changes",
+          "type": "line",
+          "title": "Changes since last save",
+          "description": "Writes not yet in an RDB snapshot; they are lost if the server stops before the next save. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "decimals": 0,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "max(redis_rdb_changes_since_last_save)",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "redis_rdb_changes_since_last_save",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "changes"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 94,
+            "w": 96,
+            "h": 16,
+            "i": 18
+          }
         }
       ]
     }
