@@ -15,8 +15,10 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reactive } from "vue";
+import config from "@/aws-exports";
 import {
   estimateSignature,
+  isSuperCluster,
   readLogsSignature,
   resetLogsAutoRunForTests,
   scopeStreams,
@@ -52,8 +54,15 @@ vi.mock("./searchState", () => ({
 }));
 vi.mock("./logsUtils", () => ({
   logsUtils: () => ({
-    addTraceId: vi.fn(),
-    removeTraceId: vi.fn(),
+    addTraceId: (id: string) => {
+      const ids = fakeSearchObj.value?.data.searchRequestTraceIds;
+      if (ids && !ids.includes(id)) ids.push(id);
+    },
+    removeTraceId: (id: string) => {
+      const data = fakeSearchObj.value?.data;
+      if (data)
+        data.searchRequestTraceIds = data.searchRequestTraceIds.filter((x: string) => x !== id);
+    },
     fnParsedSQL: vi.fn(() => ({})),
     isLimitQuery: vi.fn(() => false),
     isDistinctQuery: vi.fn(() => false),
@@ -217,12 +226,81 @@ describe("SQL scope rule (P1)", () => {
   });
 });
 
+describe("unknown windows and the super-cluster check (H1, M5)", () => {
+  const signatureFor = (time: any) =>
+    buildLogsSignature({
+      query: "",
+      sqlMode: false,
+      streams: ["app"],
+      streamType: "logs",
+      time,
+      transformContent: null,
+      showTransformEditor: false,
+      quickMode: false,
+      refreshInterval: 0,
+      sortOrder: "desc",
+      definedSchemas: "",
+    });
+
+  it("estimates a garbage absolute window or an unparseable period as unresolved", () => {
+    const now = Date.now() * 1000;
+    const list = [statsFor("app", 100)];
+    const garbage = signatureFor({ type: "absolute", startUs: Number("abc"), endUs: now });
+    expect(estimateSignature(garbage, list, now).status).toBe("unresolved");
+    const bogus = signatureFor({ type: "relative", period: "bogus" });
+    expect(estimateSignature(bogus, list, now).status).toBe("unresolved");
+  });
+
+  it("sizes period=24hours like the search does, not as an empty window", () => {
+    const now = Date.now() * 1000;
+    const estimate = estimateSignature(
+      signatureFor({ type: "relative", period: "24hours" }),
+      [statsFor("app", 1)],
+      now,
+    );
+    expect(estimate.status).toBe("known");
+    expect(estimate.knownMb).toBeGreaterThan(500);
+  });
+
+  it("blocks an automatic run from a garbage URL window and sends nothing", async () => {
+    fakeStore.state.zoConfig.auto_query_max_scan_mb = 1000;
+    const obj = fakeSearchObj.value;
+    obj.data.datetime = { type: "absolute", startTime: "garbage", endTime: "garbage" };
+    obj.data.streamResults.list = [statsFor("app", 1)];
+    const logs = vi.fn();
+    run().setExecutors({ logs });
+
+    expect(run().request("url")).toBe("scheduled");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(logs).not.toHaveBeenCalled();
+    expect(obj.meta.autoRunBlocked.decision).toMatchObject({ reason: "unresolved", estimateMb: 0 });
+  });
+
+  it("treats super_cluster_enabled as a super cluster only on an enterprise build", () => {
+    const enterprise = (config as any).isEnterprise;
+    fakeStore.state.zoConfig.super_cluster_enabled = true;
+    const signature = signatureFor({ type: "relative", period: "15m" });
+    const list = [statsFor("app", 1)];
+    try {
+      expect(isSuperCluster()).toBe(true);
+      expect(estimateSignature(signature, list, Date.now() * 1000).superCluster).toBe(true);
+      (config as any).isEnterprise = "false";
+      expect(isSuperCluster()).toBe(false);
+      const estimate = estimateSignature(signature, list, Date.now() * 1000);
+      expect(estimate.superCluster).toBe(false);
+      expect(estimate.status).toBe("known");
+    } finally {
+      (config as any).isEnterprise = enterprise;
+    }
+  });
+});
+
 describe("transport binding (AC4.1, P2 records)", () => {
   const callbacks = {
     onData: vi.fn(),
     onError: vi.fn(),
     onComplete: vi.fn(),
-    onReset: vi.fn(),
   };
 
   const openGrid = () =>
@@ -314,6 +392,33 @@ describe("transport binding (AC4.1, P2 records)", () => {
     expect(connection.initializeSearchConnection(payload)).toBeNull();
     expect(sentPayloads).toHaveLength(0);
     expect(fakeSearchObj.value.loadingHistogram).toBe(false);
+  });
+
+  it("a rejected bind leaves no trace ID and restores the last search trace (M6)", () => {
+    const connection = useSearchConnection((key: string) => key as any);
+    const obj = fakeSearchObj.value;
+    obj.data.lastSearchTraceId = "previous";
+    obj.data.searchRequestTraceIds = ["previous"];
+    const stale = openGrid();
+    openGrid();
+    connection.getDataThroughStream(
+      { query: { sql: 'select * from "app"', from: 0, size: 50 } } as any,
+      false,
+      callbacks,
+      stale.id,
+    );
+    expect(sentPayloads).toHaveLength(0);
+    expect(obj.data.searchRequestTraceIds).toEqual(["previous"]);
+    expect(obj.data.lastSearchTraceId).toBe("previous");
+
+    const histogram: any = connection.buildWebSocketPayload(
+      { query: {} } as any,
+      false,
+      "histogram",
+    );
+    histogram.generationId = stale.id;
+    expect(connection.initializeSearchConnection(histogram)).toBeNull();
+    expect(obj.data.searchRequestTraceIds).toEqual(["previous"]);
   });
 
   it("drops responses of a replaced generation and keeps the new one's", () => {

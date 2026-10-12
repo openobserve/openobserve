@@ -33,6 +33,7 @@ const banner = '[data-test="logs-auto-run-guard-banner"]';
 const runAnyway = '[data-test="logs-auto-run-guard-run-btn"]';
 const narrow = '[data-test="logs-auto-run-guard-narrow-btn"]';
 const rows = '[data-test="logs-search-result-logs-table"] tbody tr';
+const runInFlight = '[data-test="logs-search-bar-refresh-btn"][class*="bg-cancel-query-bg"]';
 
 const urlFor = (period) =>
   `/web/logs?org_identifier=${ORG}&stream=${STREAM}&stream_type=logs&period=${period}` +
@@ -44,13 +45,21 @@ async function pickRelative(page, value, unit) {
   await page.keyboard.press('Escape');
 }
 
+// No run starts while the timers fire: a dispatched hits run flips the Run button to Cancel at once.
+async function runTimersExpectingNoRun(page, ms) {
+  await page.clock.runFor(ms);
+  await expect(page.locator(runInFlight)).toHaveCount(0);
+}
+
 async function setInterval5s(page) {
   await page.locator('[data-test="logs-search-bar-refresh-interval-btn"]').click();
   await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click();
   await page.keyboard.press('Escape');
 }
 
+// Natural time until a test calls clock.runFor, which then fires every due app timer at once.
 async function open(page, period) {
+  await page.clock.install();
   await navigateToBase(page);
   await page.evaluate(() => {
     for (const key of Object.keys(localStorage)) {
@@ -89,7 +98,7 @@ test.describe('Logs Auto Run cost guard', () => {
     const searches = await open(page, '24h');
     await expect(page.locator(guard)).toBeVisible({ timeout: 60000 });
     await expect(page.locator('[data-test="logs-auto-run-guard-estimate"]')).toContainText(STREAM);
-    await page.waitForTimeout(2000);
+    await runTimersExpectingNoRun(page, 2000);
     expect(searches.all()).toHaveLength(0);
 
     testLogger.info('Run anyway sends exactly one hits request');
@@ -127,15 +136,16 @@ test.describe('Logs Auto Run cost guard', () => {
 
     await setInterval5s(page);
     const before = searches.hits().length;
-    await page.waitForTimeout(17000);
-    expect(searches.hits().length - before).toBeGreaterThanOrEqual(3);
+    await expect
+      .poll(() => searches.hits().length - before, { timeout: 30000 })
+      .toBeGreaterThanOrEqual(3);
     await expect(page.locator(banner)).toHaveCount(0);
     await page.locator('[data-test="logs-search-bar-refresh-interval-btn"]').click();
     await page.locator('[data-test="logs-search-off-refresh-interval"]').first().click();
     await page.keyboard.press('Escape');
 
     testLogger.info('A facet narrows the consented scope: it runs with no banner');
-    await page.waitForTimeout(1500);
+    await expect(page.locator(runInFlight)).toHaveCount(0, { timeout: 30000 });
     const beforeFacet = searches.hits().length;
     await page.locator('[data-test="log-search-expand-level-field-btn"]').click();
     const value = page.locator('[data-test="logs-search-subfield-add-level-error"]');
@@ -156,7 +166,7 @@ test.describe('Logs Auto Run cost guard', () => {
     const searches = await open(page, '24h');
     await expect(page.locator(guard)).toBeVisible({ timeout: 60000 });
     await setInterval5s(page);
-    await page.waitForTimeout(7000);
+    await runTimersExpectingNoRun(page, 7000);
     expect(searches.all()).toHaveLength(0);
     await expect(page.locator(guard)).toBeVisible();
   });
@@ -179,12 +189,13 @@ test.describe('Logs Auto Run cost guard', () => {
   }, async ({ page }) => {
     const searches = await open(page, '15m');
     await expect(page.locator(rows).first()).toBeVisible({ timeout: 60000 });
+    const firstRun = searches.hits().length;
     await setInterval5s(page);
-    await page.waitForTimeout(6000);
+    await expect.poll(() => searches.hits().length, { timeout: 30000 }).toBeGreaterThan(firstRun);
     await pickRelative(page, 1, 'd');
     await expect(page.locator(banner)).toBeVisible({ timeout: 15000 });
     const paused = searches.hits().length;
-    await page.waitForTimeout(12000);
+    await runTimersExpectingNoRun(page, 12000);
     expect(searches.hits()).toHaveLength(paused);
   });
 });

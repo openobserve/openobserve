@@ -3036,16 +3036,48 @@ export default defineComponent({
       }
     };
 
-    let zoomPending = false;
-    const markZoom = () => {
-      zoomPending = true;
+    // DateTime.setCustomDate keeps second-precision local date/time strings; a zoom is matched on those.
+    const zoomLabels = (range: { start: number; end: number }) => {
+      const label = (ms: number) => {
+        const d = new Date(Math.floor(ms));
+        const two = (n: number) => String(n).padStart(2, "0");
+        return {
+          date: `${d.getFullYear()}/${two(d.getMonth() + 1)}/${two(d.getDate())}`,
+          time: `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`,
+        };
+      };
+      const from = label(range.start);
+      const to = label(range.end);
+      return { from: from.date, to: to.date, startTime: from.time, endTime: to.time };
     };
 
-    const requestTimeRun = (valueType: string) => {
+    let pendingZoom: ReturnType<typeof zoomLabels> | null = null;
+    const markZoom = (range: { start: number; end: number }) => {
+      const zoom = zoomLabels(range);
+      pendingZoom = zoom;
+      // An unchanged range never emits, so the zoom must not outlive the setCustomDate that follows.
+      setTimeout(() => {
+        if (pendingZoom === zoom) pendingZoom = null;
+      }, 0);
+    };
+
+    const takeZoom = (value: any): boolean => {
+      const zoom = pendingZoom;
+      const matches =
+        !!zoom &&
+        value.valueType === "absolute" &&
+        value.selectedDate?.from === zoom.from &&
+        value.selectedDate?.to === zoom.to &&
+        value.selectedTime?.startTime === zoom.startTime &&
+        value.selectedTime?.endTime === zoom.endTime;
+      if (!matches) pendingZoom = null;
+      return matches;
+    };
+
+    const requestTimeRun = (valueType: string, isZoom: boolean) => {
       let reason: "zoom" | "time-typed" | "time" = "time";
-      if (zoomPending) reason = "zoom";
+      if (isZoom) reason = "zoom";
       else if (valueType === "absolute") reason = "time-typed";
-      zoomPending = false;
       autoRun.request(reason);
     };
 
@@ -3075,6 +3107,7 @@ export default defineComponent({
 
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
+      const isZoom = takeZoom(value);
       if (value.userChangedValue === true) noteUserScopeChange();
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
@@ -3183,9 +3216,7 @@ export default defineComponent({
         ignoreAutoTrigger === false &&
         (isLogsResultsMode() || searchObj.meta.logsVisualizeToggle === "patterns")
       ) {
-        requestTimeRun(value.valueType);
-      } else {
-        zoomPending = false;
+        requestTimeRun(value.valueType, isZoom);
       }
     };
 

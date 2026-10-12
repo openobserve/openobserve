@@ -258,6 +258,77 @@ describe("estimateScanMb + evaluateScanPolicy", () => {
   });
 });
 
+describe("unknown inputs block as unresolved (H1)", () => {
+  const corrupt: StreamStatsEntry = {
+    name: "corrupt",
+    stats: {
+      doc_time_min: NOW - MICROS_PER_DAY,
+      doc_time_max: NOW,
+      storage_size: "abc" as unknown as number,
+    },
+  };
+  const noStats: StreamStatsEntry = { name: "nostats", stats: { doc_time_max: 0 } };
+
+  it("blocks a NaN window and never reports a NaN size", () => {
+    const est = estimateScanMb(["steady"], [steady], { startUs: NaN, endUs: NOW }, ctx);
+    expect(est.status).toBe("unresolved");
+    expect(evaluateScanPolicy(est, 1e12)).toEqual({
+      allowed: false,
+      reason: "unresolved",
+      estimateMb: 0,
+    });
+  });
+
+  it("blocks a null window and an inverted one", () => {
+    expect(estimateScanMb(["steady"], [steady], null, ctx).status).toBe("unresolved");
+    const inverted = estimateScanMb(["steady"], [steady], { startUs: NOW, endUs: NOW - 1 }, ctx);
+    expect(evaluateScanPolicy(inverted, 1e12).reason).toBe("unresolved");
+  });
+
+  it("blocks a non-numeric storage_size and names the stream", () => {
+    expect(estimateStreamMb(corrupt, lastWindow(MICROS_PER_HOUR), ctx)).toMatchObject({
+      status: "unknown",
+      cause: "invalid-stats",
+      estimateMb: null,
+    });
+    const est = estimateScanMb(["corrupt"], [corrupt], lastWindow(15 * MICROS_PER_MINUTE), ctx);
+    expect(est).toMatchObject({ status: "unresolved", unresolvedSources: ["corrupt"] });
+    expect(Number.isFinite(est.knownMb)).toBe(true);
+    expect(evaluateScanPolicy(est, 1e12)).toMatchObject({ allowed: false, reason: "unresolved" });
+  });
+
+  it("blocks one corrupt stream mixed with one without stats on a short window", () => {
+    const est = estimateScanMb(
+      ["corrupt", "nostats"],
+      [corrupt, noStats],
+      lastWindow(15 * MICROS_PER_MINUTE),
+      ctx,
+    );
+    expect(est.status).toBe("unresolved");
+    expect(est.unresolvedSources).toEqual(["corrupt"]);
+    expect(evaluateScanPolicy(est, 1e12)).toMatchObject({ allowed: false, reason: "unresolved" });
+  });
+
+  it("blocks a hand-built estimate whose size is not finite", () => {
+    const est = estimateScanMb(["steady"], [steady], lastWindow(MICROS_PER_HOUR), ctx);
+    expect(evaluateScanPolicy({ ...est, knownMb: NaN }, 1e12)).toEqual({
+      allowed: false,
+      reason: "unresolved",
+      estimateMb: 0,
+    });
+  });
+
+  it("sizes period=24hours as the 24 h window the search reads", () => {
+    expect(periodToMicros("24hours")).toBe(24 * MICROS_PER_HOUR);
+    const window = relativeWindow("24hours", NOW);
+    expect(window).toEqual({ startUs: NOW - MICROS_PER_DAY, endUs: NOW });
+    const est = estimateScanMb(["steady"], [steady], window, ctx);
+    expect(est.status).toBe("known");
+    expect(est.knownMb).toBeGreaterThan(0);
+    expect(evaluateScanPolicy(est, 1)).toMatchObject({ allowed: false, reason: "over-threshold" });
+  });
+});
+
 describe("Narrow to", () => {
   it("lists presets in ascending duration", () => {
     const durations = NARROW_PRESETS.map((p) => p.durationUs);

@@ -54,7 +54,6 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       onData: (payload: any, response: any) => void;
       onError: (payload: any, error: any) => void;
       onComplete: (payload: any, response: any) => void;
-      onReset: (data: any, traceId?: string) => void;
     },
     meta?: {
       clear_cache?: Boolean;
@@ -105,7 +104,6 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
           payload.onData = callbacks.onData;
           payload.onError = callbacks.onError;
           payload.onComplete = callbacks.onComplete;
-          payload.onReset = callbacks.onReset;
         }
 
         payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace(
@@ -278,7 +276,6 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       onData: (payload: any, response: any) => void;
       onError: (payload: any, error: any) => void;
       onComplete: (payload: any, response: any) => void;
-      onReset: (data: any, traceId?: string) => void;
     },
     generationId?: number,
   ) => {
@@ -309,7 +306,6 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
       payload.onData = callbacks.onData;
       payload.onError = callbacks.onError;
       payload.onComplete = callbacks.onComplete;
-      payload.onReset = callbacks.onReset;
     }
 
     searchObj.loadingHistogram = true;

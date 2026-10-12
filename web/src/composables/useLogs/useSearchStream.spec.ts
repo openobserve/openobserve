@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import analytics from "@/services/product_analytics";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
-import { notePageRequest } from "@/composables/useLogs/logsRowNav";
 
 const { searchObj, connection, query } = vi.hoisted(() => ({
   searchObj: {
@@ -124,6 +123,12 @@ describe("useSearchStream — page crossing signals (4a §3.2.2)", () => {
     expect(searchObj.meta.showDetailTab).toBe(false);
   });
 
+  it("registers no reset callback, since no transport dispatches one", () => {
+    useSearchStream((key: string) => key).getDataThroughStream(false);
+    const callbacks = connection.getDataThroughStream.mock.calls.at(-1)![2];
+    expect(Object.keys(callbacks).sort()).toEqual(["onComplete", "onData", "onError"]);
+  });
+
   it("a throw while dispatching a page fails the crossing quietly, since a toast is already shown", () => {
     searchObj.meta.resultGrid.navigation.pendingPageSelection = {
       page: 2,
@@ -135,21 +140,5 @@ describe("useSearchStream — page crossing signals (4a §3.2.2)", () => {
     });
     useSearchStream((key: string) => key).getDataThroughStream(true);
     expect(searchObj.meta.resultGrid.navigation.pendingPageSelection).toBeNull();
-  });
-
-  it("a retried pagination request rebinds the crossing instead of superseding it", () => {
-    searchObj.meta.resultGrid.navigation.pendingPageSelection = {
-      page: 2,
-      position: "first",
-      requestId: "old",
-    };
-    connection.buildWebSocketPayload.mockImplementationOnce(() => {
-      notePageRequest(searchObj as any, "new");
-      return { traceId: "new" };
-    });
-    useSearchStream((key: string) => key).getDataThroughStream(true);
-    const { onReset } = connection.getDataThroughStream.mock.calls.at(-1)![2];
-    onReset({ type: "search", isPagination: true, traceId: "old", queryReq: {} });
-    expect(searchObj.meta.resultGrid.navigation.pendingPageSelection?.requestId).toBe("new");
   });
 });

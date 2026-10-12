@@ -781,6 +781,55 @@ describe("OTable", () => {
       });
     });
 
+    it.each([
+      ["reorderable", true],
+      ["fixed-order", false],
+    ])("wraps a plain label header in the sort button, %s header (M15)", (_label, reorder) => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(3),
+          columns: makeColumns(),
+          sorting: "server",
+          enableColumnReorder: reorder,
+        },
+      });
+      const th = wrapper.find('[data-test="o2-table-th-id"]');
+      const trigger = th.find('[data-test="o2-table-th-sort-trigger"]');
+      expect(trigger.find("[data-o2-th-label]").exists()).toBe(true);
+      expect(th.find('[data-test="o2-table-th-custom-header"]').exists()).toBe(false);
+    });
+
+    it.each([
+      ["reorderable", true],
+      ["fixed-order", false],
+    ])(
+      "keeps a component header outside a separate, labelled sort button, %s header (M15)",
+      async (_label, reorder) => {
+        const HeaderWithControl = defineComponent({
+          render: () => h("span", [h("span", "Score"), h("button", { type: "button" }, "info")]),
+        });
+        const columns: OTableColumnDef<any>[] = [
+          { id: "id", header: HeaderWithControl as any, accessorKey: "id", sortable: true },
+          { id: "name", header: raw("Name"), accessorKey: "name" },
+        ];
+        wrapper = mount(OTable, {
+          props: { data: makeRows(3), columns, sorting: "server", enableColumnReorder: reorder },
+          attachTo: document.body,
+        });
+        const th = wrapper.find('[data-test="o2-table-th-id"]');
+        const trigger = th.find('[data-test="o2-table-th-sort-trigger"]');
+        const content = th.find('[data-test="o2-table-th-custom-header"]');
+        expect(trigger.exists()).toBe(true);
+        expect(content.text()).toContain("Score");
+        expect(trigger.findAll("button")).toHaveLength(0);
+        expect(trigger.text()).not.toContain("Score");
+        expect(trigger.attributes("aria-labelledby")).toBe(content.attributes("id"));
+        expect(document.getElementById(content.attributes("id")!)).not.toBeNull();
+        await trigger.trigger("click");
+        expect(wrapper.emitted("sort-change")?.[0][0]).toEqual({ column: "id", order: "asc" });
+      },
+    );
+
     it("toggles sort order on second click", async () => {
       wrapper = mount(OTable, {
         props: {

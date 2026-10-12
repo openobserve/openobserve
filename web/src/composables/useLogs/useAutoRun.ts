@@ -695,6 +695,12 @@ export function createAutoRun(deps: AutoRunDeps) {
     deps.resetLoading?.();
   }
 
+  function surfaceFor(lane: "grid" | "patterns", op: RunOperation): PersistSurface {
+    if (lane === "patterns") return "patterns";
+    if (op !== "visualize") return "logs";
+    return deps.getMode() === "build" ? "build" : "visualize";
+  }
+
   function newGeneration(input: {
     lane: "grid" | "patterns";
     kind: RunKind;
@@ -702,15 +708,11 @@ export function createAutoRun(deps: AutoRunDeps) {
     op: RunOperation;
     signature: LogsSignature;
   }): Generation {
-    const mode = deps.getMode();
-    let surface: PersistSurface = "logs";
-    if (input.lane === "patterns") surface = "patterns";
-    else if (input.op === "visualize") surface = mode === "build" ? "build" : "visualize";
     const gen: Generation = {
       id: nextGenerationId++,
       orgId: deps.getOrgId(),
       ...input,
-      surface,
+      surface: surfaceFor(input.lane, input.op),
       traces: [],
       aborts: [],
       cancelled: false,
@@ -812,13 +814,15 @@ export function createAutoRun(deps: AutoRunDeps) {
   }
 
   function block(
-    gen: Generation,
+    gen: Generation | null,
     input: ExecuteInput,
     estimate: ScanEstimate,
     decision: ScanPolicyDecision,
   ): void {
-    gen.cancelled = true;
-    gen.settled = true;
+    if (gen) {
+      gen.cancelled = true;
+      gen.settled = true;
+    }
     meta.autoRunBlocked = {
       reason: input.reason,
       reasons: input.reasons,
@@ -826,7 +830,7 @@ export function createAutoRun(deps: AutoRunDeps) {
       scope: cloneJson(input.signature),
       estimate,
       decision,
-      estimateMb: estimate.knownMb,
+      estimateMb: decision.estimateMb,
       status: estimate.status,
       streams: [...input.signature.streams],
       window: cloneJson(input.signature.time),
@@ -836,8 +840,10 @@ export function createAutoRun(deps: AutoRunDeps) {
           : (deps.pickNarrowPreset?.(input.signature, estimate) ?? null),
     };
     meta.runPending = true;
-    setOutcome(gen.surface, "blocked");
     if (input.reasons.includes("refresh")) missedTick = true;
+    // A blocked automatic run leaves the lane's in-flight run, its outcome and its spinner alone.
+    if (!gen && isInFlight(current[input.lane])) return;
+    setOutcome(gen?.surface ?? surfaceFor(input.lane, input.op), "blocked");
     deps.resetLoading?.();
   }
 
@@ -859,9 +865,26 @@ export function createAutoRun(deps: AutoRunDeps) {
     return "dispatched";
   }
 
+  function guardVerdict(
+    input: ExecuteInput,
+  ): { estimate: ScanEstimate; decision: ScanPolicyDecision } | null {
+    if (!input.guarded || !isGuardActive(config())) return null;
+    const covered =
+      input.useConsent && isScopeCovered(scopeOf(input.signature), meta.consentedScope, nowUs());
+    if (covered) return null;
+    const estimate = deps.estimate(input.signature);
+    const decision = evaluateScanPolicy(estimate, guardThresholdMb(config()));
+    return decision.allowed ? null : { estimate, decision };
+  }
+
   function execute(input: ExecuteInput): RequestRunResult {
     const attached = attachToInFlightPage(input);
     if (attached) return attached;
+    const verdict = guardVerdict(input);
+    if (verdict && input.kind !== "explicit") {
+      block(null, input, verdict.estimate, verdict.decision);
+      return "blocked";
+    }
     const gen = newGeneration({
       lane: input.lane,
       kind: input.kind,
@@ -869,15 +892,9 @@ export function createAutoRun(deps: AutoRunDeps) {
       op: input.op,
       signature: input.signature,
     });
-    const covered =
-      input.useConsent && isScopeCovered(scopeOf(input.signature), meta.consentedScope, nowUs());
-    if (input.guarded && isGuardActive(config()) && !covered) {
-      const estimate = deps.estimate(input.signature);
-      const decision = evaluateScanPolicy(estimate, guardThresholdMb(config()));
-      if (!decision.allowed) {
-        block(gen, input, estimate, decision);
-        return "blocked";
-      }
+    if (verdict) {
+      block(gen, input, verdict.estimate, verdict.decision);
+      return "blocked";
     }
     return dispatch(gen, input);
   }
@@ -1265,8 +1282,9 @@ export function createAutoRun(deps: AutoRunDeps) {
       patchRequestBounds(record.req, bounds.startUs, bounds.endUs);
       if (record === meta.executed) republish = true;
     }
-    if (meta.consentedScope)
-      meta.consentedScope = { ...meta.consentedScope, time: cloneJson(time) };
+    const consented = meta.consentedScope;
+    if (consented && isScopeCovered({ ...consented, time }, consented, nowUs()))
+      meta.consentedScope = { ...consented, time: cloneJson(time) };
     const executed = meta.executed;
     if (republish && executed) {
       emitExecuted({

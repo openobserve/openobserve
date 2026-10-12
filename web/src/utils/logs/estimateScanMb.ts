@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { RELATIVE_PERIOD_PATTERN } from "@/utils/date";
+
 export const MICROS_PER_MINUTE = 60 * 1_000_000;
 export const MICROS_PER_HOUR = 60 * MICROS_PER_MINUTE;
 export const MICROS_PER_DAY = 24 * MICROS_PER_HOUR;
@@ -58,7 +60,7 @@ export interface WindowUs {
   endUs: number;
 }
 
-export type UnknownCause = "no-stats" | "short-span" | "super-cluster";
+export type UnknownCause = "no-stats" | "short-span" | "super-cluster" | "invalid-stats";
 
 export interface StreamScanEstimate {
   name: string;
@@ -111,7 +113,8 @@ export const NARROW_PRESETS: NarrowPreset[] = Object.entries(PRESET_VALUES)
   .sort((a, b) => a.durationUs - b.durationUs);
 
 export function periodToMicros(period: string): number | null {
-  const match = /^(\d+)([smhdwM])$/.exec(period ?? "");
+  // Same pattern the search resolves the period with, so the guard never sizes a window the search reads differently.
+  const match = RELATIVE_PERIOD_PATTERN.exec(period ?? "");
   if (!match) return null;
   return Number(match[1]) * UNIT_MICROS[match[2]];
 }
@@ -120,6 +123,15 @@ export function relativeWindow(period: string, nowUs: number): WindowUs | null {
   const duration = periodToMicros(period);
   if (duration === null) return null;
   return { startUs: nowUs - duration, endUs: nowUs };
+}
+
+export function isValidWindow(window: WindowUs | null | undefined): window is WindowUs {
+  return (
+    !!window &&
+    Number.isFinite(window.startUs) &&
+    Number.isFinite(window.endUs) &&
+    window.endUs > window.startUs
+  );
 }
 
 export function estimateStreamMb(
@@ -136,6 +148,8 @@ export function estimateStreamMb(
   if (ctx.superCluster) return unknown("super-cluster");
   const docMin = Number(entry.stats?.doc_time_min ?? 0);
   const docMax = Number(entry.stats?.doc_time_max ?? 0);
+  const storage = Number(entry.stats?.storage_size ?? 0);
+  if (![docMin, docMax, storage].every(Number.isFinite)) return unknown("invalid-stats");
   if (docMax <= 0) return unknown("no-stats");
   const observedSpan = Math.min(ctx.nowUs, docMax) - docMin;
   if (observedSpan < MIN_KNOWN_SPAN_US) return unknown("short-span");
@@ -146,22 +160,36 @@ export function estimateStreamMb(
   const spanUs = Math.max(1, observedSpan);
   const retentionUs = retentionDays * MICROS_PER_DAY;
   const denominator = retentionUs > 0 ? Math.min(retentionUs, spanUs) : spanUs;
-  const rate = Number(entry.stats?.storage_size ?? 0) / denominator;
+  const rate = storage / denominator;
   const covered = Math.max(0, Math.min(window.endUs, ctx.nowUs) - Math.max(window.startUs, docMin));
-  return { name: entry.name, status: "known", estimateMb: rate * covered, cause: null };
+  const estimateMb = rate * covered;
+  if (!Number.isFinite(estimateMb)) return unknown("invalid-stats");
+  return { name: entry.name, status: "known", estimateMb, cause: null };
 }
 
 export function estimateScanMb(
   streamNames: string[],
   list: StreamStatsEntry[],
-  window: WindowUs,
+  window: WindowUs | null,
   ctx: EstimateContext,
 ): ScanEstimate {
+  if (!isValidWindow(window)) {
+    return {
+      status: "unresolved",
+      knownMb: 0,
+      streams: [],
+      unknownStreams: [],
+      unresolvedSources: [],
+      superCluster: ctx.superCluster,
+      window: { startUs: ctx.nowUs, endUs: ctx.nowUs },
+    };
+  }
   const byName = new Map(list.map((entry) => [entry.name, entry]));
-  const unresolvedSources = streamNames.filter((name) => !byName.has(name));
   const streams = streamNames
     .filter((name) => byName.has(name))
     .map((name) => estimateStreamMb(byName.get(name) as StreamStatsEntry, window, ctx));
+  const invalid = streams.filter((s) => s.cause === "invalid-stats").map((s) => s.name);
+  const unresolvedSources = [...streamNames.filter((name) => !byName.has(name)), ...invalid];
   const knownMb = streams.reduce((sum, s) => sum + (s.estimateMb ?? 0), 0);
   const unknownStreams = streams.filter((s) => s.status === "unknown").map((s) => s.name);
   let status: ScanEstimate["status"] = "known";
@@ -182,12 +210,15 @@ export function evaluateScanPolicy(
   estimate: ScanEstimate,
   thresholdMb: number,
 ): ScanPolicyDecision {
+  const finite = Number.isFinite(estimate.knownMb);
   const decide = (allowed: boolean, reason: ScanPolicyReason): ScanPolicyDecision => ({
     allowed,
     reason,
-    estimateMb: estimate.knownMb,
+    estimateMb: finite ? estimate.knownMb : 0,
   });
-  if (estimate.status === "unresolved") return decide(false, "unresolved");
+  if (estimate.status === "unresolved" || !finite || !isValidWindow(estimate.window)) {
+    return decide(false, "unresolved");
+  }
   if (estimate.knownMb > thresholdMb) return decide(false, "over-threshold");
   if (estimate.status === "known") return decide(true, "within-threshold");
   if (estimate.superCluster || estimate.unknownStreams.length > FRESH_UNKNOWN_MAX_STREAMS) {

@@ -52,6 +52,8 @@ export const useSearchConnection = (t: TranslateFn) => {
     serverCancel: (orgId, traceIds) => searchService.delete_running_queries(orgId, traceIds),
   });
 
+  const replacedSearchTraceIds = new Map<string, string>();
+
   const buildWebSocketPayload = (
     queryReq: SearchRequestPayload,
     isPagination: boolean,
@@ -63,6 +65,7 @@ export const useSearchConnection = (t: TranslateFn) => {
     addTraceId(traceId);
 
     if (type === "search") {
+      replacedSearchTraceIds.set(traceId, searchObj.data.lastSearchTraceId ?? "");
       searchObj.data.lastSearchTraceId = traceId;
       if (isPagination) notePageRequest(searchObj, traceId);
     }
@@ -81,7 +84,6 @@ export const useSearchConnection = (t: TranslateFn) => {
       onData?: (payload: WebSocketSearchPayload, response: WebSocketSearchResponse) => void;
       onError?: (payload: WebSocketSearchPayload, error: WebSocketErrorResponse) => void;
       onComplete?: (payload: WebSocketSearchPayload, response: unknown) => void;
-      onReset?: (data: unknown, traceId?: string) => void;
     } = {
       queryReq,
       type,
@@ -95,13 +97,24 @@ export const useSearchConnection = (t: TranslateFn) => {
     return payload;
   };
 
+  const releaseRejectedPayload = (payload: any): void => {
+    removeTraceId(payload.traceId);
+    const replaced = replacedSearchTraceIds.get(payload.traceId);
+    if (replaced !== undefined && searchObj.data.lastSearchTraceId === payload.traceId) {
+      searchObj.data.lastSearchTraceId = replaced;
+    }
+    replacedSearchTraceIds.delete(payload.traceId);
+  };
+
   const initializeSearchConnection = (payload: any): string | Promise<void> | null => {
     if (!useLogsAutoRun().bindPayload(payload)) {
+      releaseRejectedPayload(payload);
       if (payload.type === "histogram" || payload.type === "pageCount") {
         searchObj.loadingHistogram = false;
       }
       return null;
     }
+    replacedSearchTraceIds.delete(payload.traceId);
     payload.searchType = "ui";
     payload.pageType = searchObj.data.stream.streamType;
     return fetchQueryDataWithHttpStream(payload, {
@@ -113,9 +126,6 @@ export const useSearchConnection = (t: TranslateFn) => {
       },
       complete: (payload: any, response: any) => {
         if (payload.onComplete) payload.onComplete(payload, response);
-      },
-      reset: (data: any, traceId?: string) => {
-        if (payload.onReset) payload.onReset(data, traceId);
       },
     }) as Promise<void>;
   };
@@ -170,7 +180,6 @@ export const useSearchConnection = (t: TranslateFn) => {
       onData: (payload: WebSocketSearchPayload, response: any) => void;
       onError: (payload: any, error: any) => void;
       onComplete: (payload: any, response: any) => void;
-      onReset: (data: any, traceId?: string) => void;
     },
     generationId?: number,
     options: { reuseSchema?: boolean } = {},
@@ -227,7 +236,6 @@ export const useSearchConnection = (t: TranslateFn) => {
       payload.onData = callbacks.onData;
       payload.onError = callbacks.onError;
       payload.onComplete = callbacks.onComplete;
-      payload.onReset = callbacks.onReset;
 
       if (shouldGetPageCount(queryReq) && searchObj.meta.refreshInterval == 0) {
         queryReq.query.size = queryReq.query.size + 1;

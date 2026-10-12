@@ -40,6 +40,7 @@ import {
 import {
   chooseNarrowPreset,
   estimateScanMb,
+  isValidWindow,
   relativeWindow,
   type EstimateContext,
   type ScanEstimate,
@@ -123,6 +124,10 @@ export function zoConfig(): AutoRunConfig & Record<string, unknown> {
   return (appStore?.state as { zoConfig?: Record<string, unknown> } | undefined)?.zoConfig ?? {};
 }
 
+export function isSuperCluster(): boolean {
+  return config.isEnterprise === "true" && !!zoConfig().super_cluster_enabled;
+}
+
 export function setAutoRunTransport(next: AutoRunTransport): void {
   transport = next;
 }
@@ -142,7 +147,7 @@ export function readLogsSignature(searchObj: SearchObject): LogsSignature {
   const data = searchObj.data;
   const datetime = data.datetime ?? {};
   const scan = meta.freeTextScan ?? {};
-  const superCluster = config.isEnterprise === "true" && !!zoConfig().super_cluster_enabled;
+  const superCluster = isSuperCluster();
   return buildLogsSignature({
     query: String(data.query ?? "").trim(),
     sqlMode: !!meta.sqlMode,
@@ -175,18 +180,18 @@ export function scopeStreams(signature: LogsSignature): { names: string[]; resol
   return { names: parsed.sources, resolved: parsed.resolved };
 }
 
-function signatureWindow(signature: LogsSignature, nowUs: number): WindowUs {
+function signatureWindow(signature: LogsSignature, nowUs: number): WindowUs | null {
   if (signature.time.type === "absolute") {
     return { startUs: signature.time.startUs, endUs: signature.time.endUs };
   }
-  return relativeWindow(signature.time.period, nowUs) ?? { startUs: nowUs, endUs: nowUs };
+  return relativeWindow(signature.time.period, nowUs);
 }
 
 function estimateContext(nowUs: number): EstimateContext {
   return {
     nowUs,
     defaultRetentionDays: Number(zoConfig().data_retention_days ?? 0),
-    superCluster: !!zoConfig().super_cluster_enabled,
+    superCluster: isSuperCluster(),
   };
 }
 
@@ -251,6 +256,7 @@ function createLogsAutoRun() {
     pickNarrowPreset: (signature) => {
       const now = nowUs();
       const window = signatureWindow(signature, now);
+      if (!isValidWindow(window)) return null;
       return chooseNarrowPreset(
         scopeStreams(signature).names,
         streamList(),

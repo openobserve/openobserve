@@ -76,6 +76,24 @@ vi.mock("@/composables/useStreams", async () => {
   };
 });
 
+const ZOOM = { start: Date.parse("2026-10-06T10:00:00"), end: Date.parse("2026-10-06T10:30:00") };
+
+function zoomPayload(range: { start: number; end: number }) {
+  const two = (n: number) => String(n).padStart(2, "0");
+  const date = (d: Date) => `${d.getFullYear()}/${two(d.getMonth() + 1)}/${two(d.getDate())}`;
+  const time = (d: Date) => `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
+  const from = new Date(range.start);
+  const to = new Date(range.end);
+  return {
+    valueType: "absolute",
+    startTime: range.start * 1000,
+    endTime: range.end * 1000,
+    selectedDate: { from: date(from), to: date(to) },
+    selectedTime: { startTime: time(from), endTime: time(to) },
+    userChangedValue: false,
+  };
+}
+
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [{ path: "/logs", name: "logs", component: { template: "<div />" } }],
@@ -538,27 +556,65 @@ describe("SearchBar — auto-run wiring (item 2)", () => {
 
     it("runs a histogram zoom as explicit even with Auto Run off (J4, #4295)", async () => {
       const { logs } = await setup({ liveMode: false });
-      wrapper!.vm.markZoom();
-      await wrapper!.vm.updateDateTime({
-        valueType: "absolute",
-        startTime: 10,
-        endTime: 20,
-        userChangedValue: false,
-      });
+      wrapper!.vm.markZoom(ZOOM);
+      await wrapper!.vm.updateDateTime(zoomPayload(ZOOM));
       expect(logs).toHaveBeenCalledTimes(1);
       expect(logs.mock.calls[0][0]).toMatchObject({ reason: "zoom", kind: "explicit" });
+    });
+
+    it("a zoom to the unchanged range does not turn the next relative pick into a zoom (M3)", async () => {
+      const { logs } = await setup();
+      vi.useFakeTimers();
+      wrapper!.vm.markZoom(ZOOM);
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "30d",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+      });
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(logs).toHaveBeenCalledTimes(1);
+      expect(logs.mock.calls[0][0]).toMatchObject({ reason: "time", kind: "refinement" });
+    });
+
+    it("a relative pick after an unemitted zoom does not run with Auto Run off (M3)", async () => {
+      const { logs } = await setup({ liveMode: false });
+      vi.useFakeTimers();
+      wrapper!.vm.markZoom(ZOOM);
+      await wrapper!.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "30d",
+        startTime: 1,
+        endTime: 2,
+        userChangedValue: true,
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("a zoom expires on the tick after it is marked (M3)", async () => {
+      const { logs } = await setup({ liveMode: false });
+      vi.useFakeTimers();
+      wrapper!.vm.markZoom(ZOOM);
+      await vi.advanceTimersByTimeAsync(0);
+      await wrapper!.vm.updateDateTime(zoomPayload(ZOOM));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(logs).not.toHaveBeenCalled();
+    });
+
+    it("an emitted range that differs from the zoom is not a zoom", async () => {
+      const { logs } = await setup({ liveMode: false });
+      wrapper!.vm.markZoom(ZOOM);
+      await wrapper!.vm.updateDateTime(zoomPayload({ start: ZOOM.start, end: ZOOM.end + 60_000 }));
+      expect(logs).not.toHaveBeenCalled();
     });
 
     it("leaves a zoom pending while the editor is dirty", async () => {
       const { logs, searchObj } = await setup();
       wrapper!.vm.onEditorUserEdit();
-      wrapper!.vm.markZoom();
-      await wrapper!.vm.updateDateTime({
-        valueType: "absolute",
-        startTime: 10,
-        endTime: 20,
-        userChangedValue: false,
-      });
+      wrapper!.vm.markZoom(ZOOM);
+      await wrapper!.vm.updateDateTime(zoomPayload(ZOOM));
       expect(logs).not.toHaveBeenCalled();
       expect(searchObj.meta.runPending).toBe(true);
     });

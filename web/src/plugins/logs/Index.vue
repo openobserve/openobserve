@@ -799,7 +799,7 @@ export default defineComponent({
   emits: ["sendToAiChat"],
   methods: {
     setHistogramDate(date: any) {
-      this.searchBarRef?.markZoom?.();
+      this.searchBarRef?.markZoom?.(date);
       this.searchBarRef.dateTimeRef.setCustomDate("absolute", date);
     },
     searchData() {

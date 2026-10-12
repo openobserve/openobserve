@@ -23,7 +23,6 @@
  */
 
 import { searchState } from "@/composables/useLogs/searchState";
-import { logsUtils } from "@/composables/useLogs/logsUtils";
 import useNotifications from "@/composables/useNotifications";
 
 // Split composables
@@ -32,19 +31,17 @@ import useSearchConnection from "@/composables/useLogs/useSearchConnection";
 import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
-import { raw, type TranslateFn } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
 import analytics from "@/services/product_analytics";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import {
   failPendingPageNavigation,
   notePageLoad,
-  notePageRetry,
   notifyHitsComplete,
 } from "@/composables/useLogs/logsRowNav";
 
 export const useSearchStream = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
-  const { addTraceId } = logsUtils();
 
   // Initialize all the split composables
   const queryBuilder = useSearchQuery(t);
@@ -76,7 +73,6 @@ export const useSearchStream = (t: TranslateFn) => {
     onData,
     onError,
     onComplete: handleSearchComplete,
-    onReset: handleSearchReset,
   });
 
   /**
@@ -172,54 +168,6 @@ export const useSearchStream = (t: TranslateFn) => {
     // Clean up connection
     connectionManager.cleanupConnection(payload.traceId);
     autoRun.finishPayload(payload);
-  };
-
-  /**
-   * Handle search reset/retry
-   */
-  const handleSearchReset = (data: any) => {
-    try {
-      if (data.type === "search") {
-        if (!data.isPagination) {
-          resetQueryData();
-          searchObj.data.queryResults = {};
-        }
-
-        // Reset histogram if needed
-        if (!data.isPagination) {
-          searchObj.data.histogram = {
-            xData: [],
-            yData: [],
-            breakdownField: null,
-            breakdownSeries: null,
-            chartParams: {
-              title: raw(""),
-              titleParts: null,
-              unparsed_x_data: [],
-              timezone: "",
-            },
-            errorCode: 0,
-            errorMsg: "",
-            errorDetail: "",
-          };
-        }
-
-        if (data.isPagination) notePageRetry(searchObj, data.traceId);
-        // Rebuild payload and retry
-        const payload = connectionManager.buildWebSocketPayload(
-          data.queryReq,
-          data.isPagination,
-          "search",
-        );
-        (payload as { generationId?: number }).generationId = data.generationId;
-        (payload as { reuseSchema?: boolean }).reuseSchema = data.reuseSchema;
-
-        connectionManager.initializeSearchConnection(payload);
-        addTraceId(payload.traceId);
-      }
-    } catch (error: any) {
-      console.error("Error during search reset:", error);
-    }
   };
 
   /**

@@ -1024,16 +1024,38 @@ describe("guard, consent and Run anyway", () => {
     expect(h.resetLoading).toHaveBeenCalledTimes(1);
   });
 
-  it("a blocked run cancels the previous in-flight generation", () => {
+  it("a blocked automatic run leaves the in-flight run current and only shows the banner (M1)", () => {
     const h = makeHarness();
     h.engine.requestRun("run");
     const first = h.lastGen();
     h.state.estimateMb = 500;
     h.live.streams = ["app", "big"];
-    h.engine.requestRun("stream");
+    expect(h.engine.requestRun("stream")).toBe("scheduled");
     vi.runAllTimers();
+    expect(h.engine.isCurrent(first)).toBe(true);
+    expect(h.engine.currentGeneration()?.id).toBe(first);
+    expect(h.abortTrace).not.toHaveBeenCalled();
+    expect(h.serverCancel).not.toHaveBeenCalled();
+    expect(h.resetLoading).not.toHaveBeenCalled();
+    expect(h.store.meta.runOutcome?.logs).toBe("running");
+    expect(h.store.meta.autoRunBlocked).toMatchObject({ reason: "stream", estimateMb: 500 });
+
+    h.engine.recordChunk(first);
+    expect(h.engine.recordComplete(first)).toBe(true);
+    expect(h.store.meta.executed?.generation).toBe(first);
+    expect(h.store.meta.autoRunBlocked).not.toBeNull();
+  });
+
+  it("a blocked explicit Narrow to still replaces the in-flight run", () => {
+    const h = makeHarness();
+    h.engine.requestRun("run");
+    const first = h.lastGen();
+    h.state.estimateMb = 500;
+    h.live.time = { type: "relative", period: "2d" };
+    expect(h.engine.requestRun("narrow")).toBe("blocked");
     expect(h.engine.isCurrent(first)).toBe(false);
     expect(h.abortTrace).toHaveBeenCalledWith("hits-1");
+    expect(h.store.meta.runOutcome?.logs).toBe("blocked");
   });
 
   it("an unresolved source is blocked with no Narrow to, never sent", () => {
@@ -1321,7 +1343,8 @@ describe("hitsSettled", () => {
 });
 
 describe("server window moves", () => {
-  const moved = { startUs: 1_000, endUs: 2_000 };
+  const NOW_US = Date.parse("2026-10-06T12:00:00Z") * 1000;
+  const moved = { startUs: NOW_US - 10 * MINUTE_US, endUs: NOW_US - 5 * MINUTE_US };
 
   it.each([
     ["with the first hits chunk", true],
@@ -1339,10 +1362,27 @@ describe("server window moves", () => {
     h.engine.recordComplete(gen);
     const record = h.store.meta.executed;
     expect(record?.signature.time).toEqual({ type: "absolute", ...moved });
-    expect(record?.req).toMatchObject({ query: { start_time: 1_000, end_time: 2_000 } });
+    expect(record?.req).toMatchObject({
+      query: { start_time: moved.startUs, end_time: moved.endUs },
+    });
     expect(h.store.meta.consentedScope?.time).toEqual({ type: "absolute", ...moved });
     expect(h.engine.isResultsStale()).toBe(false);
     expect(events).toHaveLength(afterChunk ? 2 : 1);
+  });
+
+  it("never widens consent: a wider move is ignored, a narrower one is applied (M4)", () => {
+    const h = makeHarness();
+    const nowUs = Date.now() * 1000;
+    h.live.time = { type: "absolute", startUs: nowUs - 60 * MINUTE_US, endUs: nowUs };
+    h.engine.requestRun("run");
+    const gen = h.lastGen();
+    const consented = h.store.meta.consentedScope?.time;
+    const wider = { startUs: nowUs - 120 * MINUTE_US, endUs: nowUs };
+    h.engine.recordWindowMove(gen, wider);
+    expect(h.store.meta.consentedScope?.time).toEqual(consented);
+    const narrower = { startUs: nowUs - 30 * MINUTE_US, endUs: nowUs - MINUTE_US };
+    h.engine.recordWindowMove(gen, narrower);
+    expect(h.store.meta.consentedScope?.time).toEqual({ type: "absolute", ...narrower });
   });
 
   it("ignores a move for a replaced generation", () => {
