@@ -47,8 +47,8 @@ test.describe("Onboarding GetStarted form validation", () => {
     }, async ({ page }) => {
         testLogger.info('Testing empty hear-about-us field validation');
 
-        // OForm validates on submit (revalidateLogic: submit-then-change), so the
-        // required error reveals after clicking Submit — not on blur.
+        // OForm validates on submit, so the required error shows after Continue, not on blur; Continue needs Terms ticked.
+        await pm.onboardingFormValidation.checkAgreeCheckbox();
         await pm.onboardingFormValidation.clickSubmit();
 
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toBeVisible();
@@ -65,6 +65,7 @@ test.describe("Onboarding GetStarted form validation", () => {
         testLogger.info('Testing empty where-do-you-work field validation');
 
         // Validation reveals on submit, not on blur.
+        await pm.onboardingFormValidation.checkAgreeCheckbox();
         await pm.onboardingFormValidation.clickSubmit();
 
         await expect(pm.onboardingFormValidation.getWhereDoYouWorkErrorLocator()).toBeVisible();
@@ -81,6 +82,7 @@ test.describe("Onboarding GetStarted form validation", () => {
         testLogger.info('Testing both fields empty trigger required errors on submit');
 
         // A single submit validates the whole schema, revealing both errors.
+        await pm.onboardingFormValidation.checkAgreeCheckbox();
         await pm.onboardingFormValidation.clickSubmit();
 
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toBeVisible();
@@ -98,6 +100,7 @@ test.describe("Onboarding GetStarted form validation", () => {
 
         // Reveal the error via submit, then typing re-validates on change
         // (revalidateLogic modeAfterSubmission: "change") and clears it.
+        await pm.onboardingFormValidation.checkAgreeCheckbox();
         await pm.onboardingFormValidation.clickSubmit();
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toBeVisible();
         await expect(pm.onboardingFormValidation.getHearAboutUsErrorLocator()).toContainText('This field is required');
@@ -109,20 +112,23 @@ test.describe("Onboarding GetStarted form validation", () => {
         testLogger.info('Hear-about-us error cleared correctly');
     });
 
-    test("should keep submit button enabled even when agree checkbox is unchecked", {
+    test("should disable Continue and Skip questions until the agree checkbox is ticked", {
         tag: ['@onboarding-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button stays enabled when agree not checked (R3)');
+        testLogger.info('Testing the Terms gate on both footer buttons');
 
         await pm.onboardingFormValidation.fillHearAboutUs('From a friend');
         await pm.onboardingFormValidation.fillWhereDoYouWork('Acme Corp');
 
-        // Under the OForm foundation the Save button is ALWAYS enabled — the Zod
-        // schema (isAgree must be true) gates the actual submit, not a disabled
-        // button. So with the agree box unchecked the button stays enabled.
-        await expect(pm.onboardingFormValidation.getSubmitBtnLocator()).toBeEnabled();
+        await expect(pm.onboardingFormValidation.getSubmitBtnLocator()).toBeDisabled();
+        await expect(pm.onboardingFormValidation.getSkipBtnLocator()).toBeDisabled();
 
-        testLogger.info('Submit button correctly stays enabled without agree checkbox');
+        await pm.onboardingFormValidation.checkAgreeCheckbox();
+
+        await expect(pm.onboardingFormValidation.getSubmitBtnLocator()).toBeEnabled();
+        await expect(pm.onboardingFormValidation.getSkipBtnLocator()).toBeEnabled();
+
+        testLogger.info('Continue and Skip questions follow the Terms checkbox');
     });
 
     test("should keep submit button enabled when both fields filled and agree checked", {
@@ -134,8 +140,7 @@ test.describe("Onboarding GetStarted form validation", () => {
         await pm.onboardingFormValidation.fillWhereDoYouWork('Acme Corp');
         await pm.onboardingFormValidation.checkAgreeCheckbox();
 
-        // Always enabled under the OForm foundation; with valid values it stays
-        // enabled and a submit would pass the schema.
+        // With Terms ticked and valid values, Continue is enabled and a submit passes the schema.
         await expect(pm.onboardingFormValidation.getSubmitBtnLocator()).toBeEnabled();
 
         testLogger.info('Submit button correctly enabled when form is valid');

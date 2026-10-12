@@ -2405,4 +2405,22 @@ describe("useRoutes (router.ts)", () => {
       expect(mismatches).toEqual([]);
     });
   });
+
+  describe("allowOnEmptyData", () => {
+    it.each(["home", "logs", "metrics", "traces", "dashboards"])(
+      "opens %s on an empty org",
+      (name) => {
+        const { homeChildRoutes } = useRoutes();
+        expect(findRoute(homeChildRoutes, name).meta.allowOnEmptyData).toBe(true);
+      },
+    );
+
+    it.each(["metricsEditor", "viewDashboard", "searchJobInspector", "promqlBuilder"])(
+      "keeps the empty-data guard on %s",
+      (name) => {
+        const { homeChildRoutes } = useRoutes();
+        expect(findRoute(homeChildRoutes, name).meta?.allowOnEmptyData).toBeUndefined();
+      },
+    );
+  });
 });
