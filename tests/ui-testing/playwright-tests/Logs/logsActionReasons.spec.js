@@ -74,7 +74,10 @@ test.describe('G1 visible action reasons C2', () => {
         await trigger.click();
         await settleMenu(page);
         const scheduled = page.locator('[data-test="search-scheduler-create-new-btn"]');
-        const availableIds = [...ids[menu], ...(menu === 'more' && await scheduled.count() ? ['search-scheduler-create-new-btn'] : [])];
+        const scheduleLocked = menu === 'more' && await page.locator('[data-test="search-scheduler-locked-icon"]').count() > 0;
+        // A locked item opens the upgrade dialog, not the query, so it carries no edited-query note.
+        if (scheduleLocked) await expect(page.locator('[data-test="search-scheduler-create-new-btn-reason"]')).toHaveCount(0);
+        const availableIds = [...ids[menu], ...(menu === 'more' && !scheduleLocked && await scheduled.count() ? ['search-scheduler-create-new-btn'] : [])];
         for (const id of availableIds) {
           const item = page.locator(`[data-test="${id}"]`);
           await expect(item).not.toHaveAttribute('aria-disabled', 'true');

@@ -770,7 +770,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownGroup :label="t('search.menuGroupSchedule')">
             <template v-if="!scheduledSearchAccess.allowed" #label-action>
-              <OIcon name="lock" size="xs" class="text-warning-600" />
+              <OIcon
+                name="lock"
+                size="xs"
+                class="text-warning-600"
+                data-test="search-scheduler-locked-icon"
+              />
             </template>
 
             <ODropdownItem

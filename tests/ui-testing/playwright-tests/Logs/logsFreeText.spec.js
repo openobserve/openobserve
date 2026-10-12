@@ -67,9 +67,15 @@ async function open(page, streams, query, extra = '') {
   return searches;
 }
 
+// While the load-time search is in flight the same test id is the Cancel button, so a click then cancels instead of running.
+async function clickRun(page) {
+  await expect(page.locator(runBtn)).toContainText('Run query', { timeout: 30000 });
+  await page.locator(runBtn).click();
+}
+
 async function run(page, searches) {
   const before = searches.hits().length;
-  await page.locator(runBtn).click();
+  await clickRun(page);
   await expect.poll(() => searches.hits().length, { timeout: 30000 }).toBeGreaterThan(before);
   return decodedSql(searches.hits().at(-1));
 }
@@ -425,8 +431,10 @@ test.describe('Logs bare-word search (item 1)', () => {
     tag: ['@freeText', '@logs'],
   }, async ({ page }) => {
     const failures = [];
+    // Only the search, stream and schema calls L-24 is about; the home page's enterprise-only calls 404 on OSS.
+    const l24Route = /\/api\/[^/]+\/(?:_search|streams\b|(?:[^/?]+\/)?_values)/;
     page.on('response', (response) => {
-      if (response.url().includes('/api/') && response.status() >= 400) {
+      if (l24Route.test(response.url()) && response.status() >= 400) {
         failures.push(`${response.status()} ${response.url()}`);
       }
     });
@@ -439,7 +447,7 @@ test.describe('Logs bare-word search (item 1)', () => {
     for (const { streams, shows } of cases) {
       testLogger.info(`variant ${streams}`);
       const searches = await open(page, streams, 'timeout');
-      await page.locator(runBtn).click();
+      await clickRun(page);
       await expect(page.locator(shows).first()).toBeVisible({ timeout: 30000 });
       if (shows === panel) expect(searches.hits()).toHaveLength(0);
     }
