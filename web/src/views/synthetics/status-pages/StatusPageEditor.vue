@@ -738,8 +738,7 @@ async function rotateSlug() {
 function goBack() {
   const ctx = syntheticsNavContextFromRoute(route);
   if (!ctx.orgIdentifier && orgIdentifier.value) ctx.orgIdentifier = orgIdentifier.value;
-  const base = syntheticsListRoute(ctx) as { name: string; query: Record<string, string> };
-  router.push({ name: base.name, query: { ...base.query, section: "status-pages" } });
+  router.push(syntheticsListRoute(ctx, { section: "status-pages" }));
 }
 
 watch(orgIdentifier, (org) => {

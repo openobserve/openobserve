@@ -429,6 +429,7 @@ import { orgSummaryQuery } from "@/services/organizations.queries";
 import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -498,9 +499,17 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
-    const filterQuery = ref("");
+    const viewState = useListViewState("logStreams", {
+      filterQuery: "",
+      streamType: "logs",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "name",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const duplicateStreamList: Ref<any[]> = ref([]);
-    const selectedStreamType = ref("logs");
+    const selectedStreamType = ref(viewState.streamType);
     const loadingState = ref(true);
     // A refresh with rows already on screen: the button spins, the table does not
     // go back to a skeleton.
@@ -509,14 +518,14 @@ export default defineComponent({
     const forbidden = ref(false);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
-    const streamActiveTab = ref("logs");
+    const streamActiveTab = ref(viewState.streamType);
     const { track } = useReo();
 
-    const pageSize = ref(20);
+    const pageSize = ref(viewState.pageSize);
     const pageSizeOptions = [20, 50, 100, 250, 500];
-    const currentPage = ref(1);
-    const sortBy = ref("name");
-    const sortOrder = ref<"asc" | "desc">("asc");
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
     const totalCount = ref(0);
 
     const selectedItems = computed(() =>
@@ -1160,6 +1169,17 @@ export default defineComponent({
 
     watch([currentPage, pageSize, sortBy, sortOrder], () => {
       getLogStream();
+    });
+
+    watch([filterQuery, selectedStreamType, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        streamType: selectedStreamType.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
     });
 
     watch(filterQuery, () => {

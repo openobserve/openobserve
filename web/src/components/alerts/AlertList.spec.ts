@@ -82,6 +82,7 @@ import { alertKeys } from "@/services/alerts.querykeys";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -285,11 +286,7 @@ beforeEach(() => {
   ];
   (store.state as any).organizationData.allAlertsListByFolderId = {};
   // Reset alert list filters to prevent leaking between tests
-  (store.state as any).alertListFilters = {
-    searchQuery: "",
-    filterQuery: "",
-    searchAcrossFolders: false,
-  };
+  resetListViewState();
 
   alertsDB = [
     makeAlert(1, {
@@ -945,13 +942,7 @@ describe("AlertList - pagination restoration", () => {
     // second, spurious autoResetPageIndex after the legitimate one has already settled.
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
-    (store.state as any).alertListFilters = {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-      perPage: 5,
-      currentPage: 3,
-    };
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 3 });
     const wrapper: any = await mountAlertList();
     await flushPromises();
     await wrapper.vm.$nextTick();
@@ -965,13 +956,7 @@ describe("AlertList - pagination restoration", () => {
   it("resets the persisted page on a folder switch so it is not restored onto the new folder", async () => {
     (store.state as any).organizationData.allAlertsListByFolderId = {};
     alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
-    (store.state as any).alertListFilters = {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-      perPage: 5,
-      currentPage: 3,
-    };
+    Object.assign(useListViewState("alerts", {}), { perPage: 5, currentPage: 3 });
     const wrapper: any = await mountAlertList();
     await flushPromises();
     expect(wrapper.vm.currentPage).toBe(3);
@@ -980,7 +965,59 @@ describe("AlertList - pagination restoration", () => {
     await flushPromises();
 
     expect(wrapper.vm.currentPage).toBe(1);
-    expect((store.state as any).alertListFilters.currentPage).toBe(1);
+    expect(useListViewState("alerts", {}).currentPage).toBe(1);
+  });
+});
+
+describe("AlertList - view state restoration", () => {
+  it("restores the stat-tile chip, sort and page size saved before navigating away", async () => {
+    Object.assign(useListViewState("alerts", {}), {
+      stateFilter: "paused",
+      sortBy: "name",
+      sortOrder: "desc",
+      perPage: 50,
+    });
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+
+    expect(wrapper.vm.stateFilter).toBe("paused");
+    expect(wrapper.vm.sortBy).toBe("name");
+    expect(wrapper.vm.sortOrder).toBe("desc");
+    expect(wrapper.vm.pageSize).toBe(50);
+  });
+
+  it("saves chip, sort and page size changes for the next visit", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+
+    wrapper.vm.stateFilter = "active";
+    wrapper.vm.sortBy = "name";
+    wrapper.vm.sortOrder = "asc";
+    wrapper.vm.pageSize = 100;
+    await flushPromises();
+
+    expect(useListViewState("alerts", {})).toMatchObject({
+      stateFilter: "active",
+      sortBy: "name",
+      sortOrder: "asc",
+      perPage: 100,
+    });
+  });
+
+  it("carries the active tab to the alert detail page so back lands on it", async () => {
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    const push = vi.spyOn(wrapper.vm.$router, "push");
+
+    wrapper.vm.activeTab = "scheduled";
+    wrapper.vm.triggerExpand({ alert_id: "a1", folder_id: "default" });
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertDetail",
+        query: expect.objectContaining({ tab: "scheduled" }),
+      }),
+    );
   });
 });
 

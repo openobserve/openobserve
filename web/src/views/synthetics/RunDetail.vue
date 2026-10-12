@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :subtitle="raw(currentRun.timestamp)"
         :back="{
           label: t('synthetics.results.monitors'),
-          to: backTo,
+          onClick: goBack,
           dataTest: 'synthetics-run-detail-back-btn',
         }"
       >
@@ -598,6 +598,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
@@ -726,20 +727,28 @@ const executionIdParam = computed(() =>
 // Passed to per-check API calls so RBAC can resolve folder-scoped grants.
 const folderId = computed(() => String(route.query.folder ?? ""));
 
-/**
- * Back to this run's monitor, keeping the params the results page needs.
- *
- * Previously only `params.id` was carried, so the results page it returned to
- * had no org, no folder (breaking its own RBAC-scoped fetch and its Trigger Run)
- * and no `?name=`, leaving the header untitled.
- */
-const backTo = computed(() =>
-  syntheticsResultsRoute(
+// Time range, environment and the run to reopen travel with the fallback so the results page lands where the user left it.
+const backTo = computed(() => {
+  const extra: Record<string, string> = {};
+  for (const key of ["period", "from", "to", "env"]) {
+    const v = route.query[key];
+    if (typeof v === "string" && v) extra[key] = v;
+  }
+  if (runIdParam.value && executionIdParam.value) {
+    extra.run = runIdParam.value;
+    extra.exec = executionIdParam.value;
+  }
+  return syntheticsResultsRoute(
     { orgIdentifier: store.state.selectedOrganization?.identifier, folderId: folderId.value },
     monitorId.value,
-    { name: displayMonitorName.value },
-  ),
-);
+    { name: displayMonitorName.value, extra },
+  );
+});
+
+const goBack = useListBackNavigation({
+  isListPath: (path) => /\/synthetics\/[^/]+\/results$/.test(path),
+  fallback: () => backTo.value,
+});
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults(t);

@@ -113,6 +113,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :page-size-options="pageSizeOptions"
               :current-page="currentPage"
               @update:current-page="onPageChange"
+              @update:page-size="pageSize = $event"
+              :sort-by="sortBy"
+              :sort-order="sortOrder"
+              @update:sort-by="sortBy = $event"
+              @update:sort-order="sortOrder = $event"
               width="100%"
               :show-global-filter="false"
               :default-columns="false"
@@ -967,6 +972,7 @@ import FolderList from "../common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useListViewState } from "@/composables/useListViewState";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -1071,7 +1077,16 @@ export default defineComponent({
     // Flag to skip clearing search state on the first folder emission after mount.
     // When returning from add/edit screens, the FolderList emits the active folder
     // which would normally clear restored search filters. This flag prevents that.
-    const savedAlertListFilters = store.state.alertListFilters || {};
+    const savedAlertListFilters = useListViewState("alerts", {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      stateFilter: null as "active" | "paused" | "failed" | "recent" | null,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      perPage: 20,
+      currentPage: 1,
+    });
     const isRestoringState = ref(
       !!savedAlertListFilters.searchQuery ||
         !!savedAlertListFilters.filterQuery ||
@@ -1208,6 +1223,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: row.folder_id || router.currentRoute.value.query.folder || "default",
+          tab: activeTab.value,
         },
       });
     };
@@ -1495,7 +1511,9 @@ export default defineComponent({
     // Clicking a summary tile filters the table to that state (toggle); the
     // "total" tile clears it. Counts on the tiles stay full (from filteredResults)
     // so you always see the folder totals; only the table rows are filtered.
-    const stateFilter = ref<"active" | "paused" | "failed" | "recent" | null>(null);
+    const stateFilter = ref<"active" | "paused" | "failed" | "recent" | null>(
+      savedAlertListFilters.stateFilter,
+    );
     const displayedAlerts = computed(() => {
       const rows = filteredResults.value || [];
       const f = stateFilter.value;
@@ -2475,6 +2493,8 @@ export default defineComponent({
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
+    const sortBy = ref<string>(savedAlertListFilters.sortBy);
+    const sortOrder = ref<"asc" | "desc">(savedAlertListFilters.sortOrder);
     // No timezone suffix in this table, unlike the other lists.
     const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
@@ -3034,6 +3054,8 @@ export default defineComponent({
         name: "alertInsights",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
+          tab: activeTab.value,
         },
       });
     };
@@ -3043,6 +3065,8 @@ export default defineComponent({
         name: "alertHistory",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
+          tab: activeTab.value,
         },
       });
     };
@@ -3349,15 +3373,40 @@ export default defineComponent({
       }
     });
     // Persist filter state to Vuex so it survives navigation to add/edit screens
-    watch([searchQuery, filterQuery, searchAcrossFolders, pageSize, currentPage], () => {
-      store.commit("setAlertListFilters", {
-        searchQuery: searchQuery.value || "",
-        filterQuery: filterQuery.value || "",
-        searchAcrossFolders: !!searchAcrossFolders.value,
-        perPage: pageSize.value,
-        currentPage: currentPage.value,
-      });
+    // Closing the editor remounts FolderList, whose first emit would otherwise clear the active search as a same-folder click.
+    watch([showAddAlertDialog, showImportAlertDialog], ([adding, importing]) => {
+      if (
+        !adding &&
+        !importing &&
+        (searchQuery.value || filterQuery.value || searchAcrossFolders.value)
+      ) {
+        isRestoringState.value = true;
+      }
     });
+    watch(
+      [
+        searchQuery,
+        filterQuery,
+        searchAcrossFolders,
+        stateFilter,
+        sortBy,
+        sortOrder,
+        pageSize,
+        currentPage,
+      ],
+      () => {
+        Object.assign(savedAlertListFilters, {
+          searchQuery: searchQuery.value || "",
+          filterQuery: filterQuery.value || "",
+          searchAcrossFolders: !!searchAcrossFolders.value,
+          stateFilter: stateFilter.value,
+          sortBy: sortBy.value,
+          sortOrder: sortOrder.value,
+          perPage: pageSize.value,
+          currentPage: currentPage.value,
+        });
+      },
+    );
     watch(activeTab, async (newVal) => {
       //here we are resetting the filterQuery when the activeTab is changed
       //this is done because we need to trigger again the filterQuery watch
@@ -3755,6 +3804,8 @@ export default defineComponent({
       refreshList,
       pageSize,
       pageSizeOptions,
+      sortBy,
+      sortOrder,
       currentPage,
       onPageChange,
       oTableRef,
