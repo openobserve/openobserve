@@ -21,12 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="seg in shown"
         :key="seg.key"
         type="button"
-        class="focus-visible:ring-focus-ring-accent h-full basis-0 transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:outline-none"
+        tabindex="-1"
+        aria-hidden="true"
+        class="h-full basis-0 transition-opacity hover:opacity-80"
         :class="seg.color"
         :style="{ flexGrow: seg.count }"
-        :aria-label="
-          t('autoobserve2.coverageDrawer.legendAria', { label: seg.label, count: seg.count })
-        "
         :data-test="`autoobserve2-headline-bar-${seg.key}`"
         @click="emit('select', seg.filter)"
       />
@@ -36,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="seg in shown"
         :key="seg.key"
         type="button"
-        class="text-text-secondary hover:text-text-heading focus-visible:ring-focus-ring-accent rounded-default flex items-center gap-1.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        class="text-text-body hover:text-text-heading focus-visible:ring-focus-ring-accent rounded-default flex min-h-6 items-center gap-1.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
         :data-test="`autoobserve2-headline-legend-${seg.key}`"
         @click="emit('select', seg.filter)"
       >

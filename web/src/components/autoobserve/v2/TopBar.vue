@@ -20,18 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="autoobserve2-topbar"
   >
     <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-      <span class="text-text-heading flex items-center gap-2 font-semibold">
+      <h1 class="text-text-heading flex items-center gap-2 font-semibold">
         <span
           class="bg-accent text-text-inverse rounded-default flex size-7 items-center justify-center"
         >
           <OIcon name="auto-awesome" size="sm" />
         </span>
         {{ t("autoobserve2.topbar.brand") }}
-      </span>
+      </h1>
       <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
-      <span class="text-text-secondary">{{ today }}</span>
+      <span class="text-text-body">{{ today }}</span>
       <span class="text-text-muted max-sm:hidden" aria-hidden="true">·</span>
-      <span class="text-text-secondary">{{
+      <span class="text-text-body">{{
         t("autoobserve2.topbar.checked", { count: LAST_CHECKED }, LAST_CHECKED)
       }}</span>
     </div>

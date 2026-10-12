@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </slot>
       <span
         v-if="count !== undefined"
-        class="bg-surface-subtle text-text-secondary rounded-full px-2 py-0.5 text-xs font-medium tabular-nums"
+        class="bg-surface-subtle text-text-body rounded-full px-2 py-0.5 text-xs font-medium tabular-nums"
       >
         {{ count }}
       </span>

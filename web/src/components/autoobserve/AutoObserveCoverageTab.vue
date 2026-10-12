@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             :label="cellLabel(row.cells[signal])"
             :class="isSelected(row.service, signal) ? 'ring-accent ring-2' : ''"
+            :aria-pressed="isSelected(row.service, signal)"
             :data-test="`autoobserve-coverage-cell-${row.service}-${signal}`"
             @click="selected = { service: row.service, signal }"
           />
@@ -72,7 +73,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <aside
-      class="border-border-default flex w-96 shrink-0 flex-col gap-4 overflow-auto border-s p-4 max-lg:w-full max-lg:border-s-0 max-lg:border-t [&>*]:shrink-0"
+      tabindex="0"
+      class="border-border-default focus-visible:ring-focus-ring-accent flex w-96 shrink-0 flex-col gap-4 overflow-auto border-s p-4 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset max-lg:w-full max-lg:border-s-0 max-lg:border-t [&>*]:shrink-0"
       data-test="autoobserve-coverage-rail"
     >
       <OCard v-if="selectedCell" variant="glass" data-test="autoobserve-coverage-detail">

@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div :data-test="`autoobserve2-request-${testId}`">
+  <div ref="rootEl" :data-test="`autoobserve2-request-${testId}`">
+    <p class="sr-only" role="status" :data-test="`autoobserve2-request-status-${testId}`">
+      {{ announcement }}
+    </p>
     <div
       v-if="decisions[request.id]"
       class="bg-surface-subtle rounded-default flex items-start gap-2 py-2 ps-3 pe-1.5"
@@ -32,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="xs"
         class="-my-0.5 shrink-0"
         :data-test="`autoobserve2-request-undo-${testId}`"
-        @click="undo(request.id)"
+        @click="onUndo"
       >
         {{ t("autoobserve2.needs.undo") }}
       </OButton>
@@ -111,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="text-text-secondary line-through">{{ t(entryKey("from")) }}</span>
           <OIcon name="arrow-forward" size="xs" class="text-text-muted" aria-hidden="true" />
+          <span class="sr-only">{{ t("autoobserve2.needs.shiftTo") }}</span>
           <span class="text-text-heading font-semibold">{{ t(entryKey("to")) }}</span>
           <span class="text-text-secondary">· {{ t(entryKey("on")) }}</span>
         </p>
@@ -130,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           :class="inline ? '' : 'flex-1'"
           :data-test="`autoobserve2-request-yes-${testId}`"
-          @click="decide(request.id, 'yes')"
+          @click="onDecide('yes')"
         >
           {{ t(request.yes) }}
         </OButton>
@@ -139,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           class="shrink-0"
           :data-test="`autoobserve2-request-no-${testId}`"
-          @click="decide(request.id, 'no')"
+          @click="onDecide('no')"
         >
           {{ t(request.no) }}
         </OButton>
@@ -149,12 +153,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { computed, nextTick, ref } from "vue";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { useDecisions } from "./useDecisions";
+import { useDecisions, type Decision } from "./useDecisions";
 import { say, type Request, type RequestKind } from "./fixtures";
 import { KIND_LOOK, type ChangeKind } from "./changes";
 
@@ -178,6 +182,8 @@ const CHANGE_KIND: Record<RequestKind, ChangeKind> = {
 const { decisions, phases, decide, undo } = useDecisions();
 
 const expanded = ref(false);
+const rootEl = ref<HTMLElement | null>(null);
+const announcement = ref<I18nText>(raw(""));
 
 const look = computed(() => KIND_LOOK[CHANGE_KIND[props.request.kind]]);
 
@@ -204,4 +210,24 @@ const doneText = computed(() => {
   if (decision === "yes" && doneSettled && phases[id] === "fixed") return say(t, doneSettled);
   return say(t, decision === "yes" ? doneYes : doneNo);
 });
+
+// The pressed button unmounts with the card, so focus moves to its counterpart instead of falling to the page.
+const focusAction = async (action: "undo" | "yes") => {
+  await nextTick();
+  rootEl.value
+    ?.querySelector<HTMLElement>(`[data-test="autoobserve2-request-${action}-${testId.value}"]`)
+    ?.focus();
+};
+
+const onDecide = (decision: Decision) => {
+  decide(props.request.id, decision);
+  announcement.value = doneText.value;
+  void focusAction("undo");
+};
+
+const onUndo = () => {
+  undo(props.request.id);
+  announcement.value = t("autoobserve2.needs.undone");
+  void focusAction("yes");
+};
 </script>

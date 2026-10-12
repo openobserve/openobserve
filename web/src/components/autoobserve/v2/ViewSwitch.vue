@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OToggleGroup
     :model-value="view"
+    :aria-label="t('autoobserve2.view.label')"
     data-test="autoobserve-view-switch"
     @update:model-value="(v) => v && setView(v as AutoObserveView)"
   >

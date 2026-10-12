@@ -152,13 +152,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OCardSection role="body" dense class="flex flex-col gap-3">
                 <p class="text-text-body text-sm">{{ issue.summary }}</p>
                 <div class="bg-surface-subtle rounded-surface flex flex-col gap-1.5 p-3">
-                  <span class="text-text-label text-xs font-medium">{{
+                  <span class="text-text-body text-xs font-medium">{{
                     t("autoobserve.drawer.likelyCause")
                   }}</span>
                   <p class="text-text-heading text-sm">{{ issue.likelyCause }}</p>
                 </div>
                 <div class="flex items-center gap-3">
-                  <span class="text-text-label shrink-0 text-xs font-medium">{{
+                  <span class="text-text-secondary shrink-0 text-xs font-medium">{{
                     t("autoobserve.drawer.confidence")
                   }}</span>
                   <OTag
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :label="t(CONFIDENCE_LABEL[issue.confidence])"
                     data-test="autoobserve-issue-confidence"
                   />
-                  <span class="text-text-muted text-xs">{{
+                  <span class="text-text-secondary text-xs">{{
                     t("autoobserve.confidence.uncalibrated")
                   }}</span>
                 </div>
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OCardSection>
               <OCardSection role="body" dense class="flex flex-col gap-3">
                 <div v-for="group in blast" :key="group.key" class="flex flex-col gap-1.5">
-                  <span class="text-text-label text-xs font-medium">{{ group.label }}</span>
+                  <span class="text-text-secondary text-xs font-medium">{{ group.label }}</span>
                   <div class="flex flex-wrap gap-1">
                     <OTag
                       v-for="svc in group.services"
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="sm"
                       :label="raw(svc)"
                     />
-                    <span v-if="!group.services.length" class="text-text-muted text-xs">{{
+                    <span v-if="!group.services.length" class="text-text-secondary text-xs">{{
                       t("autoobserve.drawer.none")
                     }}</span>
                   </div>

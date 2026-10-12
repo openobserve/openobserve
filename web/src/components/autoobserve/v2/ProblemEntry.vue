@@ -18,11 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- The whole row opens the drawer by mouse; the title button is its keyboard and screen-reader target. -->
   <div
     class="group hover:bg-surface-subtle-hover flex w-full cursor-pointer items-stretch gap-4 px-5 py-4 transition-colors sm:px-6"
-    @click="emit('open')"
+    @click="open"
   >
     <span class="w-1 shrink-0 rounded-full" :class="OUTCOME[problem.outcome].marker" />
     <div class="flex min-w-0 flex-1 flex-col gap-1">
       <button
+        ref="titleEl"
         type="button"
         class="text-text-heading focus-visible:ring-focus-ring-accent rounded-default self-start text-start text-base leading-snug font-semibold text-pretty focus-visible:ring-2 focus-visible:outline-none"
         :data-test="`autoobserve2-problem-${problem.id}`"
@@ -67,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -83,7 +84,15 @@ const emit = defineEmits<{ open: [] }>();
 
 const { t } = useI18nTyped();
 
+const titleEl = ref<HTMLButtonElement | null>(null);
+
 const label = computed(() => problemLabel(t, props.problem));
+
+// The drawer hands focus back to whatever held it on open, so a mouse open still returns to this row.
+const open = () => {
+  titleEl.value?.focus({ preventScroll: true });
+  emit("open");
+};
 
 const outcomeLabel = computed(() =>
   t(OUTCOME[props.problem.outcome].key, { minutes: props.problem.resolvedIn }),

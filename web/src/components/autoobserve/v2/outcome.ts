@@ -54,7 +54,7 @@ export const OUTCOME: Record<
   },
   held: {
     marker: "bg-border-strong",
-    ink: "text-border-strong",
+    ink: "text-text-secondary",
     tag: "default-soft",
     key: "autoobserve2.outcome.held",
   },

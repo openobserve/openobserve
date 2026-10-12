@@ -32,6 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownItem
             v-for="option in PROBLEM_RANGES"
             :key="option"
+            role="menuitemradio"
+            :aria-checked="option === range"
             :data-test="`autoobserve2-range-${option}`"
             @select="selectRange(option)"
           >
@@ -50,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="ranged.length" #actions>
       <OToggleGroup
         :model-value="priority"
+        :aria-label="t('autoobserve2.recent.priorityLabel')"
         data-test="autoobserve2-priority-filter"
         @update:model-value="(v) => v && select(v as PriorityFilter)"
       >
@@ -62,11 +65,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`autoobserve2-priority-${option}`"
         >
           {{ option === "all" ? t("autoobserve2.recent.all") : option.toUpperCase() }}
-          <span class="ms-1 tabular-nums opacity-70">{{ counts[option] }}</span>
+          <span class="ms-1 tabular-nums">{{ counts[option] }}</span>
         </OToggleGroupItem>
       </OToggleGroup>
     </template>
 
+    <p class="sr-only" role="status" data-test="autoobserve2-problems-status">
+      {{ t("autoobserve2.recent.showing", { count: filtered.length }, filtered.length) }}
+    </p>
     <ul
       v-if="filtered.length"
       class="border-border-subtle divide-border-subtle divide-y border-t"
@@ -75,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <li v-for="row in visible" :key="row.problem.id">
         <p
           v-if="row.group !== undefined"
-          class="bg-surface-subtle text-text-secondary px-5 py-1.5 text-xs font-medium sm:px-6"
+          class="bg-surface-subtle text-text-body px-5 py-1.5 text-xs font-medium sm:px-6"
           :data-test="`autoobserve2-problems-group-${row.group}`"
         >
           {{ groupLabel(row.group) }}
@@ -103,14 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </p>
 
     <template #footer>
-      <div class="flex flex-wrap items-center gap-2">
+      <div ref="footerEl" class="flex flex-wrap items-center gap-2">
         <OButton
           v-if="remaining"
           variant="ghost-primary"
           size="sm"
           icon-right="expand-more"
           data-test="autoobserve2-problems-show-more"
-          @click="shown = visible.length + Math.min(remaining, STEP)"
+          @click="expand(visible.length + Math.min(remaining, STEP))"
         >
           {{ t("autoobserve2.showMore", { count: Math.min(remaining, STEP) }) }}
         </OButton>
@@ -120,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           icon-right="expand-less"
           data-test="autoobserve2-problems-show-fewer"
-          @click="shown = 0"
+          @click="expand(0)"
         >
           {{ t("autoobserve2.showFewer") }}
         </OButton>
@@ -140,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { useI18nTyped, type I18nKey } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -235,6 +241,19 @@ const groupLabel = (week: number) =>
     : week === 1
       ? t("autoobserve2.recent.groups.lastWeek")
       : t("autoobserve2.recent.groups.weeksAgo", { count: week });
+
+const footerEl = ref<HTMLElement | null>(null);
+
+// Show more and Show fewer replace each other, so focus follows to whichever is left rather than dropping to the page.
+const expand = async (rows: number) => {
+  shown.value = rows;
+  await nextTick();
+  footerEl.value
+    ?.querySelector<HTMLElement>(
+      '[data-test="autoobserve2-problems-show-more"], [data-test="autoobserve2-problems-show-fewer"]',
+    )
+    ?.focus();
+};
 
 const askFor = (id: string) => props.requests.find((r) => r.kind === "fixNow" && r.problem === id);
 

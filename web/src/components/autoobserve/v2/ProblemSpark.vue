@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           x2="100"
           :y1="limitY"
           :y2="limitY"
-          class="text-border-strong"
+          class="text-text-secondary"
           stroke="currentColor"
           stroke-dasharray="2 3"
           vector-effect="non-scaling-stroke"

@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <article
+    ref="rootEl"
     class="relative flex gap-3 transition-shadow duration-700 sm:gap-4"
     :data-test="`autoobserve2-change-${entry.id}`"
   >
@@ -53,11 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t(entryKey("why")) }}
       </p>
       <p
-        class="bg-surface-subtle border-border-subtle rounded-default mt-1 inline-flex max-w-full flex-wrap items-center gap-x-1.5 self-start border px-2 py-0.5 text-xs leading-5"
+        class="bg-surface-base border-border-subtle rounded-default mt-1 inline-flex max-w-full flex-wrap items-center gap-x-1.5 self-start border px-2 py-0.5 text-xs leading-5"
         :data-test="`autoobserve2-change-${entry.id}-shift`"
       >
         <span class="text-text-secondary line-through">{{ t(entryKey("from")) }}</span>
         <OIcon name="arrow-forward" size="xs" class="text-text-muted" aria-hidden="true" />
+        <span class="sr-only">{{ t("autoobserve2.needs.shiftTo") }}</span>
         <span class="text-text-heading font-semibold">{{ t(entryKey("to")) }}</span>
         <span class="text-text-secondary">· {{ t(entryKey("on")) }}</span>
       </p>
@@ -83,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           icon-left="undo"
           :data-test="`autoobserve2-change-${entry.id}-undo`"
-          @click="emit('undo')"
+          @click="onUndo"
         >
           {{ t("autoobserve2.activityPage.actions.undo") }}
         </OButton>
@@ -91,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="open"
         :id="detailsId"
-        class="bg-surface-subtle rounded-default mt-2.5 flex flex-col gap-4 p-4"
+        class="bg-surface-panel rounded-default mt-2.5 flex flex-col gap-4 p-4"
         :data-test="`autoobserve2-change-${entry.id}-details`"
       >
         <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm">
@@ -114,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </dd>
         </dl>
         <div class="flex flex-col gap-1">
-          <span class="text-text-label text-xs font-medium">{{
+          <span class="text-text-secondary text-xs font-medium">{{
             t("autoobserve2.activityPage.details.saw")
           }}</span>
           <p class="text-text-body text-sm leading-relaxed text-pretty">{{ entry.evidence }}</p>
@@ -157,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, nextTick, ref } from "vue";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -180,6 +182,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+const rootEl = ref<HTMLElement | null>(null);
 
 const entry = computed(() => props.change.entry);
 const look = computed(() => KIND_LOOK[props.change.kind]);
@@ -216,4 +220,15 @@ const notes = computed(() => {
     e.decided ? t("autoobserve2.activityPage.details.undoDecided") : undefined,
   ].filter((n): n is I18nText => !!n);
 });
+
+// Undo removes its own button, so focus moves to the row's details toggle instead of falling to the page.
+const onUndo = async () => {
+  emit("undo");
+  await nextTick();
+  rootEl.value
+    ?.querySelector<HTMLElement>(
+      `[data-test="autoobserve2-change-${entry.value.id}-details-toggle"]`,
+    )
+    ?.focus();
+};
 </script>

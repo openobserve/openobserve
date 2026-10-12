@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :stroke-width="edge.active ? 2 : 1.5"
             :stroke-dasharray="edge.dashed ? '5 4' : undefined"
             vector-effect="non-scaling-stroke"
-            :class="edge.active ? 'text-accent' : 'text-border-strong'"
+            :class="edge.active ? 'text-accent' : 'text-text-secondary'"
           />
           <circle
             v-for="edge in layout.edges"
@@ -71,14 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :cy="edge.end.y"
             r="0.2"
             fill="currentColor"
-            :class="edge.active ? 'text-accent' : 'text-border-strong'"
+            :class="edge.active ? 'text-accent' : 'text-text-secondary'"
           />
         </svg>
 
         <span
           v-for="(lane, i) in layout.lanes"
           :key="lane ?? 'team'"
-          class="text-text-label bg-surface-subtle rounded-default absolute px-1 text-xs font-medium"
+          class="text-text-body bg-surface-subtle rounded-default absolute px-1 text-xs font-medium"
           :style="{ left: rem(PAD_X), top: rem(laneTop(i) + 0.4) }"
         >
           {{ lane ?? t("autoobserve.unfold.team") }}
@@ -159,12 +159,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </p>
           <dl class="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
             <div v-for="fact in facts" :key="fact.key" class="flex min-w-0 flex-col">
-              <dt class="text-text-label text-xs font-medium">{{ fact.label }}</dt>
+              <dt class="text-text-secondary text-xs font-medium">{{ fact.label }}</dt>
               <dd class="text-text-heading truncate text-sm tabular-nums">{{ fact.value }}</dd>
             </div>
           </dl>
           <div v-if="selected.times?.length" class="flex flex-wrap items-center gap-1.5">
-            <span class="text-text-label me-1 text-xs font-medium">{{
+            <span class="text-text-secondary me-1 text-xs font-medium">{{
               t("autoobserve.unfold.firedAt")
             }}</span>
             <OTag
@@ -264,7 +264,7 @@ const TONE: Record<UnfoldTone, { bar: string; ink: string }> = {
   warning: { bar: "bg-status-warning-text", ink: "text-status-warning-text" },
   info: { bar: "bg-accent", ink: "text-accent" },
   success: { bar: "bg-status-positive", ink: "text-status-positive" },
-  neutral: { bar: "bg-border-strong", ink: "text-text-muted" },
+  neutral: { bar: "bg-border-strong", ink: "text-text-secondary" },
 };
 
 const rem = (n: number) => `${n}rem`;

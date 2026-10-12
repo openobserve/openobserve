@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ issue.analysis.verdict }}
         </p>
         <div class="flex flex-wrap items-center gap-2" data-test="autoobserve-analysis-confidence">
-          <span class="text-text-label text-xs font-medium">{{
+          <span class="text-text-secondary text-xs font-medium">{{
             t("autoobserve.drawer.confidence")
           }}</span>
           <span
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="autoobserve-analysis-comparison"
       >
         <DrawerSection :title="t('autoobserve.analysis.comparison')">
-          <span class="text-text-label -mt-1 text-xs font-medium">{{
+          <span class="text-text-secondary -mt-1 text-xs font-medium">{{
             issue.analysis.comparison.metric
           }}</span>
           <ul class="flex flex-col gap-3">
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
           <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span v-if="proposalLabel" class="text-text-label text-xs font-medium">{{
+            <span v-if="proposalLabel" class="text-text-body text-xs font-medium">{{
               proposalLabel
             }}</span>
             <span class="text-text-heading text-sm font-medium">{{ issue.proposal.title }}</span>

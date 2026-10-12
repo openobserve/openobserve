@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("autoobserve2.activityPage.title") }}
         </h1>
-        <p class="text-text-secondary flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+        <p class="text-text-body flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {{ t("autoobserve2.activityPage.stats.window") }}
         </p>
       </div>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex flex-col-reverse gap-1"
           :data-test="`autoobserve2-activity-stat-${stat.id}`"
         >
-          <dt class="text-text-secondary flex items-center gap-1.5 text-xs font-medium">
+          <dt class="text-text-body flex items-center gap-1.5 text-xs font-medium">
             <OIcon :name="stat.icon" size="xs" aria-hidden="true" />
             {{ stat.label }}
           </dt>
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             aria-hidden="true"
           />
           {{ t(FILTER_LABEL[f]) }}
-          <span class="text-text-secondary font-semibold tabular-nums">{{ counts[f] }}</span>
+          <span class="font-semibold tabular-nums">{{ counts[f] }}</span>
         </OToggleGroupItem>
       </OToggleGroup>
 

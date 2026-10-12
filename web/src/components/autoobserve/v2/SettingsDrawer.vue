@@ -26,12 +26,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         class="text-status-success-text flex items-center gap-1 text-xs transition-opacity duration-500"
         :class="saved ? 'opacity-100' : 'opacity-0'"
-        :aria-hidden="!saved"
+        aria-hidden="true"
         data-test="autoobserve2-settings-saved"
       >
         <OIcon name="check" size="xs" />
         {{ t("autoobserve2.settingsDrawer.saved") }}
       </span>
+      <span class="sr-only" role="status">{{
+        saved ? t("autoobserve2.settingsDrawer.saved") : ""
+      }}</span>
     </template>
     <div class="flex flex-col gap-8 pb-8">
       <DrawerSection
@@ -94,11 +97,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <div v-if="advancedOpen" class="flex flex-col gap-8">
           <DrawerSection :title="t('autoobserve2.settingsDrawer.perKind')">
-            <div
+            <!-- OSelect drops its id on the popover trigger, so a wrapping label names it; prevent stops a second toggle. -->
+            <label
               v-for="kind in kinds"
               :key="kind.id"
               class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
               :data-test="`autoobserve2-settings-kind-${kind.id}`"
+              @click.prevent
             >
               <div class="flex min-w-0 flex-1 basis-48 flex-col">
                 <span class="text-text-heading text-sm">{{ t(kind.name) }}</span>
@@ -112,20 +117,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="sm"
                 width="sm"
               />
-            </div>
+            </label>
           </DrawerSection>
 
           <DrawerSection :title="t('autoobserve2.settingsDrawer.digestDay')">
-            <OSelect v-model="digestDay" :options="dayOptions" />
+            <label @click.prevent>
+              <span class="sr-only">{{ t("autoobserve2.settingsDrawer.digestDay") }}</span>
+              <OSelect v-model="digestDay" :options="dayOptions" />
+            </label>
           </DrawerSection>
           <DrawerSection :title="t('autoobserve2.settingsDrawer.excluded')">
-            <OSelect
-              v-model="excluded"
-              :placeholder="t('autoobserve2.settingsDrawer.excludedNone')"
-              :options="serviceOptions"
-              multiple
-              searchable
-            />
+            <label @click.prevent>
+              <span class="sr-only">{{ t("autoobserve2.settingsDrawer.excluded") }}</span>
+              <OSelect
+                v-model="excluded"
+                :placeholder="t('autoobserve2.settingsDrawer.excludedNone')"
+                :options="serviceOptions"
+                multiple
+                searchable
+              />
+            </label>
           </DrawerSection>
         </div>
       </div>

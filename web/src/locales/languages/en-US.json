@@ -22411,7 +22411,9 @@
       },
       "all": "All",
       "none": "No {priority} problems {within}.",
-      "allIssues": "All issues"
+      "allIssues": "All issues",
+      "priorityLabel": "Priority",
+      "showing": "{count} problem shown | {count} problems shown"
     },
     "noProblems": "No problems {within}. I checked {count} service around the clock. | No problems {within}. I checked {count} services around the clock.",
     "entryLabel": "{when} · {service}",
@@ -22566,6 +22568,8 @@
       "less": "Less",
       "canUndo": "You can undo it",
       "undo": "Undo",
+      "undone": "Undone. This is waiting for your answer again.",
+      "shiftTo": "to",
       "retune": {
         "body": "The \"{alert}\" alert on {host} went off {fired} times this month, and nobody needed to act. The disk climbs to about 85% during nightly cleanup and is back near 70% by morning. Even on its busiest day, it would take more than 3 days to fill from 90%. I'd like to raise it to {to}%. I'll still warn you if the disk is ever on track to fill within a day.",
         "yes": "Yes, change it",
@@ -22953,7 +22957,8 @@
       "standard": "Standard",
       "nerd": "Nerd",
       "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
-      "nerdTooltip": "Nerd view shows every detector, loop and setting in full"
+      "nerdTooltip": "Nerd view shows every detector, loop and setting in full",
+      "label": "View"
     },
     "rail": {
       "more": "More below"

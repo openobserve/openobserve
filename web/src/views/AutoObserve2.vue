@@ -55,15 +55,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve2-scenario"
           >
             <OTag variant="purple-soft" size="xs" :label="t('autoobserve2.demoTag')" />
-            <span class="text-text-secondary text-xs">{{ t("autoobserve2.scenarioLabel") }}</span>
-            <OSelect
-              :model-value="scenario"
-              :options="scenarioOptions"
-              size="sm"
-              width="sm"
-              data-test="autoobserve2-scenario-select"
-              @update:model-value="(v) => setScenario(v as Scenario)"
-            />
+            <!-- OSelect drops its id on the popover trigger, so a wrapping label names it; prevent stops a second toggle. -->
+            <label class="flex items-center gap-2" @click.prevent>
+              <span class="text-text-body text-xs">{{ t("autoobserve2.scenarioLabel") }}</span>
+              <OSelect
+                :model-value="scenario"
+                :options="scenarioOptions"
+                size="sm"
+                width="sm"
+                data-test="autoobserve2-scenario-select"
+                @update:model-value="(v) => setScenario(v as Scenario)"
+              />
+            </label>
           </div>
         </div>
         <aside
@@ -123,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("autoobserve2.coveragePage.title") }}
             </h1>
             <p
-              class="text-text-secondary max-w-[70ch] text-sm leading-relaxed text-pretty"
+              class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
               data-test="autoobserve2-coverage-sentence"
             >
               {{ coverageSentence }}
@@ -173,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("autoobserve2.issuesPage.title") }}
           </h1>
           <p
-            class="text-text-secondary max-w-[70ch] text-sm leading-relaxed text-pretty"
+            class="text-text-body max-w-[70ch] text-sm leading-relaxed text-pretty"
             data-test="autoobserve2-issues-sentence"
           >
             {{ t("autoobserve2.issuesPage.sentence") }}
@@ -507,6 +510,9 @@ onMounted(async () => {
   if (drawer === "problem" && knownProblem) {
     howOpen.value = false;
     selectedId.value = problemId;
+    // Focus the row first, so closing a deep-linked drawer lands on it rather than the page body.
+    await nextTick();
+    document.querySelector<HTMLElement>(`[data-test="autoobserve2-problem-${problemId}"]`)?.focus();
     problemOpen.value = true;
   } else if (drawer || route.query.problem) {
     void router.replace({ query: { ...route.query, ...DRAWER_QUERY } });
