@@ -202,6 +202,26 @@ describe("ShortcutManager", () => {
 
       expect(handler).not.toHaveBeenCalled();
     });
+
+    it("should leave a skipInInput modifier combo to the focused input", () => {
+      const handler = vi.fn();
+      manager.register({ key: "ctrl+z", handler, description: "undo", skipInInput: true });
+      const event = fakeEvent({ key: "z", ctrlKey: true, target: input });
+
+      manager.handleKeyDown(event);
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("should fire a skipInInput modifier combo outside inputs", () => {
+      const handler = vi.fn();
+      manager.register({ key: "ctrl+z", handler, description: "undo", skipInInput: true });
+
+      manager.handleKeyDown(fakeEvent({ key: "z", ctrlKey: true, target: document.body }));
+
+      expect(handler).toHaveBeenCalledOnce();
+    });
   });
 });
 

@@ -252,6 +252,9 @@ export class ShortcutManager {
   }
 
   private triggerShortcut(shortcut: RegisteredShortcut, e: KeyboardEvent): void {
+    const target = e.composedPath?.()[0] ?? e.target;
+    if (shortcut.skipInInput && isInputFocused(target)) return;
+
     // Guard: never intercept single-letter shortcuts while the user is typing
     // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
     // ⌘+Enter, etc.) are always allowed through regardless of focus, and a
@@ -261,7 +264,7 @@ export class ShortcutManager {
     if (
       !shortcut.allowInInput &&
       !ShortcutManager.hasModifier(shortcut.key) &&
-      isInputFocused(e.composedPath?.()[0] ?? e.target)
+      isInputFocused(target)
     ) {
       return;
     }

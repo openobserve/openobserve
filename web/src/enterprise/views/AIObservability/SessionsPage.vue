@@ -44,18 +44,19 @@ import AiPageShell from "@/enterprise/components/AIObservability/AiPageShell.vue
 import SessionsList from "@/plugins/traces/SessionsList.vue";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
 import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
-import config from "@/aws-exports";
 
 defineOptions({ name: "AISessionsPage" });
 
 const { t } = useI18nTyped();
 
-// This same page renders at both /ai/sessions (enterprise/cloud) and /sessions
-// (OSS) — the detail route only exists under the name each build actually
-// registers it under. Matches the exact build check router/index.ts uses to
-// pick userCloudRoutes() (which registers aiSessionDetails) vs useOSRoutes().
-const detailRouteName =
-  config.isEnterprise == "true" || config.isCloud == "true" ? "aiSessionDetails" : "sessionDetails";
+// `aiSessionDetails` is registered by every edition (see
+// useAIObservabilityExtraRoutes in composables/shared/useAIObservabilityRoutes.ts,
+// consumed by both the OSS and enterprise routers) — it used to exist only on
+// the enterprise/cloud router, which forced this page to fall back to the
+// Traces module's plain `sessionDetails` route name in OSS. Sessions itself
+// ships in OSS, so its drill-down should too, under the SAME name, without an
+// edition check.
+const detailRouteName = "aiSessionDetails";
 
 // Shared with LLM Insights + Quality — see useAiDateRange.ts. Sessions syncs its
 // date to the URL (urlSync:true) so deep-links reproduce the exact view.

@@ -76,6 +76,9 @@ export interface DialogProps {
   /** Label for the neutral action button (left side). Omit to hide. */
   neutralButtonLabel?: I18nText;
 
+  /** Footer button focused on open when the body has no field; use "secondary" when primary is destructive. @default "primary" */
+  initialFocus?: "primary" | "secondary";
+
   /** OButton variant for the primary button. @default "primary" */
   primaryButtonVariant?: ButtonVariant;
   /** OButton variant for the secondary button. @default "secondary" */
