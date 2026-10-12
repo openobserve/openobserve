@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-responses-mine-btn"
         @click="mineOnly = !mineOnly"
       >
-        {{ t("oncall.myOnCallNav") }}
+        {{ t("oncall.onlyMineFilter") }}
       </OButton>
     </template>
 
