@@ -987,7 +987,7 @@ describe("AnalyticsFunnels", () => {
       ["p", long("e")],
     ]);
     const pa = useProductAnalytics();
-    const builder = wrapper!.findComponent({ name: "FunnelBuilder" });
+    const builder = wrapper!.findComponent({ name: "FunnelAddStep" });
     for (const c of ["f", "g", "h", "i"]) {
       (builder.vm as unknown as { add: (s: { kind: "p"; key: string }) => void }).add({
         kind: "p",
@@ -1802,6 +1802,147 @@ describe("AnalyticsFunnels", () => {
       expect(String(wrapper!.findComponent({ name: "AddToDashboard" }).props("notice"))).toContain(
         NOTE,
       );
+    });
+  });
+
+  describe("app filters on the Funnels tab", () => {
+    const FILTERED = { ...SUMMARY, total_sessions: 650, builtin_kept_sessions: 560 };
+    const filtered = () => {
+      routes = [[/va_rows/, [FILTERED]], ...baseRoutes()];
+      respond();
+    };
+    const at = (dt: string) => wrapper!.find(`[data-test="${dt}"]`);
+
+    it("the card line lists built-in and saved-rule removals from the page summary", async () => {
+      filtered();
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      await settle();
+      expect(at("rum-analytics-funnel-app-filters-builtin").text()).toBe("Built-in bot rule 90");
+      expect(at("rum-analytics-funnel-app-filters-rules").text()).toBe("Saved rules 60");
+      expect(at("rum-analytics-funnel-included-banner").exists()).toBe(false);
+    });
+
+    it("the card line is hidden when the app filters removed nothing", async () => {
+      routes = [
+        [/va_rows/, [{ ...SUMMARY, total_sessions: 500, builtin_kept_sessions: 500 }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      expect(at("rum-analytics-funnel-app-filters").exists()).toBe(false);
+    });
+
+    it("Include hidden traffic sets includeExcluded and xall, and the banner names the count", async () => {
+      filtered();
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      await at("rum-analytics-funnel-app-filters-include").trigger("click");
+      await settle();
+      expect(useProductAnalytics().state.includeExcluded).toBe(true);
+      expect(router.currentRoute.value.query.xall).toBe("1");
+      expect(at("rum-analytics-funnel-included-banner").text()).toContain(
+        "Including 150 sessions hidden by app filters in this view only. Synthetic tests stay excluded.",
+      );
+    });
+
+    it("Hide hidden traffic clears includeExcluded and drops xall from the URL", async () => {
+      filtered();
+      await mountFunnels({ xall: "1" });
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      expect(router.currentRoute.value.query.xall).toBe("1");
+      await at("rum-analytics-funnel-hide-hidden-btn").trigger("click");
+      await settle();
+      expect(useProductAnalytics().state.includeExcluded).toBe(false);
+      expect(router.currentRoute.value.query.xall).toBeUndefined();
+      expect(at("rum-analytics-funnel-included-banner").exists()).toBe(false);
+    });
+
+    it("Edit app filters asks the page to open the drawer", async () => {
+      filtered();
+      await mountFunnels();
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      await at("rum-analytics-funnel-app-filters-edit").trigger("click");
+      expect(wrapper!.emitted("open-exclusions")).toHaveLength(1);
+    });
+
+    it("while hidden traffic is included, synthetic sessions stay listed even when the rule count fails, and Retry fills it in", async () => {
+      const { performanceState } = usePerformance();
+      performanceState.data.streams._rumdata.schema.session_type = { name: "session_type" };
+      let fail = true;
+      const row = { ...FILTERED, synthetic_sessions: 7 };
+      routes = [
+        [
+          /va_rows/,
+          (sql: string) => {
+            if (/\b0 AS xb\b/.test(sql)) return [row];
+            if (fail) throw new Error("search failed");
+            return [row];
+          },
+        ],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels({ xall: "1" });
+      await setSteps([
+        ["p", "/a"],
+        ["p", "/b"],
+      ]);
+      expect(at("rum-analytics-funnel-app-filters-synthetic").text()).toBe(
+        "Synthetic tests 7 · always excluded",
+      );
+      expect(at("rum-analytics-funnel-included-banner").text()).toContain(
+        "Including sessions hidden by app filters in this view only.",
+      );
+      fail = false;
+      await at("rum-analytics-funnel-hidden-count-retry-btn").trigger("click");
+      await settle();
+      expect(at("rum-analytics-funnel-included-banner").text()).toContain("Including 150 sessions");
+      expect(at("rum-analytics-funnel-hidden-count-retry-btn").exists()).toBe(false);
+      expect(at("rum-analytics-funnel-app-filters-synthetic").exists()).toBe(true);
+    });
+
+    it("an exclusion's removed count comes from its xr column", async () => {
+      routes = [
+        [/FROM ps LIMIT 1/, [{ c1: 200, c2: 80, seen1: 1, seen2: 1, xr1: 7 }]],
+        ...baseRoutes(),
+      ];
+      respond();
+      await mountFunnels();
+      const pa = useProductAnalytics();
+      pa.funnel.value = {
+        steps: [
+          { kind: "p", key: "/a" },
+          { kind: "p", key: "/b" },
+        ],
+        unit: "sessions",
+        window: "session",
+        breakdown: null,
+        x: [{ step: { kind: "p", key: "/x" }, a: 1, b: 2 }],
+      };
+      await settle();
+      expect(at("rum-analytics-funnel-exclusion-0-removed").text()).toBe("7 removed at step 2");
+      expect(
+        at("rum-analytics-funnel-bar-1")
+          .find('[data-test="rum-analytics-funnel-bar-removed"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 });

@@ -72,19 +72,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="rum-analytics-version-select"
         @update:model-value="onVersionChange"
       />
-      <OTag
+      <OPopover
         v-if="exclusionCount !== null"
-        :label="
-          likelyBot
-            ? t('rum.analytics.exclusions.chipLikelyBot', { count: exclusionCount })
-            : t('rum.analytics.exclusions.chip', { count: exclusionCount })
-        "
-        :variant="likelyBot ? 'warning-soft' : 'default-outline'"
-        size="md"
-        clickable
-        data-test="rum-analytics-exclusions-chip"
-        @click="exclusionsOpen = true"
-      />
+        v-model:open="appFiltersOpen"
+        side="bottom"
+        align="end"
+        content-class="p-3 w-80"
+      >
+        <template #trigger>
+          <OTag
+            :label="
+              likelyBot
+                ? t('rum.analytics.exclusions.chipLikelyBot', { count: exclusionCount })
+                : t('rum.analytics.exclusions.chip', { count: exclusionCount })
+            "
+            :variant="likelyBot ? 'warning-soft' : 'default-outline'"
+            size="md"
+            clickable
+            data-test="rum-analytics-exclusions-chip"
+          />
+        </template>
+        <div class="flex flex-col gap-3 text-sm" data-test="rum-analytics-app-filters-menu">
+          <div
+            class="text-text-body flex flex-col gap-1"
+            data-test="rum-analytics-app-filters-counts"
+          >
+            <span
+              v-for="line in appFilterLines"
+              :key="line.id"
+              :data-test="`rum-analytics-app-filters-${line.id}`"
+              >{{ line.text }}</span
+            >
+          </div>
+          <OSwitch
+            :model-value="state.includeExcluded"
+            :label="t('rum.analytics.appFilters.switchLabel')"
+            data-test="rum-analytics-app-filters-include-switch"
+            @update:model-value="(v) => appFilters.setIncludeHidden(router, v === true)"
+          />
+          <OButton
+            variant="outline"
+            size="sm"
+            class="self-start"
+            data-test="rum-analytics-app-filters-edit-btn"
+            @click="openAppFilters"
+            >{{ t("rum.analytics.appFilters.edit") }}</OButton
+          >
+        </div>
+      </OPopover>
       <OButton
         v-if="showNewUsers"
         variant="outline"
@@ -164,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("rum.analytics.sdkSampled") }}</span
           >
         </OTooltip>
-        <template v-if="syntheticCount > 0">
+        <template v-if="syntheticCount > 0 && route.name !== PA_ROUTES.funnelBuilder">
           <span aria-hidden="true">{{ separator }}</span>
           <span data-test="rum-analytics-synthetic-excluded">{{
             t(
@@ -314,6 +349,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -329,9 +365,10 @@ import useNamedEvents from "@/composables/rum/useNamedEvents";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
 import useFunnelDraft from "@/composables/rum/useFunnelDraft";
 import useRum from "@/composables/rum/useRum";
+import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
 import useProductAnalytics, { querySignature } from "@/composables/rum/useProductAnalytics";
 import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
   EXACT_ROW_LIMIT,
@@ -367,6 +404,7 @@ const pa = useProductAnalytics();
 const namedEvents = useNamedEvents();
 const savedFunnels = useSavedFunnels();
 const funnelDraft = useFunnelDraft();
+const appFilters = useAppFilterCounts();
 const {
   state,
   apps,
@@ -389,6 +427,7 @@ const invalidDismissed = ref(false);
 const identityOpen = ref(false);
 const dateTimePickerRef = ref<any>(null);
 const exclusionsOpen = ref(false);
+const appFiltersOpen = ref(false);
 const likelyBot = ref(false);
 
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
@@ -414,6 +453,40 @@ const appOptions = computed(() => {
 const exclusionCount = computed(() => {
   const ex = pa.scope.value.exclusions;
   return ex ? (ex.bots ? 1 : 0) + ex.sessions.length : null;
+});
+
+// Counts the filters cannot back with a query stay off the menu rather than show a guess.
+const appFilterLines = computed<{ id: string; text: I18nText }[]>(() => {
+  const c = appFilters.counts.value;
+  const n = (v: number) => addCommasToNumber(v);
+  const synthetic =
+    c && c.synthetic > 0
+      ? [
+          {
+            id: "synthetic",
+            text: t("rum.analytics.appFilters.synthetic", { count: n(c.synthetic) }),
+          },
+        ]
+      : [];
+  if (state.includeExcluded) {
+    const total = appFilters.hiddenTotal.value;
+    const included =
+      total === null
+        ? t("rum.analytics.appFilters.includedPending")
+        : t("rum.analytics.appFilters.included", { count: n(total) }, total);
+    return [{ id: "included", text: included }, ...synthetic];
+  }
+  if (!c) return [];
+  const lines = [
+    ...(c.builtin
+      ? [{ id: "builtin", text: t("rum.analytics.appFilters.builtin", { count: n(c.builtin) }) }]
+      : []),
+    ...(c.rules
+      ? [{ id: "rules", text: t("rum.analytics.appFilters.rules", { count: n(c.rules) }) }]
+      : []),
+    ...synthetic,
+  ];
+  return lines.length ? lines : [{ id: "none", text: t("rum.analytics.appFilters.nothingHidden") }];
 });
 
 const NEW_USERS_ROUTES: string[] = [PA_ROUTES.funnelBuilder, PA_ROUTES.paths, PA_ROUTES.retention];
@@ -574,6 +647,11 @@ const toggleIncludeAll = () => {
 const onExactChange = (value: boolean) => {
   pa.setScope({ exact: value });
   void reload();
+};
+
+const openAppFilters = () => {
+  appFiltersOpen.value = false;
+  exclusionsOpen.value = true;
 };
 
 const refresh = () => {
