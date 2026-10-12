@@ -67,6 +67,9 @@ export { appendConjunct, materializeFreeText, planStreamsFilter, type FilterReso
 export const NON_SQL_LIMIT_MESSAGE =
   "LIMIT is not supported without SQL mode. Remove it from the filter.";
 
+// 20001 is a query-error code, the only kind whose error state offers the Run-as card.
+const HELD_FILTER_ERROR_CODE = 20001;
+
 const BLOCKED_TARGET: TextSearchTarget = { mode: "blocked", candidates: [] };
 
 export interface MultiStreamFieldContext {
@@ -108,6 +111,13 @@ export class NonSqlLimitError extends Error {
   constructor() {
     super(NON_SQL_LIMIT_MESSAGE);
     this.name = "NonSqlLimitError";
+  }
+}
+
+export class HeldFilterError extends Error {
+  constructor() {
+    super("held filter");
+    this.name = "HeldFilterError";
   }
 }
 
@@ -230,12 +240,17 @@ const rewriteArmWhere = (
   return at < 0 ? where : unparsed.slice(at).replace(/^\sWHERE\s/i, "");
 };
 
+function isHeldPlan(plan: FilterPlan): boolean {
+  return plan.kind === "unclassified" && plan.held === true;
+}
+
 function resolveStreamFilter(raw: string, stream: string, ctx: FilterResolveContext): StreamFilter {
   const filter = raw.trim();
   const plan = planStreamsFilter(filter, [stream], ctx);
   if (plan.kind !== "freeText" && hasLimitClause(stripCommentLines(filter))) {
     throw new NonSqlLimitError();
   }
+  if (isHeldPlan(plan)) throw new HeldFilterError();
   if (plan.kind !== "freeText") {
     const where = renderPlan(plan, BLOCKED_TARGET, ctx.knownFields) ?? "";
     return { where, blocked: false, sqlNodesOnly: where, plan };
@@ -255,6 +270,7 @@ export function resolveFiltersForStreams(
   if (plan.kind !== "freeText" && hasLimitClause(stripCommentLines(filter))) {
     throw new NonSqlLimitError();
   }
+  if (isHeldPlan(plan)) throw new HeldFilterError();
   const result: ResolvedStreamFilters = {
     perStream: new Map(),
     excluded: [],
@@ -320,6 +336,27 @@ export const useSearchQuery = (t: TranslateFn) => {
   const filterContext = (): FilterResolveContext =>
     buildFilterContext(searchObj, store.state.zoConfig);
 
+  const filterHeld = (): boolean =>
+    !searchObj.meta.sqlMode &&
+    isHeldPlan(
+      planStreamsFilter(
+        (searchObj.data.query ?? "").trim(),
+        searchObj.data.stream.selectedStream,
+        filterContext(),
+      ),
+    );
+
+  const rejectFilter = (e: unknown, readOnly: boolean): null => {
+    if (e instanceof NonSqlLimitError) {
+      notificationMsg.value = NON_SQL_LIMIT_MESSAGE;
+    } else if (e instanceof HeldFilterError) {
+      if (!readOnly) notificationMsg.value = t("search.searchQueryEmptyOrInvalid");
+    } else {
+      throw e;
+    }
+    return null;
+  };
+
   const multiStreamFields = (): MultiStreamFieldContext => ({
     selectedStreamFields: searchObj.data.stream.selectedStreamFields,
     fieldToGroupId: buildFieldToGroupIdMap(semanticGroups.value),
@@ -384,6 +421,7 @@ export const useSearchQuery = (t: TranslateFn) => {
         notificationMsg.value = t("search.searchQueryEmptyOrInvalid");
       } else {
         searchObj.data.errorMsg = notificationMsg.value;
+        if (filterHeld()) searchObj.data.errorCode = HELD_FILTER_ERROR_CODE;
       }
       return null;
     }
@@ -761,9 +799,7 @@ export const useSearchQuery = (t: TranslateFn) => {
     try {
       resolved = resolveStreamFilter(query, stream, filterContext());
     } catch (e) {
-      if (!(e instanceof NonSqlLimitError)) throw e;
-      notificationMsg.value = NON_SQL_LIMIT_MESSAGE;
-      return null;
+      return rejectFilter(e, readOnly);
     }
 
     if (resolved.where === null) {
@@ -844,9 +880,7 @@ export const useSearchQuery = (t: TranslateFn) => {
     try {
       resolved = resolveFiltersForStreams(query, selected, filterContext(), multiStreamFields());
     } catch (e) {
-      if (!(e instanceof NonSqlLimitError)) throw e;
-      notificationMsg.value = NON_SQL_LIMIT_MESSAGE;
-      return null;
+      return rejectFilter(e, readOnly);
     }
     if (!readOnly) writeMultiStreamState(resolved);
     if (resolved.errors.length > 0) return null;
@@ -926,7 +960,7 @@ export const useSearchQuery = (t: TranslateFn) => {
         resolveFiltersForStreams(filter, streams, filterContext(), multiStreamFields()),
       );
     } catch (e) {
-      if (!(e instanceof NonSqlLimitError)) throw e;
+      if (!(e instanceof NonSqlLimitError) && !(e instanceof HeldFilterError)) throw e;
     }
     return searchObj.data.filterErrMsg === "";
   };

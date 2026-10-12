@@ -19,6 +19,9 @@ import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusi
 import { addSpacesToOperators } from "@/utils/queryUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+import { maskedSpanEnd, stripCommentLines } from "@/utils/query/sqlComments";
+
+export { stripCommentLines };
 
 export const DEFAULT_TOKEN_LIMITS: TokenLimits = { min: 2, max: 64 };
 
@@ -130,7 +133,7 @@ export type PlanNode =
 export type FilterPlan =
   | { kind: "sql"; filter: string }
   | { kind: "freeText"; root: PlanNode; units: string[] }
-  | { kind: "unclassified"; filter: string; suggestion?: PlanNode };
+  | { kind: "unclassified"; filter: string; suggestion?: PlanNode; held?: true };
 
 export type TextSearchTarget =
   { mode: "fts"; fields: string[] } | { mode: "blocked"; candidates: string[] };
@@ -201,6 +204,7 @@ interface Lexed {
   tok: Token;
   start: number;
   end: number;
+  readsAsSubtraction?: true;
 }
 
 interface SuggestionTally {
@@ -258,7 +262,7 @@ export function planFilter(
   booleanFields: ReadonlySet<string>,
   options: PlanFilterOptions = {},
 ): FilterPlan {
-  const lexed = lex(raw);
+  const lexed = lexFilter(raw);
   if (lexed === null) return { kind: "unclassified", filter: raw };
   const rule: TermRule = {
     names: withImplicitFields(booleanFields),
@@ -396,9 +400,10 @@ export function suggestRecovery(
   raw: string,
   booleanFields: ReadonlySet<string>,
   allStreamsFts: boolean,
+  tokenLimits: TokenLimits = DEFAULT_TOKEN_LIMITS,
 ): RecoveryCards {
   const trimmed = raw.trim();
-  const tokens = lex(raw);
+  const tokens = lexFilter(raw);
   if (trimmed === "" || (tokens !== null && tokens.length === 0)) {
     return { runSuggestion: null, freeTextCandidate: null };
   }
@@ -408,8 +413,8 @@ export function suggestRecovery(
   }
 
   const tally: SuggestionTally = { text: 0, fieldValue: 0, sql: 0, predicates: 0 };
-  const rule: TermRule = { names: withImplicitFields(booleanFields), limits: DEFAULT_TOKEN_LIMITS };
-  const node = buildSuggestionExpr(withImplicitAnds(tokens, raw, rule), raw, rule.names, tally);
+  const rule: TermRule = { names: withImplicitFields(booleanFields), limits: tokenLimits };
+  const node = buildSuggestionExpr(withImplicitAnds(tokens, raw, rule), raw, rule, tally);
   const structural =
     node !== null && tally.text + tally.fieldValue > 0 && tally.sql + tally.fieldValue > 0;
   const text = structural ? renderNode(node) : "";
@@ -427,30 +432,9 @@ export function freeTextRanges(
   options: PlanFilterOptions = {},
 ): TextRange[] {
   if (planFilter(raw, booleanFields, options).kind !== "freeText") return [];
-  return (lex(raw) ?? [])
+  return (lexFilter(raw) ?? [])
     .filter(({ tok }) => tok.t === "word" || tok.t === "squote" || tok.t === "dquote")
     .map(({ start, end }) => ({ start, end }));
-}
-
-export function stripCommentLines(raw: string): string {
-  const commentStarts = new Set<number>();
-  let i = 0;
-  while (i < raw.length) {
-    const end = maskedSpanEnd(raw, i);
-    if (end === null) {
-      i++;
-    } else {
-      if (raw.startsWith("--", i)) commentStarts.add(i);
-      i = end;
-    }
-  }
-  let offset = 0;
-  const kept: string[] = [];
-  for (const line of raw.split("\n")) {
-    if (!commentStarts.has(offset + line.length - line.trimStart().length)) kept.push(line);
-    offset += line.length + 1;
-  }
-  return kept.join("\n");
 }
 
 function renderSqlFilter(filter: string, knownFields: ReadonlySet<string>): string {
@@ -513,6 +497,7 @@ function sqlString(value: string): string {
 
 function filterComments(raw: string): string[] {
   const comments: string[] = [];
+  const dashWords = dashWordsIn(raw);
   let i = 0;
   let quoteAllowed = true;
   while (i < raw.length) {
@@ -522,14 +507,14 @@ function filterComments(raw: string): string[] {
       continue;
     }
     let end: number;
-    if (isLineComment(raw, i)) {
+    if (isLineComment(raw, i, dashWords)) {
       const newline = raw.indexOf("\n", i);
       end = newline < 0 ? raw.length : newline;
     } else if (raw.startsWith("/*", i)) {
       const close = raw.indexOf("*/", i + 2);
       end = close < 0 ? raw.length : close + 2;
     } else {
-      const lexed = lexOne(raw, i, quoteAllowed);
+      const lexed = lexOne(raw, i, quoteAllowed, dashWords);
       if (!lexed) break;
       i = lexed.end;
       quoteAllowed = lexed.tok.t === "lparen" || lexed.tok.t === "op";
@@ -556,31 +541,48 @@ function exclusionOf(tok: Token, rule: TermRule): string | null {
     : null;
 }
 
-function isLineComment(raw: string, i: number): boolean {
+function isLineComment(raw: string, i: number, dashWords: boolean): boolean {
   if (!raw.startsWith("--", i)) return false;
   let start = i;
   let end = i + 2;
   while (raw[start - 1] === "-") start--;
   while (raw[end] === "-") end++;
   const wordAfter = /[\p{L}\p{N}_]/u.test(raw[end] ?? "");
-  // A spaceless --word is the user's exclusion; a real comment needs "-- " or a longer dash run.
-  if (wordAfter && end - start === 2) return false;
+  if (dashWords && wordAfter && end - start === 2) return false;
   return !(/[\p{L}\p{N}_]/u.test(raw[start - 1] ?? "") && wordAfter);
 }
 
-function lex(raw: string): Lexed[] | null {
+// SQL reads -- as a comment, so a spaceless --word is an exclusion only in a one-line text search.
+function dashWordsIn(raw: string): boolean {
+  if (raw.trim().includes("\n")) return false;
+  const tokens = lex(raw, true);
+  return tokens !== null && tokens.every(isTextSearchToken);
+}
+
+function isTextSearchToken(lexed: Lexed): boolean {
+  const { tok } = lexed;
+  if (tok.t === "kw") return CONNECTIVES.has(tok.text.toUpperCase());
+  if (tok.t === "opaque") return isMatchAllCall(lexed);
+  return tok.t !== "op";
+}
+
+function lexFilter(raw: string): Lexed[] | null {
+  return lex(raw, dashWordsIn(raw));
+}
+
+function lex(raw: string, dashWords: boolean): Lexed[] | null {
   const tokens: Lexed[] = [];
   let i = 0;
   let quoteAllowed = true;
   while (i < raw.length) {
-    const skipped = skipTrivia(raw, i);
+    const skipped = skipTrivia(raw, i, dashWords);
     if (skipped === null) return null;
     if (skipped > i) {
       i = skipped;
       quoteAllowed = true;
       continue;
     }
-    const lexed = lexOne(raw, i, quoteAllowed);
+    const lexed = lexOne(raw, i, quoteAllowed, dashWords);
     if (lexed === null) return null;
     tokens.push(lexed);
     quoteAllowed = lexed.tok.t === "lparen" || lexed.tok.t === "op";
@@ -589,12 +591,12 @@ function lex(raw: string): Lexed[] | null {
   return mergeCaseSpans(mergeParenSpans(tokens, raw), raw);
 }
 
-function skipTrivia(raw: string, i: number): number | null {
+function skipTrivia(raw: string, i: number, dashWords: boolean): number | null {
   let j = i;
   while (j < raw.length) {
     if (/\s/.test(raw[j])) {
       j++;
-    } else if (isLineComment(raw, j)) {
+    } else if (isLineComment(raw, j, dashWords)) {
       const newline = raw.indexOf("\n", j);
       j = newline < 0 ? raw.length : newline;
     } else if (raw.startsWith("/*", j)) {
@@ -608,7 +610,7 @@ function skipTrivia(raw: string, i: number): number | null {
   return j;
 }
 
-function lexOne(raw: string, i: number, quoteAllowed: boolean): Lexed | null {
+function lexOne(raw: string, i: number, quoteAllowed: boolean, dashWords: boolean): Lexed | null {
   const c = raw[i];
   if (c === "-" && quoteAllowed && (raw[i + 1] === "'" || raw[i + 1] === '"')) {
     const quoted = lexQuoted(raw, i + 1);
@@ -626,7 +628,7 @@ function lexOne(raw: string, i: number, quoteAllowed: boolean): Lexed | null {
   if (ARITHMETIC_OPS.has(c) && isSpaceDelimited(raw, i)) {
     return { tok: { t: "op", text: c }, start: i, end: i + 1 };
   }
-  return lexWord(raw, i);
+  return lexWord(raw, i, dashWords);
 }
 
 function lexQuoted(raw: string, i: number): Lexed | null {
@@ -645,9 +647,9 @@ function lexQuoted(raw: string, i: number): Lexed | null {
   return { tok: { t: quote === "'" ? "squote" : "dquote", text }, start: i, end: j + 1 };
 }
 
-function lexWord(raw: string, i: number): Lexed {
+function lexWord(raw: string, i: number, dashWords: boolean): Lexed {
   let j = i + 1;
-  while (j < raw.length && !endsWord(raw, j)) {
+  while (j < raw.length && !endsWord(raw, j, dashWords)) {
     if (raw[j] === "-") {
       do {
         j++;
@@ -666,11 +668,11 @@ function startsValueLiteral(raw: string, j: number): boolean {
   return raw[j - 1] === ":" && (raw[j] === "'" || raw[j] === '"');
 }
 
-function endsWord(raw: string, j: number): boolean {
+function endsWord(raw: string, j: number, dashWords: boolean): boolean {
   const c = raw[j];
   if (/\s/.test(c) || c === "(" || c === ")" || c === "," || ONE_CHAR_OPS.has(c)) return true;
   const two = raw.slice(j, j + 2);
-  return TWO_CHAR_OPS.has(two) || isLineComment(raw, j) || two === "/*";
+  return TWO_CHAR_OPS.has(two) || isLineComment(raw, j, dashWords) || two === "/*";
 }
 
 function isSpaceDelimited(raw: string, i: number): boolean {
@@ -934,18 +936,17 @@ function planMix(
   options: PlanFilterOptions,
 ): FilterPlan {
   const allFts = options.allTargetsFts ?? (options.targetMode ?? "fts") === "fts";
-  const implicitAnds = tokens.filter(isImplicitAnd).map((lexed) => lexed.start);
-  if (!allFts && implicitAnds.length === 0) return { kind: "sql", filter: raw };
-  const root = mixRoot(tokens, raw, rule);
-  if (root !== null && allFts) return { kind: "sql", filter: renderNode(root) };
-  if (implicitAnds.length === 0) return { kind: "sql", filter: raw };
-  // A -term after a complete predicate must never reach the backend as subtraction.
-  if (root !== null) return { kind: "freeText", root, units: collectUnits(root) };
-  const spliced = implicitAnds.reduceRight(
-    (text, at) => `${text.slice(0, at)}AND ${text.slice(at)}`,
-    raw,
-  );
-  return { kind: "sql", filter: spliced };
+  const implicitAnds = tokens.filter(isImplicitAnd);
+  if (implicitAnds.length === 0) {
+    const root = allFts ? mixRoot(tokens, raw, rule) : null;
+    return { kind: "sql", filter: root === null ? raw : renderNode(root) };
+  }
+  // A -term after a predicate is never sent as subtraction nor guessed at; the user picks Run as.
+  const ambiguous = implicitAnds.some((lexed) => lexed.readsAsSubtraction);
+  const root = ambiguous ? null : mixRoot(tokens, raw, rule);
+  if (root === null) return { kind: "unclassified", filter: raw, held: true };
+  if (allFts) return { kind: "sql", filter: renderNode(root) };
+  return { kind: "freeText", root, units: collectUnits(root) };
 }
 
 function mixRoot(tokens: Lexed[], raw: string, rule: TermRule): PlanNode | null {
@@ -988,7 +989,17 @@ function splitTrailingExclusions(out: Lexed[], start: number, raw: string, rule:
   const left = out.slice(start, k);
   if (left.every(isOperandToken) || whereShape(sliceOf(left, raw)) !== "predicate") return;
   const at = out[k].start;
-  out.splice(k, 0, { tok: { t: "kw", text: "AND" }, start: at, end: at });
+  const and: Lexed = { tok: { t: "kw", text: "AND" }, start: at, end: at };
+  if (readsAsSubtraction(left, out[k], raw, rule)) and.readsAsSubtraction = true;
+  out.splice(k, 0, and);
+}
+
+// A numeric -term after an operand that subtraction accepts is as likely arithmetic as an exclusion.
+function readsAsSubtraction(left: Lexed[], term: Lexed, raw: string, rule: TermRule): boolean {
+  const value = exclusionOf(term.tok, rule);
+  if (value === null || !NUMERIC_LITERAL.test(value)) return false;
+  if (left[left.length - 1].tok.t === "squote") return false;
+  return whereShape(raw.slice(left[0].start, term.end)) === "predicate";
 }
 
 function isTrailingExclusion(lexed: Lexed, prev: Lexed, rule: TermRule): boolean {
@@ -1068,11 +1079,11 @@ function mixTextUnit(lexed: Lexed, next: Lexed | undefined, state: MixState): Pl
 function buildSuggestionExpr(
   tokens: Lexed[],
   raw: string,
-  names: ReadonlySet<string>,
+  rule: TermRule,
   tally: SuggestionTally,
 ): PlanNode | null {
   const orParts = splitTopLevel(tokens, "OR");
-  const children = orParts.map((part) => buildSuggestionAnd(part, raw, names, tally));
+  const children = orParts.map((part) => buildSuggestionAnd(part, raw, rule, tally));
   if (children.some((child) => child === null)) return null;
   return children.length === 1 ? children[0] : { k: "or", children: children as PlanNode[] };
 }
@@ -1080,11 +1091,11 @@ function buildSuggestionExpr(
 function buildSuggestionAnd(
   tokens: Lexed[],
   raw: string,
-  names: ReadonlySet<string>,
+  rule: TermRule,
   tally: SuggestionTally,
 ): PlanNode | null {
   const andParts = splitTopLevel(tokens, "AND");
-  const children = andParts.map((part) => buildSuggestionUnit(part, raw, names, tally));
+  const children = andParts.map((part) => buildSuggestionUnit(part, raw, rule, tally));
   if (children.some((child) => child === null)) return null;
   return children.length === 1 ? children[0] : { k: "and", children: children as PlanNode[] };
 }
@@ -1092,33 +1103,29 @@ function buildSuggestionAnd(
 function buildSuggestionUnit(
   tokens: Lexed[],
   raw: string,
-  names: ReadonlySet<string>,
+  rule: TermRule,
   tally: SuggestionTally,
 ): PlanNode | null {
   if (tokens.length === 0) return null;
   if (isKeyword(tokens[0], "NOT")) {
-    const child = buildSuggestionUnit(tokens.slice(1), raw, names, tally);
+    const child = buildSuggestionUnit(tokens.slice(1), raw, rule, tally);
     return child === null ? null : negateFirst(child);
   }
   if (tokens[0].tok.t === "lparen" && matchingParen(tokens, 0) === tokens.length - 1) {
-    const child = buildSuggestionExpr(tokens.slice(1, -1), raw, names, tally);
+    const child = buildSuggestionExpr(tokens.slice(1, -1), raw, rule, tally);
     return child === null ? null : { k: "group", child };
   }
   if (tokens.every(isOperandToken)) {
-    return buildOperandRun(tokens, names, tally) ?? verbatimSql(tokens, raw, tally);
+    return buildOperandRun(tokens, rule, tally) ?? verbatimSql(tokens, raw, tally);
   }
-  return buildSqlSegment(tokens, raw, names, tally);
+  return buildSqlSegment(tokens, raw, rule, tally);
 }
 
-function buildOperandRun(
-  tokens: Lexed[],
-  names: ReadonlySet<string>,
-  tally: SuggestionTally,
-): PlanNode | null {
+function buildOperandRun(tokens: Lexed[], rule: TermRule, tally: SuggestionTally): PlanNode | null {
   const children: PlanNode[] = [];
   const counts = { text: 0, fieldValue: 0 };
   for (const { tok } of tokens) {
-    const node = operandNode(tok, names);
+    const node = operandNode(tok, rule);
     if (node === null) return null;
     children.push(node);
     if (node.k === "sql") counts.fieldValue++;
@@ -1129,14 +1136,15 @@ function buildOperandRun(
   return children.length === 1 ? children[0] : { k: "and", children };
 }
 
-function operandNode(tok: Token, names: ReadonlySet<string>): PlanNode | null {
+function operandNode(tok: Token, rule: TermRule): PlanNode | null {
+  const { names } = rule;
   if (tok.t === "word") {
     const unsigned = tok.text.replace(/^--?(?!-)/, "");
     const pair = fieldValuePair(unsigned, names);
     if (pair === null) return null;
     if (pair !== undefined) return { k: "sql", text: comparisonOf(pair, unsigned !== tok.text) };
   }
-  const value = exclusionOf(tok, { names, limits: DEFAULT_TOKEN_LIMITS });
+  const value = exclusionOf(tok, rule);
   if (value !== null) {
     return value === "" || isFieldLikeWord(value, names)
       ? null
@@ -1171,17 +1179,17 @@ function comparisonOf({ field, value }: FieldValuePair, excluded: boolean): stri
 function buildSqlSegment(
   tokens: Lexed[],
   raw: string,
-  names: ReadonlySet<string>,
+  rule: TermRule,
   tally: SuggestionTally,
 ): PlanNode {
   const whole = whereShape(sliceOf(tokens, raw));
   if (whole !== null) return countSql(whole, sliceOf(tokens, raw), tally);
   for (let k = tokens.length - 1; k > 0 && isOperandToken(tokens[k]); k--) {
-    const split = trySplit(tokens.slice(0, k), tokens.slice(k), raw, names, tally, "sqlFirst");
+    const split = trySplit(tokens.slice(0, k), tokens.slice(k), raw, rule, tally, "sqlFirst");
     if (split !== null) return split;
   }
   for (let k = 1; k < tokens.length && isOperandToken(tokens[k - 1]); k++) {
-    const split = trySplit(tokens.slice(k), tokens.slice(0, k), raw, names, tally, "textFirst");
+    const split = trySplit(tokens.slice(k), tokens.slice(0, k), raw, rule, tally, "textFirst");
     if (split !== null) return split;
   }
   return verbatimSql(tokens, raw, tally);
@@ -1196,7 +1204,7 @@ function trySplit(
   sqlTokens: Lexed[],
   textTokens: Lexed[],
   raw: string,
-  names: ReadonlySet<string>,
+  rule: TermRule,
   tally: SuggestionTally,
   order: "sqlFirst" | "textFirst",
 ): PlanNode | null {
@@ -1204,7 +1212,7 @@ function trySplit(
   const shape = whereShape(sqlText);
   if (shape === null) return null;
   const local: SuggestionTally = { text: 0, fieldValue: 0, sql: 0, predicates: 0 };
-  const run = buildOperandRun(textTokens, names, local);
+  const run = buildOperandRun(textTokens, rule, local);
   if (run === null) return null;
   const sqlNode = countSql(shape, sqlText, tally);
   tally.text += local.text;
@@ -1311,7 +1319,7 @@ function bareIdentifier(node: AstNode | undefined): string | null {
 }
 
 function leadingWord(raw: string): string {
-  const start = skipTrivia(raw, 0);
+  const start = skipTrivia(raw, 0, false);
   if (start === null) return "";
   return (raw.slice(start).match(/^[A-Za-z_]+/)?.[0] ?? "").toLowerCase();
 }
@@ -1344,21 +1352,8 @@ function maskLiteralsAndComments(raw: string): string {
   return out;
 }
 
-function maskedSpanEnd(raw: string, i: number): number | null {
-  if (raw.startsWith("--", i)) {
-    const newline = raw.indexOf("\n", i);
-    return newline < 0 ? raw.length : newline;
-  }
-  if (raw.startsWith("/*", i)) {
-    const close = raw.indexOf("*/", i + 2);
-    return close < 0 ? raw.length : close + 2;
-  }
-  if (raw[i] !== "'" && raw[i] !== '"') return null;
-  return lexQuoted(raw, i)?.end ?? raw.length;
-}
-
 function isBlankFilter(filter: string): boolean {
-  const tokens = lex(filter);
+  const tokens = lexFilter(filter);
   return tokens === null ? filter.trim() === "" : tokens.length === 0;
 }
 

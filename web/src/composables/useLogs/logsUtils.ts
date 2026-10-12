@@ -33,6 +33,7 @@ import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn } from "@/types/i18n";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+import { stripCommentLines } from "@/utils/query/sqlComments";
 import type { PersistSurface } from "@/composables/useLogs/useAutoRun";
 import {
   DEFAULT_ROWS_PER_PAGE,
@@ -146,10 +147,7 @@ export const logsUtils = () => {
   const fnParsedSQL = (queryString: string = ""): ExtendedParsedSQLResult => {
     try {
       const finalQueryString: string = queryString || searchObj.data.query;
-      const filteredQuery: string = finalQueryString
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
+      const filteredQuery: string = stripCommentLines(finalQueryString);
 
       if (maxParenDepth(filteredQuery) > SQL_PARSE_MAX_DEPTH) {
         return DEFAULT_PARSED_RESULT;

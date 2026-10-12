@@ -38,6 +38,7 @@ import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { sqlLiteral } from "@/utils/query/sqlFilterBuilder";
+import { stripCommentLines } from "@/utils/query/sqlComments";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
 import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
@@ -658,10 +659,7 @@ const useLogs = (t: TranslateFn) => {
         return {};
       }
 
-      const orgQuery: string = searchObj.data.query
-        .split("\n")
-        .filter((line: string) => !line.trim().startsWith("--"))
-        .join("\n");
+      const orgQuery: string = stripCommentLines(searchObj.data.query);
       const outputQueries: any = {};
       const parsedSQL = fnParsedSQL(orgQuery);
 

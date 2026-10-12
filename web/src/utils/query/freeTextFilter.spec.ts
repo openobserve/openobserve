@@ -22,6 +22,7 @@ import {
   materializeFreeText,
   phrasePlan,
   planFilter,
+  preserveFilterComments,
   quoteFreeTextPhrase,
   renderPlan,
   streamTextTarget,
@@ -1105,7 +1106,7 @@ describe("freeTextFilter", () => {
     it.each([
       ["-level:error status=500", "(level IS NULL OR level!='error') AND status=500"],
       ["-level:error", "(level IS NULL OR level!='error')"],
-      ["--level:error status=500", "(level IS NULL OR level!='error') AND status=500"],
+      ["--level:error", "(level IS NULL OR level!='error')"],
       ["-level:'a b' status=500", "(level IS NULL OR level!='a b') AND status=500"],
     ])("suggests an exclusion for %s that keeps rows without the field", (raw, suggestion) => {
       for (const allFts of [true, false]) {
@@ -1117,13 +1118,18 @@ describe("freeTextFilter", () => {
     });
 
     it.each([
-      ["status=500 -404", "status=500 AND NOT match_all('404')"],
       ["level='error' -404", "level='error' AND NOT match_all('404')"],
-      ["status=500 -404 -403", "status=500 AND NOT match_all('404') AND NOT match_all('403')"],
+      [
+        "level='error' -404 -403",
+        "level='error' AND NOT match_all('404') AND NOT match_all('403')",
+      ],
       ["status=500 -debug", "status=500 AND NOT match_all('debug')"],
-      ["a BETWEEN 1 AND 5 -404", "a BETWEEN 1 AND 5 AND NOT match_all('404')"],
-      ["(status=500 -404) OR error", "(status=500 AND NOT match_all('404')) OR match_all('error')"],
-      ["status=500 -404 AND is_error", "status=500 AND -404 AND is_error"],
+      ["status=500 -5xx", "status=500 AND NOT match_all('5xx')"],
+      ["a BETWEEN 1 AND 5 -debug", "a BETWEEN 1 AND 5 AND NOT match_all('debug')"],
+      [
+        "(status=500 -debug) OR error",
+        "(status=500 AND NOT match_all('debug')) OR match_all('error')",
+      ],
     ])("reads a -term after a complete predicate as an exclusion: %s", (raw, filter) => {
       expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter });
     });
@@ -1142,14 +1148,14 @@ describe("freeTextFilter", () => {
     });
 
     it("blocks a -term after a predicate on a no-fts stream instead of subtracting", () => {
-      for (const raw of ["status=500 -404", "level='error' -404", "status=500 --404"]) {
+      for (const [raw, unit] of [
+        ["level='error' -404", "404"],
+        ["status=500 -debug", "debug"],
+      ]) {
         const plan = planFilter(raw, FIELDS, NO_FTS);
-        expect(plan).toMatchObject({ kind: "freeText", units: ["404"] });
+        expect(plan).toMatchObject({ kind: "freeText", units: [unit] });
         expect(renderPlan(plan, BLOCKED, KNOWN)).toBeNull();
       }
-      expect(suggestRecovery("status=500 -404", FIELDS, true).runSuggestion).toBe(
-        "status=500 AND NOT match_all('404')",
-      );
     });
 
     it.each([
@@ -1167,7 +1173,7 @@ describe("freeTextFilter", () => {
     it("keeps real comments in SQL filters next to a --term", () => {
       expect(planFilter("status=500 --404", FIELDS)).toEqual({
         kind: "sql",
-        filter: "status=500 AND NOT match_all('404')",
+        filter: "status=500 --404",
       });
       expect(planFilter("status=500 -- note", FIELDS)).toEqual({
         kind: "sql",
@@ -1205,6 +1211,109 @@ describe("freeTextFilter", () => {
         kind: "sql",
         filter: "match_all('404') AND status=500",
       });
+    });
+  });
+  describe("review round 2 on #15234", () => {
+    const NO_FTS = { targetMode: "blocked", allTargetsFts: false } as const;
+    const held = (raw: string) => ({ kind: "unclassified", filter: raw, held: true });
+
+    it.each([
+      ["status=500 --404"],
+      ["status=500\n--retry"],
+      ["level='error'\n--debug"],
+      ["status = 500 --todo"],
+      ["--note\nstatus=500"],
+    ])("reads --word as a comment next to SQL or on a later line: %s", (raw) => {
+      expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter: raw });
+      expect(planFilter(raw, FIELDS, NO_FTS)).toEqual({ kind: "sql", filter: raw });
+      expect(suggestRecovery(raw, FIELDS, true).runSuggestion ?? "").not.toContain("match_all");
+    });
+
+    it("keeps the comment out of the rendered filter and of the preserved comments", () => {
+      expect(renderPlan({ kind: "sql", filter: "status=500\n--retry" }, FTS, KNOWN)).toBe(
+        "status = 500",
+      );
+      expect(preserveFilterComments("status=500\n--retry", "status = 500")).toBe(
+        "--retry\nstatus = 500",
+      );
+      expect(renderFts("error\n--404")).toBe("match_all('error')");
+      const rendered = "match_all('error') AND NOT match_all('404')";
+      expect(preserveFilterComments("error --404", rendered)).toBe(rendered);
+    });
+
+    it.each([
+      ["--404", "NOT match_all('404')"],
+      ["error --404", "match_all('error') AND NOT match_all('404')"],
+      [
+        "(error OR timeout) --404",
+        "(match_all('error') OR match_all('timeout')) AND NOT match_all('404')",
+      ],
+    ])("keeps a one-line text search --word as an exclusion: %s", (raw, sql) => {
+      expect(renderFts(raw)).toBe(sql);
+    });
+
+    it.each([
+      ["status=500 -404", "status=500 AND NOT match_all('404')"],
+      ["x = 5 -10", "x = 5 AND NOT match_all('10')"],
+      ["x > 0 -10", "x > 0 AND NOT match_all('10')"],
+      ["x = 5\n-10", "x = 5 AND NOT match_all('10')"],
+      ["code BETWEEN 1 AND 5 -10", "code BETWEEN 1 AND 5 AND NOT match_all('10')"],
+      ["x = y -10", "x = y AND NOT match_all('10')"],
+      ["status=500 -404 -403", "status=500 AND NOT match_all('404') AND NOT match_all('403')"],
+      ["(status=500 -404) OR error", "(status=500 AND NOT match_all('404')) OR match_all('error')"],
+    ])(
+      "holds a numeric -term that may be subtraction and suggests the exclusion: %s",
+      (raw, run) => {
+        expect(planFilter(raw, FIELDS)).toEqual(held(raw));
+        expect(planFilter(raw, FIELDS, NO_FTS)).toEqual(held(raw));
+        expect(suggestRecovery(raw, FIELDS, true)).toEqual({
+          runSuggestion: run,
+          freeTextCandidate: null,
+        });
+      },
+    );
+
+    it.each([
+      ["status=500 -404 AND is_error", "status=500 AND NOT match_all('404') AND is_error"],
+      ["status=500 -debug AND is_error", "status=500 AND NOT match_all('debug') AND is_error"],
+    ])("holds a -term mix it cannot build instead of splicing an operand: %s", (raw, run) => {
+      expect(planFilter(raw, FIELDS)).toEqual(held(raw));
+      expect(suggestRecovery(raw, FIELDS, true).runSuggestion).toBe(run);
+    });
+
+    it("never holds a filter without an implicit AND", () => {
+      for (const raw of ["x = 5 -1", "status=500-404", "status = -404", "'abc"]) {
+        expect(planFilter(raw, FIELDS)).not.toHaveProperty("held");
+      }
+    });
+
+    it("keeps a one-line --word filter when a value is appended", () => {
+      const ctx = ctxFor({ s: FTS });
+      expect(appendConjunct("--404", "level='error'", ["s"], ctx)).toBe(
+        "(\nNOT match_all('404')\n) AND level='error'",
+      );
+      expect(appendConjunct("--note", "level='error'", ["s"], ctx)).toBe(
+        "(\nNOT match_all('note')\n) AND level='error'",
+      );
+    });
+
+    it("judges the suggestion by the configured token limits, as the plan does", () => {
+      const limits = { min: 6, max: 64 };
+      expect(planFilter("status=500 -debug", FIELDS, { tokenLimits: limits })).toEqual({
+        kind: "sql",
+        filter: "status=500 -debug",
+      });
+      expect(suggestRecovery("status=500 -debug", FIELDS, true, limits).runSuggestion).toBeNull();
+      expect(suggestRecovery("status=500 -debug", FIELDS, true).runSuggestion).toBe(
+        "status=500 AND NOT match_all('debug')",
+      );
+      const four = { min: 4, max: 64 };
+      expect(suggestRecovery("-404 status=500", FIELDS, true, four).runSuggestion).toBe(
+        "match_all('-404') AND status=500",
+      );
+      expect(suggestRecovery("-404 status=500", FIELDS, true).runSuggestion).toBe(
+        "NOT match_all('404') AND status=500",
+      );
     });
   });
 });

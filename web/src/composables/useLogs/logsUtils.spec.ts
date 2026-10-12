@@ -201,6 +201,16 @@ describe("logsUtils", () => {
       expect(mockParserInstance.astify).toHaveBeenCalledWith("SELECT * FROM logs");
     });
 
+    it("should keep a -- line inside a string literal", () => {
+      mockParserInstance.astify.mockReturnValue({ columns: [], from: [] });
+
+      utils.fnParsedSQL("-- note\nSELECT * FROM logs WHERE msg = 'a\n-- b'\n-- tail");
+
+      expect(mockParserInstance.astify).toHaveBeenCalledWith(
+        "SELECT * FROM logs WHERE msg = 'a\n-- b'",
+      );
+    });
+
     it("should use searchObj.data.query when no query provided", () => {
       const mockAst = {
         columns: [],

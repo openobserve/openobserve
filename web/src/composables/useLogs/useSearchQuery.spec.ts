@@ -1256,13 +1256,41 @@ describe("useSearchQuery › free text (item 1)", () => {
     ["limit 50", "match_all('limit') AND match_all('50')"],
     ["--404", "NOT match_all('404')"],
     ["NOT -404", "match_all('404')"],
-    ["status=500 -404", "status = 500 AND NOT match_all('404')"],
+    ["level='error' -404", "level = 'error' AND NOT match_all('404')"],
+    ["status=500 -debug", "status = 500 AND NOT match_all('debug')"],
+    ["status=500 --404", "status = 500 --404"],
+    ["status=500\n--retry", "status = 500"],
+    ["level='error'\n--debug", "level = 'error'"],
   ])("produces the exact request for %s without changing the query", (raw, where) => {
     select(ftsStream("fts_a"));
     mockState.searchObj.data.query = raw;
     const { getQueryReq } = useSearchQuery(gt);
     expect(getSql(getQueryReq(false))).toBe(`select * from "fts_a"  WHERE ${where}`);
     expect(mockState.searchObj.data.query).toBe(raw);
+  });
+
+  it.each([
+    ["status=500 -404", false],
+    ["x = 5 -10", false],
+    ["status=500 -404 AND is_error", false],
+    ["status=500 -404", true],
+  ])("holds %s: no request, a query error that offers Run as (multi: %s)", (raw, multi) => {
+    select(...(multi ? [ftsStream("fts_a"), ftsStream("fts_b")] : [ftsStream("fts_a")]));
+    mockState.searchObj.data.query = raw;
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getQueryReq(false)).toBeNull();
+    expect((mockState.searchObj.data as any).errorMsg).toBe("Search query is empty or invalid.");
+    expect((mockState.searchObj.data as any).errorCode).toBe(20001);
+    expect((mockState.searchObj.data as any).freeTextBlocked).toBeNull();
+    expect(mockState.searchObj.data.query).toBe(raw);
+  });
+
+  it("holds a filter in a read-only build without touching the error state", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.data.query = "status=500 -404";
+    const { buildSearch } = useSearchQuery(gt);
+    expect(buildSearch(true)).toBeNull();
+    expect(mockState.notificationMsg.value).toBe("");
   });
 
   it("renders LIMIT words for every free-text arm in multi-stream requests", () => {

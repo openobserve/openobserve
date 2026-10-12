@@ -318,7 +318,7 @@ export function recoveryCardsFor(
   const streams = searchObj.data.stream.selectedStream ?? [];
   const allFts =
     streams.length > 0 && streams.every((stream) => ctx.targets[stream]?.mode === "fts");
-  return suggestRecovery(raw, ctx.fieldNames, allFts);
+  return suggestRecovery(raw, ctx.fieldNames, allFts, ctx.tokenLimits);
 }
 
 export function searchTextReplacement(

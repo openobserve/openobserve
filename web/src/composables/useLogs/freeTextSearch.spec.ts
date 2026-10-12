@@ -181,6 +181,20 @@ describe("recoveryCardsFor and searchTextReplacement (J5)", () => {
     });
   });
 
+  it("offers Run as for a held -term, judged by the configured token limits", () => {
+    const app = fts("app", [{ name: "status", type: "Int64" }]);
+    expect(recoveryCardsFor(makeSearchObj("status=500 -404", [app]), zoConfig)).toEqual({
+      runSuggestion: "status=500 AND NOT match_all('404')",
+      freeTextCandidate: null,
+    });
+    const obj = makeSearchObj("status=500 -debug", [app]);
+    expect(recoveryCardsFor(obj, zoConfig).runSuggestion).toBe(
+      "status=500 AND NOT match_all('debug')",
+    );
+    const strict = { ...zoConfig, inverted_index_min_token_length: 6 };
+    expect(recoveryCardsFor(obj, strict).runSuggestion).toBeNull();
+  });
+
   it("offers only Search text when a stream lacks full-text fields (AC5.6)", () => {
     const obj = makeSearchObj("level='api' timeout", [noFts("raw")]);
     expect(recoveryCardsFor(obj, zoConfig).runSuggestion).toBeNull();

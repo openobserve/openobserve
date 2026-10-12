@@ -976,6 +976,17 @@ describe("Use Logs Composable", () => {
   });
 
   describe("SQL Parsing and Query Building Functions", () => {
+    describe("extractValueQuery", () => {
+      it("should keep a -- line inside a string literal", () => {
+        const { extractValueQuery, searchObj } = wrapper.vm;
+        searchObj.meta.sqlMode = true;
+        searchObj.data.query = `SELECT * FROM "logs" WHERE msg = 'a\n-- b'\n-- note`;
+        expect(extractValueQuery()).toEqual({
+          logs: `SELECT * FROM "[INDEX_NAME]" WHERE msg = 'a\n-- b'`,
+        });
+      });
+    });
+
     describe("fnParsedSQL", () => {
       beforeEach(() => {
         // The parser might not be directly accessible, so let's test differently
