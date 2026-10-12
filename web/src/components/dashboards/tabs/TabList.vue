@@ -160,9 +160,10 @@ import { computed, inject, nextTick, ref, defineComponent } from "vue";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import { useRoute } from "vue-router";
-import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import { editTab, updateDashboard } from "@/utils/commons";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 
 export default defineComponent({
   name: "TabList",
@@ -190,11 +191,8 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const route = useRoute();
     const store = useStore();
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
 
     const showAddTabDialog = ref(false);
 
@@ -222,16 +220,18 @@ export default defineComponent({
 
     // Shared failure handling for both tab operations: surface a 409 with the
     // refresh CTA, everything else as a plain error, then reload canonical data.
-    const notifyTabFailure = (error: any, failKey: I18nKey) => {
-      if (error?.response?.status === 409) {
-        // Server/network text arrives already-resolved; the fallback is a key.
-        showConfictErrorNotificationWithRefreshBtn(
-          raw(error?.response?.data?.message ?? error?.message) || t(failKey),
-          t,
-        );
-      } else {
-        showErrorNotification(raw(error?.message) || t(failKey));
+    const notifyTabFailure = (error: any, failKey: I18nKey, change: I18nText, mine?: any) => {
+      if (saveConflict.isConflict(error)) {
+        // No refresh: the reorder or rename stays on screen while the dialog is open.
+        void saveConflict.openConflict({
+          dashboardId: props.dashboardData?.dashboardId,
+          folderId: folderId.value,
+          mine,
+          change,
+        });
+        return;
       }
+      showErrorNotification(raw(error?.message) || t(failKey));
       emit("refresh");
     };
 
@@ -273,7 +273,12 @@ export default defineComponent({
         );
         showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
       } catch (error: any) {
-        notifyTabFailure(error, "dashboard.tabsSettings.tabReorderFailed");
+        notifyTabFailure(
+          error,
+          "dashboard.tabsSettings.tabReorderFailed",
+          t("dashboard.saveConflict.change.reorderedTabs"),
+          props.dashboardData,
+        );
       }
     };
 
@@ -319,7 +324,11 @@ export default defineComponent({
         emit("refresh");
         showPositiveNotification(t("dashboard.tabsSettings.tabUpdated"));
       } catch (error: any) {
-        notifyTabFailure(error, "dashboard.tabsSettings.tabUpdationFailed");
+        notifyTabFailure(
+          error,
+          "dashboard.tabsSettings.tabUpdationFailed",
+          t("dashboard.saveConflict.change.renamedTab", { from: tab?.name ?? "", to: name }),
+        );
       } finally {
         editingName.value = "";
       }

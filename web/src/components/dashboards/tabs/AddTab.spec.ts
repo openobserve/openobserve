@@ -102,13 +102,18 @@ global.console = {
 // Mock composables
 const mockShowPositiveNotification = vi.fn();
 const mockShowErrorNotification = vi.fn();
-const mockShowConflictErrorNotification = vi.fn();
 
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showPositiveNotification: mockShowPositiveNotification,
     showErrorNotification: mockShowErrorNotification,
-    showConfictErrorNotificationWithRefreshBtn: mockShowConflictErrorNotification,
+  }),
+}));
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
   }),
 }));
 
@@ -216,7 +221,7 @@ describe("AddTab", () => {
 
     mockShowPositiveNotification.mockClear();
     mockShowErrorNotification.mockClear();
-    mockShowConflictErrorNotification.mockClear();
+    mockOpenConflict.mockClear();
 
     const { addTab, getDashboard } = await import("@/utils/commons");
     const { editTab } = await import("../../../utils/commons");
@@ -489,7 +494,7 @@ describe("AddTab", () => {
       expect(mockAddTab).not.toHaveBeenCalled();
     });
 
-    it("should handle 409 conflict errors", async () => {
+    it("opens the save-conflict dialog on a 409 instead of an error toast", async () => {
       wrapper = createWrapper();
       mockAddTab.mockRejectedValue({
         response: { status: 409, data: { message: "Tab already exists" } },
@@ -497,10 +502,10 @@ describe("AddTab", () => {
 
       await wrapper.vm.onSubmit({ name: "Test Tab" });
 
-      expect(mockShowConflictErrorNotification).toHaveBeenCalledWith(
-        "Tab already exists",
-        expect.any(Function),
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ dashboardId: wrapper.props("dashboardId") }),
       );
+      expect(mockShowErrorNotification).not.toHaveBeenCalled();
     });
 
     it("should handle general errors", async () => {

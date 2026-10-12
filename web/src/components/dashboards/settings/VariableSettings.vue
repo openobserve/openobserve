@@ -265,6 +265,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import Sortable from "sortablejs";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -366,11 +367,9 @@ export default defineComponent({
       return index < 9 ? `0${index + 1}` : `${index + 1}`;
     };
 
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+
+    const saveConflict = useDashboardSaveConflict();
     // list of all variables, which will be same as the dashboard variables list
     const dashboardVariablesList: any = ref([]);
 
@@ -460,18 +459,19 @@ export default defineComponent({
 
         emit("save");
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.variableSettingsPage.variableReorderFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"),
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: dashboardVariableData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: dashboardVariableData.data,
+            change: t("dashboard.saveConflict.change.reorderedVariables"),
+            onResolved: getDashboardData,
+          });
+          return;
         }
+        showErrorNotification(
+          error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"),
+        );
         await getDashboardData();
       }
     };
@@ -569,13 +569,15 @@ export default defineComponent({
           timeout: 2000,
         });
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.variableSettingsPage.variableDeletionFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: route.query.dashboard as string,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.deletedVariable", {
+              name: selectedDelete.value?.name ?? "",
+            }),
+            onResolved: getDashboardData,
+          });
         } else {
           showErrorNotification(
             error?.message ?? t("dashboard.variableSettingsPage.variableDeletionFailed"),

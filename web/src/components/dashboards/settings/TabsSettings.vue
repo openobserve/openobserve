@@ -194,6 +194,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 
 export default defineComponent({
   name: "TabsSettings",
@@ -229,11 +230,8 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
     };
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     // Attach SortableJS to OTable's rendered <tbody> so rows can be dragged
     // to reorder. Re-runnable: tears down any prior instance first.
     const initSortable = async () => {
@@ -324,6 +322,10 @@ export default defineComponent({
       data: {},
     });
 
+    const tabNameOf = (tabId: any) =>
+      currentDashboardData.data?.tabs?.find((tab: any) => tab.tabId === tabId)?.name ??
+      String(tabId ?? "");
+
     const handleDragEnd = async () => {
       try {
         await updateDashboard(
@@ -338,16 +340,17 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabReorderFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: currentDashboardData.data,
+            change: t("dashboard.saveConflict.change.reorderedTabs"),
+            onResolved: getDashboardData,
+          });
+          return;
         }
+        showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
         emit("refresh");
         await getDashboardData();
       }
@@ -381,16 +384,22 @@ export default defineComponent({
           editTabObj.data = {};
         }
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabUpdationFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.renamedTab", {
+              from: tabNameOf(editTabObj.data.tabId),
+              to: editTabObj.data.name,
+            }),
+            onResolved: async () => {
+              cancelEdit();
+              await getDashboardData();
+            },
+          });
+          return;
         }
+        showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
 
         emit("refresh");
         await getDashboardData();
@@ -432,13 +441,19 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.tabsSettings.tabDeleted"));
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.tabsSettings.tabDeletionFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          deletePopupVisible.value = false;
+          void saveConflict.openConflict({
+            dashboardId: currentDashboardData.data.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.deletedTab", {
+              name: tabNameOf(tabIdToBeDeleted.value),
+            }),
+            onResolved: async () => {
+              tabIdToBeDeleted.value = null;
+              await getDashboardData();
+            },
+          });
         } else {
           showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {
             timeout: 2000,

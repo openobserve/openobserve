@@ -54,12 +54,17 @@ vi.mock("vuex", () => ({
 
 const mockShowPositiveNotification = vi.fn();
 const mockShowErrorNotification = vi.fn();
-const mockShowConflictErrorNotification = vi.fn();
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showPositiveNotification: mockShowPositiveNotification,
     showErrorNotification: mockShowErrorNotification,
-    showConfictErrorNotificationWithRefreshBtn: mockShowConflictErrorNotification,
+  }),
+}));
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
   }),
 }));
 
@@ -716,6 +721,20 @@ describe("TabList", () => {
       expect(wrapper.emitted("refresh")).toBeTruthy();
     });
 
+    it("opens the save-conflict dialog on a 409 and keeps the new order on screen", async () => {
+      mockUpdateDashboard.mockRejectedValueOnce({ response: { status: 409 } });
+      wrapper = createWrapper();
+
+      await wrapper.vm.onReorder({ from: "tab3", to: "tab1", before: true });
+      await flushPromises();
+
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ mine: wrapper.props("dashboardData") }),
+      );
+      expect(wrapper.emitted("refresh")).toBeFalsy();
+      expect(wrapper.vm.tabs.map((tab: any) => tab.tabId)).toEqual(["tab3", "tab1", "tab2"]);
+    });
+
     it("should ignore a reorder referencing an unknown tab id", async () => {
       wrapper = createWrapper();
 
@@ -767,6 +786,22 @@ describe("TabList", () => {
       });
       expect(wrapper.emitted("refresh")).toBeTruthy();
       expect(wrapper.vm.editingTabId).toBe(null);
+    });
+
+    it("describes the rename as old to new in the conflict dialog on a 409", async () => {
+      mockEditTab.mockRejectedValueOnce({ response: { status: 409 } });
+      wrapper = createWrapper();
+
+      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      await flushPromises();
+      wrapper.vm.editingName = "Renamed Tab";
+      await wrapper.vm.commitRename({ tabId: "tab1", name: "First Tab" });
+
+      // t() is mocked as identity, so the change carries the i18n key.
+      expect(mockOpenConflict.mock.calls.at(-1)![0].change).toBe(
+        "dashboard.saveConflict.change.renamedTab",
+      );
+      expect(wrapper.emitted("refresh")).toBeFalsy();
     });
 
     it("should not call editTab when the name is unchanged", async () => {

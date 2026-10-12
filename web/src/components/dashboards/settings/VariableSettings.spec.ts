@@ -50,11 +50,17 @@ vi.mock("../../../utils/zincutils", () => ({
 const mockNotifications = {
   showPositiveNotification: vi.fn(),
   showErrorNotification: vi.fn(),
-  showConfictErrorNotificationWithRefreshBtn: vi.fn(),
 };
 
 vi.mock("@/composables/useNotifications", () => ({
   default: vi.fn(() => mockNotifications),
+}));
+const mockOpenConflict = vi.fn();
+vi.mock("@/composables/dashboard/useDashboardSaveConflict", () => ({
+  useDashboardSaveConflict: () => ({
+    isConflict: (error: any) => error?.response?.status === 409,
+    openConflict: mockOpenConflict,
+  }),
 }));
 
 vi.mock("../../../utils/commons", () => ({
@@ -156,7 +162,7 @@ describe("VariableSettings", () => {
     // Reset notification mocks
     mockNotifications.showPositiveNotification.mockClear();
     mockNotifications.showErrorNotification.mockClear();
-    mockNotifications.showConfictErrorNotificationWithRefreshBtn.mockClear();
+    mockOpenConflict.mockClear();
 
     mockGetDashboard = vi.fn().mockResolvedValue(mockDashboardData);
     mockDeleteVariable = vi.fn().mockResolvedValue({});
@@ -416,9 +422,11 @@ describe("VariableSettings", () => {
 
       await vm.deleteVariableFn();
 
-      expect(mockNotifications.showConfictErrorNotificationWithRefreshBtn).toHaveBeenCalledWith(
-        "Conflict error",
-        expect.any(Function),
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dashboardId: "test-dashboard",
+          onResolved: expect.any(Function),
+        }),
       );
       // No positive notification should be called when error occurs
       expect(mockNotifications.showPositiveNotification).not.toHaveBeenCalled();
@@ -493,10 +501,10 @@ describe("VariableSettings", () => {
 
       await vm.handleDragEnd();
 
-      expect(mockNotifications.showConfictErrorNotificationWithRefreshBtn).toHaveBeenCalledWith(
-        "Reorder conflict",
-        expect.any(Function),
+      expect(mockOpenConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ mine: vm.dashboardVariableData.data }),
       );
+      expect(mockNotifications.showErrorNotification).not.toHaveBeenCalled();
     });
 
     it("should handle drag end error with non-409 status", async () => {

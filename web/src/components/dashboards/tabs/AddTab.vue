@@ -53,6 +53,7 @@ import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -96,11 +97,8 @@ export default defineComponent({
     const store: any = useStore();
     const addTabForm: any = ref(null);
     const addTabSchema = makeAddTabSchema(t);
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
 
     // The tab record being edited. This is EXTERNAL data fetched from the
     // store/API (it carries the non-form fields tabId/panels) — NOT a mirror of
@@ -176,15 +174,18 @@ export default defineComponent({
           showPositiveNotification(t("dashboard.addTab.tabAddedSuccessfully"));
         }
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              (props.editMode
-                ? t("dashboard.addTab.failedToUpdateTab")
-                : t("dashboard.addTab.failedToAddTab")),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: props.dashboardId,
+            folderId: (props.folderId ?? route.query.folder ?? "default") as string,
+            change: props.editMode
+              ? t("dashboard.saveConflict.change.renamedTab", {
+                  from: editingTab.value?.name ?? "",
+                  to: value.name,
+                })
+              : t("dashboard.saveConflict.change.addedTab", { name: value.name }),
+            onResolved: () => emit("update:open", false),
+          });
         } else {
           showErrorNotification(
             error?.message ??
