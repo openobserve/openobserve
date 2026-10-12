@@ -540,7 +540,12 @@ fn create_count_array(
 fn parse_i64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, DataFusionError> {
     let parsed_values = field_values
         .iter()
-        .map(|v| v.as_deref().map(str::parse::<i64>).transpose())
+        // Indexes built before NULL preservation store NULL as an empty string.
+        .map(|v| match v.as_deref() {
+            None => Ok(None),
+            Some("") => Ok(Some(0i64)),
+            Some(v) => v.parse::<i64>().map(Some),
+        })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse i64 in topn: {e}")))?;
 
@@ -550,7 +555,11 @@ fn parse_i64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, Da
 fn parse_u64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, DataFusionError> {
     let parsed_values = field_values
         .iter()
-        .map(|v| v.as_deref().map(str::parse::<u64>).transpose())
+        .map(|v| match v.as_deref() {
+            None => Ok(None),
+            Some("") => Ok(Some(0u64)),
+            Some(v) => v.parse::<u64>().map(Some),
+        })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse u64 in topn: {e}")))?;
 
@@ -560,7 +569,11 @@ fn parse_u64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, Da
 fn parse_f64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, DataFusionError> {
     let parsed_values = field_values
         .iter()
-        .map(|v| v.as_deref().map(str::parse::<f64>).transpose())
+        .map(|v| match v.as_deref() {
+            None => Ok(None),
+            Some("") => Ok(Some(0.0f64)),
+            Some(v) => v.parse::<f64>().map(Some),
+        })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse f64 in topn: {e}")))?;
 
@@ -570,7 +583,11 @@ fn parse_f64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, Da
 fn parse_bool_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, DataFusionError> {
     let parsed_values = field_values
         .iter()
-        .map(|v| v.as_deref().map(str::parse::<bool>).transpose())
+        .map(|v| match v.as_deref() {
+            None => Ok(None),
+            Some("") => Ok(Some(false)),
+            Some(v) => v.parse::<bool>().map(Some),
+        })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse bool in topn: {e}")))?;
 
@@ -710,14 +727,18 @@ mod tests {
             assert!(!array.is_null(1));
             assert_eq!(array.null_count(), 1);
         }
-        for data_type in [
-            DataType::Int64,
-            DataType::UInt64,
-            DataType::Float64,
-            DataType::Boolean,
+        for (data_type, expected) in [
+            (
+                DataType::Int64,
+                Arc::new(Int64Array::from(vec![0])) as Arc<dyn Array>,
+            ),
+            (DataType::UInt64, Arc::new(UInt64Array::from(vec![0]))),
+            (DataType::Float64, Arc::new(Float64Array::from(vec![0.0]))),
+            (DataType::Boolean, Arc::new(BooleanArray::from(vec![false]))),
         ] {
             let field = Field::new("breakdown", data_type, true);
-            assert!(create_field_array(&field, vec![Some("".into())]).is_err());
+            let array = create_field_array(&field, vec![Some("".into())]).unwrap();
+            assert_eq!(&array, &expected);
         }
     }
 
