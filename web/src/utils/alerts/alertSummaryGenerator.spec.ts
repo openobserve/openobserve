@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import i18n from "@/locales";
+import config from "@/aws-exports";
 
 import { buildForecastAlertPromql } from "./forecastAlert";
 import { generateAlertSummary } from "./alertSummaryGenerator";
@@ -114,6 +115,14 @@ describe("generateAlertSummary: Compare-with-Past windows", () => {
 
 describe("generateAlertSummary: where it sends", () => {
   const nobody = t("alerts.summary.notifiesNobody");
+  // Workflows and on-call teams only count where they run: enterprise and cloud builds.
+  const isEnterprise = config.isEnterprise;
+  beforeEach(() => {
+    config.isEnterprise = "true";
+  });
+  afterEach(() => {
+    config.isEnterprise = isEnterprise;
+  });
 
   it("says an alert with nowhere to send notifies nobody", () => {
     expect(summary(forecastForm())).toContain(nobody);

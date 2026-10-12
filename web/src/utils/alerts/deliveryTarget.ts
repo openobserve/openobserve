@@ -13,14 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import config from "@/aws-exports";
+
+/** Where an alert sends; an absent or null list and a blank on-call team count as none. */
 export interface DeliveryTargets {
   destinations?: readonly string[] | null;
   workflows?: readonly string[] | null;
   oncall_team?: string | null;
 }
 
-/** Whether an alert names somewhere to send; mirrors the backend's `has_delivery_target`. */
+/** Whether an alert names a destination, or (enterprise) a workflow or on-call team, to notify. */
 export const hasDeliveryTarget = (alert: DeliveryTargets): boolean =>
   (alert.destinations?.length ?? 0) > 0 ||
-  (alert.workflows?.length ?? 0) > 0 ||
-  !!alert.oncall_team?.trim();
+  ((config.isEnterprise === "true" || config.isCloud === "true") &&
+    ((alert.workflows?.length ?? 0) > 0 || !!alert.oncall_team?.trim()));

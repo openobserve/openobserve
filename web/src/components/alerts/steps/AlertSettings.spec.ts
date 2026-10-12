@@ -189,8 +189,15 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     ["an on-call team is set", "sre", false],
     ["the on-call team is blank", "  ", true],
   ])("shows the notifies-nobody note only when needed: %s", (_case, team, shown) => {
-    const host = mountDescendant("true", {}, { oncall_team: team });
-    expect(host.find('[data-test="alert-settings-destinations-note"]').exists()).toBe(shown);
+    // On-call teams only page in enterprise and cloud builds.
+    const isEnterprise = config.isEnterprise;
+    config.isEnterprise = "true";
+    try {
+      const host = mountDescendant("true", {}, { oncall_team: team });
+      expect(host.find('[data-test="alert-settings-destinations-note"]').exists()).toBe(shown);
+    } finally {
+      config.isEnterprise = isEnterprise;
+    }
   });
 
   it("passes submit when valid — string number input coerces via the schema", async () => {
