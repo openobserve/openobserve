@@ -111,9 +111,12 @@ export function contrastRatio(a: string, b: string): number {
 
 /** White or near-black text, whichever contrasts more with the background. */
 export function textColorFor(background: string): string {
-  return contrastRatio(background, LIGHT_TEXT) >= contrastRatio(background, DARK_TEXT)
-    ? LIGHT_TEXT
-    : DARK_TEXT;
+  const best =
+    contrastRatio(background, LIGHT_TEXT) >= contrastRatio(background, DARK_TEXT)
+      ? LIGHT_TEXT
+      : DARK_TEXT;
+  // On mid-tones (luminance about 0.15-0.26) neither reaches AA's 4.5, but pure black always does.
+  return contrastRatio(background, best) >= 4.5 ? best : "#000000";
 }
 
 /** The authored background for a mode, or undefined to fall back to the variant's fill. */

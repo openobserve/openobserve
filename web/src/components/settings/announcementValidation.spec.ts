@@ -42,6 +42,17 @@ describe("validateBanner", () => {
     expect(issuesFor(draft({ message: "Heads up" }))).toEqual([]);
   });
 
+  it("rejects a message link that is not http(s), as the API does", () => {
+    expect(issuesFor(draft({ message: "[x](javascript:alert(1))" }))).toEqual(["message"]);
+    expect(issuesFor(draft({ message: "<mailto:a@b.c>" }))).toEqual(["message"]);
+    expect(issuesFor(draft({ message: "[docs](https://x.dev) and <https://y.dev>" }))).toEqual([]);
+  });
+
+  it("counts an emoji as one character, as the API does", () => {
+    expect(issuesFor(draft({ message: "🚨".repeat(300) }))).toEqual([]);
+    expect(issuesFor(draft({ message: "🚨".repeat(301) }))).toEqual(["message"]);
+  });
+
   it("requires a message", () => {
     expect(issuesFor(draft({ message: "   " }))).toContain("message");
   });

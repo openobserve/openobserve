@@ -50,13 +50,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("announcements.list.liveNow") }}
         </div>
         <div class="announcement-list-live" data-test="announcement-banners-preview">
-          <AnnouncementBannerStrip
-            v-for="(banner, position) in liveBanners"
-            :key="position"
-            :banner="banner"
-            :mode="themeMode"
-            preview
-          />
+          <template v-for="(banner, position) in liveBanners" :key="position">
+            <div
+              v-if="banner.orgs.length"
+              class="announcement-list-live-audience"
+              data-test="announcement-list-live-audience"
+            >
+              {{ t("announcements.list.liveOnlyFor", { orgs: banner.orgs.join(", ") }) }}
+            </div>
+            <AnnouncementBannerStrip :banner="banner" :mode="themeMode" preview />
+          </template>
           <div
             v-if="!liveBanners.length"
             class="announcement-list-live-empty"
@@ -371,8 +374,11 @@ const rows = computed<ListRow[]>(() =>
 const liveBanners = computed(() =>
   orderBanners(
     entries.value
-      .filter(({ draft }) => isShowingNow(draft, nowMs.value))
-      .map(({ draft }) => previewFromDraft(draft)),
+      .filter(
+        ({ index, draft }) =>
+          isShowingNow(draft, nowMs.value) && statuses.value.get(index) !== "hidden",
+      )
+      .map(({ draft }) => ({ ...previewFromDraft(draft), orgs: draft.orgs })),
   ),
 );
 
@@ -509,6 +515,12 @@ defineExpose({ rows, liveBanners, confirmDelete, pendingDelete, reload: load });
   border: 1px solid var(--o2-border-color, rgba(128, 128, 128, 0.3));
   border-radius: 0.375rem;
   overflow: hidden;
+}
+
+.announcement-list-live-audience {
+  padding: 0.25rem 1rem;
+  font-size: 0.75rem;
+  opacity: 0.7;
 }
 
 .announcement-list-live-empty {

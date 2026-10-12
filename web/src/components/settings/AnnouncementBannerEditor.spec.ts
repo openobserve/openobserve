@@ -444,6 +444,26 @@ describe("AnnouncementBannerEditor", () => {
     });
   });
 
+  it("keeps a critical banner critical when it is restyled", async () => {
+    getConfig.mockResolvedValue({ data: structuredClone(STYLED) });
+    const wrapper = await mountEditor();
+    (wrapper.vm as any).chooseStyle("critical");
+    (wrapper.vm as any).chooseStyle("custom");
+    expect((wrapper.vm as any).form.variant).toBe("critical");
+
+    (wrapper.vm as any).chooseStyle("style:style-1");
+    expect((wrapper.vm as any).form.variant).toBe("critical");
+  });
+
+  it("makes a custom banner critical from its switch", async () => {
+    const wrapper = await mountEditor();
+    (wrapper.vm as any).chooseStyle("custom");
+    await flushPromises();
+    await wrapper.find('[data-test="announcement-editor-style-critical"]').trigger("click");
+
+    expect((wrapper.vm as any).form).toMatchObject({ variant: "critical", dismissible: false });
+  });
+
   it("shows the look controls only for a custom style", async () => {
     const wrapper = await mountEditor();
     const look = '[data-test="announcement-editor-custom-look"]';

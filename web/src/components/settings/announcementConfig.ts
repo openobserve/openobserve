@@ -52,10 +52,17 @@ function withBanners(source: unknown, banners: unknown[]): AnnouncementConfig {
   return { ...base, banners };
 }
 
+// A span with no explicit start is anchored to whenever the server last read it, so it is treated as open-ended.
+function endMs(draft: BannerDraft, start: number | null): number | null {
+  if (draft.end === "at") return instantMs(draft.endsAt);
+  const span = draft.end === "after" ? parseDurationMs(draft.duration) : null;
+  return span != null && start != null ? start + span : null;
+}
+
 /** Where a banner stands against the clock, from its authored schedule. */
 export function bannerStatus(draft: BannerDraft, nowMs: number): BannerStatus {
   const start = draft.start === "at" ? instantMs(draft.startsAt) : null;
-  const end = draft.end === "at" ? instantMs(draft.endsAt) : null;
+  const end = endMs(draft, start);
   if (start == null && draft.end === "never") return "always";
 
   if (start != null && nowMs < start) return "scheduled";
@@ -136,10 +143,25 @@ export function saveIntent(draft: BannerDraft, nowMs: number): SaveIntent {
   return status === "ended" ? "save" : "publish";
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Whether `stored` is `original` with its `duration` pinned to an `ends_at`, as every save does. */
+function isPinnedFrom(stored: unknown, original: unknown): boolean {
+  if (!isRecord(stored) || !isRecord(original)) return false;
+  if (typeof original.duration !== "string" || "duration" in stored) return false;
+  if (typeof stored.ends_at !== "string") return false;
+
+  const { duration: _duration, ...authored } = original;
+  const { ends_at: _endsAt, ...pinned } = stored;
+  return isEqual(pinned, authored);
+}
+
 /** True when the latest config still holds `original` at `index`, so a write cannot clobber someone else's edit. */
 export function isUnchangedAt(latest: unknown, index: number, original: unknown): boolean {
   const banners = rawBanners(latest);
-  return index < banners.length && isEqual(banners[index], original);
+  if (index >= banners.length) return false;
+  return isEqual(banners[index], original) || isPinnedFrom(banners[index], original);
 }
 
 /** The config with `draft` stored at `index`, or appended when `index` is null; others pass through untouched. */
@@ -149,12 +171,12 @@ export function upsertBanner(
   draft: BannerDraft,
 ): AnnouncementConfig {
   const banners = [...rawBanners(source)];
-  const authored = authoredFromDraft(draft);
 
   if (index == null || index < 0 || index >= banners.length) {
-    banners.push(authored);
+    banners.push(authoredFromDraft(draft));
   } else {
-    banners[index] = authored;
+    const stored = banners[index];
+    banners[index] = authoredFromDraft(draft, isRecord(stored) ? stored : {});
   }
 
   return withBanners(source, banners);
@@ -180,9 +202,15 @@ export function addStyle(source: unknown, style: BannerStyle): AnnouncementConfi
   };
 }
 
+/** The config without saved style `id`, and without the label that pointed banners at it. */
 export function removeStyle(source: unknown, id: string): AnnouncementConfig {
+  const banners = rawBanners(source).map((banner) => {
+    if (!isRecord(banner) || banner.style !== id) return banner;
+    const { style: _style, ...rest } = banner;
+    return rest;
+  });
   return {
-    ...withBanners(source, rawBanners(source)),
+    ...withBanners(source, banners),
     styles: rawStyles(source).filter((style) => (style as { id?: unknown })?.id !== id),
   };
 }

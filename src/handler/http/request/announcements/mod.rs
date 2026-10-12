@@ -72,12 +72,21 @@ mod storage {
 
     /// The authored JSON, for the editor. Absent when nothing has been saved yet.
     pub async fn read_source() -> Result<Option<serde_json::Value>, infra::errors::Error> {
-        Ok(read_raw().await?.and_then(|v| {
-            v.get(SOURCE_FIELD)
-                .cloned()
-                // A value written before the envelope existed (or seeded directly
-                // into the table) is itself the source.
-                .or(Some(v))
+        let Some(raw) = read_raw().await? else {
+            return Ok(None);
+        };
+        // A value written before the envelope existed (or seeded directly into the table) is itself
+        // the source.
+        let Some(source) = raw.get(SOURCE_FIELD) else {
+            return Ok(Some(raw));
+        };
+        // Envelopes saved before durations were pinned still hold one; show the end it resolved to.
+        let resolved = raw
+            .get(RESOLVED_FIELD)
+            .and_then(|r| serde_json::from_value::<AnnouncementBanners>(r.clone()).ok());
+        Ok(Some(match resolved {
+            Some(resolved) => announcements::pin_durations(source, &resolved),
+            None => source.clone(),
         }))
     }
 

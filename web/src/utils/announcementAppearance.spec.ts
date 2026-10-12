@@ -46,8 +46,16 @@ describe("textColorFor", () => {
     expect(textColorFor("#FEF3C7")).toBe(DARK_TEXT);
   });
 
-  it("picks whichever of the two contrasts more", () => {
-    for (const background of ["#2563EB", "#3B82F6", "#E2E8F0", "#808080"]) {
+  it("keeps AA contrast on every grey, including the mid-tones", () => {
+    for (let v = 0; v < 256; v += 1) {
+      const hex = `#${v.toString(16).padStart(2, "0").repeat(3)}`;
+      expect(contrastRatio(hex, textColorFor(hex))).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(textColorFor("#7B7B7B")).toBe("#000000");
+  });
+
+  it("picks whichever of the two contrasts more when it reaches AA", () => {
+    for (const background of ["#2563EB", "#3B82F6", "#E2E8F0"]) {
       const chosen = textColorFor(background);
       const other = chosen === LIGHT_TEXT ? DARK_TEXT : LIGHT_TEXT;
       expect(contrastRatio(background, chosen)).toBeGreaterThanOrEqual(

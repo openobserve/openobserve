@@ -174,6 +174,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="announcement-editor-hint" data-test="announcement-editor-variant-help">
             {{ styleHelp }}
           </span>
+          <div v-if="isLookOnly" class="announcement-editor-critical">
+            <q-toggle
+              :model-value="form.variant === 'critical'"
+              class="announcement-editor-switch"
+              :label="t('announcements.editor.styleCritical')"
+              data-test="announcement-editor-style-critical"
+              @update:model-value="(on: boolean) => setVariant(on ? 'critical' : 'info')"
+            />
+            <span class="announcement-editor-hint">
+              {{ t("announcements.editor.styleCriticalHelp") }}
+            </span>
+          </div>
           <div
             v-if="styleChoice === CUSTOM_STYLE"
             class="announcement-editor-custom-look"
@@ -679,18 +691,18 @@ const setVariant = (variant: BannerVariantName) => {
   form.variant = variant;
 };
 
+const isLookOnly = computed(() => styleChoice.value === CUSTOM_STYLE || !!selectedStyle.value);
+
+// Custom and saved styles change only the look; severity still drives ordering, screen readers and promo hiding.
 const chooseStyle = (choice: string) => {
   styleChoice.value = choice;
   if (choice === CUSTOM_STYLE) {
-    // Starts from whatever is showing, so switching to Custom never makes the banner jump.
     form.styleId = "";
-    setVariant("info");
     return;
   }
 
   const style = styles.value.find((s) => `${STYLE_CHOICE_PREFIX}${s.id}` === choice);
   if (style) {
-    setVariant("info");
     Object.assign(form, {
       icon: style.icon,
       textSize: style.textSize,

@@ -78,7 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="{ 'announcement-message-count--over': isLong }"
         data-test="announcement-editor-message-count"
       >
-        {{ t("announcements.editor.messageCount", { count: modelValue.length, max: SOFT_LIMIT }) }}
+        {{
+          t("announcements.editor.messageCount", {
+            count: messageChars(modelValue),
+            max: MESSAGE_MAX,
+          })
+        }}
       </span>
     </div>
     <div
@@ -102,11 +107,11 @@ import {
   type MarkdownFormat,
 } from "@/utils/announcementMarkdown";
 
+import { MESSAGE_MAX, messageChars } from "./announcementValidation";
+
 const props = defineProps<{ modelValue: string; error?: string }>();
 
 const emit = defineEmits<{ (_e: "update:modelValue", _value: string): void }>();
-
-const SOFT_LIMIT = 300;
 
 const FORMAT_ACTIONS: { format: MarkdownFormat; icon: string }[] = [
   { format: "bold", icon: "format_bold" },
@@ -121,7 +126,7 @@ const { t } = useI18n();
 
 const inputRef = ref<{ getNativeElement: () => HTMLTextAreaElement } | null>(null);
 
-const isLong = computed(() => props.modelValue.length > SOFT_LIMIT);
+const isLong = computed(() => messageChars(props.modelValue) > MESSAGE_MAX);
 
 const selection = () => {
   const native = inputRef.value?.getNativeElement();

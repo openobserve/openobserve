@@ -50,6 +50,16 @@ describe("bannerStatus", () => {
     expect(bannerStatus(draft({ end: "after", duration: "1h" }), NOW)).toBe("live");
   });
 
+  it("ends a span counted from an explicit start", () => {
+    const from = (duration: string) =>
+      bannerStatus(
+        draft({ start: "at", startsAt: "2026-08-12T10:00", end: "after", duration }),
+        NOW,
+      );
+    expect(from("1h")).toBe("ended");
+    expect(from("4h")).toBe("live");
+  });
+
   it("places a window against the clock", () => {
     const window = (startsAt: string, endsAt: string) =>
       bannerStatus(
@@ -123,6 +133,21 @@ describe("upsertBanner", () => {
     upsertBanner(stored, 0, draft({ message: "x" }));
 
     expect(stored.banners[0]).toEqual({ message: "first", duration: "1h" });
+  });
+});
+
+describe("upsertBanner keeps unknown keys", () => {
+  it("carries banner fields the editor does not edit", () => {
+    const source = {
+      banners: [{ message: "a", future: { x: 1 }, cta: { text: "Go", url: "https://x.dev" } }],
+    };
+    const edited = { ...emptyDraft(), message: "b", links: [{ text: "Go", url: "https://x.dev" }] };
+
+    expect(upsertBanner(source, 0, edited).banners[0]).toEqual({
+      message: "b",
+      future: { x: 1 },
+      ctas: [{ text: "Go", url: "https://x.dev" }],
+    });
   });
 });
 
@@ -246,6 +271,12 @@ describe("isUnchangedAt", () => {
     expect(isUnchangedAt(latest, 0, { message: "a", orgs: ["x"] })).toBe(true);
   });
 
+  it("treats a duration the server pinned to ends_at as unchanged", () => {
+    const pinned = { banners: [{ message: "a", ends_at: "2026-08-12T16:00:00+00:00" }] };
+    expect(isUnchangedAt(pinned, 0, { message: "a", duration: "4h" })).toBe(true);
+    expect(isUnchangedAt(pinned, 0, { message: "edited", duration: "4h" })).toBe(false);
+  });
+
   it("rejects an entry that changed or no longer exists", () => {
     expect(isUnchangedAt(latest, 1, { message: "b", variant: "warning" })).toBe(false);
     expect(isUnchangedAt(latest, 2, { message: "c" })).toBe(false);
@@ -270,6 +301,29 @@ describe("isHiddenByCritical", () => {
     expect(isHiddenByCritical(promo(["a"]), [critical(["a", "b"])], NOW_MS)).toBe(true);
     expect(isHiddenByCritical(promo(["a", "c"]), [critical(["a"])], NOW_MS)).toBe(false);
     expect(isHiddenByCritical(promo([]), [critical(["a"])], NOW_MS)).toBe(false);
+  });
+});
+
+describe("removeStyle", () => {
+  it("drops the label from banners that pointed at the deleted style", () => {
+    const source = {
+      banners: [
+        { message: "a", style: "s1", icon: "build" },
+        { message: "b", style: "s2" },
+      ],
+      styles: [
+        { id: "s1", name: "One" },
+        { id: "s2", name: "Two" },
+      ],
+    };
+
+    expect(removeStyle(source, "s1")).toEqual({
+      banners: [
+        { message: "a", icon: "build" },
+        { message: "b", style: "s2" },
+      ],
+      styles: [{ id: "s2", name: "Two" }],
+    });
   });
 });
 

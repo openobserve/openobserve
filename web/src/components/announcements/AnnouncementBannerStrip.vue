@@ -168,11 +168,12 @@ const icon = computed(() => {
 }
 
 .announcement-bar--text-small {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
+// Medium is the bar's size from before sizes existed, so existing banners look unchanged.
 .announcement-bar--text-medium {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .announcement-bar--text-large {

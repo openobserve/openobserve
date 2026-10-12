@@ -28,6 +28,22 @@ import { parseDurationMs, type BannerDraft } from "./announcementDrafts";
 
 export const CTA_TEXT_MAX = 30;
 
+export const MESSAGE_MAX = 300;
+
+/** Counted in code points, as the API counts them, so an emoji is one character and not two. */
+export const messageChars = (value: string) => Array.from(value).length;
+
+const isHttpUrl = (value: string) => /^https?:\/\//i.test(value.trim());
+
+// Mirrors the API's link check: `[text](target)` and `<scheme:target>` autolinks.
+const MESSAGE_LINK_TARGET = /\]\(\s*<?([^)\s>]*)|<([A-Za-z][A-Za-z0-9+.-]*:[^>\s]*)>/g;
+
+/** Whether every link written into the message points at an http(s) address. */
+export const messageLinksSafe = (message: string) =>
+  Array.from(message.matchAll(MESSAGE_LINK_TARGET)).every((match) =>
+    isHttpUrl(match[1] ?? match[2]),
+  );
+
 export interface LinkErrors {
   text?: string;
   url?: string;
@@ -68,8 +84,7 @@ function validateLinks(draft: BannerDraft, t: Translate): LinkErrors[] | undefin
     else if (link.text.trim().length > CTA_TEXT_MAX) {
       found.text = t("announcements.editor.ctaTextTooLong", { max: CTA_TEXT_MAX });
     }
-    const url = link.url.trim();
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    if (!isHttpUrl(link.url)) {
       found.url = t("announcements.editor.ctaUrlInvalid");
     }
     return found;
@@ -80,8 +95,13 @@ function validateLinks(draft: BannerDraft, t: Translate): LinkErrors[] | undefin
 export function validateBanner(draft: BannerDraft, t: Translate): BannerErrors {
   const errors: BannerErrors = {};
 
-  if (!draft.message.trim()) {
+  const message = draft.message.trim();
+  if (!message) {
     errors.message = t("announcements.editor.messageRequired");
+  } else if (messageChars(message) > MESSAGE_MAX) {
+    errors.message = t("announcements.editor.messageTooLong", { max: MESSAGE_MAX });
+  } else if (!messageLinksSafe(message)) {
+    errors.message = t("announcements.editor.messageLinkInvalid");
   }
 
   validateSchedule(draft, t, errors);

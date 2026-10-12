@@ -166,8 +166,8 @@ const iconOptions = computed(() => [
     icon: materialIconName(name),
     value: name,
     attrs: {
-      "aria-label": name,
-      title: name,
+      "aria-label": t(`announcements.editor.icons.${name}`),
+      title: t(`announcements.editor.icons.${name}`),
       "data-test": `announcement-editor-icon-${name}`,
     },
   })),

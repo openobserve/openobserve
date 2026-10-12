@@ -939,8 +939,9 @@
       "title": "Announcement banners",
       "subtitle": "Notices shown at the top of the app for every organization, or only the ones you pick.",
       "addBanner": "Add banner",
-      "liveNow": "Live right now (all targeted organizations)",
+      "liveNow": "Live right now",
       "liveNowEmpty": "No banner is showing right now.",
+      "liveOnlyFor": "Only for {orgs}",
       "allBanners": "All banners",
       "loading": "Loading banners…",
       "loadFailed": "Could not load the announcement banners",
@@ -998,6 +999,8 @@
       "messagePlaceholder": "Scheduled maintenance Sat 02:00-04:00 UTC. Search may be unavailable.",
       "messageHelp": "Supports **bold**, _italic_, `code` and links.",
       "messageRequired": "Enter the message people will see.",
+      "messageTooLong": "Keep the message to {max} characters or fewer.",
+      "messageLinkInvalid": "Links in the message must start with http:// or https://.",
       "messageCount": "{count} / {max}",
       "messageLong": "Keep it under 300 characters.",
       "bold": "Bold",
@@ -1102,8 +1105,22 @@
       "hintPublish": "when you publish",
       "hintRemoved": "you remove it",
       "customStyle": "Custom",
-      "customStyleHelp": "Pick your own icon, text size and colours. Shown in the same place as Info banners.",
-      "savedStyleHelp": "A saved custom style. Pick Custom to change its look for this banner."
+      "customStyleHelp": "Pick your own icon, text size and colours.",
+      "styleCritical": "Treat as critical",
+      "styleCriticalHelp": "Shown above other banners, announced to screen readers, and hides promotions while live.",
+      "savedStyleHelp": "A saved custom style. Pick Custom to change its look for this banner.",
+      "icons": {
+        "info": "Info",
+        "warning": "Warning",
+        "error": "Error",
+        "campaign": "Megaphone",
+        "build": "Maintenance",
+        "schedule": "Clock",
+        "rocket-launch": "Launch",
+        "lightbulb": "Tip",
+        "security": "Security",
+        "update": "Update"
+      }
     }
   },
   "ticket": {

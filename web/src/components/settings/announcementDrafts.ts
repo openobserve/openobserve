@@ -290,14 +290,38 @@ export function draftsFromConfig(parsed: unknown): BannerDraft[] {
   return indexedDraftsFromConfig(parsed).map((entry) => entry.draft);
 }
 
+/** Every banner key this editor writes; any other key on a stored banner is carried through untouched. */
+const EDITED_KEYS = new Set([
+  "message",
+  "id",
+  "variant",
+  "starts_at",
+  "ends_at",
+  "duration",
+  "dismissible",
+  "cta",
+  "ctas",
+  "orgs",
+  "text_size",
+  "colors",
+  "icon",
+  "style",
+]);
+
 /**
  * One draft as authored JSON.
  *
  * Defaults are omitted rather than written out, so the stored config stays the
  * short document a person would have written by hand.
  */
-export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
-  const banner: Record<string, unknown> = { message: draft.message.trim() };
+export function authoredFromDraft(
+  draft: BannerDraft,
+  stored: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const banner: Record<string, unknown> = Object.fromEntries(
+    Object.entries(stored).filter(([key]) => !EDITED_KEYS.has(key)),
+  );
+  banner.message = draft.message.trim();
 
   if (draft.id.trim()) banner.id = draft.id.trim();
   if (draft.variant !== "info") banner.variant = draft.variant;
