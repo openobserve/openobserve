@@ -463,7 +463,7 @@ fn create_top_n_arrow_array(
 
 fn create_distinct_arrow_array(
     schema: &SchemaRef,
-    distinct_values: HashSet<Option<String>>,
+    distinct_values: HashSet<String>,
 ) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
     // Validate inputs
     if schema.fields().len() != 1 {
@@ -477,7 +477,8 @@ fn create_distinct_arrow_array(
     let field_field = &schema.fields()[0];
 
     // Create field value array with proper type based on schema
-    let field_array = create_field_array(field_field, distinct_values.into_iter().collect())?;
+    let field_array =
+        create_field_array(field_field, distinct_values.into_iter().map(Some).collect())?;
 
     Ok(vec![field_array])
 }
@@ -1195,13 +1196,9 @@ mod tests {
             DataType::Utf8,
             false,
         )]));
-        let distinct_values = vec![
-            Some("a".to_string()),
-            Some("b".to_string()),
-            Some("c".to_string()),
-        ]
-        .into_iter()
-        .collect();
+        let distinct_values = vec!["a".to_string(), "b".to_string(), "c".to_string()]
+            .into_iter()
+            .collect();
         let result = create_distinct_arrow_array(&schema, distinct_values).unwrap();
 
         assert_eq!(result.len(), 1);
@@ -1216,7 +1213,7 @@ mod tests {
             Field::new("field", DataType::Utf8, false),
             Field::new("count", DataType::Int64, false),
         ]));
-        let distinct_values = vec![Some("a".to_string())].into_iter().collect();
+        let distinct_values = vec!["a".to_string()].into_iter().collect();
         let result = create_distinct_arrow_array(&schema, distinct_values);
         assert!(result.is_err());
     }

@@ -37,7 +37,7 @@ pub enum CacheEntry {
     Histogram(Vec<u64>),                             // simple histogram optimization
     MultiHistogram(Vec<(i64, Option<String>, u64)>), // multi histogram optimization
     TopN(Vec<(Vec<Option<String>>, u64)>),           // group by top n optimization (1..=4 fields)
-    Distinct(HashSet<Option<String>>),               // simple distinct optimization
+    Distinct(HashSet<String>),                       // simple distinct optimization
 }
 
 impl From<CacheEntry> for TantivyResult {
@@ -105,14 +105,8 @@ impl CacheEntry {
                     + std::mem::size_of::<Vec<(Vec<Option<String>>, u64)>>()
             }
             CacheEntry::Distinct(distinct) => {
-                distinct
-                    .iter()
-                    .map(|s| {
-                        std::mem::size_of::<Option<String>>()
-                            + s.as_ref().map_or(0, String::capacity)
-                    })
-                    .sum::<usize>()
-                    + std::mem::size_of::<HashSet<Option<String>>>()
+                distinct.iter().map(|s| s.capacity()).sum::<usize>()
+                    + std::mem::size_of::<HashSet<String>>()
             }
         }
     }
@@ -233,9 +227,9 @@ mod tests {
 
     fn create_test_distinct_result() -> CacheEntry {
         let mut distinct = HashSet::new();
-        distinct.insert(Some("value1".to_string()));
-        distinct.insert(Some("value2".to_string()));
-        distinct.insert(Some("value3".to_string()));
+        distinct.insert("value1".to_string());
+        distinct.insert("value2".to_string());
+        distinct.insert("value3".to_string());
         CacheEntry::Distinct(distinct)
     }
 
@@ -447,9 +441,9 @@ mod tests {
 
         if let Some(TantivyResult::Distinct(distinct)) = cache.get("distinct_key") {
             assert_eq!(distinct.len(), 3);
-            assert!(distinct.contains(&Some("value1".to_string())));
-            assert!(distinct.contains(&Some("value2".to_string())));
-            assert!(distinct.contains(&Some("value3".to_string())));
+            assert!(distinct.contains("value1"));
+            assert!(distinct.contains("value2"));
+            assert!(distinct.contains("value3"));
         } else {
             panic!("Expected Distinct result");
         }

@@ -108,9 +108,6 @@ impl WarmPlan {
                     "SimpleDistinct files must be fully covered by the query time range"
                 );
                 *self = Self::default();
-                if query.downcast_ref::<tantivy::query::AllQuery>().is_some() {
-                    self.fast_fields.insert(field.clone());
-                }
                 if let Ok(field) = schema.get_field(field) {
                     self.dictionary_field = Some(field);
                 }
@@ -316,32 +313,26 @@ mod tests {
     }
 
     #[test]
-    fn simple_distinct_warms_fast_field_for_null_detection() {
-        let (plan, _) = build_plan(
-            Condition::All(),
-            Some(IndexOptimizeMode::SimpleDistinct("tag".into(), 1, true)),
-            true,
-            false,
-        );
-        assert_eq!(plan.fast_fields, HashSet::from(["tag".to_string()]));
-    }
-
-    #[test]
     fn simple_distinct_is_dictionary_only() {
-        let (plan, schema) = build_plan(
+        for condition in [
+            Condition::All(),
             Condition::StrMatch("tag".into(), "needle".into(), true),
-            Some(IndexOptimizeMode::SimpleDistinct("tag".into(), 10, true)),
-            true,
-            false,
-        );
-        assert_eq!(
-            plan.dictionary_field,
-            Some(schema.get_field("tag").unwrap())
-        );
-        assert!(plan.exact_postings.is_empty());
-        assert!(plan.exact_term_info.is_none());
-        assert!(plan.full_posting_fields.is_empty());
-        assert!(plan.fast_fields.is_empty());
+        ] {
+            let (plan, schema) = build_plan(
+                condition,
+                Some(IndexOptimizeMode::SimpleDistinct("tag".into(), 10, true)),
+                true,
+                false,
+            );
+            assert_eq!(
+                plan.dictionary_field,
+                Some(schema.get_field("tag").unwrap())
+            );
+            assert!(plan.exact_postings.is_empty());
+            assert!(plan.exact_term_info.is_none());
+            assert!(plan.full_posting_fields.is_empty());
+            assert!(plan.fast_fields.is_empty());
+        }
     }
 
     #[test]

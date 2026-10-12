@@ -31,7 +31,7 @@ pub enum TantivyMultiResultBuilder {
     Histogram(Vec<Vec<u64>>),
     MultiHistogram(Vec<Vec<(i64, Option<String>, u64)>>),
     TopN(Vec<(Vec<Option<String>>, u64)>),
-    Distinct(HashSet<Option<String>>),
+    Distinct(HashSet<String>),
 }
 
 impl TantivyMultiResultBuilder {
@@ -116,7 +116,7 @@ impl TantivyMultiResultBuilder {
     }
 
     // simple distinct
-    pub fn add_distinct(&mut self, distinct: HashSet<Option<String>>) {
+    pub fn add_distinct(&mut self, distinct: HashSet<String>) {
         match self {
             Self::Distinct(a) => a.extend(distinct),
             _ => unreachable!("unsupported tantivy multi result"),
@@ -184,7 +184,7 @@ pub enum TantivyMultiResult {
     Histogram(Vec<u64>),
     MultiHistogram(Vec<(i64, Option<String>, u64)>),
     TopN(Vec<(Vec<Option<String>>, u64)>),
-    Distinct(HashSet<Option<String>>),
+    Distinct(HashSet<String>),
 }
 
 impl Display for TantivyMultiResult {
@@ -234,7 +234,7 @@ impl TantivyMultiResult {
         }
     }
 
-    pub fn distinct(self) -> HashSet<Option<String>> {
+    pub fn distinct(self) -> HashSet<String> {
         match self {
             Self::Distinct(a) => a,
             _ => HashSet::new(),
@@ -392,12 +392,12 @@ mod tests {
         let mut builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
 
         let mut distinct1 = HashSet::new();
-        distinct1.insert(Some("value1".to_string()));
-        distinct1.insert(Some("value2".to_string()));
+        distinct1.insert("value1".to_string());
+        distinct1.insert("value2".to_string());
 
         let mut distinct2 = HashSet::new();
-        distinct2.insert(Some("value2".to_string())); // Duplicate
-        distinct2.insert(Some("value3".to_string()));
+        distinct2.insert("value2".to_string());
+        distinct2.insert("value3".to_string());
 
         builder.add_distinct(distinct1);
         builder.add_distinct(distinct2);
@@ -405,9 +405,9 @@ mod tests {
         match &builder {
             TantivyMultiResultBuilder::Distinct(results) => {
                 assert_eq!(results.len(), 3); // Should deduplicate
-                assert!(results.contains(&Some("value1".to_string())));
-                assert!(results.contains(&Some("value2".to_string())));
-                assert!(results.contains(&Some("value3".to_string())));
+                assert!(results.contains("value1"));
+                assert!(results.contains("value2"));
+                assert!(results.contains("value3"));
             }
             _ => panic!("Expected Distinct variant"),
         }
@@ -481,13 +481,13 @@ mod tests {
         // Test Distinct build
         let mut builder = TantivyMultiResultBuilder::Distinct(HashSet::new());
         let mut distinct = HashSet::new();
-        distinct.insert(Some("value1".to_string()));
+        distinct.insert("value1".to_string());
         builder.add_distinct(distinct);
         let result = builder.build("test", &mut HashMap::new());
         match result {
             TantivyMultiResult::Distinct(dist) => {
                 assert_eq!(dist.len(), 1);
-                assert!(dist.contains(&Some("value1".to_string())));
+                assert!(dist.contains("value1"));
             }
             _ => panic!("Expected Distinct result"),
         }
@@ -512,7 +512,7 @@ mod tests {
         assert_eq!(result.num_rows(), 0);
 
         let mut distinct = HashSet::new();
-        distinct.insert(Some("value".to_string()));
+        distinct.insert("value".to_string());
         let result = TantivyMultiResult::Distinct(distinct);
         assert_eq!(result.num_rows(), 0);
     }
@@ -554,8 +554,8 @@ mod tests {
     #[test]
     fn test_tantivy_multi_result_distinct() {
         let mut distinct_data = HashSet::new();
-        distinct_data.insert(Some("value1".to_string()));
-        distinct_data.insert(Some("value2".to_string()));
+        distinct_data.insert("value1".to_string());
+        distinct_data.insert("value2".to_string());
         let result = TantivyMultiResult::Distinct(distinct_data.clone());
 
         let extracted = result.distinct();
@@ -594,9 +594,9 @@ mod tests {
 
         // Test Distinct display
         let mut distinct = HashSet::new();
-        distinct.insert(Some("val1".to_string()));
-        distinct.insert(Some("val2".to_string()));
-        distinct.insert(Some("val3".to_string()));
+        distinct.insert("val1".to_string());
+        distinct.insert("val2".to_string());
+        distinct.insert("val3".to_string());
         let result = TantivyMultiResult::Distinct(distinct);
         assert_eq!(format!("{result}"), "distinct hits: 3");
     }

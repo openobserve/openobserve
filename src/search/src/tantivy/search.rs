@@ -55,7 +55,7 @@ pub enum TantivyResult {
     Histogram(Vec<u64>), // simple histogram optimization
     MultiHistogram(Vec<(i64, Option<String>, u64)>),
     TopN(Vec<(Vec<Option<String>>, u64)>), // group by top n optimization (1..=4 fields)
-    Distinct(HashSet<Option<String>>),     // simple distinct optimization
+    Distinct(HashSet<String>),             // simple distinct optimization
 }
 
 impl TantivyResult {
@@ -112,14 +112,8 @@ impl TantivyResult {
                     + std::mem::size_of::<Vec<(Vec<Option<String>>, u64)>>()
             }
             Self::Distinct(distinct) => {
-                distinct
-                    .iter()
-                    .map(|s| {
-                        std::mem::size_of::<Option<String>>()
-                            + s.as_ref().map_or(0, String::capacity)
-                    })
-                    .sum::<usize>()
-                    + std::mem::size_of::<HashSet<Option<String>>>()
+                distinct.iter().map(|s| s.capacity()).sum::<usize>()
+                    + std::mem::size_of::<HashSet<String>>()
             }
         }
     }
@@ -320,6 +314,10 @@ impl TantivyResult {
                     if ascend && distinct_values.len() >= limit {
                         break;
                     }
+                    // Legacy indexes encode NULL as an empty string.
+                    if term.is_empty() {
+                        continue;
+                    }
                     distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
                 }
             }
@@ -331,6 +329,10 @@ impl TantivyResult {
                     if ascend && distinct_values.len() >= limit {
                         break;
                     }
+                    // Legacy indexes encode NULL as an empty string.
+                    if term.is_empty() {
+                        continue;
+                    }
                     distinct_values.push(String::from_utf8(term.to_vec()).unwrap());
                 }
             }
@@ -339,32 +341,7 @@ impl TantivyResult {
             distinct_values.reverse();
             distinct_values.truncate(limit);
         }
-        let mut values: HashSet<Option<String>> = distinct_values.into_iter().map(Some).collect();
-        if index_condition.get_str_match_condition().is_none() {
-            let field_name = searcher.schema().get_field_name(field);
-            for segment in searcher.segment_readers() {
-                let column = segment.fast_fields().str(field_name)?;
-                let has_null =
-                    column
-                        .as_ref()
-                        .is_none_or(|col| match col.ords().get_cardinality() {
-                            tantivy::columnar::Cardinality::Full => false,
-                            tantivy::columnar::Cardinality::Optional => true,
-                            // Index fields get at most one raw value per document.
-                            tantivy::columnar::Cardinality::Multivalued => {
-                                unreachable!(
-                                    "index field {field_name} has a multivalued fast field"
-                                )
-                            }
-                        });
-                if has_null && segment.num_docs() > 0 {
-                    // The final DataFusion sort applies NULLS FIRST/LAST and LIMIT.
-                    values.insert(None);
-                    break;
-                }
-            }
-        }
-        Ok(Self::Distinct(values))
+        Ok(Self::Distinct(distinct_values.into_iter().collect()))
     }
 }
 
@@ -433,12 +410,11 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_simple_distinct_preserves_null_and_empty() {
+    fn test_handle_simple_distinct_skips_null_and_empty() {
         use crate::index::{Condition, IndexCondition};
 
         let mut schema_builder = tantivy::schema::SchemaBuilder::new();
-        let svc_field =
-            schema_builder.add_text_field("svc", tantivy::schema::STRING | tantivy::schema::FAST);
+        let svc_field = schema_builder.add_text_field("svc", tantivy::schema::STRING);
         let index = tantivy::index::Index::create_in_ram(schema_builder.build());
         let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
         for svc in ["", "ziox", "", "ingress-nginx"] {
@@ -458,12 +434,7 @@ mod tests {
             TantivyResult::Distinct(values) => {
                 assert_eq!(
                     values,
-                    HashSet::from([
-                        None,
-                        Some("".to_string()),
-                        Some("ingress-nginx".to_string()),
-                        Some("ziox".to_string())
-                    ])
+                    HashSet::from(["ingress-nginx".to_string(), "ziox".to_string()])
                 );
             }
             other => panic!("expected Distinct, got {other:?}"),
@@ -558,16 +529,16 @@ mod tests {
     #[test]
     fn test_tantivy_result_get_memory_size_distinct() {
         let mut distinct = HashSet::new();
-        distinct.insert(Some("value1".to_string()));
-        distinct.insert(Some("value2".to_string()));
-        distinct.insert(Some("value3".to_string()));
+        distinct.insert("value1".to_string());
+        distinct.insert("value2".to_string());
+        distinct.insert("value3".to_string());
 
         let result = TantivyResult::Distinct(distinct);
         let memory_size = result.get_memory_size();
 
         // Should include HashSet overhead + string capacities
         assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<HashSet<Option<String>>>());
+        assert!(memory_size >= std::mem::size_of::<HashSet<String>>());
     }
 
     #[test]
@@ -594,6 +565,6 @@ mod tests {
 
         let result = TantivyResult::Distinct(HashSet::new());
         let memory_size = result.get_memory_size();
-        assert_eq!(memory_size, std::mem::size_of::<HashSet<Option<String>>>());
+        assert_eq!(memory_size, std::mem::size_of::<HashSet<String>>());
     }
 }
