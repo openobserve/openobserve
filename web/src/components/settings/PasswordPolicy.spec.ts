@@ -199,6 +199,29 @@ describe("PasswordPolicy rows", () => {
   });
 });
 
+describe("PasswordPolicy maximum length", () => {
+  const errorFor = async (value: string) => {
+    const wrapper = await mountWith({ min_length: 15 });
+    await row(wrapper, "max-length").find("input").setValue(value);
+    // Quasar debounces rule validation by a timer tick.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await flushPromises();
+    return row(wrapper, "max-length").text();
+  };
+
+  it.each(["0", "14", "129"])("rejects %s", async (value) => {
+    expect(await errorFor(value)).toContain(
+      t("passwordPolicy.maxLengthTooSmall"),
+    );
+  });
+
+  it.each(["15", "128"])("accepts %s", async (value) => {
+    expect(await errorFor(value)).not.toContain(
+      t("passwordPolicy.maxLengthTooSmall"),
+    );
+  });
+});
+
 describe("PasswordPolicy sticky header and footer", () => {
   const body = (wrapper: VueWrapper) =>
     wrapper.find('[data-test="settings-password-policy-body"]');

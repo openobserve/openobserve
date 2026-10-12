@@ -282,6 +282,9 @@ interface GridSection {
 
 const DAY_MS = 86_400_000;
 
+/** The server rejects a longer `max_length`; matches `MAX_PASSWORD_LEN` in the Rust config. */
+const MAX_PASSWORD_LENGTH = 128;
+
 /** The server's default policy, shown until the real one loads. */
 const INITIAL_POLICY: PasswordPolicy = {
   ...DEFAULT_COMPLEXITY,
@@ -398,10 +401,9 @@ const sections = computed<Section[]>(() => [
         description: t("passwordPolicy.maxLengthDesc"),
         kind: "number",
         rules: [
-          // 0 is "unbounded", anything else must leave room for the minimum.
           (v) =>
-            num(v) === 0 ||
-            num(v) >= num(form.value.min_length) ||
+            (num(v) >= num(form.value.min_length) &&
+              num(v) <= MAX_PASSWORD_LENGTH) ||
             t("passwordPolicy.maxLengthTooSmall"),
         ],
       },
