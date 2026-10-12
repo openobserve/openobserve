@@ -342,7 +342,7 @@ import AutoObserveAnalysis from "./AutoObserveAnalysis.vue";
 import ProblemSpark from "./v2/ProblemSpark.vue";
 import { overridesFor, problemsFor } from "./v2/fixtures";
 import { useDecisions } from "./v2/useDecisions";
-import { PROBLEMS } from "./data/facts";
+import { PROBLEMS, type Scenario } from "./data/facts";
 import { useScenario } from "./data/useScenario";
 import {
   CONFIDENCE_LABEL,
@@ -356,6 +356,7 @@ const props = defineProps<{
   open: boolean;
   issue: Issue | null;
   ledger: LedgerEntry[];
+  scenario?: Scenario;
 }>();
 
 const emit = defineEmits<{
@@ -383,7 +384,8 @@ const seeEvidence = async () => {
   analysisRef.value?.scrollToTrail();
 };
 
-const { scenario } = useScenario();
+const { scenario: sharedScenario } = useScenario();
+const scenario = computed(() => props.scenario ?? sharedScenario.value);
 const decisions = useDecisions();
 // Built exactly like the Standard row, so a fix approved in either view redraws this chart too.
 const problem = computed(() => {

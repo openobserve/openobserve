@@ -27,23 +27,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <div class="flex items-center gap-2">
           <ViewSwitch />
-          <OTag variant="purple-soft" size="sm" :label="t('autoobserve.demo')" />
-          <OToggleGroup
-            mobile-dropdown
-            :model-value="scenario"
-            data-test="autoobserve-scenario"
-            @update:model-value="(v) => setScenario(v as Scenario)"
-          >
-            <OToggleGroupItem
-              v-for="s in SCENARIOS"
-              :key="s"
-              :value="s"
-              size="sm"
-              :data-test="`autoobserve-scenario-${s}`"
-            >
-              {{ t(SCENARIO_LABEL[s]) }}
-            </OToggleGroupItem>
-          </OToggleGroup>
         </div>
       </template>
 
@@ -93,7 +76,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <AutoObserveActivityTab
         v-else-if="tab === 'activity'"
-        :key="scenario"
         :ledger="ledger"
         @update-entry="updateEntry"
         @open-incident="openIncident"
@@ -105,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="drawerOpen"
       :issue="selectedIssue"
       :ledger="ledger"
+      :scenario="scenario"
       @update-entry="updateEntry"
     />
   </div>
@@ -119,8 +102,6 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
 import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverageTab.vue";
 import AutoObserveActivityTab from "@/components/autoobserve/AutoObserveActivityTab.vue";
@@ -128,17 +109,16 @@ import AutoObservePolicyTab from "@/components/autoobserve/AutoObservePolicyTab.
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import ViewSwitch from "@/components/autoobserve/v2/ViewSwitch.vue";
 import { issuesFor, type Issue, type Scenario } from "@/components/autoobserve/fixtures";
-import { SCENARIOS, problemsIn } from "@/components/autoobserve/data/facts";
-import { useScenario } from "@/components/autoobserve/data/useScenario";
+import { problemsIn } from "@/components/autoobserve/data/facts";
 import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
-import { SCENARIO_LABEL } from "@/components/autoobserve/v2/fixtures";
 
 const NERD_TABS = ["issues", "coverage", "activity", "policy"] as const;
 type NerdTab = (typeof NERD_TABS)[number];
 
 const { t } = useI18nTyped();
 
-const { scenario, setScenario: setSharedScenario } = useScenario();
+// Nerd ignores the shared ?scenario= param; only Standard switches scenario.
+const scenario = computed<Scenario>(() => "demo");
 const route = useRoute();
 const router = useRouter();
 const linkedTab = route.query.tab;
@@ -152,11 +132,6 @@ const openIssues = computed(() =>
   issues.value.filter((i) => i.status !== "resolved" && !i.deferred),
 );
 const awaitingCount = computed(() => ledger.value.filter((e) => e.status === "awaiting").length);
-
-const setScenario = (next: Scenario) => {
-  void setSharedScenario(next);
-  drawerOpen.value = false;
-};
 
 const openIssue = (issue: Issue) => {
   selectedIssue.value = issue;

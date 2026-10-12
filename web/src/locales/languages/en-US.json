@@ -21925,7 +21925,6 @@
   "autoobserve": {
     "title": "AutoObserve",
     "subtitle": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
-    "demo": "Demo",
     "phase2": "Phase 2",
     "tabs": {
       "issues": "Issues",
