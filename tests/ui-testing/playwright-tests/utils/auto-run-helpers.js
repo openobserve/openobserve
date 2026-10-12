@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Shared helpers for the Logs Auto Run specs (item 2): request classification, fixtures, stats.
-const { getAuthHeaders } = require('./cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
 const MINUTE_US = 60 * 1_000_000;
 
@@ -96,7 +96,11 @@ function estimateMb(entry, windowUs, retentionDays = 0) {
   return rate * covered;
 }
 
-async function readConfig(request, org) {
+// The /config payload is server-wide, so it is read from an org that already
+// exists. A spec's own fresh org is only created by its first ingest, and
+// /api/<unknown-org>/config answers 404 - which would fail beforeAll before it
+// could reach its own test.skip().
+async function readConfig(request, org = getOrgIdentifier() || 'default') {
   const response = await request.get(`${process.env.ZO_BASE_URL}/api/${org}/config`, {
     headers: getAuthHeaders(),
   });

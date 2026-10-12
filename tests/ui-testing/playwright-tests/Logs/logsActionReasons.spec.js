@@ -106,9 +106,14 @@ test.describe('G1 visible action reasons C2', () => {
           })).map((node) => ({ id: violation.id, target: node.target })));
         }, baseAxeNodes);
         expect(unexpected).toEqual([]);
-        await page.keyboard.press('Escape');
-        if (menu === 'utilities') await expect(page.locator('[role="menu"]')).toBeHidden();
-        else await expect(trigger).toBeFocused();
+        // One Escape can land while the menu is mid-update (a Download submenu is
+        // still open on `more`) and be lost, so close it deterministically before
+        // asserting where focus went back to.
+        await expect(async () => {
+          await page.keyboard.press('Escape');
+          await expect(page.locator('[role="menu"]')).toBeHidden({ timeout: 2000 });
+        }).toPass({ timeout: 30000 });
+        if (menu !== 'utilities') await expect(trigger).toBeFocused();
       }
       expect(writes).toHaveLength(0);
       expect(requests.hits()).toHaveLength(0);

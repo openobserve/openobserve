@@ -33,7 +33,7 @@ test.describe('Logs shipped defaults: auto-run with the cost guard', () => {
   let config;
 
   test.beforeAll(async ({ request }) => {
-    config = await readConfig(request, ORG);
+    config = await readConfig(request);
     test.skip(!Number.isFinite(Number(config.auto_query_max_scan_mb)), 'The backend phase adds auto_query_max_scan_mb.');
     const now = Date.now() * 1000;
     const rows = Array.from({ length: 200 }, (_, i) => ({

@@ -66,7 +66,7 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('Logs Auto Run cost guard', () => {
   test.beforeAll(async ({ request }) => {
-    const config = await readConfig(request, ORG);
+    const config = await readConfig(request);
     test.skip(!Number.isFinite(Number(config.auto_query_max_scan_mb)), 'The backend phase adds auto_query_max_scan_mb.');
     const now = Date.now() * 1000;
     const filler = 'x'.repeat(1800);
