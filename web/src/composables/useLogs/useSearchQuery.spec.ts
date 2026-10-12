@@ -1212,6 +1212,11 @@ describe("useSearchQuery › free text (item 1)", () => {
     settings: {},
   });
 
+  const withStatus = (stream: any) => {
+    stream.schema.push({ name: "status", type: "Int64" }, { name: "is_error", type: "Boolean" });
+    return stream;
+  };
+
   const select = (...streams: any[]) => {
     mockState.searchObj.data.stream.selectedStream = streams.map((s) => s.name);
     (mockState.searchObj.data as any).streamResults = { list: streams };
@@ -1258,7 +1263,12 @@ describe("useSearchQuery › free text (item 1)", () => {
     ["NOT -404", "match_all('404')"],
     ["level='error' -404", "level = 'error' AND NOT match_all('404')"],
     ["status=500 -debug", "status = 500 AND NOT match_all('debug')"],
-    ["status=500 --404", "status = 500 --404"],
+    ["status=500 --404", "status = 500"],
+    ["status=500 -- note", "status = 500"],
+    ["status=500 -404", "status = 500 AND NOT match_all('404')"],
+    ["x = 5 -10", "x = 5 AND NOT match_all('10')"],
+    ["x = 5 -1", "x = 5 -1"],
+    ["error --404 status=500", "match_all('error')"],
     ["status=500\n--retry", "status = 500"],
     ["level='error'\n--debug", "level = 'error'"],
   ])("produces the exact request for %s without changing the query", (raw, where) => {
@@ -1269,25 +1279,66 @@ describe("useSearchQuery › free text (item 1)", () => {
     expect(mockState.searchObj.data.query).toBe(raw);
   });
 
-  it.each([
-    ["status=500 -404", false],
-    ["x = 5 -10", false],
-    ["status=500 -404 AND is_error", false],
-    ["status=500 -404", true],
-  ])("holds %s: no request, a query error that offers Run as (multi: %s)", (raw, multi) => {
-    select(...(multi ? [ftsStream("fts_a"), ftsStream("fts_b")] : [ftsStream("fts_a")]));
-    mockState.searchObj.data.query = raw;
+  it.each([false, true])(
+    "keeps every stream of a multi-stream request when the filter ends in a comment: %s",
+    (lineComment) => {
+      select(withStatus(ftsStream("fts_a")), withStatus(ftsStream("fts_b")));
+      mockState.searchObj.data.query = lineComment ? "status=500 -- note" : "status=500 --404";
+      const { getQueryReq } = useSearchQuery(gt);
+      expect(getSql(getQueryReq(false))).toBe(
+        `select *, 'fts_a' as _stream_name from "fts_a"  WHERE status = 500 UNION ALL BY NAME ` +
+          `select *, 'fts_b' as _stream_name from "fts_b"  WHERE status = 500 ORDER BY _timestamp DESC`,
+      );
+    },
+  );
+
+  it("sends a -term after a predicate as an exclusion on every stream", () => {
+    select(withStatus(ftsStream("fts_a")), withStatus(ftsStream("fts_b")));
+    mockState.searchObj.data.query = "status=500 -404";
     const { getQueryReq } = useSearchQuery(gt);
-    expect(getQueryReq(false)).toBeNull();
-    expect((mockState.searchObj.data as any).errorMsg).toBe("Search query is empty or invalid.");
-    expect((mockState.searchObj.data as any).errorCode).toBe(20001);
-    expect((mockState.searchObj.data as any).freeTextBlocked).toBeNull();
-    expect(mockState.searchObj.data.query).toBe(raw);
+    expect(getSql(getQueryReq(false))).toBe(
+      `select *, 'fts_a' as _stream_name from "fts_a"  WHERE status = 500 AND NOT match_all('404') ` +
+        `UNION ALL BY NAME select *, 'fts_b' as _stream_name from "fts_b"  ` +
+        `WHERE status = 500 AND NOT match_all('404') ORDER BY _timestamp DESC`,
+    );
   });
 
-  it("holds a filter in a read-only build without touching the error state", () => {
-    select(ftsStream("fts_a"));
+  it("blocks a -term after a predicate on a no-FTS stream instead of subtracting", () => {
+    select(noFtsStream("nofts_b"));
     mockState.searchObj.data.query = "status=500 -404";
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getQueryReq(false)).toBeNull();
+    expect((mockState.searchObj.data as any).freeTextBlocked?.streams).toEqual(["nofts_b"]);
+    expect(mockState.searchObj.data.query).toBe("status=500 -404");
+  });
+
+  it("sends a single-stream SQL-mode statement with a trailing comment as typed", () => {
+    select(ftsStream("fts_a"));
+    mockState.searchObj.meta.sqlMode = true;
+    mockState.searchObj.data.query = `SELECT * FROM "fts_a" WHERE status=500 --404`;
+    const { getQueryReq } = useSearchQuery(gt);
+    expect(getSql(getQueryReq(false))).toBe(`SELECT * FROM "fts_a" WHERE status=500 --404`);
+  });
+
+  it.each([false, true])(
+    "holds a -term mix it cannot build: no request, a query error that offers Run as (multi: %s)",
+    (multi) => {
+      const raw = "status=500 -404 AND is_error";
+      const streams = multi ? [ftsStream("fts_a"), ftsStream("fts_b")] : [ftsStream("fts_a")];
+      select(...streams.map(withStatus));
+      mockState.searchObj.data.query = raw;
+      const { getQueryReq } = useSearchQuery(gt);
+      expect(getQueryReq(false)).toBeNull();
+      expect((mockState.searchObj.data as any).errorMsg).toBe("Search query is empty or invalid.");
+      expect((mockState.searchObj.data as any).errorCode).toBe(20001);
+      expect((mockState.searchObj.data as any).freeTextBlocked).toBeNull();
+      expect(mockState.searchObj.data.query).toBe(raw);
+    },
+  );
+
+  it("holds a filter in a read-only build without touching the error state", () => {
+    select(withStatus(ftsStream("fts_a")));
+    mockState.searchObj.data.query = "status=500 -404 AND is_error";
     const { buildSearch } = useSearchQuery(gt);
     expect(buildSearch(true)).toBeNull();
     expect(mockState.notificationMsg.value).toBe("");

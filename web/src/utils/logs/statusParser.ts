@@ -728,7 +728,7 @@ function tier1Level(field: string, value: unknown): KnownLogSeverityLevel | null
   const n = integerOf(value);
   if (n === null) return typeof value === "string" ? stringLevel(value) : null;
   if (SYSLOG_SEVERITY_FIELDS.has(field)) return syslogLevel(n, true);
-  // Syslog shippers put 1-7 in severity; OTEL SeverityNumber starts its debug band at 8.
+  // OTEL trace/debug (1-8) overlaps syslog 1-7; syslog shippers fill severity, so 1-7 is syslog.
   if (field === "severity") return n <= 7 ? syslogLevel(n, false) : otelBandLevel(n);
   if (field === "level") return PINO_LEVELS[n] ?? syslogLevel(n, false);
   return syslogLevel(n, false);

@@ -133,6 +133,7 @@ test.describe('Logs Auto Run cost guard', () => {
       'data-locked',
       'true',
     );
+    await settlePageWork(page);
     expect(searches.hits()).toHaveLength(1);
   });
 
@@ -166,6 +167,7 @@ test.describe('Logs Auto Run cost guard', () => {
     testLogger.info('Widening to 2 days is a new scope: the banner shows');
     await pickRelative(page, 2, 'd');
     await expect(page.locator(banner)).toBeVisible({ timeout: 15000 });
+    await settlePageWork(page);
     expect(searches.hits().length).toBe(beforeFacet + 1);
   });
 

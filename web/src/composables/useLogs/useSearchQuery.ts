@@ -34,6 +34,7 @@ import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
+import { stripSqlComments } from "@/utils/query/sqlComments";
 import { raw, type TranslateFn } from "@/types/i18n";
 import {
   STREAM_NAME_FIELD,
@@ -244,6 +245,11 @@ function isHeldPlan(plan: FilterPlan): boolean {
   return plan.kind === "unclassified" && plan.held === true;
 }
 
+// Arms are joined on one line, where a -- comment would swallow every later arm and the ORDER BY.
+function commentFree(where: string): string {
+  return stripSqlComments(where).trim();
+}
+
 function resolveStreamFilter(raw: string, stream: string, ctx: FilterResolveContext): StreamFilter {
   const filter = raw.trim();
   const plan = planStreamsFilter(filter, [stream], ctx);
@@ -252,10 +258,11 @@ function resolveStreamFilter(raw: string, stream: string, ctx: FilterResolveCont
   }
   if (isHeldPlan(plan)) throw new HeldFilterError();
   if (plan.kind !== "freeText") {
-    const where = renderPlan(plan, BLOCKED_TARGET, ctx.knownFields) ?? "";
+    const where = commentFree(renderPlan(plan, BLOCKED_TARGET, ctx.knownFields) ?? "");
     return { where, blocked: false, sqlNodesOnly: where, plan };
   }
-  const where = renderPlan(plan, ctx.targets[stream] ?? BLOCKED_TARGET, ctx.knownFields);
+  const rendered = renderPlan(plan, ctx.targets[stream] ?? BLOCKED_TARGET, ctx.knownFields);
+  const where = rendered === null ? null : commentFree(rendered);
   return { where, blocked: where === null, sqlNodesOnly: "", plan };
 }
 
@@ -284,12 +291,12 @@ export function resolveFiltersForStreams(
     for (const stream of streams) {
       const where = renderPlan(plan, ctx.targets[stream] ?? BLOCKED_TARGET, ctx.knownFields);
       if (where === null) result.excluded.push({ stream, reason: "no_fts" });
-      else result.perStream.set(stream, where);
+      else result.perStream.set(stream, commentFree(where));
     }
     return result;
   }
 
-  const where = renderPlan(plan, BLOCKED_TARGET, ctx.knownFields) ?? "";
+  const where = commentFree(renderPlan(plan, BLOCKED_TARGET, ctx.knownFields) ?? "");
   if (where.trim() === "" || !fields) {
     streams.forEach((stream) => result.perStream.set(stream, where));
     return result;

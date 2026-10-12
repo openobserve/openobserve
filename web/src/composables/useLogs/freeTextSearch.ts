@@ -207,8 +207,10 @@ export function freeTextWhereByStream(
   if (searchObj.meta.sqlMode) return null;
   const ctx = buildFilterContext(searchObj, zoConfig);
   const streams = searchObj.data.stream.selectedStream ?? [];
-  const plan = planStreamsFilter((searchObj.data.query ?? "").trim(), streams, ctx);
-  if (plan.kind !== "freeText") return null;
+  const raw = (searchObj.data.query ?? "").trim();
+  const plan = planStreamsFilter(raw, streams, ctx);
+  // Only an unrewritten SQL plan may take the raw values path; a rewritten one would run as typed.
+  if (plan.kind === "unclassified" || (plan.kind === "sql" && plan.filter === raw)) return null;
   return new Map(
     streams.map((stream) => [
       stream,

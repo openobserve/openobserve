@@ -204,7 +204,6 @@ interface Lexed {
   tok: Token;
   start: number;
   end: number;
-  readsAsSubtraction?: true;
 }
 
 interface SuggestionTally {
@@ -936,14 +935,12 @@ function planMix(
   options: PlanFilterOptions,
 ): FilterPlan {
   const allFts = options.allTargetsFts ?? (options.targetMode ?? "fts") === "fts";
-  const implicitAnds = tokens.filter(isImplicitAnd);
-  if (implicitAnds.length === 0) {
+  if (!tokens.some(isImplicitAnd)) {
     const root = allFts ? mixRoot(tokens, raw, rule) : null;
     return { kind: "sql", filter: root === null ? raw : renderNode(root) };
   }
-  // A -term after a predicate is never sent as subtraction nor guessed at; the user picks Run as.
-  const ambiguous = implicitAnds.some((lexed) => lexed.readsAsSubtraction);
-  const root = ambiguous ? null : mixRoot(tokens, raw, rule);
+  const root = mixRoot(tokens, raw, rule);
+  // The raw text reads the -term as subtraction, so the search waits for Run as instead.
   if (root === null) return { kind: "unclassified", filter: raw, held: true };
   if (allFts) return { kind: "sql", filter: renderNode(root) };
   return { kind: "freeText", root, units: collectUnits(root) };
@@ -989,17 +986,7 @@ function splitTrailingExclusions(out: Lexed[], start: number, raw: string, rule:
   const left = out.slice(start, k);
   if (left.every(isOperandToken) || whereShape(sliceOf(left, raw)) !== "predicate") return;
   const at = out[k].start;
-  const and: Lexed = { tok: { t: "kw", text: "AND" }, start: at, end: at };
-  if (readsAsSubtraction(left, out[k], raw, rule)) and.readsAsSubtraction = true;
-  out.splice(k, 0, and);
-}
-
-// A numeric -term after an operand that subtraction accepts is as likely arithmetic as an exclusion.
-function readsAsSubtraction(left: Lexed[], term: Lexed, raw: string, rule: TermRule): boolean {
-  const value = exclusionOf(term.tok, rule);
-  if (value === null || !NUMERIC_LITERAL.test(value)) return false;
-  if (left[left.length - 1].tok.t === "squote") return false;
-  return whereShape(raw.slice(left[0].start, term.end)) === "predicate";
+  out.splice(k, 0, { tok: { t: "kw", text: "AND" }, start: at, end: at });
 }
 
 function isTrailingExclusion(lexed: Lexed, prev: Lexed, rule: TermRule): boolean {

@@ -1262,16 +1262,37 @@ describe("freeTextFilter", () => {
       ["status=500 -404 -403", "status=500 AND NOT match_all('404') AND NOT match_all('403')"],
       ["(status=500 -404) OR error", "(status=500 AND NOT match_all('404')) OR match_all('error')"],
     ])(
-      "holds a numeric -term that may be subtraction and suggests the exclusion: %s",
-      (raw, run) => {
-        expect(planFilter(raw, FIELDS)).toEqual(held(raw));
-        expect(planFilter(raw, FIELDS, NO_FTS)).toEqual(held(raw));
+      "reads a numeric -term after a predicate as an exclusion, never subtraction: %s",
+      (raw, sql) => {
+        expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter: sql });
+        const noFts = planFilter(raw, FIELDS, NO_FTS);
+        expect(noFts.kind).toBe("freeText");
+        expect(renderPlan(noFts, BLOCKED, KNOWN)).toBeNull();
         expect(suggestRecovery(raw, FIELDS, true)).toEqual({
-          runSuggestion: run,
+          runSuggestion: sql,
           freeTextCandidate: null,
         });
       },
     );
+
+    it("pins the accepted cost: x = 5 -10 excludes 10, x = 5 -1 stays arithmetic", () => {
+      expect(planFilter("x = 5 -10", FIELDS)).toEqual({
+        kind: "sql",
+        filter: "x = 5 AND NOT match_all('10')",
+      });
+      expect(planFilter("x = 5 -1", FIELDS)).toEqual({ kind: "sql", filter: "x = 5 -1" });
+      expect(planFilter("x = 5 -1", FIELDS, NO_FTS)).toEqual({ kind: "sql", filter: "x = 5 -1" });
+    });
+
+    it("reads --404 after a predicate as a comment, as SQL does: error --404 status=500", () => {
+      const raw = "error --404 status=500";
+      expect(planFilter(raw, FIELDS)).toEqual({
+        kind: "freeText",
+        root: { k: "text", value: "error" },
+        units: ["error"],
+      });
+      expect(renderFts(raw)).toBe("match_all('error')");
+    });
 
     it.each([
       ["status=500 -404 AND is_error", "status=500 AND NOT match_all('404') AND is_error"],

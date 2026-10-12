@@ -670,6 +670,7 @@ import {
 } from "@/utils/query/sqlUtils";
 import { buildColumnIdentifierAst, quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { replaceSelectFieldList } from "@/utils/query/quickModeFieldList";
+import { hasLineComment } from "@/utils/query/sqlComments";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -1838,7 +1839,10 @@ export default defineComponent({
             streams.forEach((stream: string, index: number) => {
               // BY NAME merges differing columns; ALL keeps events duplicated across streams.
               if (index > 0) {
-                searchObj.data.query += " UNION ALL BY NAME ";
+                // A -- comment runs to the end of the line, so the next arm must start a new one.
+                searchObj.data.query += hasLineComment(searchObj.data.query)
+                  ? "\nUNION ALL BY NAME "
+                  : " UNION ALL BY NAME ";
               }
               const armWhere = textWhere ? `WHERE ${textWhere[index]}` : whereClause;
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${armWhere}`;

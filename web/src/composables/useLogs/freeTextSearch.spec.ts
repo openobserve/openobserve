@@ -181,7 +181,7 @@ describe("recoveryCardsFor and searchTextReplacement (J5)", () => {
     });
   });
 
-  it("offers Run as for a held -term, judged by the configured token limits", () => {
+  it("suggests the exclusion the plan runs for a -term, judged by the configured token limits", () => {
     const app = fts("app", [{ name: "status", type: "Int64" }]);
     expect(recoveryCardsFor(makeSearchObj("status=500 -404", [app]), zoConfig)).toEqual({
       runSuggestion: "status=500 AND NOT match_all('404')",
@@ -234,6 +234,19 @@ describe("freeTextWhereByStream and filterForParsing", () => {
     expect([...(freeTextWhereByStream(obj, zoConfig) ?? new Map())]).toEqual([
       ["app", "match_all('timeout')"],
       ["raw", "FALSE"],
+    ]);
+  });
+
+  it("gives the values path the exclusion for a -term after a predicate, never subtraction", () => {
+    const app = fts("app", [{ name: "status", type: "Int64" }]);
+    const obj = makeSearchObj("status=500 -404", [app, noFts("raw")]);
+    expect([...(freeTextWhereByStream(obj, zoConfig) ?? new Map())]).toEqual([
+      ["app", "status=500 AND NOT match_all('404')"],
+      ["raw", "FALSE"],
+    ]);
+    const ftsOnly = makeSearchObj("status=500 -404", [app]);
+    expect([...(freeTextWhereByStream(ftsOnly, zoConfig) ?? new Map())]).toEqual([
+      ["app", "status = 500 AND NOT match_all('404')"],
     ]);
   });
 

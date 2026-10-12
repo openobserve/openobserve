@@ -34,6 +34,34 @@ export function stripCommentLines(raw: string): string {
   return kept.join("\n");
 }
 
+// A comment becomes one space, so the tokens on either side of it never join.
+export function stripSqlComments(raw: string): string {
+  let out = "";
+  let i = 0;
+  while (i < raw.length) {
+    const end = maskedSpanEnd(raw, i);
+    if (end === null) {
+      out += raw[i];
+      i++;
+    } else {
+      out += isCommentStart(raw, i) ? " " : raw.slice(i, end);
+      i = end;
+    }
+  }
+  return out;
+}
+
+export function hasLineComment(raw: string): boolean {
+  let i = 0;
+  while (i < raw.length) {
+    const end = maskedSpanEnd(raw, i);
+    if (end === null) i++;
+    else if (raw.startsWith("--", i)) return true;
+    else i = end;
+  }
+  return false;
+}
+
 export function maskedSpanEnd(raw: string, i: number): number | null {
   if (raw.startsWith("--", i)) {
     const newline = raw.indexOf("\n", i);
@@ -57,4 +85,8 @@ function quotedSpanEnd(raw: string, i: number): number {
     else return j + 1;
   }
   return raw.length;
+}
+
+function isCommentStart(raw: string, i: number): boolean {
+  return raw.startsWith("--", i) || raw.startsWith("/*", i);
 }

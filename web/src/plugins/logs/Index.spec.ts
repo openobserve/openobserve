@@ -497,6 +497,51 @@ describe("Logs Index", async () => {
       );
     });
 
+    it("SQL toggle writes a -term after a predicate as an exclusion, never subtraction", async () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.data.query = "status=500 -404";
+      await wrapper.vm.setQuery(true);
+      expect(wrapper.vm.searchObj.data.query).toBe(
+        `SELECT * FROM "fts_a" WHERE status = 500 AND NOT match_all('404')`,
+      );
+    });
+
+    it("SQL toggle is refused for a -term after a predicate on a no-FTS stream", async () => {
+      select(stream("nofts_b", false));
+      wrapper.vm.searchObj.meta.sqlMode = true;
+      wrapper.vm.searchObj.data.query = "status=500 -404";
+      await wrapper.vm.setQuery(true);
+      expect(wrapper.vm.searchObj.meta.sqlMode).toBe(false);
+      expect(wrapper.vm.searchObj.data.query).toBe("status=500 -404");
+      expect(wrapper.vm.searchObj.data.freeTextBlocked.streams).toEqual(["nofts_b"]);
+      wrapper.vm.searchObj.data.freeTextBlocked = null;
+    });
+
+    it.each(["status=500 --404", "status=500 -- note"])(
+      "SQL toggle keeps every stream when the filter ends in a comment: %s",
+      async (query) => {
+        select(stream("fts_a", true), stream("fts_d", true));
+        wrapper.vm.searchObj.data.query = query;
+        await wrapper.vm.setQuery(true);
+        const where = `WHERE status = 500 ${query.slice("status=500 ".length)}`;
+        expect(wrapper.vm.searchObj.data.query).toBe(
+          `SELECT * FROM "fts_a" ${where}\nUNION ALL BY NAME SELECT * FROM "fts_d" ${where}`,
+        );
+      },
+    );
+
+    it("Build gets a -term after a predicate as an exclusion, and no WHERE on a no-FTS stream", () => {
+      select(stream("fts_a", true));
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      wrapper.vm.searchObj.data.query = "status=500 -404";
+      expect(wrapper.vm.buildWhereForBuild).toEqual({
+        where: "status=500 AND NOT match_all('404')",
+        freeText: true,
+      });
+      select(stream("nofts_b", false));
+      expect(wrapper.vm.buildWhereForBuild).toEqual({ where: "", freeText: true });
+    });
+
     it("Build gets the rendered WHERE for a pure-text filter", () => {
       select(stream("fts_a", true));
       wrapper.vm.searchObj.meta.sqlMode = false;

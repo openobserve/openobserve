@@ -352,6 +352,33 @@ describe("usePatternActions", () => {
       }
     });
 
+    it("carries a -term after a predicate into the alert as an exclusion, never subtraction", () => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [
+          {
+            name: "test-stream",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [
+        { name: "body" },
+        { name: "status" },
+      ];
+      mockSearchObj.data.query = "status=500 -404";
+      try {
+        const sql = usePatternActions().buildPatternsAlertPrefill().sql;
+        expect(sql).toContain("(status=500 AND NOT match_all('404'))");
+        expect(sql).not.toContain("500 -404");
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+      }
+    });
+
     it("says so when a SQL-mode query cannot be spliced in", () => {
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.data.query = 'SELECT * FROM "test-stream"';
