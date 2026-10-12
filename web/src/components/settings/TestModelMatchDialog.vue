@@ -52,7 +52,6 @@
           </OText>
         </div>
 
-        <!-- Optional span attributes — lets service-tier / speed tiers be tested -->
         <div class="flex flex-col gap-1.5" data-test="test-match-attributes">
           <OText variant="label">{{ t("modelPricing.testAttributesLabel") }}</OText>
           <OText variant="meta">{{ t("modelPricing.testAttributesHint") }}</OText>
@@ -64,6 +63,7 @@
           >
             <OInput
               v-model="attr.key"
+              :label="t('modelPricing.testAttributeKey')"
               :placeholder="
                 t('modelPricing.ruleKeysPlaceholder', {
                   example: raw('openai.response.service_tier'),
@@ -74,6 +74,7 @@
             />
             <OInput
               v-model="attr.value"
+              :label="t('modelPricing.testAttributeValue')"
               :placeholder="t('modelPricing.ruleValuesPlaceholder', { example: raw('flex') })"
               size="sm"
               :data-test="`test-match-attribute-value-${aIdx}`"
@@ -82,10 +83,12 @@
               variant="ghost"
               size="icon-xs-sq"
               type="button"
+              :aria-label="t('modelPricing.testRemoveAttribute')"
               :data-test="`test-match-attribute-remove-${aIdx}`"
               @click="removeAttribute(aIdx)"
             >
               <OIcon name="close" size="xs" />
+              <OTooltip :side-offset="4" :content="t('modelPricing.testRemoveAttribute')" />
             </OButton>
           </div>
           <OButton
@@ -256,7 +259,7 @@
                     class="text-2xs mt-0.5 opacity-50"
                     data-test="test-match-tier-rule"
                   >
-                    <OCode>{{ formatTierRule(rule) }}</OCode>
+                    <OCode>{{ formatTierRule(rule, t) }}</OCode>
                   </div>
                   <div
                     class="text-2xs mt-0.5 opacity-50"
@@ -309,7 +312,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import modelPricingService from "@/services/model_pricing";
@@ -317,6 +320,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -352,8 +356,7 @@ const testModelName = ref("");
 // Optional `HH:MM` UTC time-of-day to test at; empty = "right now". Lets a
 // peak / off-peak tier be exercised without waiting for its window.
 const testAtTime = ref("");
-// Optional span attributes, so a tier restricted by attribute rules (OpenAI
-// service tier, Anthropic speed) can be exercised. Blank keys are not sent.
+// Blank keys are not sent, so a half-typed row never changes the result.
 const testAttributes = ref<Array<{ key: string; value: string }>>([]);
 
 function addAttribute() {
@@ -378,6 +381,7 @@ function attributesPayload(): Record<string, string> | undefined {
 watch(internalValue, (val) => {
   if (val) {
     testResult.value = null;
+    hasRun.value = false;
     testModelName.value = "";
     testAtTime.value = "";
     testAttributes.value = [];
@@ -387,6 +391,10 @@ watch(internalValue, (val) => {
 // ── Backend test API ──────────────────────────────────────────────────────────
 
 const testResult = ref<any>(null);
+// Kept apart from testResult so a failed call does not stop later automatic reruns.
+const hasRun = ref(false);
+let requestSeq = 0;
+let attributeTimer: ReturnType<typeof setTimeout> | undefined;
 
 // The instant the backend resolves `valid_from` and any recurring UTC window
 // (peak / off-peak rates) against: today at the chosen UTC time, or "right now"
@@ -407,6 +415,7 @@ function testTimestampMicros(): number {
 }
 
 async function callTestApi() {
+  const seq = ++requestSeq;
   if (!testModelName.value) {
     testResult.value = null;
     return;
@@ -418,9 +427,9 @@ async function callTestApi() {
       timestamp: testTimestampMicros(),
       attributes: attributesPayload(),
     });
-    testResult.value = res.data;
+    if (seq === requestSeq) testResult.value = res.data;
   } catch {
-    testResult.value = null;
+    if (seq === requestSeq) testResult.value = null;
   }
 }
 
@@ -429,26 +438,33 @@ const testing = ref(false);
 async function runTest() {
   if (!testModelName.value) return;
   testing.value = true;
+  hasRun.value = true;
   await callTestApi();
   testing.value = false;
 }
 
 watch(testModelName, (val) => {
-  if (!val) testResult.value = null;
+  if (!val) {
+    testResult.value = null;
+    hasRun.value = false;
+  }
 });
 
 // A shown result answers "what applies at the tested time" — keep it honest by
 // re-running when that time changes rather than displaying a stale tier.
 watch(testAtTime, () => {
-  if (testResult.value !== null && testModelName.value) callTestApi();
+  if (hasRun.value && testModelName.value) callTestApi();
 });
+// Watching the serialized payload ignores edits that do not change what is sent; the debounce avoids a request per keystroke.
 watch(
-  testAttributes,
+  () => JSON.stringify(attributesPayload() ?? {}),
   () => {
-    if (testResult.value !== null && testModelName.value) callTestApi();
+    clearTimeout(attributeTimer);
+    if (!hasRun.value || !testModelName.value) return;
+    attributeTimer = setTimeout(callTestApi, 300);
   },
-  { deep: true },
 );
+onBeforeUnmount(() => clearTimeout(attributeTimer));
 
 // ── Derived display values ────────────────────────────────────────────────────
 
@@ -476,6 +492,9 @@ const matchedTierDef = computed(() => {
   const result = testResult.value;
   if (!result?.matched) return null;
   const tiers: any[] = result.matched.tiers || [];
+  if (Number.isInteger(result.tier_index) && tiers[result.tier_index]) {
+    return tiers[result.tier_index];
+  }
   return tiers.find((t: any) => (t.name || "Default") === result.tier) || tiers[0] || null;
 });
 

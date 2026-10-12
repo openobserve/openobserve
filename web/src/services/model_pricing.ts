@@ -44,7 +44,7 @@ const modelPricing = {
       model_name: string;
       usage?: Record<string, number>;
       timestamp?: number | null;
-      attributes?: Record<string, string>;
+      attributes?: Record<string, string | number | boolean>;
     },
   ) => {
     return http().post(`/api/${org_identifier}/llm/models/test`, data);

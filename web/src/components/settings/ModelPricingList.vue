@@ -305,7 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :key="rIdx"
                             class="text-2xs font-mono opacity-70"
                           >
-                            {{ formatTierRule(rule) }}
+                            {{ formatTierRule(rule, t) }}
                           </div>
                           <div v-if="isUnrestrictedTier(tier)" class="text-2xs opacity-70">
                             {{ t("modelPricing.tierAlwaysActive") }}
@@ -575,7 +575,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="mt-0.5"
                     data-test="model-pricing-drawer-tier-rule"
                   >
-                    <OCode>{{ formatTierRule(rule) }}</OCode>
+                    <OCode>{{ formatTierRule(rule, t) }}</OCode>
                   </div>
                   <div v-if="isUnrestrictedTier(tier)" class="text-2xs mt-0.5 opacity-55">
                     {{ t("modelPricing.tierAlwaysActive") }}
@@ -931,7 +931,6 @@ function isUnrestrictedTier(tier: any): boolean {
   return !tier?.condition && !tier?.utc_windows?.length && !tier?.rules?.length;
 }
 
-// Mirrors the backend fallback rule: the default tier is the unrestricted one.
 function getDefaultTier(model: any) {
   const fallback = model.tiers?.find(isUnrestrictedTier);
   return fallback || model.tiers?.[0];

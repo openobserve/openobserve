@@ -79,8 +79,14 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
         .await
         .map_err(|e| anyhow::anyhow!("Failed to fetch built-in pricing: {e}"))?;
 
-    let entries: Vec<BuiltInModelPricingEntry> = serde_json::from_slice(&data)
+    let raw_entries: Vec<serde_json::Value> = serde_json::from_slice(&data)
         .map_err(|e| anyhow::anyhow!("Failed to parse built-in pricing JSON: {e}"))?;
+    // Names come from the raw JSON so an entry this build cannot parse is kept, not disabled.
+    let upstream_names: std::collections::HashSet<String> = raw_entries
+        .iter()
+        .filter_map(|e| e.get("name").and_then(|n| n.as_str()).map(str::to_string))
+        .collect();
+    let entries = parse_entries(raw_entries);
 
     // Get existing built-in model names for detecting removals
     let existing_names: std::collections::HashSet<String> =
@@ -91,8 +97,6 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
 
     let mut created = 0usize;
     let mut updated = 0usize;
-    let upstream_names: std::collections::HashSet<String> =
-        entries.iter().map(|e| e.name.clone()).collect();
 
     // Upsert each entry
     for entry in entries {
@@ -166,6 +170,22 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
         updated,
         disabled,
     })
+}
+
+/// Parses each catalogue entry on its own so one malformed entry does not stop the whole sync.
+fn parse_entries(raw: Vec<serde_json::Value>) -> Vec<BuiltInModelPricingEntry> {
+    raw.into_iter()
+        .filter_map(|value| {
+            let name = value
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("<unnamed>")
+                .to_string();
+            serde_json::from_value(value)
+                .inspect_err(|e| log::warn!("[model_pricing_sync] skipping entry '{name}': {e}"))
+                .ok()
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -295,6 +315,23 @@ mod tests {
         assert_eq!(tiers[2].rules[0].values, vec!["flex"]);
         assert!(tiers[2].condition.is_none());
         assert_eq!(tiers[3].restriction_count(), 2);
+    }
+
+    #[test]
+    fn test_parse_entries_skips_only_malformed_entries() {
+        let raw: Vec<serde_json::Value> = serde_json::from_str(
+            r#"[
+              {"name": "Good", "match_pattern": "good", "tiers": [{"name": "Default", "prices": {"input": 1e-6}}]},
+              {"name": "Broken", "match_pattern": "broken", "tiers": "not-a-list"},
+              {"name": "Future", "match_pattern": "future", "tiers": [
+                {"name": "Default", "prices": {"input": 1e-6}},
+                {"name": "New op", "rules": [{"keys": ["k"], "op": "regex", "values": ["v"]}], "prices": {"input": 2e-6}}
+              ]}
+            ]"#,
+        )
+        .unwrap();
+        let names: Vec<String> = parse_entries(raw).into_iter().map(|e| e.name).collect();
+        assert_eq!(names, vec!["Good", "Future"]);
     }
 
     #[test]

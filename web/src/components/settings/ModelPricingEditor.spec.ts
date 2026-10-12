@@ -20,7 +20,7 @@ import ModelPricingEditor from "./ModelPricingEditor.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import i18n from "@/locales";
-import { makeModelPricingSchema } from "./ModelPricingEditor.schema";
+import { findAmbiguousTiers, makeModelPricingSchema } from "./ModelPricingEditor.schema";
 
 // Service mocks
 vi.mock("@/services/model_pricing", async (importOriginal) => {
@@ -680,7 +680,6 @@ describe("ModelPricingEditor.vue", () => {
 
   describe("Schema validation: attribute rules", () => {
     const schema = makeModelPricingSchema(i18n.global.t as any);
-    // Isolate the rule issues (path tiers[1].rules[0].<field>).
     const ruleIssue = (rule: Record<string, any>, field: string) => {
       const res = schema.safeParse({
         name: "X",
@@ -726,10 +725,232 @@ describe("ModelPricingEditor.vue", () => {
       );
     });
 
+    it("rejects an empty or infinite threshold for a comparison operator", () => {
+      expect(
+        ruleIssue({ keys: "usage.input", op: "gt", values: "", value: "" }, "value"),
+      ).toContain("numeric threshold");
+      expect(
+        ruleIssue({ keys: "usage.input", op: "lte", values: "", value: Infinity }, "value"),
+      ).not.toBe("");
+    });
+
     it("needs neither values nor a threshold for a presence operator", () => {
       const rule = { keys: "service_tier", op: "exists", values: "", value: 0 };
       expect(ruleIssue(rule, "values")).toBe("");
       expect(ruleIssue(rule, "value")).toBe("");
+    });
+  });
+
+  describe("Tier ordering, priority and ambiguity", () => {
+    const flexRule = (values = "flex") => ({
+      keys: "openai.response.service_tier, openai.request.service_tier",
+      op: "in",
+      values,
+      value: 0,
+    });
+    const extended = { usage_key: "input", operator: "gte", value: 272000 };
+
+    it("moves a built-in's unrestricted tier to the front and saves it back losslessly", async () => {
+      const apiTiers = [
+        {
+          name: "Extended Context (200k+)",
+          condition: { usage_key: "input", operator: "gte", value: 200000 },
+          prices: { input: 0.000006 },
+        },
+        { name: "Default", condition: null, prices: { input: 0.000003 } },
+      ];
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "sonnet",
+          name: "Claude Sonnet 4",
+          match_pattern: "(?i)claude-sonnet-4",
+          enabled: true,
+          tiers: apiTiers,
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "sonnet" } });
+      await flushPromises();
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+
+      const call = mockService.update.mock.calls[0];
+      const payload = call[call.length - 1];
+      expect(payload.tiers.map((t: any) => [t.name, t.condition, t.prices])).toEqual([
+        ["Default", null, { input: 0.000003 }],
+        [
+          "Extended Context (200k+)",
+          { usage_key: "input", operator: "gte", value: 200000 },
+          { input: 0.000006 },
+        ],
+      ]);
+    });
+
+    it("never offers to remove tier 0", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Flex", rules: [flexRule()], prices: [row("input", 2)] }),
+      ]);
+      await nextTick();
+      expect(wrapper.find('[data-test="model-pricing-tier-remove-btn-0"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="model-pricing-tier-remove-btn-1"]').exists()).toBe(true);
+    });
+
+    it("round-trips a non-zero priority and omits a zero one", async () => {
+      mockService.get.mockResolvedValue({
+        data: {
+          id: "p",
+          name: "P",
+          match_pattern: "p",
+          enabled: true,
+          tiers: [
+            { name: "Default", prices: { input: 0.000001 } },
+            { name: "Fast", priority: 5, rules: [{ keys: ["speed"], op: "exists" }], prices: {} },
+            { name: "Long", condition: extended, prices: {} },
+          ],
+        },
+      });
+      const wrapper = createWrapper({ query: { id: "p" } });
+      await flushPromises();
+      expect(getForm(wrapper).state.values.tiers[1].priority).toBe(5);
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      const call = mockService.update.mock.calls[0];
+      const payload = call[call.length - 1];
+      expect(payload.tiers[1].priority).toBe(5);
+      expect("priority" in payload.tiers[2]).toBe(false);
+      expect("priority" in payload.tiers[0]).toBe(false);
+    });
+
+    it("swaps the value field when the operator changes and sends only what the operator reads", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Big", rules: [flexRule()], prices: [row("input", 2)] }),
+      ]);
+      await nextTick();
+      expect(wrapper.find('[data-test="model-pricing-tier-rule-values-input-1-0"]').exists()).toBe(
+        true,
+      );
+
+      getForm(wrapper).setFieldValue("tiers[1].rules[0].op", "gte");
+      getForm(wrapper).setFieldValue("tiers[1].rules[0].value", 1000);
+      await nextTick();
+      expect(wrapper.find('[data-test="model-pricing-tier-rule-values-input-1-0"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="model-pricing-tier-rule-value-input-1-0"]').exists()).toBe(
+        true,
+      );
+
+      await getForm(wrapper).handleSubmit();
+      await flushPromises();
+      expect(mockService.create.mock.calls[0][1].tiers[1].rules).toEqual([
+        {
+          keys: ["openai.response.service_tier", "openai.request.service_tier"],
+          op: "gte",
+          value: 1000,
+        },
+      ]);
+    });
+
+    it("removing a middle rule keeps the surrounding rows bound to the right values", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({
+          name: "Multi",
+          rules: [flexRule("a"), flexRule("b"), flexRule("c")],
+          prices: [row("input", 2)],
+        }),
+      ]);
+      await nextTick();
+      (wrapper.vm as any).removeRule(1, 1);
+      await nextTick();
+      expect(getForm(wrapper).state.values.tiers[1].rules.map((r: any) => r.values)).toEqual([
+        "a",
+        "c",
+      ]);
+      expect(wrapper.findAll('[data-test^="model-pricing-tier-rule-remove-btn-1-"]')).toHaveLength(
+        2,
+      );
+    });
+
+    it("shows a tie warning for overlapping tiers of equal rank", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      fillValid(wrapper, [
+        tier({ prices: [row("input", 1)] }),
+        tier({ name: "Extended", condition: extended, prices: [row("input", 2)] }),
+        tier({ name: "Fast", rules: [flexRule("priority")], prices: [row("input", 3)] }),
+      ]);
+      await nextTick();
+      const banner = wrapper.find('[data-test="model-pricing-tier-tie-warning"]');
+      expect(banner.exists()).toBe(true);
+      expect(banner.text()).toContain("Extended");
+      expect(banner.text()).toContain("Fast");
+    });
+
+    describe("findAmbiguousTiers", () => {
+      const base = { condition: null, utc_windows: [], rules: [], priority: 0 };
+
+      it("flags two overlapping tiers of equal priority and specificity", () => {
+        expect(
+          findAmbiguousTiers([
+            base,
+            { ...base, condition: extended },
+            { ...base, rules: [flexRule("priority")] },
+          ]),
+        ).toEqual([[1, 2]]);
+      });
+
+      it("treats disjoint values on the same keys as exclusive", () => {
+        expect(
+          findAmbiguousTiers([
+            base,
+            { ...base, rules: [flexRule("flex")] },
+            { ...base, rules: [flexRule("priority, FAST")] },
+          ]),
+        ).toEqual([]);
+      });
+
+      it("treats disjoint usage ranges as exclusive", () => {
+        expect(
+          findAmbiguousTiers([
+            base,
+            { ...base, condition: { usage_key: "input", operator: "gte", value: 272000 } },
+            { ...base, condition: { usage_key: "input", operator: "lt", value: 272000 } },
+          ]),
+        ).toEqual([]);
+      });
+
+      it("is resolved by a tier that combines both restrictions", () => {
+        expect(
+          findAmbiguousTiers([
+            base,
+            { ...base, condition: extended },
+            { ...base, rules: [flexRule("priority")] },
+            { ...base, condition: extended, rules: [flexRule("priority")] },
+          ]),
+        ).toEqual([]);
+      });
+
+      it("is resolved by giving one tier a different priority", () => {
+        expect(
+          findAmbiguousTiers([
+            base,
+            { ...base, condition: extended },
+            { ...base, rules: [flexRule("priority")], priority: 1 },
+          ]),
+        ).toEqual([]);
+      });
+
+      it("ignores tier 0 and unrestricted tiers", () => {
+        expect(findAmbiguousTiers([base, base, { ...base, condition: extended }])).toEqual([]);
+      });
     });
   });
 
@@ -770,7 +991,6 @@ describe("ModelPricingEditor.vue", () => {
         { keys: ["usage.input"], op: "gt", value: 272000 },
         { keys: ["gen_ai.request.speed"], op: "exists" },
       ]);
-      // A rule-only tier carries no usage condition.
       expect(payload.tiers[1].condition).toBeNull();
     });
 
@@ -1406,7 +1626,7 @@ describe("ModelPricingEditor.vue", () => {
   });
 
   describe("Edit-mode hydration", () => {
-    it("hydrates the form from the service, converts prices to rows, and seeds tier conditions", async () => {
+    it("hydrates the form from the service, converts prices to rows, and never invents a condition", async () => {
       mockService.get.mockResolvedValue({
         data: {
           id: "abc",
@@ -1415,7 +1635,6 @@ describe("ModelPricingEditor.vue", () => {
           enabled: true,
           tiers: [
             { name: "Default", condition: null, prices: { input: 0.001 } },
-            // missing condition — should be defaulted
             { name: "Tier 2", prices: {} },
           ],
         },
@@ -1429,13 +1648,13 @@ describe("ModelPricingEditor.vue", () => {
       expect(form.state.values.name).toBe("Existing");
       expect(form.state.values.match_pattern).toBe("gpt-.*");
 
-      // tiers converted to per-million ROW shape; condition defaulted on tier 2.
       const tiers = (wrapper.vm as any).formTiers;
       expect(tiers).toHaveLength(2);
       // 0.001 per-token → 1000 per-million
       expect(tiers[0].prices.map((r: any) => [r.key, r.value])).toEqual([["input", 1000]]);
       expect(tiers[0].condition).toBeNull();
-      expect(tiers[1].condition).toEqual({ usage_key: "input", operator: "gt", value: 0 });
+      // Fabricating a condition here silently changed which spans the tier priced.
+      expect(tiers[1].condition).toBeNull();
     });
 
     it("notifies and continues when get() rejects with non-403", async () => {
