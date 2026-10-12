@@ -2491,6 +2491,7 @@
   "login": {
     "lockedOut": "Zu viele fehlgeschlagene Anmeldeversuche. Versuchen Sie es in {duration} erneut, oder wenden Sie sich an Ihren Administrator.",
     "redirectingToSsoMessage": "Weiterleitung zur SSO-Anmeldeseite. Wenn Sie nicht weitergeleitet werden, bitte",
+    "signingIn": "Sie werden angemeldet...",
     "clickHere": "klicken Sie hier",
     "loginWithSso": "Mit SSO anmelden",
     "loginAsInternalUser": "Als interner Benutzer anmelden",

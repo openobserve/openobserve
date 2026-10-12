@@ -2491,6 +2491,7 @@
   "login": {
     "lockedOut": "Trop de tentatives de connexion échouées. Réessayez dans {duration} ou contactez votre administrateur.",
     "redirectingToSsoMessage": "Redirection vers la page de connexion SSO. Si vous n'êtes pas redirigé, veuillez",
+    "signingIn": "Connexion en cours...",
     "clickHere": "cliquez ici",
     "loginWithSso": "Se connecter avec SSO",
     "loginAsInternalUser": "Se connecter en tant qu'utilisateur interne",

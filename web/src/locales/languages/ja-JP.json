@@ -2491,6 +2491,7 @@
   "login": {
     "lockedOut": "サインインの失敗回数が多すぎます。{duration}後に再試行するか、管理者にお問い合わせください。",
     "redirectingToSsoMessage": "SSOログインページにリダイレクトしています。リダイレクトされない場合は、",
+    "signingIn": "サインインしています...",
     "clickHere": "ここをクリック",
     "loginWithSso": "SSOでログイン",
     "loginAsInternalUser": "内部ユーザーとしてログイン",

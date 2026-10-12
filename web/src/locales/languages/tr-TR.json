@@ -2491,6 +2491,7 @@
   "login": {
     "lockedOut": "Çok fazla başarısız oturum açma denemesi. {duration} sonra tekrar deneyin veya yöneticinizle iletişime geçin.",
     "redirectingToSsoMessage": "SSO giriş sayfasına yönlendiriliyorsunuz. Yönlendirilmezseniz, lütfen",
+    "signingIn": "Oturumunuz açılıyor...",
     "clickHere": "buraya tıklayın",
     "loginWithSso": "SSO ile giriş yap",
     "loginAsInternalUser": "Dahili kullanıcı olarak giriş yap",
