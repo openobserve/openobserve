@@ -51,12 +51,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <RoleTable
+          ref="roleTableRef"
           data-test="iam-roles-table-section"
           :data="rows"
           :loading="loading"
           :forbidden="forbidden"
           :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
+          v-model:page-size="pageSize"
+          v-model:current-page="currentPage"
+          v-model:sort-by="sortBy"
+          v-model:sort-order="sortOrder"
           :selected-ids="selectedRoleNames"
           :assign-target="assignTarget"
           :assigning-role-name="assigningRoleName"
@@ -129,12 +134,35 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
 
 const { track } = useReo();
 
-const filterQuery = ref("");
+const viewState = useListViewState("iam-roles", {
+  filterQuery: "",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref(viewState.sortOrder);
+const roleTableRef = ref<any>(null);
+
+watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 
 const showAddGroup = ref(false);
 
@@ -278,6 +306,15 @@ const rolesList = useQuery(() =>
 // Bound to the query rather than hand-managed: `isPending` is the cold read,
 // `isFetching` is any request in flight.
 const loading = rolesList.isPending;
+// setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => roleTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { once: true, immediate: true },
+);
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = rolesList.isFetching;

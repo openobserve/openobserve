@@ -426,9 +426,10 @@ const fetchAlerts = async () => {
 };
 
 const goBack = () => {
+  const { folder, tab } = route.query;
   router.push({
     name: "alertList",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
+    query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
   });
 };
 
