@@ -422,6 +422,12 @@ describe("AppAnalytics shell", () => {
     expect(wrapper!.find('[data-test="rum-analytics-synthetic-excluded"]').text()).toContain("7");
   });
 
+  it("drops the synthetic caption on the funnel builder, where the funnel card carries it", async () => {
+    await mountAt("/product-analytics/funnels/build?app=web&period=7d");
+    expect(wrapper!.find('[data-test="rum-analytics-sdk-sampling"]').exists()).toBe(true);
+    expect(wrapper!.find('[data-test="rum-analytics-synthetic-excluded"]').exists()).toBe(false);
+  });
+
   it("names the excluded identity share, never the value, and Include it sets idall (AC-50)", async () => {
     await mountAt("/product-analytics/overview?app=web&period=7d");
     const note = wrapper!.find('[data-test="rum-analytics-identity-note"]');
@@ -1040,7 +1046,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
   const chip = () =>
     wrapper!
       .findAll("*")
-      .filter((e) => /^\s*Exclusions\b[\s\S]*\d/.test(e.text()))
+      .filter((e) => /^\s*App filters\b[\s\S]*\d/.test(e.text()))
       .at(-1);
   const body = () => document.body.textContent ?? "";
   const buttonIn = (root: ParentNode, label: string) =>
@@ -1053,6 +1059,10 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     );
   const openDrawer = async () => {
     await chip()!.trigger("click");
+    await flushPromises();
+    document
+      .querySelector<HTMLElement>('[data-test="rum-analytics-app-filters-edit-btn"]')
+      ?.click();
     await settle();
   };
   const isDisabled = (el: Element | undefined) =>
@@ -1118,7 +1128,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
   it("P7-R2: the chip reads Exclusions 1 on day one, for the built-in rule of an app with no row", async () => {
     settingsApi.getAppSettings.mockImplementation(async () => ({ data: appSettings(NEVER_SAVED) }));
     await mountAt("/product-analytics/overview?app=web&period=7d");
-    expect(chip()?.text()).toMatch(/^\s*Exclusions\s*·?\s*1\b/);
+    expect(chip()?.text()).toMatch(/^\s*App filters\s*·?\s*1\b/);
   });
 
   it("P7-R2: N counts the built-in rule and the session rules, never the ignored pages", async () => {
@@ -1133,7 +1143,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       }),
     }));
     await mountAt("/product-analytics/overview?app=web&period=7d");
-    expect(chip()?.text()).toMatch(/^\s*Exclusions\s*·?\s*3\b/);
+    expect(chip()?.text()).toMatch(/^\s*App filters\s*·?\s*3\b/);
   });
 
   it("P7-R2: with the built-in rule off, N is the session rules only", async () => {
@@ -1141,7 +1151,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       data: appSettings({ bots: false, sessions: [STAFF_RULE] }),
     }));
     await mountAt("/product-analytics/overview?app=web&period=7d");
-    expect(chip()?.text()).toMatch(/^\s*Exclusions\s*·?\s*1\b/);
+    expect(chip()?.text()).toMatch(/^\s*App filters\s*·?\s*1\b/);
   });
 
   it("P7-R2: the chip says likely bot found when the Overview banner fires for a user agent", async () => {
@@ -1164,7 +1174,7 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     };
     const normal = await chipTone([{ ua: "Chrome", dev: "Other", sessions: 1500 }]);
     const warned = await chipTone(BOT_UA);
-    expect(normal.text).toMatch(/^\s*Exclusions/);
+    expect(normal.text).toMatch(/^\s*App filters/);
     expect(warned.text).toContain("likely bot found");
     expect(warned.tone).not.toBe(normal.tone);
   });
@@ -1176,6 +1186,27 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
       vi.mocked(searchService.search).mock.calls.some((c) => UA_RE.test(c[0].query.query.sql)),
     ).toBe(true);
     expect(chip()?.text()).not.toContain("likely bot found");
+  });
+
+  it("the chip opens a menu with the removed counts, an include switch and Edit app filters", async () => {
+    withHits([[UA_RE, []]]);
+    await mountAt("/product-analytics/overview?app=web&period=7d");
+    await chip()!.trigger("click");
+    await flushPromises();
+    const menu = () =>
+      document.querySelector<HTMLElement>('[data-test="rum-analytics-app-filters-menu"]')!;
+    expect(menu().textContent).toContain("Built-in bot rule 12,256");
+    expect(menu().textContent).toContain("Saved rules 79");
+    expect(menu().textContent).toContain("Synthetic tests 7 · always excluded");
+    expect(menu().textContent).toContain("Include hidden traffic in this view");
+    wrapper!.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+    await settle();
+    expect(useProductAnalytics().state.includeExcluded).toBe(true);
+    expect(router.currentRoute.value.query.xall).toBe("1");
+    wrapper!.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", false);
+    await settle();
+    expect(useProductAnalytics().state.includeExcluded).toBe(false);
+    expect(router.currentRoute.value.query.xall).toBeUndefined();
   });
 
   it("P6-R11: an identity suggestion fires the banner but not the chip's warning tone", async () => {
@@ -1330,7 +1361,9 @@ describe("pa gap fixes (scope bar and Exclusions drawer)", () => {
     buttonIn(d, "Save")!.click();
     await settle();
     expect(settingsApi.putAppSettings).toHaveBeenCalledTimes(1);
-    expect(drawer()!.textContent).toContain("Reloaded with the latest rules, re-apply your change");
+    expect(drawer()!.textContent).toContain(
+      "Reloaded with the latest app filters, re-apply your change",
+    );
     expect(hasValue(drawer()!, "@reloaded-only.example")).toBe(true);
   });
 
