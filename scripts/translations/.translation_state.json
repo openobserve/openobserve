@@ -8754,6 +8754,48 @@
       "workflows": "45b34f16db605a06"
     }
   },
+  "enterpriseFeature": {
+    "availableIn": "87cba85aefb9e899",
+    "category": {
+      "ai": "5510f99112dc8ca1",
+      "analysis": "11353a3a2fbe3277",
+      "scale": "16dc8328c4dfd585",
+      "security": "22ac21bec9438800"
+    },
+    "docsFooter": "c37dcf93ad693023",
+    "featuresPageTitle": "c2ef82e31689e16f",
+    "legendBeta": "321217e9e556bfbf",
+    "legendHa": "967175140a198f5a",
+    "locked": "39f206a0bdfbdf70",
+    "lockedTitle": "9d48410d14d39fd2",
+    "pitch": {
+      "agentBehavior": "0bf634774f6af147",
+      "agentGraph": "77be45e041db4501",
+      "aiAssistant": "169b6f825d2fd521",
+      "alertInsights": "8c46a231623ad013",
+      "anomalyDetection": "fc8be1f4d539361e",
+      "correlation": "bc63f12fcef95816",
+      "customBranding": "0c2cf2516d9a1988",
+      "datasets": "3744e4900df5d3bc",
+      "discovery": "d36aab5791a4a8c6",
+      "evaluations": "c73bd3a0331c61a3",
+      "experiments": "597783c51d9296e4",
+      "genAiAgentMapping": "4e66f73deca6e7ce",
+      "incidents": "3012816df11353de",
+      "logPatterns": "83687b9e82030998",
+      "oncall": "067b3db2e0ee7a53",
+      "playground": "e11388704d1141d0",
+      "prompts": "8f9107202472d86e",
+      "queues": "0d4110df012cc91b",
+      "rbac": "b58fccb2a2b70eb4",
+      "remoteTasks": "666c978471087303",
+      "scheduledSearch": "614a9d125a4fa5c2",
+      "serviceGraph": "6d824b12b22baa94",
+      "workflows": "1da03bd350c0721f"
+    },
+    "rbacDisabled": "a14b38b64ed64bcc",
+    "viewAllDocs": "f8c3b3add60e7809"
+  },
   "errorInsights": {
     "errorsGreaterThan": "35e06d5c92a4d992",
     "tabLabel": "cb702378f31507ef",

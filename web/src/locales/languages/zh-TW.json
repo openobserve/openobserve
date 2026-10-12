@@ -4295,6 +4295,48 @@
     "inspectBtnLabel": "檢查",
     "analyzeBtnLabel": "洞察"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "企業版功能",
+    "featuresPageTitle": "企業版功能",
+    "category": {
+      "security": "安全性與合規",
+      "scale": "規模與效能",
+      "ai": "AI 與自動化",
+      "analysis": "分析與資料流"
+    },
+    "legendBeta": "搶先體驗",
+    "legendHa": "高可用性",
+    "docsFooter": "每項功能都連結至其文件。",
+    "viewAllDocs": "檢視所有文件",
+    "locked": "使用 OpenObserve 企業版解鎖 {feature}。",
+    "availableIn": "於 OpenObserve 企業版提供",
+    "rbacDisabled": "此組織的 RBAC 已關閉。請聯絡您的管理員啟用。",
+    "pitch": {
+      "incidents": "自動將觸發中的警示轉為可追蹤的事件。",
+      "workflows": "自動化執行手冊，為您回應警示。",
+      "oncall": "排定值班輪替，並自動將呼叫轉派給正確的人員。",
+      "serviceGraph": "查看您的服務彼此如何呼叫，並在故障擴散前及早發現。",
+      "rbac": "為您的團隊建立具備精細權限的自訂角色。",
+      "logPatterns": "自動找出重複出現的日誌模式，無須逐行閱讀。",
+      "correlation": "從單一日誌行直接跳至相關的指標與追蹤。",
+      "aiAssistant": "請 AI 撰寫查詢，並以淺顯英文說明您的資料。",
+      "alertInsights": "查看警示觸發的頻率，並一眼找出相關聯的警示。",
+      "anomalyDetection": "自動捕捉異常的指標行為，在觸發閾值警示之前。",
+      "agentGraph": "以圖形呈現您的 AI 代理與工具彼此如何呼叫。",
+      "agentBehavior": "找出代理工具呼叫行為隨時間出現的異常。",
+      "discovery": "自動找出值得檢視的 AI 工作階段。",
+      "queues": "將標記的 AI 工作階段轉派給審查人員，進行人工介入標註。",
+      "datasets": "從真實工作階段整理資料集，以評估及微調您的 AI。",
+      "prompts": "為驅動 AI 功能的提示詞建立版本並管理。",
+      "playground": "在發布變更前，並排測試提示詞與模型。",
+      "experiments": "在推出前，以您的資料集比較模型與提示詞的變更。",
+      "remoteTasks": "對遠端模型與代理執行評估與評分作業。",
+      "evaluations": "自動為 AI 品質評分，並持續追蹤。",
+      "genAiAgentMapping": "依產生追蹤的 AI 代理分組，並並排比較各版本。",
+      "scheduledSearch": "依排程自動執行已儲存的搜尋，無須手動重新執行。",
+      "customBranding": "以您自己的品牌取代預設標誌與文字。"
+    }
+  },
   "errorInsights": {
     "title": "洞察",
     "tabLabel": "錯誤",

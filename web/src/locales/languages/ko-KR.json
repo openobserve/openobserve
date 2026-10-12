@@ -4295,6 +4295,48 @@
     "inspectBtnLabel": "검사",
     "analyzeBtnLabel": "인사이트"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "엔터프라이즈 기능",
+    "featuresPageTitle": "엔터프라이즈 기능",
+    "category": {
+      "security": "보안 및 규정 준수",
+      "scale": "확장성 및 성능",
+      "ai": "AI 옵저버빌리티 및 자동화",
+      "analysis": "분석 및 데이터 흐름"
+    },
+    "legendBeta": "얼리 액세스",
+    "legendHa": "고가용성",
+    "docsFooter": "모든 기능은 해당 문서로 연결됩니다.",
+    "viewAllDocs": "전체 문서 보기",
+    "locked": "{feature} 기능은 OpenObserve 엔터프라이즈에서 사용할 수 있습니다.",
+    "availableIn": "OpenObserve 엔터프라이즈에서 사용 가능",
+    "rbacDisabled": "이 조직에서는 RBAC가 사용 중지되어 있습니다. 관리자에게 활성화를 요청하세요.",
+    "pitch": {
+      "incidents": "발생 중인 알림을 자동으로 추적되는 인시던트로 전환합니다.",
+      "workflows": "알림에 대응하는 런북을 자동화합니다.",
+      "oncall": "온콜 교대 일정을 예약하고 페이지를 적절한 담당자에게 자동 라우팅합니다.",
+      "serviceGraph": "서비스 간 호출 관계를 파악하고 장애가 확산되기 전에 감지하세요.",
+      "rbac": "팀을 위한 세분화된 권한의 사용자 정의 역할을 생성합니다.",
+      "logPatterns": "한 줄씩 읽지 않고도 반복되는 로그 패턴을 자동으로 찾아냅니다.",
+      "correlation": "로그 라인에서 관련 메트릭과 트레이스로 바로 이동합니다.",
+      "aiAssistant": "AI 어시스턴트에게 쿼리 작성을 요청하고 데이터를 쉬운 말로 설명받으세요.",
+      "alertInsights": "알림이 얼마나 자주 발생하는지 확인하고 연관된 알림을 한눈에 파악합니다.",
+      "anomalyDetection": "임계값 알림이 발생하기 전에 비정상적인 메트릭 동작을 자동으로 감지합니다.",
+      "agentGraph": "AI 에이전트와 도구가 서로를 호출하는 방식을 그래프로 시각화하여 확인합니다.",
+      "agentBehavior": "시간 경과에 따른 에이전트 도구 호출 동작의 이상 징후를 감지합니다.",
+      "discovery": "검토할 가치가 있는 AI 세션을 자동으로 표시합니다.",
+      "queues": "플래그된 AI 세션을 검토자에게 전달해 사람이 직접 주석을 달도록 합니다.",
+      "datasets": "실제 세션에서 데이터셋을 구성하여 AI를 평가하고 미세 조정합니다.",
+      "prompts": "AI 기능을 구동하는 프롬프트를 버전 관리하고 관리합니다.",
+      "playground": "변경 사항을 배포하기 전에 프롬프트와 모델을 나란히 테스트합니다.",
+      "experiments": "배포 전에 데이터셋을 기준으로 모델 및 프롬프트 변경 사항을 비교합니다.",
+      "remoteTasks": "원격 모델과 에이전트를 대상으로 평가 및 채점 작업을 실행합니다.",
+      "evaluations": "AI 품질을 자동으로 채점하고 시간 경과에 따라 추적합니다.",
+      "genAiAgentMapping": "트레이스를 이를 생성한 AI 에이전트별로 그룹화하고 버전을 나란히 비교합니다.",
+      "scheduledSearch": "저장된 검색을 수동으로 다시 실행하는 대신 일정에 따라 자동으로 실행합니다.",
+      "customBranding": "기본 로고와 텍스트를 자체 브랜딩으로 교체합니다."
+    }
+  },
   "errorInsights": {
     "title": "인사이트",
     "tabLabel": "오류",

@@ -4295,6 +4295,48 @@
     "inspectBtnLabel": "Inspecteer",
     "analyzeBtnLabel": "Inzichten"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "Enterprise-functie",
+    "featuresPageTitle": "Enterprise-functies",
+    "category": {
+      "security": "Beveiliging en compliance",
+      "scale": "Schaal en prestaties",
+      "ai": "AI en automatisering",
+      "analysis": "Analyse en gegevensstroom"
+    },
+    "legendBeta": "Vroege toegang",
+    "legendHa": "Hoge beschikbaarheid",
+    "docsFooter": "Elke functie linkt naar de bijbehorende documentatie.",
+    "viewAllDocs": "Alle documentatie bekijken",
+    "locked": "{feature} ontgrendelen met OpenObserve Enterprise.",
+    "availableIn": "Beschikbaar in OpenObserve Enterprise",
+    "rbacDisabled": "RBAC is uitgeschakeld voor deze organisatie. Vraag je beheerder om het in te schakelen.",
+    "pitch": {
+      "incidents": "Zet afgaande alarmen automatisch om in gevolgde incidenten.",
+      "workflows": "Automatiseer runbooks die namens jou op alarmen reageren.",
+      "oncall": "Plan piketroosters en routeer piketmeldingen automatisch naar de juiste persoon.",
+      "serviceGraph": "Zie hoe je services elkaar aanroepen en vang storingen op voordat ze zich verspreiden.",
+      "rbac": "Maak aangepaste rollen met fijnmazige machtigingen voor je team.",
+      "logPatterns": "Herken terugkerende logpatronen automatisch in plaats van regel voor regel te lezen.",
+      "correlation": "Spring van een logregel direct naar de bijbehorende metrieken en traces.",
+      "aiAssistant": "Vraag AI om query's te schrijven en je gegevens in gewone taal uit te leggen.",
+      "alertInsights": "Zie hoe vaak een alarm afgaat en herken gecorreleerde alarmen in één oogopslag.",
+      "anomalyDetection": "Detecteer automatisch ongebruikelijk metriekgedrag, voordat er een drempelalarm afgaat.",
+      "agentGraph": "Zie hoe je AI-agents en tools elkaar aanroepen, weergegeven als een graaf.",
+      "agentBehavior": "Herken anomalieën in het tool-aanroepgedrag van agents in de loop van de tijd.",
+      "discovery": "Maak automatisch AI-sessies zichtbaar die het bekijken waard zijn.",
+      "queues": "Stuur gemarkeerde AI-sessies naar reviewers voor human-in-the-loop-annotatie.",
+      "datasets": "Stel datasets samen uit echte sessies om je AI te evalueren en bij te fine-tunen.",
+      "prompts": "Geef versies aan en beheer de prompts die je AI-functies aandrijven.",
+      "playground": "Test prompts en modellen naast elkaar voordat je wijzigingen uitrolt.",
+      "experiments": "Vergelijk wijzigingen in modellen en prompts met je datasets vóór uitrol.",
+      "remoteTasks": "Voer evaluatie- en scoretaken uit tegen externe modellen en agents.",
+      "evaluations": "Scoor de AI-kwaliteit automatisch en volg deze in de loop van de tijd.",
+      "genAiAgentMapping": "Groepeer traces op de AI-agent die ze heeft geproduceerd en vergelijk versies naast elkaar.",
+      "scheduledSearch": "Voer een opgeslagen zoekopdracht automatisch volgens schema uit, in plaats van deze handmatig opnieuw te starten.",
+      "customBranding": "Vervang het standaardlogo en de standaardtekst door je eigen branding."
+    }
+  },
   "errorInsights": {
     "title": "Inzichten",
     "tabLabel": "Fouten",
