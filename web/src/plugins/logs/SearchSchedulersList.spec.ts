@@ -4,6 +4,7 @@ import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // Mock services
 vi.mock("@/services/search", async (importOriginal) => {
@@ -75,7 +76,8 @@ vi.mock("@/utils/date", () => ({
 }));
 
 // Mock utils
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
   timestampToTimezoneDate: vi.fn(),
   b64EncodeUnicode: vi.fn((str) => btoa(str)),
   b64DecodeUnicode: vi.fn((str) => atob(str)),
@@ -97,6 +99,7 @@ describe("SearchSchedulersList Component", () => {
   beforeEach(async () => {
     // Reset mocks
     vi.clearAllMocks();
+    resetListViewState();
 
     // Setup search service mock
     const { default: searchServiceMock } = await import("@/services/search");
@@ -838,6 +841,43 @@ describe("SearchSchedulersList Component", () => {
       expect(typeof wrapper.vm.confirmCancel).toBe("boolean");
       expect(typeof wrapper.vm.toBeDeletedJob).toBe("object");
       expect(typeof wrapper.vm.toBeCancelled).toBe("object");
+    });
+  });
+
+  describe("View state restore", () => {
+    const mountList = () =>
+      mount(SearchSchedulersList, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: { OTable: true, AppTabs: true, QueryEditor: true, ConfirmDialog: true },
+          mocks: { $router: mockRouter },
+        },
+      });
+
+    it("restores page, size and sort", () => {
+      resetListViewState();
+      useListViewState("searchSchedulers", {
+        pageSize: 10,
+        currentPage: 3,
+        sortBy: "created_at",
+        sortOrder: "desc",
+      });
+      const restored = mountList();
+      expect(restored.vm.pageSize).toBe(10);
+      expect(restored.vm.currentPage).toBe(3);
+      expect(restored.vm.sortBy).toBe("created_at");
+      expect(restored.vm.sortOrder).toBe("desc");
+      restored.unmount();
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper.vm.pageSize = 50;
+      wrapper.vm.sortBy = "user_id";
+      await nextTick();
+      const saved: any = useListViewState("searchSchedulers", {});
+      expect(saved.pageSize).toBe(50);
+      expect(saved.sortBy).toBe("user_id");
     });
   });
 });

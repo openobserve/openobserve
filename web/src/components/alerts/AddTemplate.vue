@@ -233,7 +233,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div>{{ raw("alert_period, alert_operator, alert_threshold") }}</div>
               <div>{{ raw("alert_count, alert_agg_value") }}</div>
               <div>{{ raw("alert_description") }}</div>
-              <div>{{ raw("alert_start_time, alert_end_time, alert_url") }}</div>
+              <div>
+                {{
+                  raw(
+                    "alert_start_time, alert_end_time, alert_start_time_millis, alert_end_time_millis, alert_url",
+                  )
+                }}
+              </div>
               <div>
                 {{
                   raw(

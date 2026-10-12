@@ -42,6 +42,8 @@ export interface ShortcutEntry {
   display?: string;
   /** Fire even while a text input has focus (see `Shortcut.allowInInput`). */
   allowInInput?: boolean;
+  /** Never fire while a text input has focus, even as a modifier combo (see `Shortcut.skipInInput`). */
+  skipInInput?: boolean;
   /** Hide this entry in the cheatsheet unless the edition/config exposes it. */
   visible?: (caps: ShortcutCapabilities) => boolean;
 }
@@ -303,6 +305,26 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         keyForWindows: "ctrl+s",
         keyForMac: "meta+s",
         descriptionKey: "shortcuts.actions.dashboardSave",
+      },
+      // The manager builds combos as ctrl, shift, alt, meta, so the Mac redo is shift+meta.
+      {
+        id: "dashboardLayoutUndo",
+        keyForWindows: "ctrl+z",
+        keyForMac: "meta+z",
+        descriptionKey: "shortcuts.actions.dashboardLayoutUndo",
+        skipInInput: true,
+      },
+      {
+        id: "dashboardLayoutRedo",
+        keyForWindows: "ctrl+shift+z",
+        keyForMac: "shift+meta+z",
+        descriptionKey: "shortcuts.actions.dashboardLayoutRedo",
+        skipInInput: true,
+      },
+      {
+        id: "dashboardLayoutExit",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dashboardLayoutExit",
       },
       {
         id: "dashboardFullscreen",
@@ -1112,6 +1134,7 @@ export interface ShortcutDef {
   keyForMac?: string;
   keys?: string[];
   allowInInput?: boolean;
+  skipInInput?: boolean;
 }
 
 function isRegisterable(e: ShortcutEntry): boolean {
@@ -1135,6 +1158,7 @@ const DEFS: Map<string, ShortcutDef> = (() => {
         keyForMac: e.keyForMac,
         keys: e.keys,
         allowInInput: e.allowInInput,
+        skipInInput: e.skipInInput,
       });
     }
   }
