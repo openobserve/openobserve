@@ -357,7 +357,7 @@ pub(crate) mod tests {
     }
 
     /// Serves `m{job="api"}` on instances `a` = 100 and `b` = 200, sampled every minute.
-    struct TwoInstanceProvider(datafusion::prelude::SessionContext);
+    struct TwoInstanceProvider(datafusion::prelude::SessionContext, Vec<String>);
 
     #[async_trait::async_trait]
     impl crate::TableProvider for TwoInstanceProvider {
@@ -371,12 +371,15 @@ pub(crate) mod tests {
             _filters: &mut [(String, Vec<String>)],
             _streaming: bool,
         ) -> Result<Vec<crate::ScanContext>> {
-            Ok(vec![crate::ScanContext::table(
-                self.0.clone(),
-                two_instance_schema(),
-                config::meta::search::ScanStats::default(),
-                true,
-            )])
+            Ok(vec![
+                crate::ScanContext::table(
+                    self.0.clone(),
+                    two_instance_schema(),
+                    config::meta::search::ScanStats::default(),
+                    true,
+                )
+                .with_warnings(self.1.clone()),
+            ])
         }
     }
 
@@ -420,7 +423,7 @@ pub(crate) mod tests {
                 .unwrap();
         let ctx = datafusion::prelude::SessionContext::new();
         ctx.register_table("m", Arc::new(table)).unwrap();
-        TwoInstanceProvider(ctx)
+        TwoInstanceProvider(ctx, vec![])
     }
 
     #[test]
@@ -1287,40 +1290,6 @@ pub(crate) mod tests {
         }
     }
 
-    /// Serves the two-instance data as if one node behind every context had failed.
-    struct PartialProvider(TwoInstanceProvider);
-
-    #[async_trait::async_trait]
-    impl crate::TableProvider for PartialProvider {
-        async fn create_context(
-            &self,
-            org_id: &str,
-            stream_name: &str,
-            time_range: (i64, i64),
-            matchers: Matchers,
-            label_selector: HashSet<String>,
-            filters: &mut [(String, Vec<String>)],
-            streaming: bool,
-        ) -> Result<Vec<crate::ScanContext>> {
-            let ctxs = self
-                .0
-                .create_context(
-                    org_id,
-                    stream_name,
-                    time_range,
-                    matchers,
-                    label_selector,
-                    filters,
-                    streaming,
-                )
-                .await?;
-            Ok(ctxs
-                .into_iter()
-                .map(|ctx| ctx.with_warnings(vec!["ingester down".to_string()]))
-                .collect())
-        }
-    }
-
     #[tokio::test]
     async fn test_exec_returns_scan_context_warnings_with_the_data() {
         let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
@@ -1337,8 +1306,9 @@ pub(crate) mod tests {
         let (_, _, _, warnings) = ctx.exec("test_trace", stmt("m")).await.unwrap();
         assert!(warnings.is_empty());
 
-        let mut ctx =
-            PromqlContext::new(query_ctx, PartialProvider(two_instance_provider()), vec![]);
+        let mut provider = two_instance_provider();
+        provider.1 = vec!["ingester down".to_string()];
+        let mut ctx = PromqlContext::new(query_ctx, provider, vec![]);
         let (value, _, _, warnings) = ctx.exec("test_trace", stmt("m + m")).await.unwrap();
         let Value::Vector(series) = value else {
             panic!("expected a vector");
