@@ -19,6 +19,9 @@ import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import store from "../../test/unit/helpers/store";
 
+const leafRoutes = (children: any[]): any[] =>
+  children.flatMap((child) => (child.children ? leafRoutes(child.children) : [child]));
+
 // Mock the config module
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -352,7 +355,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 13 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(13); // 4 base + 9 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, nodes, domainManagement, regexPatterns, correlationSettings, license)
+      expect(routes[0].children).toHaveLength(14); // 4 base + 10 enterprise (query_management, cipherKeys, aiToolsets, pipelineDestinations, nodes, domainManagement, announcements, regexPatterns, correlationSettings, license)
     });
   });
 
@@ -422,7 +425,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 14 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(14); // 4 base + 9 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(15); // 4 base + 10 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -468,7 +471,7 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes = useManagementRoutes();
-      routes[0].children.forEach((child: any) => {
+      leafRoutes(routes[0].children).forEach((child: any) => {
         expect(child.name).toBeDefined();
         expect(child.name).not.toBe("");
         expect(typeof child.name).toBe("string");
@@ -490,10 +493,45 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       const routes = useManagementRoutes();
-      routes[0].children.forEach((child: any) => {
+      leafRoutes(routes[0].children).forEach((child: any) => {
         expect(child.component).toBeDefined();
         expect(typeof child.component === "function" || typeof child.component === "object").toBe(true);
       });
+    });
+  });
+
+  describe("Announcement banner routes", () => {
+    beforeEach(() => {
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+    });
+
+    const announcementGroup = () =>
+      useManagementRoutes()[0].children.find((child: any) => child.path === "announcements");
+
+    it("groups the list and editor under settings/announcements", () => {
+      const group = announcementGroup();
+
+      expect(group).toBeDefined();
+      expect(group.component).toBeUndefined();
+      expect(group.children.map((child: any) => [child.path, child.name])).toEqual([
+        ["", "announcementBanners"],
+        ["edit", "announcementBannerEditor"],
+      ]);
+    });
+
+    it("guards both announcement routes", () => {
+      for (const child of announcementGroup().children) {
+        const next = vi.fn();
+        child.beforeEnter({}, {}, next);
+        expect(routeGuard).toHaveBeenCalledWith({}, {}, next);
+      }
+    });
+
+    it("is absent outside enterprise", () => {
+      config.isEnterprise = "false";
+
+      expect(announcementGroup()).toBeUndefined();
     });
   });
 

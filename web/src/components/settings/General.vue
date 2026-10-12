@@ -389,34 +389,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </div>
         </div>
-
-        <!-- Authoring banners needs far more room than a settings row, so the
-             row is just the entry point into a drawer. -->
-        <div class="settings-grid-item">
-          <span class="individual-setting-title">
-            {{ t("announcements.settings.label") }}
-          </span>
-          <div class="tw:flex tw:items-center">
-            <q-btn
-              no-caps
-              size="md"
-              class="o2-secondary-button tw:h-[36px]"
-              :label="t('announcements.settings.configure')"
-              data-test="settings_ent_announcement_banners_btn"
-              @click="showAnnouncementBanners = true"
-            />
-          </div>
-          <span class="individual-setting-description">
-            {{ t("announcements.settings.description") }}
-          </span>
-        </div>
       </div>
     </div>
   </div>
-
-  <!-- The drawer belongs to the component that fills it — its header and
-       footer actions are part of the same surface. -->
-  <AnnouncementBanners v-model:open="showAnnouncementBanners" />
 
   <q-spinner-hourglass
     v-if="loadingState"
@@ -484,7 +459,6 @@ import config from "@/aws-exports";
 import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
-import AnnouncementBanners from "./AnnouncementBanners.vue";
 import store from "@/test/unit/helpers/store";
 import { applyThemeColors } from "@/utils/theme";
 
@@ -504,7 +478,6 @@ export default defineComponent({
     },
   },
   components: {
-    AnnouncementBanners,
     GroupHeader,
   },
   setup() {
@@ -524,7 +497,6 @@ export default defineComponent({
     const loadingState = ref(false);
     const customText = ref("");
     const editingText = ref(false);
-    const showAnnouncementBanners = ref(false);
     const files = ref(null);
     const filesLight = ref(null);
     const filesDark = ref(null);
@@ -991,7 +963,6 @@ export default defineComponent({
       store,
       config,
       router,
-      showAnnouncementBanners,
       scrapeIntereval,
       maxSeriesPerQuery,
       onSubmit,

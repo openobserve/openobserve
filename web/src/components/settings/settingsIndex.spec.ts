@@ -339,6 +339,38 @@ describe('SettingsIndex.vue', () => {
       expect(mockPush).not.toHaveBeenCalled();
     });
 
+    it.each(['announcementBanners', 'announcementBannerEditor'])(
+      'should redirect %s to general without the meta org',
+      (routeName) => {
+        wrapper = createWrapper(false, { isEnterprise: 'true' });
+        mockRouter.currentRoute.value.name = routeName;
+        mockPush.mockClear();
+
+        wrapper.vm.handleSettingsRouting();
+
+        expect(wrapper.vm.settingsTab).toBe('general');
+        expect(mockPush).toHaveBeenCalledWith({
+          path: '/settings/general',
+          query: { org_identifier: 'test-org' },
+        });
+      },
+    );
+
+    it.each(['announcementBanners', 'announcementBannerEditor'])(
+      'should keep %s for the meta org on enterprise',
+      (routeName) => {
+        mockRouter.currentRoute.value.name = routeName;
+        wrapper = createWrapper(true, { isEnterprise: 'true' });
+        mockPush.mockClear();
+        wrapper.vm.isMetaOrg.value = true;
+        wrapper.vm.config.isEnterprise = 'true';
+
+        wrapper.vm.handleSettingsRouting();
+
+        expect(mockPush).not.toHaveBeenCalled();
+      },
+    );
+
     it('should not redirect when on other routes', () => {
       mockRouter.currentRoute.value.name = 'general';
       wrapper = createWrapper();
