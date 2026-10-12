@@ -295,7 +295,7 @@ import {
   type NamedEvent,
   type SavedFunnel,
 } from "@/utils/rum/productAnalyticsModel";
-import { funnelSql, type FunnelDef } from "@/utils/rum/productAnalyticsQueries";
+import { funnelSql, storedFunnelScope, type FunnelDef } from "@/utils/rum/productAnalyticsQueries";
 
 defineOptions({ name: "SavedFunnelsPage", beforeRouteEnter: forwardFunnelLink });
 
@@ -363,11 +363,11 @@ const canWrite = computed(() => permission.value === "write");
 const openedId = computed(() => pa.openedFunnel.value?.id ?? null);
 const readOnlyTip = computed(() => t("rum.analytics.saved.readOnly"));
 
-// The sql the builder would save for `d`, so a copy never re-sends the stored text; null when Users cannot be counted.
+// The sql the builder would save for `d`, without the page scope, so a copy matches what the funnel remembers.
 const compileSql = (d: FunnelDef): string | null =>
   !pa.rulesReady.value || (d.unit === "users" && !pa.identitySql.value)
     ? null
-    : funnelSql({ ...pa.scope.value, xall: undefined }, pa.identitySql.value, d, {
+    : funnelSql(storedFunnelScope(pa.scope.value), pa.identitySql.value, d, {
         events: events.value,
         sample: 1,
       });

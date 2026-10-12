@@ -60,6 +60,8 @@ describe("FunnelLayoutRail", () => {
         app: "web",
         appFilters: { builtin: 0, rules: 0, synthetic: 0 },
         includeHidden: false,
+        filterFields: ["geo_info_country"],
+        filterValues: { field: null, status: "idle", rows: [] },
         settings: [
           { id: "unit", label: "Count by" as never, value: "Sessions" as never },
           { id: "window", label: "Window" as never, value: "Same session" as never },
@@ -123,5 +125,32 @@ describe("FunnelLayoutRail", () => {
     const def = w.emitted("update:def")!.at(-1)![0] as FunnelDef;
     expect(def.steps).toHaveLength(1);
     expect(def.x).toEqual([]);
+  });
+
+  it("renders Filter all steps as a rail section, and its chips remove a filter", async () => {
+    const def = {
+      ...DEF,
+      f: [{ field: "geo_info_country", op: "in", values: ["India"] }],
+    } as FunnelDef;
+    const w = mountRail({ def });
+    const aside = w.find("aside");
+    const section = aside.find('[data-test="rum-analytics-funnel-filter-all"]');
+    expect(section.text()).toContain("Filter all steps");
+    await section
+      .find('[data-test="rum-analytics-funnel-filter-geo_info_country"] button')
+      .trigger("click");
+    const next = w.emitted("update:def")!.at(-1)![0] as FunnelDef;
+    expect(next).not.toHaveProperty("f");
+  });
+
+  it("shows a step's view conditions in the rail step card", () => {
+    const vc = [{ t: "ref", op: "eq", values: ["google.com"] }];
+    const def = {
+      ...DEF,
+      steps: [{ kind: "p", key: "/web", f: { vc } }, DEF.steps[1]],
+    } as FunnelDef;
+    expect(
+      mountRail({ def }).find('[data-test="rum-analytics-funnel-rail-step-0"]').text(),
+    ).toContain("from google.com");
   });
 });

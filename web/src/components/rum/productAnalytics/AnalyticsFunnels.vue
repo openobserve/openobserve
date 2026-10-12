@@ -163,6 +163,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 }}</span
               >
+              <WhyEnteredPopover
+                v-if="!usersMode && def.steps.length > 1"
+                :count="firstUnits"
+                :app="pa.state.app"
+                :step1="firstLabel"
+                :state="whyState"
+                :lines="why"
+                :estimated="funnelPanel.sampled > 1"
+                @open="onWhyOpen"
+                @retry="loadWhy(true)"
+              />
             </template>
           </span>
           <OToggleGroup
@@ -370,7 +381,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :app-filters="appFilters.counts.value"
               :include-hidden="pa.state.includeExcluded"
               :settings="layoutSettings"
-              @update:def="(d: FunnelDef) => (pa.funnel.value = d)"
+              :filter-fields="filterFields"
+              :filter-values="filterValues"
+              @update:def="applyDef"
+              @filter-values="loadFilterValues"
               @dropoff="openDropoff"
               @suggestions-retry="retrySuggestions"
               @include-hidden="appFilters.setIncludeHidden(router, true)"
@@ -457,6 +471,11 @@ import KeySequence from "@/components/rum/productAnalytics/KeySequence.vue";
 import DropoffDrawer from "@/components/rum/productAnalytics/DropoffDrawer.vue";
 import NamedEventsNotice from "@/components/rum/productAnalytics/NamedEventsNotice.vue";
 import SavedFunnelBar from "@/components/rum/productAnalytics/SavedFunnelBar.vue";
+import WhyEnteredPopover from "@/components/rum/productAnalytics/funnelParts/WhyEnteredPopover.vue";
+import { fitsLink } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
+import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
+import { whyLines, type WhyLines } from "@/components/rum/productAnalytics/funnelParts/whyEntered";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import FunnelQuickStarts from "@/components/rum/productAnalytics/FunnelQuickStarts.vue";
 import useFunnelQuickStarts from "@/composables/rum/useFunnelQuickStarts";
 import useSavedFunnels from "@/composables/rum/useSavedFunnels";
@@ -477,6 +496,7 @@ import useNamedEvents from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
 import {
+  FILTER_FIELDS,
   exclusionRemoved,
   foldBreakdown,
   formatCount,
@@ -486,11 +506,15 @@ import {
   type FunnelResult,
   type NamedEvent,
   type SavedFunnel,
+  type SessionField,
 } from "@/utils/rum/productAnalyticsModel";
 import {
   DIMENSIONS,
+  filterValuesSql,
   funnelSql,
   nextStepsSql,
+  storedFunnelScope,
+  whyEnteredSql,
   type BreakdownDim,
   type BuildOpts,
   type FunnelCohort,
@@ -523,6 +547,8 @@ const runner = useAnalyticsSearch();
 const { identitySql } = pa;
 
 const funnelPanel = runner.panel<Record<string, unknown>>("funnel");
+const valuesPanel = runner.panel<{ v: string; sessions: number }>("filter-values");
+const whyPanel = runner.panel<Record<string, unknown>>("why");
 const nextPanel = runner.panel<{ is_next: number; kind: string; k: string; units: number }>("next");
 const namedEvents = useNamedEvents();
 const savedFunnels = useSavedFunnels();
@@ -533,9 +559,12 @@ const eventsStatus = computed(() => (usesEvents.value ? pa.eventsStatus.value : 
 const { entries, entriesLoading, entriesFailed, recent, loadEntries, refreshRecent, pushRecent } =
   useFunnelQuickStarts(() => events.value);
 const dropoffCohort = ref<FunnelCohort | null>(null);
+const valuesField = ref<SessionField | null>(null);
+const whyOpen = ref(false);
 const dashboardOpen = ref(false);
 const linkProblem = pa.savedLinkProblem;
 let timer: ReturnType<typeof setTimeout> | null = null;
+let whyTimer: ReturnType<typeof setTimeout> | null = null;
 let lastKey = "";
 let active = true;
 let activatedOnce = false;
@@ -651,6 +680,54 @@ const removed = computed<(number | null)[]>(() =>
     ? exclusionRemoved(funnelPanel.value.rows, def.value.x?.length ?? 0)
     : [],
 );
+
+const filterFields = computed(() => FILTER_FIELDS.filter((f) => pa.schema.value[f]));
+
+// Rows from another field or scope must never be offered as this field's values.
+const filterValues = computed<FilterValuesState>(() => {
+  const p = valuesPanel.value;
+  const field = valuesField.value;
+  if (!field || p.key !== `${pa.scopeKey.value}|${field}`)
+    return { field, status: "idle", rows: [] };
+  if (p.status === "ok")
+    return {
+      field,
+      status: "ok",
+      rows: p.rows.map((r) => ({ value: String(r.v), sessions: Number(r.sessions) || 0 })),
+    };
+  if (p.status === "loading") return { field, status: "loading", rows: [] };
+  return {
+    field,
+    status: p.status === "error" || p.status === "forbidden" ? "error" : "idle",
+    rows: [],
+  };
+});
+
+const whyState = computed<"idle" | "loading" | "ok" | "error">(() => {
+  const p = whyPanel.value;
+  if (p.key !== funnelKey.value) return "idle";
+  if (p.status === "ok" || p.status === "loading") return p.status;
+  return p.status === "error" || p.status === "forbidden" ? "error" : "idle";
+});
+
+// The summary is the page's own, so only step 1 and Filter all steps need the popover's query.
+const why = computed<WhyLines | null>(() => {
+  const s = pa.summary.value;
+  if (whyState.value !== "ok" || !s || !result.value) return null;
+  const row = whyPanel.value.rows[0] ?? {};
+  return whyLines({
+    total: s.totalSessions,
+    synthetic: pa.schema.value.session_type ? s.syntheticSessions : 0,
+    builtinKept: s.builtinKeptSessions,
+    kept: s.sessions,
+    opened: Number(row.opened) || 0,
+    inFilter: Number(row.kept) || 0,
+    entered: firstUnits.value,
+    removed: removed.value,
+    atStep1: (def.value.x ?? []).map((x) => x.b === undefined && x.a === 1),
+    hasFilters: !!def.value.f?.length,
+  });
+});
 
 const includedBanner = computed<I18nText>(() => {
   const n = appFilters.hiddenTotal.value;
@@ -782,7 +859,7 @@ watch(
 // A saved funnel's name is the panel's default title; the panel stays a snapshot.
 const dashboardPanel = () => {
   const panel = buildFunnelPanel(
-    snapshotScope(),
+    storedFunnelScope(pa.scope.value),
     def.value,
     events.value,
     t,
@@ -791,11 +868,14 @@ const dashboardPanel = () => {
   return pa.openedFunnel.value ? { ...panel, title: pa.openedFunnel.value.name } : panel;
 };
 
-// The time-relative SQL the funnel runs for `d`, kept beside it as a snapshot; null when Users cannot be counted here.
+// Stored SQL follows the definition, which remembers no page scope, so env, version, compared apps and new users stay out.
 const savedSql = (d: FunnelDef): string | null =>
   !pa.rulesReady.value || (d.unit === "users" && !identitySql.value)
     ? null
-    : funnelSql(snapshotScope(), identitySql.value, d, { events: events.value, sample: 1 });
+    : funnelSql(storedFunnelScope(pa.scope.value), identitySql.value, d, {
+        events: events.value,
+        sample: 1,
+      });
 
 // An sf link wins over the funnel it carried; only a confirmed absence drops it, a failed read keeps it for Retry.
 const resolveSavedLink = async (retry = false, quiet = false) => {
@@ -831,9 +911,16 @@ const funnelKey = computed(() => {
   return `${pa.scopeKey.value}|${identitySql.value?.excluded.length ?? ""}|${JSON.stringify(funnelParam(d))}|${eventSignature(d)}`;
 });
 
-const update = (patch: Partial<FunnelDef>) => {
-  pa.funnel.value = { ...def.value, ...patch };
+// The URL keeps the funnel, so any edit that would push it past a link's length is refused.
+const applyDef = (d: FunnelDef) => {
+  if (!fitsLink(d)) {
+    toast({ variant: "error", message: t("rum.analytics.funnel.tooLongForLink") });
+    return;
+  }
+  pa.funnel.value = d;
 };
+
+const update = (patch: Partial<FunnelDef>) => applyDef({ ...def.value, ...patch });
 
 const setSteps = (steps: StepRef[]) => {
   if (!steps.length) pa.detachSavedFunnel();
@@ -932,6 +1019,43 @@ const retrySuggestions = () => {
   });
 };
 
+const loadFilterValues = (field: SessionField) => {
+  valuesField.value = field;
+  if (!pa.schema.value[field]) return;
+  const key = `${pa.scopeKey.value}|${field}`;
+  const p = valuesPanel.value;
+  if (p.key === key && (p.status === "ok" || p.status === "loading")) return;
+  void runner.run(
+    "filter-values",
+    { sql: filterValuesSql(pa.scope.value, field), ...pa.resolveRange(), limit: 20, sampled: 1 },
+    key,
+  );
+};
+
+// Runs only while the popover is open, and never inside the funnel query, so the funnel keeps its row pruning.
+const loadWhy = (force = false) => {
+  const d = effectiveDef.value;
+  if (!whyOpen.value || usersMode.value || d.steps.length < 2) return;
+  const key = funnelKey.value;
+  const p = whyPanel.value;
+  if (!force && p.key === key && (p.status === "ok" || p.status === "loading")) return;
+  void runner.run(
+    "why",
+    {
+      sql: whyEnteredSql(pa.scope.value, d, { events: events.value, sample: 1 }),
+      ...pa.resolveRange(),
+      limit: 1,
+      sampled: 1,
+    },
+    key,
+  );
+};
+
+const onWhyOpen = (open: boolean) => {
+  whyOpen.value = open;
+  loadWhy();
+};
+
 const schedule = () => {
   if (timer) clearTimeout(timer);
   timer = setTimeout(() => {
@@ -992,6 +1116,15 @@ watch(
   },
 );
 
+// Typing an "Only when" value changes the key per keystroke, so the open popover reruns once typing settles.
+watch(funnelKey, () => {
+  if (whyTimer) clearTimeout(whyTimer);
+  whyTimer = setTimeout(() => {
+    whyTimer = null;
+    if (active) loadWhy();
+  }, DEBOUNCE_MS);
+});
+
 // Opening, saving or detaching a saved funnel need not change the steps, so the link is synced here.
 watch(
   () => [pa.openedFunnel.value?.id, pa.savedFunnelMissing.value],
@@ -1035,6 +1168,7 @@ onDeactivated(() => {
 
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer);
+  if (whyTimer) clearTimeout(whyTimer);
   runner.abortAll();
 });
 
