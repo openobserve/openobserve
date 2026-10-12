@@ -133,9 +133,7 @@ const workflowsEnabled = computed(
 );
 // Shown (disabled) instead of hidden outright when the family supports
 // workflows but this edition doesn't unlock them.
-const workflowsLocked = computed(
-  () => props.supportsWorkflows && !workflowsAccess.value.allowed,
-);
+const workflowsLocked = computed(() => props.supportsWorkflows && !workflowsAccess.value.allowed);
 
 const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
 const fetchWorkflows = async (force = false) => {

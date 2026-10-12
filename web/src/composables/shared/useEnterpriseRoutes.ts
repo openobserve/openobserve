@@ -17,12 +17,19 @@ import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
-import { withFeatureGate as withFeatureGateBase, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import {
+  withFeatureGate as withFeatureGateBase,
+  buildFeatureGateContext,
+} from "@/utils/enterpriseFeatures";
 
 // "rbac" needs the backend `rbac_enabled` flag, which only `store.state.zoConfig`
 // carries — every other key here is edition-only and could use the default.
 const withFeatureGate: typeof withFeatureGateBase = (key, guard, getContext) =>
-  withFeatureGateBase(key, guard, getContext ?? (() => buildFeatureGateContext(store.state.zoConfig)));
+  withFeatureGateBase(
+    key,
+    guard,
+    getContext ?? (() => buildFeatureGateContext(store.state.zoConfig)),
+  );
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL

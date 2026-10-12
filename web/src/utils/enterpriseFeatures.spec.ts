@@ -183,7 +183,10 @@ describe("enterpriseFeatures", () => {
     it("redirects to the locked page, preserving org_identifier and the original path", () => {
       const guard = vi.fn();
       const next = vi.fn();
-      const to = { query: { org_identifier: "o1" }, fullPath: "/settings/cipher_keys?org_identifier=o1" };
+      const to = {
+        query: { org_identifier: "o1" },
+        fullPath: "/settings/cipher_keys?org_identifier=o1",
+      };
       withFeatureGate("cipherKeys", guard)(to, {}, next);
       expect(guard).not.toHaveBeenCalled();
       expect(next).toHaveBeenCalledWith({

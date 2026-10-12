@@ -127,9 +127,7 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => {
       icon: section.icon,
       to: {
         name: section.routeName,
-        query: section.tabQuery
-          ? { ...orgQuery.value, tab: section.tabQuery }
-          : orgQuery.value,
+        query: section.tabQuery ? { ...orgQuery.value, tab: section.tabQuery } : orgQuery.value,
       },
       dataTest: section.dataTest,
       group: section.group,

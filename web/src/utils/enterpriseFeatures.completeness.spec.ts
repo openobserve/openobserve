@@ -48,9 +48,7 @@ function walk(dir: string, files: string[] = []): string[] {
 // Read once for every test in this file — the repo has thousands of source
 // files, and re-walking per `it()` would make this test suite the slow one.
 const SOURCE_FILES = walk(SRC_ROOT);
-const SOURCE_TEXT = new Map<string, string>(
-  SOURCE_FILES.map((f) => [f, readFileSync(f, "utf-8")]),
-);
+const SOURCE_TEXT = new Map<string, string>(SOURCE_FILES.map((f) => [f, readFileSync(f, "utf-8")]));
 
 /**
  * Every shape a `FeatureKey` can legitimately be spent through: a direct
@@ -88,8 +86,9 @@ describe("FEATURE_GATES completeness", () => {
       });
       if (!hasCallSite) orphaned.push(key);
     }
-    expect(orphaned, `FeatureKey(s) with no checkFeatureAccess/withFeatureGate/useLockedAffordance call site anywhere in web/src — either wire them up or remove the registry entry: ${orphaned.join(", ")}`).toEqual(
-      [],
-    );
+    expect(
+      orphaned,
+      `FeatureKey(s) with no checkFeatureAccess/withFeatureGate/useLockedAffordance call site anywhere in web/src — either wire them up or remove the registry entry: ${orphaned.join(", ")}`,
+    ).toEqual([]);
   });
 });
