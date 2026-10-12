@@ -242,7 +242,13 @@ impl QueryConditionExt for QueryCondition {
                 )
                 .await
                 {
-                    Ok(v) => v,
+                    Ok(v) if !v.warnings.is_empty() => {
+                        return Err(anyhow::anyhow!(
+                            "Partial response: {}",
+                            v.warnings.join(", ")
+                        ));
+                    }
+                    Ok(v) => v.value,
                     // A failed search is an ERROR, not an empty result. Returning
                     // Ok here would record outcome=Normal/level=Ok and refresh
                     // `level_at`, silently clearing a prior Critical — an error
