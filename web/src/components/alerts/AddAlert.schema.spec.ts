@@ -137,9 +137,9 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
   });
 
   // ── AlertSettings (reused) ──────────────────────────────────────────────────
-  it("requires at least one destination", () => {
+  it("accepts an alert with no destination", () => {
     const m = issuesByPath(validScheduled({ destinations: [] }));
-    expect(m["destinations"]?.length).toBeGreaterThan(0);
+    expect(m["destinations"]).toBeUndefined();
   });
 
   it("requires period ≥ 1 for scheduled alerts", () => {

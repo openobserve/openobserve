@@ -79,6 +79,7 @@
       v-model:workflows="form.workflows"
       :destination-options="destinationOptions"
       :error="fieldError('destinations') || undefined"
+      :notifies-nobody="!hasDeliveryTarget(form)"
       data-test="slo-alert-form-targets"
       @refresh="loadDestinations"
     />
@@ -111,6 +112,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import SloAlertCondition from "@/components/slos/SloAlertCondition.vue";
 import alertsService from "@/services/alerts";
 import { saveAlertMutation } from "@/services/alerts.queries";

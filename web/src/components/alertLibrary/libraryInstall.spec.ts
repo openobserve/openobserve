@@ -82,6 +82,10 @@ describe("buildInstallPayload", () => {
       expect(build({ file: bare }).destinations).toEqual(["ops-slack"]);
     });
 
+    it("installs with no destination when none is chosen, never the author's", () => {
+      expect(build({ destination: "" }).destinations).toEqual([]);
+    });
+
     it("stamps the library id and content hash without dropping the file's own attributes", () => {
       const payload = build({
         file: file({ context_attributes: { team: "platform" } }),

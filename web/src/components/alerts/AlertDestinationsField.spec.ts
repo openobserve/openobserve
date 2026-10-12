@@ -53,7 +53,7 @@ const TargetsStub = defineComponent({
   template: "<div />",
 });
 
-function mountField() {
+function mountField(props: Record<string, unknown> = {}) {
   const store = createStore({
     state: {
       selectedOrganization: { identifier: "test-org" },
@@ -61,7 +61,7 @@ function mountField() {
     },
   });
   return mount(AlertDestinationsField, {
-    props: { destinations: [], workflows: [], destinationOptions: [] },
+    props: { destinations: [], workflows: [], destinationOptions: [], ...props },
     global: {
       plugins: [i18n, store],
       stubs: { AlertTargetsSelect: TargetsStub, OIcon: true, OTooltip: true },
@@ -110,5 +110,31 @@ describe("AlertDestinationsField workflows", () => {
 
     expect(listWorkflowsMock).toHaveBeenCalledTimes(2);
     expect(wrapper.emitted("refresh")).toHaveLength(1);
+  });
+});
+
+describe("AlertDestinationsField with nowhere to send", () => {
+  const NOTE = '[data-test="alert-settings-destinations-note"]';
+  const ERROR = '[data-test="alert-settings-destinations-error"]';
+
+  it("is not marked required", () => {
+    expect(mountField().text()).not.toContain("*");
+  });
+
+  it("says the alert notifies nobody when told so", () => {
+    expect(mountField({ notifiesNobody: true }).find(NOTE).text()).toContain(
+      (i18n.global.t as any)("alerts.alertSettings.noDestinationNote"),
+    );
+  });
+
+  it("stays quiet by default, as on the recovery field", () => {
+    expect(mountField().find(NOTE).exists()).toBe(false);
+  });
+
+  // focusOnFirstError finds the tab that owns an invalid field by its [role="alert"] message.
+  it("renders an error instead of the note, as [role=alert]", () => {
+    const wrapper = mountField({ notifiesNobody: true, error: "bad" });
+    expect(wrapper.find(ERROR).attributes("role")).toBe("alert");
+    expect(wrapper.find(NOTE).exists()).toBe(false);
   });
 });

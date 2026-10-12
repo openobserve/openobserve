@@ -573,8 +573,7 @@ async function waitForSloMeasured(page, sloId, {
 /**
  * Create a notification template + destination for burn-rate alerts.
  *
- * An SLO alert cannot be saved without one: the form rejects a submit with
- * "Alert destination or workflows is required". By default the destination
+ * Specs that pick a destination need one to exist. By default the destination
  * points at this instance's OWN ingest endpoint so delivery is self-contained
  * and needs no external service — the same trick
  * `alerts-api-helpers.seedAlertFixtures` uses.

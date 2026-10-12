@@ -25,7 +25,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
 
   // ============================================================================
   // Setup: Create unique-named template + destination via API so that:
-  //   1) The Add Alert button is enabled (requires at least one destination)
+  //   1) The tests have a destination to pick
   //   2) Templates are available in the override template select
   //   3) Date.now() + Math.random() avoids parallel-worker collisions
   // ============================================================================

@@ -18,10 +18,9 @@ const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 // ─────────────────────────────────────────────────────────────────────────────
 // Self-seeded prerequisites
 //
-// The app hard-disables the "Add Alert" button when the org has ZERO alert
-// destinations (button title = "alerts.noDestinations"). The wizard-based blocks
-// (FilterCondition / FieldsInput / QueryConfig / AlertSettings) therefore need at
-// least one destination to exist before they can open the wizard.
+// The "Add Alert" button needs at least one template, and the wizard-based blocks
+// (FilterCondition / FieldsInput / QueryConfig / AlertSettings) pick a destination,
+// so both must exist before they open the wizard.
 //
 // Rather than depend on some other spec having left a destination behind (an
 // implicit, order-dependent cross-file coupling that breaks on an isolated

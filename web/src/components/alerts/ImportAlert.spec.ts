@@ -484,6 +484,44 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         }
       });
 
+      describe("destinations", () => {
+        // Other fields are invalid on purpose: only the destination errors are read.
+        const destinationErrors = async (destinations: unknown) => {
+          wrapper.vm.alertErrorsToDisplay = [];
+          await wrapper.vm.validateAlertInputs(
+            {
+              name: "a1",
+              stream_type: "invalid",
+              query_condition: { type: "custom" },
+              trigger_condition: {},
+              ...(destinations === undefined ? {} : { destinations }),
+            },
+            1,
+          );
+          return wrapper.vm.alertErrorsToDisplay
+            .flat()
+            .filter((error: any) => error?.field === "destination_name");
+        };
+
+        it.each([
+          ["absent", undefined],
+          ["empty", []],
+        ])("imports an alert whose destinations are %s", async (_case, destinations) => {
+          expect(await destinationErrors(destinations)).toEqual([]);
+        });
+
+        it.each([
+          ["null", null],
+          ["not a list", "ops-slack"],
+        ])("rejects destinations that are %s", async (_case, destinations) => {
+          expect(await destinationErrors(destinations)).toHaveLength(1);
+        });
+
+        it("still rejects a destination this org does not have", async () => {
+          expect(await destinationErrors(["no-such-destination"])).toHaveLength(1);
+        });
+      });
+
       it("should validate inputs and return boolean result using component function", async () => {
         // Test that the validation function exists and can be called
         const input = {

@@ -78,7 +78,6 @@ const silenceMinutes = computed({
         :workflows="[]"
         :destination-options="destinations"
         :label="t('synthetics.scheduleAlert.destinations')"
-        :required="false"
         tooltip=""
         :supports-workflows="false"
         data-test="synthetics-check-alerts-destinations"

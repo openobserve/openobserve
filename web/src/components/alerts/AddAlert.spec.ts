@@ -263,7 +263,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
     });
 
-    it("blocks save when there are no destinations", async () => {
+    it("saves an alert with no destination", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
@@ -273,8 +273,9 @@ describe("AddAlert (OForm owner)", () => {
       await form.handleSubmit();
       await flushPromises();
 
-      expect(form.state.isValid).toBe(false);
-      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(form.state.isValid).toBe(true);
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect((alertsService.create_by_alert_id as any).mock.calls[0][1].destinations).toEqual([]);
     });
   });
 
@@ -1463,7 +1464,7 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       const form = wrapper.vm.form;
       seedEmptyBuilder(form, SQL);
-      form.setFieldValue("destinations", []);
+      form.setFieldValue("trigger_condition.silence", "");
 
       await clickSave();
 

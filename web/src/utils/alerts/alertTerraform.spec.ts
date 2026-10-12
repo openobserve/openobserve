@@ -72,6 +72,11 @@ describe("alertsToTerraform", () => {
     );
   });
 
+  it("writes an alert with no destination as destinations = [], not as omitted", () => {
+    const { hcl } = alertsToTerraform([{ ...sqlAlert, destinations: [] }]);
+    expect(hcl).toMatch(/^ {2}destinations += \[\]$/m);
+  });
+
   it("names the provider in a header so the config is usable on its own", () => {
     const { hcl } = alertsToTerraform([sqlAlert]);
 

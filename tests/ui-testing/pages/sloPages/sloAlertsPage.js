@@ -38,6 +38,8 @@ export class SloAlertsPage {
       submit: '[data-test="slo-alert-form-submit"]',
       cancel: '[data-test="slo-alert-form-cancel"]',
       formError: '[data-test="o-toast-message"]',
+      destinationsNote: '[data-test="alert-settings-destinations-note"]',
+      destinationsError: '[data-test="alert-settings-destinations-error"]',
 
       // Condition
       conditionCritical: '[data-test="slos-sloalertcondition-critical"]',
@@ -88,8 +90,7 @@ export class SloAlertsPage {
   /**
    * Pick a notification destination.
    *
-   * Required: the form rejects a submit with "Alert destination or workflows is
-   * required". The picker lives inside `AlertDestinationsField` ->
+   * Optional: an alert saves without one. The picker lives inside `AlertDestinationsField` ->
    * `AlertTargetsSelect`, which carries its own `alert-destinations-select`
    * (the parent's `slo-alert-form-targets` falls through to the FIELD's root,
    * not to this control).
@@ -311,11 +312,10 @@ export class SloAlertsPage {
     if (pattern) await expect(err).toContainText(pattern);
   }
 
-  /** The toast raised for a refused save — the same surface the alert form uses. */
-  async expectFormError(pattern = null) {
-    const toasts = this.page.locator(this.locators.formError);
-    await expect(toasts.first()).toBeVisible({ timeout: 20000 });
-    if (pattern) await expect(toasts.filter({ hasText: pattern })).not.toHaveCount(0);
+  /** With nothing picked, the destinations field notes that the alert notifies nobody, and does not error. */
+  async expectNoDestinationNote() {
+    await expect(this.page.locator(this.locators.destinationsNote)).toBeVisible();
+    await expect(this.page.locator(this.locators.destinationsError)).toHaveCount(0);
   }
 
   /** A field carries its own inline validation message. */

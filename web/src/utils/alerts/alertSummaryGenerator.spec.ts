@@ -111,3 +111,19 @@ describe("generateAlertSummary: Compare-with-Past windows", () => {
     );
   });
 });
+
+describe("generateAlertSummary: where it sends", () => {
+  const nobody = t("alerts.summary.notifiesNobody");
+
+  it("says an alert with nowhere to send notifies nobody", () => {
+    expect(summary(forecastForm())).toContain(nobody);
+  });
+
+  it.each([
+    ["a destination", { destinations: ["ops-slack"] }],
+    ["only a workflow", { workflows: ["wf-1"] }],
+    ["only an on-call team", { oncall_team: "sre" }],
+  ])("does not say so for %s", (_case, targets) => {
+    expect(summary({ ...forecastForm(), ...targets })).not.toContain(nobody);
+  });
+});

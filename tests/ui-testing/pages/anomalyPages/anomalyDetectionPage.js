@@ -89,7 +89,7 @@ class AnomalyDetectionPage {
             tagsInput: '[data-test="anomaly-tags-input"]',
             alertEnabled: '[data-test="anomaly-alert-enabled"]',
             destination: '[data-test="anomaly-destination"]',
-            destinationError: '[data-test="anomaly-destination-error"]',
+            destinationNote: '[data-test="anomaly-destination-note"]',
             refreshDestinations: '[data-test="anomaly-refresh-destinations"]',
 
             // Right rail
@@ -582,8 +582,8 @@ class AnomalyDetectionPage {
      *
      * OSwitch toggles from a click handler on its WRAPPER, not on the inner
      * role=switch button, so a click on the button is not self-evidently a
-     * state change. Assert the end state — silently leaving this on makes the
-     * save fail much later with "At least one destination is required".
+     * state change. Assert the end state — silently leaving this on saves an
+     * anomaly config that notifies nobody.
      */
     async toggleNotifications(enabled) {
         const root = this.page.locator(this.selectors.alertEnabled);
@@ -641,8 +641,8 @@ class AnomalyDetectionPage {
         ]);
     }
 
-    getDestinationErrorLocator() {
-        return this.page.locator(this.selectors.destinationError);
+    getDestinationNoteLocator() {
+        return this.page.locator(this.selectors.destinationNote);
     }
 
     // Save / cancel

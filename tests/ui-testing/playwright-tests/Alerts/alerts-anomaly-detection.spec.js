@@ -36,8 +36,8 @@ test.describe('Anomaly Detection', () => {
   let seq = 0;
   const anomalyName = (suffix) => `E2E_Anomaly_${suffix}${++seq}_${randomValue}`;
 
-  // The Add button is disabled while the org has no destination, so both must
-  // exist before any wizard test can open.
+  // The Add button needs a template, and the alerting tests pick a destination,
+  // so both exist before any wizard test opens.
   const prerequisiteTemplateName = `e2e_anomaly_template_${randomValue}`;
   const prerequisiteDestinationName = `e2e_anomaly_dest_${randomValue}`;
 
@@ -122,16 +122,15 @@ test.describe('Anomaly Detection', () => {
       await expect(pm.anomalyDetectionPage.getListTableLocator()).toBeVisible();
     });
 
-    test('destination is required once notifications are enabled', {
+    test('notifications with no destination show a note, not an error', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
       await pm.anomalyDetectionPage.openAddAnomalyWizard();
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('destreq'), 'logs', testStreamName);
       await pm.anomalyDetectionPage.openAlertingTab();
       await pm.anomalyDetectionPage.toggleNotifications(true);
-      await pm.anomalyDetectionPage.save();
 
-      await expect(pm.anomalyDetectionPage.getDestinationErrorLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getDestinationNoteLocator()).toBeVisible();
       await pm.anomalyDetectionPage.cancel();
     });
 
@@ -1152,16 +1151,15 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.cancel();
     });
 
-    test('budget mode still requires a destination when notifications are enabled', {
+    test('budget mode notes when notifications have no destination', {
       tag: ['@anomaly', '@P2', '@functional', '@all'],
     }, async ({ page }) => {
       const name = await ownConfig(page, 'destreq', 4);
       await pm.anomalyDetectionPage.openEdit(name);
       await pm.anomalyDetectionPage.openAlertingTab();
       await pm.anomalyDetectionPage.toggleNotifications(true);
-      await pm.anomalyDetectionPage.save();
 
-      await expect(pm.anomalyDetectionPage.getDestinationErrorLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getDestinationNoteLocator()).toBeVisible();
 
       await pm.anomalyDetectionPage.cancel();
     });

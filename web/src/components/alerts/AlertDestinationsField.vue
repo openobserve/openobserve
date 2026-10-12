@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-start max-md:flex-col max-md:gap-1">
     <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
-      {{ required ? labelText + " *" : labelText }}
+      {{ labelText }}
       <template v-if="tooltipText">
         <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
         <OTooltip :content="tooltipText" side="right" />
@@ -60,6 +60,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ error }}
       </div>
+      <OBanner
+        v-else-if="notifiesNobody"
+        variant="info"
+        icon="info"
+        dense
+        class="mt-1 max-w-125"
+        :content="t('alerts.alertSettings.noDestinationNote')"
+        data-test="alert-settings-destinations-note"
+      />
     </div>
   </div>
 </template>
@@ -71,6 +80,7 @@ import { useStore } from "vuex";
 
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import { workflowsQuery } from "@/services/workflows.queries";
@@ -88,8 +98,8 @@ const props = withDefaults(
     error?: string;
     /** Override the label; defaults to the alert form's "Destination". */
     label?: string;
-    /** Whether this alert family requires a destination; drives the "*". */
-    required?: boolean;
+    /** The alert has nowhere to send, so the field says it notifies nobody. */
+    notifiesNobody?: boolean;
     /** Override the tooltip; pass "" for alert families that need none. */
     tooltip?: string;
     /** False for alert families with no workflow routing (e.g. synthetics
@@ -97,7 +107,7 @@ const props = withDefaults(
      *  enterprise, so the picker cannot offer options that would not save. */
     supportsWorkflows?: boolean;
   }>(),
-  { required: true, supportsWorkflows: true },
+  { supportsWorkflows: true, notifiesNobody: false },
 );
 
 const emit = defineEmits<{

@@ -102,7 +102,7 @@ describe("AddAlertView.vue", () => {
     );
   });
 
-  it("should not render AddAlert when destinations are empty", async () => {
+  it("renders AddAlert even when the org has no destinations", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
       data: [],
     } as any);
@@ -121,7 +121,7 @@ describe("AddAlertView.vue", () => {
 
     await flushPromises();
 
-    expect(wrapper.find(".add-alert-stub").exists()).toBe(false);
+    expect(wrapper.find(".add-alert-stub").exists()).toBe(true);
   });
 
   it("should handle getDestinations error", async () => {

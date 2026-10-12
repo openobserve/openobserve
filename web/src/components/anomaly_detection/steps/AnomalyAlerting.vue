@@ -82,7 +82,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="config.alert_enabled" class="mb-6! flex flex-wrap items-start gap-x-2 pb-0!">
         <div class="flex h-9 w-47.5 shrink-0 items-center font-semibold">
           {{ t("alerts.destination") }}
-          <span class="text-status-error-text ms-1">*</span>
         </div>
         <div class="flex min-w-0 flex-1 basis-60 flex-col">
           <div class="flex flex-wrap items-center gap-y-1">
@@ -137,13 +136,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.anomaly.addNewDestination") }}
             </OButton>
           </div>
-          <div
-            v-if="config.alert_enabled && config.alert_destination_ids.length === 0"
-            class="text-input-error-text pt-1 text-xs"
-            data-test="anomaly-destination-error"
-          >
-            {{ t("alerts.anomaly.destinationRequired") }}
-          </div>
+          <OBanner
+            v-if="config.alert_destination_ids.length === 0"
+            variant="info"
+            icon="info"
+            dense
+            class="mt-1 max-w-125"
+            :content="t('alerts.anomaly.noDestinationNote')"
+            data-test="anomaly-destination-note"
+          />
         </div>
       </div>
 
@@ -251,6 +252,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
@@ -261,7 +263,7 @@ import {
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, OSwitch, OSelect, OInput, OTagInput, OTooltip, OIcon, OTag },
+  components: { OButton, OSwitch, OSelect, OInput, OTagInput, OTooltip, OIcon, OTag, OBanner },
 
   props: {
     config: {

@@ -5,6 +5,7 @@
 
 import { gt } from "@/types/i18n";
 import { isForecastHorizonValid } from "@/utils/alerts/forecastAlert";
+import { hasDeliveryTarget } from "./deliveryTarget";
 
 /**
  * Translator accepted by the summary helpers.
@@ -188,11 +189,12 @@ export function generateAlertSummary(
 
   // Notification section — use formData.destinations (selected), not destinations param (all available)
   const selectedDestinations: string[] = formData.destinations || [];
-  if (selectedDestinations.length === 0) {
+  // A workflow or on-call team still notifies someone, but only their ids are known here.
+  if (!hasDeliveryTarget(formData)) {
     parts.push(
-      `✓ ${translate("alerts.summary.sendsTo")}: ${clickable(translate("alerts.summary.noDestination"), "destinations")} ${translate("alerts.summary.notSetupYet")} ⚠️`,
+      `✓ ${translate("alerts.summary.sendsTo")}: ${clickable(translate("alerts.summary.noDestination"), "destinations")} ${translate("alerts.summary.notifiesNobody")}`,
     );
-  } else {
+  } else if (selectedDestinations.length > 0) {
     const uniqueNames = Array.from(new Set(selectedDestinations));
     const destText = uniqueNames.join(", ");
     parts.push(`✓ ${translate("alerts.summary.sendsTo")}: ${clickable(destText, "destinations")}`);

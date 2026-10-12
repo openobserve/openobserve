@@ -130,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :workflows="workflows"
             :destination-options="formattedDestinations"
             :error="destinationsError"
+            :notifies-nobody="notifiesNobody"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"
@@ -290,6 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :workflows="workflows"
             :destination-options="formattedDestinations"
             :error="destinationsError"
+            :notifies-nobody="notifiesNobody"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"
@@ -343,7 +345,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :workflows="[]"
             :destination-options="formattedDestinations"
             :label="t('alerts.alertSettings.recoveryDestinations')"
-            :required="false"
             :tooltip="t('alerts.alertSettings.recoveryDestinationsTooltip')"
             :supports-workflows="false"
             @update:destinations="$emit('update:recoveryDestinations', $event)"
@@ -392,6 +393,7 @@ import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
+import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
@@ -496,12 +498,16 @@ export default defineComponent({
         : computed(() => undefined);
     const periodError = fieldError("trigger_condition.period");
     const silenceError = fieldError("trigger_condition.silence");
-    // Destinations is NOT an OFormSelect any more (AlertDestinationsField below
-    // is a plain controlled component covering destinations + workflows), so its
-    // schema error has no wrapper to render it — surface it the same way period
-    // and silence do. The rule is "at least one destination OR workflow" and is
-    // keyed on `destinations` in AddAlert.schema.ts, so it lands on this path.
+    // AlertDestinationsField is not an OForm* wrapper, so it cannot render its own schema error.
     const destinationsError = fieldError("destinations");
+    const notifiesNobody = computed(
+      () =>
+        !hasDeliveryTarget({
+          destinations: props.destinations,
+          workflows: props.workflows,
+          oncall_team: props.formData?.oncall_team,
+        }),
+    );
     const pendingPeriodError = fieldError("_ui.pendingPeriod");
     // Forecast mode fixes the period and reads its own history window, so a period field would only compete with it.
     const isForecastMode = form
@@ -716,6 +722,7 @@ export default defineComponent({
       isForecastMode,
       silenceError,
       destinationsError,
+      notifiesNobody,
       pendingPeriodError,
       pendingPeriodWarning,
       pendingPeriodUnit,

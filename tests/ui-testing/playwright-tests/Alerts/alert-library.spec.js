@@ -40,7 +40,7 @@ test.describe('Alert Library', () => {
     await pm.commonActions.initializeAlertTestStream(readyStream);
     await pm.commonActions.queryStream(readyStream).catch(() => {}); // let it become searchable
 
-    // Install requires a real destination (template first). example.com avoids
+    // The install picks a real destination (template first). example.com avoids
     // the SSRF guard that blocks self-host URLs.
     await pm.alertTemplatesPage.ensureTemplateExists(templateName);
     await pm.alertDestinationsPage.ensureDestinationExists(
@@ -117,7 +117,7 @@ test.describe('Alert Library', () => {
 
     // Install wizard: destination → alerts → folder(default) → tune → run.
     await lib.installFromDrawer();
-    await lib.expectNextDisabled(); // F2: cannot advance until a destination is chosen
+    await lib.expectNextEnabled(); // F2: the destination is optional
     await lib.pickDestination(destinationName);
     await lib.expectNextEnabled();
     await lib.next(); // → alerts
@@ -424,7 +424,7 @@ test.describe('Alert Library', () => {
     await lib.expectInstallResultCount('failed', 1);
   });
 
-  test('install blocks when the org has no usable destinations', async ({ page }) => {
+  test('install explains when the org has no usable destinations', async ({ page }) => {
     const ready = entries[0];
 
     // F4: destinations fail to load → failed banner + retry.
@@ -445,5 +445,7 @@ test.describe('Alert Library', () => {
     await lib.clickDestinationsRetry();
     await lib.expectDestinationsEmpty();
     await lib.expectOpenDestinationsVisible();
+    // Not a blocker: the alerts install without a destination.
+    await lib.expectNextEnabled();
   });
 });
