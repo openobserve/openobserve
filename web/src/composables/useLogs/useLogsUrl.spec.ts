@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { ref } from "vue";
+import { createMemoryHistory, createRouter } from "vue-router";
 import {
   bindLogsUrlRouter,
   changedParams,
@@ -246,6 +247,33 @@ describe("useLogsUrl (4c C7b)", () => {
       expect(router.push).not.toHaveBeenCalled();
       await writeLogsUrl("push", { stream: "web" });
       expect(router.push).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not cancel a pending navigation away from Logs", async () => {
+      let loadStreams: (value: unknown) => void = () => {};
+      const streamsPage = new Promise((resolve) => (loadStreams = resolve));
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/logs", name: "logs", component: { render: () => null } },
+          { path: "/streams", name: "streams", component: () => streamsPage as any },
+        ],
+      });
+      bindLogsUrlRouter(router);
+      await router.push("/logs?stream=app");
+      await writeLogsUrl("replace", { stream: "app", page: "2" });
+      expect(router.currentRoute.value.query).toEqual({ stream: "app", page: "2" });
+
+      const leaving = router.push("/streams");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await writeLogsUrl("replace", { stream: "app", page: "3" });
+      loadStreams({ render: () => null });
+      expect(await leaving).toBeUndefined();
+      expect(router.currentRoute.value.name).toBe("streams");
+
+      await router.push("/logs?stream=app");
+      await writeLogsUrl("replace", { stream: "app", page: "4" });
+      expect(router.currentRoute.value.query).toEqual({ stream: "app", page: "4" });
     });
 
     it("drops log_* with a replace and leaves a URL without them alone", async () => {

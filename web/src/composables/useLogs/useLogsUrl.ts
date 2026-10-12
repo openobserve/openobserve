@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, ref } from "vue";
-import type { LocationQuery, LocationQueryRaw, Router } from "vue-router";
+import type { LocationQuery, LocationQueryRaw, RouteLocationNormalized, Router } from "vue-router";
 import { b64DecodeUnicodeSafe, b64EncodeUnicode } from "@/utils/formatters";
 import { decodeFtScan } from "@/utils/logs/freeTextScan";
 import type {
@@ -62,6 +62,10 @@ export const sharedPageNotice = ref<{ page: number; lastPage: number | null } | 
 
 let boundRouter: Router | null = null;
 
+const guardedRouters = new WeakSet<Router>();
+
+let pendingNavigation: RouteLocationNormalized | null = null;
+
 let historyStateProvider: () => LogsHistoryState = () => ({
   zoomStack: [],
   returnPreset: null,
@@ -106,7 +110,9 @@ interface LogsHistoryState {
 }
 
 export function bindLogsUrlRouter(router: Router | null | undefined): void {
-  if (router) boundRouter = router;
+  if (!router) return;
+  boundRouter = router;
+  trackPendingNavigation(router);
 }
 
 export function resetShownSearch(): void {
@@ -254,6 +260,8 @@ export function urlWriteMode(
 export function writeLogsUrl(mode: LogsUrlMode, query: LocationQueryRaw): Promise<unknown> {
   const router = boundRouter;
   if (!router) return Promise.resolve();
+  // A relative write while leaving Logs supersedes that navigation and keeps the user on Logs.
+  if (pendingNavigation && pendingNavigation.name !== "logs") return Promise.resolve();
   if (changedParams(currentQuery(), query).length === 0) return Promise.resolve();
   const target = { query, state: { ...historyStateProvider() } as Record<string, any> };
   return mode === "replace" ? router.replace(target) : router.push(target);
@@ -277,10 +285,26 @@ export function routeHasLineLink(query: LocationQuery | Record<string, unknown>)
 
 export function resetLogsUrlForTests(): void {
   boundRouter = null;
+  pendingNavigation = null;
   resetShownSearch();
   sharedPage.value = null;
   sharedPageNotice.value = null;
   historyStateProvider = () => ({ zoomStack: [], returnPreset: null, stackId: null, level: 0 });
+}
+
+function trackPendingNavigation(router: Router): void {
+  if (guardedRouters.has(router) || typeof router.beforeEach !== "function") return;
+  guardedRouters.add(router);
+  router.beforeEach((to) => {
+    pendingNavigation = to;
+  });
+  router.afterEach((to) => {
+    if (pendingNavigation === to) pendingNavigation = null;
+  });
+  // A guard that throws skips afterEach, so clear here or Logs URL writes stay blocked.
+  router.onError(() => {
+    pendingNavigation = null;
+  });
 }
 
 function sameMembers(a: string[], b: string[]): boolean {
