@@ -21923,143 +21923,15 @@
     "modeUnknown": "Unknown"
   },
   "autoobserve": {
-    "howItWorks": {
-      "statusLink": "New here? See how it works →",
-      "seeIn": "See it in {tab} →",
-      "coming": "Coming",
-      "hero": {
-        "eyebrow": "How AutoObserve works",
-        "promise": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
-        "withoutTitle": "Without AutoObserve",
-        "withoutCount": "pages this week from your old alerts",
-        "without1": "You write the alerts, then keep tuning them",
-        "without2": "You watch dashboards to notice when something breaks",
-        "without3": "Every ping asks the same question: is this one real?",
-        "withTitle": "With AutoObserve",
-        "withCount": "pages this week, each explained — the cause attached, or following in the thread for P1 or when triage times out or fails",
-        "with1": "Nothing to set up: every service is found, and gaps are reported",
-        "with2": "One notification per problem, not one per symptom",
-        "with3": "Each one says what broke, where, since when, and why — the cause included when ready, or following in the same thread"
-      },
-      "machine": {
-        "title": "The machine, one problem at a time",
-        "subtitle": "Follow {id}, the checkout payments failure ({severity}), from raw data to the one message the on-call received.",
-        "prev": "Previous",
-        "next": "Next",
-        "play": "Play",
-        "pause": "Pause",
-        "overview": "Overview",
-        "present": "Present",
-        "diagramLabel": "The AutoObserve pipeline: data, coverage, detect, calibrate, incident, investigate, you, with the proposal gate below",
-        "stageNumber": "Step {n}",
-        "stepOf": "Step {n} of {total}",
-        "counterFirings": "firings",
-        "counterIncidents": "incidents",
-        "counterNotifications": "notifications",
-        "counterMessage": "message, with its cause",
-        "learnBack": "What would have caught it earlier?",
-        "learnBackProposal": "Make {alert} count all pods against payments-db's limit of {limit}",
-        "phase2Action": "Action — fixes what it safely can (phase 2)",
-        "phase2Outcome": "Outcome — learns what worked (phase 2)",
-        "data": {
-          "name": "Your data",
-          "short": "Logs, metrics, traces",
-          "caption": "Logs, metrics and traces arrive the way they already do. Nothing is configured first: no alert rules to write, no dashboards to build."
-        },
-        "coverage": {
-          "name": "Coverage",
-          "short": "Found; gaps reported",
-          "caption": "Every service in the data is found, and checks are picked from the library by what its data contains: learned anomaly baselines for requests, errors and latency, and fixed-threshold guardrails while it learns. New detectors apply on their own as soon as a service appears, with a review window, and gaps are reported."
-        },
-        "detect": {
-          "name": "Detect",
-          "short": "{count} for this problem",
-          "caption": "Detectors fire when something changes. This week they fired {firings} times; most were blips under 2 minutes that cleared on their own, and the rest were grouped into incidents. For this problem the first firing came from {firstDetector} at {firstAt}, followed by firings from {services}."
-        },
-        "calibrate": {
-          "name": "Calibrate",
-          "short": "Routing, digest, dedup",
-          "caption": "Severity decides what reaches people: P1 and P2 page, P3 sends a message that doesn't page, and P4 waits for the Friday summary; deduplication applies to all. This week {held} problems waited for the summary. Noise is treated as a defect: the \"{retuneAlert}\" alert on {retuneHost} fired {retuneFired} times and nobody needed to act, and its growth leaves days of headroom, so AutoObserve proposes raising it from {retuneFrom}% to {retuneTo}%."
-        },
-        "incident": {
-          "name": "Incident",
-          "short": "First firing opens it",
-          "caption": "The first firing opens {id} at {openedAt}. It is {severity}, so the page waits for the investigation. Later firings keep joining the same problem — {count} by {groupedAt} — and it stays one incident with one page."
-        },
-        "investigate": {
-          "name": "Investigate",
-          "short": "Cause found, {confidence} confidence",
-          "caption": "The SRE agent finds the likely cause at {rcaAt}, with {confidence} confidence (no calibrated score yet): {service} {version} raised each pod's connection pool from 20 to 50, and {pods} pods together asked for more than payments-db's {limit} connections. payments-db is a coverage gap, so its limit is inferred from where connections levelled off and the error it returned. The page goes out at {pagedAt} with the cause attached. A P1 would have paged at once, with the cause following in the thread."
-        },
-        "you": {
-          "name": "You",
-          "short": "One message",
-          "caption": "The on-call has one message for the problem, with the cause in its thread. Afterwards the agent asks what would have caught it earlier. The {alert} alert compared each pod with its own pool, so it never fired; the proposal makes it count all pods against payments-db's limit of {limit}. It goes to the proposal gate like any other change."
-        },
-        "exitPresent": "Exit full screen",
-        "rowProblem": "This problem",
-        "rowWeek": "This week",
-        "counterIncident": "incident",
-        "counterHeld": "held for the digest",
-        "p1Path": "P1: pages at once, without waiting; cause follows in the thread",
-        "p2Path": "P2–P3: waits for the cause;",
-        "ledger": {
-          "number": "Behind it",
-          "name": "Proposals → gate",
-          "short": "Off · Suggest · Auto",
-          "applied": "Applied with snapshot + review window",
-          "caption": "Every change any part of AutoObserve wants to make becomes a proposal in one ledger. The gate handles each by its action class: Off never acts and only tells you what it would do, Suggest queues it for one-click approval, Auto applies it with a snapshot and a review window."
-        },
-        "announce": "Step {n} of {total}: {stage}",
-        "p2PathExtra": "or goes out without it if triage times out",
-        "investigateToYou": "cause posted in the same thread"
-      },
-      "trust": {
-        "title": "Why you can trust it",
-        "silenceTitle": "Silence you can check",
-        "silenceBody": "Coverage shows what watches every service and signal. Gaps and unscanned streams are reported as findings, never skipped silently, so a quiet day means nothing it watches is wrong, and you can see exactly what that covers.",
-        "undoTitle": "Every automatic config change can be rolled back",
-        "undoBody": "Each automatic configuration change keeps a snapshot of the prior state and enters a review window: kept if its checks pass, rolled back if they fail. Meanwhile the old configuration keeps being evaluated silently, so anything the change would have hidden still shows up.",
-        "levelTitle": "Clear rules on what it changes",
-        "levelBody": "Every action class has a level. Off never acts on its own and only tells you what it would do, Suggest queues each change for one-click approval, and Auto applies it with a snapshot and a review window. Phase 1 ships fixed defaults."
-      },
-      "roadmap": {
-        "title": "What's next",
-        "phase1": "Phase 1",
-        "phase1Body": "Will watch everything it finds, keep notifications to real problems, and attach the cause.",
-        "phase2": "Phase 2",
-        "action": "Action, including production remediation",
-        "outcome": "Outcome",
-        "phase2Body": "Will fix what it safely can through a governed gate. Each kind of action earns autonomy from its measured outcomes; a fix that doesn't help counts against it, and a fix that keeps being needed is reported as a bug, not automated.",
-        "next": "Next",
-        "afterThat": "After that"
-      },
-      "explain": {
-        "title": "In plain words",
-        "sendTitle": "What happens when you send data",
-        "sendBody": "New streams are scanned from their first ingest, and every stream is swept within a fixed window. A large first ingest can take a while to scan, and until it finishes the stream is reported as unknown, not covered. Fixed-threshold checks go live at once; learned baselines go live once there is enough history. While a service learns, it is covered by an error-ratio ceiling and a freshness check.",
-        "spamTitle": "Why it won't spam you",
-        "spamBody": "Severity decides the route: P1 and P2 always page, P3 sends a message as soon as it's ready that never pages anyone, and P4 goes into the Friday summary. P2 and P3 wait up to 2 minutes for the cause, or go out without it if triage times out or fails, and the cause then follows in the thread. Noisy alerts are treated as defects, so AutoObserve proposes retunes for them.",
-        "wrongTitle": "What if it's wrong",
-        "wrongBody": "An automatic change that makes things worse is rolled back by its review window (see above), and you can undo it yourself from Activity at any time. Anything waiting for approval changes nothing until you approve it.",
-        "changesTitle": "What it changes on its own",
-        "changesBody": "Coverage creates detectors and matching library alerts on its own. Among changes to existing alerts, only deduplication applies on its own. Retiring an alert is never automatic, and alerts you built are never changed silently. Some production actions, like a restart, can't be undone. Others, like a rollback, are reversed by redeploying. Each states its own recovery rule."
-      },
-      "exampleWeek": "Example week: demo week",
-      "conceptPreview": "Concept preview",
-      "demoNote": "This example comes from the demo week."
-    },
     "title": "AutoObserve",
     "subtitle": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
     "demo": "Demo",
     "phase2": "Phase 2",
     "tabs": {
-      "status": "Status",
       "issues": "Issues",
       "coverage": "Coverage",
       "activity": "Activity",
-      "policy": "Policy",
-      "howItWorks": "How it works"
+      "policy": "Policy"
     },
     "loops": {
       "coverage": "Coverage",
@@ -22082,49 +21954,6 @@
       "rejected": "Rejected",
       "rolledBack": "Rolled back",
       "kept": "Kept — checks passed"
-    },
-    "status": {
-      "quietHeadline": "All quiet. No incidents.",
-      "incidentHeadline": "{count} problem needs you. | {count} problems need you.",
-      "incidentSub": "Each problem is one incident. The cause is attached, or follows in the same thread while the investigation is still running.",
-      "deferred": "{count} low-severity (P4) problem held for Friday's summary. P4 problems go there by severity. | {count} low-severity (P4) problems held for Friday's summary. P4 problems go there by severity.",
-      "p1NeverDeferred": "P1 and P2 always page. P3 sends a message that doesn't page, and P4 waits for Friday's summary.",
-      "servicesWatched": "Fully watched",
-      "ofTotal": "of {total}",
-      "learning": "Learning",
-      "gaps": "Coverage gaps",
-      "changesThisWeek": "Changes made",
-      "noiseTitle": "Noise absorbed this week",
-      "firings": "detector firing | detector firings",
-      "incidents": "incident | incidents",
-      "notifications": "notification | notifications",
-      "noiseHint": "Most detector firings are brief blips that clear on their own. I group the rest into incidents and notify only when a person is needed.",
-      "openProblems": "Open problems",
-      "nothingOpen": "Nothing open. The last problem was resolved {when}.",
-      "viewAll": "View all",
-      "recentActivity": "Recent activity",
-      "coverageGaps": "Coverage gaps",
-      "gapTitle": "{service} · {signal}",
-      "streamTitle": "Stream {stream}",
-      "thisWeek": "this week",
-      "selfCheck": "AutoObserve pipeline healthy · discovery, detection and incidents all ran in the last minute | AutoObserve pipeline healthy · discovery, detection and incidents all ran in the last {count} minutes",
-      "nothingOpenEver": "Nothing open, and nothing to resolve yet.",
-      "quietSubClear": "No coverage gaps, every stream is scanned, and no proposals are waiting.",
-      "blindHeadline": "Partly blind: 1 service can't be seen right now. | Partly blind: {count} services can't be seen right now.",
-      "subGaps": "1 coverage gap | {count} coverage gaps",
-      "subStreams": "1 unscanned stream | {count} unscanned streams",
-      "subAnd": " and ",
-      "subNeedLook": "{items} needs a look. | {items} need a look.",
-      "subProposals": "1 proposal is waiting. | {count} proposals are waiting.",
-      "pagesThisWeek": "Pages sent",
-      "pagesCount": "1 page | {count} pages",
-      "routingTitle": "Where I sent things this week",
-      "routingHint": "Severity decides the route: P1 and P2 page, P3 gets a message that doesn't page, and P4 goes into Friday's summary.",
-      "fridaySummary": "Friday's summary",
-      "messagesCount": "1 message | {count} messages",
-      "problemsCount": "1 problem | {count} problems",
-      "asksCount": "1 request for an OK | {count} requests for an OK",
-      "messagesNoPage": "Messages (no page)"
     },
     "issues": {
       "subtitle": "Incidents grouped and investigated by the SRE agent. One notification per problem; the cause is attached, or follows in the same thread if triage times out or fails.",

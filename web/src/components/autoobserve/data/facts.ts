@@ -3835,14 +3835,6 @@ export const serviceStats = (scenario: Scenario) => {
   };
 };
 
-export const pagesTo = (scenario: Scenario, destination: string) =>
-  problemsIn(scenario, "week").filter((p) => p.pagedAt && p.destination === destination).length;
-
-export const asksTo = (scenario: Scenario, destination: string) =>
-  problemsIn(scenario, "week").filter(
-    (p) => p.askedAt && !p.pagedAt && p.destination === destination,
-  ).length;
-
 export const heldBeforeFriday = (scenario: Scenario) =>
   problemsIn(scenario, "week").filter(
     (p) => p.outcome === "held" && DAY_DATE[p.day] < DAY_DATE.friday,
@@ -3871,7 +3863,6 @@ export const daysBefore = (day: DayKey) => {
   return Math.round((today - Date.UTC(yy, mm - 1, dd)) / 86400000);
 };
 
-export const MACHINE_EXAMPLE = "checkout";
 export const MACHINE_ALERT = {
   name: "payments-api-db-pool",
   dbLimit: 200,

@@ -32,8 +32,6 @@ import {
   daysBefore,
   groupedFirings,
   ledgerIn,
-  pagesTo,
-  asksTo,
   periodStats,
   problemsIn,
   scenarioFacts,
@@ -229,14 +227,6 @@ export interface PlanItem {
   signal: Signal;
   library: string;
   reason: I18nText;
-}
-
-export interface DestinationPages {
-  id: string;
-  destination: I18nText;
-  kind: "slack" | "pagerduty" | "email";
-  pages: Record<Scenario, number>;
-  asks: Record<Scenario, number>;
 }
 
 export interface ActionClassPolicy {
@@ -569,8 +559,6 @@ export const issuesFor = (
   period: Period = "week",
 ): Issue[] => problemsIn(scenario, period).map((fact) => toIssue(fact, t, fixedIds));
 
-export const issueFor = (id: string, t: TranslateFn): Issue => toIssue(PROBLEMS[id], t);
-
 export const issueByIncidentId = (
   incidentId: string,
   t: TranslateFn,
@@ -608,10 +596,6 @@ export const ledgerFor = (scenario: Scenario, t: TranslateFn): LedgerEntry[] =>
     .map((e) => toLedger(e, t));
 
 export const allLedger = (t: TranslateFn): LedgerEntry[] => LEDGER.map((e) => toLedger(e, t));
-
-export const THIS_WEEK_LEDGER = LEDGER.filter((e) => DAY_DATE[e.day] >= DAY_DATE.monday).map(
-  (e) => e.id,
-);
 
 const w = (
   detector: string,
@@ -872,19 +856,6 @@ export const gapServices = (scenario: Scenario): string[] =>
 export const unscannedStreams = (scenario: Scenario, t: TranslateFn): StreamScan[] =>
   streamsFor(scenario, t).filter((s) => !s.lastScanned);
 
-export const PAGES_BY_DESTINATION: DestinationPages[] = DESTINATIONS.filter(
-  (d) => d.kind === "slack",
-).map((d) => ({
-  id: d.id,
-  destination: raw(d.name),
-  kind: d.kind,
-  pages: Object.fromEntries(SCENARIOS.map((s) => [s, pagesTo(s, d.id)])) as Record<
-    Scenario,
-    number
-  >,
-  asks: Object.fromEntries(SCENARIOS.map((s) => [s, asksTo(s, d.id)])) as Record<Scenario, number>,
-}));
-
 export const CHANNELS = DESTINATIONS;
 
 const autonomyMode = (actionClass: string): PolicyMode =>
@@ -949,15 +920,6 @@ export const SIGNAL_LABEL: Record<Signal, I18nKey> = {
   saturation: "autoobserve.signals.saturation",
   logPatterns: "autoobserve.signals.logPatterns",
   dependencies: "autoobserve.signals.dependencies",
-};
-
-export const lastResolved = (scenario: Scenario, t: TranslateFn): I18nText | null => {
-  const done = problemsIn(scenario, "month")
-    .filter((p) => p.outcome !== "active" && p.resolvedAt)
-    .sort((a, b) =>
-      `${DAY_DATE[b.day]} ${b.resolvedAt}`.localeCompare(`${DAY_DATE[a.day]} ${a.resolvedAt}`),
-    )[0];
-  return done ? whenLabel(t, done.day, done.resolvedAt) : null;
 };
 
 export const groupedCount = groupedFirings;

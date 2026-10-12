@@ -49,10 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #header-tabs>
         <OTabs v-model="tab" align="left" data-test="autoobserve-tabs">
-          <OTab name="status" data-test="autoobserve-tab-status">
-            <OIcon name="monitor-heart" size="sm" />
-            <span>{{ t("autoobserve.tabs.status") }}</span>
-          </OTab>
           <OTab name="issues" data-test="autoobserve-tab-issues">
             <OIcon name="notifications-active" size="sm" />
             <span>{{ t("autoobserve.tabs.issues") }}</span>
@@ -81,23 +77,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="tune" size="sm" />
             <span>{{ t("autoobserve.tabs.policy") }}</span>
           </OTab>
-          <OTab name="howItWorks" data-test="autoobserve-tab-how-it-works">
-            <OIcon name="lightbulb-outline" size="sm" />
-            <span>{{ t("autoobserve.tabs.howItWorks") }}</span>
-          </OTab>
         </OTabs>
       </template>
 
-      <AutoObserveStatusTab
-        v-if="tab === 'status'"
-        :scenario="scenario"
-        :issues="issues"
-        :ledger="ledger"
-        @open-issue="openIssue"
-        @go="(target) => (tab = target)"
-      />
       <AutoObserveIssuesTab
-        v-else-if="tab === 'issues'"
+        v-if="tab === 'issues'"
         :issues="issues"
         :scenario="scenario"
         @open-issue="openIssue"
@@ -111,18 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="tab === 'activity'"
         :key="scenario"
         :ledger="ledger"
-        :highlight-id="highlightId"
         @update-entry="updateEntry"
         @open-incident="openIncident"
       />
       <AutoObservePolicyTab v-else-if="tab === 'policy'" />
-      <AutoObserveHowItWorksTab
-        v-else
-        :scenario="scenario"
-        v-model:step="howStep"
-        v-model:overview="howOverview"
-        @go="openExample"
-      />
     </OPageLayout>
 
     <AutoObserveIssueDrawer
@@ -135,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -145,12 +121,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import AutoObserveStatusTab from "@/components/autoobserve/AutoObserveStatusTab.vue";
 import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
 import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverageTab.vue";
 import AutoObserveActivityTab from "@/components/autoobserve/AutoObserveActivityTab.vue";
 import AutoObservePolicyTab from "@/components/autoobserve/AutoObservePolicyTab.vue";
-import AutoObserveHowItWorksTab from "@/components/autoobserve/AutoObserveHowItWorksTab.vue";
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import ViewSwitch from "@/components/autoobserve/v2/ViewSwitch.vue";
 import { issuesFor, type Issue, type Scenario } from "@/components/autoobserve/fixtures";
@@ -159,12 +133,16 @@ import { useScenario } from "@/components/autoobserve/data/useScenario";
 import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
 import { SCENARIO_LABEL } from "@/components/autoobserve/v2/fixtures";
 
+const NERD_TABS = ["issues", "coverage", "activity", "policy"] as const;
+type NerdTab = (typeof NERD_TABS)[number];
+
 const { t } = useI18nTyped();
 
 const { scenario, setScenario: setSharedScenario } = useScenario();
 const route = useRoute();
 const router = useRouter();
-const tab = ref(typeof route.query.tab === "string" ? route.query.tab : "status");
+const linkedTab = route.query.tab;
+const tab = ref<NerdTab>(NERD_TABS.find((name) => name === linkedTab) ?? "issues");
 const { overrides, ledger, updateEntry, issueByIncident } = useIssueLedger(scenario, t);
 const drawerOpen = ref(false);
 const selectedIssue = ref<Issue | null>(null);
@@ -178,23 +156,6 @@ const awaitingCount = computed(() => ledger.value.filter((e) => e.status === "aw
 const setScenario = (next: Scenario) => {
   void setSharedScenario(next);
   drawerOpen.value = false;
-};
-
-const highlightId = ref<string | undefined>();
-const howStep = ref(0);
-const howOverview = ref(false);
-
-watch(tab, (next) => {
-  if (next !== "activity") highlightId.value = undefined;
-});
-
-// Following a "See it in" link is an explicit jump to the example, which lives in the demo week.
-const openExample = (target: string, focusId?: string) => {
-  setScenario("demo");
-  if (target === "activity") highlightId.value = focusId;
-  tab.value = target;
-  const issue = target === "issues" && issuesFor("demo", t).find((i) => i.id === focusId);
-  if (issue) openIssue(issue);
 };
 
 const openIssue = (issue: Issue) => {
