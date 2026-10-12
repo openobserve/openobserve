@@ -733,7 +733,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             </button>
           </OTooltip>
 
-          <!-- Sortable component header: the content stays outside the sort button -->
+          <!-- A button must not nest interactive content, so a component header sorts from a sibling button -->
           <template v-else-if="(header.column.columnDef.meta as any)?.sortable">
             <div
               :id="headerLabelId(header)"

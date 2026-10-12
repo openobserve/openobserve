@@ -32,6 +32,17 @@ import { raw } from "@/types/i18n";
 import { setAutoRunTransport, useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
 import searchService from "@/services/search";
 import { failPendingPageNavigation, notePageRequest } from "@/composables/useLogs/logsRowNav";
+import type { PageRequest, PendingPageSelection } from "@/utils/pageCrossing";
+
+interface ReplacedSearchState {
+  lastSearchTraceId: string;
+  page?: { before: PageRequestNote; after: PageRequestNote };
+}
+
+interface PageRequestNote {
+  pageRequest: PageRequest | null;
+  pending: PendingPageSelection | null;
+}
 
 export const useSearchConnection = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
@@ -52,7 +63,18 @@ export const useSearchConnection = (t: TranslateFn) => {
     serverCancel: (orgId, traceIds) => searchService.delete_running_queries(orgId, traceIds),
   });
 
-  const replacedSearchTraceIds = new Map<string, string>();
+  const replacedSearchState = new Map<string, ReplacedSearchState>();
+
+  const readPageRequestNote = (): PageRequestNote => ({
+    pageRequest: searchObj.data.resultGrid?.pageRequest ?? null,
+    pending: searchObj.meta.resultGrid?.navigation?.pendingPageSelection ?? null,
+  });
+
+  const notePagination = (traceId: string): ReplacedSearchState["page"] => {
+    const before = readPageRequestNote();
+    notePageRequest(searchObj, traceId);
+    return { before, after: readPageRequestNote() };
+  };
 
   const buildWebSocketPayload = (
     queryReq: SearchRequestPayload,
@@ -65,9 +87,10 @@ export const useSearchConnection = (t: TranslateFn) => {
     addTraceId(traceId);
 
     if (type === "search") {
-      replacedSearchTraceIds.set(traceId, searchObj.data.lastSearchTraceId ?? "");
+      const lastSearchTraceId = searchObj.data.lastSearchTraceId ?? "";
       searchObj.data.lastSearchTraceId = traceId;
-      if (isPagination) notePageRequest(searchObj, traceId);
+      const page = isPagination ? notePagination(traceId) : undefined;
+      replacedSearchState.set(traceId, { lastSearchTraceId, page });
     }
     if (type === "histogram") {
       searchObj.data.lastHistogramTraceId = traceId;
@@ -97,13 +120,26 @@ export const useSearchConnection = (t: TranslateFn) => {
     return payload;
   };
 
+  // Restores only what still holds the rejected request's note, so a later request's state stays.
+  const releasePageRequest = (page: NonNullable<ReplacedSearchState["page"]>): void => {
+    const grid = searchObj.data.resultGrid;
+    if (grid && grid.pageRequest === page.after.pageRequest) {
+      grid.pageRequest = page.before.pageRequest;
+    }
+    const navigation = searchObj.meta.resultGrid?.navigation;
+    if (navigation && navigation.pendingPageSelection === page.after.pending) {
+      navigation.pendingPageSelection = page.before.pending;
+    }
+  };
+
   const releaseRejectedPayload = (payload: any): void => {
     removeTraceId(payload.traceId);
-    const replaced = replacedSearchTraceIds.get(payload.traceId);
-    if (replaced !== undefined && searchObj.data.lastSearchTraceId === payload.traceId) {
-      searchObj.data.lastSearchTraceId = replaced;
+    const replaced = replacedSearchState.get(payload.traceId);
+    if (replaced && searchObj.data.lastSearchTraceId === payload.traceId) {
+      searchObj.data.lastSearchTraceId = replaced.lastSearchTraceId;
     }
-    replacedSearchTraceIds.delete(payload.traceId);
+    if (replaced?.page) releasePageRequest(replaced.page);
+    replacedSearchState.delete(payload.traceId);
   };
 
   const initializeSearchConnection = (payload: any): string | Promise<void> | null => {
@@ -114,7 +150,7 @@ export const useSearchConnection = (t: TranslateFn) => {
       }
       return null;
     }
-    replacedSearchTraceIds.delete(payload.traceId);
+    replacedSearchState.delete(payload.traceId);
     payload.searchType = "ui";
     payload.pageType = searchObj.data.stream.streamType;
     return fetchQueryDataWithHttpStream(payload, {

@@ -447,7 +447,7 @@ const BRACKETED_LEVEL_RE =
   /[[<(]\s*(EMERG(?:ENCY)?|FATAL|PANIC|ALERT|CRIT(?:ICAL)?|ERROR|ERR|WARN(?:ING)?|NOTICE|INFO|DEBUG|TRACE)\s*[\]>)]/i;
 // Lookarounds reject identifiers, file names and paths such as TRACE-ID, NOTICE.md and /v1/ALERT-rules.
 const UPPERCASE_LEVEL_RE =
-  /(?<![\w/-])(EMERG(?:ENCY)?|FATAL|PANIC|ALERT|CRIT(?:ICAL)?|ERROR|WARN(?:ING)?|NOTICE|INFO|DEBUG|TRACE)(?![-.\w])/;
+  /(?<![\w/-])(EMERG(?:ENCY)?|FATAL|PANIC|ALERT|CRIT(?:ICAL)?|ERROR|WARN(?:ING)?|NOTICE|INFO|DEBUG|TRACE)(?![-\w]|\.\w)/;
 const GLOG_PREFIX_RE = /^([IWEF])\d{4} \d{2}:\d{2}:\d{2}/;
 const STACK_TRACE_RES: readonly RegExp[] = [
   /^Traceback \(most recent call last\)/,
@@ -728,7 +728,8 @@ function tier1Level(field: string, value: unknown): KnownLogSeverityLevel | null
   const n = integerOf(value);
   if (n === null) return typeof value === "string" ? stringLevel(value) : null;
   if (SYSLOG_SEVERITY_FIELDS.has(field)) return syslogLevel(n, true);
-  if (field === "severity") return otelBandLevel(n);
+  // Syslog shippers put 1-7 in severity; OTEL SeverityNumber starts its debug band at 8.
+  if (field === "severity") return n <= 7 ? syslogLevel(n, false) : otelBandLevel(n);
   if (field === "level") return PINO_LEVELS[n] ?? syslogLevel(n, false);
   return syslogLevel(n, false);
 }

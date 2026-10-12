@@ -535,7 +535,7 @@ describe("resolveLogSeverity — tier 1 numbers", () => {
   it.each([
     [{ level: "50" }, "error"],
     [{ level: " 30 " }, "info"],
-    [{ severity: "3" }, "trace"],
+    [{ severity: "3" }, "error"],
     [{ log_level: "3" }, "error"],
     [{ severity: "0", level: "emergency" }, "emergency"],
   ])("numeric string %j → %s", (row, level) => {
@@ -1193,10 +1193,27 @@ describe("severity inference review fixes (M9-M13)", () => {
     [{ severity: 20 }, "error", "severity"],
     [{ severity: 9 }, "info", "severity"],
     [{ severity: "17" }, "error", "severity"],
+    [{ severity: 8 }, "debug", "severity"],
     [{ severity_number: 17 }, "error", "severity_number"],
     [{ severity_number: 20 }, "error", "severity_number"],
   ])("M10: %j → %s from %s", (row, level, field) => {
     expect(sev(row)).toMatchObject({ level, source: "field", field });
+  });
+
+  it.each([
+    [{ severity: 3 }, "error"],
+    [{ severity: "3" }, "error"],
+    [{ severity: 6 }, "info"],
+    [{ severity: 7 }, "debug"],
+    [{ severity: 1 }, "alert"],
+    [{ severity: 9 }, "info"],
+    [{ severity: 20 }, "error"],
+    [{ severity_number: 3 }, "trace"],
+    [{ severity_number: 6 }, "debug"],
+  ])("D2: %j → %s (severity 1-7 syslog, 8-24 OTEL; severity_number OTEL)", (row, level) => {
+    expect(levelOf(row)).toBe(level);
+    const [field, value] = Object.entries(row)[0];
+    expect(resolveSeverityFieldValue(field, value)).toEqual({ level, source: "field" });
   });
 
   it("M10: pino numbers apply to level only", () => {
@@ -1220,13 +1237,16 @@ describe("severity inference review fixes (M9-M13)", () => {
     });
   });
 
-  it.each(["TRACE-ID: abc123", "see NOTICE.md", "GET /v1/ALERT-rules 200"])(
-    "M12: %j is not a level word",
-    (message) => {
-      expect(inferSeverityFromMessage(message)).toBeNull();
-      expect(levelOf({ message })).toBe("unknown");
-    },
-  );
+  it.each([
+    "TRACE-ID: abc123",
+    "see NOTICE.md",
+    "GET /v1/ALERT-rules 200",
+    "open NOTICE.md.",
+    "id=TRACE.x1",
+  ])("M12: %j is not a level word", (message) => {
+    expect(inferSeverityFromMessage(message)).toBeNull();
+    expect(levelOf({ message })).toBe("unknown");
+  });
 
   it.each([
     ["ERROR: boom", "error"],
@@ -1235,7 +1255,11 @@ describe("severity inference review fixes (M9-M13)", () => {
     ["x-ERROR boom", null],
     ["path/DEBUG x", null],
     ["boom ERROR", "error"],
-  ])("M12: %j → %s", (message, level) => {
+    ["Connection failed with ERROR.", "error"],
+    ["INFO...", "info"],
+    ["status ERROR... retrying", "error"],
+    ["shutting down. WARN.", "warning"],
+  ])("M12/D4: %j → %s", (message, level) => {
     expect(inferSeverityFromMessage(message)).toBe(level);
   });
 

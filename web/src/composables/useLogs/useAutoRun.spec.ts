@@ -1385,6 +1385,24 @@ describe("server window moves", () => {
     expect(h.store.meta.consentedScope?.time).toEqual({ type: "absolute", ...narrower });
   });
 
+  it("applies a server narrowing of a relative consent that lands 90 s after dispatch (D7)", () => {
+    const h = makeHarness();
+    const dispatchUs = Date.now() * 1000;
+    h.engine.requestRun("run");
+    const gen = h.lastGen();
+    expect(h.store.meta.consentedScope?.time).toEqual({ type: "relative", period: "15m" });
+    vi.setSystemTime(Date.now() + 90_000);
+    const wider = { startUs: dispatchUs - 16 * MINUTE_US, endUs: dispatchUs };
+    h.engine.recordWindowMove(gen, wider);
+    expect(h.store.meta.consentedScope?.time).toEqual({ type: "relative", period: "15m" });
+    const stretched = { startUs: dispatchUs - 15 * MINUTE_US, endUs: dispatchUs + 90_000_000 };
+    h.engine.recordWindowMove(gen, stretched);
+    expect(h.store.meta.consentedScope?.time).toEqual({ type: "relative", period: "15m" });
+    const narrowed = { startUs: dispatchUs - 14 * MINUTE_US, endUs: dispatchUs };
+    h.engine.recordWindowMove(gen, narrowed);
+    expect(h.store.meta.consentedScope?.time).toEqual({ type: "absolute", ...narrowed });
+  });
+
   it("ignores a move for a replaced generation", () => {
     const h = makeHarness();
     h.engine.requestRun("run");
@@ -1856,6 +1874,27 @@ describe("pure helpers", () => {
     });
     expect(sig.freeTextScan).toEqual({ app: "consented" });
     expect(sig.quickModeFields).toEqual(["a", "b"]);
+  });
+
+  it("isScopeCovered measures a relative consent from the dispatch time (D7)", () => {
+    const dispatchUs = 1_000_000 * MINUTE_US;
+    const nowUs = dispatchUs + 90_000_000;
+    const base = { streamType: "logs", streams: ["a"], regions: [], clusters: [] };
+    const consented = { ...base, time: { type: "relative" as const, period: "15m" } };
+    const at = (startUs: number, endUs: number) => ({
+      ...base,
+      time: { type: "absolute" as const, startUs, endUs },
+    });
+    const narrowed = at(dispatchUs - 14 * MINUTE_US, dispatchUs);
+    expect(isScopeCovered(narrowed, consented, nowUs)).toBe(false);
+    expect(isScopeCovered(narrowed, consented, nowUs, dispatchUs)).toBe(true);
+    expect(
+      isScopeCovered(at(dispatchUs - 16 * MINUTE_US, dispatchUs), consented, nowUs, dispatchUs),
+    ).toBe(false);
+    expect(
+      isScopeCovered(at(dispatchUs - 15 * MINUTE_US, nowUs), consented, nowUs, dispatchUs),
+    ).toBe(false);
+    expect(isScopeCovered(at(dispatchUs, nowUs + 1), consented, nowUs, dispatchUs)).toBe(false);
   });
 
   it("isScopeCovered handles relative and absolute windows, streams, type and regions", () => {

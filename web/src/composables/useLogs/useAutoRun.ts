@@ -202,6 +202,7 @@ export interface Generation {
   op: RunOperation;
   surface: PersistSurface;
   signature: LogsSignature;
+  dispatchedUs: number;
   traces: { traceId: string; role: TraceRole }[];
   aborts: (() => void)[];
   cancelled: boolean;
@@ -405,10 +406,14 @@ function sameSet(a: string[], b: string[]): boolean {
   return a.length === b.length && [...a].sort().every((v, i) => v === sb[i]);
 }
 
-function timeBounds(time: TimeSelection, nowUs: number): { startUs: number; endUs: number } | null {
+function timeBounds(
+  time: TimeSelection,
+  nowUs: number,
+  sinceUs = nowUs,
+): { startUs: number; endUs: number } | null {
   if (time.type === "absolute") return { startUs: time.startUs, endUs: time.endUs };
   const duration = periodToMicros(time.period);
-  return duration === null ? null : { startUs: nowUs - duration, endUs: nowUs };
+  return duration === null ? null : { startUs: sinceUs - duration, endUs: nowUs };
 }
 
 function patchRequestBounds(req: unknown, startUs: number, endUs: number): void {
@@ -522,6 +527,7 @@ export function isScopeCovered(
   scope: ConsentScope,
   consented: ConsentScope | null | undefined,
   nowUs: number,
+  dispatchedUs = nowUs,
 ): boolean {
   if (!consented) return false;
   if (scope.streamType !== consented.streamType) return false;
@@ -534,8 +540,11 @@ export function isScopeCovered(
     return own !== null && allowed !== null && own <= allowed;
   }
   const own = timeBounds(scope.time, nowUs);
-  const allowed = timeBounds(consented.time, nowUs);
+  // A relative consent spans [dispatch - period, now]; the period cap keeps that slack from widening it.
+  const allowed = timeBounds(consented.time, nowUs, Math.min(dispatchedUs, nowUs));
   if (!own || !allowed) return false;
+  const period = consented.time.type === "relative" ? periodToMicros(consented.time.period) : null;
+  if (period !== null && own.endUs - own.startUs > period) return false;
   return own.startUs >= allowed.startUs && own.endUs <= allowed.endUs;
 }
 
@@ -713,6 +722,7 @@ export function createAutoRun(deps: AutoRunDeps) {
       orgId: deps.getOrgId(),
       ...input,
       surface: surfaceFor(input.lane, input.op),
+      dispatchedUs: nowUs(),
       traces: [],
       aborts: [],
       cancelled: false,
@@ -1283,7 +1293,7 @@ export function createAutoRun(deps: AutoRunDeps) {
       if (record === meta.executed) republish = true;
     }
     const consented = meta.consentedScope;
-    if (consented && isScopeCovered({ ...consented, time }, consented, nowUs()))
+    if (consented && isScopeCovered({ ...consented, time }, consented, nowUs(), gen.dispatchedUs))
       meta.consentedScope = { ...consented, time: cloneJson(time) };
     const executed = meta.executed;
     if (republish && executed) {

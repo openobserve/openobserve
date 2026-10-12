@@ -438,6 +438,8 @@ describe("convertLogData.ts", () => {
       ["response_code", "404", "#FB8C00"],
       ["syslog_severity", "0", "#E53935"],
       ["level", "50", "#EF5350"],
+      ["severity", "3", "#EF5350"],
+      ["severity", "6", "#1E88E5"],
       ["severity", "20", "#EF5350"],
       ["severity_number", "18", "#EF5350"],
       ["severity_number", "10", "#1E88E5"],

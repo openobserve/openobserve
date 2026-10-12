@@ -48,7 +48,16 @@ async function pickRelative(page, value, unit) {
 // No run starts while the timers fire: a dispatched hits run flips the Run button to Cancel at once.
 async function runTimersExpectingNoRun(page, ms) {
   await page.clock.runFor(ms);
+  await settlePageWork(page);
   await expect(page.locator(runInFlight)).toHaveCount(0);
+}
+
+// networkidle resolves at once after the first load, so a fired timer's async chain gets a bounded real wait instead.
+async function settlePageWork(page) {
+  await page.evaluate(() => new Promise((resolve) => queueMicrotask(resolve)));
+  await page.clock.runFor(0);
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  await page.clock.runFor(0);
 }
 
 async function setInterval5s(page) {
@@ -181,6 +190,7 @@ test.describe('Logs Auto Run cost guard', () => {
     await page.keyboard.type("level='error'", { delay: 20 });
     await expect(page.locator(runAnyway)).toHaveCount(0);
     await expect(page.locator('[data-test="logs-search-bar-refresh-btn"][data-run-pending="true"]')).toBeVisible();
+    await runTimersExpectingNoRun(page, 2000);
     expect(searches.all()).toHaveLength(0);
   });
 

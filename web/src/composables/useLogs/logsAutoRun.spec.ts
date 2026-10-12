@@ -421,6 +421,54 @@ describe("transport binding (AC4.1, P2 records)", () => {
     expect(obj.data.searchRequestTraceIds).toEqual(["previous"]);
   });
 
+  it.each([
+    ["an unbound crossing", null],
+    ["a crossing bound to an earlier request", "earlier"],
+  ])("a rejected pagination bind restores the page request note, %s (M6)", (_label, bound) => {
+    const connection = useSearchConnection((key: string) => key as any);
+    const obj = fakeSearchObj.value;
+    const pending = { page: 2, position: "first", requestId: bound };
+    obj.meta.resultGrid = {
+      navigation: { currentRowIndex: 49, selectionActive: true, pendingPageSelection: pending },
+    };
+    obj.data.resultGrid.pageRequest = { requestId: "in-flight" };
+    obj.data.lastSearchTraceId = "in-flight";
+    obj.data.searchRequestTraceIds = ["in-flight"];
+    const stale = openGrid();
+    openGrid();
+    connection.getDataThroughStream(
+      { query: { sql: 'select * from "app"', from: 50, size: 50 } } as any,
+      true,
+      callbacks,
+      stale.id,
+    );
+    expect(sentPayloads).toHaveLength(0);
+    expect(obj.data.resultGrid.pageRequest).toEqual({ requestId: "in-flight" });
+    expect(obj.meta.resultGrid.navigation.pendingPageSelection).toEqual({
+      page: 2,
+      position: "first",
+      requestId: bound,
+    });
+    expect(obj.data.lastSearchTraceId).toBe("in-flight");
+    expect(obj.data.searchRequestTraceIds).toEqual(["in-flight"]);
+  });
+
+  it("a rejected bind keeps a page request noted after it (M6)", () => {
+    const connection = useSearchConnection((key: string) => key as any);
+    const obj = fakeSearchObj.value;
+    obj.meta.resultGrid = {
+      navigation: { currentRowIndex: 49, selectionActive: true, pendingPageSelection: null },
+    };
+    obj.data.resultGrid.pageRequest = null;
+    const stale = openGrid();
+    openGrid();
+    const rejected: any = connection.buildWebSocketPayload({ query: {} } as any, true, "search");
+    rejected.generationId = stale.id;
+    obj.data.resultGrid.pageRequest = { requestId: "later" };
+    expect(connection.initializeSearchConnection(rejected)).toBeNull();
+    expect(obj.data.resultGrid.pageRequest).toEqual({ requestId: "later" });
+  });
+
   it("drops responses of a replaced generation and keeps the new one's", () => {
     useSearchConnection((key: string) => key as any);
     const old = openGrid();

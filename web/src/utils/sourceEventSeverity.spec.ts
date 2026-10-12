@@ -67,6 +67,8 @@ describe("extractSeverity — correlation adapter over the severity resolver", (
     it("numeric level 1-7 now uses syslog: level 3 is ERROR (was TRACE)", () => {
       expect(extractSeverity({ level: 3 })).toBe("ERROR");
       expect(extractSeverity({ severity: 7 })).toBe("DEBUG");
+      expect(extractSeverity({ severity: 3 })).toBe("ERROR");
+      expect(extractSeverity({ severity: 6 })).toBe("INFO");
     });
 
     it("pino numbers on level resolve (level 50 is ERROR)", () => {
