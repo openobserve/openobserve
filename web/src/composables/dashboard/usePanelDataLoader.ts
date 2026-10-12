@@ -16,6 +16,7 @@
 import { ref, watch, reactive, toRefs, onMounted, onUnmounted, toRaw, markRaw } from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
 import { isEqual, omit } from "lodash-es";
@@ -356,7 +357,10 @@ export const usePanelDataLoader = (
       traceIds.forEach((traceId: string) => {
         cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId });
       });
-      queryService.delete_running_queries(orgId, traceIds)?.catch?.(() => {});
+      // The query manager cancel route exists only in enterprise and cloud builds; OSS answers 404.
+      if (config.isEnterprise == "true" || config.isCloud == "true") {
+        queryService.delete_running_queries(orgId, traceIds)?.catch?.(() => {});
+      }
     } catch (error) {
       console.error("Error cancelling superseded searches:", error);
     }

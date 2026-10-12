@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { flushPromises } from "@vue/test-utils";
 import { usePanelDataLoader } from "./usePanelDataLoader";
 import queryService from "../../services/search";
+import config from "@/aws-exports";
 
 const RealAbortController = globalThis.AbortController;
 
@@ -1511,41 +1512,56 @@ describe("usePanelDataLoader", () => {
   });
 
   describe("superseded runs", () => {
-    it("cancels the superseded run's search on the server before starting the next", async () => {
+    const supersedeRun = async (edition: { isEnterprise: string; isCloud: string }) => {
+      const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+      Object.assign(config, edition);
       const streams: any[] = [];
       streamOverride = (payload, callbacks) => {
         streams.push({ payload, callbacks });
         return "held-stream";
       };
-      const loader = usePanelDataLoader(
-        createMockPanelSchema(),
-        createMockSelectedTimeObj({
-          start_time: new Date(Date.now() - 3600000),
-          end_time: new Date(),
-        }),
-        createMockVariablesData(),
-        ref(null),
-        ref(true),
-        ref("dashboards"),
-        ref("test-dashboard"),
-        ref("test-folder"),
-        ref(null),
-        ref(null),
-        ref(null),
-        ref(null),
-        ref(null),
-        ref(false),
-      );
-      await loader.loadData();
-      const [{ payload }] = streams;
-      expect(loader.searchRequestTraceIds.value).toContain(payload.traceId);
-      vi.mocked(queryService.delete_running_queries).mockClear();
+      try {
+        const loader = usePanelDataLoader(
+          createMockPanelSchema(),
+          createMockSelectedTimeObj({
+            start_time: new Date(Date.now() - 3600000),
+            end_time: new Date(),
+          }),
+          createMockVariablesData(),
+          ref(null),
+          ref(true),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        );
+        await loader.loadData();
+        const traceId = streams[0].payload.traceId;
+        expect(loader.searchRequestTraceIds.value).toContain(traceId);
+        vi.mocked(queryService.delete_running_queries).mockClear();
+        await loader.loadData();
+        return { streams, traceId };
+      } finally {
+        Object.assign(config, original);
+      }
+    };
 
-      await loader.loadData();
+    it("cancels the superseded run's search on the server before starting the next", async () => {
+      const { streams, traceId } = await supersedeRun({ isEnterprise: "true", isCloud: "false" });
 
-      expect(queryService.delete_running_queries).toHaveBeenCalledWith("test-org", [
-        payload.traceId,
-      ]);
+      expect(queryService.delete_running_queries).toHaveBeenCalledWith("test-org", [traceId]);
+      expect(streams).toHaveLength(2);
+    });
+
+    it("skips the server-side cancel on OSS, which has no query manager route", async () => {
+      const { streams } = await supersedeRun({ isEnterprise: "false", isCloud: "false" });
+
+      expect(queryService.delete_running_queries).not.toHaveBeenCalled();
       expect(streams).toHaveLength(2);
     });
 
