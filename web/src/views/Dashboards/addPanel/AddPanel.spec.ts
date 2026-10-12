@@ -4962,4 +4962,82 @@ describe("AddPanel.vue", () => {
       query.customQuery = false;
     });
   });
+
+  describe("Time range and Auto Run", () => {
+    const mountForTime = async () => {
+      const w = mount(AddPanel, {
+        global: {
+          plugins: [store, router, i18n],
+          mocks: {
+            $route: { query: { dashboard: "test-dashboard" }, params: {} },
+            $router: { push: vi.fn(), replace: vi.fn() },
+          },
+          stubs: {
+            OPageHeader: true,
+            PanelEditor: true,
+            DateTimePickerDashboard: true,
+            QueryInspector: true,
+            AddSettingVariable: true,
+            ConfigDrawer: true,
+          },
+        },
+        props: { metaData: null },
+      });
+      await nextTick();
+      return w;
+    };
+
+    // Stubs replace the template refs on every render, so the fakes go back in before each change.
+    const usePicker = (w: any, startTime: number) => {
+      w.vm.panelEditorRef = { initChartData: vi.fn() };
+      w.vm.dateTimePickerRef = {
+        getConsumableDateTime: () => ({ startTime, endTime: startTime + 60_000 }),
+        refresh: vi.fn(),
+      };
+    };
+
+    const pick = async (w: any, relativeTimePeriod: string, startTime: number) => {
+      usePicker(w, startTime);
+      w.vm.selectedDate = { valueType: "relative", relativeTimePeriod };
+      await nextTick();
+    };
+
+    const chartStart = (w: any) => w.vm.dashboardPanelData.meta.dateTime.start_time.getTime();
+
+    beforeEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("with Auto Run off, holds a picked range until Apply", async () => {
+      wrapper = await mountForTime();
+      await pick(wrapper, "15m", 1_000_000);
+      expect(chartStart(wrapper)).toBe(1_000_000);
+
+      await pick(wrapper, "30m", 2_000_000);
+
+      expect(chartStart(wrapper)).toBe(1_000_000);
+    });
+
+    it("with Auto Run on, applies a picked range directly", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      wrapper = await mountForTime();
+      await pick(wrapper, "15m", 1_000_000);
+
+      await pick(wrapper, "30m", 2_000_000);
+
+      expect(chartStart(wrapper)).toBe(2_000_000);
+    });
+
+    it("applies a range picked while Auto Run was off once it is turned on", async () => {
+      wrapper = await mountForTime();
+      await pick(wrapper, "15m", 1_000_000);
+      await pick(wrapper, "30m", 2_000_000);
+
+      usePicker(wrapper, 2_000_000);
+      store.state.zoConfig.auto_query_enabled = true;
+      await nextTick();
+
+      expect(chartStart(wrapper)).toBe(2_000_000);
+    });
+  });
 });

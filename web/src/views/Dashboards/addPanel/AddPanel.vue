@@ -80,6 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-model="selectedDate"
               ref="dateTimePickerRef"
               :disable="disable"
+              :auto-apply-dashboard="true"
               class="max-md:[&_.date-time-label]:hidden"
               @hide="setTimeForVariables"
               data-test="dashboard-global-date-time-picker"
@@ -966,8 +967,21 @@ export default defineComponent({
         end_time: endTime,
       };
     };
+    // A relative range is the same selection whatever "now" it last ended at.
+    const dateSelectionKey = (date: any) =>
+      date?.valueType === "relative"
+        ? `relative:${date.relativeTimePeriod}`
+        : `absolute:${date?.startTime}:${date?.endTime}`;
+    const appliedDateKey = ref<string | null>(null);
+    const isTimeChangePending = computed(
+      () =>
+        appliedDateKey.value !== null &&
+        dateSelectionKey(selectedDate.value) !== appliedDateKey.value,
+    );
+
+    // With Auto Run off a picked range waits for Apply like any other edit; the first range always applies.
     watch(selectedDate, () => {
-      updateDateTime();
+      if (isAutoRunOn.value || appliedDateKey.value === null) updateDateTime();
     });
     // Watch for panel-level time configuration changes and update URL
     watch(
@@ -1109,6 +1123,7 @@ export default defineComponent({
 
         // Set the effective time for chart rendering
         dashboardPanelData.meta.dateTime = effectiveTime;
+        appliedDateKey.value = dateSelectionKey(selectedDate.value);
 
         // CRITICAL: Update chartData to trigger PanelSchemaRenderer to re-render
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
@@ -1699,8 +1714,14 @@ export default defineComponent({
       isBuilderValid: isBuilderValidSilently,
       isLoading: disable,
       run: runLivePreview,
-      pendingApply: () => panelEditorRef.value?.sparklinePendingApply ?? false,
+      pendingApply: () =>
+        (panelEditorRef.value?.sparklinePendingApply ?? false) || isTimeChangePending.value,
       autoRun: () => isAutoRunOn.value,
+    });
+
+    // Turning Auto Run back on applies a range picked while it was off.
+    watch(isAutoRunOn, (on) => {
+      if (on && isTimeChangePending.value) refreshDateTime();
     });
 
     const isOutDated = computed(() => livePreview.isPending.value);
