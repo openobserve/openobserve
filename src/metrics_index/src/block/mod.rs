@@ -214,6 +214,7 @@ impl Index {
         })
     }
 
+    /// Labels absent from the source return None; present labels must be projected.
     #[inline]
     pub fn label_value(&self, block: usize, name: &str) -> Result<Option<&str>> {
         ensure!(block < self.blocks.len(), "block index out of bounds");
