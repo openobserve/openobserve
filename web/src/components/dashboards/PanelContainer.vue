@@ -504,6 +504,7 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
 import { getUUID, processQueryMetadataErrors, b64EncodeUnicode } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -711,11 +712,8 @@ export default defineComponent({
     const showLegendsDialog = ref(false);
     const confirmDeletePanelDialog = ref(false);
     const confirmMovePanelDialog: any = ref(false);
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const metaDataValue = (metadata: any) => {
       metaData.value = metadata;
     };
@@ -939,11 +937,12 @@ export default defineComponent({
       } catch (error: any) {
         // Show an error notification.
 
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ?? error?.message ?? t("panel.panelDuplicationFailed"),
-            t,
-          );
+        if (saveConflict.isConflict(error)) {
+          void saveConflict.openConflict({
+            dashboardId: String(route.query.dashboard),
+            folderId: (route.query.folder as string) ?? "default",
+            change: t("dashboard.saveConflict.change.duplicatedPanel", { name: data.title }),
+          });
         } else {
           showErrorNotification(error?.message ?? t("panel.panelDuplicationFailed"));
         }

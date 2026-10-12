@@ -249,6 +249,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
+import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
@@ -423,6 +424,37 @@ describe("ViewDashboard", () => {
       wrapper.vm.toggleAutoRun();
       expect(localStorage.getItem("oo_toggle_auto_run")).toBe("false");
       expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+  });
+
+  describe("save conflict resolution", () => {
+    it("marks the page not saved while this dashboard's conflict is unresolved", async () => {
+      wrapper = shallowMount(ViewDashboard, {
+        global: {
+          plugins: [i18n, store],
+          config: { globalProperties: { store } },
+          stubs: {
+            OPageLayout: { template: "<div><slot /></div>" },
+            OBanner: { template: "<div><slot /><slot name='actions' /></div>" },
+          },
+        },
+      });
+      await flushPromises();
+      const banner = () => wrapper.find('[data-test="dashboard-unsaved-conflict-banner"]');
+      expect(banner().exists()).toBe(false);
+
+      dashboardSaveConflictState.myChange = 'Deleted panel "CPU"';
+      dashboardSaveConflictState.unresolvedDashboardId = "test-dashboard-1";
+      await flushPromises();
+      expect(banner().exists()).toBe(true);
+      // This spec's i18n has no messages, so the banner carries its key.
+      expect(banner().text()).toContain("dashboard.saveConflict.notSavedChange");
+      expect(wrapper.find('[data-test="dashboard-unsaved-conflict-resolve"]').exists()).toBe(true);
+
+      dashboardSaveConflictState.unresolvedDashboardId = "other-dashboard";
+      await flushPromises();
+      expect(banner().exists()).toBe(false);
+      dashboardSaveConflictState.unresolvedDashboardId = "";
     });
   });
 

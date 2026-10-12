@@ -334,6 +334,7 @@ import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
 import useNotifications from "@/composables/useNotifications";
+import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import { getVariableKey, useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
@@ -656,11 +657,8 @@ export default defineComponent({
       }
     });
 
-    const {
-      showPositiveNotification,
-      showErrorNotification,
-      showConfictErrorNotificationWithRefreshBtn,
-    } = useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const saveConflict = useDashboardSaveConflict();
     const refreshDashboard = (onlyIfRequired = false) => {
       emit("refresh", onlyIfRequired);
     };
@@ -834,23 +832,23 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.renderDashboardCharts.dashboardUpdatedSuccessfully"));
       } catch (error: any) {
-        if (error?.response?.status === 409) {
-          showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
-            t,
-          );
-        } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
-            {
-              timeout: 2000,
-            },
-          );
+        if (saveConflict.isConflict(error)) {
+          // No refresh: the layout I just made stays on screen while the dialog is open.
+          void saveConflict.openConflict({
+            dashboardId: props.dashboardData.dashboardId,
+            folderId: (route.query.folder as string) ?? "default",
+            mine: props.dashboardData,
+            change: t("dashboard.saveConflict.change.movedPanels"),
+          });
+          return;
         }
+        showErrorNotification(
+          error?.message ?? t("dashboard.renderDashboardCharts.dashboardUpdateFailed"),
+          {
+            timeout: 2000,
+          },
+        );
 
-        // refresh dashboard
         refreshDashboard();
       } finally {
         /* no cleanup needed */
