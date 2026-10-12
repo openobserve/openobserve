@@ -946,6 +946,7 @@ export default defineComponent({
         panelEditorRef.value?.initChartData(dashboardPanelData.data, {
           keepQueries: livePreview.isTypedPending.value,
         });
+        refreshDateTime();
       },
     );
     const dateTimeForVariables = ref<{
@@ -1060,9 +1061,7 @@ export default defineComponent({
         // copy the data object excluding the reactivity
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         panelEditorRef.value?.initChartData(dashboardPanelData.data);
-        // refresh the date time based on current time if relative date is selected
-        dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-        updateDateTime();
+        refreshDateTime();
 
         // Call PanelEditor's runQuery if available
         if (panelEditorRef.value) {
@@ -1128,6 +1127,12 @@ export default defineComponent({
           },
         });
       }
+    };
+
+    // A relative range such as "Past 15 Minutes" must end now for every run, not only on Apply.
+    const refreshDateTime = () => {
+      dateTimePickerRef.value?.refresh();
+      updateDateTime();
     };
 
     const goBack = async () => {
@@ -1677,6 +1682,7 @@ export default defineComponent({
       updateCommittedVariables();
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       panelEditorRef.value?.initChartData(dashboardPanelData.data);
+      refreshDateTime();
       // The editor's own run records what was loaded (e.g. the sparkline), so Apply stops showing it as pending.
       panelEditorRef.value?.runQuery();
     };
