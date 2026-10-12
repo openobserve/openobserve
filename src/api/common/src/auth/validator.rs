@@ -146,6 +146,8 @@ pub struct AuthValidationResult {
     pub user_email: String,
     pub user_role: Option<UserRole>,
     pub is_internal_user: bool,
+    /// Name of the org ingestion token the request authenticated with.
+    pub token_name: Option<String>,
 }
 
 /// What a password comparison decided, once the lockout policy has had its say.
@@ -236,6 +238,7 @@ pub async fn validator(
                         user_email: res.user_email,
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
+                        token_name: None,
                     });
                 }
 
@@ -248,10 +251,15 @@ pub async fn validator(
                     )
                     .await
                 {
+                    let token_name = password
+                        .trim()
+                        .starts_with(infra::table::org_ingestion_tokens::ORG_INGESTION_TOKEN_PREFIX)
+                        .then_some(res.user_name);
                     Ok(AuthValidationResult {
                         user_email: res.user_email,
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
+                        token_name,
                     })
                 } else {
                     Err(AuthError::Forbidden("Unauthorized Access".to_string()))
@@ -1098,6 +1106,7 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                                 user_email: res.user_email,
                                 user_role: res.user_role,
                                 is_internal_user: res.is_internal_user,
+                                token_name: None,
                             })
                         } else {
                             Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1145,6 +1154,7 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                             user_email: res.user_email,
                             user_role: res.user_role,
                             is_internal_user: res.is_internal_user,
+                            token_name: None,
                         })
                     } else {
                         Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1226,12 +1236,14 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_email: user.email,
                         user_role: Some(user.role),
                         is_internal_user: !user.is_external,
+                        token_name: None,
                     })
                 } else {
                     Ok(AuthValidationResult {
                         user_email: String::new(),
                         user_role: None,
                         is_internal_user: false,
+                        token_name: None,
                     })
                 }
             }

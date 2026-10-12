@@ -15,7 +15,7 @@
 
 use std::{
     collections::BTreeMap,
-    sync::{Arc, LazyLock},
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use async_trait::async_trait;
@@ -72,6 +72,90 @@ impl Table for StreamTable {
         _case: Case,
         _fields: &[&str],
     ) -> Result<IndexHandle, vector_enrichment::Error> {
+        Ok(IndexHandle(1))
+    }
+
+    fn index_fields(&self) -> Vec<(Case, Vec<String>)> {
+        Vec::new()
+    }
+
+    fn needs_reload(&self) -> bool {
+        false
+    }
+}
+
+/// No org for a process-wide table.
+type TableRead = (Option<String>, String);
+
+#[derive(Clone, Default)]
+pub(crate) struct TableReads {
+    reads: Arc<Mutex<Vec<TableRead>>>,
+}
+
+impl TableReads {
+    pub(crate) fn recorder(&self, org_id: Option<String>, name: String) -> TableReadRecorder {
+        TableReadRecorder {
+            org_id,
+            name,
+            reads: self.clone(),
+        }
+    }
+
+    pub(crate) fn org_tables(&self) -> Vec<(String, String)> {
+        let reads = self.reads.lock().unwrap_or_else(|e| e.into_inner());
+        let mut out: Vec<(String, String)> = Vec::new();
+        for (org_id, name) in reads.iter() {
+            if let Some(org_id) = org_id
+                && !out.iter().any(|(o, n)| o == org_id && n == name)
+            {
+                out.push((org_id.clone(), name.clone()));
+            }
+        }
+        out
+    }
+}
+
+/// VRL enrichment functions call `add_index` on their literal table at compile time.
+#[derive(Clone)]
+pub(crate) struct TableReadRecorder {
+    org_id: Option<String>,
+    name: String,
+    reads: TableReads,
+}
+
+impl Table for TableReadRecorder {
+    fn find_table_row(
+        &self,
+        _case: Case,
+        _conditions: &[vector_enrichment::Condition],
+        _select: Option<&[String]>,
+        _wildcard: Option<&Value>,
+        _index: Option<IndexHandle>,
+    ) -> Result<ObjectMap, vector_enrichment::Error> {
+        Ok(ObjectMap::default())
+    }
+
+    fn find_table_rows(
+        &self,
+        _case: Case,
+        _conditions: &[vector_enrichment::Condition],
+        _select: Option<&[String]>,
+        _wildcard: Option<&Value>,
+        _index: Option<IndexHandle>,
+    ) -> Result<Vec<ObjectMap>, vector_enrichment::Error> {
+        Ok(Vec::new())
+    }
+
+    fn add_index(
+        &mut self,
+        _case: Case,
+        _fields: &[&str],
+    ) -> Result<IndexHandle, vector_enrichment::Error> {
+        self.reads
+            .reads
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push((self.org_id.clone(), self.name.clone()));
         Ok(IndexHandle(1))
     }
 

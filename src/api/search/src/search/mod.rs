@@ -1281,9 +1281,7 @@ fn resolve_typed_stream_names(
 ) -> Result<Vec<(String, StreamType)>, infra::errors::Error> {
     use config::meta::sql::TableReferenceExt;
 
-    let sql = config::utils::query_select_utils::replace_o2_custom_patterns(sql)
-        .unwrap_or_else(|_| sql.to_string());
-    Ok(config::meta::sql::resolve_stream_names_with_type(&sql)?
+    Ok(openobserve_core::authz::resolve_sql_tables(sql)?
         .iter()
         .map(|t| (t.stream_name(), t.get_stream_type(stream_type)))
         .collect())
