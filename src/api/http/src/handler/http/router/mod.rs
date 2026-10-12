@@ -36,7 +36,9 @@ use openobserve_api_management::request::{
     short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
-use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
+use openobserve_api_search::{
+    profiles as profiles_query, promql, rum as rum_query, search, traces,
+};
 use openobserve_core::auth::AuthExtractor;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
@@ -1274,6 +1276,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
         .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
+
+        // RUM trace lookup
+        .route("/{org_id}/rum/lookup", post(rum_query::lookup::lookup))
 
         // RUM Product Analytics
         .route("/{org_id}/rum/analytics/named_events", get(rum_analytics::list_named_events).post(rum_analytics::create_named_event))

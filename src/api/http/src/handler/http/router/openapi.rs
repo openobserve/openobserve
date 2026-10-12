@@ -82,6 +82,7 @@ use crate::{
         openobserve_api_search::traces::time_index::get_trace_time_range,
         openobserve_api_search::traces::time_index::get_org_trace_time_range,
         openobserve_api_search::traces::dag::get_trace_dag,
+        openobserve_api_search::rum::lookup::lookup,
         openobserve_api_search::profiles::meta::get_profiles_meta,
         openobserve_api_search::profiles::tag_values::get_profiles_tag_values,
         openobserve_api_search::profiles::series::profiles_series_get,

@@ -58,6 +58,7 @@ pub mod prompts;
 pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
+pub mod rum;
 pub mod rum_pa;
 use search_service as search;
 #[cfg(feature = "profiling")]

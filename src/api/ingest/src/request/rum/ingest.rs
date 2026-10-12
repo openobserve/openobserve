@@ -27,6 +27,7 @@ use flate2::read::ZlibDecoder;
 use ingestion_common::{IngestUser, IngestionRequest};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
+pub use openobserve_core::rum::RUM_DATA_STREAM;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -37,7 +38,6 @@ use crate::{
 
 pub const RUM_LOG_STREAM: &str = "_rumlog";
 pub const RUM_SESSION_REPLAY_STREAM: &str = "_sessionreplay";
-pub const RUM_DATA_STREAM: &str = "_rumdata";
 
 /// Multipart form data being ingested in the form of session-replay
 #[derive(ToSchema)]
@@ -148,7 +148,10 @@ pub async fn data(
         // 202 Accepted: the RUM SDKs treat any non-202 intake response as an unexpected error
         // and drop the batch instead of retrying, so the status must be 202 even though the
         // body still carries `code: 200` from the shared ingestion response.
-        Ok(v) => (StatusCode::ACCEPTED, Json(v)).into_response(),
+        Ok(v) => {
+            openobserve_core::rum::ensure_lookup_index_fields(&org_id).await;
+            (StatusCode::ACCEPTED, Json(v)).into_response()
+        }
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
