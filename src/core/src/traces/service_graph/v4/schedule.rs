@@ -15,7 +15,7 @@
 
 //! Stream discovery, org gate, claim, learning trigger and the per-stream window loop.
 
-use std::sync::{Arc, atomic::Ordering};
+use std::sync::Arc;
 
 use config::{
     cluster::LOCAL_NODE,
@@ -29,8 +29,7 @@ use tokio::sync::{Mutex, RwLock};
 
 use super::{
     LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, ORG_RETAINED, ORG_TABLES,
-    RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN, STREAM_STATES, Settings, TableRef,
-    V1_STOP_AFTER_MICROS, V1_STOPPED_SEEN,
+    RETAINED, SNAPSHOT_INTERVAL_SECS, STREAM_STATES, Settings, TableRef,
     resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
     resolve::{CONNECTION_MODEL, CONNECTION_TOOL, SeriesKey, Staging},
     sql::{
@@ -43,10 +42,7 @@ use super::{
     stream_concurrency, writer,
 };
 use crate::{
-    db::service_graph::{
-        get_started_at, get_v4_offset, is_v1_stopped, set_started_at_if_absent,
-        set_v1_stopped_if_absent, set_v4_offset, v4_offset_key,
-    },
+    db::service_graph::{get_v4_offset, set_v4_offset, v4_offset_key},
     traces::service_graph::run_graph_search,
 };
 
@@ -132,17 +128,9 @@ pub fn settle_ql_trigger(table: &mut ResolutionTable, need_ql: bool, horizon: i6
     }
 }
 
-/// No per-org data-age guard: once auto-stop is enabled, 7 days of v4 is the whole condition.
-pub fn should_stop_v1(now: i64, started_at: Option<i64>) -> bool {
-    started_at.is_some_and(|started_at| now - started_at >= V1_STOP_AFTER_MICROS)
-}
-
 pub async fn run_tick(settings: &Settings) {
     let now = now_micros();
     let discovered = discover().await;
-    if settings.v1_auto_stop {
-        maybe_stop_v1(now).await;
-    }
 
     let mut jobs = vec![];
     for (org, streams) in discovered {
@@ -272,27 +260,6 @@ async fn claim_under_lock(org: &str, stream: &str) -> Option<i64> {
         log::warn!("[ServiceGraph] {org}/{stream}: claim unlock failed: {e}");
     }
     claimed
-}
-
-/// Write-once switch; once set, v1 stops computing service and agent edges together.
-async fn maybe_stop_v1(now: i64) {
-    if V1_STOPPED_SEEN.load(Ordering::Relaxed) {
-        return;
-    }
-    if is_v1_stopped().await {
-        V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
-        return;
-    }
-    if !should_stop_v1(now, get_started_at().await) {
-        return;
-    }
-    match set_v1_stopped_if_absent().await {
-        Ok(()) => {
-            V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
-            log::info!("[ServiceGraph] v4 has run for 7 days, v1 job stopped");
-        }
-        Err(e) => log::warn!("[ServiceGraph] failed to write v1 stopped flag: {e}"),
-    }
 }
 
 async fn org_table(org: &str, claimed_offsets: &[i64], settings: &Settings, now: i64) -> TableRef {
@@ -775,7 +742,6 @@ async fn deliver(org: &str, stream: &str, state: &mut StreamState, batch: Batch)
     match writer::write_batch(org, chunks).await {
         writer::WriteOutcome::Delivered => {
             state.mark_clean(&batch);
-            note_started().await;
             true
         }
         outcome => {
@@ -786,16 +752,6 @@ async fn deliver(org: &str, stream: &str, state: &mut StreamState, batch: Batch)
             state.pending = Some(batch);
             false
         }
-    }
-}
-
-async fn note_started() {
-    if STARTED_AT_WRITTEN.load(Ordering::Relaxed) {
-        return;
-    }
-    match set_started_at_if_absent(now_micros()).await {
-        Ok(()) => STARTED_AT_WRITTEN.store(true, Ordering::Relaxed),
-        Err(e) => log::warn!("[ServiceGraph] failed to record v4 started_at: {e}"),
     }
 }
 
@@ -828,24 +784,6 @@ mod tests {
         assert_eq!(claim_decision("me", "me", true), ClaimDecision::Owned);
         assert_eq!(claim_decision("other", "me", true), ClaimDecision::Skip);
         assert_eq!(claim_decision("other", "me", false), ClaimDecision::Claim);
-    }
-
-    #[test]
-    fn test_should_stop_v1() {
-        let started = 1_000 * SECOND_MICRO_SECS;
-        assert!(!should_stop_v1(started + V1_STOP_AFTER_MICROS, None));
-        assert!(!should_stop_v1(
-            started + V1_STOP_AFTER_MICROS - 1,
-            Some(started)
-        ));
-        assert!(should_stop_v1(
-            started + V1_STOP_AFTER_MICROS,
-            Some(started)
-        ));
-        assert!(should_stop_v1(
-            started + V1_STOP_AFTER_MICROS + 1,
-            Some(started)
-        ));
     }
 
     #[test]

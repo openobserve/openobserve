@@ -61,6 +61,15 @@ fn otlp_request_type_from_content_type(content_type: &str) -> Option<OtlpRequest
     }
 }
 
+/// Firehose treats 413 as a permanent failure and retries every other non-200 status.
+fn kinesis_error_status(e: &infra::errors::Error) -> StatusCode {
+    match e {
+        infra::errors::Error::ResourceError(_) => StatusCode::SERVICE_UNAVAILABLE,
+        infra::errors::Error::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
+        _ => StatusCode::BAD_REQUEST,
+    }
+}
+
 /// _bulk ES compatible ingestion API
 #[utoipa::path(
     post,
@@ -368,27 +377,15 @@ pub async fn handle_kinesis_request(
             if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
                 log::error!("Error processing kinesis request:  org_id: {org_id} {e}");
             }
-            if matches!(e, infra::errors::Error::ResourceError(_)) {
-                (
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    Json(KinesisFHIngestionResponse {
-                        request_id,
-                        timestamp: request_time,
-                        error_message: e.to_string().into(),
-                    }),
-                )
-                    .into_response()
-            } else {
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(KinesisFHIngestionResponse {
-                        request_id,
-                        timestamp: request_time,
-                        error_message: e.to_string().into(),
-                    }),
-                )
-                    .into_response()
-            }
+            (
+                kinesis_error_status(&e),
+                Json(KinesisFHIngestionResponse {
+                    request_id,
+                    timestamp: request_time,
+                    error_message: e.to_string().into(),
+                }),
+            )
+                .into_response()
         }
     }
 }
@@ -676,6 +673,23 @@ mod tests {
             .await
             .unwrap();
         (status, resp_headers, json::from_slice(&body).unwrap())
+    }
+
+    #[test]
+    fn kinesis_refusals_over_the_decompressed_limit_are_not_retried_by_firehose() {
+        let status = |e| kinesis_error_status(&e);
+        assert_eq!(
+            status(infra::errors::Error::PayloadTooLarge("x".into())),
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
+        assert_eq!(
+            status(infra::errors::Error::ResourceError("x".into())),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            status(infra::errors::Error::IngestionError("x".into())),
+            StatusCode::BAD_REQUEST
+        );
     }
 
     #[tokio::test]

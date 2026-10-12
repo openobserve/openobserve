@@ -44,6 +44,8 @@ spec:
       containers:
         - name: openobserve
           image: o2cr.ai/openobserve/openobserve:latest
+          securityContext:
+            allowPrivilegeEscalation: false
           env:
             - name: ZO_ROOT_USER_EMAIL
               value: root@example.com

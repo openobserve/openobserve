@@ -112,13 +112,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <!-- Bottom footer -->
-          <template #bottom="{ totalRows }">
-            <div class="me-4 flex items-center py-2 text-xs font-normal max-md:hidden">
-              {{ t("pipeline.backfillJobLabel", { count: totalRows }, totalRows) }}
-            </div>
-          </template>
-
           <!-- Pipeline Name Column -->
           <template #cell-pipeline_name="{ row }">
             <div class="font-medium">

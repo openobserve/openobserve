@@ -6,13 +6,19 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  anomalyBandPayload,
   anomalyIntervalPayload,
+  anomalySensitivityPayload,
   anomalyWindowSecondsToParts,
   defaultAnomalyConfig,
   parseAnomalyInterval,
 } from "@/composables/useAlertForm";
 
 describe("defaultAnomalyConfig", () => {
+  it("defaults the training window to 28 days", () => {
+    expect(defaultAnomalyConfig().training_window_days).toBe(28);
+  });
+
   it("defaults threshold to the 97th percentile", () => {
     expect(defaultAnomalyConfig().threshold).toBe(97);
   });
@@ -115,6 +121,94 @@ describe("anomalyIntervalPayload", () => {
       histogram_interval: "90s",
       schedule_interval: "1h",
       detection_window_seconds: 3990,
+    });
+  });
+});
+
+// Band width, direction and window share: each default is the value the server reads NULL as.
+describe("band and delivery defaults", () => {
+  it("creates at Auto, both directions and every out-of-band bucket alerting", () => {
+    const c = defaultAnomalyConfig();
+    expect(c.band_width).toBeNull();
+    // The percentile stays at its default, so the backend contract is unchanged.
+    expect(c.threshold).toBe(97);
+    expect(c.alert_direction).toBe("both");
+    expect(c.alert_window_buckets).toBe(1);
+    expect(c.alert_window_fire_pct).toBe(100);
+    expect(c.alert_window_recover_pct).toBeNull();
+  });
+});
+
+describe("anomalyBandPayload", () => {
+  it("sends the create defaults as they are, Auto as a null band width", () => {
+    expect(anomalyBandPayload(defaultAnomalyConfig(), false)).toEqual({
+      band_width: null,
+      alert_direction: "both",
+      alert_window_buckets: 1,
+      alert_window_fire_pct: 100,
+      alert_window_recover_pct: null,
+    });
+  });
+
+  it("sends a set band width and window share as numbers", () => {
+    expect(
+      anomalyBandPayload(
+        {
+          band_width: "4.5",
+          alert_direction: "above",
+          alert_window_buckets: 5,
+          alert_window_fire_pct: 80,
+          alert_window_recover_pct: 60,
+        },
+        false,
+      ),
+    ).toEqual({
+      band_width: 4.5,
+      alert_direction: "above",
+      alert_window_buckets: 5,
+      alert_window_fire_pct: 80,
+      alert_window_recover_pct: 60,
+    });
+  });
+
+  // The update path replaces every field, so a cleared input must go out as null, not be omitted.
+  it("sends cleared inputs as null and an unset direction as both", () => {
+    expect(
+      anomalyBandPayload(
+        {
+          band_width: "",
+          alert_direction: null,
+          alert_window_buckets: "",
+          alert_window_fire_pct: "",
+          alert_window_recover_pct: "",
+        },
+        false,
+      ),
+    ).toEqual({
+      band_width: null,
+      alert_direction: "both",
+      alert_window_buckets: null,
+      alert_window_fire_pct: null,
+      alert_window_recover_pct: null,
+    });
+  });
+
+  it("never sends a band width beside a budget, which the server rejects", () => {
+    expect(anomalyBandPayload({ band_width: 4 }, true).band_width).toBeNull();
+  });
+});
+
+describe("anomalySensitivityPayload", () => {
+  it("sends only the budget in budget mode", () => {
+    expect(anomalySensitivityPayload(2, 97)).toEqual({ alert_budget_per_day: 2 });
+  });
+
+  // The update endpoint's alert_budget_per_day is a double-Option: an absent key leaves a
+  // previously stored budget untouched, so switching to band mode must send an explicit null.
+  it("sends an explicit null budget alongside the threshold in band mode", () => {
+    expect(anomalySensitivityPayload(null, 97)).toEqual({
+      threshold: 97,
+      alert_budget_per_day: null,
     });
   });
 });

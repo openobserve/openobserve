@@ -97,6 +97,26 @@ describe("buildSQLContext y-axis ticks", () => {
     expect(fmt(200)).toContain("200.00");
   });
 
+  it("labels the zero tick in the panel's own unit", () => {
+    // the axis starts at 0, which used to read "0.00B" on a KB or MB panel
+    const rows = [
+      { t: "10:00", v: 100 },
+      { t: "10:01", v: 900 },
+    ];
+    const cases: [string, number, string, string][] = [
+      ["kilobytes", 2, "0.00KB", "200.00KB"],
+      ["megabytes", 2, "0.00MB", "200.00MB"],
+      // the License page's ingestion chart: megabytes at 0 decimals
+      ["megabytes", 0, "0MB", "200MB"],
+    ];
+    for (const [unit, decimals, zeroTick, tick] of cases) {
+      const ctx = buildCtx(basePanel({ config: { decimals, unit } }), rows);
+      const fmt = ctx?.options.yAxis.axisLabel.formatter;
+      expect(fmt(0)).toBe(zeroTick);
+      expect(fmt(200)).toBe(tick);
+    }
+  });
+
   it("measures one tick beyond the extent so a slightly-short estimate cannot under-reserve", () => {
     // max 790 predicts ticks up to 800; the safety tick also measures the
     // 1000 label, so the gap matches a chart whose extent truly reaches 1000

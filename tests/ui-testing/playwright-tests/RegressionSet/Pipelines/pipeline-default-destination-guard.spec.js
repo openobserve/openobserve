@@ -1,4 +1,4 @@
-const { test, expect } = require('../../utils/enhanced-baseFixtures.js');
+const { test } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
 const logsdata = require("../../../../test-data/logs_data.json");
@@ -27,14 +27,14 @@ test.describe("Pipeline default destination node guard", () => {
     tag: ['@bug-8597', '@P2', '@regression', '@pipelinesRegression']
   }, async () => {
     // Saving the source node implicitly adds a destination mirroring it; that is the guarded node.
-    expect(await pm.pipelinesPage.countOutputStreamNodes()).toBeGreaterThan(0);
+    await pm.pipelinesPage.expectOutputStreamNodePresent();
 
     await pm.pipelinesPage.openOutputStreamNodeDeleteDialog();
     await pm.pipelinesPage.expectDefaultDestinationWarningVisible();
     await pm.pipelinesPage.cancelConfirmDialog();
 
     // Cancelling must leave the node in place, or the warning is decoration.
-    expect(await pm.pipelinesPage.countOutputStreamNodes()).toBeGreaterThan(0);
+    await pm.pipelinesPage.expectOutputStreamNodePresent();
 
     testLogger.info('✓ PASSED: implicit destination node delete is guarded (Bug #8597)');
   });

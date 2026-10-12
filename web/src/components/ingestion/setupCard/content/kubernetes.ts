@@ -181,6 +181,7 @@ export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn):
 
   return {
     provider: {
+      id: "kubernetes",
       name: raw("Kubernetes"),
       tagline: t("ingestion.setupCard.taglineKubernetes"),
       logo: getImageURL("images/common/kubernetes.svg"),

@@ -16,6 +16,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import billings from "@/services/billings";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http");
 
@@ -647,5 +650,23 @@ describe("Billings Service", () => {
       const attributionResult = await billings.submit_new_user_info(mockOrgId, userInfo);
       expect(attributionResult.data.message).toBe("Attribution saved");
     });
+  });
+});
+
+describe("billings product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after resume_subscription succeeds", async () => {
+    (http as any).mockImplementation(() => ({ get: vi.fn().mockResolvedValue({ data: {} }) }));
+    await billings.resume_subscription("org1");
+    expect(analytics.track).toHaveBeenCalledWith("billing_plan_subscribed");
+  });
+
+  it("does not track when resume_subscription fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({ get: vi.fn().mockRejectedValue(new Error("boom")) }));
+    await expect(billings.resume_subscription("org1")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

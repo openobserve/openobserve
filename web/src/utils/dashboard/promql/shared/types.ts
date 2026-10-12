@@ -59,6 +59,8 @@ export interface ProcessedPromQLData {
     data: Record<number, string>; // timestamp -> value map
   }>;
   queryIndex: number;
+  /** "shifted" for a past period drawn over its panel query. */
+  seriesRole?: "primary" | "shifted";
   queryConfig: any;
 }
 
@@ -102,6 +104,10 @@ export interface ConversionContext {
   hoveredSeriesState: any;
   annotations: any;
   metadata?: any;
+  /** Panel query index of each expanded (time-shifted) result; see alignShiftedPromQLResults. */
+  parentQueryIndex?: number[];
+  /** periodAsStr per expanded result, "" for a current-period one. */
+  nameSuffixes?: string[];
 }
 
 /**

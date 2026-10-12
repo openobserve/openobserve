@@ -73,6 +73,17 @@ test.describe("Logs Result Display Regression", () => {
     await sendRequest(page, getIngestionUrl(orgId, denseStream), rows, getHeaders());
 
     await pm.logsPage.waitForStreamAvailable(denseStream);
+
+    // Ingest acks before every row is searchable. Settling over the API before the
+    // page loads means the banner is read once the window is complete, rather than
+    // re-running the query in the UI and hoping the index catches up first.
+    await pm.logsPage.waitForSearchableRowCount(
+      denseStream,
+      DENSE_ROWS,
+      secondStartMs * 1000,
+      (secondStartMs + 1000) * 1000,
+    );
+
     await page.goto(
       `${logData.logsUrl}?org_identifier=${orgId}&stream=${denseStream}&stream_type=logs` +
       `&from=${secondStartMs}&to=${secondStartMs + 1000}`,
@@ -80,9 +91,6 @@ test.describe("Logs Result Display Regression", () => {
     await pm.logsPage.clickRefreshButton();
     await pm.logsPage.expectResultsGridSettledWithRows();
 
-    // Ingest acks before every row is searchable, so settle on the full count
-    // first -- otherwise the banner reports whatever prefix happens to be
-    // indexed and the comparison below is against the wrong number.
     const title = await pm.logsPage.waitForResultTotal(DENSE_ROWS);
     const rendered = await pm.logsPage.getLogRowCount();
     testLogger.info(`Banner: ${title.replace(/\n/g, ' | ')} | rendered rows: ${rendered}`);

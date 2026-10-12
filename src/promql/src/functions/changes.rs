@@ -30,9 +30,12 @@ impl RangeFunc for ChangesFunc {
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let changes = samples
             .windows(2)
-            .map(|pair| (!pair[0].value.eq(&pair[1].value) as u32) as f64)
-            .sum();
-        Some(changes)
+            .filter(|pair| {
+                let (prev, cur) = (pair[0].value, pair[1].value);
+                prev != cur && !(prev.is_nan() && cur.is_nan())
+            })
+            .count();
+        Some(changes as f64)
     }
 }
 
@@ -109,5 +112,17 @@ mod tests {
             }
             _ => panic!("Expected Matrix result"),
         }
+    }
+
+    #[test]
+    fn test_changes_skips_nan_to_nan() {
+        let func = ChangesFunc;
+        let samples = [
+            Sample::new(1, f64::NAN),
+            Sample::new(2, f64::NAN),
+            Sample::new(3, 1.0),
+            Sample::new(4, f64::NAN),
+        ];
+        assert_eq!(func.exec(&samples, 4, &Duration::ZERO), Some(2.0));
     }
 }

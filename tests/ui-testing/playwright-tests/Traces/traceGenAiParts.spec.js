@@ -39,8 +39,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     // auto-select the freshly-ingested stream before searching.
     await pm.tracesPage.navigateToTracesUrlWithStream(streamName);
     await pm.tracesPage.setTimeRange('15m');
-    await pm.tracesPage.runTraceSearch();
-    await pm.tracesPage.waitForTraceSearchResults();
+    await pm.tracesPage.searchUntilTraceResultVisible();
     await pm.tracesPage.clickFirstTraceResult();
     const clicked = await pm.tracesPage.clickTraceTreeSpanByOperationName(spanName);
     expect(clicked).toBeTruthy();
@@ -296,8 +295,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
 
     await pm.tracesPage.navigateToTracesUrlWithStream(streamName);
     await pm.tracesPage.setTimeRange('15m');
-    await pm.tracesPage.runTraceSearch();
-    await pm.tracesPage.waitForTraceSearchResults();
+    await pm.tracesPage.searchUntilTraceResultVisible();
     await pm.tracesPage.clickFirstTraceResult();
 
     const opened = await pm.tracesPage.openTraceDetailsTab('thread');

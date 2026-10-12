@@ -667,6 +667,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         }
     }
 

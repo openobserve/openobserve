@@ -663,7 +663,7 @@ mod tests {
         let builder = ParquetRecordBatchReaderBuilder::try_new(bytes)?;
         let schema = builder.schema().clone();
         let metadata = builder.metadata().as_ref().clone();
-        let mut writer = metrics_index::block::BlockWriter::new_pending(
+        let mut writer = metrics_index::block::BlockWriter::new(
             Vec::new(),
             schema.clone(),
             metrics_index::block::MAX_BLOCK_ROWS,
@@ -799,9 +799,9 @@ mod tests {
             assert_eq!(encoded, reference, "file {position}");
             let index =
                 metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
-            assert_eq!(index.parent.rows, meta.records as u64);
+            assert_eq!(index.header.parent.rows, meta.records as u64);
             assert_eq!(
-                index.row_group_size,
+                index.header.row_group_size,
                 Some(meta.records.min(PARQUET_MAX_ROW_GROUP_SIZE as i64) as u32)
             );
             let mut decoded = Vec::new();
@@ -1059,17 +1059,49 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn invalid_samples_fail_merge() {
+    async fn stale_marker_compacts_into_the_block() {
+        let stale = config::meta::promql::STALE_NAN_BITS;
         for format in [FileFormat::Parquet, FileFormat::Vortex] {
             let schema = block_schema(None, false);
-            let rows = [(1, 10, Some(1f64.to_bits())), (2, 20, None)];
+            let rows = [(1, 10, Some(1f64.to_bits())), (1, 20, None), (2, 20, None)];
             let mut output = block_output();
             output.file_format = format;
-            let error = produce(&schema, vec![block_batch(&schema, &rows)], output)
+            let file = produce(&schema, vec![block_batch(&schema, &rows)], output)
                 .await
-                .err()
-                .expect("invalid samples must fail the merge");
-            assert!(error.to_string().contains("nullable samples unsupported"));
+                .unwrap()
+                .remove(0);
+            assert!(matches!(file, MergedFile::MetricsIndexed { .. }));
+            let (data, meta, path) = file.into_upload_parts().await.unwrap();
+            let data = bytes::Bytes::from(data);
+            assert_eq!(sample_rows_for(format, data.clone()).await, rows);
+            let encoded = tokio::fs::read(path.unwrap()).await.unwrap();
+            let parent = metrics_index::block::ParentMetadata {
+                rows: meta.records as u64,
+                compressed_size: data.len() as u64,
+            };
+            let index =
+                metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
+            let mut decoded = Vec::new();
+            for block in &index.blocks {
+                let range = block.block_range();
+                let samples = metrics_index::block::decode_block(
+                    &encoded[range.start as usize..range.end as usize],
+                    &block,
+                )
+                .unwrap();
+                decoded.extend(
+                    samples
+                        .timestamps
+                        .into_iter()
+                        .zip(samples.value_bits)
+                        .map(|(time, value)| (block.hash, time, value)),
+                );
+            }
+            assert_eq!(
+                decoded,
+                vec![(1, 10, 1f64.to_bits()), (1, 20, stale), (2, 20, stale)],
+                "{format:?}"
+            );
         }
     }
 
@@ -1117,8 +1149,8 @@ mod tests {
             compressed_size: data.len() as u64,
         };
         let index = metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
-        assert_eq!(index.row_group_size, None);
-        assert_eq!(index.source_schema.as_ref(), schema.as_ref());
+        assert_eq!(index.header.row_group_size, None);
+        assert_eq!(index.header.source_schema.as_ref(), schema.as_ref());
         let mut native_rows = Vec::new();
         for block in &index.blocks {
             let range = block.block_range();
@@ -1202,7 +1234,7 @@ mod tests {
             };
             let index =
                 metrics_index::block::decode_file(&encoded, &parent, &["tag".into()]).unwrap();
-            assert_eq!(index.row_group_size, None);
+            assert_eq!(index.header.row_group_size, None);
             let mut native = Vec::new();
             for block in &index.blocks {
                 let range = block.block_range();

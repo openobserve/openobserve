@@ -73,6 +73,7 @@ export default function sqlServerCard(subs: CardSubstitutions, t: TranslateFn): 
   const tool = sharedToolIcons();
   return {
     provider: {
+      id: "sqlServer",
       name: raw("SQL Server"),
       tagline: t("ingestion.setupCard.sqlServerTagline"),
       logo: getImageURL("images/ingestion/sqlserver.png"),

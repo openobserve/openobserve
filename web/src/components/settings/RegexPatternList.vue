@@ -178,23 +178,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdown>
               </div>
             </template>
-            <template #bottom>
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-normal max-md:hidden">
-                  {{ t("regex_patterns.bottom_header", { count: resultTotal }) }}
-                </span>
-                <OButton
-                  v-if="selectedPatterns.length > 0"
-                  data-test="regex-pattern-list-delete-patterns-btn"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  icon-left="delete"
-                  :loading="bulkDeleteLoading"
-                  @click="openBulkDeleteDialog"
-                >
-                  {{ t("settings.regexPatternList.delete") }}
-                </OButton>
-              </div>
+            <template #selection-actions>
+              <OButton
+                data-test="regex-pattern-list-delete-patterns-btn"
+                variant="outline-destructive"
+                size="sm"
+                icon-left="delete"
+                :loading="bulkDeleteLoading"
+                @click="openBulkDeleteDialog"
+              >
+                {{ t("settings.regexPatternList.delete") }}
+              </OButton>
             </template>
           </OTable>
         </div>
@@ -363,8 +357,6 @@ export default defineComponent({
     const confirmBulkDelete = ref(false);
     const bulkDeleteLoading = ref(false);
 
-    const resultTotal = ref(0);
-
     const listLoading = regexPatternsList.isPending;
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
@@ -413,7 +405,6 @@ export default defineComponent({
           filtered.push(rows[i]);
         }
       }
-      resultTotal.value = filtered.length;
       return filtered;
     };
 
@@ -433,7 +424,6 @@ export default defineComponent({
       regexPatterns,
       (rows: any[]) => {
         store.dispatch("setRegexPatterns", rows);
-        resultTotal.value = rows.length;
       },
       { immediate: true },
     );
@@ -631,7 +621,6 @@ export default defineComponent({
       columns,
       regexPatterns,
       filterData,
-      resultTotal,
       createRegexPattern,
       listLoading,
       fetching,

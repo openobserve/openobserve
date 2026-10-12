@@ -502,7 +502,12 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
                 crossLinkNameA, crossLinkNameB
             });
 
-            // Arm the waiter BEFORE the navigation so we don't miss a fast response.
+            // Navigating back remounts the panel, which drops its per-mount result_schema cache.
+            await page.goto(dashboardViewUrl);
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            await pm.dashboardPanelActions.waitForTablePanelWithData(30000);
+
+            // result_schema is fetched lazily on the first drilldown click (usePanelDrilldown ensureDrilldownSchema), not on render.
             const crossLinkResponsePromise = page
                 .waitForResponse(
                     (resp) =>
@@ -512,11 +517,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
                     { timeout: 20000 }
                 )
                 .catch(() => null);
-
-            // Navigate back to the saved dashboard — this remounts the panel and
-            // fires the result_schema cross-link call.
-            await page.goto(dashboardViewUrl);
-            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            await pm.crossLinkPage.clickFirstDashboardTableCell();
 
             const crossLinkResponse = await crossLinkResponsePromise;
             if (!crossLinkResponse) {

@@ -10,7 +10,6 @@
         row-key="id"
         :loading="loading"
         :forbidden="forbidden"
-        :footer-title="t('onlineEvals.job.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
         :page-size="20"
@@ -76,21 +75,16 @@
           </div>
         </template>
 
-        <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal max-md:hidden">
-            {{ totalRows.toLocaleString() }} {{ t("onlineEvals.job.listTitle") }}
-          </span>
+        <template #selection-actions>
           <OButton
-            v-if="selectedIds.length > 0"
             variant="outline-destructive"
             size="sm"
-            class="ms-3"
             icon-left="delete"
             data-test="eval-job-bulk-delete-btn"
             :loading="actionLoading"
             @click="handleBulkDelete"
           >
-            {{ t("onlineEvals.job.deleteBulkButton") }} ({{ selectedIds.length }})
+            {{ t("common.delete") }}
           </OButton>
         </template>
 

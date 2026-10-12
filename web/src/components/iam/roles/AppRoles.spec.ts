@@ -245,6 +245,15 @@ describe("AppRoles - onRoleAdded", () => {
     );
   });
 
+  it.each(["rum_viewer", "rum_editor"])("forwards the %s preset in the query", async (preset) => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "RUM", startFrom: preset });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ preset }) }),
+    );
+  });
+
   it("does not set a preset when startFrom is omitted", async () => {
     const wrapper = await mountAppRoles();
     const spy = vi.spyOn(router, "push");

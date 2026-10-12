@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          in solid text (Sessions never dimmed it). -->
     <AiScopeBar
       v-if="!(streamsLoaded && availableStreams.length === 0)"
-      v-model:filter-mode="filterMode"
+      :filter-mode="filterMode"
       v-model:active-stream="activeStream"
       v-model:selected-env="selectedEnv"
       v-model:selected-agent-name="selectedAgentName"
@@ -114,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :total-count-exact="!hasMore"
       :page-size="rowsPerPage"
       :page-size-options="rowsPerPageOptions"
-      :footer-title="t('traces.sessionsList.sessions')"
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="ai-sessions-list"
@@ -179,10 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Session ID -->
       <template #cell-sessionId="{ row }">
-        <div class="w-full truncate text-xs">
-          {{ row.sessionId }}
-          <OTooltip :content="raw(row.sessionId)" />
-        </div>
+        <span class="text-xs">{{ row.sessionId }}</span>
       </template>
 
       <!-- User -->
@@ -192,10 +188,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- First user message -->
       <template #cell-firstUserMessage="{ row }">
-        <div v-if="row.firstUserMessage" class="text-text-secondary w-full truncate text-xs">
+        <span v-if="row.firstUserMessage" class="text-text-secondary text-xs">
           {{ row.firstUserMessage }}
-          <OTooltip :content="raw(row.firstUserMessage)" />
-        </div>
+        </span>
         <span v-else class="text-text-muted text-xs">—</span>
       </template>
 

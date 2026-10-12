@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 export type ToolsetKind = "mcp" | "cli" | "skill" | "generic";
 
@@ -37,7 +38,12 @@ const aiToolsets = {
     return http().get(`/api/${org_identifier}/ai/toolsets/${id}`);
   },
   create: (org_identifier: string, data: ToolsetCreateRequest) => {
-    return http().post(`/api/${org_identifier}/ai/toolsets`, data);
+    return http()
+      .post(`/api/${org_identifier}/ai/toolsets`, data)
+      .then((res) => {
+        analytics.track("ai_toolset_created", { kind: data.kind });
+        return res;
+      });
   },
   update: (org_identifier: string, id: string, data: ToolsetUpdateRequest) => {
     return http().put(`/api/${org_identifier}/ai/toolsets/${id}`, data);

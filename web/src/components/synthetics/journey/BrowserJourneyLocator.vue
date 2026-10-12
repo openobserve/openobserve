@@ -51,6 +51,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LocatorComposeDialog from "./LocatorComposeDialog.vue";
@@ -320,11 +321,9 @@ function onCombine(built: { value: string; from: CompositePart[] }) {
             <OBadge variant="default" size="sm">
               {{ t(`synthetics.journey.locatorKind.${row.kind}`) }}
             </OBadge>
-            <OTooltip :content="raw(row.value)" interactive>
-              <span class="text-text-body min-w-0 flex-1 truncate font-mono text-xs">
-                {{ row.value }}
-              </span>
-            </OTooltip>
+            <OTruncatedText class="text-text-body flex-1 font-mono text-xs">
+              {{ row.value }}
+            </OTruncatedText>
             <!-- Per row, not per block. The old whole-block notice fired only when
                EVERY candidate was positional — that is, only when nothing could
                be done about it — and stayed silent when something could. -->

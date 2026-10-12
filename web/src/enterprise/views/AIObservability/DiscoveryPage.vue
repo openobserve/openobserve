@@ -124,19 +124,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-span="{ row }">
           <div class="flex min-w-0 flex-col">
-            <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
-            <span v-if="row.traceId" class="text-text-secondary text-2xs truncate">
+            <OTruncatedText class="font-mono text-xs">{{
+              textOrDash(row.operationName)
+            }}</OTruncatedText>
+            <OTruncatedText v-if="row.traceId" class="text-text-secondary text-2xs">
               {{ t("aiObservability.discovery.spanParent", { trace: row.traceId }) }}
-            </span>
+            </OTruncatedText>
+          </div>
+        </template>
+
+        <template #cell-trace="{ row }">
+          <div class="flex min-w-0 flex-col">
+            <OTruncatedText class="font-mono text-xs">{{
+              textOrDash(row.operationName)
+            }}</OTruncatedText>
+            <!-- Annotation-only traces have no trace_id on their scores; a trace row's targetId is the trace id. -->
+            <OTruncatedText
+              v-if="row.traceId || row.targetId"
+              class="text-text-secondary text-2xs font-mono"
+            >
+              {{ raw(row.traceId || row.targetId) }}
+            </OTruncatedText>
           </div>
         </template>
 
         <template #cell-session="{ row }">
           <div class="flex min-w-0 flex-col">
-            <span class="truncate font-mono text-xs">{{ textOrDash(row.sessionId) }}</span>
-            <span v-if="row.userEmail" class="text-text-secondary text-2xs truncate">
+            <OTruncatedText class="font-mono text-xs">{{
+              textOrDash(row.sessionId)
+            }}</OTruncatedText>
+            <OTruncatedText v-if="row.userEmail" class="text-text-secondary text-2xs">
               {{ raw(row.userEmail) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
@@ -163,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-input="{ row }">
-          <span class="text-text-body line-clamp-1">{{ textOrDash(row.input) }}</span>
+          <span class="text-text-body">{{ textOrDash(row.input) }}</span>
         </template>
 
         <template #cell-traceCount="{ row }">
@@ -195,47 +214,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <!-- Selection + bulk action live in the table footer, the same shape the
-             Alerts list uses. -->
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between gap-2">
-            <span class="text-xs font-normal">
-              <template v-if="selectedIds.length">
-                {{
-                  t("aiObservability.discovery.selectedCount", {
-                    selected: selectedIds.length,
-                    total,
-                  })
-                }}
-              </template>
-              <!-- Search runs over the loaded page, so say so rather than let a
-                   filtered count read like a whole-result-set count. -->
-              <template v-else-if="search">
-                {{
-                  t("aiObservability.discovery.searchFooter", {
-                    matched: visibleItems.length,
-                    loaded: items.length,
-                  })
-                }}
-              </template>
-              <span v-else class="max-md:hidden">
-                {{ t("aiObservability.discovery.footerTitle", { scope: scopeNoun }) }}
-              </span>
-            </span>
-            <AddToQueueMenu
-              v-if="selectedIds.length"
-              :scope="scope"
-              :queues="queues"
-              :loading="queuesLoading"
-              :busy="addingId === BULK"
-              side="top"
-              variant="primary"
-              :label="t('aiObservability.discovery.bulkAdd', { count: selectedIds.length })"
-              data-test="ai-discovery-bulk-add"
-              @open="loadQueues"
-              @select="(queue) => addToQueue(queue, selectedRows)"
-            />
-          </div>
+        <template #selection-actions>
+          <AddToQueueMenu
+            :scope="scope"
+            :queues="queues"
+            :loading="queuesLoading"
+            :busy="addingId === BULK"
+            side="top"
+            variant="primary"
+            size="sm"
+            :label="t('aiObservability.discovery.addToQueue')"
+            data-test="ai-discovery-bulk-add"
+            @open="loadQueues"
+            @select="(queue) => addToQueue(queue, selectedRows)"
+          />
+        </template>
+
+        <!-- Search runs over the loaded page only, which the pager's whole-result total cannot say. -->
+        <template v-if="search" #footer-note>
+          <span>
+            {{
+              t("aiObservability.discovery.searchFooter", {
+                matched: visibleItems.length,
+                loaded: items.length,
+              })
+            }}
+          </span>
         </template>
       </OTable>
     </div>
@@ -271,6 +275,7 @@ import llmDiscoveryService, {
 } from "@/services/llm-discovery.service";
 import llmQueuesService, { type LlmQueue } from "@/services/llm-queues.service";
 import { formatTimeWithSuffix } from "@/utils/formatters";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIDiscoveryPage" });
 
@@ -333,8 +338,6 @@ const scopeTabs = computed(() => [
   { id: "session" as DiscoveryScope, label: t("aiObservability.discovery.scope.session") },
 ]);
 
-const scopeNoun = computed(() => t(`aiObservability.discovery.scopeNoun.${scope.value}`));
-
 const queueStatusOptions = computed(() => [
   { label: t("aiObservability.discovery.inQueueFilter.notEnqueued"), value: "not_enqueued" },
   { label: t("aiObservability.discovery.inQueueFilter.enqueued"), value: "enqueued" },
@@ -360,6 +363,8 @@ const visibleItems = computed(() => {
       item.serviceName,
       item.operationName,
       item.genAiOperationName,
+      item.traceId,
+      item.targetId,
       item.sessionId,
       item.userEmail,
       item.quality,
@@ -506,12 +511,12 @@ const columns = computed(() => {
   return [
     timestamp,
     {
-      id: "genAiOperationName",
-      header: t("aiObservability.discovery.columns.type"),
-      accessorKey: "genAiOperationName",
-      hideable: true,
+      // Trace-level identity, not the first span's gen-ai operation: that value reads as a span kind.
+      id: "trace",
+      header: t("aiObservability.discovery.columns.trace"),
+      accessorKey: "operationName",
       sortable: false,
-      size: 180,
+      size: 240,
       meta: { align: "left" },
     },
     {

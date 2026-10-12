@@ -75,6 +75,16 @@ pub struct CorrelationSubject {
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
 }
 
+/// An alert's incident correlation, and why its incident notification missed a destination.
+#[derive(Debug, Clone)]
+pub struct CorrelatedIncident {
+    pub outcome: IncidentCorrelationOutcome,
+    /// `None` when every destination was notified, or no notification was due.
+    pub notify_error: Option<String>,
+    /// Whether a notification was due and had a destination to go to.
+    pub notify_attempted: bool,
+}
+
 /// Combined correlation result from both Service Discovery and semantic extraction
 struct ParallelCorrelationResult {
     service_discovery: Option<ServiceDiscoveryResult>,
@@ -338,7 +348,7 @@ async fn send_incident_notifications(
     event: &str,
     triggered_at: i64,
     dest_names: &[String],
-) {
+) -> Option<String> {
     // Preserve the alert/stream sub-object emitted for the internal alert path.
     let alert_block = config::utils::json::json!({
         "name": alert.name,
@@ -356,7 +366,7 @@ async fn send_incident_notifications(
         dest_names,
         Some(alert_block),
     )
-    .await;
+    .await
 }
 
 /// Build an incident-specific notification payload and send to all given destinations.
@@ -374,9 +384,9 @@ async fn send_incident_notifications_inner(
     triggered_at: i64,
     dest_names: &[String],
     alert_block: Option<Value>,
-) {
+) -> Option<String> {
     if dest_names.is_empty() {
-        return;
+        return None;
     }
 
     // Load incident to get severity, title and service_name.
@@ -428,7 +438,7 @@ async fn send_incident_notifications_inner(
             log::error!(
                 "[incidents] Failed to serialize notification payload for {org_id}/{incident_id}: {e}"
             );
-            return;
+            return Some(format!("failed to serialize incident notification: {e}"));
         }
     };
 
@@ -477,11 +487,13 @@ async fn send_incident_notifications_inner(
             "[incidents] Notification sent for incident {incident_id} ({event}): {}",
             success_parts.join("; ")
         );
+        None
     } else {
+        let error = err_parts.join("; ");
         log::error!(
-            "[incidents] Notification partially failed for incident {org_id}/{incident_id} ({event}): {}",
-            err_parts.join("; ")
+            "[incidents] Notification partially failed for incident {org_id}/{incident_id} ({event}): {error}"
         );
+        Some(error)
     }
 }
 
@@ -542,6 +554,7 @@ async fn send_incident_severity_notification(org_id: &str, incident_id: &str) {
 ///   alerts.
 /// - `NewAlertTypeJoined` → same as above (new alert type joining is an escalation signal).
 /// - `ExistingAlertRepeated` → notification suppressed (same alert type already in incident).
+/// - A failed send is returned in `CorrelatedIncident::notify_error` for the caller to record.
 ///
 /// When `notify_rows` is empty the function still correlates but sends no notification.
 /// Pass an empty slice from manual test-trigger paths that send their own notification.
@@ -558,7 +571,7 @@ pub async fn correlate_alert_to_incident(
     // Warning → P3). None (manual triggers, single-level alerts) keeps the
     // enterprise default.
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
-) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
+) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
 
     // Enrich with alert condition dimensions (deterministic baseline)
@@ -759,6 +772,8 @@ pub async fn correlate_alert_to_incident(
 
     // Send incident notification unless rows are empty (manual trigger path)
     // or the outcome is a repeated alert (suppressed by design).
+    let mut notify_error = None;
+    let mut notify_attempted = false;
     if !notify_rows.is_empty() {
         match &outcome {
             IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
@@ -772,7 +787,8 @@ pub async fn correlate_alert_to_incident(
                 let merged_destinations =
                     collect_incident_destinations(&alert.org_id, incident_id, &alert.destinations)
                         .await;
-                send_incident_notifications(
+                notify_attempted = !merged_destinations.is_empty();
+                notify_error = send_incident_notifications(
                     alert,
                     incident_id,
                     event,
@@ -789,7 +805,11 @@ pub async fn correlate_alert_to_incident(
         }
     }
 
-    Ok(Some(outcome))
+    Ok(Some(CorrelatedIncident {
+        outcome,
+        notify_error,
+        notify_attempted,
+    }))
 }
 
 /// External-event twin of [`correlate_alert_to_incident`].
@@ -2133,7 +2153,7 @@ pub async fn enrich_with_topology(
 
 /// Whether the service graph knows the `from -> to` dependency around `at`.
 async fn dependency_edge_type(org_id: &str, from: &str, to: &str, at: i64) -> EdgeType {
-    if crate::traces::service_graph::use_v4_source(org_id).await {
+    if crate::traces::service_graph::use_v4_source(org_id, None).await {
         dependency_edge_type_v4(org_id, from, to, at).await
     } else {
         dependency_edge_type_v1(org_id, from, to).await
@@ -2381,7 +2401,7 @@ pub async fn rca_will_run(org_id: &str, incident_id: &str) -> bool {
     let cfg = get_config();
     let will_run = cfg.incidents.enabled
         && cfg.incidents.rca_enabled
-        && !cfg.ai.agent_url.is_empty()
+        && cfg.ai.has_agent_target()
         && !rca_service::l0_off_for_incident(org_id, incident_id).await;
     if !will_run {
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
@@ -2431,7 +2451,7 @@ pub async fn trigger_rca_for_incident(
         return Ok(()); // Not an error - just not configured
     }
 
-    if config.ai.agent_url.is_empty() {
+    if !config.ai.has_agent_target() {
         log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
         // §6: no verdict is coming, so nothing may go on holding a page for
         // one. Every guard below reaches this same state.

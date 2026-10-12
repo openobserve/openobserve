@@ -364,24 +364,34 @@ def test_a_percentile_that_clamps_to_the_stored_threshold_is_not_a_change(
         f"97.4 clamps to the stored 97: {resp.status_code} {resp.text}"
 
 
-def test_clearing_a_budget_requires_the_direct_anomaly_api(
-    client: OpenObserveClient, budget_config: str
-):
-    """The alerts path maps `Option<f64>.map(Some)`, which can never produce
-    `Some(None)` — so clearing is expressible only on the direct endpoint."""
-    via_alerts = client.put(
-        f"alerts/{budget_config}",
+def _budget_after_alerts_put(client: OpenObserveClient, anomaly_id: str, anomaly_config: dict):
+    resp = client.put(
+        f"alerts/{anomaly_id}",
         json={"name": unique_name("anomcond"), "alert_type": "anomaly_detection",
-              "anomaly_config": {"alert_budget_per_day": None}},
+              "anomaly_config": anomaly_config},
         prefix="api/v2/",
         raise_for_status=False,
     )
-    stored = client.get(f"anomaly_detection/{budget_config}").json()
-    stored = stored.get("data", stored)
-    assert stored["alert_budget_per_day"] is not None, \
-        f"the alerts path is set-only; the budget should survive it " \
-        f"(PUT answered {via_alerts.status_code})"
+    assert resp.status_code == HTTPStatus.OK, resp.text
+    stored = client.get(f"anomaly_detection/{anomaly_id}").json()
+    return stored.get("data", stored)["alert_budget_per_day"]
 
+
+def test_the_alerts_path_keeps_an_absent_budget_and_clears_a_null_one(
+    client: OpenObserveClient, budget_config: str
+):
+    """`UpdateAnomalyAlertFields` keeps absent and `null` apart: an unrelated
+    edit leaves the budget, an explicit `null` clears it."""
+    kept = _budget_after_alerts_put(client, budget_config, {"alert_enabled": False})
+    assert kept == 5, f"an absent budget must leave the stored one, got {kept!r}"
+
+    cleared = _budget_after_alerts_put(client, budget_config, {"alert_budget_per_day": None})
+    assert cleared is None, f"a null budget must clear it, got {cleared!r}"
+
+
+def test_the_direct_anomaly_api_clears_a_budget(
+    client: OpenObserveClient, budget_config: str
+):
     direct = client.put(
         f"anomaly_detection/{budget_config}",
         json={"alert_budget_per_day": None},
@@ -393,6 +403,91 @@ def test_clearing_a_budget_requires_the_direct_anomaly_api(
     assert cleared["alert_budget_per_day"] is None, \
         f"the direct endpoint must clear it, got {cleared['alert_budget_per_day']!r}"
 
+
+# ─── A3b. Band width, and the budget→band escape hatch (ENT#2813) ─────────────
+
+
+def test_clearing_a_budget_in_the_same_call_puts_the_band_width_in_force(
+    client: OpenObserveClient, budget_config: str
+):
+    """The budget→band escape hatch: one call clears the budget AND sets the band.
+
+    `validated_band_settings` resolves the budget as
+    `req.alert_budget_per_day.unwrap_or(existing...)`, and the field is a
+    double-Option — so an explicit `null` reads as cleared and the band width
+    is accepted in the same request. This is the payload ENT#2813 proved the
+    UI cannot produce; asserting `band_width` is actually *in force* afterwards
+    is the part the pre-existing budget-clearing test does not cover.
+    """
+    resp = client.put(
+        f"anomaly_detection/{budget_config}",
+        json={"alert_budget_per_day": None, "band_width": 5},
+        raise_for_status=False,
+    )
+    assert resp.status_code == HTTPStatus.OK, resp.text
+
+    stored = client.get(f"anomaly_detection/{budget_config}").json()
+    stored = stored.get("data", stored)
+    assert stored["alert_budget_per_day"] is None, \
+        f"the budget must be cleared, got {stored['alert_budget_per_day']!r}"
+    assert stored["band_width"] == 5.0, \
+        f"the band width must be in force once the budget is gone, got {stored['band_width']!r}"
+
+
+def test_a_band_width_beside_a_live_budget_is_rejected_naming_the_repair(
+    client: OpenObserveClient, budget_config: str
+):
+    """Without the explicit null the stored budget still stands, so the band is refused.
+
+    This is the guard rail the UI works around by suppressing `band_width`
+    whenever a budget is present — which is why switching modes was a silent
+    no-op rather than an error.
+    """
+    resp = client.put(
+        f"anomaly_detection/{budget_config}",
+        json={"band_width": 5},
+        raise_for_status=False,
+    )
+    assert resp.status_code == HTTPStatus.BAD_REQUEST, \
+        f"expected 400, got {resp.status_code}: {resp.text}"
+    assert "alert_budget_per_day" in resp.text, \
+        f"the rejection must name the budget so the caller knows what to clear: {resp.text}"
+    assert "band_width" in resp.text, \
+        f"the rejection must name the field that was refused: {resp.text}"
+
+
+@pytest.mark.parametrize("band_width", [0.99, 0, -1, 10.01, 11])
+def test_a_band_width_outside_one_to_ten_is_rejected(
+    client: OpenObserveClient, band_width
+):
+    """`BAND_WIDTH_RANGE` is 1.0..=10.0. Pinned at the HTTP boundary — the Rust
+    unit test covers the function, not that the route reaches it."""
+    resp = _create(client, _config(band_width=band_width))
+    try:
+        assert resp.status_code == HTTPStatus.BAD_REQUEST, \
+            f"band_width={band_width} must be rejected, got {resp.status_code}: {resp.text}"
+        assert "between 1 and 10" in resp.text, (
+            "the rejection must name the range rule — 'band_width' alone also matches "
+            f"the mutual-exclusion error, so it cannot say which rule fired: {resp.text}"
+        )
+    finally:
+        _cleanup(client, resp)
+
+
+# The inclusive edges are the point: 1.0..10.0 would pass every rejection case above.
+@pytest.mark.parametrize("band_width", [1.0, 3, 10.0])
+def test_a_band_width_inside_the_range_round_trips(client: OpenObserveClient, band_width):
+    """A plain band-mode create keeps the width it was given, edges included."""
+    resp = _create(client, _config(band_width=band_width))
+    try:
+        assert resp.status_code == HTTPStatus.OK, \
+            f"band_width={band_width} is inside BAND_WIDTH_RANGE and must be accepted: {resp.text}"
+        stored = client.get(f"anomaly_detection/{resp.json()['anomaly_id']}").json()
+        stored = stored.get("data", stored)
+        assert stored["band_width"] == float(band_width), \
+            f"band_width must round-trip, got {stored['band_width']!r}"
+    finally:
+        _cleanup(client, resp)
 
 # ─── A4. The G4 denominator gate, over HTTP ───────────────────────────────────
 

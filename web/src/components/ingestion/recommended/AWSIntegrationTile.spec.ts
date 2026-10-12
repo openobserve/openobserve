@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import enUS from "@/locales/languages/en-US.json";
@@ -29,7 +29,7 @@ vi.mock("@/utils/awsIntegrations", () => ({
   awsIntegrations: [],
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 
@@ -572,6 +572,32 @@ describe("AWSIntegrationTile.vue", () => {
 
       expect(vm.showTemplateDialog).toBe(false);
       expect(vm.showComponentContent).toBe(true);
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks dashboard_created once the user's Add Dashboard import succeeds", async () => {
+      const analytics = (await import("@/services/product_analytics")).default;
+      const dashboardsService = (await import("@/services/dashboards")).default;
+      wrapper = createWrapper();
+
+      await (wrapper.vm as any).handleAddDashboard();
+      await flushPromises();
+
+      expect(dashboardsService.create).toHaveBeenCalled();
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+    });
+
+    it("does not track dashboard_created when the import fails", async () => {
+      const analytics = (await import("@/services/product_analytics")).default;
+      const dashboardsService = (await import("@/services/dashboards")).default;
+      vi.mocked(dashboardsService.create).mockRejectedValueOnce(new Error("boom"));
+      wrapper = createWrapper();
+
+      await (wrapper.vm as any).handleAddDashboard();
+      await flushPromises();
+
+      expect(analytics.track).not.toHaveBeenCalledWith("dashboard_created");
     });
   });
 });

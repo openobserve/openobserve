@@ -76,7 +76,6 @@ pub(super) async fn decode_plan(
     let mut ctx = DataFusionContextBuilder::new()
         .trace_id(trace_id)
         .work_group(req.super_cluster_info.work_group.clone())
-        .stream_type(stream_type)
         .build(cfg.limit.cpu_num)
         .await?;
 

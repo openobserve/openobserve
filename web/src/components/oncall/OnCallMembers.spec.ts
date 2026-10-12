@@ -446,4 +446,46 @@ describe("OnCallMembers", () => {
       );
     });
   });
+
+  /// A phone's action column holds one control, so both row actions are mirrored in a menu that must act the same.
+  describe("the phone row menu", () => {
+    const menuStubs = {
+      ...stubs,
+      ODropdown: { name: "ODropdown", template: "<div><slot name='trigger' /><slot /></div>" },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        emits: ["select"],
+        template: `<button @click="$emit('select')"><slot /></button>`,
+      },
+    };
+
+    function renderWithMenu() {
+      return mount(OnCallMembers, {
+        props: { teamId: "team_1", members: [member("ana@o2.ai")], timezone: "UTC" },
+        global: { plugins: [i18n, store], stubs: menuStubs },
+      });
+    }
+
+    it("shows the buttons from md up and the menu below it, never both", async () => {
+      const wrapper = renderWithMenu();
+      await flushPromises();
+
+      for (const action of ["mark-away", "remove"]) {
+        expect(
+          wrapper.find(`[data-test="oncall-members-${action}-ana@o2.ai"]`).classes(),
+        ).toContain("max-md:hidden");
+      }
+      expect(wrapper.find('[data-test="oncall-members-row-more-actions"]').classes()).toContain(
+        "md:hidden",
+      );
+    });
+
+    it("opens the away dialog for the row's member", async () => {
+      const wrapper = renderWithMenu();
+      await flushPromises();
+      await wrapper.find('[data-test="oncall-members-mark-away-ana@o2.ai-menu"]').trigger("click");
+
+      expect(wrapper.find('[data-test="oncall-members-away-save"]').exists()).toBe(true);
+    });
+  });
 });

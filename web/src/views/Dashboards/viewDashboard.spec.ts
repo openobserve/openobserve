@@ -247,6 +247,10 @@ vi.mock("moment-timezone", () => ({
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import analytics from "@/services/product_analytics";
+import ShareButton from "@/components/common/ShareButton.vue";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 describe("ViewDashboard", () => {
   let wrapper: any;
@@ -359,6 +363,68 @@ describe("ViewDashboard", () => {
       ...options,
     });
   };
+
+  describe("Auto Run", () => {
+    const setAutoQuery = (enabled: boolean) => {
+      global.mockStoreState.zoConfig = {
+        ...global.mockStoreState.zoConfig,
+        auto_query_enabled: enabled,
+      };
+    };
+
+    afterEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+      setAutoQuery(false);
+    });
+
+    it("is on by default when the server enables auto query", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isAutoRunAvailable).toBe(true);
+      expect(wrapper.vm.isAutoRunOn).toBe(true);
+    });
+
+    it("never shows the apply-changes state while Auto Run is on", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+    });
+
+    it("keeps Refresh-to-apply when the user turned Auto Run off", async () => {
+      setAutoQuery(true);
+      localStorage.setItem("oo_toggle_auto_run", "false");
+      wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+      expect(wrapper.vm.isVariablesChanged).toBe(true);
+    });
+
+    it("is unavailable and off when the server flag is off", async () => {
+      setAutoQuery(false);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isAutoRunAvailable).toBe(false);
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+
+    it("toggling writes the key shared with logs", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.toggleAutoRun();
+      expect(localStorage.getItem("oo_toggle_auto_run")).toBe("false");
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+  });
 
   describe("Basic Component Tests", () => {
     it("should create component without crashing", async () => {
@@ -1458,6 +1524,55 @@ describe("ViewDashboard", () => {
       // Test config and loading state properties exist
       expect(wrapper.vm.config).toBeDefined();
       expect(wrapper.vm.arePanelsLoading).toBeDefined();
+    });
+  });
+
+  describe("product analytics", () => {
+    const mountWithOverflowActions = () =>
+      createWrapper({
+        global: {
+          plugins: [i18n, store],
+          stubs: { OPageLayout: { template: '<div><slot name="actions-overflow" /></div>' } },
+        },
+      });
+
+    it("tracks dashboard_shared once the share link is copied", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("copy:success", { url: "x", type: "short" });
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("dashboard_shared");
+    });
+
+    it("does not track dashboard_shared when only the short URL was created", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("shorten:success", { shortUrl: "x" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track dashboard_shared when the copy fails", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper
+        .findComponent(ShareButton)
+        .vm.$emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("does not track dashboard_shared when shortening fails", async () => {
+      wrapper = mountWithOverflowActions();
+      await flushPromises();
+
+      wrapper.findComponent(ShareButton).vm.$emit("shorten:error", { error: "x" });
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

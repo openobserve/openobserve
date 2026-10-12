@@ -52,6 +52,14 @@ pub struct ListAlertsResponseBodyItem {
     pub description: Option<String>,
     /// Discriminator: "scheduled" | "realtime" | "slo" | "anomaly_detection" | "composite"
     pub alert_type: String,
+    /// The stream this alert watches. Absent for `composite` alerts (which
+    /// watch children, not a stream) and for an `anomaly_detection` config
+    /// that predates stream selection.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_name: Option<String>,
+    /// Paired with `stream_name` — present and absent together.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_type: Option<String>,
     pub condition: Option<QueryCondition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger_condition: Option<TriggerCondition>,
@@ -459,6 +467,11 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
         } else {
             "scheduled".to_string()
         };
+        // Every scheduled/realtime/slo alert is saved against a real stream —
+        // an empty `stream_name` only happens pre-save, never on a stored
+        // alert — but treat it as "no stream" defensively rather than send a
+        // stream_name/stream_type pair where one half is a lie.
+        let has_stream = !alert.stream_name.is_empty();
         Ok(Self {
             alert_id: alert.id.ok_or(())?,
             folder_id: folder.folder_id,
@@ -467,6 +480,8 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             owner: alert.owner,
             description: Some(alert.description).filter(|d| !d.is_empty()),
             alert_type,
+            stream_name: has_stream.then_some(alert.stream_name),
+            stream_type: has_stream.then(|| alert.stream_type.to_string()),
             condition: Some(alert.query_condition.into()),
             trigger_condition: Some(alert.trigger_condition.into()),
             enabled: alert.enabled,
@@ -554,12 +569,25 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         .unwrap_or("")
         .to_string();
 
+    let stream_name = v
+        .get("stream_name")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+    let stream_type = v
+        .get("stream_type")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+
     Some(ListAlertsResponseBodyItem {
         alert_id,
         folder_id,
         folder_name,
         name: v.get("name")?.as_str()?.to_string(),
         owner: v.get("owner").and_then(|o| o.as_str()).map(String::from),
+        stream_name,
+        stream_type,
         description: v
             .get("description")
             .and_then(|d| d.as_str())
@@ -682,6 +710,8 @@ mod tests {
             owner: None,
             description: None,
             alert_type: "anomaly_detection".to_string(),
+            stream_name: None,
+            stream_type: None,
             condition: None,
             trigger_condition: None,
             enabled: false,

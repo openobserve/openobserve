@@ -30,7 +30,7 @@ use rayon::prelude::*;
 use super::SeriesStream;
 use crate::{
     aggregations::{group_series_by_labels, projected_labels},
-    functions::KEEP_METRIC_NAME_FUNC,
+    functions::keeps_metric_name,
 };
 
 /// Series per partition; matches the fused fold's historical chunk size.
@@ -148,7 +148,7 @@ pub(crate) fn group_sources(
         .expect("range function input must have a time window")
         .range;
     // strip the metric name as the range function would have; visible to `sum by(__name__)`
-    if func_name != KEEP_METRIC_NAME_FUNC {
+    if !keeps_metric_name(func_name) {
         matrix.par_iter_mut().for_each(|series| {
             series.labels.retain(|label| label.name != NAME_LABEL);
         });

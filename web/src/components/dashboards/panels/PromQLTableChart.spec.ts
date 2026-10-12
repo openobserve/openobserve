@@ -535,6 +535,23 @@ describe("PromQLTableChart", () => {
       expect(allClear.findComponent({ name: "OIcon" }).props("name")).toBe("check");
     });
 
+    it("a healthy-empty triage table drops the row count; a plain empty table keeps it", async () => {
+      wrapper = createWrapper({
+        data: { columns: mockTableData.columns, rows: [] },
+        config: { ...mockConfig, promql_table_mode: "all", curated_empty_means_healthy: true },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="dashboard-table-pagination"]').exists()).toBe(false);
+      wrapper.unmount();
+
+      wrapper = createWrapper({
+        data: { columns: mockTableData.columns, rows: [] },
+        config: { ...mockConfig, promql_table_mode: "all" },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="dashboard-table-pagination"]').exists()).toBe(true);
+    });
+
     it("should handle completely empty data", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       wrapper = createWrapper({

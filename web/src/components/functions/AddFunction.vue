@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :languages="['vrl', 'javascript']"
                     :default-language="transType === '1' ? 'javascript' : 'vrl'"
                     :query="formData.function"
+                    v-model:nlp-mode="functionEditorNlpMode"
                     :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
                     :disable-ai="!store.state.zoConfig.ai_enabled"
                     :disable-ai-reason="raw('')"
@@ -214,7 +215,7 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
-import segment from "../../services/segment_analytics";
+import analytics from "../../services/product_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
@@ -323,6 +324,10 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const editorRef: any = ref(null);
     const functionEditorPlaceholderFlag = ref(true);
+    // Externally controlled so the AI bar only opens on explicit user action
+    // (the AI toggle/close button) — VRL text never looks like a natural-
+    // language query, so auto-detection here is only ever a false positive.
+    const functionEditorNlpMode = ref(false);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
     const { placeholder: jsPlaceholder } = useJsPlaceholder();
     let editorobj: any = null;
@@ -520,7 +525,7 @@ export default defineComponent({
         loadingNotification();
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Save Function",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -663,6 +668,7 @@ export default defineComponent({
       indexOptions,
       editorRef,
       functionEditorPlaceholderFlag,
+      functionEditorNlpMode,
       vrlPlaceholder,
       jsPlaceholder,
       editorobj,

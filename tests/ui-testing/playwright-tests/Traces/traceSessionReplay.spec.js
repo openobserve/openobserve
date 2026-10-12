@@ -271,8 +271,8 @@ test.describe('RUM Session Replay testcases', () => {
     await pm.tracesPage.expectSessionReplayButtonVisible();
     await pm.tracesPage.clickSessionReplayButton();
     await pm.rumSessionsPage.expectSessionViewerFor(seeded.sessionId);
-    // The seeded session has no `_sessionreplay` rows, so the viewer lands on the empty state.
-    await pm.rumSessionsPage.expectNoReplayEmptyState(seeded.sessionId);
+    // The seeded session has a `_rumdata` row but no `_sessionreplay` rows, so the viewer lands on its events-only state.
+    await pm.rumSessionsPage.expectEventsOnlyState();
     testLogger.info('Play Session Replay navigated to the Session Viewer for the replayable session');
   });
 

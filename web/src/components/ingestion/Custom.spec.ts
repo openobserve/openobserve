@@ -5,7 +5,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // Mock services
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: {
     track: vi.fn(),
   },
@@ -284,11 +284,11 @@ describe("Custom Component", () => {
       });
     });
 
-    it("should track segment analytics for copy action", async () => {
+    it("should track product analytics for copy action", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(true);
 
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       const mockContent = {
         innerText: "test content",
@@ -296,7 +296,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: mockRouter.currentRoute.value.name,
         user_org: store.state.selectedOrganization.identifier,
@@ -818,12 +818,12 @@ describe("Custom Component", () => {
     });
   });
 
-  describe("Segment Analytics", () => {
+  describe("Product Analytics", () => {
     it("should track analytics with correct parameters for different routes", async () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockResolvedValue(true);
 
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       // Test with different route
       mockRouter.currentRoute.value.name = "prometheus";
@@ -834,7 +834,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(segment.default.track).toHaveBeenCalledWith("Button Click", {
+      expect(analytics.default.track).toHaveBeenCalledWith("Button Click", {
         button: "Copy to Clipboard",
         ingestion: "prometheus",
         user_org: store.state.selectedOrganization.identifier,
@@ -847,7 +847,7 @@ describe("Custom Component", () => {
       const { copyToClipboard } = await import("@/utils/clipboard");
       vi.mocked(copyToClipboard).mockRejectedValueOnce(new Error("Copy failed"));
 
-      const segment = await import("@/services/segment_analytics");
+      const analytics = await import("@/services/product_analytics");
 
       const mockContent = {
         innerText: "test analytics content",
@@ -859,8 +859,8 @@ describe("Custom Component", () => {
         // Expected error
       }
 
-      // segment.track is only called on success, so it should NOT be called on failure
-      expect(segment.default.track).not.toHaveBeenCalled();
+      // analytics.track is only called on success, so it should NOT be called on failure
+      expect(analytics.default.track).not.toHaveBeenCalled();
     });
   });
 

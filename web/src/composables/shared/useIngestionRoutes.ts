@@ -47,6 +47,7 @@ import ProfilesOtelCollector from "@/components/ingestion/profiles/OtelCollector
 
 import RUMWeb from "@/components/ingestion/recommended/FrontendRumConfig.vue";
 import KubernetesConfig from "@/components/ingestion/recommended/KubernetesConfig.vue";
+import GpuConfig from "@/components/ingestion/recommended/GpuConfig.vue";
 import LinuxConfig from "@/components/ingestion/recommended/LinuxConfig.vue";
 import MacOSConfig from "@/components/ingestion/recommended/MacOSConfig.vue";
 import OtelConfig from "@/components/ingestion/recommended/OtelConfig.vue";
@@ -414,6 +415,14 @@ const useIngestionRoutes = () => {
               path: "macos",
               name: "ingestFromMacOS",
               component: MacOSConfig,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "gpu",
+              name: "ingestFromGpu",
+              component: GpuConfig,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },

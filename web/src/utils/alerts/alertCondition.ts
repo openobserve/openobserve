@@ -22,6 +22,8 @@
  * trusting either.
  */
 
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+
 const EMPTY = "—";
 
 const isBlank = (v: unknown) => v === undefined || v === null || v === "";
@@ -33,7 +35,7 @@ function queryConditionOf(alert: any) {
 
 /**
  * The critical condition — `avg(latency) > 500`, a PromQL comparison, or the
- * raw SQL when the rule is not an aggregation. `—` when the alert is unknown.
+ * raw SQL of a non-Builder rule with no aggregation. `—` when the alert is unknown.
  */
 export function alertConditionText(alert: any): string {
   const qc = queryConditionOf(alert);
@@ -44,7 +46,8 @@ export function alertConditionText(alert: any): string {
     return isBlank(pc?.value) ? EMPTY : `${pc.operator || ""} ${pc.value}`.trim();
   }
   const agg = qc?.aggregation;
-  if (!agg) return qc?.sql || EMPTY;
+  // A Builder alert can still store SQL from another mode; it never runs.
+  if (!agg) return qc?.type === "custom" ? EMPTY : qc?.sql || EMPTY;
   const fn = agg.function || "";
   const col = agg.having?.column || "";
   const op = agg.having?.operator || "";
@@ -68,4 +71,42 @@ export function alertWarningConditionText(alert: any): string {
 export function alertPeriodMinutes(alert: any): number | null {
   const period = Number(alert?.trigger_condition?.period);
   return Number.isFinite(period) && period > 0 ? period : null;
+}
+
+type QueryMode = "custom" | "sql" | "promql";
+
+/** The SQL the form writes into an empty SQL tab; it is not the user's query. */
+const STARTER_SQL = /^SELECT \* FROM "[^"]*"$/;
+
+/** Complete Builder conditions (column, operator, value unless unary), nested groups included. */
+export function countCompleteConditions(tree: any): number {
+  if (!Array.isArray(tree?.conditions)) return 0;
+  let count = 0;
+  for (const item of tree.conditions) {
+    if (item?.filterType === "group") {
+      count += countCompleteConditions(item);
+    } else if (
+      item?.column &&
+      item.operator &&
+      (!isBlank(item.value) || isUnaryOperator(item.operator))
+    ) {
+      count++;
+    }
+  }
+  return count;
+}
+
+/** The modes of a scheduled alert that hold content, in the order Builder, SQL, PromQL. */
+export function modesWithContent(input: {
+  sql?: string;
+  promql?: string;
+  conditions?: unknown;
+  streamType?: string;
+}): QueryMode[] {
+  const modes: QueryMode[] = [];
+  if (countCompleteConditions(input.conditions) > 0) modes.push("custom");
+  const sql = input.sql?.trim();
+  if (sql && !STARTER_SQL.test(sql)) modes.push("sql");
+  if (input.streamType === "metrics" && input.promql?.trim()) modes.push("promql");
+  return modes;
 }

@@ -67,7 +67,6 @@
       :current-page="currentPage"
       :total-count="totalCount"
       :page-size-options="[10, 20, 50]"
-      :footer-title="t('onlineEvals.quality.runs.footerTitle')"
       :empty-message="emptyMessage"
       :enable-column-resize="true"
       :persist-columns="true"

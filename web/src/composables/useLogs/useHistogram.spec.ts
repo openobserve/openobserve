@@ -390,7 +390,8 @@ describe("useHistogram Composable", () => {
       expect(series.get("1")).toEqual([2]);
     });
 
-    it("filters out aggs rows with null/undefined zo_sql_breakdown", () => {
+    it("falls through to the flat path, without losing any counts, when only some aggs rows have zo_sql_breakdown", () => {
+      // Partial breakdown coverage (seen live) must not trigger a spurious "(unspecified)" legend entry in the stacked path.
       setAggs([
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
         { zo_sql_key: ts1, zo_sql_breakdown: null, zo_sql_num: 99 },
@@ -398,15 +399,28 @@ describe("useHistogram Composable", () => {
       ]);
 
       wrapper.vm.generateHistogramData();
-      const series = mockState.searchObj.data.histogram.breakdownSeries as unknown as Map<
-        string,
-        number[]
-      >;
+      const hist = mockState.searchObj.data.histogram;
 
-      expect([...series.keys()]).toEqual(["info"]);
-      expect(series.get("info")).toEqual([3]);
-      // 99 and 77 should NOT leak into totals
-      expect(mockState.searchObj.data.queryResults.total).toBe(3);
+      expect(hist.breakdownField).toBeNull();
+      expect(hist.breakdownSeries).toBeNull();
+      expect(hist.yData).toEqual([179]); // 3 + 99 + 77 — nothing dropped
+      expect(mockState.searchObj.data.queryResults.total).toBe(179);
+    });
+
+    it("falls through to the flat path for a lone zo_sql_breakdown: null row, without dropping its count", () => {
+      // null !== undefined, so a hasBreakdown check using only `!== undefined` would wrongly stay true and drop this row.
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
+        { zo_sql_key: ts1, zo_sql_breakdown: null, zo_sql_num: 99 },
+      ]);
+
+      wrapper.vm.generateHistogramData();
+      const hist = mockState.searchObj.data.histogram;
+
+      expect(hist.breakdownField).toBeNull();
+      expect(hist.breakdownSeries).toBeNull();
+      expect(hist.yData).toEqual([102]); // 3 + 99 — nothing dropped
+      expect(mockState.searchObj.data.queryResults.total).toBe(102);
     });
 
     it("sums multiple aggs rows for the same (timestamp, category)", () => {
@@ -570,7 +584,7 @@ describe("useHistogram Composable", () => {
       expect(hist.yData).toEqual([3, 5]);
     });
 
-    it("enters breakdown path when at least one aggs row has breakdown", () => {
+    it("stays in flat mode, not breakdown mode, when only one aggs row out of several has breakdown", () => {
       setAggs([
         { zo_sql_key: ts1, zo_sql_num: 10 }, // no breakdown
         { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 3 },
@@ -579,13 +593,28 @@ describe("useHistogram Composable", () => {
       wrapper.vm.generateHistogramData();
       const hist = mockState.searchObj.data.histogram;
 
-      // hasBreakdown is true because .some() matches the second row.
+      // hasBreakdown requires every() row to carry a breakdown value — a lone tagged row isn't enough to enter the stacked path.
+      expect(hist.breakdownField).toBeNull();
+      expect(hist.breakdownSeries).toBeNull();
+      expect(hist.yData).toEqual([13]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(13);
+    });
+
+    it("enters breakdown path only when every aggs row has breakdown", () => {
+      setAggs([
+        { zo_sql_key: ts1, zo_sql_breakdown: "info", zo_sql_num: 10 },
+        { zo_sql_key: ts1, zo_sql_breakdown: "error", zo_sql_num: 3 },
+      ]);
+
+      wrapper.vm.generateHistogramData();
+      const hist = mockState.searchObj.data.histogram;
+
       expect(hist.breakdownField).toBe("severity");
       expect(hist.breakdownSeries).toBeInstanceOf(Map);
       const series = hist.breakdownSeries as unknown as Map<string, number[]>;
-      // The non-breakdown row is skipped; only the info row contributes.
-      expect(series.get("info")).toEqual([3]);
-      expect(mockState.searchObj.data.queryResults.total).toBe(3);
+      expect(series.get("info")).toEqual([10]);
+      expect(series.get("error")).toEqual([3]);
+      expect(mockState.searchObj.data.queryResults.total).toBe(13);
     });
 
     it("writes chartParams.timezone from the store", () => {

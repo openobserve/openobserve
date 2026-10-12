@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="openPage"
     >
       <template #cell-page="{ row }">
-        <span class="flex min-w-0 flex-col gap-0.5">
+        <span class="flex min-w-0 flex-col gap-0.5 max-lg:py-1.5">
           <span class="flex items-center gap-1.5">
             <!-- Unread is a dot, not a bold row: a list where most rows shout
                  is a list where none of them do. -->
@@ -120,10 +120,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="xs"
+          class="max-md:ps-2 max-md:pe-2"
           :data-test="`oncall-my-delivery-toggle-${row.event_id}`"
           @click.stop="toggleRead(row)"
         >
-          {{ row.read ? t("oncall.myDeliveriesMarkUnread") : t("oncall.myDeliveriesMarkRead") }}
+          <OIcon :name="row.read ? 'mail' : 'check'" size="sm" class="md:hidden" />
+          <span class="max-md:sr-only">
+            {{ row.read ? t("oncall.myDeliveriesMarkUnread") : t("oncall.myDeliveriesMarkRead") }}
+          </span>
         </OButton>
       </template>
     </OTable>
@@ -146,6 +150,7 @@ import { useStore } from "vuex";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OText from "@/lib/core/Typography/OText.vue";

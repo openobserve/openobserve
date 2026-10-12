@@ -126,6 +126,11 @@ impl RemoteScanExec {
         self.peak_memory.clone()
     }
 
+    /// The input plan bytes exactly as every follower receives them.
+    pub fn encoded_plan(&self) -> &[u8] {
+        &self.remote_scan_node.search_infos.plan
+    }
+
     pub fn with_scan_stats(mut self, scan_stats: Arc<Mutex<ScanStats>>) -> Self {
         self.scan_stats = scan_stats;
         self

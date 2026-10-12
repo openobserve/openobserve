@@ -396,20 +396,21 @@ fn _decrypt_brute_force(cipher: &mut Box<dyn Cipher>, original_str: &str) -> Str
     let mut start = 0;
     let mut end = 0;
     let mut in_base64 = false;
-    // we go through the characters one by one
-    for c in original_str.chars() {
+    // byte offsets: char-count offsets would land inside a multi-byte character.
+    for (end_pos, c) in original_str.bytes().enumerate() {
+        let c = c as char;
         if BASE64_CHARS.contains(c) {
             // if the current character is base64
             if in_base64 {
                 // if we are already in a base64 string, simply extend the end
-                end += 1;
+                end = end_pos + 1;
             } else {
                 // otherwise we have reached end of a non-base64 string,
                 // so copy it as-is, set the start of the base64 string to current
                 // and set in_base64 to true
                 output.push_str(&original_str[start..end]);
                 start = end;
-                end += 1;
+                end = end_pos + 1;
                 in_base64 = true;
             }
         } else {
@@ -428,11 +429,11 @@ fn _decrypt_brute_force(cipher: &mut Box<dyn Cipher>, original_str: &str) -> Str
                     }
                 }
                 start = end;
-                end += 1;
+                end = end_pos + 1;
                 in_base64 = false;
             } else {
                 // if already part of non-base64 string, increment the end
-                end += 1
+                end = end_pos + 1;
             }
         }
     }
@@ -586,6 +587,15 @@ mod tests {
         for (input, expected) in cases {
             let dec = _decrypt_brute_force(&mut cipher, input);
             assert_eq!(dec, expected);
+        }
+    }
+
+    #[test]
+    fn test_brute_force_decrypt_multibyte_input_does_not_panic() {
+        let mut cipher = get_cipher();
+        for input in ["é", "café", "日本abc==", "😀abc=="] {
+            let dec = _decrypt_brute_force(&mut cipher, input);
+            assert_eq!(dec, input);
         }
     }
 }

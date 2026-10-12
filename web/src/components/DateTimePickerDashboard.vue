@@ -120,6 +120,11 @@ export default defineComponent({
       return dateTimePicker.value.getConsumableDateTime();
     };
 
+    // The picker reads its v-model only on mount; this moves an already-mounted one.
+    const setSavedDate = (dateObj: any) => {
+      dateTimePicker.value.setSavedDate(dateObj);
+    };
+
     const onHide = () => {
       emit("hide");
     };
@@ -145,6 +150,7 @@ export default defineComponent({
       dateTimePicker,
       setCustomDate,
       getConsumableDateTime,
+      setSavedDate,
       onShow,
       onHide,
     };

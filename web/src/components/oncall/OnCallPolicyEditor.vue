@@ -132,7 +132,7 @@
                    step's own offset cell, where the reader is already looking. -->
                     <div
                       v-if="stepIndex > 0"
-                      class="border-border-default flex flex-wrap items-center gap-2 border-t py-2 ps-24 pe-3"
+                      class="border-border-default flex flex-wrap items-center gap-2 border-t py-2 ps-24 pe-3 max-md:ps-3"
                     >
                       <OText variant="label">{{ t("oncall.policyIfNoAck") }}</OText>
                       <span class="w-36">

@@ -84,6 +84,12 @@ export function parseLe(raw: string): number {
   return Number.isNaN(parsed) ? NaN : parsed;
 }
 
+/** Orders parsed `le` bounds ascending; not `a - b`, as `Infinity - Infinity` is NaN. */
+export function compareLe(a: number, b: number): number {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
 /**
  * Coerce a raw cumulative cell value to a number.
  * Missing / null / undefined / empty / non-numeric all become `NaN`.
@@ -144,13 +150,8 @@ export function deaccumulateHistogramSeries(
 
   if (parsed.length === 0) return [];
 
-  // 2. Sort ascending; +Inf ends up last. Avoid `a - b` because
-  //    `Infinity - Infinity` is NaN, which would corrupt the comparator.
-  //    Array.prototype.sort is stable, so equal `le` keep their input order.
-  parsed.sort((a, b) => {
-    if (a.leValue === b.leValue) return 0;
-    return a.leValue < b.leValue ? -1 : 1;
-  });
+  // 2. Stable, so step 3 keeps the first of equal `le` in input order.
+  parsed.sort((a, b) => compareLe(a.leValue, b.leValue));
 
   // 3. De-duplicate identical le values, keeping the first after sort.
   const buckets: typeof parsed = [];

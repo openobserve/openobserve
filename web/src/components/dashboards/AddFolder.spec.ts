@@ -60,6 +60,9 @@ vi.mock("@/composables/useNotifications", () => ({
   }),
 }));
 
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
+
 // Mock analytics
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({
@@ -243,5 +246,28 @@ describe("AddFolder", () => {
     await flushPromises();
 
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  it("tracks dashboard_folder_created once a new folder is created", async () => {
+    const wrapper = createWrapper({ editMode: false });
+
+    await wrapper.vm.onSubmit({ name: "Valid Folder", description: "" });
+    await flushPromises();
+
+    expect(analytics.track).toHaveBeenCalledWith("dashboard_folder_created");
+  });
+
+  it("does not track dashboard_folder_created when creation fails or a folder is edited", async () => {
+    const commons = await import("@/utils/commons");
+    (commons.createFolder as any).mockRejectedValueOnce(new Error("Folder creation failed"));
+
+    await createWrapper({ editMode: false }).vm.onSubmit({ name: "Valid Folder", description: "" });
+    await createWrapper({ editMode: true, folderId: "folder1" }).vm.onSubmit({
+      name: "Test Folder",
+      description: "",
+    });
+    await flushPromises();
+
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

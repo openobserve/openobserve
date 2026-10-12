@@ -27,6 +27,7 @@ const props = defineProps<{
   getHighlightedHtml?: (columnId: string, cellValue: any) => string | null;
   wrap?: boolean;
   dense?: boolean;
+  compact?: boolean;
   bordered?: boolean;
   striped?: boolean;
   rowClass?: string | ((row: any) => string);
@@ -241,6 +242,7 @@ const headingColspan = computed(
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
       :dense="dense"
+      :compact="compact"
       :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"
@@ -304,6 +306,7 @@ const headingColspan = computed(
         :get-highlighted-html="getHighlightedHtml"
         :wrap="wrap"
         :dense="dense"
+        :compact="compact"
         :bordered="bordered"
         :striped="striped"
         :row-class-fn="rowClass"
@@ -371,6 +374,7 @@ const headingColspan = computed(
       :get-highlighted-html="getHighlightedHtml"
       :wrap="wrap"
       :dense="dense"
+      :compact="compact"
       :bordered="bordered"
       :striped="striped"
       :row-class-fn="rowClass"

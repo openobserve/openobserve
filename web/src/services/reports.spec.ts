@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import reports from "@/services/reports";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -438,5 +441,78 @@ describe("reports service", () => {
         "Server error",
       );
     });
+  });
+
+  describe("product analytics", () => {
+    const cases: Array<[string, string, () => Promise<unknown>, unknown[]]> = [
+      ["createReportV2", "post", () => reports.createReportV2("org1", {}), ["report_created"]],
+      [
+        "updateReport",
+        "put",
+        () => reports.updateReport("org1", { name: "r" }),
+        ["report_updated"],
+      ],
+      [
+        "updateReportById",
+        "put",
+        () => reports.updateReportById("org1", "r1", {}),
+        ["report_updated"],
+      ],
+      [
+        "deleteReportById",
+        "delete",
+        () => reports.deleteReportById("org1", "r1"),
+        ["report_deleted", { count: 1 }],
+      ],
+      [
+        "bulkDeleteById",
+        "delete",
+        () => reports.bulkDeleteById("org1", { ids: ["a", "b"] }),
+        ["report_deleted", { count: 2 }],
+      ],
+      [
+        "toggleReportStateById enable",
+        "patch",
+        () => reports.toggleReportStateById("org1", "r1", true),
+        ["report_enabled", { count: 1 }],
+      ],
+      [
+        "toggleReportStateById disable",
+        "patch",
+        () => reports.toggleReportStateById("org1", "r1", false),
+        ["report_disabled", { count: 1 }],
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the request resolves", async (_label, verb, call, args) => {
+      const response = { data: { successful: ["a", "b"], unsuccessful: [], success: true } };
+      mockHttpInstance[verb].mockResolvedValue(response);
+
+      await expect(call()).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith(...args);
+    });
+
+    it.each(cases)("%s does not track when the request rejects", async (_label, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["bulkDeleteById", "delete", () => reports.bulkDeleteById("org1", { ids: ["a"] })],
+    ] as Array<[string, string, () => Promise<unknown>]>)(
+      "%s does not track when nothing was affected",
+      async (_label, verb, call) => {
+        mockHttpInstance[verb].mockResolvedValue({ data: { successful: [], unsuccessful: ["a"] } });
+
+        await call();
+
+        expect(analytics.track).not.toHaveBeenCalled();
+      },
+    );
   });
 });

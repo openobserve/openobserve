@@ -9,6 +9,7 @@
 import { computed, ref } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 const props = withDefaults(
@@ -65,8 +66,15 @@ async function handleCopy(e: MouseEvent) {
 
 <template>
   <span v-if="isEmpty" class="text-text-body">{{ emptyLabel }}</span>
-  <span v-else class="group/user inline-flex items-center gap-1">
-    <span class="text-text-body whitespace-nowrap" :title="identity">{{ displayText }}</span>
+  <span v-else class="group/user inline-flex max-w-full min-w-0 items-center gap-1">
+    <!-- A display name or short form keeps the full identity in its title: that is more than the text. -->
+    <span
+      v-if="displayText !== identity"
+      class="text-text-body min-w-0 truncate"
+      :title="identity"
+      >{{ displayText }}</span
+    >
+    <OTruncatedText v-else class="text-text-body">{{ displayText }}</OTruncatedText>
     <button
       v-if="copy"
       type="button"

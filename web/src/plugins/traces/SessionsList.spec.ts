@@ -116,7 +116,6 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
       "rowKey",
       "totalCount",
       "totalCountExact",
-      "footerTitle",
       "sorting",
       "sortBy",
       "sortOrder",
@@ -155,7 +154,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
           </div>
         </template>
         <div data-test="sessions-list-footer" class="otable-footer">
-          {{ footerTitle }} {{ totalCount }}
+          {{ totalCount }}
         </div>
       </div>
     `,

@@ -39,6 +39,8 @@ vi.mock("@/composables/useWorkloadDetection", () => ({
 vi.mock("@/composables/useHostMetricsDashboard", () => ({ importHostMetricsDashboard }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+import analytics from "@/services/product_analytics";
 
 vi.mock("@/composables/useDashboardGallery", () => ({
   useDashboardGallery: () => galleryState,
@@ -251,6 +253,45 @@ describe("TemplateSuggestionCards", () => {
     await flushPromises();
     // §6: the create body IS the bundled JSON, not merely something title-shaped.
     expect(dashboardsService.create).toHaveBeenCalledWith("test-org", dashboardJson, "default");
+  });
+
+  it("tracks dashboard_created when the Host Metrics card creates the dashboard", async () => {
+    wrapper = mountCards();
+    await wrapper.find('[data-test="template-card-hostmetrics"]').trigger("click");
+    await flushPromises();
+    expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+  });
+
+  it("does not track dashboard_created when Host Metrics already exists", async () => {
+    importHostMetricsDashboard.mockResolvedValue({
+      status: "exists",
+      dashboardId: "dash-old",
+      folderId: "default",
+    });
+    wrapper = mountCards();
+    await wrapper.find('[data-test="template-card-hostmetrics"]').trigger("click");
+    await flushPromises();
+    expect(analytics.track).not.toHaveBeenCalled();
+  });
+
+  it("tracks dashboard_created once a confirmed replace re-creates the dashboard", async () => {
+    importHostMetricsDashboard.mockResolvedValue({
+      status: "exists",
+      dashboardId: "dash-old",
+      folderId: "default",
+    });
+    vi.mocked(dashboardsService.delete).mockResolvedValue({} as any);
+    vi.mocked(dashboardsService.create).mockResolvedValue({
+      data: { version: 8, v8: { dashboardId: "dash-new" } },
+    } as any);
+    wrapper = mountCards();
+    await wrapper.find('[data-test="template-card-hostmetrics"]').trigger("click");
+    await flushPromises();
+    vi.useFakeTimers();
+    await wrapper.find('[data-test="template-replace-confirm-ok"]').trigger("click");
+    await vi.advanceTimersByTimeAsync(500);
+    await flushPromises();
+    expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
   });
 
   it("declining the replace navigates to the existing dashboard untouched", async () => {

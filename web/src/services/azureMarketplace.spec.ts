@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import azureMarketplace from "@/services/azureMarketplace";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -186,5 +189,27 @@ describe("azureMarketplace service", () => {
       const callArgs = mockHttpInstance.post.mock.calls[0];
       expect(callArgs[1]).toEqual({ token });
     });
+  });
+});
+
+describe("azureMarketplace product analytics", () => {
+  beforeEach(() => {
+    vi.mocked(analytics.track).mockClear();
+  });
+
+  it("tracks after linkSubscription succeeds", async () => {
+    (http as any).mockImplementation(() => ({ post: vi.fn().mockResolvedValue({ data: {} }) }));
+    await azureMarketplace.linkSubscription("org1", "tok");
+    expect(analytics.track).toHaveBeenCalledWith("marketplace_subscription_linked", {
+      marketplace: "azure",
+    });
+  });
+
+  it("does not track when linkSubscription fails and keeps the rejection", async () => {
+    (http as any).mockImplementation(() => ({
+      post: vi.fn().mockRejectedValue(new Error("boom")),
+    }));
+    await expect(azureMarketplace.linkSubscription("org1", "tok")).rejects.toThrow("boom");
+    expect(analytics.track).not.toHaveBeenCalled();
   });
 });

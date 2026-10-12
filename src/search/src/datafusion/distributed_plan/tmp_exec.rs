@@ -145,8 +145,7 @@ impl ExecutionPlan for TmpExec {
         }
 
         if let Some(data) = self.data.clone() {
-            let reader =
-                unsafe { FileReader::try_new(Cursor::new(data), None)?.with_skip_validation(true) };
+            let reader = FileReader::try_new(Cursor::new(data), None)?;
             let mut batches = Vec::new();
             for batch in reader {
                 batches.push(batch?);
@@ -227,7 +226,7 @@ async fn fetch_data(
     };
 
     let buf = data;
-    let reader = unsafe { FileReader::try_new(Cursor::new(buf), None)?.with_skip_validation(true) };
+    let reader = FileReader::try_new(Cursor::new(buf), None)?;
     let mut batches = Vec::new();
     for batch in reader {
         batches.push(batch?);

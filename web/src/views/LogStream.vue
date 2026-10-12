@@ -336,25 +336,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OEmptyState>
             </div>
           </template>
-          <template #bottom="scope">
-            <div class="flex w-full items-center justify-between py-2">
-              <div class="flex w-full items-center text-xs font-normal">
-                <span class="max-md:hidden">
-                  {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
-                </span>
-                <OButton
-                  v-if="selectedIds.length > 0"
-                  icon-left="delete"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  class="ms-4"
-                  :disabled="isDeleting"
-                  @click="confirmBatchDeleteAction"
-                >
-                  {{ isDeleting ? t("common.deleting") : t("common.delete") }}
-                </OButton>
-              </div>
-            </div>
+          <template #selection-actions>
+            <OButton
+              icon-left="delete"
+              variant="outline-destructive"
+              size="sm"
+              :disabled="isDeleting"
+              @click="confirmBatchDeleteAction"
+            >
+              {{ isDeleting ? t("common.deleting") : t("common.delete") }}
+            </OButton>
           </template>
         </OTable>
       </div>
@@ -452,7 +443,7 @@ import { addCommasToNumber, formatEventCount } from "@/utils/formatters";
 import SchemaIndex from "../components/logstream/schema.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
-import segment from "../services/segment_analytics";
+import analytics from "../services/product_analytics";
 import { getImageURL, verifyOrganizationStatus, formatSizeFromMB } from "../utils/zincutils";
 import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
@@ -504,7 +495,6 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const confirmBatchDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
-    const resultTotal = ref<number>(0);
     const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
@@ -717,7 +707,6 @@ export default defineComponent({
     // Rows only — the one-time side effects below run on the fresh result, so
     // a cached paint never re-opens the schema dialog or re-warms the next page.
     const applyStreams = (res: any) => {
-      resultTotal.value = res.list.length;
       totalCount.value = res.total;
       logStream.value = [];
 
@@ -836,7 +825,7 @@ export default defineComponent({
           });
       }
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Refresh Streams",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -1012,7 +1001,7 @@ export default defineComponent({
       schemaData.value.stream_type = props.row.stream_type;
       showIndexSchemaDialog.value = true;
 
-      segment.track("Button Click", {
+      analytics.track("Button Click", {
         button: "Actions",
         user_org: store.state.selectedOrganization.identifier,
         user_id: store.state.userInfo.email,
@@ -1045,7 +1034,6 @@ export default defineComponent({
 
       const removedCount = before - logStream.value.length;
       totalCount.value = Math.max(0, totalCount.value - removedCount);
-      resultTotal.value = logStream.value.length;
 
       selectedIds.value = [];
 
@@ -1083,6 +1071,7 @@ export default defineComponent({
         )
         .then((res: any) => {
           if (res.data.code == 200) {
+            analytics.track("stream_deleted", { stream_type: deleteStreamType, count: 1 });
             toast({
               message: t("toastMessages.views.streamDeletedSuccessfully"),
               variant: "success",
@@ -1123,6 +1112,17 @@ export default defineComponent({
         .then((responses) => {
           const successfulDeletions = responses.filter((res) => res.data.code === 200);
           const failedDeletions = responses.filter((res) => res.data.code !== 200);
+          const deletedTypes = new Set(
+            items
+              .filter((_s: any, i: number) => responses[i].data.code === 200)
+              .map((s: any) => s.stream_type),
+          );
+          if (successfulDeletions.length > 0) {
+            analytics.track("stream_deleted", {
+              stream_type: deletedTypes.size === 1 ? [...deletedTypes][0] : "mixed",
+              count: successfulDeletions.length,
+            });
+          }
 
           if (successfulDeletions.length > 0) {
             toast({
@@ -1367,7 +1367,6 @@ export default defineComponent({
       streamRowStyle,
       summaryStats,
       summaryLoading,
-      resultTotal,
       listSchema,
       deleteStream,
       deleteBatchStream,

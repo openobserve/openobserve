@@ -1,4 +1,5 @@
 import http from "./http";
+import analytics from "./product_analytics";
 
 export const annotationService = {
   create_timed_annotations: (
@@ -15,11 +16,16 @@ export const annotationService = {
     };
 
     // Make the API call
-    return http().post(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, data, {
-      headers: {
-        "Content-Type": "application/json; charset=UTF-8",
-      },
-    });
+    return http()
+      .post(`/api/${org_id}/dashboards/${dashboard_id}/annotations`, data, {
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+        },
+      })
+      .then((res) => {
+        analytics.track("dashboard_annotation_created");
+        return res;
+      });
   },
 
   update_timed_annotations: (

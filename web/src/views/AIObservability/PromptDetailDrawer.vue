@@ -295,7 +295,12 @@
               <span class="truncate">{{ row.commitMessage || raw("—") }}</span>
             </template>
             <template #cell-labels="{ row }">
-              <div v-if="labelsForVersion(row.version).length" class="flex flex-wrap gap-1">
+              <OTruncatedText
+                v-if="labelsForVersion(row.version).length"
+                as="div"
+                class="flex flex-wrap gap-1"
+                :tooltip="raw(labelsForVersion(row.version).join(', '))"
+              >
                 <OTag
                   v-for="label in labelsForVersion(row.version)"
                   :key="label"
@@ -303,7 +308,7 @@
                   shape="rounded"
                   >{{ label }}</OTag
                 >
-              </div>
+              </OTruncatedText>
               <span v-else class="text-text-secondary">{{ raw("—") }}</span>
             </template>
             <template #cell-createdBy="{ row }">
@@ -346,6 +351,7 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PromptLabelsPanel from "./PromptLabelsPanel.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";

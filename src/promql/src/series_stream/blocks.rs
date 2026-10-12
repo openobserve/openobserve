@@ -32,7 +32,7 @@ use bytes::Bytes;
 use config::{
     meta::{
         promql::{
-            MetricsBlockScan,
+            MetricsBlockScan, STALE_NAN_BITS,
             value::{EvalContext, Labels, Sample},
         },
         stream::FileKey,
@@ -67,7 +67,11 @@ struct MetadataLoad<'a> {
 }
 
 impl MetadataLoad<'_> {
-    async fn run(self, mut seed: Option<Arc<CachedIndex>>) -> Result<Arc<LoadedFile>> {
+    async fn run(
+        self,
+        mut seed: Option<Arc<CachedIndex>>,
+        mut complete: bool,
+    ) -> Result<Arc<LoadedFile>> {
         let Self {
             file,
             labels,
@@ -78,24 +82,8 @@ impl MetadataLoad<'_> {
             flights,
         } = self;
         loop {
-            if seed
-                .as_ref()
-                .map(|entry| entry.index.missing_labels(labels))
-                .transpose()?
-                .is_some_and(|missing| missing.is_empty())
-            {
-                let binding = seed.as_ref().map(|entry| entry.binding.clone());
-                let loaded = load_entry(file, labels, &key.parent, &sidecar, seed).await;
-                let entry = match loaded {
-                    Ok(value) => value,
-                    Err(error) => {
-                        cache
-                            .lock()
-                            .unwrap_or_else(|e| e.into_inner())
-                            .remove_bound(&key, binding.as_ref());
-                        return Err(error);
-                    }
-                };
+            if complete {
+                let entry = seed.unwrap();
                 return Ok(Arc::new(LoadedFile {
                     account: file.account.clone(),
                     sidecar,
@@ -105,6 +93,7 @@ impl MetadataLoad<'_> {
             match flights.claim(key.clone()) {
                 loads::Claim::Waiter(flight) => {
                     if let Some(loaded) = flight.wait().await? {
+                        complete = loaded.index.missing_labels(labels)?.is_empty();
                         seed = Some(loaded);
                     }
                 }
@@ -293,6 +282,7 @@ pub(crate) struct BlockSeriesStream {
     decoder: Option<BlockDecoder>,
     local_stats: PartitionReadStats,
     stats: Arc<ReadStats>,
+    stale_markers: bool,
 }
 
 impl BlockSeriesStream {
@@ -323,6 +313,7 @@ impl BlockSeriesStream {
             decoder: None,
             local_stats: PartitionReadStats::default(),
             stats: partition.stats,
+            stale_markers: config::get_config().prom.staleness_markers_enabled,
         }
     }
 }
@@ -383,7 +374,9 @@ impl SeriesStream for BlockSeriesStream {
                         .copied()
                         .zip(block.value_bits.iter().copied())
                     {
-                        if timestamp >= self.window.0 && timestamp <= self.window.1 {
+                        // markers compacted while the flag was on stay invisible once it is off
+                        let dropped = !self.stale_markers && bits == STALE_NAN_BITS;
+                        if timestamp >= self.window.0 && timestamp <= self.window.1 && !dropped {
                             let timestamp =
                                 timestamp.checked_add(self.offset).ok_or_else(|| {
                                     DataFusionError::Execution(
@@ -743,11 +736,12 @@ async fn load_index_cached(
         account: file.account.clone(),
         parent: parent.clone(),
     };
-    let cached = {
+    let lookup = {
         let mut cache = cache.lock().unwrap_or_else(|e| e.into_inner());
         cache.trim(limit);
-        cache.get(&key)
+        cache.lookup(&key)
     };
+    let (cached, complete) = lookup.classify(labels)?;
     MetadataLoad {
         file,
         labels,
@@ -757,7 +751,7 @@ async fn load_index_cached(
         cache,
         flights,
     }
-    .run(cached)
+    .run(cached, complete)
     .await
 }
 
@@ -768,15 +762,7 @@ async fn load_entry(
     sidecar: &str,
     cached: Option<Arc<CachedIndex>>,
 ) -> Result<Arc<CachedIndex>> {
-    if cached
-        .as_ref()
-        .map(|entry| entry.index.missing_labels(labels))
-        .transpose()?
-        .is_some_and(|missing| missing.is_empty())
-    {
-        return Ok(cached.unwrap());
-    }
-    Ok(metrics_index::fetch_parsed_index(
+    metrics_index::fetch_parsed_index(
         &file.account,
         sidecar,
         parent.metadata(),
@@ -784,7 +770,7 @@ async fn load_entry(
         labels,
         cached,
     )
-    .await?)
+    .await
 }
 
 pub(crate) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
@@ -948,7 +934,7 @@ mod tests {
     use async_trait::async_trait;
     use config::{
         meta::{
-            promql::{HASH_SORTED_TABLE_SUFFIX, value::Label},
+            promql::value::Label,
             stream::{FileMeta, FileSelection},
         },
         metrics::promql::IndexBlocksCacheMetrics,
@@ -974,9 +960,12 @@ mod tests {
     use tokio::sync::Notify;
 
     use super::*;
-    use crate::series_stream::{
-        SeriesSource,
-        plan::{StreamingSelector, execute_partitioned},
+    use crate::{
+        ScanSource,
+        series_stream::{
+            SeriesSource,
+            plan::{StreamingSelector, execute_partitioned},
+        },
     };
 
     type Row = (u64, i64, f64, Option<&'static str>);
@@ -1165,7 +1154,6 @@ mod tests {
         }
         fn scan(&self, files: impl IntoIterator<Item = FileKey>) -> MetricsBlockScan {
             MetricsBlockScan {
-                table_name: "m".into(),
                 files: files
                     .into_iter()
                     .map(|mut file| {
@@ -1259,7 +1247,7 @@ mod tests {
         .unwrap()
     }
     fn file(rows: &[Row]) -> (FileKey, Vec<u8>) {
-        file_batch(batch(rows), vec!["group".into()])
+        file_batch(batch(rows))
     }
 
     #[tokio::test]
@@ -1300,7 +1288,7 @@ mod tests {
         );
     }
 
-    fn file_batch(batch: RecordBatch, label_columns: Vec<String>) -> (FileKey, Vec<u8>) {
+    fn file_batch(batch: RecordBatch) -> (FileKey, Vec<u8>) {
         let records = batch.num_rows();
         let timestamps = batch
             .column_by_name("_timestamp")
@@ -1319,16 +1307,11 @@ mod tests {
             rows: records as u64,
             compressed_size: 123,
         };
-        let mut writer = BlockWriter::new(
-            Vec::new(),
-            batch.schema(),
-            label_columns,
-            parent.metadata(),
-            2,
-        )
-        .unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), batch.schema(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let bytes = writer.finish().unwrap();
+        let bytes = writer
+            .finish_for_vortex(parent.metadata(), batch.schema())
+            .unwrap();
         let mut file = FileKey::new(
             0,
             String::new(),
@@ -1514,11 +1497,8 @@ mod tests {
     async fn sparse_evaluation_uses_block_source() {
         let data = file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
-        let ctx = SessionContext::new_with_config(
-            SessionConfig::new()
-                .with_target_partitions(2)
-                .with_extension(Arc::new(fixture.scan([data.0]))),
-        );
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
+        let source = ScanSource::Blocks(Arc::new(fixture.scan([data.0])));
         let matchers = Matchers::empty();
         let selector = StreamingSelector {
             table_name: "m",
@@ -1528,14 +1508,13 @@ mod tests {
         let eval = EvalContext::new(130, 230, 100, "sparse-block".into());
         let sources = execute_partitioned(
             &ctx,
-            schema().as_ref(),
+            &source,
             &selector,
             LabelColumns::grouped(vec!["group".into()]),
             20,
             &eval,
         )
         .await
-        .unwrap()
         .unwrap();
         for source in sources {
             assert!(matches!(source.await.unwrap(), SeriesSource::Block(_)));
@@ -1613,6 +1592,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn stale_markers_are_dropped_on_read_when_markers_are_off() {
+        let stale = config::meta::promql::STALE_NAN_BITS;
+        let data = file(&[
+            (1, 20, 1.0, Some("a")),
+            (1, 30, f64::from_bits(stale), Some("a")),
+        ]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let scan = fixture.scan([data.0]);
+        for stale_markers in [true, false] {
+            let prepared = prepare(
+                &scan,
+                &Matchers::empty(),
+                columns(),
+                &intervals(),
+                100,
+                20,
+                &eval(),
+            )
+            .await
+            .unwrap();
+            let mut actual = Vec::new();
+            for partition in prepared {
+                let mut stream = BlockSeriesStream::new(partition);
+                stream.stale_markers = stale_markers;
+                let mut samples = Vec::new();
+                while stream.advance().await.unwrap().is_some() {
+                    stream.consume(&mut samples).await.unwrap();
+                    actual.extend(samples.iter().map(|s| (s.timestamp, s.value.to_bits())));
+                }
+            }
+            let mut expected = vec![(120, 1f64.to_bits())];
+            if stale_markers {
+                expected.push((130, stale));
+            }
+            assert_eq!(actual, expected, "stale_markers: {stale_markers}");
+        }
+    }
+
+    #[tokio::test]
     async fn merge_orders_shared_hashes_and_exhausted_files() {
         let first = file(&[(1, 10, 1.0, Some("a")), (4, 10, 4.0, Some("d"))]);
         let second = file(&[(1, 20, 2.0, Some("a")), (2, 10, 3.0, Some("b"))]);
@@ -1685,10 +1703,7 @@ mod tests {
         )
         .await;
         file.account = format!("{id}:default");
-        let scan = MetricsBlockScan {
-            table_name: "m".into(),
-            files: vec![file],
-        };
+        let scan = MetricsBlockScan { files: vec![file] };
         let prepared = prepare(
             &scan,
             &Matchers::empty(),
@@ -1780,11 +1795,7 @@ mod tests {
         bytes[index.blocks.block(1).block_offset as usize] ^= 1;
         key.selection = None;
         let fixture = Fixture::new(&[(key.clone(), bytes)], false).await;
-        let matchers = Matchers::new(vec![Matcher::new(
-            MatchOp::Re("first|last".parse().unwrap()),
-            "group",
-            "first|last",
-        )]);
+        let matchers = parsed_matchers(r#"m{group=~"first|last"}"#);
         let prepared = prepare(
             &fixture.scan([key]),
             &matchers,
@@ -1831,6 +1842,42 @@ mod tests {
         );
     }
 
+    #[test]
+    fn midx_regex_selection_preserves_parser_anchoring_and_normalization() {
+        let (_, bytes) = file(&[
+            (1, 10, 1.0, Some("first")),
+            (2, 10, 2.0, Some("last")),
+            (3, 10, 3.0, Some("first-extra")),
+            (4, 10, 4.0, Some("prefix-last")),
+            (5, 10, 5.0, Some("middle")),
+            (6, 10, 6.0, Some("bc{abc}")),
+            (7, 10, 7.0, Some("xbc{abc}")),
+            (8, 10, 8.0, Some("bc{abc}x")),
+        ]);
+        let index = metrics_index::block::decode_file(
+            &bytes,
+            &ParentMetadata {
+                rows: 8,
+                compressed_size: 123,
+            },
+            &["group".into()],
+        )
+        .unwrap();
+        for (pattern, operator, expected) in [
+            ("first|last", "=~", vec![0, 1]),
+            ("first|last", "!~", vec![2, 3, 4, 5, 6, 7]),
+            ("bc{abc}", "=~", vec![5]),
+            ("bc{abc}", "!~", vec![0, 1, 2, 3, 4, 6, 7]),
+        ] {
+            let query = format!(r#"m{{group{operator}"{pattern}"}}"#);
+            let matchers = parsed_matchers(&query);
+            assert_eq!(
+                metrics_index::matching_blocks(&index, &matchers).unwrap(),
+                expected
+            );
+        }
+    }
+
     #[tokio::test]
     async fn filtered_block_selection_reuses_one_decode_without_global_cache() {
         let data = file(&[
@@ -1840,12 +1887,18 @@ mod tests {
         ]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
         let file = fixture.scan([data.0]).files.remove(0);
-        let cache = Mutex::new(IndexCache::default());
+        let (cache, registry) = observed_cache();
+        let cache = Mutex::new(cache);
         let flights = Arc::new(loads::LoadRegistry::default());
         let loaded = load_index_cached(&file, &["group".into()], &cache, &flights, 0)
             .await
             .unwrap();
         assert!(cache.lock().unwrap().is_empty());
+        assert!(
+            cache_snapshot(&registry)
+                .values()
+                .all(|value| *value == 0.0)
+        );
         let reads = fixture.metadata_calls.load(Ordering::SeqCst);
         assert!(reads > 0);
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "group", "x")]);
@@ -1864,8 +1917,8 @@ mod tests {
             Matcher::new(MatchOp::Equal, "path", "/api/bar"),
             Matcher::new(MatchOp::Equal, "path", ""),
             Matcher::new(MatchOp::NotEqual, "path", "/api/bar"),
-            Matcher::new(MatchOp::Re(".*".parse().unwrap()), "path", ".*"),
-            Matcher::new(MatchOp::NotRe("api.*".parse().unwrap()), "path", "api.*"),
+            parsed_matchers(r#"m{path=~".*"}"#).matchers.remove(0),
+            parsed_matchers(r#"m{path!~"api.*"}"#).matchers.remove(0),
         ] {
             let prepared = prepare(
                 &fixture.scan([data.0.clone()]),
@@ -1895,10 +1948,7 @@ mod tests {
         fields.push(Arc::new(Field::new("env", DataType::Utf8, true)));
         let mut arrays = source.columns().to_vec();
         arrays.push(Arc::new(StringArray::from(vec!["prod", "prod"])));
-        let new = file_batch(
-            RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap(),
-            vec!["group".into(), "env".into()],
-        );
+        let new = file_batch(RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap());
         let fixture = Fixture::new(&[old.clone(), new.clone()], false).await;
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "env", "prod")]);
         let prepared = prepare(
@@ -1977,9 +2027,11 @@ mod tests {
                 .optimizer
                 .enable_round_robin_repartition = false;
             config.options_mut().optimizer.prefer_existing_sort = true;
-            if blocks {
-                config.set_extension(Arc::clone(&scan));
-            }
+            let source = if blocks {
+                ScanSource::Blocks(Arc::clone(&scan))
+            } else {
+                ScanSource::HashSorted
+            };
             let ctx = SessionContext::new_with_config(config);
             let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
                 .unwrap()
@@ -1987,8 +2039,7 @@ mod tests {
                     col("__hash__").sort(true, false),
                     col("_timestamp").sort(true, false),
                 ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
+            ctx.register_table("m", Arc::new(table)).unwrap();
             let matchers = Matchers::empty();
             let selector = StreamingSelector {
                 table_name: "m",
@@ -1997,14 +2048,13 @@ mod tests {
             };
             let sources = execute_partitioned(
                 &ctx,
-                schema().as_ref(),
+                &source,
                 &selector,
                 LabelColumns::grouped(vec![]),
                 20,
                 &eval,
             )
             .await
-            .unwrap()
             .unwrap();
             let func: Arc<dyn functions::RangeFunc> =
                 Arc::from(functions::fusable_range_func("rate").unwrap());
@@ -2065,9 +2115,11 @@ mod tests {
                 .optimizer
                 .enable_round_robin_repartition = false;
             config.options_mut().optimizer.prefer_existing_sort = true;
-            if blocks {
-                config.set_extension(Arc::clone(&scan));
-            }
+            let source = if blocks {
+                ScanSource::Blocks(Arc::clone(&scan))
+            } else {
+                ScanSource::HashSorted
+            };
             let ctx = SessionContext::new_with_config(config);
             let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
                 .unwrap()
@@ -2075,9 +2127,8 @@ mod tests {
                     col("__hash__").sort(true, false),
                     col("_timestamp").sort(true, false),
                 ]]);
-            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                .unwrap();
-            contexts.push(ctx);
+            ctx.register_table("m", Arc::new(table)).unwrap();
+            contexts.push((ctx, source));
         }
         for name in [
             "avg_over_time",
@@ -2096,9 +2147,15 @@ mod tests {
             "stddev_over_time",
             "stdvar_over_time",
             "sum_over_time",
+            "first_over_time",
+            "mad_over_time",
+            "ts_of_first_over_time",
+            "ts_of_last_over_time",
+            "ts_of_max_over_time",
+            "ts_of_min_over_time",
         ] {
             let mut outputs = Vec::new();
-            for ctx in &contexts {
+            for (ctx, source) in &contexts {
                 let matchers = Matchers::empty();
                 let selector = StreamingSelector {
                     table_name: "m",
@@ -2107,14 +2164,13 @@ mod tests {
                 };
                 let sources = execute_partitioned(
                     ctx,
-                    schema().as_ref(),
+                    source,
                     &selector,
                     LabelColumns::grouped(vec!["group".into()]),
                     20,
                     &eval,
                 )
                 .await
-                .unwrap()
                 .unwrap();
                 let func: Arc<dyn functions::RangeFunc> =
                     Arc::from(functions::fusable_range_func(name).unwrap());
@@ -2225,12 +2281,8 @@ mod tests {
             (1, 30, 4.0, Some("x")),
         ]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
-        let scan = Arc::new(fixture.scan([data.0]));
-        let ctx = SessionContext::new_with_config(
-            SessionConfig::new()
-                .with_target_partitions(28)
-                .with_extension(scan),
-        );
+        let source = ScanSource::Blocks(Arc::new(fixture.scan([data.0])));
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(28));
         let eval = EvalContext::new(120, 130, 5, "duplicate-range-functions".into());
         for name in ["count_over_time", "irate", "rate", "resets"] {
             let matchers = Matchers::empty();
@@ -2241,14 +2293,13 @@ mod tests {
             };
             let sources = execute_partitioned(
                 &ctx,
-                schema().as_ref(),
+                &source,
                 &selector,
                 LabelColumns::grouped(vec!["group".into()]),
                 20,
                 &eval,
             )
             .await
-            .unwrap()
             .unwrap();
             let func: Arc<dyn functions::RangeFunc> =
                 Arc::from(functions::fusable_range_func(name).unwrap());
@@ -2271,20 +2322,15 @@ mod tests {
         let valid = file(&rows);
         let missing = file(&[(2, 30, 3.0, Some("y"))]);
         let fixture = Fixture::new(std::slice::from_ref(&valid), false).await;
-        let scan = fixture.scan([valid.0, missing.0]);
-        let ctx = SessionContext::new_with_config(
-            SessionConfig::new()
-                .with_target_partitions(2)
-                .with_extension(Arc::new(scan)),
-        );
+        let source = ScanSource::Blocks(Arc::new(fixture.scan([valid.0, missing.0])));
+        let ctx = SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
         let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
             .unwrap()
             .with_sort_order(vec![vec![
                 col("__hash__").sort(true, false),
                 col("_timestamp").sort(true, false),
             ]]);
-        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-            .unwrap();
+        ctx.register_table("m", Arc::new(table)).unwrap();
         let matchers = Matchers::empty();
         let selector = StreamingSelector {
             table_name: "m",
@@ -2293,7 +2339,7 @@ mod tests {
         };
         let error = execute_partitioned(
             &ctx,
-            schema().as_ref(),
+            &source,
             &selector,
             LabelColumns::grouped(vec!["group".into()]),
             20,
@@ -2338,19 +2384,20 @@ mod tests {
                     source.1 = legacy.clone();
                 }
                 let fixture = Fixture::new(&files, false).await;
-                let mut config = SessionConfig::new().with_target_partitions(2);
-                if enabled {
-                    config.set_extension(Arc::new(fixture.scan(files.iter().map(|v| v.0.clone()))));
-                }
-                let ctx = SessionContext::new_with_config(config);
+                let source = if enabled {
+                    ScanSource::Blocks(Arc::new(fixture.scan(files.iter().map(|v| v.0.clone()))))
+                } else {
+                    ScanSource::HashSorted
+                };
+                let ctx =
+                    SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
                 let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
                     .unwrap()
                     .with_sort_order(vec![vec![
                         col("__hash__").sort(true, false),
                         col("_timestamp").sort(true, false),
                     ]]);
-                ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
-                    .unwrap();
+                ctx.register_table("m", Arc::new(table)).unwrap();
                 let matchers = Matchers::empty();
                 let selector = StreamingSelector {
                     table_name: "m",
@@ -2359,7 +2406,7 @@ mod tests {
                 };
                 let result = execute_partitioned(
                     &ctx,
-                    schema().as_ref(),
+                    &source,
                     &selector,
                     LabelColumns::grouped(vec!["group".into()]),
                     20,
@@ -2371,7 +2418,7 @@ mod tests {
                     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
                     continue;
                 }
-                let sources = result.unwrap().unwrap();
+                let sources = result.unwrap();
                 let mut actual = Vec::new();
                 for source in sources {
                     let mut source = source.await.unwrap();
@@ -2408,7 +2455,7 @@ mod tests {
             original.columns()[..3].to_vec(),
         )
         .unwrap();
-        let absent = file_batch(absent, vec![]);
+        let absent = file_batch(absent);
         let null = file(&[(1, 30, 3.0, None), (1, 40, 4.0, None)]);
         let empty = file(&[(1, 30, 3.0, Some("")), (1, 40, 4.0, Some(""))]);
         let fixture = Fixture::new(&[absent.clone(), null.clone(), empty.clone()], false).await;
@@ -2613,8 +2660,204 @@ mod tests {
                 assert!(values.insert(name, value).is_none());
             }
         }
-        assert_eq!(values.len(), 3);
+        assert_eq!(values.len(), 5);
         values
+    }
+
+    #[test]
+    fn metadata_cache_lookup_classifies_full_partial_and_missing_keys() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        cache.trim(weight.total);
+        let (cached, complete) = cache.lookup(&key).classify(&["group".into()]).unwrap();
+        assert!(cached.is_none());
+        assert!(!complete);
+        let partial = Arc::new(CachedIndex {
+            index: Arc::new(entry.index.project(&[]).unwrap()),
+            binding: entry.binding.clone(),
+        });
+        cache.insert(key.clone(), partial, weight.total).unwrap();
+        let (cached, complete) = cache.lookup(&key).classify(&["group".into()]).unwrap();
+        assert!(cached.is_some());
+        assert!(!complete);
+        cache.insert(key.clone(), entry, weight.total).unwrap();
+        let (cached, complete) = cache
+            .lookup(&key)
+            .classify(&["group".into(), "absent_from_source".into()])
+            .unwrap();
+        assert!(cached.is_some());
+        assert!(complete);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 2.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 1.0);
+        assert!(cache.lookup(&key).classify(&["value".into()]).is_err());
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 3.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 1.0);
+    }
+
+    #[test]
+    fn metadata_cache_lookup_classifies_after_releasing_cache_lock() {
+        let (cache, registry) = observed_cache();
+        let cache = Mutex::new(cache);
+        let (key, entry, weight) = cache_entry();
+        let partial = Arc::new(CachedIndex {
+            index: Arc::new(entry.index.project(&[]).unwrap()),
+            binding: entry.binding.clone(),
+        });
+        let lookup = {
+            let mut cache = cache.lock().unwrap();
+            cache.insert(key.clone(), partial, weight.total).unwrap();
+            cache.lookup(&key)
+        };
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        cache.try_lock().unwrap().trim(0);
+        let (cached, complete) = lookup.classify(&["group".into()]).unwrap();
+        assert!(cached.is_some());
+        assert!(!complete);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 0.0);
+        assert_eq!(values["used_bytes"], 0.0);
+    }
+
+    #[test]
+    fn metadata_cache_get_preserves_key_lookup_compatibility() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        assert!(cache.get(&key).is_none());
+        assert_eq!(cache_snapshot(&registry)["misses_total"], 0.0);
+        cache.trim(weight.total);
+        assert!(cache.get(&key).is_none());
+        cache.insert(key.clone(), entry, weight.total).unwrap();
+        assert!(cache.get(&key).is_some());
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 1.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        assert_eq!(values["misses_total"], 1.0);
+    }
+
+    #[test]
+    fn metadata_cache_peek_and_merge_do_not_count_lookups() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        assert!(cache.peek(&key).is_none());
+        cache
+            .insert(key.clone(), Arc::clone(&entry), weight.total)
+            .unwrap();
+        assert!(cache.peek(&key).is_some());
+        cache.insert(key.clone(), entry, weight.total).unwrap();
+        assert!(cache.peek(&key).is_some());
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 0.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        assert_eq!(values["misses_total"], 0.0);
+    }
+
+    #[tokio::test]
+    async fn metadata_cache_lookup_counts_incremental_label_load_once() {
+        let data = file(&[(1, 10, 1.0, Some("x"))]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let file = fixture.scan([data.0]).files.remove(0);
+        let (cache, registry) = observed_cache();
+        let cache = Mutex::new(cache);
+        let flights = Arc::new(loads::LoadRegistry::default());
+        load_index_cached(&file, &[], &cache, &flights, usize::MAX)
+            .await
+            .unwrap();
+        let directory_reads = fixture.metadata_calls.load(Ordering::SeqCst);
+        let labels = ["group".into()];
+        let loaded = load_index_cached(&file, &labels, &cache, &flights, usize::MAX)
+            .await
+            .unwrap();
+        assert!(loaded.index.labels.column_by_name("group").is_some());
+        let label_reads = fixture.metadata_calls.load(Ordering::SeqCst);
+        assert!(label_reads > directory_reads);
+        load_index_cached(&file, &labels, &cache, &flights, usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(fixture.metadata_calls.load(Ordering::SeqCst), label_reads);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 2.0);
+        assert_eq!(values["partial_hits_total"], 1.0);
+        assert_eq!(values["misses_total"], 1.0);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn metadata_cache_singleflight_waiter_keeps_initial_miss() {
+        let data = file(&[(1, 10, 1.0, Some("x"))]);
+        let fixture = Fixture::new(std::slice::from_ref(&data), false).await;
+        let file = fixture.scan([data.0]).files.remove(0);
+        let key = CacheKey {
+            account: file.account.clone(),
+            parent: ParentIdentity {
+                object_key: file.key.clone(),
+                rows: file.meta.records as u64,
+                compressed_size: file.meta.compressed_size as u64,
+            },
+        };
+        let entry = Arc::new(CachedIndex {
+            index: Arc::new(
+                metrics_index::block::decode_file(
+                    &data.1,
+                    &key.parent.metadata(),
+                    &["group".into()],
+                )
+                .unwrap(),
+            ),
+            binding: SidecarBinding::parse(
+                data.1.len() as u64,
+                &data.1[data.1.len() - metrics_index::block::MIDX_TRAILER_LEN..],
+            )
+            .unwrap(),
+        });
+        let (cache, registry) = observed_cache();
+        let cache = Arc::new(Mutex::new(cache));
+        let flights = Arc::new(loads::LoadRegistry::default());
+        let loads::Claim::Owner(owner) = flights.claim(key) else {
+            panic!("first claim must own the load");
+        };
+        let worker_cache = Arc::clone(&cache);
+        let worker_flights = Arc::clone(&flights);
+        let waiting = tokio::spawn(async move {
+            load_index_cached(
+                &file,
+                &["group".into()],
+                &worker_cache,
+                &worker_flights,
+                usize::MAX,
+            )
+            .await
+        });
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while cache_snapshot(&registry)["misses_total"] == 0.0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(!waiting.is_finished());
+        owner.complete(&Ok(entry));
+        assert!(
+            waiting
+                .await
+                .unwrap()
+                .unwrap()
+                .index
+                .labels
+                .column_by_name("group")
+                .is_some()
+        );
+        assert_eq!(fixture.metadata_calls.load(Ordering::SeqCst), 0);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["hits_total"], 0.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        assert_eq!(values["misses_total"], 1.0);
     }
 
     #[test]
@@ -2671,7 +2914,11 @@ mod tests {
             .insert(key.clone(), Arc::clone(&entry), weight.total - 1)
             .unwrap();
         let values = cache_snapshot(&registry);
-        assert!(values.values().all(|value| *value == 0.0));
+        assert_eq!(values["misses_total"], 1.0);
+        assert_eq!(values["hits_total"], 0.0);
+        assert_eq!(values["partial_hits_total"], 0.0);
+        assert_eq!(values["used_bytes"], 0.0);
+        assert_eq!(values["evictions_total"], 0.0);
         cache.insert(key, entry, weight.total).unwrap();
         cache.trim(0);
         let reset = cache_snapshot(&registry);
@@ -2789,5 +3036,14 @@ mod tests {
         cache.trim(0);
         assert!(cache.get(&key).is_none());
         assert_eq!(cache.bytes, 0);
+    }
+
+    fn parsed_matchers(query: &str) -> Matchers {
+        let promql_parser::parser::Expr::VectorSelector(selector) =
+            promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        selector.matchers
     }
 }

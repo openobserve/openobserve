@@ -14,7 +14,7 @@
     "@openobserve/mobile-react-native": "0.1.2",
     "@openobserve/mobile-react-native-session-replay": "0.1.2",
     "react": "18.3.1",
-    "react-native": "0.75.4"
+    "react-native": "0.87.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
@@ -22,7 +22,7 @@
     "@babel/runtime": "^7.20.0",
     "@react-native/babel-preset": "0.75.4",
     "@react-native/eslint-config": "0.75.4",
-    "@react-native/metro-config": "0.75.4",
+    "@react-native/metro-config": "0.87.1",
     "@react-native/typescript-config": "0.75.4",
     "@types/react": "^18.2.6",
     "@types/react-test-renderer": "^18.0.0",

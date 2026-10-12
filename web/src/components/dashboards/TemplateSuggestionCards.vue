@@ -25,6 +25,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import dashboardsService from "@/services/dashboards";
+import analytics from "@/services/product_analytics";
 import dashboardJson from "@/assets/dashboards/host_metrics.dashboard.json";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
 import { useWorkloadDetection } from "@/composables/useWorkloadDetection";
@@ -39,6 +40,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = defineProps<{
   activeFolderId: string;
@@ -121,6 +123,7 @@ const onHostMetricsClick = async () => {
         ),
       });
     } else if (result.status === "created") {
+      analytics.track("dashboard_created");
       emit("imported");
       goToDashboard(result.dashboardId);
     } else {
@@ -141,6 +144,7 @@ const confirmReplace = async () => {
     // The AWS-tile mechanics: let the delete settle before re-creating.
     await new Promise((resolve) => setTimeout(resolve, 500));
     const created = await dashboardsService.create(orgId.value, dashboardJson, "default");
+    analytics.track("dashboard_created");
     const dashboardId = created.data?.[`v${created.data?.version}`]?.dashboardId ?? "";
     emit("imported");
     goToDashboard(dashboardId);
@@ -183,9 +187,9 @@ onMounted(() => {
         @keydown.enter.prevent="onHostMetricsClick"
       >
         <OTag variant="success-soft" icon="monitor-heart" size="sm" />
-        <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">
+        <OTruncatedText class="text-text-heading flex-1 text-sm font-medium">
           {{ raw("Host Metrics") }}
-        </span>
+        </OTruncatedText>
         <OTag
           v-if="hostsDetected"
           variant="primary-soft"
@@ -210,9 +214,9 @@ onMounted(() => {
           :icon="getCategoryInfo(dashboard).icon"
           size="sm"
         />
-        <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">
+        <OTruncatedText class="text-text-heading flex-1 text-sm font-medium">
           {{ raw(dashboard.displayName) }}
-        </span>
+        </OTruncatedText>
         <OTag
           v-if="cardBadged(dashboard)"
           variant="primary-soft"

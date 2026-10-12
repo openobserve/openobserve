@@ -1,4 +1,5 @@
 import http from "./http";
+import analytics from "./product_analytics";
 
 // ----------- Groups -------------
 export const getGroups = (org_identifier: string) => {
@@ -23,11 +24,16 @@ export const bulkDeleteGroups = (org_identifier: string, data: any) => {
 
 export const createGroup = (group_name: string, org_identifier: string) => {
   const url = `/api/${org_identifier}/groups`;
-  return http({}).post(url, {
-    name: group_name,
-    users: [],
-    roles: [],
-  });
+  return http({})
+    .post(url, {
+      name: group_name,
+      users: [],
+      roles: [],
+    })
+    .then((res) => {
+      analytics.track("user_group_created");
+      return res;
+    });
 };
 
 export const updateGroup = (group: {

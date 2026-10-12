@@ -69,7 +69,6 @@ test.describe("UI Regression Bugs", () => {
 
     // Click Help menu - using POM method
     await pm.enrichmentPage.clickHelpMenuItem();
-    await page.waitForTimeout(1000);
 
     testLogger.info('Help menu opened');
 

@@ -371,7 +371,6 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.runs.empty')"
-            :footer-title="t('onlineEvals.job.detail.tabs.runs')"
             show-index
             width="100%"
             class="w-full"
@@ -384,15 +383,11 @@
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
@@ -424,7 +419,6 @@
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :empty-message="t('onlineEvals.job.detail.failures.recentEmpty')"
-            :footer-title="t('onlineEvals.job.detail.tabs.failures')"
             show-index
             width="100%"
             class="w-full"
@@ -437,15 +431,11 @@
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
-                row.targetSpanId
-              }}</span>
+              <span v-if="row.targetSpanId">{{ row.targetSpanId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
-                row.targetTraceId
-              }}</span>
+              <span v-if="row.targetTraceId">{{ row.targetTraceId }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">

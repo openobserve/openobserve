@@ -339,7 +339,9 @@ describe("ExperimentComparisonPanel", () => {
 
     // The label states the fact; the reason and the fix have to be reachable,
     // or the column just looks broken.
-    const hint = header.get('[data-test="tooltip"]').attributes("data-content");
+    const hint = header
+      .get('[data-test="ai-experiment-dim-none-score:tone:score-quality:1"] [data-test="tooltip"]')
+      .attributes("data-content");
     expect(hint).toContain("no comparison policy");
     expect(hint).toContain("cannot affect the outcome");
     expect(hint).toContain("direction and a threshold");

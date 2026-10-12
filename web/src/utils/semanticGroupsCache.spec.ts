@@ -79,6 +79,43 @@ describe("semanticGroupsCache — concurrent failure reporting", () => {
   });
 });
 
+describe("semanticGroupsCache — console noise on failure", () => {
+  beforeEach(() => {
+    clearSemanticGroupsCache();
+    getSemanticGroupsMock.mockReset();
+  });
+
+  it("does not log a 403 as an error — every caller already falls back to []", async () => {
+    // A 403 means this org/user isn't entitled to semantic groups, which every
+    // caller already handles by proceeding with an empty list. Logging it as
+    // console.error was pure noise, picked up by RUM as a false "bug".
+    const err: any = new Error("forbidden");
+    err.response = { status: 403 };
+    getSemanticGroupsMock.mockRejectedValue(err);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const groups = await loadSemanticGroups("org-403");
+
+    expect(groups).toEqual([]);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("still logs a non-403 failure as an error", async () => {
+    const err = new Error("boom");
+    getSemanticGroupsMock.mockRejectedValue(err);
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const groups = await loadSemanticGroups("org-500");
+
+    expect(groups).toEqual([]);
+    expect(consoleErrorSpy).toHaveBeenCalledWith("Error loading semantic groups:", err);
+
+    consoleErrorSpy.mockRestore();
+  });
+});
+
 describe("semanticGroupsCache — the fresh-hit fast path", () => {
   const groups = [{ id: "host", display: "Host", fields: ["host_name"] }];
 

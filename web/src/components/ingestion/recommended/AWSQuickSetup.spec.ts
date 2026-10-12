@@ -54,7 +54,7 @@ vi.mock("@/utils/awsIntegrations", () => ({
   QUICK_SETUP_SERVICES: MOCK_SERVICES,
 }));
 
-vi.mock("@/services/segment_analytics", () => ({
+vi.mock("@/services/product_analytics", () => ({
   default: { track: vi.fn() },
 }));
 

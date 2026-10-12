@@ -58,3 +58,7 @@ tracing.workspace = true
 transform.workspace = true
 url.workspace = true
 utoipa.workspace = true
+
+[dev-dependencies]
+openobserve-core = { workspace = true, features = ["test-utils"] }
+tokio.workspace = true

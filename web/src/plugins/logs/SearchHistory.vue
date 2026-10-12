@@ -9,9 +9,9 @@
     <template #subtitle>
       <div class="flex min-w-0 items-center gap-2">
         <OTag type="streamType" :value="activeStreamType" />
-        <span v-if="activeStreamName" class="min-w-0 truncate leading-normal">{{
+        <OTruncatedText v-if="activeStreamName" class="leading-normal">{{
           activeStreamName
-        }}</span>
+        }}</OTruncatedText>
       </div>
     </template>
     <template #actions>
@@ -262,13 +262,8 @@
           </div>
         </template>
 
-        <template #bottom>
-          <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-              {{ resultTotal }} {{ t("search_history.results") }}
-            </div>
-            <div class="ms-auto me-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
-          </div>
+        <template v-if="dataToBeLoaded.length > 0" #footer-note>
+          <span>{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></span>
         </template>
       </OTable>
     </div>
@@ -322,6 +317,7 @@ import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -345,6 +341,7 @@ export default defineComponent({
     OIcon,
     OTag,
     OTooltip,
+    OTruncatedText,
     OTable,
     OTimeCell,
     OPageLayout,
@@ -419,8 +416,6 @@ export default defineComponent({
     ]);
 
     onUnmounted(() => {});
-
-    const resultTotal = ref<number>(0);
 
     const pageSize = ref(100);
     const pageSizeOptions = [5, 10, 20, 50, 100];
@@ -500,9 +495,6 @@ export default defineComponent({
         );
         const limitedHits = response.data.hits;
         const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
-        if (filteredHits.length > 0) {
-          resultTotal.value = filteredHits.length;
-        }
         columnsToBeRendered.value = generateColumns();
         filteredHits.forEach((hit: any) => {
           //adding uuid to each which will be used to track the expanded "row"
@@ -781,7 +773,6 @@ export default defineComponent({
       copyToClipboard,
       formatTime,
       delayMessage,
-      resultTotal,
       pageSize,
       pageSizeOptions,
       activeTab,

@@ -2,6 +2,7 @@ import store from "@/stores";
 import { contextRegistry, createDefaultContextProvider } from "@/composables/contextProviders";
 import { generateTraceContext } from "@/utils/zincutils";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
+import analytics from "@/services/product_analytics";
 
 let contextHandler: any;
 
@@ -217,6 +218,7 @@ const useAiChat = () => {
         credentials: "include",
         headers,
       });
+      if (response.ok) analytics.track("ai_assistant_feedback_given", { type: feedbackType });
       return response.ok;
     } catch (error) {
       console.error("Error submitting feedback:", error);

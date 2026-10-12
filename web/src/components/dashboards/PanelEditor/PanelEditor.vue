@@ -496,7 +496,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <!-- Editor/Preview splitter -->
-                <div class="h-125 shrink-0 overflow-hidden">
+                <div
+                  class="overflow-hidden"
+                  :class="resolvedConfig.showQueryEditor ? 'h-125 shrink-0' : 'min-h-0 flex-1'"
+                >
                   <OSplitter
                     class="query-editor-splitter h-full"
                     v-model="splitterModel"

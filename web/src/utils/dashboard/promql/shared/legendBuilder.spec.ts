@@ -539,6 +539,21 @@ describe("legendBuilder", () => {
       expect(names.get(metrics[0])).toBe("app");
     });
 
+    // A shifted result re-uses its primary's metric object and must not collide with itself.
+    it("names a metric object passed twice exactly as when passed once", () => {
+      const metrics = [
+        { pod: "api-1", region: "us", zone: "a" },
+        { pod: "api-1", region: "eu", zone: "b" },
+        { pod: "api-2", region: "us", zone: "a" },
+      ];
+
+      const once = buildPromqlSeriesNames([{ metrics }]);
+      const twice = buildPromqlSeriesNames([{ metrics }, { metrics }]);
+
+      expect(new Set(nameList(once, metrics)).size).toBe(3);
+      expect(nameList(twice, metrics)).toEqual(nameList(once, metrics));
+    });
+
     it("falls back to the query's fallback when a series has no labels at all", () => {
       const metrics = [{}];
 

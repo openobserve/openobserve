@@ -280,16 +280,11 @@
               </div>
             </div>
           </template>
-          <template #bottom>
-            <div class="flex h-12 w-full items-center justify-between">
-              <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
-                {{ resultTotal }} {{ t("search_scheduler_job.results") }}
-              </div>
-              <div class="ms-auto me-2 max-md:hidden">
-                {{ t("search_scheduler_job.max_limit") }} :
-                <b>1000</b>
-              </div>
-            </div>
+          <template v-if="dataToBeLoaded.length > 0" #footer-note>
+            <span class="max-md:hidden">
+              {{ t("search_scheduler_job.max_limit") }} :
+              <b>1000</b>
+            </span>
           </template>
           <template #empty>
             <div v-if="!isLoading" class="flex w-full">
@@ -434,8 +429,6 @@ export default defineComponent({
     //   await fetchSearchHistory();
     // })
 
-    const resultTotal = ref<number>(0);
-
     // Columns are a fixed schema (not derived from the response), so they can be
     // built up front — the table needs them present during loading to render the
     // skeleton, and to keep column widths stable across refetches.
@@ -533,7 +526,6 @@ export default defineComponent({
           })
           .then((res) => {
             responseToBeFetched = res.data;
-            resultTotal.value = res.data.length;
 
             columnsToBeRendered.value = generateColumns();
 
@@ -911,7 +903,6 @@ export default defineComponent({
       copyToClipboard,
       formatTime,
       delayMessage,
-      resultTotal,
       getStatusText,
       getStatusIcon,
       getStatusColor,

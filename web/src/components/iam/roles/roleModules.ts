@@ -49,6 +49,11 @@ export type RoleModule = {
   countedKeys: string[];
 };
 
+/** Rail key of the view that lists every module's own grant row; no resource key starts with `__`. */
+export const ALL_MODULES_KEY = "__all__";
+
+export const ALL_MODULES_ICON: IconName = "checklist";
+
 /** Stream types are type-level children of `stream`, opened from the Streams module like folders. */
 export const STREAM_PARENT_KEY = "stream";
 
@@ -124,6 +129,7 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   dataset: "ai",
   experiment: "ai",
   playground: "ai",
+  pfolder: "ai",
   prompt: "ai",
   prompt_label: "ai",
   ai: "ai",
@@ -186,6 +192,7 @@ const ICON_OF: Record<string, IconName> = {
   dataset: "table-chart",
   experiment: "science",
   playground: "psychology",
+  pfolder: "folder",
   prompt: "edit-note",
   prompt_label: "label",
   ai: "smart-toy",

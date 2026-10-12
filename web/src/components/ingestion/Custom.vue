@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="h-full overflow-hidden">
       <router-view
-        :title="tabs"
         :currOrgIdentifier="currOrgIdentifier"
         :currUserEmail="currentUserEmail"
         @copy-to-clipboard-fn="copyToClipboardFn"
@@ -87,7 +86,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
@@ -205,7 +204,7 @@ export default defineComponent({
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {
-          segment.track("Button Click", {
+          analytics.track("Button Click", {
             button: "Copy to Clipboard",
             ingestion: router.currentRoute.value.name,
             user_org: store.state.selectedOrganization.identifier,

@@ -916,6 +916,7 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
     match db::organization::delete_org(org_id).await {
         Ok(_) => {
             delete_org_tuples(org_id).await;
+            crate::ingestion::rejections::clear_rejections(org_id).await;
             #[cfg(feature = "cloud")]
             if let Some(org) = org_snapshot {
                 enqueue_cloud_event(CloudEvent {

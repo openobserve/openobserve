@@ -45,7 +45,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :loading="loading"
         :forbidden="forbidden"
         @row-click="openDetail"
-        :footer-title="t('aiObservability.datasets.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
         :page-size="20"
@@ -91,11 +90,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-description="{ row }">
-          <span class="text-text-secondary line-clamp-1">{{ row.description || "—" }}</span>
+          <span class="text-text-secondary">{{ row.description || "—" }}</span>
         </template>
 
         <template #cell-tags="{ row }">
-          <div v-if="row.tags.length" class="flex flex-nowrap items-center gap-1">
+          <OTruncatedText
+            v-if="row.tags.length"
+            as="div"
+            class="flex flex-nowrap items-center gap-1"
+            :tooltip="tagsLabel(row.tags)"
+          >
             <OTag
               v-for="tag in row.tags"
               :key="tag"
@@ -105,12 +109,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ tag }}
             </OTag>
-          </div>
+          </OTruncatedText>
           <span v-else class="text-text-secondary">—</span>
         </template>
 
         <template #cell-sources="{ row }">
-          <div class="flex flex-nowrap items-center gap-1.5">
+          <OTruncatedText
+            as="div"
+            class="flex flex-nowrap items-center gap-1.5"
+            :tooltip="sourcesLabel(row)"
+          >
             <OTag variant="blue-soft" :count="row.sources.trace">
               {{ t("aiObservability.datasets.source.trace") }}
             </OTag>
@@ -120,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag variant="orange-soft" :count="row.sources.manual">
               {{ t("aiObservability.datasets.source.manual") }}
             </OTag>
-          </div>
+          </OTruncatedText>
         </template>
 
         <template #cell-itemCount="{ row }">
@@ -282,6 +290,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import { datasetFormDefaults, makeDatasetFormSchema, type DatasetForm } from "./DatasetForm.schema";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
@@ -298,6 +307,17 @@ const DASH = raw("—");
 /** The `v` prefix is a version marker, not copy — same shape as the pill on the
  *  item detail drawer. */
 const versionLabel = (version: number) => raw(`v${version}`);
+
+// Tag rows hold no separators in their text, so the cut-cell tooltip spells them out.
+const tagsLabel = (tags: string[]) => raw(tags.join(", "));
+const sourcesLabel = (row: LlmDataset) =>
+  raw(
+    [
+      `${t("aiObservability.datasets.source.trace")} ${row.sources.trace}`,
+      `${t("aiObservability.datasets.source.annotation")} ${row.sources.annotation}`,
+      `${t("aiObservability.datasets.source.manual")} ${row.sources.manual}`,
+    ].join(", "),
+  );
 const store = useStore();
 const router = useRouter();
 const { confirm } = useConfirmDialog();

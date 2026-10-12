@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import analytics from "./product_analytics";
 
 const settings = {
   createLogo: (org_identifier: string, formData: any, theme: string = "light") => {
@@ -21,7 +22,12 @@ const settings = {
     const headers = {
       "Content-Type": "multipart/form-data",
     };
-    return http(headers).post(url, formData);
+    return http(headers)
+      .post(url, formData)
+      .then((res) => {
+        analytics.track("org_logo_uploaded", { theme });
+        return res;
+      });
   },
   deleteLogo: (org_identifier: string, theme: string = "light") => {
     return http().delete(`/api/${org_identifier}/settings/logo?theme=${theme}`);

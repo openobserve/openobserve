@@ -1,4 +1,5 @@
 import http from "./http";
+import analytics from "./product_analytics";
 
 const pipelines = {
   getPipelines: (org_identifier: string) => {
@@ -22,31 +23,63 @@ const pipelines = {
     from_now: boolean,
   ) => {
     const url = `/api/${org_identifier}/pipelines/${pipeline_id}/enable?value=${enable}&from_now=${from_now}`;
-    return http().put(url);
+    return http()
+      .put(url)
+      .then((res) => {
+        analytics.track(enable ? "pipeline_resumed" : "pipeline_paused", { count: 1 });
+        return res;
+      });
   },
   bulkToggleState: (org_identifier: string, enable: boolean, data: any) => {
     const url = `/api/${org_identifier}/pipelines/bulk/enable?value=${enable}`;
-    return http().post(url, data);
+    return http()
+      .post(url, data)
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track(enable ? "pipeline_resumed" : "pipeline_paused", { count });
+        return res;
+      });
   },
 
   deletePipeline: ({ pipeline_id, org_id }: { pipeline_id: string; org_id: string }) => {
     const url = `/api/${org_id}/pipelines/${pipeline_id}`;
-    return http().delete(url);
+    return http()
+      .delete(url)
+      .then((res) => {
+        analytics.track("pipeline_deleted", { count: 1 });
+        return res;
+      });
   },
 
   bulkDelete: (org_identifier: string, data: any) => {
     const url = `/api/${org_identifier}/pipelines/bulk`;
-    return http().delete(url, { data });
+    return http()
+      .delete(url, { data })
+      .then((res) => {
+        const count = res.data?.successful?.length ?? 0;
+        if (count > 0) analytics.track("pipeline_deleted", { count });
+        return res;
+      });
   },
 
   createPipeline: ({ data, org_identifier }: { data: object; org_identifier: string }) => {
     const url = `/api/${org_identifier}/pipelines`;
-    return http({}).post(url, data);
+    return http({})
+      .post(url, data)
+      .then((res) => {
+        analytics.track("pipeline_created");
+        return res;
+      });
   },
 
   updatePipeline: ({ org_identifier, data }: { org_identifier: string; data: any }) => {
     const url = `/api/${org_identifier}/pipelines`;
-    return http().put(url, data);
+    return http()
+      .put(url, data)
+      .then((res) => {
+        analytics.track("pipeline_updated");
+        return res;
+      });
   },
   getPipelineStreams: (org_identifier: string) => {
     const url = `/api/${org_identifier}/pipelines/streams`;

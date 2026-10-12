@@ -193,6 +193,8 @@ vi.mock("@/composables/useDashboardPanelData", () => ({
     resetDashboardPanelData: vi.fn(),
   }),
 }));
+// Records which loader the page-load flow picked; the real loaders still run.
+const loaderCalls = vi.hoisted(() => [] as string[]);
 vi.mock("@/composables/useLogs", async () => {
   // Import the real module
   const actual =
@@ -200,6 +202,20 @@ vi.mock("@/composables/useLogs", async () => {
 
   return {
     ...actual,
+    default: (...args: Parameters<typeof actual.default>) => {
+      const api = actual.default(...args);
+      return {
+        ...api,
+        loadLogsData: () => {
+          loaderCalls.push("logs");
+          return api.loadLogsData();
+        },
+        loadVisualizeData: () => {
+          loaderCalls.push("visualize");
+          return api.loadVisualizeData();
+        },
+      };
+    },
     // Only mock clearSearchObject
     clearSearchObj: vi.fn(),
   };
@@ -213,8 +229,28 @@ vi.mock("@/composables/useLogs/usePatterns", () => ({
   patternsState: { value: { patterns: null, loading: false, error: null, lastQuery: null } },
 }));
 
+// Drill down page content — stubbed so the tests assert what Index passes it.
+vi.mock("@/plugins/traces/metrics/TracesAnalysisDashboard.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "TracesAnalysisDashboard",
+    props: {
+      embedded: Boolean,
+      streamName: null,
+      streamType: null,
+      timeRange: null,
+      rateFilter: null,
+      baseFilter: null,
+      streamFields: null,
+      logSamples: null,
+      analysisType: null,
+    },
+    template: '<div data-test="drill-down-dashboard-stub" />',
+  },
+}));
+
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
+import analytics from "@/services/product_analytics";
 
 describe("Logs Index", async () => {
   let wrapper: any;
@@ -785,7 +821,7 @@ describe("Logs Index", async () => {
   it("Should set loading & runQuery, and track analytics on cloud in searchData", async () => {
     const originalIsCloud = config.isCloud;
     try {
-      (segment as any).track = vi.fn();
+      (analytics as any).track = vi.fn();
       (config as any).isCloud = "true";
 
       wrapper.vm.searchObj.loading = false;
@@ -800,7 +836,7 @@ describe("Logs Index", async () => {
 
       expect(wrapper.vm.searchObj.loading).toBe(true);
       expect(wrapper.vm.searchObj.runQuery).toBe(true);
-      expect((segment as any).track).toHaveBeenCalledWith(
+      expect((analytics as any).track).toHaveBeenCalledWith(
         "Button Click",
         expect.objectContaining({ button: "Search Data" }),
       );
@@ -1299,6 +1335,202 @@ describe("Logs Index", async () => {
       expect(searchState().searchObj.data.errorDetail).toBe("");
       expect(searchState().searchObj.data.countErrorMsg).toBe("");
       expect(searchState().searchObj.data.errorCode).toBe(0);
+    });
+  });
+
+  describe("Drill down mode", () => {
+    const hits = [
+      { _timestamp: 1, level: "info" },
+      { _timestamp: 2, level: "error" },
+    ];
+
+    // Runs a "search" (loading true -> settles) in drill down mode with the given outcome.
+    const enterDrillDown = async ({
+      loading = false,
+      sqlMode = false,
+      withHits = true,
+      searchApplied = true,
+      selectedStream = ["app_logs"],
+      errorMsg = "",
+      filterErrMsg = "",
+    } = {}) => {
+      const { searchObj } = wrapper.vm;
+      searchObj.loadingStream = false;
+      searchObj.data.stream.streamLists = [{ label: "app_logs", value: "app_logs" }];
+      searchObj.data.stream.selectedStream = selectedStream;
+      searchObj.data.editorValue = "level = 'error'";
+      searchObj.meta.sqlMode = sqlMode;
+      searchObj.meta.logsVisualizeToggle = "drilldown";
+      searchObj.loading = true;
+      await flushPromises();
+      searchObj.data.queryResults = { hits: withHits ? hits : [] };
+      searchObj.data.errorMsg = errorMsg;
+      searchObj.data.filterErrMsg = filterErrMsg;
+      searchObj.meta.searchApplied = searchApplied;
+      searchObj.loading = loading;
+      await flushPromises();
+    };
+
+    const dashboard = () => wrapper.findComponent({ name: "TracesAnalysisDashboard" });
+
+    it("renders the insights dashboard as an embedded page fed by the current search", async () => {
+      await enterDrillDown();
+
+      expect(wrapper.find('[data-test="logs-drill-down-page"]').exists()).toBe(true);
+      expect(dashboard().exists()).toBe(true);
+      expect(dashboard().props()).toMatchObject({
+        embedded: true,
+        streamName: "app_logs",
+        streamType: "logs",
+        baseFilter: "level = 'error'",
+        logSamples: hits,
+        analysisType: "volume",
+      });
+    });
+
+    it("hides the search results section while active", async () => {
+      await enterDrillDown();
+
+      expect(wrapper.find("#thirdLevel").attributes("style")).toContain("display: none");
+    });
+
+    it("unmounts the dashboard while a search runs so it rebuilds from the new results", async () => {
+      await enterDrillDown({ loading: true });
+
+      expect(dashboard().exists()).toBe(false);
+    });
+
+    it("shows a SQL-mode message instead of the dashboard in SQL mode", async () => {
+      await enterDrillDown({ sqlMode: true });
+
+      expect(dashboard().exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-drill-down-sql-mode-text"]').exists()).toBe(true);
+    });
+
+    it("asks to run a query when no search has been applied yet", async () => {
+      await enterDrillDown({ withHits: false, searchApplied: false });
+
+      expect(dashboard().exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-drill-down-apply-search-text"]').exists()).toBe(true);
+    });
+
+    it("shows the no-events state, not 'run a query', when the search returned 0 hits", async () => {
+      await enterDrillDown({ withHits: false, searchApplied: true });
+
+      expect(dashboard().exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-drill-down-no-events-found-text"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="logs-drill-down-apply-search-text"]').exists()).toBe(false);
+    });
+
+    it("shows the search error instead of the dashboard when the search failed", async () => {
+      await enterDrillDown({ withHits: false, errorMsg: "Search failed" });
+
+      expect(dashboard().exists()).toBe(false);
+      expect(wrapper.find('[data-test="logs-drill-down-error-state"]').text()).toContain(
+        "Search failed",
+      );
+    });
+
+    it("shows the filter error when the query names an unknown stream", async () => {
+      await enterDrillDown({
+        withHits: false,
+        selectedStream: [],
+        filterErrMsg: "Stream not found",
+      });
+
+      expect(wrapper.find('[data-test="logs-drill-down-filter-error-message"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("shows the pick-a-stream state when no stream is selected", async () => {
+      await enterDrillDown({ withHits: false, selectedStream: [] });
+
+      expect(wrapper.find('[data-test="logs-drill-down-no-stream-selected-text"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("passes the filter of the last completed search, not unrun editor typing", async () => {
+      await enterDrillDown();
+
+      wrapper.vm.searchObj.data.editorValue = "level = 'warn'";
+      await flushPromises();
+
+      expect(dashboard().props("baseFilter")).toBe("level = 'error'");
+    });
+
+    it("picks up the new filter once the next search runs", async () => {
+      await enterDrillDown();
+
+      wrapper.vm.searchObj.data.editorValue = "level = 'warn'";
+      wrapper.vm.searchObj.loading = true;
+      await flushPromises();
+      wrapper.vm.searchObj.loading = false;
+      await flushPromises();
+
+      expect(dashboard().props("baseFilter")).toBe("level = 'warn'");
+    });
+
+    it("re-runs the Search tab activation flow on keep-alive reactivation", async () => {
+      await enterDrillDown();
+      wrapper.vm.searchObj.meta.refreshHistogram = false;
+
+      await wrapper.vm.handleActivation();
+
+      // handleSearchTab flags a histogram refresh; the visualize path does not.
+      expect(wrapper.vm.searchObj.meta.refreshHistogram).toBe(true);
+    });
+
+    it("compares against the histogram brush tracked by SearchResult", () => {
+      wrapper.vm.searchResultRef = {
+        originalTimeRangeBeforeSelection: { startTime: 100, endTime: 200 },
+        volumeAnalysisTimeRange: { startTime: 150, endTime: 160 },
+        hasHistogramSelection: true,
+        histogramSelectionRange: { start: -1, end: -1, timeStart: 150, timeEnd: 160 },
+      };
+
+      expect(wrapper.vm.drillDownTimeRange).toEqual({ startTime: 100, endTime: 200 });
+      expect(wrapper.vm.drillDownRateFilter).toEqual({
+        start: -1,
+        end: -1,
+        timeStart: 150,
+        timeEnd: 160,
+      });
+    });
+
+    it("falls back to the search time range when there is no brush", () => {
+      wrapper.vm.searchResultRef = null;
+      wrapper.vm.searchObj.data.datetime.startTime = 10;
+      wrapper.vm.searchObj.data.datetime.endTime = 20;
+
+      expect(wrapper.vm.drillDownTimeRange).toEqual({ startTime: 10, endTime: 20 });
+      expect(wrapper.vm.drillDownRateFilter).toBeUndefined();
+    });
+  });
+
+  describe("Drill down restored from the URL", () => {
+    it("restores the mode and loads the logs results it is built from", async () => {
+      wrapper.unmount();
+      (store.state as any).logs.isInitialized = false;
+      await router.replace({
+        path: router.currentRoute.value.path,
+        query: { logs_visualize_toggle: "drilldown" },
+      });
+      loaderCalls.length = 0;
+
+      wrapper = mount(Index, {
+        attachTo: "#app",
+        global: { provide: { store }, plugins: [i18n, router] },
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.searchObj.meta.logsVisualizeToggle).toBe("drilldown");
+      expect(loaderCalls).toEqual(["logs"]);
+
+      await router.replace({ path: router.currentRoute.value.path, query: {} });
     });
   });
 });

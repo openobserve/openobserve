@@ -195,6 +195,10 @@ export const useSavedGrantExpansion = (deps: ExpansionDeps) => {
           for (const folderEntity of resourceMapper["workflow_folder"]?.entities ?? []) {
             await getResourceEntities(folderEntity as Entity);
           }
+        } else if (resource === "prompt") {
+          for (const folderEntity of resourceMapper["pfolder"]?.entities ?? []) {
+            await getResourceEntities(folderEntity as Entity);
+          }
         } else if (
           resource === "logs" ||
           resource === "metrics" ||

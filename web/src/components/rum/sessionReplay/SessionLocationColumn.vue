@@ -21,7 +21,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="column.country_iso_code"
         :class="`fi fi-${column.country_iso_code} me-1.5 shrink-0`"
       />
-      <div class="truncate text-xs">{{ column.country || t("common.unknown") }}</div>
+      <OTruncatedText as="div" class="text-xs">{{
+        column.country || t("common.unknown")
+      }}</OTruncatedText>
     </div>
     <div class="text-text-secondary flex min-w-0 flex-nowrap items-center text-xs">
       <template v-for="(part, index) in detailParts" :key="`${index}-${part}`">
@@ -32,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           class="text-icon-color mx-1.5 shrink-0"
         />
-        <span class="truncate">{{ part }}</span>
+        <OTruncatedText>{{ part }}</OTruncatedText>
       </template>
     </div>
   </div>
@@ -41,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import "flag-icons/css/flag-icons.min.css";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();

@@ -56,10 +56,9 @@ class AnomalyDetectionPage {
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
             customSqlTimestampError: '[data-test="anomaly-custom-sql-timestamp-alias-error"]',
             detectionFunction: '[data-test="anomaly-detection-function"]',
-            // The Detection Function info icon renders as a bare OIcon (no data-test,
-            // unlike the sensitivity info icon), so anchor on the label and take the
-            // cursor-pointer icon span — the OTooltip's hidden anchor span (also
-            // aria-hidden) has no cursor-pointer class and is excluded.
+            // The Detection Function info icon renders as a bare OIcon (no data-test), so anchor on
+            // the label and take the cursor-pointer icon span — the OTooltip's hidden anchor span
+            // (also aria-hidden) has no cursor-pointer class and is excluded.
             detectionFunctionInfo:
               'div.font-semibold:has-text("Detection Function") span[aria-hidden="true"].cursor-pointer',
             detectionFunctionField: '[data-test="anomaly-detection-function-field"]',
@@ -75,12 +74,11 @@ class AnomalyDetectionPage {
             trainingWindow: '[data-test="anomaly-training-window"]',
             retrainInterval: '[data-test="anomaly-retrain-interval"]',
             sensitivityTier: '[data-test="anomaly-sensitivity-tier"]',
-            sensitivityPercentile: '[data-test="anomaly-sensitivity-percentile"]',
-            sensitivityPercentileInfo: '[data-test="anomaly-sensitivity-percentile-info"]',
+            sensitivityLevel: '[data-test="anomaly-sensitivity-level"]',
             sensitivityError: '[data-test="anomaly-sensitivity-error"]',
             sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
             // Budget mode (edit-only sensitivity): renders when the config
-            // carries alert_budget_per_day, replacing the percentile tier.
+            // carries alert_budget_per_day, replacing the band-width tier.
             budgetTiers: '[data-test="anomaly-budget-tiers"]',
             budgetCount: '[data-test="anomaly-budget-count"]',
             budgetPeriod: '[data-test="anomaly-budget-period"]',
@@ -120,16 +118,24 @@ class AnomalyDetectionPage {
             rowTriggerDetection: (name) => `[data-test="alert-list-${name}-trigger-detection"]`,
             rowRetrain: (name) => `[data-test="alert-list-${name}-retrain-anomaly"]`,
 
-            sensitivityTierItem: (pct) => `[data-test="anomaly-sensitivity-tier-${pct}"]`,
+            sensitivityTierItem: (k) => `[data-test="anomaly-sensitivity-tier-${k}"]`,
             budgetTierItem: (value) => `[data-test="anomaly-budget-tier-${value}"]`,
             queryTab: (mode) => `[data-test="anomaly-query-tab-${mode}"]`,
             filterField: (idx) => `[data-test="anomaly-filter-field-${idx}"]`,
             filterOperator: (idx) => `[data-test="anomaly-filter-operator-${idx}"]`,
             filterValue: (idx) => `[data-test="anomaly-filter-value-${idx}"]`,
             chartRangeItem: (v) => `[data-test="alerts-anomalydetectionchart-range-${v}"]`,
+            chartInternals: '[data-test="alerts-anomalydetectionchart-internals"]',
             chartPanel: (key) => `[data-test="alerts-anomalydetectionchart-${key}"]`,
-            chartPanelBody: (key) => `[data-test="alerts-anomalydetectionchart-${key}-panel"]`,
-            chartPanelEmpty: (key) => `[data-test="alerts-anomalydetectionchart-${key}-empty"]`,
+            // The metric chart is the band chart, not a dashboard panel, and has a no-rows state of its own.
+            chartPanelBody: (key) =>
+                key === 'metric'
+                    ? '[data-test="alerts-anomalydetectionchart-metric-chart"]'
+                    : `[data-test="alerts-anomalydetectionchart-${key}-panel"]`,
+            chartPanelEmpty: (key) =>
+                key === 'metric'
+                    ? '[data-test="alerts-anomalydetectionchart-metric-empty"], [data-test="alerts-anomalydetectionchart-metric-nodata"]'
+                    : `[data-test="alerts-anomalydetectionchart-${key}-empty"]`,
         };
     }
 
@@ -453,17 +459,17 @@ class AnomalyDetectionPage {
     // Sensitivity
 
     /**
-     * Pick a sensitivity tier.
+     * Pick a sensitivity tier: 'auto' (trained k), or Conservative 4, Balanced 3, Aggressive 2.5 (band width in σ).
      *
      * The tier toggle arrived with the anomaly revamp; builds before it expose a
      * plain threshold slider instead. Left at its default there so the flows
      * that merely pass through this step still run.
      *
-     * @param {95|97|99} percentile
+     * @param {'auto'|4|3|2.5} k
      * @returns {Promise<boolean>} whether the tier control was present
      */
-    async selectSensitivityTier(percentile) {
-        const tier = this.page.locator(this.selectors.sensitivityTierItem(percentile));
+    async selectSensitivityTier(k) {
+        const tier = this.page.locator(this.selectors.sensitivityTierItem(k));
         if (!(await tier.count())) {
             testLogger.info('Sensitivity tiers absent on this build; keeping the default threshold');
             return false;
@@ -472,18 +478,18 @@ class AnomalyDetectionPage {
         return true;
     }
 
-    /** True when the build exposes the revamped tier/percentile sensitivity controls. */
+    /** True when the build exposes the tier/level sensitivity controls. */
     async hasSensitivityTiers() {
         return (await this.page.locator(this.selectors.sensitivityTier).count()) > 0;
     }
 
-    /** Tier toggle and percentile input share the `threshold` field. */
-    async setSensitivityPercentile(percentile) {
-        await this.fillFormInput(this.selectors.sensitivityPercentile, percentile);
+    /** Tier toggle and level input share the `band_width` field. */
+    async setSensitivityLevel(k) {
+        await this.fillFormInput(this.selectors.sensitivityLevel, k);
     }
 
-    async getSensitivityPercentile() {
-        return this.getFormInputValue(this.selectors.sensitivityPercentile);
+    async getSensitivityLevel() {
+        return this.getFormInputValue(this.selectors.sensitivityLevel);
     }
 
     async getActiveSensitivityTier() {
@@ -492,7 +498,9 @@ class AnomalyDetectionPage {
         );
         if ((await active.count()) === 0) return null;
         const dataTest = await active.first().getAttribute('data-test');
-        return dataTest ? Number(dataTest.replace('anomaly-sensitivity-tier-', '')) : null;
+        if (!dataTest) return null;
+        const tier = dataTest.replace('anomaly-sensitivity-tier-', '');
+        return tier === 'auto' ? tier : Number(tier);
     }
 
     getSensitivityHintLocator() {
@@ -503,18 +511,13 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.sensitivityError);
     }
 
-    /** The info icon beside the percentile label ("Level" disambiguation). */
-    getSensitivityPercentileInfoLocator() {
-        return this.page.locator(this.selectors.sensitivityPercentileInfo);
+    getSensitivityLevelLocator() {
+        return this.page.locator(this.selectors.sensitivityLevel);
     }
 
-    /**
-     * The inline percentile label span ("Level"). It carries no data-test, so
-     * anchor it as the info icon's parent — the icon is a child of the label,
-     * not a sibling.
-     */
-    getSensitivityPercentileLabelLocator() {
-        return this.page.locator(this.selectors.sensitivityPercentileInfo).locator('xpath=..');
+    /** The inline "Level" label span; it carries no data-test and sits just before the input. */
+    getSensitivityLevelLabelLocator() {
+        return this.page.locator(this.selectors.sensitivityLevel).locator('xpath=preceding-sibling::span[1]');
     }
 
     // Budget mode (edit-only sensitivity)
@@ -554,7 +557,7 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.budgetTiers);
     }
 
-    getPercentileTierLocator() {
+    getSensitivityTierLocator() {
         return this.page.locator(this.selectors.sensitivityTier);
     }
 
@@ -872,6 +875,21 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.chartPanelEmpty(key));
     }
 
+    /** Score and deviation sit in a collapsed "Detector internals" section that mounts them only when open. */
+    async openDetectorInternals() {
+        const trigger = this.page.locator(this.selectors.chartInternals).getByRole('button').first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    }
+
+    /** Dashboard panels query only once scrolled into view, so an off-screen panel never re-queries on its own. */
+    async revealChartPanels() {
+        for (const key of ['metric', 'score', 'deviation']) {
+            await this.getChartPanelLocator(key).scrollIntoViewIfNeeded();
+        }
+    }
+
     async selectChartRange(value) {
         const range = this.page.locator(this.selectors.detectionChartsRange);
         await range.waitFor({ state: 'visible', timeout: 15000 });
@@ -895,7 +913,8 @@ class AnomalyDetectionPage {
         const expectedUs = rangeMs * 1000;
         const projections = [
             ['metric', 'actual_value'],
-            ['score', 'threshold_value'],
+            // Not threshold_value: the metric query projects it too.
+            ['score', 'score_value'],
             ['deviation', 'deviation_percent'],
         ];
         return Promise.all(

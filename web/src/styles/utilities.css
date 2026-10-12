@@ -45,6 +45,24 @@
   background-image: var(--color-chat-bubble-user);
 }
 
+/* Diagonal hatch marking a span that exists but cannot be shown. Consumer: components/rum/ReplayLoadBand.vue. */
+@utility bg-hatch-unavailable {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--color-surface-subtle-hover) 0 0.1875rem,
+    transparent 0.1875rem 0.4375rem
+  );
+}
+
+/* Hatch over a filled cell whose period is still in progress. Consumer: components/rum/productAnalytics/RetentionGrid.vue. */
+@utility bg-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-border-strong) 55%, transparent) 0 0.125rem,
+    transparent 0.125rem 0.375rem
+  );
+}
+
 /* ── Drag-and-drop row affordances ──────────────────────────────────────────
    Sortable adds these classes to a row CLONE it builds at runtime, so no
    template can reach it and the name must be a single token. `!important`

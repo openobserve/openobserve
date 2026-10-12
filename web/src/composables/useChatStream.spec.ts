@@ -28,8 +28,10 @@ vi.mock("@/utils/zincutils", async (importOriginal) => ({
   getUUIDv7: vi.fn(() => "minted-session"),
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import { abortBackgroundStreams, useChatStream } from "@/composables/useChatStream";
+import analytics from "@/services/product_analytics";
 
 const scopes: EffectScope[] = [];
 
@@ -67,6 +69,24 @@ const makeStream = () => {
   return { stream, options, chatMessages };
 };
 
+const sseResponse = (...events: object[]) => {
+  const chunks = events.map((e) => new TextEncoder().encode(`data: ${JSON.stringify(e)}\n`));
+  let i = 0;
+  return {
+    ok: true,
+    body: {
+      getReader: () => ({
+        read: async () =>
+          i < chunks.length
+            ? { done: false, value: chunks[i++] }
+            : { done: true, value: undefined },
+      }),
+    },
+  };
+};
+
+const trackedEvents = () => vi.mocked(analytics.track).mock.calls.map((c) => c[0]);
+
 const entry = (sessionId: string): ChatHistoryEntry => ({
   id: 7,
   timestamp: "",
@@ -78,6 +98,7 @@ const entry = (sessionId: string): ChatHistoryEntry => ({
 describe("useChatStream", () => {
   beforeEach(() => {
     mockFetchAiChat.mockReset();
+    vi.mocked(analytics.track).mockClear();
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -168,5 +189,199 @@ describe("useChatStream", () => {
     vi.advanceTimersByTime(500);
 
     expect(block().text).toBe("a");
+  });
+
+  describe("product analytics", () => {
+    it("tracks the sent message and the completed answer", async () => {
+      mockFetchAiChat.mockResolvedValue(sseResponse({ content: "hi" }, { type: "complete" }));
+      const { stream } = makeStream();
+
+      await stream.runTurn(true, []);
+
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_message_sent", {
+        has_images: true,
+        new_session: true,
+      });
+      expect(trackedEvents()).toEqual([
+        "ai_assistant_message_sent",
+        "ai_assistant_answer_completed",
+      ]);
+    });
+
+    it("marks a turn in an existing session as not new", async () => {
+      mockFetchAiChat.mockResolvedValue(sseResponse({ content: "hi" }));
+      const { stream } = makeStream();
+      stream.currentSessionId.value = "existing";
+
+      await stream.runTurn(false, []);
+
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_message_sent", {
+        has_images: false,
+        new_session: false,
+      });
+    });
+
+    it("tracks a stream error event as a failed answer, never as completed", async () => {
+      mockFetchAiChat.mockResolvedValue(sseResponse({ type: "error", error: "boom" }));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_answer_failed", {
+        stage: "stream",
+      });
+      expect(trackedEvents()).not.toContain("ai_assistant_answer_completed");
+    });
+
+    it("tracks a thrown request as failed without counting the message as sent", async () => {
+      mockFetchAiChat.mockRejectedValue(new Error("network"));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(trackedEvents()).toEqual(["ai_assistant_answer_failed"]);
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_answer_failed", {
+        stage: "request",
+      });
+    });
+
+    it("tracks a server error response as failed without counting the message as sent", async () => {
+      mockFetchAiChat.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(trackedEvents()).toEqual(["ai_assistant_answer_failed"]);
+    });
+
+    it("tracks nothing for a request cancelled before it was sent", async () => {
+      mockFetchAiChat.mockResolvedValue({ cancelled: true });
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+
+    it("tracks a user stop only while an answer is in flight", async () => {
+      const { stream } = makeStream();
+
+      await stream.cancelCurrentRequest();
+      expect(analytics.track).not.toHaveBeenCalled();
+
+      stream.currentAbortController.value = new AbortController();
+      await stream.cancelCurrentRequest();
+      expect(trackedEvents()).toEqual(["ai_assistant_answer_aborted"]);
+    });
+
+    it("counts a Stop during an error response only as aborted", async () => {
+      const { stream } = makeStream();
+      mockFetchAiChat.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => {
+          await stream.cancelCurrentRequest();
+          throw Object.assign(new Error("aborted"), { name: "AbortError" });
+        },
+      });
+
+      await stream.runTurn(false, []);
+
+      expect(trackedEvents()).toEqual(["ai_assistant_answer_aborted"]);
+    });
+
+    it("counts a Stop that lands after the answer completed only as completed", async () => {
+      const { stream, options } = makeStream();
+      let stopped = false;
+      options.dbSaveToHistory.mockImplementation(async () => {
+        if (!stopped && trackedEvents().includes("ai_assistant_answer_completed")) {
+          stopped = true;
+          await stream.cancelCurrentRequest();
+        }
+        return 1;
+      });
+      mockFetchAiChat.mockResolvedValue(sseResponse({ content: "hi" }, { type: "complete" }));
+
+      await stream.runTurn(false, []);
+
+      expect(stopped).toBe(true);
+      expect(trackedEvents()).toEqual([
+        "ai_assistant_message_sent",
+        "ai_assistant_answer_completed",
+      ]);
+    });
+
+    it("counts a halted stream once even when the session restore then completes", async () => {
+      mockFetchAiChat
+        .mockResolvedValueOnce(
+          sseResponse(
+            { type: "error", code: "session_owner_unavailable" },
+            { type: "error", error: "boom" },
+          ),
+        )
+        .mockResolvedValueOnce(sseResponse({ content: "hi" }, { type: "complete" }));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+      expect(trackedEvents()).toEqual(["ai_assistant_message_sent", "ai_assistant_answer_failed"]);
+    });
+
+    it("tracks a failed session restore as a failed answer", async () => {
+      mockFetchAiChat
+        .mockResolvedValueOnce(sseResponse({ type: "error", code: "session_owner_unavailable" }))
+        .mockResolvedValueOnce({ ok: false, status: 500 });
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(trackedEvents()).toEqual(["ai_assistant_message_sent", "ai_assistant_answer_failed"]);
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_answer_failed", {
+        stage: "request",
+      });
+    });
+
+    it("tracks a failed answer when the restored session is lost again", async () => {
+      mockFetchAiChat
+        .mockResolvedValueOnce(sseResponse({ type: "error", code: "session_owner_unavailable" }))
+        .mockResolvedValueOnce(sseResponse({ type: "error", code: "session_owner_unavailable" }));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+      expect(trackedEvents()).toEqual(["ai_assistant_message_sent", "ai_assistant_answer_failed"]);
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_answer_failed", {
+        stage: "stream",
+      });
+    });
+
+    it("tracks a stream that ends without a complete frame as failed", async () => {
+      mockFetchAiChat.mockResolvedValue(sseResponse({ content: "partial" }));
+      const { stream } = makeStream();
+
+      await stream.runTurn(false, []);
+
+      expect(trackedEvents()).toEqual(["ai_assistant_message_sent", "ai_assistant_answer_failed"]);
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_answer_failed", {
+        stage: "stream",
+      });
+    });
+
+    it("tracks a tool call answer only once the server registers it", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch");
+      const { stream } = makeStream();
+
+      fetchSpy.mockResolvedValueOnce({ ok: false, status: 404 } as Response);
+      expect(await stream.sendConfirmation("s1", true)).toBe(false);
+      expect(analytics.track).not.toHaveBeenCalled();
+
+      fetchSpy.mockResolvedValueOnce({ ok: true } as Response);
+      expect(await stream.sendConfirmation("s1", false)).toBe(true);
+      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_tool_call_answered", {
+        approved: false,
+      });
+    });
   });
 });

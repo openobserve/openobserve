@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelPromQLExecutor } from "./usePanelPromQLExecutor";
 import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
+import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
 
 // ─── module mocks ─────────────────────────────────────────────────────────────
 
@@ -569,5 +570,336 @@ describe("a superseded run cannot write over the newer one (#14350)", () => {
     expect(state.loadingProgressPercentage).toBe(40);
     expect(state.data[0].result).toHaveLength(1);
     expect(state.loading).toBe(false);
+  });
+});
+
+describe("time shift (compare to a previous period)", () => {
+  const DAY_MS = 86_400_000;
+  const START_US = 1_700_000_000_000_000;
+  const END_US = START_US + 3_600_000_000;
+
+  const run = async (queries: any[]) => {
+    const panelSchema = makePanelSchema(queries);
+    panelSchema.value.type = "line";
+    const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+    const handlers: any[] = [];
+    (fetchQueryDataWithHttpStream as any).mockImplementation((_payload: any, h: any) => {
+      handlers.push(h);
+    });
+    const { executePromQL } = usePanelPromQLExecutor(ctx as any);
+    await executePromQL(START_US, END_US, null);
+    const payloads = (fetchQueryDataWithHttpStream as any).mock.calls.map((c: any[]) => c[0]);
+    return { state, handlers, payloads, panelSchema };
+  };
+
+  it("sends one extra range query per offset over the shifted window, with the same query string", async () => {
+    const { payloads } = await run([
+      { query: "rate(x[5m])", config: { time_shift: [{ offSet: "1d" }, { offSet: "1w" }] } },
+    ]);
+
+    expect(payloads).toHaveLength(3);
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual([
+      "rate(x[5m])",
+      "rate(x[5m])",
+      "rate(x[5m])",
+    ]);
+    // Panel window is µs, the offset is a fixed ms delta: shift by Δ × 1000.
+    expect(payloads[1].queryReq.start_time).toBe(START_US - DAY_MS * 1000);
+    expect(payloads[1].queryReq.end_time).toBe(END_US - DAY_MS * 1000);
+    expect(payloads[2].queryReq.start_time).toBe(START_US - 7 * DAY_MS * 1000);
+    expect(payloads[2].queryReq.end_time).toBe(END_US - 7 * DAY_MS * 1000);
+    expect(payloads.every((p: any) => p.queryReq.query_type === "range")).toBe(true);
+    expect(new Set(payloads.map((p: any) => p.queryReq.step)).size).toBe(1);
+  });
+
+  it("appends shifted entries after every primary and tags them with timeRangeGap and panelQueryIndex", async () => {
+    const { state, handlers } = await run([
+      { query: "a", config: { time_shift: [{ offSet: "1d" }] } },
+      { query: "b", config: { time_shift: [{ offSet: "1d" }] } },
+    ]);
+    handlers.forEach((h: any) =>
+      h.data({}, { type: "promql_response", content: { results: { result: [] } } }),
+    );
+
+    const meta = state.metadata.queries;
+    expect(meta.map((m: any) => m.originalQuery)).toEqual(["a", "b", "a", "b"]);
+    expect(meta.map((m: any) => m.panelQueryIndex)).toEqual([0, 1, 0, 1]);
+    expect(meta.map((m: any) => m.timeRangeGap.seconds)).toEqual([0, 0, DAY_MS, DAY_MS]);
+    expect(meta[2].timeRangeGap.periodAsStr).toBeTruthy();
+    expect(meta[0].timeRangeGap.periodAsStr).toBe("");
+    // Exemplars read the primary indexes: those carry the current window.
+    expect(meta[0].startTime).toBe(START_US);
+    expect(meta[1].endTime).toBe(END_US);
+    expect(meta[3].startTime).toBe(START_US - DAY_MS * 1000);
+  });
+
+  it("writes each stream's results and step metadata at its expanded index", async () => {
+    const { state, handlers } = await run([
+      { query: "a", config: { time_shift: [{ offSet: "1d" }] } },
+    ]);
+    handlers[1].data({}, { type: "promql_metadata", content: { step: 15_000_000 } });
+    handlers[1].data(
+      {},
+      { type: "promql_response", content: { results: { result: [{ metric: {} }] } } },
+    );
+
+    expect(state.data[0]).toBeUndefined();
+    expect(state.data[1].result).toHaveLength(1);
+    expect(state.resultMetaData[1][0].step).toBe(15_000_000);
+  });
+
+  it("ignores time_shift on an instant query and keeps the saved offsets", async () => {
+    const queries = [
+      { query: "up", config: { query_type: "instant", time_shift: [{ offSet: "1d" }] } },
+    ];
+    const { payloads, panelSchema } = await run(queries);
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].queryReq.query_type).toBe("instant");
+    expect(panelSchema.value.queries[0].config.time_shift).toEqual([{ offSet: "1d" }]);
+  });
+
+  it("keeps a truncated primary's series-limit warning when a shifted stream finishes later", async () => {
+    const processor = (stats: any) => ({ processChunk: vi.fn(), getStats: vi.fn(() => stats) });
+    (createPromQLChunkProcessor as any)
+      .mockReturnValueOnce(
+        processor({ totalMetricsReceived: 150, uniqueSeriesSeen: 150, metricsStored: 100 }),
+      )
+      .mockReturnValueOnce(
+        processor({ totalMetricsReceived: 40, uniqueSeriesSeen: 40, metricsStored: 40 }),
+      );
+    const { state, handlers } = await run([
+      { query: "a", config: { time_shift: [{ offSet: "1d" }] } },
+    ]);
+
+    handlers[0].complete({}, {});
+    handlers[1].complete({}, {});
+
+    const { uniqueSeriesSeen, metricsStored } = state.metadata.seriesLimiting;
+    expect(uniqueSeriesSeen).toBeGreaterThan(metricsStored);
+  });
+
+  it("finishes loading only after every expanded stream completes", async () => {
+    const { state, handlers } = await run([
+      { query: "a", config: { time_shift: [{ offSet: "1d" }] } },
+    ]);
+    state.loading = true;
+
+    handlers[0].complete({}, {});
+    expect(state.loading).toBe(true);
+    handlers[1].error({}, { content: { message: "boom" } });
+    expect(state.loading).toBe(false);
+  });
+});
+
+describe("time shift keeps the shifted series of every shown primary under the series cap", () => {
+  const series = (labels: Record<string, string>, points: number) => ({
+    metric: labels,
+    values: Array.from({ length: points }, (_, t) => [t, "1"]),
+  });
+  const shown = Array.from({ length: 5 }, (_, i) => ({ host: `shown-${i}` }));
+  const pastOnly = Array.from({ length: 150 }, (_, i) => ({ host: `past-${i}` }));
+
+  it.each([
+    ["the shifted stream finishes first", true],
+    ["the primary finishes first", false],
+  ])("%s", async (_name, shiftedFirst) => {
+    const actual: any = await vi.importActual("./promqlChunkProcessor");
+    (createPromQLChunkProcessor as any)
+      .mockImplementationOnce(actual.createPromQLChunkProcessor)
+      .mockImplementationOnce(actual.createPromQLChunkProcessor);
+    const panelSchema = makePanelSchema([
+      { query: "a", config: { time_shift: [{ offSet: "1d" }] } },
+    ]);
+    const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+    const handlers: any[] = [];
+    (fetchQueryDataWithHttpStream as any).mockImplementation((_p: any, h: any) => handlers.push(h));
+    await usePanelPromQLExecutor(ctx as any).executePromQL(1_000_000, 2_000_000, null);
+
+    const deliver = (i: number, result: any[]) => {
+      handlers[i].data({}, { type: "promql_response", content: { results: { result } } });
+      handlers[i].complete({}, {});
+    };
+    const primary = () =>
+      deliver(
+        0,
+        shown.map((m) => series(m, 10)),
+      );
+    const shifted = () =>
+      deliver(1, [...pastOnly.map((m) => series(m, 20)), ...shown.map((m) => series(m, 10))]);
+    if (shiftedFirst) {
+      shifted();
+      primary();
+    } else {
+      primary();
+      shifted();
+    }
+
+    const shiftedHosts = state.data[1].result.map((m: any) => m.metric.host);
+    expect(shiftedHosts).toHaveLength(100);
+    expect(shiftedHosts).toEqual(expect.arrayContaining(shown.map((m) => m.host)));
+  });
+});
+
+describe("formulas and hidden queries", () => {
+  const ERR = 'sum by (job)(rate(http_requests_total{code=~"5.."}[5m]))';
+  const ALL = "sum by (job)(rate(http_requests_total[5m]))";
+
+  const run = async (queries: any[]) => {
+    const panelSchema = makePanelSchema(queries);
+    const made = makeCtx({ panelSchema });
+    const handlers: any[] = [];
+    (made.fetchQueryDataWithHttpStream as any).mockImplementation((_p: any, h: any) =>
+      handlers.push(h),
+    );
+    await usePanelPromQLExecutor(made.ctx as any).executePromQL(0, 300_000_000, null);
+    const payloads = (made.fetchQueryDataWithHttpStream as any).mock.calls.map((c: any) => c[0]);
+    return { ...made, handlers, payloads };
+  };
+
+  it("sends only the formula when its inputs are hidden", async () => {
+    const { payloads, state } = await run([
+      { query: ERR, config: { ref: "A", hide: true } },
+      { query: ALL, config: { ref: "B", hide: true } },
+      { query: "", config: { formula: "A / B * 100" } },
+    ]);
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].queryReq.query).toBe(`(${ERR}) / (${ALL}) * 100`);
+    expect(state.metadata.queries[2].panelQueryIndex).toBe(2);
+    expect(state.metadata.queries[2].query).toBe(`(${ERR}) / (${ALL}) * 100`);
+  });
+
+  it("keeps data and metadata slots aligned with panel queries for hidden ones", async () => {
+    const { state, handlers } = await run([
+      { query: "a", config: { ref: "A", hide: true } },
+      { query: "b", config: { ref: "B" } },
+    ]);
+
+    expect(handlers).toHaveLength(1);
+    expect(state.data[0]).toEqual({ resultType: "matrix", result: [] });
+    expect(state.metadata.queries[0].panelQueryIndex).toBe(0);
+    handlers[0].data({}, { type: "promql_response", content: { results: { result: [1] } } });
+    expect(state.data[0]).toEqual({ resultType: "matrix", result: [] });
+    expect(state.metadata.queries[1].panelQueryIndex).toBe(1);
+  });
+
+  it("finishes loading when every query is hidden", async () => {
+    const { state, payloads } = await run([{ query: "a", config: { ref: "A", hide: true } }]);
+
+    expect(payloads).toHaveLength(0);
+    expect(state.loading).toBe(false);
+  });
+
+  it("substitutes each input's text after variable substitution", async () => {
+    const panelSchema = makePanelSchema([
+      { query: 'up{job="$job"}', config: { ref: "A" } },
+      { query: "", config: { formula: "A * 2" } },
+    ]);
+    const made = makeCtx({ panelSchema });
+    made.ctx.applyDynamicVariables = vi.fn(async (q: string) => ({
+      query: q.replace("$job", "api"),
+      metadata: [],
+    }));
+    await usePanelPromQLExecutor(made.ctx as any).executePromQL(0, 300_000_000, null);
+
+    const sent = (made.fetchQueryDataWithHttpStream as any).mock.calls.map(
+      (c: any) => c[0].queryReq.query,
+    );
+    expect(sent).toEqual(['up{job="api"}', '(up{job="api"}) * 2']);
+  });
+
+  it("uses the formula's own query type, not its input's", async () => {
+    const { payloads } = await run([
+      { query: "up", config: { ref: "A", hide: true, query_type: "instant" } },
+      { query: "", config: { formula: "A * 2", query_type: "range" } },
+    ]);
+
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].queryReq.query_type).toBe("range");
+  });
+
+  it("gives letters to legacy inputs by position", async () => {
+    const { payloads } = await run([
+      { query: "x", config: { hide: true } },
+      { query: "y", config: { hide: true } },
+      { query: "", config: { formula: "B - A" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["(y) - (x)"]);
+  });
+
+  it("shows an unknown-letter error and sends nothing for that formula", async () => {
+    const { payloads, state, handlers } = await run([
+      { query: "x", config: { ref: "A" } },
+      { query: "", config: { formula: "A / B" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["x"]);
+    expect(state.errorDetail.message).toBe("B is not a query in this panel");
+    expect(state.data[1]).toEqual({ resultType: "matrix", result: [] });
+    handlers[0].data({}, { type: "promql_response", content: { results: { result: [] } } });
+    expect(state.errorDetail.message).toBe("B is not a query in this panel");
+  });
+
+  it("time-shifts a formula like any other query", async () => {
+    const { payloads, state } = await run([
+      { query: "x", config: { ref: "A", hide: true } },
+      { query: "", config: { formula: "A * 2", time_shift: [{ offSet: "1d" }] } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["(x) * 2", "(x) * 2"]);
+    expect(payloads[1].queryReq.end_time).toBe(300_000_000 - 86_400_000_000);
+    expect(state.metadata.queries[2].panelQueryIndex).toBe(1);
+  });
+
+  it("applies ad-hoc filters to the inputs but not to the formula text", async () => {
+    const panelSchema = makePanelSchema([
+      { query: "up", config: { ref: "A", hide: true } },
+      { query: "", config: { formula: "A * $factor" } },
+    ]);
+    const made = makeCtx({ panelSchema });
+    made.ctx.replaceQueryValue = vi.fn((q: string) => ({
+      query: q.replace("$factor", "3"),
+      metadata: [],
+    }));
+    made.ctx.applyDynamicVariables = vi.fn(async (q: string) => ({
+      query: `${q}{env="prod"}`,
+      metadata: [],
+    }));
+    await usePanelPromQLExecutor(made.ctx as any).executePromQL(0, 300_000_000, null);
+
+    const sent = (made.fetchQueryDataWithHttpStream as any).mock.calls.map(
+      (c: any) => c[0].queryReq.query,
+    );
+    expect(sent).toEqual(['(up{env="prod"}) * 3']);
+  });
+
+  it("marks queries that were not sent, so exemplars skip them", async () => {
+    const { state } = await run([
+      { query: "x", config: { ref: "A", hide: true } },
+      { query: "y", config: { ref: "B" } },
+      { query: "", config: { formula: "A / C" } },
+    ]);
+
+    expect(state.metadata.queries.map((m: any) => !!m.notSent)).toEqual([true, false, true]);
+  });
+
+  it("keeps a formula on its input after a preceding query is deleted", async () => {
+    const { payloads } = await run([
+      { query: "b", config: { ref: "B", hide: true } },
+      { query: "", config: { formula: "B * 2" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["(b) * 2"]);
+  });
+
+  it("does not time-shift a hidden query", async () => {
+    const { payloads } = await run([
+      { query: "x", config: { ref: "A", hide: true, time_shift: [{ offSet: "1d" }] } },
+      { query: "y", config: { ref: "B" } },
+    ]);
+
+    expect(payloads.map((p: any) => p.queryReq.query)).toEqual(["y"]);
   });
 });

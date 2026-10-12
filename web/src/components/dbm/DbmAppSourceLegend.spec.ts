@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import i18n from "@/locales";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { raw } from "@/types/i18n";
 
 import DbmAppSourceLegend from "./DbmAppSourceLegend.vue";
 
@@ -33,5 +34,10 @@ describe("DbmAppSourceLegend", () => {
     const wrapper = mountLegend({ compact: true });
     expect(wrapper.find('[data-test="dbm-app-source-legend-text"]').exists()).toBe(false);
     expect(wrapper.findComponent(OTooltip).props("content")).toBeTruthy();
+  });
+
+  it("keeps a view's own wording in the tooltip when compact", () => {
+    const wrapper = mountLegend({ compact: true, label: raw("Completed in this window") });
+    expect(wrapper.findComponent(OTooltip).props("content")).toBe("Completed in this window");
   });
 });

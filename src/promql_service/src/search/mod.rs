@@ -42,7 +42,7 @@ use infra::{
 use promql::{
     DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
     ast::{
-        at_modifier::resolve_query, result_order::top_level_sort_descending,
+        at_modifier::resolve_query, result_order::top_level_order,
         selector_window::selector_window, subquery_grid::max_subquery_steps,
     },
     micros,
@@ -64,6 +64,13 @@ mod cache;
 pub mod grpc;
 pub use cache::get_cache_stats;
 
+#[derive(Debug)]
+pub struct SearchResponse {
+    pub value: Value,
+    /// Non-empty when some nodes failed and the value may be incomplete.
+    pub warnings: Vec<String>,
+}
+
 pub async fn init() -> Result<()> {
     if !config::cluster::LOCAL_NODE.is_querier() {
         return Ok(());
@@ -82,7 +89,7 @@ pub async fn search(
     user_email: &str,
     timeout: i64,
     is_super_cluster: bool,
-) -> Result<Value> {
+) -> Result<SearchResponse> {
     #[cfg(feature = "enterprise")]
     {
         let query = Some(req.query.clone());
@@ -285,12 +292,12 @@ async fn search_in_cluster(
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
     nodes: &[Node],
-) -> Result<Value> {
+) -> Result<SearchResponse> {
     let start_ins = std::time::Instant::now();
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
-    let ast = parser::parse(&req.query.as_ref().unwrap().query)
+    let ast = promql::parse(&req.query.as_ref().unwrap().query)
         .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
     let window = selector_window(&ast);
 
@@ -351,7 +358,7 @@ async fn search_in_cluster(
         (start, vec![])
     } else {
         let start_time = std::time::Instant::now();
-        match cache::get(query, start, end, step).await {
+        match cache::get(&req.org_id, query, start, end, step).await {
             Ok(Some((new_start, values))) => {
                 let took = start_time.elapsed().as_millis() as i32;
                 let cache_ratio = (new_start - start) as f64 / (end - start) as f64;
@@ -381,7 +388,10 @@ async fn search_in_cluster(
             merge_matrix_query(&cached_values, &req.org_id).await?
         };
 
-        return Ok(values);
+        return Ok(SearchResponse {
+            value: values,
+            warnings: vec![],
+        });
     }
 
     if (end - start) / step > max_points as i64 {
@@ -498,8 +508,14 @@ async fn search_in_cluster(
     let mut scan_stats = ScanStats::new();
     let mut result_type = String::new();
     let mut series_data: Vec<cluster_rpc::Series> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
     for resp in results {
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
+        for warning in resp.warnings {
+            if !warnings.contains(&warning) {
+                warnings.push(warning);
+            }
+        }
         if result_type.is_empty() {
             result_type = resp.result_type.clone();
         }
@@ -564,8 +580,13 @@ async fn search_in_cluster(
     )
     .await;
 
-    // cache the result
+    if !warnings.is_empty() {
+        log::warn!("[trace_id {trace_id}] promql->search: partial result: {warnings:?}");
+    }
+
+    // an incomplete result must not be served from cache later
     if cacheable
+        && warnings.is_empty()
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
@@ -585,7 +606,10 @@ async fn search_in_cluster(
     let took = start_ins.elapsed().as_millis() as f64;
     log::info!("[trace_id {trace_id}] promql->search search finished took: {took} ms",);
 
-    Ok(values)
+    Ok(SearchResponse {
+        value: values,
+        warnings,
+    })
 }
 
 /// Whether a range query would answer with a subquery's own samples, which sit off its grid.
@@ -649,6 +673,12 @@ async fn merge_vector_query(
     org_id: &str,
     query: &str,
 ) -> Result<Value> {
+    let max_limit = get_max_series_limit(org_id).await;
+    Ok(merge_vector_series(series, query, max_limit))
+}
+
+/// Orders before truncating, so a capped response keeps the series the order puts first.
+fn merge_vector_series(series: &[cluster_rpc::Series], query: &str, max_limit: usize) -> Value {
     let mut merged_data = HashMap::new();
     let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
@@ -663,7 +693,7 @@ async fn merge_vector_query(
             merged_metrics.insert(signature(&labels), labels);
         }
     }
-    let mut merged_data = merged_data
+    let merged_data = merged_data
         .into_iter()
         .map(|(sig, sample)| InstantValue {
             labels: merged_metrics.get(&sig).unwrap().to_owned(),
@@ -671,21 +701,20 @@ async fn merge_vector_query(
         })
         .collect::<Vec<_>>();
 
-    // Check series limit and truncate if necessary
-    let max_limit = get_max_series_limit(org_id).await;
-    if should_truncate_series(merged_data.len(), max_limit) {
-        merged_data.truncate(max_limit);
-    }
-
     let mut value = Value::Vector(merged_data);
-    let sort_descending = promql_parser::parser::parse(query)
+    match promql::parse(query)
         .ok()
-        .and_then(|expr| top_level_sort_descending(&expr));
-    match sort_descending {
-        Some(descending) => value.sort_by_value(descending),
+        .and_then(|expr| top_level_order(&expr))
+    {
+        Some(order) => order.apply(&mut value),
         None => value.sort(),
     }
-    Ok(value)
+    if let Value::Vector(vector) = &mut value
+        && should_truncate_series(vector.len(), max_limit)
+    {
+        vector.truncate(max_limit);
+    }
+    value
 }
 
 fn merge_scalar_query(series: &[cluster_rpc::Series]) -> Value {
@@ -814,7 +843,7 @@ mod tests {
             ("up", false),
         ] {
             assert_eq!(
-                is_root_subquery(&parser::parse(query).unwrap()),
+                is_root_subquery(&promql::parse(query).unwrap()),
                 expected,
                 "{query}"
             );
@@ -823,7 +852,7 @@ mod tests {
 
     #[test]
     fn test_rejects_root_subquery_only_in_range_sample_queries() {
-        let expr = parser::parse("up[5m:1m]").unwrap();
+        let expr = promql::parse("up[5m:1m]").unwrap();
         assert!(rejects_root_subquery(&expr, true, false));
         assert!(!rejects_root_subquery(&expr, false, false));
         assert!(!rejects_root_subquery(&expr, true, true));
@@ -946,5 +975,58 @@ mod tests {
 
         // Verify the default is the expected value (40,000)
         assert_eq!(expected_default, 40_000);
+    }
+
+    fn instance_vector(instances: &[(&str, f64)]) -> cluster_rpc::MetricsQueryResponse {
+        let mut response = cluster_rpc::MetricsQueryResponse::default();
+        grpc::add_value(
+            &mut response,
+            Value::Vector(
+                instances
+                    .iter()
+                    .map(|(instance, value)| InstantValue {
+                        labels: vec![Arc::new(Label::new("instance", instance))],
+                        sample: Sample::new(3_000_000, *value),
+                    })
+                    .collect(),
+            ),
+        );
+        response
+    }
+
+    fn instances(value: Value) -> Vec<String> {
+        let Value::Vector(vector) = value else {
+            panic!("expected a vector, got {value:?}");
+        };
+        vector
+            .iter()
+            .map(|v| v.labels.get_value("instance"))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_merge_vector_orders_by_label() {
+        let response = instance_vector(&[("host10", 1.0), ("host2", 3.0), ("host1", 2.0)]);
+        let value = merge_vector_query(
+            &response.series,
+            "test_sort_by_label_merge",
+            r#"sort_by_label(up, "instance")"#,
+        )
+        .await
+        .unwrap();
+        assert_eq!(instances(value), ["host1", "host2", "host10"]);
+    }
+
+    #[test]
+    fn test_merge_vector_orders_before_truncating() {
+        let response = instance_vector(&[("host10", 1.0), ("host2", 3.0), ("host1", 2.0)]);
+        for (query, expected) in [
+            (r#"sort_by_label(up, "instance")"#, ["host1", "host2"]),
+            ("sort(up)", ["host10", "host1"]),
+            ("up", ["host2", "host1"]),
+        ] {
+            let value = merge_vector_series(&response.series, query, 2);
+            assert_eq!(instances(value), expected, "{query}");
+        }
     }
 }

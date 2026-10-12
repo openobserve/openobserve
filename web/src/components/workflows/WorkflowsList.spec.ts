@@ -112,7 +112,6 @@ const OTableStub = {
         </span>
         <slot name="cell-actions" :row="row" />
       </template>
-      <slot name="bottom" />
     </div>
   `,
 };
@@ -663,16 +662,6 @@ describe("WorkflowsList", () => {
         name: "createWorkflow",
         query: { org_identifier: "default", folder: "default" },
       });
-    });
-
-    it("reports the filtered total in the footer", async () => {
-      wrapper = mountList();
-      await flushPromises();
-      expect(wrapper.find(".o2-table-footer-title").text()).toContain("2");
-
-      await search(wrapper).setValue("workflow-1");
-      await nextTick();
-      expect(wrapper.find(".o2-table-footer-title").text()).toContain("1");
     });
   });
 

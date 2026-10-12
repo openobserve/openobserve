@@ -6,6 +6,9 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { queryClient } from "@/composables/query/queryClient";
 
+// Every test here mounts the whole role editor, which runs ~5x slower on CI than locally — the 5s default times out.
+vi.setConfig({ testTimeout: 20000 });
+
 // Mock toast so we can assert notification calls
 const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -53,6 +56,7 @@ const ctl = vi.hoisted(() => ({
   resources: null,
   // Mutable so a spec can shrink the org's metric streams (the zero-match case).
   metricStreams: null,
+  logStreams: null,
 }));
 
 // Mock composable useStreams
@@ -60,7 +64,7 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn(async (type) => {
       const map = {
-        logs: { list: [{ name: "app" }, { name: "sys" }] },
+        logs: { list: ctl.logStreams ?? [{ name: "app" }, { name: "sys" }] },
         metrics: {
           list: ctl.metricStreams ?? [
             { name: "cpu" },
@@ -422,6 +426,28 @@ const RESOURCE_CATALOG = [
 // The navigation suite pins exact rail and module expectations against this trimmed catalogue.
 const NAVIGATION_RESOURCE_CATALOG = RESOURCE_CATALOG.slice(0, 11);
 
+const RUM_RESOURCE_CATALOG = [
+  ...RESOURCE_CATALOG,
+  {
+    key: "sourcemaps",
+    display_name: "Source Maps",
+    has_entities: false,
+    top_level: true,
+    visible: true,
+    parent: "",
+    order: 19,
+  },
+  {
+    key: "rum_analytics",
+    display_name: "RUM Product Analytics",
+    has_entities: false,
+    top_level: true,
+    visible: true,
+    parent: "",
+    order: 20,
+  },
+];
+
 const SAVED_GRANTS_RESOURCE_CATALOG = [
   { key: "stream", display_name: "Streams", has_entities: true, top_level: true, order: 1 },
   {
@@ -587,6 +613,7 @@ beforeEach(() => {
   ctl.resourcesError = null;
   ctl.resources = RESOURCE_CATALOG;
   ctl.metricStreams = null;
+  ctl.logStreams = null;
   router.currentRoute.value.query = {};
 });
 
@@ -1194,6 +1221,69 @@ describe("EditRole - dbm viewer preset", () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountEditRole();
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+});
+
+describe("EditRole - RUM presets", () => {
+  const mountWithPreset = async (preset) => {
+    router.currentRoute.value.query = { preset };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+    return wrapper;
+  };
+  const staged = (wrapper) =>
+    Object.values(wrapper.vm.addedPermissions)
+      .map((p) => `${p.object} ${p.permission}`)
+      .sort();
+
+  beforeEach(() => {
+    ctl.resources = RUM_RESOURCE_CATALOG;
+    ctl.logStreams = [{ name: "app" }, { name: "_rumdata" }, { name: "_sessionreplay" }];
+  });
+
+  it("rum_viewer stages exactly read on _rumdata and _sessionreplay, LIST on logs and sourcemaps, and no rum_analytics", async () => {
+    const wrapper = await mountWithPreset("rum_viewer");
+    expect(staged(wrapper)).toEqual([
+      "logs:_all_default AllowList",
+      "logs:_rumdata AllowGet",
+      "logs:_sessionreplay AllowGet",
+      "sourcemaps:_all_default AllowList",
+    ]);
+  });
+
+  // Reads of /rum/analytics/* check logs:_rumdata, so only the writes are enforced on rum_analytics.
+  it("rum_editor adds only the enforced rum_analytics write grants", async () => {
+    const wrapper = await mountWithPreset("rum_editor");
+    expect(staged(wrapper)).toEqual([
+      "logs:_all_default AllowList",
+      "logs:_rumdata AllowGet",
+      "logs:_sessionreplay AllowGet",
+      "rum_analytics:_all_default AllowDelete",
+      "rum_analytics:_all_default AllowPost",
+      "rum_analytics:_all_default AllowPut",
+      "sourcemaps:_all_default AllowList",
+    ]);
+  });
+
+  it("an org with no RUM streams yet warns, stages the module grants and leaves the logs type node alone", async () => {
+    ctl.logStreams = [{ name: "app" }];
+    mockToast.mockClear();
+    const wrapper = await mountWithPreset("rum_editor");
+    const objects = staged(wrapper);
+    expect(objects.some((o) => o.startsWith("logs:"))).toBe(false);
+    expect(objects).toContain("rum_analytics:_all_default AllowPost");
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "warning", message: expect.stringContaining("None") }),
+    );
+  });
+
+  it("reports how many RUM streams matched", async () => {
+    mockToast.mockClear();
+    await mountWithPreset("rum_viewer");
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "info", message: expect.stringContaining("2 of 2") }),
+    );
   });
 });
 
@@ -2211,6 +2301,29 @@ describe("EditRole - preset cards", () => {
     await k8s.vm.applyPreset("k8s");
     await flushPromises();
     expect(staged(k8s).some((key) => key.startsWith("db_monitoring:"))).toBe(false);
+  });
+
+  it("runs the RUM presets the cards name", async () => {
+    ctl.resources = RUM_RESOURCE_CATALOG;
+    const viewer = await mountEditRole();
+    await viewer.vm.applyPreset("rum_viewer");
+    await flushPromises();
+    expect(staged(viewer)).toContain("sourcemaps:_all_default:AllowList");
+    expect(staged(viewer).some((key) => key.startsWith("rum_analytics:"))).toBe(false);
+
+    const editor = await mountEditRole();
+    await editor.vm.applyPreset("rum_editor");
+    await flushPromises();
+    expect(staged(editor)).toContain("rum_analytics:_all_default:AllowPost");
+  });
+
+  it("the read-only preset stages no rum_analytics reads, which OpenFGA would reject", async () => {
+    ctl.resources = RUM_RESOURCE_CATALOG;
+    const wrapper = await mountEditRole();
+    await wrapper.vm.applyPreset("readonly");
+    await flushPromises();
+    expect(staged(wrapper)).toContain("sourcemaps:_all_default:AllowList");
+    expect(staged(wrapper).some((key) => key.startsWith("rum_analytics:"))).toBe(false);
   });
 
   it("does nothing for an unknown preset", async () => {
@@ -3442,5 +3555,82 @@ describe("EditRole savedGrants - JSON view", () => {
 
     expect([...wrapper.vm.selectedPermissionsHash]).toEqual([`role:_all_${ORG}:AllowGet`]);
     expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([`role:_all_${ORG}:AllowGet`]);
+  });
+});
+
+describe("EditRole - all modules", () => {
+  const openAllModules = async (wrapper) => {
+    wrapper.vm.activeModule = "__all__";
+    await flushPromises();
+  };
+
+  it("lists one row per rail module", async () => {
+    const wrapper = await mountEditRole();
+    await openAllModules(wrapper);
+
+    const keys = wrapper.vm.railModules.map((module) => module.key);
+    expect(keys.length).toBeGreaterThan(1);
+    // One row per module and nothing else: a stream type or folder here would be a second, narrower grant.
+    expect(wrapper.vm.paneView.entities.map((row) => row.name)).toEqual(keys);
+    keys.forEach((key) => {
+      expect(
+        wrapper
+          .find(`[data-test="edit-role-permissions-table-body-row-${key}-col-AllowAll-checkbox"]`)
+          .exists(),
+      ).toBe(true);
+    });
+  });
+
+  // rum_analytics hides List, so ticking the column must skip it rather than stage a grant OpenFGA rejects.
+  it("stages the module-wide List grant on every module that offers it from one header tick", async () => {
+    ctl.resources = RUM_RESOURCE_CATALOG;
+    const wrapper = await mountEditRole();
+    await openAllModules(wrapper);
+
+    await wrapper
+      .find('[data-test="edit-role-module-pane-bulk-AllowList"] button[role="checkbox"]')
+      .trigger("click");
+    await flushPromises();
+
+    const expected = wrapper.vm.railModules
+      .map((module) => module.key)
+      .filter((key) => key !== "rum_analytics")
+      .map((key) => `${key}:${ALL}:AllowList`);
+    expect(Object.keys(wrapper.vm.addedPermissions).sort()).toEqual(expected.sort());
+    expect(
+      wrapper
+        .find('[data-test="edit-role-module-pane-bulk-AllowList"] button[role="checkbox"]')
+        .attributes("aria-checked"),
+    ).toBe("true");
+  });
+
+  // A role that holds one stream must still show it on the Streams row, or Selected hides the module.
+  it("badges a module row with the grants held inside it", async () => {
+    ctl.rolePermissions = [{ object: "logs:app", permission: "AllowGet" }];
+    const wrapper = await mountEditRole();
+    await openAllModules(wrapper);
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-inside-stream"]').text()).toBe(
+      String(i18n.global.t("iam.editRole.grantedInsideCount", { count: 1 })),
+    );
+  });
+
+  // A module row switches the rail to that module; treating it as a folder would leave All Modules on screen.
+  it("opens the module itself when its row is clicked", async () => {
+    const wrapper = await mountEditRole();
+    await openAllModules(wrapper);
+
+    await wrapper.find('[data-test="edit-role-module-pane-open-stream"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.vm.activeModule).toBe("stream");
+    expect(wrapper.vm.openFolder).toBeNull();
+    expect(wrapper.vm.activeModuleView.entities.map((row) => row.name).sort()).toEqual([
+      "index",
+      "logs",
+      "metrics",
+      "traces",
+    ]);
+    expect(wrapper.find('[data-test^="edit-role-module-pane-bulk-"]').exists()).toBe(false);
   });
 });

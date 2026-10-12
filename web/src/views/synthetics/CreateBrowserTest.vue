@@ -133,7 +133,6 @@ import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
-import BetaBadge from "@/components/common/BetaBadge.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 const router = useRouter();
@@ -1835,6 +1834,7 @@ function onClearResults() {
 <template>
   <!-- ── Non-loading: shared wrapper with page header ── -->
   <OPageLayout
+    :title="raw(headerTitle)"
     class="bg-surface-base"
     :subtitle="headerSubtitle"
     :back="{
@@ -1844,12 +1844,6 @@ function onClearResults() {
     }"
     bleed
   >
-    <template #title>
-      <span class="inline-flex min-w-0 items-center gap-2">
-        <span class="truncate">{{ headerTitle }}</span>
-        <BetaBadge />
-      </span>
-    </template>
     <template v-if="referencedByCount > 0 || showStartControls" #actions>
       <JourneyUsedByPopover
         v-if="referencedByCount > 0"

@@ -459,16 +459,12 @@ const baseStubs = {
   Teleport: {
     template: "<div><slot /></div>",
   },
-  BetaBadge: {
-    template: '<span data-test="beta-badge">BETA</span>',
-  },
 };
 
 // ── Missing component stubs required by OPageLayout ──────────────────────
 const pageLayoutStubs = {
   OPageLayout: {
-    template:
-      '<div><slot name="title" /><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
+    template: '<div><div data-test="page-actions"><slot name="actions" /></div><slot /></div>',
     props: ["title", "subtitle", "back", "class", "bleed"],
   },
 };
@@ -674,13 +670,6 @@ describe("CreateBrowserTest", () => {
       const buildBtn = wrapper.find('[data-test="synthetics-create-build-btn"]');
       expect(recordBtn.attributes("disabled")).toBeDefined();
       expect(buildBtn.attributes("disabled")).toBeDefined();
-    });
-
-    it("should render the Beta badge in the page title", async () => {
-      wrapper = mountPage();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
     it("should show a placeholder example under the Starting URL", async () => {

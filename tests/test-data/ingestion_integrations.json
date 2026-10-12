@@ -285,6 +285,11 @@
     "category": "recommended"
   },
   {
+    "path": "/ingestion/recommended/gpu",
+    "label": "GPU (DCGM Exporter)",
+    "category": "recommended"
+  },
+  {
     "path": "/ingestion/recommended/gcp",
     "label": "GCP",
     "category": "recommended"

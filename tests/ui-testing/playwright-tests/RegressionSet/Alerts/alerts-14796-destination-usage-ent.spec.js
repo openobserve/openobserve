@@ -105,6 +105,53 @@ test.describe('Enterprise consumers of the destination delete guard testcases', 
     await pm.alertDestinationsPage.searchDestinations(name);
   }
 
+  /**
+   * A pipeline-module destination plus a realtime pipeline whose `remote_stream`
+   * node names it. Pipeline destinations carry no template and never appear on the
+   * alert destinations list, so this is the only way to reach that arm.
+   */
+  async function seedPipelineOnDestination(page, prefix) {
+    const { v1, org } = urls();
+    const destinationName = await seedDestination(page, prefix, 'pipeline');
+
+    const pipelineName = uniq(`${prefix}_pipeline`);
+    const stream = 'alerts_p0_stream';
+    const pipeRes = await api(page, 'post', `${v1}/pipelines`, {
+      name: pipelineName, description: '', org, enabled: true,
+      source: { source_type: 'realtime', org_id: org, stream_name: stream, stream_type: 'logs' },
+      nodes: [
+        {
+          id: 'n1', type: 'input', io_type: 'input', position: { x: 0, y: 0 },
+          data: { node_type: 'stream', org_id: org, stream_name: stream, stream_type: 'logs' },
+        },
+        {
+          id: 'n2', type: 'output', io_type: 'output', position: { x: 200, y: 200 },
+          data: { node_type: 'remote_stream', org_id: org, destination_name: destinationName },
+        },
+      ],
+      edges: [{ id: 'e1', source: 'n1', target: 'n2' }],
+    });
+    expect(pipeRes.status(), await pipeRes.text()).toBe(200);
+    createdConsumers.push(`${v1}/pipelines/${(await pipeRes.json()).id}`);
+    return { destinationName, pipelineName };
+  }
+
+  test('should refuse deleting a pipeline destination a pipeline still routes to', {
+    tag: ['@alert-destination-pipeline-consumer', '@enterprise', '@alerts', '@P0'],
+  }, async ({ page }) => {
+    testLogger.info('Seeding a pipeline destination and a pipeline that routes to it');
+    const { destinationName, pipelineName } = await seedPipelineOnDestination(page, 'e2e_14796_pipe');
+
+    // Pipeline destinations live on their own Settings tab, which is enterprise-only.
+    await pm.pipelinesPage.openPipelineDestinationsAt(destinationName);
+
+    testLogger.info('Asserting the delete is refused and names the pipeline');
+    await pm.alertDestinationsPage.attemptDeleteDestination(destinationName);
+    await pm.alertDestinationsPage.expectInUseErrorToastContaining(['pipeline', pipelineName]);
+    await pm.alertDestinationsPage.expectDestinationRowStillVisible(destinationName);
+    testLogger.info('Test completed');
+  });
+
   test('should count an anomaly detection config and refuse its destination delete', {
     tag: ['@alert-destination-anomaly-consumer', '@enterprise', '@alerts', '@P0'],
   }, async ({ page }) => {

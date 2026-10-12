@@ -100,6 +100,7 @@ export function buildFromMarkdown(
 
   return {
     provider: {
+      id: slug,
       name: str(card.name) ?? slug,
       tagline: raw(str(card.tagline) ?? ""),
       // Logo from the md frontmatter, resolved to a bundled asset URL (or an

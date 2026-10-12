@@ -91,7 +91,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
     template: `<div class="o-table" :data-table-id="tableId" :data-total="totalCount"
       :data-page="currentPage" :data-pagination="pagination"
       :data-columns="(columns || []).map(c => c.id).join(',')">
-      <slot name="toolbar" /><slot name="bottom" /></div>`,
+      <slot name="toolbar" /><slot name="selection-actions" /><slot name="footer-note" /></div>`,
   },
 }));
 
@@ -205,7 +205,7 @@ describe("DiscoveryPage fetching", () => {
 
     expect(table().attributes("data-table-id")).toBe("ai-discovery-trace");
     expect(table().attributes("data-columns")).toBe(
-      "refTimestamp,genAiOperationName,serviceName,input,quality,inQueue,actions",
+      "refTimestamp,trace,serviceName,input,quality,inQueue,actions",
     );
 
     (wrapper.vm as any).$.setupState.onPageChange(3);
@@ -299,6 +299,23 @@ describe("DiscoveryPage fetching", () => {
 
     // Client-side only — /discovery takes no query parameter.
     expect(mockSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("finds a trace row by its id when the score carries no trace_id", async () => {
+    mockSearch.mockResolvedValue(
+      searchResult({
+        items: [
+          ...searchResult().items,
+          { ...searchResult().items[0], targetId: "trace-9", traceId: null },
+        ],
+      }),
+    );
+    const wrapper = await mountPage();
+    const state = (wrapper.vm as any).$.setupState;
+
+    state.search = "trace-9";
+    await flushPromises();
+    expect(state.visibleItems.map((r: any) => r.targetId)).toEqual(["trace-9"]);
   });
 
   it("clears the search when the scope changes", async () => {

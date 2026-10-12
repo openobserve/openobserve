@@ -17,7 +17,8 @@
 use config::utils::time::day_micros;
 use hashbrown::HashSet;
 use sea_orm::{
-    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+    TransactionTrait,
 };
 use sea_orm_migration::prelude::*;
 
@@ -31,7 +32,15 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
         let txn = db.begin().await?;
-        let mut org_set = HashSet::new();
+        // a re-run finds organizations that are already in the table
+        let mut org_set: HashSet<String> = organizations::Entity::find()
+            .select_only()
+            .column(organizations::Column::Identifier)
+            .into_tuple()
+            .all(&txn)
+            .await?
+            .into_iter()
+            .collect();
         // Migrate pages of 100 records at a time to avoid loading too many
         // records into memory.
         // txn.execute()
@@ -149,10 +158,59 @@ mod organizations {
 
 #[cfg(test)]
 mod tests {
+    use sea_orm::{ConnectionTrait, Database};
+
     use super::*;
+    use crate::table::migration::m20241227_000001_create_organizations_table as create_orgs;
 
     #[test]
     fn test_default_org_constant_value() {
         assert_eq!(DEFAULT_ORG, "default");
+    }
+
+    #[tokio::test]
+    async fn test_up_skips_organizations_that_already_exist() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let manager = SchemaManager::new(&db);
+        create_orgs::Migration.up(&manager).await.unwrap();
+        // cloud builds also write trial_ends_at, which a later migration adds
+        #[cfg(feature = "cloud")]
+        db.execute_unprepared(
+            "ALTER TABLE organizations ADD COLUMN trial_ends_at BIGINT NOT NULL DEFAULT 0",
+        )
+        .await
+        .unwrap();
+        for sql in [
+            "CREATE TABLE meta (id INTEGER PRIMARY KEY AUTOINCREMENT, module TEXT NOT NULL, \
+             key1 TEXT NOT NULL, key2 TEXT NOT NULL, start_dt BIGINT NOT NULL, \
+             value TEXT NOT NULL)",
+            "INSERT INTO meta (module, key1, key2, start_dt, value) VALUES \
+             ('schema', 'default', 'logs/a', 0, ''), ('schema', 'org1', 'logs/b', 0, '')",
+            "INSERT INTO organizations (identifier, org_name, org_type, created_at, updated_at) \
+             VALUES ('default', 'renamed', 0, 1, 1)",
+        ] {
+            db.execute_unprepared(sql).await.unwrap();
+        }
+
+        Migration
+            .up(&manager)
+            .await
+            .expect("an existing organization must not be inserted again");
+        let orgs: Vec<(String, String)> = organizations::Entity::find()
+            .select_only()
+            .column(organizations::Column::Identifier)
+            .column(organizations::Column::OrgName)
+            .order_by_asc(organizations::Column::Identifier)
+            .into_tuple()
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(
+            orgs,
+            [
+                ("default".to_string(), "renamed".to_string()),
+                ("org1".to_string(), "org1".to_string()),
+            ]
+        );
     }
 }

@@ -586,7 +586,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 name="trigger_condition.timezone"
                                 :options="timezoneSelectOptions"
                                 :placeholder="raw(t('logStream.timezone') + ' *')"
-                                :title="triggerData.timezone"
                                 width="xs"
                               />
                             </div>
@@ -797,6 +796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :enable-cell-copy="true"
                       expansion="multiple"
                       :expand-on-row-click="true"
+                      :cell-overflow-tooltip="false"
                       data-test="scheduled-pipeline-sql-preview-table"
                     >
                       <!-- eslint-enable local/no-hardcoded-px -->

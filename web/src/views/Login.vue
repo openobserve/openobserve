@@ -18,15 +18,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <Login v-if="user.email == '' && !showInvitations" />
   <div v-if="showInvitations && config.isCloud == 'true'">
     <div class="relative-position flex px-3 pt-2">
-      <img
-        class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
-        loading="lazy"
-        :src="
-          isDark
-            ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-            : getImageURL('images/common/openobserve_latest_light_2.svg')
-        "
-      />
+      <a href="https://openobserve.ai/" target="_blank" rel="noopener noreferrer">
+        <img
+          class="h-10 max-h-10 w-auto max-w-50 cursor-pointer"
+          loading="lazy"
+          :alt="t('login.openObserveLogoAlt')"
+          :src="
+            isDark
+              ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+              : getImageURL('images/common/openobserve_latest_light_2.svg')
+          "
+        />
+      </a>
     </div>
     <InvitationList
       v-if="showInvitations"
@@ -62,6 +65,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
 import { isSameOriginRedirect } from "@/utils/safeUrl";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
+import { capturePrefill } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "LoginPage",
@@ -82,6 +87,20 @@ export default defineComponent({
       identifier: "",
       name: "",
     });
+
+    // The SSO round trip drops the signup link's query and referrer, so keep them for the Get started pick.
+    const pendingUtmContent = (): string | null => {
+      try {
+        const uri = window.sessionStorage.getItem("redirectURI");
+        return uri ? new URL(uri, window.location.origin).searchParams.get("utm_content") : null;
+      } catch {
+        return null;
+      }
+    };
+    capturePrefill(
+      router?.currentRoute.value.query?.utm_content ?? pendingUtmContent(),
+      document.referrer,
+    );
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
@@ -121,8 +140,17 @@ export default defineComponent({
 
           store.dispatch("setOrganizations", res.data.data);
 
-          orgOptions.value = res.data.data.map(
-            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
+          const labeledOrgs = withDisambiguatedOrgLabels(res.data.data);
+          orgOptions.value = labeledOrgs.map(
+            (data: {
+              id: any;
+              name: any;
+              type: any;
+              identifier: any;
+              UserObj: any;
+              label: string;
+            }) => {
+              // `label` is the real name here; the disambiguated string is applied only to the dropdown copy returned below.
               let optiondata: any = {
                 label: data.name,
                 id: data.id,
@@ -153,7 +181,7 @@ export default defineComponent({
                 tempDefaultOrg = optiondata;
               }
 
-              return optiondata;
+              return { ...optiondata, label: data.label };
             },
           );
 

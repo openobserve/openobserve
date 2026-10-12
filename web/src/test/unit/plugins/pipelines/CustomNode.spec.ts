@@ -301,7 +301,7 @@ describe("CustomNode.vue", () => {
       expect(wrapper.text()).toContain("status = '200'");
     });
 
-    it("should truncate long condition text", () => {
+    it("should render long condition text in full", () => {
       const wrapper = mount(CustomNode, {
         props: {
           id: "cond-1",
@@ -325,12 +325,10 @@ describe("CustomNode.vue", () => {
         },
       });
 
-      const text = wrapper.text();
-      // Should contain ellipsis if truncated (truncated to 20 chars)
-      if (text.length > 23) {
-        // 20 chars + "..."
-        expect(text).toContain("...");
-      }
+      expect(wrapper.text()).toContain(
+        "very_long_column_name_that_exceeds_limit = 'very_long_value'",
+      );
+      expect(wrapper.text()).not.toContain("...");
     });
 
     it("should handle V2 format group conditions", () => {

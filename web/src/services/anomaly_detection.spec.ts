@@ -16,6 +16,9 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import anomaly_detection from "@/services/anomaly_detection";
 import http from "@/services/http";
+import analytics from "@/services/product_analytics";
+
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -477,6 +480,56 @@ describe("anomaly_detection service", () => {
       await expect(anomaly_detection.getHistory("org123", "detector-id")).rejects.toThrow(
         "Server error",
       );
+    });
+  });
+
+  describe("product analytics", () => {
+    it("tracks alert_created from create once the request resolves and returns the response", async () => {
+      const response = { data: { code: 200 } };
+      mockHttpInstance.post.mockResolvedValue(response);
+
+      await expect(anomaly_detection.create("org123", { name: "a" }, "f1")).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith("alert_created");
+    });
+
+    it("does not track alert_created from create when the request rejects", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+
+      await expect(anomaly_detection.create("org123", { name: "a" }, "f1")).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("product analytics: anomaly lifecycle", () => {
+    const cases: Array<[string, string, () => Promise<unknown>, unknown[]]> = [
+      ["update", "put", () => anomaly_detection.update("org1", "a1", {}), ["alert_updated"]],
+      [
+        "triggerTraining",
+        "post",
+        () => anomaly_detection.triggerTraining("org1", "a1"),
+        ["anomaly_detection_training_started"],
+      ],
+    ];
+
+    it.each(cases)("%s tracks once the request resolves", async (_label, verb, call, args) => {
+      const response = { data: { successful: ["a", "b"], unsuccessful: [], success: true } };
+      mockHttpInstance[verb].mockResolvedValue(response);
+
+      await expect(call()).resolves.toBe(response);
+
+      expect(analytics.track).toHaveBeenCalledTimes(1);
+      expect(analytics.track).toHaveBeenCalledWith(...args);
+    });
+
+    it.each(cases)("%s does not track when the request rejects", async (_label, verb, call) => {
+      mockHttpInstance[verb].mockRejectedValue(new Error("boom"));
+
+      await expect(call()).rejects.toThrow("boom");
+
+      expect(analytics.track).not.toHaveBeenCalled();
     });
   });
 });

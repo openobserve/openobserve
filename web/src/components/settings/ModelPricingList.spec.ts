@@ -256,9 +256,6 @@ const mockI18n = createI18n({
         newModel: "New Model",
         noModels: "No model pricing",
         noModelsDesc: "Add a custom model pricing",
-        modelsCount: "{count} Models",
-        exportSelected: "Export ({count})",
-        deleteSelected: "Delete ({count})",
         tabAll: "All",
         tabCustom: "Custom",
         tabSystem: "System",
@@ -624,14 +621,6 @@ describe("ModelPricingList.vue", () => {
       wrapper.vm.selectedIds = ["org-1", "meta-1"];
       wrapper.vm.selectedIds = ["meta-1"];
       expect(wrapper.vm.selectedIds).toEqual(["meta-1"]);
-    });
-
-    it("selectedCount reflects selectedIds length", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.selectedIds = ["a", "b", "c"];
-      await nextTick();
-      expect(wrapper.vm.selectedCount).toBe(3);
     });
 
     it("selectedIdsOnlyContainsOwn is false when nothing is selected", async () => {
