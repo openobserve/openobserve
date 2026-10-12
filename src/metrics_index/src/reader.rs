@@ -235,7 +235,7 @@ pub async fn fetch_parsed_index(
             crate::block::decode_index(&header, &columns, &requested)?
         };
         Ok(Arc::new(CachedIndex {
-            index: Arc::new(index.for_cache()),
+            index: Arc::new(index),
             binding,
         }))
     })
@@ -335,10 +335,11 @@ fn metrics_block_index_data(
     let row_group_size = match format {
         config::FileFormat::Parquet => Some(
             index
+                .header
                 .row_group_size
                 .context("Parquet block index lacks parent row group size")?,
         ),
-        config::FileFormat::Vortex if index.row_group_size.is_none() => None,
+        config::FileFormat::Vortex if index.header.row_group_size.is_none() => None,
         _ => bail!("Invalid block parent format/row-group binding"),
     };
     let mut fields = vec![arrow::datatypes::Field::new(
@@ -350,9 +351,14 @@ fn metrics_block_index_data(
         index.blocks.row_counts(),
     ))];
     for (i, field) in index.labels.schema().fields().iter().enumerate() {
-        if index.source_schema.field_with_name(field.name()).is_ok() {
+        if index
+            .header
+            .source_schema
+            .field_with_name(field.name())
+            .is_ok()
+        {
             if flat_labels.contains(field.name()) {
-                let source_field = index.source_schema.field_with_name(field.name())?;
+                let source_field = index.header.source_schema.field_with_name(field.name())?;
                 fields.push(source_field.clone());
                 columns.push(arrow::compute::cast(
                     index.labels.column(i),
@@ -369,7 +375,7 @@ fn metrics_block_index_data(
     Ok(MetricsIndexData {
         schema,
         batches: vec![batch],
-        parent_records: usize::try_from(index.parent.rows)?,
+        parent_records: usize::try_from(index.header.parent.rows)?,
         row_group_size,
     })
 }

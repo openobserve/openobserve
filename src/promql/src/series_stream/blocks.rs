@@ -2673,7 +2673,7 @@ mod tests {
         assert!(cached.is_none());
         assert!(!complete);
         let partial = Arc::new(CachedIndex {
-            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            index: Arc::new(entry.index.project(&[]).unwrap()),
             binding: entry.binding.clone(),
         });
         cache.insert(key.clone(), partial, weight.total).unwrap();
@@ -2704,7 +2704,7 @@ mod tests {
         let cache = Mutex::new(cache);
         let (key, entry, weight) = cache_entry();
         let partial = Arc::new(CachedIndex {
-            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            index: Arc::new(entry.index.project(&[]).unwrap()),
             binding: entry.binding.clone(),
         });
         let lookup = {

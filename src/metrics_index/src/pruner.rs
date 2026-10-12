@@ -58,7 +58,12 @@ pub fn matching_blocks(index: &Index, matchers: &Matchers) -> Result<Vec<usize>>
             .field_with_name(&matcher.name)
             .is_err()
         {
-            if index.source_schema.field_with_name(&matcher.name).is_err() {
+            if index
+                .header
+                .source_schema
+                .field_with_name(&matcher.name)
+                .is_err()
+            {
                 return Ok(Vec::new());
             }
             bail!("MIDX lacks identity label {}", matcher.name);
