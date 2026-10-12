@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Repro of a live capture where some partitions returned hits without zo_sql_breakdown, which used to zero out the whole stacked render.
+// Replay of a live capture: rows without zo_sql_breakdown are the SQL NULL group of the breakdown field.
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-// Representative slice of real captured aggs: flat (no breakdown) hours immediately followed by breakdown-tagged hours.
+// Captured aggs: NULL-group rows (no zo_sql_breakdown) beside rows whose breakdown value is 0.
 const MIXED_AGGS = [
   { zo_sql_key: "2026-09-24T12:00:00", zo_sql_num: 37 },
   { zo_sql_key: "2026-09-24T11:00:00", zo_sql_num: 29 },
@@ -96,8 +96,9 @@ vi.mock("vue-i18n", () => ({
 }));
 
 import { useHistogram } from "./useHistogram";
+import { convertStackedLogData } from "@/utils/logs/convertLogData";
 
-describe("histogram mixed breakdown-shape capture replay", () => {
+describe("histogram NULL breakdown group capture replay", () => {
   let histogram: ReturnType<typeof useHistogram>;
 
   beforeEach(() => {
@@ -109,32 +110,30 @@ describe("histogram mixed breakdown-shape capture replay", () => {
     histogram = useHistogram();
   });
 
-  it("does not zero out real counts for hours whose hits came back without zo_sql_breakdown", () => {
+  it("stacks the NULL group as an (empty) series without losing counts", () => {
     histogram.generateHistogramData();
 
     const hist = mockState.searchObj.data.histogram;
-    // Since the backend response is inconsistently shaped for this capture
-    // (some hours tagged with zo_sql_breakdown, most not), hasBreakdown's
-    // every() check falls through to the flat single-series path — matching
-    // what Visualize renders for the same data, no spurious legend entry.
-    expect(hist.breakdownField).toBeNull();
-    expect(hist.breakdownSeries).toBeNull();
+    const series = hist.breakdownSeries as unknown as Map<string, number[]>;
+    expect(hist.breakdownField).toBe("severity");
+
+    const { options } = convertStackedLogData(hist.xData, series, hist.chartParams, false);
+    expect(options.series.map((s: any) => s.name).sort()).toEqual(["(empty)", "0"]);
 
     const { xData, yData } = hist;
     const idxFor = (iso: string) => xData.indexOf(new Date(iso + "Z").getTime());
 
-    // The three flat (no zo_sql_breakdown) hours have real, non-zero counts
-    // in the source data — they must not render as zero.
     expect(yData[idxFor("2026-09-24T12:00:00")]).toBe(37);
     expect(yData[idxFor("2026-09-24T11:00:00")]).toBe(29);
     expect(yData[idxFor("2026-09-24T10:00:00")]).toBe(32);
-
-    // The breakdown-tagged hours still work — the flat path doesn't key on
-    // zo_sql_breakdown at all, so their counts are unaffected.
     expect(yData[idxFor("2026-09-24T08:00:00")]).toBe(32);
     expect(yData[idxFor("2026-09-24T07:00:00")]).toBe(35);
-
-    // The hour with BOTH a tagged and an untagged hit sums both (20 + 11).
+    // The NULL group and the 0 group share this hour and stack to 20 + 11.
     expect(yData[idxFor("2026-09-24T09:00:00")]).toBe(31);
+    expect(series.get("")![idxFor("2026-09-24T09:00:00")]).toBe(11);
+    expect(series.get("0")![idxFor("2026-09-24T09:00:00")]).toBe(20);
+
+    const capturedTotal = MIXED_AGGS.reduce((sum, row) => sum + row.zo_sql_num, 0);
+    expect(mockState.searchObj.data.queryResults.total).toBe(capturedTotal);
   });
 });

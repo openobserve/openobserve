@@ -329,6 +329,9 @@ export const DEFAULT_SEARCH_DEBUG_DATA = {
   extractFieldsWithAPI: "",
 };
 
+export const BREAKDOWN_EMPTY_VALUE = "";
+export const BREAKDOWN_EMPTY_LABEL = "(empty)";
+
 // Type definitions for constants
 export type IntervalMapKey = keyof typeof INTERVAL_MAP;
 export type RefreshTimeOption = (typeof REFRESH_TIMES)[number][number];

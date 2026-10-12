@@ -17,7 +17,7 @@ import { useStore } from "vuex";
 
 import { searchState, type HistogramTitleParts } from "@/composables/useLogs/searchState";
 
-import { INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
+import { BREAKDOWN_EMPTY_VALUE, INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
 
 // Severity-aware sort order for stacked histogram breakdown categories.
 // Lower index = bottom of stack (least severe), higher = top (most severe).
@@ -185,11 +185,7 @@ export const useHistogram = () => {
         const breakdownField: string | null =
           searchObj.data.queryResults.histogram_breakdown_field ?? null;
 
-        // every() (not some()) so a mixed-shape backend response — some rows tagged with zo_sql_breakdown, some not — falls back to the flat path instead of entering breakdown mode and silently skipping the untagged rows.
-        const hasBreakdown =
-          !!breakdownField &&
-          searchObj.data.queryResults.aggs.length > 0 &&
-          searchObj.data.queryResults.aggs.every((item: any) => item.zo_sql_breakdown != null);
+        const hasBreakdown = !!breakdownField;
 
         if (hasBreakdown) {
           // --- Stacked breakdown path ---
@@ -206,14 +202,11 @@ export const useHistogram = () => {
           // would appear to grow outward from the center as partitions stream in.
           const timestampSet = new Set<string>();
 
-          // Seed from previously accumulated pages
+          // histogramResults holds only the zero-fill rows, which add timestamps and never a category
           histogramResults.value.forEach((item: any) => {
             if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
               timestampSet.add(item.zo_sql_key);
             }
-            if (item.zo_sql_breakdown === undefined || item.zo_sql_breakdown === null) return;
-            const key = `${item.zo_sql_key}|||${item.zo_sql_breakdown}`;
-            breakdownMap.set(key, JSON.parse(JSON.stringify(item)));
           });
 
           // Merge current page aggs into the map.
@@ -221,27 +214,26 @@ export const useHistogram = () => {
             if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
               timestampSet.add(item.zo_sql_key);
             }
-            const cat = item.zo_sql_breakdown;
-            if (cat === undefined || cat === null) return;
+            // missing key, null and "" are all the NULL group; the two backend paths return it differently
+            const cat = String(item.zo_sql_breakdown ?? BREAKDOWN_EMPTY_VALUE);
             const key = `${item.zo_sql_key}|||${cat}`;
             if (breakdownMap.has(key)) {
               breakdownMap.get(key)!.zo_sql_num += parseInt(item.zo_sql_num, 10);
             } else {
-              breakdownMap.set(key, { ...item, zo_sql_num: parseInt(item.zo_sql_num, 10) });
+              breakdownMap.set(key, {
+                ...item,
+                zo_sql_breakdown: cat,
+                zo_sql_num: parseInt(item.zo_sql_num, 10),
+              });
             }
           });
 
           // Sorted unique timestamps (ISO strings sort lexicographically = chronologically)
           const allTimestamps = [...timestampSet].sort();
 
-          // Coerce to string — numeric breakdown values (e.g. severity=0, status=404)
-          // come back as JSON numbers. Without this, .toLowerCase() / .localeCompare()
-          // below would throw a TypeError.
           const rawCategories = [
             ...new Set([...breakdownMap.values()].map((r) => r.zo_sql_breakdown)),
-          ]
-            .filter((c) => c !== undefined && c !== null)
-            .map((c) => String(c));
+          ];
 
           const allCategories = rawCategories.sort((a, b) => {
             const aRank = SEVERITY_ORDER[a.toLowerCase()] ?? 100;
@@ -262,11 +254,7 @@ export const useHistogram = () => {
           breakdownMap.forEach((row) => {
             const idx = tsIndex.get(row.zo_sql_key);
             if (idx === undefined) return;
-            const raw = row.zo_sql_breakdown;
-            if (raw === undefined || raw === null) return;
-            // Coerce to match seriesMap's string keys (handles numeric 0, booleans, etc.)
-            const cat = String(raw);
-            const bucket = seriesMap.get(cat);
+            const bucket = seriesMap.get(row.zo_sql_breakdown);
             if (bucket) bucket[idx] += row.zo_sql_num;
           });
 

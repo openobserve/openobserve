@@ -880,6 +880,9 @@ import { getImageURL, useLocalWrapContent } from "../../utils/zincutils";
 import { formatLargeNumber } from "@/utils/formatters";
 import { CUSTOM_THEME_NAME, THEME_STORAGE_KEYS } from "@/constants/themes";
 import useLogs from "../../composables/useLogs";
+import { BREAKDOWN_EMPTY_LABEL, BREAKDOWN_EMPTY_VALUE } from "@/utils/logs/constants";
+import { getEmptyBreakdownFilter } from "@/utils/logs/breakdownFilter";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
@@ -1610,22 +1613,18 @@ export default defineComponent({
       const timestamp = formatDate(new Date(xData[dataIndex]));
 
       const rows = [...breakdownSeries.entries()].map(([category, counts]) => {
-        // Explicit check so numeric 0 is not treated as empty (0 is falsy in JS).
-        // Case is preserved — we never re-capitalize or lowercase user data;
-        // the tooltip label and the filter term must match the source exactly.
+        // Explicit check so a numeric 0 stays a real category; the label must match the source exactly.
         const label =
-          category === null || category === undefined || category === ""
-            ? "(empty)"
+          category === null || category === undefined || category === BREAKDOWN_EMPTY_VALUE
+            ? BREAKDOWN_EMPTY_LABEL
             : String(category);
-        const rawValue = label === "(empty)" ? "" : label;
+        const rawValue = label === BREAKDOWN_EMPTY_LABEL ? BREAKDOWN_EMPTY_VALUE : label;
         const matchedSeries = (plotChart.value?.options?.series ?? []).find(
           (s: any) => s.name === label,
         );
         return {
-          // `label` stays the English sentinel: it is compared above to derive
-          // rawValue and matched against the ECharts series name. Only the
-          // rendered field is translated.
-          displayLabel: label === "(empty)" ? t("logs.searchResult.emptyValue") : label,
+          // label stays the sentinel because it is matched against the ECharts series name
+          displayLabel: label === BREAKDOWN_EMPTY_LABEL ? t("logs.searchResult.emptyValue") : label,
           rawValue,
           count: (counts as number[])[dataIndex] ?? 0,
           color: matchedSeries?.itemStyle?.color ?? "#888",
@@ -1659,6 +1658,13 @@ export default defineComponent({
     const applyPinnedFilter = (rawValue: string, action: "include" | "exclude") => {
       const field = pinnedTooltip.value.field;
       if (!field) return;
+      if (rawValue === BREAKDOWN_EMPTY_VALUE) {
+        const quote = (f: string) =>
+          searchObj.meta.sqlMode === true ? quoteSqlIdentifierIfNeeded(f) : f;
+        searchObj.data.stream.addToFilterMode = "append";
+        searchObj.data.stream.addToFilter = getEmptyBreakdownFilter(field, action, quote);
+        return;
+      }
       addSearchTerm(field, rawValue, action);
     };
 
