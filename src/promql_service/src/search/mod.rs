@@ -88,23 +88,14 @@ pub async fn search_rule(
     user_email: &str,
     timeout: i64,
     is_super_cluster: bool,
-) -> Result<Value> {
+) -> Result<SearchResponse> {
     let limit = get_max_series_limit(org_id).await;
-    let mut req = req.clone();
-    req.search_event_context
-        .get_or_insert_with(Default::default)
-        .promql_require_complete = true;
-    let value = search(
-        trace_id,
-        org_id,
-        &req,
-        user_email,
-        timeout,
-        is_super_cluster,
-    )
-    .await?;
-    ensure_rule_reply_complete(&value, limit.min(get_max_series_limit(org_id).await))?;
-    Ok(value)
+    let response = search(trace_id, org_id, req, user_email, timeout, is_super_cluster).await?;
+    ensure_rule_reply_complete(
+        &response.value,
+        limit.min(get_max_series_limit(org_id).await),
+    )?;
+    Ok(response)
 }
 
 #[tracing::instrument(skip_all, fields(org_id = org_id))]

@@ -58,6 +58,7 @@ pub(super) async fn evaluate(
         .enabled;
     let result =
         promql_service::search::search_rule(trace_id, org, &req, "", 0, super_cluster).await?;
+    let result = complete_rule_result(result)?;
     rule_results(
         result,
         at,
@@ -78,6 +79,15 @@ pub(super) async fn infer_stream(org: &str, query: &QueryCondition) -> anyhow::R
     Err(anyhow::anyhow!(
         "expression has no referenced existing metrics stream; supply stream_name"
     ))
+}
+
+fn complete_rule_result(
+    response: promql_service::search::SearchResponse,
+) -> anyhow::Result<PromValue> {
+    if !response.warnings.is_empty() {
+        anyhow::bail!("Partial response: {}", response.warnings.join(", "));
+    }
+    Ok(response.value)
 }
 
 fn rule_results(
@@ -186,6 +196,34 @@ mod tests {
                 })
                 .collect(),
         )
+    }
+
+    #[test]
+    fn alerts_reject_partial_promql_results_even_when_empty() {
+        use promql_service::search::SearchResponse;
+        for value in [
+            PromValue::Vector(vec![]),
+            PromValue::Matrix(vec![]),
+            vector(&[1.0]),
+            PromValue::Matrix(vec![config::meta::promql::value::RangeValue {
+                samples: vec![Sample::new(0, 1.0)],
+                ..Default::default()
+            }]),
+        ] {
+            let error = complete_rule_result(SearchResponse {
+                value,
+                warnings: vec!["ingester timeout".into()],
+            })
+            .unwrap_err();
+            assert!(error.to_string().contains("ingester timeout"));
+        }
+        assert!(
+            complete_rule_result(SearchResponse {
+                value: PromValue::Vector(vec![]),
+                warnings: vec![],
+            })
+            .is_ok()
+        );
     }
 
     #[test]
