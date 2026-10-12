@@ -15,7 +15,6 @@
 
 mod parallel;
 mod reader;
-mod sequential;
 use std::{collections::HashMap, sync::Arc};
 
 use arrow::array::{
@@ -30,6 +29,7 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::storage::{self, StorageTier};
+use parallel::build_index;
 
 use crate::puffin_directory::{PROP_ROW_GROUP_SIZE, writer::PuffinDirWriter};
 
@@ -59,11 +59,7 @@ pub async fn create_tantivy_index(
     };
 
     let dir = PuffinDirWriter::new();
-    let index = if thread_num > 1 {
-        parallel::build_index(dir.clone(), file_format, buf, index_schema, thread_num).await?
-    } else {
-        sequential::build_index(dir.clone(), file_format, buf, index_schema).await?
-    };
+    let index = build_index(dir.clone(), file_format, buf, index_schema, thread_num).await?;
     if index.is_none() {
         return Ok(0);
     }
@@ -105,10 +101,10 @@ pub async fn create_tantivy_index(
     Ok(index_size)
 }
 
-/// Bundle of the tantivy schema and the per-row metadata both build paths need.
+/// Bundle of the tantivy schema and the per-row metadata the Parquet and Vortex paths need.
 ///
 /// Built once by [`build_tantivy_schema`] and shared by the
-/// sequential and parallel builders so they don't each rebuild the schema.
+/// parallel workers so they don't each rebuild the schema.
 #[derive(Clone)]
 pub(super) struct TantivyIndexSchema {
     /// The built tantivy schema.
@@ -121,7 +117,7 @@ pub(super) struct TantivyIndexSchema {
     pub(super) fts_field: Option<tantivy::schema::Field>,
 }
 
-/// Builds the tantivy `Schema` shared by both index-build paths.
+/// Builds the tantivy `Schema` shared by the Parquet and Vortex index-build paths.
 ///
 /// Returns `None` when there are no fields to index (configured fields don't
 /// intersect with the stream schema).
@@ -348,7 +344,7 @@ pub(super) mod tests {
     }
 
     /// Helper function to create test record batches.
-    /// Shared with [`super::sequential`] and [`super::parallel`] test modules.
+    /// Shared with the [`super::parallel`] test module.
     pub(in crate::index_builder) fn create_test_batch(
         num_rows: usize,
         include_timestamp: bool,
@@ -523,6 +519,6 @@ pub(super) mod tests {
 
     // Note: Full testing of create_tantivy_index with storage operations would require
     // mocking the storage layer, which is complex for unit tests. The main logic is
-    // tested in sequential::build_index. Integration tests would be more appropriate
+    // tested in parallel::build_index. Integration tests would be more appropriate
     // for testing the full create_tantivy_index function with actual storage operations.
 }

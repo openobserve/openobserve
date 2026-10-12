@@ -277,16 +277,15 @@ mod tests {
         datatypes::{DataType, Field, Schema},
         record_batch::RecordBatch,
     };
-    use config::{FileFormat, TIMESTAMP_COL_NAME};
+    use config::{FileFormat, INDEX_FIELD_NAME_FOR_ALL, TIMESTAMP_COL_NAME};
     use parquet::{
         arrow::{AsyncArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder},
         file::properties::WriterProperties,
     };
     use tantivy::directory::RamDirectory;
 
-    use crate::index_builder::{
-        sequential,
-        tests::{create_test_parquet_bytes, make_index_schema},
+    use crate::index_builder::tests::{
+        create_test_batch, create_test_parquet_bytes, make_index_schema,
     };
 
     /// Build a record batch where every row has a globally-unique marker token
@@ -470,21 +469,15 @@ mod tests {
         }
     }
 
-    /// Same data through parallel-row_group path and sequential path must
+    /// Same data through multi-worker and single-worker row_group paths must
     /// yield the same `(marker → doc_id)` mapping for every row. Verifies
     /// behavioural equivalence end-to-end.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn test_row_group_parallel_matches_sequential() {
+    async fn test_row_group_parallel_matches_worker_counts() {
         // 750 rows, fixed row_group size 250 ⇒ 3 full row_groups of 250 each.
         let total = 750usize;
         let buf_par =
             create_test_parquet_bytes_fixed_rg(vec![create_marker_batch(0, total)], 250).await;
-        let buf_seq = create_test_parquet_bytes(vec![
-            create_marker_batch(0, 250),
-            create_marker_batch(250, 250),
-            create_marker_batch(500, 250),
-        ])
-        .await;
         let schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("marker", DataType::Utf8, false),
@@ -493,18 +486,19 @@ mod tests {
         let par = super::build_index(
             RamDirectory::create(),
             FileFormat::Parquet,
-            buf_par,
+            buf_par.clone(),
             make_index_schema(&[], &["marker".to_string()], &schema),
             3,
         )
         .await
         .unwrap()
         .unwrap();
-        let seq = sequential::build_index(
+        let single = super::build_index(
             RamDirectory::create(),
             FileFormat::Parquet,
-            buf_seq,
+            buf_par,
             make_index_schema(&[], &["marker".to_string()], &schema),
+            1,
         )
         .await
         .unwrap()
@@ -516,21 +510,21 @@ mod tests {
             .iter()
             .map(|s| s.meta().max_doc() as usize)
             .sum();
-        let seq_total: usize = seq
+        let single_total: usize = single
             .searchable_segments()
             .unwrap()
             .iter()
             .map(|s| s.meta().max_doc() as usize)
             .sum();
         assert_eq!(par_total, total);
-        assert_eq!(seq_total, total);
+        assert_eq!(single_total, total);
 
         let par_reader = par.reader().unwrap();
         let par_searcher = par_reader.searcher();
         let par_marker = par.schema().get_field("marker").unwrap();
-        let seq_reader = seq.reader().unwrap();
-        let seq_searcher = seq_reader.searcher();
-        let seq_marker = seq.schema().get_field("marker").unwrap();
+        let single_reader = single.reader().unwrap();
+        let single_searcher = single_reader.searcher();
+        let single_marker = single.schema().get_field("marker").unwrap();
 
         for row in 0..total {
             let m = format!("row{:09}", row);
@@ -538,23 +532,351 @@ mod tests {
                 tantivy::Term::from_field_text(par_marker, &m),
                 tantivy::schema::IndexRecordOption::Basic,
             );
-            let q_seq = tantivy::query::TermQuery::new(
-                tantivy::Term::from_field_text(seq_marker, &m),
+            let q_single = tantivy::query::TermQuery::new(
+                tantivy::Term::from_field_text(single_marker, &m),
                 tantivy::schema::IndexRecordOption::Basic,
             );
             let hits_par = par_searcher
                 .search(&q_par, &tantivy::collector::DocSetCollector)
                 .unwrap();
-            let hits_seq = seq_searcher
-                .search(&q_seq, &tantivy::collector::DocSetCollector)
+            let hits_single = single_searcher
+                .search(&q_single, &tantivy::collector::DocSetCollector)
                 .unwrap();
             assert_eq!(hits_par.len(), 1);
-            assert_eq!(hits_seq.len(), 1);
+            assert_eq!(hits_single.len(), 1);
             let addr_par = *hits_par.iter().next().unwrap();
-            let addr_seq = *hits_seq.iter().next().unwrap();
+            let addr_single = *hits_single.iter().next().unwrap();
             assert_eq!(addr_par.doc_id as usize, row);
-            assert_eq!(addr_seq.doc_id as usize, row);
+            assert_eq!(addr_single.doc_id as usize, row);
         }
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_with_fts_fields() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, false);
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+
+        let result = super::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(&["content".to_string()], &[], &batch.schema()),
+            2,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_with_index_fields() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, false, true);
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+
+        let result = super::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(&[], &["status".to_string()], &batch.schema()),
+            2,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_with_both_field_types() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, true);
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+
+        let result = super::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &["status".to_string()],
+                &batch.schema(),
+            ),
+            2,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_mixed_existing_and_missing_fields() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, true);
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+
+        // Mix of existing and non-existing fields
+        let result = super::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string(), "nonexistent_field".to_string()],
+                &[
+                    "status".to_string(),
+                    "another_nonexistent_field".to_string(),
+                ],
+                &batch.schema(),
+            ),
+            2,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_multiple_batches() {
+        let dir = RamDirectory::create();
+        let batch1 = create_test_batch(5, true, true, true);
+        let batch2 = create_test_batch(5, true, true, true);
+        let buf = create_test_parquet_bytes(vec![batch1.clone(), batch2.clone()]).await;
+
+        let result = super::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &["status".to_string()],
+                &batch1.schema(),
+            ),
+            2,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("status").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_non_string_fields() {
+        let fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("content", DataType::Utf8, false),
+            Field::new("number_field", DataType::Int64, false),
+        ];
+
+        let schema = Arc::new(Schema::new(fields));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1000, 1001, 1002])),
+                Arc::new(StringArray::from(vec!["content1", "content2", "content3"])),
+                Arc::new(Int64Array::from(vec![1, 2, 3])),
+            ],
+        )
+        .unwrap();
+
+        let dir = RamDirectory::create();
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+
+        let result = super::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &["number_field".to_string()],
+                &batch.schema(),
+            ),
+            2,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field("number_field").is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+        let query = tantivy::query::TermQuery::new(
+            tantivy::Term::from_field_text(schema.get_field("number_field").unwrap(), "2"),
+            tantivy::schema::IndexRecordOption::Basic,
+        );
+        assert_eq!(
+            index
+                .reader()
+                .unwrap()
+                .searcher()
+                .search(&query, &tantivy::collector::Count)
+                .unwrap(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_timestamp_field_handling() {
+        let dir = RamDirectory::create();
+        let batch = create_test_batch(10, true, true, true);
+        let buf = create_test_parquet_bytes(vec![batch.clone()]).await;
+
+        // Try to index the timestamp field as a regular index field
+        let result = super::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &["content".to_string()],
+                &[TIMESTAMP_COL_NAME.to_string()], // This should be ignored
+                &batch.schema(),
+            ),
+            2,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let schema = index.schema();
+        assert!(schema.get_field(INDEX_FIELD_NAME_FOR_ALL).is_ok());
+        assert!(schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+
+        // Verify that the timestamp field is indexed as Int64, not as text
+        let ts_field = schema.get_field(TIMESTAMP_COL_NAME).unwrap();
+        assert!(matches!(
+            schema.get_field_entry(ts_field).field_type(),
+            tantivy::schema::FieldType::I64(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_generate_tantivy_index_stream_schema_vs_parquet_schema() {
+        // This test validates the critical fix where we pass stream schema (with all
+        // configured fields) instead of parquet schema (only fields in actual data).
+        //
+        // Scenario: Stream settings configure `continent`, `name`, `flag_url` as secondary
+        // index fields, but the parquet data only contains `name` and `flag_url`.
+        // The missing field `continent` should still be included in the .ttv schema.
+
+        let dir = RamDirectory::create();
+
+        let parquet_fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("name", DataType::Utf8, false),
+            Field::new("flag_url", DataType::Utf8, false),
+        ];
+        let parquet_schema = Arc::new(Schema::new(parquet_fields));
+
+        let timestamps: Vec<i64> = (0..10).map(|i| 1000 + i as i64).collect();
+        let names: Vec<String> = (0..10).map(|i| format!("Name {i}")).collect();
+        let flag_urls: Vec<String> = (0..10)
+            .map(|i| format!("https://example.com/{i}"))
+            .collect();
+
+        let parquet_batch = RecordBatch::try_new(
+            parquet_schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(timestamps)),
+                Arc::new(StringArray::from(names)),
+                Arc::new(StringArray::from(flag_urls)),
+            ],
+        )
+        .unwrap();
+
+        let stream_fields = vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("continent", DataType::Utf8, false), // Configured but not in data
+            Field::new("name", DataType::Utf8, false),
+            Field::new("flag_url", DataType::Utf8, false),
+        ];
+        let stream_schema = Arc::new(Schema::new(stream_fields));
+
+        let buf = create_test_parquet_bytes(vec![parquet_batch]).await;
+
+        let result = super::build_index(
+            dir,
+            FileFormat::Parquet,
+            buf,
+            make_index_schema(
+                &[], // No FTS fields
+                &[
+                    "continent".to_string(),
+                    "name".to_string(),
+                    "flag_url".to_string(),
+                ],
+                &stream_schema, // Pass stream schema, not parquet schema
+            ),
+            2,
+        )
+        .await;
+
+        assert!(result.is_ok());
+        let index = result.unwrap();
+        assert!(index.is_some());
+
+        let index = index.unwrap();
+        let tantivy_schema = index.schema();
+
+        assert!(
+            tantivy_schema.get_field("continent").is_ok(),
+            "continent field should be in tantivy schema even though it's not in parquet data"
+        );
+        assert!(
+            tantivy_schema.get_field("name").is_ok(),
+            "name field should be in tantivy schema"
+        );
+        assert!(
+            tantivy_schema.get_field("flag_url").is_ok(),
+            "flag_url field should be in tantivy schema"
+        );
+        assert!(tantivy_schema.get_field(TIMESTAMP_COL_NAME).is_ok());
+
+        let reader = index.reader().unwrap();
+        let searcher = reader.searcher();
+        assert_eq!(searcher.num_docs(), 10);
     }
 
     mod vortex_tests {

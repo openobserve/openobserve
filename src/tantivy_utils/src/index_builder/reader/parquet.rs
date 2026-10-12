@@ -15,33 +15,14 @@
 
 //! Parquet record readers used while building indexes.
 
-use std::{io::Cursor, sync::Arc};
+use std::sync::Arc;
 
-use arrow::error::ArrowError;
 use arrow_schema::Schema;
 use bytes::Bytes;
-use config::{get_batch_size, utils::parquet::RecordBatchStream};
-use futures::TryStreamExt;
-use parquet::arrow::{
-    ParquetRecordBatchStreamBuilder, ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder,
-};
+use config::get_batch_size;
+use parquet::arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder};
 
 use super::RecordBatchIter;
-
-/// Open a parquet file and return an async record batch stream over all rows.
-pub(super) async fn scan_parquet_async(
-    data: Bytes,
-    projection: Option<&[String]>,
-) -> Result<RecordBatchStream, anyhow::Error> {
-    let builder = ParquetRecordBatchStreamBuilder::new(Cursor::new(data)).await?;
-    let mut builder = builder.with_batch_size(get_batch_size());
-    if let Some(mask) = parquet_projection(builder.schema(), builder.metadata(), projection)? {
-        builder = builder.with_projection(mask);
-    }
-    let reader = builder.build()?;
-    let stream: RecordBatchStream = Box::pin(reader.map_err(ArrowError::from));
-    Ok(stream)
-}
 
 /// Build a sync iterator over one parquet row group.
 pub(super) fn scan_parquet_row_group(
