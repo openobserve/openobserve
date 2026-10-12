@@ -19,6 +19,7 @@ import {
   AUTONOMY,
   DAY_DATE,
   DEMO_DATE,
+  DEMO_NOW,
   DESTINATIONS,
   LEARNING_WINDOW_DAYS,
   LEDGER,
@@ -41,6 +42,7 @@ import {
   type ConfidenceBand,
   type DayKey,
   type FixKind,
+  type HypothesisVerdict,
   type LedgerFact,
   type ProblemFact,
   type Scenario,
@@ -67,6 +69,23 @@ export interface Evidence {
   count?: I18nText;
   points?: number[];
   projected?: number;
+  card?: string;
+}
+
+export interface Analysis {
+  verdict: I18nText;
+  impact: I18nText[];
+  duration?: I18nText;
+  hypotheses: { name: I18nText; verdict: HypothesisVerdict; reason: I18nText }[];
+  comparison?: {
+    metric: I18nText;
+    rows: {
+      label: I18nText;
+      value: number;
+      shown: I18nText;
+      kind: "affected" | "healthy" | "limit";
+    }[];
+  };
 }
 
 export interface TimelineEntry {
@@ -91,10 +110,32 @@ export interface Firing {
   sampleTimes: string[];
 }
 
-export interface GraphEdge {
-  from: string;
-  to: string;
-  kind: "service_dependency" | "temporal";
+export type UnfoldKind =
+  "metric" | "log" | "trace" | "change" | "unwatched" | "forecast" | "outcome";
+export type UnfoldOutcome =
+  "paged" | "asked" | "notified" | "held" | "fixFailed" | "fixed" | "resolved" | "open";
+export type UnfoldTone = "danger" | "warning" | "info" | "success" | "neutral";
+
+// lane is a service name, or null for the team's lane; minute orders the chain and is null for anything without a clock time.
+export interface UnfoldCard {
+  id: string;
+  kind: UnfoldKind;
+  outcome?: UnfoldOutcome;
+  lane: string | null;
+  at: string;
+  minute: number | null;
+  title: I18nText;
+  detail?: I18nText;
+  tag?: I18nKey;
+  tone: UnfoldTone;
+  times?: string[];
+  count?: number;
+  peak?: I18nText;
+  threshold?: I18nText;
+  points?: number[];
+  projected?: number;
+  after?: string;
+  via?: I18nText;
 }
 
 export interface Issue {
@@ -111,11 +152,12 @@ export interface Issue {
   confidence: ConfidenceBand;
   nextStep: I18nText;
   evidence: Evidence[];
+  analysis: Analysis;
   upstream: string[];
   downstream: string[];
   timeline: TimelineEntry[];
   firings: Firing[];
-  edges: GraphEdge[];
+  unfold: UnfoldCard[];
   channel: I18nText;
   thread: ThreadMessage[];
   proposal?: { ledgerId: string; title: string; detail: string; kind: "detection" | "fix" };
@@ -239,16 +281,165 @@ export const FUNNEL: Record<Scenario, ReturnType<typeof funnelFor>> = Object.fro
   SCENARIOS.map((s) => [s, funnelFor(s)]),
 ) as Record<Scenario, ReturnType<typeof funnelFor>>;
 
-const edgesFor = (fact: ProblemFact): GraphEdge[] => {
-  const firings = fact.firings;
-  return firings.slice(1).flatMap((f, i) => {
-    const prev = firings[i];
-    const temporal: GraphEdge = { from: prev.detector, to: f.detector, kind: "temporal" };
-    return prev.service === f.service
-      ? [temporal]
-      : [temporal, { from: prev.detector, to: f.detector, kind: "service_dependency" }];
-  });
+const SEVERITY_TONE: Record<Severity, UnfoldTone> = {
+  p1: "danger",
+  p2: "danger",
+  p3: "warning",
+  p4: "neutral",
 };
+
+const minuteOf = (at: string) => {
+  const match = /^(\d{2}):(\d{2})$/.exec(at);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+};
+
+const stepDetail = (fact: ProblemFact, title: string) =>
+  fact.steps.find((s) => s.title.startsWith(title))?.detail;
+
+// The first change event is the cause card; a low-confidence read only says the two line up.
+const causeCard = (fact: ProblemFact): UnfoldCard[] => {
+  const step = fact.steps.find((s) => s.by === "event" && s.variant === "info");
+  if (!step) return [];
+  return [
+    {
+      id: "change",
+      kind: "change",
+      lane: step.service ?? fact.deploy?.service ?? fact.service,
+      at: step.at,
+      minute: minuteOf(step.at),
+      title: raw(step.title),
+      detail: raw(step.detail),
+      tag:
+        confidenceBand(fact.confidence) === "low"
+          ? "autoobserve.unfold.linesUpWith"
+          : "autoobserve.unfold.likelyCause",
+      tone: "info",
+    },
+  ];
+};
+
+const signalCards = (fact: ProblemFact, fixed: boolean): UnfoldCard[] => [
+  ...fact.firings.map((f): UnfoldCard => ({
+    id: f.detector,
+    kind: f.signal,
+    lane: f.service,
+    at: f.times[0],
+    minute: minuteOf(f.times[0]),
+    title: raw(f.name),
+    detail: raw(f.detector),
+    tone: SEVERITY_TONE[fact.severity],
+    times: f.times,
+    count: f.count,
+    peak: raw(f.peak),
+    threshold: f.threshold ? raw(f.threshold) : undefined,
+    points: f.charted ? chartPoints(fact.chart, fixed) : undefined,
+    projected: f.charted ? fact.chart.forecast : undefined,
+    after: f.after,
+    via: f.via ? raw(f.via) : undefined,
+  })),
+  ...(fact.chainNotes ?? []).map((n): UnfoldCard => ({
+    id: n.id,
+    kind: n.kind,
+    lane: n.service,
+    at: n.at,
+    minute: minuteOf(n.at),
+    title: raw(n.title),
+    detail: raw(n.detail),
+    tone: n.kind === "forecast" ? "warning" : "neutral",
+    after: n.after,
+    via: n.via ? raw(n.via) : undefined,
+  })),
+];
+
+const outcomeCard = (
+  outcome: UnfoldOutcome,
+  at: string,
+  tone: UnfoldTone,
+  detail: I18nText | undefined,
+  t: TranslateFn,
+): UnfoldCard => ({
+  id: `outcome-${outcome}`,
+  kind: "outcome",
+  outcome,
+  lane: null,
+  at,
+  minute: minuteOf(at),
+  title: t(k(`autoobserve.unfold.outcome.${outcome}`)),
+  detail,
+  tone,
+});
+
+// What reached people, then how it ended; a fix that worked is folded into the ending.
+const outcomeCards = (fact: ProblemFact, t: TranslateFn, fixed: boolean): UnfoldCard[] => {
+  const channel = raw(destinationName(fact.destination));
+  const heldAt = fact.steps.find((s) => s.title.startsWith("Held"))?.at;
+  const notice = fact.pagedAt
+    ? outcomeCard("paged", fact.pagedAt, "danger", channel, t)
+    : fact.askedAt
+      ? outcomeCard("asked", fact.askedAt, "info", channel, t)
+      : fact.notifiedAt
+        ? outcomeCard("notified", fact.notifiedAt, "warning", channel, t)
+        : heldAt
+          ? outcomeCard("held", heldAt, "neutral", channel, t)
+          : null;
+  const fixStep = stepDetail(fact, "Fix applied");
+  const fixDetail = fixStep ? raw(fixStep) : undefined;
+  const resolvedStep = stepDetail(fact, "Resolved");
+  const failedFix =
+    fact.fix && !fact.fix.worked
+      ? outcomeCard("fixFailed", fact.fix.at, "danger", fixDetail, t)
+      : null;
+  const now = t("autoobserve2.drawer.now");
+  const lastStep = raw(fact.steps[fact.steps.length - 1].detail);
+  let ending: UnfoldCard | null = null;
+  if (fact.resolvedAt && fact.fix?.worked) {
+    ending = outcomeCard("fixed", fact.resolvedAt, "success", fixDetail, t);
+  } else if (fact.resolvedAt) {
+    const detail = resolvedStep ? raw(resolvedStep) : undefined;
+    ending = outcomeCard("resolved", fact.resolvedAt, "success", detail, t);
+  } else if (fact.outcome === "active") {
+    ending = fixed
+      ? outcomeCard("fixed", now, "success", undefined, t)
+      : outcomeCard("open", now, "warning", lastStep, t);
+  }
+  return [notice, failedFix, ending].filter((c): c is UnfoldCard => c !== null);
+};
+
+const byMinute = (a: UnfoldCard, b: UnfoldCard) => (a.minute ?? Infinity) - (b.minute ?? Infinity);
+
+// Cards run by time, except a card never comes before the card it followed from.
+const unfoldFor = (fact: ProblemFact, t: TranslateFn, fixed: boolean): UnfoldCard[] => {
+  const pending = [...signalCards(fact, fixed), ...outcomeCards(fact, t, fixed)].sort(byMinute);
+  const placed = causeCard(fact);
+  while (pending.length) {
+    const ready = pending.findIndex((c) => !c.after || !pending.some((p) => p.id === c.after));
+    placed.push(...pending.splice(Math.max(ready, 0), 1));
+  }
+  return placed;
+};
+
+// An open problem runs until now on the pinned demo clock; one the viewer fixed on the page has no running clock.
+const durationOf = (fact: ProblemFact, t: TranslateFn, fixed: boolean): I18nText | undefined => {
+  if (fact.resolvedIn) return t("autoobserve.analysis.lasted", { count: fact.resolvedIn });
+  const [from, now] = [minuteOf(fact.time), minuteOf(DEMO_NOW)];
+  if (fact.outcome !== "active" || fixed || from === null || now === null) return undefined;
+  return t("autoobserve.analysis.soFar", { count: now - from });
+};
+
+const analysisFor = (fact: ProblemFact, t: TranslateFn, fixed: boolean): Analysis => ({
+  verdict: raw(fact.verdict),
+  impact: fact.impact.map(raw),
+  duration: durationOf(fact, t, fixed),
+  hypotheses: fact.hypotheses.map((h) => ({
+    name: raw(h.name),
+    verdict: h.verdict,
+    reason: raw(h.reason),
+  })),
+  comparison: fact.comparison && {
+    metric: raw(fact.comparison.metric),
+    rows: fact.comparison.rows.map((r) => ({ ...r, label: raw(r.label), shown: raw(r.shown) })),
+  },
+});
 
 const proposalFor = (fact: ProblemFact): Issue["proposal"] => {
   const entry = LEDGER.find((e) => e.id === fact.proposalLedgerId);
@@ -294,7 +485,9 @@ const toIssue = (fact: ProblemFact, t: TranslateFn, fixedIds: string[] = []): Is
       count: e.count ? raw(e.count) : undefined,
       points: e.chart ? chartPoints(fact.chart, fixedIds.includes(fact.id)) : undefined,
       projected: e.chart ? fact.chart.forecast : undefined,
+      card: e.card ?? (e.chart ? fact.firings.find((f) => f.charted)?.detector : undefined),
     })),
+    analysis: analysisFor(fact, t, fixedIds.includes(fact.id)),
     upstream: fact.upstream,
     downstream: fact.downstream,
     timeline: fact.steps.map((s) => ({
@@ -310,7 +503,7 @@ const toIssue = (fact: ProblemFact, t: TranslateFn, fixedIds: string[] = []): Is
       daysAgo,
       sampleTimes: f.times,
     })),
-    edges: edgesFor(fact),
+    unfold: unfoldFor(fact, t, fixedIds.includes(fact.id)),
     channel: raw(destinationName(fact.destination)),
     thread: held
       ? []
@@ -707,3 +900,15 @@ export const lastResolved = (scenario: Scenario, t: TranslateFn): I18nText | nul
 };
 
 export const groupedCount = groupedFirings;
+
+// Forecast points render muted, so a projection never reads as a measurement.
+export const sparkPoints = ({
+  points = [],
+  projected,
+}: {
+  points?: number[];
+  projected?: number;
+}) => {
+  const from = points.length - (projected ?? 0);
+  return projected ? points.map((value, i) => ({ value, provisional: i >= from })) : points;
+};

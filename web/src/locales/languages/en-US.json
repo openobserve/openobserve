@@ -22165,7 +22165,45 @@
       "caughtEarlier": "What would have caught this earlier",
       "analyzedAt": "Investigation landed at {time}.",
       "triggersSample": "Showing {shown} of {total} firings",
-      "waitingForOk": "Waiting for your OK"
+      "waitingForOk": "Waiting for your OK",
+      "proposedFix": "Proposed fix",
+      "unfoldTab": "How it unfolded"
+    },
+    "unfold": {
+      "hint": "Read left to right: what changed, the signals it set off, then what reached your team. Select a card for its firings.",
+      "legend": "Card types",
+      "team": "Your team",
+      "kind": {
+        "metric": "Metric",
+        "log": "Log",
+        "trace": "Trace",
+        "change": "Change"
+      },
+      "likelyCause": "Likely cause",
+      "linesUpWith": "Lines up with",
+      "times": "×{count}",
+      "sameMinute": "same minute",
+      "plusMinutes": "+{count} min",
+      "plusHours": "+{hours} h {minutes} min",
+      "firstFired": "First fired",
+      "lastFired": "Last fired",
+      "firings": "Firings",
+      "peak": "Peak",
+      "normal": "Compared with",
+      "detector": "Detector",
+      "firedAt": "Fired at",
+      "when": "When",
+      "chartNote": "The problem's main chart, as in Evidence",
+      "outcome": {
+        "paged": "Paged on-call",
+        "asked": "Asked for an OK",
+        "notified": "Message sent, no page",
+        "held": "Held for Friday's summary",
+        "fixFailed": "Fix didn't help",
+        "fixed": "Fixed",
+        "resolved": "Resolved",
+        "open": "Still open"
+      }
     },
     "coverage": {
       "showing": "Showing {shown} of {total} services",
@@ -22301,6 +22339,29 @@
       "medium": "Medium",
       "low": "Low",
       "uncalibrated": "no calibrated score yet"
+    },
+    "analysis": {
+      "verdict": "Verdict",
+      "unconfirmed": "Not confirmed yet",
+      "lasted": "Lasted {count} min",
+      "soFar": "{count} min so far",
+      "checked": "What I checked",
+      "verdicts": {
+        "confirmed": "Confirmed",
+        "ruled_out": "Ruled out",
+        "open": "Still open"
+      },
+      "comparison": "Healthy vs affected",
+      "kinds": {
+        "affected": "Affected",
+        "healthy": "Healthy",
+        "limit": "Limit"
+      },
+      "trail": "Evidence trail",
+      "seeInUnfold": "See in How it unfolded",
+      "nextStep": "Next step",
+      "fullReport": "Full report",
+      "fullReportHint": "Everything above as one document, ready to copy or download"
     }
   },
   "autoobserve2": {

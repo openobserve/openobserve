@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabs v-model="tab" bordered class="shrink-0" data-test="autoobserve-issue-tabs">
         <OTab name="overview" :label="t('alerts.insights.tabs.overview')" />
         <OTab name="analysis" :label="t('alerts.incidents.incidentAnalysis')" />
-        <OTab name="graph" :label="t('alerts.incidents.alertGraph')" />
+        <OTab name="graph" :label="t('autoobserve.drawer.unfoldTab')" />
         <OTab name="firings">
           <div class="flex items-center gap-1.5">
             <span>{{ t("alerts.incidents.alertTriggers") }}</span>
@@ -36,20 +36,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OTab>
       </OTabs>
-      <div v-if="tab === 'analysis'" class="flex min-h-0 flex-1 flex-col p-4">
-        <IncidentRCAAnalysis
-          :has-existing-rca="true"
-          :rca-loading="false"
-          :formatted-rca-content="rcaHtml"
-          :is-dark-mode="isDark"
-          @copy-report="notInDemo"
-          @download-report="notInDemo"
-          @trigger-rca="notInDemo"
-        />
-      </div>
-      <div v-else-if="tab === 'graph'" class="relative min-h-0 flex-1">
-        <IncidentServiceGraph :topology-context="topology" />
-      </div>
+      <AutoObserveAnalysis
+        v-if="tab === 'analysis'"
+        :issue="issue"
+        :entry="proposalEntry"
+        @approve="approve"
+        @reject="reject"
+        @open-unfold="openUnfold"
+      >
+        <template #report>
+          <!-- The analysis tab already offers copy and download, so the embedded report's toolbar is hidden. -->
+          <IncidentRCAAnalysis
+            class="[&_[data-test=rca-toolbar]]:hidden"
+            :has-existing-rca="true"
+            :rca-loading="false"
+            :formatted-rca-content="rcaHtml"
+            :is-dark-mode="isDark"
+            @copy-report="notInDemo"
+            @download-report="notInDemo"
+            @trigger-rca="notInDemo"
+          />
+        </template>
+      </AutoObserveAnalysis>
+      <AutoObserveUnfoldGraph
+        v-else-if="tab === 'graph'"
+        :cards="issue.unfold"
+        :focus-id="unfoldFocus"
+      />
       <div v-else-if="tab === 'firings'" class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
         <p class="text-text-secondary mb-2 text-xs" data-test="autoobserve-issue-triggers-note">
           {{
@@ -94,9 +107,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-text-secondary"
             />
             <OText variant="panel-title">{{
-              issue.proposal.kind === "fix"
-                ? t("autoobserve.drawer.waitingForOk")
-                : t("autoobserve.drawer.caughtEarlier")
+              issue.proposal.kind !== "fix"
+                ? t("autoobserve.drawer.caughtEarlier")
+                : proposalEntry?.status === "awaiting"
+                  ? t("autoobserve.drawer.waitingForOk")
+                  : t("autoobserve.drawer.proposedFix")
             }}</OText>
           </OCardSection>
           <OCardSection role="body" dense class="flex items-start gap-4 max-md:flex-col">
@@ -331,9 +346,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import IncidentRCAAnalysis from "@/components/alerts/IncidentRCAAnalysis.vue";
-import IncidentServiceGraph from "@/components/alerts/IncidentServiceGraph.vue";
 import IncidentAlertTriggersTable from "@/components/alerts/IncidentAlertTriggersTable.vue";
-import type { AlertNode, IncidentAlert } from "@/services/incidents";
+import type { IncidentAlert } from "@/services/incidents";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -344,11 +358,14 @@ import OSparkline from "@/lib/data/Sparkline/OSparkline.vue";
 import OTimeline from "@/lib/data/Timeline/OTimeline.vue";
 import OTimelineItem from "@/lib/data/Timeline/OTimelineItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import AutoObserveUnfoldGraph from "./AutoObserveUnfoldGraph.vue";
+import AutoObserveAnalysis from "./AutoObserveAnalysis.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import {
   CONFIDENCE_LABEL,
   DEMO_DATE,
   LEDGER_STATUS,
+  sparkPoints,
   type Evidence,
   type Issue,
   type LedgerEntry,
@@ -369,10 +386,19 @@ const { t } = useI18nTyped();
 const { isDark } = useTheme();
 
 const tab = ref("overview");
+const unfoldFocus = ref<string>();
 watch(
   () => props.issue?.id,
-  () => (tab.value = "overview"),
+  () => {
+    tab.value = "overview";
+    unfoldFocus.value = undefined;
+  },
 );
+
+const openUnfold = (cardId: string) => {
+  unfoldFocus.value = cardId;
+  tab.value = "graph";
+};
 
 // Fixture times are wall-clock on the pinned demo day, so every incident view agrees with the timeline.
 const clockUs = (at: string, daysAgo: number) => {
@@ -387,26 +413,6 @@ const analyzedAtLabel = computed(
     props.issue?.timeline.find((e) => e.variant === "primary" && /^\d{2}:\d{2}$/.test(e.at))?.at ??
     "",
 );
-
-const topology = computed<{ nodes: AlertNode[]; edges: unknown[] } | null>(() => {
-  if (!props.issue) return null;
-  const firings = props.issue.firings;
-  const nodes = firings.map((f) => ({
-    alert_id: f.detector,
-    alert_name: f.detector,
-    service_name: f.service,
-    alert_count: f.count,
-    first_fired_at: clockUs(f.sampleTimes[0], f.daysAgo),
-    last_fired_at: clockUs(f.sampleTimes[f.sampleTimes.length - 1], f.daysAgo),
-  }));
-  const index = (detector: string) => firings.findIndex((f) => f.detector === detector);
-  const edges = props.issue.edges.map((e) => ({
-    from_node_index: index(e.from),
-    to_node_index: index(e.to),
-    edge_type: e.kind,
-  }));
-  return { nodes, edges };
-});
 
 const triggers = computed<IncidentAlert[]>(() => {
   const issue = props.issue;
@@ -468,12 +474,6 @@ const EVIDENCE_ICON: Record<Evidence["kind"], IconName> = {
   metric: "show-chart",
 };
 
-const sparkPoints = (ev: Evidence) => {
-  const points = ev.points ?? [];
-  const from = points.length - (ev.projected ?? 0);
-  return ev.projected ? points.map((value, i) => ({ value, provisional: i >= from })) : points;
-};
-
 const blast = computed(() => {
   if (!props.issue) return [];
   return [
@@ -503,5 +503,14 @@ const approve = () => {
   if (!proposalEntry.value) return;
   emit("update-entry", proposalEntry.value.id, { status: "approved" });
   toast({ variant: "success", message: t("autoobserve.activity.approvedToast") });
+};
+
+const reject = () => {
+  if (!proposalEntry.value) return;
+  emit("update-entry", proposalEntry.value.id, {
+    status: "rejected",
+    note: t("autoobserve.activity.rejectedNote"),
+  });
+  toast({ variant: "default", message: t("autoobserve.activity.rejectedToast") });
 };
 </script>

@@ -51,11 +51,21 @@ export interface Destination {
   name: string;
 }
 
+export type SignalKind = "metric" | "log" | "trace";
+
+// after names the detector this one followed from (default: the one before it); via labels that link.
 export interface Firing {
   detector: string;
   service: string;
   count: number;
   times: string[];
+  signal: SignalKind;
+  name: string;
+  peak: string;
+  threshold?: string;
+  charted?: boolean;
+  after?: string;
+  via?: string;
 }
 
 export interface Step {
@@ -64,14 +74,49 @@ export interface Step {
   title: string;
   detail: string;
   variant: StepVariant;
+  service?: string;
 }
 
+// A link in the chain that no detector fired for: a service I can't see, or harm still to come.
+export interface ChainNote {
+  id: string;
+  kind: "unwatched" | "forecast";
+  service: string;
+  at: string;
+  title: string;
+  detail: string;
+  after?: string;
+  via?: string;
+}
+
+// card names the How it unfolded card this row is about; a charted row defaults to the charted firing.
 export interface Evidence {
   kind: "log" | "trace" | "metric";
   title: string;
   detail: string;
   count?: string;
   chart?: boolean;
+  card?: string;
+}
+
+export type HypothesisVerdict = "confirmed" | "ruled_out" | "open";
+
+export interface Hypothesis {
+  name: string;
+  verdict: HypothesisVerdict;
+  reason: string;
+}
+
+export interface ComparisonRow {
+  label: string;
+  value: number;
+  shown: string;
+  kind: "affected" | "healthy" | "limit";
+}
+
+export interface Comparison {
+  metric: string;
+  rows: ComparisonRow[];
 }
 
 export interface ChartFact {
@@ -123,12 +168,17 @@ export interface ProblemFact {
   notifiedAt?: string;
   firings: Firing[];
   steps: Step[];
+  chainNotes?: ChainNote[];
   chart: ChartFact;
   cause: string;
   summary: string;
   likelyCause: string;
   confidence: number;
   nextStep: string;
+  verdict: string;
+  impact: string[];
+  hypotheses: Hypothesis[];
+  comparison?: Comparison;
   evidence: Evidence[];
   deploy?: Deploy;
   fix?: FixFact;
@@ -338,6 +388,33 @@ const earlierLeak = (
       service: "checkout",
       count: 3,
       times: [start, asked, fixed],
+      signal: "metric",
+      name: "Pool in use",
+      peak: "50 of 50, 0 idle",
+      threshold: "limit 50",
+    },
+    {
+      detector: "checkout-log-patterns",
+      service: "checkout",
+      count: 1,
+      times: [start],
+      signal: "log",
+      name: "Connection leak logs",
+      peak: `${leaked} held > 10 min`,
+      threshold: "none before",
+      via: "same pool",
+    },
+    {
+      detector: "checkout-errors",
+      service: "checkout",
+      count: 2,
+      times: [asked, fixed],
+      signal: "metric",
+      name: "Timed-out payments",
+      peak: "11% of payments",
+      threshold: "baseline 0%",
+      charted: true,
+      via: "pool empty",
     },
   ],
   steps: [
@@ -399,11 +476,50 @@ const earlierLeak = (
     : `Pool 50 of 50, 0 idle. ${leaked} connections held over 10 min with no query running, all from RefundExporter.export(). Same signature as 23 Sep: known bug CHK-482, second time in 8 days.`,
   confidence: 90,
   nextStep: "Fixed for now by evicting the leaked connections. Root cause CHK-482.",
+  verdict:
+    "Refund exports leak database connections (CHK-482) until checkout has none left for payments.",
+  impact: ["1 in 9 payments timed out"],
+  hypotheses: [
+    {
+      name: "Leaked connections (CHK-482)",
+      verdict: "confirmed",
+      reason: `${leaked} of 50 held over 10 minutes with no query running, all from RefundExporter.export().`,
+    },
+    {
+      name: "Pool too small for traffic",
+      verdict: "ruled_out",
+      reason: `Only ${50 - leaked} connections were doing real work; the rest were leaked.`,
+    },
+    {
+      name: "payments-api slow",
+      verdict: "ruled_out",
+      reason: "Payments time out waiting for a free connection, before any call to payments-api.",
+    },
+  ],
+  comparison: {
+    metric: "checkout's 50 database connections",
+    rows: [
+      {
+        label: "Leaked by RefundExporter.export()",
+        value: leaked,
+        shown: String(leaked),
+        kind: "affected",
+      },
+      {
+        label: "Left for payments",
+        value: 50 - leaked,
+        shown: String(50 - leaked),
+        kind: "healthy",
+      },
+      { label: "Pool limit", value: 50, shown: "50", kind: "limit" },
+    ],
+  },
   evidence: [
     {
       kind: "metric",
       title: "Metric deviation on checkout",
       detail: "pool connections in use: 50 of 50, 0 idle",
+      card: "checkout-pool-saturation",
     },
     {
       kind: "metric",
@@ -415,6 +531,7 @@ const earlierLeak = (
       kind: "log",
       title: "Connection leak detection",
       detail: `${leaked} held > 10 min, acquired at RefundExporter.export()`,
+      card: "checkout-log-patterns",
     },
   ],
   fix: { kind: "pool", at: fixed, ledgerId, worked: true },
@@ -442,12 +559,43 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "search",
         count: 7,
         times: ["10:27", "10:28", "10:29", "10:30"],
+        signal: "metric",
+        name: "p95 latency",
+        peak: "3.4 s",
+        threshold: "baseline 0.38 s",
+        charted: true,
+      },
+      {
+        detector: "search-jvm-memory",
+        service: "search",
+        count: 6,
+        times: ["10:20", "10:23", "10:26"],
+        signal: "metric",
+        name: "Memory on search-2",
+        peak: "99% of 16 GB heap",
+        threshold: "other nodes 55–62%",
       },
       {
         detector: "search-log-patterns",
         service: "search",
         count: 4,
-        times: ["10:28", "10:29", "10:30", "10:31"],
+        times: ["10:20", "10:24", "10:28", "10:31"],
+        signal: "log",
+        name: "OutOfMemory logs",
+        peak: "1,240 lines, ~10 crashes",
+        threshold: "0 on search-1, 3, 4, 5",
+        via: "same node",
+      },
+      {
+        detector: "search-slow-spans",
+        service: "search",
+        count: 3,
+        times: ["10:25", "10:27", "10:29"],
+        signal: "trace",
+        name: "Slow query spans",
+        peak: "p95 3,400 ms",
+        threshold: "baseline 380 ms",
+        via: "queries stall",
       },
     ],
     steps: [
@@ -521,29 +669,69 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 86,
     nextStep:
       "Approve reverting search-2's query cache to 10%, the value the other 4 nodes run (L-308). Follow-up: confirm why it was changed at 10:16, and route node-level setting changes through review.",
+    verdict:
+      "search-2 runs out of memory because a 10:16 setting change gave its query cache 60% of the heap.",
+    impact: ["1 in 5 searches slower than 3 s", "search-2 crashed about 10 times"],
+    hypotheses: [
+      {
+        name: "Config change on search-2",
+        verdict: "confirmed",
+        reason:
+          "The only node changed (query cache 10% → 60% at 10:16) is the only node out of memory.",
+      },
+      {
+        name: "Traffic spike",
+        verdict: "ruled_out",
+        reason: "Search traffic stayed flat all morning.",
+      },
+      {
+        name: "Bad deploy",
+        verdict: "ruled_out",
+        reason: "Nothing was deployed to search in the 6 hours before 10:16.",
+      },
+      {
+        name: "Shared dependency",
+        verdict: "ruled_out",
+        reason: "search-1, 3, 4 and 5 use the same dependencies and are healthy at 55–62% memory.",
+      },
+    ],
+    comparison: {
+      metric: "Heap used, by node",
+      rows: [
+        { label: "search-2", value: 99, shown: "99%", kind: "affected" },
+        { label: "search-1", value: 58, shown: "58%", kind: "healthy" },
+        { label: "search-3", value: 55, shown: "55%", kind: "healthy" },
+        { label: "search-4", value: 62, shown: "62%", kind: "healthy" },
+        { label: "search-5", value: 60, shown: "60%", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "log",
         title: "Log pattern in search",
         detail:
           "java.lang.OutOfMemoryError: Java heap space (search-2 only, about 10 crashes; 0 on search-1,3,4,5)",
+        card: "search-log-patterns",
         count: "1,240 since 10:20",
       },
       {
         kind: "log",
         title: "Config audit",
         detail: "search-2 search.query_cache.size 10% → 60% at 10:16",
+        card: "change",
       },
       {
         kind: "trace",
         title: "Slow span in search",
         detail: "GET /search → shard.query: p95 3,400 ms (baseline 380 ms)",
+        card: "search-slow-spans",
         count: "2,108 traces",
       },
       {
         kind: "metric",
         title: "Metric deviation on search",
         detail: "jvm.memory.used{pod=search-2}: 99% of 16 GB; other nodes 55–62%",
+        card: "search-jvm-memory",
       },
       {
         kind: "metric",
@@ -575,6 +763,12 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "orders-db",
         count: 5,
         times: ["09:40", "09:55", "10:10", "10:25", "10:40"],
+        signal: "metric",
+        name: "Disk full forecast",
+        peak: "445 of 500 GB, full in ~3 days",
+        threshold: "growth was 6 GB/day",
+        charted: true,
+        via: "40× audit rows",
       },
     ],
     steps: [
@@ -584,6 +778,7 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         title: "Deploy orders 3.8.0",
         detail: "order_audit.level summary → full: every order write is now audited",
         variant: "info",
+        service: "orders",
       },
       {
         at: "Thu 14:10",
@@ -622,6 +817,22 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "muted",
       },
     ],
+    chainNotes: (
+      [
+        ["checkout", "Can't save orders"],
+        ["orders", "Order updates fail"],
+        ["refunds", "Refunds fail"],
+      ] as const
+    ).map(([svc, title], i) => ({
+      id: `${svc}-writes`,
+      kind: "forecast" as const,
+      service: svc,
+      at: "Wed ~11:00",
+      title,
+      detail: "orders-db stops accepting writes once its disk is full",
+      after: "orders-db-disk-forecast",
+      via: i === 0 ? "when full" : undefined,
+    })),
     chart: {
       metric: "disk used",
       unit: "GB",
@@ -640,6 +851,34 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 90,
     nextStep:
       "Turn order-audit logging back down, or add disk space before Wednesday. No automatic fix: neither is a change I'm allowed to make.",
+    verdict:
+      "orders 3.8.0 turned on full audit logging, so orders-db's disk now fills three times faster.",
+    impact: ["Disk full in about 3 days", "Nothing broken yet"],
+    hypotheses: [
+      {
+        name: "orders 3.8.0 audit logging",
+        verdict: "confirmed",
+        reason:
+          "order_audit grows about 16 M rows a day since Thursday 14:05 (was 0.4 M): 12 of the 18 GB a day.",
+      },
+      {
+        name: "Gradual order growth",
+        verdict: "ruled_out",
+        reason: "Growth tripled within 5 minutes of the deploy, not over weeks.",
+      },
+      {
+        name: "Other tables or bloat",
+        verdict: "ruled_out",
+        reason: "Everything except order_audit still grows about 6 GB a day, as before.",
+      },
+    ],
+    comparison: {
+      metric: "Disk growth per day",
+      rows: [
+        { label: "Since orders 3.8.0", value: 18, shown: "18 GB", kind: "affected" },
+        { label: "Before Thursday", value: 6, shown: "6 GB", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
@@ -652,6 +891,7 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         kind: "log",
         title: "Deploy orders 3.8.0",
         detail: "Thursday 14:05: order_audit.level summary → full",
+        card: "change",
       },
       {
         kind: "metric",
@@ -681,12 +921,33 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "checkout",
         count: 9,
         times: ["10:43", "10:44", "10:45", "10:46"],
+        signal: "metric",
+        name: "Failed payments",
+        peak: "16% of payments",
+        threshold: "baseline 0.1%",
+        charted: true,
       },
       {
         detector: "checkout-latency",
         service: "checkout",
         count: 5,
         times: ["10:43", "10:44", "10:45", "10:46"],
+        signal: "metric",
+        name: "p95 latency",
+        peak: "1.9 s",
+        threshold: "baseline 0.42 s",
+        via: "same pods",
+      },
+      {
+        detector: "checkout-error-spans",
+        service: "checkout",
+        count: 3,
+        times: ["10:44", "10:45", "10:46"],
+        signal: "trace",
+        name: "2.4.0 failed spans",
+        peak: "3,204 traces, all on 2.4.0",
+        threshold: "0 on the previous version",
+        via: "2.4.0 only",
       },
     ],
     steps: [
@@ -746,6 +1007,38 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 62,
     nextStep:
       "Stop the 2.4.0 rollout and send traffic back to the 6 pods on the previous version. They run at 40% CPU, so they can take the full load. Then investigate.",
+    verdict: "Payments fail only on the pods running checkout 2.4.0, but why is not confirmed yet.",
+    impact: ["1 in 6 payments failing"],
+    hypotheses: [
+      {
+        name: "checkout 2.4.0",
+        verdict: "open",
+        reason:
+          "Every failure is on the 6 pods running 2.4.0, deployed 2 minutes before. Why it fails is not confirmed yet.",
+      },
+      {
+        name: "Card provider",
+        verdict: "ruled_out",
+        reason: "The card provider is inside its baseline.",
+      },
+      {
+        name: "Not enough capacity",
+        verdict: "ruled_out",
+        reason: "The 6 pods on the previous version are healthy at 40% CPU.",
+      },
+      {
+        name: "payments-db",
+        verdict: "open",
+        reason: "A coverage gap (no service.name), so it can't be checked from here.",
+      },
+    ],
+    comparison: {
+      metric: "Failed payment traces, by version",
+      rows: [
+        { label: "2.4.0 · 6 pods", value: 3204, shown: "3,204", kind: "affected" },
+        { label: "Previous version · 6 pods", value: 0, shown: "0", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
@@ -757,6 +1050,7 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         kind: "trace",
         title: "Errors by version",
         detail: "checkout 2.4.0: 100% of failed spans; 6 of 12 pods",
+        card: "checkout-error-spans",
         count: "3,204 traces",
       },
     ],
@@ -785,12 +1079,33 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "email-worker",
         count: 3,
         times: ["03:15", "03:16", "03:17"],
+        signal: "metric",
+        name: "Email queue age",
+        peak: "9 m 12 s",
+        threshold: "baseline under 10 s",
+        charted: true,
+        after: "email-worker-requests",
+        via: "no consumers",
+      },
+      {
+        detector: "email-worker-requests",
+        service: "email-worker",
+        count: 2,
+        times: ["03:15", "03:16"],
+        signal: "metric",
+        name: "Emails sent per minute",
+        peak: "0 for about 8 min",
+        threshold: "baseline ~140/min",
       },
       {
         detector: "email-worker-log-patterns",
         service: "email-worker",
         count: 1,
         times: ["03:16"],
+        signal: "log",
+        name: "Consumer rebalance logs",
+        peak: "4 of 4 pods restarting",
+        threshold: "none before 03:12",
       },
     ],
     steps: [
@@ -842,6 +1157,34 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 83,
     nextStep:
       "No action needed tonight. Summary suggestion: roll email-worker one pod at a time so the queue always has consumers.",
+    verdict: "All email workers restarted at once, so nothing sent emails for about 8 minutes.",
+    impact: ["Emails up to 9 minutes late", "No emails lost"],
+    hypotheses: [
+      {
+        name: "All pods replaced at once",
+        verdict: "confirmed",
+        reason:
+          "At 03:12 all 4 pods restarted together, and 0 emails went out for about 8 minutes.",
+      },
+      {
+        name: "Emails dropped",
+        verdict: "ruled_out",
+        reason: "The sent count matched the queued count.",
+      },
+      {
+        name: "More orders than usual",
+        verdict: "ruled_out",
+        reason:
+          "The queue grew because nothing consumed it, and drained by 03:36 once pods were back.",
+      },
+    ],
+    comparison: {
+      metric: "Oldest email waiting",
+      rows: [
+        { label: "During the deploy", value: 552, shown: "9 m 12 s", kind: "affected" },
+        { label: "Normal", value: 10, shown: "under 10 s", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
@@ -879,8 +1222,47 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "checkout",
         count: 4,
         times: ["11:18", "11:19", "11:20", "11:21"],
+        signal: "metric",
+        name: "Pool in use",
+        peak: "50 of 50, 0 idle",
+        threshold: "limit 50",
       },
-      { detector: "checkout-latency", service: "checkout", count: 2, times: ["11:19", "11:20"] },
+      {
+        detector: "checkout-latency",
+        service: "checkout",
+        count: 2,
+        times: ["11:19", "11:20"],
+        signal: "trace",
+        name: "Slow pool waits",
+        peak: "waits 30 s",
+        threshold: "baseline under 5 ms",
+        after: "checkout-log-patterns",
+        via: "pool empty",
+      },
+      {
+        detector: "checkout-log-patterns",
+        service: "checkout",
+        count: 2,
+        times: ["11:18", "11:20"],
+        signal: "log",
+        name: "Connection leak logs",
+        peak: "48 held > 10 min",
+        threshold: "none before",
+        via: "same pool",
+      },
+      {
+        detector: "checkout-errors",
+        service: "checkout",
+        count: 3,
+        times: ["11:19", "11:20", "11:21"],
+        signal: "metric",
+        name: "Timed-out payments",
+        peak: "11% of payments",
+        threshold: "baseline 0%",
+        charted: true,
+        after: "checkout-latency",
+        via: "timeouts",
+      },
     ],
     steps: [
       {
@@ -929,11 +1311,42 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 92,
     nextStep:
       "Fixed for now by evicting the leaked connections. Root cause CHK-482 (fix in review). The earlier leaks came 8 and 6 days apart, so the pool fills again in about a week.",
+    verdict:
+      "Refund exports leak database connections (CHK-482) until checkout has none left for payments.",
+    impact: ["1 in 9 payments timed out"],
+    hypotheses: [
+      {
+        name: "Leaked connections (CHK-482)",
+        verdict: "confirmed",
+        reason:
+          "48 of 50 held over 10 minutes with no query running, all from RefundExporter.export().",
+      },
+      {
+        name: "Pool too small for traffic",
+        verdict: "ruled_out",
+        reason: "Only 2 connections were doing real work; the rest were leaked.",
+      },
+      {
+        name: "payments-api slow",
+        verdict: "ruled_out",
+        reason:
+          "Payments time out waiting 30 s for a free connection, before any call to payments-api.",
+      },
+    ],
+    comparison: {
+      metric: "checkout's 50 database connections",
+      rows: [
+        { label: "Leaked by RefundExporter.export()", value: 48, shown: "48", kind: "affected" },
+        { label: "Left for payments", value: 2, shown: "2", kind: "healthy" },
+        { label: "Pool limit", value: 50, shown: "50", kind: "limit" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
         title: "Metric deviation on checkout",
         detail: "pool connections in use: 50 of 50, 0 idle",
+        card: "checkout-pool-saturation",
       },
       {
         kind: "metric",
@@ -945,11 +1358,13 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         kind: "log",
         title: "Connection leak detection",
         detail: "48 held > 10 min, acquired at RefundExporter.export()",
+        card: "checkout-log-patterns",
       },
       {
         kind: "trace",
         title: "Slow span in checkout",
         detail: "POST /pay → pool.acquire: waits 30 s",
+        card: "checkout-latency",
         count: "1,312 traces",
       },
     ],
@@ -994,24 +1409,47 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "checkout",
         count: 12,
         times: ["14:02", "14:03", "14:04", "14:05"],
+        signal: "metric",
+        name: "Failed payments",
+        peak: "8.3% of payments",
+        threshold: "baseline 0.1%",
+        charted: true,
+        after: "payments-api-log-patterns",
+        via: "calls",
       },
       {
         detector: "payments-api-errors",
         service: "payments-api",
         count: 7,
         times: ["14:02", "14:03", "14:04", "14:05"],
+        signal: "metric",
+        name: "Error ratio",
+        peak: "8.9% of requests",
+        threshold: "baseline 0.1%",
+        after: "payments-api-log-patterns",
+        via: "same pods",
       },
       {
         detector: "payments-api-latency",
         service: "payments-api",
         count: 3,
         times: ["14:03", "14:04", "14:05"],
+        signal: "metric",
+        name: "p95 latency",
+        peak: "2.8 s",
+        threshold: "baseline 0.21 s",
       },
       {
         detector: "payments-api-log-patterns",
         service: "payments-api",
         count: 1,
         times: ["14:02"],
+        signal: "log",
+        name: "Too many clients",
+        peak: "3,914 lines",
+        threshold: "none before 14:02",
+        after: "payments-db-limit",
+        via: "refused",
       },
     ],
     steps: [
@@ -1058,6 +1496,18 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
+    chainNotes: [
+      {
+        id: "payments-db-limit",
+        kind: "unwatched",
+        service: "payments-db",
+        at: "14:01",
+        title: "At connection limit",
+        detail:
+          "200 of 200 connections at 14:01:58. payments-db is a coverage gap: the limit is inferred from payments-api's client connections and its errors.",
+        via: "6 × 50 > 200",
+      },
+    ],
     chart: {
       metric: "failed payments",
       unit: "%",
@@ -1079,6 +1529,45 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 91,
     nextStep:
       "Rolled back to 2.3.0. Before shipping 2.3.1 again, keep pool size × replicas under 200, with headroom. Ship payments-api through a progressive rollout.",
+    verdict: "payments-api 2.3.1 opened more database connections than payments-db allows.",
+    impact: ["1 in 12 payments failed"],
+    hypotheses: [
+      {
+        name: "payments-api 2.3.1 pool size",
+        verdict: "confirmed",
+        reason:
+          "db.pool.max went 20 → 50, so 6 pods × 50 = 300, over payments-db's 200. Errors began a minute after the deploy.",
+      },
+      {
+        name: "payments-db down",
+        verdict: "ruled_out",
+        reason:
+          "It kept 200 connections open and refused only the extra ones ('too many clients').",
+      },
+      {
+        name: "checkout itself",
+        verdict: "ruled_out",
+        reason: "92% of failed checkout spans end in a payments-api db.connect error.",
+      },
+      {
+        name: "payments-db internals",
+        verdict: "open",
+        reason: "A coverage gap: its limit is inferred from the plateau at 200 and the error.",
+      },
+    ],
+    comparison: {
+      metric: "Connections to payments-db",
+      rows: [
+        {
+          label: "payments-api 2.3.1 asks for (6 × 50)",
+          value: 300,
+          shown: "300",
+          kind: "affected",
+        },
+        { label: "payments-db limit", value: 200, shown: "200", kind: "limit" },
+        { label: "payments-api 2.3.0 used (6 × 20)", value: 120, shown: "120", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
@@ -1090,17 +1579,20 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         kind: "metric",
         title: "payments-api database client connections",
         detail: "sum of 6 pods: 120 → 200 at 14:01:58, flat after",
+        card: "payments-db-limit",
       },
       {
         kind: "log",
         title: "Log pattern in payments-api",
         detail: "FATAL: sorry, too many clients already",
+        card: "payments-api-log-patterns",
         count: "3,914 since 14:02:05",
       },
       {
         kind: "trace",
         title: "Failed span in checkout",
         detail: "92% of failed checkout spans end in a payments-api db.connect error",
+        card: "payments-api-errors",
         count: "2,911 traces",
       },
     ],
@@ -1130,6 +1622,23 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "recommendations",
         count: 3,
         times: ["16:40", "16:41", "16:42"],
+        signal: "metric",
+        name: "p95 latency",
+        peak: "0.94 s",
+        threshold: "baseline 0.26 s",
+        charted: true,
+        after: "recommendations-cpu",
+        via: "same pods",
+      },
+      {
+        detector: "recommendations-cpu",
+        service: "recommendations",
+        count: 2,
+        times: ["16:40", "16:42"],
+        signal: "metric",
+        name: "CPU",
+        peak: "92% of limit",
+        threshold: "threshold 85%",
       },
     ],
     steps: [
@@ -1181,6 +1690,29 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 88,
     nextStep:
       "No action needed. Summary note: a rebuild slows recommendations about 3×, so run it off-peak.",
+    verdict: "Someone started the nightly cache rebuild by hand during peak traffic.",
+    impact: ["Recommendations about 3× slower", "Pages still loaded"],
+    hypotheses: [
+      {
+        name: "Cache rebuild started by hand",
+        verdict: "confirmed",
+        reason:
+          "Started from the admin console at 16:38, during peak traffic; it usually runs at 02:00.",
+      },
+      {
+        name: "Lasting slowdown",
+        verdict: "ruled_out",
+        reason: "Back to about 0.26 s once the rebuild finished at 16:55.",
+      },
+      { name: "Pages failing", verdict: "ruled_out", reason: "Pages still loaded; only slower." },
+    ],
+    comparison: {
+      metric: "p95 latency",
+      rows: [
+        { label: "During the rebuild", value: 0.94, shown: "0.94 s", kind: "affected" },
+        { label: "Normal", value: 0.26, shown: "0.26 s", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
@@ -1193,6 +1725,7 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         title: "Job log",
         detail:
           "cache-rebuild job started manually from the admin console at 16:38 (usually 02:00)",
+        card: "change",
       },
     ],
   },
@@ -1219,6 +1752,22 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "api-gateway",
         count: 5,
         times: ["15:22", "15:23", "15:24", "15:25"],
+        signal: "metric",
+        name: "401 responses",
+        peak: "3.3% of requests",
+        threshold: "10× the level 5 min earlier",
+        charted: true,
+      },
+      {
+        detector: "login-errors",
+        service: "login",
+        count: 2,
+        times: ["15:23", "15:24"],
+        signal: "metric",
+        name: "Sign-in errors",
+        peak: "4.1% of sign-ins",
+        threshold: "ceiling 2%",
+        via: "tokens expire",
       },
     ],
     steps: [
@@ -1275,6 +1824,34 @@ export const PROBLEMS: Record<string, ProblemFact> = {
       "token_ttl was changed from 3600 to 60 at 15:20, so tokens expired mid-session and requests were rejected.",
     confidence: 89,
     nextStep: "Reverted. Add a review step for token_ttl changes.",
+    verdict: "A config change cut sign-in tokens to 60 seconds, so they expired mid-session.",
+    impact: ["1 in 30 requests rejected"],
+    hypotheses: [
+      {
+        name: "token_ttl config change",
+        verdict: "confirmed",
+        reason:
+          "Cut from 3600 s to 60 s at 15:20; 401s jumped 2 minutes later, as tokens expired mid-session.",
+      },
+      {
+        name: "Sign-in outage",
+        verdict: "ruled_out",
+        reason: "Sign-in errors followed the 401s, not the other way round.",
+      },
+      {
+        name: "Normal for this hour",
+        verdict: "open",
+        reason:
+          "Only 3 days of history, so judged against 5 minutes earlier, not a learned baseline.",
+      },
+    ],
+    comparison: {
+      metric: "401 responses",
+      rows: [
+        { label: "After the change", value: 3.3, shown: "3.3%", kind: "affected" },
+        { label: "5 minutes before", value: 0.3, shown: "0.3%", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
@@ -1283,7 +1860,12 @@ export const PROBLEMS: Record<string, ProblemFact> = {
           "401 responses: 3.3%, 10× the level 5 minutes earlier (safety check while learning)",
         chart: true,
       },
-      { kind: "log", title: "Config audit", detail: "token_ttl 3600 → 60 at 15:20" },
+      {
+        kind: "log",
+        title: "Config audit",
+        detail: "token_ttl 3600 → 60 at 15:20",
+        card: "change",
+      },
     ],
   },
   queue: {
@@ -1309,18 +1891,37 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "order-queue",
         count: 6,
         times: ["21:30", "21:31", "21:33", "21:35"],
+        signal: "metric",
+        name: "Orders waiting",
+        peak: "4,120 orders",
+        threshold: "baseline under 50",
+        charted: true,
+        after: "orders-latency",
+        via: "backlog",
       },
       {
         detector: "orders-latency",
         service: "orders",
         count: 3,
         times: ["21:31", "21:32", "21:34"],
+        signal: "metric",
+        name: "p95 latency",
+        peak: "1.6 s",
+        threshold: "baseline 0.12 s",
+        after: "orders-db-query-latency",
+        via: "40× slower",
       },
       {
         detector: "orders-db-query-latency",
         service: "orders-db",
         count: 2,
         times: ["21:32", "21:34"],
+        signal: "trace",
+        name: "Slow index lookups",
+        peak: "p95 120 ms",
+        threshold: "baseline 3 ms",
+        after: "change",
+        via: "index invalid",
       },
     ],
     steps: [
@@ -1330,6 +1931,7 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         title: "Database migration",
         detail: "orders-db migration 0142: rebuild orders_by_status",
         variant: "info",
+        service: "orders-db",
       },
       {
         at: "21:30",
@@ -1380,6 +1982,34 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 84,
     nextStep:
       "Resolved by rebuilding the index. Follow-up: migrations that build indexes concurrently should check the index is valid before finishing.",
+    verdict: "The 21:20 migration left an index invalid, so order lookups became 40× slower.",
+    impact: ["About 4,000 orders waiting at peak"],
+    hypotheses: [
+      {
+        name: "Index left invalid by migration 0142",
+        verdict: "confirmed",
+        reason:
+          "orders_by_status lookups went from 3 ms to 120 ms at 21:21, a minute after the migration.",
+      },
+      {
+        name: "Too few workers",
+        verdict: "ruled_out",
+        reason: "Doubling workers 4 → 8 at 21:33 didn't help, so I scaled back and paged.",
+      },
+      {
+        name: "More orders than usual",
+        verdict: "ruled_out",
+        reason:
+          "Each worker drained a third as many orders; the slow lookup, not the volume, built the backlog.",
+      },
+    ],
+    comparison: {
+      metric: "orders_by_status lookup, p95",
+      rows: [
+        { label: "Since 21:21", value: 120, shown: "120 ms", kind: "affected" },
+        { label: "Before the migration", value: 3, shown: "3 ms", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
@@ -1392,6 +2022,7 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         title: "Slow span in orders",
         detail:
           "orders → orders-db SELECT … WHERE status = $1: p95 120 ms (baseline 3 ms) since 21:21",
+        card: "orders-db-query-latency",
       },
     ],
     fix: { kind: "queueWorker", at: "21:33", ledgerId: "L-305", worked: false },
@@ -1418,9 +2049,34 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "notifications",
         count: 2,
         times: ["13:50", "13:51"],
+        signal: "metric",
+        name: "Delivery delay",
+        peak: "p95 128 s",
+        threshold: "baseline 4 s",
+        charted: true,
+        after: "notifications-deps",
+      },
+      {
+        detector: "notifications-deps",
+        service: "notifications",
+        count: 3,
+        times: ["13:50", "13:52", "13:55"],
+        signal: "trace",
+        name: "Slow provider calls",
+        peak: "p95 3.1 s",
+        threshold: "baseline 0.1 s",
+        via: "calls",
       },
     ],
     steps: [
+      {
+        at: "13:48",
+        by: "event",
+        title: "Push provider slowed down",
+        detail: "Provider API latency 30× its usual level (status page: degraded)",
+        variant: "info",
+        service: "push provider",
+      },
       {
         at: "13:50",
         by: "event",
@@ -1458,6 +2114,32 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     likelyCause: "Provider API latency rose 30× from 13:48.",
     confidence: 90,
     nextStep: "No action needed.",
+    verdict: "The outside push provider slowed down; nothing changed on our side.",
+    impact: ["Push about 2 minutes late"],
+    hypotheses: [
+      {
+        name: "Push provider slow",
+        verdict: "confirmed",
+        reason: "Provider calls went from 0.1 s to 3.1 s at 13:48; its status page said degraded.",
+      },
+      {
+        name: "Our notifications service",
+        verdict: "ruled_out",
+        reason: "The extra wait is all inside the provider calls.",
+      },
+      {
+        name: "A change on our side",
+        verdict: "ruled_out",
+        reason: "No deploy or config change to notifications before 13:48.",
+      },
+    ],
+    comparison: {
+      metric: "Provider call time, p95",
+      rows: [
+        { label: "From 13:48", value: 3.1, shown: "3.1 s", kind: "affected" },
+        { label: "Normal", value: 0.1, shown: "0.1 s", kind: "healthy" },
+      ],
+    },
     evidence: [
       { kind: "metric", title: "Delivery delay", detail: "p95 128 s (baseline 4 s)", chart: true },
     ],
@@ -1485,12 +2167,46 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "login",
         count: 11,
         times: ["10:12", "10:13", "10:14", "10:15"],
+        signal: "metric",
+        name: "p95 sign-in time",
+        peak: "5.8 s",
+        threshold: "baseline 0.6 s",
+        charted: true,
+        after: "session-cache-memory",
+        via: "cache misses",
       },
       {
         detector: "session-cache-memory",
         service: "session-cache",
         count: 6,
         times: ["10:11", "10:12", "10:13", "10:14"],
+        signal: "metric",
+        name: "Cache memory",
+        peak: "100% of maxmemory",
+        threshold: "threshold 90%",
+        via: "2× sessions",
+      },
+      {
+        detector: "session-cache-evictions",
+        service: "session-cache",
+        count: 4,
+        times: ["10:12", "10:13", "10:15", "10:17"],
+        signal: "metric",
+        name: "Sessions evicted",
+        peak: "3,400 a minute",
+        threshold: "baseline near 0",
+        via: "cache full",
+      },
+      {
+        detector: "login-log-patterns",
+        service: "login",
+        count: 2,
+        times: ["10:13", "10:15"],
+        signal: "log",
+        name: "Session lost logs",
+        peak: "people signed out",
+        threshold: "none before 10:13",
+        after: "session-cache-evictions",
       },
     ],
     steps: [
@@ -1549,6 +2265,33 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 88,
     nextStep:
       "Resolved by adding cache memory. Follow-up: sessions live in a cache that evicts when full, so a full cache signs people out.",
+    verdict:
+      "Doubled traffic filled the session cache, which evicted sessions and signed people out.",
+    impact: ["1 in 8 sign-ins took over 5 s", "Some people signed out"],
+    hypotheses: [
+      {
+        name: "Session cache full",
+        verdict: "confirmed",
+        reason: "session-cache hit 100% of its memory and evicted 3,400 sessions a minute.",
+      },
+      {
+        name: "Traffic doubled",
+        verdict: "confirmed",
+        reason: "A marketing email doubled traffic at 10:05 and filled the cache.",
+      },
+      {
+        name: "Bug in login",
+        verdict: "ruled_out",
+        reason: "Sign-in recovered once cache memory was raised at 10:31, with no change to login.",
+      },
+    ],
+    comparison: {
+      metric: "p95 sign-in time",
+      rows: [
+        { label: "Cache full", value: 5.8, shown: "5.8 s", kind: "affected" },
+        { label: "Normal", value: 0.6, shown: "0.6 s", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
@@ -1580,6 +2323,23 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         service: "image-resizer",
         count: 2,
         times: ["07:05", "07:06"],
+        signal: "metric",
+        name: "Failed uploads",
+        peak: "2.4% after retries",
+        threshold: "baseline 0.05%",
+        charted: true,
+        after: "image-resizer-log-patterns",
+      },
+      {
+        detector: "image-resizer-log-patterns",
+        service: "image-resizer",
+        count: 3,
+        times: ["07:05", "07:08", "07:11"],
+        signal: "log",
+        name: "TLS handshake errors",
+        peak: "1 of 12 pods",
+        threshold: "none before 07:04",
+        via: "old cert",
       },
     ],
     steps: [
@@ -1630,6 +2390,33 @@ export const PROBLEMS: Record<string, ProblemFact> = {
     confidence: 87,
     nextStep:
       "Renew certificates days before expiry, not minutes, and have servers reload them without a restart.",
+    verdict: "One of 12 servers kept serving an expired certificate until 07:15.",
+    impact: ["1 in 40 uploads failed"],
+    hypotheses: [
+      {
+        name: "Expired certificate on one pod",
+        verdict: "confirmed",
+        reason:
+          "1 of 12 pods hadn't loaded the replacement issued at 06:58 and failed TLS handshakes from 07:04.",
+      },
+      {
+        name: "Every server",
+        verdict: "ruled_out",
+        reason: "The other 11 pods served the new certificate without errors.",
+      },
+      {
+        name: "Why renewal came so late",
+        verdict: "open",
+        reason: "The replacement was issued 6 minutes before expiry; I haven't checked why.",
+      },
+    ],
+    comparison: {
+      metric: "Uploads failing, by pod",
+      rows: [
+        { label: "1 pod on the expired certificate", value: 100, shown: "all", kind: "affected" },
+        { label: "11 pods on the new certificate", value: 0, shown: "none", kind: "healthy" },
+      ],
+    },
     evidence: [
       {
         kind: "metric",
