@@ -1,4 +1,4 @@
-// IAM → Edit Role · grant semantics (G-01 .. G-16)
+// IAM → Edit Role · grant semantics (G-01 .. G-18)
 //
 // Plan: .claude/commands/nvpworkflow/iam-roles-redesign-tests.md
 //
@@ -27,6 +27,12 @@ const made = makeTracker();
 
 const obj = (resource) => `${resource}:_all_${org()}`;
 
+/** The six action columns, in the order the pane renders them. */
+const ACTIONS = ['AllowAll', 'AllowList', 'AllowGet', 'AllowPost', 'AllowPut', 'AllowDelete'];
+
+/** A permission set as comparable strings, so a PUT body and the API answer can be equated. */
+const tuples = (perms) => perms.map((p) => `${p.object}|${p.permission}`).sort();
+
 test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () => {
     // Serial, NOT parallel. every test in this file creates roles under one namespace and afterAll sweeps that
     // namespace, and beforeAll/afterAll run once PER WORKER — not per file. Under
@@ -51,6 +57,37 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         await pm.rolesPage.openRole(name);
         await pm.rolesPage.waitForGrantsSettled(0);
         return name;
+    };
+
+    /** The number on the "N Permissions" badge, or null while it has not painted. */
+    const permissionCount = async () => {
+        const n = (await pm.rolesPage.permissionsCount.innerText().catch(() => '')).match(/\d+/);
+        return n ? Number(n[0]) : null;
+    };
+
+    /** Staged-change count from the unsaved badge; 0 when nothing is staged. */
+    const staged = async () => {
+        const n = (await pm.rolesPage.unsavedCount.innerText().catch(() => '')).match(/\d+/);
+        return n ? Number(n[0]) : 0;
+    };
+
+    /**
+     * A column header once it reflects the SAVED grants, not the loading state.
+     *
+     * The pane paints before the grants land, and in that window every header reads
+     * unchecked AND disabled even on a fully granted role. Reading one straight after
+     * a reload therefore measures the spinner: it reported "not granted" on a role
+     * holding 315 tuples, and a tick sent into that window is swallowed by the
+     * disabled box. Settle on the hydrated pair before touching or asserting it.
+     */
+    const hydratedHeader = async (action, checked) => {
+        const box = pm.rolesPage.bulkCheckbox(action);
+        await box.waitFor({ state: 'visible', timeout: 15000 });
+        await expect
+            .poll(async () => `${await box.getAttribute('aria-checked')}/${await box.isDisabled().catch(() => 'err')}`,
+                { timeout: 30000 })
+            .toBe(`${checked}/false`);
+        return box;
     };
 
     test.beforeAll(async ({ browser }) => {
@@ -331,6 +368,13 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         await pm.rolesPage.gotoRoles();
         await pm.rolesPage.createRole(name, { startFrom: 'readonly' });
         await pm.rolesPage.waitForGrantsSettled();
+        // The preset seeds ASYNCHRONOUSLY: EditRole awaits the resource fetches before it
+        // stages anything, and waitForGrantsSettled() only waits for the count to paint.
+        // Saving straight after it races the seed and stores an EMPTY role — measured
+        // twice in a row on pentest, so this is a reproducible race, not a slow run.
+        await expect
+            .poll(async () => staged(), { timeout: 30000 })
+            .toBeGreaterThan(0);
         await pm.rolesPage.save();
 
         // AddRole's start-from seeds once the user lands on EditRole; a role created
@@ -366,6 +410,140 @@ test.describe('IAM · Edit Role · grant semantics', { tag: '@enterprise' }, () 
         await expect
             .poll(async () => sortedObjects(await getPerms(page, name)), { timeout: 15000 })
             .toEqual([...objects].sort());
+    });
+
+    test('G-15 · ticking every action header grants all six on every module that offers them', {
+        tag: ['@iam', '@iamRolesGrants', '@P0', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'bulkall');
+        await pm.rolesPage.openAllModules();
+
+        // setCheckbox throws on a disabled box, so this also asserts no header locks
+        // another: a module-wide AllowAll does not lock its own row's narrower columns.
+        for (const action of ACTIONS) {
+            await pm.rolesPage.setCheckbox(pm.rolesPage.bulkCheckbox(action), true);
+        }
+
+        const payload = await pm.rolesPage.saveAndCapture();
+        expect(payload, 'save fired no PUT').toBeTruthy();
+        expect(payload.remove).toEqual([]);
+        // Module-wide objects only: the All Modules rows ARE the modules, so nothing
+        // scoped to a single entity may be staged from here.
+        expect(payload.add.every((p) => p.object.endsWith(`:_all_${org()}`))).toBe(true);
+
+        const byResource = {};
+        for (const p of payload.add) (byResource[p.object.split(':')[0]] ||= []).push(p.permission);
+        // A plain module takes all six; one tick per column must reach every one of them.
+        expect(byResource.stream?.sort()).toEqual([...ACTIONS].sort());
+        expect(byResource.function?.sort()).toEqual([...ACTIONS].sort());
+        // ...and a module that hides actions must take only what its row can show, rather
+        // than the header staging a grant the row never offered. settings has Get+Put only;
+        // OpenFGA's rum_analytics type has no GET or LIST (same shape G-12 pins).
+        expect(byResource.settings?.sort()).toEqual(['AllowAll', 'AllowGet', 'AllowPut']);
+        expect(byResource.rum_analytics?.sort())
+            .toEqual(['AllowAll', 'AllowDelete', 'AllowPost', 'AllowPut']);
+
+        // OpenFGA must accept every tuple the six ticks sent — the body alone proves nothing.
+        await expect
+            .poll(async () => (await getPerms(page, name)).length, { timeout: 20000 })
+            .toBe(payload.add.length);
+        expect(tuples(await getPerms(page, name)), 'the stored set differs from the PUT body')
+            .toEqual(tuples(payload.add));
+        // Polled, not read once: the badge repaints after the save settles, so a bare
+        // read here races it and fails on null rather than on a real disagreement.
+        await expect
+            .poll(async () => await permissionCount(), { timeout: 20000 })
+            .toBe(payload.add.length);
+
+        // A reload is the only thing that proves the editor can READ BACK what it wrote:
+        // the headers are derived from the grants, so a decode bug shows up here and
+        // nowhere in the payload assertions above.
+        await page.reload();
+        await pm.rolesPage.waitForGrantsSettled();
+        await pm.rolesPage.openAllModules();
+        for (const action of ACTIONS) await hydratedHeader(action, true);
+        await expect
+            .poll(async () => await permissionCount(), { timeout: 20000 })
+            .toBe(payload.add.length);
+    });
+
+    test('G-16 · unticking the All header strips the AllowAll tuples and leaves the rest', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'bulkundo');
+        await pm.rolesPage.openAllModules();
+        for (const action of ACTIONS) {
+            await pm.rolesPage.setCheckbox(pm.rolesPage.bulkCheckbox(action), true);
+        }
+        expect(await pm.rolesPage.saveAndCapture(), 'the setup save fired no PUT').toBeTruthy();
+        const full = await getPerms(page, name);
+
+        await page.reload();
+        await pm.rolesPage.waitForGrantsSettled();
+        await pm.rolesPage.openAllModules();
+        const allBox = await hydratedHeader('AllowAll', true);
+        await pm.rolesPage.setCheckbox(allBox, false);
+
+        const payload = await pm.rolesPage.saveAndCapture();
+        expect(payload, 'the untick fired no PUT').toBeTruthy();
+        expect(payload.add).toEqual([]);
+        // Undo means undo exactly one column. Widening it to the narrower grants would
+        // silently revoke access the admin never touched.
+        const collateral = payload.remove.filter((p) => p.permission !== 'AllowAll');
+        expect(collateral, `the All column took other grants with it: ${JSON.stringify(collateral.slice(0, 5))}`)
+            .toEqual([]);
+
+        const left = await getPerms(page, name);
+        expect(left.length).toBe(full.length - payload.remove.length);
+        expect(left.some((p) => p.permission === 'AllowAll'), 'AllowAll survived the untick').toBe(false);
+        expect(left.length, 'the narrower grants went with it').toBeGreaterThan(0);
+    });
+
+    test('G-17 · a pane search narrows what one header tick reaches', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'bulkfilt');
+        await pm.rolesPage.openAllModules();
+        await pm.rolesPage.paneSearch.fill('alert');
+        // The filter drives the header, so settle on the filtered rows before ticking.
+        await expect.poll(async () => (await pm.rolesPage.paneRowKeys()).length, { timeout: 15000 })
+            .toBeGreaterThan(0);
+        const visible = await pm.rolesPage.paneRowKeys();
+        expect(visible, 'the search matched every module, so it narrows nothing')
+            .not.toContain('stream');
+
+        await pm.rolesPage.setCheckbox(pm.rolesPage.bulkCheckbox('AllowGet'), true);
+        const payload = await pm.rolesPage.saveAndCapture();
+        expect(payload, 'save fired no PUT').toBeTruthy();
+        // Blast radius is the FILTER, not the page: every matched row, and nothing else.
+        expect(payload.add.map((p) => p.object).sort())
+            .toEqual(visible.map((key) => obj(key)).sort());
+        expect(payload.add.every((p) => p.permission === 'AllowGet')).toBe(true);
+        expect(tuples(await getPerms(page, name))).toEqual(tuples(payload.add));
+    });
+
+    test('G-18 · reopening a fully granted role and saving sends nothing', {
+        tag: ['@iam', '@iamRolesGrants', '@P1', '@all']
+    }, async ({ page }) => {
+        const name = await openFresh(page, 'bulkidem');
+        await pm.rolesPage.openAllModules();
+        for (const action of ACTIONS) {
+            await pm.rolesPage.setCheckbox(pm.rolesPage.bulkCheckbox(action), true);
+        }
+        expect(await pm.rolesPage.saveAndCapture(), 'the setup save fired no PUT').toBeTruthy();
+        const held = (await getPerms(page, name)).length;
+
+        await page.reload();
+        await pm.rolesPage.waitForGrantsSettled(held);
+        await pm.rolesPage.openAllModules();
+        for (const action of ACTIONS) await hydratedHeader(action, true);
+
+        // G-12 pins the cost of getting this wrong: OpenFGA answers 500 on re-writing a
+        // tuple already held, so a header that re-stages what it just read breaks the
+        // next save rather than merely wasting a request.
+        const payload = await pm.rolesPage.saveAndCapture({ expectRequest: false });
+        expect(payload, `a no-op save re-sent ${payload?.add?.length} grants`).toBeNull();
+        expect((await getPerms(page, name)).length).toBe(held);
     });
 
     // ---------------- negative / rejection ----------------

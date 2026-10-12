@@ -85,6 +85,7 @@ impl StorageScan<'_> {
             scan_stats: self.scan_stats,
             keep_filters: true,
             source: ScanSource::Blocks(Arc::new(MetricsBlockScan { files: self.files })),
+            warnings: vec![],
         })
     }
 
@@ -157,6 +158,7 @@ impl StorageScan<'_> {
             scan_stats: self.scan_stats,
             keep_filters,
             source,
+            warnings: vec![],
         }))
     }
 

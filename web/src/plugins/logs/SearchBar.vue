@@ -1815,6 +1815,7 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
@@ -2706,6 +2707,8 @@ export default defineComponent({
               for (const stream of searchObj.data.stream?.selectedStreamFields || []) {
                 if (
                   stream.name == col &&
+                  // A VRL-derived column must not be stored, nor persisted, as interesting.
+                  isSchemaBackedField(stream) &&
                   !searchObj.data.stream.interestingFieldList.includes(col) &&
                   col !== store.state.zoConfig?.timestamp_column
                 ) {

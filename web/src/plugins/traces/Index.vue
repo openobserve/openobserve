@@ -17,11 +17,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="rounded-default tracePage h-full max-h-full! min-h-full! overflow-hidden!"
+    class="rounded-default tracePage flex h-full max-h-full! min-h-full! flex-col overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
-    <div id="tracesSecondLevel" class="h-full">
+    <FirstDataPanel
+      v-if="firstDataArrival"
+      signal="traces"
+      variant="full"
+      :arrived="firstDataArrival"
+      class="mx-2.5 mt-2.5 shrink-0"
+      @dismiss="firstDataArrival = null"
+    />
+    <div id="tracesSecondLevel" class="h-full min-h-0 flex-1">
       <OSplitter
         :class="[
           'traces-horizontal-splitter h-full',
@@ -136,16 +144,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #after>
                   <div class="h-full pb-2.5">
                     <!-- No trace streams in org yet -->
-                    <TracesNoDataState
+                    <FirstDataPanel
                       v-if="
                         !searchObj.loadingStream &&
                         searchObj.data.stream.streamLists.length === 0 &&
                         !searchObj.loading
                       "
-                      :ai-enabled="isAiEnabled"
-                      data-test="traces-no-streams-in-org-text"
-                      @ask-ai="onAskAiSetupTracing"
-                    />
+                      v-slot="{ layout, statusLine }"
+                      signal="traces"
+                      variant="full"
+                      status-in-slot
+                      @detected="onFirstDataDetected"
+                    >
+                      <TracesNoDataState
+                        :ai-enabled="isAiEnabled"
+                        :alternatives-only="layout === 'panel'"
+                        data-test="traces-no-streams-in-org-text"
+                        @ask-ai="onAskAiSetupTracing"
+                      >
+                        <template v-if="layout === 'status'" #status>
+                          <component :is="statusLine" />
+                        </template>
+                      </TracesNoDataState>
+                    </FirstDataPanel>
                     <!-- Stable loading state while streams load / auto-run fires,
                        so the empties don't flash in between. -->
                     <div
@@ -323,6 +344,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
+import type { FirstEventResult } from "@/composables/firstEvent/useFirstEventWatch";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
 import { resolveTraceStream } from "@/utils/traces/streamSelection";
@@ -1703,6 +1726,13 @@ const onAskAiTracing = () => {
 const onConfigureTracesStream = () => {
   const stream = searchObj.data.stream.selectedStream?.value;
   if (stream) router.push(`/streams?dialog=${stream}`);
+};
+
+const firstDataArrival = ref<FirstEventResult | null>(null);
+// the first traces stream arrived on an empty org: list it and search, no reload
+const onFirstDataDetected = async (result: FirstEventResult) => {
+  firstDataArrival.value = result;
+  await loadPageData();
 };
 
 // "Ask AI" from the no-streams empty state: open the AI chat asking how to

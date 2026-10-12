@@ -368,13 +368,13 @@ mod tests {
     fn test_merge_red_insights_enabled_sets_and_leaves() {
         let mut data = OrganizationSetting::default();
         assert!(!merge_red_insights_enabled(&mut data, None));
-        assert!(data.red_insights_enabled);
-        assert!(merge_red_insights_enabled(&mut data, Some(false)));
-        assert!(!data.red_insights_enabled);
-        assert!(!merge_red_insights_enabled(&mut data, None));
         assert!(!data.red_insights_enabled);
         assert!(merge_red_insights_enabled(&mut data, Some(true)));
         assert!(data.red_insights_enabled);
+        assert!(!merge_red_insights_enabled(&mut data, None));
+        assert!(data.red_insights_enabled);
+        assert!(merge_red_insights_enabled(&mut data, Some(false)));
+        assert!(!data.red_insights_enabled);
     }
 
     #[test]

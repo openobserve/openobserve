@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// useSpanDetect — backs the "have my spans arrived?" status bar with a single,
-// user-triggered check (no background polling).
-//
 // states: idle → checking → connected | stalled   ·   check() runs one probe.
 //
-// The user runs their app, then clicks "Test". Each check is a two-stage gate:
+// Each check is a two-stage gate:
 //   1. Existence — the target stream isn't created until the first span lands,
 //      so we first hit the cheap streams-list ("stream stats") API. If the
 //      stream is absent we report "not found yet" (no _search, so no 404 noise).
@@ -178,6 +175,11 @@ export function useStreamDetect(opts: UseStreamDetectOptions) {
     state.value = "stalled";
   };
 
+  // The shared bar confirmed the data, so the card's steps, confetti and RUM follow it.
+  const markConnected = (n = 1) => {
+    if (state.value !== "connected") succeed(n);
+  };
+
   // Back to the untested state.
   const reset = () => {
     state.value = "idle";
@@ -189,6 +191,7 @@ export function useStreamDetect(opts: UseStreamDetectOptions) {
     count,
     /** Run one check ("Test" / "Test again" / "I fixed it"). */
     check,
+    markConnected,
     reset,
     idle: computed(() => state.value === "idle"),
     checking: computed(() => state.value === "checking"),

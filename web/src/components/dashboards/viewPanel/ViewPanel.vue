@@ -58,31 +58,79 @@
           class="hover:bg-interactive-hover-bg h-8 transition-all duration-200"
           data-test="dashboard-viewpanel-refresh-interval"
         />
-        <OButton
-          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
-          variant="outline-destructive"
-          size="icon-sm"
-          @click="cancelViewPanelQuery"
-          data-test="dashboard-viewpanel-cancel-btn"
-          icon-left="cancel"
-        >
-          <OTooltip :content="t('panel.cancel')" />
-        </OButton>
-        <OButton
-          v-else
-          :variant="isVariablesChanged ? 'outline' : 'warning'"
-          size="icon-sm"
-          @click="refreshData"
-          :disabled="disable"
-          data-test="dashboard-viewpanel-refresh-data-btn"
-          icon-left="refresh"
-        >
-          <OTooltip
-            :content="
-              isVariablesChanged ? t('common.refresh') : t('dashboard.refreshToApplyVariables')
-            "
-          />
-        </OButton>
+        <OButtonGroup>
+          <OButton
+            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
+            variant="outline-destructive"
+            size="icon-sm"
+            @click="cancelViewPanelQuery"
+            data-test="dashboard-viewpanel-cancel-btn"
+            icon-left="cancel"
+          >
+            <OTooltip :content="t('panel.cancel')" />
+          </OButton>
+          <OButton
+            v-else
+            :variant="showApplyHint ? 'warning' : 'outline'"
+            size="icon-sm"
+            @click="refreshData"
+            :disabled="disable"
+            data-test="dashboard-viewpanel-refresh-data-btn"
+            :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+          >
+            <OTooltip
+              :content="
+                isAutoRunOn
+                  ? t('search.autoRunEnabled')
+                  : showApplyHint
+                    ? t('dashboard.refreshToApplyVariables')
+                    : t('common.refresh')
+              "
+            />
+          </OButton>
+          <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
+            <template #trigger>
+              <OButton
+                :variant="showApplyHint ? 'warning' : 'outline'"
+                size="icon-sm"
+                class="w-5"
+                :disabled="disable"
+                :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
+                data-test="dashboard-viewpanel-refresh-options-btn"
+                icon-left="arrow-drop-down"
+              />
+            </template>
+            <ODropdownItem
+              data-test="dashboard-viewpanel-refresh-item"
+              icon-left="refresh"
+              :disabled="disable"
+              @select="refreshData"
+            >
+              {{ t("common.refresh") }}
+            </ODropdownItem>
+            <ODropdownSeparator />
+            <ODropdownItem
+              data-test="dashboard-viewpanel-auto-run-toggle-btn"
+              @select="toggleAutoRun"
+            >
+              <template #icon-left>
+                <OIcon
+                  :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                  size="sm"
+                  :class="isAutoRunOn ? 'text-accent' : ''"
+                />
+              </template>
+              <span>
+                <div class="font-medium">
+                  {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                </div>
+                <div class="text-text-secondary text-xs">
+                  {{ t("search.liveModeTooltip") }}
+                </div>
+              </span>
+            </ODropdownItem>
+          </ODropdown>
+        </OButtonGroup>
         <OButton
           variant="outline"
           size="icon-sm"
@@ -213,8 +261,14 @@ import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
@@ -245,6 +299,11 @@ export default defineComponent({
     ShowLegendsPopup,
     PanelErrorButtons,
     OButton,
+    OButtonGroup,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
+    OIcon,
     OTooltip,
     ExemplarToggle,
     OTruncatedText,
@@ -307,7 +366,8 @@ export default defineComponent({
       errors: [],
     });
     let variablesData: any = reactive({});
-    const isVariablesChanged = ref(true); // Flag to track if variables have changed
+    // True while the selector holds values the chart has not applied yet.
+    const isVariablesChanged = ref(false);
     let needsVariablesAutoUpdate = true;
 
     const variablesDataUpdated = (data: any) => {
@@ -409,9 +469,8 @@ export default defineComponent({
         });
 
         // Mark as changed to signal refresh needed (unless this is initial setup)
-        // Note: false means changes need to be applied (flag logic is inverted)
         if (!wasInitialSetup) {
-          isVariablesChanged.value = false;
+          isVariablesChanged.value = true;
         }
       },
     );
@@ -530,16 +589,16 @@ export default defineComponent({
     watch(
       () => variablesData,
       () => {
-        const isValueChanged =
-          currentVariablesDataRef?.values?.length > 0 &&
-          variablesData.values.every((variable: any, index: number) => {
+        const hasApplied = currentVariablesDataRef?.values?.length > 0;
+        const isInSync =
+          hasApplied &&
+          variablesData.values?.every((variable: any, index: number) => {
             const prevValue = currentVariablesDataRef.values[index]?.value;
             const newValue = variable.value;
             // Compare current and previous values; handle both string and array cases
             return Array.isArray(newValue) ? isEqual(prevValue, newValue) : prevValue === newValue;
           });
-        // Set the `isChanged` flag if values are different
-        isVariablesChanged.value = isValueChanged;
+        isVariablesChanged.value = hasApplied && !isInSync;
       },
       { deep: true },
     );
@@ -557,10 +616,22 @@ export default defineComponent({
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         dateTimePickerRef.value.refresh();
         Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
-        // Set to true to indicate everything is now in sync (flag logic is inverted)
-        isVariablesChanged.value = true;
+        isVariablesChanged.value = false;
       }
     };
+
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+    const showApplyHint = computed(() => isVariablesChanged.value && !isAutoRunOn.value);
+
+    watch(isAutoRunOn, (on) => variablesManager.setLiveMode(on), { immediate: true });
+
+    // The chart reads the selector snapshot, not the manager's committed state, so apply it here.
+    const stopAutoCommit = variablesManager.onAutoCommit(async () => {
+      await nextTick();
+      Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
+      isVariablesChanged.value = false;
+    });
+    onUnmounted(stopAutoCommit);
 
     const currentDashboard = toRaw(store.state.currentSelectedDashboard);
 
@@ -652,8 +723,7 @@ export default defineComponent({
       // both changes are applied to the chart when Apply is clicked
       Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
 
-      // Mark variables as in sync (flag logic is inverted)
-      isVariablesChanged.value = true;
+      isVariablesChanged.value = false;
     });
 
     const dateTimeForVariables = ref<{
@@ -864,6 +934,10 @@ export default defineComponent({
       config,
       currentVariablesDataRef,
       isVariablesChanged,
+      showApplyHint,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
       store,
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,

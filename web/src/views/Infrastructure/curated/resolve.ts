@@ -1214,17 +1214,13 @@ function buildVariable(
     return resolved ? [{ name, resolved }] : [];
   });
 
-  // The sections this picker applies to, declared on the variable the way the
-  // dashboards model declares `tabs` — read as a reactive filter at render time
-  // so switching tabs never rebuilds this object. Scope stays "global": an
-  // all-sentinel variable at tab scope is skipped by setTabVisibility and would
-  // never fetch its options at all.
-  const curatedTabs = manifest.sections
+  // Tab-scoped on the sections that declare it, so the picker renders below the tab
+  // bar and each tab keeps its own selection.
+  const tabs = manifest.sections
     .filter((section) => (section.scopedBy ?? []).includes(def.name))
     .map((section) => section.id);
 
   return {
-    curatedTabs,
     curatedPickerLabel: picker.label,
     name: def.name,
     label: def.labelKey ? "" : picker.label,
@@ -1236,7 +1232,8 @@ function buildVariable(
     ...(def.multiSelect
       ? { selectAllValueForMultiSelect: def.defaultFirstValue ? "first" : "all" }
       : {}),
-    scope: "global",
+    scope: "tabs",
+    tabs,
     omitWhenValuesEmpty: def.omitWhenValuesEmpty === true,
     // Consumed by VariablesValueSelector; stored dashboards never carry them, so they stay invisible outside curated pages.
     curatedOmitWhenValuesEmpty: def.omitWhenValuesEmpty === true,

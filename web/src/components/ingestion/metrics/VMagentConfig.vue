@@ -18,12 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <IngestionContent>
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.vmagent.singleTargetTitle") }}</div>
-      <CopyContent :content="raw(singleTargetContent)" />
+      <CredentialCodeBlock slug="vmagent-single-target" :content="singleTargetContent" />
     </div>
 
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.vmagent.fanoutTitle") }}</div>
-      <CopyContent :content="raw(fanoutContent)" />
+      <CredentialCodeBlock slug="vmagent-fanout" :content="fanoutContent" />
       <div class="italic">
         {{ t("ingestion.vmagent.tipPrefix") }}
         <code>{{ raw("-remoteWrite.url") }}</code> {{ t("ingestion.vmagent.tipSuffix") }}
@@ -41,7 +41,7 @@ import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 
@@ -55,7 +55,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent, IngestionDocLink },
+  components: { CredentialCodeBlock, IngestionContent, IngestionDocLink },
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();

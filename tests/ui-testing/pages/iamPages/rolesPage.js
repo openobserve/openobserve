@@ -17,6 +17,9 @@ export const ACTIONS = ['AllowAll', 'AllowList', 'AllowGet', 'AllowPost', 'Allow
 // own slug, `edit-role-module-rail-overview` (ModuleRail.vue).
 const RAIL_ITEM = 'edit-role-module-rail-item-';
 
+// The open-this-row control a pane row carries; its suffix is the row's resource key.
+const PANE_OPEN = 'edit-role-module-pane-open-';
+
 export class RolesPage {
     constructor(page) {
         this.page = page;
@@ -173,6 +176,18 @@ export class RolesPage {
             .locator(`[data-test^="${RAIL_ITEM}"]`)
             .evaluateAll((els) => els.map((e) => e.getAttribute('data-test')));
         return [...new Set(slugs.map((s) => s.replace(RAIL_ITEM, '')))];
+    }
+
+    /**
+     * Resource keys of the rows the pane is CURRENTLY showing — after any search or
+     * filter. On the All Modules view a row is a whole module, so this is the set one
+     * column-header tick acts on.
+     */
+    async paneRowKeys() {
+        const slugs = await this.page
+            .locator(`[data-test^="${PANE_OPEN}"]`)
+            .evaluateAll((els) => els.map((e) => e.getAttribute('data-test')));
+        return slugs.map((slug) => slug.replace(PANE_OPEN, ''));
     }
 
     scopeRow(key) {

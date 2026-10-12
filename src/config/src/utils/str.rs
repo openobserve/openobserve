@@ -113,6 +113,14 @@ pub fn mask_secret(secret: &str) -> String {
     format!("{head}****{tail}")
 }
 
+/// Hides everything after a DSN scheme, e.g. before the value reaches stderr or a crash report.
+pub fn redact_dsn(s: &str) -> String {
+    match s.split_once("://") {
+        Some((scheme, _)) => format!("{scheme}://..."),
+        None => s.to_string(),
+    }
+}
+
 /// Render a license key as `abc*****xyz`; anything shorter than 7 characters is masked whole.
 pub fn mask_license_key(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
@@ -173,6 +181,15 @@ pub fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_redact_dsn_keeps_only_the_scheme() {
+        assert_eq!(
+            redact_dsn("postgres://o2:secret@db:5432/o2"),
+            "postgres://..."
+        );
+        assert_eq!(redact_dsn("mongodb"), "mongodb");
+    }
 
     #[test]
     fn test_mask_license_key_never_panics() {
