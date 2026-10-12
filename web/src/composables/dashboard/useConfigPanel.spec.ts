@@ -647,6 +647,20 @@ describe("useConfigPanel – axis section", () => {
     const c = makeComposable();
     expect(c.isConfigOptionVisible("axis", "gridlines")).toBe(true);
   });
+
+  it("axis-label-mode is visible for a cartesian SQL panel and hidden in PromQL mode", async () => {
+    const { shouldShowCartesianAxisConfig } = await import("@/utils/dashboard/configUtils");
+    vi.mocked(shouldShowCartesianAxisConfig).mockReturnValue(true);
+    expect(makeComposable().isConfigOptionVisible("axis", "axis-label-mode")).toBe(true);
+    expect(
+      makeComposable(makePanelData(), ref(true)).isConfigOptionVisible("axis", "axis-label-mode"),
+    ).toBe(false);
+    vi.mocked(shouldShowCartesianAxisConfig).mockReturnValue(false);
+  });
+
+  it("axis-label-mode is hidden for a non-cartesian panel", () => {
+    expect(makeComposable().isConfigOptionVisible("axis", "axis-label-mode")).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

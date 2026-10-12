@@ -198,14 +198,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <span class="text-text-secondary text-2xs shrink-0">→</span>
                         <OTag type="alertLevel" :value="row.level" class="shrink-0" />
                       </template>
-                      <span
+                      <OTruncatedText
                         v-if="row.group_label"
-                        class="text-2xs text-text-secondary min-w-0 truncate"
+                        class="text-2xs text-text-secondary"
                         data-test="alert-history-group-label"
                       >
                         {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
-                        <OTooltip :content="row.group_label" :max-width="'18.75rem'" />
-                      </span>
+                      </OTruncatedText>
                     </div>
                   </template>
 
@@ -396,6 +395,7 @@ import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";

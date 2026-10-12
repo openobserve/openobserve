@@ -123,13 +123,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="arePanelsLoading"
               :loading="arePanelsLoading"
               data-test="dashboard-refresh-btn"
-              icon-left="refresh"
+              :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
             >
               <OTooltip
                 :content="
-                  isVariablesChanged
-                    ? t('dashboard.viewDashboard.refreshToApplyVariables')
-                    : t('dashboard.viewDashboard.refresh')
+                  isAutoRunOn
+                    ? t('search.autoRunEnabled')
+                    : isVariablesChanged
+                      ? t('dashboard.viewDashboard.refreshToApplyVariables')
+                      : t('dashboard.viewDashboard.refresh')
                 "
                 shortcut-id="dashboardRefresh"
               />
@@ -153,6 +155,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ t("dashboard.viewDashboard.refreshCacheReload") }}
               </ODropdownItem>
+              <template v-if="isAutoRunAvailable">
+                <ODropdownSeparator />
+                <ODropdownItem data-test="dashboard-auto-run-toggle-btn" @select="toggleAutoRun">
+                  <template #icon-left>
+                    <OIcon
+                      :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                      size="sm"
+                      :class="isAutoRunOn ? 'text-accent' : ''"
+                    />
+                  </template>
+                  <span>
+                    <div class="font-medium">
+                      {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                    </div>
+                    <div class="text-text-secondary text-xs">
+                      {{ t("search.liveModeTooltip") }}
+                    </div>
+                  </span>
+                </ODropdownItem>
+              </template>
             </ODropdown>
           </OButtonGroup>
         </template>
@@ -371,11 +393,13 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -384,7 +408,7 @@ import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
-import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
+import { hasPanelTime, queryChangeAffectsPanelTimes } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -423,6 +447,7 @@ export default defineComponent({
     OButtonGroup,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OIcon,
     OTooltip,
   },
@@ -587,6 +612,9 @@ export default defineComponent({
     // provide it to child components
     provide("selectedTabId", selectedTabId);
 
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+    provide("dashboardAutoRun", isAutoRunOn);
+
     // variables data
     const variablesData = reactive({});
     const refreshedVariablesData = reactive({}); // Flag to track if variables have changed
@@ -639,6 +667,8 @@ export default defineComponent({
       // If using variables manager, access hasUncommittedChanges directly from the manager
       // Explicitly dereference to ensure Vue tracks the dependency
       const manager = variablesManager.value;
+
+      if (isAutoRunOn.value) return false;
 
       if (manager && "hasUncommittedChanges" in manager) {
         // Access the value (Vue auto-unwraps computed refs in composable returns)
@@ -1079,23 +1109,8 @@ export default defineComponent({
     watch(
       () => route.query,
       (newQuery, oldQuery) => {
-        // Union of old+new keys so removed params (e.g. cell_* on drawer close) count too.
-        const changedKeys = new Set(
-          [...Object.keys(newQuery), ...Object.keys(oldQuery ?? {})].filter(
-            (key) => newQuery[key] !== oldQuery?.[key],
-          ),
-        );
-
-        const globalTimeParamsChanged =
-          changedKeys.has("period") || changedKeys.has("from") || changedKeys.has("to");
-
-        // pt-* (panel time) and cell_* (drawer) never affect panel times — don't refresh.
-        const onlyIgnorableParamsChanged =
-          changedKeys.size > 0 &&
-          [...changedKeys].every((key) => key.startsWith("pt-") || key.startsWith("cell_")) &&
-          !globalTimeParamsChanged;
-
-        if (!onlyIgnorableParamsChanged) {
+        // An applied variable rewrites var-* here; recomputing would re-run every relative panel-time panel.
+        if (queryChangeAffectsPanelTimes(newQuery, oldQuery)) {
           computeAllPanelTimes();
         }
       },
@@ -1890,6 +1905,9 @@ export default defineComponent({
       refreshInterval,
       // ----------------
       refreshData,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
       refreshOptionsVariant,
       isVariablesChanged,
       refreshedVariablesDataUpdated,

@@ -21,6 +21,7 @@ import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
 import { parseSearchError } from "@/utils/query/searchError";
 import { gt } from "@/types/i18n";
 import { convertOffsetToSeconds } from "@/utils/dashboard/dateTimeUtils";
+import { formulaInputs, isFormulaQuery, substituteFormula } from "@/utils/dashboard/promql/formula";
 
 // Fixed-length units only (ms): a time shift moves both ends of the window by one delta.
 const FIXED_OFFSET_MS: Record<string, number> = {
@@ -36,6 +37,21 @@ const fixedTimeRangeGap = (offSet: string, endTime: number) => {
   const ms = (FIXED_OFFSET_MS[offSet?.slice(-1)] ?? 0) * parseInt(offSet?.slice(0, -1));
   if (!(ms > 0)) return null;
   return { seconds: ms, periodAsStr: convertOffsetToSeconds(offSet, endTime).periodAsStr };
+};
+
+type QueryPlan = { query: string; skip: boolean; error?: string };
+
+// A hidden query is never sent: a formula embeds its inputs' text instead.
+const planQueries = (queries: any[], texts: string[]): QueryPlan[] => {
+  const inputs = formulaInputs(queries, texts);
+  return queries.map((it, i) => {
+    if (it.config?.hide) return { query: texts[i], skip: true };
+    if (!isFormulaQuery(it)) return { query: texts[i], skip: false };
+    const out = substituteFormula(texts[i], inputs);
+    return "error" in out
+      ? { query: texts[i], skip: true, error: out.error }
+      : { query: out.expr, skip: false };
+  });
 };
 
 export const usePanelPromQLExecutor = (ctx: {
@@ -79,6 +95,23 @@ export const usePanelPromQLExecutor = (ctx: {
     removeTraceId,
   } = ctx;
 
+  const resolveQueryText = async (query: any, startISOTimestamp: any, endISOTimestamp: any) => {
+    const isFormula = isFormulaQuery(query);
+    const { query: query1, metadata: metadata1 } = replaceQueryValue(
+      isFormula ? query.config.formula : query.query,
+      startISOTimestamp,
+      endISOTimestamp,
+      panelSchema.value.queryType,
+    );
+    // Ad-hoc filters reach a formula through its inputs; on the formula text they break the parse.
+    if (isFormula) return { query: query1, variables: metadata1 || [] };
+    const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
+      query1,
+      panelSchema.value.queryType,
+    );
+    return { query: query2, variables: [...(metadata1 || []), ...(metadata2 || [])] };
+  };
+
   const executePromQL = async (
     startISOTimestamp: any,
     endISOTimestamp: any,
@@ -119,10 +152,22 @@ export const usePanelPromQLExecutor = (ctx: {
         metricsStored: number;
       }[] = [];
 
+      const queries: any[] = panelSchema.value.queries;
+      const resolved = await Promise.all(
+        queries.map((it) => resolveQueryText(it, startISOTimestamp, endISOTimestamp)),
+      );
+      const plans = planQueries(
+        queries,
+        resolved.map((r) => r.query),
+      );
+      // Kept across responses, or another query's success would clear it.
+      const planError = { message: plans.find((plan) => plan.error)?.error ?? "", code: "" };
+      if (planError.message) state.errorDetail = { ...planError };
+
       // Shifted streams follow every primary, so index i < queries.length stays panel query i.
-      let nextShiftedIndex = panelSchema.value.queries.length;
-      const shiftsByQuery = panelSchema.value.queries.map((it: any) =>
-        (it.config?.query_type === "instant" ? [] : (it.config?.time_shift ?? []))
+      let nextShiftedIndex = queries.length;
+      const shiftsByQuery = queries.map((it: any, i: number) =>
+        (it.config?.query_type === "instant" || plans[i].skip ? [] : (it.config?.time_shift ?? []))
           .map((shift: { offSet: string }) => fixedTimeRangeGap(shift?.offSet, endISOTimestamp))
           .filter(Boolean)
           .map((timeRangeGap: { seconds: number; periodAsStr: string }) => ({
@@ -130,12 +175,37 @@ export const usePanelPromQLExecutor = (ctx: {
             timeRangeGap,
           })),
       );
-      const totalStreams = nextShiftedIndex;
+      const totalStreams = nextShiftedIndex - plans.filter((plan) => plan.skip).length;
       const chunkProcessors: ReturnType<typeof createPromQLChunkProcessor>[] = [];
+
+      // An empty slot keeps data[i] and metadata.queries[i] on panel query i.
+      plans.forEach((plan, i) => {
+        if (!plan.skip) return;
+        queryResults[i] = { resultType: "matrix", result: [] };
+        queryMetadata[i] = {
+          originalQuery: queries[i].query,
+          query: plan.query,
+          startTime: startISOTimestamp,
+          endTime: endISOTimestamp,
+          queryType: panelSchema.value.queryType,
+          variables: resolved[i].variables,
+          tabName: queries[i].tabName,
+          timeRangeGap: { seconds: 0, periodAsStr: "" },
+          panelQueryIndex: i,
+          notSent: true,
+        };
+      });
+      state.data = markRaw([...queryResults]);
+      state.metadata = { queries: queryMetadata };
+      if (totalStreams === 0) {
+        state.loading = false;
+        state.isPartialData = false;
+        saveCurrentStateToCache();
+      }
 
       // Process all queries in parallel using streaming
       await Promise.all(
-        panelSchema.value.queries.map(
+        queries.map(
           async (
             it: {
               query: string;
@@ -144,19 +214,9 @@ export const usePanelPromQLExecutor = (ctx: {
             },
             panelQueryIndex: number,
           ) => {
-            const { query: query1, metadata: metadata1 } = replaceQueryValue(
-              it.query,
-              startISOTimestamp,
-              endISOTimestamp,
-              panelSchema.value.queryType,
-            );
-
-            const { query: query2, metadata: metadata2 } = await applyDynamicVariables(
-              query1,
-              panelSchema.value.queryType,
-            );
-
-            const query = query2;
+            if (plans[panelQueryIndex].skip) return;
+            const query = plans[panelQueryIndex].query;
+            const variables = resolved[panelQueryIndex].variables;
 
             // "0" is not a step — it is the panel schema's way of saying "no step
             // set, let the server decide", and it is what a dashboard panel
@@ -214,7 +274,7 @@ export const usePanelPromQLExecutor = (ctx: {
                 startTime: streamStart,
                 endTime: streamEnd,
                 queryType: panelSchema.value.queryType,
-                variables: [...(metadata1 || []), ...(metadata2 || [])],
+                variables,
                 tabName: it.tabName,
                 timeRangeGap,
                 panelQueryIndex,
@@ -300,11 +360,7 @@ export const usePanelPromQLExecutor = (ctx: {
                     queries: queryMetadata,
                   };
 
-                  // Clear error on successful response
-                  state.errorDetail = {
-                    message: "",
-                    code: "",
-                  };
+                  state.errorDetail = { ...planError };
                 }
               };
 

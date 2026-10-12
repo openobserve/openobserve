@@ -28,7 +28,7 @@ use common::meta::user::{InviteStatus, UserInvite, UserInviteList};
 #[cfg(feature = "enterprise")]
 use config::meta::ratelimit::CachedUserRoles;
 use config::{
-    DEFAULT_ORG, META_ORG_ID, get_config, ider,
+    DEFAULT_ORG, META_ORG_ID, ider,
     meta::user::{DBUser, User, UserOrg, UserRole},
     utils::rand::generate_random_string,
 };
@@ -81,7 +81,6 @@ pub async fn post_user(
     if !is_valid_email(&usr_req.email) {
         return Ok(MetaHttpResponse::bad_request("Invalid email"));
     }
-    let cfg = get_config();
     usr_req.email = usr_req.email.to_lowercase();
     if let Some(_custom_roles) = &usr_req.role.custom_role {
         #[cfg(not(feature = "enterprise"))]
@@ -165,7 +164,7 @@ pub async fn post_user(
             }
             let salt = ider::uuid();
             let password = get_hash(&usr_req.password, &salt);
-            let password_ext = get_hash(&usr_req.password, &cfg.auth.ext_auth_salt);
+            let password_ext = get_hash(&usr_req.password, &config::get_ext_auth_salt());
             let token = generate_random_string(16);
             let token_for_response = token.clone();
             let rum_token = format!("rum{}", generate_random_string(16));
@@ -309,8 +308,7 @@ pub async fn update_user(
 
     let mut old_role = None;
     let mut new_role = None;
-    let conf = get_config();
-    let password_ext_salt = conf.auth.ext_auth_salt.as_str();
+    let password_ext_salt = &config::get_ext_auth_salt();
 
     let Ok(existing_user) = existing_user else {
         return Ok(MetaHttpResponse::not_found("User not found"));
@@ -1342,10 +1340,9 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
 }
 
 pub async fn create_root_user(org_id: &str, user_req: UserRequest) -> Result<(), anyhow::Error> {
-    let cfg = get_config();
     let salt = ider::uuid();
     let password = get_hash(&user_req.password, &salt);
-    let password_ext = get_hash(&user_req.password, &cfg.auth.ext_auth_salt);
+    let password_ext = get_hash(&user_req.password, &config::get_ext_auth_salt());
     let token = user_req
         .token
         .clone()
@@ -1457,8 +1454,7 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
     let random_password = generate_random_string(32);
     let salt = ider::uuid();
     let password_hash = get_hash(&random_password, &salt);
-    let cfg = get_config();
-    let password_ext = get_hash(&random_password, &cfg.auth.ext_auth_salt);
+    let password_ext = get_hash(&random_password, &config::get_ext_auth_salt());
     let now = chrono::Utc::now().timestamp_micros();
     let user_record = infra::table::users::UserRecord {
         email: email.to_string(),

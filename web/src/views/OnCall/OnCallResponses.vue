@@ -413,12 +413,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { teamId: row.latest.team_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full truncate underline"
+          class="text-text-body inline-block max-w-full underline"
           :data-test="`oncall-row-team-${row.rowKey}`"
           @click.stop
         >
-          {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
-          <OTooltip :content="raw(teamNameById[row.latest.team_id] ?? row.latest.team_id)" />
+          <OTruncatedText class="block">{{
+            raw(teamNameById[row.latest.team_id] ?? row.latest.team_id)
+          }}</OTruncatedText>
         </router-link>
       </template>
 
@@ -433,14 +434,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { id: row.latest.incident_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full truncate underline"
+          class="text-text-body inline-block max-w-full underline"
           :data-test="`oncall-row-incident-${row.rowKey}`"
           @click.stop
         >
-          {{ raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id) }}
-          <OTooltip
-            :content="raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)"
-          />
+          <OTruncatedText class="block">{{
+            raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)
+          }}</OTruncatedText>
         </router-link>
       </template>
 
@@ -449,10 +449,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-subject="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="flex items-center gap-1.5">
-            <span class="text-text-body truncate">
+            <OTruncatedText class="text-text-body">
               {{ raw(row.latest.title || row.latest.subject.source_id) }}
-              <OTooltip :content="raw(row.latest.title || row.latest.subject.source_id)" />
-            </span>
+            </OTruncatedText>
             <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
               {{ raw(`×${row.firings.length}`) }}
             </OTag>
@@ -882,6 +881,7 @@ import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

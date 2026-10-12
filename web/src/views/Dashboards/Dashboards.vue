@@ -120,9 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: dashboards table -->
       <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-        <div class="bg-card-glass-bg h-full">
+        <div class="bg-card-glass-bg flex h-full flex-col">
+          <div
+            v-show="showFirstData"
+            class="shrink-0 px-5 pt-5 empty:hidden"
+            data-test="dashboards-first-data"
+          >
+            <FirstDataPanel v-if="showFirstData" signal="any" variant="compact" />
+          </div>
           <OTable
-            class="h-full w-full"
+            class="min-h-0 w-full flex-1"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -209,7 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #cell-name="{ row, value }">
-              <span class="inline-flex items-center gap-1">
+              <span class="flex min-w-0 items-center gap-1">
                 <!-- One-click favorite toggle — filled gold star when
                      favorited, neutral outline otherwise. -->
                 <OButton
@@ -225,11 +232,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`dashboard-favorite-toggle-${value}`"
                   @click.stop="toggleFavorite(row)"
                 />
-                <span
+                <OTruncatedText
                   class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
-                  :title="value"
-                  >{{ value }}</span
+                  >{{ value }}</OTruncatedText
                 >
                 <!-- At-a-glance indicator: shows which dashboard is the org
                      home dashboard without an interactive icon on every row. -->
@@ -251,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body font-mono text-xs" :title="value">{{ value }}</span>
             </template>
             <template #cell-description="{ value }">
-              <span class="text-text-body" :title="value">{{ value || "—" }}</span>
+              <span class="text-text-body">{{ value || "—" }}</span>
             </template>
             <template #cell-owner="{ value }">
               <OUserCell :value="value" />
@@ -270,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
-                <span class="truncate">{{ row.folder }}</span>
+                <OTruncatedText>{{ row.folder }}</OTruncatedText>
               </button>
             </template>
             <template #cell-actions="{ row }">
@@ -552,6 +558,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import { useRoute, useRouter } from "vue-router";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
@@ -583,6 +590,7 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -629,6 +637,8 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    FirstDataPanel,
+    OTruncatedText,
     OUserCell,
     OTimeCell,
     OPageLayout,
@@ -1382,6 +1392,14 @@ export default defineComponent({
       { flush: "sync" },
     );
 
+    // mounted only while it can show, so a list with dashboards or an org with data runs no hidden watcher
+    const showFirstData = computed(
+      () =>
+        !loading.value &&
+        !dashboards.value.length &&
+        store.state.organizationData?.isDataIngested === false,
+    );
+
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
         // Capture before the row reference is cleared — used below to drop a
@@ -1808,6 +1826,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      showFirstData,
       refreshing,
       lastUpdatedAt,
       forbidden,

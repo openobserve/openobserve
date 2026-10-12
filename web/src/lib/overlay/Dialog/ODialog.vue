@@ -26,6 +26,7 @@ import {
   onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -123,8 +124,12 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
 }
 
+// Escape pressed inside an open dropdown or select belongs to that popup, not the dialog.
+const ESCAPE_OWNED_BY_POPUP = "[data-reka-popper-content-wrapper]";
+
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  if (props.persistent || target?.closest(ESCAPE_OWNED_BY_POPUP)) {
     e.preventDefault();
     return;
   }
@@ -479,20 +484,19 @@ watch(shown, (open) => {
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
-            <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="min-w-0 shrink-0">
-              <span
+            <div v-if="title || subTitle" class="min-w-0">
+              <OTruncatedText
                 v-if="title"
-                class="text-dialog-header-text block truncate text-base font-semibold"
+                class="text-dialog-header-text block text-base font-semibold"
               >
                 {{ title }}
-              </span>
-              <span
+              </OTruncatedText>
+              <OTruncatedText
                 v-if="subTitle"
-                class="text-dialog-content-text mt-0.5 block truncate text-sm opacity-70"
+                class="text-dialog-content-text mt-0.5 block text-sm opacity-70"
               >
                 {{ subTitle }}
-              </span>
+              </OTruncatedText>
             </div>
 
             <!-- #header-left sub-slot — grows to fill space, content flows left-to-right after title -->

@@ -46,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="onUpdateValue"
     >
       <template #trigger>
-        <span
-          class="text-select-text flex-1 truncate text-start text-xs leading-4 font-semibold"
+        <OTruncatedText
+          class="text-select-text flex-1 text-start text-xs leading-4 font-semibold"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
-          >{{ displayValue }}</span
+          >{{ displayValue }}</OTruncatedText
         >
       </template>
       <template #before-options>
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
-import { debounce } from "lodash-es";
+import { debounce, isEqual } from "lodash-es";
 import { defineComponent, ref, watch, computed, onUnmounted } from "vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -139,10 +139,11 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useI18nTyped } from "@/types/i18n";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
-  components: { OSeparator, OSelect, OCheckbox, OSpinner, OTooltip },
+  components: { OTruncatedText, OSeparator, OSelect, OCheckbox, OSpinner, OTooltip },
   props: {
     modelValue: { type: null, default: undefined },
     variableItem: { type: Object, default: undefined },
@@ -294,8 +295,9 @@ export default defineComponent({
         : SELECT_ALL_VALUE;
 
       selectedValue.value = newValue;
-      emit("update:modelValue", newValue);
+      // Multi-select applies on close (onPopupHide), like every other tick.
       if (!props.variableItem.multiSelect) {
+        emit("update:modelValue", newValue);
         await closePopUpWhenValueIsSet();
       }
     };
@@ -330,9 +332,10 @@ export default defineComponent({
       isOpen.value = false;
 
       filterText.value = "";
-      if (props.variableItem.multiSelect) {
-        emit("update:modelValue", selectedValue.value);
-      }
+      if (!props.variableItem.multiSelect) return;
+      // An unchanged value still resets every dependent variable downstream.
+      if (isEqual(selectedValue.value, props.variableItem.value)) return;
+      emit("update:modelValue", selectedValue.value);
     };
 
     const displayValue = computed(() => {

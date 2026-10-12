@@ -13,14 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
-import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
+import {
+  buildPrefillFromPanel,
+  dateToMicros,
+  executedPanelQuery,
+  panelQueryChoices,
+} from "@/utils/alerts/prefill/fromPanel";
+import { requestAlertCreation, useAlertCreation } from "@/composables/alerts/useAlertCreation";
+import { needsConfirmation, normalizePrefill } from "@/utils/alerts/alertPrefill";
+import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
+import {
+  FORECAST_FREQUENCY_MINUTES,
+  FORECAST_PERIOD_MINUTES,
+  buildForecastAlertPromql,
+  forecastAlertFromChart,
+} from "@/utils/alerts/forecastAlert";
 import { ref } from "vue";
 import { downloadFile } from "@/utils/dom";
-import { toast } from "@/lib/feedback/Toast/useToast";
-// `gt`, not useI18nTyped: this composable takes router/store as injected deps
-// so it can be constructed outside a component, and useI18n() throws there.
-import { gt, type TranslateFn } from "@/types/i18n";
+import type { TranslateFn } from "@/types/i18n";
+
+const PERIOD_WARNINGS = ["absoluteToRolling", "periodClamped"];
 
 // Helper function to properly wrap CSV values
 export const wrapCsvValue = (val: any): string => {
@@ -37,6 +49,78 @@ export const wrapCsvValue = (val: any): string => {
   return needsQuotes ? `"${str}"` : str;
 };
 
+/** Times in seconds; the line starts at its fit at the range end, past the points closing its seam. */
+export const forecastPointOf = (series: any, dataIndex: number | undefined) => {
+  const times: number[] = series?._timestamps ?? [];
+  const data: any[] = series?.data ?? [];
+  const start = series?._fitStartIndex ?? data.findIndex((point) => point?.[1] != null);
+  if (start < 0) return undefined;
+  const end = data.findLastIndex((point) => point?.[1] != null);
+  return {
+    rangeEndValue: series?._rangeEndValue,
+    startTime: times[start],
+    startValue: Number(data[start][1]),
+    endValue: Number(data[end][1]),
+    clickedTime: times[dataIndex ?? -1] ?? times[times.length - 1],
+  };
+};
+
+/** The SQL column a right-clicked threshold applies to, read off the query's y-axis or its SQL. */
+const sqlYAxisColumnOf = (
+  query: any,
+  executedQuery: string | undefined,
+  clickedSeriesName: string | undefined,
+): string | null => {
+  let yAxisColumn = null;
+  const sqlQuery = executedQuery || query.query;
+
+  // First, try to get from query.fields.y if available (most reliable for query builder)
+  if (query.fields?.y && query.fields.y.length > 0) {
+    // For query builder queries, use the Y-axis field
+    const yField = query.fields.y[0];
+    const aliasOrColumn = yField.alias || yField.column;
+
+    // Extract from SQL to get the exact case (without quotes)
+    if (sqlQuery) {
+      // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
+      const escapedAlias = aliasOrColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(`\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`, "i");
+      const match = sqlQuery.match(regex);
+      if (match && match[1]) {
+        // Strip quotes - the parser will add them back if needed
+        yAxisColumn = match[1].replace(/^["']|["']$/g, "");
+      } else {
+        yAxisColumn = aliasOrColumn;
+      }
+    } else {
+      yAxisColumn = aliasOrColumn;
+    }
+  } else if (clickedSeriesName && sqlQuery) {
+    // Fallback: try to match the clicked series name in the SQL
+    // First try exact match with the series name
+    const regex = new RegExp(
+      `\\s+as\\s+["']?(${clickedSeriesName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})["']?(?:\\s|,|\\)|$)`,
+      "i",
+    );
+    const match = sqlQuery.match(regex);
+    if (match && match[1]) {
+      yAxisColumn = match[1];
+    } else {
+      // Last resort: extract any aggregation column from SQL (first one found)
+      // Pattern: count(...) as alias, avg(...) as alias, etc.
+      const aggRegex =
+        /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
+      const aggMatch = sqlQuery.match(aggRegex);
+      if (aggMatch && aggMatch[1]) {
+        yAxisColumn = aggMatch[1];
+      } else {
+        yAxisColumn = clickedSeriesName;
+      }
+    }
+  }
+  return yAxisColumn;
+};
+
 export function usePanelAlertCreation({
   panelSchema,
   allowAlertCreation,
@@ -46,6 +130,9 @@ export function usePanelAlertCreation({
   store,
   router,
   emit,
+  visibleQueryIndexes,
+  hideChartTooltip,
+  alertSource,
 }: {
   panelSchema: any;
   allowAlertCreation: any;
@@ -55,6 +142,10 @@ export function usePanelAlertCreation({
   store: any;
   router: any;
   emit: any;
+  /** Panel queries not hidden in the editor; all of them when absent. */
+  visibleQueryIndexes?: { value: number[] };
+  hideChartTooltip?: () => void;
+  alertSource?: { value: string };
 }) {
   // Context menu state for alert creation
   const contextMenuVisible = ref(false);
@@ -76,6 +167,8 @@ export function usePanelAlertCreation({
       return;
     }
 
+    // The chart tooltip sits above every menu, so it would cover the alert items.
+    hideChartTooltip?.();
     contextMenuVisible.value = true;
     contextMenuPosition.value = { x: event.x, y: event.y };
     contextMenuValue.value = event.value;
@@ -86,11 +179,42 @@ export function usePanelAlertCreation({
     contextMenuVisible.value = false;
   };
 
-  const handleCreateAlert = (selection: { condition: string; threshold: number }) => {
+  const forecastPrefill = (
+    base: AlertPrefill,
+    T: number,
+    point: Omit<Parameters<typeof forecastAlertFromChart>[0], "U" | "T" | "rangeSeconds">,
+  ): AlertPrefill => {
+    const { start_time, end_time } = selectedTimeObj.value ?? {};
+    const rangeSeconds =
+      start_time instanceof Date && end_time instanceof Date
+        ? (dateToMicros(end_time) - dateToMicros(start_time)) / 1e6
+        : 0;
+    const forecast = forecastAlertFromChart({ U: base.promql ?? "", T, rangeSeconds, ...point });
+    return {
+      ...base,
+      // The forecast reads its own history window, so the chart's range says nothing about its period.
+      warnings: base.warnings.filter((w) => !PERIOD_WARNINGS.includes(w.key)),
+      promql: buildForecastAlertPromql(forecast),
+      promqlCondition: { column: "value", operator: "<=", value: forecast.H },
+      promqlMultiAlert: true,
+      periodMinutes: FORECAST_PERIOD_MINUTES,
+      frequencyMinutes: FORECAST_FREQUENCY_MINUTES,
+    };
+  };
+
+  const handleCreateAlert = (selection: {
+    condition: string;
+    threshold: number;
+    panelQueryIndex?: number;
+    seriesRole?: string;
+  }) => {
     hideContextMenu();
 
-    // Prepare panel data to pass to alert creation
-    const query = panelSchema.value.queries?.[0];
+    const queries: any[] = panelSchema.value.queries ?? [];
+    const visible = visibleQueryIndexes?.value ?? queries.map((_, index) => index);
+    // A click on empty chart area hit no series, so only a lone visible query is certain.
+    const queryIndex = selection.panelQueryIndex ?? (visible.length === 1 ? visible[0] : undefined);
+    const query = queries[queryIndex ?? visible[0]];
     if (!query) {
       return;
     }
@@ -102,96 +226,53 @@ export function usePanelAlertCreation({
       queryType = "promql";
     }
 
-    // Get the executed query with variables replaced from metadata
-    // Only use metadata if it's available and has queries
-    const executedQuery =
-      metadata.value?.queries && metadata.value.queries.length > 0
-        ? metadata.value.queries[0]?.query || query.query
-        : query.query;
+    const executedQueryOf = (index: number) =>
+      executedPanelQuery(metadata.value?.queries, index) || queries[index]?.query;
+    // Only a SQL threshold needs the y-axis column; PromQL compares the series value.
+    const yAxisColumnOf = (index: number) =>
+      queryType === "sql"
+        ? sqlYAxisColumnOf(
+            queries[index],
+            executedQueryOf(index),
+            contextMenuData.value?.seriesName,
+          )
+        : null;
 
-    // Get the Y-axis column for threshold comparison
-    // Only needed for SQL queries, not for PromQL
-    let yAxisColumn = null;
-
-    if (queryType === "sql") {
-      const clickedSeriesName = contextMenuData.value?.seriesName;
-      const sqlQuery = executedQuery || query.query;
-
-      // First, try to get from query.fields.y if available (most reliable for query builder)
-      if (query.fields?.y && query.fields.y.length > 0) {
-        // For query builder queries, use the Y-axis field
-        const yField = query.fields.y[0];
-        const aliasOrColumn = yField.alias || yField.column;
-
-        // Extract from SQL to get the exact case (without quotes)
-        if (sqlQuery) {
-          // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
-          const escapedAlias = aliasOrColumn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-          const regex = new RegExp(`\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`, "i");
-          const match = sqlQuery.match(regex);
-          if (match && match[1]) {
-            // Strip quotes - the parser will add them back if needed
-            yAxisColumn = match[1].replace(/^["']|["']$/g, "");
-          } else {
-            yAxisColumn = aliasOrColumn;
-          }
-        } else {
-          yAxisColumn = aliasOrColumn;
-        }
-      } else if (clickedSeriesName && sqlQuery) {
-        // Fallback: try to match the clicked series name in the SQL
-        // First try exact match with the series name
-        const regex = new RegExp(
-          `\\s+as\\s+["']?(${clickedSeriesName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})["']?(?:\\s|,|\\)|$)`,
-          "i",
-        );
-        const match = sqlQuery.match(regex);
-        if (match && match[1]) {
-          yAxisColumn = match[1];
-        } else {
-          // Last resort: extract any aggregation column from SQL (first one found)
-          // Pattern: count(...) as alias, avg(...) as alias, etc.
-          const aggRegex =
-            /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
-          const aggMatch = sqlQuery.match(aggRegex);
-          if (aggMatch && aggMatch[1]) {
-            yAxisColumn = aggMatch[1];
-          } else {
-            yAxisColumn = clickedSeriesName;
-          }
-        }
-      }
-    }
-
-    // The panel's y-axis extraction above is this surface's own knowledge; from
-    // here on it is the shared path — the same adapter, launcher, and form that
-    // every other surface uses. No confirm dialog here: the user already chose
-    // the threshold and condition in the context menu itself.
-    const { openAlertCreation } = useAlertCreation({ router, store });
-
-    const launched = openAlertCreation(
-      buildPrefillFromPanel({
+    // The menu already chose the threshold, so the dialog is only for which query, which stream, or why not.
+    const queryChoices =
+      queryIndex === undefined
+        ? panelQueryChoices(queries, metadata.value?.queries, visible)
+        : undefined;
+    const build = (options: AlertBuildOptions = {}) => {
+      const index = options.queryIndex ?? queryIndex ?? visible[0] ?? 0;
+      const prefill = buildPrefillFromPanel({
         panelTitle: panelSchema.value.title || "Unnamed Panel",
         panelId: panelSchema.value.id,
-        queries: panelSchema.value.queries,
+        queries,
         queryType,
+        queryIndex: index,
+        queryChoices,
         timeRange: selectedTimeObj.value,
         threshold: selection.threshold,
         condition: selection.condition as "above" | "below",
-        yAxisColumn,
-        executedQuery,
-      }),
-    );
-
-    // There is no confirm dialog on this path, so a refusal would otherwise be
-    // an unexplained no-op — the user right-clicks, picks a threshold, and
-    // nothing happens. Say why instead.
-    if (!launched) {
-      toast({
-        variant: "error",
-        message: gt("toastMessages.dashboard.panelQueryHasNoStreamToAlertOn"),
+        yAxisColumn: yAxisColumnOf(index),
+        executedQuery: executedQueryOf(index),
+        metadataQueries: metadata.value?.queries,
       });
+      return alertSource?.value ? { ...prefill, source: alertSource.value } : prefill;
+    };
+
+    const point = contextMenuData.value?.forecastPoint;
+    const prefill = normalizePrefill(
+      selection.condition === "forecast" && point
+        ? forecastPrefill(build(), selection.threshold, point)
+        : build(),
+    );
+    if (needsConfirmation(prefill)) {
+      requestAlertCreation(prefill, {}, build);
+      return;
     }
+    useAlertCreation({ router, store }).openAlertCreation(prefill);
   };
 
   return {

@@ -236,6 +236,29 @@ describe("ODialog", () => {
       expect(emitted?.[0]).toEqual([false]);
     });
 
+    it("stays open when Escape comes from an open dropdown or select inside it", async () => {
+      const wrapper = mount(ODialog, {
+        props: { open: true, title: "Test" },
+      });
+      const panel = findDialogPanel(wrapper);
+      const popup = document.createElement("div");
+      popup.setAttribute("data-reka-popper-content-wrapper", "");
+      const item = document.createElement("div");
+      popup.appendChild(item);
+      document.body.appendChild(popup);
+      const event = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      });
+      item.dispatchEvent(event);
+
+      await panel.vm.$emit("escapeKeyDown", event);
+
+      expect(wrapper.emitted("update:open")).toBeFalsy();
+      popup.remove();
+    });
+
     it("does NOT emit update:open when Escape is pressed and persistent=true", async () => {
       const wrapper = mount(ODialog, {
         props: { open: true, title: "Test", persistent: true },

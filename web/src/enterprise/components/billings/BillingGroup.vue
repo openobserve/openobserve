@@ -167,9 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.invitedBy") }}
                 </div>
-                <div class="truncate text-base font-semibold">
+                <OTruncatedText as="div" class="text-base font-semibold">
                   {{ membership?.created_by }}
-                </div>
+                </OTruncatedText>
               </div>
             </div>
             <div
@@ -184,9 +184,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
-                <div class="truncate text-base font-semibold">
+                <OTruncatedText as="div" class="text-base font-semibold">
                   {{ membership?.accepted_by || t("billing.billingGroup.addedOnCreation") }}
-                </div>
+                </OTruncatedText>
               </div>
             </div>
             <div
@@ -410,6 +410,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
   makeBillingGroupInviteSchema,
   billingGroupInviteDefaults,
@@ -455,6 +456,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OTooltip,
+    OTruncatedText,
     AppTabs,
   },
   setup() {

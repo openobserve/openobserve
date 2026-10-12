@@ -404,10 +404,8 @@ describe("buildPromqlStepCatalog", () => {
       expect(definitions.find((d) => d.id === PromqlStepId.Rad)).toBeDefined();
     });
 
-    it("should include Pi function with no params", () => {
-      const pi = definitions.find((d) => d.id === PromqlStepId.Pi);
-      expect(pi).toBeDefined();
-      expect(pi!.params).toHaveLength(0);
+    it("keeps pi only as a retired step, a constant that cannot be a step over a metric", () => {
+      expect(definitions.find((d) => d.id === PromqlStepId.Pi)?.retired).toBe(true);
     });
   });
 

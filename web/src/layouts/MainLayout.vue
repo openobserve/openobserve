@@ -155,6 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="store.state.selectedOrganization?.identifier"
               class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
+              <FirstDataNotice
+                v-if="firstDataNotice.visible.value && router.currentRoute.value.name !== 'home'"
+                class="mx-3 mt-3"
+                :stream="firstDataNotice.stream.value"
+                :arrived-at="firstDataNotice.arrivedAt.value"
+                @open="firstDataNotice.open"
+                @dismiss="firstDataNotice.dismiss"
+              />
               <router-view v-slot="{ Component }">
                 <keep-alive :include="KEPT_ALIVE_VIEWS">
                   <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
@@ -208,7 +216,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       data-test="main-layout-get-started-dialog"
       v-model:open="showGetStarted"
-      size="full"
+      size="lg"
+      persistent
       :show-close="false"
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
@@ -237,6 +246,10 @@ import {
   shouldPaywallRoute,
   isEmptyDataExempt,
 } from "../utils/zincutils";
+import { isPaywalledDestination } from "@/utils/auth";
+import { withDisambiguatedOrgLabels } from "@/utils/organizationLabel";
+import { notifyTrialBlocked } from "@/utils/trialPaywallNotice";
+import { runBeforeAppReloadHooks } from "@/utils/beforeAppReload";
 
 import {
   ref,
@@ -249,6 +262,7 @@ import {
   markRaw,
   nextTick,
   onBeforeMount,
+  provide,
 } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -274,6 +288,13 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
 import useStreams from "@/composables/useStreams";
+import { userDataStreams } from "@/utils/internalStreams";
+import FirstDataNotice from "@/components/ingestion/FirstDataNotice.vue";
+import {
+  FIRST_DATA_NOTICE,
+  useFirstDataNotice,
+  type OrgStreamList,
+} from "@/composables/firstEvent/useFirstDataNotice";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
@@ -321,6 +342,7 @@ export default defineComponent({
     ODialog,
     ODrawer,
     OButton,
+    FirstDataNotice,
   },
   methods: {
     navigateToDocs() {
@@ -379,7 +401,8 @@ export default defineComponent({
         },
       });
     },
-    changeLanguage(item: { code: string; label: string }) {
+    async changeLanguage(item: { code: string; label: string }) {
+      await runBeforeAppReloadHooks();
       setLanguage(item.code);
       window.location.reload();
     },
@@ -429,6 +452,13 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
+    // The list verifyStreamExist already fetches; the next-visit banner reuses it instead of asking again.
+    const layoutStreams = ref<OrgStreamList | undefined>();
+    const firstDataNotice = useFirstDataNotice(
+      computed(() => store.state.selectedOrganization?.identifier ?? ""),
+      layoutStreams,
+    );
+    provide(FIRST_DATA_NOTICE, firstDataNotice);
     const isIncidentsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -887,7 +917,7 @@ export default defineComponent({
 
       linksList.value.splice(insertAt, 0, {
         title: t("menu.profiles"),
-        icon: "account-tree",
+        icon: "memory",
         link: "/profiles",
         name: "profiles",
       });
@@ -997,14 +1027,24 @@ export default defineComponent({
     };
 
     const verifyStreamExist = async (selectedOrgData: any) => {
+      // getStreams reads the store's org when it starts, so the list belongs to that org even if the selection moves on
+      const listOrg: string = store.state.selectedOrganization?.identifier ?? "";
       await getStreams("", false).then((response: any) => {
+        const listIsCurrent = listOrg === (store.state.selectedOrganization?.identifier ?? "");
         store.dispatch("setSelectedOrganization", {
           ...selectedOrgData,
         });
-        if (response.list.length == 0) {
+        layoutStreams.value = { org: listOrg, list: response.list ?? [] };
+        if (userDataStreams(response.list).length === 0) {
           store.dispatch("setIsDataIngested", false);
-          if (isEmptyDataExempt(router.currentRoute.value)) return;
-          router.push({ name: "ingestion" });
+          // a deep link or reload ran the route guard before the flag or this list was known
+          if (
+            store.state.zoConfig?.restricted_routes_on_empty_data === true &&
+            listIsCurrent &&
+            !isEmptyDataExempt(router.currentRoute.value)
+          ) {
+            router.push({ name: "ingestion", query: { org_identifier: listOrg } });
+          }
         } else {
           store.dispatch("setIsDataIngested", true);
         }
@@ -1059,7 +1099,8 @@ export default defineComponent({
               user_email: store.state.userInfo.email,
             };
           }
-          orgOptions.value = store.state.organizations
+          const labeledOrgs = withDisambiguatedOrgLabels(store.state.organizations);
+          orgOptions.value = labeledOrgs
             .map(
               (data: {
                 id: any;
@@ -1071,7 +1112,9 @@ export default defineComponent({
                 search_threshold: number;
                 CustomerBillingObj: { subscription_type: string; note: string };
                 status: string;
+                label: string;
               }) => {
+                // `label` is the real name here — General.vue's delete-confirm gate matches it; disambiguation is applied only on the dropdown copy below.
                 const optiondata: any = {
                   label: data.name,
                   id: data.id,
@@ -1130,7 +1173,8 @@ export default defineComponent({
                   tempDefaultOrg = optiondata;
                 }
 
-                return optiondata;
+                // Disambiguated label only for the dropdown entry — optiondata itself keeps the real name.
+                return { ...optiondata, label: data.label };
               },
             )
             .sort((a: any, b: any) => a.label.localeCompare(b.label));
@@ -1143,7 +1187,7 @@ export default defineComponent({
         }
 
         if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations.length > 0) {
-          let data = store.state.organizations[0];
+          let data = withDisambiguatedOrgLabels(store.state.organizations)[0];
           let optiondata = {
             label: data.name,
             id: data.id,
@@ -1263,6 +1307,13 @@ export default defineComponent({
             router.currentRoute.value.name,
           )
         ) {
+          // Name the page only when its own guard would block it; Home has none, so it gets the generic copy.
+          const current = router.currentRoute.value;
+          notifyTrialBlocked(
+            isPaywalledDestination(orgSettings?.data?.data?.free_trial_expiry, current)
+              ? current
+              : {},
+          );
           router.push({
             name: "plans",
             query: {
@@ -1332,9 +1383,7 @@ export default defineComponent({
           if (res.data.rum.enabled) {
             setRumUser();
           }
-          // The empty-data → /ingestion redirect depends on
-          // restricted_routes_on_empty_data, which only arrives with the full
-          // config — the first navigation ran before it landed, so re-check now.
+          // restricted_routes_on_empty_data arrives only with the full config, so the first navigation could not record isDataIngested
           if (
             res.data.restricted_routes_on_empty_data === true &&
             store.state.organizationData.isDataIngested === false
@@ -1533,6 +1582,7 @@ export default defineComponent({
       isDark,
       t,
       raw,
+      firstDataNotice,
       layoutMixin,
       router,
       store,

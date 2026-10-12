@@ -16,9 +16,11 @@
 import { describe, expect, it } from "vitest";
 import {
   arrivalTraceWindowUs,
+  isRumContextSpan,
   spanWindowUs,
   traceQueryWindow,
   TRACE_RANGE_PADDING_US,
+  waterfallAxisSpans,
 } from "@/utils/rum/traceWindow";
 
 describe("traceQueryWindow", () => {
@@ -147,5 +149,53 @@ describe("arrivalTraceWindowUs", () => {
     expect(
       arrivalTraceWindowUs([{}, { _first_ts: null, _last_ts: "" }, { _first_ts: 0 }]),
     ).toBeNull();
+  });
+});
+
+describe("isRumContextSpan", () => {
+  it("is true for the RUM view and for collapsed group rows", () => {
+    expect(isRumContextSpan({ rum_event_type: "view" })).toBe(true);
+    expect(
+      isRumContextSpan({ rum_event_type: "collapsed_requests", _is_collapsed_group: true }),
+    ).toBe(true);
+  });
+
+  it("is false for RUM actions and requests and for backend spans", () => {
+    expect(isRumContextSpan({ rum_event_type: "action" })).toBe(false);
+    expect(isRumContextSpan({ rum_event_type: "resource" })).toBe(false);
+    expect(isRumContextSpan({})).toBe(false);
+    expect(isRumContextSpan(null)).toBe(false);
+  });
+});
+
+describe("waterfallAxisSpans", () => {
+  const view = { rum_event_type: "view", start_time: 0, end_time: 1_500_000_000_000 };
+  const others = {
+    rum_event_type: "collapsed_requests",
+    _is_collapsed_group: true,
+    start_time: 1_000,
+    end_time: 1_400_000_000_000,
+  };
+  const request = { rum_event_type: "resource", start_time: 600e9, end_time: 600.3e9 };
+  const backend = { start_time: 600.1e9, end_time: 600.2e9 };
+
+  // Regression: a 25-minute view set a 25-minute axis and hid every request bar.
+  it("fits the axis to the request and its backend spans, not the page visit", () => {
+    expect(spanWindowUs(waterfallAxisSpans([view, others, request, backend]))).toEqual({
+      start: 600e6,
+      end: 600.3e6,
+    });
+  });
+
+  it("leaves a trace without RUM spans unchanged", () => {
+    expect(waterfallAxisSpans([request, backend])).toEqual([request, backend]);
+  });
+
+  it("falls back to every span when only context spans are present", () => {
+    expect(waterfallAxisSpans([view, others])).toEqual([view, others]);
+  });
+
+  it("returns an empty list for no spans", () => {
+    expect(waterfallAxisSpans(undefined)).toEqual([]);
   });
 });

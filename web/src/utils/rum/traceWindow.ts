@@ -74,3 +74,19 @@ export function arrivalTraceWindowUs(
   if (!Number.isFinite(first) || !Number.isFinite(last)) return null;
   return { start: first - TRACE_RANGE_PADDING_US, end: last + TRACE_RANGE_PADDING_US };
 }
+
+type RumSpanMarkers = { rum_event_type?: unknown; _is_collapsed_group?: unknown };
+
+/** A RUM view or collapsed group row: it frames the trace rather than taking part. */
+export function isRumContextSpan(span: RumSpanMarkers | null | undefined): boolean {
+  return span?.rum_event_type === "view" || span?._is_collapsed_group === true;
+}
+
+/** Spans the waterfall axis fits: non-context spans, or all spans if none remain. */
+export function waterfallAxisSpans<T extends RumSpanMarkers & SpanTimes>(
+  spans: ReadonlyArray<T> | null | undefined,
+): ReadonlyArray<T> {
+  if (!spans) return [];
+  const participants = spans.filter((span) => !isRumContextSpan(span));
+  return participants.length ? participants : spans;
+}

@@ -89,6 +89,7 @@ const grid = vi.hoisted(() => {
     runDialogQuery: vi.fn(),
     cancelDialogQueries: vi.fn(),
     runDetailQuery: vi.fn(),
+    detailStepFor: vi.fn(() => 30),
     rateWindowFor: vi.fn(() => "4m"),
     labelsByStream: { value: {} },
     prefixAssignment: { value: { groupOf: new Map() } },
@@ -1191,6 +1192,19 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.paused.value).toBe(true);
     });
 
+    it("keeps the Used in tab in the URL", async () => {
+      routerState.query = { metric: CARD.name };
+      const wrapper = mountExplorer();
+      routerState.replace.mockClear();
+
+      (wrapper.vm as any).onDetailTab("used_in");
+      await wrapper.vm.$nextTick();
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        tab: "used_in",
+      });
+    });
+
     it("REPLACES the entry on a tab or breakdown-label change", async () => {
       routerState.query = { metric: CARD.name };
       const wrapper = mountExplorer();
@@ -1534,6 +1548,64 @@ describe("MetricsExplorer wiring", () => {
       expect(grid.effectiveVariant).toHaveBeenLastCalledWith(OTHER, undefined, expect.any(Object));
       expect(chart.queries).toEqual([{ expr: "sum(rate(http_responses_total[4m]))" }]);
       expect(chart.chartType).toBe("line");
+    });
+
+    it("restores compare from a deep link and writes a change to the URL without re-querying the grid", async () => {
+      routerState.query = { metric: CARD.name, compare: "1d" };
+      const wrapper = mountExplorer();
+      expect(detailView(wrapper).props("compare")).toBe("1d");
+      expect(detailView(wrapper).props("stepSeconds")).toBe(30);
+      routerState.push.mockClear();
+      routerState.replace.mockClear();
+      grid.requestPreview.mockClear();
+
+      detailView(wrapper).vm.$emit("update:compare", "1w");
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("compare")).toBe("1w");
+      expect(routerState.replace.mock.calls.at(-1)[0].query).toMatchObject({
+        metric: CARD.name,
+        compare: "1w",
+      });
+      expect(routerState.push).not.toHaveBeenCalled();
+
+      const prefixes = grid.selectedPrefixes.value;
+      const labels = grid.labelFilters.value;
+      routerState.query = { metric: CARD.name, compare: "1h" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("compare")).toBe("1h");
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.labelFilters.value).toBe(labels);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      expect(grid.sweepSlice).not.toHaveBeenCalled();
+    });
+
+    it("restores the forecast from a deep link and writes a change without re-querying the grid", async () => {
+      routerState.query = { metric: CARD.name, forecast: "linear", forecast_h: "6h" };
+      const wrapper = mountExplorer();
+      expect(detailView(wrapper).props("forecast")).toBe("linear");
+      expect(detailView(wrapper).props("forecastHorizon")).toBe("6h");
+      routerState.replace.mockClear();
+      grid.requestPreview.mockClear();
+
+      detailView(wrapper).vm.$emit("update:forecast", "smoothed");
+      detailView(wrapper).vm.$emit("update:forecastHorizon", null);
+      await wrapper.vm.$nextTick();
+      const query = routerState.replace.mock.calls.at(-1)[0].query;
+      expect(query).toMatchObject({ metric: CARD.name, forecast: "smoothed" });
+      expect(query.forecast_h).toBeUndefined();
+
+      const prefixes = grid.selectedPrefixes.value;
+      routerState.query = { metric: CARD.name, forecast: "linear", forecast_h: "1d" };
+      (wrapper.vm as any).onRouteQueryChange();
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("forecastHorizon")).toBe("1d");
+      expect(grid.selectedPrefixes.value).toBe(prefixes);
+      expect(grid.requestPreview).not.toHaveBeenCalled();
+      detailView(wrapper).vm.$emit("update:forecast", null);
+      await wrapper.vm.$nextTick();
+      expect(detailView(wrapper).props("forecastHorizon")).toBeNull();
+      expect(routerState.replace.mock.calls.at(-1)[0].query.forecast_h).toBeUndefined();
     });
 
     it("Back to the label grid clears the breakdown label, replacing the entry", async () => {

@@ -5,17 +5,11 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const { ingestTraces } = require('../utils/trace-ingestion.js');
 
-// TracesMetricsDashboard.emitFiltersToQueryEditor writes duration filters as human-readable strings.
-const DURATION_FILTER_PATTERN = /duration\s*(>=|<=)\s*'[\d.]+(us|ms|s|m)'/;
-const DURATION_GTE_PATTERN = /duration\s*>=\s*'[\d.]+(us|ms|s|m)'/;
-const DURATION_LTE_PATTERN = /duration\s*<=\s*'[\d.]+(us|ms|s|m)'/;
-// A two-sided bound; a context-menu selection must be single-sided, never this.
-const DURATION_RANGE_PATTERN = /and\s+duration\s*(>=|<=)/;
-// The Insights query fails server-side when that string is not decoded back to µs.
+// A heatmap box writes its half-open band with exact 1-2-5 bounds.
+const DURATION_FILTER_PATTERN = /duration\s*(>=|<)\s*'\d+(us|ms|s)'/;
+// The Drill down query fails server-side when that string is not decoded back to µs.
 const CAST_ERROR_PATTERN = /Cannot cast string|simplify_expressions|Arrow error/i;
 const RED_PANELS = ['Rate', 'Errors', 'Duration'];
-// Insights tab slugs from TracesAnalysisDashboard.vue.
-const ANALYSIS_TABS = ['volume', 'error', 'duration'];
 
 test.describe("Traces Charts testcases", () => {
   let pm;
@@ -114,25 +108,13 @@ test.describe("Traces Charts testcases", () => {
     expect(query, 'Duration zoom must write a duration filter into the editor')
       .toMatch(DURATION_FILTER_PATTERN);
 
-    await pm.tracesPage.clickInsightsButton();
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
-    await page.waitForTimeout(5000);
+    // The comparison decodes the filter too; a cast failure would land it in its error state.
+    const state = await pm.tracesPage.openComparison();
+    const text = await page.locator(state).innerText();
+    expect(text, 'Drill down must not fail casting the duration filter').not.toMatch(CAST_ERROR_PATTERN);
+    expect(state, 'Drill down must compare the box').toBe(pm.tracesPage.comparisonPage);
 
-    // The cast error hit every dimension panel on every tab, so all three are checked.
-    // A zoomed band can match nothing, so this asserts on errors, not on chart counts.
-    for (const tab of ANALYSIS_TABS) {
-      const states = await pm.tracesPage.openAnalysisTab(tab);
-      testLogger.info(`Insights ${tab} tab panels after duration zoom`, states);
-
-      expect(states.errorText, `${tab} tab must not fail casting the duration filter`)
-        .not.toMatch(CAST_ERROR_PATTERN);
-      expect(states.errors, `${tab} tab must render no errored dimension panel`).toBe(0);
-      // A narrow zoom can legitimately leave a dimension empty; an unresolved panel cannot.
-      expect(states.charts + states.noData, `${tab} tab must resolve every panel`)
-        .toBe(states.panels);
-    }
-
-    await pm.tracesPage.closeAnalysisDashboard();
+    await page.locator(pm.tracesPage.drillDownBackButton).click();
   });
 
   // ─── P0 — Critical path ──────────────────────────────────────────────────────
@@ -187,40 +169,10 @@ test.describe("Traces Charts testcases", () => {
     await searchAndShowCharts();
 
     expect(await pm.tracesPage.isInsightsButtonVisible(), 'Insights button must be visible').toBeTruthy();
-    await pm.tracesPage.clickInsightsButton();
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
+    // Without a box or brush there is nothing to compare, so the page asks for a selection.
+    expect(await pm.tracesPage.openComparison()).toBe(pm.tracesPage.comparisonNoSelection);
 
-    expect(await pm.tracesPage.isAnalysisDashboardVisible(), 'Insights dashboard must open').toBeTruthy();
-
-    const drawerText = await pm.tracesPage.getAnalysisDashboardText();
-    expect(drawerText, 'Insights must open without a query error').not.toMatch(CAST_ERROR_PATTERN);
-
-    await pm.tracesPage.closeAnalysisDashboard();
-  });
-
-  test("P0: Insights renders a chart for every dimension on every tab", {
-    tag: ['@tracesCharts', '@traces', '@smoke', '@P0', '@all']
-  }, async ({ page }) => {
-
-    await searchAndShowCharts();
-    await pm.tracesPage.clickInsightsButton();
-    await pm.tracesPage.waitForAnalysisDashboardLoad();
-
-    let charted = 0;
-    for (const tab of ANALYSIS_TABS) {
-      const states = await pm.tracesPage.openAnalysisTab(tab);
-      testLogger.info(`Insights ${tab} tab panels`, states);
-
-      expect(states.panels, `${tab} tab must render dimension panels`).toBeGreaterThan(0);
-      expect(states.errors, `${tab} tab panel error: ${states.errorText}`).toBe(0);
-      // The Errors tab is empty when the window holds no error spans; that is not a failure.
-      expect(states.charts + states.noData, `${tab} tab must resolve every panel`)
-        .toBe(states.panels);
-      charted += states.charts;
-    }
-    expect(charted, 'At least one dimension must chart across the three tabs').toBeGreaterThan(0);
-
-    await pm.tracesPage.closeAnalysisDashboard();
+    await page.locator(pm.tracesPage.drillDownBackButton).click();
   });
 
   // ─── P1 — Functional ─────────────────────────────────────────────────────────
@@ -482,91 +434,5 @@ test.describe("Traces Charts testcases", () => {
 
     testLogger.info('Page errors during chart interaction', { pageErrors });
     expect(pageErrors, `Uncaught errors: ${pageErrors.join(' | ')}`).toHaveLength(0);
-  });
-
-  // ─── Right-click Duration gte/lte context menu (Workflow 3) ────────────────
-
-  test("P1: Right-click Duration opens the gte/lte context menu and dismisses on Escape", {
-    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-
-    await searchAndShowCharts();
-
-    const { dispatched, opened } = await pm.tracesPage.openMetricsContextMenu('Duration');
-    expect(dispatched, 'Right-click must reach the Duration panel').toBeTruthy();
-    expect(opened, 'Duration right-click must open the gte/lte menu').toBeTruthy();
-
-    await pm.tracesPage.expectMetricsContextMenuVisible();
-    expect(await pm.tracesPage.isMetricsContextMenuItemVisible('gte'), 'gte item must render').toBeTruthy();
-    expect(await pm.tracesPage.isMetricsContextMenuItemVisible('lte'), 'lte item must render').toBeTruthy();
-
-    await pm.tracesPage.dismissMetricsContextMenu();
-    await pm.tracesPage.expectMetricsContextMenuHidden();
-  });
-
-  test("P1: Right-click Duration then gte writes a single-sided duration >= filter", {
-    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-
-    await searchAndShowCharts();
-
-    const before = await pm.tracesPage.getQueryEditorContent();
-    expect(before, 'Editor must start without a duration filter').not.toMatch(DURATION_FILTER_PATTERN);
-
-    await pm.tracesPage.openMetricsContextMenu('Duration');
-    await pm.tracesPage.expectMetricsContextMenuVisible();
-    await pm.tracesPage.selectMetricsContextMenuItem('gte');
-
-    await expect
-      .poll(async () => pm.tracesPage.getQueryEditorContent(), { timeout: 8000 })
-      .toMatch(DURATION_GTE_PATTERN);
-
-    const after = await pm.tracesPage.getQueryEditorContent();
-    testLogger.info('Query editor after gte context-menu selection', { after });
-    expect(after, 'gte must write a single-sided bound (no upper bound)')
-      .not.toMatch(DURATION_RANGE_PATTERN);
-
-    const panelError = await pm.tracesPage.getMetricsPanelErrorText();
-    expect(panelError, 'No RED panel may error after a gte context-menu selection').toBe('');
-  });
-
-  test("P1: Right-click Duration then lte writes a single-sided duration <= filter", {
-    tag: ['@tracesCharts', '@traces', '@functional', '@P1', '@all']
-  }, async ({ page }) => {
-
-    await searchAndShowCharts();
-
-    const before = await pm.tracesPage.getQueryEditorContent();
-    expect(before, 'Editor must start without a duration filter').not.toMatch(DURATION_FILTER_PATTERN);
-
-    await pm.tracesPage.openMetricsContextMenu('Duration');
-    await pm.tracesPage.expectMetricsContextMenuVisible();
-    await pm.tracesPage.selectMetricsContextMenuItem('lte');
-
-    await expect
-      .poll(async () => pm.tracesPage.getQueryEditorContent(), { timeout: 8000 })
-      .toMatch(DURATION_LTE_PATTERN);
-
-    const after = await pm.tracesPage.getQueryEditorContent();
-    testLogger.info('Query editor after lte context-menu selection', { after });
-    expect(after, 'lte must write a single-sided bound (no lower bound)')
-      .not.toMatch(DURATION_RANGE_PATTERN);
-
-    const panelError = await pm.tracesPage.getMetricsPanelErrorText();
-    expect(panelError, 'No RED panel may error after an lte context-menu selection').toBe('');
-  });
-
-  test("P2: Right-click Rate does not open the gte/lte context menu", {
-    tag: ['@tracesCharts', '@traces', '@edge', '@P2', '@all']
-  }, async ({ page }) => {
-
-    await searchAndShowCharts();
-
-    const { dispatched, opened } = await pm.tracesPage.openMetricsContextMenu('Rate');
-    // Without this the assertion below would also pass on a right-click that missed the canvas.
-    expect(dispatched, 'Right-click must reach the Rate panel for this test to mean anything').toBeTruthy();
-    expect(opened, 'Rate must not open the Duration-only context menu').toBeFalsy();
-
-    await pm.tracesPage.expectMetricsContextMenuStaysHidden();
   });
 });

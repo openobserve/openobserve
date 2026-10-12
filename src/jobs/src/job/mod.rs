@@ -564,7 +564,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
-    tokio::task::spawn(db::system_settings::watch());
     tokio::task::spawn(db::model_pricing::watch());
     tokio::task::spawn(openobserve_core::prompts::watch_invalidation());
     tokio::task::spawn(db::alerts::templates::watch());
@@ -631,9 +630,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .await
         .expect("prom cluster leader cache failed");
 
+    // Queue changes during hydration so the snapshot cannot overwrite newer events.
+    let system_settings_watcher = db::system_settings::create_watcher().await?;
     db::system_settings::cache()
         .await
         .expect("system settings cache failed");
+    tokio::task::spawn(system_settings_watcher);
+
+    #[cfg(feature = "enterprise")]
+    o2_enterprise::enterprise::common::remote_defaults::spawn_refresher();
 
     if config::get_config().common.model_pricing_enabled {
         db::model_pricing::cache()

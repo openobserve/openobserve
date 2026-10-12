@@ -9,9 +9,9 @@
     <template #subtitle>
       <div class="flex min-w-0 items-center gap-2">
         <OTag type="streamType" :value="activeStreamType" />
-        <span v-if="activeStreamName" class="min-w-0 truncate leading-normal">{{
+        <OTruncatedText v-if="activeStreamName" class="leading-normal">{{
           activeStreamName
-        }}</span>
+        }}</OTruncatedText>
       </div>
     </template>
     <template #actions>
@@ -317,6 +317,7 @@ import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -340,6 +341,7 @@ export default defineComponent({
     OIcon,
     OTag,
     OTooltip,
+    OTruncatedText,
     OTable,
     OTimeCell,
     OPageLayout,

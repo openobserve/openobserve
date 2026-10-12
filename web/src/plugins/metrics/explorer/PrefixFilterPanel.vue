@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="toggle(facet.id)"
         >
           <template #label>
-            <span class="truncate text-xs" :title="facet.label">{{ facet.label }}</span>
+            <OTruncatedText class="block text-xs">{{ facet.label }}</OTruncatedText>
           </template>
         </OCheckbox>
 
@@ -114,6 +114,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 /** A rail facet. Counts are recomputed by the caller against the OTHER active
  *  filters, so this component only ever renders them. */

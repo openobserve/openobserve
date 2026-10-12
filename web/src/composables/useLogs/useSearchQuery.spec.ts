@@ -349,6 +349,72 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
     });
   });
 
+  // ── VRL-derived fields must never reach the SELECT (o2-enterprise#2859) ────
+
+  describe("SQL field list excludes VRL-derived fields", () => {
+    beforeEach(() => {
+      mockState.searchObj.meta.quickMode = true;
+      mockState.searchObj.data.stream.selectedStream = ["my-stream"];
+      // extractFields() appends hit-only fields — a VRL function's output — with
+      // isSchemaField: false, alongside the stream's own schema fields.
+      mockState.searchObj.data.stream.selectedStreamFields = [
+        { name: "field1", isSchemaField: true },
+        { name: "vrl_field", isSchemaField: false },
+      ];
+      mockState.searchObj.data.stream.interestingFieldList = ["field1", "vrl_field"];
+    });
+
+    it("should keep a VRL-derived field out of the SELECT list", () => {
+      const result = buildSearch(false, false);
+
+      const sql = getSql(result);
+      expect(sql).toContain("field1");
+      // The VRL runs after the SQL, so selecting its output field fails the whole
+      // query with "Search field not found: vrl_field".
+      expect(sql).not.toContain("vrl_field");
+    });
+
+    it("should prune a VRL-derived field from interestingFieldList in normal mode", () => {
+      buildSearch(false, false);
+
+      expect(mockState.searchObj.data.stream.interestingFieldList).toEqual(["field1"]);
+    });
+
+    it("should not mutate interestingFieldList in readOnly mode", () => {
+      const result = buildSearch(true, false);
+
+      expect(getSql(result)).not.toContain("vrl_field");
+      expect(mockState.searchObj.data.stream.interestingFieldList).toEqual(["field1", "vrl_field"]);
+    });
+
+    it("should use SELECT * when every interesting field is VRL-derived", () => {
+      mockState.searchObj.data.stream.selectedStreamFields = [
+        { name: "vrl_field", isSchemaField: false },
+      ];
+      mockState.searchObj.data.stream.interestingFieldList = ["vrl_field"];
+
+      const result = buildSearch(false, false);
+
+      const sql = getSql(result);
+      expect(sql).toContain("*");
+      expect(sql).not.toContain("vrl_field");
+    });
+
+    it("should keep fields that carry no isSchemaField flag at all", () => {
+      // Index.vue and useSearchBar.ts assign raw stream schema objects, which have
+      // no isSchemaField property — those are schema fields and must stay selectable.
+      mockState.searchObj.data.stream.selectedStreamFields = [
+        { name: "field1" },
+        { name: "field2" },
+      ];
+      mockState.searchObj.data.stream.interestingFieldList = ["field1", "field2"];
+
+      const result = buildSearch(false, false);
+
+      expect(getSql(result)).toContain("field1,field2");
+    });
+  });
+
   // ── ignoreQuickMode does not affect non-quick-mode field list ──────────────
 
   describe("ignoreQuickMode with empty interestingFieldList", () => {

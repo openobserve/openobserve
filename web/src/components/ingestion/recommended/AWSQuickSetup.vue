@@ -286,10 +286,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ param.key }}
                   </div>
                   <div class="flex flex-1 items-center gap-1 overflow-hidden">
-                    <span
-                      class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                    <OTruncatedText
+                      :tooltip="param.key === 'OpenObserveAccessKey' ? false : undefined"
+                      class="flex-1"
                       :class="paramValTextClass"
-                      >{{ param.value }}</span
+                      >{{ param.secret ? maskSecret(param.value) : param.value }}</OTruncatedText
                     >
                     <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
                       <OIcon name="content-copy" size="sm" />
@@ -333,11 +334,13 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import analytics from "@/services/product_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { maskSecret } from "@/composables/useCredentialSnippet";
 
 const COMPLETE_TEMPLATE_URL =
   "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml";
@@ -351,6 +354,7 @@ export default defineComponent({
     OButton,
     OSelect,
     OTooltip,
+    OTruncatedText,
     OCheckbox,
     OIcon,
     OTag,
@@ -433,7 +437,7 @@ export default defineComponent({
         { key: "TemplateS3Bucket", value: "openobserve-datasources-bucket" },
         { key: "TemplateS3Prefix", value: "datasource/cloud/aws" },
         { key: "OpenObserveEndpoint", value: endpointUrl },
-        { key: "OpenObserveAccessKey", value: accessKey },
+        { key: "OpenObserveAccessKey", value: accessKey, secret: true },
         ...QUICK_SETUP_SERVICES.map(({ flag }) => ({
           key: flag,
           value: serviceFlags[flag],
@@ -564,6 +568,7 @@ export default defineComponent({
       showTargetRegions,
       showServices,
       stackSetParams,
+      maskSecret,
       AWS_REGIONS,
       regionOptions,
       QUICK_SETUP_SERVICES,

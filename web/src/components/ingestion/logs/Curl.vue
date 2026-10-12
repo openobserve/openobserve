@@ -16,17 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+    <CredentialCodeBlock slug="curl" lang="bash" :content="content" />
   </IngestionContent>
 </template>
 
 <script lang="ts">
-import { raw } from "@/types/i18n";
 import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL, maskText } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 export default defineComponent({
   name: "curl-mechanism",
@@ -38,7 +37,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent },
+  components: { CredentialCodeBlock, IngestionContent },
   setup() {
     const store = useStore();
     const endpoint: any = ref({
@@ -53,10 +52,11 @@ export default defineComponent({
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
 
-    const content = `curl -u [EMAIL]:[PASSCODE] -k ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json -d "[{\\"level\\":\\"info\\",\\"job\\":\\"test\\",\\"log\\":\\"test message for openobserve\\"}]"`;
+    // Cloud endpoints carry valid certificates, so -k there only teaches users to skip TLS checks.
+    const insecureFlag = config.isCloud === "true" ? "" : " -k";
+    const content = `curl -u [EMAIL]:[PASSCODE]${insecureFlag} ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json -d "[{\\"level\\":\\"info\\",\\"job\\":\\"test\\",\\"log\\":\\"test message for openobserve\\"}]"`;
 
     return {
-      raw,
       store,
       config,
       endpoint,

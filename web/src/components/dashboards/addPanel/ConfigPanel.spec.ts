@@ -332,6 +332,45 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Axis labels mode", () => {
+    const panelOf = (type: string, config: Record<string, unknown> = {}) => ({
+      ...mockDashboardPanelData,
+      data: {
+        ...mockDashboardPanelData.data,
+        type,
+        config: { ...mockDashboardPanelData.data.config, ...config },
+      },
+    });
+    const toggleOf = () =>
+      wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.text().includes("Axis Labels"));
+
+    it("offers Auto, Show and Hide and writes config.axis_label_mode", async () => {
+      const panel = panelOf("bar", { axis_label_mode: "auto" });
+      wrapper = createWrapper({ dashboardPanelData: panel });
+      expect(toggleOf()?.props("modelValue")).toBe("auto");
+      expect(toggleOf()?.text()).toContain("AutoShowHide");
+      await toggleOf()?.vm.$emit("update:modelValue", "hide");
+      expect(panel.data.config.axis_label_mode).toBe("hide");
+    });
+
+    it("reads Auto for a panel saved before the mode existed", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("bar") });
+      expect(toggleOf()?.props("modelValue")).toBe("auto");
+    });
+
+    it.each(["table", "pie", "metric", "heatmap"])("is absent for %s", (type) => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf(type) });
+      expect(toggleOf()).toBeUndefined();
+    });
+
+    it("is absent in PromQL mode", () => {
+      wrapper = createWrapper({ dashboardPanelData: panelOf("line") }, { promqlMode: true });
+      expect(toggleOf()).toBeUndefined();
+    });
+  });
+
   describe("Time shift (Comparison against)", () => {
     const shiftedPanel = (queryType: string) => ({
       ...mockDashboardPanelData,

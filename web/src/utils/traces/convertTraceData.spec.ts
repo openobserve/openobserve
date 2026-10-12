@@ -489,6 +489,42 @@ describe("convertTraceData", () => {
       expect(tallFont).toBeLessThanOrEqual(12);
     });
 
+    it("shows each node's own request count, as the graph view does, not its edge traffic", () => {
+      const graphData = {
+        nodes: [
+          { id: "A", label: "A", requests: 7, errors: 0 },
+          { id: "B", label: "B", requests: 42, errors: 0 },
+          { id: "C", label: "C", requests: 500, errors: 0 },
+        ],
+        edges: [
+          { from: null, to: "A", total_requests: 7 },
+          { from: "A", to: "B", total_requests: 30 },
+          { from: "B", to: "C", total_requests: 500 },
+        ],
+      };
+      const result = convertServiceGraphToTree(graphData as any, "horizontal");
+      const [a] = result.options.series[0].data;
+      const b = a.children[0];
+      expect(a.value).toBe(7);
+      expect(b.name).toBe("B");
+      expect(b.value).toBe(42);
+      expect(b.label.formatter({ name: "B" })).toContain("42");
+      expect(b.children[0].value).toBe(500);
+    });
+
+    it("falls back to edge traffic for a node without its own request count", () => {
+      const graphData = {
+        nodes: [
+          { id: "A", label: "A" },
+          { id: "B", label: "B" },
+        ],
+        edges: [{ from: "A", to: "B", total_requests: 30 }],
+      };
+      const [a] = convertServiceGraphToTree(graphData as any, "horizontal").options.series[0].data;
+      expect(a.value).toBe(30);
+      expect(a.children[0].value).toBe(30);
+    });
+
     it("drops the 'N req' second label line at extreme density, keeps the name", () => {
       // The two-line label (name + "N req") is the real overlap driver. At a
       // roomy panel both lines show; at extreme density the second line is

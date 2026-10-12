@@ -84,6 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :color="color"
           :time-range="state.timeRange"
           :legend="legend"
+          :allow-alert-creation="allowAlertCreation"
+          :shifted="state.shifted ?? []"
+          :step-seconds="state.stepSeconds ?? 0"
+          :forecast="state.forecast ?? null"
           @error="onRenderError"
         />
       </slot>
@@ -97,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import MetricCardChart from "./MetricCardChart.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -107,16 +111,36 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { parseSearchError } from "@/utils/query/searchError";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import { isCancelled } from "@/composables/metrics/useMetricsPreviewQueue";
-import { hasSamples } from "@/composables/metrics/useMetricsExplorerGrid";
+import { hasSamples, type QueryWindow } from "@/composables/metrics/useMetricsExplorerGrid";
+import type { ChartForecast, ShiftedResult } from "./MetricCardChart.vue";
+import { fitForecasts, type ForecastMethod } from "@/utils/metrics/forecast";
 
 export interface TileQuery {
   expr: string;
   legendTemplate?: string;
+  /** The stream the query reads, for an alert created from the chart. */
+  stream?: string;
+}
+
+export interface TileCompare {
+  gapMs: number;
+  periodAsStr: I18nText;
+}
+
+/** `horizon` in seconds; the fits are trained on the tile's own window. */
+export interface TileForecast {
+  method: ForecastMethod;
+  horizon: number;
+  label: string;
 }
 
 interface TileState {
   status: "idle" | "loading" | "done" | "error";
   results: any[];
+  shifted?: ShiftedResult[];
+  forecast?: ChartForecast | null;
+  /** The step `results` were queried at, kept with them like `timeRange`. */
+  stepSeconds?: number;
   error: string;
   /** The window `results` were queried for: a chart kept through a refresh stays on its axis. */
   timeRange?: { start_time: number; end_time: number };
@@ -134,25 +158,66 @@ const props = withDefaults(
     color: string;
     timeRange: { start_time: number; end_time: number };
     legend?: boolean;
+    /** Offer the chart's right-click "Create alert" menu. */
+    allowAlertCreation?: boolean;
+    compare?: TileCompare | null;
+    forecast?: TileForecast | null;
+    stepSeconds?: number;
     /** A signal, not a cancel by expr, so two tiles on one query never cancel each other. */
-    runQuery: (expr: string, signal: AbortSignal) => Promise<any>;
+    runQuery: (
+      expr: string,
+      signal: AbortSignal,
+      opts?: { window?: QueryWindow; instantAt?: number },
+    ) => Promise<any>;
     dataTest: string;
   }>(),
-  { chartType: "line", unit: null, bucketUnit: null, legend: false },
+  {
+    chartType: "line",
+    unit: null,
+    bucketUnit: null,
+    legend: false,
+    allowAlertCreation: false,
+    compare: null,
+    forecast: null,
+    stepSeconds: 0,
+  },
 );
 
 const emit = defineEmits<{
   select: [];
   /** What the tile holds, so a parent can read the fetched series without querying again. */
-  results: [state: { status: TileState["status"]; results: any[] }];
+  results: [
+    state: {
+      status: TileState["status"];
+      results: any[];
+      periodEmpty: boolean;
+      forecastDrawn: boolean;
+    },
+  ];
 }>();
 
 const { t } = useI18nTyped();
 
 const root = ref<HTMLElement | null>(null);
 const state = ref<TileState>(IDLE);
-watch(state, ({ status, results }) => emit("results", { status, results }), { immediate: true });
-const hasData = computed(() => state.value.results.some(hasSamples));
+watch(
+  state,
+  ({ status, results, shifted, forecast }) =>
+    emit("results", {
+      status,
+      results,
+      forecastDrawn: !!forecast,
+      periodEmpty:
+        status === "done" && !!props.compare && !shifted?.some((entry) => hasSamples(entry.result)),
+    }),
+  { immediate: true },
+);
+// The earlier period alone is still worth charting: it says what this window is missing.
+const hasData = computed(
+  () =>
+    state.value.results.some(hasSamples) ||
+    !!state.value.shifted?.some((entry) => hasSamples(entry.result)),
+);
 const o2Unit = computed(() => toO2Unit(props.unit ?? ""));
 const bucketO2Unit = computed(() =>
   props.bucketUnit ? toO2Unit(props.bucketUnit) : { unit: null, unitCustom: null },
@@ -167,9 +232,14 @@ let stale = true;
 let generation = 0;
 let active: AbortController | null = null;
 /** What the last load asked for, so a watcher catching up on it does not ask again. */
-let loadedFor: { key: string; timeRange: object } | null = null;
+let loadedFor: { key: string; forecastKey: string; timeRange: object } | null = null;
 
-const queryKey = () => props.queries?.map((query) => query.expr).join("\n") ?? null;
+const queryKey = () => {
+  const exprs = props.queries?.map((query) => query.expr).join("\n");
+  return exprs === undefined ? null : `${exprs}\n${props.compare?.gapMs ?? 0}`;
+};
+const forecastKey = () =>
+  props.forecast ? `${props.forecast.method}|${props.forecast.horizon}` : "";
 
 const cancelActive = () => {
   active?.abort();
@@ -186,18 +256,53 @@ const load = async () => {
   }
   stale = false;
   const timeRange = props.timeRange;
-  loadedFor = { key: exprs.join("\n"), timeRange };
+  const compare = props.compare;
+  const forecast = props.forecast;
+  const stepSeconds = props.stepSeconds;
+  loadedFor = { key: queryKey() ?? "", forecastKey: forecastKey(), timeRange };
   active = new AbortController();
   const { signal } = active;
   // Only a chart of this same query is still kept here: a new query resets to IDLE first.
   if (state.value.status === "done") refreshing.value = true;
   else state.value = { status: "loading", results: [], error: "" };
   try {
-    const results = await Promise.all(exprs.map((expr) => props.runQuery(expr, signal)));
+    const window = compare && {
+      start: timeRange.start_time - compare.gapMs * 1000,
+      end: timeRange.end_time - compare.gapMs * 1000,
+    };
+    const current = Promise.all([
+      Promise.all(exprs.map((expr) => props.runQuery(expr, signal))),
+      window ? Promise.all(exprs.map((expr) => props.runQuery(expr, signal, { window }))) : [],
+    ]);
+    const T = timeRange.end_time;
+    const fitWindow = { T, rangeSeconds: (T - timeRange.start_time) / 1e6, stepSeconds };
+    // Issued after the chart's queries so they queue behind them, and not awaited: they are slower and optional.
+    const pendingForecast =
+      forecast && stepSeconds > 0
+        ? fitForecasts(exprs, forecast, fitWindow, (query) =>
+            props.runQuery(query, signal, { instantAt: T }),
+          ).catch(() => null)
+        : Promise.resolve(null);
+    const [results, past] = await current;
+    if (mine !== generation) return;
+    refreshing.value = false;
+    const shifted = compare
+      ? past.map((result, parentIndex) => ({ result, ...compare, parentIndex }))
+      : [];
+    state.value = {
+      status: "done",
+      results,
+      shifted,
+      error: "",
+      timeRange,
+      stepSeconds,
+      forecast: null,
+    };
+    const fits = await pendingForecast;
     if (mine !== generation) return;
     active = null;
-    refreshing.value = false;
-    state.value = { status: "done", results, error: "", timeRange };
+    if (fits && forecast)
+      state.value = { ...state.value, forecast: { ...fits, label: forecast.label } };
   } catch (error: any) {
     if (mine !== generation) return;
     // The other queries of a failed load are not worth finishing.
@@ -216,9 +321,19 @@ const load = async () => {
 
 /** Drops whatever is shown or running; only an on-screen tile queries again now. */
 const invalidate = () => {
-  if (!stale && loadedFor?.key === queryKey() && loadedFor?.timeRange === props.timeRange) return;
-  // A new window alone (a refresh tick) keeps the drawn chart until the new result lands.
+  if (
+    !stale &&
+    loadedFor?.key === queryKey() &&
+    loadedFor?.forecastKey === forecastKey() &&
+    loadedFor?.timeRange === props.timeRange
+  )
+    return;
+  // A new window or forecast alone keeps the drawn chart until the new result lands.
   const windowOnly = loadedFor?.key === queryKey();
+  // A kept chart must not go on drawing a forecast the control no longer asks for.
+  if (loadedFor?.forecastKey !== forecastKey() && state.value.forecast) {
+    state.value = { ...state.value, forecast: null };
+  }
   generation += 1;
   cancelActive();
   refreshing.value = false;
@@ -228,7 +343,7 @@ const invalidate = () => {
 };
 
 // Sources compared one by one: a getter returning a fresh array re-fires on every rebuild.
-watch([queryKey, () => props.timeRange], invalidate);
+watch([queryKey, forecastKey, () => props.timeRange], invalidate);
 
 watch(visible, (isVisible) => {
   if (isVisible) {

@@ -404,3 +404,40 @@ describe("useRoleSummary - grants inside a drill-in row", () => {
     expect(s.innerGrants(traces, 2)).toEqual({ count: 3, names: ["a", "b"] });
   });
 });
+
+describe("useRoleSummary - grants inside an All Modules row", () => {
+  // A stream type's own wide grant is still inside Streams; only `stream:_all_` is the row's own box.
+  it("counts every grant under the module except its own module-wide one", () => {
+    const s = setup();
+    s.seed({
+      saved: [`stream:${ALL}:AllowList`, `logs:${ALL}:AllowGet`, "metrics:cpu:AllowGet"],
+    });
+
+    expect(s.moduleInnerGrants({ name: "stream" }, 10)).toEqual({
+      count: 2,
+      names: [String(i18n.global.t("iam.editRole.scopeAllOf", { module: "Logs" })), "cpu"],
+    });
+  });
+
+  it("reports a role that grants a single dashboard on its folder module", () => {
+    const s = setup();
+    s.seed({ saved: ["dashboard:f1/d1:AllowGet"] });
+
+    expect(s.moduleInnerGrants({ name: "dfolder" }, 10).count).toBe(1);
+    expect(s.moduleInnerGrants({ name: "stream" }, 10).count).toBe(0);
+  });
+
+  it("drops a grant that is staged for removal", () => {
+    const s = setup();
+    s.seed({ saved: ["metrics:cpu:AllowGet"], removed: ["metrics:cpu:AllowGet"] });
+
+    expect(s.moduleInnerGrants({ name: "stream" }, 10)).toEqual({ count: 0, names: [] });
+  });
+
+  it("reports nothing for a node that is not a module", () => {
+    const s = setup();
+    s.seed({ saved: ["metrics:cpu:AllowGet"] });
+
+    expect(s.moduleInnerGrants({ name: "metrics" }, 10)).toEqual({ count: 0, names: [] });
+  });
+});

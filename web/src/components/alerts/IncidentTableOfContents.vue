@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex-shrink-0 opacity-60"
                 />
                 <!-- Text in the middle - clickable to scroll -->
-                <span
+                <OTruncatedText
                   :data-test="`toc-level1-text-${item.id}`"
                   @click="$emit('scroll-to-section', item.id)"
-                  class="hover:text-text-link-hover flex-1 cursor-pointer truncate text-xs font-medium"
-                  >{{ item.text }}</span
+                  class="hover:text-text-link-hover flex-1 cursor-pointer text-xs font-medium"
+                  >{{ item.text }}</OTruncatedText
                 >
                 <!-- Expand button on the right (only for items with children) -->
                 <OButton
@@ -110,11 +110,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="flex-shrink-0 opacity-60"
                       />
                       <!-- Text in the middle - clickable to scroll -->
-                      <span
+                      <OTruncatedText
                         :data-test="`toc-level2-text-${child.id}`"
                         @click="$emit('scroll-to-section', child.id)"
-                        class="hover:text-text-link-hover flex-1 cursor-pointer truncate text-xs"
-                        >{{ child.text }}</span
+                        class="hover:text-text-link-hover flex-1 cursor-pointer text-xs"
+                        >{{ child.text }}</OTruncatedText
                       >
                       <!-- Expand button on the right (only for items with children) -->
                       <OButton
@@ -157,10 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="xs"
                           class="opacity-60"
                         />
-                        <span
+                        <OTruncatedText
                           :data-test="`toc-level3-text-${grandchild.id}`"
-                          class="text-2xs truncate"
-                          >{{ grandchild.text }}</span
+                          class="text-2xs"
+                          >{{ grandchild.text }}</OTruncatedText
                         >
                       </div>
                     </div>
@@ -180,6 +180,7 @@ import { defineComponent, PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 interface TocItem {
@@ -192,7 +193,7 @@ interface TocItem {
 
 export default defineComponent({
   name: "IncidentTableOfContents",
-  components: { OButton, OIcon, OTooltip },
+  components: { OButton, OIcon, OTooltip, OTruncatedText },
   props: {
     tableOfContents: {
       type: Array as PropType<TocItem[]>,

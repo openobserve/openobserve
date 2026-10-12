@@ -328,6 +328,27 @@ describe("TraceDetailsSidebar", async () => {
     expect(serviceName.text()).toContain(mockSpan.service_name);
   });
 
+  describe("span start offset", () => {
+    const startText = () => wrapper.vm.getStartTime;
+
+    it("measures the start from the trace root, not the waterfall axis start", async () => {
+      // A RUM view root begins 10 min before the axis, which fits only the request.
+      const rootStartUs = mockSpan.start_time / 1000;
+      await wrapper.setProps({
+        baseTracePosition: {
+          ...mockBaseTracePosition,
+          startTimeUs: rootStartUs + 600_000_000,
+          traceStartUs: rootStartUs,
+        },
+      });
+      expect(startText()).toBe("0us");
+    });
+
+    it("falls back to the axis start when no trace start is given", () => {
+      expect(startText()).toBe("0us");
+    });
+  });
+
   describe("service icon", () => {
     it("should render service icon img inside the service chip", () => {
       const serviceChip = wrapper.find(

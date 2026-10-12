@@ -16,6 +16,7 @@
 // The panel travels as the metrics_data blob, so an entry reopens exactly what was run.
 
 import { encodeMetricsConfig, getMetricsConfig } from "@/composables/metrics/metricsUrlState";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 import {
   queryParamsToSelectedDate,
   selectedDateToQueryParams,
@@ -41,11 +42,11 @@ export const buildHistoryEntry = (
   selectedDate: Partial<SelectedDate> | null | undefined,
 ): QueryHistoryRecord | null => {
   const hidden: number[] = dashboardPanelData?.layout?.hiddenQueries ?? [];
-  const visible = ((dashboardPanelData?.data?.queries ?? []) as any[]).filter(
-    (_, index) => !hidden.includes(index),
-  );
-  const query = visible
-    .map((q) => (typeof q?.query === "string" ? q.query.trim() : ""))
+  const queries = (dashboardPanelData?.data?.queries ?? []) as any[];
+  const query = queries
+    .filter((_, index) => !hidden.includes(index))
+    .map((q) => (isFormulaQuery(q) ? q.config.formula : q?.query))
+    .map((text) => (typeof text === "string" ? text.trim() : ""))
     .filter(Boolean)
     .join("\n");
   if (!query) return null;
@@ -57,7 +58,7 @@ export const buildHistoryEntry = (
       step: dashboardPanelData?.data?.config?.step_value ?? null,
       chart_type: dashboardPanelData?.data?.type ?? "",
       metrics_data: encodeMetricsConfig(
-        getMetricsConfig({ data: { ...dashboardPanelData?.data, queries: visible } }),
+        getMetricsConfig({ data: { ...dashboardPanelData?.data, queries } }),
       ),
     },
   };

@@ -859,7 +859,8 @@ impl From<TriggerCondition> for meta_alerts::TriggerCondition {
             threshold: value.threshold_count,
             warning_threshold: value.warning_threshold_count,
             notify_on_warning: value.notify_on_warning,
-            frequency: value.frequency_minutes * 60,
+            // `From` cannot fail; `prepare_alert` rejects the saturated value
+            frequency: value.frequency_minutes.saturating_mul(60),
             cron: value.cron,
             frequency_type: value.frequency_type.unwrap_or_default().into(),
             silence: value.silence_minutes,
@@ -1773,5 +1774,17 @@ mod tests {
         assert!(!meta.creates_incident);
         assert!(meta.id.is_none());
         assert!(meta.owner.is_none());
+    }
+
+    #[test]
+    fn an_out_of_range_frequency_saturates_instead_of_overflowing() {
+        let trigger = TriggerCondition {
+            frequency_minutes: i64::MAX,
+            ..Default::default()
+        };
+        assert_eq!(
+            meta_alerts::TriggerCondition::from(trigger).frequency,
+            i64::MAX
+        );
     }
 }

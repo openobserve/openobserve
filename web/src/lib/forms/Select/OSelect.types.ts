@@ -101,6 +101,12 @@ export interface SelectProps {
    */
   collapsibleGroups?: boolean;
   /**
+   * Multi-select with group headers: on open, float the selected options to the
+   * top of their own group, as flat lists always do. Default off, so groups
+   * that lead with a fixed entry (e.g. "Current Panel") keep their order.
+   */
+  pinSelectedInGroups?: boolean;
+  /**
    * Renders a "Select All" master row at the top of the dropdown (multi-select
    * listbox mode only). Shows an indeterminate dash when only some options are
    * selected, a check when all are, and toggles the entire selection on click.

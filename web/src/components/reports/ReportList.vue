@@ -165,14 +165,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Name column: badges for type/preview -->
               <template #cell-name="{ row }">
-                <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
-                <OTag
-                  v-if="row.dashboards?.[0]?.report_type === 'png'"
-                  type="reportTag"
-                  value="png"
-                  class="ms-1"
-                />
-                <OTag v-if="row.imagePreview" type="reportTag" value="preview" class="ms-1" />
+                <div class="flex min-w-0 items-center">
+                  <OTruncatedText :data-test="`report-list-name-cell-${row.name}`">{{
+                    row.name
+                  }}</OTruncatedText>
+                  <OTag
+                    v-if="row.dashboards?.[0]?.report_type === 'png'"
+                    type="reportTag"
+                    value="png"
+                    class="ms-1 shrink-0"
+                  />
+                  <OTag
+                    v-if="row.imagePreview"
+                    type="reportTag"
+                    value="preview"
+                    class="ms-1 shrink-0"
+                  />
+                </div>
               </template>
 
               <!-- Owner column -->
@@ -392,6 +401,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";

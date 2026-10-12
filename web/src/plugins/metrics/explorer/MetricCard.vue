@@ -49,11 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`metrics-explorer-card-title-${card.name}`"
           @click="$emit('open-detail', card)"
         >
-          <span
-            class="text-compact text-text-heading overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
-            :title="card.name"
-            >{{ card.name }}</span
-          >
+          <OTruncatedText class="text-compact text-text-heading font-medium tracking-[0.02em]">{{
+            card.name
+          }}</OTruncatedText>
         </OButton>
         <!-- Badge text is never the sole carrier of meaning — the card's aria
              label spells the type out too. -->
@@ -399,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <MetricCardChart
         v-else-if="preview?.results?.length"
         :results="preview.results"
-        :queries="queries"
+        :queries="chartQueries"
         :chart-type="preview.chartType"
         :unit="o2Unit.unit"
         :unit-custom="o2Unit.unitCustom ?? undefined"
@@ -484,11 +482,13 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { BADGE_LABEL_KEYS, UNIT_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
+import { withSourceStreams } from "@/utils/metrics/metricsHandoff";
 import { hasSamples, type CardPreview } from "@/composables/metrics/useMetricsExplorerGrid";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
 import type { InjectedExemplars } from "@/ts/interfaces/exemplars";
@@ -506,6 +506,7 @@ export default defineComponent({
     PanelBar,
     OTag,
     OTooltip,
+    OTruncatedText,
     ExemplarToggle,
   },
   props: {
@@ -555,6 +556,7 @@ export default defineComponent({
     const { isDark } = useTheme();
 
     const color = computed(() => cardColorForIndex(props.index, isDark.value));
+    const chartQueries = computed(() => withSourceStreams(props.queries, props.card.name));
     // Kept for the card's aria label; the VISIBLE badge renders through the
     // registry's metricType group, which owns the label and colour.
     const badgeLabel = computed(() =>
@@ -732,6 +734,7 @@ export default defineComponent({
       t,
       root,
       color,
+      chartQueries,
       badgeLabel,
       o2Unit,
       bucketO2Unit,

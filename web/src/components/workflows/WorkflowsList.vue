@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-name="{ row }">
               <div class="flex min-w-0 items-center gap-2">
-                <span class="truncate">{{ row.name }}</span>
+                <OTruncatedText>{{ row.name }}</OTruncatedText>
                 <OTag
                   v-if="row.is_draft"
                   :value="t('workflow.draft')"
@@ -345,6 +345,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";

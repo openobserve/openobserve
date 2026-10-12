@@ -997,6 +997,18 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "an error banner paints its text on the banner fill",
   },
   {
+    fg: "--color-brand-email-foreground",
+    bg: "--color-brand-email",
+    category: "text",
+    why: "a destination-preview CTA label sits on its fixed brand fill",
+  },
+  {
+    fg: "--color-brand-email-ink-foreground",
+    bg: "--color-brand-email-ink",
+    category: "text",
+    why: "a destination-preview CTA label sits on its fixed brand fill",
+  },
+  {
     fg: "--color-brand-msg-text",
     bg: "--color-brand-msg-bg",
     category: "text",
@@ -1015,6 +1027,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     why: "a chat-preview message renders on the mock message surface",
   },
   {
+    fg: "--color-brand-slack-foreground",
+    bg: "--color-brand-slack",
+    category: "text",
+    why: "a destination-preview CTA label sits on its fixed brand fill",
+  },
+  {
     fg: "--color-brand-slack-link",
     bg: "--color-brand-msg-bg",
     category: "text",
@@ -1025,6 +1043,12 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-brand-msg-bg",
     category: "text",
     why: "the Slack preview renders on the mock message surface",
+  },
+  {
+    fg: "--color-brand-teams-foreground",
+    bg: "--color-brand-teams",
+    category: "text",
+    why: "a destination-preview CTA label sits on its fixed brand fill",
   },
   {
     fg: "--color-brand-teams-text",
@@ -1320,6 +1344,13 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     under: ["--color-surface-base"],
     category: "text",
     why: "a language pill's label is painted on the translucent pill",
+  },
+  {
+    fg: "--color-nav-label-accent",
+    bg: "--color-tabs-hover-bg",
+    category: "text",
+    why: "the hover label is painted on the tile's hover tint, which is darker than the page",
+    themes: ["light"],
   },
   {
     fg: "--color-lang-vrl-text",

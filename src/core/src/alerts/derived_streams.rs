@@ -29,7 +29,13 @@ use config::{
 };
 use cron::Schedule;
 
-use crate::{alerts::QueryConditionExt, db};
+use crate::{
+    alerts::{
+        QueryConditionExt,
+        alert::{SCHEDULE_FIELD_MAX_SECS, TZ_OFFSET_RANGE_MINUTES},
+    },
+    db,
+};
 
 pub async fn save(
     mut derived_stream: DerivedStream,
@@ -115,6 +121,10 @@ pub async fn save(
         // default 3 mins, set min at 1 minutes
         derived_stream.trigger_condition.frequency =
             std::cmp::max(1, get_config().limit.derived_stream_schedule_interval / 60);
+    }
+    // an enable toggle re-saves the stored schedule with `needs_validated` off
+    if needs_validated {
+        check_schedule(&derived_stream)?;
     }
 
     let trigger_module_key = derived_stream.get_scheduler_module_key(pipeline_name, pipeline_id);
@@ -203,6 +213,47 @@ pub async fn delete(
     .map_err(|e| anyhow::anyhow!("Error deleting derived stream trigger: {e}"))
 }
 
+fn check_schedule(derived_stream: &DerivedStream) -> Result<(), anyhow::Error> {
+    if !TZ_OFFSET_RANGE_MINUTES.contains(&derived_stream.tz_offset) {
+        return Err(anyhow::anyhow!(
+            "tz_offset must be strictly between -1440 and 1440 minutes"
+        ));
+    }
+    let trigger = &derived_stream.trigger_condition;
+    if trigger.frequency_type == FrequencyType::Cron {
+        if Schedule::from_str(&trigger.cron)?
+            .upcoming(Utc)
+            .next()
+            .is_none()
+        {
+            return Err(anyhow::anyhow!(
+                "cron schedule '{}' has no future occurrence",
+                trigger.cron
+            ));
+        }
+    } else if !(1..=SCHEDULE_FIELD_MAX_SECS / 60).contains(&trigger.frequency) {
+        // derived streams schedule in minutes, alerts in seconds
+        return Err(anyhow::anyhow!(
+            "frequency must be between 1 and {} minutes",
+            SCHEDULE_FIELD_MAX_SECS / 60
+        ));
+    }
+    if !(0..=SCHEDULE_FIELD_MAX_SECS / 60).contains(&trigger.silence) {
+        return Err(anyhow::anyhow!(
+            "silence must be between 0 and {} minutes",
+            SCHEDULE_FIELD_MAX_SECS / 60
+        ));
+    }
+    if let Some(tolerance) = trigger.tolerance_in_secs
+        && !(0..=SCHEDULE_FIELD_MAX_SECS).contains(&tolerance)
+    {
+        return Err(anyhow::anyhow!(
+            "tolerance_in_secs must be between 0 and {SCHEDULE_FIELD_MAX_SECS} seconds"
+        ));
+    }
+    Ok(())
+}
+
 #[async_trait]
 pub trait DerivedStreamExt: Sync + Send + 'static {
     async fn evaluate(
@@ -235,5 +286,66 @@ impl DerivedStreamExt for DerivedStream {
                 trace_id,
             )
             .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Runs the real `save`; every rejection here happens before the DB is touched.
+    async fn save_err(mutate: impl FnOnce(&mut DerivedStream)) -> String {
+        let mut derived_stream = DerivedStream::default();
+        mutate(&mut derived_stream);
+        save(derived_stream, "p", "p1", true)
+            .await
+            .unwrap_err()
+            .to_string()
+    }
+
+    #[tokio::test]
+    async fn save_rejects_a_full_day_tz_offset() {
+        for tz_offset in [1440, -1440, i32::MAX] {
+            let err = save_err(|d| d.tz_offset = tz_offset).await;
+            assert!(err.contains("tz_offset"), "{tz_offset}: {err}");
+        }
+    }
+
+    #[tokio::test]
+    async fn save_rejects_out_of_range_schedule_fields() {
+        let err = save_err(|d| d.trigger_condition.frequency = i64::MAX).await;
+        assert!(err.contains("frequency"), "{err}");
+        let err = save_err(|d| d.trigger_condition.silence = i64::MAX).await;
+        assert!(err.contains("silence"), "{err}");
+        let err = save_err(|d| d.trigger_condition.tolerance_in_secs = Some(i64::MAX)).await;
+        assert!(err.contains("tolerance_in_secs"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn save_rejects_a_cron_with_no_future_occurrence() {
+        let err = save_err(|d| {
+            d.trigger_condition.frequency_type = FrequencyType::Cron;
+            d.trigger_condition.cron = "0 0 0 1 1 * 2020".to_string();
+        })
+        .await;
+        assert!(err.contains("no future occurrence"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn an_enable_toggle_does_not_revalidate_a_stored_schedule() {
+        let mut derived_stream = DerivedStream::default();
+        derived_stream.trigger_condition.frequency = i64::MAX;
+        derived_stream.tz_offset = 1440;
+        let err = save(derived_stream, "p", "p1", false)
+            .await
+            .map_or_else(|e| e.to_string(), |()| String::new());
+        for field in [
+            "tz_offset",
+            "frequency must",
+            "silence",
+            "tolerance_in_secs",
+        ] {
+            assert!(!err.contains(field), "{err}");
+        }
     }
 }

@@ -107,6 +107,9 @@ const STREAMS = [
 /** Every in-flight streaming query, so a test can land or strand each one. */
 const inFlight: Array<{
   query: string;
+  start: number;
+  end: number;
+  queryType: string;
   complete: (result: any) => void;
 }> = [];
 
@@ -143,6 +146,9 @@ vi.mock("@/composables/useStreamingSearch", () => ({
     fetchQueryDataWithHttpStream: (payload: any, handlers: any) => {
       inFlight.push({
         query: payload.queryReq.query,
+        start: payload.queryReq.start_time,
+        end: payload.queryReq.end_time,
+        queryType: payload.queryReq.query_type,
         complete: (result: any) => {
           handlers.data({}, { type: "promql_response", content: { results: result } });
           handlers.complete();
@@ -504,11 +510,32 @@ describe("useMetricsExplorerGrid", () => {
 
       await grid.addLabelFilter({ label: "code", value: "500", operator: "=" });
 
-      expect(grid.schemaLoaded.value).toBe(true); // we did stop trying...
+      expect(grid.schemaLoaded.value).toBe(false); // a failure is not a load: the next call retries...
       // ...but we do not claim a card is ineligible when we cannot know.
       // (Against the CARD count, not the stream count: the histogram base is a
       // metadata-only phantom and is suppressed, so it never becomes a card.)
       expect(grid.sortedCards.value).toHaveLength(grid.cards.value.length);
+    });
+
+    it("reports a failed load, and fetches again on the next call", async () => {
+      const grid = await setup();
+      const calls = (StreamService.nameList as any).mock.calls.length;
+      (StreamService.nameList as any).mockRejectedValueOnce(new Error("500"));
+      expect(await grid.ensureSchemas()).toBe(false);
+
+      (StreamService.nameList as any).mockResolvedValueOnce({
+        data: { list: STREAMS.map((x) => ({ ...x, schema: [{ name: "pod", type: "Utf8" }] })) },
+      });
+      expect(await grid.ensureSchemas()).toBe(true);
+      expect((StreamService.nameList as any).mock.calls.length).toBe(calls + 2);
+      expect(grid.schemaLoaded.value).toBe(true);
+    });
+
+    it("treats an empty stream list as a failed load too", async () => {
+      const grid = await setup();
+      (StreamService.nameList as any).mockResolvedValueOnce({ data: { list: [] } });
+      expect(await grid.ensureSchemas()).toBe(false);
+      expect(grid.schemaLoaded.value).toBe(false);
     });
 
     it("narrows the grid once membership IS known", async () => {
@@ -1898,6 +1925,46 @@ describe("useMetricsExplorerGrid", () => {
       expect(cancel).toHaveBeenCalledWith(key, owner);
       await expect(pending).rejects.toSatisfy(isCancelled);
       inFlight.length = 0;
+    });
+
+    it("runs a shifted window as its own request, never joining the current window's", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const { start_time, end_time } = grid.timeRange.value;
+      const DAY_US = 86_400_000_000;
+      const shifted = { start: start_time - DAY_US, end: end_time - DAY_US };
+
+      grid.runDetailQuery("sum(up)", card, new AbortController().signal).catch(() => {});
+      grid
+        .runDetailQuery("sum(up)", card, new AbortController().signal, { window: shifted })
+        .catch(() => {});
+      await flush();
+
+      const requests = inFlight.filter((q) => q.query === "sum(up)");
+      expect(requests.map((q) => [q.start, q.end])).toEqual([
+        [start_time, end_time],
+        [shifted.start, shifted.end],
+      ]);
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
+    });
+
+    it("runs an instant query at T as its own request, with start and end both T", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      const T = grid.timeRange.value.end_time;
+
+      grid.runDetailQuery("sum(up)", card, new AbortController().signal).catch(() => {});
+      grid
+        .runDetailQuery("sum(up)", card, new AbortController().signal, { instantAt: T })
+        .catch(() => {});
+      await flush();
+
+      const requests = inFlight.filter((q) => q.query === "sum(up)");
+      expect(requests.map((q) => [q.queryType, q.start, q.end])).toEqual([
+        ["range", grid.timeRange.value.start_time, T],
+        ["instant", T, T],
+      ]);
+      inFlight.splice(0).forEach((q) => q.complete(SERIES));
     });
 
     it("never starts a query whose signal already aborted", async () => {

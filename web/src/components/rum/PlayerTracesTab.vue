@@ -71,9 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
-        <code class="text-text-secondary min-w-0 flex-1 truncate text-sm">{{
+        <OTruncatedText as="code" class="text-text-secondary flex-1 text-sm">{{
           traceDisplayName(selectedTrace)
-        }}</code>
+        }}</OTruncatedText>
         <div class="flex flex-shrink-0 items-center gap-1.5">
           <span
             v-if="selectedTrace.metadata?.errorCount > 0"
@@ -188,12 +188,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-page="{ row }">
-            <span class="block truncate font-mono text-xs" :title="pageRoute(row)">
+            <span class="font-mono text-xs">
               {{ pageRoute(row) }}
             </span>
           </template>
           <template #cell-route="{ row }">
-            <span class="block truncate font-mono text-xs" :title="traceDisplayName(row)">
+            <span class="font-mono text-xs">
               {{ traceDisplayName(row) }}
             </span>
           </template>
@@ -239,6 +239,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";

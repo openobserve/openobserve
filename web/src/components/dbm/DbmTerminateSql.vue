@@ -32,13 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div v-if="statement" class="flex min-w-0 items-center gap-1.5" :data-test="dataTest">
-    <code
-      class="bg-surface-subtle text-text-code rounded-default text-2xs min-w-0 truncate px-1.5 py-0.5 font-mono"
+    <OTruncatedText
+      as="code"
+      class="bg-surface-subtle text-text-code rounded-default text-2xs px-1.5 py-0.5 font-mono"
       :data-test="`${dataTest}-statement`"
     >
-      <OTooltip :content="raw(statement)" />
       {{ raw(statement) }}
-    </code>
+    </OTruncatedText>
     <OButton
       variant="ghost-muted"
       size="icon-xs"
@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onBeforeUnmount, ref } from "vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { copyToClipboard } from "@/utils/clipboard";

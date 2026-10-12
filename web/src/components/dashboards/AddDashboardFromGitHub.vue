@@ -131,9 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.enter.prevent="toggleDashboard(dashboard)"
               @keydown.space.prevent="toggleDashboard(dashboard)"
             >
-              <span class="text-text-heading min-w-0 flex-1 truncate text-sm font-medium">{{
+              <OTruncatedText class="text-text-heading flex-1 text-sm font-medium">{{
                 dashboard.displayName
-              }}</span>
+              }}</OTruncatedText>
               <OCheckbox
                 :model-value="isSelected(dashboard)"
                 size="sm"
@@ -249,12 +249,14 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 type GitHubDashboard = GalleryDashboard;
 
 export default defineComponent({
   name: "AddDashboardFromGitHub",
   components: {
+    OTruncatedText,
     AddFolder,
     OButton,
     OText,

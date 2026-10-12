@@ -135,20 +135,28 @@
           <OButton variant="ghost" size="xs" @click.stop="openDetail(row)">{{ row.name }}</OButton>
         </template>
         <template #cell-description="{ row }">
-          <span class="text-text-body" :title="raw(row.description ?? '')">{{
-            row.description || raw("—")
-          }}</span>
+          <span class="text-text-body">{{ row.description || raw("—") }}</span>
         </template>
         <template #cell-tags="{ row }">
-          <div class="flex max-w-64 flex-wrap gap-1">
+          <OTruncatedText
+            v-if="row.tags.length"
+            as="div"
+            class="flex max-w-64 flex-wrap gap-1"
+            :tooltip="raw(row.tags.join(', '))"
+          >
             <OTag v-for="tag in row.tags" :key="tag" variant="default-soft" shape="rounded">{{
               tag
             }}</OTag>
-            <span v-if="!row.tags.length" class="text-text-secondary">{{ raw("—") }}</span>
-          </div>
+          </OTruncatedText>
+          <span v-else class="text-text-secondary">{{ raw("—") }}</span>
         </template>
         <template #cell-labels="{ row }">
-          <div class="flex flex-wrap items-center gap-1">
+          <OTruncatedText
+            v-if="activeLabels(row).length"
+            as="div"
+            class="flex flex-wrap items-center gap-1"
+            :tooltip="labelsText(row)"
+          >
             <OTag
               v-for="label in activeLabels(row)"
               :key="label.name"
@@ -163,8 +171,8 @@
                 })
               }}
             </OTag>
-            <span v-if="!activeLabels(row).length" class="text-text-secondary">{{ raw("—") }}</span>
-          </div>
+          </OTruncatedText>
+          <span v-else class="text-text-secondary">{{ raw("—") }}</span>
         </template>
         <template #cell-latestVersion="{ row }">
           <span class="tabular-nums">{{
@@ -286,6 +294,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -445,6 +454,19 @@ const columns: OTableColumnDef[] = [
 
 function activeLabels(prompt: Prompt): PromptLabel[] {
   return prompt.labels.filter((label) => label.version != null);
+}
+// The chips hold no separators in their text, so the cut-cell tooltip spells them out.
+function labelsText(prompt: Prompt) {
+  return raw(
+    activeLabels(prompt)
+      .map((label) =>
+        t("aiObservability.promptManagement.labelVersion", {
+          name: label.name,
+          version: label.version,
+        }),
+      )
+      .join(", "),
+  );
 }
 function errorStatus(error: unknown): number | null {
   if (!error || typeof error !== "object" || !("response" in error)) return null;

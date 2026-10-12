@@ -47,8 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
            after the title+subtitle column, stranding it far from the title). -->
       <template #title>
-        <span class="inline-flex min-w-0 items-center gap-2">
-          <span class="truncate">{{ workflowName || t("workflow.runs.title") }}</span>
+        <span class="flex min-w-0 items-center gap-2">
+          <OTruncatedText>{{ workflowName || t("workflow.runs.title") }}</OTruncatedText>
           <BetaBadge />
         </span>
       </template>
@@ -159,6 +159,7 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";

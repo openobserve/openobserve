@@ -26,13 +26,13 @@ limitations under the License.
       <div
         v-if="type === 'slack'"
         data-test="slack-preview"
-        class="slack-message border-border-default rounded-default mx-auto max-w-150 border bg-white p-4 shadow-sm"
+        class="slack-message border-brand-msg-divider rounded-default mx-auto max-w-150 border bg-white p-4 shadow-sm"
       >
         <div class="slack-message-container flex gap-3">
           <div class="slack-avatar">
             <div
               data-test="slack-avatar-icon"
-              class="avatar-circle rounded-default border-border-default bg-surface-base text-text-secondary flex h-9 w-9 items-center justify-center border"
+              class="avatar-circle rounded-default border-brand-msg-divider text-brand-slack-meta flex h-9 w-9 items-center justify-center border bg-white"
             >
               <OIcon name="notifications" size="sm" />
             </div>
@@ -104,14 +104,14 @@ limitations under the License.
             </div>
           </div>
         </div>
-        <p data-test="slack-preview-disclaimer" class="text-text-secondary m-0 mt-3 text-xs">
+        <p data-test="slack-preview-disclaimer" class="text-brand-slack-meta m-0 mt-3 text-xs">
           {{ t("alert_destinations.slackOAuth.previewDisclaimer") }}
         </p>
       </div>
 
       <!-- MS Teams Preview -->
       <div
-        v-if="type === 'msteams'"
+        v-else-if="type === 'msteams'"
         data-test="msteams-preview"
         class="teams-card rounded-default border-brand-msg-border-2 mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -180,7 +180,7 @@ limitations under the License.
 
       <!-- Email Preview -->
       <div
-        v-if="type === 'email'"
+        v-else-if="type === 'email'"
         data-test="email-preview"
         class="email-client rounded-default border-brand-msg-divider mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -271,7 +271,7 @@ limitations under the License.
 
       <!-- PagerDuty Preview -->
       <div
-        v-if="type === 'pagerduty'"
+        v-else-if="type === 'pagerduty'"
         data-test="pagerduty-preview"
         class="pagerduty-incident rounded-default border-brand-msg-divider mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -313,7 +313,7 @@ limitations under the License.
 
       <!-- ServiceNow Preview -->
       <div
-        v-if="type === 'servicenow'"
+        v-else-if="type === 'servicenow'"
         data-test="servicenow-preview"
         class="servicenow-incident rounded-default border-brand-msg-divider mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -355,7 +355,7 @@ limitations under the License.
 
       <!-- Opsgenie Preview -->
       <div
-        v-if="type === 'opsgenie'"
+        v-else-if="type === 'opsgenie'"
         data-test="opsgenie-preview"
         class="opsgenie-alert rounded-default border-brand-msg-divider mx-auto max-w-150 overflow-hidden border bg-white shadow-sm"
       >
@@ -388,10 +388,27 @@ limitations under the License.
             </div>
           </div>
           <div class="opsgenie-actions mt-4 flex justify-center">
-            <OButton variant="preview-action">{{ raw("View in OpenObserve") }}</OButton>
+            <OButton variant="preview-opsgenie">{{ raw("View in OpenObserve") }}</OButton>
           </div>
         </div>
       </div>
+
+      <!-- Types without a mockup (custom Web Hook, Discord): the rendered body as
+           sent. The footer's Copy Template button is the copy action. -->
+      <template v-else>
+        <OCodeBlock
+          class="my-0!"
+          :code="templateContent"
+          :lang="rawPreviewLang"
+          wrap
+          :max-lines="16"
+          :copyable="false"
+          data-test="raw-preview"
+        />
+        <p data-test="raw-preview-note" class="text-text-secondary m-0 mt-3 text-xs">
+          {{ t("alert_destinations.webhookPreviewNote") }}
+        </p>
+      </template>
     </div>
 
     <template #footer>
@@ -418,6 +435,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -440,6 +458,16 @@ const isOpen = computed({
   set: (value) => emit("update:modelValue", value),
 });
 
+// A JSON body gets JSON highlighting; anything else is left to auto-detection.
+const rawPreviewLang = computed(() => {
+  try {
+    JSON.parse(props.templateContent);
+    return "json";
+  } catch {
+    return undefined;
+  }
+});
+
 // Get current time for display
 const getCurrentTime = (): string => {
   return new Date().toLocaleTimeString();
@@ -448,8 +476,9 @@ const getCurrentTime = (): string => {
 // Get destination type display name
 const getDestinationTypeName = (type: string): string => {
   // Vendor product names shown in the preview header — brands, identical in
-  // every locale.
+  // every locale. A custom destination is named by its localised tab label.
   const typeNames: Record<string, string> = {
+    custom: t("alerts.webhook"),
     slack: raw("Slack"),
     msteams: raw("Microsoft Teams"),
     email: raw("Email"),

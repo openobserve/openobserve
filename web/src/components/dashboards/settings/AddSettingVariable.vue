@@ -208,7 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? raw('')
                           : t('dashboard.addSettingVariable.selectFieldPlaceholder')
                       "
-                      :title="filter.name || undefined"
                       @update:model-value="filterUpdated(index, $event)"
                       data-test="dashboard-query-values-filter-name-selector"
                       class="min-w-0 flex-2"

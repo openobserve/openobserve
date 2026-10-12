@@ -162,6 +162,9 @@ impl Search for Searcher {
         req: Request<GetTableRequest>,
     ) -> Result<Response<GetTableResponse>, Status> {
         let path = req.into_inner().path;
+        if !::search::datafusion::distributed_plan::codec::is_join_result_path(&path) {
+            return Err(Status::invalid_argument("invalid table path"));
+        }
         let res = infra::storage::get_bytes("", &path)
             .await
             .map_err(|e| Status::internal(format!("failed to get table: {e}")))?;
@@ -174,6 +177,9 @@ impl Search for Searcher {
         req: Request<GetResultRequest>,
     ) -> Result<Response<GetResultResponse>, Status> {
         let path = req.into_inner().path;
+        if !crate::search_jobs::is_search_job_result_path(&path) {
+            return Err(Status::invalid_argument("invalid result path"));
+        }
         let res = infra::storage::get_bytes("", &path)
             .await
             .map_err(|e| Status::internal(format!("failed to get result: {e}")))?;
@@ -196,6 +202,12 @@ impl Search for Searcher {
         req: Request<DeleteResultRequest>,
     ) -> Result<Response<DeleteResultResponse>, Status> {
         let paths = req.into_inner().paths;
+        if paths
+            .iter()
+            .any(|path| !crate::search_jobs::is_search_job_result_path(path))
+        {
+            return Err(Status::invalid_argument("invalid result path"));
+        }
         let paths = paths
             .iter()
             .map(|path| ("", path.as_str()))
@@ -292,6 +304,9 @@ impl Search for Searcher {
             req.path
         );
 
+        if !infra::table::source_maps::is_sourcemap_path_for_org(&req.org_id, &req.path) {
+            return Err(Status::invalid_argument("invalid sourcemap path"));
+        }
         let res = infra::storage::get_bytes("", &req.path)
             .await
             .map_err(|e| {
@@ -488,5 +503,119 @@ impl Search for Searcher {
         _req: Request<GetWorkflowInputsRequest>,
     ) -> Result<Response<GetWorkflowInputsResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_table_rejects_non_join_paths() {
+        let searcher = Searcher::new();
+        for path in [
+            "files/otherorg/logs/x.parquet",
+            "../x",
+            "join/../files/otherorg/secret.arrow",
+        ] {
+            let req = Request::new(GetTableRequest {
+                path: path.to_string(),
+            });
+            let err = searcher
+                .get_table(req)
+                .await
+                .expect_err(&format!("{path} was accepted"));
+            assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_table_accepts_join_result_path() {
+        let searcher = Searcher::new();
+        let path = "join/2026/09/29/0123456789abcdef0123456789abcdef/test.arrow";
+        infra::storage::put("", path, Vec::new().into())
+            .await
+            .unwrap();
+
+        let req = Request::new(GetTableRequest {
+            path: path.to_string(),
+        });
+        let res = searcher.get_table(req).await;
+
+        assert!(res.is_ok(), "join result path was rejected: {res:?}");
+        let _ = infra::storage::del(vec![("", path)]).await;
+    }
+
+    #[tokio::test]
+    async fn test_get_sourcemap_file_rejects_other_org_path() {
+        let searcher = Searcher::new();
+        for path in [
+            "files/otherorg/sourcemaps/secret.map",
+            "files/myorg/sourcemaps/../otherorg/sourcemaps/secret.map",
+        ] {
+            let req = Request::new(GetSourcemapFileRequest {
+                org_id: "myorg".to_string(),
+                original_name: "app.js.map".to_string(),
+                path: path.to_string(),
+            });
+            let err = searcher
+                .get_sourcemap_file(req)
+                .await
+                .expect_err(&format!("{path} was accepted"));
+            assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_sourcemap_file_accepts_own_org_path() {
+        let searcher = Searcher::new();
+        let path = "files/myorg/sourcemaps/app.js.map";
+        infra::storage::put("", path, Vec::new().into())
+            .await
+            .unwrap();
+
+        let req = Request::new(GetSourcemapFileRequest {
+            org_id: "myorg".to_string(),
+            original_name: "app.js.map".to_string(),
+            path: path.to_string(),
+        });
+        let res = searcher.get_sourcemap_file(req).await;
+
+        assert!(res.is_ok(), "own org sourcemap path was rejected: {res:?}");
+        let _ = infra::storage::del(vec![("", path)]).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_delete_result_rejects_non_result_paths() {
+        let searcher = Searcher::new();
+        let req = Request::new(DeleteResultRequest {
+            paths: vec![
+                "result/2026/09/29/abc123/final.result.json".to_string(),
+                "files/otherorg/secret.result.json".to_string(),
+            ],
+        });
+        let err = searcher
+            .delete_result(req)
+            .await
+            .expect_err("a request mixing a valid and an invalid path was accepted");
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_delete_result_accepts_result_paths() {
+        let searcher = Searcher::new();
+        let path = "result/2026/09/29/abc123/final.result.json";
+        infra::storage::put("", path, Vec::new().into())
+            .await
+            .unwrap();
+
+        let req = Request::new(DeleteResultRequest {
+            paths: vec![path.to_string()],
+        });
+        let res = searcher.delete_result(req).await;
+
+        assert!(res.is_ok(), "result path was rejected: {res:?}");
     }
 }

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import useIngestion from "@/composables/useIngestion";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import { aiCategories } from "./data";
@@ -104,7 +104,7 @@ const richContent = computed(() =>
     />
     <AIIntegrationCard v-else-if="cardContent" :content="raw(cardContent)" :doc-url="docURL" />
     <div v-else class="text-base">
-      <CopyContent :content="raw(aiContent)" />
+      <CredentialCodeBlock slug="ai-integration" :content="aiContent" />
       <div class="pt-6 pb-2 font-bold">
         {{ t("ingestion.ai.viewDocsPrefix") }}
         <a

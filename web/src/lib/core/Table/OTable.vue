@@ -18,8 +18,17 @@ import { useTableColumnPersistence } from "./composables/useTableColumnPersisten
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender, type Row } from "@tanstack/vue-table";
 import {
+  TOOLTIP_OFF_ATTR,
+  TOOLTIP_TRIGGER_ATTR,
+  TOOLTIP_TRIGGER_OVERFLOW,
+  type TooltipSide,
+} from "@/lib/overlay/Tooltip/OTooltip.types";
+import { isElementTruncated, readElementText } from "@/lib/overlay/Tooltip/useIsTruncated";
+import {
   TABLE_CHECKBOX_COL_SIZE,
+  TABLE_CELL_CLIP_ATTR,
   OTableCellActionsKey,
+  OTableOverflowTooltipKey,
   ROW_RAIL_TONE_CLASS,
   ROW_TONE_CLASS,
   type OTableProps,
@@ -27,6 +36,7 @@ import {
   type OTableSlots,
   type OTableColumnDef,
   type OTableSection,
+  type OTableOverflowTooltipState,
 } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
@@ -51,6 +61,7 @@ import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
+import OTableOverflowTooltip from "./sub-components/OTableOverflowTooltip.vue";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const { t } = useI18nTyped();
@@ -73,15 +84,18 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   streaming: false,
   error: null,
   dense: true,
+  compact: false,
   bordered: true,
   // No outer box border on tables (design system): the app chrome already frames
   // content, and CRUD listing tables sit flush to the edges. Row dividers (the
   // `bordered` row-bottom hairlines) stay; only the surrounding border is gone.
   frame: false,
   toolbarBordered: true,
+  paginationBordered: true,
   striped: false,
   stickyHeader: true,
   wrap: false,
+  cellOverflowTooltip: true,
   rowKey: "id",
   rowHeight: undefined,
   showGlobalFilter: true,
@@ -326,6 +340,77 @@ provide(OTableCellActionsKey, {
   enabled: computed(() => !!slots["cell-hover-actions"]),
 });
 
+// ── Cut-off cell tooltip ────────────────────────────────────────
+// One tooltip for the whole table, measured only on hover, so cells carry no per-cell cost.
+const OVERFLOW_TOOLTIP_DELAY_MS = 700;
+const OWN_TOOLTIP_SELECTOR = `[${TOOLTIP_TRIGGER_ATTR}], [title]:not([title=""])`;
+const TOOLTIP_OFF_SELECTOR = `[${TOOLTIP_OFF_ATTR}]`;
+const overflowAnchor = shallowRef<HTMLElement | null>(null);
+const overflowText = ref("");
+const overflowSide = ref<TooltipSide>("top");
+let overflowTimer: ReturnType<typeof setTimeout> | null = null;
+
+function hideCellOverflow(): void {
+  if (overflowTimer) {
+    clearTimeout(overflowTimer);
+    overflowTimer = null;
+  }
+  overflowAnchor.value = null;
+}
+// An overflow-only tooltip only shows while its own element is cut; any other owner always shows.
+function ownTooltipShows(el: Element): boolean {
+  return (
+    el.getAttribute(TOOLTIP_TRIGGER_ATTR) !== TOOLTIP_TRIGGER_OVERFLOW || isElementTruncated(el)
+  );
+}
+// A cell that already shows its own tooltip keeps it (never two bubbles), and one marked off never gets one.
+function hasOwnTooltip(target: HTMLElement, cell: HTMLElement): boolean {
+  const off = target.closest(TOOLTIP_OFF_SELECTOR);
+  if ((off && cell.contains(off)) || target.querySelector(TOOLTIP_OFF_SELECTOR)) return true;
+  for (let el: Element | null = target; el && cell.contains(el); el = el.parentElement) {
+    if (el.matches(OWN_TOOLTIP_SELECTOR) && ownTooltipShows(el)) return true;
+  }
+  // A text-less owner inside the cell (an icon button's "Copy") describes itself, not the cut text.
+  return [...target.querySelectorAll(OWN_TOOLTIP_SELECTOR)].some(
+    (el) => (el.textContent ?? "").trim() !== "" && ownTooltipShows(el),
+  );
+}
+function showCellOverflow(cell: HTMLElement, toolbarSide?: () => TooltipSide | null): void {
+  overflowTimer = null;
+  if (!cell.isConnected) return;
+  const candidates = [cell, ...cell.querySelectorAll<HTMLElement>(`[${TABLE_CELL_CLIP_ATTR}]`)];
+  const target = candidates.find((el) => isElementTruncated(el));
+  if (!target || hasOwnTooltip(target, cell)) return;
+  const text = readElementText(target);
+  if (!text) return;
+  overflowText.value = text;
+  overflowSide.value = toolbarSide?.() === "top" ? "bottom" : "top";
+  overflowAnchor.value = target;
+}
+function enterCell(cell: HTMLElement, toolbarSide?: () => TooltipSide | null): void {
+  hideCellOverflow();
+  if (!props.cellOverflowTooltip) return;
+  overflowTimer = setTimeout(() => showCellOverflow(cell, toolbarSide), OVERFLOW_TOOLTIP_DELAY_MS);
+}
+function onOverflowTooltipOpenChange(open: boolean): void {
+  if (!open) hideCellOverflow();
+}
+// Handed over as one fixed object: only the tooltip component reads the refs, so opening it never re-renders the table.
+const overflowTooltip: OTableOverflowTooltipState = {
+  anchor: overflowAnchor,
+  text: overflowText,
+  side: overflowSide,
+  onOpenChange: onOverflowTooltipOpenChange,
+};
+watch(
+  () => props.cellOverflowTooltip,
+  (on) => {
+    if (!on) hideCellOverflow();
+  },
+);
+onBeforeUnmount(hideCellOverflow);
+provide(OTableOverflowTooltipKey, { enter: enterCell, leave: hideCellOverflow });
+
 // TanStack memoises the core row model on the DATA ARRAY'S IDENTITY. Callers
 // that stream results mutate their array in place (logs pushes each partition's
 // hits onto `queryResults.hits`), so the identity never changes, the memo never
@@ -397,8 +482,12 @@ const {
       return props.currentPage;
     },
     showIndex: props.showIndex,
-    sortBy: props.sortBy,
-    sortOrder: props.sortOrder,
+    get sortBy() {
+      return props.sortBy;
+    },
+    get sortOrder() {
+      return props.sortOrder;
+    },
     sortFieldMap: props.sortFieldMap,
     get globalFilter() {
       return globalFilterLocal.value;
@@ -714,7 +803,7 @@ const {
   scrollMargin: props.scrollMargin ?? 0,
   // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
   // virtualizer's measured height matches the actual rendered row height.
-  rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
+  rowHeight: props.rowHeight ?? (props.compact ? 25 : props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
   // A delegated scroller can contain a histogram or other content before this
@@ -934,6 +1023,7 @@ watch(
     effectiveColumns,
     () => props.loading,
     () => props.dense,
+    () => props.compact,
     () => frozen.value,
     () => measuredColumnSizeVars.value,
     () => containerWidth.value,
@@ -1157,6 +1247,8 @@ const showStreaming = computed(() => props.streaming && displayRows.value.length
 
 // ── Scroll event handler ────────────────────────────────────────
 function handleScroll(event: Event) {
+  // Virtual rows are recycled on scroll, so the hovered cell may now show another row.
+  hideCellOverflow();
   const el = event.target as HTMLElement;
   if (!el) return;
   emit("scroll", { scrollTop: el.scrollTop, scrollLeft: el.scrollLeft });
@@ -1206,6 +1298,9 @@ defineExpose({
   resetColumnOrder: () => {
     userReorderedColumns.value = false;
     columnOrder.value = props.columns.map((c) => c.id);
+  },
+  applyColumnVisibility: (visibility: Record<string, boolean>) => {
+    internalColumnVisibility.value = { ...internalColumnVisibility.value, ...visibility };
   },
   resetPersistedColumns: () => {
     persistence.clearPersistedState();
@@ -1404,9 +1499,11 @@ defineExpose({
             '--table-row-height':
               props.rowHeight != null
                 ? `${props.rowHeight}px`
-                : props.dense
-                  ? 'var(--table-row-height-dense, 2.25rem)'
-                  : 'var(--table-row-height-normal, 2.75rem)',
+                : props.compact
+                  ? 'var(--table-row-height-compact, 1.5625rem)'
+                  : props.dense
+                    ? 'var(--table-row-height-dense, 2.25rem)'
+                    : 'var(--table-row-height-normal, 2.75rem)',
           }"
           data-test="o2-table"
           :data-test-loading="props.loading ? 'true' : 'false'"
@@ -1438,6 +1535,7 @@ defineExpose({
             :sticky-header="props.stickyHeader"
             :bordered="props.bordered"
             :dense="props.dense"
+            :compact="props.compact"
             :pivot-header-levels="props.pivotHeaderLevels"
             :pivot-row-columns="props.pivotRowColumns"
             :sticky-col-totals="props.stickyColTotals"
@@ -1487,6 +1585,7 @@ defineExpose({
             :get-highlighted-html="highlighting.getHighlightedHtml"
             :wrap="props.wrap"
             :dense="props.dense"
+            :compact="props.compact"
             :bordered="props.bordered"
             :striped="props.striped"
             :row-class="resolvedRowClass as any"
@@ -1744,6 +1843,7 @@ defineExpose({
         :is-last-page="pagination.isLastPage.value"
         :loading="heldLoading"
         :selected-count="selection.selectedCount.value"
+        :bordered="props.paginationBordered"
         @update:page-size="pagination.setPageSize"
         @first-page="pagination.firstPage"
         @prev-page="pagination.prevPage"
@@ -1759,6 +1859,7 @@ defineExpose({
       </OTablePagination>
     </div>
     <!-- /bordered wrapper -->
+    <OTableOverflowTooltip v-if="cellOverflowTooltip" :state="overflowTooltip" />
   </div>
 </template>
 
@@ -1815,7 +1916,7 @@ defineExpose({
 
 /* keep(lib-override:o2-table-hide-header): public modifier, same shape as the
    block above — `thead` is this component's own render, and the class is passed
-   in by components/queries/QueryList.vue and plugins/logs/SearchBar.vue (x2). */
+   in by components/queries/QueryList.vue. */
 .o2-table-hide-header :deep(thead) {
   display: none;
 }

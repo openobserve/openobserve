@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
-              <div class="block w-full truncate">{{ row.name }}</div>
+              <OTruncatedText as="div" class="block w-full">{{ row.name }}</OTruncatedText>
             </div>
           </template>
           <template #cell-match_pattern="{ row }">
@@ -653,6 +653,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import UtcHoursBar from "@/components/settings/UtcHoursBar.vue";
 import OCode from "@/lib/core/Code/OCode.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { operatorSymbol, formatUtcWindows, formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";

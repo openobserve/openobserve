@@ -323,13 +323,42 @@ describe("alertPayload", () => {
       expect(payload.query_condition.promql_condition).toBeNull();
     });
 
-    it("should clear sql for promql tab", () => {
+    // A PromQL alert never runs its SQL (the backend reads `sql` only for SQL
+    // alerts), so the stored query survives the save, as it does for Builder.
+    it("keeps the stored sql for promql tab", () => {
       const formData = createBaseFormData();
+      formData.query_condition.sql = 'SELECT count(*) FROM "cpu_usage"';
       const context = createBaseContext({ getSelectedTab: { value: "promql" } });
 
       const payload = getAlertPayload(formData, context);
 
-      expect(payload.query_condition.sql).toBe("");
+      expect(payload.query_condition.sql).toBe('SELECT count(*) FROM "cpu_usage"');
+    });
+
+    // Compare-with-Past windows only run with SQL; the form keeps them on other tabs.
+    describe("multi_time_range", () => {
+      const windows = [{ offSet: "1h" }];
+      const withWindows = (type: string) => {
+        const formData = createBaseFormData();
+        return {
+          ...formData,
+          query_condition: { ...formData.query_condition, type, multi_time_range: windows },
+        };
+      };
+
+      it.each(["custom", "promql"])("sends no windows for a %s alert", (type) => {
+        const context = createBaseContext({ getSelectedTab: { value: type } });
+
+        const payload = getAlertPayload(withWindows(type), context);
+
+        expect(payload.query_condition.multi_time_range).toEqual([]);
+      });
+
+      it("keeps the windows for a sql alert", () => {
+        const payload = getAlertPayload(withWindows("sql"), createBaseContext());
+
+        expect(payload.query_condition.multi_time_range).toEqual(windows);
+      });
     });
 
     it("should base64 encode vrl_function when present", () => {

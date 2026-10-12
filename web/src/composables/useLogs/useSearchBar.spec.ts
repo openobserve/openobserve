@@ -339,6 +339,19 @@ describe("useSearchBar Composable", () => {
       const ids = searchState().searchObj.data.savedViews.map((v: any) => v.view_id);
       expect(ids).toEqual(["1", "2"]);
     });
+
+    it("resolves with the complete list on success and undefined on failure", async () => {
+      const views = [
+        { view_id: "1", view_name: "legacy" },
+        { view_id: "3", view_name: "traces", view_type: "traces" },
+      ];
+      mockSavedViewsGet.mockResolvedValue({ data: { views } });
+      await expect(wrapper.vm.getSavedViews(true)).resolves.toEqual(views);
+
+      mockSavedViewsGet.mockRejectedValue(new Error("boom"));
+      await expect(wrapper.vm.getSavedViews(true)).resolves.toBeUndefined();
+      expect(searchState().searchObj.loadingSavedView).toBe(false);
+    });
   });
 
   describe("getFunctions", () => {

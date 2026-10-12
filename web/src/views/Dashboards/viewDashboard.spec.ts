@@ -364,6 +364,68 @@ describe("ViewDashboard", () => {
     });
   };
 
+  describe("Auto Run", () => {
+    const setAutoQuery = (enabled: boolean) => {
+      global.mockStoreState.zoConfig = {
+        ...global.mockStoreState.zoConfig,
+        auto_query_enabled: enabled,
+      };
+    };
+
+    afterEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+      setAutoQuery(false);
+    });
+
+    it("is on by default when the server enables auto query", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isAutoRunAvailable).toBe(true);
+      expect(wrapper.vm.isAutoRunOn).toBe(true);
+    });
+
+    it("never shows the apply-changes state while Auto Run is on", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+    });
+
+    it("keeps Refresh-to-apply when the user turned Auto Run off", async () => {
+      setAutoQuery(true);
+      localStorage.setItem("oo_toggle_auto_run", "false");
+      wrapper = createWrapper();
+      await flushPromises();
+      await wrapper.vm.onVariablesManagerReady({ hasUncommittedChanges: true });
+
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+      expect(wrapper.vm.isVariablesChanged).toBe(true);
+    });
+
+    it("is unavailable and off when the server flag is off", async () => {
+      setAutoQuery(false);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.vm.isAutoRunAvailable).toBe(false);
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+
+    it("toggling writes the key shared with logs", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      wrapper.vm.toggleAutoRun();
+      expect(localStorage.getItem("oo_toggle_auto_run")).toBe("false");
+      expect(wrapper.vm.isAutoRunOn).toBe(false);
+    });
+  });
+
   describe("Basic Component Tests", () => {
     it("should create component without crashing", async () => {
       expect(() => {

@@ -20,22 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="rootRef"
     class="bg-surface-panel flex h-full w-full flex-col overflow-hidden"
   >
-    <div class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2">
-      <OButton
-        ref="backBtnRef"
-        data-test="traces-drill-down-back-btn"
-        variant="outline"
-        size="xs"
-        icon-left="arrow-back"
-        @click="close"
-      >
-        {{ t("traces.backToResults") }}
-      </OButton>
-      <span class="text-text-heading min-w-0 truncate text-base font-semibold">{{ title }}</span>
-      <div class="flex min-w-0 flex-1 items-center gap-2">
-        <slot name="header-left" />
-      </div>
-    </div>
+    <OPageHeader
+      :title="title"
+      :back="{
+        label: t('traces.drillDownBackTarget'),
+        onClick: close,
+        dataTest: 'traces-drill-down-back-btn',
+      }"
+    >
+      <template #actions>
+        <slot name="actions" />
+      </template>
+    </OPageHeader>
     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <slot />
     </div>
@@ -44,12 +40,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import OButton from "@/lib/core/Button/OButton.vue";
-import { useI18nTyped } from "@/types/i18n";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 defineProps<{
   open: boolean;
-  title?: string;
+  title?: I18nText;
 }>();
 
 const emit = defineEmits<{
@@ -58,7 +54,6 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const rootRef = ref<HTMLElement | null>(null);
-const backBtnRef = ref<{ $el?: HTMLElement } | null>(null);
 
 const close = () => emit("update:open", false);
 
@@ -88,7 +83,7 @@ const onKeydown = (e: KeyboardEvent) => {
 onMounted(() => {
   setCoveredInert(true);
   document.addEventListener("keydown", onKeydown);
-  backBtnRef.value?.$el?.focus?.();
+  rootRef.value?.querySelector<HTMLElement>('[data-test="traces-drill-down-back-btn"]')?.focus();
 });
 onBeforeUnmount(() => {
   // Only a Back/Escape close leaves focus here; a close caused by a new search must not steal it.

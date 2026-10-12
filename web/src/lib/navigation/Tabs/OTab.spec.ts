@@ -67,7 +67,10 @@ function mountTab(
     template: `
       <TabsRoot :model-value="modelValue" :orientation="orientation">
         <TabsList>
-          <OTab v-bind="tabProps"><slot /></OTab>
+          <OTab v-bind="tabProps">
+            <slot />
+            <template v-if="$slots.trailing" #trailing><slot name="trailing" /></template>
+          </OTab>
         </TabsList>
       </TabsRoot>
     `,
@@ -152,6 +155,22 @@ describe("OTab", () => {
     });
     expect(wrapper.find(".badge").exists()).toBe(true);
     expect(wrapper.find(".badge").text()).toBe("3");
+  });
+
+  it("renders trailing controls beside the trigger, not inside it", () => {
+    const wrapper = mountTab({
+      label: "Logs",
+      slots: { trailing: '<button data-testid="eye">Hide</button>' },
+    });
+    const eye = wrapper.find('[data-testid="eye"]').element;
+    expect(eye.closest('[role="tab"]')).toBeNull();
+    expect(eye.closest("[data-otab-trailing]")).not.toBeNull();
+    expect(wrapper.find('[role="tab"]').text()).toBe("Logs");
+  });
+
+  it("renders no trailing wrapper without trailing content", () => {
+    const wrapper = mountTab({ label: "Logs" });
+    expect(wrapper.find("[data-otab-trailing]").exists()).toBe(false);
   });
 
   // --- Element type + CSS class ---

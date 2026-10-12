@@ -738,20 +738,12 @@ export const useStreamFields = () => {
                     group: resolveFieldGroup(key, "Utf8", semanticIndex, dynamicPrefixes),
                     isSchemaField: false,
                     showValues: false,
-                    isInterestingField: searchObj.data.stream.interestingFieldList.includes(key)
-                      ? true
-                      : false,
+                    // Never interesting: a persisted entry would be re-added on every extract.
+                    isInterestingField: false,
                     streams: [],
                   };
                   schemaMaps.push(fieldObj);
 
-                  if (fieldObj.isInterestingField) {
-                    interestingSchemaMaps.push(fieldObj);
-                    if (!interestingFieldsMapping[stream.name])
-                      interestingFieldsMapping[stream.name] = [];
-                    interestingFieldsMapping[stream.name].push(fieldObj);
-                    interestingFieldsMap[fieldObj.name] = true;
-                  }
                   schemaFields.push(key);
                 }
               }

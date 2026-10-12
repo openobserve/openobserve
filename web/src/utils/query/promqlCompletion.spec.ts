@@ -77,6 +77,12 @@ describe("PROMQL_FUNCTIONS — aggregations and function identifiers", () => {
     }
   });
 
+  it("offers the scalar and query-window functions the upstream snapshot lacks", () => {
+    for (const fn of ["min_of", "max_of", "start", "end", "range", "step"]) {
+      expect(labels(PROMQL_FUNCTIONS), `missing ${fn}`).toContain(fn);
+    }
+  });
+
   it("carries the whole *_over_time family, not a sample of it", () => {
     // The family is the most common source of "I know this function exists".
     const overTime = labels(PROMQL_FUNCTIONS).filter((l) => l.endsWith("_over_time"));

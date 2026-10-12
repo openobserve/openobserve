@@ -31,6 +31,22 @@ pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
+/// Every stream name O2 writes itself; web/src/utils/internalStreams.ts must list the same names.
+pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
+    USAGE_STREAM,
+    AUDIT_STREAM,
+    STATS_STREAM,
+    TRIGGERS_STREAM,
+    ERROR_STREAM,
+    DATA_RETENTION_USAGE_STREAM,
+    "cloud_events",
+    "_agent_signals",
+    super::redaction::REDACTION_EVIDENCE_STREAM,
+    super::evaluator::EVALUATOR_STREAM,
+    super::llm_scores::LLM_SCORES_STREAM,
+    super::llm_experiments::LLM_EXPERIMENT_STREAM,
+    "_anomalies",
+];
 
 /// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
 /// are rejected. OTLP has no guard: collectors write `_o2_dbm_server` there.
@@ -311,6 +327,9 @@ pub struct TriggerData {
     /// The venue the failed synthetics slot was scheduled for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synthetics_location: Option<String>,
+    /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_attempted: Option<bool>,
 }
 
 impl Default for TriggerData {
@@ -350,6 +369,7 @@ impl Default for TriggerData {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         }
     }
 }
@@ -400,6 +420,7 @@ impl TriggerData {
             value_is_lower_bound: Some(false),
             synthetics_error_source: Some(String::new()),
             synthetics_location: Some(String::new()),
+            delivery_attempted: Some(true),
         }
     }
 
@@ -1466,6 +1487,67 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
     }
 
+    /// Quoted names inside the `INTERNAL_STREAM_NAMES` array literal of a TypeScript source.
+    fn ts_internal_stream_names(source: &str) -> Vec<String> {
+        let start = source
+            .find("INTERNAL_STREAM_NAMES")
+            .expect("INTERNAL_STREAM_NAMES missing from internalStreams.ts");
+        let rest = &source[start..];
+        let assign = rest
+            .find('=')
+            .expect("INTERNAL_STREAM_NAMES is not assigned");
+        let open = rest[assign..]
+            .find('[')
+            .expect("INTERNAL_STREAM_NAMES has no array literal")
+            + assign;
+        let close = rest[open..].find(']').expect("unterminated array literal") + open;
+        rest[open + 1..close]
+            .lines()
+            .map(|line| line.split("//").next().unwrap_or(""))
+            .flat_map(|line| line.split(','))
+            .map(|item| {
+                item.trim()
+                    .trim_matches(|c| c == '"' || c == '\'' || c == '`')
+            })
+            .filter(|item| !item.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+
+    #[test]
+    fn test_internal_stream_names_match_web_list() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../web/src/utils/internalStreams.ts");
+        let source = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let mut web = ts_internal_stream_names(&source);
+        web.sort();
+        let mut rust = INTERNAL_STREAM_NAMES.map(str::to_string).to_vec();
+        rust.sort();
+        assert_eq!(web, rust);
+    }
+
+    #[test]
+    fn test_ts_internal_stream_names_parses_quotes_and_comments() {
+        let source = "export const INTERNAL_STREAM_NAMES: readonly string[] = [\n  \"usage\", // billing\n  'audit',\n] as const;\nconst OTHER = [\"x\"];";
+        assert_eq!(ts_internal_stream_names(source), vec!["usage", "audit"]);
+    }
+
+    #[test]
+    fn test_internal_stream_names_leave_is_internal_stream_unchanged() {
+        assert_eq!(INTERNAL_STREAM_NAMES.len(), 13);
+        for name in [
+            ERROR_STREAM,
+            STATS_STREAM,
+            TRIGGERS_STREAM,
+            USAGE_STREAM,
+            "cloud_events",
+        ] {
+            assert!(INTERNAL_STREAM_NAMES.contains(&name));
+            assert!(!is_internal_stream(name), "{name} must stay discoverable");
+        }
+    }
+
     #[test]
     fn test_is_internal_stream() {
         for name in [
@@ -1700,6 +1782,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            delivery_attempted: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
@@ -2654,6 +2737,27 @@ mod tests {
                  `init_for_reflection` sets it, and a `triggers` schema without the column is a \
                  column the quota alert rule can never fire on"
             );
+        }
+    }
+
+    #[test]
+    fn trigger_data_delivery_attempted_reads_legacy_rows_as_unknown() {
+        let json =
+            serde_json::to_value(TriggerData::default()).expect("TriggerData must serialize");
+        assert!(json.get("delivery_attempted").is_none());
+        let legacy: TriggerData =
+            serde_json::from_value(json).expect("a row written before the field must deserialize");
+        assert_eq!(legacy.delivery_attempted, None);
+
+        for attempted in [true, false] {
+            let row = TriggerData {
+                delivery_attempted: Some(attempted),
+                ..TriggerData::default()
+            };
+            let json = serde_json::to_value(&row).expect("TriggerData must serialize");
+            assert_eq!(json["delivery_attempted"], attempted);
+            let back: TriggerData = serde_json::from_value(json).expect("must read back");
+            assert_eq!(back.delivery_attempted, Some(attempted));
         }
     }
 }

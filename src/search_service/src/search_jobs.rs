@@ -288,6 +288,16 @@ fn generate_result_path(
     )
 }
 
+/// Only search-job result files under `result/` may be read back from object storage.
+pub fn is_search_job_result_path(path: &str) -> bool {
+    use std::path::{Component, Path};
+    path.starts_with("result/")
+        && path.ends_with(".result.json")
+        && Path::new(path)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+}
+
 /// Delete every S3 result file backing an org's search jobs. Used by org cleanup:
 /// the DB rows are removed by `search_jobs::delete_by_org`, but the result objects
 /// in storage (keyed by created_at/trace_id, not org) would otherwise be orphaned.
@@ -555,4 +565,25 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_search_job_result_path() {
+        assert!(is_search_job_result_path(
+            "result/2026/09/29/abc123/final.result.json"
+        ));
+        assert!(is_search_job_result_path(
+            "result/2026/09/29/abc123/0.result.json"
+        ));
+        assert!(!is_search_job_result_path("files/otherorg/logs/x.parquet"));
+        assert!(!is_search_job_result_path(
+            "result/../files/otherorg/secret.result.json"
+        ));
+        assert!(!is_search_job_result_path("/result/x.result.json"));
+        assert!(!is_search_job_result_path("result/x.parquet"));
+    }
 }

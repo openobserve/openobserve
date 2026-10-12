@@ -29,7 +29,7 @@ use rayon::prelude::*;
 use crate::binary::scalar_binary_operations;
 
 // DROP_METRIC_BIN_OP if the operation is one of these, drop the metric __name__
-pub const DROP_METRIC_BIN_OP: [u8; 7] = [
+pub const DROP_METRIC_BIN_OP: [token::TokenId; 7] = [
     token::T_ADD,
     token::T_SUB,
     token::T_DIV,
