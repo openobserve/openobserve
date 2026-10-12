@@ -1613,6 +1613,7 @@ pub async fn list_alert_group_transitions(
                     to_outcome: t.to_outcome.to_string(),
                     at: t.at,
                     value: t.value,
+                    rule_value: t.rule_value,
                 })
                 .collect(),
         }),

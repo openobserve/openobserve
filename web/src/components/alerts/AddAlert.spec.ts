@@ -706,6 +706,55 @@ describe("AddAlert (OForm owner)", () => {
   });
 
   describe("update save path", () => {
+    it.each([1, 30, 240])(
+      "preserves a rule pending duration of %s seconds when editing",
+      async (seconds) => {
+        wrapper = mountAlert({
+          isUpdated: true,
+          modelValue: {
+            name: "pending_rule",
+            stream_type: "metrics",
+            stream_name: "up",
+            is_real_time: false,
+            pending_period_sec: seconds,
+            query_condition: {
+              type: "promql",
+              promql: "up",
+              promql_rule_mode: true,
+              promql_multi_alert: true,
+              promql_condition: null,
+              sql: "",
+              aggregation: null,
+              conditions: null,
+              vrl_function: "",
+              multi_time_range: [],
+            },
+            trigger_condition: {
+              period: 5,
+              operator: ">=",
+              frequency: 60,
+              threshold: 1,
+              silence: 0,
+              frequency_type: "minutes",
+              timezone: "UTC",
+            },
+            destinations: ["email"],
+            context_attributes: {},
+            description: "",
+            row_template: "",
+            row_template_type: "String",
+            enabled: true,
+          },
+          destinations: [{ name: "email" }],
+        });
+        await flushPromises();
+        expect(wrapper.vm.form.state.values.pending_period_sec).toBeCloseTo(seconds / 60);
+        const payload = wrapper.vm.getAlertPayload();
+        expect(payload.pending_period_sec).toBe(seconds);
+        expect(payload.query_condition.promql_multi_alert).toBe(true);
+      },
+    );
+
     it("updates an existing alert via update_by_alert_id (beingUpdated)", async () => {
       wrapper = mountAlert({
         isUpdated: true,

@@ -7500,6 +7500,11 @@
     "SearchSQLCancelled": "錯誤：搜尋 SQL 已取消。"
   },
   "alerts": {
+    "promRuleMode": "規則模式",
+    "promRulePreview": "目前符合 {count} 個傳回的序列。每個序列都必須完成待定期間才會觸發。",
+    "promRuleModeDescription": "當運算式傳回任何序列時即符合。待定期間為零時，請選擇單一或多重警示；有待定期間會自動啟用多重警示。將串流留空以推斷所參照的指標串流。",
+    "promRuleModePendingMulti": "待定期間需要為每個序列使用獨立的計時器，因此無法停用多重警示。",
+    "promRuleModeConflict": "規則模式無法使用嚴重或警告值閾值；待定期間需要多重警示。",
     "allAlerts": "所有警示",
     "compositeAlert": "複合",
     "import": {
@@ -8435,6 +8440,8 @@
         "alertDescription": "警示的描述文字",
         "alertStartTime": "視窗開始時間（ISO 8601）",
         "alertEndTime": "視窗結束時間（ISO 8601）",
+        "alertStartTimeMillis": "視窗開始時間（epoch 毫秒）",
+        "alertEndTimeMillis": "視窗結束時間（epoch 毫秒）",
         "alertUrl": "返回 OpenObserve 調查的連結",
         "alertTriggerTime": "警示觸發時間（ISO 8601）",
         "alertTriggerTimeMillis": "觸發時間（epoch 毫秒）",

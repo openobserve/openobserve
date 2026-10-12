@@ -663,6 +663,7 @@ where
         to_level: Set(t.to_level.map(|l| l.to_i32())),
         at: Set(t.at),
         value: Set(t.value),
+        rule_value: Set(t.rule_value.clone()),
         group_labels: Set(t.group_labels.clone()),
         ..Default::default()
     }
@@ -712,6 +713,7 @@ pub async fn list_transitions_filtered(
                 to_level: m.to_level.and_then(AlertLevel::from_i32),
                 at: m.at,
                 value: m.value,
+                rule_value: m.rule_value,
                 group_labels: m.group_labels,
             })
         })
@@ -753,6 +755,7 @@ pub async fn list_transitions_between(
                 to_level: m.to_level.and_then(AlertLevel::from_i32),
                 at: m.at,
                 value: m.value,
+                rule_value: m.rule_value,
                 group_labels: m.group_labels,
             })
         })
@@ -801,6 +804,7 @@ pub async fn list_transitions_between_many(
             to_level: m.to_level.and_then(AlertLevel::from_i32),
             at: m.at,
             value: m.value,
+            rule_value: m.rule_value,
             group_labels: m.group_labels,
         };
         let lane = grouped.entry(transition.alert_id.clone()).or_default();
@@ -1170,6 +1174,7 @@ mod tests {
                 to_level: Some(AlertLevel::Critical),
                 at,
                 value: Some(9.5),
+                rule_value: None,
                 group_labels: None,
             }),
         }
@@ -1664,5 +1669,28 @@ mod tests {
         );
         assert!(stored.episode_opened_at.is_none());
         assert!(stored.episode_incident_id.is_none());
+    }
+    #[tokio::test]
+    async fn rule_value_transition_is_stored_as_text() {
+        let db = db().await;
+        for (i, value) in ["NaN", "+Inf", "-Inf", "0.25"].iter().enumerate() {
+            let mut update = update_at("host=a", 1_750_000_000_000_000 + i as i64);
+            let t = update.transition.as_mut().unwrap();
+            t.rule_value = Some((*value).into());
+            t.value = None;
+            write_transition(&db, t).await.unwrap();
+        }
+        let rows = alert_state_transitions::Entity::find()
+            .order_by_asc(alert_state_transitions::Column::At)
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.iter()
+                .map(|r| r.rule_value.as_deref().unwrap())
+                .collect::<Vec<_>>(),
+            ["NaN", "+Inf", "-Inf", "0.25"]
+        );
+        assert!(rows.iter().all(|r| r.value.is_none()));
     }
 }

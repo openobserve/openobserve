@@ -302,6 +302,9 @@ pub struct TriggerData {
     /// search cap is reached.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actual_value: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// PromQL sample text preserves special floats that cannot populate numeric actual_value.
+    pub rule_value: Option<String>,
     /// The threshold that matched. `None` on `normal` rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threshold_value: Option<f64>,
@@ -362,6 +365,7 @@ impl Default for TriggerData {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -413,6 +417,7 @@ impl TriggerData {
             grouped: Some(false),
             group_size: Some(0),
             actual_value: Some(0.0),
+            rule_value: Some(String::new()),
             threshold_value: Some(0.0),
             threshold_operator: Some(String::new()),
             level: Some(0),
@@ -1775,6 +1780,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,

@@ -7505,6 +7505,11 @@
     "SearchSQLCancelled": "Lỗi: SQL tìm kiếm đã bị hủy."
   },
   "alerts": {
+    "promRuleMode": "Chế độ quy tắc",
+    "promRulePreview": "{count} chuỗi trả về khớp hiện tại. Mỗi chuỗi phải hoàn thành khoảng thời gian chờ trước khi kích hoạt.",
+    "promRuleModeDescription": "Khớp khi biểu thức trả về bất kỳ chuỗi nào. Chọn Single hoặc Multi alert khi khoảng thời gian chờ bằng không; khoảng thời gian chờ sẽ tự động bật Multi alert. Để trống stream để suy ra stream chỉ số được tham chiếu.",
+    "promRuleModePendingMulti": "Khoảng thời gian chờ yêu cầu một bộ đếm độc lập cho mỗi chuỗi, nên không thể tắt Multi alert.",
+    "promRuleModeConflict": "Chế độ quy tắc không thể dùng ngưỡng giá trị Critical hoặc Warning; khoảng thời gian chờ yêu cầu Multi alert.",
     "allAlerts": "Tất cả cảnh báo",
     "compositeAlert": "Tổng hợp",
     "import": {
@@ -8440,6 +8445,8 @@
         "alertDescription": "Văn bản mô tả của cảnh báo",
         "alertStartTime": "Thời gian bắt đầu cửa sổ (ISO 8601)",
         "alertEndTime": "Thời gian kết thúc cửa sổ (ISO 8601)",
+        "alertStartTimeMillis": "Thời gian bắt đầu cửa sổ theo epoch mili giây",
+        "alertEndTimeMillis": "Thời gian kết thúc cửa sổ theo epoch mili giây",
         "alertUrl": "Liên kết trở lại OpenObserve để điều tra",
         "alertTriggerTime": "Thời điểm cảnh báo kích hoạt (ISO 8601)",
         "alertTriggerTimeMillis": "Thời gian kích hoạt theo epoch millis",

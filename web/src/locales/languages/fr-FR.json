@@ -7505,6 +7505,11 @@
     "SearchSQLCancelled": "Erreur : Search SQL a été annulé."
   },
   "alerts": {
+    "promRuleMode": "Mode de règle",
+    "promRulePreview": "{count} séries retournées correspondent maintenant. Chaque série doit atteindre la fin de la période d'attente avant de se déclencher.",
+    "promRuleModeDescription": "Correspond lorsque l'expression renvoie au moins une série. Choisissez une alerte Simple ou Multiple lorsque la période d'attente est nulle ; une période d'attente active automatiquement l'alerte Multiple. Laissez le flux vide pour déduire un flux de métriques référencé.",
+    "promRuleModePendingMulti": "Une période d'attente nécessite un minuteur indépendant pour chaque série, l'alerte Multiple ne peut donc pas être désactivée.",
+    "promRuleModeConflict": "Le mode de règle ne peut pas utiliser de seuils de valeur Critique ou Avertissement ; une période d'attente nécessite l'alerte Multiple.",
     "allAlerts": "Toutes les alertes",
     "compositeAlert": "Composite",
     "import": {
@@ -8440,6 +8445,8 @@
         "alertDescription": "Description de l'alerte",
         "alertStartTime": "Début de la fenêtre (ISO 8601)",
         "alertEndTime": "Fin de la fenêtre (ISO 8601)",
+        "alertStartTimeMillis": "Heure de début de la fenêtre en millisecondes epoch",
+        "alertEndTimeMillis": "Heure de fin de la fenêtre en millisecondes epoch",
         "alertUrl": "Lien vers OpenObserve pour enquêter",
         "alertTriggerTime": "Déclenchement de l'alerte (ISO 8601)",
         "alertTriggerTimeMillis": "Heure de déclenchement en millisecondes epoch",
