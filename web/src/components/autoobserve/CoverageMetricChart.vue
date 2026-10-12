@@ -16,12 +16,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section
-    :id="`autoobserve-coverage-signal-${def.signal}`"
-    class="flex scroll-mt-4 flex-col gap-1.5"
+    class="bg-surface-base rounded-surface flex min-w-0 flex-col gap-1 border p-3 shadow-xs"
+    :class="expanded ? 'border-accent' : 'border-border-default'"
     :data-test="`autoobserve-coverage-chart-${def.signal}`"
   >
     <div class="flex items-center gap-2">
-      <span class="text-text-heading text-sm font-medium">{{ title }}</span>
+      <span class="text-text-secondary min-w-0 truncate text-xs">{{ title }}</span>
+      <OButton
+        variant="ghost"
+        size="xs"
+        class="ms-auto"
+        :aria-expanded="expanded"
+        :aria-label="t('autoobserve.coverage.detailsFor', { metric: title })"
+        :data-test="`autoobserve-coverage-chart-details-${def.signal}`"
+        @click="emit('toggle')"
+      >
+        <OIcon :name="expanded ? 'expand-less' : 'expand-more'" size="xs" />
+        {{ t("autoobserve.coverage.details") }}
+      </OButton>
+    </div>
+    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <span
+        v-if="cell.state !== 'gap'"
+        class="text-text-heading text-xl leading-tight font-semibold tabular-nums"
+        :data-test="`autoobserve-coverage-chart-value-${def.signal}`"
+        >{{ valueText }}</span
+      >
+      <span
+        v-if="delta"
+        class="inline-flex items-center gap-0.5 text-xs font-medium tabular-nums"
+        :class="delta.tone"
+        :aria-label="delta.label"
+        :data-test="`autoobserve-coverage-chart-delta-${def.signal}`"
+        ><OIcon
+          v-if="delta.up !== null"
+          :name="delta.up ? 'arrow-upward' : 'arrow-downward'"
+          size="xs"
+        />{{ delta.text }}</span
+      >
       <span
         class="ms-auto inline-flex items-center gap-1 text-xs"
         :class="badge.tone"
@@ -29,17 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon :name="badge.icon" size="xs" />{{ badge.label }}
       </span>
-      <OButton
-        variant="ghost"
-        size="xs"
-        :aria-expanded="expanded"
-        :aria-label="t('autoobserve.coverage.detailsFor', { metric: title })"
-        :data-test="`autoobserve-coverage-chart-details-${def.signal}`"
-        @click="emit('toggle')"
-      >
-        {{ t("autoobserve.coverage.details") }}
-        <OIcon :name="expanded ? 'expand-less' : 'expand-more'" size="xs" />
-      </OButton>
     </div>
 
     <div
@@ -53,8 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         role="img"
         :aria-label="summary"
-        class="min-w-0 cursor-pointer"
-        :class="showAxis ? 'h-34' : 'h-30'"
+        class="h-30 min-w-0 cursor-pointer"
         @click="emit('toggle')"
       >
         <!-- ChartRenderer, not PanelSchemaRenderer: static mock series and a learned band have no query to run. -->
@@ -82,6 +102,7 @@ import useTheme from "@/composables/useTheme";
 import { chartColor, chartGridLine, chartTextColor } from "@/utils/chartTheme";
 import {
   ACCENT,
+  RISE_IS_BAD,
   formatValue,
   type ChartRange,
   type MetricDef,
@@ -96,7 +117,6 @@ const props = defineProps<{
   range: ChartRange;
   start: number;
   end: number;
-  showAxis: boolean;
   expanded: boolean;
   readyOn: I18nText | null;
 }>();
@@ -111,6 +131,33 @@ const panelId = computed(() => `autoobserve-coverage-${props.def.signal}`);
 const title = computed(() => t(props.def.titleKey));
 
 const valueText = computed(() => raw(formatValue(props.def, props.series.current)));
+
+// Against the start of the window; requests carry no good-or-bad colour.
+const delta = computed(() => {
+  const { current, previous } = props.series;
+  if (props.cell.state === "gap" || !previous) return null;
+  const change = (current - previous) / previous;
+  const pct = raw(`${Math.round(Math.abs(change) * 100)}%`);
+  if (Math.round(Math.abs(change) * 100) === 0)
+    return {
+      up: null,
+      tone: "text-text-secondary",
+      text: pct,
+      label: t("autoobserve.coverage.deltaFlat"),
+    };
+  const up = change > 0;
+  const bad = RISE_IS_BAD[props.def.signal];
+  const tone =
+    bad == null
+      ? "text-text-secondary"
+      : up === bad
+        ? "text-status-warning-text"
+        : "text-status-success-text";
+  const label = up
+    ? t("autoobserve.coverage.deltaUp", { change: pct })
+    : t("autoobserve.coverage.deltaDown", { change: pct });
+  return { up, tone, text: pct, label };
+});
 
 const anomaly = computed(() => props.cell.method === "anomaly");
 
@@ -235,7 +282,7 @@ const options = computed(() => {
   return {
     animation: false,
     backgroundColor: "transparent",
-    grid: { left: 44, right: 30, top: 12, bottom: props.showAxis ? 22 : 6 },
+    grid: { left: 40, right: 26, top: 14, bottom: 18 },
     tooltip: {
       trigger: "axis",
       confine: true,
@@ -263,7 +310,8 @@ const options = computed(() => {
       max: props.end,
       axisLine: { lineStyle: { color: grid } },
       axisTick: { show: false },
-      axisLabel: { show: props.showAxis, color: text, fontSize: 10, hideOverlap: true },
+      axisLabel: { color: text, fontSize: 9, hideOverlap: true },
+      splitNumber: 3,
       splitLine: { show: false },
     },
     yAxis: {
