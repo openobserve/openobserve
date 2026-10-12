@@ -4,6 +4,7 @@ import { useCollapsibleGroup } from "./useCollapsibleGroup";
 import { CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "reka-ui";
 import { ref, computed, watch, useSlots } from "vue";
 import OIcon from "../Icon/OIcon.vue";
+import OTruncatedText from "../Typography/OTruncatedText.vue";
 import { iconRegistry } from "../Icon/OIcon.icons";
 
 const props = withDefaults(defineProps<OCollapsibleProps>(), {
@@ -131,13 +132,13 @@ watch(
           <slot name="trigger" :open="isOpen" />
         </span>
         <span v-else class="flex min-w-0 flex-1 flex-col">
-          <span
-            class="text-collapsible-label text-compact group-data-[state=open]:text-collapsible-icon-open truncate font-medium"
-            >{{ label }}</span
+          <OTruncatedText
+            class="text-collapsible-label text-compact group-data-[state=open]:text-collapsible-icon-open font-medium"
+            >{{ label }}</OTruncatedText
           >
-          <span v-if="caption" class="text-collapsible-caption truncate text-xs">{{
+          <OTruncatedText v-if="caption" class="text-collapsible-caption text-xs">{{
             caption
-          }}</span>
+          }}</OTruncatedText>
         </span>
 
         <OIcon
@@ -180,16 +181,16 @@ watch(
           >
 
           <span class="flex min-w-0 flex-1 flex-col">
-            <span
+            <OTruncatedText
               :class="[
-                'text-collapsible-label truncate font-medium',
+                'text-collapsible-label font-medium',
                 variant === 'sidebar' ? 'text-compact' : 'text-sm',
               ]"
-              >{{ label }}</span
+              >{{ label }}</OTruncatedText
             >
-            <span v-if="caption" class="text-collapsible-caption truncate text-xs">{{
+            <OTruncatedText v-if="caption" class="text-collapsible-caption text-xs">{{
               caption
-            }}</span>
+            }}</OTruncatedText>
           </span>
 
           <!-- Right chevron — default variant only -->

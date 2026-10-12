@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for GetStarted.vue (onboarding form). Both fields required.
+// Validation schema for GetStarted.vue (onboarding form). Both text fields required; the first source is optional.
 
 import { z } from "zod";
 
@@ -24,13 +24,15 @@ export const makeGetStartedSchema = (t: TranslateFn) =>
     isAgree: z.boolean().refine((v) => v === true, {
       error: () => t("login.mustAcceptTerms"),
     }),
+    firstSource: z.string().optional(),
   });
 
 export type GetStartedForm = z.infer<ReturnType<typeof makeGetStartedSchema>>;
 
-export const getStartedDefaults = (): GetStartedForm => ({
+export const getStartedDefaults = (firstSource?: string): GetStartedForm => ({
   hearAboutUs: "",
   whereDoYouWork: "",
   // Start unchecked; `false` fails the `isAgree` gate until the user checks it.
   isAgree: false,
+  firstSource,
 });

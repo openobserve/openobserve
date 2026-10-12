@@ -251,6 +251,47 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
 }
 
 #[test]
+fn null_value_is_written_as_the_stale_marker() {
+    let schema = Arc::new(Schema::new(vec![
+        Field::new("__hash__", DataType::UInt64, false),
+        Field::new("_timestamp", DataType::Int64, false),
+        Field::new("value", DataType::Float64, true),
+        Field::new("label_a", DataType::Utf8, true),
+    ]));
+    let input = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(UInt64Array::from(vec![1, 1, 2])),
+            Arc::new(Int64Array::from(vec![10, 20, 10])),
+            Arc::new(Float64Array::from(vec![Some(1.0), None, None])),
+            Arc::new(StringArray::from(vec![Some("a"), Some("a"), Some("b")])),
+        ],
+    )
+    .unwrap();
+    let parent = ParentMetadata {
+        rows: 3,
+        compressed_size: 123,
+    };
+    let mut writer = BlockWriter::new(
+        Vec::new(),
+        schema,
+        vec!["label_a".into()],
+        parent.clone(),
+        MAX_BLOCK_ROWS,
+    )
+    .unwrap();
+    writer.write(&input).unwrap();
+    let blob = writer.finish().unwrap();
+
+    let index = decode_file(&blob, &parent, &["label_a".into()]).unwrap();
+    let stale = config::meta::promql::STALE_NAN_BITS;
+    assert_eq!(
+        decoded_rows(&blob, &index),
+        vec![(1, 10, 1f64.to_bits()), (1, 20, stale), (2, 10, stale)]
+    );
+}
+
+#[test]
 fn numeric_parent_and_projection_are_validated() {
     let blob = fixture();
     let mut wrong = parent();

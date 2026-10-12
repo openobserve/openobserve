@@ -19,7 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
     <OPageLayout
-      v-if="!showAddJSTransformDialog"
       :title="t('function.enrichmentTables')"
       icon="dataset"
       :subtitle="t('function.enrichmentTablesSubtitle')"
@@ -376,14 +375,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPageLayout>
-    <div v-else>
-      <AddEnrichmentTable
-        v-model="formData"
-        :isUpdating="isUpdated"
-        @update:list="refreshList"
-        @cancel:hideform="hideForm"
-      />
-    </div>
+    <!-- Keyed per open: the form reads its defaults from modelValue only at setup. -->
+    <AddEnrichmentTable
+      :key="formKey"
+      :open="showAddJSTransformDialog"
+      v-model="formData"
+      :isUpdating="isUpdated"
+      @update:list="refreshList"
+      @cancel:hideform="hideForm"
+    />
     <ConfirmDialog
       :title="t('function.deleteEnrichmentTableTitle')"
       :message="t('function.deleteEnrichmentTableConfirm')"
@@ -541,6 +541,7 @@ export default defineComponent({
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
+    const formKey = ref(0);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -557,7 +558,6 @@ export default defineComponent({
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
-    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
     const currentPage = ref(1);
     const onPageChange = (page: number) => {
       currentPage.value = page;
@@ -838,6 +838,7 @@ export default defineComponent({
     };
 
     const addLookupTable = () => {
+      formKey.value += 1;
       showAddJSTransformDialog.value = true;
     };
 
@@ -1176,6 +1177,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
+      formKey,
       delete: "delete",
       filterQuery,
       filterData,

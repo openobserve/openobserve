@@ -107,10 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- Group label + child count -->
-              <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">
+              <OTruncatedText class="text-text-body flex-1 text-sm font-medium">
                 {{ row.label }}
                 <span class="text-text-secondary font-normal">({{ row.children.length }})</span>
-              </span>
+              </OTruncatedText>
 
               <!-- Aggregate progress e.g. "8/10" -->
               <span class="text-text-secondary text-xs whitespace-nowrap tabular-nums">
@@ -142,9 +142,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'text-text-secondary': child.status === 'pending',
                     }"
                   />
-                  <span class="text-text-body min-w-0 flex-1 truncate text-sm">
+                  <OTruncatedText class="text-text-body flex-1 text-sm">
                     {{ streamChildLabel(child.step) }}
-                  </span>
+                  </OTruncatedText>
                   <span
                     v-if="child.attempts > 0"
                     class="text-text-secondary text-xs whitespace-nowrap tabular-nums"
@@ -186,9 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <!-- Step name -->
-              <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">
+              <OTruncatedText class="text-text-body flex-1 text-sm font-medium">
                 {{ formatStepName(row.task.step) }}
-              </span>
+              </OTruncatedText>
 
               <!-- Attempts (only when relevant) -->
               <span
@@ -253,6 +253,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 interface CleanupTask {
@@ -270,7 +271,7 @@ interface CleanupTask {
 
 export default defineComponent({
   name: "OrgCleanupTasksDialog",
-  components: { ODialog, OButton, OBadge, OIcon, OProgressBar },
+  components: { ODialog, OButton, OBadge, OIcon, OProgressBar, OTruncatedText },
   props: {
     open: { type: Boolean, required: true },
     orgId: { type: String, required: true },

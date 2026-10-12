@@ -456,15 +456,16 @@ export default defineComponent({
       writeField(index, "params", params);
     };
 
+    // The server reads only camelCase, so a snake_case file would import as VRL; camelCase wins when both are present.
+    const declaredTransType = (item: any) => item?.transType ?? item?.trans_type ?? 0;
+
     // A control over a rejected item opens on that item, not on a blank.
     const currentBody = (index: number) =>
       String(baseImportRef.value?.jsonArrayOfObj?.[index]?.function ?? "");
 
     // Absent is VRL (what gets sent); unusable is nothing, or picking VRL emits no change.
     const currentTransType = (index: number) => {
-      const declared = baseImportRef.value?.jsonArrayOfObj?.[index]?.transType;
-      if (declared === undefined || declared === null) return "0";
-      const text = String(declared);
+      const text = String(declaredTransType(baseImportRef.value?.jsonArrayOfObj?.[index]));
       return text === "0" || text === "1" ? text : "";
     };
 
@@ -530,7 +531,7 @@ export default defineComponent({
         });
       }
 
-      const transType = item?.transType ?? 0;
+      const transType = declaredTransType(item);
       if (![0, 1, "0", "1"].includes(transType)) {
         errors.push({
           field: "trans_type",
@@ -580,7 +581,7 @@ export default defineComponent({
       name: item.name as string,
       function: String(item.function).trim(),
       params: typeof item.params === "string" && item.params.trim() ? item.params : "row",
-      transType: parseInt(String(item.transType ?? 0)),
+      transType: parseInt(String(declaredTransType(item))),
     });
 
     const writeFunction = async (item: any, index: number, itemIndex: number) => {
@@ -612,9 +613,11 @@ export default defineComponent({
           status: "failed",
         });
         // A taken name has one specific fix, so it gets the rename box.
-        return /already exist/i.test(String(reason))
-          ? [conflictError(item, index, itemIndex)]
-          : rejectionErrors(item, index, itemIndex);
+        if (/already exist/i.test(String(reason))) {
+          return [conflictError(item, index, itemIndex)];
+        }
+        // Only a 400 means the server judged this function, so only a 400 is worth a retype.
+        return error?.response?.status === 400 ? rejectionErrors(item, index, itemIndex) : [];
       }
     };
 
@@ -665,23 +668,35 @@ export default defineComponent({
       }
 
       let written = 0;
-      // What the server refused; every item here was actually attempted.
+      let failed = 0;
+      // A failure with no inline fix is counted but contributes no control group.
       const rejected: ImportError[][] = [];
       for (const [itemIndex, item] of items.entries()) {
         const errors = await writeFunction(item, itemIndex + 1, itemIndex);
-        if (errors) rejected.push(errors);
-        else written++;
+        if (!errors) {
+          written++;
+          continue;
+        }
+        failed++;
+        if (errors.length > 0) rejected.push(errors);
       }
 
       if (rejected.length > 0) {
         functionErrors.value = rejected;
-      } else {
-        toast({
-          message: t("function.import.importSuccess", { count: written }, written),
-          variant: "success",
-        });
-        redirectTimer = setTimeout(goBack, 400);
       }
+
+      // Counted, not inferred: an all-403 run produces no groups and would toast success.
+      if (failed > 0) {
+        isImporting.value = false;
+        if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
+        return;
+      }
+
+      toast({
+        message: t("function.import.importSuccess", { count: written }, written),
+        variant: "success",
+      });
+      redirectTimer = setTimeout(goBack, 400);
 
       isImporting.value = false;
       if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;

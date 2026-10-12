@@ -237,6 +237,16 @@ const rangeOptions = computed(() => [
 
 const interval = computed(() => props.alert?.histogram_interval);
 
+// In custom SQL the function's field names a query alias, not a stream column.
+const metricUnit = computed(() => {
+  const a = props.alert;
+  if (a?.stream_type !== "traces" || a?.query_mode === "custom_sql") return "numbers";
+  const match = /^(\w+)\((.+)\)$/.exec(String(a?.detection_function ?? ""));
+  return match?.[2] === "duration" && match[1].toLowerCase() !== "count"
+    ? "microseconds"
+    : "numbers";
+});
+
 // Kind flags serialize only when true, so the stream schema is what says which per-kind split a query may reference.
 const kindColumns = ref<AnomalyKindColumns>({ ...NO_KIND_COLUMNS });
 // Charts wait for the schema probe, or the first render burns a query round-trip on the legacy shape.
@@ -409,6 +419,7 @@ const metricOptions = computed(() => {
     },
     { startMs: windowUs.value.startUs / 1000, endMs: windowUs.value.endUs / 1000 },
     anomalyIntervalMs(interval.value),
+    metricUnit.value,
   );
 });
 

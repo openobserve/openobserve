@@ -71,9 +71,9 @@
       <template #cell-person="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5 py-1">
           <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            <span class="text-text-heading truncate text-sm font-medium">
+            <OTruncatedText class="text-text-heading text-sm font-medium">
               {{ raw(row.name) }}
-            </span>
+            </OTruncatedText>
             <OTag v-if="row.state === 'on_call'" variant="success-soft" size="sm">
               {{ t("oncall.badgeOnCallNow") }}
             </OTag>
@@ -98,7 +98,9 @@
               {{ t("oncall.contactUnreachable") }}
             </OTag>
           </span>
-          <span class="text-text-secondary truncate text-xs">{{ raw(row.user_email) }}</span>
+          <OTruncatedText class="text-text-secondary text-xs">{{
+            raw(row.user_email)
+          }}</OTruncatedText>
         </span>
       </template>
 
@@ -123,15 +125,15 @@
 
       <template #cell-nextShift="{ row }">
         <span class="flex flex-col gap-0.5">
-          <span
+          <OTruncatedText
             :class="row.rotation ? 'text-text-body text-sm' : 'text-text-muted text-sm'"
             :data-test="`oncall-members-shift-${row.id}`"
           >
             {{ shiftLine(row) }}
-          </span>
-          <span v-if="row.rotation" class="text-text-secondary truncate text-xs">
+          </OTruncatedText>
+          <OTruncatedText v-if="row.rotation" class="text-text-secondary text-xs">
             {{ row.away ? t("oncall.shiftSkippedWhileAway") : raw(row.rotation) }}
-          </span>
+          </OTruncatedText>
         </span>
       </template>
 
@@ -300,6 +302,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODataBarCell from "@/lib/core/Table/cells/ODataBarCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OnCallChannelChips from "@/components/oncall/OnCallChannelChips.vue";

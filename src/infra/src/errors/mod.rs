@@ -91,6 +91,8 @@ pub enum Error {
     ResourceError(String),
     #[error("Error# {0}")]
     IngestionError(String),
+    #[error("PayloadTooLarge# {0}")]
+    PayloadTooLarge(String),
     /// Carried inside an `anyhow::Error`, whose `OtherError` wrapper adds the `Error# ` prefix.
     #[error("{0}")]
     ColumnsLimitExceeded(String),

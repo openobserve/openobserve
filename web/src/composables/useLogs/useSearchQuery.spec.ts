@@ -349,6 +349,72 @@ describe("useSearchQuery › buildSearch › ignoreQuickMode parameter", () => {
     });
   });
 
+  // ── VRL-derived fields must never reach the SELECT (o2-enterprise#2859) ────
+
+  describe("SQL field list excludes VRL-derived fields", () => {
+    beforeEach(() => {
+      mockState.searchObj.meta.quickMode = true;
+      mockState.searchObj.data.stream.selectedStream = ["my-stream"];
+      // extractFields() appends hit-only fields — a VRL function's output — with
+      // isSchemaField: false, alongside the stream's own schema fields.
+      mockState.searchObj.data.stream.selectedStreamFields = [
+        { name: "field1", isSchemaField: true },
+        { name: "vrl_field", isSchemaField: false },
+      ];
+      mockState.searchObj.data.stream.interestingFieldList = ["field1", "vrl_field"];
+    });
+
+    it("should keep a VRL-derived field out of the SELECT list", () => {
+      const result = buildSearch(false, false);
+
+      const sql = getSql(result);
+      expect(sql).toContain("field1");
+      // The VRL runs after the SQL, so selecting its output field fails the whole
+      // query with "Search field not found: vrl_field".
+      expect(sql).not.toContain("vrl_field");
+    });
+
+    it("should prune a VRL-derived field from interestingFieldList in normal mode", () => {
+      buildSearch(false, false);
+
+      expect(mockState.searchObj.data.stream.interestingFieldList).toEqual(["field1"]);
+    });
+
+    it("should not mutate interestingFieldList in readOnly mode", () => {
+      const result = buildSearch(true, false);
+
+      expect(getSql(result)).not.toContain("vrl_field");
+      expect(mockState.searchObj.data.stream.interestingFieldList).toEqual(["field1", "vrl_field"]);
+    });
+
+    it("should use SELECT * when every interesting field is VRL-derived", () => {
+      mockState.searchObj.data.stream.selectedStreamFields = [
+        { name: "vrl_field", isSchemaField: false },
+      ];
+      mockState.searchObj.data.stream.interestingFieldList = ["vrl_field"];
+
+      const result = buildSearch(false, false);
+
+      const sql = getSql(result);
+      expect(sql).toContain("*");
+      expect(sql).not.toContain("vrl_field");
+    });
+
+    it("should keep fields that carry no isSchemaField flag at all", () => {
+      // Index.vue and useSearchBar.ts assign raw stream schema objects, which have
+      // no isSchemaField property — those are schema fields and must stay selectable.
+      mockState.searchObj.data.stream.selectedStreamFields = [
+        { name: "field1" },
+        { name: "field2" },
+      ];
+      mockState.searchObj.data.stream.interestingFieldList = ["field1", "field2"];
+
+      const result = buildSearch(false, false);
+
+      expect(getSql(result)).toContain("field1,field2");
+    });
+  });
+
   // ── ignoreQuickMode does not affect non-quick-mode field list ──────────────
 
   describe("ignoreQuickMode with empty interestingFieldList", () => {
@@ -947,5 +1013,32 @@ describe("useSearchQuery › buildSearch › LIMIT in filter mode", () => {
     mockState.searchObj.data.query = 'SELECT * FROM "my-stream" LIMIT 10';
 
     expect(buildSearch()).not.toBeNull();
+  });
+});
+
+describe("useSearchQuery › getQueryReq › highlightQuery", () => {
+  let getQueryReq: ReturnType<typeof useSearchQuery>["getQueryReq"];
+
+  beforeEach(() => {
+    mockState = createMockState();
+    (mockState.searchObj.data.stream as any).streamLists = [{ name: "my-stream" }];
+    vi.clearAllMocks();
+    ({ getQueryReq } = useSearchQuery(gt));
+  });
+
+  // str_match and re_match highlight case-sensitively, so the query must keep its case.
+  it("should keep the query case in quick/builder mode", () => {
+    mockState.searchObj.data.query = "str_match(body, ERROR) AND re_match(body, ^Error)";
+    getQueryReq(false);
+    expect((mockState.searchObj.data as any).highlightQuery).toBe(
+      "str_match(body, ERROR) AND re_match(body, ^Error)",
+    );
+  });
+
+  it("should keep the WHERE clause case in SQL mode", () => {
+    mockState.searchObj.meta.sqlMode = true;
+    mockState.searchObj.data.query = 'SELECT * FROM "my-stream" WHERE str_match(body, WARN)';
+    getQueryReq(false);
+    expect((mockState.searchObj.data as any).highlightQuery).toBe(" str_match(body, WARN)");
   });
 });

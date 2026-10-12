@@ -317,15 +317,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :def="def"
               :result="result"
               :suggestions="suggestions"
+              :suggestions-state="suggestionsState"
               :state="funnelPanel"
               :sampled="1"
               :events="events"
               :events-status="eventsStatus"
+              :deleted-names="namedEvents.deletedNames.value"
               :unit-label="unitLabel"
               :unit-noun="unitNoun"
               :hide-time="!!def.breakdown"
               @update:def="(d) => (pa.funnel.value = d)"
               @dropoff="openDropoff"
+              @suggestions-retry="retrySuggestions"
             />
           </template>
           <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
@@ -338,6 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :steps="def.steps"
               :dim-label="dimLabel"
               :events="events"
+              :deleted-names="namedEvents.deletedNames.value"
             />
           </template>
         </div>
@@ -356,6 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :sampled="pa.sampleRatio.value"
         :expected-dropped="expectedDropped"
         :events="events"
+        :deleted-names="namedEvents.deletedNames.value"
         @update:open="(v) => !v && closeDropoff()"
         @paths="openCohortPaths"
       />
@@ -403,7 +408,7 @@ import useFunnelDraft, {
 } from "@/composables/rum/useFunnelDraft";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
-import useAnalyticsSearch from "@/composables/rum/useAnalyticsSearch";
+import useAnalyticsSearch, { type PanelState } from "@/composables/rum/useAnalyticsSearch";
 import useNamedEvents from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
@@ -422,6 +427,7 @@ import {
   funnelSql,
   nextStepsSql,
   type BreakdownDim,
+  type BuildOpts,
   type FunnelCohort,
   type FunnelDef,
   type FunnelWindow,
@@ -559,7 +565,9 @@ const step1Empty = computed(
     !firstStepDeleted.value,
 );
 const firstLabel = computed(() =>
-  def.value.steps[0] ? stepLabel(def.value.steps[0], events.value) : "",
+  def.value.steps[0]
+    ? stepLabel(def.value.steps[0], events.value, namedEvents.deletedNames.value)
+    : "",
 );
 
 const suggestions = computed(() =>
@@ -571,6 +579,18 @@ const suggestions = computed(() =>
           units: Number(r.units),
         }))
     : [],
+);
+// Only surfaces the error once it belongs to the funnel on screen, same key guard as `suggestions`.
+const idleSuggestionsState: PanelState<unknown> = {
+  status: "idle",
+  rows: [],
+  error: null,
+  partial: null,
+  key: null,
+  sampled: 1,
+};
+const suggestionsState = computed(() =>
+  nextPanel.value.key === funnelKey.value ? nextPanel.value : idleSuggestionsState,
 );
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
@@ -615,9 +635,28 @@ const openAlert = () => {
 
 const org = () => pa.toQuery().org_identifier as string;
 
+// Once the live list says a step's event is gone, its last known name is worth a lookup.
+watch(
+  () => [def.value.steps, eventsStatus.value] as const,
+  () => {
+    if (eventsStatus.value !== "ready") return;
+    const missing = def.value.steps
+      .filter((s) => s.kind === "e" && !events.value.some((e) => e.id === s.key))
+      .map((s) => s.key);
+    if (missing.length) void namedEvents.resolveDeletedNames(org(), missing);
+  },
+  { immediate: true, deep: true },
+);
+
 // A saved funnel's name is the panel's default title; the panel stays a snapshot.
 const dashboardPanel = () => {
-  const panel = buildFunnelPanel(pa.scope.value, def.value, events.value, t);
+  const panel = buildFunnelPanel(
+    pa.scope.value,
+    def.value,
+    events.value,
+    t,
+    namedEvents.deletedNames.value,
+  );
   return pa.openedFunnel.value ? { ...panel, title: pa.openedFunnel.value.name } : panel;
 };
 
@@ -725,6 +764,15 @@ const compute = async (force = false) => {
     key,
   );
   if (res.status !== "ok" || key !== lastKey) return;
+  runSuggestions(d, key, cur, opts);
+};
+
+const runSuggestions = (
+  d: FunnelDef,
+  key: string,
+  cur: { startUs: number; endUs: number },
+  opts: BuildOpts,
+) => {
   const sampled = usersMode.value ? 1 : pa.sampleRatio.value;
   void runner.run(
     "next",
@@ -741,6 +789,15 @@ const compute = async (force = false) => {
     },
     key,
   );
+};
+
+// Cheaper than compute(true): the funnel counts haven't changed, only the suggestions query failed.
+const retrySuggestions = () => {
+  if (funnelPanel.value.status !== "ok") return;
+  runSuggestions(effectiveDef.value, funnelKey.value, pa.resolveRange(), {
+    events: events.value,
+    sample: pa.sampleRatio.value,
+  });
 };
 
 const schedule = () => {

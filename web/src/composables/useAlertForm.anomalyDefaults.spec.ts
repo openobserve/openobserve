@@ -8,6 +8,7 @@ import { describe, it, expect } from "vitest";
 import {
   anomalyBandPayload,
   anomalyIntervalPayload,
+  anomalySensitivityPayload,
   anomalyWindowSecondsToParts,
   defaultAnomalyConfig,
   parseAnomalyInterval,
@@ -194,5 +195,20 @@ describe("anomalyBandPayload", () => {
 
   it("never sends a band width beside a budget, which the server rejects", () => {
     expect(anomalyBandPayload({ band_width: 4 }, true).band_width).toBeNull();
+  });
+});
+
+describe("anomalySensitivityPayload", () => {
+  it("sends only the budget in budget mode", () => {
+    expect(anomalySensitivityPayload(2, 97)).toEqual({ alert_budget_per_day: 2 });
+  });
+
+  // The update endpoint's alert_budget_per_day is a double-Option: an absent key leaves a
+  // previously stored budget untouched, so switching to band mode must send an explicit null.
+  it("sends an explicit null budget alongside the threshold in band mode", () => {
+    expect(anomalySensitivityPayload(null, 97)).toEqual({
+      threshold: 97,
+      alert_budget_per_day: null,
+    });
   });
 });

@@ -620,6 +620,7 @@ import {
 } from "@/utils/zincutils";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import metrics from "./metrics/metrics.json";
+import { chartInterval } from "./metrics/latencyHeatmap";
 import {
   type MetricGroupDefinition,
   K8S_METRIC_GROUP_DEFINITIONS,
@@ -1104,6 +1105,7 @@ export default defineComponent({
 
       const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
       const catalogServiceFilter = serviceFilter();
+      const interval = chartInterval(props.timeRange.startTime, props.timeRange.endTime);
 
       convertedDashboard.tabs[0].panels.forEach((panel: any, index: number) => {
         let whereClause: string;
@@ -1118,7 +1120,12 @@ export default defineComponent({
 
         let query = panel.queries[0].query
           .replace("[STREAM_NAME]", () => `"${streamName}"`)
-          .replace("[WHERE_CLAUSE]", () => whereClause);
+          .replace("[WHERE_CLAUSE]", () => whereClause)
+          .replace("[INTERVAL]", interval.sql)
+          .replace("[INTERVAL_SECONDS]", String(interval.seconds));
+
+        // Always span counts here, so the Rate unit is too.
+        if (panel.title === "Rate") panel.config.unit_custom = t("traces.metrics.perSecond.spans");
 
         // Use count(*) instead of approx_distinct(trace_id)
         query = query

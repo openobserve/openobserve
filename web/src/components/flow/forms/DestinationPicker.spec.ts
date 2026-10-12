@@ -111,13 +111,12 @@ describe("DestinationPicker", () => {
     expect(wrapper.find(".o-select").attributes("data-count")).toBe("2");
   });
 
-  it("truncates long destination URLs in the sub-label", async () => {
+  it("passes the full destination URL to the sub-label", async () => {
     const wrapper = createWrapper();
     await flushPromises();
     const opts = (wrapper.vm as any).destinationOptions;
     const long = opts.find((o: any) => o.value === "sink-b");
-    expect(long.subLabel.endsWith("...")).toBe(true);
-    expect(long.subLabel.length).toBe(73); // 70 + "..."
+    expect(long.subLabel).toBe(listResponse.data[1].url);
   });
 
   it("preselects initialName", async () => {

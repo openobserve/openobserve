@@ -1,6 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { onMounted, ref } from "vue";
+import { flushPromises } from "@vue/test-utils";
 import { usePanelDataLoader } from "./usePanelDataLoader";
+
+const RealAbortController = globalThis.AbortController;
 
 /**
  * Lets the NEXT usePanelDataLoader() install its visibility observer.
@@ -165,10 +168,12 @@ vi.mock("./useAnnotations", () => ({
 
 // Enhanced HTTP Streaming mocking
 let shouldStreamingThrow = false;
+let streamOverride: ((payload: any, callbacks: any) => any) | null = null;
 
 vi.mock("../useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: vi.fn().mockImplementation((payload, callbacks) => {
+      if (streamOverride) return streamOverride(payload, callbacks);
       if (shouldStreamingThrow) {
         callbacks?.error?.(payload, { message: "Streaming error" });
         return "error-stream-id";
@@ -265,6 +270,7 @@ const resetAllMocks = () => {
 
   // Reset streaming mocks
   shouldStreamingThrow = false;
+  streamOverride = null;
 
   // Reset cache mocks
   mockCacheData = null;
@@ -1500,6 +1506,107 @@ describe("usePanelDataLoader", () => {
 
         expect(loader.errorDetail.value.message).toBeDefined();
       });
+    });
+  });
+
+  describe("superseded runs", () => {
+    it("a stream completing while the rerun is debounced writes nothing", async () => {
+      const streams: any[] = [];
+      streamOverride = (payload, callbacks) => {
+        streams.push({ payload, callbacks });
+        return "held-stream";
+      };
+      const loader = usePanelDataLoader(
+        createMockPanelSchema(),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        createMockVariablesData(),
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+      await loader.loadData();
+      expect(streams).toHaveLength(1);
+      const cacheWritesBefore = cacheOperationCount;
+
+      const rerun = loader.loadData();
+      const [{ payload, callbacks }] = streams;
+      callbacks.data(payload, {
+        type: "search_response_hits",
+        content: { results: { hits: [{ value: "stale" }] } },
+      });
+      callbacks.data(payload, { type: "end" });
+      await callbacks.complete(payload, { type: "end" });
+
+      expect(JSON.stringify(loader.data.value)).not.toContain("stale");
+      expect(loader.loading.value).toBe(true);
+      expect(cacheOperationCount).toBe(cacheWritesBefore);
+      await rerun;
+    });
+  });
+
+  describe("first load waiting on a multi-select child variable", () => {
+    it("sends one query when the child resolves to ALL, not one per watcher", async () => {
+      global.AbortController = RealAbortController;
+      const streams: any[] = [];
+      streamOverride = (payload) => {
+        streams.push(payload);
+        return `stream-${streams.length}`;
+      };
+      const ctr = {
+        name: "ctr",
+        type: "query_values",
+        multiSelect: true,
+        value: [],
+        isVariablePartialLoaded: false,
+      };
+      const variablesData = createMockVariablesData({ values: [ctr] });
+      const loader = usePanelDataLoader(
+        createMockPanelSchema({
+          queryConfig: { query: "SELECT * FROM t WHERE c IN ($ctr)" },
+        }),
+        createMockSelectedTimeObj({
+          start_time: new Date(Date.now() - 3600000),
+          end_time: new Date(),
+        }),
+        variablesData,
+        ref(null),
+        ref(true),
+        ref("dashboards"),
+        ref("test-dashboard"),
+        ref("test-folder"),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(null),
+        ref(false),
+      );
+
+      // The mount run waits for ctr, which has never loaded.
+      const mountRun = loader.loadData();
+      await flushPromises();
+      expect(streams).toHaveLength(0);
+
+      variablesData.value = {
+        isVariablesLoading: false,
+        values: [{ ...ctr, value: ["_o2_all_"], isVariablePartialLoaded: true }],
+      };
+      await flushPromises();
+      await mountRun;
+      await flushPromises();
+
+      expect(streams).toHaveLength(1);
     });
   });
 

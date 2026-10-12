@@ -125,7 +125,7 @@ describe("kubernetesCard builder", () => {
     const install = card.steps[0];
     for (const v of install.variants!) {
       // A jump link, not prose — it opens the accordion and scrolls to it.
-      expect(v.note).toContain("[Advanced Installation (Manual Steps)](#advanced)");
+      expect(v.note).toContain("[Advanced installation (manual steps)](#advanced)");
     }
     expect(card.extras!.advanced!.labelKey).toBe("ingestion.setupCard.advancedInstallLabel");
   });
@@ -150,7 +150,7 @@ describe("kubernetesCard builder", () => {
     expect(install.code?.raw).toContain("--o2-url=");
     // With no variants to carry it, the installer note (and the jump link to
     // the advanced section) moves onto the step itself.
-    expect(install.note).toContain("[Advanced Installation (Manual Steps)](#advanced)");
+    expect(install.note).toContain("[Advanced installation (manual steps)](#advanced)");
   });
 
   it("points the internal variant at the cluster-local router", async () => {

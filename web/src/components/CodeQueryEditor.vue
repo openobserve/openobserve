@@ -596,6 +596,9 @@ export default defineComponent({
 
       editorObj.onDidChangeModelContent(commitModelChange);
 
+      // Fires on the text area's own blur. onDidBlurEditorWidget waits a timer tick, so a fast click on Run reads the previous query.
+      editorObj.onDidBlurEditorText(() => commitModelChange.flush());
+
       const runQuery = () => {
         commitModelChange.flush();
         emit("run-query");

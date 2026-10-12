@@ -25,22 +25,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="mail" size="sm" class="pe-1" />
             {{ sessionDetails.user_email || t("common.unknownUser") }}
           </div>
-          <div class="mb-2 w-full truncate pe-1 text-xs">
+          <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
             <OIcon name="schedule" size="sm" class="pe-1" />
             {{ sessionDetails.date }}
-          </div>
-          <div class="mb-2 w-full truncate pe-1 text-xs">
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
             <OIcon name="settings" size="sm" class="pe-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
-          </div>
-          <div class="mb-2 w-full truncate text-xs">
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full text-xs">
             <OIcon name="language" size="sm" class="pe-1" />
             {{ sessionDetails.ip }}
-          </div>
-          <div class="mb-2 w-full truncate text-xs">
+          </OTruncatedText>
+          <OTruncatedText as="div" class="mb-2 w-full text-xs">
             <OIcon name="location-on" size="sm" class="pe-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
-          </div>
+          </OTruncatedText>
         </div>
       </div>
     </template>
@@ -56,6 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :current-time="currentTime"
         :start-time="startTime"
         :end-time="endTime"
+        :rum-window-us="rumWindowUs"
         @event-emitted="(type, payload) => emit('event-emitted', type, payload)"
       />
     </KeepAlive>
@@ -92,14 +93,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
-            <div class="truncate">
-              <div class="me-3 inline" data-test="event-display-time">
+            <div class="flex min-w-0 items-center">
+              <div class="me-3 shrink-0" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
               <OTag
                 type="rumEventType"
                 :value="filteredEvent.type"
-                class="me-3"
+                class="me-3 shrink-0"
                 data-test="event-type-badge"
               />
               <template
@@ -107,18 +108,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="me-1 inline"
+                  class="me-1 shrink-0"
                 />
               </template>
-              <div class="inline" :title="filteredEvent.name" data-test="event-name">
-                {{ filteredEvent.name }}
-              </div>
+              <OTruncatedText data-test="event-name">{{ filteredEvent.name }}</OTruncatedText>
               <OTag
                 v-if="markedSet.has(filteredEvent.timestamp)"
                 :label="t('rum.analytics.viewer.stepMark')"
                 variant="primary-soft"
                 size="xs"
-                class="ms-2"
+                class="ms-2 shrink-0"
                 data-test="session-viewer-funnel-step-mark"
               />
             </div>
@@ -140,6 +139,7 @@ import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
 
 const { t } = useI18nTyped();
@@ -168,6 +168,10 @@ const props = defineProps({
   endTime: {
     type: Number,
     default: 0,
+  },
+  rumWindowUs: {
+    type: Object as PropType<{ start: number; end: number } | null>,
+    default: null,
   },
   markedTimestamps: {
     type: Array as PropType<number[]>,

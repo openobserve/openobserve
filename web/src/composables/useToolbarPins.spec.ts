@@ -60,3 +60,104 @@ describe("useToolbarPins defaults", () => {
     expect(pinnedItems.value).toEqual(["histogram", "sqlMode", "syntaxGuide"]);
   });
 });
+
+describe("useToolbarPins scopes", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("keeps the logs storage key and defaults unchanged", async () => {
+    const { useToolbarPins } = await importFresh();
+    const { togglePin, pinnedItems } = useToolbarPins();
+    expect(pinnedItems.value).toEqual(["histogram"]);
+    togglePin("sqlMode");
+    expect(JSON.parse(window.localStorage.getItem("logs_toolbar_pinned_items")!)).toEqual([
+      "histogram",
+      "sqlMode",
+    ]);
+    expect(window.localStorage.getItem("traces_toolbar_pinned_items")).toBeNull();
+  });
+
+  it("pins traces saved views by default", async () => {
+    const { useToolbarPins } = await importFresh();
+    const { isPinned, pinnedItems } = useToolbarPins("traces");
+    expect(isPinned("savedViews")).toBe(true);
+    expect(isPinned("histogram")).toBe(false);
+    expect(pinnedItems.value).toEqual(["savedViews"]);
+  });
+
+  it("pins traces RED Metrics through the histogram key in canonical order", async () => {
+    const { useToolbarPins } = await importFresh();
+    const { togglePin, pinnedItems } = useToolbarPins("traces");
+    togglePin("histogram");
+    expect(pinnedItems.value).toEqual(["histogram", "savedViews"]);
+    expect(JSON.parse(window.localStorage.getItem("traces_toolbar_pinned_items")!)).toEqual([
+      "savedViews",
+      "histogram",
+    ]);
+    const fresh = await importFresh();
+    expect(fresh.useToolbarPins("traces").isPinned("histogram")).toBe(true);
+  });
+
+  it("keeps the traces and logs histogram pins independent", async () => {
+    const { useToolbarPins } = await importFresh();
+    useToolbarPins("traces").togglePin("histogram");
+    expect(useToolbarPins("traces").isPinned("histogram")).toBe(true);
+    useToolbarPins().togglePin("histogram");
+    expect(useToolbarPins().isPinned("histogram")).toBe(false);
+    expect(useToolbarPins("traces").isPinned("histogram")).toBe(true);
+    useToolbarPins("traces").togglePin("histogram");
+    expect(useToolbarPins("traces").isPinned("histogram")).toBe(false);
+    expect(useToolbarPins().isPinned("histogram")).toBe(false);
+  });
+
+  it("isolates scopes from each other", async () => {
+    const { useToolbarPins } = await importFresh();
+    useToolbarPins("traces").togglePin("savedViews");
+    expect(useToolbarPins("traces").isPinned("savedViews")).toBe(false);
+    expect(useToolbarPins().isPinned("savedViews")).toBe(false);
+    useToolbarPins().togglePin("savedViews");
+    expect(useToolbarPins().isPinned("savedViews")).toBe(true);
+    expect(useToolbarPins("traces").isPinned("savedViews")).toBe(false);
+    expect(window.localStorage.getItem("logs_toolbar_histogram_pin_decided")).toBeNull();
+  });
+
+  it("keeps instances of one scope in sync", async () => {
+    const { useToolbarPins } = await importFresh();
+    const a = useToolbarPins("traces");
+    const b = useToolbarPins("traces");
+    a.togglePin("savedViews");
+    expect(b.isPinned("savedViews")).toBe(false);
+  });
+
+  it("keeps traces saved views unpinned across a module reload", async () => {
+    const { useToolbarPins } = await importFresh();
+    useToolbarPins("traces").togglePin("savedViews");
+    expect(window.localStorage.getItem("traces_toolbar_saved_views_pin_decided")).toBe("true");
+    const fresh = await importFresh();
+    expect(fresh.useToolbarPins("traces").isPinned("savedViews")).toBe(false);
+  });
+
+  it("keeps each default's decided flag when stored pins are corrupt", async () => {
+    window.localStorage.setItem("logs_toolbar_pinned_items", "{not json");
+    window.localStorage.setItem("traces_toolbar_pinned_items", "{not json");
+    window.localStorage.setItem("traces_toolbar_saved_views_pin_decided", "true");
+    const { useToolbarPins } = await importFresh();
+    expect(useToolbarPins("traces").isPinned("savedViews")).toBe(false);
+    expect(useToolbarPins().isPinned("histogram")).toBe(true);
+  });
+});
+
+describe("useToolbarPins scope keys", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("ignores a key outside the scope's key list", async () => {
+    const { useToolbarPins } = await importFresh();
+    const traces = useToolbarPins("traces");
+    traces.togglePin("sqlMode");
+    expect(traces.isPinned("sqlMode")).toBe(false);
+    expect(window.localStorage.getItem("traces_toolbar_pinned_items")).toBeNull();
+  });
+});

@@ -38,9 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="focusPath"
           class="border-border-default bg-surface-page rounded-default flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden px-2 py-1 text-xs"
           data-test="flame-graph-focus-bar"
-          :title="focusedNode?.name"
         >
-          <span class="text-text-body min-w-0 truncate font-medium">{{ focusedNode?.name }}</span>
+          <OTruncatedText class="text-text-body font-medium">{{
+            focusedNode?.name
+          }}</OTruncatedText>
           <span class="text-text-secondary shrink-0 whitespace-nowrap">{{
             focusPercentLabel
           }}</span>
@@ -143,6 +144,7 @@ import type {
 } from "echarts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { escapeHtml } from "@/utils/html";
 import { cssToken } from "@/utils/theme";
 import { useI18nTyped } from "@/types/i18n";

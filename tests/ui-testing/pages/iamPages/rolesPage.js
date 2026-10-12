@@ -17,6 +17,9 @@ export const ACTIONS = ['AllowAll', 'AllowList', 'AllowGet', 'AllowPost', 'Allow
 // own slug, `edit-role-module-rail-overview` (ModuleRail.vue).
 const RAIL_ITEM = 'edit-role-module-rail-item-';
 
+// The open-this-row control a pane row carries; its suffix is the row's resource key.
+const PANE_OPEN = 'edit-role-module-pane-open-';
+
 export class RolesPage {
     constructor(page) {
         this.page = page;
@@ -67,6 +70,8 @@ export class RolesPage {
         // pane instead of the overview.
         this.railSummaryItem = page.locator('[data-test="edit-role-module-rail-overview"]');
         this.railNoMatch = page.locator('[data-test="edit-role-module-rail-no-match"]');
+        // "All Modules" — pinned under Role Overview; one row per module, each its module-wide grant.
+        this.railAllModules = page.locator('[data-test="edit-role-module-rail-all-modules"]');
 
         // ---------- module pane ----------
         this.pane = page.locator('[data-test="edit-role-module-pane"]');
@@ -173,6 +178,18 @@ export class RolesPage {
         return [...new Set(slugs.map((s) => s.replace(RAIL_ITEM, '')))];
     }
 
+    /**
+     * Resource keys of the rows the pane is CURRENTLY showing — after any search or
+     * filter. On the All Modules view a row is a whole module, so this is the set one
+     * column-header tick acts on.
+     */
+    async paneRowKeys() {
+        const slugs = await this.page
+            .locator(`[data-test^="${PANE_OPEN}"]`)
+            .evaluateAll((els) => els.map((e) => e.getAttribute('data-test')));
+        return slugs.map((slug) => slug.replace(PANE_OPEN, ''));
+    }
+
     scopeRow(key) {
         return this.page.locator(`[data-test="edit-role-module-pane-scope-row-${key}"]`);
     }
@@ -210,6 +227,12 @@ export class RolesPage {
     entityCheckboxes(action) {
         return this.page.locator(
             `[data-test^="edit-role-permissions-table-body-row-"][data-test$="-col-${action}-checkbox"] [role="checkbox"]`,
+        );
+    }
+    /** The select-all box in an action column header, offered only in the All Modules view. */
+    bulkCheckbox(action) {
+        return this.page.locator(
+            `[data-test="edit-role-module-pane-bulk-${action}"] [role="checkbox"]`,
         );
     }
     openEntity(nodeName) {
@@ -330,6 +353,11 @@ export class RolesPage {
 
     async openModule(moduleKey) {
         await this.railItem(moduleKey).click();
+        await expect(this.pane).toBeVisible({ timeout: 15000 });
+    }
+
+    async openAllModules() {
+        await this.railAllModules.click();
         await expect(this.pane).toBeVisible({ timeout: 15000 });
     }
 

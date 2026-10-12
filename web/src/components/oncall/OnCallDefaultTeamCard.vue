@@ -32,12 +32,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :variant="loadingRoutingConfig || defaultTeamId ? 'outline' : 'warning'"
       size="sm-action"
       class="max-w-64"
-      :title="triggerLabel"
       :loading="loadingRoutingConfig"
       data-test="oncall-default-team-open"
       @click="openDialog"
     >
-      <span class="min-w-0 truncate">{{ triggerLabel }}</span>
+      <OTruncatedText>{{ triggerLabel }}</OTruncatedText>
     </OButton>
 
     <ODialog
@@ -123,6 +122,7 @@ import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";

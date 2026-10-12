@@ -16,6 +16,8 @@
 use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::{DataFusionError, Result};
 
+use crate::scalar_param::ScalarParam;
+
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#scalar
 pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
     let matrix = match data {
@@ -60,6 +62,34 @@ pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
         exemplars: None,
         time_window: None,
     }]))
+}
+
+/// `min_of(a, b)` / `max_of(a, b)` at every step; NaN when either is NaN, as Go's `math.Min`.
+pub(crate) fn min_max_of(
+    a: &ScalarParam,
+    b: &ScalarParam,
+    max: bool,
+    eval_ctx: &EvalContext,
+) -> Value {
+    let pick = |a: f64, b: f64| match (a.is_nan() || b.is_nan(), max) {
+        (true, _) => f64::NAN,
+        (false, true) => a.max(b),
+        (false, false) => a.min(b),
+    };
+    if let (ScalarParam::Const(a), ScalarParam::Const(b)) = (a, b) {
+        return Value::Float(pick(*a, *b));
+    }
+    Value::Matrix(vec![RangeValue {
+        labels: Labels::default(),
+        samples: eval_ctx
+            .timestamps()
+            .into_iter()
+            .enumerate()
+            .map(|(slot, timestamp)| Sample::new(timestamp, pick(a.at_slot(slot), b.at_slot(slot))))
+            .collect(),
+        exemplars: None,
+        time_window: None,
+    }])
 }
 
 #[cfg(test)]

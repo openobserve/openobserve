@@ -66,6 +66,22 @@
         />
       </div>
 
+      <div v-if="showRedInsights" data-test="settings-red-insights" class="o2-input">
+        <div data-test="settings-traces-heading" class="pt-4 pb-1 text-base font-bold">
+          {{ t("settings.tracesHeading") }}
+        </div>
+        <OFormSwitch
+          data-test="settings-red-insights-btn"
+          name="redInsightsEnabled"
+          :label="t('settings.redInsightsEnabledLabel')"
+          class="mt-2"
+        >
+          <template #tooltip>
+            <OTooltip :content="t('settings.redInsightsEnabledHelp')" />
+          </template>
+        </OFormSwitch>
+      </div>
+
       <!-- Cross-Linking Configuration -->
       <template v-if="store.state.zoConfig?.enable_cross_linking">
         <OSeparator class="mt-6 mb-4" />
@@ -110,6 +126,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
@@ -132,6 +149,15 @@ const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
 const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cross_links || []);
 const formDirty = ref(false);
 
+// Domain mappings are read and written on the meta org only, and the backend
+// ignores the field outside cloud — so the section renders under both conditions.
+const { isMetaOrg } = useIsMetaOrg();
+const showDomainOrgMappings = computed(() => config.isCloud === "true" && isMetaOrg.value);
+const showRedInsights = config.isEnterprise == "true";
+const domainOrgMappings = ref<DomainOrgMapping[]>(
+  store.state?.organizationData?.organizationSettings?.domain_org_mappings || [],
+);
+
 // Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
 // span/toggle values are form-owned (OFormInput / OFormSwitch).
 const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
@@ -141,6 +167,7 @@ const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
     spanIdFieldName: s?.span_id_field_name ?? "",
     toggleIngestionLogs: s?.toggle_ingestion_logs ?? false,
     usageStreamEnabled: s?.usage_stream_enabled ?? false,
+    redInsightsEnabled: s?.red_insights_enabled ?? false,
   };
 });
 
@@ -166,6 +193,16 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       usage_stream_enabled: value.usageStreamEnabled,
     };
 
+    // Only sent when the section rendered: an org that never showed it must not
+    // post an empty list and wipe mappings another admin saved.
+    if (showDomainOrgMappings.value) {
+      payload.domain_org_mappings = domainOrgMappings.value;
+    }
+    // Same rule for the enterprise-only switch: a hidden field must not overwrite the stored one.
+    if (showRedInsights) {
+      payload.red_insights_enabled = value.redInsightsEnabled;
+    }
+
     const crossLinksChanged =
       JSON.stringify(crossLinks.value) !==
       JSON.stringify(store.state?.organizationData?.organizationSettings?.cross_links || []);
@@ -180,6 +217,8 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       toggle_ingestion_logs: value.toggleIngestionLogs,
       cross_links: crossLinks.value,
       usage_stream_enabled: value.usageStreamEnabled,
+      ...(showDomainOrgMappings.value ? { domain_org_mappings: domainOrgMappings.value } : {}),
+      ...(showRedInsights ? { red_insights_enabled: value.redInsightsEnabled } : {}),
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);

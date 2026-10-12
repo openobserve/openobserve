@@ -110,10 +110,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="settings" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span
-                    class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
-                    >{{ t("about.cargoToml") }}</span
-                  >
+                  <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
+                    t("about.cargoToml")
+                  }}</OTruncatedText>
                   <span class="text-text-secondary text-xs">{{ t("about.rustCrates") }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
@@ -125,10 +124,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="backpack" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span
-                    class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
-                    >{{ t("about.packageJson") }}</span
-                  >
+                  <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
+                    t("about.packageJson")
+                  }}</OTruncatedText>
                   <span class="text-text-secondary text-xs">{{ t("about.nodePackages") }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
@@ -140,10 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="javascript" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span
-                    class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
-                    >{{ t("about.npmjsCom") }}</span
-                  >
+                  <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
+                    t("about.npmjsCom")
+                  }}</OTruncatedText>
                   <span class="text-text-secondary text-xs">{{ t("about.jsRegistry") }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
@@ -155,10 +152,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OIcon name="inventory-2" size="md" class="text-accent shrink-0" />
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span
-                    class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
-                    >{{ t("about.cratesIo") }}</span
-                  >
+                  <OTruncatedText class="text-text-heading font-mono text-sm font-semibold">{{
+                    t("about.cratesIo")
+                  }}</OTruncatedText>
                   <span class="text-text-secondary text-xs">{{ t("about.rustRegistry") }}</span>
                 </div>
                 <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
@@ -470,6 +466,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
@@ -481,6 +478,7 @@ export default defineComponent({
     OSpinner,
     OBanner,
     OText,
+    OTruncatedText,
   },
   setup() {
     const store = useStore();

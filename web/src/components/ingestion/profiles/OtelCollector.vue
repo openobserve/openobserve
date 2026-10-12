@@ -2,17 +2,17 @@
   <IngestionContent>
     <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
-      <ContentCopy :content="raw(getProfilesConfig)" />
+      <CredentialCodeBlock slug="profiles-otel" :content="getProfilesConfig" />
     </div>
   </IngestionContent>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import ContentCopy from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 

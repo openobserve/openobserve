@@ -103,11 +103,13 @@ describe("AppAnalytics shell", () => {
   let router: Router;
   let wrapper: VueWrapper | null = null;
   let replaceSpy: ReturnType<typeof vi.spyOn>;
+  let setSavedDateSpy: ReturnType<typeof vi.fn>;
 
   const mountAt = async (path: string, keepAlive = false) => {
     router = makeRouter();
     await router.push(path);
     replaceSpy = vi.spyOn(router, "replace");
+    setSavedDateSpy = vi.fn();
     wrapper = mount(keepAlive ? KeptAliveRoot : { template: "<router-view />" }, {
       global: {
         plugins: [router, store],
@@ -115,6 +117,7 @@ describe("AppAnalytics shell", () => {
           DateTimePickerDashboard: {
             template: "<div data-test='date-picker-stub' />",
             props: ["modelValue"],
+            methods: { setSavedDate: (d: unknown) => setSavedDateSpy(d) },
           },
           ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
         },
@@ -771,6 +774,87 @@ describe("AppAnalytics shell", () => {
     await flushPromises();
     expect(scopeSearches()).toBeGreaterThan(before);
     expect(router.currentRoute.value.query.period).toBe("30d");
+  });
+
+  it("a reload or shared link moves the already-mounted picker, not just the model (P1-M1)", async () => {
+    const setSavedDate = vi.fn();
+    router = makeRouter();
+    await router.push("/product-analytics/overview?app=web&period=4w");
+    wrapper = mount(
+      { template: "<router-view />" },
+      {
+        global: {
+          plugins: [router, store],
+          stubs: {
+            DateTimePickerDashboard: {
+              props: ["modelValue"],
+              setup: (_: unknown, { expose }: { expose: (e: object) => void }) => {
+                expose({ setSavedDate });
+                return {};
+              },
+              template: "<div data-test='date-picker-stub' />",
+            },
+            ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
+          },
+        },
+        attachTo: document.body,
+      },
+    );
+    await flushPromises();
+    await flushPromises();
+
+    expect(useProductAnalytics().state.datetime).toMatchObject({
+      valueType: "relative",
+      relativeTimePeriod: "4w",
+    });
+    expect(setSavedDate).toHaveBeenCalledWith({ type: "relative", relativeTimePeriod: "4w" });
+  });
+
+  it("switching sub-tabs with a new range in the URL moves the mounted picker too (P1-M1)", async () => {
+    const setSavedDate = vi.fn();
+    router = makeRouter();
+    await router.push("/product-analytics/overview?app=web&period=7d");
+    wrapper = mount(
+      { template: "<router-view />" },
+      {
+        global: {
+          plugins: [router, store],
+          stubs: {
+            DateTimePickerDashboard: {
+              props: ["modelValue"],
+              setup: (_: unknown, { expose }: { expose: (e: object) => void }) => {
+                expose({ setSavedDate });
+                return {};
+              },
+              template: "<div data-test='date-picker-stub' />",
+            },
+            ShareButton: { template: "<button data-test='share-stub' />", props: ["url"] },
+          },
+        },
+        attachTo: document.body,
+      },
+    );
+    await flushPromises();
+    await flushPromises();
+    setSavedDate.mockClear();
+
+    await router.push("/product-analytics/funnels?app=web&period=4w");
+    await flushPromises();
+    await flushPromises();
+
+    expect(setSavedDate).toHaveBeenCalledWith({ type: "relative", relativeTimePeriod: "4w" });
+  });
+
+  it("widening the range to 30d after a no-data result also moves the picker's own label", async () => {
+    await mountAt("/product-analytics/overview?app=web&period=15m");
+    await new Promise((r) => setTimeout(r, 30));
+    await flushPromises();
+    setSavedDateSpy.mockClear();
+    useProductAnalytics().widenRange(router);
+    await new Promise((r) => setTimeout(r, 30));
+    await flushPromises();
+    expect(router.currentRoute.value.query.period).toBe("30d");
+    expect(setSavedDateSpy).toHaveBeenCalledWith({ type: "relative", relativeTimePeriod: "30d" });
   });
 
   it("mounting inside keep-alive enters once, as a plain mount does (F6)", async () => {

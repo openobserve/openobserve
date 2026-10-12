@@ -25,7 +25,7 @@ describe("OSQuery.vue", () => {
       global: {
         plugins: [store],
         stubs: {
-          CopyContent: {
+          CredentialCodeBlock: {
             template: '<div data-test="copy-content-stub">{{ content }}</div>',
             props: ["content"],
           },
@@ -38,7 +38,7 @@ describe("OSQuery.vue", () => {
     expect(mountComponent().exists()).toBe(true);
   });
 
-  it("should render CopyContent component", () => {
+  it("should render CredentialCodeBlock component", () => {
     expect(mountComponent().find('[data-test="copy-content-stub"]').exists()).toBe(true);
   });
 

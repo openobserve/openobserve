@@ -151,6 +151,7 @@ import Description from "~icons/material-symbols/description-outline";
 import Dns from "~icons/material-symbols/dns-outline";
 import ForkRight from "~icons/material-symbols/fork-right";
 import FullscreenExit from "~icons/material-symbols/fullscreen-exit";
+import FitScreen from "~icons/material-symbols/fit-screen";
 import Group from "~icons/material-symbols/group-outline";
 import HourglassEmpty from "~icons/material-symbols/hourglass-empty";
 import Label from "~icons/material-symbols/label-outline";
@@ -532,6 +533,7 @@ export const iconRegistry = {
   "navigate-before": ChevronLeft,
   "navigate-next": ChevronRight,
   "fullscreen-exit": FullscreenExit,
+  "fit-screen": FitScreen,
   group: Group,
   "hourglass-empty": HourglassEmpty,
   label: Label,

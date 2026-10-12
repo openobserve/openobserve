@@ -91,10 +91,11 @@
           <!-- The type is what makes the two numbers beside it readable: without
                it a boolean flip and a rank move both render as `0 → 1`. -->
           <template #cell-dimension="{ row: score }">
-            <div class="flex items-center gap-1.5">
-              <span class="text-text-body">{{ score.dimension }}</span>
+            <div class="flex min-w-0 items-center gap-1.5">
+              <OTruncatedText class="text-text-body">{{ score.dimension }}</OTruncatedText>
               <OTag
                 v-if="score.dataType"
+                class="shrink-0"
                 size="sm"
                 icon=""
                 variant="default-soft"
@@ -136,6 +137,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useFullscreenBox } from "@/composables/useFullscreenBox";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";

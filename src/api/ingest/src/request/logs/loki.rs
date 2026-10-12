@@ -13,16 +13,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Read;
-
 use axum::{
     body::Bytes,
     extract::Path,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use config::axum::middlewares::{get_process_time, insert_process_time_header};
-use flate2::read::GzDecoder;
+use config::{
+    axum::middlewares::{get_process_time, insert_process_time_header},
+    utils::snappy::decode_raw_snappy,
+};
 use prost::Message;
 use proto::loki_rpc;
 
@@ -135,15 +135,8 @@ fn parse_json_request(
     content_encoding: Option<&str>,
     body: Bytes,
 ) -> Result<LokiPushRequest, LokiError> {
+    // `RequestDecompressionLayer` has already inflated gzip within the body limit
     let json_data = match content_encoding {
-        Some("gzip") => {
-            let mut decoder = GzDecoder::new(body.as_ref());
-            let mut decompressed = Vec::new();
-            match decoder.read_to_end(&mut decompressed) {
-                Ok(_) => decompressed,
-                Err(_) => body.to_vec(), // Fallback to original data like OpenObserve pattern
-            }
-        }
         None | Some("identity") => body.to_vec(),
         Some(encoding) => {
             return Err(LokiError::UnsupportedContentEncoding {
@@ -158,13 +151,14 @@ fn parse_protobuf_request(
     content_encoding: Option<&str>,
     body: Bytes,
 ) -> Result<loki_rpc::PushRequest, LokiError> {
+    let limit = config::get_config().limit.req_payload_limit;
     let decompressed = match content_encoding {
         // promtail sends snappy protobuf with no Content-Encoding, so None means snappy
-        Some("snappy") | None => snap::raw::Decoder::new()
-            .decompress_vec(&body)
-            .map_err(|e| LokiError::UnsupportedContentEncoding {
+        Some("snappy") | None => {
+            decode_raw_snappy(&body, limit).map_err(|e| LokiError::UnsupportedContentEncoding {
                 encoding: format!("snappy decompression failed: {e}"),
-            })?,
+            })?
+        }
         Some("identity") => body.to_vec(),
         Some(encoding) => {
             return Err(LokiError::UnsupportedContentEncoding {
@@ -284,5 +278,39 @@ mod tests {
     fn test_parse_protobuf_request_no_encoding_is_still_snappy() {
         let result = parse_protobuf_request(None, create_snappy_protobuf_body());
         assert_eq!(result.unwrap().streams.len(), 1);
+    }
+
+    fn snappy_header_declaring(decompressed_len: u64) -> Bytes {
+        let mut header = Vec::new();
+        let mut n = decompressed_len;
+        while n >= 0x80 {
+            header.push((n as u8 & 0x7f) | 0x80);
+            n >>= 7;
+        }
+        header.push(n as u8);
+        header.extend_from_slice(b"garbage");
+        Bytes::from(header)
+    }
+
+    #[test]
+    fn parse_protobuf_request_rejects_a_declared_length_over_the_limit() {
+        let limit = config::get_config().limit.req_payload_limit as u64;
+        for encoding in [None, Some("snappy")] {
+            let err = parse_protobuf_request(encoding, snappy_header_declaring(limit + 1))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("larger than allowed"), "{encoding:?}: {err}");
+        }
+    }
+
+    #[test]
+    fn parse_json_request_does_not_inflate_gzip_itself() {
+        use std::io::Write;
+
+        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        gz.write_all(create_valid_loki_json().as_bytes()).unwrap();
+        let body = Bytes::from(gz.finish().unwrap());
+        let err = parse_json_request(Some("gzip"), body).unwrap_err();
+        assert!(matches!(err, LokiError::UnsupportedContentEncoding { .. }));
     }
 }

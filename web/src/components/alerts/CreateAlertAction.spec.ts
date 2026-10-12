@@ -100,6 +100,19 @@ describe("CreateAlertAction", () => {
     expect(wrapper.findComponent(DropdownItemStub).exists()).toBe(false);
   });
 
+  it("renders a toolbar button that keeps its name when the label hides on a phone", () => {
+    wrapper = mountAction({ variant: "toolbar", source: "explorer" });
+    const button = wrapper.findComponent({ name: "OButton" });
+    expect(button.props("variant")).toBe("outline");
+    expect(button.attributes("aria-label")).toBe("Create alert");
+    expect(button.find("span.max-md\\:hidden").text()).toBe("Create alert");
+  });
+
+  it("adds no tooltip on a toolbar button whose label is visible", () => {
+    wrapper = mountAction({ variant: "toolbar", source: "explorer" });
+    expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(false);
+  });
+
   it("does NOT call build on render — only on activation", async () => {
     const build = vi.fn(prefill);
     wrapper = mountAction({}, build);

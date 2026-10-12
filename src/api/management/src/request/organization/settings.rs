@@ -133,6 +133,10 @@ pub async fn create(
         data.usage_stream_enabled = usage_stream_enabled;
     }
 
+    if merge_red_insights_enabled(&mut data, settings.red_insights_enabled) {
+        field_found = true;
+    }
+
     if let Some(cross_links) = settings.cross_links {
         for link in &cross_links {
             if link.name.is_empty() {
@@ -194,30 +198,20 @@ pub async fn create(
                 ));
             }
 
-            if let Some(role) = mapping.role_name.as_ref() {
-                use openobserve_api_common::auth::jwt::format_role_name;
-
-                let all_roles = match get_all_roles(&mapping.org_id, None).await {
-                    Ok(v) => v,
-                    Err(e) => {
-                        log::error!(
-                            "error getting all roles for {} when updating domain org mappings : {e}",
-                            mapping.org_id
-                        );
-                        return MetaHttpResponse::bad_request(format!(
-                            "error getting role for org {} : {e}",
-                            mapping.org_id
-                        ));
-                    }
-                };
-                if !matches!(role.as_str(), "admin" | "editor" | "viewer" | "user")
-                    && !all_roles.contains(&format_role_name(&mapping.org_id, role))
-                {
-                    return MetaHttpResponse::bad_request(format!(
-                        "custom role {role} not found in org {}",
-                        mapping.org_id
-                    ));
+            if !matches!(
+                mapping.base_role.as_str(),
+                "admin" | "editor" | "viewer" | "allowed_user"
+            ) {
+                return MetaHttpResponse::bad_request(format!(
+                    "base role {} for org {} is not a valid base role - only admin, editor, viewer, allowed_user are supported",
+                    mapping.base_role, mapping.org_id
+                ));
+            }
+            if let Some(mut claim) = mapping.role_claim_name.as_mut() {
+                if claim.trim().is_empty() {
+                    return MetaHttpResponse::bad_request("role claim name must not be empty");
                 }
+                *claim = claim.trim().to_string();
             }
 
             match org_domain_ownership::get_domain_org_record(&org_id, &domain).await {
@@ -409,8 +403,31 @@ pub async fn delete_logo_text() -> Response {
     (StatusCode::FORBIDDEN, Json("Not Supported")).into_response()
 }
 
+fn merge_red_insights_enabled(data: &mut OrganizationSetting, value: Option<bool>) -> bool {
+    let Some(enabled) = value else {
+        return false;
+    };
+    data.red_insights_enabled = enabled;
+    true
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_red_insights_enabled_sets_and_leaves() {
+        let mut data = OrganizationSetting::default();
+        assert!(!merge_red_insights_enabled(&mut data, None));
+        assert!(!data.red_insights_enabled);
+        assert!(merge_red_insights_enabled(&mut data, Some(true)));
+        assert!(data.red_insights_enabled);
+        assert!(!merge_red_insights_enabled(&mut data, None));
+        assert!(data.red_insights_enabled);
+        assert!(merge_red_insights_enabled(&mut data, Some(false)));
+        assert!(!data.red_insights_enabled);
+    }
+
     #[test]
     fn test_max_series_per_query_validation_valid_values() {
         // Test minimum valid value

@@ -27,19 +27,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Service name + badge -->
     <div class="flex min-w-0 flex-nowrap! items-center gap-[0.325rem]">
-      <span data-test="trace-row-service-name" class="text-text-body min-w-0 truncate text-xs">
+      <OTruncatedText data-test="trace-row-service-name" class="text-text-body text-xs">
         {{ item.service_name }}
-        <OTooltip side="bottom" align="center">
-          <template #content>{{ item.service_name }}</template>
-        </OTooltip>
-      </span>
+      </OTruncatedText>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import useTraces from "@/composables/useTraces";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import useTheme from "@/composables/useTheme";

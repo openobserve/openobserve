@@ -127,6 +127,7 @@ export const EMOJI_GROUPS: readonly EmojiGroup[] = [
       { token: "o2:categraf", keywords: ["categraf"] },
       { token: "o2:nightingale", keywords: ["nightingale", "n9e"] },
       { token: "o2:vmagent", keywords: ["vmagent", "victoriametrics"] },
+      { token: "o2:nvidia", keywords: ["nvidia", "gpu", "dcgm"] },
       { token: "o2:macos", keywords: ["macos", "mac", "osx", "darwin"] },
       { token: "o2:windows", keywords: ["windows", "winlogbeat", "win32"] },
       { token: "o2:curl", keywords: ["curl"] },

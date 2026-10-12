@@ -373,6 +373,8 @@ const search = {
     start_time,
     end_time,
     hint_ts,
+    after_start_time,
+    after_span_id,
   }: {
     org_identifier: string;
     stream_name: string;
@@ -380,11 +382,15 @@ const search = {
     start_time?: number;
     end_time?: number;
     hint_ts?: number;
+    after_start_time?: string;
+    after_span_id?: string;
   }) => {
     const params = new URLSearchParams();
     if (start_time != null) params.set("start_time", String(start_time));
     if (end_time != null) params.set("end_time", String(end_time));
     if (hint_ts != null) params.set("hint_ts", String(hint_ts));
+    if (after_start_time != null) params.set("after_start_time", after_start_time);
+    if (after_span_id != null) params.set("after_span_id", after_span_id);
     const query = params.toString();
     const url = `/api/${org_identifier}/${stream_name}/traces/${encodeURIComponent(trace_id)}/details${query ? `?${query}` : ""}`;
     return http().get(url);

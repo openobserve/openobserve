@@ -81,12 +81,12 @@
           <!-- Text, not a button: typing `{{` in a message offers the same
                variables as completions, at the caret, which is where the token
                is wanted. A second way to insert only split the habit. -->
-          <span
-            class="text-accent text-2xs truncate font-mono font-semibold"
+          <OTruncatedText
+            class="text-accent text-2xs font-mono font-semibold"
             :data-test="`ai-playground-var-chip-${name}`"
           >
             {{ tokenFor(name) }}
-          </span>
+          </OTruncatedText>
           <div class="grow" />
           <OButton
             v-if="!used.includes(name)"
@@ -166,6 +166,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { EXPECTED_OUTPUT_TOKEN } from "@/enterprise/views/AIObservability/playgroundDraft";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 const props = defineProps<{
   /** Every variable on the bench: declared, or referenced by any variant. */

@@ -459,6 +459,8 @@ pub enum IngestionError {
     JsonError(json::Error),
     AWSError(KinesisFHIngestionResponse),
     GCPError(GCPIngestionResponse),
+    /// Records inflated past the request's decompressed budget, so a retry cannot succeed.
+    PayloadTooLarge(String),
 }
 
 impl From<json::Error> for IngestionError {
@@ -480,10 +482,7 @@ pub enum IngestionDataIter {
         std::vec::IntoIter<json::Value>,
         Option<GCPIngestionResponse>,
     ),
-    KinesisFH(
-        std::vec::IntoIter<json::Value>,
-        Option<KinesisFHIngestionResponse>,
-    ),
+    KinesisFH(std::vec::IntoIter<json::Value>, Option<IngestionError>),
 }
 
 pub enum HecStatus {

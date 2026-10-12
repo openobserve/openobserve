@@ -45,9 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </OBadge>
         <div class="flex min-w-0 flex-1 flex-col gap-1">
-          <span class="text-text-body truncate text-sm" :title="change.label">
+          <OTruncatedText class="text-text-body text-sm">
             {{ change.label }}
-          </span>
+          </OTruncatedText>
           <div class="flex min-w-0 flex-wrap items-center gap-1">
             <span class="text-text-secondary me-1 truncate text-xs">{{ change.moduleLabel }}</span>
             <OBadge
@@ -79,6 +79,7 @@ import { computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 export type PendingChange = {

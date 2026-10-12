@@ -143,9 +143,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="alerts"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
-              <span v-else class="text-text-body min-w-0 truncate font-medium">
+              <OTruncatedText v-else class="text-text-body font-medium">
                 {{ activeFolderName }}
-              </span>
+              </OTruncatedText>
             </span>
           </template>
         </OPageHeader>
@@ -588,6 +588,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :isEditing="beingUpdated"
     />
   </ODrawer>
+
+  <ODialog
+    data-test="alert-save-mode-dialog"
+    v-model:open="saveModeDialogOpen"
+    size="sm"
+    :title="t('alerts.saveModeDialog.title')"
+    persistent
+    :show-close="false"
+    :secondary-button-label="t('alerts.cancel')"
+    :primary-button-label="
+      t('alerts.saveModeDialog.saveWithMode', { mode: queryModeName(saveModePick) })
+    "
+    @click:secondary="saveModeDialogOpen = false"
+    @click:primary="saveWithPickedMode"
+  >
+    <div class="flex flex-col gap-3 text-sm">
+      <p data-test="alert-save-mode-lead">{{ saveModeLead }}</p>
+      <OToggleGroup v-model="saveModePick" class="self-start" data-test="alert-save-mode-options">
+        <OToggleGroupItem
+          v-for="mode in saveModeChoices ?? []"
+          :key="mode"
+          :value="mode"
+          size="sm"
+          :data-test="`alert-save-mode-option-${mode}`"
+        >
+          <template #icon-left>
+            <OIcon v-if="mode === 'custom'" name="build" size="sm" />
+            <OIcon v-else-if="mode === 'sql'" name="database" size="sm" />
+            <OIcon v-else name="show-chart" size="sm" />
+          </template>
+          {{ queryModeName(mode) }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+      <p v-if="saveModeInfo" class="text-status-warning-text" data-test="alert-save-mode-warning">
+        {{ saveModeInfo }}
+      </p>
+      <p class="text-text-secondary text-xs" data-test="alert-save-mode-note">
+        {{ saveModeNote }}
+      </p>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -617,6 +658,7 @@ import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import { anomalyNoticeBadgeKeys } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
@@ -627,6 +669,7 @@ import { buildAlertAutoName } from "@/utils/autoName";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import CompositeAlertForm from "./composite/CompositeAlertForm.vue";
 import alertsService from "@/services/alerts";
 
@@ -676,12 +719,14 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     ODrawer,
+    ODialog,
     OTag,
     OTooltip,
     OForm,
     OFormInlineEdit,
     OFormSelect,
     OPageHeader,
+    OTruncatedText,
     CompositeAlertForm,
   },
   setup(props, { emit }) {
@@ -897,7 +942,65 @@ export default defineComponent({
     // anomaly/composite tab switch.
     const onAlertTypeChange = (value: unknown) => {
       alertForm.setF("is_real_time", value);
+      // Realtime runs Builder only. The query text and Compare-with-Past windows
+      // stay in the form for a switch back; the payload never sends windows here.
+      if (value === "true" && alertForm.formData.value.query_condition?.type !== "custom") {
+        alertForm.setF("query_condition.type", "custom");
+      }
     };
+
+    // ── Save-mode dialog copy ────────────────────────────────────────────────
+    // Mode names match the QueryConfig mode toggle.
+    const queryModeName = (mode: string) =>
+      mode === "sql"
+        ? raw("SQL")
+        : mode === "promql"
+          ? raw("PromQL")
+          : alertForm.t("alerts.queryBuilder");
+
+    // Names the modes that are set up; an empty selected mode is named first.
+    const saveModeLead = computed(() => {
+      const selected = alertForm.formData.value.query_condition?.type || "custom";
+      const [first, second, third] = alertForm.queryModesWithContent.value.map(queryModeName);
+      if (alertForm.queryModesWithContent.value.includes(selected)) {
+        return third
+          ? alertForm.t("alerts.saveModeDialog.leadAllSetUp", { first, second, third })
+          : alertForm.t("alerts.saveModeDialog.leadBothSetUp", { first, second });
+      }
+      return second
+        ? alertForm.t("alerts.saveModeDialog.leadSelectedEmptyTwoOthers", {
+            selected: queryModeName(selected),
+            first,
+            second,
+          })
+        : alertForm.t("alerts.saveModeDialog.leadSelectedEmptyOneOther", {
+            selected: queryModeName(selected),
+            other: first,
+          });
+    });
+
+    // Only warns, and only when the picked mode is empty by the same rule as the lead.
+    const saveModeInfo = computed(() => {
+      const pick = alertForm.saveModePick.value;
+      if (alertForm.queryModesWithContent.value.includes(pick)) return null;
+      return pick === "custom"
+        ? alertForm.t("alerts.saveModeDialog.noFilters", {
+            stream: alertForm.formData.value.stream_name,
+          })
+        : alertForm.t("alerts.saveModeDialog.noQuery");
+    });
+
+    // Says what runs: the picked mode only. Names the other modes that hold content.
+    const saveModeNote = computed(() => {
+      const pick = alertForm.saveModePick.value;
+      const [first, second] = alertForm.queryModesWithContent.value
+        .filter((mode) => mode !== pick)
+        .map(queryModeName);
+      const params = { pick: queryModeName(pick), first, second, other: first };
+      if (second) return alertForm.t("alerts.saveModeDialog.noteTwoOthersUnused", params);
+      if (first) return alertForm.t("alerts.saveModeDialog.noteOneOtherUnused", params);
+      return alertForm.t("alerts.saveModeDialog.noteOnlyPick", params);
+    });
 
     // ── Smart alert name ─────────────────────────────────────────────────────
     // A new alert names itself after what it actually watches ("k8s_logs where
@@ -929,6 +1032,10 @@ export default defineComponent({
       goBackToAlertsList,
       onStreamTypeChange,
       onAlertTypeChange,
+      queryModeName,
+      saveModeLead,
+      saveModeInfo,
+      saveModeNote,
       activeEvaluationStatus,
       isCompositeMode,
       availableCompositeChildren,

@@ -191,6 +191,11 @@ struct ConfigResponse<'a> {
     histogram_enabled: bool,
     timechart_enabled: bool,
     max_query_range: i64,
+    cluster_name: String,
+    /// Hours back the ingester accepts a record's timestamp.
+    ingest_allowed_upto: i64,
+    /// Hours ahead the ingester accepts a record's timestamp.
+    ingest_allowed_in_future: i64,
     ai_enabled: bool,
     /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
     /// recovery window at all — deletion is immediate and permanent, which is what
@@ -454,7 +459,7 @@ pub async fn zo_config(
     let sso_enabled = enterprise_value!(false, dex_cfg.dex_enabled, block_features);
     let native_login_enabled = enterprise_value!(true, dex_cfg.native_login_enabled);
     let service_account_enabled = cfg.auth.service_account_enabled;
-    let rbac_enabled = enterprise_value!(false, openfga_cfg.enabled, block_features);
+    let rbac_enabled = enterprise_value!(false, rbac_enabled_for_config(openfga_cfg.enabled).await);
     let super_cluster_enabled = enterprise_value!(false, o2cfg.super_cluster.enabled);
 
     #[cfg(feature = "enterprise")]
@@ -474,7 +479,8 @@ pub async fn zo_config(
     let logo_dark = enterprise_value!(None, get_logo_dark().await);
     let custom_hide_menus = enterprise_value!("", &o2cfg.common.custom_hide_menus);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
-    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled);
+    // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
+    let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
@@ -587,6 +593,9 @@ pub async fn zo_config(
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
+        cluster_name: cfg.common.cluster_name.clone(),
+        ingest_allowed_upto: cfg.limit.ingest_allowed_upto,
+        ingest_allowed_in_future: cfg.limit.ingest_allowed_in_future,
         ai_enabled,
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
@@ -665,6 +674,12 @@ async fn search_inspector_permitted(org_id: &str, user_id: &str) -> bool {
         user.is_external,
     )
     .await
+}
+
+/// Same rule as `check_permissions`, so the UI never hides RBAC the backend enforces.
+#[cfg(feature = "enterprise")]
+async fn rbac_enabled_for_config(openfga_enabled: bool) -> bool {
+    openfga_enabled && !openobserve_core::authz::report_failure_lifts_rbac().await
 }
 
 pub async fn cache_status() -> impl IntoResponse {
@@ -1917,6 +1932,15 @@ mod tests {
 
     use super::*;
 
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_config_rbac_enabled_matches_enforcement_before_any_usage_report() {
+        assert!(block_feature_for_report_failure().await);
+        assert_eq!(last_reported_timestamp().await, 0);
+        assert!(rbac_enabled_for_config(true).await);
+        assert!(!rbac_enabled_for_config(false).await);
+    }
+
     #[test]
     fn test_healthz_response_different_status() {
         let response = HealthzResponse {
@@ -2416,6 +2440,24 @@ mod tests {
         assert_eq!(
             consume_login_state(Some(&state), Some("abd")).await,
             Err("invalid state in request")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_ingest_window_and_cluster_name() {
+        let cfg = get_config();
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["cluster_name"], cfg.common.cluster_name.as_str());
+        assert_eq!(json["ingest_allowed_upto"], cfg.limit.ingest_allowed_upto);
+        assert_eq!(
+            json["ingest_allowed_in_future"],
+            cfg.limit.ingest_allowed_in_future
         );
     }
 }

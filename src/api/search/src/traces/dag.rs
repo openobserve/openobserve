@@ -14,7 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{extract::Path, http::HeaderMap, response::Response};
-use config::{get_config, meta::stream::StreamType, metrics, utils::json};
+use config::{
+    get_config,
+    meta::{
+        stream::StreamType,
+        traces::session::{quote_identifier, quote_sql_string},
+    },
+    metrics,
+    utils::json,
+};
 use hashbrown::HashMap;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
@@ -152,19 +160,7 @@ pub async fn get_trace_dag(
     .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
     .unwrap_or(false);
 
-    let ref_parent_col = if has_ref_parent_id {
-        "reference_parent_span_id, "
-    } else {
-        ""
-    };
-
-    // Query all spans for this trace_id
-    let query_sql = format!(
-        "SELECT span_id, trace_id, service_name, operation_name, span_status, \
-         {ref_parent_col}start_time, end_time, gen_ai_operation_name \
-         FROM {stream_name} \
-         WHERE trace_id = '{trace_id}'"
-    );
+    let query_sql = build_trace_dag_sql(&stream_name, &trace_id, has_ref_parent_id);
 
     let req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -352,9 +348,55 @@ struct SpanEdge {
     to: String,
 }
 
+fn build_trace_dag_sql(stream_name: &str, trace_id: &str, has_ref_parent_id: bool) -> String {
+    let ref_parent_col = if has_ref_parent_id {
+        "reference_parent_span_id, "
+    } else {
+        ""
+    };
+    format!(
+        "SELECT span_id, trace_id, service_name, operation_name, span_status, \
+         {ref_parent_col}start_time, end_time, gen_ai_operation_name \
+         FROM {} \
+         WHERE trace_id = {}",
+        quote_identifier(stream_name),
+        quote_sql_string(trace_id),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_build_trace_dag_sql_quotes_stream_and_trace_id() {
+        let sql = build_trace_dag_sql("default", "abc123", true);
+        assert_eq!(
+            sql,
+            "SELECT span_id, trace_id, service_name, operation_name, span_status, \
+             reference_parent_span_id, start_time, end_time, gen_ai_operation_name \
+             FROM \"default\" WHERE trace_id = 'abc123'"
+        );
+    }
+
+    #[test]
+    fn test_build_trace_dag_sql_omits_missing_ref_parent_column() {
+        let sql = build_trace_dag_sql("default", "abc123", false);
+        assert!(!sql.contains("reference_parent_span_id"));
+        assert!(sql.contains("span_status, start_time"));
+    }
+
+    #[test]
+    fn test_build_trace_dag_sql_escapes_quote_in_trace_id() {
+        let sql = build_trace_dag_sql("default", "abc' OR '1'='1", false);
+        assert!(sql.ends_with("WHERE trace_id = 'abc'' OR ''1''=''1'"));
+    }
+
+    #[test]
+    fn test_build_trace_dag_sql_escapes_quote_in_stream_name() {
+        let sql = build_trace_dag_sql("evil\" x", "abc123", false);
+        assert!(sql.contains("FROM \"evil\"\" x\" WHERE"));
+    }
 
     #[test]
     fn test_span_node_serializes() {

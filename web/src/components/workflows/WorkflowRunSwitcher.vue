@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="border-border-default flex items-center justify-between gap-2 border-b px-2 py-1.5"
       >
-        <span class="text-text-body truncate text-xs font-semibold">
+        <OTruncatedText class="text-text-body text-xs font-semibold">
           {{ t("workflow.history.title") }}
-        </span>
+        </OTruncatedText>
         <ORefreshButton
           :last-run-at="workflowObj.runsHistory.fetchedAt || null"
           :loading="runsLoading"
@@ -131,6 +131,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { isTestRun, useTestRunVisibility } from "@/plugins/workflows/useWorkflowCanvas";

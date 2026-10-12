@@ -47,22 +47,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              running into it. The margin is outside the overflow box, so the
              ellipsis always lands a gap short of the icons. A title that fits is
              unaffected — the spacer just absorbs 1.25rem less. -->
-        <div
-          :title="props.data.title"
-          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
+        <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
+        <OTruncatedText
+          as="div"
+          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] max-lg:line-clamp-2 max-lg:whitespace-normal"
+          :class="curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
-        </div>
+        </OTruncatedText>
+        <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
           variant="amber-soft"
           size="sm"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
           data-test="dashboard-panel-curated-badge"
-          :title="t('infra.curated.staleBadgeTooltip')"
+          :aria-label="curatedBadgeText"
         >
-          {{ t(curatedBadge.key, curatedBadgeParams) }}
-          <OTooltip :content="t('infra.curated.staleBadgeTooltip')" side="bottom" />
+          <!-- One wrapper, because a child-mode tooltip binds to its previous sibling element. -->
+          <span class="inline-flex items-center" data-test="dashboard-panel-curated-badge-label">
+            <span class="hidden @min-[32rem]/panelbar:inline">{{ curatedBadgeText }}</span>
+            <OIcon name="schedule" size="xs" class="@min-[32rem]/panelbar:hidden" />
+          </span>
+          <OTooltip :content="curatedBadgeTooltip" side="bottom" />
         </OTag>
         <OTag
           v-if="
@@ -239,12 +247,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           />
         </OButton>
-        <!-- Direct delete icon (shown when simplifiedPanelView is true) -->
+        <!-- simplifiedPanelView panels are ephemeral (Insights / Drill down): delete without a confirm -->
         <OButton
           v-if="!viewOnly && simplifiedPanelView"
           variant="ghost"
           size="icon"
-          @click="onPanelModifyClick('DeletePanel')"
+          @click="deletePanelDialog"
           :title="t('panel.deletePanel')"
           :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
           icon-left="close"
@@ -501,13 +509,20 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
-import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import {
+  buildPrefillFromPanel,
+  executedPanelQuery,
+  panelQueryChoices,
+} from "@/utils/alerts/prefill/fromPanel";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
+import { isFormulaQuery } from "@/utils/dashboard/promql/formula";
 import { durationParts } from "@/views/Infrastructure/curated/resolve";
 import { getVariablesReferencedInQueries } from "@/utils/dashboard/variables/variablesUtils";
 import ExemplarToggle from "@/components/dashboards/exemplars/ExemplarToggle.vue";
@@ -576,6 +591,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OTooltip,
+    OTruncatedText,
     CreateAlertAction,
     ExemplarToggle,
     ShowLegendsPopup: defineAsyncComponent(() => {
@@ -615,6 +631,13 @@ export default defineComponent({
         : "";
       return { duration, date: badge.date };
     });
+    const curatedBadgeText = computed(() =>
+      curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
+    );
+    // Both halves are already translated; joining them widens to string without untranslating either.
+    const curatedBadgeTooltip = computed(() =>
+      raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
+    );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
 
@@ -669,6 +692,10 @@ export default defineComponent({
      * from PromQLTableChart's own #empty slot. Claiming tables here too printed the
      * words twice, once from each layer.
      */
+    const curatedTile = computed(
+      () =>
+        props.data?.type === "metric" && props.data?.config?.curated_no_data_eligible !== undefined,
+    );
     const curatedAllClear = computed(
       () =>
         props.data?.config?.curated_empty_means_healthy === true && props.data?.type !== "table",
@@ -1111,8 +1138,12 @@ export default defineComponent({
     // Stated up front as a disabled reason instead — a dead-end click is worse
     // than a control that explains itself.
     const alertDisabledReason = computed(() => {
-      if (!props.data?.queries?.length) return t("panel.noQueriesToCreateAlert");
-      if (!props.data.queries[0]?.fields?.stream) return t("panel.panelQueryMustHaveStream");
+      const visible = (props.data?.queries ?? []).filter((query: any) => !query?.config?.hide);
+      if (!visible.length) return t("panel.noQueriesToCreateAlert");
+      // A formula's stream comes from its inputs' text; any other query needs its own.
+      if (!visible.some((query: any) => isFormulaQuery(query) || query?.fields?.stream)) {
+        return t("panel.panelQueryMustHaveStream");
+      }
       return null;
     });
 
@@ -1126,8 +1157,11 @@ export default defineComponent({
       exemplarErrorMessage,
       curatedBadge,
       curatedBadgeParams,
+      curatedBadgeText,
+      curatedBadgeTooltip,
       curatedNoData,
       curatedAllClear,
+      curatedTile,
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
       alertDisabledReason,
@@ -1197,13 +1231,24 @@ export default defineComponent({
      * AlertPrefill out. Everything downstream — the confirm dialog, the
      * transport, the form — is shared with every other surface.
      */
-    buildPanelAlertPrefill() {
+    buildPanelAlertPrefill(options: AlertBuildOptions = {}) {
+      const queries = this.props.data.queries || [];
+      // A saved-hidden query is not drawn, so it is not what the user means to alert on.
+      const visible = queries.flatMap((query: any, i: number) => (query?.config?.hide ? [] : [i]));
+      const queryIndex = options.queryIndex ?? visible[0] ?? 0;
       return buildPrefillFromPanel({
         panelTitle: this.props.data.title,
         panelId: this.props.data.id,
         panelType: this.props.data.type,
-        queries: this.props.data.queries || [],
+        queries,
         queryType: this.props.data.queryType,
+        queryIndex,
+        queryChoices:
+          visible.length > 1
+            ? panelQueryChoices(queries, this.metaData?.queries, visible)
+            : undefined,
+        executedQuery: executedPanelQuery(this.metaData?.queries, queryIndex),
+        metadataQueries: this.metaData?.queries,
         timeRange: this.props.selectedTimeDate,
       });
     },

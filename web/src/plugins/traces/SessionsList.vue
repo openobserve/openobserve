@@ -178,10 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Session ID -->
       <template #cell-sessionId="{ row }">
-        <div class="w-full truncate text-xs">
-          {{ row.sessionId }}
-          <OTooltip :content="raw(row.sessionId)" />
-        </div>
+        <span class="text-xs">{{ row.sessionId }}</span>
       </template>
 
       <!-- User -->
@@ -191,10 +188,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- First user message -->
       <template #cell-firstUserMessage="{ row }">
-        <div v-if="row.firstUserMessage" class="text-text-secondary w-full truncate text-xs">
+        <span v-if="row.firstUserMessage" class="text-text-secondary text-xs">
           {{ row.firstUserMessage }}
-          <OTooltip :content="raw(row.firstUserMessage)" />
-        </div>
+        </span>
         <span v-else class="text-text-muted text-xs">—</span>
       </template>
 

@@ -41,6 +41,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div v-if="prefill" class="flex flex-col gap-5">
+      <!-- Query picker — only when the surface had several queries and could not tell which. -->
+      <OSelect
+        v-if="queryOptions.length > 1"
+        :model-value="prefill.queryIndex"
+        :options="queryOptions"
+        :label="t('alerts.prefill.dialog.queryChoiceLabel')"
+        :searchable="false"
+        data-test="create-alert-query-picker"
+        @update:model-value="onQueryChange"
+      />
+
       <!-- Stream picker — only when the surface offered a choice. Alerts are
            single-stream; silently taking the first one is a trap. -->
       <div v-if="hasStreamChoice" class="flex flex-col gap-2">
@@ -140,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("alerts.prefill.dialog.queryLabel") }}
         </span>
         <OCodeBlock
+          padded
           wrap
           :max-lines="10"
           :code="previewQuery"
@@ -170,6 +182,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
@@ -185,6 +198,8 @@ import type {
 import { isPrefillBlocked } from "@/utils/alerts/alertPrefill";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import { formatSqlForDisplay } from "@/utils/query/formatSql";
+
+const QUERY_LABEL_MAX = 60;
 
 const props = defineProps<{
   open: boolean;
@@ -219,6 +234,25 @@ const patternMode = computed<AlertPatternMode>(() => props.prefill?.patternFilte
 const onPatternModeChange = (value: unknown) => {
   if (!value || value === patternMode.value) return;
   emit("rebuild", { patternMode: value as AlertPatternMode });
+};
+
+const queryOptions = computed(() =>
+  (props.prefill?.queryChoices ?? []).map((choice) => {
+    const query = choice.query.replace(/\s+/g, " ").trim();
+    return {
+      value: choice.index,
+      label: t("alerts.prefill.dialog.queryChoiceOption", {
+        name:
+          choice.tabName || choice.legend || choice.ref || String.fromCharCode(65 + choice.index),
+        query: query.length > QUERY_LABEL_MAX ? `${query.slice(0, QUERY_LABEL_MAX - 1)}…` : query,
+      }),
+    };
+  }),
+);
+
+const onQueryChange = (value: unknown) => {
+  if (typeof value !== "number" || value === props.prefill?.queryIndex) return;
+  emit("rebuild", { queryIndex: value });
 };
 
 const showQuery = computed(() => {

@@ -2,11 +2,13 @@ use std::collections::HashMap;
 
 use axum::{
     Json, Router,
-    extract::{Path, Query},
+    extract::{Path, Query, Request},
     http::StatusCode,
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, put},
 };
+use config::{meta::dashboards::reports::REPORT_SECRET_HEADER, utils::str::constant_time_eq};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -140,14 +142,95 @@ pub async fn send_report(
 
 /// Create the router for the report server
 pub fn create_router() -> Router {
+    router_with_secret(config::get_config().report_server.secret.clone())
+}
+
+fn router_with_secret(secret: String) -> Router {
     Router::new()
+        .route("/api/{org_id}/reports/{name}/send", put(send_report))
+        .route_layer(middleware::from_fn(move |request, next| {
+            let secret = secret.clone();
+            async move { require_shared_secret(&secret, request, next).await }
+        }))
         .route("/api/healthz", get(healthz))
-        .route("/api/:org_id/reports/:name/send", put(send_report))
+}
+
+/// A blank secret skips the check, since standalone `o2_report_server` doesn't send it yet.
+async fn require_shared_secret(secret: &str, request: Request, next: Next) -> Response {
+    if secret.is_empty() {
+        return next.run(request).await;
+    }
+    let matches = request
+        .headers()
+        .get(REPORT_SECRET_HEADER)
+        .is_some_and(|v| constant_time_eq(v.as_bytes(), secret.as_bytes()));
+    if matches {
+        next.run(request).await
+    } else {
+        StatusCode::UNAUTHORIZED.into_response()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use axum::body::Body;
+    use tower::ServiceExt;
+
     use super::*;
+
+    fn healthz_request() -> axum::http::Request<Body> {
+        axum::http::Request::builder()
+            .uri("/api/healthz")
+            .body(Body::empty())
+            .unwrap()
+    }
+
+    fn send_request(secret: Option<&str>) -> axum::http::Request<Body> {
+        let mut builder = axum::http::Request::builder()
+            .method("PUT")
+            .uri("/api/org_a/reports/r1/send");
+        if let Some(secret) = secret {
+            builder = builder.header(REPORT_SECRET_HEADER, secret);
+        }
+        builder.body(Body::empty()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_healthz_needs_no_secret_when_secret_set() {
+        let app = router_with_secret("topsecret".to_string());
+        let resp = app.oneshot(healthz_request()).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_send_without_secret_header_is_rejected_when_secret_set() {
+        let app = router_with_secret("topsecret".to_string());
+        let resp = app.oneshot(send_request(None)).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_send_with_matching_secret_header_passes_the_check() {
+        let app = router_with_secret("topsecret".to_string());
+        let resp = app.oneshot(send_request(Some("topsecret"))).await.unwrap();
+        assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_send_with_wrong_secret_header_is_rejected() {
+        let app = router_with_secret("topsecret".to_string());
+        let resp = app.oneshot(send_request(Some("wrong"))).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[tokio::test]
+    async fn test_no_configured_secret_skips_check() {
+        let app = router_with_secret(String::new());
+        let resp = app.clone().oneshot(healthz_request()).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let resp = app.oneshot(send_request(None)).await.unwrap();
+        assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
+    }
 
     #[test]
     fn test_http_response_internal_server_error_has_500_code() {
@@ -193,5 +276,10 @@ mod tests {
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("error_detail"));
         assert!(obj.contains_key("trace_id"));
+    }
+
+    #[test]
+    fn test_create_router_does_not_panic_on_axum_08_path_syntax() {
+        let _ = create_router();
     }
 }

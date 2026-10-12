@@ -132,6 +132,19 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("text-button-ghost-destructive-text");
   });
 
+  // Destination previews are fixed-light brand replicas: the label must use the
+  // fixed brand foreground, not text-text-inverse, which turns near-black in dark mode.
+  it.each([
+    ["preview-slack", "text-brand-slack-foreground"],
+    ["preview-teams", "text-brand-teams-foreground"],
+    ["preview-email", "text-brand-email-foreground"],
+    ["preview-opsgenie", "text-brand-email-ink-foreground"],
+  ] as const)("paints the %s label with %s", (variant, label) => {
+    const wrapper = mount(OButton, { props: { variant } });
+    expect(wrapper.classes()).toContain(label);
+    expect(wrapper.classes()).not.toContain("text-text-inverse");
+  });
+
   // --- Size classes ---
 
   it("applies md size classes by default", () => {
@@ -181,6 +194,19 @@ describe("OButton", () => {
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain("h-12");
     expect(classes).toContain("w-12");
+  });
+
+  it("sizes xs-grouped one border-pair (0.125rem) shorter than xs", () => {
+    expect(mount(OButton, { props: { size: "xs" } }).classes()).toContain("h-7");
+    const classes = mount(OButton, { props: { size: "xs-grouped" } }).classes();
+    expect(classes).toContain("h-6.5");
+    expect(classes).not.toContain("h-7");
+  });
+
+  it("sizes icon-panel as a 1.625rem square, the icon partner of xs-grouped", () => {
+    const classes = mount(OButton, { props: { size: "icon-panel" } }).classes();
+    expect(classes).toContain("size-6.5");
+    expect(classes).toContain("p-0");
   });
 
   // --- Keyboard ---

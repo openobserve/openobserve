@@ -96,7 +96,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import type { DropdownAlign } from "@/lib/overlay/Dropdown/ODropdown.types";
-import { ref, reactive, watch, computed } from "vue";
+import { reactive, watch, computed } from "vue";
 import type { PropType } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 
@@ -125,6 +125,12 @@ const props = defineProps({
     type: String as PropType<DropdownAlign>,
     validator: (v: DropdownAlign) => ["start", "center", "end"].includes(v),
   },
+  // A month has no fixed length, so a time shift (one delta for both ends) cannot use it.
+  excludeMonths: {
+    default: false,
+    required: false,
+    type: Boolean,
+  },
 });
 
 const emit = defineEmits(["update:modelValue"]);
@@ -144,7 +150,7 @@ const picker = reactive({
 });
 
 // Periods for selection
-const relativePeriods: RelativePeriod[] = [
+const allRelativePeriods: RelativePeriod[] = [
   { label: t("common.seconds"), value: "s" },
   { label: t("common.minutes"), value: "m" },
   { label: t("common.hours"), value: "h" },
@@ -162,19 +168,18 @@ const relativeDates: Record<PeriodKey, number[]> = {
   M: [1, 2, 3, 4, 5, 6],
 };
 
+const relativePeriods = computed(() =>
+  props.excludeMonths ? allRelativePeriods.filter((p) => p.value !== "M") : allRelativePeriods,
+);
+
 // Options for custom period input
-const relativePeriodsSelect = ref([
-  { label: t("common.seconds"), value: "s" },
-  { label: t("common.minutes"), value: "m" },
-  { label: t("common.hours"), value: "h" },
-  { label: t("common.days"), value: "d" },
-  { label: t("common.weeks"), value: "w" },
-  { label: t("common.months"), value: "M" },
-]);
+const relativePeriodsSelect = computed(() =>
+  relativePeriods.value.map((p) => ({ label: p.label, value: p.value })),
+);
 
 // Function to map period values to their labels
 const getPeriodLabelFromValue = (periodValue: SelectModelValue | string) => {
-  const period = relativePeriods.find((p) => p.value === periodValue);
+  const period = allRelativePeriods.find((p) => p.value === periodValue);
   return period ? period.label : t("common.minutes");
 };
 
@@ -238,7 +243,7 @@ const isSelected = (value: number, period: PeriodKey) => {
 
 // Display period label for custom input
 const getPeriodLabel = () => {
-  const selectedPeriod = relativePeriods.find(
+  const selectedPeriod = allRelativePeriods.find(
     (p) => p.value === picker.data.selectedDate.relative.period,
   );
   return selectedPeriod ? selectedPeriod.label : t("common.minutes");

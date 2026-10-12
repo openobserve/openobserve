@@ -263,6 +263,11 @@ describe("AnalyticsRetention", () => {
   });
 
   it("narrows the start event with the shared picker and recomputes (AC-34)", async () => {
+    const { performanceState } = usePerformance();
+    performanceState.data.streams._rumdata = {
+      name: "_rumdata",
+      schema: { usr_email: { name: "usr_email" }, action_target_name: { name: "atn" } },
+    };
     await mountRetention();
     useProductAnalytics().retention.value = {
       ...useProductAnalytics().retention.value,

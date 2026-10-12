@@ -22,6 +22,7 @@ import useNotifications from "@/composables/useNotifications";
 import useHistogram from "@/composables/useLogs/useHistogram";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import {
   SearchAroundParams,
   StreamField,
@@ -72,7 +73,13 @@ export const useSearchAround = () => {
       let queryContext = "";
       const query: string = searchObj.data.query;
 
-      if (searchObj.meta.sqlMode === true) {
+      // The _around endpoint is single-stream, so multi-stream hits use their own _stream_name.
+      const isMultiStream = searchObj.data.stream.selectedStream.length > 1;
+      const hitStreamName: string = isMultiStream ? (params.body?.[STREAM_NAME_FIELD] ?? "") : "";
+
+      if (hitStreamName && searchObj.meta.sqlMode === true) {
+        sqlContext.push(b64EncodeUnicode(`SELECT * FROM "${hitStreamName}"`) ?? "");
+      } else if (searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL(query);
         parsedSQL.where = null;
         sqlContext.push(b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')) ?? "");
@@ -88,10 +95,12 @@ export const useSearchAround = () => {
           queryContext = queryContext.replace("[FIELD_LIST]", "*");
         }
 
-        const streamsData: string[] = searchObj.data.stream.selectedStream.filter(
-          (streamName: string) =>
-            !searchObj.data.stream.missingStreamMultiStreamFilter.includes(streamName),
-        );
+        const streamsData: string[] = hitStreamName
+          ? [hitStreamName]
+          : searchObj.data.stream.selectedStream.filter(
+              (streamName: string) =>
+                !searchObj.data.stream.missingStreamMultiStreamFilter.includes(streamName),
+            );
 
         let finalQuery = "";
         streamsData.forEach((streamName: string) => {
@@ -126,7 +135,9 @@ export const useSearchAround = () => {
       }
 
       let streamName = "";
-      if (searchObj.data.stream.selectedStream.length > 1) {
+      if (hitStreamName) {
+        streamName = hitStreamName;
+      } else if (isMultiStream) {
         streamName = b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) || "";
       } else {
         streamName = searchObj.data.stream.selectedStream[0];
@@ -151,13 +162,19 @@ export const useSearchAround = () => {
           clusters: Object.prototype.hasOwnProperty.call(searchObj.meta, "clusters")
             ? searchObj.meta.clusters.join(",")
             : "",
-          is_multistream: searchObj.data.stream.selectedStream.length > 1,
+          is_multistream: isMultiStream && !hitStreamName,
           traceparent,
         })
         .then(async (res: { data: SearchAroundResponse }) => {
           searchObj.loading = false;
           searchObj.data.histogram.chartParams.title = raw("");
           searchObj.data.histogram.chartParams.titleParts = null;
+          if (hitStreamName) {
+            // _around returns SELECT * hits; keep the stream-name column populated.
+            res.data.hits.forEach((hit: any) => {
+              hit[STREAM_NAME_FIELD] = hitStreamName;
+            });
+          }
           if (res.data.from > 0) {
             searchObj.data.queryResults.from = res.data.from;
             searchObj.data.queryResults.scan_size += res.data.scan_size;

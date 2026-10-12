@@ -276,6 +276,7 @@ function mountSessionViewer(router = createTestRouter()) {
             "currentTime",
             "startTime",
             "endTime",
+            "rumWindowUs",
             "markedTimestamps",
           ],
         },
@@ -2565,6 +2566,16 @@ describe("SessionViewer.vue — events-only view for a session with no replay (A
     expect(events).toContain("order by date asc");
     wrapper.unmount();
   });
+
+  it("hands the Traces tab the route window padded by a day, not the device-clock bounds", async () => {
+    const wrapper = await mountEventsOnly();
+    const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
+    expect(sidebar.props("rumWindowUs")).toEqual({
+      start: 1692884400000000 - 86_400_000_000,
+      end: 1692884400000000 + 86_400_000_000,
+    });
+    wrapper.unmount();
+  });
 });
 
 describe("SessionViewer.vue — events-only fallback never hides a failure (W23)", () => {
@@ -2689,6 +2700,14 @@ describe("SessionViewer.vue — opened from a funnel (AC-18)", () => {
     expect(strip.text()).toContain("/web/logs");
     const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
     expect(sidebar.props("markedTimestamps")).toEqual([1692884400000]);
+    wrapper.unmount();
+  });
+
+  it("gives the replay sidebar no rumWindowUs, so its trace search is unchanged", async () => {
+    const { wrapper } = await mountFromFunnel();
+    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);
+    const sidebar = wrapper.findComponent({ name: "PlayerEventsSidebar" });
+    expect(sidebar.props("rumWindowUs")).toBeFalsy();
     wrapper.unmount();
   });
 

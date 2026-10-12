@@ -202,27 +202,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-wrap items-center gap-2 px-2 pt-2"
       data-test="rum-analytics-funnel-suggestions"
     >
-      <span v-if="suggestions.length" class="text-text-secondary flex items-center gap-1 text-xs">
-        <OIcon name="auto-awesome" size="sm" />{{
-          t("rum.analytics.funnel.nextStep", { step: def.steps.length })
-        }}
-      </span>
-      <OButton
-        v-for="(s, i) in suggestions"
-        :key="`${s.step.kind}:${s.step.key}`"
-        variant="outline"
-        size="sm"
-        icon-left="add"
-        :disabled="full"
-        :data-test="`rum-analytics-funnel-suggestion-${i}`"
-        @click="add(s.step)"
-      >
-        <span class="flex items-center gap-1.5">
-          <OTag :label="kindLabel(s.step)" :variant="kindVariant(s.step)" size="xs" />
-          <span class="max-w-60 truncate font-mono text-xs">{{ s.step.key }}</span>
-          <span class="text-text-secondary text-xs">{{ formatCount(s.units, sampled) }}</span>
+      <AnalyticsPanelState
+        v-if="suggestionsState.status === 'error' || suggestionsState.status === 'forbidden'"
+        :state="suggestionsState"
+        data-test="rum-analytics-funnel-suggestions"
+        @retry="emit('suggestions-retry')"
+      />
+      <template v-else>
+        <span v-if="suggestions.length" class="text-text-secondary flex items-center gap-1 text-xs">
+          <OIcon name="auto-awesome" size="sm" />{{
+            t("rum.analytics.funnel.nextStep", { step: def.steps.length })
+          }}
         </span>
-      </OButton>
+        <OButton
+          v-for="(s, i) in suggestions"
+          :key="`${s.step.kind}:${s.step.key}`"
+          variant="outline"
+          size="sm"
+          icon-left="add"
+          :disabled="full"
+          :data-test="`rum-analytics-funnel-suggestion-${i}`"
+          @click="add(s.step)"
+        >
+          <span class="flex items-center gap-1.5">
+            <OTag :label="kindLabel(s.step)" :variant="kindVariant(s.step)" size="xs" />
+            <span class="max-w-60 truncate font-mono text-xs">{{ s.step.key }}</span>
+            <span class="text-text-secondary text-xs">{{ formatCount(s.units, sampled) }}</span>
+          </span>
+        </OButton>
+      </template>
       <span class="w-72 max-md:w-full">
         <StepPicker
           :model-value="null"
@@ -248,6 +256,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import StepPicker from "@/components/rum/productAnalytics/StepPicker.vue";
+import AnalyticsPanelState from "@/components/rum/productAnalytics/AnalyticsPanelState.vue";
 import type { PanelState } from "@/composables/rum/useAnalyticsSearch";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -274,15 +283,21 @@ const props = defineProps<{
   def: FunnelDef;
   result: FunnelResult | null;
   suggestions: { step: StepRef; units: number }[];
+  suggestionsState: PanelState<unknown>;
   state: PanelState<unknown>;
   sampled: SampleRatio;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
+  deletedNames: Readonly<Record<string, string>>;
   unitLabel: I18nText;
   unitNoun: I18nText;
   hideTime: boolean;
 }>();
-const emit = defineEmits<{ "update:def": [FunnelDef]; dropoff: [number] }>();
+const emit = defineEmits<{
+  "update:def": [FunnelDef];
+  dropoff: [number];
+  "suggestions-retry": [];
+}>();
 const { t } = useI18nTyped();
 const dash = raw("—");
 
@@ -309,7 +324,7 @@ const isDeleted = (s: StepRef) => s.kind === "e" && !props.events.some((e) => e.
 const labelOf = (s: StepRef): I18nText =>
   s.kind === "e" && props.eventsStatus !== "ready" && !props.events.some((e) => e.id === s.key)
     ? t("rum.analytics.events.unloadedStep")
-    : raw(stepLabel(s, props.events));
+    : raw(stepLabel(s, props.events, props.deletedNames));
 
 const kindLabel = (s: StepRef) =>
   s.kind === "p"
