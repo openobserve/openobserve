@@ -950,6 +950,49 @@ describe("AnalyticsFunnels", () => {
     expect(funnelSqls().length).toBe(before + 1);
   });
 
+  describe("layout switch through window._o2_paFunnelLayout", () => {
+    const hasRail = () => wrapper!.find('[data-test="rum-analytics-funnel-layout-rail"]').exists();
+    const hasInline = () => wrapper!.findComponent({ name: "FunnelLayoutInline" }).exists();
+
+    afterEach(() => {
+      delete window._o2_paFunnelLayout;
+    });
+
+    it("applies a new choice when the kept-alive tab is shown again, keeping the definition", async () => {
+      delete window._o2_paFunnelLayout;
+      const shown = ref(true);
+      await mountFunnels({}, shown);
+      await setSteps([
+        ["p", "/a"],
+        ["c", "b"],
+      ]);
+      expect(hasInline()).toBe(true);
+      expect(hasRail()).toBe(false);
+      const pa = useProductAnalytics();
+      const def = pa.funnel.value;
+      const queries = funnelSqls().length;
+
+      window._o2_paFunnelLayout = "rail";
+      shown.value = false;
+      await settle();
+      shown.value = true;
+      await settle();
+      expect(hasRail()).toBe(true);
+      expect(hasInline()).toBe(false);
+      expect(pa.funnel.value).toBe(def);
+      expect(funnelSqls().length).toBe(queries);
+
+      window._o2_paFunnelLayout = "nope";
+      shown.value = false;
+      await settle();
+      shown.value = true;
+      await settle();
+      expect(hasInline()).toBe(true);
+      expect(hasRail()).toBe(false);
+      expect(pa.funnel.value).toBe(def);
+    });
+  });
+
   it("names its icon-only buttons for screen readers", async () => {
     await mountFunnels();
     await setSteps([

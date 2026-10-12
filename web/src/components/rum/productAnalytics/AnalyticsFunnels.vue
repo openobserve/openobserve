@@ -363,7 +363,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </template>
             </OEmptyState>
-            <FunnelLayout
+            <component
+              :is="FunnelLayout"
               :def="def"
               :result="result"
               :removed="removed"
@@ -445,6 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   computed,
   defineAsyncComponent,
+  type Component,
   onActivated,
   onBeforeUnmount,
   onDeactivated,
@@ -488,6 +490,7 @@ import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
 import {
   FUNNEL_LAYOUTS,
   funnelLayoutName,
+  type FunnelLayoutName,
 } from "@/components/rum/productAnalytics/funnelLayouts/registry";
 import type { FunnelLayoutSetting } from "@/components/rum/productAnalytics/funnelLayouts/types";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
@@ -529,9 +532,11 @@ import { buildPrefillFromRumFunnel } from "@/utils/alerts/prefill/fromRumFunnel"
 defineOptions({ name: "AnalyticsFunnels" });
 
 const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
-// Read once per mount, so switching the layout takes a reload of the tab, never a live swap.
-const FunnelLayout = defineAsyncComponent(
-  FUNNEL_LAYOUTS[funnelLayoutName(window._o2_paFunnelLayout)],
+const layoutComponents = new Map<FunnelLayoutName, Component>(
+  (Object.keys(FUNNEL_LAYOUTS) as FunnelLayoutName[]).map((name) => [
+    name,
+    defineAsyncComponent(FUNNEL_LAYOUTS[name]),
+  ]),
 );
 
 const DEBOUNCE_MS = 300;
@@ -562,6 +567,9 @@ const dropoffCohort = ref<FunnelCohort | null>(null);
 const valuesField = ref<SessionField | null>(null);
 const whyOpen = ref(false);
 const dashboardOpen = ref(false);
+// The tab is kept alive, so the window choice is re-read on every activation, not only at setup.
+const layoutName = ref(funnelLayoutName(window._o2_paFunnelLayout));
+const FunnelLayout = computed(() => layoutComponents.get(layoutName.value));
 const linkProblem = pa.savedLinkProblem;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let whyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1147,6 +1155,7 @@ onMounted(() => {
 
 onActivated(() => {
   active = true;
+  layoutName.value = funnelLayoutName(window._o2_paFunnelLayout);
   if (!activatedOnce) {
     activatedOnce = true;
     return;
