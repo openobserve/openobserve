@@ -8445,6 +8445,8 @@
         "alertDescription": "Uyarının açıklama metni",
         "alertStartTime": "Pencere başlangıç zamanı (ISO 8601)",
         "alertEndTime": "Pencere bitiş zamanı (ISO 8601)",
+        "alertStartTimeMillis": "Pencere başlangıç zamanı epoch milisaniye cinsinden",
+        "alertEndTimeMillis": "Pencere bitiş zamanı epoch milisaniye cinsinden",
         "alertUrl": "İncelemek için OpenObserve'e dönüş bağlantısı",
         "alertTriggerTime": "Uyarının tetiklendiği zaman (ISO 8601)",
         "alertTriggerTimeMillis": "Epoch milisaniye cinsinden tetikleme zamanı",

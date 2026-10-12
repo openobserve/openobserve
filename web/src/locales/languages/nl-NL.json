@@ -8445,6 +8445,8 @@
         "alertDescription": "De beschrijvingstekst van de alert",
         "alertStartTime": "Starttijd van het venster (ISO 8601)",
         "alertEndTime": "Eindtijd van het venster (ISO 8601)",
+        "alertStartTimeMillis": "Starttijd van het venster in epoch milliseconden",
+        "alertEndTimeMillis": "Eindtijd van het venster in epoch milliseconden",
         "alertUrl": "Link terug naar OpenObserve om te onderzoeken",
         "alertTriggerTime": "Wanneer de alert werd geactiveerd (ISO 8601)",
         "alertTriggerTimeMillis": "Triggentijd in epoch-milliseconden",
