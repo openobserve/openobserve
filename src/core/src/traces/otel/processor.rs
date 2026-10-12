@@ -703,21 +703,32 @@ impl OtelIngestionProcessor {
     }
 }
 
-/// Raw span attributes, resource attributes under `resource.`, model parameters under `param.`.
-fn pricing_context(
+/// Raw span attributes, resource attributes under `resource.`, model parameters under `param.`;
+/// only the keys some rule reads are copied.
+pub fn pricing_context(
     definition: &ModelPricingDefinition,
     span_attributes: &HashMap<String, json::Value>,
     resource_attributes: &HashMap<String, json::Value>,
     model_params: &HashMap<String, String>,
 ) -> PricingContext {
-    let mut ctx = PricingContext::default();
-    // Built only when a tier reads it: most definitions have no rules.
-    if definition.has_rules() {
-        ctx.extend_json("", span_attributes);
-        ctx.extend_json("resource.", resource_attributes);
-        ctx.extend_strings("param.", model_params);
+    let mut ctx = PricingContext::known();
+    let keys = definition.rule_attribute_keys();
+    let wanted: Vec<&str> = keys.iter().map(|k| k.as_ref()).collect();
+    if !wanted.is_empty() {
+        ctx.extend_json("", span_attributes, Some(&wanted));
+        ctx.extend_json("resource.", resource_attributes, Some(&wanted));
+        ctx.extend_strings("param.", model_params, Some(&wanted));
     }
     ctx
+}
+
+/// The context the test-match endpoint resolves rules against, built the way ingestion builds it.
+pub fn test_pricing_context(
+    definition: &ModelPricingDefinition,
+    attributes: &HashMap<String, json::Value>,
+) -> PricingContext {
+    let model_params = ParametersExtractor.extract(attributes, "");
+    pricing_context(definition, attributes, &HashMap::new(), &model_params)
 }
 
 fn build_pricing_usage(
@@ -1629,6 +1640,7 @@ mod tests {
                     ]),
                     utc_windows: Vec::new(),
                     rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1704,6 +1716,7 @@ mod tests {
                     ]),
                     utc_windows: Vec::new(),
                     rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1817,6 +1830,7 @@ mod tests {
                     ]),
                     utc_windows: Vec::new(),
                     rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1895,6 +1909,7 @@ mod tests {
                     ]),
                     utc_windows: Vec::new(),
                     rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -1991,6 +2006,7 @@ mod tests {
                     ]),
                     utc_windows: Vec::new(),
                     rules: Vec::new(),
+                    priority: 0,
                 }],
                 ..Default::default()
             },
@@ -2053,12 +2069,7 @@ mod tests {
                 rules: if keys.is_empty() {
                     Vec::new()
                 } else {
-                    vec![TierRule {
-                        keys: keys.iter().map(|k| k.to_string()).collect(),
-                        op: RuleOp::In,
-                        values: values.iter().map(|v| v.to_string()).collect(),
-                        value: None,
-                    }]
+                    vec![TierRule::new(keys, RuleOp::In, values, None)]
                 },
                 ..Default::default()
             };

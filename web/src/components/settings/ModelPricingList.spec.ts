@@ -250,6 +250,7 @@ const mockI18n = createI18n({
     en: {
       modelPricing: {
         header: "LLM Model Pricing",
+        ruleOpIn: "is one of",
         matchingPriorityTooltip: "Your Org > Global > Built-in",
         searchPlaceholder: "Search models...",
         refresh: "Refresh",
@@ -780,7 +781,7 @@ describe("ModelPricingList.vue", () => {
 
       const rules = wrapper.findAll('[data-test="model-pricing-drawer-tier-rule"]');
       expect(rules).toHaveLength(1);
-      expect(rules[0].text()).toBe("openai.response.service_tier in flex");
+      expect(rules[0].text()).toBe("openai.response.service_tier +1 is one of flex");
       const drawer = wrapper.findComponent(ODrawerStub);
       expect(drawer.text().match(/Always active \(default\)/g)).toHaveLength(1);
     });

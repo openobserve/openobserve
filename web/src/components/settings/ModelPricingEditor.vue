@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div class="flex shrink-0 items-center gap-2">
                     <OButton
-                      v-if="formTiers.length > 1"
+                      v-if="idx > 0"
                       variant="outline-destructive"
                       size="icon"
                       type="button"
@@ -335,8 +335,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
 
-                  <!-- Span-attribute rules (non-default tiers only): OpenAI service
-                       tier, Anthropic speed, a cloud region — anything on the span. -->
                   <div
                     v-if="idx > 0 && tierRules(tier).length"
                     class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
@@ -348,8 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="text-2xs mt-px mb-2 opacity-55">
                       {{ t("modelPricing.attributeRulesDesc") }}
                     </div>
-                    <!-- Key by INDEX to match the index-based field names — see the
-                         price-row comment below for why a stable-id key breaks binding. -->
+                    <!-- Index keys: form fields bind to their name once, see the price-row note below. -->
                     <div
                       v-for="(rule, ruleIdx) in tierRules(tier)"
                       :key="ruleIdx"
@@ -373,6 +370,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OFormSelect
                           :name="`tiers[${idx}].rules[${ruleIdx}].op`"
                           :options="ruleOperators"
+                          :label="t('modelPricing.ruleOperator')"
                           label-key="label"
                           value-key="value"
                           :searchable="false"
@@ -442,6 +440,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ t("modelPricing.addRule") }}
                     </OButton>
+                    <div class="ms-auto w-30 shrink-0">
+                      <OFormInput
+                        :name="`tiers[${idx}].priority`"
+                        :label="t('modelPricing.tierPriority')"
+                        :help-text="t('modelPricing.tierPriorityHint')"
+                        type="number"
+                        :data-test="`model-pricing-tier-priority-input-${idx}`"
+                      />
+                    </div>
                   </div>
 
                   <!-- Quick Setup -->
@@ -644,6 +651,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
+              <OBanner
+                v-if="ambiguousTierPairs.length"
+                variant="warning"
+                icon="warning"
+                data-test="model-pricing-tier-tie-warning"
+              >
+                <div class="text-xs font-semibold">{{ t("modelPricing.tierTieWarning") }}</div>
+                <ul class="m-0 mt-1 ps-4 text-xs">
+                  <li v-for="pair in ambiguousTierPairs" :key="pair.join('-')">
+                    {{
+                      t("modelPricing.tierTiePair", {
+                        first: formTiers[pair[0]]?.name || `#${pair[0] + 1}`,
+                        second: formTiers[pair[1]]?.name || `#${pair[1] + 1}`,
+                      })
+                    }}
+                  </li>
+                </ul>
+              </OBanner>
               <OButton
                 variant="outline"
                 size="sm-action"
@@ -693,6 +718,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
 import { saveModelPricingMutation } from "@/services/model_pricing.queries";
@@ -713,7 +739,9 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { formatUtcWindowsInTz } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
+  findAmbiguousTiers,
   makeModelPricingSchema,
+  NUMERIC_RULE_OPS,
   splitList,
   PRESENCE_RULE_OPS,
   SET_RULE_OPS,
@@ -784,6 +812,7 @@ const form = useOForm<ModelPricingForm>({
 // Reactive view of the form-owned `tiers` array — form.useStore tracks array
 // mutations (a plain form.state.values read in a computed would not).
 const formTiers = form.useStore((s): ModelPricingTier[] => s.values.tiers ?? []);
+const ambiguousTierPairs = computed(() => findAmbiguousTiers(formTiers.value));
 
 function createEmptyModel() {
   return {
@@ -816,6 +845,7 @@ function newFormTier(name: string, condition: any = null) {
     condition,
     utc_windows: [] as ModelPricingTierWindow[],
     rules: [] as ModelPricingTierRule[],
+    priority: 0,
     prices: [] as Array<{ key: string; value: number }>,
     draftKey: "",
     draftValue: 0,
@@ -879,9 +909,6 @@ function parsedTierWindows(tier: any): UtcHoursWindow[] {
     );
 }
 
-// ── Attribute-rule converters ────────────────────────────────────────────────
-// The API stores `keys` / `values` as arrays; the form holds them comma-separated.
-
 /** A tier's rules, tolerant of form state seeded before the field existed. */
 function tierRules(tier: any): ModelPricingTierRule[] {
   return (tier?.rules ?? []) as ModelPricingTierRule[];
@@ -904,7 +931,7 @@ function ruleToModel(rule: any) {
     op,
   };
   if (SET_RULE_OPS.includes(op)) out.values = splitList(rule?.values);
-  else if (!PRESENCE_RULE_OPS.includes(op)) out.value = Number(rule?.value) || 0;
+  else if (NUMERIC_RULE_OPS.includes(op)) out.value = Number(rule?.value);
   return out;
 }
 
@@ -915,26 +942,21 @@ function isUnrestricted(tier: any): boolean {
 
 // API model (per-token price MAP) → FORM value (per-million ROW array).
 function modelToForm(m: any): ModelPricingForm {
-  const tiers = (m?.tiers ?? []).map((tier: any, i: number) => {
+  const apiTiers: any[] = [...(m?.tiers ?? [])];
+  // The editor treats tier 0 as the default, so the unrestricted tier must sit there or its restrictions would be dropped.
+  const defaultIdx = apiTiers.findIndex(isUnrestricted);
+  if (defaultIdx > 0) apiTiers.unshift(...apiTiers.splice(defaultIdx, 1));
+  const tiers = apiTiers.map((tier: any, i: number) => {
     const windows: ModelPricingTierWindow[] = (tier.utc_windows ?? []).map((w: any) => ({
       start: minutesToHhmm(w?.start_minute),
       end: minutesToHhmm(w?.end_minute),
     }));
     return {
       name: tier.name ?? "",
-      // Tier 0 is the unconditional default. A later tier keeps its own condition;
-      // one restricted only by time windows or rules keeps `null` rather than being
-      // handed a usage condition it never had.
-      condition:
-        i === 0
-          ? null
-          : tier.condition
-            ? { ...tier.condition }
-            : isUnrestricted(tier)
-              ? { usage_key: "input", operator: "gt", value: 0 }
-              : null,
+      condition: i === 0 || !tier.condition ? null : { ...tier.condition },
       utc_windows: i === 0 ? [] : windows,
       rules: i === 0 ? [] : (tier.rules ?? []).map(ruleToForm),
+      priority: i === 0 ? 0 : Number(tier.priority) || 0,
       prices: Object.entries(tier.prices ?? {}).map(([k, v]) => ({
         key: k,
         value: toPerMillion(Number(v)),
@@ -990,6 +1012,7 @@ function formToModelTiers(tiers: any[]): any[] {
       utc_windows: utcWindows,
       rules: i === 0 ? [] : (tier.rules ?? []).map(ruleToModel),
       prices,
+      ...(i > 0 && Number(tier.priority) ? { priority: Math.trunc(Number(tier.priority)) } : {}),
     };
   });
 }
@@ -1084,8 +1107,7 @@ function removeWindow(tierIdx: number, winIdx: number) {
   }));
 }
 
-// Seeded with OpenAI's Flex service tier — the common case this exists for, and a
-// concrete example of the "response key first, request key as fallback" format.
+// Seeded with OpenAI Flex so the "response key first, request key as fallback" order is visible.
 function addRule(idx: number) {
   patchTier(idx, (tier) => ({
     ...tier,
@@ -1258,8 +1280,7 @@ async function save(value?: ModelPricingForm) {
     }
   }
 
-  // A non-default tier with no usage condition, time window or attribute rule can
-  // never be selected — the unconditional tier 0 always wins first.
+  // A second unrestricted tier is unreachable: the backend uses the first one as the fallback.
   for (let i = 1; i < tiers.length; i++) {
     const tier = tiers[i];
     if (isUnrestricted(tier)) {
@@ -1359,18 +1380,6 @@ onBeforeMount(async () => {
           model.value.name = model.value.name + t("settings.modelPricingEditor.copySuffix");
           // Clear source so create endpoint assigns the correct one
           delete model.value.source;
-        }
-        for (let i = 1; i < model.value.tiers.length; i++) {
-          const tier = model.value.tiers[i];
-          // A tier restricted only by UTC time windows or attribute rules legitimately
-          // has no usage condition — leave it alone rather than fabricating one.
-          if (isUnrestricted(tier)) {
-            tier.condition = {
-              usage_key: "input",
-              operator: "gt",
-              value: 0,
-            };
-          }
         }
         // Data arrived after mount → re-seed the whole form (scalars + the
         // converted tier/price rows) once. formTiers (form.useStore) updates

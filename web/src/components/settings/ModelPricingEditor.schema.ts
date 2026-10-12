@@ -50,21 +50,19 @@ export const tierWindowSchema = z.object({
   end: z.string(),
 });
 
-/** Rule operators that compare against a list of values rather than a number. */
 export const SET_RULE_OPS = ["in", "not_in"];
-/** Rule operators that only check whether the attribute is present. */
 export const PRESENCE_RULE_OPS = ["exists", "not_exists"];
 
-// One span-attribute rule. `keys` and `values` are comma-separated in the form
-// and split into the API's arrays at submit.
+export const NUMERIC_RULE_OPS = ["gt", "gte", "lt", "lte"];
+
+// Keys and values stay comma-separated strings so one text input edits each list.
 export const tierRuleSchema = z.object({
   keys: z.string(),
   op: z.string(),
   values: z.string(),
-  value: z.coerce.number(),
+  value: z.union([z.number(), z.string()]).default(0),
 });
 
-/** Split a comma-separated form field into trimmed, non-empty entries. */
 export function splitList(value: string): string[] {
   return String(value ?? "")
     .split(",")
@@ -78,8 +76,8 @@ export const tierSchema = z.object({
   condition: tierConditionSchema.nullable().optional(),
   // Recurring UTC hours this tier is limited to. Empty = always active.
   utc_windows: z.array(tierWindowSchema).default([]),
-  // Span-attribute rules (service tier, speed, region) the tier is limited to.
   rules: z.array(tierRuleSchema).default([]),
+  priority: z.coerce.number().int().default(0),
   prices: z.array(priceRowSchema).default([]),
   // Staging "add price" row — non-validated form state, auto-committed at submit.
   draftKey: z.string().optional().default(""),
@@ -204,8 +202,7 @@ export const makeModelPricingSchema = (
           }
         });
 
-        // Attribute rules: a key is always required and set operators need values, or
-        // the rule can never match. The threshold field coerces to a number itself.
+        // A rule without keys, set values or a finite threshold can never match.
         (tier.rules ?? []).forEach((rule, r) => {
           if (!splitList(rule.keys).length) {
             ctx.addIssue({
@@ -221,6 +218,17 @@ export const makeModelPricingSchema = (
               message: t("modelPricing.ruleValuesRequired", { name: tierLabel }),
             });
           }
+          const threshold = String(rule.value ?? "").trim();
+          if (
+            NUMERIC_RULE_OPS.includes(rule.op) &&
+            (threshold === "" || !Number.isFinite(Number(threshold)))
+          ) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["tiers", i, "rules", r, "value"],
+              message: t("modelPricing.ruleValueRequired", { name: tierLabel }),
+            });
+          }
         });
       });
     });
@@ -230,3 +238,103 @@ export type ModelPricingTier = z.infer<typeof tierSchema>;
 export type ModelPricingTierWindow = z.infer<typeof tierWindowSchema>;
 export type ModelPricingTierRule = z.infer<typeof tierRuleSchema>;
 export type ModelPricingPriceRow = z.infer<typeof priceRowSchema>;
+
+type TieTier = {
+  condition?: { usage_key?: string; operator?: string; value?: number | string } | null;
+  utc_windows?: Array<{ start?: string; end?: string }>;
+  rules?: Array<{ keys?: string; op?: string; values?: string; value?: number | string }>;
+  priority?: number | string;
+};
+
+/** Same normalization as the backend, so `serviceTier` and `service_tier` are one key. */
+function normalizeRuleKey(key: string): string {
+  return key.toLowerCase().replace(/[_.-]/g, "");
+}
+
+function restrictionItems(tier: TieTier): string[] {
+  const items: string[] = [];
+  const c = tier.condition;
+  if (c) items.push(`c:${String(c.usage_key ?? "").trim()}|${c.operator}|${Number(c.value)}`);
+  if ((tier.utc_windows ?? []).length) items.push(`w:${JSON.stringify(tier.utc_windows)}`);
+  for (const rule of tier.rules ?? []) {
+    const keys = splitList(rule.keys ?? "")
+      .map(normalizeRuleKey)
+      .join(",");
+    const values = splitList(rule.values ?? "")
+      .map((v) => v.toLowerCase())
+      .sort()
+      .join(",");
+    const value = NUMERIC_RULE_OPS.includes(rule.op ?? "") ? Number(rule.value) : "";
+    items.push(`r:${keys}|${rule.op}|${values}|${value}`);
+  }
+  return items;
+}
+
+/** One-sided bound of a usage condition; eq / neq return null and never prove exclusivity. */
+function conditionRange(c: NonNullable<TieTier["condition"]>) {
+  const v = Number(c.value);
+  if (c.operator === "gt" || c.operator === "gte") return { lo: v, loStrict: c.operator === "gt" };
+  if (c.operator === "lt" || c.operator === "lte") return { hi: v, hiStrict: c.operator === "lt" };
+  return null;
+}
+
+function provablyExclusive(a: TieTier, b: TieTier): boolean {
+  for (const ra of a.rules ?? []) {
+    if (ra.op !== "in") continue;
+    const keysA = splitList(ra.keys ?? "")
+      .map(normalizeRuleKey)
+      .join(",");
+    const valuesA = new Set(splitList(ra.values ?? "").map((v) => v.toLowerCase()));
+    for (const rb of b.rules ?? []) {
+      if (rb.op !== "in") continue;
+      if (
+        splitList(rb.keys ?? "")
+          .map(normalizeRuleKey)
+          .join(",") !== keysA
+      )
+        continue;
+      if (!splitList(rb.values ?? "").some((v) => valuesA.has(v.toLowerCase()))) return true;
+    }
+  }
+  if (a.condition && b.condition && a.condition.usage_key === b.condition.usage_key) {
+    const ra = conditionRange(a.condition);
+    const rb = conditionRange(b.condition);
+    const lower = ra && "lo" in ra ? ra : rb && "lo" in rb ? rb : null;
+    const upper = ra && "hi" in ra ? ra : rb && "hi" in rb ? rb : null;
+    if (lower && upper && lower !== upper) {
+      const lo = lower.lo as number;
+      const hi = upper.hi as number;
+      if (hi < lo || (hi === lo && (lower.loStrict || upper.hiStrict))) return true;
+    }
+  }
+  return false;
+}
+
+/** Pairs of tier indexes the backend would break by list order alone, because neither priority, restriction count, exclusivity nor a covering tier separates them. */
+export function findAmbiguousTiers(tiers: TieTier[]): Array<[number, number]> {
+  const info = tiers.map((tier, i) => {
+    const items = restrictionItems(tier);
+    return { i, tier, items, set: new Set(items), priority: Number(tier.priority) || 0 };
+  });
+  const candidates = info.filter((t) => t.i > 0 && t.items.length > 0);
+  const outranks = (k: (typeof info)[number], x: (typeof info)[number]) =>
+    k.priority > x.priority || (k.priority === x.priority && k.items.length > x.items.length);
+  const pairs: Array<[number, number]> = [];
+  for (let a = 0; a < candidates.length; a++) {
+    for (let b = a + 1; b < candidates.length; b++) {
+      const x = candidates[a];
+      const y = candidates[b];
+      if (x.priority !== y.priority || x.items.length !== y.items.length) continue;
+      if (provablyExclusive(x.tier, y.tier)) continue;
+      const covered = candidates.some(
+        (k) =>
+          k !== x &&
+          k !== y &&
+          outranks(k, x) &&
+          [...x.items, ...y.items].every((item) => k.set.has(item)),
+      );
+      if (!covered) pairs.push([x.i, y.i]);
+    }
+  }
+  return pairs;
+}

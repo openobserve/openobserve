@@ -167,14 +167,21 @@ pub async fn list_orgs() -> Result<Vec<String>, Error> {
 
 pub async fn list(org_id: &str) -> Result<Vec<ModelPricingDefinition>, Error> {
     let client = get_orm_client_ro().await;
-    Entity::find()
+    let rows = Entity::find()
         .filter(Column::Org.eq(org_id))
         .order_by(Column::Name, sea_orm::Order::Asc)
         .all(client)
-        .await?
+        .await?;
+    Ok(rows
         .into_iter()
-        .map(|m| m.try_into())
-        .collect()
+        .filter_map(|m| {
+            let name = m.name.clone();
+            // One unreadable row must not empty the whole org's pricing cache.
+            ModelPricingDefinition::try_from(m)
+                .inspect_err(|e| log::warn!("[model_pricing] skipping unreadable '{name}': {e}"))
+                .ok()
+        })
+        .collect())
 }
 
 /// Delete a model pricing definition by ID, scoped to org.

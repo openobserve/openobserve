@@ -265,19 +265,23 @@ export function operatorSymbol(op: string): string {
   return map[op] || op;
 }
 
-/** Attribute rule → `openai.response.service_tier in flex, priority`; only the first key is shown. */
-export function formatTierRule(rule: {
-  keys?: string[];
-  op?: string;
-  values?: string[];
-  value?: number | null;
-}): string {
-  const key = (rule?.keys ?? []).map((k) => String(k ?? "").trim()).find(Boolean) ?? "";
+/** Attribute rule → `openai.response.service_tier +1 is one of flex, priority`, labelled through `t`. */
+export function formatTierRule(
+  rule: { keys?: string[]; op?: string; values?: string[]; value?: number | null },
+  t: (_key: string) => string,
+): string {
+  const keys = (rule?.keys ?? []).map((k) => String(k ?? "").trim()).filter(Boolean);
+  const key = keys.length > 1 ? `${keys[0]} +${keys.length - 1}` : (keys[0] ?? "");
   const op = rule?.op ?? "in";
-  if (op === "exists" || op === "not_exists")
-    return `${key} ${op === "exists" ? "exists" : "missing"}`;
+  const labels: Record<string, string> = {
+    in: "modelPricing.ruleOpIn",
+    not_in: "modelPricing.ruleOpNotIn",
+    exists: "modelPricing.ruleOpExists",
+    not_exists: "modelPricing.ruleOpNotExists",
+  };
+  if (op === "exists" || op === "not_exists") return `${key} ${t(labels[op])}`;
   if (op === "in" || op === "not_in") {
-    return `${key} ${op === "in" ? "in" : "not in"} ${(rule?.values ?? []).join(", ")}`;
+    return `${key} ${t(labels[op])} ${(rule?.values ?? []).join(", ")}`;
   }
   return `${key} ${operatorSymbol(op)} ${rule?.value ?? ""}`;
 }

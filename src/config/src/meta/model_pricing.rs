@@ -42,6 +42,12 @@ pub const USAGE_KEY_PREFIX: &str = "usage.";
 /// Longest attribute value kept in a [`PricingContext`]; prompts and completions are longer.
 pub const MAX_CONTEXT_VALUE_LEN: usize = 256;
 
+pub const MAX_TIERS: usize = 32;
+pub const MAX_RULES_PER_TIER: usize = 8;
+pub const MAX_RULE_KEYS: usize = 16;
+pub const MAX_RULE_VALUES: usize = 64;
+pub const MAX_TIER_PRIORITY: i32 = 1000;
+
 /// Ownership source of a model pricing definition.
 #[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -96,8 +102,8 @@ pub struct ModelPricingDefinition {
     /// Whether this definition is active
     #[serde(default = "default_true")]
     pub enabled: bool,
-    /// Pricing tiers. The first tier without a condition is the default (fallback).
-    /// Tiers with conditions are evaluated first in order; first match wins.
+    /// Pricing tiers: the matching tier with the highest (priority, restriction count) wins,
+    /// ties go to list order, and the unrestricted tier is the fallback.
     pub tiers: Vec<PricingTierDefinition>,
     /// Optional Unix timestamp (microseconds) from which this definition is valid.
     /// When multiple definitions match the same model name, the one with the
@@ -138,6 +144,26 @@ impl ModelPricingDefinition {
     pub fn has_rules(&self) -> bool {
         self.tiers.iter().any(|t| !t.rules.is_empty())
     }
+
+    /// Normalizes every rule key once; call when the definition enters the cache.
+    pub fn prepare(&mut self) {
+        for rule in self.tiers.iter_mut().flat_map(|t| t.rules.iter_mut()) {
+            rule.prepare();
+        }
+    }
+
+    /// Normalized attribute keys the rules read, so only those are copied into the context.
+    pub fn rule_attribute_keys(&self) -> Vec<Cow<'_, str>> {
+        let mut keys: Vec<Cow<'_, str>> = self
+            .tiers
+            .iter()
+            .flat_map(|t| &t.rules)
+            .flat_map(TierRule::attribute_keys)
+            .collect();
+        keys.sort_unstable();
+        keys.dedup();
+        keys
+    }
 }
 
 /// A pricing tier within a model definition.
@@ -171,14 +197,21 @@ pub struct PricingTierDefinition {
     /// `condition` (if set) passes, so windows compose with context-length tiering.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub utc_windows: Vec<UtcTimeWindow>,
-    /// Span-attribute rules (service tier, speed, region) that must all hold; the matching tier
-    /// with the most restrictions wins.
+    /// Span-attribute rules (service tier, speed, region) that must all hold.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rules: Vec<TierRule>,
+    /// Breaks ties between matching tiers before the restriction count; higher wins.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub priority: i32,
 }
 
 impl PricingTierDefinition {
-    /// How many restrictions the tier carries; the most restricted matching tier wins.
+    /// Selection rank among matching tiers: priority first, then restriction count.
+    pub fn rank(&self) -> (i32, usize) {
+        (self.priority, self.restriction_count())
+    }
+
+    /// How many restrictions the tier carries.
     pub fn restriction_count(&self) -> usize {
         usize::from(self.condition.is_some())
             + usize::from(!self.utc_windows.is_empty())
@@ -308,18 +341,39 @@ impl TierOperator {
 #[serde(default)]
 pub struct TierRule {
     /// Attribute keys tried in order; compared ignoring case and `_`/`-`/`.` separators.
+    #[serde(deserialize_with = "lenient_strings")]
     pub keys: Vec<String>,
     pub op: RuleOp,
     /// Accepted values for `in` / `not_in`, compared trimmed and case-insensitively.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "lenient_strings"
+    )]
     pub values: Vec<String>,
     /// Threshold for the numeric operators.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "lenient_f64"
+    )]
     pub value: Option<f64>,
+    #[serde(skip)]
+    #[schema(ignore)]
+    prepared: Vec<RuleKey>,
 }
 
 impl TierRule {
-    /// An absent attribute fails every operator except `not_in` and `not_exists`.
+    pub fn new(keys: &[&str], op: RuleOp, values: &[&str], value: Option<f64>) -> Self {
+        Self {
+            keys: keys.iter().map(|k| k.to_string()).collect(),
+            op,
+            values: values.iter().map(|v| v.to_string()).collect(),
+            value,
+            prepared: Vec::new(),
+        }
+    }
+
+    /// An absent attribute fails every operator except `not_in` and `not_exists`; a missing
+    /// usage count reads as 0, like the legacy `condition`.
     pub fn matches(&self, ctx: &PricingContext, usage: &HashMap<String, i64>) -> bool {
         let found = self.lookup(ctx, usage);
         match self.op {
@@ -328,19 +382,47 @@ impl TierRule {
             RuleOp::In => found.is_some_and(|v| self.accepts(&v)),
             RuleOp::NotIn => !found.is_some_and(|v| self.accepts(&v)),
             RuleOp::Gt | RuleOp::Gte | RuleOp::Lt | RuleOp::Lte => {
-                let actual = found.and_then(|v| v.trim().parse::<f64>().ok());
+                let actual = found
+                    .and_then(|v| v.trim().parse::<f64>().ok())
+                    .filter(|v| v.is_finite());
                 match (actual, self.value) {
                     (Some(actual), Some(threshold)) => self.op.compare(actual, threshold),
                     _ => false,
                 }
             }
+            RuleOp::Unknown => false,
         }
     }
 
-    /// Rejects a rule that can never match.
+    /// Rejects a rule that can never match or exceeds the size caps.
     pub fn validate(&self) -> Result<(), String> {
+        if self.op == RuleOp::Unknown {
+            return Err("rule has an unknown operator".to_string());
+        }
         if self.keys.iter().all(|k| k.trim().is_empty()) {
             return Err("rule must list at least one attribute key".to_string());
+        }
+        if self.keys.len() > MAX_RULE_KEYS || self.values.len() > MAX_RULE_VALUES {
+            return Err(format!(
+                "rule may list at most {MAX_RULE_KEYS} keys and {MAX_RULE_VALUES} values"
+            ));
+        }
+        if self
+            .keys
+            .iter()
+            .chain(&self.values)
+            .any(|s| s.len() > MAX_CONTEXT_VALUE_LEN)
+        {
+            return Err(format!(
+                "rule keys and values must be at most {MAX_CONTEXT_VALUE_LEN} characters"
+            ));
+        }
+        if self
+            .keys
+            .iter()
+            .any(|k| usage_key(k).is_some_and(|u| u.trim().is_empty()))
+        {
+            return Err("rule usage key must name a usage type after 'usage.'".to_string());
         }
         match self.op {
             RuleOp::In | RuleOp::NotIn if self.values.iter().all(|v| v.trim().is_empty()) => {
@@ -355,17 +437,28 @@ impl TierRule {
         }
     }
 
+    /// Normalizes the keys once so per-span lookups do not allocate.
+    pub fn prepare(&mut self) {
+        self.prepared = self.keys.iter().map(|k| RuleKey::parse(k)).collect();
+    }
+
     fn lookup<'a>(
-        &self,
+        &'a self,
         ctx: &'a PricingContext,
         usage: &HashMap<String, i64>,
     ) -> Option<Cow<'a, str>> {
-        self.keys
-            .iter()
-            .find_map(|key| match key.strip_prefix(USAGE_KEY_PREFIX) {
-                Some(usage_key) => usage.get(usage_key).map(|n| Cow::Owned(n.to_string())),
-                None => ctx.get(key).map(Cow::Borrowed),
-            })
+        let read = |key: &RuleKey| match key {
+            RuleKey::Usage(k) => Some(Cow::Owned(usage.get(k).copied().unwrap_or(0).to_string())),
+            RuleKey::Attr(k) => ctx.get_normalized(k).map(Cow::Borrowed),
+        };
+        if self.prepared.len() == self.keys.len() {
+            self.prepared.iter().find_map(read)
+        } else {
+            self.keys
+                .iter()
+                .map(|k| RuleKey::parse(k))
+                .find_map(|k| read(&k).map(|v| Cow::Owned(v.into_owned())))
+        }
     }
 
     fn accepts(&self, actual: &str) -> bool {
@@ -373,6 +466,42 @@ impl TierRule {
         self.values
             .iter()
             .any(|v| v.trim().eq_ignore_ascii_case(actual))
+    }
+
+    fn attribute_keys(&self) -> Vec<Cow<'_, str>> {
+        if self.prepared.len() == self.keys.len() {
+            return self
+                .prepared
+                .iter()
+                .filter_map(|k| match k {
+                    RuleKey::Attr(k) => Some(Cow::Borrowed(k.as_str())),
+                    RuleKey::Usage(_) => None,
+                })
+                .collect();
+        }
+        self.keys
+            .iter()
+            .filter_map(|k| match RuleKey::parse(k) {
+                RuleKey::Attr(k) => Some(Cow::Owned(k)),
+                RuleKey::Usage(_) => None,
+            })
+            .collect()
+    }
+}
+
+/// A rule key resolved to either a usage count or a normalized attribute name.
+#[derive(Clone, Debug, PartialEq)]
+enum RuleKey {
+    Usage(String),
+    Attr(String),
+}
+
+impl RuleKey {
+    fn parse(key: &str) -> Self {
+        match usage_key(key) {
+            Some(usage) => RuleKey::Usage(usage.trim().to_string()),
+            None => RuleKey::Attr(normalize_attribute_key(key)),
+        }
     }
 }
 
@@ -389,6 +518,9 @@ pub enum RuleOp {
     Gte,
     Lt,
     Lte,
+    /// An operator this build does not know; it never matches, so newer catalogues still parse.
+    #[serde(other)]
+    Unknown,
 }
 
 impl RuleOp {
@@ -398,56 +530,122 @@ impl RuleOp {
             RuleOp::Gte => actual >= threshold,
             RuleOp::Lt => actual < threshold,
             RuleOp::Lte => actual <= threshold,
-            RuleOp::In | RuleOp::NotIn | RuleOp::Exists | RuleOp::NotExists => false,
+            RuleOp::In | RuleOp::NotIn | RuleOp::Exists | RuleOp::NotExists | RuleOp::Unknown => {
+                false
+            }
         }
     }
 }
 
 /// Scalar span attributes a [`TierRule`] can read, keyed by normalized attribute name.
 #[derive(Clone, Debug, Default)]
-pub struct PricingContext(HashMap<String, String>);
+pub struct PricingContext {
+    entries: HashMap<String, ContextEntry>,
+    known: bool,
+}
+
+/// One attribute value plus what decides a normalized-key collision deterministically.
+#[derive(Clone, Debug)]
+struct ContextEntry {
+    namespaced: bool,
+    raw_key: String,
+    value: String,
+}
 
 impl PricingContext {
+    /// No span is known (e.g. the eval cost calculator): every rule-restricted tier is skipped.
+    pub fn unknown() -> Self {
+        Self::default()
+    }
+
+    /// A span whose attributes were all supplied, so absent ones really are absent.
+    pub fn known() -> Self {
+        Self {
+            known: true,
+            ..Self::default()
+        }
+    }
+
     pub fn from_strings(attrs: &HashMap<String, String>) -> Self {
-        let mut ctx = Self::default();
-        ctx.extend_strings("", attrs);
+        let mut ctx = Self::known();
+        for (k, v) in attrs {
+            ctx.insert("", k, v, None);
+        }
         ctx
     }
 
+    /// Whether the span's attributes were supplied; rule tiers never match otherwise.
+    pub fn is_known(&self) -> bool {
+        self.known
+    }
+
     pub fn get(&self, key: &str) -> Option<&str> {
-        self.0
-            .get(&normalize_attribute_key(key))
-            .map(String::as_str)
+        self.get_normalized(&normalize_attribute_key(key))
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.entries.is_empty()
     }
 
-    pub fn insert(&mut self, key: &str, value: &str) {
+    /// Adds JSON attributes under `prefix`, keeping only keys in `wanted` when it is given.
+    pub fn extend_json(
+        &mut self,
+        prefix: &str,
+        attrs: &HashMap<String, json::Value>,
+        wanted: Option<&[&str]>,
+    ) {
+        for (k, v) in attrs {
+            match v {
+                json::Value::String(s) => self.insert(prefix, k, s, wanted),
+                json::Value::Number(n) => self.insert(prefix, k, &n.to_string(), wanted),
+                json::Value::Bool(b) => {
+                    self.insert(prefix, k, if *b { "true" } else { "false" }, wanted)
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Adds string attributes under `prefix`, keeping only keys in `wanted` when it is given.
+    pub fn extend_strings(
+        &mut self,
+        prefix: &str,
+        attrs: &HashMap<String, String>,
+        wanted: Option<&[&str]>,
+    ) {
+        for (k, v) in attrs {
+            self.insert(prefix, k, v, wanted);
+        }
+    }
+
+    fn get_normalized(&self, normalized: &str) -> Option<&str> {
+        self.entries.get(normalized).map(|e| e.value.as_str())
+    }
+
+    fn insert(&mut self, prefix: &str, key: &str, value: &str, wanted: Option<&[&str]>) {
         if value.trim().is_empty() || value.len() > MAX_CONTEXT_VALUE_LEN {
             return;
         }
-        self.0
-            .insert(normalize_attribute_key(key), value.to_string());
-    }
-
-    pub fn extend_strings(&mut self, prefix: &str, attrs: &HashMap<String, String>) {
-        for (k, v) in attrs {
-            self.insert(&format!("{prefix}{k}"), v);
+        let normalized = normalize_attribute_key(&format!("{prefix}{key}"));
+        if wanted.is_some_and(|w| !w.contains(&normalized.as_str())) {
+            return;
         }
-    }
-
-    pub fn extend_json(&mut self, prefix: &str, attrs: &HashMap<String, json::Value>) {
-        for (k, v) in attrs {
-            let text = match v {
-                json::Value::String(s) => Cow::Borrowed(s.as_str()),
-                json::Value::Number(n) => Cow::Owned(n.to_string()),
-                json::Value::Bool(b) => Cow::Owned(b.to_string()),
-                _ => continue,
-            };
-            self.insert(&format!("{prefix}{k}"), &text);
+        let namespaced = !prefix.is_empty();
+        // Namespaced (resource./param.) values beat raw span keys, then the smaller raw key wins.
+        if let Some(existing) = self.entries.get(&normalized)
+            && (existing.namespaced, existing.raw_key.as_str()) != (namespaced, key)
+            && (!existing.namespaced, existing.raw_key.as_str()) <= (!namespaced, key)
+        {
+            return;
         }
+        self.entries.insert(
+            normalized,
+            ContextEntry {
+                namespaced,
+                raw_key: key.to_string(),
+                value: value.to_string(),
+            },
+        );
     }
 }
 
@@ -459,8 +657,49 @@ pub fn normalize_attribute_key(key: &str) -> String {
         .collect()
 }
 
+/// The usage type named by a `usage.`-prefixed rule key, matched case-insensitively.
+fn usage_key(key: &str) -> Option<&str> {
+    let key = key.trim();
+    key.get(..USAGE_KEY_PREFIX.len())
+        .filter(|p| p.eq_ignore_ascii_case(USAGE_KEY_PREFIX))
+        .map(|_| &key[USAGE_KEY_PREFIX.len()..])
+}
+
+/// Accepts strings, numbers and bools so a hand-edited catalogue entry cannot fail the whole sync.
+fn lenient_strings<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = Vec::<json::Value>::deserialize(deserializer).unwrap_or_default();
+    Ok(raw
+        .into_iter()
+        .filter_map(|v| match v {
+            json::Value::String(s) => Some(s),
+            json::Value::Number(n) => Some(n.to_string()),
+            json::Value::Bool(b) => Some(b.to_string()),
+            _ => None,
+        })
+        .collect())
+}
+
+/// Accepts a number or a numeric string; anything else becomes `None` and fails validation.
+fn lenient_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(match json::Value::deserialize(deserializer)? {
+        json::Value::Number(n) => n.as_f64(),
+        json::Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    })
+}
+
 fn default_true() -> bool {
     true
+}
+
+fn is_zero(v: &i32) -> bool {
+    *v == 0
 }
 
 #[cfg(test)]
@@ -828,12 +1067,7 @@ mod tests {
     }
 
     fn rule(keys: &[&str], op: RuleOp, values: &[&str]) -> TierRule {
-        TierRule {
-            keys: keys.iter().map(|k| k.to_string()).collect(),
-            op,
-            values: values.iter().map(|v| v.to_string()).collect(),
-            value: None,
-        }
+        TierRule::new(keys, op, values, None)
     }
 
     fn service_tier_in(values: &[&str]) -> TierRule {
@@ -988,7 +1222,7 @@ mod tests {
 
     #[test]
     fn test_context_keeps_only_short_scalars() {
-        let mut c = PricingContext::default();
+        let mut c = PricingContext::known();
         c.extend_json(
             "",
             &HashMap::from([
@@ -1002,6 +1236,7 @@ mod tests {
                     json::json!("x".repeat(MAX_CONTEXT_VALUE_LEN + 1)),
                 ),
             ]),
+            None,
         );
         assert_eq!(c.get("tier"), Some("flex"));
         assert_eq!(c.get("max_tokens"), Some("1024"));
@@ -1013,8 +1248,149 @@ mod tests {
         c.extend_strings(
             "param.",
             &HashMap::from([("service_tier".to_string(), "priority".to_string())]),
+            None,
         );
         assert_eq!(c.get("param.service_tier"), Some("priority"));
         assert!(PricingContext::default().is_empty());
+        assert!(c.is_known() && !PricingContext::unknown().is_known());
+    }
+
+    #[test]
+    fn test_context_wanted_keys_filter() {
+        let mut c = PricingContext::known();
+        c.extend_json(
+            "",
+            &HashMap::from([
+                (
+                    "openai.response.service_tier".to_string(),
+                    json::json!("flex"),
+                ),
+                ("gen_ai.request.model".to_string(), json::json!("gpt-6")),
+            ]),
+            Some(&["openairesponseservicetier"]),
+        );
+        assert_eq!(c.get("openai.response.service_tier"), Some("flex"));
+        assert_eq!(c.get("gen_ai.request.model"), None);
+    }
+
+    #[test]
+    fn test_context_collisions_are_deterministic() {
+        for _ in 0..20 {
+            let mut c = PricingContext::known();
+            c.extend_strings(
+                "",
+                &HashMap::from([
+                    ("service_tier".to_string(), "default".to_string()),
+                    ("serviceTier".to_string(), "flex".to_string()),
+                    ("resource_cloud_region".to_string(), "us".to_string()),
+                ]),
+                None,
+            );
+            // The smaller raw key wins a collision between raw span keys.
+            assert_eq!(c.get("service_tier"), Some("flex"));
+            c.extend_strings(
+                "resource.",
+                &HashMap::from([("cloud.region".to_string(), "eu".to_string())]),
+                None,
+            );
+            // A namespaced resource attribute beats a raw span key that normalizes the same.
+            assert_eq!(c.get("resource.cloud.region"), Some("eu"));
+        }
+    }
+
+    #[test]
+    fn test_rule_unknown_op_parses_never_matches_and_fails_validation() {
+        let r: TierRule =
+            serde_json::from_str(r#"{"keys":["service_tier"],"op":"regex","values":["fl.*"]}"#)
+                .unwrap();
+        assert_eq!(r.op, RuleOp::Unknown);
+        assert!(!r.matches(&ctx(&[("service_tier", "flex")]), &HashMap::new()));
+        assert!(r.validate().unwrap_err().contains("unknown operator"));
+        let tier: PricingTierDefinition = serde_json::from_str(
+            r#"{"name":"x","rules":[{"keys":["a"],"op":"contains","values":["b"]}],"prices":{"input":1e-6}}"#,
+        )
+        .unwrap();
+        assert_eq!(tier.rules[0].op, RuleOp::Unknown);
+    }
+
+    #[test]
+    fn test_rule_lenient_value_and_values_parsing() {
+        let r: TierRule =
+            serde_json::from_str(r#"{"keys":["usage.input"],"op":"gte","value":"272000"}"#)
+                .unwrap();
+        assert_eq!(r.value, Some(272000.0));
+        let r: TierRule =
+            serde_json::from_str(r#"{"keys":["n"],"op":"in","values":[1, true, "x", {"a":1}]}"#)
+                .unwrap();
+        assert_eq!(r.values, vec!["1", "true", "x"]);
+        let r: TierRule =
+            serde_json::from_str(r#"{"keys":["n"],"op":"gt","value":"lots"}"#).unwrap();
+        assert_eq!(r.value, None);
+        assert!(r.validate().is_err());
+    }
+
+    #[test]
+    fn test_rule_usage_prefix_case_insensitive_and_missing_reads_zero() {
+        let mut r = rule(&["Usage.cache_read_input_tokens"], RuleOp::Lt, &[]);
+        r.value = Some(1.0);
+        assert!(r.matches(&ctx(&[]), &HashMap::new()));
+        assert!(!r.matches(
+            &ctx(&[]),
+            &HashMap::from([("cache_read_input_tokens".to_string(), 5i64)])
+        ));
+        assert!(rule(&["usage."], RuleOp::Exists, &[]).validate().is_err());
+    }
+
+    #[test]
+    fn test_rule_prepared_and_unprepared_agree() {
+        let mut r = service_tier_in(&["flex"]);
+        let c = ctx(&[("openai.request.service_tier", "flex")]);
+        assert!(r.matches(&c, &HashMap::new()));
+        r.prepare();
+        assert!(r.matches(&c, &HashMap::new()));
+        let mut def = ModelPricingDefinition {
+            tiers: vec![PricingTierDefinition {
+                rules: vec![service_tier_in(&["flex"])],
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let unprepared: Vec<String> = def
+            .rule_attribute_keys()
+            .into_iter()
+            .map(Cow::into_owned)
+            .collect();
+        def.prepare();
+        assert_eq!(def.rule_attribute_keys(), unprepared);
+        assert_eq!(
+            def.rule_attribute_keys(),
+            vec!["openairequestservicetier", "openairesponseservicetier"]
+        );
+    }
+
+    #[test]
+    fn test_rule_validate_caps() {
+        let many: Vec<String> = (0..=MAX_RULE_VALUES).map(|i| i.to_string()).collect();
+        let refs: Vec<&str> = many.iter().map(String::as_str).collect();
+        assert!(rule(&["k"], RuleOp::In, &refs).validate().is_err());
+        let long = "x".repeat(MAX_CONTEXT_VALUE_LEN + 1);
+        assert!(rule(&[&long], RuleOp::Exists, &[]).validate().is_err());
+    }
+
+    #[test]
+    fn test_tier_rank_puts_priority_first() {
+        let low = PricingTierDefinition {
+            condition: Some(TierCondition::default()),
+            rules: vec![service_tier_in(&["flex"])],
+            ..Default::default()
+        };
+        let high = PricingTierDefinition {
+            rules: vec![service_tier_in(&["flex"])],
+            priority: 1,
+            ..Default::default()
+        };
+        assert!(high.rank() > low.rank());
+        let val = serde_json::to_value(&low).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("priority"));
     }
 }
