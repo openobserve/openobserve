@@ -89,7 +89,7 @@ pub async fn delete_linked_domain(record: Model) -> Result<(), anyhow::Error> {
         let mut lock = CACHE.write().await;
         lock.remove(&record.domain);
         drop(lock);
-        emit_sync_event(&record.org_id, &record.domaindomain).await;
+        emit_sync_event(&record.org_id, &record.domain).await;
     }
     Ok(())
 }
