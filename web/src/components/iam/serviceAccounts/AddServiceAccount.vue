@@ -65,39 +65,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
         />
 
-        <!-- Access grants happen in the same flow (enterprise/cloud only — OSS
-             has no roles/groups). Both pickers are optional; assignments are
-             applied after the account is created, and failures surface in the
-             token-reveal screen without blocking it. -->
-        <template v-if="!beingUpdated && showAccessPickers">
-          <OFormSelect
-            name="roles"
-            multiple
-            :options="roleOptions"
-            :label="t('serviceAccounts.form.roles.label')"
-            data-test="iam-add-service-account-roles-select"
-            class="showLabelOnTop mt-2"
-          />
-          <div class="mt-1 flex justify-end">
-            <OButton
-              variant="ghost"
-              size="sm"
-              icon-left="add"
-              type="button"
-              data-test="iam-add-service-account-create-role-btn"
-              @click="showAddRoleDialog = true"
-            >
-              {{ t("serviceAccounts.form.roles.create") }}
-            </OButton>
-          </div>
-          <OFormSelect
-            name="groups"
-            multiple
-            :options="groupOptions"
-            :label="t('serviceAccounts.form.groups.label')"
-            data-test="iam-add-service-account-groups-select"
-            class="showLabelOnTop mt-2"
-          />
+        <!-- Access grants happen in the same flow. Roles/groups are locked
+             (not hidden) when rbac isn't allowed — see rbacAccess — so OSS
+             shows what it's missing instead of pretending it doesn't exist.
+             Both pickers are optional; assignments are applied after the
+             account is created, and failures surface in the token-reveal
+             screen without blocking it. -->
+        <template v-if="!beingUpdated">
+          <!-- RBAC not allowed: the select would write to form state and the
+               button would open AddRole on click, so a locked click is caught
+               on this wrapper BEFORE it reaches either — removing `disabled`
+               there would let the "real" action fire alongside the dialog. -->
+          <span
+            class="contents"
+            @click.capture="!rbacAccess.allowed ? onLockedRbacClick($event) : undefined"
+          >
+            <OFormSelect
+              name="roles"
+              multiple
+              :options="roleOptions"
+              :label="t('serviceAccounts.form.roles.label')"
+              data-test="iam-add-service-account-roles-select"
+              class="showLabelOnTop mt-2"
+            />
+            <div class="mt-1 flex justify-end">
+              <OButton
+                variant="ghost"
+                size="sm"
+                type="button"
+                data-test="iam-add-service-account-create-role-btn"
+                @click="!rbacAccess.allowed ? undefined : (showAddRoleDialog = true)"
+              >
+                <template v-if="!rbacAccess.allowed" #icon-left>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+                <template v-else #icon-left><OIcon name="add" size="sm" /></template>
+                {{ t("serviceAccounts.form.roles.create") }}
+              </OButton>
+            </div>
+            <OFormSelect
+              name="groups"
+              multiple
+              :options="groupOptions"
+              :label="t('serviceAccounts.form.groups.label')"
+              data-test="iam-add-service-account-groups-select"
+              class="showLabelOnTop mt-2"
+            />
+          </span>
         </template>
       </OForm>
     </div>
@@ -126,11 +140,13 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AddRole from "@/components/iam/roles/AddRole.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import config from "@/aws-exports";
 import service_accounts from "@/services/service_accounts";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { updateRole, updateGroup } from "@/services/iam";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -154,7 +170,7 @@ const defaultValue: any = () => {
 
 export default defineComponent({
   name: "ComponentAddUpdateUser",
-  components: { ODialog, OForm, OFormInput, OFormSelect, OButton, AddRole },
+  components: { ODialog, OForm, OFormInput, OFormSelect, OButton, OIcon, AddRole },
   props: {
     open: {
       type: Boolean,
@@ -207,10 +223,16 @@ export default defineComponent({
       groups: [],
     }));
 
-    // Roles/groups exist only on enterprise/cloud (OSS has no RBAC UI).
-    const showAccessPickers = computed(
-      () => config.isEnterprise === "true" || config.isCloud === "true",
-    );
+    // Same rbac gate IdentityAccessManagement.vue uses for the Groups/Roles
+    // rail items — reused here so the pickers lock instead of vanish in OSS.
+    const rbacAccess = useLockedAffordance("rbac");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+    function onLockedRbacClick(event: MouseEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      openUpgradeDialog();
+    }
 
     const roleOptions = ref<SelectOption[]>([]);
     const groupOptions = ref<SelectOption[]>([]);
@@ -219,7 +241,7 @@ export default defineComponent({
     // Both list APIs return plain string arrays. A load failure leaves the
     // pickers empty but never blocks account creation.
     const loadAccessOptions = async () => {
-      if (!showAccessPickers.value) return;
+      if (!rbacAccess.value.allowed) return;
       try {
         const [rolesRes, groupsRes] = await Promise.all([
           queryClient.fetchQuery(rolesQuery(orgId.value)),
@@ -255,7 +277,8 @@ export default defineComponent({
       identifierSuffix,
       addServiceAccountSchema,
       addServiceAccountDefaults,
-      showAccessPickers,
+      rbacAccess,
+      onLockedRbacClick,
       roleOptions,
       groupOptions,
       showAddRoleDialog,

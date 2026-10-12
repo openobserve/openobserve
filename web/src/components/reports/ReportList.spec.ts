@@ -21,6 +21,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import reports from "@/services/reports";
 import ReportList from "./ReportList.vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // ─── Module mocks (hoisted) ──────────────────────────────────────────────────
 
@@ -228,6 +229,7 @@ describe("ReportList", () => {
   let mockRouter: { push: ReturnType<typeof vi.fn>; replace: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    resetListViewState();
     vi.mocked(reports.listByFolderId).mockResolvedValue({
       data: [REPORT_SCHEDULED, REPORT_CACHED],
     } as any);
@@ -848,5 +850,85 @@ describe("ReportList", () => {
       expect(wrapper.vm.showMoveDialog).toBe(true);
       expect(wrapper.vm.reportIdsToMove).toEqual([REPORT_SCHEDULED.report_id]);
     });
+  });
+});
+
+describe("ReportList view state persistence", () => {
+  let wrapper: VueWrapper;
+  const defaults = {
+    activeTab: "shared",
+    filterQuery: "",
+    searchQuery: "",
+    searchAcrossFolders: false,
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
+    pageSize: 20,
+    currentPage: 1,
+  };
+
+  beforeEach(() => {
+    resetListViewState();
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
+      data: [REPORT_SCHEDULED, REPORT_CACHED],
+    } as any);
+    store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
+    store.state.theme = "light";
+    store.state.organizationData.allReportsListByFolderId = {};
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    resetListViewState();
+    vi.clearAllMocks();
+  });
+
+  it("seeds tab, filter, sort and paging from the saved view", async () => {
+    Object.assign(useListViewState("reports", defaults), {
+      activeTab: "cached",
+      filterQuery: "daily",
+      sortBy: "name",
+      sortOrder: "desc",
+      pageSize: 50,
+      currentPage: 2,
+    });
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+
+    const vm = wrapper.vm as any;
+    expect(vm.activeTab).toBe("cached");
+    expect(vm.filterQuery).toBe("daily");
+    expect(vm.sortBy).toBe("name");
+    expect(vm.sortOrder).toBe("desc");
+    expect(vm.pageSize).toBe(50);
+    expect(vm.currentPage).toBe(2);
+  });
+
+  it("saves filter, sort and page changes into the view state", async () => {
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = wrapper.vm as any;
+
+    vm.filterQuery = "weekly";
+    vm.sortBy = "name";
+    vm.currentPage = 3;
+    await flushPromises();
+
+    expect(useListViewState("reports", defaults)).toMatchObject({
+      filterQuery: "weekly",
+      sortBy: "name",
+      currentPage: 3,
+    });
+  });
+
+  it("resets the page when the tab changes", async () => {
+    Object.assign(useListViewState("reports", defaults), { currentPage: 3 });
+    wrapper = mountComponent().wrapper;
+    await flushPromises();
+    const vm = wrapper.vm as any;
+
+    vm.activeTab = "cached";
+    await flushPromises();
+
+    expect(vm.currentPage).toBe(1);
   });
 });

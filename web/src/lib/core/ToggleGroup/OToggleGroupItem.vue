@@ -169,7 +169,12 @@ const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | 
       <OIcon v-else-if="props.iconLeft" :name="props.iconLeft" :size="iconSize[props.size]" />
       <slot />
       <slot v-if="slots['icon-right']" name="icon-right" />
-      <OIcon v-else-if="props.iconRight" :name="props.iconRight" :size="iconSize[props.size]" />
+      <OIcon
+        v-else-if="props.iconRight"
+        :name="props.iconRight"
+        :size="iconSize[props.size]"
+        :class="props.iconRight === 'lock' ? 'text-warning-600' : ''"
+      />
     </ToggleGroupItem>
     <OTooltip v-if="props.tooltip" :content="props.tooltip" />
   </span>

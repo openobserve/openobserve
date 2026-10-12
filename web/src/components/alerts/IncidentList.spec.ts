@@ -56,6 +56,7 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 }));
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import IncidentList from "./IncidentList.vue";
@@ -147,6 +148,7 @@ describe("IncidentList.vue", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
 
     store.state.selectedOrganization = {
       label: "default Organization",
@@ -730,6 +732,32 @@ describe("IncidentList.vue", () => {
       expect(restorePage).toHaveBeenCalledWith(3);
       store.state.incidents = { incidents: {}, isInitialized: false };
       vi.useRealTimers();
+    });
+  });
+
+  describe("View state restore", () => {
+    it("restores severity, page size and sort", () => {
+      useListViewState("incidents", {
+        severityFilter: "P2",
+        pageSize: 50,
+        sortBy: "title",
+        sortOrder: "desc",
+      });
+      wrapper = createWrapper();
+      expect(wrapper.vm.severityFilter).toBe("P2");
+      expect(wrapper.vm.pageSize).toBe(50);
+      expect(wrapper.vm.sortBy).toBe("title");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.severityFilter = "P1";
+      wrapper.vm.pageSize = 100;
+      await flushPromises();
+      const saved: any = useListViewState("incidents", {});
+      expect(saved.severityFilter).toBe("P1");
+      expect(saved.pageSize).toBe(100);
     });
   });
 });

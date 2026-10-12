@@ -169,6 +169,7 @@ mod tests {
         // reflection sample or orgs created after the change get a triggers
         // stream schema without them.
         assert!(field_names.contains(&"actual_value".to_string()));
+        assert!(field_names.contains(&"rule_value".to_string()));
         assert!(field_names.contains(&"threshold_value".to_string()));
         assert!(field_names.contains(&"threshold_operator".to_string()));
         assert!(field_names.contains(&"level".to_string()));
@@ -186,8 +187,8 @@ mod tests {
         assert!(field_names.contains(&"downtime_id".to_string()));
 
         // Verify count matches struct fields
-        // 36: 21 original + 5 dedup/grouping + 6 value-context + 2 synthetics + downtime + delivery
-        assert_eq!(field_names.len(), 36);
+        // 37: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value
+        assert_eq!(field_names.len(), 37);
 
         // Verify no duplicate fields
         let unique_count = field_names

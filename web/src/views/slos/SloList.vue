@@ -57,8 +57,13 @@
       row-key="id"
       :loading="loading"
       :error="error"
-      :page-size="25"
+      :page-size="pageSize"
       :page-size-options="[25, 50, 100]"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
+      @update:sort-by="sortBy = $event"
+      @update:sort-order="sortOrder = $event"
+      @update:page-size="pageSize = $event"
       :current-page="currentPage"
       :show-global-filter="false"
       table-id="slos-list"
@@ -548,6 +553,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useListViewState } from "@/composables/useListViewState";
 import alertsService from "@/services/alerts";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { slosToTerraform } from "@/utils/slos/sloTerraform";
@@ -605,9 +611,30 @@ const error = computed<string | null>(() => {
   if (!e) return null;
   return e?.response?.data?.message || e?.message || t("slos.loadFailed");
 });
-const search = ref("");
-const typeFilter = ref("all");
-const healthFilter = ref<string | null>(null);
+const savedView = useListViewState("slos", {
+  search: "",
+  typeFilter: "all",
+  healthFilter: null as string | null,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+  pageSize: 25,
+});
+const search = ref(savedView.search);
+const typeFilter = ref(savedView.typeFilter);
+const healthFilter = ref<string | null>(savedView.healthFilter);
+const sortBy = ref<string>(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const pageSize = ref<number>(savedView.pageSize);
+watch([search, typeFilter, healthFilter, sortBy, sortOrder, pageSize], () => {
+  Object.assign(savedView, {
+    search: search.value,
+    typeFilter: typeFilter.value,
+    healthFilter: healthFilter.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+    pageSize: pageSize.value,
+  });
+});
 const deleteDialog = ref(false);
 const pendingDelete = ref<SloListItem | null>(null);
 const selectedIds = ref<string[]>([]);

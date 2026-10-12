@@ -16,6 +16,12 @@ export default class DashboardactionPage {
     this.panelSaveBtn = page.locator('[data-test="dashboard-panel-save"]');
     this.applyDashboard = page.locator('[data-test="dashboard-apply"]');
     this.addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+    this.layoutEditBtn = page.locator('[data-test="dashboard-edit-btn"]');
+    this.layoutEditSaveBtn = page.locator('[data-test="dashboard-edit-save-btn"]');
+    this.layoutEditDiscardBtn = page.locator('[data-test="dashboard-edit-discard-btn"]');
+    this.layoutEditUndoBtn = page.locator('[data-test="dashboard-edit-undo-btn"]');
+    this.layoutEditRedoBtn = page.locator('[data-test="dashboard-edit-redo-btn"]');
+    this.layoutEditChangesCount = page.locator('[data-test="dashboard-edit-changes-count"]');
     this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
     this.chartRenderer = page.locator('[data-test="dashboard-panel-table"], [data-test="chart-renderer"]');
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
@@ -324,10 +330,37 @@ export default class DashboardactionPage {
     const actionTestId = actionDataTestIds[action];
     if (!actionTestId) throw new Error(`Unknown action: ${action}`);
 
+    // The panel menu offers "Edit layout" only in layout edit mode, and only that item there.
+    if (action === "Layout") await this.enterLayoutEdit();
+
     await this.page
       .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
       .click();
     await this.page.locator(`[data-test="${actionTestId}"]`).click();
+  }
+
+  async enterLayoutEdit() {
+    await this.layoutEditBtn.waitFor({ state: "visible" });
+    await this.layoutEditBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "visible" });
+  }
+
+  async saveLayoutEdit() {
+    await this.layoutEditSaveBtn.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
+  }
+
+  async discardLayoutEdit() {
+    await this.layoutEditDiscardBtn.click();
+    const confirm = this.page.locator(
+      '[data-test="dashboard-edit-discard-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
+    await Promise.race([
+      confirm.waitFor({ state: "visible" }),
+      this.layoutEditSaveBtn.waitFor({ state: "hidden" }),
+    ]).catch(() => {});
+    if (await confirm.isVisible()) await confirm.click();
+    await this.layoutEditSaveBtn.waitFor({ state: "hidden" });
   }
 
   /**

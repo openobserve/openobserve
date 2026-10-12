@@ -642,6 +642,7 @@ import reports from "@/services/reports";
 import { saveReportMutation } from "@/services/reports.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { convertDateToTimestamp } from "@/utils/date";
@@ -1344,14 +1345,28 @@ const saveReport = async (value: CreateReportForm) => {
     });
 };
 
+const reportsListRoute = () => ({
+  name: "reports",
+  query: {
+    org_identifier: store.state.selectedOrganization.identifier,
+    folder: selectedReportFolderId.value || "default",
+  },
+});
+
+const goBackToOrigin = useListBackNavigation({
+  // The dashboard view hosts the scheduled-reports drawer that also opens this form.
+  isListPath: (path) => path.endsWith("/reports") || path.endsWith("/dashboards/view"),
+  fallback: reportsListRoute,
+});
+
 const goToReports = () => {
-  router.replace({
-    name: "reports",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-      folder: selectedReportFolderId.value || "default",
-    },
-  });
+  const entryFolder = router.currentRoute.value.query.folder;
+  // Saving into another folder must land on that folder, not the one the form was opened from.
+  if (entryFolder && selectedReportFolderId.value && entryFolder !== selectedReportFolderId.value) {
+    router.replace(reportsListRoute());
+    return;
+  }
+  goBackToOrigin();
 };
 
 const setupEditingReport = async (report: any) => {

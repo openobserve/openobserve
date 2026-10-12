@@ -36,6 +36,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import sloService from "@/services/slos";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -231,5 +232,68 @@ describe("SloList pagination persistence", () => {
     expect(pushed.params).toEqual({ slo_id: "slo-1" });
     expect(pushed.query.page).toBe("3");
     expect(pushed.query.folder).toBe("team-a");
+  });
+});
+
+describe("SloList view state persistence", () => {
+  let wrapper: any;
+  const defaults = {
+    search: "",
+    typeFilter: "all",
+    healthFilter: null as string | null,
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
+    pageSize: 25,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetListViewState();
+    (router as any).currentRoute.value.query = {};
+    vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    resetListViewState();
+    vi.restoreAllMocks();
+  });
+
+  it("seeds search, type, health and sort from the saved view", async () => {
+    Object.assign(useListViewState("slos", defaults), {
+      search: "checkout",
+      typeFilter: "metrics",
+      healthFilter: "healthy",
+      sortBy: "name",
+      sortOrder: "desc",
+      pageSize: 50,
+    });
+    wrapper = await mountList();
+
+    const vm = wrapper.vm as any;
+    expect(vm.search).toBe("checkout");
+    expect(vm.typeFilter).toBe("metrics");
+    expect(vm.healthFilter).toBe("healthy");
+    expect(vm.sortBy).toBe("name");
+    expect(vm.sortOrder).toBe("desc");
+    expect(vm.pageSize).toBe(50);
+  });
+
+  it("saves filter changes into the view state", async () => {
+    wrapper = await mountList();
+    const vm = wrapper.vm as any;
+
+    vm.search = "api";
+    vm.onStatSelect("breached");
+    vm.sortBy = "target";
+    vm.sortOrder = "desc";
+    await flushPromises();
+
+    expect(useListViewState("slos", defaults)).toMatchObject({
+      search: "api",
+      healthFilter: "breached",
+      sortBy: "target",
+      sortOrder: "desc",
+    });
   });
 });

@@ -16,14 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OTable
+    ref="oTableRef"
     v-model:selected-ids="localSelectedIds"
     :columns="columns"
     :data="data"
     :loading="loading"
     :forbidden="forbidden"
     pagination="client"
-    :page-size="20"
+    :page-size="pageSize"
     :page-size-options="[10, 20, 25, 50]"
+    :current-page="currentPage"
+    :sort-by="sortBy"
+    :sort-order="sortOrder"
     row-key="id"
     selection="multiple"
     :show-global-filter="false"
@@ -37,6 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :get-row-style="monitorRowStyle"
     show-index
     @row-click="(row: any) => emit('row-click', row)"
+    @update:current-page="emit('update:currentPage', $event)"
+    @update:page-size="emit('update:pageSize', $event)"
+    @update:sort-by="emit('update:sortBy', $event)"
+    @update:sort-order="emit('update:sortOrder', $event)"
   >
     <!-- Summary strip supplied by the parent (it owns the status facet). -->
     <template v-if="$slots.subheader" #subheader>
@@ -654,8 +662,13 @@ const props = withDefaults(
      *  human label. Falls back to the raw id when a location isn't in the map
      *  (e.g. deleted since the check last ran). */
     locationNames?: Record<string, string>;
+    pageSize?: number;
+    currentPage?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }>(),
   {
+    pageSize: 20,
     loading: false,
     dataTest: "monitor-table",
     toggleLoadingMap: () => ({}),
@@ -688,7 +701,15 @@ const emit = defineEmits<{
   "trigger-selected": [];
   "navigate-to-folder": [folderId: string];
   "empty-action": [actionId: string];
+  "update:currentPage": [page: number];
+  "update:pageSize": [size: number];
+  "update:sortBy": [columnId: string];
+  "update:sortOrder": [order: "asc" | "desc"];
 }>();
+
+const oTableRef = ref<any>(null);
+
+defineExpose({ restorePage: (page: number) => oTableRef.value?.restorePage?.(page) });
 
 const { t } = useI18nTyped();
 

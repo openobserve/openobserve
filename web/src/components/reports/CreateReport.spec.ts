@@ -707,6 +707,61 @@ describe("CreateReport", () => {
     });
   });
 
+  describe("return after save/cancel", () => {
+    const setBack = (router: any, back: string) => {
+      router.options = { history: { state: { back } } };
+    };
+
+    it("goes back to the list it was opened from so its filters are restored", async () => {
+      ({ wrapper, mockRouter } = mountComponent({ folder: "default" }));
+      await flushPromises();
+      setBack(mockRouter, "/web/reports?folder=default");
+
+      (wrapper.vm as any).goToReports();
+
+      expect(mockRouter.back).toHaveBeenCalledTimes(1);
+      expect(mockRouter.push).not.toHaveBeenCalled();
+    });
+
+    it("goes back to the dashboard view when opened from its scheduled-reports drawer", async () => {
+      ({ wrapper, mockRouter } = mountComponent({ dashboardId: "d1" }));
+      await flushPromises();
+      setBack(mockRouter, "/web/dashboards/view?dashboard=d1");
+
+      (wrapper.vm as any).goToReports();
+
+      expect(mockRouter.back).toHaveBeenCalledTimes(1);
+    });
+
+    it("falls back to the reports route when it was not opened from a list", async () => {
+      ({ wrapper, mockRouter } = mountComponent());
+      await flushPromises();
+      setBack(mockRouter, "/web/logs");
+
+      (wrapper.vm as any).goToReports();
+
+      expect(mockRouter.back).not.toHaveBeenCalled();
+      expect(mockRouter.push).toHaveBeenCalledWith(expect.objectContaining({ name: "reports" }));
+    });
+
+    it("lands on the chosen folder when it differs from the one the form was opened from", async () => {
+      ({ wrapper, mockRouter } = mountComponent({ folder: "default" }));
+      await flushPromises();
+      setBack(mockRouter, "/web/reports?folder=default");
+      (wrapper.vm as any).selectedReportFolderId = "other";
+
+      (wrapper.vm as any).goToReports();
+
+      expect(mockRouter.back).not.toHaveBeenCalled();
+      expect(mockRouter.replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "reports",
+          query: expect.objectContaining({ folder: "other" }),
+        }),
+      );
+    });
+  });
+
   // ── Cached report toggle ─────────────────────────────────────────────────
 
   describe("cached report toggle", () => {
