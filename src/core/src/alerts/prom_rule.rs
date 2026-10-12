@@ -56,8 +56,7 @@ pub(super) async fn evaluate(
     let super_cluster = o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled;
-    let result =
-        promql_service::search::search_rule(trace_id, org, &req, "", 0, super_cluster).await?;
+    let result = promql_service::search::search(trace_id, org, &req, "", 0, super_cluster).await?;
     let result = complete_rule_result(result)?;
     rule_results(
         result,
