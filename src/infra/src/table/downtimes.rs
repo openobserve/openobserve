@@ -54,6 +54,12 @@ pub enum Guard<'a> {
     Unchanged(i64),
     /// A follow-up row, inserted while its parent still has this `updated_at`.
     ParentUnchanged { parent_id: &'a str, updated_at: i64 },
+    /// A live follow-up at `updated_at`, rewritten while its parent is at `parent_updated_at`.
+    FollowUpUnchanged {
+        updated_at: i64,
+        parent_id: &'a str,
+        parent_updated_at: i64,
+    },
 }
 
 /// The version of a stored row, soft-deleted or not, for ordering replicated writes.
@@ -315,6 +321,13 @@ pub async fn write_with<C: ConnectionTrait + TransactionTrait>(
             parent_id,
             updated_at,
         } => insert_if_parent_unchanged_with(&txn, downtime, parent_id, updated_at).await?,
+        Guard::FollowUpUnchanged {
+            updated_at,
+            parent_id,
+            parent_updated_at,
+        } => {
+            update_follow_up_with(&txn, downtime, updated_at, parent_id, parent_updated_at).await?
+        }
     };
     if !written {
         txn.rollback().await?;
@@ -378,15 +391,31 @@ pub async fn insert_if_parent_unchanged_with<C: ConnectionTrait + TransactionTra
     Ok(true)
 }
 
-/// [bump_parent_with] on the read-write pool.
-pub async fn bump_parent(
-    org: &str,
+/// Rewrites a live follow-up and bumps its parent together, so a stale request loses on either.
+pub async fn update_follow_up_with<C: ConnectionTrait>(
+    txn: &C,
+    row: &Downtime,
+    expected_updated_at: i64,
     parent_id: &str,
-    stored: RowVersion,
-    at: i64,
+    parent_updated_at: i64,
 ) -> Result<bool, errors::Error> {
-    let client = get_orm_client_rw().await;
-    bump_parent_with(client, org, parent_id, stored, at).await
+    let parent = Entity::find_by_id(parent_id)
+        .filter(Column::Org.eq(&row.org))
+        .one(txn)
+        .await?
+        .filter(|p| p.updated_at == parent_updated_at && p.deleted_at.is_none());
+    let Some(parent) = parent else {
+        return Ok(false);
+    };
+    if !put_if_unchanged_with(txn, row, expected_updated_at).await? {
+        return Ok(false);
+    }
+    let stored = RowVersion {
+        version: parent.version,
+        updated_at: parent.updated_at,
+        deleted: false,
+    };
+    bump_parent_with(txn, &row.org, parent_id, stored, row.updated_at).await
 }
 
 /// Moves only the parent's version and time on, so a request at its old version gets a 409.

@@ -322,11 +322,7 @@ pub async fn extend(
         access::authorize_row(org, user_id, &follow_up, "PUT").await?;
         let current_end = follow_up.schedule.ends_at.unwrap_or(window.end);
         let new_end = extended_end(current_end, req, now)?;
-        // The parent bump comes first: a request that read the parent meanwhile loses here.
-        if !db::downtimes::bump_parent(&before, now).await? {
-            return Err(changed_meanwhile());
-        }
-        let after = extend_once(org, user_id, &follow_up, new_end, now).await?;
+        let after = extend_follow_up(org, user_id, &before, &follow_up, new_end, now).await?;
         notify::deliver_in_background(before.clone(), extended_event(window.start, new_end));
         return Ok(ExtendDowntimeResponse {
             created_id: Some(after.id.clone()),
@@ -605,6 +601,34 @@ async fn extend_once(
     checked_request(org, user_id, request_of(&after), Some(before), false).await?;
     let plan = remeasure_plan(Some(before), &after).await?;
     set_if_unchanged(&after, before.updated_at, &plan).await?;
+    plan.trigger(&after.id).await;
+    Ok(after)
+}
+
+/// [extend_once] for a live follow-up: the row and its parent's bump land in one transaction.
+async fn extend_follow_up(
+    org: &str,
+    user_id: &str,
+    parent: &Downtime,
+    before: &Downtime,
+    new_end: i64,
+    now: i64,
+) -> Result<Downtime, DowntimeError> {
+    let after = extended_once(before, new_end, user_id, now);
+    checked_request(org, user_id, request_of(&after), Some(before), false).await?;
+    let plan = remeasure_plan(Some(before), &after).await?;
+    let written = db::downtimes::set_follow_up_if_unchanged(
+        &after,
+        before.updated_at,
+        &parent.id,
+        parent.updated_at,
+        plan.jobs(),
+    )
+    .await
+    .map_err(|e| DowntimeError::Internal(e.to_string()))?;
+    if !written {
+        return Err(changed_meanwhile());
+    }
     plan.trigger(&after.id).await;
     Ok(after)
 }
@@ -2857,7 +2881,7 @@ mod tests {
     #[tokio::test]
     async fn extending_a_follow_up_bumps_the_parent_so_a_stale_third_click_is_a_409() {
         use infra::table::{
-            downtimes::{self as table, Guard, RowVersion},
+            downtimes::{self as table, Guard},
             entity::{downtimes as entity, folders},
         };
         use sea_orm::{ConnectionTrait, Database, Schema};
@@ -2917,18 +2941,19 @@ mod tests {
             .unwrap();
         let end = extended_end(live.schedule.ends_at.unwrap(), &ask(2), now).unwrap();
         let longer = extended_once(&live, end, "ops", now + 1);
+        let guard = Guard::FollowUpUnchanged {
+            updated_at: live.updated_at,
+            parent_id: "d1",
+            parent_updated_at: read.updated_at,
+        };
         assert!(
-            table::put_if_unchanged_with(&db, &longer, live.updated_at)
+            table::write_with(&db, &longer, guard, &[], now + 1)
                 .await
                 .unwrap()
         );
-        let stored = RowVersion {
-            version: read.version,
-            updated_at: read.updated_at,
-            deleted: false,
-        };
+        // The same guard a second time names a stale parent and a stale follow-up: nothing moves.
         assert!(
-            table::bump_parent_with(&db, "acme", "d1", stored, now + 1)
+            !table::write_with(&db, &longer, guard, &[], now + 2)
                 .await
                 .unwrap()
         );
@@ -2946,9 +2971,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(stored.schedule.ends_at, Some(window.end + HOUR));
-        assert!(
-            body_of("pub async fn extend(").contains("db::downtimes::bump_parent(&before, now)")
-        );
+        assert!(body_of("pub async fn extend(").contains("extend_follow_up(org, user_id, &before"));
     }
 
     fn body_of(head: &str) -> &'static str {

@@ -83,18 +83,24 @@ pub async fn set_if_parent_unchanged(
     Ok(true)
 }
 
-/// Bumps the parent of an extended follow-up, then tells this region's nodes and the other regions.
-pub async fn bump_parent(parent: &Downtime, at: i64) -> Result<bool, anyhow::Error> {
-    let stored = table::RowVersion {
-        version: parent.version,
-        updated_at: parent.updated_at,
-        deleted: false,
+/// [set_if_unchanged] for a live follow-up, with its parent bumped in the same transaction.
+pub async fn set_follow_up_if_unchanged(
+    downtime: &Downtime,
+    expected_updated_at: i64,
+    parent_id: &str,
+    parent_updated_at: i64,
+    remeasures: &[Remeasure],
+) -> Result<bool, anyhow::Error> {
+    let guard = Guard::FollowUpUnchanged {
+        updated_at: expected_updated_at,
+        parent_id,
+        parent_updated_at,
     };
-    if !table::bump_parent(&parent.org, &parent.id, stored, at).await? {
+    if !write(downtime, guard, remeasures).await? {
         return Ok(false);
     }
-    reload_org(&parent.org).await?;
-    replicate(&parent.org, &parent.id).await;
+    reload_org(&downtime.org).await?;
+    replicate(&downtime.org, parent_id).await;
     Ok(true)
 }
 

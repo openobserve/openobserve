@@ -61,11 +61,16 @@ pub fn run() {
 
 /// The persisted tick only moves on when every claim was written, so a failed one is retried.
 async fn tick(now: i64) -> Result<(), anyhow::Error> {
+    let cached = db::downtimes::all_cached();
+    // No row anywhere means nothing to send and nothing to record.
+    if cached.iter().all(|rows| rows.is_empty()) {
+        return Ok(());
+    }
     let region = notify::this_region();
     let key = last_tick_key(&region);
     let from = tick_from(load_last_tick(&key).await, now);
     let mut failed = false;
-    for rows in db::downtimes::all_cached() {
+    for rows in cached {
         for row in rows.iter().filter(|row| notify::sends_here(row, &region)) {
             failed |= !deliver_all(row, &due_in_org(&rows, row, from, now)).await;
         }
