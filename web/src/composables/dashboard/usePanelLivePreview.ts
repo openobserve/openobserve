@@ -106,6 +106,7 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
 
   const isArmed = ref(false);
   const isSlowPaused = ref(false);
+  const isRunQueued = ref(false);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let runStartedAt: number | null = null;
   let holdStartedAt: number | null = null;
@@ -177,8 +178,11 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
     () => isArmed.value && !isTypedPending.value && isOutdated.value && !isBuilderValid.value,
   );
 
+  // A change live preview is about to run itself is not waiting on Apply.
   const isPending = computed(
-    () => isArmed.value && (isTypedPending.value || (isOutdated.value && !isIncomplete.value)),
+    () =>
+      isArmed.value &&
+      (isTypedPending.value || (isOutdated.value && !isIncomplete.value && !isRunQueued.value)),
   );
 
   const applyState = computed<LivePreviewApplyState>(() => {
@@ -189,9 +193,14 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
     return "pending";
   });
 
+  const setTimer = (next: ReturnType<typeof setTimeout> | null) => {
+    timer = next;
+    isRunQueued.value = next !== null;
+  };
+
   const clearTimer = () => {
     if (timer) clearTimeout(timer);
-    timer = null;
+    setTimer(null);
     holdStartedAt = null;
   };
 
@@ -208,10 +217,10 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
   };
 
   const fire = () => {
-    timer = null;
+    setTimer(null);
     if (isTypedPending.value || isSlowPaused.value) return;
     if (shouldHold()) {
-      timer = setTimeout(fire, LIVE_PREVIEW_HOLD_POLL_MS);
+      setTimer(setTimeout(fire, LIVE_PREVIEW_HOLD_POLL_MS));
       return;
     }
     holdStartedAt = null;
@@ -222,8 +231,8 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
 
   const schedule = () => {
     clearTimer();
-    if (!autoRun()) return;
-    timer = setTimeout(fire, debounceMs);
+    if (!autoRun() || isSlowPaused.value) return;
+    setTimer(setTimeout(fire, debounceMs));
   };
 
   const arm = () => {

@@ -182,6 +182,7 @@ describe("usePanelLivePreview", () => {
       await nextTick();
       vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS + LIVE_PREVIEW_HOLD_MAX_MS / 2);
       expect(run).not.toHaveBeenCalled();
+      expect(live.isPending.value).toBe(false);
       vi.advanceTimersByTime(LIVE_PREVIEW_HOLD_MAX_MS);
       expect(run).toHaveBeenCalledTimes(1);
       scope.stop();
@@ -252,10 +253,22 @@ describe("usePanelLivePreview", () => {
       vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS / 2);
       panel.queries[0].query = "SELECT a, b FROM default";
       await nextTick();
-      expect(live.isPending.value).toBe(true);
       vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
       expect(run).toHaveBeenCalledTimes(1);
       await nextTick();
+      expect(live.isPending.value).toBe(false);
+      scope.stop();
+    });
+
+    it("keeps Apply normal, not yellow, while its own live run is queued", async () => {
+      const { panel, run, live, scope } = setup();
+      live.arm();
+      panel.queries[0].query = "SELECT a FROM default";
+      await nextTick();
+      expect(live.isPending.value).toBe(false);
+      expect(live.applyState.value).toBe("refresh");
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+      expect(run).toHaveBeenCalledTimes(1);
       expect(live.isPending.value).toBe(false);
       scope.stop();
     });
@@ -409,6 +422,7 @@ describe("usePanelLivePreview", () => {
 
       panel.queries[0].query = "SELECT slow FROM default";
       await nextTick();
+      expect(live.applyState.value).toBe("slow");
       vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
       expect(run).not.toHaveBeenCalled();
       expect(live.applyState.value).toBe("slow");
