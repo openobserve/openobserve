@@ -319,6 +319,13 @@ impl Engine {
         };
         let result = result?;
         self.ctx.scan_stats.write().await.add(&ctx.scan_stats);
+        if !ctx.warnings.is_empty() {
+            self.ctx
+                .warnings
+                .write()
+                .await
+                .extend_from_slice(&ctx.warnings);
+        }
         Ok(result)
     }
 
@@ -436,6 +443,7 @@ mod tests {
                 } else {
                     ScanSource::Table
                 },
+                warnings: vec![],
             }])
         }
 

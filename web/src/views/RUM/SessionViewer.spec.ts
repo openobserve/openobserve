@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
@@ -1139,6 +1139,16 @@ describe("SessionViewer.vue — segment manifest and windowed fetch", () => {
     expect(wrapper.find('[data-test="session-viewer-duration"]').text()).toBe("7m 35s");
     wrapper.unmount();
   });
+
+  it("shows the player's tab notice in the strip above the player", async () => {
+    const wrapper = await mountLoaded();
+    (wrapper.vm as any).tabNotice = "This tab's recording has a gap from 00:03.";
+    await flushPromises();
+    expect(wrapper.find('[data-test="session-viewer-tab-notice"]').text()).toContain(
+      "gap from 00:03",
+    );
+    wrapper.unmount();
+  });
 });
 
 describe("SessionViewer.vue — segment identity (Risk 1)", () => {
@@ -1473,6 +1483,47 @@ describe("SessionViewer.vue — background batches (G5)", () => {
     await vi.advanceTimersByTimeAsync(1_000);
     expect(vm.loadState).toBe("complete");
     expect(vm.segments).toHaveLength(30);
+    wrapper.unmount();
+  });
+
+  it("gives a skip marker its row's view id", async () => {
+    replaySchema.fields = { ...replaySchema.fields, view_id: true, index_in_view: true };
+    const rows = manyRows(30).map((row, i) => ({ ...row, view_id: "V", index_in_view: i }));
+    const good = rowsResponder(rows);
+    resetStreaming((sql, from) =>
+      sql.includes(`start >= ${S + 1000} `) ? { error: { status: 502 } } : good(sql, from),
+    );
+    const wrapper = await mountWithFakeTimers();
+    const vm = wrapper.vm as any;
+
+    expect(vm.segments[1]).toMatchObject({ skipped: true, viewId: "V" });
+    expect(vm.replayWatermark).toBe(Number.POSITIVE_INFINITY);
+    wrapper.unmount();
+  });
+
+  it("passes each view's last row end to the player, and none while the session is live", async () => {
+    replaySchema.fields = { ...replaySchema.fields, view_id: true, index_in_view: true };
+    const rows = manyRows(4).map((row, i) => ({
+      ...row,
+      view_id: i % 2 ? "W" : "V",
+      index_in_view: Math.floor(i / 2),
+    }));
+    resetStreaming(rowsResponder(rows));
+    const wrapper = await mountWithFakeTimers();
+    const vm = wrapper.vm as any;
+    const player = () =>
+      wrapper.findComponent('[data-test="stub-video-player"]').vm.$attrs["view-ends"] as Map<
+        string,
+        number
+      >;
+
+    expect([...player()]).toEqual([
+      ["V", S + 2999],
+      ["W", S + 3999],
+    ]);
+    vm.isLive = true;
+    await flushPromises();
+    expect(player().size).toBe(0);
     wrapper.unmount();
   });
 
