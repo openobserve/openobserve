@@ -4299,6 +4299,48 @@
     "inspectBtnLabel": "Inspecionar",
     "analyzeBtnLabel": "Percepções"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "Recurso Enterprise",
+    "featuresPageTitle": "Recursos Enterprise",
+    "category": {
+      "security": "Segurança e Conformidade",
+      "scale": "Escala e Desempenho",
+      "ai": "IA e Automação",
+      "analysis": "Análise e Fluxo de Dados"
+    },
+    "legendBeta": "Acesso antecipado",
+    "legendHa": "Alta disponibilidade",
+    "docsFooter": "Cada recurso tem um link para sua documentação.",
+    "viewAllDocs": "Ver toda a documentação",
+    "locked": "Desbloqueie {feature} com o OpenObserve Enterprise.",
+    "availableIn": "Disponível no OpenObserve Enterprise",
+    "rbacDisabled": "O RBAC está desativado para esta organização. Peça ao seu administrador para ativá-lo.",
+    "pitch": {
+      "incidents": "Transforme alertas disparados em incidentes acompanhados automaticamente.",
+      "workflows": "Automatize runbooks que respondem aos alertas por você.",
+      "oncall": "Agende escalas de plantão e encaminhe notificações automaticamente para a pessoa certa.",
+      "serviceGraph": "Veja como seus serviços se chamam e detecte falhas antes que se espalhem.",
+      "rbac": "Crie papéis personalizados com permissões granulares para sua equipe.",
+      "logPatterns": "Detecte padrões recorrentes nos registros automaticamente, em vez de ler linha por linha.",
+      "correlation": "Salte de uma linha de registro direto para suas métricas e rastros relacionados.",
+      "aiAssistant": "Peça à IA para escrever consultas e explicar seus dados em linguagem simples.",
+      "alertInsights": "Veja com que frequência um alerta dispara e identifique alertas correlacionados rapidamente.",
+      "anomalyDetection": "Detecte comportamentos anômalos em métricas automaticamente, antes que disparem um alerta de limite.",
+      "agentGraph": "Veja como seus agentes de IA e ferramentas se chamam, visualizado como um grafo.",
+      "agentBehavior": "Detecte anomalias no comportamento de chamadas de ferramentas dos agentes ao longo do tempo.",
+      "discovery": "Destaque automaticamente sessões de IA que valem a pena revisar.",
+      "queues": "Encaminhe sessões de IA sinalizadas para revisores fazerem anotação com humano no loop.",
+      "datasets": "Monte conjuntos de dados a partir de sessões reais para avaliar e ajustar seu modelo de IA.",
+      "prompts": "Versione e gerencie os prompts que alimentam seus recursos de IA.",
+      "playground": "Teste prompts e modelos lado a lado antes de publicar alterações.",
+      "experiments": "Compare alterações de modelos e prompts com seus conjuntos de dados antes da implantação.",
+      "remoteTasks": "Execute tarefas de avaliação e pontuação em modelos e agentes remotos.",
+      "evaluations": "Pontue a qualidade da IA automaticamente e acompanhe-a ao longo do tempo.",
+      "genAiAgentMapping": "Agrupe rastros pelo agente de IA que os produziu e compare versões lado a lado.",
+      "scheduledSearch": "Execute uma busca salva automaticamente em um agendamento, em vez de executá-la manualmente.",
+      "customBranding": "Substitua o logotipo e o texto padrão pela sua própria marca."
+    }
+  },
   "errorInsights": {
     "title": "Percepções",
     "tabLabel": "Erros",

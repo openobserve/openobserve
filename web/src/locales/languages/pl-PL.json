@@ -4299,6 +4299,48 @@
     "inspectBtnLabel": "Sprawdź",
     "analyzeBtnLabel": "Analizy"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "Funkcja Enterprise",
+    "featuresPageTitle": "Funkcje Enterprise",
+    "category": {
+      "security": "Bezpieczeństwo i zgodność",
+      "scale": "Skalowanie i wydajność",
+      "ai": "AI i automatyzacja",
+      "analysis": "Analiza i przepływ danych"
+    },
+    "legendBeta": "Wczesny dostęp",
+    "legendHa": "Wysoka dostępność",
+    "docsFooter": "Każda funkcja zawiera link do swojej dokumentacji.",
+    "viewAllDocs": "Zobacz całą dokumentację",
+    "locked": "Odblokuj {feature} w OpenObserve Enterprise.",
+    "availableIn": "Dostępne w OpenObserve Enterprise",
+    "rbacDisabled": "RBAC jest wyłączony dla tej organizacji. Poproś administratora o włączenie go.",
+    "pitch": {
+      "incidents": "Automatycznie zamieniaj wyzwolone alerty w śledzone incydenty.",
+      "workflows": "Zautomatyzuj runbooki, które reagują na alerty za Ciebie.",
+      "oncall": "Planuj rotacje dyżurów i automatycznie kieruj wezwania do właściwej osoby.",
+      "serviceGraph": "Zobacz, jak Twoje usługi wywołują się nawzajem, i wykrywaj awarie, zanim się rozprzestrzenią.",
+      "rbac": "Twórz niestandardowe role ze szczegółowymi uprawnieniami dla swojego zespołu.",
+      "logPatterns": "Automatycznie wykrywaj powtarzające się wzorce logów, zamiast czytać je linia po linii.",
+      "correlation": "Przechodź z wiersza logu bezpośrednio do powiązanych metryk i trace.",
+      "aiAssistant": "Poproś AI o napisanie zapytań i wyjaśnienie Twoich danych prostym językiem.",
+      "alertInsights": "Zobacz, jak często alert się wyzwala, i jednym spojrzeniem wykryj skorelowane alerty.",
+      "anomalyDetection": "Automatycznie wykrywaj nietypowe zachowanie metryk, zanim wywoła alert progowy.",
+      "agentGraph": "Zobacz, jak Twoi agenci AI i narzędzia wywołują się nawzajem, w formie grafu.",
+      "agentBehavior": "Wykrywaj anomalie w zachowaniu agentów podczas wywoływania narzędzi w czasie.",
+      "discovery": "Automatycznie wskazuj sesje AI warte przejrzenia.",
+      "queues": "Kieruj oznaczone sesje AI do recenzentów w celu adnotacji z udziałem człowieka.",
+      "datasets": "Przygotowuj zestawy danych z rzeczywistych sesji, aby oceniać i dostrajać swoją AI.",
+      "prompts": "Wersjonuj i zarządzaj promptami zasilającymi Twoje funkcje AI.",
+      "playground": "Testuj prompty i modele obok siebie przed wdrożeniem zmian.",
+      "experiments": "Porównuj zmiany modeli i promptów na swoich zestawach danych przed wdrożeniem.",
+      "remoteTasks": "Uruchamiaj zadania oceny i punktacji względem zdalnych modeli i agentów.",
+      "evaluations": "Automatycznie oceniaj jakość AI i śledź ją w czasie.",
+      "genAiAgentMapping": "Grupuj trace według agenta AI, który je wygenerował, i porównuj wersje obok siebie.",
+      "scheduledSearch": "Uruchamiaj zapisane wyszukiwanie automatycznie według harmonogramu, zamiast powtarzać je ręcznie.",
+      "customBranding": "Zastąp domyślne logo i tekst własną marką."
+    }
+  },
   "errorInsights": {
     "title": "Analizy",
     "tabLabel": "Błędy",

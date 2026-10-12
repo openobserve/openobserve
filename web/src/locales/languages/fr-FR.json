@@ -4299,6 +4299,48 @@
     "inspectBtnLabel": "Inspectez",
     "analyzeBtnLabel": "Perspectives"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "Fonctionnalité Enterprise",
+    "featuresPageTitle": "Fonctionnalités Enterprise",
+    "category": {
+      "security": "Sécurité et conformité",
+      "scale": "Échelle et performances",
+      "ai": "IA et automatisation",
+      "analysis": "Analyse et flux de données"
+    },
+    "legendBeta": "Accès anticipé",
+    "legendHa": "Haute disponibilité",
+    "docsFooter": "Chaque fonctionnalité renvoie à sa documentation.",
+    "viewAllDocs": "Voir toute la documentation",
+    "locked": "Débloquez {feature} avec OpenObserve Enterprise.",
+    "availableIn": "Disponible dans OpenObserve Enterprise",
+    "rbacDisabled": "Le RBAC est désactivé pour cette organisation. Demandez à votre administrateur de l'activer.",
+    "pitch": {
+      "incidents": "Transformez automatiquement les alertes déclenchées en incidents suivis.",
+      "workflows": "Automatisez les runbooks qui répondent aux alertes à votre place.",
+      "oncall": "Planifiez les rotations d'astreinte et acheminez automatiquement les notifications vers la bonne personne.",
+      "serviceGraph": "Visualisez les appels entre vos services et détectez les pannes avant qu'elles ne se propagent.",
+      "rbac": "Créez des rôles personnalisés avec des permissions fines pour votre équipe.",
+      "logPatterns": "Repérez automatiquement les motifs récurrents dans les logs au lieu de lire ligne par ligne.",
+      "correlation": "Passez d'une ligne de log directement à ses métriques et traces associées.",
+      "aiAssistant": "Demandez à l'IA d'écrire des requêtes et d'expliquer vos données en langage clair.",
+      "alertInsights": "Voyez à quelle fréquence une alerte se déclenche et repérez d'un coup d'œil les alertes corrélées.",
+      "anomalyDetection": "Détectez automatiquement les comportements inhabituels des métriques, avant qu'ils ne déclenchent une alerte de seuil.",
+      "agentGraph": "Visualisez les appels entre vos agents et outils d'IA sous forme de graphe.",
+      "agentBehavior": "Repérez les anomalies dans le comportement d'appel d'outils des agents au fil du temps.",
+      "discovery": "Faites remonter automatiquement les sessions d'IA qui méritent un examen.",
+      "queues": "Acheminez les sessions d'IA signalées vers des réviseurs pour une annotation avec validation humaine.",
+      "datasets": "Constituez des jeux de données à partir de sessions réelles pour évaluer et affiner votre IA.",
+      "prompts": "Versionnez et gérez les prompts qui alimentent vos fonctionnalités d'IA.",
+      "playground": "Testez les prompts et les modèles côte à côte avant de déployer les modifications.",
+      "experiments": "Comparez les modifications de modèles et de prompts sur vos jeux de données avant le déploiement.",
+      "remoteTasks": "Exécutez des tâches d'évaluation et de notation sur des modèles et agents distants.",
+      "evaluations": "Évaluez automatiquement la qualité de l'IA et suivez son évolution dans le temps.",
+      "genAiAgentMapping": "Regroupez les traces par agent d'IA à l'origine, et comparez les versions côte à côte.",
+      "scheduledSearch": "Exécutez automatiquement une recherche enregistrée selon une planification, au lieu de la relancer manuellement.",
+      "customBranding": "Remplacez le logo et le texte par défaut par votre propre image de marque."
+    }
+  },
   "errorInsights": {
     "title": "Perspectives",
     "tabLabel": "Erreurs",

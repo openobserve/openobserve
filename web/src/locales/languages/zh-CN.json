@@ -4299,6 +4299,48 @@
     "inspectBtnLabel": "检查",
     "analyzeBtnLabel": "见解"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "企业版功能",
+    "featuresPageTitle": "企业版功能",
+    "category": {
+      "security": "安全与合规",
+      "scale": "规模与性能",
+      "ai": "AI 与自动化",
+      "analysis": "分析与数据流"
+    },
+    "legendBeta": "抢先体验",
+    "legendHa": "高可用性",
+    "docsFooter": "每项功能都附带文档链接。",
+    "viewAllDocs": "查看全部文档",
+    "locked": "使用 OpenObserve 企业版解锁 {feature}。",
+    "availableIn": "适用于 OpenObserve 企业版",
+    "rbacDisabled": "该组织的 RBAC 已关闭。请联系管理员启用。",
+    "pitch": {
+      "incidents": "自动将触发中的告警转化为可跟踪的事件。",
+      "workflows": "自动化运行手册，替您响应告警。",
+      "oncall": "安排值班轮换，并自动将呼叫路由给合适的人员。",
+      "serviceGraph": "查看服务之间的调用关系，在故障扩散前及时发现。",
+      "rbac": "为团队创建具有细粒度权限的自定义角色。",
+      "logPatterns": "自动识别重复出现的日志模式，无需逐行阅读。",
+      "correlation": "从一行日志直接跳转到其相关的指标和追踪。",
+      "aiAssistant": "让 AI 编写查询，并用通俗语言解释您的数据。",
+      "alertInsights": "查看告警的触发频率，并一眼发现相关联的告警。",
+      "anomalyDetection": "自动捕捉异常的指标行为，在触发阈值告警之前就发现。",
+      "agentGraph": "以图的形式查看 AI 智能体与工具之间的调用关系。",
+      "agentBehavior": "发现智能体工具调用行为随时间出现的异常。",
+      "discovery": "自动呈现值得复查的 AI 会话。",
+      "queues": "将被标记的 AI 会话转给审核人员进行人工标注。",
+      "datasets": "从真实会话中整理数据集，用于评估和微调您的 AI。",
+      "prompts": "对驱动 AI 功能的提示词进行版本管理。",
+      "playground": "在发布变更前，对提示词和模型进行并排测试。",
+      "experiments": "在发布前，基于数据集对比模型和提示词变更。",
+      "remoteTasks": "对远程模型和智能体运行评估与评分任务。",
+      "evaluations": "自动为 AI 质量评分并持续跟踪。",
+      "genAiAgentMapping": "按生成追踪的 AI 智能体进行分组，并并排对比不同版本。",
+      "scheduledSearch": "按计划自动运行已保存的搜索，无需手动重复执行。",
+      "customBranding": "用您自己的品牌标识替换默认徽标和文字。"
+    }
+  },
   "errorInsights": {
     "title": "标题",
     "tabLabel": "错误",

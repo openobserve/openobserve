@@ -4299,6 +4299,48 @@
     "inspectBtnLabel": "Inspizieren",
     "analyzeBtnLabel": "Einblicke"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "Enterprise-Funktion",
+    "featuresPageTitle": "Enterprise-Funktionen",
+    "category": {
+      "security": "Sicherheit & Compliance",
+      "scale": "Skalierung & Leistung",
+      "ai": "KI & Automatisierung",
+      "analysis": "Analyse & Datenfluss"
+    },
+    "legendBeta": "Früher Zugriff",
+    "legendHa": "Hochverfügbarkeit",
+    "docsFooter": "Jede Funktion verlinkt ihre Dokumentation.",
+    "viewAllDocs": "Gesamte Dokumentation anzeigen",
+    "locked": "{feature} mit OpenObserve Enterprise freischalten.",
+    "availableIn": "Verfügbar in OpenObserve Enterprise",
+    "rbacDisabled": "RBAC ist für diese Organisation deaktiviert. Bitten Sie Ihren Administrator, es zu aktivieren.",
+    "pitch": {
+      "incidents": "Verwandeln Sie ausgelöste Alarme automatisch in nachverfolgte Vorfälle.",
+      "workflows": "Automatisieren Sie Runbooks, die für Sie auf Alarme reagieren.",
+      "oncall": "Planen Sie On-Call-Rotationen und leiten Sie Pages automatisch an die richtige Person weiter.",
+      "serviceGraph": "Sehen Sie, wie Ihre Services sich gegenseitig aufrufen, und erkennen Sie Fehler, bevor sie sich ausbreiten.",
+      "rbac": "Erstellen Sie benutzerdefinierte Rollen mit feingranularen Berechtigungen für Ihr Team.",
+      "logPatterns": "Erkennen Sie wiederkehrende Log-Muster automatisch, statt Zeile für Zeile zu lesen.",
+      "correlation": "Springen Sie von einer Logzeile direkt zu den zugehörigen Metriken und Traces.",
+      "aiAssistant": "Lassen Sie KI Abfragen schreiben und Ihre Daten in einfacher Sprache erklären.",
+      "alertInsights": "Sehen Sie, wie oft ein Alarm ausgelöst wird, und erkennen Sie korrelierte Alarme auf einen Blick.",
+      "anomalyDetection": "Erkennen Sie ungewöhnliches Metrikverhalten automatisch, bevor ein Schwellenwert-Alarm ausgelöst wird.",
+      "agentGraph": "Sehen Sie, wie Ihre KI-Agenten und -Tools sich gegenseitig aufrufen – visualisiert als Graph.",
+      "agentBehavior": "Erkennen Sie Anomalien im Tool-Aufrufverhalten von Agenten im Zeitverlauf.",
+      "discovery": "Heben Sie automatisch KI-Sitzungen hervor, die eine Überprüfung verdienen.",
+      "queues": "Leiten Sie markierte KI-Sitzungen zur Human-in-the-Loop-Annotation an Reviewer weiter.",
+      "datasets": "Kuratieren Sie Datensätze aus echten Sitzungen, um Ihre KI zu bewerten und feinabzustimmen.",
+      "prompts": "Versionieren und verwalten Sie die Prompts, die Ihre KI-Funktionen antreiben.",
+      "playground": "Testen Sie Prompts und Modelle Seite an Seite, bevor Sie Änderungen ausrollen.",
+      "experiments": "Vergleichen Sie Modell- und Prompt-Änderungen vor dem Rollout mit Ihren Datensätzen.",
+      "remoteTasks": "Führen Sie Evaluierungs- und Bewertungsjobs für Remote-Modelle und -Agenten aus.",
+      "evaluations": "Bewerten Sie die KI-Qualität automatisch und verfolgen Sie sie im Zeitverlauf.",
+      "genAiAgentMapping": "Gruppieren Sie Traces nach dem KI-Agenten, der sie erzeugt hat, und vergleichen Sie Versionen Seite an Seite.",
+      "scheduledSearch": "Führen Sie eine gespeicherte Suche automatisch nach Zeitplan aus, statt sie manuell erneut auszuführen.",
+      "customBranding": "Ersetzen Sie das Standardlogo und den Text durch Ihr eigenes Branding."
+    }
+  },
   "errorInsights": {
     "title": "Einblicke",
     "tabLabel": "Fehler",

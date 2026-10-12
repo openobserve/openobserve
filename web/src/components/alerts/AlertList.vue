@@ -155,17 +155,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-tabs"
                     @update:model-value="(v) => onAlertTabChange(v as string)"
                   >
-                    <OToggleGroupItem
-                      v-for="tab in alertTabs"
-                      :key="tab.value"
-                      :value="tab.value"
-                      size="sm"
-                      :icon-left="tab.icon"
-                      :title="lgUp ? undefined : tab.label"
-                      :data-test="`alert-list-tab-${tab.value}`"
-                    >
-                      <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
-                    </OToggleGroupItem>
+                    <template v-for="tab in alertTabs" :key="tab.value">
+                      <OToggleGroupItem
+                        :value="tab.value"
+                        size="sm"
+                        :icon-left="tab.icon"
+                        :title="lgUp && !tab.locked ? undefined : tab.label"
+                        :data-test="`alert-list-tab-${tab.value}`"
+                      >
+                        <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
+                        <template v-if="tab.locked" #icon-right>
+                          <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+                        </template>
+                      </OToggleGroupItem>
+                    </template>
                   </OToggleGroup>
                   <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
                   <div class="min-w-0 flex-1 md:max-lg:min-w-80">
@@ -958,6 +961,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert } from "@/ts/interfaces/index";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
@@ -1217,17 +1221,26 @@ export default defineComponent({
       window.removeEventListener("resize", onWindowResize);
     });
 
-    // Show anomaly detection only when the backend is an enterprise or cloud build.
-    // The frontend build flag alone is not sufficient — an enterprise UI can be
-    // pointed at an OSS backend which does not have the feature.
-    // The backend can also disable it at runtime via O2_ANOMALY_DETECTION_DISABLED,
-    // surfaced as anomaly_detection_enabled in the config API response.
+    // Anomaly detection needs BOTH an entitled build (backend compiled with
+    // the feature AND a frontend that shows it: the frontend build flag alone
+    // is not sufficient — an enterprise UI can be pointed at an OSS backend)
+    // AND the runtime toggle the backend also exposes
+    // (O2_ANOMALY_DETECTION_DISABLED, surfaced as anomaly_detection_enabled).
+    // Only the entitlement half is a lockable upsell; an entitled build whose
+    // admin has turned the runtime toggle off still never sees the tab at all
+    // — same reasoning as RBAC's own enabled/disabled split.
+    const anomalyDetectionEntitled = computed(
+      () => store.state.zoConfig.build_type !== "opensource" && config.isEnterprise === "true",
+    );
+    const anomalyDetectionTabVisible = computed(
+      () =>
+        !anomalyDetectionEntitled.value || store.state.zoConfig.anomaly_detection_enabled === true,
+    );
     const isAnomalyDetectionEnabled = computed(
       () =>
-        store.state.zoConfig.build_type !== "opensource" &&
-        config.isEnterprise === "true" &&
-        store.state.zoConfig.anomaly_detection_enabled === true,
+        anomalyDetectionEntitled.value && store.state.zoConfig.anomaly_detection_enabled === true,
     );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     // Initialize activeTab from URL query parameter, default to "all".
     // Prevent forcing anomalyDetection tab when the feature is not available.
@@ -1510,17 +1523,18 @@ export default defineComponent({
 
     // Tabs for alerts view
     const alertTabs = computed(() => {
-      const tabs: { label: I18nText; value: string; icon?: IconName }[] = [
+      const tabs: { label: I18nText; value: string; icon?: IconName; locked?: boolean }[] = [
         { label: t("alerts.all"), value: "all", icon: "format-list-bulleted" },
         { label: t("alerts.scheduled"), value: "scheduled", icon: "schedule" },
         { label: t("alerts.realTime"), value: "realTime", icon: "bolt" },
         { label: t("alerts.compositeAlert"), value: "composite", icon: "account-tree" },
       ];
-      if (isAnomalyDetectionEnabled.value) {
+      if (anomalyDetectionTabVisible.value) {
         tabs.push({
           label: t("alerts.anomalyDetection"),
           value: "anomalyDetection",
           icon: "query-stats",
+          locked: !isAnomalyDetectionEnabled.value,
         });
       }
       return tabs;
@@ -2218,6 +2232,13 @@ export default defineComponent({
     };
 
     const onAlertTabChange = async (tab: string) => {
+      // OToggleGroup is controlled (`:model-value`), so refusing to advance
+      // `activeTab` here is what keeps a locked tab from becoming active —
+      // clicking it opens the upgrade dialog instead of switching.
+      if (tab === "anomalyDetection" && !isAnomalyDetectionEnabled.value) {
+        openUpgradeDialog();
+        return;
+      }
       activeTab.value = tab;
       const apiType =
         tab === "realTime" ? "realtime" : tab === "anomalyDetection" ? "anomaly_detection" : tab;
