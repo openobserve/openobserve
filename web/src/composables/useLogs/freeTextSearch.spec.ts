@@ -63,7 +63,7 @@ const zoConfig = { default_fts_keys: ["body", "log", "message"] };
 
 const makeSearchObj = (query: string, streams: any[]): FreeTextSearchObj => ({
   organizationIdentifier: "org1",
-  meta: { sqlMode: false, freeTextScan: {} },
+  meta: { sqlMode: false },
   data: {
     query,
     stream: {

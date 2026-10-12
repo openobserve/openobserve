@@ -48,6 +48,7 @@ import {
   appendConjunct,
   materializeFreeText,
   renderPlan,
+  stripCommentLines,
   type FilterPlan,
   type TextSearchTarget,
 } from "@/utils/query/freeTextFilter";
@@ -140,12 +141,6 @@ const replaceColumnRefsInWhere = (node: any, fieldMapping: Record<string, string
   replaceColumnRefsInWhere(node.args, fieldMapping);
   if (node.expr) replaceColumnRefsInWhere(node.expr, fieldMapping);
 };
-
-const stripCommentLines = (text: string): string =>
-  text
-    .split("\n")
-    .filter((line: string) => !line.trim().startsWith("--"))
-    .join("\n");
 
 const columnName = (column: any): string | null => {
   if (typeof column === "string") return column.replace(/^"|"$/g, "");
@@ -735,10 +730,7 @@ export const useSearchQuery = (t: TranslateFn) => {
       }
     }
 
-    req.query.sql = query
-      .split("\n")
-      .filter((line: string) => !line.trim().startsWith("--"))
-      .join("\n");
+    req.query.sql = stripCommentLines(query);
     req.query["sql_mode"] = "full";
 
     return finalizeRequest(req);

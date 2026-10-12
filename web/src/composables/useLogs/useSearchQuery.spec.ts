@@ -1024,6 +1024,19 @@ describe("useSearchQuery › buildSearch › LIMIT in filter mode", () => {
 
     expect(buildSearch()).not.toBeNull();
   });
+
+  it("should keep a -- line inside a string literal of the filter", () => {
+    mockState.searchObj.data.query = "code = 'a\n-- b' AND code = 1\n-- note";
+
+    expect(getSql(buildSearch())).toContain("WHERE code = 'a\n-- b' AND code = 1");
+  });
+
+  it("should keep a -- line inside a string literal in SQL mode", () => {
+    mockState.searchObj.meta.sqlMode = true;
+    mockState.searchObj.data.query = `SELECT * FROM "my-stream" WHERE msg = 'a\n-- b'\n-- note`;
+
+    expect(getSql(buildSearch())).toBe(`SELECT * FROM "my-stream" WHERE msg = 'a\n-- b'`);
+  });
 });
 
 describe("useSearchQuery › getQueryReq › highlightQuery", () => {
@@ -1241,6 +1254,9 @@ describe("useSearchQuery › free text (item 1)", () => {
     ["-500", "NOT match_all('500')"],
     ["error -404", "match_all('error') AND NOT match_all('404')"],
     ["limit 50", "match_all('limit') AND match_all('50')"],
+    ["--404", "NOT match_all('404')"],
+    ["NOT -404", "match_all('404')"],
+    ["status=500 -404", "status = 500 AND NOT match_all('404')"],
   ])("produces the exact request for %s without changing the query", (raw, where) => {
     select(ftsStream("fts_a"));
     mockState.searchObj.data.query = raw;

@@ -17,7 +17,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   appendConjunct,
   DEFAULT_TOKEN_LIMITS,
-  FREE_TEXT_SCAN_MAX_FIELDS,
   isAuthoredStatement,
   looksLikeSqlStatement,
   materializeFreeText,
@@ -26,6 +25,7 @@ import {
   quoteFreeTextPhrase,
   renderPlan,
   streamTextTarget,
+  stripCommentLines,
   suggestRecovery,
   tokenLimitsFromConfig,
   type FreeTextContext,
@@ -72,7 +72,6 @@ const KNOWN = new Set([
   "body",
 ]);
 const FTS: TextSearchTarget = { mode: "fts", fields: ["body"] };
-const SCAN: TextSearchTarget = { mode: "scan", fields: ["msg_text", "detail"] };
 const BLOCKED: TextSearchTarget = { mode: "blocked", candidates: ["msg_text"] };
 const LONG_TOKEN = "a".repeat(65);
 
@@ -100,7 +99,6 @@ const renderFts = (raw: string, fields: ReadonlySet<string> = FIELDS) =>
 const ctxFor = (targets: Record<string, TextSearchTarget>): FreeTextContext => ({
   fieldNames: FIELDS,
   targets,
-  freeTextScan: { nofts: { fields: ["msg_text", "detail"] } },
 });
 
 const stream = (overrides: Partial<StreamWithSchema>): StreamWithSchema => ({
@@ -120,7 +118,7 @@ describe("freeTextFilter", () => {
       ["-debug", "NOT match_all('debug')"],
       ["error -debug", "match_all('error') AND NOT match_all('debug')"],
       ["error OR -debug", "match_all('error') OR NOT match_all('debug')"],
-      ["NOT -debug", "NOT NOT match_all('debug')"],
+      ["NOT -debug", "match_all('debug')"],
       ["limit 50", "match_all('limit') AND match_all('50')"],
       ["-'quoted'", "NOT match_all('quoted')"],
       ['"connection refused"', "match_all('connection refused')"],
@@ -397,7 +395,6 @@ describe("freeTextFilter", () => {
       ["--"],
       ["- 404"],
       ["-5"],
-      ["-_timestamp"],
       ["status = -1"],
       ["status=-1"],
       ["status > -1.5"],
@@ -445,14 +442,10 @@ describe("freeTextFilter", () => {
       expect(renderFts("-timeout")).toBe("NOT match_all('timeout')");
     });
 
-    it("keeps % and _ in a term verbatim, and literal in scan mode", () => {
+    it("keeps % and _ in a term verbatim", () => {
       expect(renderFts("50%")).toBe("match_all('50%')");
       expect(renderFts("req_id")).toBe("match_all('req_id')");
       expect(planFilter("a_b", FIELDS).kind).toBe("sql");
-      const scanPlan = planFilter("a_b", FIELDS, { targetMode: "scan" });
-      expect(renderPlan(scanPlan, { mode: "scan", fields: ["msg"] }, KNOWN)).toBe(
-        `(("msg" IS NOT NULL AND str_match_ignore_case("msg", 'a_b')))`,
-      );
     });
 
     it("passes re: prefixes and * wrapping through to the backend", () => {
@@ -476,15 +469,6 @@ describe("freeTextFilter", () => {
         "match_all('timeout') AND match_all('error')",
       );
       expect(renderFts("x' OR '1'='1")).toBe(legacyWhere("x' OR '1'='1", KNOWN));
-    });
-
-    it("double-quotes malicious scan identifiers with doubled quotes", () => {
-      const plan = planFilter("timeout", FIELDS, { targetMode: "scan" });
-      const target: TextSearchTarget = { mode: "scan", fields: ['a"b', 'x") OR 1=1 --'] };
-      expect(renderPlan(plan, target, KNOWN)).toBe(
-        `(("a""b" IS NOT NULL AND str_match_ignore_case("a""b", 'timeout')) OR ` +
-          `("x"") OR 1=1 --" IS NOT NULL AND str_match_ignore_case("x"") OR 1=1 --", 'timeout')))`,
-      );
     });
 
     it("allows unicode terms", () => {
@@ -603,10 +587,10 @@ describe("freeTextFilter", () => {
       expect(planFilter("a".repeat(64), FIELDS).kind).toBe("sql");
     });
 
-    it("needs one eligible token per unit, and skips the gate for scan and blocked targets", () => {
+    it("needs one eligible token per unit, and skips the gate for blocked targets", () => {
       expect(planFilter("timeout a", FIELDS).kind).toBe("sql");
       expect(planFilter("10.0.0.1", FIELDS).kind).toBe("freeText");
-      expect(planFilter("a", FIELDS, { targetMode: "scan" }).kind).toBe("freeText");
+      expect(planFilter("a", FIELDS, { targetMode: "blocked" }).kind).toBe("freeText");
       expect(planFilter("'a'", FIELDS, { targetMode: "blocked" }).kind).toBe("freeText");
     });
   });
@@ -616,7 +600,7 @@ describe("freeTextFilter", () => {
       for (const raw of ["status =", `a("b`, "it's", "a", LONG_TOKEN, "level"]) {
         const quoted = quoteFreeTextPhrase(raw);
         expect(quoted).toBe(`'${raw.replaceAll("'", "''")}'`);
-        expect(planFilter(quoted, FIELDS, { targetMode: "scan" })).toMatchObject({
+        expect(planFilter(quoted, FIELDS, { targetMode: "blocked" })).toMatchObject({
           kind: "freeText",
           units: [raw],
         });
@@ -641,11 +625,7 @@ describe("freeTextFilter", () => {
       expect(phrasePlan("   ")).toEqual({ kind: "sql", filter: "   " });
     });
 
-    it("renders a phrase on a no-fts stream as a scan or blocks it", () => {
-      expect(renderPlan(phrasePlan("a"), SCAN, KNOWN)).toBe(
-        `(("msg_text" IS NOT NULL AND str_match_ignore_case("msg_text", 'a')) OR ` +
-          `("detail" IS NOT NULL AND str_match_ignore_case("detail", 'a')))`,
-      );
+    it("blocks a phrase on a no-fts stream", () => {
       expect(renderPlan(phrasePlan("a"), BLOCKED, KNOWN)).toBeNull();
     });
   });
@@ -742,12 +722,12 @@ describe("freeTextFilter", () => {
         schema: [utf8("message"), utf8("log"), utf8("custom"), { name: "data", type: "Int64" }],
         settings: { full_text_search_keys: ["custom", "missing"] },
       });
-      expect(streamTextTarget(s, ["log", "message", "data"], undefined)).toEqual({
+      expect(streamTextTarget(s, ["log", "message", "data"])).toEqual({
         mode: "fts",
         fields: ["custom", "log", "message"],
       });
-      expect(streamTextTarget(s, [], undefined)).toEqual({ mode: "fts", fields: ["custom"] });
-      expect(streamTextTarget(stream({ schema: [utf8("log")] }), ["log"], undefined)).toEqual({
+      expect(streamTextTarget(s, [])).toEqual({ mode: "fts", fields: ["custom"] });
+      expect(streamTextTarget(stream({ schema: [utf8("log")] }), ["log"])).toEqual({
         mode: "fts",
         fields: ["log"],
       });
@@ -761,7 +741,7 @@ describe("freeTextFilter", () => {
           { name: "c_body", type: "Binary" },
         ],
       });
-      expect(streamTextTarget(s, ["a_body", "b_body", "c_body"], undefined)).toEqual({
+      expect(streamTextTarget(s, ["a_body", "b_body", "c_body"])).toEqual({
         mode: "fts",
         fields: ["a_body", "b_body"],
       });
@@ -769,7 +749,7 @@ describe("freeTextFilter", () => {
 
     it("blocks a stream whose only fts-named field is not a string (AC3.5)", () => {
       const s = stream({ schema: [{ name: "data", type: "Int64" }, utf8("msg_text")] });
-      expect(streamTextTarget(s, ["data"], undefined)).toEqual({
+      expect(streamTextTarget(s, ["data"])).toEqual({
         mode: "blocked",
         candidates: ["msg_text"],
       });
@@ -780,12 +760,12 @@ describe("freeTextFilter", () => {
         schema: [utf8("body"), utf8("level")],
         settings: { defined_schema_fields: ["level"] },
       });
-      expect(streamTextTarget(s, ["body"], undefined)).toEqual({
+      expect(streamTextTarget(s, ["body"])).toEqual({
         mode: "blocked",
         candidates: ["body", "level"],
       });
       s.settings = { defined_schema_fields: ["level", "body"] };
-      expect(streamTextTarget(s, ["body"], undefined)).toEqual({ mode: "fts", fields: ["body"] });
+      expect(streamTextTarget(s, ["body"])).toEqual({ mode: "fts", fields: ["body"] });
     });
 
     it.each([500, 7])("restricts UDS at the backend limit %i but bypasses it above", (limit) => {
@@ -794,20 +774,20 @@ describe("freeTextFilter", () => {
         schema: [utf8("body"), ...defined.map(utf8)],
         settings: { defined_schema_fields: defined },
       });
-      expect(streamTextTarget(s, ["body"], undefined, undefined, limit).mode).toBe("blocked");
+      expect(streamTextTarget(s, ["body"], limit).mode).toBe("blocked");
       s.settings = { defined_schema_fields: [...defined, "extra"] };
-      expect(streamTextTarget(s, ["body"], undefined, undefined, limit)).toEqual({
+      expect(streamTextTarget(s, ["body"], limit)).toEqual({
         mode: "fts",
         fields: ["body"],
       });
       if (limit === 500) {
-        expect(streamTextTarget(s, ["body"], undefined).mode).toBe("fts");
+        expect(streamTextTarget(s, ["body"]).mode).toBe("fts");
       }
     });
 
     it("blocks on empty default_fts_keys and no explicit keys", () => {
       const s = stream({ schema: [utf8("message")] });
-      expect(streamTextTarget(s, [], undefined)).toEqual({
+      expect(streamTextTarget(s, [])).toEqual({
         mode: "blocked",
         candidates: ["message"],
       });
@@ -831,20 +811,16 @@ describe("freeTextFilter", () => {
         settings: { index_all_values: true },
       });
       expect(original.schema.map((f: { name: string }) => f.name)).toEqual(["_timestamp", "code"]);
-      expect(streamTextTarget(original, [], undefined)).toEqual({
+      expect(streamTextTarget(original, [])).toEqual({
         mode: "fts",
         fields: ["_original"],
       });
-      expect(streamTextTarget(allValues, [], undefined)).toEqual({
+      expect(streamTextTarget(allValues, [])).toEqual({
         mode: "fts",
         fields: ["_all_values"],
       });
       expect(
-        renderPlan(
-          planFilter("timeout", FIELDS),
-          streamTextTarget(allValues, [], undefined),
-          KNOWN,
-        ),
+        renderPlan(planFilter("timeout", FIELDS), streamTextTarget(allValues, []), KNOWN),
       ).toBe("match_all('timeout')");
     });
 
@@ -870,43 +846,21 @@ describe("freeTextFilter", () => {
           ],
         },
       });
-      expect(streamTextTarget(s, [], undefined)).toEqual({
+      expect(streamTextTarget(s, [])).toEqual({
         mode: "blocked",
         candidates: ["detail", "msg_text", "host", "zz"],
       });
     });
 
-    it("re-validates consent against candidates and the field guard", () => {
-      const s = stream({ schema: [utf8("msg_text"), utf8("detail"), utf8("host")] });
-      expect(FREE_TEXT_SCAN_MAX_FIELDS).toBe(0);
-      expect(streamTextTarget(s, [], ["msg_text"])).toEqual({
-        mode: "blocked",
-        candidates: ["msg_text", "detail", "host"],
-      });
-      expect(streamTextTarget(s, [], ["detail", "gone", "msg_text", "host"], 2)).toEqual({
-        mode: "scan",
-        fields: ["detail", "msg_text"],
-      });
-      expect(streamTextTarget(s, [], ["gone"], 3).mode).toBe("blocked");
-      expect(streamTextTarget(s, [], "bad" as unknown as string[], 3).mode).toBe("blocked");
-      expect(streamTextTarget(s, [], [1, null] as unknown as string[], 3).mode).toBe("blocked");
-    });
-
     it("renders every schema variant as SQL text (L-24)", () => {
-      const plan = planFilter("timeout", FIELDS, { targetMode: "scan" });
+      const plan = planFilter("timeout", FIELDS);
       const variants: Array<[string, StreamWithSchema, string | null]> = [
         ["fts", stream({ schema: [utf8("body")] }), "match_all('timeout')"],
-        [
-          "scan",
-          stream({ schema: [utf8("msg_text")] }),
-          `(("msg_text" IS NOT NULL AND str_match_ignore_case("msg_text", 'timeout')))`,
-        ],
         ["blocked", stream({ schema: [utf8("msg_text")] }), null],
         ["no string fields", stream({ schema: [{ name: "n", type: "Int64" }] }), null],
       ];
       for (const [name, s, expected] of variants) {
-        const consent = name === "scan" ? ["msg_text"] : undefined;
-        const target = streamTextTarget(s, ["body"], consent, 3);
+        const target = streamTextTarget(s, ["body"]);
         expect({ name, sql: renderPlan(plan, target, KNOWN) }).toEqual({ name, sql: expected });
       }
     });
@@ -937,25 +891,12 @@ describe("freeTextFilter", () => {
       expect(materializeFreeText("status=500", ["s"], ftsCtx)).toBe("status=500");
     });
 
-    it("materialises a single scan stream and marks provenance", () => {
-      const ctx = ctxFor({ nofts: SCAN });
-      expect(appendConjunct("timeout", "level='error'", ["nofts"], ctx)).toBe(
-        '(\n(("msg_text" IS NOT NULL AND str_match_ignore_case("msg_text", \'timeout\')) OR ' +
-          "(\"detail\" IS NOT NULL AND str_match_ignore_case(\"detail\", 'timeout')))\n) AND level='error'",
-      );
-      expect(ctx.freeTextScan?.nofts).toEqual({
-        fields: ["msg_text", "detail"],
-        materialized: true,
-      });
-    });
-
     it("appends as today when one rendering cannot serve every stream", () => {
-      const ctx = ctxFor({ s: FTS, nofts: SCAN });
+      const ctx = ctxFor({ s: FTS, nofts: BLOCKED });
       expect(materializeFreeText("timeout", ["s", "nofts"], ctx)).toBeNull();
       expect(appendConjunct("timeout", "level='error'", ["s", "nofts"], ctx)).toBe(
         "timeout and level='error'",
       );
-      expect(ctx.freeTextScan?.nofts.materialized).toBeUndefined();
       expect(materializeFreeText("timeout", ["blocked"], ctxFor({ blocked: BLOCKED }))).toBeNull();
       expect(materializeFreeText("timeout", [], ftsCtx)).toBeNull();
       expect(materializeFreeText("timeout", ["unknown"], ftsCtx)).toBeNull();
@@ -1079,9 +1020,8 @@ describe("freeTextFilter", () => {
     });
 
     it("still classifies nesting past SQL_PARSE_MAX_DEPTH but under the bound (F4)", () => {
-      expect(renderFts(`${"NOT ".repeat(40)}timeout`)).toBe(
-        `${"NOT ".repeat(40)}match_all('timeout')`,
-      );
+      expect(renderFts(`${"NOT ".repeat(40)}timeout`)).toBe("match_all('timeout')");
+      expect(renderFts(`${"NOT ".repeat(41)}timeout`)).toBe("NOT match_all('timeout')");
       const deep = `${"(".repeat(100)}timeout${")".repeat(100)}`;
       expect(renderFts(deep)).toBe(`${"(".repeat(100)}match_all('timeout')${")".repeat(100)}`);
     });
@@ -1113,6 +1053,158 @@ describe("freeTextFilter", () => {
       expect(planFilter(groupThenNots, FIELDS).kind).toBe("unclassified");
       const atBound = `${"(".repeat(200)}${"NOT ".repeat(56)}timeout${")".repeat(200)}`;
       expect(planFilter(atBound, FIELDS).kind).toBe("freeText");
+    });
+  });
+
+  describe("review fixes on #15234", () => {
+    const NO_FTS = { targetMode: "blocked", allTargetsFts: false } as const;
+    const text = (value: string) => ({ k: "text", value });
+    const not = (child: object) => ({ k: "not", child });
+
+    it.each([
+      ["-5", {}, { kind: "sql", filter: "-5" }],
+      ["-5", NO_FTS, { kind: "freeText", root: text("-5"), units: ["-5"] }],
+      ["-0.5", NO_FTS, { kind: "freeText", root: text("-0.5"), units: ["-0.5"] }],
+      ["-10", {}, { kind: "freeText", root: not(text("10")), units: ["10"] }],
+      ["-10", NO_FTS, { kind: "freeText", root: not(text("10")), units: ["10"] }],
+      ["error AND -1", {}, { kind: "sql", filter: "error AND -1" }],
+      [
+        "error AND -1",
+        NO_FTS,
+        {
+          kind: "freeText",
+          root: { k: "and", children: [text("error"), text("-1")] },
+          units: ["error", "-1"],
+        },
+      ],
+      [
+        "-404",
+        { ...NO_FTS, tokenLimits: { min: 4, max: 64 } },
+        { kind: "freeText", root: text("-404"), units: ["-404"] },
+      ],
+    ])("excludes a minus number only at the index minimum: %s %o", (raw, options, plan) => {
+      expect(planFilter(raw, FIELDS, options)).toEqual(plan);
+    });
+
+    it("keeps a minus field name as text and never sends it as raw SQL", () => {
+      expect(renderFts("-_timestamp")).toBe("match_all('-_timestamp')");
+      expect(planFilter("-_timestamp", FIELDS, NO_FTS)).toEqual({
+        kind: "freeText",
+        root: text("-_timestamp"),
+        units: ["-_timestamp"],
+      });
+      expect(renderFts("-_id", new Set([...FIELDS, "_id"]))).toBe("match_all('-_id')");
+      expect(renderFts("-_id")).toBe("NOT match_all('_id')");
+      expect(planFilter("-_timestamp AND status=500", FIELDS)).toEqual({
+        kind: "sql",
+        filter: "match_all('-_timestamp') AND status=500",
+      });
+      expect(planFilter("-level", FIELDS)).toEqual({ kind: "sql", filter: "-level" });
+    });
+
+    it.each([
+      ["-level:error status=500", "(level IS NULL OR level!='error') AND status=500"],
+      ["-level:error", "(level IS NULL OR level!='error')"],
+      ["--level:error status=500", "(level IS NULL OR level!='error') AND status=500"],
+      ["-level:'a b' status=500", "(level IS NULL OR level!='a b') AND status=500"],
+    ])("suggests an exclusion for %s that keeps rows without the field", (raw, suggestion) => {
+      for (const allFts of [true, false]) {
+        expect(suggestRecovery(raw, FIELDS, allFts)).toEqual({
+          runSuggestion: suggestion,
+          freeTextCandidate: null,
+        });
+      }
+    });
+
+    it.each([
+      ["status=500 -404", "status=500 AND NOT match_all('404')"],
+      ["level='error' -404", "level='error' AND NOT match_all('404')"],
+      ["status=500 -404 -403", "status=500 AND NOT match_all('404') AND NOT match_all('403')"],
+      ["status=500 -debug", "status=500 AND NOT match_all('debug')"],
+      ["a BETWEEN 1 AND 5 -404", "a BETWEEN 1 AND 5 AND NOT match_all('404')"],
+      ["(status=500 -404) OR error", "(status=500 AND NOT match_all('404')) OR match_all('error')"],
+      ["status=500 -404 AND is_error", "status=500 AND -404 AND is_error"],
+    ])("reads a -term after a complete predicate as an exclusion: %s", (raw, filter) => {
+      expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter });
+    });
+
+    it.each([
+      ["a - -1 > 0"],
+      ["status > -1"],
+      ["x = 5 -1"],
+      ["status = -404"],
+      ["status=500-404"],
+      ["is_error -404"],
+      ["status=500 -level"],
+    ])("leaves arithmetic and incomplete predicates as typed: %s", (raw) => {
+      expect(planFilter(raw, FIELDS)).toEqual({ kind: "sql", filter: raw });
+      expect(planFilter(raw, FIELDS, NO_FTS)).toEqual({ kind: "sql", filter: raw });
+    });
+
+    it("blocks a -term after a predicate on a no-fts stream instead of subtracting", () => {
+      for (const raw of ["status=500 -404", "level='error' -404", "status=500 --404"]) {
+        const plan = planFilter(raw, FIELDS, NO_FTS);
+        expect(plan).toMatchObject({ kind: "freeText", units: ["404"] });
+        expect(renderPlan(plan, BLOCKED, KNOWN)).toBeNull();
+      }
+      expect(suggestRecovery("status=500 -404", FIELDS, true).runSuggestion).toBe(
+        "status=500 AND NOT match_all('404')",
+      );
+    });
+
+    it.each([
+      ["--404", "NOT match_all('404')"],
+      ["error --404", "match_all('error') AND NOT match_all('404')"],
+      ["--debug", "NOT match_all('debug')"],
+      ["-- note\nerror", "match_all('error')"],
+      ["error -- note", "match_all('error')"],
+      ["--- note\nerror", "match_all('error')"],
+      ["error--timeout", "match_all('error--timeout')"],
+    ])("reads a spaceless --term as an exclusion and -- note as a comment: %s", (raw, sql) => {
+      expect(renderFts(raw)).toBe(sql);
+    });
+
+    it("keeps real comments in SQL filters next to a --term", () => {
+      expect(planFilter("status=500 --404", FIELDS)).toEqual({
+        kind: "sql",
+        filter: "status=500 AND NOT match_all('404')",
+      });
+      expect(planFilter("status=500 -- note", FIELDS)).toEqual({
+        kind: "sql",
+        filter: "status=500 -- note",
+      });
+      expect(renderPlan({ kind: "sql", filter: "-- note\nstatus=500" }, FTS, KNOWN)).toBe(
+        "status = 500",
+      );
+    });
+
+    it("strips comment lines but never a line inside a string literal", () => {
+      const raw = "level = 'a\n-- b' AND code=1";
+      expect(renderPlan({ kind: "sql", filter: raw }, FTS, KNOWN)).toBe(
+        "level = 'a\n-- b' AND code = 1",
+      );
+      expect(stripCommentLines("-- c\nlevel='a\n  -- b'\n  -- d\nx=1")).toBe(
+        "level='a\n  -- b'\nx=1",
+      );
+      expect(stripCommentLines("/* x\n-- y */ a=1")).toBe("/* x\n-- y */ a=1");
+      expect(stripCommentLines("-- don't\nlevel='x'")).toBe("level='x'");
+      expect(stripCommentLines('"a\n-- b" = 1')).toBe('"a\n-- b" = 1');
+    });
+
+    it.each([
+      ["NOT -404", "match_all('404')"],
+      ["NOT NOT debug", "match_all('debug')"],
+      ["NOT NOT NOT debug", "NOT match_all('debug')"],
+      ["NOT (NOT debug)", "NOT (NOT match_all('debug'))"],
+    ])("collapses a double negation: %s", (raw, sql) => {
+      expect(renderFts(raw)).toBe(sql);
+    });
+
+    it("collapses a double negation in a predicate mix", () => {
+      expect(planFilter("NOT -404 AND status=500", FIELDS)).toEqual({
+        kind: "sql",
+        filter: "match_all('404') AND status=500",
+      });
     });
   });
 });

@@ -28,7 +28,6 @@ import {
   tokenLimitsFromConfig,
   type FilterPlan,
   type FreeTextContext,
-  type FreeTextScanEntry,
   type RecoveryCards,
   type SchemaField,
   type StreamWithSchema,
@@ -65,7 +64,7 @@ export interface NoFtsStream {
 
 export interface FreeTextSearchObj {
   organizationIdentifier?: string;
-  meta: { sqlMode?: boolean; freeTextScan?: Record<string, FreeTextScanEntry> | null };
+  meta: { sqlMode?: boolean };
   data: {
     query: string;
     stream: {
@@ -91,9 +90,7 @@ function schemaKey(searchObj: FreeTextSearchObj, stream: string): string {
 }
 
 function targetModeOf(targets: TextSearchTarget[]): TextSearchTarget["mode"] {
-  if (targets.some((target) => target.mode === "fts")) return "fts";
-  if (targets.some((target) => target.mode === "scan")) return "scan";
-  return "blocked";
+  return targets.some((target) => target.mode === "fts") ? "fts" : "blocked";
 }
 
 function streamEntry(searchObj: FreeTextSearchObj, name: string): StreamWithSchema | undefined {
@@ -124,8 +121,6 @@ export function buildFilterContext(
     targets[name] = streamTextTarget(
       entry,
       zoConfig?.default_fts_keys ?? [],
-      undefined,
-      undefined,
       zoConfig?.quick_mode_num_fields,
     );
   }
@@ -133,7 +128,6 @@ export function buildFilterContext(
     fieldNames,
     targets,
     tokenLimits: tokenLimitsFromConfig(zoConfig),
-    freeTextScan: searchObj.meta.freeTextScan ?? {},
     knownFields: new Set(
       (searchObj.data.stream.selectedStreamFields ?? []).map((field) => field.name),
     ),

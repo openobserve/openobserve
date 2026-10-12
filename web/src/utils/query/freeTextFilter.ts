@@ -20,8 +20,6 @@ import { addSpacesToOperators } from "@/utils/queryUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
-export const FREE_TEXT_SCAN_MAX_FIELDS = 0;
-
 export const DEFAULT_TOKEN_LIMITS: TokenLimits = { min: 2, max: 64 };
 
 const KEYWORDS = new Set([
@@ -135,9 +133,7 @@ export type FilterPlan =
   | { kind: "unclassified"; filter: string; suggestion?: PlanNode };
 
 export type TextSearchTarget =
-  | { mode: "fts"; fields: string[] }
-  | { mode: "scan"; fields: string[] }
-  | { mode: "blocked"; candidates: string[] };
+  { mode: "fts"; fields: string[] } | { mode: "blocked"; candidates: string[] };
 
 export interface TokenLimits {
   min: number;
@@ -184,7 +180,6 @@ export interface FreeTextContext {
   fieldNames: ReadonlySet<string>;
   targets: Readonly<Record<string, TextSearchTarget>>;
   tokenLimits?: TokenLimits;
-  freeTextScan?: Record<string, FreeTextScanEntry>;
 }
 
 export interface StreamLookup {
@@ -215,10 +210,23 @@ interface SuggestionTally {
   predicates: number;
 }
 
-interface MixState {
+interface TermRule {
   names: ReadonlySet<string>;
   limits: TokenLimits;
+}
+
+interface MixState extends TermRule {
   units: number;
+}
+
+interface ParseState {
+  pos: number;
+  rule: TermRule;
+}
+
+interface FieldValuePair {
+  field: string;
+  value: string;
 }
 
 interface AstNode {
@@ -250,21 +258,23 @@ export function planFilter(
   booleanFields: ReadonlySet<string>,
   options: PlanFilterOptions = {},
 ): FilterPlan {
-  const tokens = lex(raw);
-  if (tokens === null) return { kind: "unclassified", filter: raw };
-  const names = withImplicitFields(booleanFields);
-  if (tokens.length === 0) return { kind: "sql", filter: raw };
-  if (!isPureTextShape(tokens, names)) {
-    return { kind: "sql", filter: planMix(tokens, raw, names, options) ?? raw };
-  }
+  const lexed = lex(raw);
+  if (lexed === null) return { kind: "unclassified", filter: raw };
+  const rule: TermRule = {
+    names: withImplicitFields(booleanFields),
+    limits: options.tokenLimits ?? DEFAULT_TOKEN_LIMITS,
+  };
+  if (lexed.length === 0) return { kind: "sql", filter: raw };
+  const tokens = withImplicitAnds(lexed, raw, rule);
+  if (!isPureTextShape(tokens, rule)) return planMix(tokens, raw, rule, options);
   if (exceedsTextNesting(tokens)) return { kind: "unclassified", filter: raw };
 
-  const root = parseBooleanText(tokens);
+  const root = parseBooleanText(tokens, rule);
   if (root === null) return { kind: "unclassified", filter: raw };
 
   const units = collectUnits(root);
   if (units.length === 0 || units.some((unit) => unit === "")) return { kind: "sql", filter: raw };
-  const limits = options.tokenLimits ?? DEFAULT_TOKEN_LIMITS;
+  const { limits } = rule;
   if ((options.targetMode ?? "fts") === "fts" && !units.every((u) => hasIndexToken(u, limits))) {
     return { kind: "sql", filter: raw };
   }
@@ -284,7 +294,7 @@ export function renderPlan(
 ): string | null {
   if (plan.kind !== "freeText") return renderSqlFilter(plan.filter, knownFields);
   if (target.mode === "blocked" || target.fields.length === 0) return null;
-  return renderNode(plan.root, target);
+  return renderNode(plan.root);
 }
 
 export function preserveFilterComments(raw: string, rendered: string): string {
@@ -301,8 +311,6 @@ export function preserveFilterComments(raw: string, rendered: string): string {
 export function streamTextTarget(
   stream: StreamWithSchema,
   defaultFtsKeys: string[],
-  scanConsent: string[] | undefined,
-  maxScanFields: number = FREE_TEXT_SCAN_MAX_FIELDS,
   quickModeNumFields: number = 500,
 ): TextSearchTarget {
   const rawSchema = [
@@ -324,13 +332,7 @@ export function streamTextTarget(
     (key) => stringFields.has(key) && (!restrictDefinedFields || definedFields.includes(key)),
   );
   if (fts.length > 0) return { mode: "fts", fields: fts };
-
-  const candidates = scanCandidates(rawSchema, settings);
-  const chosen = unique(asStringArray(scanConsent).filter((f) => candidates.includes(f))).slice(
-    0,
-    Math.max(0, maxScanFields),
-  );
-  return chosen.length > 0 ? { mode: "scan", fields: chosen } : { mode: "blocked", candidates };
+  return { mode: "blocked", candidates: scanCandidates(rawSchema, settings) };
 }
 
 export function quoteFreeTextPhrase(raw: string): string {
@@ -371,18 +373,11 @@ export function materializeFreeText(
 ): string | null {
   const targets = streams.map((stream) => ctx.targets[stream]);
   if (targets.length === 0 || targets.some((target) => !target)) return null;
-  const target = targets[0];
   const allFts = targets.every((target) => target.mode === "fts");
-  const singleScan = targets.length === 1 && target.mode === "scan";
-  const targetMode = allFts ? "fts" : singleScan ? "scan" : "blocked";
+  const targetMode = allFts ? "fts" : "blocked";
   const plan = planFilter(raw, ctx.fieldNames, { targetMode, tokenLimits: ctx.tokenLimits });
   if (plan.kind !== "freeText") return raw;
-  if ((!allFts && !singleScan) || target.mode === "blocked") return null;
-
-  const rendered = renderNode(plan.root, target);
-  const scanEntry = singleScan ? ctx.freeTextScan?.[streams[0]] : undefined;
-  if (scanEntry) scanEntry.materialized = true;
-  return rendered;
+  return allFts ? renderNode(plan.root) : null;
 }
 
 export function appendConjunct(
@@ -413,10 +408,11 @@ export function suggestRecovery(
   }
 
   const tally: SuggestionTally = { text: 0, fieldValue: 0, sql: 0, predicates: 0 };
-  const node = buildSuggestionExpr(tokens, raw, withImplicitFields(booleanFields), tally);
+  const rule: TermRule = { names: withImplicitFields(booleanFields), limits: DEFAULT_TOKEN_LIMITS };
+  const node = buildSuggestionExpr(withImplicitAnds(tokens, raw, rule), raw, rule.names, tally);
   const structural =
     node !== null && tally.text + tally.fieldValue > 0 && tally.sql + tally.fieldValue > 0;
-  const text = structural ? renderNode(node, { mode: "fts", fields: [] }) : "";
+  const text = structural ? renderNode(node) : "";
   const valid = structural && whereShape(text) !== null;
   if (valid && (tally.text === 0 || allStreamsFts)) {
     return { runSuggestion: text, freeTextCandidate: null };
@@ -436,12 +432,29 @@ export function freeTextRanges(
     .map(({ start, end }) => ({ start, end }));
 }
 
+export function stripCommentLines(raw: string): string {
+  const commentStarts = new Set<number>();
+  let i = 0;
+  while (i < raw.length) {
+    const end = maskedSpanEnd(raw, i);
+    if (end === null) {
+      i++;
+    } else {
+      if (raw.startsWith("--", i)) commentStarts.add(i);
+      i = end;
+    }
+  }
+  let offset = 0;
+  const kept: string[] = [];
+  for (const line of raw.split("\n")) {
+    if (!commentStarts.has(offset + line.length - line.trimStart().length)) kept.push(line);
+    offset += line.length + 1;
+  }
+  return kept.join("\n");
+}
+
 function renderSqlFilter(filter: string, knownFields: ReadonlySet<string>): string {
-  const body = filter
-    .trim()
-    .split("\n")
-    .filter((line: string) => !line.trim().startsWith("--"))
-    .join("\n");
+  const body = stripCommentLines(filter.trim());
   if (body.trim() === "") return "";
 
   const spaced = addSpacesToOperators(body);
@@ -477,31 +490,21 @@ function sqlLiteralAndCommentRanges(raw: string): TextRange[] {
   return ranges;
 }
 
-function renderNode(node: PlanNode, target: { mode: "fts" | "scan"; fields: string[] }): string {
+function renderNode(node: PlanNode): string {
   switch (node.k) {
     case "text":
-      return target.mode === "fts"
-        ? `match_all(${sqlString(node.value)})`
-        : scanPredicate(node.value, target.fields);
+      return `match_all(${sqlString(node.value)})`;
     case "sql":
       return node.text;
     case "not":
-      return `NOT ${renderNode(node.child, target)}`;
+      return node.child.k === "not"
+        ? renderNode(node.child.child)
+        : `NOT ${renderNode(node.child)}`;
     case "group":
-      return `(${renderNode(node.child, target)})`;
+      return `(${renderNode(node.child)})`;
     default:
-      return node.children
-        .map((child) => renderNode(child, target))
-        .join(node.k === "and" ? " AND " : " OR ");
+      return node.children.map(renderNode).join(node.k === "and" ? " AND " : " OR ");
   }
-}
-
-function scanPredicate(value: string, fields: string[]): string {
-  const arms = fields.map((field) => {
-    const id = `"${field.replaceAll('"', '""')}"`;
-    return `(${id} IS NOT NULL AND str_match_ignore_case(${id}, ${sqlString(value)}))`;
-  });
-  return `(${arms.join(" OR ")})`;
 }
 
 function sqlString(value: string): string {
@@ -539,10 +542,18 @@ function filterComments(raw: string): string[] {
   return comments;
 }
 
-function isExcludedToken(tok: Token): boolean {
-  return tok.t === "word"
-    ? /^-[\p{L}\p{N}_]/u.test(tok.text)
-    : (tok.t === "squote" || tok.t === "dquote") && tok.negated === true;
+// A digit- or _-led term that names a field or is below the index minimum stays text.
+function exclusionOf(tok: Token, rule: TermRule): string | null {
+  if (tok.t === "squote" || tok.t === "dquote") return tok.negated === true ? tok.text : null;
+  if (tok.t !== "word") return null;
+  const value = tok.text.replace(/^--?(?!-)/, "");
+  if (value === tok.text) return null;
+  if (/^\p{L}/u.test(value)) return value;
+  return /^[\p{N}_]/u.test(value) &&
+    hasIndexToken(value, rule.limits) &&
+    !isFieldLikeWord(value, rule.names)
+    ? value
+    : null;
 }
 
 function isLineComment(raw: string, i: number): boolean {
@@ -551,7 +562,10 @@ function isLineComment(raw: string, i: number): boolean {
   let end = i + 2;
   while (raw[start - 1] === "-") start--;
   while (raw[end] === "-") end++;
-  return !(/[\p{L}\p{N}_]/u.test(raw[start - 1] ?? "") && /[\p{L}\p{N}_]/u.test(raw[end] ?? ""));
+  const wordAfter = /[\p{L}\p{N}_]/u.test(raw[end] ?? "");
+  // A spaceless --word is the user's exclusion; a real comment needs "-- " or a longer dash run.
+  if (wordAfter && end - start === 2) return false;
+  return !(/[\p{L}\p{N}_]/u.test(raw[start - 1] ?? "") && wordAfter);
 }
 
 function lex(raw: string): Lexed[] | null {
@@ -742,9 +756,9 @@ function isKeyword(lexed: Lexed | undefined, upper: string): boolean {
   return lexed?.tok.t === "kw" && lexed.tok.text.toUpperCase() === upper;
 }
 
-function isPureTextShape(tokens: Lexed[], names: ReadonlySet<string>): boolean {
+function isPureTextShape(tokens: Lexed[], rule: TermRule): boolean {
   return tokens.every((lexed, index) =>
-    isPureTextToken(lexed, tokens[index - 1], tokens[index + 1], names),
+    isPureTextToken(lexed, tokens[index - 1], tokens[index + 1], rule),
   );
 }
 
@@ -752,9 +766,10 @@ function isPureTextToken(
   lexed: Lexed,
   prev: Lexed | undefined,
   next: Lexed | undefined,
-  names: ReadonlySet<string>,
+  rule: TermRule,
 ): boolean {
   const { tok } = lexed;
+  const { names } = rule;
   switch (tok.t) {
     case "kw":
       return CONNECTIVES.has(tok.text.toUpperCase());
@@ -763,7 +778,7 @@ function isPureTextToken(
     case "rparen":
       return true;
     case "word":
-      return !isFieldLikeWord(isExcludedToken(tok) ? tok.text.slice(1) : tok.text, names);
+      return !isFieldLikeWord(exclusionOf(tok, rule) ?? tok.text, names);
     case "dquote":
       return (
         !(tok.negated ? isFieldLikeWord(tok.text, names) : names.has(tok.text)) &&
@@ -796,13 +811,13 @@ function isFieldLikeWord(word: string, names: ReadonlySet<string>): boolean {
   );
 }
 
-function parseBooleanText(tokens: Lexed[]): PlanNode | null {
-  const state = { pos: 0 };
+function parseBooleanText(tokens: Lexed[], rule: TermRule): PlanNode | null {
+  const state: ParseState = { pos: 0, rule };
   const root = parseOr(tokens, state);
   return root !== null && state.pos === tokens.length ? root : null;
 }
 
-function parseOr(tokens: Lexed[], state: { pos: number }): PlanNode | null {
+function parseOr(tokens: Lexed[], state: ParseState): PlanNode | null {
   const children: PlanNode[] = [];
   for (;;) {
     const child = parseAnd(tokens, state);
@@ -814,7 +829,7 @@ function parseOr(tokens: Lexed[], state: { pos: number }): PlanNode | null {
   return children.length === 1 ? children[0] : { k: "or", children };
 }
 
-function parseAnd(tokens: Lexed[], state: { pos: number }): PlanNode | null {
+function parseAnd(tokens: Lexed[], state: ParseState): PlanNode | null {
   const children: PlanNode[] = [];
   for (;;) {
     const child = parseUnary(tokens, state);
@@ -826,7 +841,7 @@ function parseAnd(tokens: Lexed[], state: { pos: number }): PlanNode | null {
   return children.length === 1 ? children[0] : { k: "and", children };
 }
 
-function parseUnary(tokens: Lexed[], state: { pos: number }): PlanNode | null {
+function parseUnary(tokens: Lexed[], state: ParseState): PlanNode | null {
   let negations = 0;
   while (isKeyword(tokens[state.pos], "NOT")) {
     negations++;
@@ -837,7 +852,7 @@ function parseUnary(tokens: Lexed[], state: { pos: number }): PlanNode | null {
   return node;
 }
 
-function parsePrimary(tokens: Lexed[], state: { pos: number }): PlanNode | null {
+function parsePrimary(tokens: Lexed[], state: ParseState): PlanNode | null {
   const lexed = tokens[state.pos];
   if (!lexed) return null;
   const { tok } = lexed;
@@ -848,12 +863,8 @@ function parsePrimary(tokens: Lexed[], state: { pos: number }): PlanNode | null 
     state.pos++;
     return { k: "group", child };
   }
-  if ((tok.t === "word" || tok.t === "squote" || tok.t === "dquote") && isExcludedToken(tok)) {
-    return {
-      k: "not",
-      child: { k: "text", value: tok.t === "word" ? tok.text.slice(1) : tok.text },
-    };
-  }
+  const excluded = exclusionOf(tok, state.rule);
+  if (excluded !== null) return { k: "not", child: { k: "text", value: excluded } };
   if (tok.t === "word" || tok.t === "squote" || tok.t === "dquote")
     return { k: "text", value: tok.text };
   if (isMatchAllCall(lexed) && tok.t === "opaque") return { k: "sql", text: tok.text };
@@ -919,20 +930,75 @@ function hasIndexToken(value: string, limits: TokenLimits): boolean {
 function planMix(
   tokens: Lexed[],
   raw: string,
-  names: ReadonlySet<string>,
+  rule: TermRule,
   options: PlanFilterOptions,
-): string | null {
+): FilterPlan {
   const allFts = options.allTargetsFts ?? (options.targetMode ?? "fts") === "fts";
-  if (!allFts || exceedsTextNesting(tokens)) return null;
-  const state: MixState = {
-    names,
-    limits: options.tokenLimits ?? DEFAULT_TOKEN_LIMITS,
-    units: 0,
-  };
+  const implicitAnds = tokens.filter(isImplicitAnd).map((lexed) => lexed.start);
+  if (!allFts && implicitAnds.length === 0) return { kind: "sql", filter: raw };
+  const root = mixRoot(tokens, raw, rule);
+  if (root !== null && allFts) return { kind: "sql", filter: renderNode(root) };
+  if (implicitAnds.length === 0) return { kind: "sql", filter: raw };
+  // A -term after a complete predicate must never reach the backend as subtraction.
+  if (root !== null) return { kind: "freeText", root, units: collectUnits(root) };
+  const spliced = implicitAnds.reduceRight(
+    (text, at) => `${text.slice(0, at)}AND ${text.slice(at)}`,
+    raw,
+  );
+  return { kind: "sql", filter: spliced };
+}
+
+function mixRoot(tokens: Lexed[], raw: string, rule: TermRule): PlanNode | null {
+  if (exceedsTextNesting(tokens)) return null;
+  const state: MixState = { ...rule, units: 0 };
   const root = buildMixExpr(tokens, raw, state);
   if (root === null || state.units === 0) return null;
-  const filter = renderNode(root, { mode: "fts", fields: [] });
-  return whereShape(filter) === null ? null : filter;
+  return whereShape(renderNode(root)) === null ? null : root;
+}
+
+function withImplicitAnds(tokens: Lexed[], raw: string, rule: TermRule): Lexed[] {
+  const out: Lexed[] = [];
+  let segment = 0;
+  let between = false;
+  for (const lexed of tokens) {
+    const betweenAnd = between && isKeyword(lexed, "AND");
+    if (isKeyword(lexed, "BETWEEN")) between = true;
+    if (betweenAnd) between = false;
+    if (!betweenAnd && isSegmentBoundary(lexed)) {
+      splitTrailingExclusions(out, segment, raw, rule);
+      segment = out.length + 1;
+    }
+    out.push(lexed);
+  }
+  splitTrailingExclusions(out, segment, raw, rule);
+  return out;
+}
+
+function isSegmentBoundary(lexed: Lexed): boolean {
+  const { t } = lexed.tok;
+  return (
+    t === "lparen" || t === "rparen" || ["AND", "OR", "NOT"].some((kw) => isKeyword(lexed, kw))
+  );
+}
+
+function splitTrailingExclusions(out: Lexed[], start: number, raw: string, rule: TermRule): void {
+  let k = out.length;
+  while (k - 1 > start && isTrailingExclusion(out[k - 1], out[k - 2], rule)) k--;
+  if (k === out.length) return;
+  const left = out.slice(start, k);
+  if (left.every(isOperandToken) || whereShape(sliceOf(left, raw)) !== "predicate") return;
+  const at = out[k].start;
+  out.splice(k, 0, { tok: { t: "kw", text: "AND" }, start: at, end: at });
+}
+
+function isTrailingExclusion(lexed: Lexed, prev: Lexed, rule: TermRule): boolean {
+  if (lexed.tok.t !== "word" || lexed.start <= prev.end) return false;
+  const value = exclusionOf(lexed.tok, rule);
+  return value !== null && hasIndexToken(value, rule.limits) && !isFieldLikeWord(value, rule.names);
+}
+
+function isImplicitAnd(lexed: Lexed): boolean {
+  return lexed.start === lexed.end && isKeyword(lexed, "AND");
 }
 
 function buildMixExpr(tokens: Lexed[], raw: string, state: MixState): PlanNode | null {
@@ -984,10 +1050,10 @@ function mixTextUnit(lexed: Lexed, next: Lexed | undefined, state: MixState): Pl
   if (tok.t !== "word" && tok.t !== "squote" && tok.t !== "dquote") return null;
   if (tok.t !== "word" && gluedToNextOperand(lexed, next)) return null;
   if (tok.t === "dquote" && state.names.has(tok.text)) return null;
-  if (isExcludedToken(tok) && tok.t !== "word" && isFieldLikeWord(tok.text, state.names))
-    return null;
-  const negated = isExcludedToken(tok);
-  const value = negated && tok.t === "word" ? tok.text.slice(1) : tok.text;
+  const excluded = exclusionOf(tok, state);
+  const negated = excluded !== null;
+  if (negated && tok.t !== "word" && isFieldLikeWord(tok.text, state.names)) return null;
+  const value = excluded ?? tok.text;
   if (
     tok.t === "word" &&
     ((!negated && NUMERIC_LITERAL.test(value)) || isFieldLikeWord(value, state.names))
@@ -1064,8 +1130,14 @@ function buildOperandRun(
 }
 
 function operandNode(tok: Token, names: ReadonlySet<string>): PlanNode | null {
-  if ((tok.t === "word" || tok.t === "squote" || tok.t === "dquote") && isExcludedToken(tok)) {
-    const value = tok.t === "word" ? tok.text.slice(1) : tok.text;
+  if (tok.t === "word") {
+    const unsigned = tok.text.replace(/^--?(?!-)/, "");
+    const pair = fieldValuePair(unsigned, names);
+    if (pair === null) return null;
+    if (pair !== undefined) return { k: "sql", text: comparisonOf(pair, unsigned !== tok.text) };
+  }
+  const value = exclusionOf(tok, { names, limits: DEFAULT_TOKEN_LIMITS });
+  if (value !== null) {
     return value === "" || isFieldLikeWord(value, names)
       ? null
       : { k: "not", child: { k: "text", value } };
@@ -1074,15 +1146,26 @@ function operandNode(tok: Token, names: ReadonlySet<string>): PlanNode | null {
   if (tok.t === "dquote")
     return names.has(tok.text) || tok.text === "" ? null : { k: "text", value: tok.text };
   if (tok.t !== "word") return null;
-  const colon = tok.text.indexOf(":");
-  const left = colon > 0 ? tok.text.slice(0, colon) : "";
-  const rawRest = tok.text.slice(colon + 1);
-  const rest = unquoteLiteral(rawRest);
-  if (left !== "" && isFieldLikeWord(left, names)) {
-    const partialQuote = /^['"]/.test(rawRest) && lexQuoted(rawRest, 0)?.end !== rawRest.length;
-    return rest === "" || partialQuote ? null : { k: "sql", text: `${left}=${sqlString(rest)}` };
-  }
   return isFieldLikeWord(tok.text, names) ? null : { k: "text", value: tok.text };
+}
+
+function fieldValuePair(
+  word: string,
+  names: ReadonlySet<string>,
+): FieldValuePair | null | undefined {
+  const colon = word.indexOf(":");
+  const field = colon > 0 ? word.slice(0, colon) : "";
+  if (field === "" || !isFieldLikeWord(field, names)) return undefined;
+  const rawValue = word.slice(colon + 1);
+  const value = unquoteLiteral(rawValue);
+  const partialQuote = /^['"]/.test(rawValue) && lexQuoted(rawValue, 0)?.end !== rawValue.length;
+  return value === "" || partialQuote ? null : { field, value };
+}
+
+// An excluded field:value keeps rows that lack the field, which NOT field='v' would drop as NULL.
+function comparisonOf({ field, value }: FieldValuePair, excluded: boolean): string {
+  const literal = sqlString(value);
+  return excluded ? `(${field} IS NULL OR ${field}!=${literal})` : `${field}=${literal}`;
 }
 
 function buildSqlSegment(
