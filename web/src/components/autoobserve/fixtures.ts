@@ -209,7 +209,11 @@ export interface CoverageCell {
 
 export interface CoverageRow {
   service: string;
+  stream: string;
+  blockedBy?: "noLink" | "stopped";
+  addedThisWeek?: boolean;
   lastScanned: I18nText;
+  scannedMinutes: number | null;
   cells: Record<Signal, CoverageCell>;
 }
 
@@ -625,6 +629,24 @@ const CPU = "requires k8s.pod.name + container CPU";
 const LOGS = "requires service.name in logs";
 const DEPS = "requires span.kind = client";
 
+// Agrees with the incident facts: checkout saturates on its connection pool, search on memory.
+const SATURATION_OVERRIDE: Record<string, CoverageCell> = {
+  checkout: w(
+    "checkout-pool-saturation",
+    "threshold",
+    "db-client/pool",
+    "requires db.client.connections.usage + max",
+    "otel_traces",
+  ),
+  search: w(
+    "search-memory",
+    "threshold",
+    "k8s-workload/memory",
+    "requires container memory + limit",
+    "k8s_metrics",
+  ),
+};
+
 const watchedCells = (svc: ServiceFact): Record<Signal, CoverageCell> => {
   const name = svc.name;
   const logs = w(`${name}-log-patterns`, "anomaly", "logs/new-pattern", LOGS, svc.stream);
@@ -734,7 +756,9 @@ const watchedCells = (svc: ServiceFact): Record<Signal, CoverageCell> => {
     requests: w(`${name}-requests`, "anomaly", "http-service/requests", HTTP_REQ, svc.stream),
     errors: w(`${name}-errors`, "anomaly", "http-service/error-rate", HTTP_ERR, svc.stream),
     latency: w(`${name}-latency`, "anomaly", "http-service/latency-p95", HTTP_LAT, svc.stream),
-    saturation: w(`${name}-cpu`, "threshold", "k8s-workload/cpu", CPU, "k8s_metrics"),
+    saturation:
+      SATURATION_OVERRIDE[name] ??
+      w(`${name}-cpu`, "threshold", "k8s-workload/cpu", CPU, "k8s_metrics"),
     logPatterns: logs,
     dependencies: w(`${name}-deps`, "anomaly", "dependencies/client-errors", DEPS, svc.stream),
   };
@@ -791,6 +815,10 @@ export const coverageFor = (scenario: Scenario, t: TranslateFn): CoverageRow[] =
       const stream = facts.streams.find((s) => s.name === svc.stream);
       return {
         service: svc.name,
+        stream: svc.stream,
+        blockedBy: svc.state === "cantSee" ? svc.reason : undefined,
+        addedThisWeek: svc.foundToday,
+        scannedMinutes: stream?.scannedMinutesAgo ?? null,
         lastScanned:
           scannedLabel(t, stream?.scannedMinutesAgo ?? null, stream?.stale) ??
           t("autoobserve.coverage.notScanned"),
@@ -831,6 +859,7 @@ export const coverageStats = (scenario: Scenario) => {
     learning: s.learning,
     gaps: s.unseen,
     fullyWatched: s.total - s.learning - s.unseen,
+    added: s.foundToday,
     detectors,
   };
 };
