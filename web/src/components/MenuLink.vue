@@ -37,6 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
           <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
           <div
+            v-if="locked"
+            class="bg-surface-base absolute -top-1 -right-1 z-1 flex h-3.5 w-3.5 items-center justify-center rounded-full"
+          >
+            <OIcon name="lock" size="xs" class="text-warning-600" />
+          </div>
+          <div
             v-if="badge && badge > 0"
             class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md"
             aria-live="polite"
@@ -201,6 +207,17 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Present but unreachable — an enterprise/cloud-only item in a build that
+    // doesn't unlock it (see utils/enterpriseFeatures.ts). Dimmed, inert on
+    // click, and shows `lockedMessage` as a tooltip instead of navigating.
+    locked: {
+      type: Boolean,
+      default: false,
+    },
+    lockedMessage: {
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
+    },
   },
   emits: ["trigger"],
   setup(props, { emit }) {
@@ -314,19 +331,30 @@ export default defineComponent({
       return !!c && (typeof c === "function" || Object.keys(c).length > 0);
     });
 
-    // Resolve the root element/component for the current mode.
+    // Locked wins over everything else. A real `RouterLink` can't be made
+    // inert via `onRootClick`'s preventDefault — RouterLink's own click
+    // handler runs before the parent's `@click` fallthrough listener (vue-
+    // router merges its `navigate` first) — so a plain `div` is the only way
+    // to guarantee no navigation.
     const rootComponent = computed(() =>
-      props.external ? "a" : props.asTrigger ? "button" : RouterLink,
+      props.locked ? "div" : props.external ? "a" : props.asTrigger ? "button" : RouterLink,
     );
 
     // Attributes bound to the root, per mode. Kept in one place so the three
     // modes can never drift apart visually.
     const rootProps = computed<Record<string, any>>(() => {
       const common: Record<string, any> = {
-        "data-test": `menu-link-${props.link}-item`,
+        "data-test": props.locked
+          ? `menu-link-${props.link}-item-locked`
+          : `menu-link-${props.link}-item`,
         "aria-label": ariaLabel.value,
         "data-truncated": isTruncated.value ? "true" : undefined,
       };
+      if (props.locked) {
+        // A plain `div` carries no native tabindex — add one so keyboard
+        // users can still reach it (and trigger its click) by Tab.
+        return { ...common, role: "link", tabindex: 0 };
+      }
       // Set only when present: an explicit undefined would erase the tooltip's own describedby.
       if (props.paywalled) {
         common["data-paywalled"] = "true";
@@ -367,9 +395,11 @@ export default defineComponent({
       "max-md:flex max-md:min-h-11 max-md:items-center max-md:px-2 max-md:py-2",
       // Sit above the rail's sliding pill so icon/label stay readable.
       slideActive.value ? "z-10" : "",
-      isActive.value
-        ? activePillClass.value
-        : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
+      props.locked
+        ? "cursor-pointer text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg"
+        : isActive.value
+          ? activePillClass.value
+          : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
       isActive.value ? "nav-menu-item--active" : "",
       props.title === "Functions" ? "menu-link-function" : "",
       // Reset native <button> chrome so the trigger looks EXACTLY like a link.
@@ -383,6 +413,11 @@ export default defineComponent({
     ]);
 
     const onRootClick = (event: MouseEvent) => {
+      if (props.locked) {
+        event.preventDefault();
+        router.push({ name: "enterpriseFeatures" }).catch(() => {});
+        return;
+      }
       if (props.external) {
         event.preventDefault();
         openWebPage(props.link);

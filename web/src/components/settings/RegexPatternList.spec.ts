@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ref, nextTick } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
@@ -138,6 +139,8 @@ const mockRouter = {
 const mockNotify = {
   notify: vi.fn(),
 };
+
+beforeEach(() => resetListViewState());
 
 describe("RegexPatternList.vue Component Logic", () => {
   const mockRegexPatterns = [
@@ -1292,5 +1295,28 @@ describe("RegexPatternList.vue - ODrawer Migration", () => {
     await child.vm.$emit("update:open", false);
     await flushPromises();
     expect(w.vm.showAddRegexPatternDialog.show).toBe(false);
+  });
+
+  it("restores saved list state and writes changes back", async () => {
+    Object.assign(useListViewState("regex-patterns", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    const { wrapper } = await mountComponent();
+    const vm: any = wrapper.vm;
+    expect([vm.filterQuery, vm.pageSize, vm.currentPage, vm.sortBy, vm.sortOrder]).toEqual([
+      "abc",
+      50,
+      2,
+      "name",
+      "desc",
+    ]);
+    vm.pageSize = 100;
+    await vm.$nextTick();
+    expect(useListViewState("regex-patterns", {}).pageSize).toBe(100);
+    wrapper.unmount();
   });
 });

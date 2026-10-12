@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="max-w-[calc(100%_-_2.5rem)]"
       v-model="selectedTabId"
       :align="'left'"
-      :reorderable="canManage"
+      :reorderable="canReorder"
       dense
       mobile-arrows
       @click.stop
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="tab?.name"
             :data-test="`dashboard-tab-${tab.tabId}-name`"
             :data-test-tab-name="tab?.name"
-            @dblclick="canManage ? startRename(tab) : undefined"
+            @dblclick="canRename ? startRename(tab) : undefined"
             >{{ tab?.name }}</span
           >
           <!-- Panel-count badge: conveys how dense each tab is without opening it.
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                commits the rename. Both are absolutely positioned in the pe-2.5
                reserve, so swapping them never affects the tab's width. -->
           <OIcon
-            v-if="canManage && editingTabId !== tab.tabId"
+            v-if="canRename && editingTabId !== tab.tabId"
             name="edit"
             size="sm"
             :aria-label="t('common.edit')"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- mousedown.prevent keeps the input focused (no blur-commit race);
                the click then commits explicitly. -->
           <OIcon
-            v-else-if="canManage"
+            v-else-if="canRename"
             name="check"
             size="sm"
             :aria-label="t('common.save')"
@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Always-visible + (spreadsheet-style tab bars keep the add affordance
          persistent, not hover-revealed). -->
     <OButton
-      v-if="!viewOnly"
+      v-if="!viewOnly && layoutMode !== 'edit'"
       variant="ghost"
       size="icon"
       class="ms-1"
@@ -156,13 +156,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { computed, inject, nextTick, ref, defineComponent } from "vue";
+import { computed, inject, nextTick, ref, defineComponent, type PropType } from "vue";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import { useRoute } from "vue-router";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { editTab, updateDashboard } from "@/utils/commons";
 import useNotifications from "@/composables/useNotifications";
+import type { LayoutMode } from "@/components/dashboards/layoutMode";
 
 export default defineComponent({
   name: "TabList",
@@ -184,8 +185,12 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    layoutMode: {
+      type: String as PropType<LayoutMode>,
+      default: "live",
+    },
   },
-  emits: ["refresh"],
+  emits: ["refresh", "layoutChange"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const route = useRoute();
@@ -208,6 +213,9 @@ export default defineComponent({
     // Reorder and rename affordances are edit-only — a view-only dashboard shows
     // no grip and its names aren't editable.
     const canManage = computed(() => !props.viewOnly);
+    // Tab order is layout, so it moves only in edit mode; renaming saves at once, so it never does.
+    const canReorder = computed(() => canManage.value && props.layoutMode !== "view");
+    const canRename = computed(() => canManage.value && props.layoutMode !== "edit");
 
     // Real panels only — section headers (o2SectionHeader) are layout labels.
     const panelCount = (tab: any): number =>
@@ -262,6 +270,11 @@ export default defineComponent({
       // Optimistic: mutate the shared tab array in place so the keyed v-for moves
       // the existing DOM nodes (what the FLIP animation slides).
       props.dashboardData!.tabs = list;
+
+      if (props.layoutMode === "edit") {
+        emit("layoutChange");
+        return;
+      }
 
       try {
         await updateDashboard(
@@ -333,6 +346,8 @@ export default defineComponent({
       route,
       selectedTabId,
       canManage,
+      canReorder,
+      canRename,
       panelCount,
       onReorder,
       editingTabId,

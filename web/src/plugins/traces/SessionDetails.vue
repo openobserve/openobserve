@@ -53,15 +53,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #actions>
-        <TraceAnnotateMenu
-          v-if="canAnnotate"
-          ref-type="session"
-          :ref-id="sessionId"
-          :ref-trace-start-time="sessionEvaluationRange.startTime"
-          :source-stream="streamName"
-          compact
-          data-test="session-detail-annotate-btn"
-        />
+        <template v-if="canAnnotateContext">
+          <TraceAnnotateMenu
+            v-if="queuesAccess.allowed"
+            ref-type="session"
+            :ref-id="sessionId"
+            :ref-trace-start-time="sessionEvaluationRange.startTime"
+            :source-stream="streamName"
+            compact
+            data-test="session-detail-annotate-btn"
+          />
+          <!-- TraceAnnotateMenu has no disabled affordance of its own, so a
+               locked edition gets a stand-in button that opens the upgrade
+               dialog instead. -->
+          <OButton
+            v-else
+            variant="outline"
+            size="sm"
+            data-test="session-detail-annotate-btn"
+            @click="openUpgradeDialog"
+          >
+            {{ t("aiObservability.traceActions.annotate.button") }}
+            <template #icon-right
+              ><OIcon name="lock" size="sm" class="text-warning-600"
+            /></template>
+          </OButton>
+        </template>
         <OButton
           v-if="canManualEvaluate"
           variant="outline"
@@ -943,6 +960,8 @@ import SessionRibbon from "./SessionRibbon.vue";
 import ThreadView from "./ThreadView.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
 import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import { renderMarkdown } from "./markdown";
@@ -1021,13 +1040,14 @@ const canManualEvaluate = computed(() => {
 });
 const manualEvaluationOpen = ref(false);
 
-// Same enterprise gate as manual evaluation minus the online-eval flag —
-// queuing a session for human review does not require the eval engine.
-const canAnnotate = computed(() => {
+// Same non-edition conditions as manual evaluation minus the online-eval
+// flag — queuing a session for human review does not require the eval
+// engine. Drives the Annotate button's VISIBILITY so a locked edition still
+// shows it, just disabled.
+const canAnnotateContext = computed(() => {
   const range = sessionEvaluationRange.value;
   return (
     hasLlmSessionData.value &&
-    (config.isEnterprise === "true" || config.isCloud === "true") &&
     Boolean(orgIdentifier.value) &&
     Boolean(streamName.value) &&
     Boolean(sessionId.value) &&
@@ -1035,6 +1055,10 @@ const canAnnotate = computed(() => {
     range.startTime > 0
   );
 });
+// Annotating a session is the same capability as queuing it into AI
+// Observability's review Queues, so it shares that gate.
+const queuesAccess = useLockedAffordance("queues");
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the
 // real trace rows returned by the session-detail API.
