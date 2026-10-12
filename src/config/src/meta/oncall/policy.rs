@@ -249,13 +249,12 @@ pub fn retry_delay_micros(attempts_made: u32) -> Option<i64> {
     Some(1_000_000i64 << (attempts_made - 1))
 }
 
-/// The window §9 measures a channel's failure ratio over.
+/// The window §9 counts a channel's consecutive failures over.
 pub const BREAKER_WINDOW_MICROS: i64 = MICROS_PER_MINUTE;
 /// How long an open breaker stays open before it admits one probe.
 pub const BREAKER_OPEN_MICROS: i64 = MICROS_PER_MINUTE;
-/// Attempts needed before a ratio means anything. Two failures out of two is
-/// not a hard-down provider, it is a team with one bad address.
-pub const BREAKER_MIN_ATTEMPTS: usize = 4;
+/// Failures in the window that open the breaker; fewer is one bad address, not a down provider.
+pub const BREAKER_FAILURES: usize = 4;
 
 /// §9's per-channel circuit breaker, as a pure state machine.
 ///
@@ -268,8 +267,8 @@ pub const BREAKER_MIN_ATTEMPTS: usize = 4;
 /// come back, and the half-open probe fixes that within a minute.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ChannelBreaker {
-    /// `(at, delivered)` for the attempts still inside the window.
-    attempts: Vec<(i64, bool)>,
+    /// Failure times inside the window; a success clears them, so no success is ever kept.
+    failures: Vec<i64>,
     /// When it tripped, if it is open.
     opened_at: Option<i64>,
     /// When the half-open probe was admitted; a slot this old is dead and free again.
@@ -304,21 +303,19 @@ impl ChannelBreaker {
         self.probe_at = None;
         // A success ends the story: the channel works, so open state and past failures are moot.
         if delivered {
-            self.attempts.clear();
+            self.failures.clear();
             self.opened_at = None;
             return;
         }
         // A failed half-open probe re-opens for a full cool-down, else every rung pays a probe.
         if self.opened_at.is_some() {
             self.opened_at = Some(now);
-            self.attempts.clear();
+            self.failures.clear();
             return;
         }
-        self.attempts
-            .retain(|(at, _)| now - *at < BREAKER_WINDOW_MICROS);
-        self.attempts.push((now, false));
-        let failures = self.attempts.iter().filter(|(_, ok)| !ok).count();
-        if self.attempts.len() >= BREAKER_MIN_ATTEMPTS && failures * 2 >= self.attempts.len() {
+        self.failures.retain(|at| now - *at < BREAKER_WINDOW_MICROS);
+        self.failures.push(now);
+        if self.failures.len() >= BREAKER_FAILURES {
             self.opened_at = Some(now);
         }
     }
@@ -1420,7 +1417,7 @@ mod tests {
     #[test]
     fn test_the_breaker_needs_evidence_before_it_opens() {
         let mut b = ChannelBreaker::new();
-        for i in 0..(BREAKER_MIN_ATTEMPTS as i64 - 1) {
+        for i in 0..(BREAKER_FAILURES as i64 - 1) {
             b.record(i, false);
             assert_eq!(
                 b.admit(i),
@@ -1429,9 +1426,9 @@ mod tests {
                 i + 1
             );
         }
-        b.record(BREAKER_MIN_ATTEMPTS as i64, false);
+        b.record(BREAKER_FAILURES as i64, false);
         assert_eq!(
-            b.admit(BREAKER_MIN_ATTEMPTS as i64),
+            b.admit(BREAKER_FAILURES as i64),
             Admission::Refuse,
             "a channel failing every attempt has to stop being tried"
         );
@@ -1442,10 +1439,10 @@ mod tests {
     #[test]
     fn test_an_open_breaker_admits_one_probe_and_a_success_closes_it() {
         let mut b = ChannelBreaker::new();
-        for i in 0..BREAKER_MIN_ATTEMPTS as i64 {
+        for i in 0..BREAKER_FAILURES as i64 {
             b.record(i, false);
         }
-        let opened = BREAKER_MIN_ATTEMPTS as i64 - 1;
+        let opened = BREAKER_FAILURES as i64 - 1;
         assert_eq!(b.admit(opened + BREAKER_OPEN_MICROS - 1), Admission::Refuse);
         assert_eq!(b.admit(opened + BREAKER_OPEN_MICROS), Admission::Probe);
 
@@ -1465,7 +1462,7 @@ mod tests {
         );
     }
 
-    /// The ratio is measured over a window, so failures spread across an hour
+    /// Failures are counted over a window, so failures spread across an hour
     /// never add up to an outage.
     #[test]
     fn test_failures_outside_the_window_do_not_count() {
@@ -1486,12 +1483,12 @@ mod tests {
     fn test_admit_lets_one_probe_through_a_half_open_breaker() {
         let open = |at: i64| {
             let mut b = ChannelBreaker::new();
-            for i in 0..BREAKER_MIN_ATTEMPTS as i64 {
+            for i in 0..BREAKER_FAILURES as i64 {
                 b.record(at + i, false);
             }
             b
         };
-        let opened = BREAKER_MIN_ATTEMPTS as i64 - 1;
+        let opened = BREAKER_FAILURES as i64 - 1;
         let half_open = opened + BREAKER_OPEN_MICROS;
         let probing = || {
             let mut b = open(0);
@@ -1544,10 +1541,10 @@ mod tests {
     #[test]
     fn test_release_frees_the_probe_slot_without_closing_the_breaker() {
         let mut b = ChannelBreaker::new();
-        for i in 0..BREAKER_MIN_ATTEMPTS as i64 {
+        for i in 0..BREAKER_FAILURES as i64 {
             b.record(i, false);
         }
-        let half_open = BREAKER_MIN_ATTEMPTS as i64 - 1 + BREAKER_OPEN_MICROS;
+        let half_open = BREAKER_FAILURES as i64 - 1 + BREAKER_OPEN_MICROS;
         let before = b.clone();
         assert_eq!(b.admit(half_open), Admission::Probe);
         b.release();

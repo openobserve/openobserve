@@ -189,6 +189,7 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
                 .await?;
         }
         OncallMessage::ContactPut {
+            id,
             org_id,
             user_email,
             phone,
@@ -196,6 +197,7 @@ pub(crate) async fn process_msg(msg: OncallMessage) -> Result<()> {
         } => {
             log::debug!("[SUPER_CLUSTER:oncall] Put contact org={org_id} user={user_email}");
             table::super_cluster_oncall::put_contact(
+                &id,
                 &org_id,
                 &user_email,
                 phone,
@@ -301,7 +303,7 @@ mod tests {
         let org = format!("org_{}", config::ider::uuid());
         let key = format!("/oncall/{org}/contacts/ana@o2.ai");
         let put = format!(
-            r#"{{"ContactPut":{{"org_id":"{org}","user_email":"ana@o2.ai","phone":"+15550100","phone_verified_at":700}}}}"#
+            r#"{{"ContactPut":{{"id":"c_1","org_id":"{org}","user_email":"ana@o2.ai","phone":"+15550100","phone_verified_at":700}}}}"#
         );
 
         process(oncall_msg(&key, &put)).await.unwrap();

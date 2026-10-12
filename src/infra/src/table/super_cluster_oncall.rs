@@ -282,6 +282,7 @@ pub async fn clear_unavailability_for_user(
 
 /// Applies a person's phone and its proof as sent, keeping every other field. [strong]
 pub async fn put_contact(
+    id: &str,
     org_id: &str,
     user_email: &str,
     phone: Option<String>,
@@ -289,6 +290,7 @@ pub async fn put_contact(
 ) -> Result<(), errors::Error> {
     put_contact_in(
         get_orm_client_rw().await,
+        id,
         org_id,
         user_email,
         phone,
@@ -548,6 +550,7 @@ async fn put_event_in<C: ConnectionTrait>(
 
 async fn put_contact_in<C: ConnectionTrait>(
     conn: &C,
+    id: &str,
     org_id: &str,
     user_email: &str,
     phone: Option<String>,
@@ -561,7 +564,7 @@ async fn put_contact_in<C: ConnectionTrait>(
     // The proof is applied as received: the source already decided it, and V5 may have copied it.
     let Some(existing) = existing else {
         oncall_user_contacts::ActiveModel {
-            id: Set(config::ider::uuid()),
+            id: Set(id.to_string()),
             org_id: Set(org_id.to_string()),
             user_email: Set(user_email.to_string()),
             phone: Set(phone),
@@ -1000,6 +1003,7 @@ mod tests {
 
         put_contact_in(
             &db,
+            "c_1",
             "acme",
             "ana@o2.ai",
             Some("+15550100".into()),
@@ -1009,6 +1013,10 @@ mod tests {
         .unwrap();
 
         let row = stored_contact(&db).await;
+        assert_eq!(
+            row.id, "c_1",
+            "every region keys the profile by the source's id"
+        );
         assert_eq!(
             (row.org_id.as_str(), row.user_email.as_str()),
             ("acme", "ana@o2.ai")
@@ -1040,6 +1048,7 @@ mod tests {
 
         put_contact_in(
             &db,
+            "c_from_another_region",
             "acme",
             "ana@o2.ai",
             Some("+15550100".into()),
@@ -1059,12 +1068,20 @@ mod tests {
     #[tokio::test]
     async fn test_a_contact_put_with_a_new_number_keeps_the_proof_it_carries() {
         let db = db().await;
-        put_contact_in(&db, "acme", "ana@o2.ai", Some("+15550100".into()), None)
-            .await
-            .unwrap();
+        put_contact_in(
+            &db,
+            "c_1",
+            "acme",
+            "ana@o2.ai",
+            Some("+15550100".into()),
+            None,
+        )
+        .await
+        .unwrap();
 
         put_contact_in(
             &db,
+            "c_1",
             "acme",
             "ana@o2.ai",
             Some("+15550199".into()),

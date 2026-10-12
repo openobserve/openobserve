@@ -18,11 +18,17 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// How long a texted code stays valid.
 pub const CODE_TTL_MICROS: i64 = 10 * 60 * 1_000_000;
+/// Wrong entries allowed per code, so six digits cannot be guessed.
 pub const CODE_MAX_ATTEMPTS: u32 = 5;
+/// Minimum wait between two codes from one user to one number.
 pub const SEND_GAP_MICROS: i64 = 60 * 1_000_000;
+/// Codes one user may send in 24 h across all numbers; caps the org's SMS bill.
 pub const SENDS_PER_USER_PER_DAY: u32 = 5;
+/// Codes one number may receive in 24 h from all users; protects the phone's owner.
 pub const SENDS_PER_NUMBER_PER_DAY: u32 = 10;
+/// The rolling 24 h window the daily caps count over.
 pub const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
 
 /// The contact methods a person has volunteered, and whether each is proven.
@@ -48,10 +54,7 @@ pub struct Contact {
 }
 
 impl Contact {
-    /// An empty profile for somebody who has never saved one. Returned rather
-    /// than a 404: "this person has no phone" is a complete, true answer, and
-    /// making every caller branch on a missing row is how a screen ends up
-    /// rendering nothing at all.
+    /// An empty profile for somebody who never saved one; "no phone" is a true answer, not a 404.
     pub fn empty(org_id: &str, user_email: &str) -> Self {
         Self {
             org_id: org_id.to_string(),
@@ -65,10 +68,7 @@ impl Contact {
         }
     }
 
-    /// Whether an SMS or voice transport may ring this number. Both halves are
-    /// required: a number nobody has verified is a claim, not an address — the
-    /// previous owner of a recycled mobile has not consented to being woken at
-    /// 3am by somebody else's outage.
+    /// Whether SMS or voice may ring this number; unverified, it may belong to a stranger.
     pub fn phone_is_pageable(&self) -> bool {
         self.phone.as_ref().is_some_and(|p| !p.trim().is_empty())
             && self.phone_verified_at.is_some()
@@ -113,7 +113,9 @@ pub struct CodeRow {
     pub has_code: bool,
     pub attempts: u32,
     pub sent_at: i64,
+    /// Codes sent in the rolling 24 h window that began at `day_started_at`.
     pub sends_today: u32,
+    /// When the current rolling 24 h window began, in micros.
     pub day_started_at: i64,
 }
 
@@ -160,7 +162,7 @@ pub fn to_e164(raw: &str) -> Result<String, ContactError> {
     Ok(compact)
 }
 
-/// Whether a code may go to `target` now (V7), from this user's rows and this number's rows. [pure]
+/// Whether a code may be texted now, else the longest wait and which limit caused it. [pure]
 pub fn code_send_decision(
     user_email: &str,
     target: &str,
@@ -203,7 +205,7 @@ pub fn code_send_decision(
     }
 }
 
-/// The `(sends_today, day_started_at)` to store after a send (V8). [pure]
+/// The rolling-window counts to store after a send, so the daily caps see it. [pure]
 pub fn next_counts(row: Option<&CodeRow>, now: i64) -> (u32, i64) {
     match row {
         Some(r) if now - r.day_started_at < DAY_MICROS => (r.sends_today + 1, r.day_started_at),
@@ -211,7 +213,7 @@ pub fn next_counts(row: Option<&CodeRow>, now: i64) -> (u32, i64) {
     }
 }
 
-/// The outcome of one code entry against the row for the user's current number (V2, V6). [pure]
+/// Whether an entered code verifies the user's current number, or why it does not. [pure]
 pub fn code_check(
     row: Option<&CodeRow>,
     current_phone: Option<&str>,
@@ -235,7 +237,7 @@ pub fn code_check(
     }
 }
 
-/// The V8 refusal text and its `Retry-After` seconds for a wait of `micros`. [pure]
+/// The refusal text and `Retry-After` seconds that tell a user when they may ask again. [pure]
 pub fn wait_message(micros: i64) -> (String, i64) {
     let secs = ((micros + 999_999) / 1_000_000).max(1);
     let minutes = (secs + 59) / 60;
@@ -246,7 +248,7 @@ pub fn wait_message(micros: i64) -> (String, i64) {
     )
 }
 
-/// The micros until the earliest live window of `rows` ends, once their live sends reach `cap`.
+/// How long until a daily cap frees a send, or `None` while `rows` are under `cap`.
 fn daily_wait<'a>(rows: impl Iterator<Item = &'a CodeRow>, cap: u32, now: i64) -> Option<i64> {
     let live: Vec<&CodeRow> = rows
         .filter(|r| now - r.day_started_at < DAY_MICROS)
