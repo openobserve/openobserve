@@ -9,7 +9,7 @@
       xAliasInconsistencyWarning ||
       isCachedDataDifferWithCurrentTimeRange ||
       (isPartialData && !isPanelLoading) ||
-      (lastTriggeredAt && !viewOnly && !simplifiedPanelView)
+      ((lastTriggeredAt || isRefreshing) && !viewOnly && !simplifiedPanelView)
     "
     class="flex flex-nowrap items-center"
   >
@@ -143,9 +143,17 @@
       />
     </OButton>
 
+    <span
+      v-if="isRefreshing && !viewOnly && !simplifiedPanelView"
+      class="ms-1.25 inline-flex min-w-0 items-center gap-1 overflow-hidden text-xs whitespace-nowrap"
+      data-test="panel-refreshing-in-background"
+    >
+      <OSpinner size="xs" />
+      {{ t("dashboard.panelErrorButtons.refreshing") }}
+    </span>
     <!-- Universal Last Refreshed Clock Icon and Time -->
     <span
-      v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
+      v-else-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
       class="lastRefreshedAt ms-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
       data-test="panel-last-refreshed-at"
     >
@@ -173,9 +181,10 @@ import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 export default defineComponent({
   name: "PanelErrorButtons",
-  components: { RelativeTime, OButton, OIcon, OTooltip },
+  components: { RelativeTime, OButton, OIcon, OTooltip, OSpinner },
   props: {
     error: {
       type: String,
@@ -208,6 +217,10 @@ export default defineComponent({
     lastTriggeredAt: {
       type: [String, Number, Date, null],
       default: null,
+    },
+    isRefreshing: {
+      type: Boolean,
+      default: false,
     },
     viewOnly: {
       type: Boolean,

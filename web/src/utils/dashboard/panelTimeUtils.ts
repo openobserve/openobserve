@@ -203,6 +203,20 @@ export const resolvePanelTimeValue = (
   return null;
 };
 
+/** Whether a dashboard panel runs on a relative range: URL pt-* time, then saved range, then global. */
+export const isEffectivePanelTimeRelative = (
+  panel: any,
+  query: LocationQuery | undefined,
+  globalTime: { valueType?: string } | null | undefined,
+): boolean => {
+  // A panel's own time counts only while panel time is on, as in ViewDashboard's computeAllPanelTimes.
+  const ownTime = hasPanelTime(panel)
+    ? (getPanelTimeFromURL(panel.id, query) ??
+      convertPanelTimeRangeToPicker(panel.config?.panel_time_range))
+    : null;
+  return (ownTime?.valueType ?? globalTime?.valueType) === "relative";
+};
+
 /** Whether a dashboard URL change can move any panel's time; var-, pt- and cell_ params cannot. */
 export const queryChangeAffectsPanelTimes = (
   newQuery: Record<string, any>,

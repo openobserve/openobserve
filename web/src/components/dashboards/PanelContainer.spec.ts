@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PanelContainer from "@/components/dashboards/PanelContainer.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -1350,6 +1351,25 @@ describe("PanelContainer", () => {
       await panelRenderer.vm.$emit("loading-state-change", true);
 
       expect(wrapper.vm.isPanelLoading).toBe(true);
+    });
+
+    it("shows Refreshing… in the header while the renderer refreshes a restored result", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+
+      await renderer.vm.$emit("last-triggered-at-update", Date.now() - 10 * 60 * 1000);
+      await renderer.vm.$emit("is-refreshing-in-background-update", true);
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-refreshing-in-background"]').text()).toContain(
+        "Refreshing…",
+      );
+      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(false);
+
+      await renderer.vm.$emit("last-triggered-at-update", Date.now());
+      await renderer.vm.$emit("is-refreshing-in-background-update", false);
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-refreshing-in-background"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(true);
     });
   });
 

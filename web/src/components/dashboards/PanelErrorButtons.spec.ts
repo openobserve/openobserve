@@ -283,4 +283,39 @@ describe("PanelErrorButtons", () => {
       expect(wrapper.find('[data-test="dashboard-panel-exemplars-error"]').exists()).toBe(false);
     });
   });
+
+  describe("background refresh after a cache restore", () => {
+    it("shows a spinner and Refreshing… in place of the last-refreshed time", () => {
+      const wrapper = mountComponent({
+        props: { lastTriggeredAt: Date.now() - 10 * 60 * 1000, isRefreshing: true },
+      });
+
+      const chip = wrapper.find('[data-test="panel-refreshing-in-background"]');
+      expect(chip.exists()).toBe(true);
+      expect(chip.text()).toContain("Refreshing…");
+      expect(chip.find('[role="status"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(false);
+    });
+
+    it("goes back to the last-refreshed time when the fresh result lands", async () => {
+      const wrapper = mountComponent({
+        props: { lastTriggeredAt: Date.now() - 10 * 60 * 1000, isRefreshing: true },
+      });
+
+      await wrapper.setProps({ lastTriggeredAt: Date.now(), isRefreshing: false });
+
+      expect(wrapper.find('[data-test="panel-refreshing-in-background"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(true);
+    });
+
+    it("stays hidden in view-only and simplified panels", () => {
+      const viewOnly = mountComponent({ props: { isRefreshing: true, viewOnly: true } });
+      const simplified = mountComponent({
+        props: { isRefreshing: true, simplifiedPanelView: true },
+      });
+
+      expect(viewOnly.find('[data-test="panel-refreshing-in-background"]').exists()).toBe(false);
+      expect(simplified.find('[data-test="panel-refreshing-in-background"]').exists()).toBe(false);
+    });
+  });
 });

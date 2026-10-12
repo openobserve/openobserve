@@ -6327,6 +6327,7 @@
       "refresh": "Refresh",
       "refreshCacheReload": "Refresh cache & reload",
       "moreRefreshOptions": "More refresh options",
+      "autoRunDescription": "Auto-run on open and on filter/time changes",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard not found or has been deleted. Redirecting to dashboard list.",
       "failedToLoadDashboard": "Failed to load dashboard. Redirecting to dashboard list.",
@@ -6533,7 +6534,8 @@
       "cachedDataDiffers": "The data shown is cached and is different from the selected time range.",
       "partialData": "The data shown is incomplete because the loading was interrupted. Refresh to load complete data.",
       "lastRefreshed": "Last Refreshed: ",
-      "lastRefreshedAt": "Last Refreshed At: "
+      "lastRefreshedAt": "Last Refreshed At: ",
+      "refreshing": "Refreshing…"
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "Max {count} field in {axis} is allowed.",

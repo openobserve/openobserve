@@ -1258,6 +1258,41 @@ describe("PanelSchemaRenderer", () => {
     });
   });
 
+  describe("Background refresh after a cache restore", () => {
+    it("forwards the loader's refreshing state to the panel header", async () => {
+      const isRefreshingInBackground = ref(false);
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({}),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+        isRefreshingInBackground,
+      } as any);
+      wrapper = createWrapper();
+
+      isRefreshingInBackground.value = true;
+      await flushPromises();
+      isRefreshingInBackground.value = false;
+      await flushPromises();
+
+      expect(wrapper.emitted("is-refreshing-in-background-update")).toEqual([[true], [false]]);
+    });
+
+    it("does not emit when the loader has no refreshing state", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.emitted("is-refreshing-in-background-update")).toBeUndefined();
+    });
+  });
+
   describe("Advanced Event Emissions", () => {
     it("should emit series-data-update when panel data changes", async () => {
       wrapper = createWrapper();

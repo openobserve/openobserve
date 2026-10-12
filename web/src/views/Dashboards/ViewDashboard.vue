@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip
                 :content="
                   isAutoRunOn
-                    ? t('search.autoRunEnabled')
+                    ? t('dashboard.viewDashboard.autoRunDescription')
                     : isVariablesChanged
                       ? t('dashboard.viewDashboard.refreshToApplyVariables')
                       : t('dashboard.viewDashboard.refresh')
@@ -142,7 +142,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :variant="refreshOptionsVariant"
                   size="icon-toolbar"
                   class="w-5"
-                  :disabled="arePanelsLoading"
                   :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                   data-test="dashboard-refresh-options-btn"
                   icon-left="arrow-drop-down"
@@ -151,6 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownItem
                 data-test="dashboard-refresh-without-cache-btn"
                 icon-left="cached"
+                :disabled="arePanelsLoading"
                 @select="refreshData(true)"
               >
                 {{ t("dashboard.viewDashboard.refreshCacheReload") }}
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
                     </div>
                     <div class="text-text-secondary text-xs">
-                      {{ t("search.liveModeTooltip") }}
+                      {{ t("dashboard.viewDashboard.autoRunDescription") }}
                     </div>
                   </span>
                 </ODropdownItem>
@@ -394,6 +394,10 @@ import reports from "@/services/reports";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import {
+  createDashboardFreshOnOpen,
+  DASHBOARD_FRESH_ON_OPEN,
+} from "@/composables/dashboard/dashboardFreshOnOpen";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -408,7 +412,11 @@ import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
-import { hasPanelTime, queryChangeAffectsPanelTimes } from "@/utils/dashboard/panelTimeUtils";
+import {
+  hasPanelTime,
+  isEffectivePanelTimeRelative,
+  queryChangeAffectsPanelTimes,
+} from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -614,6 +622,17 @@ export default defineComponent({
 
     const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
     provide("dashboardAutoRun", isAutoRunOn);
+
+    const freshOnOpen = createDashboardFreshOnOpen(
+      (panel) =>
+        isAutoRunOn.value && isEffectivePanelTimeRelative(panel, route.query, selectedDate.value),
+    );
+    provide(DASHBOARD_FRESH_ON_OPEN, freshOnOpen);
+    // A cross-dashboard drilldown keeps this view mounted, so each dashboard it opens is a new visit.
+    watch(
+      () => route.query.dashboard,
+      () => freshOnOpen.reset(),
+    );
 
     // variables data
     const variablesData = reactive({});

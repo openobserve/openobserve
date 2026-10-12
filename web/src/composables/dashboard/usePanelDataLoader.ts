@@ -18,6 +18,7 @@ import queryService from "../../services/search";
 import { useStore } from "vuex";
 
 import { usePanelCache } from "./usePanelCache";
+import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
 import { isEqual, omit } from "lodash-es";
 
 import { useAnnotations } from "./useAnnotations";
@@ -177,7 +178,12 @@ export const usePanelDataLoader = (
   // is panel currently visible or not
   const isVisible: any = ref(false);
 
+  const refreshAfterRestore = usePanelRefreshAfterRestore({ state, panelSchema, dashboardId });
+
   const saveCurrentStateToCache = async () => {
+    // Anything saved during a held refresh is partial and would replace the good restored entry.
+    if (refreshAfterRestore.isHolding()) return;
+    refreshAfterRestore.markIfComplete();
     await savePanelCache(
       getCacheKey(),
       { ...toRaw(state) },
@@ -319,8 +325,9 @@ export const usePanelDataLoader = (
   };
 
   const cancelQueryAbort = () => {
+    const keptRestoredResult = refreshAfterRestore.release(true);
     // Only set isPartialData to true if the panel was still loading
-    if (state.loading) {
+    if (state.loading && !keptRestoredResult) {
       state.isPartialData = true; // Set to true when cancelled
     }
     state.loading = false;
@@ -343,7 +350,8 @@ export const usePanelDataLoader = (
     if (abortController) {
       abortController?.abort();
     }
-    saveCurrentStateToCache();
+    // The restored entry is still the last complete result; re-saving would stamp it with the new window.
+    if (!keptRestoredResult) saveCurrentStateToCache();
   };
 
   const loadData = async () => {
@@ -425,7 +433,7 @@ export const usePanelDataLoader = (
           state.isOperationCancelled = false;
           log("loadData: panelcache: restored from cache");
           runCount++;
-          return;
+          if (!refreshAfterRestore.queueRefresh()) return;
         }
       }
 
@@ -458,6 +466,7 @@ export const usePanelDataLoader = (
 
       runCount++;
 
+      refreshAfterRestore.holdIfQueued();
       state.loading = true;
       state.isCachedDataDifferWithCurrentTimeRange = false;
 
@@ -643,7 +652,8 @@ export const usePanelDataLoader = (
     searchType,
     searchResponse,
     is_ui_histogram,
-    shouldRefreshWithoutCache,
+    shouldRefreshWithoutCache:
+      refreshAfterRestore.clearCacheUnlessHolding(shouldRefreshWithoutCache),
     dashboardId,
     dashboardName,
     folderId,
@@ -868,6 +878,8 @@ export const usePanelDataLoader = (
 
   return {
     ...toRefs(state),
+    ...refreshAfterRestore.shownResult,
+    isRefreshingInBackground: refreshAfterRestore.isRefreshingInBackground,
     loadData,
     reloadAnnotations,
   };
