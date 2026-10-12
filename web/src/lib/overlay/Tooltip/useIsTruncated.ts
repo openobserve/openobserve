@@ -1,13 +1,22 @@
 import { ref, onMounted, onBeforeUnmount, type Ref } from "vue";
 
-// Chromium reports scrollWidth === clientWidth for a clamped word that overflows by a fraction of a px yet still draws an ellipsis.
-export function isElementTruncated(el: HTMLElement, clamp: boolean): boolean {
-  if (!clamp) return el.scrollWidth > el.clientWidth;
+/** True when `el` cuts its content off; `clamp` says whether the box is line-clamped, read from its style when left out. */
+export function isElementTruncated(el: Element | null | undefined, clamp?: boolean): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.scrollWidth > el.clientWidth) return true;
+  // Only a clamped box may be taller than itself; elsewhere glyph overflow would read as "cut".
+  if (!(clamp ?? isLineClamped(el))) return false;
   if (el.scrollHeight > el.clientHeight) return true;
+  // Chromium reports scrollWidth === clientWidth for a clamped word that overflows by a fraction of a px yet still draws an ellipsis.
   const range = el.ownerDocument.createRange();
   range.selectNodeContents(el);
   if (typeof range.getBoundingClientRect !== "function") return false;
   return range.getBoundingClientRect().width > el.getBoundingClientRect().width;
+}
+
+/** Full visible text of an element, capped so a huge value cannot flood a tooltip. */
+export function readElementText(el: Element, maxLength = 2000): string {
+  return (el.textContent ?? "").trim().slice(0, maxLength);
 }
 
 /**
@@ -21,7 +30,7 @@ export function useIsTruncated(elRef: Ref<HTMLElement | null>, options: { clamp?
 
   function update() {
     const el = elRef.value;
-    isTruncated.value = !!el && isElementTruncated(el, options.clamp === true);
+    isTruncated.value = isElementTruncated(el, options.clamp === true);
   }
 
   let resizeObserver: ResizeObserver | null = null;
@@ -45,4 +54,9 @@ export function useIsTruncated(elRef: Ref<HTMLElement | null>, options: { clamp?
   onBeforeUnmount(detach);
 
   return { isTruncated, update };
+}
+
+function isLineClamped(el: HTMLElement): boolean {
+  const clamp = getComputedStyle(el).getPropertyValue("-webkit-line-clamp");
+  return clamp !== "" && clamp !== "none";
 }

@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+  <IngestionContent :target-stream="targetStream">
+    <CredentialCodeBlock slug="loong-collector" :content="content" />
     <IngestionDocLink href="https://github.com/alibaba/loongcollector">
       {{ t("ingestion.loongCollectorDocLinkText") }}
     </IngestionDocLink>
@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "LoongCollector",
@@ -42,7 +42,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent, IngestionDocLink },
+  components: { CredentialCodeBlock, IngestionContent, IngestionDocLink },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
@@ -57,6 +57,7 @@ export default defineComponent({
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
 
+    const targetStream = "default";
     const content = `enable: true
 inputs:
   - Type: input_file
@@ -67,14 +68,14 @@ processors:
     SourceKey: content
 flushers:
   - Type: flusher_http
-    RemoteURL: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/default/_json
+    RemoteURL: ${endpoint.value.url}/api/${store.state.selectedOrganization.identifier}/${targetStream}/_json
     Method: POST
     Headers:
       Authorization: Basic [BASIC_PASSCODE]
     Compress: gzip`;
 
     return {
-      raw,
+      targetStream,
       t,
       content,
     };

@@ -3037,11 +3037,13 @@ export class TracesPage {
       if (!request.url().includes('/_search')) return;
       let query = {};
       try { query = JSON.parse(request.postData() || '{}').query || {}; } catch { /* non-JSON body */ }
-      const panel = (request.url().match(/panel_name=([^&]+)/) || [])[1]
-        || (request.url().includes('search_type=ui') ? 'results' : 'other');
       // The results search sends its SQL base64-encoded; panels send it as plain text.
       let sql = String(query.sql || '');
       if (/^[A-Za-z0-9+/=_.-]+$/.test(sql)) sql = Buffer.from(sql, 'base64').toString();
+      // The Duration heatmap has no panel_name and shares search_type=ui with the results, so match its SQL (latencyHeatmap.ts).
+      const panel = (request.url().match(/panel_name=([^&]+)/) || [])[1]
+        || (/\bAS duration_bucket\b/.test(sql) ? 'Duration' : null)
+        || (request.url().includes('search_type=ui') ? 'results' : 'other');
       requests.push({ panel, startTime: query.start_time, endTime: query.end_time, from: query.from, sql });
     };
     this.page.on('request', onRequest);

@@ -57,7 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="account-tree"
           :data-test="`traces-no-stream-recent-${recentStream}`"
           @click="emit('pick-stream', recentStream)"
-          ><span class="max-w-40 truncate">{{ recentStream }}</span></EmptyStateIngestionChip
+          ><OTruncatedText class="max-w-40">{{
+            recentStream
+          }}</OTruncatedText></EmptyStateIngestionChip
         >
       </div>
     </template>
@@ -70,6 +72,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { restoreTracesStream } from "@/utils/streamPersist";
 import DOMPurify from "dompurify";
 

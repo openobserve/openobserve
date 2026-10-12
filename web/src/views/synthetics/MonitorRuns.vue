@@ -426,13 +426,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="e.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(e.name)">
-                            <span
-                              class="text-text-body w-20 flex-none cursor-help truncate font-mono text-xs font-semibold"
-                            >
-                              {{ e.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body w-20 flex-none font-mono text-xs font-semibold"
+                          >
+                            {{ e.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -468,13 +466,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(b.name)">
-                            <span
-                              class="text-text-body w-20 flex-none cursor-help truncate text-xs font-semibold"
-                            >
-                              {{ b.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body w-20 flex-none text-xs font-semibold"
+                          >
+                            {{ b.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -510,13 +506,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(l.name)">
-                            <span
-                              class="text-text-body w-40 flex-none cursor-help truncate text-xs font-semibold"
-                            >
-                              {{ l.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body w-40 flex-none text-xs font-semibold"
+                          >
+                            {{ l.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -552,13 +546,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(d.name)">
-                            <span
-                              class="text-text-body text-capitalize w-18 flex-none cursor-help truncate text-xs font-semibold"
-                            >
-                              {{ d.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body text-capitalize w-18 flex-none text-xs font-semibold"
+                          >
+                            {{ d.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -594,13 +586,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="raw(d.name)">
-                            <span
-                              class="text-text-body w-34 flex-none cursor-help truncate text-xs font-semibold"
-                            >
-                              {{ d.name }}
-                            </span>
-                          </OTooltip>
+                          <OTruncatedText
+                            class="text-text-body w-34 flex-none text-xs font-semibold"
+                          >
+                            {{ d.name }}
+                          </OTruncatedText>
                           <div
                             class="bg-text-disabled/25! h-1.5 min-w-10 flex-1 overflow-hidden rounded-full"
                           >
@@ -731,15 +721,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Runs table -->
               <OCard class="p-0">
                 <OTable
+                  ref="runsTableRef"
                   :columns="runColumns"
                   :data="visibleRuns"
                   :loading="runsLoading"
                   pagination="client"
-                  :page-size="10"
+                  :page-size="pageSize"
                   :page-size-options="[10, 20, 25, 50]"
+                  :current-page="currentPage"
                   sorting="client"
-                  sort-by="last_run_at"
-                  sort-order="desc"
+                  :sort-by="sortBy"
+                  :sort-order="sortOrder"
+                  @update:current-page="currentPage = $event"
+                  @update:page-size="pageSize = $event"
+                  @update:sort-by="sortBy = $event"
+                  @update:sort-order="sortOrder = $event"
                   row-key="id"
                   :show-global-filter="false"
                   :enable-column-resize="true"
@@ -755,10 +751,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-environment="{ row }">
                     <span
                       v-if="(row as VisibleRun).environment"
-                      class="text-text-body inline-flex items-center gap-1 font-mono text-sm"
+                      class="text-text-body inline-flex max-w-full items-center gap-1 font-mono text-sm"
                     >
                       <OIcon name="layers" size="sm" class="text-text-secondary" />
-                      {{ (row as VisibleRun).environment }}
+                      <OTruncatedText>{{ (row as VisibleRun).environment }}</OTruncatedText>
                     </span>
                     <span v-else class="text-text-muted text-sm">—</span>
                   </template>
@@ -784,21 +780,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
                   <template #cell-location="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="locationIcon((row as VisibleRun).location)" size="sm" />
-                      {{ locationLabel((row as VisibleRun).location) }}
+                      <OTruncatedText>{{
+                        locationLabel((row as VisibleRun).location)
+                      }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-browser="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="browserIcon((row as VisibleRun).browser)" size="sm" />
-                      {{ (row as VisibleRun).browser }}
+                      <OTruncatedText>{{ (row as VisibleRun).browser }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-device="{ row }">
-                    <span class="text-text-body inline-flex items-center gap-1 text-sm">
+                    <span class="text-text-body inline-flex max-w-full items-center gap-1 text-sm">
                       <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
-                      {{ deviceDisplay((row as VisibleRun).device) }}
+                      <OTruncatedText>{{
+                        deviceDisplay((row as VisibleRun).device)
+                      }}</OTruncatedText>
                     </span>
                   </template>
                   <template #cell-trigger_type="{ row }">
@@ -932,9 +932,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="stepsError">
                 <div class="flex items-center gap-2 px-2" data-test="monitor-runs-steps-error">
                   <OIcon name="error_outline" size="xs" class="text-status-error-text shrink-0" />
-                  <span class="text-status-error-text min-w-0 flex-1 truncate text-xs">{{
+                  <OTruncatedText :lines="2" class="text-status-error-text flex-1 text-xs">{{
                     stepsError
-                  }}</span>
+                  }}</OTruncatedText>
                   <OButton
                     variant="ghost"
                     size="xs"
@@ -968,9 +968,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- cell-name: Step name -->
                     <template #cell-name="{ row }">
                       <div class="min-w-0">
-                        <div class="text-text-heading truncate text-xs font-semibold">
+                        <OTruncatedText as="div" class="text-text-heading text-xs font-semibold">
                           {{ row.name }}
-                        </div>
+                        </OTruncatedText>
                       </div>
                     </template>
 
@@ -1126,7 +1126,7 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -1134,6 +1134,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { useListViewState } from "@/composables/useListViewState";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -1296,7 +1297,24 @@ function locationIcon(region: string): string {
 }
 
 // ── State ────────────────────────────────────────────────────────────────
-const activeTab = ref("overview");
+// Keyed by monitor so the filters outlive this component when the user leaves the results page and comes back.
+const savedView = useListViewState(`synthetic-runs:${props.monitorId}`, {
+  activeTab: "overview",
+  statusFilter: "all",
+  browserFilter: "all",
+  deviceFilter: "all",
+  locationFilter: "all",
+  durationFilter: "all",
+  failedStepFilter: "all",
+  locatorFilter: "",
+  actionFilter: "all",
+  errorFilter: null as string | null,
+  currentPage: 1,
+  pageSize: 10,
+  sortBy: "last_run_at",
+  sortOrder: "desc" as "asc" | "desc",
+});
+const activeTab = ref(savedView.activeTab);
 
 // ── Monitor type — derived from the prop set by parent's fetchCheck() call ──
 const isBrowser = computed(() => props.checkType === "browser");
@@ -1328,15 +1346,70 @@ const windowLabel = computed(() =>
     ? formatWindowLabel(timeRangeMicros.value.startTime, timeRangeMicros.value.endTime)
     : t("synthetics.runs.window24h"),
 );
-const statusFilter = ref("all");
-const browserFilter = ref("all");
-const deviceFilter = ref("all");
-const locationFilter = ref("all");
-const durationFilter = ref("all");
-const failedStepFilter = ref("all");
-const locatorFilter = ref("");
-const actionFilter = ref("all");
-const errorFilter = ref<string | null>(null);
+const statusFilter = ref(savedView.statusFilter);
+const browserFilter = ref(savedView.browserFilter);
+const deviceFilter = ref(savedView.deviceFilter);
+const locationFilter = ref(savedView.locationFilter);
+const durationFilter = ref(savedView.durationFilter);
+const failedStepFilter = ref(savedView.failedStepFilter);
+const locatorFilter = ref(savedView.locatorFilter);
+const actionFilter = ref(savedView.actionFilter);
+const errorFilter = ref<string | null>(savedView.errorFilter);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const runsTableRef = ref<any>(null);
+
+watch([statusFilter, browserFilter, deviceFilter, locationFilter, errorFilter], () => {
+  currentPage.value = 1;
+});
+watch(
+  [
+    activeTab,
+    statusFilter,
+    browserFilter,
+    deviceFilter,
+    locationFilter,
+    durationFilter,
+    failedStepFilter,
+    locatorFilter,
+    actionFilter,
+    errorFilter,
+    currentPage,
+    pageSize,
+    sortBy,
+    sortOrder,
+  ],
+  () => {
+    Object.assign(savedView, {
+      activeTab: activeTab.value,
+      statusFilter: statusFilter.value,
+      browserFilter: browserFilter.value,
+      deviceFilter: deviceFilter.value,
+      locationFilter: locationFilter.value,
+      durationFilter: durationFilter.value,
+      failedStepFilter: failedStepFilter.value,
+      locatorFilter: locatorFilter.value,
+      actionFilter: actionFilter.value,
+      errorFilter: errorFilter.value,
+      currentPage: currentPage.value,
+      pageSize: pageSize.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+    });
+  },
+);
+// The first runs load lands after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(
+  () => synthetics.runsLoading.value,
+  (isLoading) => {
+    if (isLoading || pageRestored) return;
+    pageRestored = true;
+    setTimeout(() => runsTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+);
 
 // ── Smart empty state helpers ──────────────────────────────────────────
 const hasActiveFilters = computed(

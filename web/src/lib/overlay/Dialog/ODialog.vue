@@ -26,6 +26,7 @@ import {
   onDeactivated,
 } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -60,6 +61,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   showClose: true,
   width: undefined,
   maxHeight: undefined,
+  initialFocus: "primary",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -123,8 +125,12 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
 }
 
+// Escape pressed inside an open dropdown or select belongs to that popup, not the dialog.
+const ESCAPE_OWNED_BY_POPUP = "[data-reka-popper-content-wrapper]";
+
 function handleEscapeKeyDown(e: KeyboardEvent) {
-  if (props.persistent) {
+  const target = e.target instanceof Element ? e.target : null;
+  if (props.persistent || target?.closest(ESCAPE_OWNED_BY_POPUP)) {
     e.preventDefault();
     return;
   }
@@ -244,6 +250,7 @@ const contentStyle = computed(() => {
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const secondaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 
 // Text fields take priority; a select/combobox trigger (OSelect listbox
 // trigger, reka SelectTrigger) is the second tier so a dialog whose
@@ -279,7 +286,8 @@ function handleOpenAutoFocus(event: Event) {
       return;
     }
     // No form field found → focus primary button (confirm dialog pattern)
-    const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
+    const btnRef = props.initialFocus === "secondary" ? secondaryBtnRef : primaryBtnRef;
+    const btnEl = (btnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
     }
@@ -479,20 +487,19 @@ watch(shown, (open) => {
 
           <!-- CASE 2: Default / structured layout -->
           <template v-else>
-            <!-- Title + subtitle block — fixed width, never grows -->
-            <div v-if="title || subTitle" class="min-w-0 shrink-0">
-              <span
+            <div v-if="title || subTitle" class="min-w-0">
+              <OTruncatedText
                 v-if="title"
-                class="text-dialog-header-text block truncate text-base font-semibold"
+                class="text-dialog-header-text block text-base font-semibold"
               >
                 {{ title }}
-              </span>
-              <span
+              </OTruncatedText>
+              <OTruncatedText
                 v-if="subTitle"
-                class="text-dialog-content-text mt-0.5 block truncate text-sm opacity-70"
+                class="text-dialog-content-text mt-0.5 block text-sm opacity-70"
               >
                 {{ subTitle }}
-              </span>
+              </OTruncatedText>
             </div>
 
             <!-- #header-left sub-slot — grows to fill space, content flows left-to-right after title -->
@@ -602,6 +609,7 @@ watch(shown, (open) => {
             <div class="flex items-center gap-2">
               <OButton
                 v-if="secondaryButtonLabel"
+                ref="secondaryBtnRef"
                 data-test="o-dialog-secondary-btn"
                 :variant="secondaryButtonVariant"
                 size="sm-action"

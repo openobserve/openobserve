@@ -124,32 +124,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-span="{ row }">
           <div class="flex min-w-0 flex-col">
-            <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
-            <span v-if="row.traceId" class="text-text-secondary text-2xs truncate">
+            <OTruncatedText class="font-mono text-xs">{{
+              textOrDash(row.operationName)
+            }}</OTruncatedText>
+            <OTruncatedText v-if="row.traceId" class="text-text-secondary text-2xs">
               {{ t("aiObservability.discovery.spanParent", { trace: row.traceId }) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
         <template #cell-trace="{ row }">
           <div class="flex min-w-0 flex-col">
-            <span class="truncate font-mono text-xs">{{ textOrDash(row.operationName) }}</span>
+            <OTruncatedText class="font-mono text-xs">{{
+              textOrDash(row.operationName)
+            }}</OTruncatedText>
             <!-- Annotation-only traces have no trace_id on their scores; a trace row's targetId is the trace id. -->
-            <span
+            <OTruncatedText
               v-if="row.traceId || row.targetId"
-              class="text-text-secondary text-2xs truncate font-mono"
+              class="text-text-secondary text-2xs font-mono"
             >
               {{ raw(row.traceId || row.targetId) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
         <template #cell-session="{ row }">
           <div class="flex min-w-0 flex-col">
-            <span class="truncate font-mono text-xs">{{ textOrDash(row.sessionId) }}</span>
-            <span v-if="row.userEmail" class="text-text-secondary text-2xs truncate">
+            <OTruncatedText class="font-mono text-xs">{{
+              textOrDash(row.sessionId)
+            }}</OTruncatedText>
+            <OTruncatedText v-if="row.userEmail" class="text-text-secondary text-2xs">
               {{ raw(row.userEmail) }}
-            </span>
+            </OTruncatedText>
           </div>
         </template>
 
@@ -176,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-input="{ row }">
-          <span class="text-text-body line-clamp-1">{{ textOrDash(row.input) }}</span>
+          <span class="text-text-body">{{ textOrDash(row.input) }}</span>
         </template>
 
         <template #cell-traceCount="{ row }">
@@ -269,6 +275,7 @@ import llmDiscoveryService, {
 } from "@/services/llm-discovery.service";
 import llmQueuesService, { type LlmQueue } from "@/services/llm-queues.service";
 import { formatTimeWithSuffix } from "@/utils/formatters";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 defineOptions({ name: "AIDiscoveryPage" });
 

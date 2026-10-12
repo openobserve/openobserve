@@ -1,3 +1,5 @@
+import type { I18nText } from "@/types/i18n";
+
 /**
  * OCode — inline and block monospace code display.
  *
@@ -29,6 +31,9 @@ export interface CodeProps {
    * In block mode, content scrolls horizontally instead.
    */
   truncate?: boolean;
+
+  /** With `truncate`: hover text when the value is cut (defaults to the value); `false` for secrets, which must never show on hover. */
+  tooltip?: I18nText | false;
 }
 
 export interface CodeSlots {

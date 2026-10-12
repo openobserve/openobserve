@@ -30,12 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OUserCell :value="userEmail" :name="youLabel" />
 
     <span class="flex min-w-0 flex-col">
-      <span class="text-text-heading truncate text-sm font-semibold">
+      <OTruncatedText class="text-text-heading text-sm font-semibold">
         {{ t("oncall.shiftBannerTitle", { rotation: raw(rotation) }) }}
-      </span>
-      <span class="text-text-secondary truncate text-xs" data-test="oncall-shift-banner-team">
+      </OTruncatedText>
+      <OTruncatedText class="text-text-secondary text-xs" data-test="oncall-shift-banner-team">
         {{ teamsLabel }}
-      </span>
+      </OTruncatedText>
     </span>
 
     <!-- The countdown is the point of the banner, so it keeps its own column
@@ -57,6 +57,7 @@ import { computed } from "vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";

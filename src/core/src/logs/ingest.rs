@@ -348,10 +348,11 @@ pub async fn ingest(
             }
         };
 
-        if let Some(extend) = extend_json.as_ref() {
-            for (key, val) in extend.iter() {
-                item[key] = val.clone();
-            }
+        if let Some(extend) = extend_json.as_ref()
+            && let Err(e) = add_extra_fields(&mut item, extend)
+        {
+            log::error!("[LOGS:JSON] IngestionError: org_id: {org_id}, error: {e}");
+            return Err(e);
         }
 
         // store a copy of original data before it's being transformed and/or flattened, when
@@ -848,6 +849,19 @@ fn parse_json_body(body: &[u8]) -> Result<Vec<json::Value>> {
         Ok(records) => Ok(records),
         Err(_) => Ok(vec![json::from_slice(body)?]),
     }
+}
+
+/// RUM intake is NDJSON with one object per line, so any other record is refused.
+fn add_extra_fields(item: &mut json::Value, extend: &HashMap<String, json::Value>) -> Result<()> {
+    let Some(record) = item.as_object_mut() else {
+        return Err(Error::IngestionError(
+            "Failed processing: each line must be a JSON object".to_string(),
+        ));
+    };
+    for (key, val) in extend {
+        record.insert(key.clone(), val.clone());
+    }
+    Ok(())
 }
 
 /// Count one rejected record on a stream's status, separating an ingestion-window
@@ -1592,6 +1606,21 @@ mod tests {
         // Which is what the collector turns into code 6.
         assert!(status.failed > status.policy_dropped);
         assert_eq!(status.error, "Can't parse timestamp");
+    }
+
+    #[test]
+    fn a_rum_line_must_be_a_json_object() {
+        let extend = HashMap::from([("ip".to_string(), json::json!("127.0.0.1"))]);
+        let mut array = json::json!([{"service": "web"}]);
+        assert_eq!(
+            add_extra_fields(&mut array, &extend)
+                .unwrap_err()
+                .to_string(),
+            "Error# Failed processing: each line must be a JSON object"
+        );
+        let mut object = json::json!({"service": "web"});
+        add_extra_fields(&mut object, &extend).unwrap();
+        assert_eq!(object, json::json!({"service": "web", "ip": "127.0.0.1"}));
     }
 
     #[test]

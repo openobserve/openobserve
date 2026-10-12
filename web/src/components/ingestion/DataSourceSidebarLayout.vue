@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ORouteTab
             v-for="(tab, index) in filteredTabs"
             :key="tab.name"
-            :title="tab.title || tab.name"
             :default="index === 0"
             :name="tab.name"
             :to="tab.to"
@@ -117,7 +116,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ORouteTab
               v-for="(tab, index) in filteredTabs"
               :key="tab.name"
-              :title="tab.title || tab.name"
               :default="index === 0"
               :name="tab.name"
               :to="tab.to"
@@ -161,7 +159,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <ORouteTab
                   v-for="(tab, index) in filteredTabs"
                   :key="tab.name"
-                  :title="tab.title || tab.name"
                   :default="index === 0"
                   :name="tab.name"
                   :to="tab.to"

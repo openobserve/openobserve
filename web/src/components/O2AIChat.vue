@@ -22,18 +22,11 @@
                   class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-40 min-w-0 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
                 >
                   <div class="flex min-w-0 items-center gap-2">
-                    <span
-                      class="chat-title-text text-text-body block min-w-0 truncate text-sm font-medium"
+                    <OTruncatedText
+                      class="chat-title-text text-text-body block text-sm font-medium"
                     >
                       {{ displayedTitle || t("common.newChat") }}
-                      <OTooltip
-                        v-if="displayedTitle && displayedTitle.length > 25"
-                        :sideOffset="8"
-                        side="bottom"
-                        align="center"
-                        :content="raw(displayedTitle)"
-                      />
-                    </span>
+                    </OTruncatedText>
                     <OIcon name="arrow-drop-down" size="md" class="flex-shrink-0" />
                   </div>
                 </OButton>
@@ -367,6 +360,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -410,6 +404,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OInput,
   },
   props: {

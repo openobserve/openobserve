@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
@@ -155,6 +156,7 @@ describe("SourceMaps.vue", () => {
   let wrapper: any;
 
   beforeEach(() => {
+    resetListViewState();
     store = createMockStore();
     router = createMockRouter();
     i18n = createMockI18n();
@@ -658,6 +660,36 @@ describe("SourceMaps.vue", () => {
 
       expect((wrapper.vm as any).formatTimestamp(0)).toBe("-");
       expect((wrapper.vm as any).formatTimestamp(null)).toBe("-");
+    });
+  });
+
+  describe("View state restore", () => {
+    it("restores filters, page, size and sort and fetches with the filters", async () => {
+      useListViewState("rumSourceMaps", {
+        filters: { service: "web" },
+        pageSize: 50,
+        currentPage: 2,
+        sortBy: "version",
+        sortOrder: "desc",
+      });
+      wrapper = await mountComponent();
+      const vm = wrapper.vm as any;
+      expect(vm.filters).toEqual({ service: "web" });
+      expect(vm.selectedPerPage).toBe(50);
+      expect(vm.sortBy).toBe("version");
+      expect(vm.sortOrder).toBe("desc");
+      expect(listSourceMapsMock).toHaveBeenCalledWith(expect.anything(), { service: "web" });
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = await mountComponent();
+      const vm = wrapper.vm as any;
+      vm.filters = { version: "1.0" };
+      vm.selectedPerPage = 100;
+      await nextTick();
+      const saved: any = useListViewState("rumSourceMaps", {});
+      expect(saved.filters).toEqual({ version: "1.0" });
+      expect(saved.pageSize).toBe(100);
     });
   });
 });

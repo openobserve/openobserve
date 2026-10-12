@@ -287,9 +287,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`services-catalog-type-${cat}`"
             >
               <div class="flex w-full flex-nowrap items-center justify-between gap-2">
-                <span class="min-w-0 flex-1 truncate text-left">{{
+                <OTruncatedText class="flex-1 text-left">{{
                   t(`traces.servicesCatalog.types.${cat}`)
-                }}</span>
+                }}</OTruncatedText>
                 <span class="flex shrink-0 items-center gap-1">
                   <span class="text-text-tertiary tabular-nums">{{ categoryCounts[cat] }}</span>
                   <!-- Unhealthy count in a filled circle, colored by the tab's
@@ -351,6 +351,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="client"
             :page-size="rowsPerPage"
             :page-size-options="rowsPerPageOptions"
+            :current-page="currentPage"
+            @update:current-page="currentPage = $event"
+            @update:page-size="rowsPerPage = $event"
             table-id="services-catalog"
             data-test="services-catalog-table"
             @row-click="(row) => handleRowClick(row)"
@@ -520,6 +523,7 @@ import {
 } from "@/utils/zincutils";
 import { getEffectiveTimeRange } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -535,6 +539,7 @@ import searchService from "@/services/search";
 import config from "@/aws-exports";
 import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
 const { isMobile } = useBreakpoint();
@@ -634,13 +639,40 @@ const isSearching = ref(false);
 // Epoch-ms of the last completed load, shown on the page header's refresh control.
 const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
-const filterText = ref("");
-const typeFilter = ref<TypeFilter>("service");
-const currentPage = ref(1);
-const rowsPerPage = ref(25);
+const viewState = useListViewState("servicesCatalog", {
+  filterText: "",
+  typeFilter: "service" as TypeFilter,
+  currentPage: 1,
+  rowsPerPage: 25,
+  sortBy: "status",
+  sortOrder: "desc" as "asc" | "desc",
+});
+const filterText = ref(viewState.filterText);
+const typeFilter = ref<TypeFilter>(viewState.typeFilter);
+const currentPage = ref(viewState.currentPage);
+const rowsPerPage = ref(viewState.rowsPerPage);
 const rowsPerPageOptions = [10, 25, 50, 100];
-const sortBy = ref<string>("status");
-const sortOrder = ref<"asc" | "desc">("desc");
+const sortBy = ref<string>(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+watch(filterText, () => (currentPage.value = 1));
+watch([filterText, typeFilter, currentPage, rowsPerPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterText: filterText.value,
+    typeFilter: typeFilter.value,
+    currentPage: currentPage.value,
+    rowsPerPage: rowsPerPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+let pageRestored = false;
+watch(isLoading, (loadingNow) => {
+  if (loadingNow || pageRestored) return;
+  pageRestored = true;
+  // Macrotask so the restored page wins over the table's own reset on data change.
+  setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+});
 interface StreamSchemaFlags {
   org: string;
   stream: string;

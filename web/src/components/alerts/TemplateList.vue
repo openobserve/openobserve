@@ -62,10 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           selection="multiple"
           :is-row-selectable="isTemplateRowSelectable"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[5, 10, 20, 50, 100]"
           :current-page="currentPage"
+          @update:page-size="pageSize = $event"
           sorting="client"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           filter-mode="client"
           :default-columns="false"
           show-index
@@ -147,8 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #cell-name="{ row }">
-            <div class="flex items-center gap-2">
-              <span>{{ row.name }}</span>
+            <div class="flex min-w-0 items-center gap-2">
+              <OTruncatedText>{{ row.name }}</OTruncatedText>
               <OTag
                 v-if="row.isPrebuilt"
                 type="templateOrigin"
@@ -344,6 +349,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -352,6 +358,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -425,10 +432,29 @@ const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
 const bulkDeleteLoading = ref(false);
 const deletingTemplates = ref(new Set<string>());
-const filterQuery = ref("");
+const viewState = useListViewState("alertTemplates", {
+  filterQuery: "",
+  tab: "all" as "all" | "prebuilt" | "custom",
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
 // Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
 // system templates (name starts with `prebuilt_`), "custom" shows the rest.
-const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+const activeTab = ref<"all" | "prebuilt" | "custom">(viewState.tab);
+watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    tab: activeTab.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 const oTableRef: any = ref(null);
 
 // URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.

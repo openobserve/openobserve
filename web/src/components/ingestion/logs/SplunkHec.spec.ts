@@ -18,13 +18,24 @@ import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
 import SplunkHec from "@/components/ingestion/logs/SplunkHec.vue";
 
-vi.mock("@/components/CopyContent.vue", () => ({
+const barStart = vi.fn();
+
+vi.mock("@/lib/core/Code/OCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
-    props: ["content"],
-    template: "<div class='copy-content-mock'>{{ content }}</div>",
+    name: "OCodeBlock",
+    props: ["code", "copyOnClick", "inset"],
+    emits: ["copy"],
+    template: "<div class='copy-content-mock'>{{ code }}</div>",
   },
 }));
+
+const track = vi.fn();
+vi.mock("@/services/product_analytics", () => ({
+  default: { track: (...a: unknown[]) => track(...a) },
+}));
+
+const awsConfig = vi.hoisted(() => ({ isCloud: "false" }));
+vi.mock("@/aws-exports", () => ({ default: awsConfig }));
 
 vi.mock("../../../utils/zincutils", () => ({
   getImageURL: vi.fn().mockReturnValue("http://example.com/image.png"),
@@ -68,6 +79,7 @@ describe("SplunkHec", () => {
           OBanner: { template: "<div class='o-banner-mock'><slot /></div>" },
           OText: { template: "<div class='o-text-mock'><slot /></div>" },
           RouterLink: { template: "<a class='router-link-mock'><slot /></a>" },
+          FirstEventStatus: { template: "<div />", methods: { start: barStart } },
         },
       },
     });
@@ -164,7 +176,7 @@ describe("SplunkHec", () => {
     it("should document the full event envelope, including the metadata fields", () => {
       wrapper = createWrapper();
       const parsed = JSON.parse(wrapper.vm.payloadContent);
-      expect(parsed.index).toBe("application");
+      expect(parsed.index).toBe("default");
       // Fractional epoch SECONDS, which is what the collector reads, and within the
       // ingestion window: a literal ages out and is then discarded behind a code 0.
       const nowSeconds = Date.now() / 1000;
@@ -203,6 +215,47 @@ describe("SplunkHec", () => {
     it("should render one copy block per snippet", () => {
       wrapper = createWrapper();
       expect(wrapper.findAll(".copy-content-mock")).toHaveLength(4);
+    });
+
+    it("should render every snippet as a copy-on-click OCodeBlock", () => {
+      wrapper = createWrapper();
+      const blocks = wrapper.findAllComponents({ name: "OCodeBlock" });
+      expect(blocks.every((b: any) => b.props("copyOnClick") !== undefined)).toBe(true);
+    });
+
+    it("should inset every snippet from the block border, as CopyContent did", () => {
+      wrapper = createWrapper();
+      const blocks = wrapper.findAllComponents({ name: "OCodeBlock" });
+      expect(blocks.every((b: any) => b.props("inset") !== undefined)).toBe(true);
+    });
+
+    it("should track snippet_copied with partial on copy", async () => {
+      wrapper = createWrapper();
+      await wrapper
+        .findAllComponents({ name: "OCodeBlock" })[1]
+        .vm.$emit("copy", { partial: true });
+      expect(track).toHaveBeenCalledWith(
+        "snippet_copied",
+        expect.objectContaining({ partial: true }),
+      );
+      expect(barStart).toHaveBeenCalledWith("copy");
+    });
+  });
+
+  describe("TLS flag", () => {
+    it("keeps -k on a non-Cloud build", () => {
+      awsConfig.isCloud = "false";
+      wrapper = createWrapper();
+      expect(wrapper.vm.curlContent).toMatch(/^curl -k https:/);
+      expect(wrapper.vm.healthContent).toMatch(/^curl -k https:/);
+    });
+
+    it("drops -k on a Cloud build", () => {
+      awsConfig.isCloud = "true";
+      wrapper = createWrapper();
+      expect(wrapper.vm.curlContent).not.toContain(" -k");
+      expect(wrapper.vm.healthContent).not.toContain(" -k");
+      awsConfig.isCloud = "false";
     });
   });
 

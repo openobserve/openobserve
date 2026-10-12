@@ -676,32 +676,29 @@ describe("CustomNode.vue", () => {
   });
 
   // =========================================================================
-  describe("getTruncatedConditions", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+  describe("condition preview text", () => {
+    const conditionText = (condition: unknown) => {
+      wrapper = createWrapper({ data: { node_type: "condition", condition }, io_type: "default" });
+      return wrapper.find('[data-test="o-truncated-text"]').text();
+    };
+
+    it("renders empty text for a missing condition", () => {
+      expect(conditionText(null)).toBe("");
     });
 
-    it("returns empty string for null/undefined", () => {
-      const vm = wrapper.vm as any;
-      expect(vm.getTruncatedConditions(null)).toBe("");
-      expect(vm.getTruncatedConditions(undefined)).toBe("");
-    });
-
-    it("truncates to 20 chars with ellipsis for long condition strings", () => {
-      const vm = wrapper.vm as any;
-      const longCondition = {
+    it("renders a long condition in full, cut by CSS within the card width", () => {
+      const text = conditionText({
         filterType: "condition",
         column: "very_long_field_name",
         operator: "=",
         value: "something_really_long_here",
-      };
-      const result = vm.getTruncatedConditions(longCondition);
-      expect(result.length).toBeLessThanOrEqual(23); // 20 + "..."
+      });
+      expect(text).toBe("very_long_field_name = 'something_really_long_here'");
+      expect(wrapper.find('[data-test="o-truncated-text"]').classes()).toContain("max-w-44");
     });
 
     it("handles V2 group format with nested conditions", () => {
-      const vm = wrapper.vm as any;
-      const conditionData = {
+      const text = conditionText({
         filterType: "group",
         conditions: [
           {
@@ -712,48 +709,34 @@ describe("CustomNode.vue", () => {
             logicalOperator: null,
           },
         ],
-      };
-      const result = vm.getTruncatedConditions(conditionData);
-      expect(typeof result).toBe("string");
+      });
+      expect(text).toBe("a = '1'");
     });
 
     it("handles V1 backend OR format", () => {
-      const vm = wrapper.vm as any;
-      const conditionData = {
-        or: [{ column: "x", operator: "=", value: "y" }],
-      };
-      const result = vm.getTruncatedConditions(conditionData);
-      expect(typeof result).toBe("string");
+      expect(conditionText({ or: [{ column: "x", operator: "=", value: "y" }] })).toBe("(x = 'y')");
     });
 
     it("handles V1 backend AND format", () => {
-      const vm = wrapper.vm as any;
-      const conditionData = {
-        and: [{ column: "a", operator: "!=", value: "b" }],
-      };
-      const result = vm.getTruncatedConditions(conditionData);
-      expect(typeof result).toBe("string");
+      expect(conditionText({ and: [{ column: "a", operator: "!=", value: "b" }] })).toBe(
+        "(a != 'b')",
+      );
     });
 
     it("handles V0 array format", () => {
-      const vm = wrapper.vm as any;
-      const conditionData = [{ column: "field", operator: "=", value: "val" }];
-      const result = vm.getTruncatedConditions(conditionData);
-      expect(result).toContain("field");
+      expect(conditionText([{ column: "field", operator: "=", value: "val" }])).toBe(
+        "field = 'val'",
+      );
     });
 
     it("handles single condition with column and operator", () => {
-      const vm = wrapper.vm as any;
-      const conditionData = { column: "status", operator: "=", value: "200" };
-      const result = vm.getTruncatedConditions(conditionData);
-      expect(result).toContain("status");
+      expect(conditionText({ column: "status", operator: "=", value: "200" })).toBe(
+        "status = '200'",
+      );
     });
 
-    it("returns empty string when conditionData has empty conditions array", () => {
-      const vm = wrapper.vm as any;
-      const conditionData = { filterType: "group", conditions: [] };
-      const result = vm.getTruncatedConditions(conditionData);
-      expect(result).toBe("");
+    it("renders empty text when the group has an empty conditions array", () => {
+      expect(conditionText({ filterType: "group", conditions: [] })).toBe("");
     });
   });
 

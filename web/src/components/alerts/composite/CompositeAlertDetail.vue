@@ -7,6 +7,7 @@ import CompositeExpressionPills from "./CompositeExpressionPills.vue";
 import CompositeStatusTimeline from "./CompositeStatusTimeline.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type {
   CompositeAlertChild,
   CompositeAlertDetail,
@@ -108,14 +109,14 @@ const childReason = (
               >
                 {{ raw(letterFor(index)) }}
               </span>
-              <a
-                class="text-link-primary min-w-0 flex-1 truncate font-medium"
+              <OTruncatedText
+                as="a"
+                class="text-link-primary flex-1 font-medium"
                 :href="childLink(child)"
-                :title="child.name"
                 :data-test="`alerts-composite-detail-child-link-${child.alert_id}`"
               >
                 {{ raw(child.name) }}
-              </a>
+              </OTruncatedText>
               <OTag type="alertLevel" :value="child.level ?? 'nodata'" size="xs" />
               <OTag v-if="child.alert_type" type="alertType" :value="child.alert_type" size="xs" />
               <OTag

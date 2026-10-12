@@ -61,7 +61,7 @@ use super::{
     pipeline::{batch_execution::ExecutablePipeline, db as pipeline},
 };
 use crate::{
-    alerts::alert::{AlertError, AlertExt, NotificationOutcome},
+    alerts::alert::{AlertError, AlertExt, NotificationOutcome, send_attempted},
     common::{
         infra::config::STREAM_ALERTS,
         meta::stream::{SchemaEvolution, SchemaRecords},
@@ -71,6 +71,7 @@ use crate::{
 pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
+pub mod rejections;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
@@ -716,6 +717,11 @@ pub async fn check_ingestion_allowed(
     Ok(())
 }
 
+/// Whether a write must look its stream up to see if it is new; Cloud reports every new stream.
+pub fn checks_for_new_stream(org_id: &str) -> bool {
+    cfg!(feature = "cloud") || !infra::schema::org_has_user_stream(org_id)
+}
+
 pub fn get_val_for_attr(attr_val: &Value) -> Value {
     let local_val = attr_val.as_object().unwrap();
     if let Some((key, value)) = local_val.into_iter().next() {
@@ -927,6 +933,7 @@ fn record_realtime_delivery(
     trigger_data_stream: &mut TriggerData,
     outcome: &Result<NotificationOutcome, AlertError>,
 ) {
+    trigger_data_stream.delivery_attempted = Some(send_attempted(outcome));
     match outcome {
         Err(e) => {
             trigger_data_stream.status = RunOutcome::NotifyFailed;
@@ -1661,6 +1668,7 @@ mod tests {
         let mut row = realtime_row();
         let delivered = Ok(NotificationOutcome {
             succeeded: vec!["slack".to_string()],
+            attempted: true,
             success_message: " sent ".to_string(),
             ..Default::default()
         });
@@ -1668,6 +1676,15 @@ mod tests {
         assert_eq!(row.status, RunOutcome::Firing);
         assert_eq!(row.success_response.as_deref(), Some("sent"));
         assert_eq!(row.error, None);
+        assert_eq!(row.delivery_attempted, Some(true));
+    }
+
+    #[test]
+    fn test_realtime_alert_wired_to_nothing_fired_without_a_delivery_attempt() {
+        let mut row = realtime_row();
+        record_realtime_delivery(&mut row, &Ok(NotificationOutcome::default()));
+        assert_eq!(row.status, RunOutcome::Firing);
+        assert_eq!(row.delivery_attempted, Some(false));
     }
 
     #[test]
@@ -1676,13 +1693,27 @@ mod tests {
         let partial = Ok(NotificationOutcome {
             succeeded: vec!["slack".to_string()],
             failed: vec!["pagerduty".to_string()],
+            attempted: true,
             success_message: "sent to slack".to_string(),
             error_message: "pagerduty timed out".to_string(),
         });
         record_realtime_delivery(&mut row, &partial);
         assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.delivery_attempted, Some(true));
         assert_eq!(row.error.as_deref(), Some("pagerduty timed out"));
         assert_eq!(row.success_response.as_deref(), Some("sent to slack"));
+    }
+
+    #[test]
+    fn test_new_stream_lookup_is_skipped_once_the_org_has_a_user_stream() {
+        let org = "ingestion_new_stream_lookup_org";
+        let key = format!("{org}/logs/app");
+        let mut map = hashbrown::HashMap::new();
+        assert!(checks_for_new_stream(org));
+        infra::schema::insert_latest(&mut map, key.clone(), SchemaCache::new(Schema::empty()));
+        assert_eq!(checks_for_new_stream(org), cfg!(feature = "cloud"));
+        infra::schema::remove_latest(&mut map, &key);
+        assert!(checks_for_new_stream(org));
     }
 
     #[test]
@@ -1693,6 +1724,7 @@ mod tests {
         });
         record_realtime_delivery(&mut row, &failed);
         assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert_eq!(row.delivery_attempted, Some(true));
         assert_eq!(
             row.error.as_deref(),
             Some("error sending notification for alert: http 500")

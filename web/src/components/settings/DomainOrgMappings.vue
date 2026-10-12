@@ -45,26 +45,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-start justify-between">
           <div class="min-w-0 flex-1">
             <div class="flex min-w-0 items-center gap-1 text-sm">
-              <span
-                class="text-text-heading truncate font-bold"
+              <OTruncatedText
+                class="text-text-heading font-bold"
                 :data-test="`settings-domain-org-mappings-item-domain-${index}`"
-                >{{ atSign }}{{ mapping.domain }}</span
+                >{{ atSign }}{{ mapping.domain }}</OTruncatedText
               >
               <OIcon name="arrow-forward" size="xs" class="text-text-muted shrink-0" />
-              <span
-                class="text-text-body truncate"
+              <OTruncatedText
+                class="text-text-body"
                 :data-test="`settings-domain-org-mappings-item-org-${index}`"
-                >{{ mapping.org_id }}</span
+                >{{ mapping.org_id }}</OTruncatedText
               >
             </div>
             <div class="mt-1 flex flex-wrap items-center gap-1">
               <OTag type="userRole" :value="badgeRole(mapping.base_role)" />
               <OTag
-                v-if="mapping.user_group"
+                v-if="mapping.role_claim_name"
                 type="fieldTag"
-                :data-test="`settings-domain-org-mappings-item-group-${index}`"
+                class="max-w-full min-w-0"
+                :data-test="`settings-domain-org-mappings-item-role-claim-${index}`"
               >
-                <span class="truncate text-xs">{{ mapping.user_group }}</span>
+                <OTruncatedText class="text-xs">{{ mapping.role_claim_name }}</OTruncatedText>
               </OTag>
             </div>
           </div>
@@ -128,6 +129,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import DomainOrgMappingDialog from "./DomainOrgMappingDialog.vue";
 import type { DomainOrgMapping } from "./DomainOrgMappings.schema";

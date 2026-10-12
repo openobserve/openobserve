@@ -53,12 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- The worst finding whole, on one line. The count moved into the
                  disclosure button, so nothing here can wrap the strip. -->
             <!-- Touch has no hover to read a clipped sentence by, so below lg it gets a second line instead. -->
-            <span
-              class="text-text-body min-w-0 truncate text-sm max-lg:line-clamp-2 max-lg:whitespace-normal"
+            <OTruncatedText
+              class="text-text-body text-sm max-lg:line-clamp-2 max-lg:whitespace-normal"
             >
               {{ worst.message }}
-              <OTooltip side="bottom" :content="worst.message" />
-            </span>
+            </OTruncatedText>
           </span>
         </span>
 
@@ -209,9 +208,9 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   ConfigRisk,
   ConfigRisks,

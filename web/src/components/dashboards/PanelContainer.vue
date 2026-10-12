@@ -36,9 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-panel-bar"
       >
         <OIcon
-          v-if="!viewOnly && !simplifiedPanelView"
+          v-if="!viewOnly && !simplifiedPanelView && layoutMode !== 'view'"
           name="drag-indicator"
           size="sm"
+          class="shrink-0"
           data-test="dashboard-panel-drag"
         />
         <!-- me-5 is a truncation MARGIN, not decoration. The spacer after this
@@ -47,22 +48,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              running into it. The margin is outside the overflow box, so the
              ellipsis always lands a gap short of the icons. A title that fits is
              unaffected — the spacer just absorbs 1.25rem less. -->
-        <div
-          :title="props.data.title"
-          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
+        <!-- Curated tiles sit six to a row: they wrap at every width and keep two lines so a row's values stay level. -->
+        <OTruncatedText
+          as="div"
+          class="text-compact text-text-heading me-5 font-medium tracking-[0.02em] max-lg:line-clamp-2 max-lg:whitespace-normal"
+          :class="curatedTile ? 'me-1! line-clamp-2 min-h-[2lh] whitespace-normal!' : undefined"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
-        </div>
+        </OTruncatedText>
+        <!-- Icon-only on a narrow bar and gone on a tiny one: the dimmed body and page banner still say it is stale. -->
         <OTag
           v-if="curatedBadge"
           variant="amber-soft"
           size="sm"
+          class="shrink-0 @max-[8rem]/panelbar:hidden"
           data-test="dashboard-panel-curated-badge"
-          :title="t('infra.curated.staleBadgeTooltip')"
+          :aria-label="curatedBadgeText"
         >
-          {{ t(curatedBadge.key, curatedBadgeParams) }}
-          <OTooltip :content="t('infra.curated.staleBadgeTooltip')" side="bottom" />
+          <!-- One wrapper, because a child-mode tooltip binds to its previous sibling element. -->
+          <span class="inline-flex items-center" data-test="dashboard-panel-curated-badge-label">
+            <span class="hidden @min-[32rem]/panelbar:inline">{{ curatedBadgeText }}</span>
+            <OIcon name="schedule" size="xs" class="@min-[32rem]/panelbar:hidden" />
+          </span>
+          <OTooltip :content="curatedBadgeTooltip" side="bottom" />
         </OTag>
         <OTag
           v-if="
@@ -162,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <ExemplarToggle
           v-if="exemplarsEligible && !viewOnly"
-          :class="exemplarToggleAtRest ? '' : hoverRevealClass"
+          :class="exemplarToggleAtRest && !isLayoutEditing ? '' : hoverRevealClass"
           :on="exemplarsOn"
           :loading="PanleSchemaRendererRef?.exemplarsStatus === 'loading'"
           :count="PanleSchemaRendererRef?.exemplarsCount ?? 0"
@@ -224,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @retry-exemplars="PanleSchemaRendererRef?.retryExemplars()"
         />
         <OButton
-          v-if="!viewOnly && !simplifiedPanelView"
+          v-if="!viewOnly && !simplifiedPanelView && !isLayoutEditing"
           :variant="variablesDataUpdated ? 'ghost-warning' : 'ghost'"
           size="icon"
           @click="() => onRefreshPanel(false)"
@@ -263,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            v-if="!simplifiedPanelView"
+            v-if="!simplifiedPanelView && !isLayoutEditing"
             data-test="dashboard-edit-panel"
             @select="onPanelModifyClick('EditPanel')"
             shortcut-id="panelEdit"
@@ -272,93 +281,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.editPanel") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView"
+            v-if="!simplifiedPanelView && layoutMode !== 'view'"
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
           >
             <template #icon-left><OIcon name="dashboard-customize" size="sm" /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-duplicate-panel"
-            @select="onPanelModifyClick('DuplicatePanel')"
-            shortcut-id="panelDuplicate"
-          >
-            <template #icon-left><OIcon name="content-copy" size="sm" /></template>
-            {{ t("panel.duplicate") }}
-          </ODropdownItem>
-          <ODropdownItem
-            data-test="dashboard-delete-panel"
-            @select="onPanelModifyClick('DeletePanel')"
-            shortcut-id="panelDelete"
-          >
-            <template #icon-left
-              ><OIcon name="delete-outline" size="sm" class="text-current!"
-            /></template>
-            {{ t("panel.deletePanel") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-query-inspector-panel"
-            @select="showViewPanel = true"
-            shortcut-id="panelQueryInspector"
-          >
-            <template #icon-left><OIcon name="manage-search" size="sm" /></template>
-            {{ t("panel.queryInspector") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-panel-download-as-csv-btn"
-            @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
-          >
-            <template #icon-left><OIcon name="file-download" size="sm" /></template>
-            {{ t("panel.downloadAsCSV") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-panel-download-as-json-btn"
-            @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
-          >
-            <template #icon-left><OIcon name="data-object" size="sm" /></template>
-            {{ t("panel.downloadAsJSON") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            :disabled="props.data.queryType != 'sql'"
-            data-test="dashboard-move-to-logs-module"
-            @select="onLogPanel"
-            icon-left="search"
-          >
-            {{ t("panel.goToLogs") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-refresh-without-cache"
-            @select="onPanelModifyClick('Refresh')"
-            icon-left="cached"
-          >
-            {{ t("dashboard.panelContainer.refreshCacheReload") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-move-to-another-panel"
-            @select="onPanelModifyClick('MovePanel')"
-          >
-            <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
-            {{ t("panel.moveToAnotherTab") }}
-          </ODropdownItem>
-          <!-- Alert creation is shared platform machinery: this contributes the
-               panel's state through a pure adapter and the action owns the rest
-               (label, confirm dialog, transport). See CreateAlertAction.vue. -->
-          <CreateAlertAction
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            variant="menu-item"
-            source="panel"
-            :build="buildPanelAlertPrefill"
-            :disabled-reason="alertDisabledReason"
-            data-test="dashboard-create-alert-from-panel"
-          />
+          <!-- Only the layout dialog belongs to layout edit mode; every other action saves on its own. -->
+          <template v-if="!isLayoutEditing">
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-duplicate-panel"
+              @select="onPanelModifyClick('DuplicatePanel')"
+              shortcut-id="panelDuplicate"
+            >
+              <template #icon-left><OIcon name="content-copy" size="sm" /></template>
+              {{ t("panel.duplicate") }}
+            </ODropdownItem>
+            <ODropdownItem
+              data-test="dashboard-delete-panel"
+              @select="onPanelModifyClick('DeletePanel')"
+              shortcut-id="panelDelete"
+            >
+              <template #icon-left
+                ><OIcon name="delete-outline" size="sm" class="text-current!"
+              /></template>
+              {{ t("panel.deletePanel") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-query-inspector-panel"
+              @select="showViewPanel = true"
+              shortcut-id="panelQueryInspector"
+            >
+              <template #icon-left><OIcon name="manage-search" size="sm" /></template>
+              {{ t("panel.queryInspector") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-panel-download-as-csv-btn"
+              @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+            >
+              <template #icon-left><OIcon name="file-download" size="sm" /></template>
+              {{ t("panel.downloadAsCSV") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-panel-download-as-json-btn"
+              @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+            >
+              <template #icon-left><OIcon name="data-object" size="sm" /></template>
+              {{ t("panel.downloadAsJSON") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              :disabled="props.data.queryType != 'sql'"
+              data-test="dashboard-move-to-logs-module"
+              @select="onLogPanel"
+              icon-left="search"
+            >
+              {{ t("panel.goToLogs") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-refresh-without-cache"
+              @select="onPanelModifyClick('Refresh')"
+              icon-left="cached"
+            >
+              {{ t("dashboard.panelContainer.refreshCacheReload") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-move-to-another-panel"
+              @select="onPanelModifyClick('MovePanel')"
+            >
+              <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
+              {{ t("panel.moveToAnotherTab") }}
+            </ODropdownItem>
+            <!-- Alert creation is shared platform machinery: this contributes the
+                 panel's state through a pure adapter and the action owns the rest
+                 (label, confirm dialog, transport). See CreateAlertAction.vue. -->
+            <CreateAlertAction
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              variant="menu-item"
+              source="panel"
+              :build="buildPanelAlertPrefill"
+              :disabled-reason="alertDisabledReason"
+              data-test="dashboard-create-alert-from-panel"
+            />
+          </template>
         </ODropdown>
       </PanelBar>
     </div>
@@ -501,9 +513,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isEqual } from "lodash-es";
 import shortURL from "@/services/short_url";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
@@ -568,6 +581,7 @@ export default defineComponent({
     "simplifiedPanelView",
     "shouldRefreshWithoutCache",
     "showLegendsButton",
+    "layoutMode",
   ],
   components: {
     OTag,
@@ -582,6 +596,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OTooltip,
+    OTruncatedText,
     CreateAlertAction,
     ExemplarToggle,
     ShowLegendsPopup: defineAsyncComponent(() => {
@@ -621,6 +636,13 @@ export default defineComponent({
         : "";
       return { duration, date: badge.date };
     });
+    const curatedBadgeText = computed(() =>
+      curatedBadge.value ? t(curatedBadge.value.key as never, curatedBadgeParams.value) : raw(""),
+    );
+    // Both halves are already translated; joining them widens to string without untranslating either.
+    const curatedBadgeTooltip = computed(() =>
+      raw(`${curatedBadgeText.value} · ${t("infra.curated.staleBadgeTooltip")}`),
+    );
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
 
@@ -675,6 +697,10 @@ export default defineComponent({
      * from PromQLTableChart's own #empty slot. Claiming tables here too printed the
      * words twice, once from each layer.
      */
+    const curatedTile = computed(
+      () =>
+        props.data?.type === "metric" && props.data?.config?.curated_no_data_eligible !== undefined,
+    );
     const curatedAllClear = computed(
       () =>
         props.data?.config?.curated_empty_means_healthy === true && props.data?.type !== "table",
@@ -756,6 +782,7 @@ export default defineComponent({
 
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
+    const isLayoutEditing = computed(() => props.layoutMode === "edit");
 
     // Applied to every hover-revealed control in the panel bar. They stay in the
     // layout while hidden so the title's truncation point never moves when the
@@ -763,9 +790,11 @@ export default defineComponent({
     // out of the tab order and the a11y tree, so nothing hidden is reachable.
     // Touch has no hover, so < md the controls are simply always shown.
     const { isMobile } = useBreakpoint();
-    const hoverRevealClass = computed(() =>
-      isCurrentlyHoveredPanel.value || isMobile.value ? "" : "invisible pointer-events-none",
-    );
+    // Layout editing drops them so the grip does not squeeze a narrow panel's title.
+    const hoverRevealClass = computed(() => {
+      if (isLayoutEditing.value) return "hidden";
+      return isCurrentlyHoveredPanel.value || isMobile.value ? "" : "invisible pointer-events-none";
+    });
 
     //for edit panel
     const onEditPanel = (data: any) => {
@@ -1087,6 +1116,7 @@ export default defineComponent({
     const handlePanelKeydown = (e: KeyboardEvent) => {
       if (!isCurrentlyHoveredPanel.value) return;
       if (isInputFocused()) return;
+      if (isLayoutEditing.value && !["v", "V", "i", "I"].includes(e.key)) return;
       // These are single-letter shortcuts — never fire while a modifier is held.
       // Otherwise combos like Alt+Left (panel-editor "Discard & go back") leaking
       // a still-held Alt into the next keystroke would wrongly trigger edit/view.
@@ -1136,8 +1166,11 @@ export default defineComponent({
       exemplarErrorMessage,
       curatedBadge,
       curatedBadgeParams,
+      curatedBadgeText,
+      curatedBadgeTooltip,
       curatedNoData,
       curatedAllClear,
+      curatedTile,
       curatedTableOwnsEmpty,
       onCuratedSeriesData,
       alertDisabledReason,
@@ -1146,6 +1179,7 @@ export default defineComponent({
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,
+      isLayoutEditing,
       hoverRevealClass,
       showViewPanel,
       dependentAdHocVariable,

@@ -651,7 +651,7 @@ import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFuncti
 import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { useStore } from "vuex";
-import { MAX_FIELD_LABEL_CHARS, FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
+import { FIELD_FUNCTION_MENU_WIDTH } from "@/utils/dashboard/constants";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import PromQLBuilderOptions from "@/components/promql/components/PromQLBuilderOptions.vue";
@@ -1191,9 +1191,7 @@ export default defineComponent({
               ?.stream
           : "",
       );
-      return label?.length > MAX_FIELD_LABEL_CHARS
-        ? label.substring(0, MAX_FIELD_LABEL_CHARS) + "..."
-        : label;
+      return label;
     };
 
     const xLabel = computed(() => {

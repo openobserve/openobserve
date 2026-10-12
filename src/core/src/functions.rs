@@ -35,6 +35,7 @@ use db::{
 use transform::compile_vrl_function;
 
 use crate::{
+    authz::WriteCheck,
     common::meta::{
         authz::Authz,
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
@@ -54,7 +55,16 @@ pub enum FunctionDeleteError {
     PipelineDependencies(String),
 }
 
-pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpResponse, Error> {
+pub async fn save_function(org_id: String, func: Transform) -> Result<HttpResponse, Error> {
+    save_function_checked(org_id, func, None).await
+}
+
+/// [`save_function`], running `check` after every check of its own and before the write.
+pub async fn save_function_checked(
+    org_id: String,
+    mut func: Transform,
+    check: Option<&dyn WriteCheck<Transform>>,
+) -> Result<HttpResponse, Error> {
     if func.name.is_empty() {
         return Ok(MetaHttpResponse::bad_request(
             "Function name cannot be empty",
@@ -94,6 +104,11 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
                     "Invalid transform type. Use 0 for VRL or 1 for JS.",
                 ));
             }
+        }
+        if let Some(check) = check
+            && let Err(refused) = check.check(&func).await
+        {
+            return Ok(refused);
         }
         extract_num_args(&mut func);
         if let Err(error) = db::functions::set(&org_id, &func.name, &func).await {
@@ -324,7 +339,17 @@ fn run_js_test(org_id: &str, function: &str, events: Vec<Value>) -> Result<Vec<V
 pub async fn update_function(
     org_id: &str,
     fn_name: &str,
+    func: Transform,
+) -> Result<HttpResponse, Error> {
+    update_function_checked(org_id, fn_name, func, None).await
+}
+
+/// [`update_function`], running `check` after every check of its own and before the write.
+pub async fn update_function_checked(
+    org_id: &str,
+    fn_name: &str,
     mut func: Transform,
+    check: Option<&dyn WriteCheck<Transform>>,
 ) -> Result<HttpResponse, Error> {
     if func.name.is_empty() {
         return Ok(MetaHttpResponse::bad_request(
@@ -374,6 +399,11 @@ pub async fn update_function(
                 "Invalid transform type. Use 0 for VRL or 1 for JS.",
             ));
         }
+    }
+    if let Some(check) = check
+        && let Err(refused) = check.check(&func).await
+    {
+        return Ok(refused);
     }
     extract_num_args(&mut func);
     if let Err(error) = db::functions::set(org_id, &func.name, &func).await {
@@ -674,5 +704,39 @@ mod tests {
             .unwrap();
 
         assert_eq!(meta_response.status(), http::StatusCode::OK);
+    }
+
+    struct Unreached;
+
+    #[async_trait::async_trait]
+    impl crate::authz::WriteCheck<Transform> for Unreached {
+        async fn check(&self, _: &Transform) -> Result<(), axum::response::Response> {
+            panic!("the write check must run only after every check of the save's own");
+        }
+    }
+
+    #[tokio::test]
+    async fn the_save_s_own_errors_answer_before_the_write_check() {
+        let empty = Transform {
+            name: "write_check_fn".to_string(),
+            function: String::new(),
+            params: "row".to_string(),
+            num_args: 1,
+            trans_type: Some(0),
+            streams: None,
+        };
+        let saved = save_function_checked(
+            "write_check_org".to_string(),
+            empty.clone(),
+            Some(&Unreached),
+        )
+        .await
+        .unwrap();
+        assert_eq!(saved.status(), http::StatusCode::BAD_REQUEST);
+        let updated =
+            update_function_checked("write_check_org", "write_check_fn", empty, Some(&Unreached))
+                .await
+                .unwrap();
+        assert_eq!(updated.status(), http::StatusCode::BAD_REQUEST);
     }
 }

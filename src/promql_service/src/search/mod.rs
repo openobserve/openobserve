@@ -64,6 +64,13 @@ mod cache;
 pub mod grpc;
 pub use cache::get_cache_stats;
 
+#[derive(Debug)]
+pub struct SearchResponse {
+    pub value: Value,
+    /// Non-empty when some nodes failed and the value may be incomplete.
+    pub warnings: Vec<String>,
+}
+
 pub async fn init() -> Result<()> {
     if !config::cluster::LOCAL_NODE.is_querier() {
         return Ok(());
@@ -82,7 +89,7 @@ pub async fn search(
     user_email: &str,
     timeout: i64,
     is_super_cluster: bool,
-) -> Result<Value> {
+) -> Result<SearchResponse> {
     #[cfg(feature = "enterprise")]
     {
         let query = Some(req.query.clone());
@@ -285,7 +292,7 @@ async fn search_in_cluster(
     req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
     nodes: &[Node],
-) -> Result<Value> {
+) -> Result<SearchResponse> {
     let start_ins = std::time::Instant::now();
     let started_at = now_micros();
     let cfg = get_config();
@@ -381,7 +388,10 @@ async fn search_in_cluster(
             merge_matrix_query(&cached_values, &req.org_id).await?
         };
 
-        return Ok(values);
+        return Ok(SearchResponse {
+            value: values,
+            warnings: vec![],
+        });
     }
 
     if (end - start) / step > max_points as i64 {
@@ -498,8 +508,14 @@ async fn search_in_cluster(
     let mut scan_stats = ScanStats::new();
     let mut result_type = String::new();
     let mut series_data: Vec<cluster_rpc::Series> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
     for resp in results {
         scan_stats.add(&resp.scan_stats.as_ref().unwrap().into());
+        for warning in resp.warnings {
+            if !warnings.contains(&warning) {
+                warnings.push(warning);
+            }
+        }
         if result_type.is_empty() {
             result_type = resp.result_type.clone();
         }
@@ -564,8 +580,13 @@ async fn search_in_cluster(
     )
     .await;
 
-    // cache the result
+    if !warnings.is_empty() {
+        log::warn!("[trace_id {trace_id}] promql->search: partial result: {warnings:?}");
+    }
+
+    // an incomplete result must not be served from cache later
     if cacheable
+        && warnings.is_empty()
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
@@ -585,7 +606,10 @@ async fn search_in_cluster(
     let took = start_ins.elapsed().as_millis() as f64;
     log::info!("[trace_id {trace_id}] promql->search search finished took: {took} ms",);
 
-    Ok(values)
+    Ok(SearchResponse {
+        value: values,
+        warnings,
+    })
 }
 
 /// Whether a range query would answer with a subquery's own samples, which sit off its grid.

@@ -129,7 +129,7 @@ describe("McpServerCard", () => {
       await wrapper.find('[data-test="ai-integrations-mcp-skills-repo-btn"]').trigger("click");
 
       expect(open).toHaveBeenCalledWith(
-        "https://github.com/openobserve/skills",
+        "https://www.npmjs.com/package/@openobserve/skills",
         "_blank",
         "noopener,noreferrer",
       );
@@ -235,7 +235,7 @@ describe("McpServerCard", () => {
       );
     });
 
-    // CopyContent expanded [BASIC_PASSCODE] on screen, printing a real credential.
+    // CredentialCodeBlock expanded [BASIC_PASSCODE] on screen, printing a real credential.
     it("shows a placeholder header, not a credential, before generating", () => {
       const wrapper = mountCard();
       const block = configBlock(wrapper);

@@ -33,13 +33,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ currentOrgToShow.primary }}
               </div>
-              <div
+              <OTruncatedText
                 v-if="currentOrgToShow.secondary"
-                class="member-id max-w-full truncate text-xs normal-case opacity-60"
-                :title="currentOrgToShow.secondary"
+                as="div"
+                class="member-id max-w-full text-xs normal-case opacity-60"
               >
                 {{ currentOrgToShow.secondary }}
-              </div>
+              </OTruncatedText>
             </div>
           </OTab>
         </OTabs>
@@ -83,13 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 {{ opt.primary }}
               </div>
-              <div
+              <OTruncatedText
                 v-if="opt.secondary"
-                class="member-id max-w-full truncate text-xs normal-case opacity-60"
-                :title="opt.secondary"
+                as="div"
+                class="member-id max-w-full text-xs normal-case opacity-60"
               >
                 {{ opt.secondary }}
-              </div>
+              </OTruncatedText>
             </div>
           </OTab>
         </OTabs>
@@ -115,6 +115,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 
 export interface MemberOrg {
   id: string;
@@ -123,7 +124,7 @@ export interface MemberOrg {
 
 export default defineComponent({
   name: "UsageMemberList",
-  components: { OTabs, OTab, OSeparator, OInput, OIcon },
+  components: { OTabs, OTab, OSeparator, OInput, OIcon, OTruncatedText },
   props: {
     modelValue: {
       type: String,

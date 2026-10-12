@@ -75,12 +75,17 @@
          a multi-column group_by is the common case, and the rendered string is
          ambiguous the moment a value contains a separator. -->
     <template #cell-group="{ row }">
-      <div v-if="row.labels?.length" class="flex flex-wrap items-center gap-2">
+      <OTruncatedText
+        v-if="row.labels?.length"
+        as="div"
+        class="flex flex-wrap items-center gap-2"
+        :tooltip="labelsText(row.labels)"
+      >
         <span v-for="label in row.labels" :key="label.name" class="inline-flex items-center gap-1">
           <span class="text-2xs text-text-tertiary">{{ label.name }}</span>
           <span class="text-compact text-text-heading font-mono">{{ label.value }}</span>
         </span>
-      </div>
+      </OTruncatedText>
       <span v-else class="text-text-secondary">—</span>
     </template>
 
@@ -166,8 +171,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { AlertGroup } from "@/ts/interfaces/alert";
+import type { AlertGroup, AlertGroupLabel } from "@/ts/interfaces/alert";
 
 const props = withDefaults(
   defineProps<{
@@ -197,6 +203,10 @@ const rows = computed<AlertGroup[]>(() => {
 const onEmptyAction = (id?: string) => {
   if (id === "clear-filters") search.value = "";
 };
+
+// The label pairs hold no separators in their text, so the cut-cell tooltip spells them out.
+const labelsText = (labels: AlertGroupLabel[]) =>
+  raw(labels.map((label) => `${label.name}=${label.value}`).join(", "));
 
 const defaultColumnVisibility = { last_seen: false, silenced_until: false };
 

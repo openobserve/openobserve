@@ -103,6 +103,7 @@ use crate::{
         rum::ingest::log,
         rum::ingest::data,
         rum::ingest::sessionreplay,
+        openobserve_api_management::request::ingest_rejections::recent_rejections,
         openobserve_api_search::search::search,
         openobserve_api_search::search::search_partition,
         openobserve_api_search::search::query_functions::list,
@@ -330,6 +331,7 @@ use crate::{
         rum_analytics::get_named_event,
         rum_analytics::update_named_event,
         rum_analytics::delete_named_event,
+        rum_analytics::deleted_event_names,
         rum_analytics::named_event_funnels,
         rum_analytics::list_funnels,
         rum_analytics::create_funnel,
@@ -465,6 +467,9 @@ use crate::{
             ingestion_common::RecordStatus,
             ingestion_common::StreamStatus,
             ingestion_common::IngestionResponse,
+            meta::ingest_rejections::RecentRejections,
+            meta::ingest_rejections::IngestRejection,
+            meta::ingest_rejections::RejectionReason,
             meta::loki::LokiPushResponse,
             meta::loki::LokiPushRequest,
             meta::loki::LokiStream,
@@ -555,6 +560,8 @@ use crate::{
             openobserve_core::rum_pa::NamedEventList,
             openobserve_core::rum_pa::SavedFunnelList,
             openobserve_core::rum_pa::FunnelRefList,
+            openobserve_core::rum_pa::NamedEventRef,
+            openobserve_core::rum_pa::NamedEventRefList,
             openobserve_core::rum_pa::Current,
             openobserve_core::rum_pa::RumPaErrorBody,
          ),
@@ -902,6 +909,21 @@ mod tests {
                 .unwrap_or_else(|| panic!("{method} {path} is not documented"));
             assert_eq!(op["x-o2-ratelimit"]["module"], "Query History");
             assert_eq!(op["x-o2-mcp"]["enabled"], false, "{method} {path}");
+        }
+    }
+
+    #[test]
+    fn recent_rejections_path_and_schemas_are_registered() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let op = &spec["paths"]["/api/{org_id}/ingest/recent_rejections"]["get"];
+        assert_eq!(op["operationId"], "GetRecentIngestRejections", "{op}");
+        assert_eq!(
+            op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"],
+            "#/components/schemas/RecentRejections"
+        );
+        let schemas = spec["components"]["schemas"].as_object().unwrap();
+        for name in ["RecentRejections", "IngestRejection", "RejectionReason"] {
+            assert!(schemas.contains_key(name), "schema {name} missing");
         }
     }
 

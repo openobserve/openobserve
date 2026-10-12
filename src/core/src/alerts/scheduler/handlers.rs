@@ -53,8 +53,8 @@ use crate::organization::is_org_in_free_trial_period;
 use crate::{
     alerts::{
         alert::{
-            AlertExt, NotificationOutcome, get_alert_start_end_time, get_by_id_db,
-            get_row_column_map,
+            AlertError, AlertExt, NotificationOutcome, get_alert_start_end_time, get_by_id_db,
+            get_row_column_map, send_attempted,
         },
         derived_streams::DerivedStreamExt,
     },
@@ -300,6 +300,8 @@ struct GroupDispatchOutcome {
     /// Group keys whose send succeeded. A dedup reservation is confirmed by
     /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
     delivered_groups: std::collections::HashSet<String>,
+    /// Whether any group's send dispatched a destination or workflow.
+    attempted: bool,
     /// The state layer failed, so nothing was even attempted. Distinct from
     /// "delivered nothing": a zero/zero result otherwise reads as a clean run
     /// and the caller would advance the trigger as if the alert had been
@@ -398,6 +400,7 @@ async fn dispatch_per_group(
             pending: 0,
             errors: vec!["group state did not commit".to_string()],
             delivered_groups: Default::default(),
+            attempted: false,
             state_failed: true,
         });
     }
@@ -412,6 +415,7 @@ async fn dispatch_per_group(
                 pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
                 delivered_groups: Default::default(),
+                attempted: false,
                 state_failed: true,
             });
         }
@@ -472,6 +476,7 @@ async fn dispatch_per_group(
     let (mut delivered, mut failed) = (0usize, 0usize);
     let mut errors: Vec<String> = Vec::new();
     let mut delivered_groups: std::collections::HashSet<String> = Default::default();
+    let mut attempted = false;
     for item in &plan.items {
         // The group's OWN row, level and value — never the worst group's
         // (MN-3). One send per group is what makes host-a and host-b page
@@ -500,6 +505,7 @@ async fn dispatch_per_group(
         // be slow, and a window opened before its own notification landed can
         // expire while that notification is still in flight.
         let resolved_at = now_micros();
+        attempted |= send_attempted(&outcome);
 
         let ok = match outcome {
             Ok(outcome) => {
@@ -575,6 +581,7 @@ async fn dispatch_per_group(
         pending: plan.pending,
         errors,
         delivered_groups,
+        attempted,
         state_failed: false,
     })
 }
@@ -1009,6 +1016,7 @@ async fn handle_composite_alert_trigger(
     transaction.commit().await?;
 
     let mut delivery_retry_at = None;
+    let mut delivery_error = None;
     if evaluated.result {
         scheduled_data.last_satisfied_at = Some(now);
         // Hoisted: correlation runs in the deliverable branch, but paging needs the answer.
@@ -1049,12 +1057,12 @@ async fn handle_composite_alert_trigger(
             let rows = [notification_row];
 
             #[cfg(feature = "enterprise")]
-            let incident_handled = if notification_alert.creates_incident
+            let (incident_handled, incident_notify_error) = if notification_alert.creates_incident
                 && o2_enterprise::enterprise::common::config::get_config()
                     .incidents
                     .enabled
             {
-                crate::alerts::incidents::correlate_alert_to_incident(
+                match crate::alerts::incidents::correlate_alert_to_incident(
                     &notification_alert,
                     &rows[0],
                     &rows,
@@ -1062,20 +1070,23 @@ async fn handle_composite_alert_trigger(
                     Some(evaluated.level),
                 )
                 .await
-                .map(|outcome| outcome.is_some())
-                .unwrap_or_else(|error| {
-                    log::error!(
-                        "[COMPOSITE_ALERT] incident correlation failed for {}/{}: {error}",
-                        trigger.org,
-                        definition.definition.id
-                    );
-                    false
-                })
+                {
+                    Ok(Some(correlated)) => (true, correlated.notify_error),
+                    Ok(None) => (false, None),
+                    Err(error) => {
+                        log::error!(
+                            "[COMPOSITE_ALERT] incident correlation failed for {}/{}: {error}",
+                            trigger.org,
+                            definition.definition.id
+                        );
+                        (false, None)
+                    }
+                }
             } else {
-                false
+                (false, None)
             };
             #[cfg(not(feature = "enterprise"))]
-            let incident_handled = false;
+            let (incident_handled, incident_notify_error) = (false, None);
 
             #[cfg(feature = "enterprise")]
             {
@@ -1108,6 +1119,7 @@ async fn handle_composite_alert_trigger(
                     )
                     .await
             };
+            delivery_error = composite_delivery_error(&delivery_result, incident_notify_error);
             match delivery_result {
                 Ok(outcome) if outcome.failed.is_empty() => {
                     scheduled_data.notified_destinations.clear();
@@ -1164,7 +1176,12 @@ async fn handle_composite_alert_trigger(
             "{}/{}",
             definition.definition.name, definition.definition.id
         ),
-        status: outcome.clone(),
+        status: if delivery_error.is_some() {
+            RunOutcome::NotifyFailed
+        } else {
+            outcome.clone()
+        },
+        error: delivery_error,
         actual_value: Some(i32::from(evaluated.result) as f64),
         level: Some(evaluated.level.to_i32()),
         scheduler_trace_id: Some(trace_id.to_string()),
@@ -1249,6 +1266,25 @@ fn should_dispatch_after_incident(
     has_workflows: bool,
 ) -> bool {
     !incident_destinations_handled || has_workflows
+}
+
+/// Why a composite's send, or its incident's notification, left a destination unnotified.
+fn composite_delivery_error(
+    delivery: &Result<NotificationOutcome, AlertError>,
+    incident_notify_error: Option<String>,
+) -> Option<String> {
+    let delivery_error = match delivery {
+        Ok(outcome) if outcome.failed.is_empty() => None,
+        Ok(outcome) => Some(outcome.error_message.trim().to_owned()),
+        Err(error) => Some(format!("error sending notification for alert: {error}")),
+    };
+    match incident_notify_error {
+        None => delivery_error,
+        incident_error => Some(crate::alerts::alert::with_incident_notify_error(
+            delivery_error.unwrap_or_default(),
+            incident_error,
+        )),
+    }
 }
 
 fn composite_notification_alert(
@@ -2042,6 +2078,17 @@ async fn release_alert_firing_hold(
     }
 }
 
+/// Records a failed incident page; the returned pre-failure outcome is what the alert state keeps.
+#[cfg(feature = "enterprise")]
+fn record_incident_notify_failure(row: &mut TriggerData, error: String) -> RunOutcome {
+    let durable = std::mem::replace(&mut row.status, RunOutcome::NotifyFailed);
+    row.error = Some(crate::alerts::alert::with_incident_notify_error(
+        row.error.take().unwrap_or_default(),
+        Some(error),
+    ));
+    durable
+}
+
 #[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
 async fn handle_alert_triggers(
     trace_id: &str,
@@ -2199,37 +2246,6 @@ async fn handle_alert_triggers(
     };
     // Set the is_realtime field according to the alert
     new_trigger.is_realtime = alert.is_real_time;
-
-    // [ENTERPRISE] Initialize RCA batch tracking for this scheduler run
-    // #[cfg(feature = "enterprise")]
-    // let rca_enabled =
-    //     o2_enterprise::enterprise::ai::rca::integration::is_rca_enabled_for_org(&new_trigger.
-    // org); #[cfg(not(feature = "enterprise"))]
-    let _rca_enabled = false;
-
-    // Helper closure to mark alert completion and process batch if needed
-    // #[cfg(feature = "enterprise")]
-    // let mark_rca_completion = || async {
-    //     if rca_enabled {
-    //         let is_batch_complete =
-    //             o2_enterprise::enterprise::ai::rca::mark_alert_completed(trace_id);
-    //         if is_batch_complete {
-    //             log::info!(
-    //                 "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} complete, processing
-    // incidents",                 trace_id
-    //             );
-    //             if let Err(e) =
-    // o2_enterprise::enterprise::ai::rca::integration::process_batch_and_create_incidents(
-    //                 trace_id
-    //             ).await {
-    //                 log::error!(
-    //                     "[SCHEDULER trace_id {scheduler_trace_id}] Error creating incidents from
-    // batch {}: {}",                     trace_id, e
-    //                 );
-    //             }
-    //         }
-    //     }
-    // };
 
     #[cfg(feature = "cloud")]
     {
@@ -2547,10 +2563,6 @@ async fn handle_alert_triggers(
         }
         publish_triggers_usage(trigger_data_stream);
 
-        // [ENTERPRISE] Mark completion even on failure
-        // #[cfg(feature = "enterprise")]
-        // mark_rca_completion().await;
-
         return Err(err);
     }
 
@@ -2764,6 +2776,9 @@ async fn handle_alert_triggers(
     // Only the enterprise correlation block assigns this.
     #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
     let mut episode_incident_id: Option<String> = None;
+    // A failed incident page marks this run's record, not the alert state.
+    #[cfg_attr(not(feature = "enterprise"), allow(unused_mut))]
+    let mut durable_outcome: Option<RunOutcome> = None;
     // Read-or-mint BEFORE the send: a resolve only matches a key the vendor saw on the trigger.
     let episode_key: Option<String> = if alert.notify_on_recovery
         && delivery.should_deliver()
@@ -2991,11 +3006,12 @@ async fn handle_alert_triggers(
                 );
 
                 // Add to batch
-                let batch_ready = crate::alerts::grouping::add_to_batch(
+                let admission = crate::alerts::grouping::add_to_batch(
                     fingerprint.clone(),
                     new_trigger.org.clone(),
                     alert.clone(),
                     data.clone(),
+                    trigger_data_stream.clone(),
                     grouping_config.group_wait_seconds,
                     grouping_config.max_group_size,
                     eval_level,
@@ -3012,41 +3028,38 @@ async fn handle_alert_triggers(
                 // actually succeeded — stamping a failed send would start a
                 // silence window with zero destinations reached and suppress
                 // the retry.
-                let mut grouped_delivery_ok = true;
-                if batch_ready {
-                    log::info!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
-                    );
-                    if let Some(batch) =
-                        crate::alerts::grouping::get_ready_batch(&new_trigger.org, &fingerprint)
-                        && let Err(e) = crate::alerts::grouping::send_grouped_notification(
-                            &scheduler_trace_id,
-                            batch,
-                        )
-                        .await
-                    {
-                        log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] Failed to send grouped notification: org_id: {}, error: {}",
-                            new_trigger.org,
-                            e
+                let grouped_delivery_ok = match admission {
+                    crate::alerts::grouping::BatchAdmission::Ready => {
+                        log::info!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
                         );
-                        grouped_delivery_ok = false;
+                        // Absent means the expiry worker took the batch and publishes its rows.
+                        match crate::alerts::grouping::get_ready_batch(
+                            &new_trigger.org,
+                            &fingerprint,
+                        ) {
+                            Some(batch) => {
+                                crate::alerts::grouping::flush_batch(&scheduler_trace_id, batch)
+                                    .await
+                            }
+                            None => true,
+                        }
                     }
-                } else {
-                    log::debug!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] Alert added to batch, waiting for more alerts or timeout, fingerprint: {}",
-                        fingerprint
-                    );
-                }
-
-                // Mark as grouped for history tracking
-                trigger_data_stream.dedup_enabled = Some(true);
-                trigger_data_stream.grouped = Some(true);
-                trigger_data_stream.group_size = Some(if batch_ready {
-                    grouping_config.max_group_size as i32
-                } else {
-                    1
-                });
+                    crate::alerts::grouping::BatchAdmission::Queued => {
+                        log::debug!(
+                            "[SCHEDULER trace_id {scheduler_trace_id}] Alert added to batch, waiting for more alerts or timeout, fingerprint: {}",
+                            fingerprint
+                        );
+                        true
+                    }
+                    crate::alerts::grouping::BatchAdmission::Refused => {
+                        publish_triggers_usage(crate::alerts::grouping::refused_row(
+                            &trigger_data_stream,
+                        ));
+                        // No batch owns this evaluation, so no silence window may open for it.
+                        false
+                    }
+                };
 
                 // Alert added to batch, don't send individual notification.
                 if grouped_delivery_ok {
@@ -3073,7 +3086,6 @@ async fn handle_alert_triggers(
                     )
                     .await;
                 }
-                publish_triggers_usage(trigger_data_stream);
                 return Ok(());
             }
         }
@@ -3111,6 +3123,7 @@ async fn handle_alert_triggers(
                         // Mark as suppressed for history tracking
                         trigger_data_stream.dedup_enabled = Some(true);
                         trigger_data_stream.dedup_suppressed = Some(true);
+                        trigger_data_stream.delivery_attempted = Some(false);
 
                         // All results were deduplicated, skip notification
                         // Still update the trigger timing
@@ -3153,34 +3166,8 @@ async fn handle_alert_triggers(
             }
         };
 
-        // [ENTERPRISE] Collect alert events for batched incident creation
-        // #[cfg(feature = "enterprise")]
-        // if rca_enabled && !data.is_empty() {
-        //     // Collect each deduplicated result row as an alert event
-        //     // Use parent trace_id for cross-alert correlation (not scheduler_trace_id)
-        //     for row in &data {
-        //         if let Err(e) =
-        // o2_enterprise::enterprise::ai::rca::integration::collect_alert_event(
-        // trace_id, // Use parent trace_id for cross-alert batch             &alert,
-        //             row,
-        //             triggered_at,
-        //         ) {
-        //             log::error!(
-        //                 "[SCHEDULER trace_id {scheduler_trace_id}] Error collecting alert event
-        // for RCA: {}",                 e
-        //             );
-        //             // Don't fail alert evaluation if RCA collection fails
-        //         }
-        //     }
-        //     log::debug!(
-        //         "[SCHEDULER trace_id {scheduler_trace_id}] Collected {} alert events for RCA
-        // batch {}",         data.len(),
-        //         trace_id
-        //     );
-        // }
-
         #[cfg(feature = "enterprise")]
-        let incident_handled_notification = if alert.creates_incident
+        let (incident_handled_notification, incident_notify_error) = if alert.creates_incident
             && o2_enterprise::enterprise::common::config::get_config()
                 .incidents
                 .enabled
@@ -3195,19 +3182,20 @@ async fn handle_alert_triggers(
             )
             .await
             {
-                Ok(Some(outcome)) => {
+                Ok(Some(correlated)) => {
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{} correlated to incident {} (service: {})",
                         new_trigger.org,
                         alert.name,
-                        outcome.incident_id(),
-                        outcome.service_name(),
+                        correlated.outcome.incident_id(),
+                        correlated.outcome.service_name(),
                     );
                     // Notification was handled inside correlate_alert_to_incident
                     // (sent for new incidents/alert types, suppressed for repeats).
                     // The incident owns the resolve too, so the episode records it.
-                    episode_incident_id = Some(outcome.incident_id().to_string());
-                    true
+                    episode_incident_id = Some(correlated.outcome.incident_id().to_string());
+                    trigger_data_stream.delivery_attempted = Some(correlated.notify_attempted);
+                    (true, correlated.notify_error)
                 }
                 Ok(None) => {
                     log::debug!(
@@ -3215,7 +3203,7 @@ async fn handle_alert_triggers(
                         new_trigger.org,
                         alert.name,
                     );
-                    false
+                    (false, None)
                 }
                 Err(e) => {
                     log::error!(
@@ -3223,11 +3211,11 @@ async fn handle_alert_triggers(
                         new_trigger.org
                     );
                     // Fall through to direct notification — don't silently lose the notification.
-                    false
+                    (false, None)
                 }
             }
         } else {
-            false
+            (false, None)
         };
 
         #[cfg(not(feature = "enterprise"))]
@@ -3328,6 +3316,7 @@ async fn handle_alert_triggers(
                 publish_triggers_usage(trigger_data_stream);
                 return Ok(());
             }
+            trigger_data_stream.delivery_attempted = Some(dispatch.attempted);
             // MN-7: one record (D8) for the evaluation; per-group detail lives on each group's row.
             if let Some(status) = dispatch.history_status() {
                 trigger_data_stream.status = status;
@@ -3380,7 +3369,7 @@ async fn handle_alert_triggers(
             } else {
                 &trigger_data.notified_destinations
             };
-            match alert
+            let sent = alert
                 .send_notification(
                     &scheduler_trace_id,
                     &data,
@@ -3393,12 +3382,17 @@ async fn handle_alert_triggers(
                     skip_destinations,
                     episode_key.clone(),
                 )
-                .await
-            {
+                .await;
+            // The incident notification stamped above counts even if only workflows ran here.
+            trigger_data_stream.delivery_attempted = Some(
+                send_attempted(&sent) || trigger_data_stream.delivery_attempted.unwrap_or(false),
+            );
+            match sent {
                 Ok(outcome) => {
                     let NotificationOutcome {
                         succeeded,
                         failed,
+                        attempted: _,
                         success_message: success_msg,
                         error_message: err_msg,
                     } = outcome;
@@ -3586,6 +3580,13 @@ async fn handle_alert_triggers(
                 }
             }
         }
+        #[cfg(feature = "enterprise")]
+        if let Some(error) = incident_notify_error {
+            durable_outcome = Some(record_incident_notify_failure(
+                &mut trigger_data_stream,
+                error,
+            ));
+        }
     } else {
         if condition_matched {
             // The condition DID match — this branch was reached because the
@@ -3599,6 +3600,7 @@ async fn handle_alert_triggers(
                 new_trigger.org,
                 new_trigger.module_key
             );
+            trigger_data_stream.delivery_attempted = Some(false);
         } else if trigger_results.frozen {
             // Frozen is not Normal: nothing was measured (§7.6). `Skipped` is
             // the outcome `should_persist` drops entirely, so BOTH state axes
@@ -3650,7 +3652,9 @@ async fn handle_alert_triggers(
         let _ = persist_alert_run_state(
             &alert,
             &alert_id.to_string(),
-            &trigger_data_stream.status,
+            durable_outcome
+                .as_ref()
+                .unwrap_or(&trigger_data_stream.status),
             eval_level,
             trigger_results.group_classification.as_ref(),
             &config::meta::alerts::recovery::EpisodeInput {
@@ -3669,10 +3673,6 @@ async fn handle_alert_triggers(
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream);
-
-    // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
-    // #[cfg(feature = "enterprise")]
-    // mark_rca_completion().await;
 
     Ok(())
 }
@@ -6303,6 +6303,7 @@ mod tests {
             pending,
             errors: errors.iter().map(|e| (*e).to_string()).collect(),
             delivered_groups: std::collections::HashSet::new(),
+            attempted: false,
             state_failed: false,
         }
     }
@@ -7486,6 +7487,55 @@ mod tests {
         assert_eq!(result[0].stream_name.as_str(), "output-stream");
     }
 
+    #[test]
+    fn test_composite_delivery_error_for_every_send_result() {
+        let delivered = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            ..Default::default()
+        });
+        assert_eq!(composite_delivery_error(&delivered, None), None);
+
+        let partial = Ok(NotificationOutcome {
+            succeeded: vec!["slack".to_string()],
+            failed: vec!["pagerduty".to_string()],
+            error_message: " pagerduty timed out ".to_string(),
+            ..Default::default()
+        });
+        assert_eq!(
+            composite_delivery_error(&partial, None).as_deref(),
+            Some("pagerduty timed out")
+        );
+
+        let failed = Err(AlertError::SendNotificationError {
+            error_message: "http 500".to_string(),
+        });
+        assert!(
+            composite_delivery_error(&failed, None)
+                .is_some_and(|error| error.starts_with("error sending notification for alert:"))
+        );
+    }
+
+    #[test]
+    fn test_composite_delivery_error_reports_a_failed_incident_notification() {
+        let incident_error = || Some("slack: http 500".to_string());
+
+        let nothing_else_sent = Ok(NotificationOutcome::default());
+        assert_eq!(
+            composite_delivery_error(&nothing_else_sent, incident_error()).as_deref(),
+            Some("slack: http 500")
+        );
+
+        let workflow_failed = Ok(NotificationOutcome {
+            failed: vec!["workflow".to_string()],
+            error_message: "workflow timed out".to_string(),
+            ..Default::default()
+        });
+        assert_eq!(
+            composite_delivery_error(&workflow_failed, incident_error()).as_deref(),
+            Some("slack: http 500; workflow timed out")
+        );
+    }
+
     /// The alert list's only source for an anomaly's outcome, so the recorded
     /// value must survive alongside the anomaly timestamp written beside it.
     mod record_anomaly_outcome_tests {
@@ -7586,5 +7636,27 @@ mod tests {
             anomaly_run_status(&run(false, false, false, false)),
             RunOutcome::Normal
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_failed_incident_page_marks_the_record_but_keeps_the_alert_state() {
+        let mut fired = TriggerData {
+            status: RunOutcome::Firing,
+            ..Default::default()
+        };
+        let kept = record_incident_notify_failure(&mut fired, "slack: http 500".to_string());
+        assert_eq!(kept, RunOutcome::Firing);
+        assert_eq!(fired.status, RunOutcome::NotifyFailed);
+        assert_eq!(fired.error.as_deref(), Some("slack: http 500"));
+
+        let mut workflow_failed = TriggerData {
+            status: RunOutcome::NotifyFailed,
+            error: Some("workflow x failed".to_string()),
+            ..Default::default()
+        };
+        let kept =
+            record_incident_notify_failure(&mut workflow_failed, "slack: http 500".to_string());
+        assert_eq!(kept, RunOutcome::NotifyFailed);
     }
 }

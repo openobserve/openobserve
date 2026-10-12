@@ -80,3 +80,34 @@ describe("generateAlertSummary in Forecast mode", () => {
     expect(text).not.toContain("forecast to rise");
   });
 });
+
+describe("generateAlertSummary: Compare-with-Past windows", () => {
+  // Returns the key, so a test asserts which sentence the summary chose.
+  const keyT = (key: string) => key;
+
+  const scheduledAlert = (type: string) => ({
+    stream_name: "default",
+    stream_type: "logs",
+    is_real_time: "false",
+    query_condition: {
+      type,
+      sql: 'SELECT count(*) FROM "default"',
+      multi_time_range: [{ offSet: "1h" }],
+    },
+    trigger_condition: { period: 10, operator: ">=", threshold: 3, frequency: 10, silence: 10 },
+    destinations: [],
+  });
+
+  it("lists the windows for a SQL alert", () => {
+    expect(generateAlertSummary(scheduledAlert("sql"), [], keyT)).toContain(
+      "alerts.summary.timeRangeCount",
+    );
+  });
+
+  // The payload sends windows only with SQL, so the summary must not promise them.
+  it("leaves out windows that a Builder alert does not save", () => {
+    expect(generateAlertSummary(scheduledAlert("custom"), [], keyT)).not.toContain(
+      "alerts.summary.timeRangeCount",
+    );
+  });
+});

@@ -35,7 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size-options="[20, 50, 100, 250, 500]"
         :current-page="currentPage"
         @update:current-page="onPageChange"
+        @update:page-size="pageSize = $event"
         sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         filter-mode="client"
         :default-columns="false"
         show-index
@@ -131,11 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-title="{ row }">
-          <div class="flex items-center gap-1">
-            <span>
-              {{ row.title || formatDimensions(row.group_values) }}
-            </span>
-          </div>
+          <span>
+            {{ row.title || formatDimensions(row.group_values) }}
+          </span>
         </template>
         <template #cell-dimensions="{ row }">
           <div
@@ -295,6 +298,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
+import { useListViewState } from "@/composables/useListViewState";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -395,7 +399,15 @@ export default defineComponent({
         : "active",
     );
     const isRestoringState = ref(false);
-    const pageSize = ref(20);
+    const viewState = useListViewState("incidents", {
+      severityFilter: "all",
+      pageSize: 20,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const pageSize = ref(viewState.pageSize);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
     // Restored from the Vuex incidents store (same mechanism as searchQuery/statusFilter) so returning from a detail view lands back on the same page.
     const currentPage = ref(1);
     const onPageChange = (page: number) => {
@@ -403,7 +415,15 @@ export default defineComponent({
       savePageState();
     };
     // Severity facet — independent of status ("all" | "P1".."P4").
-    const severityFilter = ref("all");
+    const severityFilter = ref(viewState.severityFilter);
+    watch([severityFilter, pageSize, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        severityFilter: severityFilter.value,
+        pageSize: pageSize.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
 
     const columns: OTableColumnDef[] = [
       {
@@ -662,7 +682,7 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: currentPage.value, rowsPerPage: 20 },
+        pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
 
@@ -679,7 +699,7 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: currentPage.value, rowsPerPage: 20 },
+        pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
     };
@@ -888,7 +908,7 @@ export default defineComponent({
         store.dispatch("incidents/setIncidents", {
           searchQuery: searchQuery.value,
           statusFilter: statusFilter.value,
-          pagination: { page: currentPage.value, rowsPerPage: 20 },
+          pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
           organizationIdentifier: store.state.selectedOrganization.identifier,
         });
       }
@@ -937,6 +957,8 @@ export default defineComponent({
       clearFilters,
       columns,
       pageSize,
+      sortBy,
+      sortOrder,
       currentPage,
       onPageChange,
       loadIncidents,

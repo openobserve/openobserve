@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="enterpriseFeature"
       v-if="
         !trialExpired &&
-        config.isEnterprise == 'true' &&
+        customBrandingAccess.visible &&
         store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
       "
     >
@@ -189,52 +189,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("settings.customLogoText") }}
           </span>
-          <div
-            v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
-            class="flex items-center gap-2"
-          >
-            <OInput class="w-62.5" data-test="settings_ent_logo_custom_text" v-model="customText" />
-            <div class="flex gap-x-2">
-              <OButton
-                type="button"
-                variant="outline-destructive"
-                size="icon-xs-sq"
-                @click="cancelLogoText"
-                icon-left="close"
+          <template v-if="!customBrandingAccess.allowed">
+            <div class="flex items-center gap-2" @click.capture="onLockedBrandingClick">
+              <OInput
+                class="w-62.5"
+                model-value=""
+                :placeholder="t('settings.noTextAvailable')"
+                data-test="settings_ent_logo_custom_text_locked"
+              >
+                <template v-slot:icon-right>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+              </OInput>
+            </div>
+          </template>
+          <template v-else>
+            <div
+              v-if="editingText || store.state.zoConfig.custom_logo_text == ''"
+              class="flex items-center gap-2"
+            >
+              <OInput
+                class="w-62.5"
+                data-test="settings_ent_logo_custom_text"
+                v-model="customText"
               />
+              <div class="flex gap-x-2">
+                <OButton
+                  type="button"
+                  variant="outline-destructive"
+                  size="icon-xs-sq"
+                  @click="cancelLogoText"
+                  icon-left="close"
+                />
+                <OButton
+                  data-test="settings_ent_logo_custom_text_save_btn"
+                  :loading="loadingState"
+                  variant="outline"
+                  size="icon-xs-sq"
+                  type="button"
+                  @click="updateCustomText"
+                  icon-left="check"
+                />
+              </div>
+            </div>
+            <div v-else class="flex items-center">
+              <OTruncatedText class="w-47.5 text-center"
+                >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
+              </OTruncatedText>
               <OButton
-                data-test="settings_ent_logo_custom_text_save_btn"
+                data-test="settings_ent_logo_custom_text_edit_btn"
                 :loading="loadingState"
                 variant="outline"
                 size="icon-xs-sq"
+                class="ms-2"
                 type="button"
-                @click="updateCustomText"
-                icon-left="check"
+                @click="editingText = !editingText"
+                icon-left="edit"
               />
             </div>
-          </div>
-          <div v-else class="flex items-center">
-            <span class="w-47.5 truncate text-center"
-              >{{ store.state.zoConfig.custom_logo_text || t("settings.noTextAvailable") }}
-              <OTooltip
-                v-if="store.state.zoConfig.custom_logo_text.length > 20"
-                side="top"
-                align="center"
-                max-width="15.625rem"
-                :content="store.state.zoConfig.custom_logo_text"
-              />
-            </span>
-            <OButton
-              data-test="settings_ent_logo_custom_text_edit_btn"
-              :loading="loadingState"
-              variant="outline"
-              size="icon-xs-sq"
-              class="ms-2"
-              type="button"
-              @click="editingText = !editingText"
-              icon-left="edit"
-            />
-          </div>
+          </template>
           <span class="individual-setting-description text-compact opacity-70">
             {{ t("settings.customLogoTextDescription") }}
           </span>
@@ -246,63 +259,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
-          <div
-            v-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
-              store.state.zoConfig.custom_logo_img != null
-            "
-            class="w-full"
-          >
-            <img
-              data-test="setting_ent_custom_logo_img"
-              :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_img"
-              :alt="t('settings.logoLabel')"
-              class="mx-3 max-h-7.75 max-w-37.5"
-            />
-            <OButton
-              data-test="setting_ent_custom_logo_img_delete_btn"
-              variant="ghost-destructive"
-              size="icon-xs-sq"
-              class="mx-3"
-              @click="confirmDeleteLogo('light')"
-              icon-left="delete"
-            />
-          </div>
-          <div v-else class="flex items-start gap-2">
-            <OFile
-              data-test="setting_ent_custom_logo_img_file_upload"
-              v-model="filesLight"
-              :label="t('settings.dragDropUpload')"
-              counter
-              :counter-label="counterLabelFn"
-              accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-              @rejected="onRejected"
-              :help-text="t('settings.fileFormatConstraint')"
-              class="o2-file-input mx-0"
+          <template v-if="!customBrandingAccess.allowed">
+            <div class="flex items-start gap-2" @click.capture="onLockedBrandingClick">
+              <OFile
+                data-test="setting_ent_custom_logo_img_file_upload_locked"
+                :label="t('settings.dragDropUpload')"
+                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+                :help-text="t('settings.fileFormatConstraint')"
+                class="o2-file-input mx-0"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+              </OFile>
+            </div>
+          </template>
+          <template v-else>
+            <div
+              v-if="
+                store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
+                store.state.zoConfig.custom_logo_img != null
+              "
+              class="w-full"
             >
-              <template v-slot:prepend>
-                <OIcon name="attach-file" size="sm" />
-              </template>
-            </OFile>
-            <div class="flex gap-x-2 pt-5.75">
-              <OButton
-                type="button"
-                variant="outline-destructive"
-                size="icon-xs-sq"
-                @click="filesLight = null"
-                icon-left="close"
+              <img
+                data-test="setting_ent_custom_logo_img"
+                :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_img"
+                :alt="t('settings.logoLabel')"
+                class="mx-3 max-h-7.75 max-w-37.5"
               />
               <OButton
-                data-test="settings_ent_logo_custom_light_save_btn"
-                :loading="loadingState"
-                variant="outline"
+                data-test="setting_ent_custom_logo_img_delete_btn"
+                variant="ghost-destructive"
                 size="icon-xs-sq"
-                type="button"
-                @click="uploadImage(filesLight, 'light')"
-                icon-left="check"
+                class="mx-3"
+                @click="confirmDeleteLogo('light')"
+                icon-left="delete"
               />
             </div>
-          </div>
+            <div v-else class="flex items-start gap-2">
+              <OFile
+                data-test="setting_ent_custom_logo_img_file_upload"
+                v-model="filesLight"
+                :label="t('settings.dragDropUpload')"
+                counter
+                :counter-label="counterLabelFn"
+                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+                @rejected="onRejected"
+                :help-text="t('settings.fileFormatConstraint')"
+                class="o2-file-input mx-0"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="attach-file" size="sm" />
+                </template>
+              </OFile>
+              <div class="flex gap-x-2 pt-5.75">
+                <OButton
+                  type="button"
+                  variant="outline-destructive"
+                  size="icon-xs-sq"
+                  @click="filesLight = null"
+                  icon-left="close"
+                />
+                <OButton
+                  data-test="settings_ent_logo_custom_light_save_btn"
+                  :loading="loadingState"
+                  variant="outline"
+                  size="icon-xs-sq"
+                  type="button"
+                  @click="uploadImage(filesLight, 'light')"
+                  icon-left="check"
+                />
+              </div>
+            </div>
+          </template>
           <span class="individual-setting-description text-compact -translate-y-1.25 opacity-70">
             {{ t("settings.customLogoLightDescription") }}
           </span>
@@ -315,63 +345,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
-          <div
-            v-if="
-              store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
-              store.state.zoConfig.custom_logo_dark_img != null
-            "
-            class="w-full"
-          >
-            <img
-              data-test="setting_ent_custom_logo_dark_img"
-              :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img"
-              :alt="t('settings.logoLabel')"
-              class="mx-3 max-h-7.75 max-w-37.5"
-            />
-            <OButton
-              data-test="setting_ent_custom_logo_dark_img_delete_btn"
-              variant="ghost-destructive"
-              size="icon-xs-sq"
-              class="mx-3"
-              @click="confirmDeleteLogo('dark')"
-              icon-left="delete"
-            />
-          </div>
-          <div v-else class="flex items-start gap-2">
-            <OFile
-              data-test="setting_ent_custom_logo_dark_img_file_upload"
-              v-model="filesDark"
-              :label="t('settings.dragDropUpload')"
-              counter
-              :counter-label="counterLabelFn"
-              accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
-              @rejected="onRejected"
-              :help-text="t('settings.fileFormatConstraint')"
-              class="o2-file-input mx-0"
+          <template v-if="!customBrandingAccess.allowed">
+            <div class="flex items-start gap-2" @click.capture="onLockedBrandingClick">
+              <OFile
+                data-test="setting_ent_custom_logo_dark_img_file_upload_locked"
+                :label="t('settings.dragDropUpload')"
+                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+                :help-text="t('settings.fileFormatConstraint')"
+                class="o2-file-input mx-0"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="lock" size="sm" class="text-warning-600" />
+                </template>
+              </OFile>
+            </div>
+          </template>
+          <template v-else>
+            <div
+              v-if="
+                store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
+                store.state.zoConfig.custom_logo_dark_img != null
+              "
+              class="w-full"
             >
-              <template v-slot:prepend>
-                <OIcon name="attach-file" size="sm" />
-              </template>
-            </OFile>
-            <div class="flex gap-x-2 pt-5.75">
-              <OButton
-                type="button"
-                variant="outline-destructive"
-                size="icon-xs-sq"
-                @click="filesDark = null"
-                icon-left="close"
+              <img
+                data-test="setting_ent_custom_logo_dark_img"
+                :src="`data:image; base64, ` + store.state.zoConfig.custom_logo_dark_img"
+                :alt="t('settings.logoLabel')"
+                class="mx-3 max-h-7.75 max-w-37.5"
               />
               <OButton
-                data-test="settings_ent_logo_custom_dark_save_btn"
-                :loading="loadingState"
-                variant="outline"
+                data-test="setting_ent_custom_logo_dark_img_delete_btn"
+                variant="ghost-destructive"
                 size="icon-xs-sq"
-                type="button"
-                @click="uploadImage(filesDark, 'dark')"
-                icon-left="check"
+                class="mx-3"
+                @click="confirmDeleteLogo('dark')"
+                icon-left="delete"
               />
             </div>
-          </div>
+            <div v-else class="flex items-start gap-2">
+              <OFile
+                data-test="setting_ent_custom_logo_dark_img_file_upload"
+                v-model="filesDark"
+                :label="t('settings.dragDropUpload')"
+                counter
+                :counter-label="counterLabelFn"
+                accept=".png, .jpg, .jpeg, .gif, .bmp, .jpeg2, image/*"
+                @rejected="onRejected"
+                :help-text="t('settings.fileFormatConstraint')"
+                class="o2-file-input mx-0"
+              >
+                <template v-slot:prepend>
+                  <OIcon name="attach-file" size="sm" />
+                </template>
+              </OFile>
+              <div class="flex gap-x-2 pt-5.75">
+                <OButton
+                  type="button"
+                  variant="outline-destructive"
+                  size="icon-xs-sq"
+                  @click="filesDark = null"
+                  icon-left="close"
+                />
+                <OButton
+                  data-test="settings_ent_logo_custom_dark_save_btn"
+                  :loading="loadingState"
+                  variant="outline"
+                  size="icon-xs-sq"
+                  type="button"
+                  @click="uploadImage(filesDark, 'dark')"
+                  icon-left="check"
+                />
+              </div>
+            </div>
+          </template>
           <span class="individual-setting-description text-compact -translate-y-1.25 opacity-70">
             {{ t("settings.customLogoDarkDescription") }}
           </span>
@@ -586,6 +633,7 @@ import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -595,6 +643,8 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeGeneralSettingsSchema, type GeneralSettingsForm } from "./General.schema";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -618,6 +668,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTooltip,
+    OTruncatedText,
     OInput,
     OFile,
     OForm,
@@ -630,6 +681,16 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const router: any = useRouter();
+
+    // Self-hosted-only (cloudOffers: false) — pure Cloud gets `visible: false`
+    // (hidden, matching today's real behavior), OSS gets locked-but-visible.
+    const customBrandingAccess = useLockedAffordance("customBranding");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    function onLockedBrandingClick(event: MouseEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      openUpgradeDialog();
+    }
 
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
@@ -1406,6 +1467,8 @@ export default defineComponent({
       openDeleteOrgDialog,
       orgScope,
       orgScopeLoading,
+      customBrandingAccess,
+      onLockedBrandingClick,
     };
   },
 });

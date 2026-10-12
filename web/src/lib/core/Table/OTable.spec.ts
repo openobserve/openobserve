@@ -30,8 +30,10 @@ beforeAll(() => {
 import { defineComponent, h, nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
 import OTableHeader from "./sub-components/OTableHeader.vue";
+import OTableBody from "./sub-components/OTableBody.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "./OTable.types";
+import { raw } from "@/types/i18n";
 
 interface TestRow {
   id: number;
@@ -1156,6 +1158,373 @@ describe("OTable", () => {
     });
   });
 
+  // ── Cut-off cell tooltip ──────────────────────────────
+
+  describe("cut-off cell tooltip", () => {
+    // jsdom has no layout, so a test sets the two widths the cut-off check compares.
+    const setWidths = (el: Element, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    };
+    const bubbles = () => document.body.querySelectorAll('[data-test="o-tooltip-content"]');
+    const hoverPastDelay = async (cell: Element) => {
+      cell.dispatchEvent(new MouseEvent("mouseenter"));
+      vi.advanceTimersByTime(700);
+      await nextTick();
+      await nextTick();
+    };
+    const nameSlot = (inner: string) => ({
+      "cell-name": `<template #cell-name="{ row }">${inner}</template>`,
+    });
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("shows the full value in one shared tooltip after hovering a cut cell", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(2), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.findAll('[data-test="o2-table-cell-email"]')[0].element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(1);
+      expect(bubbles()[0].textContent).toContain("user1@example.com");
+    });
+
+    it("opens and closes the tooltip without re-rendering the table body", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.findAll('[data-test="o2-table-cell-email"]')[0].element;
+      setWidths(cell, 400, 120);
+      const body = wrapper.findComponent(OTableBody).vm.$;
+      const renderedBody = body.subTree;
+
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+      expect(body.subTree).toBe(renderedBody);
+
+      cell.dispatchEvent(new MouseEvent("mouseleave"));
+      for (let i = 0; i < 4; i++) await nextTick();
+      expect(bubbles()).toHaveLength(0);
+      expect(body.subTree).toBe(renderedBody);
+    });
+
+    it("opens nothing when the cell's text fits", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 120, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("never shows a cut cell in a column that opts out, as a secret column does", async () => {
+      const columns = makeColumns().map((c) =>
+        c.id === "email" ? { ...c, meta: { cellOverflowTooltip: false } } : c,
+      );
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("never shows a cut cell when the whole table turns the tooltip off", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns(), cellOverflowTooltip: false },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("closes an open tooltip when the table turns the tooltip off", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+
+      await wrapper.setProps({ cellOverflowTooltip: false });
+      // reka removes a closed bubble a few ticks after `open` turns false.
+      for (let i = 0; i < 4; i++) await nextTick();
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("measures the slot wrapper for custom cell content", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<b>{{ row.name }}</b>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.textContent).toContain("User 1");
+    });
+
+    it("leaves cut text alone when it already carries its own title", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span :title="row.name">{{ row.name }}</span>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("still shows cut text when the cell's only other title is a text-less copy button", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span>{{ row.name }}</span><button title="Copy"></button>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.textContent).toContain("User 1");
+    });
+
+    it("never shows text from inside an element marked off, as a secret is", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span data-o-tooltip-off="">{{ row.name }}</span>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("shows the cut wrapper's text when an overflow-only tooltip inside it is not cut itself", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<span data-o-tooltip-trigger="overflow">{{ row.name }}</span>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.textContent).toContain("User 1");
+    });
+
+    it("opens nothing when the cut cell has no text, such as an icon", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: nameSlot(`<i class="icon"></i>`),
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-name"]').element;
+      setWidths(cell.querySelector("[data-o2-cell-clip]")!, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("opens below the cell when the cell's hover toolbar sits above it", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: { "cell-hover-actions": `<span class="hover-act">A</span>` },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(document.querySelector(".hover-act")).not.toBeNull();
+      expect(bubbles()[0]?.getAttribute("data-side")).toBe("bottom");
+    });
+
+    it("opens above the cell when there is no hover toolbar", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+
+      await hoverPastDelay(cell);
+
+      expect(bubbles()[0]?.getAttribute("data-side")).toBe("top");
+    });
+
+    it("closes the tooltip when the pointer leaves the cell", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+
+      cell.dispatchEvent(new MouseEvent("mouseleave"));
+      // reka removes a closed bubble a few ticks after `open` turns false.
+      for (let i = 0; i < 4; i++) await nextTick();
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("closes the tooltip when the table scrolls", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      const cell = wrapper.find('[data-test="o2-table-cell-email"]').element;
+      setWidths(cell, 400, 120);
+      await hoverPastDelay(cell);
+      expect(bubbles()).toHaveLength(1);
+
+      await wrapper.find('[data-test="o2-table-scroll-container"]').trigger("scroll");
+      await nextTick();
+
+      expect(bubbles()).toHaveLength(0);
+    });
+  });
+
+  describe("cut-off header text", () => {
+    const setWidths = (el: Element, scrollWidth: number, clientWidth: number) => {
+      Object.defineProperty(el, "scrollWidth", { configurable: true, value: scrollWidth });
+      Object.defineProperty(el, "clientWidth", { configurable: true, value: clientWidth });
+    };
+    const bubbles = () => document.body.querySelectorAll('[data-test="o-tooltip-content"]');
+    const hoverPastDelay = async (el: Element) => {
+      el.dispatchEvent(new MouseEvent("mouseenter"));
+      vi.advanceTimersByTime(700);
+      await nextTick();
+      await nextTick();
+    };
+    const withHelp = (subLabel?: string) =>
+      makeColumns().map((c) =>
+        c.id === "email"
+          ? {
+              ...c,
+              // Without row reorder, only a sortable header draws its sub-label.
+              sortable: !!subLabel,
+              meta: {
+                headerTooltip: raw("Where we send alerts"),
+                ...(subLabel ? { headerSubLabel: raw(subLabel) } : {}),
+              },
+            }
+          : c,
+      );
+    const th = () => wrapper.find('[data-test="o2-table-th-email"]').element;
+    const label = () => th().querySelector("[data-o2-th-label]")!;
+
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("shows a cut column name in a cut-only tooltip instead of an always-on title", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+      expect(label().getAttribute("title")).toBeNull();
+      expect(label().getAttribute("data-o-tooltip-trigger")).toBe("overflow");
+
+      setWidths(label(), 400, 120);
+      await hoverPastDelay(label());
+
+      expect(bubbles()).toHaveLength(1);
+      expect(bubbles()[0].textContent).toContain("Email");
+    });
+
+    it("opens nothing on a column name that fits", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        attachTo: document.body,
+      });
+
+      await hoverPastDelay(label());
+
+      expect(bubbles()).toHaveLength(0);
+    });
+
+    it("starts the help bubble with a cut name, so only one bubble opens", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp() },
+        attachTo: document.body,
+      });
+      expect(label().hasAttribute("data-o-tooltip-off")).toBe(true);
+      setWidths(label(), 400, 120);
+
+      await hoverPastDelay(th());
+
+      expect(bubbles()).toHaveLength(1);
+      const name = bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]');
+      expect(name?.textContent).toBe("Email");
+      expect(bubbles()[0].textContent).toContain("Where we send alerts");
+    });
+
+    it("leaves the help bubble unchanged when the name fits", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp() },
+        attachTo: document.body,
+      });
+
+      await hoverPastDelay(th());
+
+      expect(bubbles()).toHaveLength(1);
+      expect(bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]')).toBeNull();
+      expect(bubbles()[0].textContent).toContain("Where we send alerts");
+      expect(bubbles()[0].textContent).not.toContain("Email");
+    });
+
+    it("adds a cut sub-label under the name in the help bubble", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: withHelp("delivery address") },
+        attachTo: document.body,
+      });
+      setWidths(th().querySelector("[data-o2-th-sublabel]")!, 400, 120);
+
+      await hoverPastDelay(th());
+
+      expect(
+        bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-name"]')?.textContent,
+      ).toBe("Email");
+      expect(
+        bubbles()[0].querySelector('[data-test="o2-table-th-tooltip-sublabel"]')?.textContent,
+      ).toBe("delivery address");
+    });
+  });
+
   // ── Cell hover-action overlay ─────────────────────────
 
   describe("cell hover actions", () => {
@@ -1339,6 +1708,37 @@ describe("OTable", () => {
       // dense mode sets row height to 2.25rem via CSS variable on the table
       const tableEl = wrapper.find('[data-test="o2-table"]');
       expect(tableEl.attributes("style")).toContain("2.25rem");
+    });
+
+    it("uses the compact row token and unpadded cells when compact is true", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns(), compact: true },
+      });
+      const tableEl = wrapper.find('[data-test="o2-table"]');
+      expect(tableEl.attributes("style")).toContain("var(--table-row-height-compact, 1.5625rem)");
+      const cell = wrapper.find('td[data-test^="o2-table-cell-"]');
+      expect(cell.classes()).toContain("px-0");
+      expect(cell.classes()).not.toContain("px-2");
+      expect(wrapper.find('th[data-test^="o2-table-th-"]').classes()).toContain("h-6");
+    });
+
+    it("keeps padded cells and the default header height without compact", () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns: makeColumns() },
+      });
+      expect(wrapper.find('td[data-test^="o2-table-cell-"]').classes()).toContain("px-2");
+      expect(wrapper.find('th[data-test^="o2-table-th-"]').classes()).toContain("h-8");
+    });
+
+    it("draws the pager hairline by default and drops it with paginationBordered false", async () => {
+      wrapper = mount(OTable, {
+        props: { data: makeRows(5), columns: makeColumns(), pageSize: 2 },
+      });
+      const pager = () => wrapper.find('[data-test="o2-table-pagination-bottom"]');
+      expect(pager().classes()).toContain("border-t");
+
+      await wrapper.setProps({ paginationBordered: false });
+      expect(pager().classes()).not.toContain("border-t");
     });
   });
 

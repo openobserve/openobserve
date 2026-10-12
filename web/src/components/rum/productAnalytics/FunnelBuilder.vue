@@ -288,6 +288,7 @@ const props = defineProps<{
   sampled: SampleRatio;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
+  deletedNames: Readonly<Record<string, string>>;
   unitLabel: I18nText;
   unitNoun: I18nText;
   hideTime: boolean;
@@ -323,7 +324,7 @@ const isDeleted = (s: StepRef) => s.kind === "e" && !props.events.some((e) => e.
 const labelOf = (s: StepRef): I18nText =>
   s.kind === "e" && props.eventsStatus !== "ready" && !props.events.some((e) => e.id === s.key)
     ? t("rum.analytics.events.unloadedStep")
-    : raw(stepLabel(s, props.events));
+    : raw(stepLabel(s, props.events, props.deletedNames));
 
 const kindLabel = (s: StepRef) =>
   s.kind === "p"

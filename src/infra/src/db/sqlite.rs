@@ -1429,4 +1429,47 @@ mod tests {
             "a non-UTF-8 decode error must propagate"
         );
     }
+
+    #[tokio::test]
+    async fn test_put_if_revision_creates_updates_and_refuses_a_stale_revision() {
+        use crate::db::Db;
+
+        crate::db::create_table().await.unwrap();
+        let db = SqliteDb::default();
+        let key = "/ingest_rejection/sqlite_put_if_revision_org";
+        db.delete_if_exists(key, false, false).await.unwrap();
+
+        assert!(db.get_with_revision(key).await.unwrap().is_none());
+        assert!(
+            db.put_if_revision(key, Bytes::from("a"), None)
+                .await
+                .unwrap()
+        );
+        assert!(
+            !db.put_if_revision(key, Bytes::from("x"), None)
+                .await
+                .unwrap(),
+            "create refused once the key exists"
+        );
+        let (value, revision) = db.get_with_revision(key).await.unwrap().unwrap();
+        assert_eq!(value, Bytes::from("a"));
+
+        assert!(
+            db.put_if_revision(key, Bytes::from("b"), Some(revision))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !db.put_if_revision(key, Bytes::from("c"), Some(revision))
+                .await
+                .unwrap(),
+            "stale revision refused"
+        );
+        let (value, newer) = db.get_with_revision(key).await.unwrap().unwrap();
+        assert_eq!(value, Bytes::from("b"));
+        assert_ne!(newer, revision);
+
+        db.delete(key, false, false, None).await.unwrap();
+        assert!(db.get_with_revision(key).await.unwrap().is_none());
+    }
 }

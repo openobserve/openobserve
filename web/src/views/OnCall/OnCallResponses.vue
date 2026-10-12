@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          "On call now" column. -->
     <OTable
       v-if="!unavailable && !setupOnly"
+      ref="oTableRef"
       :frame="false"
       :data="rows"
       :columns="columns"
@@ -109,9 +110,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :streaming="backgroundLoading"
       :error="loadError"
       pagination="client"
-      :page-size="20"
-      sort-by="last_alert_at"
-      sort-order="desc"
+      :page-size="pageSize"
+      :current-page="currentPage"
+      :sort-by="sortBy"
+      :sort-order="sortOrder"
       :column-visibility="{
         firings: false,
         state: false,
@@ -132,6 +134,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expansion="single"
       v-model:expanded-ids="expandedIds"
       @row-click="openResponse"
+      @update:current-page="currentPage = $event"
+      @update:page-size="pageSize = $event"
+      @update:sort-by="sortBy = $event"
+      @update:sort-order="sortOrder = $event"
     >
       <!-- During an incident the list IS the work surface. Opening 200 pages
            one at a time to claim them is not triage. -->
@@ -413,12 +419,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { teamId: row.latest.team_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full truncate underline"
+          class="text-text-body inline-block max-w-full underline"
           :data-test="`oncall-row-team-${row.rowKey}`"
           @click.stop
         >
-          {{ raw(teamNameById[row.latest.team_id] ?? row.latest.team_id) }}
-          <OTooltip :content="raw(teamNameById[row.latest.team_id] ?? row.latest.team_id)" />
+          <OTruncatedText class="block">{{
+            raw(teamNameById[row.latest.team_id] ?? row.latest.team_id)
+          }}</OTruncatedText>
         </router-link>
       </template>
 
@@ -433,14 +440,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { id: row.latest.incident_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full truncate underline"
+          class="text-text-body inline-block max-w-full underline"
           :data-test="`oncall-row-incident-${row.rowKey}`"
           @click.stop
         >
-          {{ raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id) }}
-          <OTooltip
-            :content="raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)"
-          />
+          <OTruncatedText class="block">{{
+            raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)
+          }}</OTruncatedText>
         </router-link>
       </template>
 
@@ -449,10 +455,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-subject="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="flex items-center gap-1.5">
-            <span class="text-text-body truncate">
+            <OTruncatedText class="text-text-body">
               {{ raw(row.latest.title || row.latest.subject.source_id) }}
-              <OTooltip :content="raw(row.latest.title || row.latest.subject.source_id)" />
-            </span>
+            </OTruncatedText>
             <OTag v-if="row.firings.length > 1" variant="default-soft" size="sm">
               {{ raw(`×${row.firings.length}`) }}
             </OTag>
@@ -882,8 +887,10 @@ import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useListViewState } from "@/composables/useListViewState";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -1037,35 +1044,55 @@ const loadError = ref<string | null>(null);
 /// §G.8.1: 404 or 403 "Not Supported" from the entry fetch — on-call is not
 /// available on this deployment. A fact about the build, never an error.
 const unavailable = ref(false);
-const search = ref("");
-const teamFilter = ref("all");
-const priorityFilter = ref("all");
+const savedView = useListViewState("oncall-responses", {
+  search: "",
+  teamFilter: "all",
+  priorityFilter: "all",
+  mineOnly: false,
+  grouped: true,
+  activeFilter: "all" as "all" | SectionKey,
+  causeFilter: "" as ResolutionCause | "",
+  currentPage: 1,
+  pageSize: 20,
+  sortBy: "last_alert_at",
+  sortOrder: "desc" as "asc" | "desc",
+});
+const search = ref(savedView.search);
+const teamFilter = ref(savedView.teamFilter);
+const priorityFilter = ref(savedView.priorityFilter);
 /// `?mine=1` opens the list already narrowed. It is what the retired
 /// `oncall/me` page now redirects to, so a bookmark from before still lands on
 /// the answer instead of a stub that told everybody they were on no team.
-const mineOnly = ref(false);
+const mineOnly = ref(savedView.mineOnly);
 const selectedIds = ref<string[]>([]);
-const grouped = ref(true);
+const grouped = ref(savedView.grouped);
 /// `"all"` is the default tab, and "all" means all — resolved included —
 /// so the very first fetch already asks for resolved pages too.
-const includeResolved = ref(true);
+const includeResolved = ref(
+  savedView.activeFilter === "all" || savedView.activeFilter === "resolved",
+);
 /// All four sections start visible, matching the default `"all"` tab.
 const sectionVisibility = ref<Record<SectionKey, boolean>>({
-  ringing: true,
-  snoozed: true,
-  handled: true,
-  resolved: true,
+  ringing: savedView.activeFilter === "all" || savedView.activeFilter === "ringing",
+  snoozed: savedView.activeFilter === "all" || savedView.activeFilter === "snoozed",
+  handled: savedView.activeFilter === "all" || savedView.activeFilter === "handled",
+  resolved: includeResolved.value,
 });
 /// The tab the toolbar shows as pressed. `"all"` is every section at once
 /// (open and resolved alike) and has no `SectionKey` of its own; picking any
 /// other tab narrows `sectionVisibility` to just that one section — and, for
 /// every tab but `"all"` and `"resolved"`, drops resolved pages out of the
 /// fetch entirely.
-const activeFilter = ref<"all" | SectionKey>("all");
+const activeFilter = ref<"all" | SectionKey>(savedView.activeFilter);
 /// Empty means every cause. Cleared whenever resolved pages leave the list,
 /// because a cause filter over open records matches nothing and would read as
 /// "there is nothing here" rather than "this filter cannot apply".
-const causeFilter = ref<ResolutionCause | "">("");
+const causeFilter = ref<ResolutionCause | "">(includeResolved.value ? savedView.causeFilter : "");
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const oTableRef = ref<any>(null);
 const busyId = ref("");
 const bulkBusy = ref(false);
 const confirmBulkResolve = ref(false);
@@ -2060,6 +2087,49 @@ function onEmptyAction(id?: string) {
   }
 }
 
+watch([search, teamFilter, priorityFilter, mineOnly, grouped, activeFilter, causeFilter], () => {
+  currentPage.value = 1;
+});
+watch(
+  [
+    search,
+    teamFilter,
+    priorityFilter,
+    mineOnly,
+    grouped,
+    activeFilter,
+    causeFilter,
+    currentPage,
+    pageSize,
+    sortBy,
+    sortOrder,
+  ],
+  () => {
+    Object.assign(savedView, {
+      search: search.value,
+      teamFilter: teamFilter.value,
+      priorityFilter: priorityFilter.value,
+      mineOnly: mineOnly.value,
+      grouped: grouped.value,
+      activeFilter: activeFilter.value,
+      causeFilter: causeFilter.value,
+      currentPage: currentPage.value,
+      pageSize: pageSize.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+    });
+  },
+);
+// The first load lands after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+watch(
+  () => loaded.value && setupLoaded.value,
+  (ready) => {
+    if (!ready) return;
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { once: true },
+);
+
 useShortcuts([
   {
     id: "oncallRefresh",
@@ -2072,7 +2142,7 @@ useShortcuts([
 ]);
 
 onMounted(() => {
-  mineOnly.value = route.query.mine === "1";
+  if (route.query.mine === "1") mineOnly.value = true;
   return loadAll();
 });
 </script>

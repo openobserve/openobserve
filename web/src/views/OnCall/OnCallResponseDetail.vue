@@ -25,11 +25,11 @@
       >
         <template #team>
           <router-link
-            class="text-accent shrink-0 hover:underline"
+            class="text-accent min-w-0 hover:underline"
             :to="teamRoute"
             data-test="oncall-response-team-link"
           >
-            {{ raw(teamName) }}
+            <OTruncatedText class="block">{{ raw(teamName) }}</OTruncatedText>
           </router-link>
         </template>
         <template #firing>
@@ -41,7 +41,7 @@
           </span>
         </template>
         <template #opened>
-          <span class="truncate" data-test="oncall-response-opened">{{ openedAtClock }}</span>
+          <span class="shrink-0" data-test="oncall-response-opened">{{ openedAtClock }}</span>
         </template>
       </i18n-t>
     </template>
@@ -700,6 +700,7 @@ import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";

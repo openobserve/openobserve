@@ -51,8 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OTag>
 
   <OTag v-else variant="default-soft" shape="rounded" data-test="enqueue-chip-single">
-    <span class="max-w-40 truncate">{{ singleLabel }}</span>
-    <OTooltip side="bottom" :content="singleLabel" />
+    <OTruncatedText class="max-w-40">{{ singleLabel }}</OTruncatedText>
   </OTag>
 </template>
 
@@ -61,6 +60,7 @@ import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { DiscoveryQueueMembership } from "@/services/llm-discovery.service";
 
 defineOptions({ name: "EnqueueStatusChip" });

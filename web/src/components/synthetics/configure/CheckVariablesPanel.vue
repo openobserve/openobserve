@@ -24,6 +24,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { getUUID } from "@/utils/uuid";
@@ -385,9 +386,9 @@ function onPromoted(name: string) {
         role="status"
         data-test="synthetics-check-variables-panel-undo-row"
       >
-        <span class="text-text-secondary min-w-0 flex-1 truncate text-xs">{{
+        <OTruncatedText class="text-text-secondary flex-1 text-xs">{{
           t("synthetics.variablesPanel.removed", { name: lastRemoved.variable.name })
-        }}</span>
+        }}</OTruncatedText>
         <OButton
           variant="ghost-primary"
           size="xs"

@@ -22,6 +22,8 @@ pub mod alerts;
 pub mod anomaly_detection;
 pub mod auth;
 pub mod authz;
+#[cfg(any(feature = "enterprise", test))]
+pub mod background_access;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
@@ -44,6 +46,7 @@ pub mod logs;
 pub mod metrics;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
+pub mod onboarding;
 pub mod org_cleanup;
 #[cfg(feature = "cloud")]
 pub mod org_usage;

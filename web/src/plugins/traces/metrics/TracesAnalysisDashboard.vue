@@ -158,19 +158,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
                       <div class="flex min-w-0 flex-1 flex-col">
-                        <span
-                          class="dimension-label text-text-secondary! cursor-pointer truncate text-sm [line-height:1.25rem]"
+                        <OTruncatedText
+                          class="dimension-label text-text-secondary! cursor-pointer text-sm [line-height:1.25rem]"
                         >
                           {{ dimension.label }}
-                          <OTooltip
-                            side="top"
-                            align="center"
-                            :side-offset="8"
-                            :delay="500"
-                            max-width="18.75rem"
-                            :content="dimension.label"
-                          />
-                        </span>
+                        </OTruncatedText>
                       </div>
                       <span
                         v-if="dimensionCounts[dimension.value] !== undefined"
@@ -316,7 +308,7 @@ import {
 import { selectDimensionsFromData } from "@/composables/useDimensionSelector";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";

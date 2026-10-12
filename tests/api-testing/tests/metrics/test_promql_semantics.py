@@ -150,3 +150,58 @@ def test_previously_unsupported_functions_now_evaluate(client, seeded_metric, qu
         f"{query.format(metric=seeded_metric)} returned an error: "
         f"{body.get('error') or body.get('message')}"
     )
+
+
+@pytest.mark.parametrize(("endpoint", "result_type"), [("query", "vector"), ("query_range", "matrix")])
+def test_smoothing_aliases_return_identical_results(client, seeded_metric, endpoint, result_type):
+    end = int(time.time())
+    params = {"time": end} if endpoint == "query" else {"start": end - 180, "end": end, "step": "60s"}
+    results = []
+    for name in ("holt_winters", "double_exponential_smoothing"):
+        resp = client.get(
+            f"prometheus/api/v1/{endpoint}",
+            params={**params, "query": f"{name}({seeded_metric}[10m], 0.5, 0.3)"},
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body.get("status") == "success", body
+        data = body.get("data", {})
+        assert data.get("resultType") == result_type, data
+        result = data.get("result", [])
+        assert result, f"{name} returned no series"
+        if endpoint == "query_range":
+            assert all(series.get("values") for series in result), result
+        else:
+            assert all(series.get("value") for series in result), result
+        results.append(data)
+    assert results[0] == results[1]
+
+
+@pytest.mark.parametrize("name", ["holt_winters", "double_exponential_smoothing"])
+@pytest.mark.parametrize("method", ["get", "post"])
+def test_format_query_preserves_smoothing_name(client, name, method):
+    query = f"{name}(m[5m], 0.5, 0.3)"
+    request_args = {"params": {"query": query}}
+    if method == "post":
+        # The POST handler requires a query parameter even when the expression is in the form.
+        request_args = {"params": {"query": ""}, "data": {"query": query}}
+    resp = getattr(client, method)("prometheus/api/v1/format_query", **request_args)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body.get("status") == "success", body
+    assert body.get("data") == query
+
+
+@pytest.mark.parametrize("name", ["holt_winters", "double_exponential_smoothing"])
+@pytest.mark.parametrize("endpoint", ["query", "query_range", "format_query"])
+@pytest.mark.parametrize("args", ["m[5m], 0.5", "m[5m], 0.5, 0.3, 0.1"])
+def test_smoothing_arity_error_names_called_function(client, name, endpoint, args):
+    end = int(time.time())
+    params = {"query": f"{name}({args})", "time": end}
+    if endpoint == "query_range":
+        params.update({"start": end - 180, "end": end, "step": "60s"})
+    resp = client.get(f"prometheus/api/v1/{endpoint}", params=params)
+    assert resp.status_code == 400, resp.text
+    body = resp.json()
+    assert body.get("status") == "error", body
+    assert f"call to '{name}'" in body.get("error", ""), body

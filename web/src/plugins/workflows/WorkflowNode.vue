@@ -46,9 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Capped width so a very long name / function body ellipsises instead of
            stretching the card across the canvas. -->
       <div class="flex max-w-[18rem] min-w-0 flex-col">
-        <span class="truncate leading-tight">
+        <OTruncatedText class="leading-tight">
           {{ customName || typeTitle }}
-        </span>
+        </OTruncatedText>
         <span
           v-if="showSubtitle"
           class="text-text-secondary flex min-w-0 items-baseline gap-1 text-xs leading-tight font-normal"
@@ -58,13 +58,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ typeTitle }}{{ hasDetail ? " · " : "" }}</span
           >
           <template v-if="funcTag">
-            <span class="min-w-0 truncate" data-test="workflow-node-detail">{{ data.name }}</span>
+            <OTruncatedText data-test="workflow-node-detail">{{ data.name }}</OTruncatedText>
             <span class="shrink-0">-</span>
             <strong class="shrink-0">{{ data.after_flatten ? raw("[RAF]") : raw("[RBF]") }}</strong>
           </template>
-          <span v-else-if="configDetail" class="min-w-0 truncate" data-test="workflow-node-detail">
+          <OTruncatedText
+            v-else-if="configDetail"
+            class="max-w-46"
+            data-test="workflow-node-detail"
+          >
             {{ configDetail }}
-          </span>
+          </OTruncatedText>
         </span>
       </div>
     </template>
@@ -274,6 +278,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import useWorkflowCanvas, {
   nodeMeta,
@@ -397,7 +402,7 @@ const funcTag = computed(() => props.data?.node_type === "function" && !!props.d
 const configDetail = computed(() => {
   const type = props.data?.node_type;
   if (type === "workflow_trigger" || type === "function") return "";
-  return nodeConfigDetail(props.data, 28) || "";
+  return nodeConfigDetail(props.data, Infinity) || "";
 });
 // Whether there's a config detail to show (function tag or a preview string).
 const hasDetail = computed(() => funcTag.value || !!configDetail.value);

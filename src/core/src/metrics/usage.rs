@@ -15,7 +15,10 @@
 
 //! Where a metric is used: a scan of an org's dashboards, alerts, SLOs and pipelines.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, LazyLock},
+};
 
 use config::meta::{
     alerts::{
@@ -29,12 +32,14 @@ use config::meta::{
     sql::resolve_stream_names_with_type,
     stream::StreamType,
 };
+use dashmap::DashMap;
 #[cfg(feature = "enterprise")]
 use futures::StreamExt;
 use promql::{ast::visitor::walk_expr, utils::metric_name};
 use promql_parser::{parser::Expr, util::ExprVisitor};
 use serde::Serialize;
 use serde_json::Value;
+use tokio::sync::Semaphore;
 use utoipa::ToSchema;
 
 use crate::{
@@ -49,6 +54,9 @@ const SCALAR_PLACEHOLDER: &str = "1";
 /// Bounds the OpenFGA calls one request has outstanding, since an org can hold many folders.
 #[cfg(feature = "enterprise")]
 const FOLDER_CHECKS_IN_FLIGHT: usize = 16;
+
+/// One scan per org at a time, since each loads and re-parses every query in the org.
+static SCANS: LazyLock<DashMap<String, Arc<Semaphore>>> = LazyLock::new(DashMap::new);
 
 /// How an object was matched when no query referencing the metric could be parsed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -225,6 +233,12 @@ pub async fn metric_usage(
     user_id: &str,
     metric: &str,
 ) -> Result<MetricUsage, anyhow::Error> {
+    let scans = Arc::clone(
+        &SCANS
+            .entry(org_id.to_string())
+            .or_insert_with(|| Arc::new(Semaphore::new(1))),
+    );
+    let _permit = scans.acquire().await?;
     let conn = infra::db::get_orm_client_ro().await;
     let sources = UsageSources {
         dashboards: infra::table::dashboards::list_skipping_invalid(ListDashboardsParams::new(

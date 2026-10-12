@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PlayerEventsSidebar from "@/components/rum/PlayerEventsSidebar.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import i18n from "@/locales";
 
 const node = document.createElement("div");
@@ -428,17 +429,22 @@ describe("PlayerEventsSidebar", () => {
       expect(wrapper.find('[data-test="player-event-row-action"]').text()).toContain("Action");
     });
 
-    it("should provide title attribute equal to event name on event name element", () => {
-      const firstEventName = wrapper.find('[data-test="event-name"]');
+    it("should truncate only the event name, without a native title on it", () => {
+      const firstRow = wrapper.find('[data-test="player-event-row-error"]');
+      const name = firstRow.findComponent(OTruncatedText);
 
-      expect(firstEventName.attributes("title")).toBe("TypeError: Cannot read property 'foo'");
+      expect(name.attributes("data-test")).toBe("event-name");
+      expect(name.attributes("title")).toBeUndefined();
     });
 
-    it("should provide title attributes for all visible event name elements", () => {
-      const eventNames = wrapper.findAll('[data-test="event-name"]');
+    it("should keep the time and type badge outside the name's cut-text tooltip", () => {
+      const names = wrapper.findAllComponents(OTruncatedText);
 
-      eventNames.forEach((name: any, index: number) => {
-        expect(name.attributes("title")).toBe(mockEvents[index].name);
+      expect(names).toHaveLength(mockEvents.length);
+      names.forEach((name: any, index: number) => {
+        expect(name.text()).toBe(mockEvents[index].name);
+        expect(name.props("tooltip")).toBeUndefined();
+        expect(name.find('[data-test="event-type-badge"]').exists()).toBe(false);
       });
     });
   });
@@ -619,7 +625,7 @@ describe("PlayerEventsSidebar", () => {
   // ==========================================================================
 
   describe("Accessibility", () => {
-    it("should preserve full long event name text in title attribute", async () => {
+    it("should keep the full long event name as the name's tooltip text", async () => {
       const longEvent = {
         id: "long",
         type: "error",
@@ -630,7 +636,7 @@ describe("PlayerEventsSidebar", () => {
 
       await wrapper.setProps({ events: [longEvent] });
 
-      expect(wrapper.find('[data-test="event-name"]').attributes("title")).toBe(longEvent.name);
+      expect(wrapper.findComponent(OTruncatedText).text()).toBe(longEvent.name);
     });
   });
 

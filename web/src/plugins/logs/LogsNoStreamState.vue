@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="storage"
           :data-test="`logs-no-stream-recent-${stream}`"
           @click="emit('pick-stream', stream)"
-          ><span class="max-w-40 truncate">{{ stream }}</span></EmptyStateIngestionChip
+          ><OTruncatedText class="max-w-40">{{ stream }}</OTruncatedText></EmptyStateIngestionChip
         >
       </div>
     </template>
@@ -71,6 +71,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
 import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { restoreLogsStream } from "@/utils/streamPersist";
 import DOMPurify from "dompurify";
 

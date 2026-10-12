@@ -341,9 +341,6 @@ describe("TraceDetails", () => {
       const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
 
       expect(operationName.classes()).toContain("truncate");
-      expect(operationName.attributes("title")).toBe(
-        tracesMockData.tracesDetails.traceSpans.hits[0].operation_name,
-      );
       // The ellipsis only fires if the header also lets the title block shrink.
       expect(wrapper.findComponent(OPageHeader).props("titleOverflow")).toBe("visible");
     });

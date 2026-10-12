@@ -122,13 +122,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <h1
-            class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
-            :class="titleOverflow === 'visible' ? 'min-w-0' : 'truncate'"
-            :title="title"
+            v-if="titleOverflow === 'visible'"
+            class="text-text-heading min-h-6 min-w-0 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
             :data-test="titleDataTest"
           >
             <slot name="title">{{ title }}</slot>
           </h1>
+          <OTruncatedText
+            v-else
+            as="h1"
+            class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+            :data-test="titleDataTest"
+          >
+            <slot name="title">{{ title }}</slot>
+          </OTruncatedText>
           <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
              the subtitle is present or not, so the title doesn't appear to shift
              when navigating between views. Content is vertically centered. -->
@@ -142,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- leading-normal (not the meta variant's leading-none): truncate
                  sets overflow:hidden, and a 1em line box clips descenders
                  (g/y/p). The h-5 band + items-center leaves room for it. -->
-              <span class="min-w-0 truncate leading-normal">{{ subtitle }}</span>
+              <OTruncatedText class="leading-normal">{{ subtitle }}</OTruncatedText>
             </slot>
           </OText>
         </div>
@@ -218,6 +225,7 @@ import {
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import useBreakpoint from "@/composables/useBreakpoint";

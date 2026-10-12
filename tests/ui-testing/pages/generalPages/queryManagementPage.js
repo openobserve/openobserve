@@ -2,9 +2,8 @@
 //
 // Page Object Model for the Settings Query Management navigation/gating feature.
 // Query Management ("Running Queries") is an enterprise-only, meta-org-only
-// settings section. On an OSS build the route is never registered and the
-// sidebar tab is hidden, so the observable behavior is: the tab is absent from
-// the Settings rail and a direct URL falls through to the 404 page.
+// settings section. On an OSS build the sidebar tab is hidden and a direct URL
+// redirects to the enterprise-locked page.
 
 import { expect } from '@playwright/test';
 
@@ -22,8 +21,7 @@ export class QueryManagementPage {
     // Query Management rail tab — filtered out entirely on OSS (SectionRail drops
     // `visible !== false` items), so count 0 rather than merely hidden.
     this.queryManagementTab = page.locator('[data-test="query-management-tab"]');
-    // 404 page "Go Home" button — primary proof the Error404 catch-all rendered.
-    this.goHomeBtn = page.locator('[data-test="error-404-go-home-btn"]');
+    this.enterpriseLockedPage = page.locator('[data-test="enterprise-feature-locked"]');
   }
 
   baseUrl() {
@@ -52,8 +50,8 @@ export class QueryManagementPage {
     await expect(this.queryManagementTab).toHaveCount(0);
   }
 
-  async expect404Page() {
-    // Assert promptly — Error404 auto-redirects home after a 10 s countdown.
-    await expect(this.goHomeBtn).toBeVisible({ timeout: 15000 });
+  async expectEnterpriseLockedPage() {
+    await expect(this.enterpriseLockedPage).toBeVisible({ timeout: 15000 });
+    await expect(this.page).toHaveURL(/enterprise-locked\?feature=queryManagement/);
   }
 }

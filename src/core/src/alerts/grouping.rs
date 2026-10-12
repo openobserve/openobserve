@@ -24,7 +24,13 @@ use std::{
 };
 
 use chrono::Utc;
-use config::{meta::alerts::alert::Alert, utils::json};
+use config::{
+    meta::{
+        alerts::alert::Alert,
+        self_reporting::usage::{RunOutcome, TriggerData},
+    },
+    utils::json,
+};
 use dashmap::DashMap;
 
 /// Keyed by [`batch_key`]: a fingerprint carries no org, so it alone would merge two orgs' batches.
@@ -56,6 +62,8 @@ pub struct BatchedAlert {
     pub alert: Alert,
     pub rows: Vec<json::Map<String, json::Value>>,
     pub timestamp: i64,
+    /// This evaluation's history row, held back until the flush knows whether the send landed.
+    pub trigger_data: TriggerData,
 }
 
 impl PendingBatch {
@@ -66,6 +74,7 @@ impl PendingBatch {
         org_id: String,
         alert: Alert,
         rows: Vec<json::Map<String, json::Value>>,
+        trigger_data: TriggerData,
         group_wait_seconds: i64,
         max_group_size: usize,
         level: Option<config::meta::alerts::level::AlertLevel>,
@@ -80,6 +89,7 @@ impl PendingBatch {
                 alert,
                 rows,
                 timestamp: now,
+                trigger_data,
             }],
             timer_started_at: now,
             group_wait_seconds,
@@ -89,7 +99,12 @@ impl PendingBatch {
     }
 
     /// Add an alert to this batch
-    pub fn add_alert(&mut self, alert: Alert, rows: Vec<json::Map<String, json::Value>>) -> bool {
+    pub fn add_alert(
+        &mut self,
+        alert: Alert,
+        rows: Vec<json::Map<String, json::Value>>,
+        trigger_data: TriggerData,
+    ) -> bool {
         if self.alerts.len() >= self.max_group_size {
             return false; // Batch full
         }
@@ -99,6 +114,7 @@ impl PendingBatch {
             alert,
             rows,
             timestamp: now,
+            trigger_data,
         });
         true
     }
@@ -116,18 +132,54 @@ impl PendingBatch {
     }
 }
 
+/// What the batcher did with an evaluation handed to [`add_to_batch`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BatchAdmission {
+    /// Collected into a batch that is still waiting; its flush publishes the row.
+    Queued,
+    /// Collected into a batch that is now full; the caller flushes it immediately.
+    Ready,
+    /// The batch was full and not yet taken, so this evaluation joined no batch at all.
+    Refused,
+}
+
 fn batch_key(org_id: &str, fingerprint: &str) -> String {
     format!("{org_id}/{fingerprint}")
 }
 
-/// Add alert to pending batch or create new batch
-/// Returns true if batch is ready to send (expired or full)
+/// One history row per evaluation in the batch, built before the send consumes it.
+fn flush_rows(batch: &PendingBatch) -> Vec<TriggerData> {
+    let group_size = batch.alerts.len() as i32;
+    batch
+        .alerts
+        .iter()
+        .map(|batched| TriggerData {
+            dedup_enabled: Some(true),
+            grouped: Some(true),
+            group_size: Some(group_size),
+            ..batched.trigger_data.clone()
+        })
+        .collect()
+}
+
+/// A failed send is `NotifyFailed`, not `Error`: the evaluation itself succeeded.
+fn stamp_flush_error(rows: &mut [TriggerData], error: &anyhow::Error) {
+    let text = format!("error sending notification for alert: {error}");
+    for row in rows {
+        row.status = RunOutcome::NotifyFailed;
+        row.error = Some(text.clone());
+        row.delivery_attempted = Some(true);
+    }
+}
+
+/// Add alert to pending batch or create new batch, reporting whether it was collected at all.
 #[allow(clippy::too_many_arguments)]
 pub fn add_to_batch(
     fingerprint: String,
     org_id: String,
     alert: Alert,
     rows: Vec<json::Map<String, json::Value>>,
+    trigger_data: TriggerData,
     group_wait_seconds: i64,
     max_group_size: usize,
     level: Option<config::meta::alerts::level::AlertLevel>,
@@ -135,11 +187,12 @@ pub fn add_to_batch(
     // sharing a fingerprint shares a group, because the group is part of the
     // fingerprint — so this is set once, when the batch is created.
     group_labels: Option<std::collections::BTreeMap<String, String>>,
-) -> bool {
-    PENDING_BATCHES
+) -> BatchAdmission {
+    let mut refused = false;
+    let full = PENDING_BATCHES
         .entry(batch_key(&org_id, &fingerprint))
         .and_modify(|batch| {
-            if batch.add_alert(alert.clone(), rows.clone()) {
+            if batch.add_alert(alert.clone(), rows.clone(), trigger_data.clone()) {
                 log::debug!(
                     "[grouping] Added alert '{}' to existing batch {} (count: {}/{})",
                     alert.name,
@@ -155,6 +208,7 @@ pub fn add_to_batch(
                     );
                 }
             } else {
+                refused = true;
                 log::warn!(
                     "[grouping] Failed to add alert '{}' to batch {} (already full), org_id: {}",
                     alert.name,
@@ -177,13 +231,21 @@ pub fn add_to_batch(
                 org_id,
                 alert,
                 rows,
+                trigger_data,
                 group_wait_seconds,
                 max_group_size,
                 level,
                 group_labels,
             )
         })
-        .is_full()
+        .is_full();
+    if refused {
+        BatchAdmission::Refused
+    } else if full {
+        BatchAdmission::Ready
+    } else {
+        BatchAdmission::Queued
+    }
 }
 
 /// Get and remove a batch if it's ready (expired or full)
@@ -256,11 +318,48 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
         .count() as i64
 }
 
+/// The row of an evaluation no batch took: it fired, and no notification was sent for it.
+pub fn refused_row(trigger_data: &TriggerData) -> TriggerData {
+    TriggerData {
+        status: RunOutcome::NotifyFailed,
+        error: Some(
+            "alert grouping batch was already full; this evaluation joined no batch and no \
+             notification was sent"
+                .to_string(),
+        ),
+        delivery_attempted: Some(false),
+        ..trigger_data.clone()
+    }
+}
+
+/// Sends a batch, then publishes its members' rows at once so a sent page never loses them.
+#[cfg(feature = "enterprise")]
+pub async fn flush_batch(trace_id: &str, batch: PendingBatch) -> bool {
+    let mut rows = flush_rows(&batch);
+    let delivered = match send_grouped_notification(trace_id, batch).await {
+        Ok(attempted) => {
+            for row in &mut rows {
+                row.delivery_attempted = Some(attempted);
+            }
+            true
+        }
+        Err(e) => {
+            stamp_flush_error(&mut rows, &e);
+            false
+        }
+    };
+    for row in rows {
+        usage_reporting::publish_triggers_usage(row);
+    }
+    delivered
+}
+
+/// Sends one batch's notification; `Ok` says whether any destination or workflow was tried.
 #[cfg(feature = "enterprise")]
 pub async fn send_grouped_notification(
     trace_id: &str,
     batch: crate::alerts::grouping::PendingBatch,
-) -> Result<(), anyhow::Error> {
+) -> Result<bool, anyhow::Error> {
     use config::meta::alerts::deduplication::SendStrategy;
 
     use crate::alerts::alert::AlertExt;
@@ -449,7 +548,7 @@ pub async fn send_grouped_notification(
                 batch.fingerprint,
                 success_msg
             );
-            Ok(())
+            Ok(outcome.attempted)
         }
         Err(e) => {
             log::error!(
@@ -475,17 +574,30 @@ mod tests {
         serde_json::from_value(serde_json::json!({})).unwrap()
     }
 
-    fn add_one(fp: &str, org: &str, max_group_size: usize) -> bool {
+    fn admit(fp: &str, org: &str, max_group_size: usize, row: TriggerData) -> BatchAdmission {
         add_to_batch(
             fp.to_string(),
             org.to_string(),
             make_alert(),
             vec![],
+            row,
             3600,
             max_group_size,
             None,
             None,
         )
+    }
+
+    fn add_one(fp: &str, org: &str, max_group_size: usize) -> bool {
+        admit(fp, org, max_group_size, TriggerData::default()) == BatchAdmission::Ready
+    }
+
+    fn evaluation_row(key: &str) -> TriggerData {
+        TriggerData {
+            key: key.to_string(),
+            status: RunOutcome::Firing,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -495,6 +607,7 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             10,
             None,
@@ -511,13 +624,14 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             2,
             None,
             None,
         );
         assert!(!batch.is_full());
-        let added = batch.add_alert(make_alert(), vec![]);
+        let added = batch.add_alert(make_alert(), vec![], TriggerData::default());
         assert!(added);
         assert!(batch.is_full());
     }
@@ -529,13 +643,14 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             30,
             1,
             None,
             None,
         );
         assert!(batch.is_full());
-        let added = batch.add_alert(make_alert(), vec![]);
+        let added = batch.add_alert(make_alert(), vec![], TriggerData::default());
         assert!(!added);
         assert_eq!(batch.alerts.len(), 1);
     }
@@ -547,6 +662,7 @@ mod tests {
             "myorg".to_string(),
             make_alert(),
             vec![],
+            TriggerData::default(),
             3600, // 1 hour wait
             10,
             None,
@@ -657,6 +773,76 @@ mod tests {
 
         assert!(add_one(fp, org, 1));
         assert_eq!(get_ready_batch(org, fp).unwrap().alerts.len(), 1);
+    }
+
+    #[test]
+    fn test_flush_rows_carry_each_held_back_row_with_the_real_group_size() {
+        let (fp, org) = ("grouping_test_flush_rows", "org-flush-rows");
+        assert_eq!(
+            admit(fp, org, 10, evaluation_row("a/1")),
+            BatchAdmission::Queued
+        );
+        assert_eq!(
+            admit(fp, org, 10, evaluation_row("b/2")),
+            BatchAdmission::Queued
+        );
+        let batch = PENDING_BATCHES.remove(&batch_key(org, fp)).unwrap().1;
+
+        let rows = flush_rows(&batch);
+        let keys: Vec<&str> = rows.iter().map(|row| row.key.as_str()).collect();
+        assert_eq!(keys, ["a/1", "b/2"]);
+        for row in &rows {
+            assert_eq!(row.status, RunOutcome::Firing);
+            assert_eq!(
+                (row.dedup_enabled, row.grouped, row.group_size),
+                (Some(true), Some(true), Some(2))
+            );
+        }
+    }
+
+    #[test]
+    fn test_stamp_flush_error_marks_every_member_notify_failed() {
+        let mut rows = vec![evaluation_row("a/1"), evaluation_row("b/2")];
+        stamp_flush_error(&mut rows, &anyhow::anyhow!("Send failed: http 500"));
+        for row in &rows {
+            assert_eq!(row.status, RunOutcome::NotifyFailed);
+            assert_eq!(
+                row.error.as_deref(),
+                Some("error sending notification for alert: Send failed: http 500")
+            );
+            // A failure must count as an attempt, or failures could outnumber attempts.
+            assert_eq!(row.delivery_attempted, Some(true));
+        }
+    }
+
+    #[test]
+    fn test_add_to_batch_refuses_an_evaluation_when_the_full_batch_was_not_taken() {
+        let (fp, org) = ("grouping_test_refused", "org-refused");
+        assert_eq!(
+            admit(fp, org, 1, evaluation_row("a/1")),
+            BatchAdmission::Ready
+        );
+        assert_eq!(
+            admit(fp, org, 1, evaluation_row("a/2")),
+            BatchAdmission::Refused
+        );
+        let batch = PENDING_BATCHES.remove(&batch_key(org, fp)).unwrap().1;
+        assert_eq!(batch.alerts.len(), 1);
+        assert_eq!(batch.alerts[0].trigger_data.key, "a/1");
+    }
+
+    #[test]
+    fn test_refused_row_is_notify_failed_and_not_shown_as_sent() {
+        let row = refused_row(&evaluation_row("a/2"));
+        assert_eq!(row.key, "a/2");
+        assert_eq!(row.status, RunOutcome::NotifyFailed);
+        assert!(
+            row.error
+                .is_some_and(|error| error.contains("no notification was sent"))
+        );
+        // The history page shows a dedup-enabled, ungrouped row as "notification sent".
+        assert_eq!((row.dedup_enabled, row.grouped), (None, None));
+        assert_eq!(row.delivery_attempted, Some(false));
     }
 
     #[test]

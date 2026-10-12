@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { HistoryState } from "vue-router";
 import api from "@/services/rumProductAnalytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -57,6 +57,10 @@ const list = createScopedList<NamedEvent>({
 });
 const { items: events, permission, load, status, ensure, deny } = list;
 
+/** Deleted named events' last known names, by id; ids this session has resolved (found or not). */
+const deletedNames = ref<Record<string, string>>({});
+const deletedNamesRequested = new Set<string>();
+
 const validRule = (r: unknown): r is NamedEvent["rules"][number] => {
   const rule = r as Record<string, unknown> | null;
   if (rule?.t === "view") return typeof rule.value === "string" && typeof rule.op === "string";
@@ -65,6 +69,8 @@ const validRule = (r: unknown): r is NamedEvent["rules"][number] => {
 
 export function resetNamedEvents(): void {
   list.reset();
+  deletedNames.value = {};
+  deletedNamesRequested.clear();
 }
 
 /** History state that opens the editor pre-filled and returns to `from` afterwards; it survives a reload. */
@@ -157,6 +163,24 @@ export default function useNamedEvents() {
   const usages = async (org: string, app: string, id: string): Promise<FunnelUsage[]> =>
     (await api.eventUsages(org, app, id)).data?.list ?? [];
 
+  /** Best-effort: resolves ids not yet looked up this session, merging hits into `deletedNames`. */
+  const resolveDeletedNames = async (org: string, ids: readonly string[]): Promise<void> => {
+    const unknown = [...new Set(ids)].filter((id) => !deletedNamesRequested.has(id));
+    if (!unknown.length) return;
+    unknown.forEach((id) => deletedNamesRequested.add(id));
+    try {
+      const found = (await api.deletedEventNames(org, unknown)).data?.list ?? [];
+      if (found.length) {
+        const next = { ...deletedNames.value };
+        for (const { id, name } of found) next[id] = name;
+        deletedNames.value = next;
+      }
+    } catch {
+      // A step still shows its raw id until a later call succeeds.
+      unknown.forEach((id) => deletedNamesRequested.delete(id));
+    }
+  };
+
   /** Null once deleted; the funnels named by an in-use refusal otherwise, so the caller can confirm and force. */
   const remove = async (
     org: string,
@@ -208,11 +232,13 @@ export default function useNamedEvents() {
     permission: computed(() => permission.value),
     invalidCount: computed(() => list.invalidCount.value),
     loading: computed(() => list.loading.value),
+    deletedNames: computed(() => deletedNames.value),
     load,
     status,
     ensure,
     save,
     usages,
+    resolveDeletedNames,
     remove,
     removeMany,
   };

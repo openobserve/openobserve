@@ -337,7 +337,14 @@ describe("PanelContainer", () => {
 
       const header = wrapper.find('[data-test="dashboard-panel-header"]');
       expect(header.text()).toBe("Test Panel");
-      expect(header.attributes("title")).toBe("Test Panel");
+    });
+
+    it("should give the panel title an overflow-only tooltip instead of a native title", () => {
+      wrapper = createWrapper();
+
+      const header = wrapper.find('[data-test="dashboard-panel-header"]');
+      expect(header.attributes("title")).toBeUndefined();
+      expect(header.findComponent({ name: "OTooltip" }).props("overflowOnly")).toBe(true);
     });
 
     it("should show description tooltip on hover when description exists", async () => {
@@ -1227,6 +1234,90 @@ describe("PanelContainer", () => {
       // Check the method exists
       expect(wrapper.vm.onPanelModifyClick).toBeDefined();
     });
+
+    describe("layout modes", () => {
+      const menuStubs = {
+        ODropdown: {
+          name: "ODropdown",
+          template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+        },
+        ODropdownItem: {
+          name: "ODropdownItem",
+          template: '<div class="o-dropdown-item-stub" v-bind="$attrs"><slot /></div>',
+        },
+      };
+      const menuIds = () =>
+        wrapper
+          .findAllComponents({ name: "ODropdownItem" })
+          .map((item: any) => item.attributes("data-test"));
+
+      it("keeps every action except Edit layout in view mode", () => {
+        wrapper = createWrapper({ layoutMode: "view" }, menuStubs);
+
+        expect(menuIds()).not.toContain("dashboard-edit-layout");
+        expect(menuIds()).toEqual(
+          expect.arrayContaining([
+            "dashboard-edit-panel",
+            "dashboard-duplicate-panel",
+            "dashboard-delete-panel",
+            "dashboard-move-to-another-panel",
+          ]),
+        );
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(false);
+      });
+
+      it("offers only Edit layout in edit mode", () => {
+        wrapper = createWrapper({ layoutMode: "edit" }, menuStubs);
+
+        expect(menuIds()).toEqual(["dashboard-edit-layout"]);
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').exists()).toBe(true);
+      });
+
+      it("drops the hover controls and refresh from the bar in edit mode so the title keeps the room", async () => {
+        wrapper = createWrapper({ layoutMode: "edit" });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+        await wrapper.vm.$nextTick();
+
+        const fullscreen = wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+        expect(fullscreen.classes()).toContain("hidden");
+        expect(wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]').exists()).toBe(
+          false,
+        );
+        expect(wrapper.find('[data-test="dashboard-panel-drag"]').classes()).toContain("shrink-0");
+      });
+
+      it("keeps the hover controls and refresh in view mode", async () => {
+        wrapper = createWrapper({ layoutMode: "view" });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+        await wrapper.vm.$nextTick();
+
+        const fullscreen = wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+        expect(fullscreen.exists()).toBe(true);
+        expect(fullscreen.classes()).not.toContain("hidden");
+        expect(wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]').exists()).toBe(true);
+      });
+
+      it("keeps the full menu when no layout mode is given", () => {
+        wrapper = createWrapper({}, menuStubs);
+
+        expect(menuIds()).toEqual(
+          expect.arrayContaining(["dashboard-edit-panel", "dashboard-edit-layout"]),
+        );
+      });
+
+      it.each([
+        ["view", true],
+        ["edit", false],
+      ])("the hover Delete key opens the delete confirm in %s mode: %s", async (mode, opens) => {
+        wrapper = createWrapper({ layoutMode: mode });
+        wrapper.vm.isCurrentlyHoveredPanel = true;
+
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete" }));
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.confirmDeletePanelDialog).toBe(opens);
+      });
+    });
   });
 
   describe("Variables Data Management", () => {
@@ -1941,7 +2032,9 @@ describe("PanelContainer", () => {
       // attribute nothing in web/src consumed, so the caveat reached no user.
       const tooltip = wrapper.findComponent({ name: "OTag" }).findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.props("content")).toBe("As of the last stream-list refresh.");
+      expect(tooltip.props("content")).toContain("As of the last stream-list refresh.");
+      // The label rides the tooltip too, since a narrow panel bar shows only the icon.
+      expect(tooltip.props("content")).toContain("3 days");
     });
 
     it("dims the panel BODY wrapper when badged — a full-contrast number reads as current", () => {
@@ -2169,6 +2262,24 @@ describe("PanelContainer", () => {
         viewOnly: true,
       });
       expect(wrapper.find('[data-test="dashboard-panel-curated-subtitle"]').exists()).toBe(false);
+    });
+
+    it("a curated TILE wraps its title and keeps two lines; a plain tile stays one line", () => {
+      wrapper = createWrapper({
+        data: { ...eligible(), type: "metric", title: "Deployments not ready" },
+        viewOnly: true,
+      });
+      const curated = wrapper.find('[data-test="dashboard-panel-header"]').classes();
+      expect(curated).toEqual(expect.arrayContaining(["line-clamp-2", "min-h-[2lh]"]));
+      wrapper.unmount();
+
+      wrapper = createWrapper({
+        data: { ...mockPanelData, type: "metric", title: "Deployments not ready", config: {} },
+        viewOnly: true,
+      });
+      const plain = wrapper.find('[data-test="dashboard-panel-header"]').classes();
+      expect(plain).not.toContain("line-clamp-2");
+      expect(plain).toContain("truncate");
     });
 
     it("gives the title the full bar — nothing between it and the flex spacer", () => {

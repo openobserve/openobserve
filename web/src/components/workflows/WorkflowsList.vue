@@ -77,8 +77,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="id"
             :loading="loading"
             :forbidden="forbidden"
-            :page-size="20"
+            :page-size="pageSize"
             :page-size-options="[20, 50, 100, 250, 500]"
+            @update:page-size="pageSize = $event"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             :enable-column-resize="true"
             :persist-columns="true"
             :default-columns="false"
@@ -166,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-name="{ row }">
               <div class="flex min-w-0 items-center gap-2">
-                <span class="truncate">{{ row.name }}</span>
+                <OTruncatedText>{{ row.name }}</OTruncatedText>
                 <OTag
                   v-if="row.is_draft"
                   :value="t('workflow.draft')"
@@ -328,6 +333,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import { useStore } from "vuex";
 
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -345,6 +351,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -367,7 +374,14 @@ const activeFolderId = computed(() => (route.query.folder as string) || "default
 
 // Tabs come from the trigger registry, so enabling another trigger kind adds its
 // tab without touching this file.
-const activeTab = ref("all");
+const viewState = useListViewState("workflows", {
+  filterQuery: "",
+  tab: "all",
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const activeTab = ref(viewState.tab);
 const workflowTabs = computed(() => [
   { value: "all", label: t("workflow.tabAll") },
   ...enabledTriggers().map((tr) => ({ value: tr.kind, label: t(tr.tabLabelKey ?? tr.labelKey) })),
@@ -413,7 +427,19 @@ const loading = ref(true);
 const fetching = ref(false);
 const lastUpdatedAt = ref<number | null>(null);
 const forbidden = ref(false);
-const filterQuery = ref("");
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+watch([filterQuery, activeTab, pageSize, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    tab: activeTab.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 
 // Cross-folder is a search mode, not a browse mode: with an empty box the list
 // stays in the selected folder, matching the Alerts and Dashboards lists. That
