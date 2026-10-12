@@ -69,6 +69,9 @@ pub enum PipelineError {
     PipelineDoesNotApply,
     #[error("Error deleting previous DerivedStream: {0}")]
     DeleteDerivedStream(String),
+    // the caller's write check refused, and already holds the response to send
+    #[error("Refused before the write")]
+    Refused(crate::authz::Refusal),
 }
 
 impl From<infra::errors::Error> for PipelineError {

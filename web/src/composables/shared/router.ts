@@ -242,6 +242,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.home",
+        allowOnEmptyData: true,
       },
     },
     {
@@ -251,6 +252,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.search",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         // Back-compat: Search History / Scheduler used to be `?action=…` overlays
@@ -327,6 +329,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "menu.metrics",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
@@ -376,6 +379,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.traces",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         const tab = supportedTraceTab(to.query?.tab);
@@ -616,6 +620,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "menu.dashboard",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

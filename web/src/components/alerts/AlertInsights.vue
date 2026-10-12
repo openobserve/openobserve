@@ -49,23 +49,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template #header-tabs>
-      <OTabs v-model="currentTab" dense align="left" data-test="alert-insights-tabs">
+      <OTabs
+        :model-value="currentTab"
+        dense
+        align="left"
+        data-test="alert-insights-tabs"
+        @update:model-value="onTabsChange"
+      >
         <OTab
           name="overview"
           :label="t('alerts.insights.tabs.overview')"
           data-test="tab-overview"
         />
         <OTab
-          v-if="isEnterprise"
           name="frequency"
           :label="t('alerts.insights.tabs.frequency')"
           data-test="tab-frequency"
+          :suffix-icon="!insightsAccess.allowed ? 'lock' : undefined"
         />
         <OTab
-          v-if="isEnterprise"
           name="correlation"
           :label="t('alerts.insights.tabs.correlation')"
           data-test="tab-correlation"
+          :suffix-icon="!insightsAccess.allowed ? 'lock' : undefined"
         />
         <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
       </OTabs>
@@ -261,7 +267,6 @@ import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
 import { useAlertInsights } from "@/composables/useAlertInsights";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import insightsConfig from "@/utils/alerts/insights-metrics.json";
-import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -269,14 +274,21 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
 const { t } = useI18nTyped();
+const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
-// Check if enterprise features are enabled
-const isEnterprise = config.isEnterprise === "true";
+// Frequency/Correlation tabs — shown locked (not hidden) in builds that
+// don't unlock it.
+const insightsAccess = computed(() =>
+  checkFeatureAccess("alertInsights", buildFeatureGateContext(store.state.zoConfig)),
+);
+const LOCKED_TAB_NAMES = ["frequency", "correlation"];
 
 // Composable
 const {
@@ -296,6 +308,17 @@ const isLoading = ref(false);
 const dashboardRef = ref(null);
 const dateTimeRef = ref(null);
 const currentTab = ref("overview");
+
+// OTabs is controlled (`:model-value`), so refusing to advance `currentTab`
+// here is what actually keeps a locked tab from becoming active — clicking
+// it opens the upgrade dialog instead of switching.
+function onTabsChange(name: string | number) {
+  if (LOCKED_TAB_NAMES.includes(String(name)) && !insightsAccess.value.allowed) {
+    openUpgradeDialog();
+    return;
+  }
+  currentTab.value = String(name);
+}
 const selectedAlertForAction = ref<string | null>(null);
 const dashboardData = ref<any>(null); // Store dashboard config as ref instead of computed
 const alertsList = ref<any[]>([]); // Cache alerts list
@@ -426,9 +449,10 @@ const fetchAlerts = async () => {
 };
 
 const goBack = () => {
+  const { folder, tab } = route.query;
   router.push({
     name: "alertList",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
+    query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
   });
 };
 
@@ -708,9 +732,14 @@ watch(currentTab, async () => {
 
 // Lifecycle
 onMounted(async () => {
-  // Check if there's a tab in query params
-  if (route.query.tab) {
-    currentTab.value = route.query.tab as string;
+  // Check if there's a tab in query params. Defense in depth: a locked tab
+  // is disabled in the UI, but a direct link with ?tab=frequency/correlation
+  // shouldn't be able to land on it while locked.
+  const queryTab = route.query.tab as string | undefined;
+  const isLockedTab =
+    (queryTab === "frequency" || queryTab === "correlation") && !insightsAccess.value.allowed;
+  if (queryTab && !isLockedTab) {
+    currentTab.value = queryTab;
   }
 
   // Fetch alerts list once on mount

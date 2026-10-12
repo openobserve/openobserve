@@ -120,7 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
+          ref="monitorTableRef"
           :mode="monitorTableMode"
+          :page-size="pageSize"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:current-page="currentPage = $event"
+          @update:page-size="pageSize = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           :data="filteredMonitors"
           :loading="loading"
           :forbidden="forbidden"
@@ -535,6 +544,7 @@ import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useListViewState } from "@/composables/useListViewState";
 
 const router = useRouter();
 const route = useRoute();
@@ -773,12 +783,70 @@ watch(
   },
   { immediate: true },
 );
-const activeTab = ref("all");
+const savedView = useListViewState("synthetics", {
+  folder: "",
+  activeTab: "all",
+  statusFilter: "all",
+  typeFilter: "all",
+  locationFilter: "all",
+  search: "",
+  currentPage: 1,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+// A stored page belongs to the folder it was viewed in; arriving on another folder starts at page 1.
+const savedFolder = (route.query.folder as string) ?? "default";
+if (savedView.folder && savedView.folder !== savedFolder) savedView.currentPage = 1;
+const activeTab = ref(savedView.activeTab);
 const monitorTableMode = computed(() => (activeTab.value === "browser" ? "browser" : "all"));
-const statusFilter = ref("all");
-const typeFilter = ref("all");
-const locationFilter = ref("all");
-const search = ref("");
+const statusFilter = ref(savedView.statusFilter);
+const typeFilter = ref(savedView.typeFilter);
+const locationFilter = ref(savedView.locationFilter);
+const search = ref(savedView.search);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const sortBy = ref(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const monitorTableRef = ref<InstanceType<typeof MonitorTable> | null>(null);
+
+watch([activeTab, statusFilter, typeFilter, locationFilter, search], () => {
+  currentPage.value = 1;
+});
+watch(
+  [
+    activeTab,
+    statusFilter,
+    typeFilter,
+    locationFilter,
+    search,
+    currentPage,
+    pageSize,
+    sortBy,
+    sortOrder,
+  ],
+  () => {
+    Object.assign(savedView, {
+      folder: activeFolderId.value,
+      activeTab: activeTab.value,
+      statusFilter: statusFilter.value,
+      typeFilter: typeFilter.value,
+      locationFilter: locationFilter.value,
+      search: search.value,
+      currentPage: currentPage.value,
+      pageSize: pageSize.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+    });
+  },
+);
+// The first data load makes TanStack reset to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(loading, (isLoading) => {
+  if (isLoading || pageRestored) return;
+  pageRestored = true;
+  setTimeout(() => monitorTableRef.value?.restorePage?.(currentPage.value), 0);
+});
 const showTypePicker = ref(false);
 
 // ── Folder state ───────────────────────────────────────────────────────
@@ -796,6 +864,8 @@ const activeFolderName = computed(() => {
 });
 
 watch(activeFolderId, async (newFolderId) => {
+  currentPage.value = 1;
+  savedView.folder = newFolderId;
   selectedMonitorIds.value = [];
   duplicateFolder.value = newFolderId;
   if (searchAcrossFolders.value) {

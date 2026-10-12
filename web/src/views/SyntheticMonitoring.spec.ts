@@ -21,6 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const $t = (key: string) => key;
 
@@ -154,7 +155,12 @@ const baseStubs = {
       "bulkActionLoading",
       "emptyMessage",
       "hasFilters",
+      "pageSize",
+      "currentPage",
+      "sortBy",
+      "sortOrder",
     ],
+    emits: ["update:currentPage", "update:pageSize", "update:sortBy", "update:sortOrder"],
   },
   CheckTypePicker: {
     template: '<div data-test="check-type-picker-stub"><slot /></div>',
@@ -270,6 +276,7 @@ describe("SyntheticMonitoring", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
     mockServiceList.mockResolvedValue({ data: { monitors: [] } });
     // Both are process-global and mutated by individual tests, so they are
     // restored here rather than left for the next test to inherit.
@@ -296,6 +303,75 @@ describe("SyntheticMonitoring", () => {
     it("should render the MonitorTable", () => {
       wrapper = mountPage();
       expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
+    });
+  });
+
+  describe("list view state", () => {
+    const seed = () =>
+      useListViewState("synthetics", {
+        folder: "",
+        activeTab: "all",
+        statusFilter: "all",
+        typeFilter: "all",
+        locationFilter: "all",
+        search: "",
+        currentPage: 1,
+        pageSize: 20,
+        sortBy: "",
+        sortOrder: "asc" as "asc" | "desc",
+      });
+
+    it("restores search, page, page size and sort from the saved view", () => {
+      Object.assign(seed(), {
+        search: "checkout",
+        currentPage: 3,
+        pageSize: 50,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      wrapper = mountPage();
+      const mt = wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+      expect(
+        (
+          wrapper.find('[data-test="synthetic-monitoring-search-input"]')
+            .element as HTMLInputElement
+        ).value,
+      ).toBe("checkout");
+      expect(mt.props("currentPage")).toBe(3);
+      expect(mt.props("pageSize")).toBe(50);
+      expect(mt.props("sortBy")).toBe("name");
+      expect(mt.props("sortOrder")).toBe("desc");
+    });
+
+    it("restores the type tab and drops the stored page when the folder differs", () => {
+      Object.assign(seed(), {
+        activeTab: "browser",
+        typeFilter: "BROWSER",
+        currentPage: 4,
+        folder: "other",
+      });
+      mockRoute.query.folder = "default";
+      wrapper = mountPage();
+      const mt = wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+      expect(mt.props("mode")).toBe("browser");
+      expect(mt.props("currentPage")).toBe(1);
+    });
+
+    it("saves search and table changes back to the view state", async () => {
+      wrapper = mountPage();
+      await wrapper.find('[data-test="synthetic-monitoring-search-input"]').setValue("api");
+      const mt = wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+      mt.vm.$emit("update:currentPage", 2);
+      mt.vm.$emit("update:sortBy", "status");
+      mt.vm.$emit("update:sortOrder", "desc");
+      mt.vm.$emit("update:pageSize", 25);
+      await nextTick();
+      const saved = seed();
+      expect(saved.search).toBe("api");
+      expect(saved.currentPage).toBe(2);
+      expect(saved.sortBy).toBe("status");
+      expect(saved.sortOrder).toBe("desc");
+      expect(saved.pageSize).toBe(25);
     });
   });
 

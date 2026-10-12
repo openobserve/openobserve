@@ -14,12 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { openobserveRum } from "@openobserve/browser-rum";
-import config from "@/aws-exports";
 
 export default {
   track(event: string, properties?: object) {
-    // Product events honour the telemetry opt-out even where RUM itself is enabled.
-    if (config.enableAnalytics !== "true") return;
+    // RUM already records every click wherever it runs, so a named action adds no new data; telemetry_enabled only gates third-party analytics.
+    if (!openobserveRum.getInitConfiguration()) return;
     openobserveRum.addAction(event, properties);
   },
 };

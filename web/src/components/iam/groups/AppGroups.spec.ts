@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { queryClient } from "@/composables/query/queryClient";
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -113,6 +114,8 @@ const createMockAxiosResponse = (data: any) => ({
   headers: {},
   config: {} as any,
 });
+
+beforeEach(() => resetListViewState());
 
 describe("AppGroups Component", () => {
   let wrapper: any;
@@ -684,6 +687,43 @@ describe("AppGroups - quick-assign via ?member=", () => {
     expect(spy).toHaveBeenCalledWith({
       name: "groups",
       query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("iam-groups", {}), {
+      filterQuery: "abc",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "group_name",
+      sortOrder: "desc",
+    });
+    const w: any = mount(AppGroups, { global: { provide: { store }, plugins: [i18n, router] } });
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("group_name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = mount(AppGroups, { global: { provide: { store }, plugins: [i18n, router] } });
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "group_name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("iam-groups", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "group_name",
+      sortOrder: "desc",
     });
   });
 });

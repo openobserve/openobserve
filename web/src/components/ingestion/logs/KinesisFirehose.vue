@@ -15,17 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+  <IngestionContent :target-stream="targetStream">
+    <CredentialCodeBlock slug="kinesis-firehose" :content="content" />
   </IngestionContent>
 </template>
 
 <script lang="ts">
-import { raw } from "@/types/i18n";
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 
 export default defineComponent({
@@ -38,14 +37,15 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent },
+  components: { CredentialCodeBlock, IngestionContent },
   setup() {
     const store = useStore();
     const endpoint = getEndPoint(getIngestionURL());
-    const content = `HTTP Endpoint: ${endpoint.url}/aws/${store.state.selectedOrganization.identifier}/default/_kinesis_firehose
+    const targetStream = "default";
+    const content = `HTTP Endpoint: ${endpoint.url}/aws/${store.state.selectedOrganization.identifier}/${targetStream}/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
     return {
-      raw,
+      targetStream,
       content,
     };
   },

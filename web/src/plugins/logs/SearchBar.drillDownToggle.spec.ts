@@ -126,6 +126,7 @@ describe("SearchBar — Drill down mode toggle", () => {
   });
 
   it("extracts patterns when switching from drill down to patterns", async () => {
+    (config as any).isEnterprise = "true";
     wrapper = mountSearchBar();
     wrapper.vm.searchObj.meta.logsVisualizeToggle = "drilldown";
     await flushPromises();

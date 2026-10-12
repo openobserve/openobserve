@@ -1263,7 +1263,9 @@ describe("ServiceAccountsList Component", () => {
       const groupLink = wrapper.find('[data-test="service-accounts-list-token-add-to-group"]');
       expect(roleLink.exists()).toBe(true);
       expect(groupLink.exists()).toBe(true);
-      expect(wrapper.vm.showGroupLink).toBe(true);
+      // `showGroupLink` was replaced by `rbacAccess` this session — the
+      // group link now always renders, just locked when `!rbacAccess.allowed`.
+      expect(wrapper.vm.rbacAccess.allowed).toBe(true);
 
       // Role must be the first option (appear before Group in the DOM).
       const html = wrapper.find('[data-test="service-accounts-token-step-1"]').html();

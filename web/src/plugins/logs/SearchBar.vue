@@ -124,16 +124,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroupItem>
 
             <OToggleGroupItem
-              v-if="config.isEnterprise == 'true'"
               data-test="logs-patterns-toggle"
               value="patterns"
               size="sm"
-              :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
+              :tooltip="
+                patternsAccess.allowed && toolbarToggleIconOnly
+                  ? t('search.showPatternsLabel')
+                  : undefined
+              "
             >
               <template #icon-left>
                 <OIcon name="layers" size="sm" class="shrink-0" />
               </template>
               <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
+              <template v-if="!patternsAccess.allowed" #icon-right>
+                <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+              </template>
             </OToggleGroupItem>
           </OToggleGroup>
           <!-- reset filters button — moves into More menu at very narrow widths -->
@@ -736,14 +742,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator />
 
-          <ODropdownGroup
-            v-if="config.isEnterprise == 'true'"
-            :label="t('search.menuGroupSchedule')"
-          >
+          <ODropdownGroup :label="t('search.menuGroupSchedule')">
+            <template v-if="!scheduledSearchAccess.allowed" #label-action>
+              <OIcon name="lock" size="xs" class="text-warning-600" />
+            </template>
+
             <ODropdownItem
-              v-if="config.isEnterprise == 'true'"
               data-test="search-scheduler-create-new-btn"
-              @select="createScheduleJob"
+              @select="scheduledSearchAccess.allowed ? createScheduleJob() : openUpgradeDialog()"
             >
               <template #icon-left>
                 <span
@@ -762,9 +768,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
 
             <ODropdownItem
-              v-if="config.isEnterprise == 'true'"
               data-test="search-scheduler-list-btn"
-              @select="routeToSearchSchedule"
+              @select="
+                scheduledSearchAccess.allowed ? routeToSearchSchedule() : openUpgradeDialog()
+              "
             >
               <template #icon-left>
                 <span
@@ -783,7 +790,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdownItem>
           </ODropdownGroup>
 
-          <ODropdownSeparator v-if="config.isEnterprise == 'true'" />
+          <ODropdownSeparator />
 
           <!-- Alert creation is shared platform machinery: this page contributes
                its search state through a pure adapter and CreateAlertAction owns
@@ -1780,6 +1787,8 @@ import searchService from "@/services/search";
 
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
@@ -1815,6 +1824,7 @@ import histogram_svg from "../../assets/images/common/histogram_image.svg";
 import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
+import { isSchemaBackedField } from "@/utils/logs/interestingFields";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
@@ -2072,6 +2082,17 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
     const store = useStore();
+    // Log-pattern mining ("Patterns" toggle) — shown locked (not hidden) in
+    // builds that don't unlock it, with the shared nav/settings tooltip.
+    const patternsAccess = computed(() =>
+      checkFeatureAccess("logPatterns", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    // Scheduled Search menu — shown locked (not hidden) in builds that don't
+    // unlock it, same treatment as the Patterns toggle above.
+    const scheduledSearchAccess = computed(() =>
+      checkFeatureAccess("scheduledSearch", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
     const orgIdForWrites = useOrgId();
     const createSavedView = useMutation(() => createSavedViewMutation(orgIdForWrites.value));
     const updateSavedView = useMutation(() => updateSavedViewMutation(orgIdForWrites.value));
@@ -2706,6 +2727,8 @@ export default defineComponent({
               for (const stream of searchObj.data.stream?.selectedStreamFields || []) {
                 if (
                   stream.name == col &&
+                  // A VRL-derived column must not be stored, nor persisted, as interesting.
+                  isSchemaBackedField(stream) &&
                   !searchObj.data.stream.interestingFieldList.includes(col) &&
                   col !== store.state.zoConfig?.timestamp_column
                 ) {
@@ -4268,6 +4291,14 @@ export default defineComponent({
     };
 
     const onLogsVisualizeToggleUpdate = async (value: any) => {
+      // OToggleGroup is controlled (`:model-value`), so refusing to advance
+      // here is what keeps the locked Patterns view from becoming active —
+      // clicking it opens the upgrade dialog instead of switching.
+      if (value === "patterns" && !patternsAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
+
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
       if (
         value === "visualize" &&
@@ -4814,6 +4845,9 @@ export default defineComponent({
       localSavedViews,
       loadSavedView,
       config,
+      patternsAccess,
+      scheduledSearchAccess,
+      openUpgradeDialog,
       handleRegionsSelection,
       handleQuickMode,
       handleHistogramMode,

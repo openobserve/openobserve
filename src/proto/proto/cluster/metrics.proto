@@ -45,6 +45,7 @@ message MetricsQueryResponse {
     string      result_type = 3; // vector, matrix, scalar, exemplars
     repeated Series  series = 4;
     ScanStats    scan_stats = 5;
+    repeated string warnings = 6; // non-empty when the result may be incomplete
 }
 
 message Series {

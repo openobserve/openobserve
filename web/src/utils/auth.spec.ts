@@ -912,6 +912,51 @@ describe("routeGuard", () => {
       });
     });
 
+    it.each(["home", "logs", "metrics", "traces", "dashboards", "billings"])(
+      "opens %s on an empty org with no summary read and no redirect",
+      async (name) => {
+        (config as any).isCloud = "true";
+        mockStore = buildEmptyDataStore();
+        vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+        await routeGuard(
+          { name, path: `/${name}`, meta: { allowOnEmptyData: true } },
+          {},
+          mockNext,
+        );
+
+        expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
+        expect(mockNext).toHaveBeenCalledTimes(1);
+        expect(mockNext).toHaveBeenCalledWith();
+      },
+    );
+
+    it.each([
+      ["off", { restricted_routes_on_empty_data: false }],
+      ["absent", {}],
+    ])("never reads route meta when the flag is %s", async (_label, zoConfig) => {
+      mockStore = buildMockStore({
+        state: {
+          organizationData: {
+            organizationSettings: { free_trial_expiry: "" },
+            isDataIngested: false,
+          },
+          selectedOrganization: { identifier: "default" },
+          zoConfig,
+        },
+      });
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+      const metaRead = vi.fn(() => ({ allowOnEmptyData: true }));
+      const route = { name: "logs", path: "/logs" };
+      Object.defineProperty(route, "meta", { get: metaRead });
+
+      await routeGuard(route, {}, mockNext);
+
+      expect(metaRead).not.toHaveBeenCalled();
+      expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledWith();
+    });
+
     // Only the meta flag exempts; a matching name or path prefix does not.
     it.each([
       ["an unflagged general route", { name: "general", path: "/settings/general" }],

@@ -20,6 +20,7 @@ export class OnboardingFormValidationPage {
         // Agree checkbox and submit button
         this.agreeCheckbox        = '[data-test="onboarding-get-started-agree-checkbox"]';
         this.submitBtn            = '[data-test="onboarding-get-started-submit-btn"]';
+        this.skipBtn              = '[data-test="onboarding-get-started-skip-btn"]';
 
         // ── AWS Marketplace form ──────────────────────────────────────────────
         // Route: /marketplace/aws/setup
@@ -59,18 +60,13 @@ export class OnboardingFormValidationPage {
     }
 
     async checkAgreeCheckbox() {
-        await this.page.locator(this.agreeCheckbox).click();
+        // The box itself: the wrapper's centre lands on the Privacy policy link in the label.
+        await this.page.locator(this.agreeCheckbox).getByRole('checkbox').click();
     }
 
     async clickSubmit() {
         await this.page.locator(this.submitBtn).click();
     }
-
-    // NOTE: validation is revealed by submitting the form (clickSubmit), not by
-    // blurring. The OForm foundation uses revalidateLogic (submit-then-change):
-    // nothing validates until the first submit, after which it re-validates on
-    // change. The Submit button is always enabled (the Zod schema gates the save),
-    // so clicking it always triggers validation.
 
     // ── AWS Marketplace helpers ───────────────────────────────────────────────
 
@@ -172,6 +168,7 @@ export class OnboardingFormValidationPage {
     getHearAboutUsErrorLocator()   { return this.page.locator(this.hearAboutUsError); }
     getWhereDoYouWorkErrorLocator(){ return this.page.locator(this.whereDoYouWorkError); }
     getSubmitBtnLocator()          { return this.page.locator(this.submitBtn); }
+    getSkipBtnLocator()            { return this.page.locator(this.skipBtn); }
     getAwsOrgNameInputLocator()    { return this.page.locator(this.awsOrgNameInput); }
     getAwsOrgNameErrorLocator()    { return this.page.locator(this.awsOrgNameError); }
     getAwsCreateLinkBtnLocator()   { return this.page.locator(this.awsCreateLinkBtn); }

@@ -34,10 +34,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :forbidden="forbidden"
           :global-filter="filterQuery"
           :show-global-filter="false"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100, 250, 500]"
           :current-page="currentPage"
           @update:current-page="onPageChange"
+          @update:page-size="pageSize = $event"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           selection="multiple"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -514,6 +519,7 @@ import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
@@ -559,7 +565,18 @@ interface PipelineRow {
   sql_query?: string;
 }
 
-const filterQuery = ref("");
+const viewState = useListViewState("pipelines", {
+  filterQuery: "",
+  tab: "all",
+  stateFilter: null as "errored" | "paused" | "active" | null,
+  pageSize: 20,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filterQuery = ref(viewState.filterQuery);
+const pageSize = ref(viewState.pageSize);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
 
 const showCreatePipeline = ref(false);
 
@@ -679,7 +696,7 @@ const confirmDialogMeta: any = ref({
   data: null,
   onConfirm: () => {},
 });
-const activeTab = ref("all");
+const activeTab = ref(viewState.tab);
 // Derived, not assigned: a copy written only by updateActiveTab() is empty on a cold mount.
 const filteredPipelines = computed<any[]>(() =>
   activeTab.value === "all"
@@ -775,7 +792,17 @@ const pipelineRowStyle = (row: any): Record<string, string> => {
 // ── State facet + summary strip ─────────────────────────────────────────────
 // Counts run over the TYPE-filtered rows (not the state-filtered ones) so the
 // tiles keep their totals while a facet is active.
-const stateFilter = ref<"errored" | "paused" | "active" | null>(null);
+const stateFilter = ref<"errored" | "paused" | "active" | null>(viewState.stateFilter);
+watch([filterQuery, activeTab, stateFilter, pageSize, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filterQuery: filterQuery.value,
+    tab: activeTab.value,
+    stateFilter: stateFilter.value,
+    pageSize: pageSize.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 
 const displayedPipelines = computed(() => {
   const rows = filteredPipelines.value || [];

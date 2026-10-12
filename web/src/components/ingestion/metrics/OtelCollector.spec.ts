@@ -3,7 +3,7 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import OtelCollector from "./OtelCollector.vue";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 
 vi.mock("../../../aws-exports", () => ({
   default: { API_ENDPOINT: "http://localhost:5080", region: "us-east-1", isCloud: "false" },
@@ -22,9 +22,9 @@ vi.mock("../../../utils/zincutils", () => ({
   b64EncodeStandard: vi.fn((str) => btoa(str)),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: '<div data-test="copy-content">{{ content }}</div>',
     props: ["content"],
   },
@@ -61,7 +61,7 @@ describe("OtelCollector.vue", () => {
       global: {
         plugins: [mockRouter],
         provide: { store: mockStore },
-        components: { CopyContent },
+        components: { CredentialCodeBlock },
       },
     });
   };
@@ -77,9 +77,9 @@ describe("OtelCollector.vue", () => {
       expect(() => wrapper.unmount()).not.toThrow();
     });
 
-    it("should render three CopyContent components (hostmetrics + two exporters)", () => {
+    it("should render three CredentialCodeBlock components (hostmetrics + two exporters)", () => {
       wrapper = createWrapper();
-      const copyContents = wrapper.findAllComponents(CopyContent);
+      const copyContents = wrapper.findAllComponents(CredentialCodeBlock);
       expect(copyContents.length).toBe(3);
     });
 
@@ -214,7 +214,7 @@ describe("OtelCollector.vue", () => {
   describe("Host metrics receiver block", () => {
     const hostMetricsContent = () => {
       wrapper = createWrapper();
-      return wrapper.findAllComponents(CopyContent)[0].props("content") as string;
+      return wrapper.findAllComponents(CredentialCodeBlock)[0].props("content") as string;
     };
 
     it("renders the hostmetrics receiver with the six dashboard-matching scrapers", () => {
@@ -242,7 +242,7 @@ describe("OtelCollector.vue", () => {
 
     it("interpolates the org id and masks the passcode in the hostmetrics block", () => {
       wrapper = createWrapper({ currOrgIdentifier: "my-org" });
-      const content = wrapper.findAllComponents(CopyContent)[0].props("content") as string;
+      const content = wrapper.findAllComponents(CredentialCodeBlock)[0].props("content") as string;
       // Pins the NEW block: today's first block is the HTTP exporter, which lacks this.
       expect(content).toContain("hostmetrics");
       expect(content).toContain("my-org");
@@ -250,28 +250,28 @@ describe("OtelCollector.vue", () => {
     });
   });
 
-  describe("CopyContent Integration", () => {
-    it("should pass getOtelHttpConfig to the second CopyContent", () => {
+  describe("CredentialCodeBlock Integration", () => {
+    it("should pass getOtelHttpConfig to the second CredentialCodeBlock", () => {
       wrapper = createWrapper();
-      const copyContents = wrapper.findAllComponents(CopyContent);
+      const copyContents = wrapper.findAllComponents(CredentialCodeBlock);
       const httpContent = copyContents[1].props("content");
       expect(httpContent).toBeDefined();
       expect(typeof httpContent).toBe("string");
       expect(httpContent).toContain("otlphttp/openobserve");
     });
 
-    it("should pass getOtelGrpcConfig to the third CopyContent", () => {
+    it("should pass getOtelGrpcConfig to the third CredentialCodeBlock", () => {
       wrapper = createWrapper();
-      const copyContents = wrapper.findAllComponents(CopyContent);
+      const copyContents = wrapper.findAllComponents(CredentialCodeBlock);
       const grpcContent = copyContents[2].props("content");
       expect(grpcContent).toBeDefined();
       expect(typeof grpcContent).toBe("string");
       expect(grpcContent).toContain("5081");
     });
 
-    it("should pass org identifier in HTTP config to CopyContent", () => {
+    it("should pass org identifier in HTTP config to CredentialCodeBlock", () => {
       wrapper = createWrapper({ currOrgIdentifier: "test-org" });
-      const copyContents = wrapper.findAllComponents(CopyContent);
+      const copyContents = wrapper.findAllComponents(CredentialCodeBlock);
       expect(copyContents[1].props("content")).toContain("test-org");
     });
   });

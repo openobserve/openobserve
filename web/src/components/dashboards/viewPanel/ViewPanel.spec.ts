@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import ViewPanel from "./ViewPanel.vue";
 
 // Mock vue-router
@@ -1049,6 +1049,70 @@ describe("ViewPanel", () => {
       wrapper.vm.refreshData();
 
       expect(refreshSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Refresh apply state and Auto Run", () => {
+    const setAutoQuery = (enabled: boolean) => {
+      mockStore.state.zoConfig = { ...mockStore.state.zoConfig, auto_query_enabled: enabled };
+    };
+
+    const changeAppliedVariables = async () => {
+      mockCheckIfVariablesAreLoaded.mockReturnValue(true);
+      wrapper.vm.variablesDataUpdated({ values: [{ name: "a", value: "1" }] });
+      await flushPromises();
+      wrapper.vm.variablesDataUpdated({ values: [{ name: "a", value: "2" }] });
+      await flushPromises();
+    };
+
+    afterEach(() => {
+      localStorage.removeItem("oo_toggle_auto_run");
+      setAutoQuery(false);
+    });
+
+    it("Refresh is not amber when nothing has changed", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      wrapper.vm.variablesDataUpdated({ isVariablesLoading: false, values: [] });
+      await flushPromises();
+
+      expect(wrapper.vm.isVariablesChanged).toBe(false);
+      expect(wrapper.vm.showApplyHint).toBe(false);
+    });
+
+    it("Refresh turns amber on an unapplied change and clears after Refresh", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      await changeAppliedVariables();
+      expect(wrapper.vm.showApplyHint).toBe(true);
+
+      wrapper.vm.disable = false;
+      wrapper.vm.refreshData();
+      await flushPromises();
+      expect(wrapper.vm.showApplyHint).toBe(false);
+    });
+
+    it("hides the Auto Run menu when the server flag is off", async () => {
+      setAutoQuery(false);
+      wrapper = createWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="dashboard-viewpanel-refresh-options-btn"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("offers the Auto Run menu and never shows amber while Auto Run is on", async () => {
+      setAutoQuery(true);
+      wrapper = createWrapper();
+      await flushPromises();
+      await changeAppliedVariables();
+
+      expect(wrapper.find('[data-test="dashboard-viewpanel-refresh-options-btn"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.vm.isAutoRunOn).toBe(true);
+      expect(wrapper.vm.showApplyHint).toBe(false);
     });
   });
 
