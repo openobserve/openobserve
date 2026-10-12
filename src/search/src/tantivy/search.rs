@@ -341,18 +341,20 @@ impl TantivyResult {
         }
         let mut values: HashSet<Option<String>> = distinct_values.into_iter().map(Some).collect();
         if index_condition.get_str_match_condition().is_none() {
+            let field_name = searcher.schema().get_field_name(field);
             for segment in searcher.segment_readers() {
-                let column = segment
-                    .fast_fields()
-                    .str(searcher.schema().get_field_name(field))?;
+                let column = segment.fast_fields().str(field_name)?;
                 let has_null =
                     column
                         .as_ref()
                         .is_none_or(|col| match col.ords().get_cardinality() {
                             tantivy::columnar::Cardinality::Full => false,
                             tantivy::columnar::Cardinality::Optional => true,
+                            // Index fields get at most one raw value per document.
                             tantivy::columnar::Cardinality::Multivalued => {
-                                (0..segment.max_doc()).any(|doc| col.ords().first(doc).is_none())
+                                unreachable!(
+                                    "index field {field_name} has a multivalued fast field"
+                                )
                             }
                         });
                 if has_null && segment.num_docs() > 0 {
