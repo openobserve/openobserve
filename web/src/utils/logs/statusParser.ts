@@ -445,8 +445,9 @@ const GLOG_LEVELS: Readonly<Record<string, KnownLogSeverityLevel>> = {
 const KEY_VALUE_LEVEL_RE = /\b(?:level|lvl|severity|loglevel)"?\s*[=:]\s*"?([A-Za-z]+)/i;
 const BRACKETED_LEVEL_RE =
   /[[<(]\s*(EMERG(?:ENCY)?|FATAL|PANIC|ALERT|CRIT(?:ICAL)?|ERROR|ERR|WARN(?:ING)?|NOTICE|INFO|DEBUG|TRACE)\s*[\]>)]/i;
+// Lookarounds reject identifiers, file names and paths such as TRACE-ID, NOTICE.md and /v1/ALERT-rules.
 const UPPERCASE_LEVEL_RE =
-  /\b(EMERG(?:ENCY)?|FATAL|PANIC|ALERT|CRIT(?:ICAL)?|ERROR|WARN(?:ING)?|NOTICE|INFO|DEBUG|TRACE)\b/;
+  /(?<![\w/-])(EMERG(?:ENCY)?|FATAL|PANIC|ALERT|CRIT(?:ICAL)?|ERROR|WARN(?:ING)?|NOTICE|INFO|DEBUG|TRACE)(?![-.\w])/;
 const GLOG_PREFIX_RE = /^([IWEF])\d{4} \d{2}:\d{2}:\d{2}/;
 const STACK_TRACE_RES: readonly RegExp[] = [
   /^Traceback \(most recent call last\)/,
@@ -532,7 +533,7 @@ export function resolveLogSeverity(row: unknown, projection?: SeverityProjection
   if (cached && cached.generation === generation && cached.projection === projection) {
     return cached.result;
   }
-  const result = computeLogSeverity(row as Record<string, unknown>, projection);
+  const result = computeLogSeverity(key as Record<string, unknown>, projection);
   severityMemo.set(key, { generation, projection, result });
   return result;
 }
@@ -555,7 +556,7 @@ export function resolveSeverityFieldValue(
     if (level) return { level, source: "field" };
   }
   if ((SEVERITY_HTTP_FIELDS as readonly string[]).includes(name)) {
-    const level = httpLevel(name, value);
+    const level = httpLevel(value);
     return level ? { level, source: "http" } : null;
   }
   return null;
@@ -650,20 +651,22 @@ function computeLogSeverity(
   if (statusLevel)
     return { level: statusLevel, source: "field", field: "status", notFetched: false };
   for (const field of SEVERITY_HTTP_FIELDS) {
-    const level = httpLevel(field, row[field]);
+    const level = httpLevel(row[field]);
     if (level) return { level, source: "http", field, notFetched: false };
   }
   if (projection && levelFieldNotFetched(row, projection)) return NOT_FETCHED_SEVERITY;
   if (!severityInferenceEnabled) return UNKNOWN_SEVERITY;
+  let scanned: string | null = null;
   for (const field of SEVERITY_MESSAGE_FIELDS) {
     const text = row[field];
     if (typeof text !== "string" || text.trim() === "") continue;
+    scanned ??= field;
     const level = inferSeverityFromMessage(text);
-    return level
-      ? { level, source: "message", field, notFetched: false }
-      : { level: "unknown", source: "none", field, notFetched: false };
+    if (level) return { level, source: "message", field, notFetched: false };
   }
-  return UNKNOWN_SEVERITY;
+  return scanned
+    ? { level: "unknown", source: "none", field: scanned, notFetched: false }
+    : UNKNOWN_SEVERITY;
 }
 
 function levelFieldNotFetched(
@@ -725,12 +728,17 @@ function tier1Level(field: string, value: unknown): KnownLogSeverityLevel | null
   const n = integerOf(value);
   if (n === null) return typeof value === "string" ? stringLevel(value) : null;
   if (SYSLOG_SEVERITY_FIELDS.has(field)) return syslogLevel(n, true);
-  return PINO_LEVELS[n] ?? syslogLevel(n, false);
+  if (field === "severity") return otelBandLevel(n);
+  if (field === "level") return PINO_LEVELS[n] ?? syslogLevel(n, false);
+  return syslogLevel(n, false);
 }
 
 function otelNumberLevel(value: unknown): KnownLogSeverityLevel | null {
   const n = integerOf(value);
-  if (n === null) return null;
+  return n === null ? null : otelBandLevel(n);
+}
+
+function otelBandLevel(n: number): KnownLogSeverityLevel | null {
   return OTEL_NUMBER_BANDS.find((b) => n >= b.min && n <= b.max)?.level ?? null;
 }
 
@@ -739,10 +747,8 @@ function statusStringLevel(value: unknown): KnownLogSeverityLevel | null {
   return stringLevel(value);
 }
 
-function httpLevel(field: string, value: unknown): KnownLogSeverityLevel | null {
+function httpLevel(value: unknown): KnownLogSeverityLevel | null {
   const n = integerOf(value);
   if (n === null) return null;
-  const band = HTTP_STATUS_BANDS.find((b) => n >= b.min && n <= b.max);
-  if (band) return band.level;
-  return field === "status" ? syslogLevel(n, false) : null;
+  return HTTP_STATUS_BANDS.find((b) => n >= b.min && n <= b.max)?.level ?? null;
 }

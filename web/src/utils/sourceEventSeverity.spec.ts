@@ -77,9 +77,10 @@ describe("extractSeverity — correlation adapter over the severity resolver", (
       expect(extractSeverity({ level: "MyERRORCode" })).toBeNull();
     });
 
-    it("OTel bands on level/severity no longer apply (severity 9 falls through)", () => {
-      expect(extractSeverity({ severity: 9 })).toBeNull();
-      expect(extractSeverity({ severity: 9, severity_number: 9 })).toBe("INFO");
+    it("OTel bands apply to severity but not to level (severity 9 is INFO)", () => {
+      expect(extractSeverity({ severity: 9 })).toBe("INFO");
+      expect(extractSeverity({ level: 9 })).toBeNull();
+      expect(extractSeverity({ level: 9, severity_number: 9 })).toBe("INFO");
     });
 
     it("syslog severity fields are not part of the adapter", () => {

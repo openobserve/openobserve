@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, afterEach } from "vitest";
+import { effect, reactive, stop } from "vue";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -534,7 +535,8 @@ describe("resolveLogSeverity — tier 1 numbers", () => {
   it.each([
     [{ level: "50" }, "error"],
     [{ level: " 30 " }, "info"],
-    [{ severity: "3" }, "error"],
+    [{ severity: "3" }, "trace"],
+    [{ log_level: "3" }, "error"],
     [{ severity: "0", level: "emergency" }, "emergency"],
   ])("numeric string %j → %s", (row, level) => {
     expect(levelOf(row)).toBe(level);
@@ -587,9 +589,9 @@ describe("resolveLogSeverity — tiers 3 and 4", () => {
     }
   });
 
-  it("keeps status: 3 → error through the syslog fallback (regression)", () => {
-    expect(sev({ status: 3 })).toMatchObject({ level: "error", source: "http", field: "status" });
-    expect(levelOf({ status: "3" })).toBe("error");
+  it("reads no syslog number on status (M9)", () => {
+    expect(levelOf({ status: 3 })).toBe("unknown");
+    expect(levelOf({ status: "3" })).toBe("unknown");
   });
 
   it("never reads pino or syslog on status or the other HTTP fields", () => {
@@ -627,8 +629,8 @@ describe("resolveLogSeverity — precedence and fall-through (J-A3, J-A5)", () =
     [{ level: 50 }, "error", "level"],
     [{ severity: "WARN2", severity_number: 14 }, "warning", "severity"],
     [{ severity_number: 18 }, "error", "severity_number"],
-    [{ severity: 30, level: "error" }, "info", "severity"],
-    [{ severity: "30", level: "error" }, "info", "severity"],
+    [{ severity: 30, level: "error" }, "error", "level"],
+    [{ severity: "30", level: "error" }, "error", "level"],
     [{ level: true, log_level: "warn" }, "warning", "log_level"],
     [{ level: { a: 1 }, status: 404 }, "warning", "status"],
     [{ level: "nonsense", severity_number: 9 }, "info", "severity_number"],
@@ -756,7 +758,7 @@ describe("resolveLogSeverity — tier 5 message inference", () => {
     expect(sev({ message })).toMatchObject({ level: "unknown", source: "none" });
   });
 
-  it("scans the first present non-empty string field only", () => {
+  it("scans the present non-empty string fields in order", () => {
     expect(sev({ message: { a: 1 }, msg: "[ERROR] x" })).toMatchObject({
       level: "error",
       field: "msg",
@@ -767,7 +769,10 @@ describe("resolveLogSeverity — tier 5 message inference", () => {
     });
     expect(sev({ log: "[DEBUG] x" })).toMatchObject({ level: "debug", field: "log" });
     expect(sev({ content: "[INFO] x" })).toMatchObject({ level: "info", field: "content" });
-    expect(levelOf({ message: "user logged in", msg: "[ERROR] x" })).toBe("unknown");
+    expect(sev({ message: "user logged in", msg: "[ERROR] x" })).toMatchObject({
+      level: "error",
+      field: "msg",
+    });
     expect(levelOf({ message: ["ERROR"] })).toBe("unknown");
   });
 
@@ -1155,8 +1160,102 @@ describe("exported level tables (A4, for item 4b)", () => {
       source: "field",
     });
     expect(resolveSeverityFieldValue("status", "500")).toEqual({ level: "error", source: "http" });
-    expect(resolveSeverityFieldValue("status", "3")).toEqual({ level: "error", source: "http" });
+    expect(resolveSeverityFieldValue("status", "3")).toBeNull();
     expect(resolveSeverityFieldValue("Level", "50")).toEqual({ level: "error", source: "field" });
     expect(resolveSeverityFieldValue("host", "error")).toBeNull();
+  });
+});
+
+describe("severity inference review fixes (M9-M13)", () => {
+  it.each([
+    [1, "unknown"],
+    [0, "unknown"],
+    [700, "unknown"],
+    [404, "warning"],
+    [503, "error"],
+  ])("M9: status %s → %s, HTTP codes only", (code, level) => {
+    expect(levelOf({ status: code })).toBe(level);
+    expect(severityIndicatorColor(sev({ status: code })) === "transparent").toBe(
+      level === "unknown",
+    );
+  });
+
+  it("M9: a status outside 100-599 falls through to the message", () => {
+    expect(sev({ status: 1, message: "[WARN] x" })).toMatchObject({
+      level: "warning",
+      source: "message",
+    });
+    expect(resolveSeverityFieldValue("status", 1)).toBeNull();
+  });
+
+  it.each([
+    [{ level: 30 }, "info", "level"],
+    [{ severity: 20 }, "error", "severity"],
+    [{ severity: 9 }, "info", "severity"],
+    [{ severity: "17" }, "error", "severity"],
+    [{ severity_number: 17 }, "error", "severity_number"],
+    [{ severity_number: 20 }, "error", "severity_number"],
+  ])("M10: %j → %s from %s", (row, level, field) => {
+    expect(sev(row)).toMatchObject({ level, source: "field", field });
+  });
+
+  it("M10: pino numbers apply to level only", () => {
+    expect(levelOf({ severity: 30 })).toBe("unknown");
+    expect(levelOf({ log_level: 50 })).toBe("unknown");
+    expect(levelOf({ log_level: 3 })).toBe("error");
+    expect(resolveSeverityFieldValue("severity", 20)).toEqual({ level: "error", source: "field" });
+    expect(resolveSeverityFieldValue("level", 20)).toEqual({ level: "debug", source: "field" });
+  });
+
+  it("M11: a message field with no level word does not stop the scan", () => {
+    expect(sev({ message: "user logged in", log: "ERROR boom" })).toEqual({
+      level: "error",
+      source: "message",
+      field: "log",
+      notFetched: false,
+    });
+    expect(sev({ message: "user logged in", log: "all good" })).toMatchObject({
+      level: "unknown",
+      field: "message",
+    });
+  });
+
+  it.each(["TRACE-ID: abc123", "see NOTICE.md", "GET /v1/ALERT-rules 200"])(
+    "M12: %j is not a level word",
+    (message) => {
+      expect(inferSeverityFromMessage(message)).toBeNull();
+      expect(levelOf({ message })).toBe("unknown");
+    },
+  );
+
+  it.each([
+    ["ERROR: boom", "error"],
+    ["[WARN] x", "warning"],
+    ["level=INFO", "info"],
+    ["x-ERROR boom", null],
+    ["path/DEBUG x", null],
+    ["boom ERROR", "error"],
+  ])("M12: %j → %s", (message, level) => {
+    expect(inferSeverityFromMessage(message)).toBe(level);
+  });
+
+  it("M13: the memo returns the same object for a reactive row and its raw row", () => {
+    const raw = { message: "[ERROR] x" };
+    const first = resolveLogSeverity(reactive(raw));
+    expect(resolveLogSeverity(raw)).toBe(first);
+    expect(resolveLogSeverity(reactive(raw))).toBe(first);
+  });
+
+  it("M13: inference reads the raw row, so it tracks no row field", () => {
+    const row = reactive<Record<string, unknown>>({ message: "[ERROR] x", level: undefined });
+    let runs = 0;
+    const runner = effect(() => {
+      runs += 1;
+      resolveLogSeverity(row);
+    });
+    row.message = "[WARN] y";
+    row.level = "info";
+    stop(runner);
+    expect(runs).toBe(1);
   });
 });

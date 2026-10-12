@@ -438,7 +438,7 @@ describe("convertLogData.ts", () => {
       ["response_code", "404", "#FB8C00"],
       ["syslog_severity", "0", "#E53935"],
       ["level", "50", "#EF5350"],
-      ["status", "3", "#EF5350"],
+      ["severity", "20", "#EF5350"],
       ["severity_number", "18", "#EF5350"],
       ["severity_number", "10", "#1E88E5"],
     ])("colours %s=%s through that field's rules (%s)", (breakdownField, value, colour) => {
@@ -464,6 +464,7 @@ describe("convertLogData.ts", () => {
       ["level", "constructor"],
       ["level", "__proto__"],
       ["status", "600"],
+      ["status", "3"],
       ["severity_number", "0"],
       ["level", "W"],
       ["host", "500"],
