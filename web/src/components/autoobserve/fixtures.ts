@@ -44,6 +44,7 @@ import {
   type FixKind,
   type HypothesisVerdict,
   type LedgerFact,
+  type Period,
   type ProblemFact,
   type Scenario,
   type ServiceFact,
@@ -530,8 +531,12 @@ const toIssue = (fact: ProblemFact, t: TranslateFn, fixedIds: string[] = []): Is
   };
 };
 
-export const issuesFor = (scenario: Scenario, t: TranslateFn, fixedIds: string[] = []): Issue[] =>
-  problemsIn(scenario, "week").map((fact) => toIssue(fact, t, fixedIds));
+export const issuesFor = (
+  scenario: Scenario,
+  t: TranslateFn,
+  fixedIds: string[] = [],
+  period: Period = "week",
+): Issue[] => problemsIn(scenario, period).map((fact) => toIssue(fact, t, fixedIds));
 
 export const issueFor = (id: string, t: TranslateFn): Issue => toIssue(PROBLEMS[id], t);
 

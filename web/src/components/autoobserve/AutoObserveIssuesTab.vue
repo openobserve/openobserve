@@ -122,12 +122,19 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { FUNNEL, type Issue, type Scenario } from "./fixtures";
 
-const props = defineProps<{ issues: Issue[]; scenario: Scenario }>();
+const props = withDefaults(
+  defineProps<{
+    issues: Issue[];
+    scenario: Scenario;
+    initialFilter?: "open" | "resolved" | "all";
+  }>(),
+  { initialFilter: "open" },
+);
 const emit = defineEmits<{ "open-issue": [issue: Issue] }>();
 
 const { t } = useI18nTyped();
 
-const filter = ref<"open" | "resolved" | "all">("open");
+const filter = ref(props.initialFilter);
 
 const rows = computed(() =>
   props.issues.filter((i) => {

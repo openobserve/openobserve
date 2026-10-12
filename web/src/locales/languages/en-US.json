@@ -22381,16 +22381,29 @@
       "howItWorks": "How it works"
     },
     "recent": {
-      "title": "Last 7 days",
+      "ranges": {
+        "day": "Last 24 hours",
+        "week": "Last 7 days",
+        "month": "Last 30 days"
+      },
+      "within": {
+        "day": "in the last 24 hours",
+        "week": "in the last 7 days",
+        "month": "in the last 30 days"
+      },
+      "groups": {
+        "thisWeek": "This week",
+        "lastWeek": "Last week",
+        "weeksAgo": "{count} weeks ago"
+      },
       "all": "All",
-      "none": "No {priority} problems in the last 7 days."
+      "none": "No {priority} problems {within}.",
+      "allIssues": "All issues"
     },
-    "noProblems": {
-      "week": "No problems in the last 7 days. I checked {count} service around the clock. | No problems in the last 7 days. I checked {count} services around the clock."
-    },
+    "noProblems": "No problems {within}. I checked {count} service around the clock. | No problems {within}. I checked {count} services around the clock.",
     "entryLabel": "{when} · {service}",
     "when": "{day}, {time}",
-    "seeAll": "See all {count}",
+    "showMore": "Show {count} more",
     "showFewer": "Show fewer",
     "days": {
       "today": "Today",
@@ -22616,6 +22629,11 @@
     },
     "coveragePage": {
       "title": "Everything I watch",
+      "back": "Back"
+    },
+    "issuesPage": {
+      "title": "All issues",
+      "sentence": "Every problem I opened in the last 30 days. Pick one to see what happened and what I did about it.",
       "back": "Back"
     },
     "activityPage": {

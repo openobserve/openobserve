@@ -17,6 +17,7 @@ import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n
 import {
   AUTONOMY,
   DAY_DATE,
+  DEMO_DATE,
   DEMO_NOW,
   DESTINATIONS,
   EVENTS,
@@ -52,6 +53,7 @@ export type { Autonomy, HistoryKind, Outcome, RequestKind, Scenario, Severity };
 export type ProblemOutcome = Outcome | "fixing" | "contained";
 export type HistoryTone = Outcome | "neutral" | "fix";
 export type PriorityFilter = "all" | Severity;
+export type ProblemRange = "24h" | "7d" | "30d";
 
 // Problems whose state has changed on the page because the viewer approved a fix; answered holds ledger ids.
 export interface FixOverrides {
@@ -93,11 +95,6 @@ export interface Problem {
   chart: ProblemChart;
 }
 
-export interface RecentData {
-  problems: string[];
-  quiet: Msg | null;
-}
-
 export interface Request {
   id: string;
   problem?: string;
@@ -123,7 +120,7 @@ export interface HistoryEntry {
 
 export interface ScenarioData {
   serviceCount: number;
-  recent: RecentData;
+  problems: string[];
   requests: Request[];
 }
 
@@ -142,6 +139,11 @@ export interface DestinationOption {
 }
 
 export const PRIORITY_FILTERS: PriorityFilter[] = ["all", "p1", "p2", "p3", "p4"];
+export const PROBLEM_RANGES: ProblemRange[] = ["24h", "7d", "30d"];
+
+const RANGE_DAYS: Record<ProblemRange, number> = { "24h": 1, "7d": 7, "30d": 30 };
+const DAY_MS = 86400000;
+const DEMO_DAY = Date.UTC(...DEMO_DATE);
 
 // Highest priority first, then newest first; absolute is a sortable timestamp.
 export const byPriority = (a: Problem, b: Problem) =>
@@ -239,15 +241,15 @@ export const say = (t: TranslateFn, m: Msg): I18nText => {
   return m.plural === undefined ? t(m.key, params) : t(m.key, params, m.plural);
 };
 
-// The facts week list is exactly the last 7 days before the demos now.
-const recentFor = (scenario: Scenario): RecentData => {
-  const problems = problemsIn(scenario, "week").map((p) => p.id);
-  const total = serviceStats(scenario).total;
-  return {
-    problems,
-    quiet: problems.length ? null : msg("autoobserve2.noProblems.week", { count: total }, total),
-  };
+// A range starts at the demo's clock time that many days back, so 24 hours reaches into yesterday.
+export const inRange = (problem: Problem, range: ProblemRange) => {
+  const start = new Date(DEMO_DAY - RANGE_DAYS[range] * DAY_MS).toISOString().slice(0, 10);
+  return problem.absolute >= `${start} ${DEMO_NOW}`;
 };
+
+// Whole 7-day blocks back from today, so this week matches the 7-day range.
+export const weeksAgo = (problem: Problem) =>
+  Math.floor((DEMO_DAY - Date.parse(problem.absolute.slice(0, 10))) / DAY_MS / 7);
 
 const record = (kind: FixKind) => AUTONOMY.find((a) => a.kind === kind) ?? AUTONOMY[0];
 
@@ -311,7 +313,7 @@ export const scenarioData = (scenario: Scenario): ScenarioData => {
   const facts = scenarioFacts(scenario);
   return {
     serviceCount: facts.services.length,
-    recent: recentFor(scenario),
+    problems: problemsIn(scenario, "month").map((p) => p.id),
     requests: facts.requests.map(requestFor),
   };
 };

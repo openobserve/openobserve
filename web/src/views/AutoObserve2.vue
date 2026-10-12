@@ -35,13 +35,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="contents @min-[60rem]:flex @min-[60rem]:min-w-0 @min-[60rem]:flex-col @min-[60rem]:gap-6"
         >
           <ThisWeek
-            v-model:expanded="weekExpanded"
+            v-model:range="range"
             v-model:priority="priority"
+            v-model:shown="shown"
             class="order-1"
-            :data="data.recent"
             :problems="problems"
             :requests="data.requests"
+            :service-count="data.serviceCount"
             @open-problem="openProblem"
+            @open-issues="openIssuesPage"
           />
           <PageFooter
             class="order-3 pt-2"
@@ -147,6 +149,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
+    <div
+      v-else-if="page === 'issues'"
+      class="mx-auto flex h-full max-w-[100rem] flex-col gap-5 px-4 pt-6 pb-6 @min-[60rem]:px-6"
+      data-test="autoobserve2-issues-page"
+    >
+      <header class="flex flex-col gap-3">
+        <OButton
+          variant="ghost"
+          size="xs"
+          icon-left="arrow-back"
+          class="self-start"
+          data-test="autoobserve2-issues-back"
+          @click="closePage"
+        >
+          {{ t("autoobserve2.issuesPage.back") }}
+        </OButton>
+        <div class="flex min-w-0 flex-col gap-1.5">
+          <h1
+            class="text-text-heading text-2xl leading-tight font-semibold tracking-tight"
+            data-test="autoobserve2-issues-title"
+          >
+            {{ t("autoobserve2.issuesPage.title") }}
+          </h1>
+          <p
+            class="text-text-secondary max-w-[70ch] text-sm leading-relaxed text-pretty"
+            data-test="autoobserve2-issues-sentence"
+          >
+            {{ t("autoobserve2.issuesPage.sentence") }}
+          </p>
+        </div>
+      </header>
+      <div
+        class="bg-surface-base border-border-subtle rounded-surface flex min-h-0 flex-1 overflow-hidden border shadow-xs"
+      >
+        <AutoObserveIssuesTab
+          :issues="issues"
+          :scenario="scenario"
+          initial-filter="all"
+          @open-issue="openIssue"
+        />
+      </div>
+    </div>
     <ChangesPage
       v-else
       :key="activityKey"
@@ -190,11 +234,14 @@ import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDra
 import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
 import CoverageBar from "@/components/autoobserve/v2/CoverageBar.vue";
 import AutoObserveCoverageTab from "@/components/autoobserve/AutoObserveCoverageTab.vue";
+import AutoObserveIssuesTab from "@/components/autoobserve/AutoObserveIssuesTab.vue";
 import ChangesPage from "@/components/autoobserve/v2/ChangesPage.vue";
 import {
   SIGNALS,
   coverageFor,
+  issuesFor,
   type CellState,
+  type Issue,
   type Signal,
 } from "@/components/autoobserve/fixtures";
 import HistoryDrawer from "@/components/autoobserve/v2/HistoryDrawer.vue";
@@ -207,10 +254,12 @@ import { useDecisions } from "@/components/autoobserve/v2/useDecisions";
 import {
   SCENARIOS,
   PRIORITY_FILTERS,
+  PROBLEM_RANGES,
   SCENARIO_LABEL,
   byPriority,
   coverageSummary,
   historyFor,
+  inRange,
   logEntries,
   overridesFor,
   problemsFor,
@@ -218,6 +267,7 @@ import {
   scenarioData,
   type PriorityFilter,
   type Problem,
+  type ProblemRange,
   type Scenario,
 } from "@/components/autoobserve/v2/fixtures";
 
@@ -237,9 +287,8 @@ const byId = computed(() => problemsFor(overrides.value));
 // Fix asks sit on their problem row, so only the rest are suggestions.
 const suggestions = computed(() => data.value.requests.filter((r) => r.kind !== "fixNow"));
 
-const problems = computed(() =>
-  data.value.recent.problems.map((id) => byId.value[id]).sort(byPriority),
-);
+const problems = computed(() => data.value.problems.map((id) => byId.value[id]).sort(byPriority));
+const issues = computed(() => issuesFor(scenario.value, t, overrides.value.fixed, "month"));
 const history = computed(() => [
   ...logEntries(scenario.value, store.log),
   ...historyFor(scenario.value),
@@ -258,18 +307,22 @@ const selectedIssue = computed(() => {
   const fact = selectedId.value ? PROBLEMS[selectedId.value] : undefined;
   return fact ? (issueByIncident(fact.incidentId) ?? null) : null;
 });
-const weekExpanded = ref(false);
 const priorityParam = String(route.query.priority ?? "").toLowerCase() as PriorityFilter;
 const priority = ref<PriorityFilter>(
   PRIORITY_FILTERS.includes(priorityParam) ? priorityParam : "all",
 );
+const rangeParam = String(route.query.range ?? "") as ProblemRange;
+const range = ref<ProblemRange>(PROBLEM_RANGES.includes(rangeParam) ? rangeParam : "7d");
+const shownParam = Number(route.query.shown);
+const shown = ref(Number.isInteger(shownParam) && shownParam > 0 ? shownParam : 0);
 const historyOpen = ref(false);
 const settingsOpen = ref(false);
 const howOpen = ref(false);
 
 watch(scenario, () => {
   problemOpen.value = false;
-  if (!problems.value.some((p) => p.severity === priority.value)) priority.value = "all";
+  const left = problems.value.filter((p) => inRange(p, range.value));
+  if (!left.some((p) => p.severity === priority.value)) priority.value = "all";
 });
 
 // The open panel is recorded in the URL, so browser Back from the Nerd view reopens it.
@@ -277,13 +330,14 @@ const openProblem = (problem: Problem) => {
   selectedId.value = problem.id;
   problemOpen.value = true;
   void router.replace({
-    query: {
-      ...route.query,
-      drawer: "problem",
-      problem: problem.id,
-      all: weekExpanded.value ? "1" : undefined,
-    },
+    query: { ...route.query, drawer: "problem", problem: problem.id },
   });
+};
+
+// The issues table lists incidents; each maps back to the problem the drawer opens.
+const openIssue = (issue: Issue) => {
+  const fact = Object.values(PROBLEMS).find((p) => p.incidentId === issue.id);
+  if (fact) openProblem(byId.value[fact.id]);
 };
 
 const summary = computed(() => coverageSummary(scenario.value));
@@ -299,7 +353,7 @@ const coverageSentence = computed(() => {
 });
 
 // A full page lives in the URL, so reload and browser Back/Forward land on it.
-const PAGES = ["coverage", "activity"] as const;
+const PAGES = ["coverage", "activity", "issues"] as const;
 const PAGE_QUERY = { page: undefined, focus: undefined, filter: undefined, change: undefined };
 const COVERAGE_FILTER_STATES: Record<string, CellState[]> = {
   watching: ["watched"],
@@ -346,6 +400,10 @@ const openActivity = (change?: string) => {
   });
 };
 
+const openIssuesPage = () => {
+  void router.push({ query: { ...route.query, ...DRAWER_QUERY, ...PAGE_QUERY, page: "issues" } });
+};
+
 const openChange = (ledgerId: string) => {
   historyOpen.value = false;
   openActivity(ledgerId);
@@ -381,14 +439,17 @@ const clearDrawerQuery = (isOpen: boolean) => {
   void router.replace({ query: { ...route.query, ...DRAWER_QUERY } });
 };
 
-// One watcher, so a filter change and the expansion reset it causes land in a single URL write.
-watch([weekExpanded, priority], ([isExpanded, filter]) => {
+// One watcher, so a range change and the filter and expansion resets it causes land in a single URL write.
+watch([range, priority, shown], ([r, filter, rows]) => {
   const next = {
-    all: isExpanded ? route.query.all : undefined,
+    range: r === "7d" ? undefined : r,
     priority: filter === "all" ? undefined : filter.toUpperCase(),
+    shown: rows ? String(rows) : undefined,
   };
-  if (next.all === route.query.all && next.priority === route.query.priority) return;
-  void router.replace({ query: { ...route.query, ...next } });
+  const same = (Object.keys(next) as (keyof typeof next)[]).every(
+    (k) => next[k] === route.query[k],
+  );
+  if (!same) void router.replace({ query: { ...route.query, ...next } });
 });
 watch(problemOpen, clearDrawerQuery);
 
@@ -438,10 +499,9 @@ onMounted(async () => {
   } catch {
     // Blocked storage: skip the auto-open rather than showing it on every visit.
   }
-  weekExpanded.value = route.query.all === "1";
   const drawer = route.query.drawer;
   const problemId = typeof route.query.problem === "string" ? route.query.problem : "";
-  const knownProblem = data.value.recent.problems.includes(problemId);
+  const knownProblem = data.value.problems.includes(problemId);
   if (page.value) howOpen.value = false;
   // Only a drawer the current scenario can show reopens; anything else is dropped from the URL.
   if (drawer === "problem" && knownProblem) {
