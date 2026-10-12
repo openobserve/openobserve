@@ -4937,6 +4937,28 @@ describe("AddPanel.vue", () => {
       query.fields.filter = { conditions: [] };
     });
 
+    it("holds live runs while a filter is half-built, even one the query drops", async () => {
+      wrapper = await mountForValidation();
+      validatePanelMock.mockImplementation(() => {});
+      const query = wrapper.vm.dashboardPanelData.data.queries[0];
+      Object.assign(query.fields, { source: null, target: null, latitude: null, longitude: null });
+      query.fields.x = [DEFAULT_SQL_X_FIELD()];
+      query.fields.y = [DEFAULT_SQL_Y_FIELD_COUNT()];
+      query.query = "SELECT count(*) FROM default";
+      const withFilter = (condition: Record<string, any>) => ({
+        filterType: "group",
+        conditions: [{ filterType: "condition", column: { field: "level" }, ...condition }],
+      });
+
+      query.fields.filter = withFilter({ type: "list", values: [] });
+      expect(wrapper.vm.isBuilderValidSilently()).toBe(false);
+      query.fields.filter = withFilter({ type: "condition", operator: "=", value: "" });
+      expect(wrapper.vm.isBuilderValidSilently()).toBe(false);
+      query.fields.filter = withFilter({ type: "list", values: ["error"] });
+      expect(wrapper.vm.isBuilderValidSilently()).toBe(true);
+      query.fields.filter = { conditions: [] };
+    });
+
     it("still runs a custom SQL query that fails validation, as Apply always has", async () => {
       wrapper = await mountForValidation();
       validatePanelMock.mockImplementation((errors: string[]) => {

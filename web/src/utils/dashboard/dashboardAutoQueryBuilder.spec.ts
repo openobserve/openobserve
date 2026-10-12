@@ -19,7 +19,6 @@ import {
   buildSQLChartQuery,
   addMissingArgs,
   buildCondition,
-  conditionsInQuery,
   mapChart,
   geoMapChart,
   sankeyChartQuery,
@@ -1894,39 +1893,6 @@ describe("dashboardAutoQueryBuilder", () => {
         mockDashboardPanelData,
       );
       expect(result).toContain("status = 'active'");
-    });
-  });
-
-  describe("conditionsInQuery", () => {
-    const panelData = {
-      data: { queries: [{ fields: { stream: "logs" }, joins: [] }] },
-      layout: { currentQueryIndex: 0 },
-      meta: { streamFields: { groupedFields: [] } },
-    };
-    const leaf = (overrides: Record<string, any>) => ({
-      filterType: "condition",
-      column: { field: "level" },
-      logicalOperator: "AND",
-      ...overrides,
-    });
-
-    it("drops conditions the query builder leaves out of the SQL", () => {
-      const conditions = [
-        leaf({ type: "list", values: [] }),
-        leaf({ type: "condition", operator: null, value: null }),
-        leaf({ type: "condition", operator: "=", value: "" }),
-      ];
-      expect(conditionsInQuery(conditions, panelData)).toEqual([]);
-    });
-
-    it("keeps half-built conditions that still reach the SQL, including inside groups", () => {
-      const sentWithoutValue = leaf({ type: "condition", operator: "IN", value: "" });
-      const complete = leaf({ type: "list", values: ["error"] });
-      const conditions = [
-        complete,
-        { filterType: "group", conditions: [sentWithoutValue, leaf({ type: "list", values: [] })] },
-      ];
-      expect(conditionsInQuery(conditions, panelData)).toEqual([complete, sentWithoutValue]);
     });
   });
 

@@ -271,7 +271,6 @@ import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import useAiChat from "@/composables/useAiChat";
 import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { conditionsInQuery } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import {
@@ -1684,11 +1683,10 @@ export default defineComponent({
     const collectBuilderErrors = (): string[] => {
       const errors: string[] = [];
       validatePanel(errors, true);
-      // A half-built filter that reaches the query (e.g. IN with no value) waits for its value.
+      // A half-built filter waits even when the SQL drops it, or the live run would show unfiltered data.
       dashboardPanelData.data.queries.forEach((query: any) => {
         if (query?.customQuery) return;
-        const conditions = query?.fields?.filter?.conditions ?? [];
-        validateConditions(t, conditionsInQuery(conditions, dashboardPanelData), errors);
+        validateConditions(t, query?.fields?.filter?.conditions ?? [], errors);
       });
       return [...errors, ...collectBuilderTabErrors()];
     };
@@ -1933,6 +1931,7 @@ export default defineComponent({
       seriesData,
       onApplyBtnClick,
       livePreview,
+      isBuilderValidSilently,
       applyVariant,
       applyTooltip,
       shouldRefreshWithoutCache,

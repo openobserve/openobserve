@@ -740,15 +740,6 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
   return "";
 };
 
-/** Leaf filter conditions that reach the query; buildCondition drops the rest, such as a list with no values. */
-export const conditionsInQuery = (conditions: any[], dashboardPanelData: any): any[] =>
-  (conditions ?? []).flatMap((condition: any) => {
-    if (condition?.filterType === "group") {
-      return conditionsInQuery(condition.conditions, dashboardPanelData);
-    }
-    return buildCondition(condition, dashboardPanelData) ? [condition] : [];
-  });
-
 /**
  * Build a WHERE clause from the given filter data.
  * @param {array} filterData - an array of filter objects, each with properties
