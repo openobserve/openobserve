@@ -180,6 +180,17 @@ export const usePanelDataLoader = (
 
   const refreshAfterRestore = usePanelRefreshAfterRestore({ state, panelSchema, dashboardId });
 
+  // Until the first load settles the panel has no answer yet, so "No Data" would flash over a cached result.
+  const isFirstLoadSettled = ref(false);
+  let latestLoadCall = 0;
+  watch(
+    () => state.loading,
+    (loading) => {
+      if (!loading) isFirstLoadSettled.value = true;
+    },
+    { flush: "sync" },
+  );
+
   const writeStateToCache = async (cacheTimeRange: { start_time: number; end_time: number }) => {
     // Restore rejects an incomplete state, so writing one would only delete the last complete entry.
     if (state.loading || state.isPartialData) return;
@@ -351,6 +362,7 @@ export const usePanelDataLoader = (
   };
 
   const loadData = async () => {
+    const loadCall = ++latestLoadCall;
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
 
     // Only reset isPartialData if we're starting a fresh load and not restoring from cache
@@ -487,6 +499,9 @@ export const usePanelDataLoader = (
       } else {
         log("logaData: An error occurred:", error);
       }
+    } finally {
+      // Covers every early return: a call that was not superseded and left nothing running has its answer.
+      if (loadCall === latestLoadCall && !state.loading) isFirstLoadSettled.value = true;
     }
   };
 
@@ -844,6 +859,8 @@ export const usePanelDataLoader = (
 
       // set that the cache is restored
       isRestoredFromCache = true;
+      // Same tick as the restored data, so the renderer's first flush already converts it.
+      isFirstLoadSettled.value = true;
 
       if (cache?.cacheTimeRange?.start_time && cache?.cacheTimeRange?.end_time) {
         renderedTimeRange = {
@@ -870,6 +887,7 @@ export const usePanelDataLoader = (
     ...toRefs(state),
     ...refreshAfterRestore.shownResult,
     isRefreshingInBackground: refreshAfterRestore.isRefreshingInBackground,
+    isFirstLoadSettled,
     loadData,
     reloadAnnotations,
   };

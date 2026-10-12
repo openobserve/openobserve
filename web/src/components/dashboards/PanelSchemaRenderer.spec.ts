@@ -1285,6 +1285,105 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.emitted("is-refreshing-in-background-update")).toEqual([[true], [false]]);
     });
 
+    describe("before the first load settles", () => {
+      const loaderWith = (overrides: Record<string, any>) => ({
+        data: ref([]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [] }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+        isFirstLoadSettled: ref(false),
+        ...overrides,
+      });
+
+      it("shows neither the chart nor No Data", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith({}) as any);
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(false);
+      });
+
+      it("keeps a table's empty footer hidden too", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith({}) as any);
+        wrapper = createWrapper({ panelSchema: { ...defaultProps.panelSchema, type: "table" } });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="table-renderer"]').exists()).toBe(false);
+      });
+
+      it("shows No Data once an empty first load settles", async () => {
+        const isFirstLoadSettled = ref(false);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled }) as any,
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
+      });
+
+      it("renders the chart once the restored result settles", async () => {
+        const isFirstLoadSettled = ref(false);
+        const data = ref<any[]>([]);
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({ isFirstLoadSettled, data }) as any,
+        );
+        wrapper = createWrapper({
+          panelSchema: {
+            ...defaultProps.panelSchema,
+            queryType: "promql",
+            queries: [{ query: "up", fields: {}, config: {} }],
+          },
+        });
+        await flushPromises();
+        expect(convertPanelData).not.toHaveBeenCalled();
+
+        data.value = [{ resultType: "matrix", result: [{ metric: {}, values: [[1, "4"]] }] }];
+        isFirstLoadSettled.value = true;
+        await flushPromises();
+
+        expect(convertPanelData).toHaveBeenCalled();
+        expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
+      });
+
+      it("shows the error when the first load fails", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(
+          loaderWith({
+            isFirstLoadSettled: ref(true),
+            errorDetail: ref({ message: "Query failed", code: 400 }),
+          }) as any,
+        );
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="panel-schema-renderer-error-message"]').text()).toContain(
+          "Query failed",
+        );
+      });
+
+      it("never holds back a markdown panel", async () => {
+        vi.mocked(usePanelDataLoader).mockReturnValueOnce(loaderWith({}) as any);
+        wrapper = createWrapper({
+          panelSchema: { ...defaultProps.panelSchema, type: "markdown", queries: [] },
+        });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="markdown-renderer"]').exists()).toBe(true);
+      });
+    });
+
     it("does not emit when the loader has no refreshing state", async () => {
       wrapper = createWrapper();
       await flushPromises();

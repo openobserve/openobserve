@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { defineComponent, h, provide, ref } from "vue";
+import { defineComponent, h, provide, ref, watch } from "vue";
 import { mount, type VueWrapper } from "@vue/test-utils";
 import { usePanelDataLoader } from "./usePanelDataLoader";
 import {
@@ -149,12 +149,14 @@ const mountPanel = ({
   time = windowEndingAt(NOW),
   withoutCache = false,
   variables = [],
+  injected = undefined,
 }: {
   visit?: DashboardFreshOnOpen | null;
   panel?: any;
   time?: any;
   withoutCache?: boolean;
   variables?: any[];
+  injected?: any;
 } = {}) => {
   let loader: any;
   const selectedTimeObj = ref(time);
@@ -179,6 +181,9 @@ const mountPanel = ({
         ref("Dashboard"),
         ref("Folder"),
         ref(withoutCache),
+        ref(null), // regionClusterParams
+        ref(false), // allowAnnotationsAPI
+        injected ? ref(injected) : undefined,
       );
       return () => h("div", { ref: chartPanelRef });
     },
@@ -670,6 +675,108 @@ describe("usePanelDataLoader: fresh on open", () => {
 
       expect(loader.data.value).toEqual([hits(10)]);
       expect(fakes.streams).toHaveLength(0);
+    });
+  });
+  describe("the first load settles", () => {
+    const LOADING_FILTER = [{ ...AD_HOC_FILTER[0], isLoading: true }];
+
+    it("only with the restored result, in the same tick", async () => {
+      await seedCache(10);
+      const { loader } = mountPanel({ visit: createVisit(AUTO_RUN_OFF) });
+      const settledWhenDataArrived: boolean[] = [];
+      watch(loader.data, () => settledWhenDataArrived.push(loader.isFirstLoadSettled.value));
+      expect(loader.isFirstLoadSettled.value).toBe(false);
+
+      await settle();
+
+      expect(loader.data.value).toEqual([hits(10)]);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+      expect(settledWhenDataArrived).toEqual([true]);
+    });
+
+    it("when a cold first load finishes", async () => {
+      const { loader } = mountPanel({ visit: createVisit() });
+      await settle();
+      expect(loader.loading.value).toBe(true);
+      expect(loader.isFirstLoadSettled.value).toBe(false);
+
+      endStream(0);
+
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("when the first load fails", async () => {
+      const { loader } = mountPanel({ visit: createVisit() });
+      await settle();
+
+      const { payload, handlers } = fakes.streams[0];
+      handlers.error(payload, { content: { message: "querier timed out", code: 504 } });
+
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("when the first load is cancelled before it queries", async () => {
+      const { loader } = mountPanel({ visit: createVisit(), variables: LOADING_FILTER });
+      await settle();
+      expect(loader.isFirstLoadSettled.value).toBe(false);
+
+      window.dispatchEvent(new Event("cancelQuery"));
+      await settle();
+
+      expect(fakes.streams).toHaveLength(0);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("with nothing to query", async () => {
+      const panel = { ...sqlPanel(), queries: [{ query: "", fields: {}, config: {} }] };
+      const { loader } = mountPanel({ visit: createVisit(), panel });
+      await settle();
+
+      expect(fakes.streams).toHaveLength(0);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("when the time range is not usable", async () => {
+      const { loader } = mountPanel({ visit: createVisit(), time: {} });
+      await settle();
+
+      expect(fakes.streams).toHaveLength(0);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("with injected PromQL data", async () => {
+      const injected = { data: [{ resultType: "matrix", result: [] }], metadata: { queries: [] } };
+      const { loader } = mountPanel({ visit: null, injected });
+      await settle();
+
+      expect(loader.data.value).toEqual(injected.data);
+      expect(loader.isFirstLoadSettled.value).toBe(true);
+    });
+
+    it("never while the panel is off screen", async () => {
+      await seedCache(10);
+      global.IntersectionObserver = vi.fn(function (this: any, callback: any) {
+        this.observe = () => callback([{ isIntersecting: false }]);
+        this.disconnect = vi.fn();
+      }) as any;
+      const { loader } = mountPanel({ visit: createVisit() });
+      await settle();
+
+      expect(loader.data.value).toEqual([]);
+      expect(loader.isFirstLoadSettled.value).toBe(false);
+    });
+
+    it("not from a call that a newer one superseded", async () => {
+      const { loader, selectedTimeObj } = mountPanel({
+        visit: createVisit(),
+        variables: LOADING_FILTER,
+      });
+      await settle();
+
+      selectedTimeObj.value = windowEndingAt(NOW + 60_000);
+      await settle();
+
+      expect(loader.isFirstLoadSettled.value).toBe(false);
     });
   });
 });

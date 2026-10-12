@@ -21,7 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseenter="showPopupsAndOverlays"
   >
     <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
-      <div v-if="!errorDetail?.message" :style="{ height: chartPanelHeight, width: '100%' }">
+      <div
+        v-if="!errorDetail?.message && !isAwaitingFirstLoad"
+        :style="{ height: chartPanelHeight, width: '100%' }"
+      >
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
@@ -158,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-if="
           noData &&
+          !isAwaitingFirstLoad &&
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
@@ -781,6 +785,7 @@ export default defineComponent({
       loadingProgressPercentage,
       isPartialData,
       isRefreshingInBackground,
+      isFirstLoadSettled,
       reloadAnnotations,
     } = usePanelDataLoader(
       panelSchema,
@@ -803,6 +808,13 @@ export default defineComponent({
       regionClusterParams,
       allowAnnotationsAPI,
       injectedPromqlData,
+    );
+
+    // Html and markdown render without a query, so they never wait on one.
+    const isAwaitingFirstLoad = computed(
+      () =>
+        isFirstLoadSettled?.value === false &&
+        !["html", "markdown"].includes(panelSchema.value?.type),
     );
 
     const {
@@ -1276,6 +1288,8 @@ export default defineComponent({
     // Conversions can resolve out of order; only the most recently started may land.
     let conversionGeneration = 0;
     const convertPanelDataCommon = async (applyOverlay = false) => {
+      // Converting the empty pre-load buffer would publish an empty result to the header and curated tiles.
+      if (isAwaitingFirstLoad.value) return;
       // Preserve the previously rendered chart during a reload. While loading,
       // if the new data buffer has no rows yet but a chart is already rendered,
       // skip conversion so non-streaming callers (the panelSchema deep watcher,
@@ -2183,6 +2197,7 @@ export default defineComponent({
       errorDetail,
       panelData,
       noData,
+      isAwaitingFirstLoad,
       chartRendererData,
       metadata,
       tableRendererRef,
