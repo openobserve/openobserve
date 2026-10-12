@@ -39,6 +39,8 @@ export interface UsePanelLivePreviewOptions {
   debounceMs?: number;
   /** Whether a select list is open; live runs wait for the pick (capped). */
   isOverlayOpen?: () => boolean;
+  /** A change only Apply loads, such as a newly enabled metric sparkline; it marks Apply pending without a live run. */
+  pendingApply?: () => boolean;
 }
 
 const queryPayload = (query: any) => ({
@@ -158,6 +160,7 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
     return (
       payloadChanged.value ||
       variablesChanged.value ||
+      (options.pendingApply?.() ?? false) ||
       checkIfConfigChangeRequiredApiCallOrNot(
         withoutEditorMode(applied),
         withoutEditorMode(options.panel()),

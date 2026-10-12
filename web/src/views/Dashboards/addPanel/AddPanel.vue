@@ -1677,6 +1677,8 @@ export default defineComponent({
       updateCommittedVariables();
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       panelEditorRef.value?.initChartData(dashboardPanelData.data);
+      // The editor's own run records what was loaded (e.g. the sparkline), so Apply stops showing it as pending.
+      panelEditorRef.value?.runQuery();
     };
 
     const livePreview = usePanelLivePreview({
@@ -1687,6 +1689,7 @@ export default defineComponent({
       isBuilderValid: isBuilderValidSilently,
       isLoading: disable,
       run: runLivePreview,
+      pendingApply: () => panelEditorRef.value?.sparklinePendingApply ?? false,
     });
 
     const isOutDated = computed(() => livePreview.isPending.value);

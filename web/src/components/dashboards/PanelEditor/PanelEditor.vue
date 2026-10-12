@@ -835,6 +835,7 @@ const {
 
   // Computed
   isOutDated,
+  sparklinePendingApply,
   isLoading,
   currentPanelData,
 
@@ -1336,6 +1337,7 @@ defineExpose({
   // Panel data
   dashboardPanelData,
   isOutDated,
+  sparklinePendingApply,
 
   // Loading state
   isLoading,

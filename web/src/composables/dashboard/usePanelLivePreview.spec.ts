@@ -51,9 +51,11 @@ const setup = (opts: { valid?: boolean; overlay?: () => boolean; domOverlay?: bo
   const committedVariables = ref<any[]>([]);
   const isLoading = ref(false);
   const valid = ref(opts.valid ?? true);
+  const pendingApply = ref(false);
   const run = vi.fn(() => {
     applied.value = clone(panel);
     committedVariables.value = clone(liveVariables.value);
+    pendingApply.value = false;
   });
   const scope = effectScope();
   const live = scope.run(() =>
@@ -66,9 +68,21 @@ const setup = (opts: { valid?: boolean; overlay?: () => boolean; domOverlay?: bo
       isLoading,
       run,
       isOverlayOpen: opts.domOverlay ? undefined : (opts.overlay ?? (() => false)),
+      pendingApply: () => pendingApply.value,
     }),
   )!;
-  return { panel, applied, liveVariables, committedVariables, isLoading, valid, run, scope, live };
+  return {
+    panel,
+    applied,
+    liveVariables,
+    committedVariables,
+    isLoading,
+    valid,
+    pendingApply,
+    run,
+    scope,
+    live,
+  };
 };
 
 describe("usePanelLivePreview", () => {
@@ -261,6 +275,22 @@ describe("usePanelLivePreview", () => {
       await nextTick();
       vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
       expect(run).not.toHaveBeenCalled();
+      scope.stop();
+    });
+
+    it("turns Apply yellow without a live run for a change only Apply loads", async () => {
+      const { pendingApply, run, live, scope } = setup();
+      live.arm();
+      pendingApply.value = true;
+      await nextTick();
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
+      expect(run).not.toHaveBeenCalled();
+      expect(live.isPending.value).toBe(true);
+      expect(live.applyState.value).toBe("pending");
+
+      pendingApply.value = false;
+      await nextTick();
+      expect(live.isPending.value).toBe(false);
       scope.stop();
     });
 

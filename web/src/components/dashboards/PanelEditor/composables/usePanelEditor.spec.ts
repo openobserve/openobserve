@@ -869,6 +869,17 @@ describe("usePanelEditor", () => {
 
       expect(mockUpdateCommittedVariables).toHaveBeenCalled();
     });
+
+    it("reports a turned-on sparkline as pending until the panel runs", () => {
+      const { runQuery, sparklinePendingApply } = usePanelEditor(options);
+      expect(sparklinePendingApply.value).toBe(false);
+
+      dashboardPanelData.data.config.sparkline = { enabled: true };
+      expect(sparklinePendingApply.value).toBe(true);
+
+      runQuery();
+      expect(sparklinePendingApply.value).toBe(false);
+    });
   });
 
   describe("handleChartApiError", () => {

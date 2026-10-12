@@ -843,6 +843,7 @@ export function usePanelEditor(options: UsePanelEditorOptions) {
 
     // Computed
     isOutDated,
+    sparklinePendingApply,
     isLoading,
     currentPanelData,
     isInitialDashboardPanelData,
