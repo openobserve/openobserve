@@ -21,6 +21,7 @@ use crate::{db::get_orm_client_ddl, dist_lock};
 
 pub mod alert_composites;
 pub mod alert_eval_intervals;
+pub mod alert_hygiene;
 pub mod alert_incidents;
 pub mod alert_states;
 pub mod alerts;

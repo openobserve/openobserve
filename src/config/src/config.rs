@@ -97,7 +97,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 97: create query_history.
 // 98: key alert_dedup_state by (org_id, fingerprint).
 // 99: add name to rum_pa_tombstones.
-pub const DB_SCHEMA_VERSION: u64 = 99;
+// 102: create alert_hygiene_configs.
+pub const DB_SCHEMA_VERSION: u64 = 102;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
