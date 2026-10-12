@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :index="target.index"
     :others="target.others"
     :original="target.original"
+    :base="target.base"
     :styles="styles"
     @reload="reload"
   />
@@ -92,6 +93,7 @@ interface EditorTarget {
   index: number | null;
   others: BannerDraft[];
   original: Record<string, unknown> | null;
+  base: Record<string, unknown> | null;
 }
 
 const target = computed<EditorTarget | null>(() => {
@@ -108,6 +110,7 @@ const target = computed<EditorTarget | null>(() => {
       index: editIndex,
       others: drafts.filter((_, i) => i !== editIndex),
       original: banners[editIndex],
+      base: null,
     };
   }
   if (copyIndex !== null && copyIndex < drafts.length) {
@@ -116,8 +119,9 @@ const target = computed<EditorTarget | null>(() => {
       index: null,
       others: drafts,
       original: null,
+      base: banners[copyIndex],
     };
   }
-  return { draft: emptyDraft(), index: null, others: drafts, original: null };
+  return { draft: emptyDraft(), index: null, others: drafts, original: null, base: null };
 });
 </script>

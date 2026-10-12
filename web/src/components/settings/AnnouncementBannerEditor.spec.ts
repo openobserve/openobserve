@@ -123,12 +123,29 @@ describe("makeBannerSchema", () => {
   it("rejects a message link that is not http(s), as the API does", () => {
     expect(issuesFor(draft({ message: "[x](javascript:alert(1))" }))).toEqual(["message"]);
     expect(issuesFor(draft({ message: "<mailto:a@b.c>" }))).toEqual(["message"]);
+    expect(issuesFor(draft({ message: '<a href="javascript:x">y</a>' }))).toEqual(["message"]);
     expect(issuesFor(draft({ message: "[docs](https://x.dev) and <https://y.dev>" }))).toEqual([]);
   });
 
-  it("counts an emoji as one character, as the API does", () => {
+  it("counts code points, as the API does", () => {
     expect(issuesFor(draft({ message: "🚨".repeat(300) }))).toEqual([]);
     expect(issuesFor(draft({ message: "🚨".repeat(301) }))).toEqual(["message"]);
+    expect(issuesFor(draft({ message: "⚠️".repeat(151) }))).toEqual(["message"]);
+  });
+
+  it("lets an ended banner keep its past end, but not end before a set start", () => {
+    expect(issuesFor(draft({ message: "m", end: "at", endsAt: "2020-01-01T00:00" }))).toEqual([]);
+    expect(
+      issuesFor(
+        draft({
+          message: "m",
+          start: "at",
+          startsAt: "2030-01-02T00:00",
+          end: "at",
+          endsAt: "2030-01-01T00:00",
+        }),
+      ),
+    ).toEqual(["endsAt"]);
   });
 
   it("rejects a colour that is not #RRGGBB, and allows none", () => {
@@ -444,6 +461,44 @@ describe("AnnouncementBannerEditorForm", () => {
     });
   });
 
+  it("returns to the earlier severity when the critical switch is turned off", async () => {
+    const wrapper = await mountForm({ message: "Sale", variant: "promo", icon: "campaign" });
+    const toggle = () =>
+      document
+        .querySelector<HTMLElement>(
+          '[data-test="announcement-editor-style-critical"] button, [data-test="announcement-editor-style-critical"][role="switch"]',
+        )!
+        .click();
+    toggle();
+    await flushPromises();
+    expect((wrapper.vm as any).form.state.values.variant).toBe("critical");
+
+    toggle();
+    await flushPromises();
+    expect((wrapper.vm as any).form.state.values.variant).toBe("promo");
+  });
+
+  it("restores a custom look after passing through other styles", async () => {
+    const wrapper = await mountForm(
+      { message: "m", icon: "build", colorLight: "#123456" },
+      null,
+      null,
+      {
+        styles: [release],
+      },
+    );
+    (wrapper.vm as any).chooseStyle("style:style-1");
+    await flushPromises();
+    (wrapper.vm as any).chooseStyle("custom");
+    await flushPromises();
+
+    expect((wrapper.vm as any).form.state.values).toMatchObject({
+      icon: "build",
+      colorLight: "#123456",
+      styleId: "",
+    });
+  });
+
   it("moves through the styles with the arrow keys", async () => {
     const wrapper = await mountForm({ message: "m" });
     const group = document.querySelector<HTMLElement>('[data-test="announcement-editor-variant"]')!;
@@ -467,12 +522,29 @@ describe("AnnouncementBannerEditorForm", () => {
 
   it("does not report its own duration pinning as a conflict", async () => {
     const original = { message: "Timed", duration: "4h" };
-    const pinned = { message: "Timed", ends_at: "2026-10-12T16:00:00+00:00" };
+    const pinned = { message: "Timed", ends_at: new Date(Date.now() + 3_600_000).toISOString() };
     service.getConfig.mockResolvedValue({ data: { banners: [stored[0], pinned] } });
     const wrapper = await mountForm({ message: "Timed, edited" }, 1, original);
     await submit(wrapper);
 
     expect(service.setConfig).toHaveBeenCalled();
+  });
+
+  it("re-reads and re-applies when another save lands between its read and write", async () => {
+    service.getConfig
+      .mockResolvedValueOnce({ data: { banners: [stored[0]], revision: 4 } })
+      .mockResolvedValue({ data: { banners: [stored[0], { message: "Theirs" }], revision: 5 } });
+    service.setConfig
+      .mockRejectedValueOnce({ response: { status: 409 } })
+      .mockResolvedValue({ data: {} });
+    const wrapper = await mountForm({ message: "Mine" }, null, null);
+    await submit(wrapper);
+
+    expect(service.setConfig).toHaveBeenCalledTimes(2);
+    expect(service.setConfig.mock.calls[1][1]).toMatchObject({
+      banners: [stored[0], { message: "Theirs" }, { message: "Mine" }],
+      revision: 5,
+    });
   });
 
   it("drops the label from banners using a style that is deleted", async () => {

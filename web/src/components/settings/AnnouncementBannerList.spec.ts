@@ -174,6 +174,22 @@ describe("AnnouncementBannerList", () => {
     ).toBe("Live · hidden");
   });
 
+  it("keeps a promotion for other orgs in the live strip beside a critical banner", async () => {
+    service.getConfig.mockResolvedValue({
+      data: {
+        banners: [
+          { message: "Down", variant: "critical", orgs: ["acme"] },
+          { message: "Webinar", variant: "promo", orgs: ["beta"] },
+        ],
+      },
+    });
+    await mountList();
+
+    expect(document.querySelector('[data-test="announcement-list-live"]')?.textContent).toContain(
+      "Webinar",
+    );
+  });
+
   it("does not delete when the banner changed since the list loaded", async () => {
     await mountList();
     service.getConfig.mockResolvedValue({ data: { banners: [{ message: "Someone else's" }] } });

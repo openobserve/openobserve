@@ -112,24 +112,37 @@ export function newBannerId(prefix = "banner"): string {
   return `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-const DURATION_UNIT_MS: Record<string, number> = {
-  s: 1000,
-  m: 60_000,
-  h: 3_600_000,
-  d: 86_400_000,
-  w: 604_800_000,
-};
+/** Largest first, as the API requires them in a compound span like `"1h30m"`. */
+const DURATION_UNITS: [string, number][] = [
+  ["y", 31_536_000_000],
+  ["w", 604_800_000],
+  ["d", 86_400_000],
+  ["h", 3_600_000],
+  ["m", 60_000],
+  ["s", 1000],
+  ["ms", 1],
+];
 
-/** Milliseconds in a span like `"90m"`, or null when it is not one. */
+const DURATION_PART = /(\d+)(ms|[ywdhms])/y;
+
+/** Milliseconds in a span the API accepts (`"90m"`, `"1h30m"`, bare seconds), or null when it is not one. */
 export function parseDurationMs(value: string): number | null {
-  const match = /^\s*(\d+(?:\.\d+)?)\s*([smhdw])\s*$/i.exec(value);
-  if (!match) return null;
+  const text = value.trim();
+  if (/^\d+$/.test(text)) return Number(text) * 1000 || null;
 
-  const amount = Number(match[1]);
-  const unit = DURATION_UNIT_MS[match[2].toLowerCase()];
-  if (!amount || !unit) return null;
-
-  return amount * unit;
+  DURATION_PART.lastIndex = 0;
+  let total = 0;
+  let consumed = 0;
+  let previous = -1;
+  let match: RegExpExecArray | null;
+  while ((match = DURATION_PART.exec(text))) {
+    const position = DURATION_UNITS.findIndex(([unit]) => unit === match![2]);
+    if (position <= previous) return null;
+    previous = position;
+    consumed = DURATION_PART.lastIndex;
+    total += Number(match[1]) * DURATION_UNITS[position][1];
+  }
+  return consumed === text.length && total ? total : null;
 }
 
 function pad(value: number): string {
@@ -279,6 +292,11 @@ const EDITED_KEYS = new Set([
   "style",
 ]);
 
+/** The stored instant when the picker still shows it, so a minute-precision input does not move it. */
+function keptInstant(stored: unknown, local: string): string {
+  return typeof stored === "string" && toLocalInput(stored) === local ? stored : toRfc3339(local);
+}
+
 /** One draft as authored JSON, with defaults left out so the stored config stays short. */
 export function authoredFromDraft(
   draft: BannerDraft,
@@ -292,18 +310,25 @@ export function authoredFromDraft(
   if (draft.id.trim()) banner.id = draft.id.trim();
   if (draft.variant !== "info") banner.variant = draft.variant;
 
-  if (draft.start === "at" && draft.startsAt) banner.starts_at = toRfc3339(draft.startsAt);
+  if (draft.start === "at" && draft.startsAt) {
+    banner.starts_at = keptInstant(stored.starts_at, draft.startsAt);
+  }
   if (draft.end === "after" && parseDurationMs(draft.duration)) {
     banner.duration = draft.duration.trim();
   }
-  if (draft.end === "at" && draft.endsAt) banner.ends_at = toRfc3339(draft.endsAt);
+  if (draft.end === "at" && draft.endsAt)
+    banner.ends_at = keptInstant(stored.ends_at, draft.endsAt);
 
   if (!draft.dismissible) banner.dismissible = false;
 
   const links = draft.links
     .map((link) => ({ text: link.text.trim(), url: link.url.trim() }))
     .filter((link) => link.text && link.url);
-  if (links.length) banner.ctas = links;
+  if (links.length) {
+    banner.ctas = links;
+    // The API accepts the first button mirrored here, which a server or UI that predates `ctas` keeps on save.
+    banner.cta = links[0];
+  }
 
   if (draft.orgs.length) banner.orgs = [...draft.orgs];
 

@@ -36,13 +36,20 @@ describe("parseDurationMs", () => {
     expect(parseDurationMs("2h")).toBe(2 * 3_600_000);
     expect(parseDurationMs("3d")).toBe(3 * 86_400_000);
     expect(parseDurationMs(" 1w ")).toBe(604_800_000);
+    expect(parseDurationMs("1h30m")).toBe(90 * 60_000);
+    expect(parseDurationMs("1m500ms")).toBe(60_500);
+    expect(parseDurationMs("90")).toBe(90_000);
   });
 
   it("rejects anything that is not one", () => {
     expect(parseDurationMs("")).toBeNull();
     expect(parseDurationMs("soon")).toBeNull();
     expect(parseDurationMs("0h")).toBeNull();
-    expect(parseDurationMs("5")).toBeNull();
+    expect(parseDurationMs("1.5h")).toBeNull();
+    expect(parseDurationMs("4H")).toBeNull();
+    expect(parseDurationMs("4 h")).toBeNull();
+    expect(parseDurationMs("30m1h")).toBeNull();
+    expect(parseDurationMs("1h30")).toBeNull();
   });
 });
 
@@ -184,7 +191,7 @@ describe("authoredFromDraft", () => {
     expect(authoredFromDraft({ ...draft, start: "now", end: "never" })).toEqual({ message: "m" });
   });
 
-  it("writes link buttons as ctas and drops half-filled rows", () => {
+  it("writes link buttons as ctas, mirrors the first into cta, and drops half-filled rows", () => {
     const draft = {
       ...emptyDraft(),
       message: "m",
@@ -197,6 +204,7 @@ describe("authoredFromDraft", () => {
     expect(authoredFromDraft(draft)).toEqual({
       message: "m",
       ctas: [{ text: "Status", url: "https://s.io" }],
+      cta: { text: "Status", url: "https://s.io" },
     });
   });
 
@@ -217,7 +225,13 @@ describe("the form/JSON round trip", () => {
     const config = {
       banners: [
         { message: "Outage", variant: "critical", dismissible: false },
-        { message: "Webinar", variant: "promo", ctas: [{ text: "Join", url: "https://x.dev" }] },
+        {
+          message: "Webinar",
+          variant: "promo",
+          ctas: [{ text: "Join", url: "https://x.dev" }],
+          cta: { text: "Join", url: "https://x.dev" },
+        },
+        { message: "Pinned", ends_at: "2030-01-01T00:00:00.123456+00:00" },
         { message: "Scoped", orgs: ["acme"] },
         { message: "Timed", duration: "1h" },
       ],
@@ -246,6 +260,7 @@ describe("the form/JSON round trip", () => {
       message: "m",
       future_field: { a: 1 },
       ctas: [{ text: "Old", url: "https://x.dev" }],
+      cta: { text: "Old", url: "https://x.dev" },
     });
   });
 });

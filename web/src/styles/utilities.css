@@ -81,9 +81,7 @@
   box-shadow: var(--shadow-lg) !important;
 }
 
-/* ── Announcement banner message ───────────────────────────────────────────
-   Inline markup produced at runtime from operator markdown (v-html). Links and
-   code take the banner's own colour, which is operator-chosen per banner. */
+/* Announcement message markup comes from v-html, so links and code inherit the operator-chosen banner colour. */
 @utility announcement-message {
   overflow-wrap: anywhere;
   & a,

@@ -26,15 +26,18 @@ export const CTA_MAX_LENGTH = 30;
 
 const isHttpUrl = (value: string) => /^https?:\/\//i.test(value.trim());
 
-/** Counted in code points, as the API counts them, so an emoji is one character and not two. */
+/** Counted in code points, as the API counts them; an emoji with a variation selector (⚠️) counts as two. */
 export const messageChars = (value: string) => [...value].length;
 
-// Mirrors the API's link check: `[text](target)` and `<scheme:target>` autolinks.
-const MESSAGE_LINK_TARGET = /\]\(\s*<?([^)\s>]*)|<([A-Za-z][A-Za-z0-9+.-]*:[^>\s]*)>/g;
+// Mirrors the API's link check: `[text](target)`, `<scheme:target>` autolinks and raw-HTML `href=`.
+const MESSAGE_LINK_TARGET =
+  /\]\(\s*<?([^)\s>]*)|<([A-Za-z][A-Za-z0-9+.-]*:[^>\s]*)>|[hH][rR][eE][fF]\s*=\s*["']?([^"'\s>]*)/g;
 
 /** Whether every link written into the message points at an http(s) address. */
 export const messageLinksSafe = (message: string) =>
-  [...message.matchAll(MESSAGE_LINK_TARGET)].every((match) => isHttpUrl(match[1] ?? match[2]));
+  [...message.matchAll(MESSAGE_LINK_TARGET)].every((match) =>
+    isHttpUrl(match[1] ?? match[2] ?? match[3]),
+  );
 
 /** The same rules the API enforces, checked here so an author is told at the field. */
 export const makeBannerSchema = (t: (_key: string) => string) =>
@@ -87,12 +90,13 @@ export const makeBannerSchema = (t: (_key: string) => string) =>
       if (value.end === "at") {
         if (!value.endsAt) {
           issue("endsAt", "announcements.form.endRequired");
-        } else {
-          const start = value.start === "at" && value.startsAt ? value.startsAt : null;
-          const startMs = start ? new Date(start).getTime() : Date.now();
-          if (new Date(value.endsAt).getTime() <= startMs) {
-            issue("endsAt", "announcements.form.windowBackwards");
-          }
+        } else if (
+          value.start === "at" &&
+          value.startsAt &&
+          new Date(value.endsAt).getTime() <= new Date(value.startsAt).getTime()
+        ) {
+          // An end already past with no set start is allowed: it saves an ended banner, which the API accepts.
+          issue("endsAt", "announcements.form.windowBackwards");
         }
       }
 

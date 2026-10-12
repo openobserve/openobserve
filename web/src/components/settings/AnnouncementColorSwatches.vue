@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("announcements.form.colorDefault") }}
     </OButton>
 
-    <!-- Each swatch shows its light colour over its dark one, since a preset sets both. -->
+    <!-- OButton bakes in its own background, so a swatch whose fill is the colour itself is a plain button. -->
     <button
       v-for="(preset, i) in BANNER_COLOR_PRESETS"
       :key="preset.key"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :aria-checked="modelValue === preset.key"
       :aria-label="presetLabel(preset.key)"
       :title="presetLabel(preset.key)"
-      class="rounded-default border-border-default focus-visible:ring-focus-ring size-7 cursor-pointer border p-0 transition-[transform,box-shadow] duration-100 outline-none hover:scale-110 focus-visible:ring-2"
+      class="rounded-default border-border-default focus-visible:ring-focus-ring from-banner-swatch-light to-banner-swatch-dark size-7 cursor-pointer border bg-linear-135 from-50% to-50% p-0 transition-[transform,box-shadow] duration-100 outline-none hover:scale-110 focus-visible:ring-2"
       :class="modelValue === preset.key ? 'ring-focus-ring ring-2' : ''"
       :style="swatchStyle(preset)"
       :data-test="`${dataTest}-preset-${preset.key}`"
@@ -100,7 +100,10 @@ const { setOption, tabStop, onKeydown } = useRovingRadio(
 
 const presetLabel = (key: string) => t(`announcements.colorPresets.${key}` as I18nKey);
 
-const swatchStyle = (preset: BannerColorPreset): CSSProperties => ({
-  background: `linear-gradient(135deg, ${preset.light} 50%, ${preset.dark} 50%)`,
-});
+// The colours are data, so they travel as the swatch tokens' values rather than a literal style property.
+const swatchStyle = (preset: BannerColorPreset): CSSProperties =>
+  ({
+    "--color-banner-swatch-light": preset.light,
+    "--color-banner-swatch-dark": preset.dark,
+  }) as CSSProperties;
 </script>

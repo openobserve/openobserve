@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onActivated, onBeforeUnmount, onMounted, ref } from "vue";
 import { useQuery } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -173,6 +173,7 @@ import { useStore } from "vuex";
 import AnnouncementBar from "@/components/announcements/AnnouncementBar.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { announcementServerNow } from "@/composables/useAnnouncementBanners";
 import { useTheme } from "@/composables/useTheme";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -185,7 +186,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { announcementConfigQuery } from "@/services/announcements.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
 import type { BannerVariantName } from "@/utils/announcementOrder";
-import { orderBanners } from "@/utils/announcementOrder";
+import { bannerRank } from "@/utils/announcementOrder";
 import { bannerMessageText } from "@/utils/announcementMarkdown";
 import {
   bannerStatus,
@@ -234,6 +235,9 @@ const STATUS_BADGE: Record<RowStatus, BadgeVariant> = {
   ended: "default-soft",
 };
 
+/** Statuses like "ends in 5 min" and Live/Ended flips go stale without a refresh. */
+const STATUS_TICK_MS = 30_000;
+
 const PHONE_HIDDEN_COLUMNS = { severity: false, schedule: false, audience: false };
 
 const MESSAGE_QUOTE_LENGTH = 60;
@@ -250,6 +254,14 @@ const configQuery = useQuery(() =>
   Object.assign(announcementConfigQuery(metaOrg.value), { enabled: !!metaOrg.value }),
 );
 const { update } = useAnnouncementConfigUpdate();
+
+const now = ref(announcementServerNow());
+let statusTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  statusTimer = setInterval(() => (now.value = announcementServerNow()), STATUS_TICK_MS);
+});
+onBeforeUnmount(() => clearInterval(statusTimer));
+onActivated(() => (now.value = announcementServerNow()));
 
 // The dialog closes itself before it emits `ok`, so the target must outlive the open flag.
 const deleteOpen = ref(false);
@@ -269,10 +281,10 @@ const rows = computed<BannerRow[]>(() => {
   );
 
   return drafts.map((draft, index) => {
-    const base = bannerStatus(draft);
+    const base = bannerStatus(draft, now.value);
     const others = drafts.filter((_, i) => i !== index);
     const status: RowStatus =
-      base === "live" && isHiddenByCritical(draft, others) ? "hidden" : base;
+      base === "live" && isHiddenByCritical(draft, others, now.value) ? "hidden" : base;
     const endsSoon = base === "live" && draft.end === "at" && draft.endsAt;
     return {
       index,
@@ -289,7 +301,9 @@ const rows = computed<BannerRow[]>(() => {
         status === "hidden"
           ? t("announcements.list.status.hidden")
           : endsSoon
-            ? t("announcements.list.status.liveEnds", { when: relativeTo(draft.endsAt) })
+            ? t("announcements.list.status.liveEnds", {
+                when: relativeTo(draft.endsAt, now.value),
+              })
             : t(`announcements.list.status.${base}`),
       statusHint: status === "hidden" ? t("announcements.list.hiddenHint") : undefined,
       schedule: scheduleSummary(draft, t),
@@ -298,13 +312,12 @@ const rows = computed<BannerRow[]>(() => {
   });
 });
 
-// Same resolver as the live bar, so this strip stacks banners exactly as users get them.
+// Rows already drop promotions a critical banner hides per org, so only the severity order is applied here.
 const liveBanners = computed(() =>
-  orderBanners(
-    rows.value
-      .filter((row) => row.status === "live")
-      .map((row) => ({ ...row, variant: row.draft.variant })),
-  ),
+  rows.value
+    .filter((row) => row.status === "live")
+    .map((row) => ({ ...row, variant: row.draft.variant }))
+    .sort((a, b) => bannerRank(b.variant) - bannerRank(a.variant)),
 );
 
 const columns = computed<OTableColumnDef<BannerRow>[]>(() => [

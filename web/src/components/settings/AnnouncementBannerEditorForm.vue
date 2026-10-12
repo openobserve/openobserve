@@ -615,6 +615,8 @@ const props = defineProps<{
   others: BannerDraft[];
   /** The banner exactly as stored when the editor opened, to detect a concurrent change on save. */
   original: Record<string, unknown> | null;
+  /** The stored banner a duplicate was copied from, whose keys this editor does not edit carry over. */
+  base?: Record<string, unknown> | null;
   /** Saved styles; refreshed in place when one is added or deleted. */
   styles: BannerStyle[];
 }>();
@@ -752,7 +754,7 @@ const form = useOForm<BannerForm>({
       await update((latest) => {
         const banners = [...latest.banners];
         if (index === null) {
-          banners.push(authoredFromDraft(draft));
+          banners.push(authoredFromDraft(draft, props.base ?? {}));
         } else if (sameAuthored(banners[index], original)) {
           banners[index] = authoredFromDraft(draft, banners[index]);
         } else {
@@ -926,7 +928,23 @@ const styleHelp = computed(() => {
 // Which swatch is lit is view state; the colours themselves live only in the form.
 const colorChoice = ref(colorChoiceFor(props.draft.colorLight, props.draft.colorDark));
 
-const applyLook = (look: Pick<BannerStyle, "icon" | "textSize" | "colorLight" | "colorDark">) => {
+type Look = Pick<BannerStyle, "icon" | "textSize" | "colorLight" | "colorDark">;
+
+// Arrowing through the style radios selects each one passed, so a custom look is kept to restore on return.
+let customLook: Look | null = null;
+
+// The severity "Treat as critical" returns to when switched off.
+let calmVariant: BannerVariantName =
+  props.draft.variant === "critical" ? "info" : props.draft.variant;
+
+const currentLook = (): Look => ({
+  icon: values.value.icon ?? "",
+  textSize: values.value.textSize,
+  colorLight: values.value.colorLight ?? "",
+  colorDark: values.value.colorDark ?? "",
+});
+
+const applyLook = (look: Look) => {
   form.setFieldValue("icon", look.icon);
   form.setFieldValue("textSize", look.textSize);
   form.setFieldValue("colorLight", look.colorLight);
@@ -936,9 +954,11 @@ const applyLook = (look: Pick<BannerStyle, "icon" | "textSize" | "colorLight" | 
 
 // Custom and saved styles change only the look; severity still drives ordering, screen readers and promo hiding.
 const chooseStyle = (choice: string) => {
+  if (styleChoice.value === CUSTOM_STYLE && choice !== CUSTOM_STYLE) customLook = currentLook();
   styleChoice.value = choice;
   if (choice === CUSTOM_STYLE) {
     form.setFieldValue("styleId", "");
+    if (customLook) applyLook(customLook);
     return;
   }
 
@@ -954,7 +974,8 @@ const chooseStyle = (choice: string) => {
 };
 
 const setCritical = (on: unknown) => {
-  form.setFieldValue("variant", on ? "critical" : "info");
+  if (values.value.variant !== "critical") calmVariant = values.value.variant;
+  form.setFieldValue("variant", on ? "critical" : calmVariant);
 };
 
 const chooseColor = (choice: string) => {

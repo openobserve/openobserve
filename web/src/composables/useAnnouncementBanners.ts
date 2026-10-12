@@ -66,6 +66,12 @@ const DISMISSED_STORAGE_KEY = "o2_dismissed_announcements";
 // Module scope so a save in Settings reaches the bar mounted in the layout.
 const configVersion = ref(0);
 
+/** Server time minus browser time, in ms; shared so the settings list judges status by the same clock. */
+const clockSkewMs = ref(0);
+
+/** The server's clock as last measured by the live bar, in ms. */
+export const announcementServerNow = () => Date.now() + clockSkewMs.value;
+
 function readDismissed(): string[] {
   try {
     const stored = window.localStorage.getItem(DISMISSED_STORAGE_KEY);
@@ -103,8 +109,6 @@ export function useAnnouncementBanners() {
   const banners = ref<Banner[]>([]);
   const dismissedIds = ref<string[]>(readDismissed());
 
-  /** Server time minus browser time, in ms. */
-  const clockSkewMs = ref(0);
   let pollTimer: ReturnType<typeof setInterval> | undefined;
   let boundaryTimer: ReturnType<typeof setTimeout> | undefined;
 

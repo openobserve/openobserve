@@ -23,6 +23,8 @@ import { announcementKeys } from "./announcements.querykeys";
 export interface AnnouncementConfig {
   banners: Record<string, unknown>[];
   styles: Record<string, unknown>[];
+  /** Save counter the server checks on write, so a save based on an older read is refused. */
+  revision?: number;
   /** Keys this UI does not edit, written back untouched. */
   [key: string]: unknown;
 }

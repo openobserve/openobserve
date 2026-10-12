@@ -832,6 +832,10 @@
   --color-banner-custom-bg: var(--color-banner-default-bg);
   --color-banner-custom-text: var(--color-banner-default-text);
 
+  /* swatch: a colour preset's light and dark halves, set per element by AnnouncementColorSwatches. */
+  --color-banner-swatch-light: var(--color-banner-default-bg);
+  --color-banner-swatch-dark: var(--color-banner-default-bg);
+
   /* the page behind a banner preview frame, fixed per mode whatever the app theme */
   --color-banner-preview-page-bg: var(--color-grey-50);
   --color-banner-preview-page-line: var(--color-grey-200);
@@ -2067,6 +2071,8 @@
   --color-banner-error-soft-text: var(--color-banner-error-soft-text);
   --color-banner-custom-bg: var(--color-banner-custom-bg);
   --color-banner-custom-text: var(--color-banner-custom-text);
+  --color-banner-swatch-light: var(--color-banner-swatch-light);
+  --color-banner-swatch-dark: var(--color-banner-swatch-dark);
   --color-banner-preview-page-bg: var(--color-banner-preview-page-bg);
   --color-banner-preview-page-line: var(--color-banner-preview-page-line);
   --color-banner-error-text: var(--color-banner-error-text);

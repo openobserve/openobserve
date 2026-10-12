@@ -15,6 +15,7 @@
 
 import { computed } from "vue";
 import { useMutation, useQueryClient } from "@tanstack/vue-query";
+import { isEqual } from "lodash-es";
 import { useStore } from "vuex";
 
 import { notifyAnnouncementsChanged } from "@/composables/useAnnouncementBanners";
@@ -23,30 +24,50 @@ import {
   saveAnnouncementConfigMutation,
   type AnnouncementConfig,
 } from "@/services/announcements.queries";
+import { parseDurationMs } from "./announcementDrafts";
 
 /** Thrown by a change when the part of the config it edits moved since the page loaded it. */
 export class AnnouncementConflictError extends Error {}
 
+/** Saves that keep losing the race to other saves give up rather than retry forever. */
+const MAX_SAVE_ATTEMPTS = 3;
+
+/** How far ahead of this browser a server pin can plausibly be anchored, for clock skew. */
+const PIN_ANCHOR_SLACK_MS = 5 * 60_000;
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Whether `stored.ends_at` is where the server would have pinned `original`'s duration. */
+const isPinnedEnd = (stored: Record<string, unknown>, original: Record<string, unknown>) => {
+  const span = parseDurationMs(String(original.duration));
+  const anchor = Date.parse(String(stored.ends_at)) - (span ?? NaN);
+  if (Number.isNaN(anchor)) return false;
+  if (typeof original.starts_at === "string") {
+    return Math.abs(anchor - Date.parse(original.starts_at)) < 1000;
+  }
+  // Unstarted, the pin is anchored to an unknown save time; only an anchor in the future is provably not a pin.
+  return anchor <= Date.now() + PIN_ANCHOR_SLACK_MS;
+};
 
 /** Whether `stored` is `original` with its `duration` pinned to an `ends_at`, as every save does. */
 const isPinnedFrom = (stored: unknown, original: unknown) => {
   if (!isRecord(stored) || !isRecord(original)) return false;
   if (typeof original.duration !== "string" || "duration" in stored) return false;
-  if (typeof stored.ends_at !== "string") return false;
+  if (typeof stored.ends_at !== "string" || !isPinnedEnd(stored, original)) return false;
 
   const { duration: _duration, ...authored } = original;
   const { ends_at: _endsAt, ...pinned } = stored;
-  return JSON.stringify(pinned) === JSON.stringify(authored);
+  return isEqual(pinned, authored);
 };
 
 /** Same stored banner, tolerating the server's own duration pinning so a save by this page is not a conflict. */
 export const sameAuthored = (stored: unknown, original: unknown) =>
-  stored !== undefined &&
-  (JSON.stringify(stored) === JSON.stringify(original) || isPinnedFrom(stored, original));
+  stored !== undefined && (isEqual(stored, original) || isPinnedFrom(stored, original));
 
-/** Read-modify-write of the whole stored config, re-read first so a concurrent save is not lost. */
+const isRevisionConflict = (error: any) => error?.response?.status === 409;
+
+/** Read-modify-write of the whole stored config; the server refuses a write based on a stale read, which is re-read and re-applied. */
 export function useAnnouncementConfigUpdate() {
   const store = useStore();
   const queryClient = useQueryClient();
@@ -54,11 +75,19 @@ export function useAnnouncementConfigUpdate() {
   const saveConfig = useMutation(() => saveAnnouncementConfigMutation(metaOrg.value));
 
   const update = async (change: (latest: AnnouncementConfig) => AnnouncementConfig) => {
-    const latest = await queryClient.fetchQuery({
-      ...announcementConfigQuery(metaOrg.value),
-      staleTime: 0,
-    });
-    await saveConfig.mutateAsync(change(latest));
+    for (let attempt = 1; ; attempt++) {
+      const latest = await queryClient.fetchQuery({
+        ...announcementConfigQuery(metaOrg.value),
+        staleTime: 0,
+      });
+      try {
+        await saveConfig.mutateAsync({ ...change(latest), revision: latest.revision });
+        break;
+      } catch (error) {
+        if (!isRevisionConflict(error)) throw error;
+        if (attempt >= MAX_SAVE_ATTEMPTS) throw new AnnouncementConflictError();
+      }
+    }
     notifyAnnouncementsChanged();
   };
 
