@@ -7440,6 +7440,11 @@
     "SearchSQLCancelled": "Błąd: Wyszukiwanie SQL zostało anulowane."
   },
   "alerts": {
+    "promRuleMode": "Tryb reguły",
+    "promRulePreview": "{count} zwróconych serii pasuje teraz. Każda seria musi ukończyć okres oczekiwania, zanim alert zostanie wyzwolony.",
+    "promRuleModeDescription": "Pasuje, gdy wyrażenie zwraca dowolną serię. Wybierz alert pojedynczy lub wielokrotny, gdy okres oczekiwania wynosi zero; okres oczekiwania automatycznie włącza alert wielokrotny. Pozostaw strumień pusty, aby wywnioskować strumień metryk, do którego istnieje odwołanie.",
+    "promRuleModePendingMulti": "Okres oczekiwania wymaga niezależnego licznika dla każdej serii, więc alertu wielokrotnego nie można wyłączyć.",
+    "promRuleModeConflict": "Tryb reguły nie może używać progów wartości Krytyczny ani Ostrzeżenie; okres oczekiwania wymaga alertu wielokrotnego.",
     "allAlerts": "Wszystkie alerty",
     "compositeAlert": "Złożony",
     "import": {

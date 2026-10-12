@@ -7440,6 +7440,11 @@
     "SearchSQLCancelled": "Errore: Search SQL è stato annullato."
   },
   "alerts": {
+    "promRuleMode": "Modalità regola",
+    "promRulePreview": "{count} serie restituite corrispondono ora. Ogni serie deve completare il periodo di attesa prima di attivarsi.",
+    "promRuleModeDescription": "Corrisponde quando l'espressione restituisce una qualsiasi serie. Scegli avviso Singolo o Multiplo quando il periodo di attesa è zero; un periodo di attesa abilita automaticamente l'avviso Multiplo. Lascia lo stream vuoto per dedurre uno stream di metriche referenziato.",
+    "promRuleModePendingMulti": "Un periodo di attesa richiede un timer indipendente per ogni serie, quindi l'avviso Multiplo non può essere disabilitato.",
+    "promRuleModeConflict": "La modalità regola non può usare soglie di valore Critical o Warning; un periodo di attesa richiede l'avviso Multiplo.",
     "allAlerts": "Tutti gli avvisi",
     "compositeAlert": "Composito",
     "import": {

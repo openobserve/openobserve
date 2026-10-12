@@ -7440,6 +7440,11 @@
     "SearchSQLCancelled": "Hata: Search SQL iptal edildi."
   },
   "alerts": {
+    "promRuleMode": "Kural modu",
+    "promRulePreview": "{count} döndürülen seri şu anda eşleşiyor. Her seri, tetiklenmeden önce bekleme süresini tamamlamalıdır.",
+    "promRuleModeDescription": "İfade herhangi bir seri döndürdüğünde eşleşir. Bekleme süresi sıfır olduğunda Tek veya Çoklu uyarı seçin; bir bekleme süresi Çoklu uyarıyı otomatik olarak etkinleştirir. Referans verilen bir metrik akışını çıkarsamak için akışı boş bırakın.",
+    "promRuleModePendingMulti": "Bir bekleme süresi her seri için bağımsız bir zamanlayıcı gerektirir, bu nedenle Çoklu uyarı devre dışı bırakılamaz.",
+    "promRuleModeConflict": "Kural modu Kritik veya Uyarı değer eşiklerini kullanamaz; bir bekleme süresi Çoklu uyarı gerektirir.",
     "allAlerts": "Tüm Uyarılar",
     "compositeAlert": "Bileşik",
     "import": {

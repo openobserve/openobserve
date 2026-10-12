@@ -7440,6 +7440,11 @@
     "SearchSQLCancelled": "错误：搜索 SQL 已取消。"
   },
   "alerts": {
+    "promRuleMode": "规则模式",
+    "promRulePreview": "{count} 个返回的序列当前匹配。每个序列必须在触发前完成待处理期。",
+    "promRuleModeDescription": "当表达式返回任意序列时匹配。待处理期为零时，请选择单告警或多告警；设置待处理期会自动启用多告警。将数据流留空可推断所引用的指标数据流。",
+    "promRuleModePendingMulti": "待处理期需要为每个序列使用独立的计时器，因此无法禁用多告警。",
+    "promRuleModeConflict": "规则模式不能使用严重或警告值阈值；待处理期需要启用多告警。",
     "allAlerts": "所有告警",
     "compositeAlert": "复合",
     "import": {

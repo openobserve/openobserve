@@ -7440,6 +7440,11 @@
     "SearchSQLCancelled": "Error: se canceló Search SQL."
   },
   "alerts": {
+    "promRuleMode": "Modo de regla",
+    "promRulePreview": "{count} series devueltas coinciden ahora. Cada serie debe completar el período pendiente antes de dispararse.",
+    "promRuleModeDescription": "Coincide cuando la expresión devuelve alguna serie. Elige alerta Única o Múltiple cuando el período pendiente sea cero; un período pendiente habilita la alerta Múltiple automáticamente. Deja el stream vacío para inferir un stream de métricas referenciado.",
+    "promRuleModePendingMulti": "Un período pendiente requiere un temporizador independiente para cada serie, por lo que la alerta Múltiple no se puede desactivar.",
+    "promRuleModeConflict": "El modo de regla no puede usar umbrales de valor Crítico o Advertencia; un período pendiente requiere la alerta Múltiple.",
     "allAlerts": "Todas las alertas",
     "compositeAlert": "Compuesta",
     "import": {

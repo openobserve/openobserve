@@ -7440,6 +7440,11 @@
     "SearchSQLCancelled": "Fehler: Die Suche in SQL wurde abgebrochen."
   },
   "alerts": {
+    "promRuleMode": "Regelmodus",
+    "promRulePreview": "{count} zurückgegebene Zeitreihen stimmen jetzt überein. Jede Zeitreihe muss den ausstehenden Zeitraum abschließen, bevor sie ausgelöst wird.",
+    "promRuleModeDescription": "Trifft zu, wenn der Ausdruck eine beliebige Zeitreihe zurückgibt. Wählen Sie Einzel- oder Multi-Alarm, wenn der ausstehende Zeitraum null ist; ein ausstehender Zeitraum aktiviert Multi-Alarm automatisch. Lassen Sie den Stream leer, um einen referenzierten Metriken-Stream abzuleiten.",
+    "promRuleModePendingMulti": "Ein ausstehender Zeitraum erfordert einen unabhängigen Timer für jede Zeitreihe, daher kann Multi-Alarm nicht deaktiviert werden.",
+    "promRuleModeConflict": "Der Regelmodus kann keine Critical- oder Warning-Wertschwellen verwenden; ein ausstehender Zeitraum erfordert Multi-Alarm.",
     "allAlerts": "Alle Alarme",
     "compositeAlert": "Zusammengesetzt",
     "import": {

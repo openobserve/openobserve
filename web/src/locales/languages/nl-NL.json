@@ -7440,6 +7440,11 @@
     "SearchSQLCancelled": "Fout: Search SQL is geannuleerd."
   },
   "alerts": {
+    "promRuleMode": "Regelmodus",
+    "promRulePreview": "{count} geretourneerde reeksen komen nu overeen. Elke reeks moet de wachtperiode voltooien voordat deze afgaat.",
+    "promRuleModeDescription": "Komt overeen wanneer de expressie een willekeurige reeks retourneert. Kies Enkel of Multi-alarm wanneer de wachtperiode nul is; een wachtperiode schakelt automatisch Multi-alarm in. Laat de stream leeg om een gerefereerde metriekenstream af te leiden.",
+    "promRuleModePendingMulti": "Een wachtperiode vereist een onafhankelijke timer voor elke reeks, dus Multi-alarm kan niet worden uitgeschakeld.",
+    "promRuleModeConflict": "De regelmodus kan geen Critical- of Warning-waardegrenzen gebruiken; een wachtperiode vereist Multi-alarm.",
     "allAlerts": "Alle alarmen",
     "compositeAlert": "Samengesteld",
     "import": {
