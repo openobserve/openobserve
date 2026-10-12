@@ -41,6 +41,8 @@ export interface UsePanelLivePreviewOptions {
   isOverlayOpen?: () => boolean;
   /** A change only Apply loads, such as a newly enabled metric sparkline; it marks Apply pending without a live run. */
   pendingApply?: () => boolean;
+  /** Whether edits may run on their own (Auto Run); when off they only mark Apply pending. */
+  autoRun?: () => boolean;
 }
 
 const queryPayload = (query: any) => ({
@@ -100,6 +102,7 @@ export const isPopupOpen = (): boolean =>
 export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
   const debounceMs = options.debounceMs ?? LIVE_PREVIEW_DEBOUNCE_MS;
   const isOverlayOpen = options.isOverlayOpen ?? isPopupOpen;
+  const autoRun = () => options.autoRun?.() ?? true;
 
   const isArmed = ref(false);
   const isSlowPaused = ref(false);
@@ -219,6 +222,7 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
 
   const schedule = () => {
     clearTimer();
+    if (!autoRun()) return;
     timer = setTimeout(fire, debounceMs);
   };
 
@@ -237,6 +241,11 @@ export const usePanelLivePreview = (options: UsePanelLivePreviewOptions) => {
   // A run skipped while the builder was incomplete is due once it is valid, even if the payload did not change.
   watch(isBuilderValid, (valid) => {
     if (valid && isArmed.value) schedule();
+  });
+
+  // Turning Auto Run back on runs what changed while it was off; turning it off drops a pending run.
+  watch(autoRun, () => {
+    if (isArmed.value) schedule();
   });
 
   watch(options.isLoading, (loading) => {

@@ -52,6 +52,7 @@ const setup = (opts: { valid?: boolean; overlay?: () => boolean; domOverlay?: bo
   const isLoading = ref(false);
   const valid = ref(opts.valid ?? true);
   const pendingApply = ref(false);
+  const autoRun = ref(true);
   const run = vi.fn(() => {
     applied.value = clone(panel);
     committedVariables.value = clone(liveVariables.value);
@@ -69,6 +70,7 @@ const setup = (opts: { valid?: boolean; overlay?: () => boolean; domOverlay?: bo
       run,
       isOverlayOpen: opts.domOverlay ? undefined : (opts.overlay ?? (() => false)),
       pendingApply: () => pendingApply.value,
+      autoRun: () => autoRun.value,
     }),
   )!;
   return {
@@ -79,6 +81,7 @@ const setup = (opts: { valid?: boolean; overlay?: () => boolean; domOverlay?: bo
     isLoading,
     valid,
     pendingApply,
+    autoRun,
     run,
     scope,
     live,
@@ -291,6 +294,35 @@ describe("usePanelLivePreview", () => {
       pendingApply.value = false;
       await nextTick();
       expect(live.isPending.value).toBe(false);
+      scope.stop();
+    });
+
+    it("only marks Apply pending while Auto Run is off, then runs once it is turned back on", async () => {
+      const { panel, autoRun, run, live, scope } = setup();
+      autoRun.value = false;
+      live.arm();
+      panel.queries[0].query = "SELECT a FROM default";
+      await nextTick();
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
+      expect(run).not.toHaveBeenCalled();
+      expect(live.isPending.value).toBe(true);
+
+      autoRun.value = true;
+      await nextTick();
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS);
+      expect(run).toHaveBeenCalledTimes(1);
+      scope.stop();
+    });
+
+    it("drops a scheduled run when Auto Run is turned off before it fires", async () => {
+      const { panel, autoRun, run, live, scope } = setup();
+      live.arm();
+      panel.queries[0].query = "SELECT a FROM default";
+      await nextTick();
+      autoRun.value = false;
+      await nextTick();
+      vi.advanceTimersByTime(LIVE_PREVIEW_DEBOUNCE_MS * 2);
+      expect(run).not.toHaveBeenCalled();
       scope.stop();
     });
 

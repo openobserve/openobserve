@@ -271,6 +271,7 @@ import useStreams from "@/composables/useStreams";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import { conditionsInQuery } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import { usePanelLivePreview } from "@/composables/dashboard/usePanelLivePreview";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import {
   validateConditions,
   validateJoinFields,
@@ -1687,6 +1688,9 @@ export default defineComponent({
       panelEditorRef.value?.runQuery();
     };
 
+    // Same switch as the dashboard's Auto Run: ZO_AUTO_QUERY_ENABLED plus the user's on/off choice.
+    const { isAutoRunOn } = useAutoRunToggle();
+
     const livePreview = usePanelLivePreview({
       panel: () => dashboardPanelData.data,
       applied: () => panelEditorRef.value?.chartData,
@@ -1696,6 +1700,7 @@ export default defineComponent({
       isLoading: disable,
       run: runLivePreview,
       pendingApply: () => panelEditorRef.value?.sparklinePendingApply ?? false,
+      autoRun: () => isAutoRunOn.value,
     });
 
     const isOutDated = computed(() => livePreview.isPending.value);
