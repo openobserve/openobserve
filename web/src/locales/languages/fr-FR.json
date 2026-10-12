@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "Destination des alertes · les pages sont répliquées ici",
     "testPageSent": "La page de test est parvenue à {count} personne | La page de test est parvenue à {count} personnes",
     "testPageNobody": "Rien n'a été envoyé — {reason}",
+    "testPageUndelivered": "Page de test envoyée, mais aucune remise n'a réussi : {reason}",
     "testPageFailed": "Impossible d'envoyer la page de test",
     "riskTeamsPageNobody": "{count} équipe ne joint personne | {count} équipes ne joignent personne",
     "riskUnroutedPaths": "{count} chemin non routé | {count} chemins non routés",

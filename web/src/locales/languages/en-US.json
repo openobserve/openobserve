@@ -22222,6 +22222,7 @@
     "reachDestinationHint": "Alert destination · pages mirror here",
     "testPageSent": "Test page reached {count} person | Test page reached {count} people",
     "testPageNobody": "Nothing was sent — {reason}",
+    "testPageUndelivered": "Test page sent, but no delivery succeeded: {reason}",
     "testPageFailed": "Could not send the test page",
     "riskTeamsPageNobody": "{count} team pages nobody | {count} teams page nobody",
     "riskUnroutedPaths": "{count} unrouted path | {count} unrouted paths",

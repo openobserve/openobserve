@@ -22,6 +22,7 @@ import i18n from "@/locales";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallRouting from "@/views/OnCall/OnCallRouting.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 // The queries call these through the default export, so that is what is mocked.
 vi.mock("@/services/service_streams", () => ({
@@ -51,6 +52,8 @@ vi.mock("@/services/oncall", () => ({
 // Hoisted so every useRouter() call shares ONE spy — a fresh vi.fn() per call
 // records the navigation onto an object the test can no longer see.
 const push = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
+
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push }),
 }));
@@ -317,6 +320,37 @@ describe("OnCallRouting", () => {
 
     expect(service.testPage).toHaveBeenCalled();
     expect(simulator(wrapper).props("canConfigure")).toBe(false);
+  });
+
+  /// A test page that tried and failed everywhere was sent, so it must not say "Nothing was sent", and it must say why.
+  it("names the provider's error when every test delivery fails", async () => {
+    service.testPage.mockResolvedValue({
+      data: {
+        reached_anyone: false,
+        not_sent_because: null,
+        channels: ["sms"],
+        attempts: [
+          {
+            channel: "sms",
+            recipient: "ana@o2.ai",
+            reason: "on call now",
+            delivered: false,
+            detail: "Twilio 401: authenticate",
+          },
+        ],
+      },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-test-signal"]').trigger("click");
+
+    simulator(wrapper).vm.$emit("send-test", { team_id: "team_1", priority: "P1" });
+    await flushPromises();
+
+    expect(vi.mocked(toast)).toHaveBeenCalledWith({
+      variant: "warning",
+      message: "Test page sent, but no delivery succeeded: Twilio 401: authenticate",
+    });
   });
 
   /// Nominating a catch-all is a one-time act, but whether one exists is a

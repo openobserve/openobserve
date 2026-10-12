@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "告警目标 · 呼叫会同步显示在这里",
     "testPageSent": "测试呼叫已送达 {count} 人 | 测试呼叫已送达 {count} 人",
     "testPageNobody": "未发送任何呼叫 — {reason}",
+    "testPageUndelivered": "测试呼叫已发送，但没有一次送达成功：{reason}",
     "testPageFailed": "无法发送测试呼叫",
     "riskTeamsPageNobody": "有 {count} 个团队的呼叫无人接收 | 有 {count} 个团队的呼叫无人接收",
     "riskUnroutedPaths": "{count} 条未路由路径 | {count} 条未路由路径",

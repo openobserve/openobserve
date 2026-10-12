@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "Destino de alertas · los avisos se reflejan aquí",
     "testPageSent": "El aviso de prueba llegó a {count} persona | El aviso de prueba llegó a {count} personas",
     "testPageNobody": "No se envió nada — {reason}",
+    "testPageUndelivered": "Página de prueba enviada, pero ninguna entrega tuvo éxito: {reason}",
     "testPageFailed": "No se pudo enviar el aviso de prueba",
     "riskTeamsPageNobody": "{count} equipo no avisa a nadie | {count} equipos no avisan a nadie",
     "riskUnroutedPaths": "{count} ruta sin enrutar | {count} rutas sin enrutar",

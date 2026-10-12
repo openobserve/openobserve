@@ -22176,6 +22176,7 @@
     "reachDestinationHint": "警示目標 · 傳呼同步至此",
     "testPageSent": "測試傳呼已送達 {count} 人 | 測試傳呼已送達 {count} 人",
     "testPageNobody": "未傳送任何傳呼 — {reason}",
+    "testPageUndelivered": "測試呼叫已傳送，但沒有一次送達成功：{reason}",
     "testPageFailed": "無法發送測試傳呼",
     "riskTeamsPageNobody": "{count} 個團隊沒有可傳呼的對象 | {count} 個團隊沒有可傳呼的對象",
     "riskUnroutedPaths": "{count} 條未路由路徑 | {count} 條未路由路徑",

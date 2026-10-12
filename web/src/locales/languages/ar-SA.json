@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "وجهة التنبيه · تنعكس الاستدعاءات هنا",
     "testPageSent": "{count} شخص | {count} أشخاص",
     "testPageNobody": "لم يتم إرسال شيء — {reason}",
+    "testPageUndelivered": "أُرسلت صفحة الاختبار، لكن لم ينجح أي تسليم: {reason}",
     "testPageFailed": "تعذر إرسال الاستدعاء الاختباري",
     "riskTeamsPageNobody": "{count} فريق لا يصل استدعاؤه لأحد | {count} فرق لا يصل استدعاؤها لأحد",
     "riskUnroutedPaths": "{count} مسار غير موجه | {count} مسارات غير موجهة",

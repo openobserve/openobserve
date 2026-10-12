@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "Cel alertów · powiadomienia są tu dublowane",
     "testPageSent": "Testowe powiadomienie dotarło do {count} osoby | Testowe powiadomienie dotarło do {count} osób",
     "testPageNobody": "Nic nie zostało wysłane — {reason}",
+    "testPageUndelivered": "Wysłano stronę testową, ale żadne doręczenie się nie powiodło: {reason}",
     "testPageFailed": "Nie udało się wysłać testowego powiadomienia",
     "riskTeamsPageNobody": "{count} zespół nie powiadamia nikogo | {count} zespołów nie powiadamia nikogo",
     "riskUnroutedPaths": "{count} ścieżka bez trasy | {count} ścieżek bez trasy",

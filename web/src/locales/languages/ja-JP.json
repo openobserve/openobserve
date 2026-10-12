@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "アラート宛先 · ページはここにミラーリングされます",
     "testPageSent": "テストページは{count}人に届きました | テストページは{count}人に届きました",
     "testPageNobody": "何も送信されませんでした — {reason}",
+    "testPageUndelivered": "テストページを送信しましたが、配信はすべて失敗しました: {reason}",
     "testPageFailed": "テストページを送信できませんでした",
     "riskTeamsPageNobody": "{count}チームは誰にもページを送信できません | {count}チームは誰にもページを送信できません",
     "riskUnroutedPaths": "{count}件の未ルーティングパス | {count}件の未ルーティングパス",

@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "Uyarı hedefi · çağrılar buraya yansır",
     "testPageSent": "Test çağrısı {count} kişiye ulaştı | Test çağrısı {count} kişiye ulaştı",
     "testPageNobody": "Hiçbir şey gönderilmedi — {reason}",
+    "testPageUndelivered": "Test sayfası gönderildi ama hiçbir teslimat başarılı olmadı: {reason}",
     "testPageFailed": "Test çağrısı gönderilemedi",
     "riskTeamsPageNobody": "{count} ekip kimseye çağrı göndermiyor | {count} ekip kimseye çağrı göndermiyor",
     "riskUnroutedPaths": "{count} yönlendirilmemiş yol | {count} yönlendirilmemiş yol",

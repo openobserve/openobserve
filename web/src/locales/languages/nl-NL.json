@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "Alarmbestemming · oproepen worden hier gespiegeld",
     "testPageSent": "Testoproep bereikte {count} persoon | Testoproep bereikte {count} personen",
     "testPageNobody": "Er is niets verzonden — {reason}",
+    "testPageUndelivered": "Testpage verzonden, maar geen enkele aflevering is gelukt: {reason}",
     "testPageFailed": "De testoproep kon niet worden verzonden",
     "riskTeamsPageNobody": "{count} team roept niemand op | {count} teams roepen niemand op",
     "riskUnroutedPaths": "{count} niet-gerouteerd pad | {count} niet-gerouteerde paden",

@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "Warnmeldungsziel · Benachrichtigungen werden hierher gespiegelt",
     "testPageSent": "Testbenachrichtigung erreichte {count} Person | Testbenachrichtigung erreichte {count} Personen",
     "testPageNobody": "Es wurde nichts gesendet — {reason}",
+    "testPageUndelivered": "Testseite gesendet, aber keine Zustellung war erfolgreich: {reason}",
     "testPageFailed": "Die Testbenachrichtigung konnte nicht gesendet werden.",
     "riskTeamsPageNobody": "{count} Team benachrichtigt niemanden | {count} Teams benachrichtigen niemanden",
     "riskUnroutedPaths": "{count} nicht gerouteter Pfad | {count} nicht geroutete Pfade",

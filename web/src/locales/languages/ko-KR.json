@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "알림 대상 · 호출이 여기에 표시됩니다",
     "testPageSent": "테스트 호출이 {count}명에게 전달되었습니다 | 테스트 호출이 {count}명에게 전달되었습니다",
     "testPageNobody": "아무것도 전송되지 않았습니다 — {reason}",
+    "testPageUndelivered": "테스트 페이지를 보냈지만 전달에 모두 실패했습니다: {reason}",
     "testPageFailed": "테스트 호출을 보낼 수 없습니다",
     "riskTeamsPageNobody": "호출 수신 대상이 없는 팀 {count}개 | 호출 수신 대상이 없는 팀 {count}개",
     "riskUnroutedPaths": "라우팅되지 않은 경로 {count}개 | 라우팅되지 않은 경로 {count}개",

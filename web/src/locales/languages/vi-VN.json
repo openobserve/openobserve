@@ -22181,6 +22181,7 @@
     "reachDestinationHint": "Điểm đến cảnh báo · thông báo được phản chiếu tại đây",
     "testPageSent": "Thông báo thử đã đến {count} người | Thông báo thử đã đến {count} người",
     "testPageNobody": "Không có gì được gửi — {reason}",
+    "testPageUndelivered": "Đã gửi trang thử nghiệm nhưng không lần gửi nào thành công: {reason}",
     "testPageFailed": "Không thể gửi thông báo thử",
     "riskTeamsPageNobody": "{count} nhóm không có ai nhận thông báo | {count} nhóm không có ai nhận thông báo",
     "riskUnroutedPaths": "{count} đường dẫn chưa định tuyến | {count} đường dẫn chưa định tuyến",

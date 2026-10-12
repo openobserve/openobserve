@@ -232,24 +232,6 @@ mod tests {
         assert!(c.phone_is_pageable());
     }
 
-    /// The rule the write path enforces, as the property it protects: a
-    /// verification vouches for one string, so a different string is unverified
-    /// again. Pinned here as pure logic because the branch itself lives inside a
-    /// database round trip.
-    #[test]
-    fn test_changing_a_number_must_drop_its_verification() {
-        let old = Some("+15550100".to_string());
-
-        let same = Some("+15550100".to_string());
-        assert!(same == old, "an identical number is not a change");
-
-        let changed = Some("+15550199".to_string());
-        assert!(changed != old, "a different number must re-verify");
-
-        let cleared: Option<String> = None;
-        assert!(cleared != old, "clearing is a change too");
-    }
-
     #[test]
     fn test_an_empty_patch_changes_nothing() {
         assert!(ContactPatch::default().is_empty());
@@ -336,6 +318,19 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(edited.phone_verified_at, Some(2_000));
+    }
+
+    /// A proof vouches for one number, so an edited number must not be paged until re-verified.
+    #[tokio::test]
+    async fn test_changing_a_verified_number_drops_its_verification() {
+        let db = db_with(&["ana@o2.ai"]).await;
+
+        let changed = upsert_in(&db, "default", "ana@o2.ai", &phone("+15550199"), 3_000)
+            .await
+            .unwrap();
+
+        assert_eq!(changed.phone.as_deref(), Some("+15550199"));
+        assert_eq!(changed.phone_verified_at, None);
     }
 
     #[tokio::test]

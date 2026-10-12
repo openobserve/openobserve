@@ -833,11 +833,14 @@ async function sendTestPage(value: { team_id: string; priority: string }) {
     });
     // `attempts`, not `recipients` — the latter never existed on the wire.
     const reached = (res.data?.attempts ?? []).filter((attempt) => attempt.delivered).length;
+    const failure = res.data?.attempts.find((attempt) => attempt.detail)?.detail;
     toast({
       variant: res.data?.reached_anyone ? "success" : "warning",
       message: res.data?.reached_anyone
         ? t("oncall.testPageSent", { count: reached }, reached)
-        : t("oncall.testPageNobody", { reason: raw(res.data?.not_sent_because ?? "") }),
+        : res.data?.not_sent_because
+          ? t("oncall.testPageNobody", { reason: raw(res.data.not_sent_because) })
+          : t("oncall.testPageUndelivered", { reason: raw(failure ?? "") }),
     });
   } catch (err) {
     noteConfigurationDenied(err);
