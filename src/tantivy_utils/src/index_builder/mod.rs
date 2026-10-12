@@ -141,7 +141,9 @@ fn build_tantivy_schema(
         .iter()
         .filter(|f| {
             schema_fields.get(f).is_some_and(|v| {
-                v.data_type() == &DataType::Utf8 || v.data_type() == &DataType::LargeUtf8
+                v.data_type() == &DataType::Utf8
+                    || v.data_type() == &DataType::LargeUtf8
+                    || v.data_type() == &DataType::Utf8View
             })
         })
         .map(String::from)
@@ -153,6 +155,7 @@ fn build_tantivy_schema(
                 matches!(
                     v.data_type(),
                     DataType::Utf8
+                        | DataType::Utf8View
                         | DataType::LargeUtf8
                         | DataType::Int64
                         | DataType::UInt64

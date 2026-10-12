@@ -103,6 +103,8 @@ impl WarmPlan {
         match rule {
             None => {}
             Some(IndexOptimizeMode::SimpleDistinct(field, ..)) => {
+                // This collector reads only the target term dictionary and
+                // does not execute the Tantivy query.
                 debug_assert!(
                     file_in_range,
                     "SimpleDistinct files must be fully covered by the query time range"
@@ -314,25 +316,20 @@ mod tests {
 
     #[test]
     fn simple_distinct_is_dictionary_only() {
-        for condition in [
-            Condition::All(),
+        let (plan, schema) = build_plan(
             Condition::StrMatch("tag".into(), "needle".into(), true),
-        ] {
-            let (plan, schema) = build_plan(
-                condition,
-                Some(IndexOptimizeMode::SimpleDistinct("tag".into(), 10, true)),
-                true,
-                false,
-            );
-            assert_eq!(
-                plan.dictionary_field,
-                Some(schema.get_field("tag").unwrap())
-            );
-            assert!(plan.exact_postings.is_empty());
-            assert!(plan.exact_term_info.is_none());
-            assert!(plan.full_posting_fields.is_empty());
-            assert!(plan.fast_fields.is_empty());
-        }
+            Some(IndexOptimizeMode::SimpleDistinct("tag".into(), 10, true)),
+            true,
+            false,
+        );
+        assert_eq!(
+            plan.dictionary_field,
+            Some(schema.get_field("tag").unwrap())
+        );
+        assert!(plan.exact_postings.is_empty());
+        assert!(plan.exact_term_info.is_none());
+        assert!(plan.full_posting_fields.is_empty());
+        assert!(plan.fast_fields.is_empty());
     }
 
     #[test]
