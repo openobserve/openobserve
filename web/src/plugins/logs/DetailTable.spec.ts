@@ -19,6 +19,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
 
 import DetailTable from "@/plugins/logs/DetailTable.vue";
+import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -1463,24 +1464,42 @@ describe("DetailTable Component", () => {
       expect(wrapper.vm.prevTooltip).toBe("Previous log");
     });
 
-    it("emits update:tab on mount, including a correlated initial tab, and on every change", async () => {
-      await mountFooter({ initialTab: "correlated-logs" });
-      expect(wrapper.emitted("update:tab")?.[0]).toEqual(["correlated-logs"]);
-      wrapper.vm.tab = "table";
-      await flushPromises();
-      expect(wrapper.emitted("update:tab")?.at(-1)).toEqual(["table"]);
+    describe("with correlation unlocked", () => {
+      const originalIsEnterprise = config.isEnterprise;
+      beforeEach(() => {
+        (config as any).isEnterprise = "true";
+      });
+      afterEach(() => {
+        (config as any).isEnterprise = originalIsEnterprise;
+      });
+
+      it("emits update:tab on mount, including a correlated initial tab, and on every change", async () => {
+        await mountFooter({ initialTab: "correlated-logs" });
+        expect(wrapper.emitted("update:tab")?.[0]).toEqual(["correlated-logs"]);
+        wrapper.vm.tab = "table";
+        await flushPromises();
+        expect(wrapper.emitted("update:tab")?.at(-1)).toEqual(["table"]);
+      });
+
+      it("lets only the visible correlated-traces tab own the trace shortcuts (AC1.8)", async () => {
+        await mountFooter({ correlationProps: { serviceName: "svc" }, initialTab: "json" });
+        const traces = () =>
+          wrapper
+            .findAllComponents(dashboardStub)
+            .find((c: any) => c.props("externalActiveTab") === "traces");
+        expect(traces()?.props("shortcutsActive")).toBe(false);
+        wrapper.vm.tab = "correlated-traces";
+        await flushPromises();
+        expect(traces()?.props("shortcutsActive")).toBe(true);
+      });
     });
 
-    it("lets only the visible correlated-traces tab own the trace shortcuts (AC1.8)", async () => {
-      await mountFooter({ correlationProps: { serviceName: "svc" }, initialTab: "json" });
-      const traces = () =>
-        wrapper
-          .findAllComponents(dashboardStub)
-          .find((c: any) => c.props("externalActiveTab") === "traces");
-      expect(traces()?.props("shortcutsActive")).toBe(false);
-      wrapper.vm.tab = "correlated-traces";
+    it("never emits a locked correlated tab and bounces back from one", async () => {
+      await mountFooter({ initialTab: "json" });
+      wrapper.vm.tab = "correlated-logs";
       await flushPromises();
-      expect(traces()?.props("shortcutsActive")).toBe(true);
+      expect(wrapper.vm.tab).toBe("json");
+      expect(wrapper.emitted("update:tab")?.flat()).not.toContain("correlated-logs");
     });
   });
 });

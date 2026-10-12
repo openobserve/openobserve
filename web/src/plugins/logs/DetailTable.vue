@@ -844,6 +844,12 @@ export default defineComponent({
     const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
+    // Must precede the immediate initialTab watcher, which reads it during setup.
+    const correlationAccess = computed(() =>
+      checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
+    );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
     const selectedRelativeValue = ref<number>(10);
     const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
       { label: raw("10"), value: 10 },
@@ -1026,12 +1032,6 @@ export default defineComponent({
     const serviceStreamsEnabled = computed(() => {
       return store.state.zoConfig.service_streams_enabled !== false;
     });
-
-    // Shown locked (not hidden) in builds that don't unlock it.
-    const correlationAccess = computed(() =>
-      checkFeatureAccess("correlation", buildFeatureGateContext(store.state.zoConfig)),
-    );
-    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     // OTabs is controlled (`:model-value`), so refusing to advance `tab` here
     // is what keeps a locked correlation tab from becoming active — clicking

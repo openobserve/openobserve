@@ -221,6 +221,7 @@ describe("SearchBar — 4c line links and URL timing", () => {
     });
 
     it("switching mode is a view-state replace, never a new history entry", async () => {
+      (config as any).isEnterprise = "true";
       await router.replace({ name: "logs", query: { stream: "app_logs", period: "15m" } });
       await setup();
       const push = vi.spyOn(router, "push");
