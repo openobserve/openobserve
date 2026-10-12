@@ -22350,7 +22350,9 @@
         "summary": "Its disk is filling about 18 GB a day since Thursday's orders release turned up audit logging, so it fills around Wednesday morning. When it does, checkout, orders and refunds will start failing. Nothing is broken yet, so I sent your team a heads-up instead of paging.",
         "notify1": "orders-db will run out of disk in about 3 days, around Wednesday 11:00.",
         "notify2": "Cause: since orders 3.8.0 went out on Thursday, audit logging writes about 18 GB a day. Before that the disk grew about 6 GB a day.",
-        "notify3": "Turn audit logging back down or add disk space before Wednesday. When it fills, checkout, orders and refunds will fail. Nothing is broken yet, so this is a heads-up, not a page."
+        "notify3": "Turn audit logging back down or add disk space before Wednesday. When it fills, checkout, orders and refunds will fail. Nothing is broken yet, so this is a heads-up, not a page.",
+        "chartCaption": "disk · full ~Wed 11:00",
+        "chartLabel": "Disk use grew from 334 to 445 GB of 500 over 14 days, faster since Thursday, and is forecast to be full around Wednesday 11:00"
       },
       "search": {
         "title": "Search is slow and search-2 keeps crashing",
@@ -22360,51 +22362,70 @@
         "notify2": "Cause: a setting changed on search-2 at 10:16 fills its memory. It has crashed about 10 times since 10:20. The other 4 nodes don't have the change and are fine.",
         "notify3": "Putting the old setting back should fix it, and I can undo it. Reply \"revert\" and I'll do it. Whoever made the change should check why.",
         "summaryFixed": "It started at 10:27, because a setting changed on search-2 filled its memory. You approved putting the old setting back, so I did, and searches are back to normal.",
-        "summaryFixing": "It started at 10:27, because a setting changed on search-2 fills its memory. You approved putting the old setting back, so I'm doing that now."
+        "summaryFixing": "It started at 10:27, because a setting changed on search-2 fills its memory. You approved putting the old setting back, so I'm doing that now.",
+        "chartCaption": "p95 latency · 3.4 s peak",
+        "chartLabel": "p95 latency rose from 0.38 s to 3.4 s at 10:27 and is still high",
+        "chartLabelFixed": "p95 latency rose from 0.38 s to 3.4 s at 10:27 and fell back to normal once the setting was put back"
       },
       "checkout": {
         "title": "1 in 12 payments failed after a deploy",
         "summary": "payments-api 2.3.1 asked the payments database for more connections than it allows. Rolling back fixed it 18 minutes after the failures began.",
         "notify1": "Checkout is failing about 1 in 12 payments, since 14:02.",
         "notify2": "Likely cause: payments-api 2.3.1 went out at 14:01 and raised its connection pool from 20 to 50 per server. 6 servers × 50 is more than the 200 the payments database allows.",
-        "notify3": "Rolling back to 2.3.0 is the quickest fix."
+        "notify3": "Rolling back to 2.3.0 is the quickest fix.",
+        "chartCaption": "failed payments · 1 in 12 peak",
+        "chartLabel": "Failed payments jumped from 0.1% to 1 in 12 at 14:02 and were back to normal 18 minutes later, after the rollback"
       },
       "pool": {
         "title": "Checkout ran out of database connections",
         "summary": "Leaked connections used up all the free ones, and payments started timing out. You approved clearing them, so I did. Payments recovered 2 minutes later.",
         "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 11:18.",
         "notify2": "Cause: 48 of 50 connections are held by refund exports that never returned them. It's the CHK-482 leak, third time in two weeks.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it."
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
+        "chartCaption": "timeouts · 1 in 9 peak",
+        "chartLabel": "Payment timeouts rose to about 1 in 9 at 11:18 and recovered 2 minutes after the fix at 11:21"
       },
       "email": {
         "title": "Order emails ran up to 9 minutes late",
-        "summary": "All the mail workers were replaced at once overnight, and the queue caught up by itself within about 20 minutes. This was minor, so it went into Friday's summary."
+        "summary": "All the mail workers were replaced at once overnight, and the queue caught up by itself within about 20 minutes. This was minor, so it went into Friday's summary.",
+        "chartCaption": "email delay · 9 min peak",
+        "chartLabel": "Email delay rose to 9 minutes from 03:15 and recovered by itself by 03:36"
       },
       "recs": {
         "title": "Recommendations got slower for 15 minutes",
-        "summary": "They went from a quarter of a second to almost a second. The nightly cache rebuild had been started by hand during the afternoon, and it finished by itself. I held it for Friday's summary."
+        "summary": "They went from a quarter of a second to almost a second. The nightly cache rebuild had been started by hand during the afternoon, and it finished by itself. I held it for Friday's summary.",
+        "chartCaption": "p95 latency · 0.94 s peak",
+        "chartLabel": "p95 latency rose from 0.26 s to 0.94 s at 16:40 and recovered by itself 15 minutes later"
       },
       "login": {
         "title": "Sign-in was slow for about 25 minutes",
         "summary": "1 in 8 people waited more than 5 seconds. The session cache ran out of space after a traffic spike and signed some people out. Your team added space and it recovered.",
         "notify1": "Sign-in is slow: about 1 in 8 people wait over 5 seconds, since 10:12.",
         "notify2": "Cause: the session cache is full after traffic doubled at 10:05.",
-        "notify3": "Adding space to the cache should fix it."
+        "notify3": "Adding space to the cache should fix it.",
+        "chartCaption": "p95 sign-in · 5.8 s peak",
+        "chartLabel": "p95 sign-in time rose from 0.6 s to 5.8 s at 10:12 and recovered after cache space was added at 10:31"
       },
       "queue": {
         "title": "Orders backed up in the queue",
         "summary": "About 4,000 were waiting at the worst. I added workers as you've allowed, but it didn't help, so I put them back and paged on-call. The real cause was a database index that a migration left broken; your team fixed it 40 minutes after it began.",
         "notify1": "Orders are backing up: about 4,000 waiting, since 21:30.",
         "notify2": "I added workers at 21:33, as you've allowed, but it didn't help, so I've put them back.",
-        "notify3": "Order lookups are about 40 times slower since the 21:20 database migration. Check the orders_by_status index first."
+        "notify3": "Order lookups are about 40 times slower since the 21:20 database migration. Check the orders_by_status index first.",
+        "chartCaption": "backlog · 4,120 peak",
+        "chartLabel": "Orders waiting climbed to 4,120 from 21:30, kept climbing after workers were added, and drained once the index was rebuilt at 21:52"
       },
       "uploads": {
         "title": "Image uploads failed for 1 in 40 people",
-        "summary": "It lasted 10 minutes, because a certificate expired before one server had loaded its replacement. It sorted itself out, so I held it for Friday's summary."
+        "summary": "It lasted 10 minutes, because a certificate expired before one server had loaded its replacement. It sorted itself out, so I held it for Friday's summary.",
+        "chartCaption": "failed uploads · 1 in 40 peak",
+        "chartLabel": "Failed uploads rose to about 1 in 40 at 07:05 and recovered by itself 10 minutes later"
       },
       "push": {
         "title": "Push notifications arrived 2 minutes late",
-        "summary": "It lasted half an hour, while the provider that delivers them was slow. Minor, so it waited for Friday's summary."
+        "summary": "It lasted half an hour, while the provider that delivers them was slow. Minor, so it waited for Friday's summary.",
+        "chartCaption": "delivery delay · 2 min peak",
+        "chartLabel": "Delivery delay rose from 4 s to about 2 minutes at 13:50 and recovered by itself 30 minutes later"
       },
       "checkoutNow": {
         "title": "Checkout is failing 1 in 6 payments",
@@ -22414,28 +22435,37 @@
         "notify2": "I'm still looking into why. So far it lines up with checkout 2.4.0 going out at 10:41.",
         "notify3": "Only the servers on 2.4.0 are failing. Reply \"stop\" and I'll send traffic back to the old version; the old servers have room for it. I can't see payments-db directly, so I haven't ruled it out.",
         "summaryFixing": "It started at 10:43, right after version 2.4.0 went out. You approved stopping the rollout, so I'm sending traffic back to the old version now.",
-        "summaryFixed": "It started at 10:43, after version 2.4.0 went out. You approved stopping the rollout, and failures stopped once traffic went back to the old version. Why 2.4.0 fails is still for your team to find."
+        "summaryFixed": "It started at 10:43, after version 2.4.0 went out. You approved stopping the rollout, and failures stopped once traffic went back to the old version. Why 2.4.0 fails is still for your team to find.",
+        "chartCaption": "failed payments · 1 in 6 peak",
+        "chartLabel": "Failed payments jumped from 0.1% to about 1 in 6 at 10:43 and are still failing",
+        "chartLabelFixed": "Failed payments jumped from 0.1% to about 1 in 6 at 10:43 and fell back to normal once the rollout was stopped"
       },
       "gateway": {
         "title": "The API rejected 1 in 30 requests",
         "summary": "It started after a config change. Your team reverted it, and it was back to normal 13 minutes after it began.",
         "notify1": "The API is rejecting about 1 in 30 requests, since 15:22.",
         "notify2": "Likely cause: a config change at 15:20 shortened how long sign-in tokens last.",
-        "notify3": "Reverting that change should fix it."
+        "notify3": "Reverting that change should fix it.",
+        "chartCaption": "rejected · 1 in 30 peak",
+        "chartLabel": "Rejected requests rose to 1 in 30 at 15:22 and fell back to normal when the config change was reverted at 15:34"
       },
       "poolSep": {
         "title": "Checkout ran out of database connections",
         "summary": "Leaked connections used up all the free ones, and payments started timing out. I traced the leak to refund exports, and you approved clearing the leaked connections. Payments recovered 2 minutes later.",
         "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 15:42.",
         "notify2": "Cause: 47 of 50 connections are held by refund exports that never returned them. It looks like a leak in the refund export code.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it."
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
+        "chartCaption": "timeouts · 1 in 9 peak",
+        "chartLabel": "Payment timeouts rose to about 1 in 9 at 15:42 and recovered 2 minutes after the fix at 15:45"
       },
       "poolOct": {
         "title": "Checkout ran out of database connections again",
         "summary": "It was the same refund-export leak (CHK-482). You approved clearing the leaked connections, and payments recovered 2 minutes later.",
         "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 10:05.",
         "notify2": "Cause: 46 of 50 connections are held by refund exports. It's the CHK-482 leak again, second time in 8 days.",
-        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it."
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
+        "chartCaption": "timeouts · 1 in 9 peak",
+        "chartLabel": "Payment timeouts rose to about 1 in 9 at 10:05 and recovered 2 minutes after the fix at 10:08"
       }
     },
     "drawer": {
@@ -22444,14 +22474,19 @@
       "now": "Now"
     },
     "needs": {
-      "heading": "One thing I need from you | {count} things I need from you",
+      "more": "More",
+      "less": "Less",
+      "canUndo": "You can undo it",
       "undo": "Undo",
       "retune": {
         "body": "The \"{alert}\" alert on {host} went off {fired} times this month, and nobody needed to act. The disk climbs to about 85% during nightly cleanup and is back near 70% by morning. Even on its busiest day, it would take more than 3 days to fill from 90%. I'd like to raise it to {to}%. I'll still warn you if the disk is ever on track to fill within a day.",
         "yes": "Yes, change it",
         "no": "Leave it",
         "doneYes": "Done. I raised it to {to}%. The fill warning stays on.",
-        "doneNo": "Okay, I'll leave it at {from}%."
+        "doneNo": "Okay, I'll leave it at {from}%.",
+        "headline": "Raise the 'disk 80%' alert on ingest-3 to 90%?",
+        "why": "It went off 41 times this month and nobody needed to act.",
+        "cost": "Fill warning stays on"
       },
       "fixNow": {
         "search": {
@@ -22460,7 +22495,10 @@
           "no": "I'll handle it",
           "doneYes": "Done. Putting it back now.",
           "doneNo": "Okay, it's yours. I'll keep watching.",
-          "doneSettled": "Done. search-2 is back and searches are normal."
+          "doneSettled": "Done. search-2 is back and searches are normal.",
+          "headline": "Put search-2's cache setting back to 10%?",
+          "why": "A 10:16 change fills its memory, so it keeps crashing.",
+          "cost": "One restart of search-2"
         },
         "checkoutNow": {
           "body": "Checkout is failing about 1 in 6 payments, and only the servers on 2.4.0 are failing. The 6 servers on the old version have room for all the traffic. May I stop the rollout and send traffic back to them? 2.4.0 stays deployed for your team to look at.",
@@ -22468,7 +22506,10 @@
           "no": "I'll handle it",
           "doneYes": "Done. Stopping the rollout now.",
           "doneNo": "Okay, it's yours. I'll keep watching.",
-          "doneSettled": "Done. Payments are back to normal."
+          "doneSettled": "Done. Payments are back to normal.",
+          "headline": "Stop checkout's 2.4.0 rollout?",
+          "why": "About 1 in 6 payments fail, all on 2.4.0. The old version can take all the traffic.",
+          "cost": "2.4.0 stays deployed"
         }
       },
       "fromNowOn": {
@@ -22476,20 +22517,17 @@
         "yes": "Yes, on its own",
         "no": "Keep asking me",
         "doneYes": "Done. I'll stop bad rollouts on my own and tell you each time.",
-        "doneNo": "Okay, I'll keep asking you first."
+        "doneNo": "Okay, I'll keep asking you first.",
+        "headline": "Stop bad rollouts on my own from now on?",
+        "why": "All 6 times you said yes, the failures stopped within 2 minutes.",
+        "cost": "Only during a rollout"
       },
       "labels": {
         "fixNow": "Fix now",
         "fromNowOn": "Let me handle this",
         "retune": "Quieter alert"
       },
-      "empty": {
-        "title": "Nothing needs you right now",
-        "body": "I'll ask here when there's a decision for you to make.",
-        "allVisible": "I can see every service you send me, so nothing I watch is wrong right now.",
-        "stillLearning": "I can see everything you send me, but I'm still learning what normal looks like for most of it."
-      },
-      "allAnswered": "Nothing else needs you right now"
+      "needsOk": "Needs your OK"
     },
     "footer": {
       "text": "I check myself too: if I stop working, you'll hear about it.",
@@ -22826,6 +22864,10 @@
     },
     "rail": {
       "more": "More below"
+    },
+    "suggestions": {
+      "title": "Suggestions",
+      "subtitle": "When you have a minute — these cut noise or save you time."
     }
   }
 }

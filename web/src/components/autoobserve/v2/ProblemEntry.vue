@@ -15,17 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <button
-    type="button"
-    class="group hover:bg-surface-subtle-hover focus-visible:ring-focus-ring-accent flex w-full items-stretch gap-4 px-5 py-4 text-start transition-colors focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset sm:px-6"
-    :data-test="`autoobserve2-problem-${problem.id}`"
+  <!-- The whole row opens the drawer by mouse; the title button is its keyboard and screen-reader target. -->
+  <div
+    class="group hover:bg-surface-subtle-hover flex w-full cursor-pointer items-stretch gap-4 px-5 py-4 transition-colors sm:px-6"
     @click="emit('open')"
   >
     <span class="w-1 shrink-0 rounded-full" :class="OUTCOME[problem.outcome].marker" />
-    <span class="flex min-w-0 flex-1 flex-col gap-1">
-      <span class="text-text-heading text-base leading-snug font-semibold text-pretty">
+    <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <button
+        type="button"
+        class="text-text-heading focus-visible:ring-focus-ring-accent rounded-default self-start text-start text-base leading-snug font-semibold text-pretty focus-visible:ring-2 focus-visible:outline-none"
+        :data-test="`autoobserve2-problem-${problem.id}`"
+      >
         {{ t(problem.title) }}
-      </span>
+      </button>
       <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span class="text-text-secondary text-sm tabular-nums">
           {{ label }}
@@ -47,13 +50,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-text-secondary mt-0.5 max-w-[70ch] text-sm leading-relaxed text-pretty">
         {{ t(problem.summary) }}
       </span>
-    </span>
+      <AskCard v-if="request" :request="request" inline class="mt-2 cursor-auto" @click.stop />
+      <ProblemSpark :chart="problem.chart" :outcome="problem.outcome" class="mt-2 flex sm:hidden" />
+    </div>
+    <ProblemSpark
+      :chart="problem.chart"
+      :outcome="problem.outcome"
+      class="hidden shrink-0 self-center sm:flex"
+    />
     <OIcon
       name="chevron-right"
       size="sm"
       class="text-text-muted group-hover:text-text-secondary shrink-0 self-center transition-transform group-hover:translate-x-0.5"
     />
-  </button>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -62,10 +72,12 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { problemLabel, type Problem } from "./fixtures";
+import { problemLabel, type Problem, type Request } from "./fixtures";
 import { OUTCOME } from "./outcome";
+import ProblemSpark from "./ProblemSpark.vue";
+import AskCard from "./AskCard.vue";
 
-const props = defineProps<{ problem: Problem }>();
+const props = defineProps<{ problem: Problem; request?: Request }>();
 
 const emit = defineEmits<{ open: [] }>();
 

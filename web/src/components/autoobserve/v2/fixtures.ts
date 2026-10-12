@@ -28,6 +28,7 @@ import {
   SCENARIOS,
   STALLED,
   EVENT_PROBLEM,
+  chartPoints,
   eventScenarios,
   heldBeforeFriday,
   ledgerIn,
@@ -67,6 +68,16 @@ export interface Msg {
   plural?: number;
 }
 
+export interface ProblemChart {
+  points: number[];
+  detectedAt: number;
+  actionAt?: number;
+  forecast: number;
+  limit?: number;
+  caption: I18nKey;
+  label: I18nKey;
+}
+
 export interface Problem {
   id: string;
   incidentId: string;
@@ -79,6 +90,7 @@ export interface Problem {
   resolvedIn?: number;
   title: I18nKey;
   summary: I18nKey;
+  chart: ProblemChart;
 }
 
 export interface RecentData {
@@ -113,7 +125,6 @@ export interface ScenarioData {
   serviceCount: number;
   recent: RecentData;
   requests: Request[];
-  allVisible: boolean;
 }
 
 export interface SettingsKind {
@@ -174,6 +185,7 @@ const toProblem = (fact: ProblemFact, overrides: FixOverrides): Problem => {
       ? "fixing"
       : null;
   const base = `autoobserve2.problems.${fact.id}`;
+  const chart = fact.chart;
   return {
     id: fact.id,
     incidentId: fact.incidentId,
@@ -192,6 +204,16 @@ const toProblem = (fact: ProblemFact, overrides: FixOverrides): Problem => {
           ? `${base}.summaryFixing`
           : `${base}.summary`,
     ),
+    chart: {
+      points: chartPoints(chart, state === "fixed"),
+      detectedAt: chart.detectedAt,
+      // A fix approved on the page lands on the latest measurement.
+      actionAt: state ? chart.points.length - 1 : chart.actionAt,
+      forecast: chart.forecast ?? 0,
+      limit: chart.limit,
+      caption: k(`${base}.chartCaption`),
+      label: k(state === "fixed" ? `${base}.chartLabelFixed` : `${base}.chartLabel`),
+    },
   };
 };
 
@@ -291,7 +313,6 @@ export const scenarioData = (scenario: Scenario): ScenarioData => {
     serviceCount: facts.services.length,
     recent: recentFor(scenario),
     requests: facts.requests.map(requestFor),
-    allVisible: !facts.gaps.length,
   };
 };
 

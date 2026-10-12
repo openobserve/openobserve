@@ -22,12 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- A size container, so the pinned rail can be capped to the visible panel rather than the viewport. -->
     <div
       v-if="!page"
-      class="mx-auto flex max-w-[47.5rem] flex-col gap-6 px-4 pt-6 pb-12 sm:pt-8 @min-[60rem]:max-w-[68rem] @min-[60rem]:px-6"
+      class="mx-auto flex max-w-[47.5rem] flex-col gap-6 px-4 pt-6 pb-12 sm:pt-8"
+      :class="suggestions.length ? '@min-[60rem]:max-w-[68rem] @min-[60rem]:px-6' : ''"
     >
       <TopBar @open="openNamed" />
-      <!-- Below the breakpoint both columns dissolve into one ordered list, so the rail's requests come first. -->
+      <!-- Below the breakpoint both columns dissolve into one ordered list, so suggestions follow the problems. -->
       <div
-        class="grid grid-cols-1 gap-6 @min-[60rem]:grid-cols-[minmax(0,44rem)_20rem] @min-[60rem]:items-start @min-[60rem]:justify-center @min-[60rem]:gap-8"
+        class="grid grid-cols-1 gap-6 @min-[60rem]:items-start @min-[60rem]:justify-center @min-[60rem]:gap-8"
+        :class="suggestions.length ? '@min-[60rem]:grid-cols-[minmax(0,44rem)_20rem]' : ''"
       >
         <div
           class="contents @min-[60rem]:flex @min-[60rem]:min-w-0 @min-[60rem]:flex-col @min-[60rem]:gap-6"
@@ -35,9 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ThisWeek
             v-model:expanded="weekExpanded"
             v-model:priority="priority"
-            class="order-2"
+            class="order-1"
             :data="data.recent"
             :problems="problems"
+            :requests="data.requests"
             @open-problem="openProblem"
           />
           <PageFooter
@@ -62,6 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <aside
+          v-if="suggestions.length"
           class="contents @min-[60rem]:sticky @min-[60rem]:top-6 @min-[60rem]:block"
           data-test="autoobserve2-rail"
         >
@@ -71,12 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve2-rail-scroll"
             @scroll="measureRail"
           >
-            <NeedsYou
-              class="order-1 shrink-0"
-              :requests="data.requests"
-              :all-visible="data.allVisible"
-              :learning="learningCount"
-            />
+            <Suggestions class="order-2 shrink-0" :requests="suggestions" />
           </div>
           <div
             v-if="railMore"
@@ -185,7 +184,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import TopBar from "@/components/autoobserve/v2/TopBar.vue";
 import ThisWeek from "@/components/autoobserve/v2/ThisWeek.vue";
-import NeedsYou from "@/components/autoobserve/v2/NeedsYou.vue";
+import Suggestions from "@/components/autoobserve/v2/Suggestions.vue";
 import PageFooter from "@/components/autoobserve/v2/PageFooter.vue";
 import AutoObserveIssueDrawer from "@/components/autoobserve/AutoObserveIssueDrawer.vue";
 import { useIssueLedger } from "@/components/autoobserve/useIssueLedger";
@@ -203,7 +202,7 @@ import { isChange } from "@/components/autoobserve/v2/changes";
 import SettingsDrawer from "@/components/autoobserve/v2/SettingsDrawer.vue";
 import HowItWorksDrawer from "@/components/autoobserve/v2/HowItWorksDrawer.vue";
 import { useScenario } from "@/components/autoobserve/data/useScenario";
-import { PROBLEMS, serviceStats } from "@/components/autoobserve/data/facts";
+import { PROBLEMS } from "@/components/autoobserve/data/facts";
 import { useDecisions } from "@/components/autoobserve/v2/useDecisions";
 import {
   SCENARIOS,
@@ -235,7 +234,8 @@ const overrides = computed(() => overridesFor(scenario.value, store.decisions, s
 
 const data = computed(() => scenarioData(scenario.value));
 const byId = computed(() => problemsFor(overrides.value));
-const learningCount = computed(() => serviceStats(scenario.value).learning);
+// Fix asks sit on their problem row, so only the rest are suggestions.
+const suggestions = computed(() => data.value.requests.filter((r) => r.kind !== "fixNow"));
 
 const problems = computed(() =>
   data.value.recent.problems.map((id) => byId.value[id]).sort(byPriority),

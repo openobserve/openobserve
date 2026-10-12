@@ -46,7 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="autoobserve2-problems"
     >
       <li v-for="problem in visible" :key="problem.id">
-        <ProblemEntry :problem="problem" @open="emit('open-problem', problem)" />
+        <ProblemEntry
+          :problem="problem"
+          :request="askFor(problem.id)"
+          @open="emit('open-problem', problem)"
+        />
       </li>
     </ul>
     <p
@@ -96,11 +100,13 @@ import {
   type PriorityFilter,
   type Problem,
   type RecentData,
+  type Request,
 } from "./fixtures";
 
 const props = defineProps<{
   data: RecentData;
   problems: Problem[];
+  requests: Request[];
 }>();
 
 const emit = defineEmits<{
@@ -131,6 +137,8 @@ const filtered = computed(() =>
 );
 
 const visible = computed(() => (expanded.value ? filtered.value : filtered.value.slice(0, LIMIT)));
+
+const askFor = (id: string) => props.requests.find((r) => r.kind === "fixNow" && r.problem === id);
 
 const select = (value: PriorityFilter) => {
   priority.value = value;

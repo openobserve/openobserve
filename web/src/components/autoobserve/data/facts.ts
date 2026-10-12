@@ -74,6 +74,20 @@ export interface Evidence {
   chart?: boolean;
 }
 
+export interface ChartFact {
+  metric: string;
+  unit: string;
+  points: number[];
+  detectedAt: number;
+  actionAt?: number;
+  // The last points are a forecast, not measurements.
+  forecast?: number;
+  limit?: number;
+  peak: number;
+  // Measured after a fix the viewer approves on the page, so it only shows once that fix is done.
+  recovery?: number[];
+}
+
 export interface Deploy {
   service: string;
   version: string;
@@ -109,9 +123,7 @@ export interface ProblemFact {
   notifiedAt?: string;
   firings: Firing[];
   steps: Step[];
-  chart: number[];
-  // The last chart points are a forecast, not measurements.
-  projected?: number;
+  chart: ChartFact;
   cause: string;
   summary: string;
   likelyCause: string;
@@ -283,6 +295,19 @@ const PAYMENTS = "slack-oncall-payments";
 const SEARCH = "slack-oncall-search";
 const PLATFORM = "slack-platform-alerts";
 
+// Every CHK-482 leak has the same shape: payments time out at 50 of 50 connections and recover 2 minutes after the fix.
+const LEAK_CHART: ChartFact = {
+  metric: "timed-out payments",
+  unit: "%",
+  points: [
+    0, 0, 0.1, 0, 0, 0, 0.1, 0, 0, 0.2, 6.2, 10.4, 11.1, 10.8, 3.9, 0.4, 0, 0.1, 0, 0, 0, 0, 0.1, 0,
+    0, 0,
+  ],
+  detectedAt: 10,
+  actionAt: 13,
+  peak: 11.1,
+};
+
 // The two earlier CHK-482 leaks share the Wednesday incident's shape; only the times and counts differ.
 const earlierLeak = (
   id: string,
@@ -364,7 +389,7 @@ const earlierLeak = (
         ]
       : []),
   ],
-  chart: [0, 1, 0, 0, 0, 1, 0, 0, 12, 17, 20, 16, 5, 1, 0, 0, 0, 1, 0, 0],
+  chart: LEAK_CHART,
   cause:
     "Refund exports check out database connections and never return them, so checkout ran out of free connections.",
   summary:
@@ -379,6 +404,11 @@ const earlierLeak = (
       kind: "metric",
       title: "Metric deviation on checkout",
       detail: "pool connections in use: 50 of 50, 0 idle",
+    },
+    {
+      kind: "metric",
+      title: "Payment timeouts on checkout",
+      detail: "about 1 in 9 payments (11%) at worst, 0 after the fix",
       chart: true,
     },
     {
@@ -471,7 +501,17 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "muted",
       },
     ],
-    chart: [20, 30, 20, 20, 30, 410, 580, 630, 550, 610, 670, 590, 640, 600],
+    chart: {
+      metric: "p95 latency",
+      unit: "s",
+      points: [
+        0.37, 0.39, 0.38, 0.36, 0.38, 0.4, 0.37, 0.38, 0.41, 0.52, 1.1, 1.9, 2.6, 3.1, 3.3, 2.9,
+        3.4, 3.2, 3.0, 3.4, 3.3, 3.1, 3.4, 3.2, 3.3, 3.4,
+      ],
+      detectedAt: 13,
+      peak: 3.4,
+      recovery: [2.2, 0.7, 0.4, 0.38],
+    },
     cause:
       "A 10:16 change raised search-2's query cache to 60% of heap. The heap fills within minutes of each restart, the node stalls in GC, then exits on OutOfMemoryError.",
     summary:
@@ -504,6 +544,11 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         kind: "metric",
         title: "Metric deviation on search",
         detail: "jvm.memory.used{pod=search-2}: 99% of 16 GB; other nodes 55–62%",
+      },
+      {
+        kind: "metric",
+        title: "Latency on search",
+        detail: "p95 latency: 3.4 s (baseline 0.38 s), high since 10:27",
         chart: true,
       },
     ],
@@ -577,8 +622,15 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "muted",
       },
     ],
-    chart: [334, 340, 346, 352, 358, 364, 370, 376, 382, 388, 394, 409, 427, 445, 463, 481, 500],
-    projected: 3,
+    chart: {
+      metric: "disk used",
+      unit: "GB",
+      points: [334, 340, 346, 352, 358, 364, 370, 376, 382, 388, 394, 409, 427, 445, 463, 481, 500],
+      detectedAt: 13,
+      forecast: 3,
+      limit: 500,
+      peak: 445,
+    },
     cause:
       "orders 3.8.0 turned order-audit logging up on Thursday, so orders-db's disk grows about 18 GB a day instead of 6.",
     summary:
@@ -674,7 +726,17 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "primary",
       },
     ],
-    chart: [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 22, 31, 28, 34, 30],
+    chart: {
+      metric: "failed payments",
+      unit: "%",
+      points: [
+        0.1, 0.12, 0.09, 0.1, 0.11, 0.08, 0.1, 0.13, 0.1, 0.09, 0.11, 0.1, 0.12, 0.1, 0.09, 0.1,
+        0.11, 2.4, 11.8, 15.6, 16.3, 15.9, 16.8, 15.7, 16.2, 16.5, 15.8, 16.1,
+      ],
+      detectedAt: 18,
+      peak: 16.8,
+      recovery: [9.4, 1.2, 0.2, 0.1],
+    },
     cause:
       "Not confirmed yet. Failures come only from pods running checkout 2.4.0, deployed at 10:41.",
     summary:
@@ -761,7 +823,16 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
-    chart: [0, 0, 0, 1, 4, 7, 9, 8, 6, 3, 1, 0, 0],
+    chart: {
+      metric: "email delay",
+      unit: "min",
+      points: [
+        0.1, 0.1, 0.12, 0.1, 0.1, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.2, 8.8, 8.1, 7.3, 6.5,
+        5.6, 4.8, 4.0, 3.2, 2.5, 1.9, 1.3, 0.8, 0.5, 0.3, 0.1, 0.1, 0.12, 0.1, 0.1, 0.1, 0.1, 0.1,
+      ],
+      detectedAt: 7,
+      peak: 9.2,
+    },
     cause:
       "At 03:12 all 4 email-worker pods were replaced at once; nothing consumed the queue for about 8 minutes, and it drained by 03:36.",
     summary:
@@ -848,7 +919,7 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
-    chart: [0, 1, 0, 0, 1, 0, 0, 0, 14, 19, 21, 18, 6, 1, 0, 0, 1, 0, 0, 0],
+    chart: LEAK_CHART,
     cause:
       "Refund exports check out database connections and never return them. At 11:18 checkout had none free.",
     summary:
@@ -863,6 +934,11 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         kind: "metric",
         title: "Metric deviation on checkout",
         detail: "pool connections in use: 50 of 50, 0 idle",
+      },
+      {
+        kind: "metric",
+        title: "Payment timeouts on checkout",
+        detail: "about 1 in 9 payments (11%) at worst, 0 after the fix",
         chart: true,
       },
       {
@@ -982,7 +1058,18 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
-    chart: [1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 12, 17, 19, 18, 21, 16, 9, 2, 1, 0, 1, 0],
+    chart: {
+      metric: "failed payments",
+      unit: "%",
+      points: [
+        0.1, 0.12, 0.09, 0.1, 0.11, 0.08, 0.1, 0.13, 0.1, 0.1, 6.9, 8.1, 8.3, 8.2, 8.0, 8.3, 7.9,
+        8.2, 8.1, 8.3, 7.4, 6.1, 4.8, 3.6, 2.5, 1.6, 0.9, 0.4, 0.12, 0.1, 0.09, 0.11, 0.1, 0.1,
+        0.08, 0.1,
+      ],
+      detectedAt: 10,
+      actionAt: 19,
+      peak: 8.3,
+    },
     cause:
       "payments-api 2.3.1 raised each pod's connection pool from 20 to 50; 6 pods asked for more than payments-db's 200 connections.",
     summary:
@@ -1075,7 +1162,17 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
-    chart: [26, 25, 27, 26, 71, 89, 94, 92, 88, 64, 31, 27, 26],
+    chart: {
+      metric: "p95 latency",
+      unit: "s",
+      points: [
+        0.26, 0.25, 0.27, 0.26, 0.26, 0.25, 0.26, 0.27, 0.27, 0.52, 0.78, 0.89, 0.94, 0.92, 0.9,
+        0.93, 0.91, 0.94, 0.9, 0.88, 0.92, 0.89, 0.86, 0.71, 0.45, 0.29, 0.26, 0.27, 0.26, 0.25,
+        0.26, 0.26, 0.27, 0.26, 0.25, 0.26,
+      ],
+      detectedAt: 10,
+      peak: 0.94,
+    },
     cause:
       "The nightly cache rebuild was started by hand at 16:38, during peak traffic, and finished by itself.",
     summary: "Recommendations went from about 0.26 s to 0.94 s for 15 minutes. Pages still loaded.",
@@ -1161,7 +1258,17 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
-    chart: [1, 0, 1, 0, 1, 31, 36, 34, 38, 33, 35, 37, 2, 1, 0],
+    chart: {
+      metric: "rejected requests",
+      unit: "%",
+      points: [
+        0.3, 0.35, 0.3, 0.32, 0.28, 0.33, 0.31, 0.3, 0.32, 1.6, 3.1, 3.3, 3.4, 3.2, 3.3, 3.4, 3.3,
+        3.2, 3.4, 3.3, 3.2, 3.3, 3.1, 0.6, 0.3, 0.32, 0.29, 0.3, 0.31, 0.3, 0.33, 0.3, 0.29, 0.3,
+      ],
+      detectedAt: 10,
+      actionAt: 22,
+      peak: 3.4,
+    },
     cause: "A config change at 15:20 cut the sign-in token lifetime from 3600 s to 60 s.",
     summary: "The API rejected about 1 in 30 requests with 401 for 13 minutes.",
     likelyCause:
@@ -1254,7 +1361,17 @@ export const PROBLEMS: Record<string, ProblemFact> = {
       },
       { at: "22:10", by: "event", title: "Resolved", detail: "Queue empty", variant: "success" },
     ],
-    chart: [0, 0, 0.1, 0.6, 1.4, 2.1, 2.9, 3.6, 4.1, 3.4, 2.2, 1.1, 0.3, 0],
+    chart: {
+      metric: "orders waiting",
+      unit: "orders",
+      points: [
+        30, 45, 90, 220, 420, 680, 960, 1300, 1650, 2000, 2350, 2700, 3000, 3300, 3600, 3900, 4120,
+        3850, 3400, 2900, 2350, 1800, 1250, 750, 320, 40, 30, 40, 30,
+      ],
+      detectedAt: 5,
+      actionAt: 16,
+      peak: 4120,
+    },
     cause:
       "The 21:20 migration left index orders_by_status invalid, so lookups scanned the whole table; adding workers didn't help.",
     summary: "Orders piled up to about 4,000 behind for 40 minutes.",
@@ -1326,7 +1443,16 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
-    chart: [4, 5, 4, 96, 118, 128, 121, 110, 97, 40, 6, 4],
+    chart: {
+      metric: "delivery delay",
+      unit: "s",
+      points: [
+        4, 5, 4, 4, 30, 96, 118, 128, 121, 115, 124, 119, 110, 117, 122, 108, 97, 84, 52, 18, 6, 4,
+        4, 5, 4, 4,
+      ],
+      detectedAt: 5,
+      peak: 128,
+    },
     cause: "The outside push provider was slow.",
     summary: "Push notifications arrived about 2 minutes late for 30 minutes.",
     likelyCause: "Provider API latency rose 30× from 13:48.",
@@ -1404,7 +1530,18 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
-    chart: [3, 2, 4, 3, 38, 52, 61, 58, 63, 55, 49, 12, 4, 3],
+    chart: {
+      metric: "p95 sign-in time",
+      unit: "s",
+      points: [
+        0.6, 0.6, 0.7, 0.8, 1.1, 1.9, 3.4, 4.6, 5.2, 5.5, 5.8, 5.6, 5.4, 5.7, 5.5, 5.8, 5.6, 5.3,
+        5.5, 5.7, 5.4, 5.6, 5.5, 5.3, 5.6, 5.4, 5.5, 4.4, 3.1, 2.0, 1.2, 0.8, 0.6, 0.6, 0.6, 0.5,
+        0.6, 0.6, 0.6, 0.6,
+      ],
+      detectedAt: 7,
+      actionAt: 26,
+      peak: 5.8,
+    },
     cause: "The session cache filled up after traffic doubled.",
     summary: "1 in 8 people waited more than 5 s to sign in for 25 minutes.",
     likelyCause:
@@ -1475,7 +1612,16 @@ export const PROBLEMS: Record<string, ProblemFact> = {
         variant: "success",
       },
     ],
-    chart: [0, 0, 1, 9, 12, 11, 10, 8, 6, 3, 0, 0],
+    chart: {
+      metric: "failed uploads",
+      unit: "%",
+      points: [
+        0.05, 0.05, 0.04, 0.05, 0.06, 0.05, 0.05, 0.04, 0.05, 0.9, 2.1, 2.4, 2.3, 2.4, 2.2, 2.3,
+        2.4, 2.2, 2.3, 1.6, 0.3, 0.05, 0.05, 0.04, 0.05, 0.06, 0.05, 0.05, 0.04, 0.05, 0.05,
+      ],
+      detectedAt: 10,
+      peak: 2.4,
+    },
     cause:
       "The certificate expired at 07:04. Its replacement was only issued at 06:58, and 1 of the 12 servers didn't load it until 07:15.",
     summary: "About 1 in 40 image uploads failed for 10 minutes.",
@@ -2107,6 +2253,10 @@ export const EVENT_PROBLEM: Record<string, string> = {
   recsHeld: "recs",
   loginPaged: "login",
 };
+
+// The fix's recovery is only measured once the viewer's approved fix is done.
+export const chartPoints = (chart: ChartFact, fixed: boolean) =>
+  fixed && chart.recovery ? [...chart.points, ...chart.recovery] : chart.points;
 
 export const scenarioFacts = (scenario: Scenario): ScenarioFact => {
   const services = servicesFor(scenario);
