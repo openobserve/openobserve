@@ -235,7 +235,7 @@ describe("McpServerCard", () => {
       );
     });
 
-    // CopyContent expanded [BASIC_PASSCODE] on screen, printing a real credential.
+    // CredentialCodeBlock expanded [BASIC_PASSCODE] on screen, printing a real credential.
     it("shows a placeholder header, not a credential, before generating", () => {
       const wrapper = mountCard();
       const block = configBlock(wrapper);

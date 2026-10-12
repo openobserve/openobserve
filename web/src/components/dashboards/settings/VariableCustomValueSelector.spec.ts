@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, VueWrapper, config } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper, config } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import VariableCustomValueSelector from "./VariableCustomValueSelector.vue";
@@ -90,7 +90,8 @@ describe("VariableCustomValueSelector", () => {
               "selectAll",
               "labelPosition",
             ],
-            emits: ["update:modelValue", "update:model-value"],
+            name: "OSelect",
+            emits: ["update:modelValue", "update:model-value", "close"],
             methods: {
               handleChange(e: Event) {
                 const target = e.target as HTMLSelectElement;
@@ -195,61 +196,93 @@ describe("VariableCustomValueSelector", () => {
   });
 
   describe("emitted events", () => {
-    it("emits update:modelValue when selectedValue changes", async () => {
+    it("single-select emits the picked value once", async () => {
       wrapper = mountComponent();
 
-      // Set selectedValue directly to trigger the watch
-      wrapper.vm.selectedValue = "staging";
+      wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:model-value", "staging");
       await nextTick();
 
-      const emitted = wrapper.emitted("update:modelValue");
-      expect(emitted).toBeTruthy();
-      expect(emitted?.[0]?.[0]).toBe("staging");
+      expect(wrapper.emitted("update:modelValue")).toEqual([["staging"]]);
     });
 
-    it("emits update:modelValue for array values in multiSelect", async () => {
+    it("multi-select does not emit while options are toggled", async () => {
       wrapper = mountComponent({ variableItem: multiSelectItem });
 
-      wrapper.vm.selectedValue = ["staging", "development"];
+      wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:model-value", ["staging"]);
+      wrapper
+        .findComponent({ name: "OSelect" })
+        .vm.$emit("update:model-value", ["staging", "development"]);
       await nextTick();
 
-      const emitted = wrapper.emitted("update:modelValue");
-      expect(emitted).toBeTruthy();
-      expect(emitted?.[0]?.[0]).toEqual(["staging", "development"]);
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+      expect(wrapper.vm.selectedValue).toEqual(["staging", "development"]);
     });
 
-    it("emits when selectedValue is set to null", async () => {
-      wrapper = mountComponent();
+    it("multi-select emits the final selection once when the dropdown closes", async () => {
+      wrapper = mountComponent({ variableItem: multiSelectItem });
+      const select = wrapper.findComponent({ name: "OSelect" });
 
-      wrapper.vm.selectedValue = null;
+      select.vm.$emit("update:model-value", ["staging"]);
+      select.vm.$emit("update:model-value", ["staging", "development"]);
+      select.vm.$emit("close");
       await nextTick();
 
-      const emitted = wrapper.emitted("update:modelValue");
-      expect(emitted).toBeTruthy();
-      expect(emitted?.[0]?.[0]).toBe(null);
+      expect(wrapper.emitted("update:modelValue")).toEqual([[["staging", "development"]]]);
     });
 
-    it("emits when selectedValue is set to empty string", async () => {
-      wrapper = mountComponent();
+    it("multi-select closing without a change emits nothing", async () => {
+      wrapper = mountComponent({ variableItem: multiSelectItem });
 
-      wrapper.vm.selectedValue = "";
+      wrapper.findComponent({ name: "OSelect" }).vm.$emit("close");
       await nextTick();
 
-      const emitted = wrapper.emitted("update:modelValue");
-      expect(emitted).toBeTruthy();
-      expect(emitted?.[0]?.[0]).toBe("");
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
     });
 
-    it("does not emit on initial mount (before any changes)", async () => {
+    it("an external value change does not echo back as an emit", async () => {
       wrapper = mountComponent();
+
+      await wrapper.setProps({ variableItem: { ...defaultVariableItem, value: "staging" } });
+
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+    });
+  });
+
+  describe("with the real OSelect", () => {
+    it("multi-select applies the ticks when Escape closes the dropdown", async () => {
+      wrapper = mount(VariableCustomValueSelector, {
+        attachTo: document.body,
+        props: { modelValue: multiSelectItem.value, variableItem: multiSelectItem },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+      wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", ["development"]);
       await nextTick();
 
-      // The watcher fires immediately (immediate: true) but it's a watch
-      // on props.variableItem.value, not on selectedValue itself.
-      // The selectedValue watcher fires manually when it changes.
-      // On mount, selectedValue is set but the watcher may fire.
-      // Just verify the component is mounted and functional.
-      expect(wrapper.exists()).toBe(true);
+      const target =
+        document.body.querySelector<HTMLElement>('input[placeholder="Search..."]') ??
+        document.activeElement ??
+        document.body;
+      target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await flushPromises();
+
+      expect(wrapper.emitted("update:modelValue")).toEqual([[["development"]]]);
+    });
+
+    it("multi-select applies on the real select's close event", async () => {
+      wrapper = mount(VariableCustomValueSelector, {
+        props: { modelValue: multiSelectItem.value, variableItem: multiSelectItem },
+      });
+      const select = wrapper.findComponent({ name: "OSelect" });
+      expect(select.exists()).toBe(true);
+
+      select.vm.$emit("update:modelValue", ["development"]);
+      await nextTick();
+      expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+
+      select.vm.$emit("close");
+      await nextTick();
+      expect(wrapper.emitted("update:modelValue")).toEqual([[["development"]]]);
     });
   });
 

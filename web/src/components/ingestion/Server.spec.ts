@@ -418,3 +418,46 @@ describe("Server Component", () => {
     });
   });
 });
+
+describe("Server: Get started pick", () => {
+  const PICK_KEY = `o2.onboarding.firstSource.${store.state.selectedOrganization.identifier}`;
+  const mountRail = () =>
+    mount(Server, {
+      ...mountOptions,
+      global: {
+        ...mountOptions.global,
+        stubs: {
+          DataSourceSidebarLayout: {
+            props: ["tabs"],
+            template:
+              '<div><slot name="tabs" :tabs="tabs" filter=""><span data-test="default-rail" /></slot></div>',
+          },
+          ORouteTab: true,
+          "router-view": true,
+        },
+      },
+    });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it("pins nginx under Your pick and lists the other servers under Web Servers", () => {
+    localStorage.setItem(PICK_KEY, "webserver");
+    const wrapper = mountRail();
+    expect(wrapper.find('[data-test="ingestion-servers-pick-group"]').text()).toBe("Your pick");
+    expect(wrapper.find('[data-test="ingestion-servers-pick-tab-nginx"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="ingestion-servers-rest-group"]').text()).toBe("Web Servers");
+    const names = wrapper.findAllComponents({ name: "ORouteTab" }).map((c) => c.props("name"));
+    expect(names).toEqual(["nginx", "iis"]);
+    wrapper.unmount();
+  });
+
+  it("keeps the default rail for a pick from another rail", () => {
+    localStorage.setItem(PICK_KEY, "kubernetes");
+    const wrapper = mountRail();
+    expect(wrapper.find('[data-test="default-rail"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="ingestion-servers-pick-group"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});

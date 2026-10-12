@@ -410,14 +410,14 @@ describe("OrganizationSettings", () => {
       expect(getForm(wrapper).vm.form.state.values.redInsightsEnabled).toBe(false);
     });
 
-    it("prefills the switch on when the settings carry no value", () => {
+    it("prefills the switch off when the settings carry no value", () => {
       config.isEnterprise = "true";
       mockStore.state.organizationData.organizationSettings = {
         trace_id_field_name: "trace_id",
         span_id_field_name: "span_id",
       };
       const wrapper = createWrapper();
-      expect(getForm(wrapper).vm.form.state.values.redInsightsEnabled).toBe(true);
+      expect(getForm(wrapper).vm.form.state.values.redInsightsEnabled).toBe(false);
     });
 
     it("keeps the help text in a hover tooltip on the info icon, under a Traces heading", () => {

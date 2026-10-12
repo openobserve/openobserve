@@ -459,4 +459,72 @@ describe("UsageTab", () => {
       expect(wrapper.exists()).toBe(true);
     });
   });
+  describe("summary failure with the empty-data flag on", () => {
+    let originalZoConfig: Record<string, unknown>;
+
+    beforeEach(() => {
+      originalZoConfig = { ...store.state.zoConfig };
+      store.commit("setConfig", { ...originalZoConfig, restricted_routes_on_empty_data: true });
+    });
+
+    afterEach(() => {
+      store.commit("setConfig", originalZoConfig);
+    });
+
+    it("should show the load-error state with Retry instead of the populated layout", async () => {
+      vi.mocked(orgService.get_organization_summary).mockRejectedValueOnce(
+        new Error("Network failure"),
+      );
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="usage-load-error-empty-state"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="home-usage-tab-no-data"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("Retry");
+    });
+
+    it("should raise neither the loading toast nor the error toast", async () => {
+      vi.mocked(orgService.get_organization_summary).mockRejectedValueOnce(
+        new Error("Network failure"),
+      );
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(mockNotify).not.toHaveBeenCalled();
+    });
+
+    it("should load the summary again when Retry is clicked", async () => {
+      vi.mocked(orgService.get_organization_summary).mockRejectedValueOnce(
+        new Error("Network failure"),
+      );
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      await wrapper.find('[data-test="usage-load-error-empty-state"] button').trigger("click");
+      await flushPromises();
+
+      expect(orgService.get_organization_summary).toHaveBeenCalledTimes(2);
+      expect(wrapper.find('[data-test="usage-load-error-empty-state"]').exists()).toBe(false);
+    });
+  });
+
+  describe("summary failure with the empty-data flag off", () => {
+    it("should keep today's loading toast and error toast", async () => {
+      vi.mocked(orgService.get_organization_summary).mockRejectedValueOnce(
+        new Error("Network failure"),
+      );
+
+      wrapper = mountUsageTab();
+      await flushPromises();
+
+      expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({ variant: "loading" }));
+      expect(mockNotify).toHaveBeenCalledWith({
+        variant: "error",
+        message: "Error while pulling summary.",
+      });
+      expect(wrapper.find('[data-test="usage-load-error-empty-state"]').exists()).toBe(false);
+    });
+  });
 });
