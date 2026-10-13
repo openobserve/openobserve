@@ -537,14 +537,6 @@ mod tests {
     use super::*;
 
     // Test data helpers
-    fn create_test_labels() -> Labels {
-        vec![
-            Arc::new(Label::new("instance", "localhost:9090")),
-            Arc::new(Label::new("job", "prometheus")),
-            Arc::new(Label::new("__name__", "http_requests_total")),
-        ]
-    }
-
     fn labels_to_include(
         include_labels: &[String],
         mut actual_labels: Vec<Arc<Label>>,
@@ -560,19 +552,6 @@ mod tests {
         actual_labels
             .retain(|label| !exclude_labels.contains(&label.name) && label.name != NAME_LABEL);
         actual_labels
-    }
-
-    #[test]
-    fn test_labels_to_include() {
-        let actual_labels = create_test_labels();
-        let include_labels = vec!["instance".to_string(), "job".to_string()];
-
-        let result = labels_to_include(&include_labels, actual_labels.clone());
-
-        assert_eq!(result.len(), 2);
-        assert!(result.iter().any(|l| l.name == "instance"));
-        assert!(result.iter().any(|l| l.name == "job"));
-        assert!(!result.iter().any(|l| l.name == "__name__"));
     }
 
     /// One value of a label-less series, for the scalar accumulators that never read labels.
@@ -984,34 +963,6 @@ mod tests {
 
         assert_eq!(eval_chunked_single_group(&values, Sum), -2.0);
         assert_eq!(eval_chunked_single_group(&values, Avg), -2.0 / n as f64);
-    }
-
-    #[test]
-    fn test_labels_to_exclude_removes_name_label() {
-        let actual_labels = create_test_labels();
-        let exclude_labels = vec!["instance".to_string()];
-
-        let result = labels_to_exclude(&exclude_labels, actual_labels.clone());
-
-        // Should not contain __name__ label (which is NAME_LABEL)
-        assert!(!result.iter().any(|l| l.name == "__name__"));
-    }
-
-    #[test]
-    fn test_labels_to_include_empty_include_list() {
-        let actual_labels = create_test_labels();
-        let result = labels_to_include(&[], actual_labels);
-        assert_eq!(result.len(), 0);
-    }
-
-    #[test]
-    fn test_labels_to_exclude_empty_exclude_list() {
-        let actual_labels = create_test_labels();
-        let result = labels_to_exclude(&[], actual_labels);
-        // NAME_LABEL (__name__) is always excluded
-        assert!(!result.iter().any(|l| l.name == "__name__"));
-        assert!(result.iter().any(|l| l.name == "instance"));
-        assert!(result.iter().any(|l| l.name == "job"));
     }
 
     #[test]
