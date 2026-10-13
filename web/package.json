@@ -84,7 +84,7 @@
     "moment-timezone": "^0.6.5",
     "monaco-editor": "^0.52.2",
     "re2js": "^2.8.6",
-    "reka-ui": "^2.11.0",
+    "reka-ui": "2.10.1",
     "reodotdev": "^1.1.0",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "rollup-plugin-polyfill-node": "^0.13.0",
@@ -96,7 +96,7 @@
     "vue-i18n": "^11.4.14",
     "vue-router": "^4.6.4",
     "vuex": "^4.1.0",
-    "zod": "^4.6.7"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@cypress/vue": "^6.0.3",
