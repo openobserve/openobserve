@@ -58,7 +58,7 @@
           class="hover:bg-interactive-hover-bg h-8 transition-all duration-200"
           data-test="dashboard-viewpanel-refresh-interval"
         />
-        <OButtonGroup>
+        <OButtonGroup class="shrink-0">
           <OButton
             v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
             variant="outline-destructive"
@@ -93,7 +93,7 @@
               <OButton
                 :variant="showApplyHint ? 'warning' : 'outline'"
                 size="icon-sm"
-                class="w-5"
+                class="w-5!"
                 :disabled="disable"
                 :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
                 data-test="dashboard-viewpanel-refresh-options-btn"
