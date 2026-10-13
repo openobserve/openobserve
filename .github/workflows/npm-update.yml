@@ -47,12 +47,14 @@ jobs:
           node-version: 24
 
       - name: Configure Git
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
         run: |
-          # Commit as a real user rather than the bot, so the commit and the PR
-          # share one author and the PR shows up under their own filters.
-          # Without these, `git commit` below aborts with "Please tell me who you
-          # are" — Actions runners have no global git identity of their own.
-          
+          # Commit as the PAT owner so the commit and the PR share one author.
+          read -r LOGIN ID < <(gh api user --jq '"\(.login) \(.id)"')
+          git config user.name "$LOGIN"
+          git config user.email "${ID}+${LOGIN}@users.noreply.github.com"
+
       - name: Create update branch
         run: |
           BRANCH_NAME="chore/npm-update-$(date +%Y%m%d)"
