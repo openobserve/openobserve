@@ -580,6 +580,14 @@ describe("AppRoles - ODialog/ODrawer Migration", () => {
 // "Assign a role" link (?member=<email>), which used to just redirect here
 // with no way to actually add the account to a role.
 describe("AppRoles - quick-assign via ?member=", () => {
+  // Earlier tests leave real navigations in flight; one awaited navigation cancels them first.
+  beforeEach(async () => {
+    await router.replace({
+      name: "roles",
+      query: { org_identifier: store.state.selectedOrganization.identifier },
+    });
+  });
+
   afterEach(() => {
     router.currentRoute.value.query = {};
   });

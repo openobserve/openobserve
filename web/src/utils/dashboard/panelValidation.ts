@@ -120,7 +120,7 @@ const validateHistogramIntervalArgument = (
  * @param conditions the conditions array
  * @param errors the array to push the errors to
  */
-function validateConditions(t: TranslateFn, conditions: any, errors: any) {
+export function validateConditions(t: TranslateFn, conditions: any, errors: any) {
   conditions.forEach((it: any) => {
     if (it.filterType === "condition") {
       validateConditionItem(t, it, errors);
@@ -758,7 +758,7 @@ const validateJoinField = (t: TranslateFn, join: any, errors: string[], joinInde
   });
 };
 
-const validateJoinFields = (t: TranslateFn, joins: any, errors: string[]) => {
+export const validateJoinFields = (t: TranslateFn, joins: any, errors: string[]) => {
   // validate join fields
   if (joins) {
     joins.forEach((join: any, index: number) => validateJoinField(t, join, errors, index));

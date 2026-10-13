@@ -75,13 +75,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OToggleGroupItem
               v-if="store.state.zoConfig.timechart_enabled"
               data-test="logs-visualize-toggle"
-              :disabled="isVisualizeDisabled"
+              :aria-label="t('search.visualize')"
+              focusable-unavailable
+              :disabled="isVisualizeDisabled || !!visualizeReason"
               :tooltip="
                 isVisualizeDisabled
                   ? t('search.enableSqlModeOrSelectSingleStream')
-                  : toolbarToggleIconOnly
-                    ? t('search.visualize')
-                    : undefined
+                  : visualizeReason
+                    ? visualizeReason
+                    : toolbarToggleIconOnly
+                      ? t('search.visualize')
+                      : undefined
               "
               value="visualize"
               size="sm"
@@ -285,10 +289,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="icon-xs-sq"
                         icon-left="edit"
                         class="ms-auto"
-                        :title="t('search.updateSavedViewWithCurrent')"
+                        :aria-label="t('search.updateSavedViewWithCurrent')"
+                        :disabled="!!saveViewReason"
+                        focusable-unavailable
                         :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
                         @click.stop.prevent="quickUpdateSavedView(view)"
-                      />
+                        @keydown.enter.stop.prevent="quickUpdateSavedView(view)"
+                        @keydown.space.stop
+                      >
+                        <template #unavailable-reason>{{ saveViewReason }}</template>
+                      </OButton>
                     </template>
                   </ODropdownItem>
                 </div>
@@ -300,6 +310,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdownItem
                 icon-left="save"
                 data-test="logs-search-bar-saved-views-menu-create"
+                :disabled="!!saveViewReason"
+                focusable-unavailable
+                :description="saveViewReason || saveViewNote"
                 @select="fnSavedView"
               >
                 {{ t("search.createSavedView") }}
@@ -315,12 +328,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSeparator vertical />
             <OButton
               data-test="logs-search-bar-saved-views-pinned-create-btn"
+              :aria-label="t('search.createSavedView')"
               variant="ghost"
               size="icon-panel"
+              :disabled="!!saveViewReason"
+              focusable-unavailable
               @click="fnSavedView"
             >
               <OIcon name="save" size="sm" />
-              <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
+              <OTooltip :content="saveViewReason || t('search.createSavedView')" :side-offset="6" />
+              <template #unavailable-reason>{{ saveViewReason }}</template>
             </OButton>
           </OButtonGroup>
 
@@ -556,6 +573,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdownItem
               data-test="logs-search-bar-menu-create-saved-view-btn"
               shortcut-id="logsSaveView"
+              :disabled="!!saveViewReason"
+              focusable-unavailable
+              :description="saveViewReason || saveViewNote"
               @select="fnSavedView"
             >
               <template #icon-left>
@@ -640,6 +660,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm-action"
               :show-label="true"
+              :disabled="!!shareReason"
+              :tooltip="shareReason || undefined"
               class="w-full"
             />
           </div>
@@ -669,60 +691,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- DOWNLOADS -->
           <ODropdownGroup :label="t('search.menuGroupDownloads')">
             <!-- Download results — nested sub-dropdown (hover to open) -->
-            <div
+            <ODropdownSub
+              v-if="!isDownloadDisabled"
+              v-model:open="showDownloadSubmenu"
               data-test="search-download-submenu-trigger"
-              :aria-disabled="isDownloadDisabled || undefined"
-              @mouseenter="!isMobile && !isDownloadDisabled && (showDownloadSubmenu = true)"
-              @mouseleave="!isMobile && (showDownloadSubmenu = false)"
-              @click="onDownloadRowClick"
-              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-[''] max-md:flex-wrap"
-              :class="{
-                'text-text-muted cursor-not-allowed! hover:bg-transparent!': isDownloadDisabled,
-              }"
+              :text-value="t('search.downloadTable')"
+              :description="downloadNote"
             >
-              <span
-                class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+              <template #icon-left>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon size="sm" name="download" />
+                </span>
+              </template>
+              <template #trigger>{{ t("search.downloadTable") }}</template>
+              <template #icon-right><OIcon size="sm" name="chevron-right" /></template>
+              <ODropdownItem
+                data-test="search-download-csv-btn"
+                icon-left="grid-on"
+                :disabled="isDownloadDisabled"
+                @select="downloadLogs(searchObj.data.queryResults.hits, 'csv')"
+                >{{ t("search.downloadCSV") }}</ODropdownItem
               >
-                <OIcon size="sm" name="download" />
-              </span>
-              <span class="flex-1 whitespace-nowrap">{{ t("search.downloadTable") }}</span>
-              <OIcon size="sm" name="chevron-right" />
+              <ODropdownItem
+                data-test="search-download-json-btn"
+                icon-left="data-object"
+                :disabled="isDownloadDisabled"
+                @select="downloadLogs(searchObj.data.queryResults.hits, 'json')"
+                >{{ t("search.downloadJSON") }}</ODropdownItem
+              >
+            </ODropdownSub>
 
-              <div
-                v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 me-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)] max-md:static max-md:me-0 max-md:mt-1 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none"
-                data-test="search-download-submenu"
-              >
-                <button
-                  type="button"
-                  data-test="search-download-csv-btn"
-                  class="text-text-body hover:bg-interactive-hover-bg flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left [line-height:1.2] text-[var(--text-sm)]"
-                  @click="
-                    downloadLogs(searchObj.data.queryResults.hits, 'csv');
-                    showDownloadSubmenu = false;
-                  "
+            <ODropdownItem
+              v-else
+              data-test="search-download-submenu-trigger"
+              disabled
+              focusable-unavailable
+              :description="downloadReason"
+              :text-value="t('search.downloadTable')"
+            >
+              <template #icon-left>
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
                 >
-                  <OIcon name="grid-on" size="sm" />
-                  <span class="flex-1">{{ t("search.downloadCSV") }}</span>
-                </button>
-                <button
-                  type="button"
-                  data-test="search-download-json-btn"
-                  class="text-text-body hover:bg-interactive-hover-bg flex w-full cursor-pointer items-center gap-2.5 border-0 bg-transparent px-3 py-1.5 text-left [line-height:1.2] text-[var(--text-sm)]"
-                  @click="
-                    downloadLogs(searchObj.data.queryResults.hits, 'json');
-                    showDownloadSubmenu = false;
-                  "
-                >
-                  <OIcon name="data-object" size="sm" />
-                  <span class="flex-1">{{ t("search.downloadJSON") }}</span>
-                </button>
-              </div>
-            </div>
+                  <OIcon size="sm" name="download" />
+                </span>
+              </template>
+              {{ t("search.downloadTable") }}
+              <template #icon-right
+                ><OIcon size="sm" name="chevron-right" class="text-text-secondary"
+              /></template>
+            </ODropdownItem>
 
             <ODropdownItem
               data-test="logs-search-bar-download-custom-range-btn"
-              :disabled="isDownloadDisabled"
+              :disabled="isDownloadDisabled || !!customRangeReason"
+              focusable-unavailable
+              :description="customRangeReason || downloadReason || customRangeNote"
               @select="toggleCustomDownloadDialog"
             >
               <template #icon-left>
@@ -744,11 +770,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownGroup :label="t('search.menuGroupSchedule')">
             <template v-if="!scheduledSearchAccess.allowed" #label-action>
-              <OIcon name="lock" size="xs" class="text-warning-600" />
+              <OIcon
+                name="lock"
+                size="xs"
+                class="text-warning-600"
+                data-test="search-scheduler-locked-icon"
+              />
             </template>
 
             <ODropdownItem
               data-test="search-scheduler-create-new-btn"
+              :disabled="scheduledSearchAccess.allowed && !!scheduleJobReason"
+              focusable-unavailable
+              :description="
+                scheduledSearchAccess.allowed ? scheduleJobReason || scheduleJobNote : undefined
+              "
               @select="scheduledSearchAccess.allowed ? createScheduleJob() : openUpgradeDialog()"
             >
               <template #icon-left>
@@ -802,6 +838,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :source="createAlertSource"
               :build="buildAlertPrefill"
               :disabled-reason="createAlertDisabledReason"
+              :note="createAlertNote"
               data-test="logs-create-alert-btn"
             >
               <!-- Same icon badge every other item in this menu uses, so the
@@ -863,6 +900,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :url="shareURL"
           variant="outline"
           size="icon-toolbar"
+          :disabled="!!shareReason"
+          :tooltip="shareReason || undefined"
           class="order-3"
         />
         <!-- Function Editor (pinned) — sits to the left of the date picker -->
@@ -973,6 +1012,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t('search.runQuery')
                   "
                   :disabled="
+                    buildRunBlocked ||
                     isGeneratingSQL ||
                     (isNaturalLanguageDetected &&
                       !searchObj.meta.nlpMode &&
@@ -1024,7 +1064,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
-                      config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length
+                      buildRunBlocked ||
+                      (config.isEnterprise === 'true' && !!visualizeSearchRequestTraceIds.length)
                     "
                     @select="handleRunQueryFn(true)"
                   >
@@ -1059,6 +1100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : t('search.runQuery')
                   "
                   :disabled="
+                    buildRunBlocked ||
                     disable ||
                     isGeneratingSQL ||
                     (isNaturalLanguageDetected &&
@@ -1111,7 +1153,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
-                      config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length
+                      buildRunBlocked ||
+                      (config.isEnterprise === 'true' && !!visualizeSearchRequestTraceIds.length)
                     "
                     @select="handleRunQueryFn(true)"
                   >
@@ -1133,29 +1176,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="t('search.cancel')"
                 size="sm-toolbar"
                 class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-default h-[1.875rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                @click="cancelPatterns"
+                @click="autoRun.engine.cancelGeneration(null, { cause: 'user' })"
                 >{{ t("search.cancel") }}</OButton
               >
-              <!-- Cancel button for logs tab (enterprise only, trace-based) -->
               <OButton
-                v-else-if="
-                  config.isEnterprise == 'true' &&
-                  (!!searchObj.data.searchRequestTraceIds.length ||
-                    !!searchObj.data.searchWebSocketTraceIds.length) &&
-                  (searchObj.loading == true || searchObj.loadingHistogram == true)
-                "
+                v-else-if="isGridInFlight"
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 variant="primary"
                 :title="t('search.cancel')"
                 size="sm-toolbar"
-                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow h-[1.875rem]! w-[5.875rem]! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
-                :class="
-                  config.isEnterprise == 'true'
-                    ? 'rounded-s-default! rounded-e-none!'
-                    : 'rounded-default'
-                "
-                @click="cancelQuery"
+                class="bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow rounded-s-default! h-[1.875rem]! w-[5.875rem]! rounded-e-none! p-0 px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]"
+                @click="cancelRun"
                 >{{ t("search.cancel") }}</OButton
               >
               <!-- Main action button: "Ask AI" when NL detected but AI bar not open, otherwise "Run Query" -->
@@ -1163,18 +1195,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-else
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
-                variant="primary"
+                :data-run-pending="showRunQueryPending ? 'true' : undefined"
+                :aria-label="showRunQueryPending ? t('search.runQueryPendingLabel') : undefined"
+                :variant="showRunQueryPending ? 'warning' : 'primary'"
                 :title="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? t('search.generateQueryTooltip')
                     : t('search.runQuery')
                 "
                 :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
-                class="element-box-shadow h-[1.875rem]! p-0"
+                class="element-box-shadow relative h-[1.875rem]! p-0"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
+                    : 'w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease]',
+                  showRunQueryPending || (isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                    ? ''
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md',
                   'rounded-s-default! rounded-e-none!',
                 ]"
                 @click="
@@ -1195,11 +1232,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip
                   v-if="
-                    searchObj.meta.liveMode &&
-                    store.state.zoConfig.auto_query_enabled &&
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                    (searchObj.meta.liveMode && store.state.zoConfig.auto_query_enabled) ||
+                    showRunQueryPending
                   "
-                  :content="t('search.autoRunEnabled')"
+                  :content="
+                    showRunQueryPending ? t('search.autoRunPendingDot') : t('search.autoRunEnabled')
+                  "
                 />
                 <OIcon
                   v-if="
@@ -1221,19 +1259,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
-                    variant="ghost"
+                    :variant="showRunQueryPending && !isRunQueryCancelShown ? 'warning' : 'ghost'"
                     size="icon-xs"
                     data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
-                      (searchObj.meta.logsVisualizeToggle === 'patterns' &&
-                        patternsState.loading) ||
-                      (!(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
-                        config.isEnterprise == 'true' &&
-                        (!!searchObj.data.searchRequestTraceIds.length ||
-                          !!searchObj.data.searchWebSocketTraceIds.length) &&
-                        (searchObj.loading == true || searchObj.loadingHistogram == true))
+                      isRunQueryCancelShown
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                        : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                            !showRunQueryPending
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                           : '',
                       'rounded-e-default! rounded-s-none!',
@@ -1284,6 +1317,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <div class="text-text-secondary text-xs">
                       {{ t("search.liveModeTooltip") }}
+                    </div>
+                    <div class="text-text-secondary text-xs">
+                      {{ t("search.autoRunAppliesTo") }}
                     </div>
                   </span>
                 </ODropdownItem>
@@ -1374,6 +1410,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :ai-placeholder="aiQueryPlaceholder || t('search.askAIPlaceholder')"
                 data-test="logs-search-bar-query-editor"
                 data-test-prefix="logs-search-bar"
+                :free-text-decorations="
+                  searchObj.meta.sqlMode ? null : searchObj.data.freeTextDecorations
+                "
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
                 language="sql"
@@ -1382,6 +1421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.buildModeQueryEditorDisabled
                 "
                 @update:query="updateQueryValue"
+                @user-edit="onEditorUserEdit"
                 @update:nlp-mode="(val) => (searchObj.meta.nlpMode = val)"
                 @run-query="handleRunQueryFn"
                 @keydown="handleKeyDown"
@@ -1768,7 +1808,7 @@ import {
   toRef,
   computed,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -1807,7 +1847,6 @@ import {
   buildDateTimeObject,
 } from "@/utils/zincutils";
 
-import { debounce } from "lodash-es";
 import savedviewsService from "@/services/saved_views";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -1825,6 +1864,9 @@ import { allSelectionFieldsHaveAlias } from "@/utils/query/visualizationUtils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
 import { isSchemaBackedField } from "@/utils/logs/interestingFields";
+import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFilter";
+import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
+import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
@@ -1838,6 +1880,19 @@ import {
 
 import useSearchBar from "@/composables/useLogs/useSearchBar";
 import usePatterns, { patternsState } from "@/composables/useLogs/usePatterns";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { writeLogsUrl } from "@/composables/useLogs/useLogsUrl";
+import {
+  clearColumnsFromUrl,
+  clearPermalink,
+  noteUserScopeChange,
+} from "@/composables/useLogs/useLogPermalink";
+import type {
+  PersistAction,
+  PersistSurface,
+  PersistReasonCode,
+} from "@/composables/useLogs/useAutoRun";
+import { applySearchSnapshot, prepareSearchForSave } from "@/utils/logs/transientSearchKeys";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1846,6 +1901,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownSub from "@/lib/overlay/Dropdown/ODropdownSub.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -1935,6 +1991,7 @@ export default defineComponent({
     OButtonGroup,
     ODialog,
     ODropdown,
+    ODropdownSub,
     ODropdownItem,
     ODropdownSeparator,
     ODropdownGroup,
@@ -2005,6 +2062,7 @@ export default defineComponent({
         });
         return;
       }
+      if (this.blockWithReason(this.saveViewReason)) return;
       this.savedViewDropdownModel = false;
       this.savedViewsListDialog = false;
       this.updateViewObj = item;
@@ -2014,6 +2072,7 @@ export default defineComponent({
       this.deleteSavedViews();
     },
     toggleCustomDownloadDialog() {
+      if (this.blockWithReason(this.customRangeReason || this.downloadReason)) return;
       this.customDownloadDialog = true;
     },
     confirmUpdateSavedViews() {
@@ -2077,6 +2136,10 @@ export default defineComponent({
       type: Object,
       default: () => ({}),
     },
+    buildRunBlocked: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props, { emit }) {
     const router = useRouter();
@@ -2115,14 +2178,108 @@ export default defineComponent({
       fnParsedSQL,
       fnUnparsedSQL,
       updatedLocalLogFilterField,
-      updateUrlQueryParams,
+      patchUrlViewState,
       generateURLQuery,
       checkTimestampAlias,
     } = logsUtils();
-    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
-      useSearchBar(t);
+    const { getSavedViews, setSelectedStreams, onStreamChange, cancelQuery } = useSearchBar(t);
     const { loadStreamLists, extractFields } = useStreamFields();
     const { cancelPatterns } = usePatterns(t);
+    const autoRun = useLogsAutoRun();
+
+    const activeSurface = computed<PersistSurface>(() => {
+      const mode = searchObj.meta.logsVisualizeToggle;
+      if (mode === "patterns" || mode === "visualize" || mode === "build") return mode;
+      return "logs";
+    });
+    const EDITOR_QUERY_ACTIONS = new Set<PersistAction>([
+      "save-view",
+      "create-alert",
+      "search-job",
+    ]);
+    type PersistControlReason = PersistReasonCode | "edited-query" | "unrun-query";
+    const persistReason = (
+      surface: PersistSurface,
+      action?: PersistAction,
+    ): PersistControlReason | null => {
+      if (surface === "logs" && autoRun.searchAroundActive()) return "search-around";
+      const decision = autoRun.engine.canPersistOrShare(surface, action, {
+        allowNotRun: !!action && EDITOR_QUERY_ACTIONS.has(action),
+      });
+      if (decision.ok) return null;
+      if (decision.code !== "needs-run" || action === "share-link") return decision.code;
+      return isQueryEdited.value ? "edited-query" : "unrun-query";
+    };
+    const persistReasonText = (surface: PersistSurface, action?: PersistAction) => {
+      const code = persistReason(surface, action);
+      if (code === null) return null;
+      const keys = {
+        "search-around": "search.autoRunSearchAroundActive",
+        "free-text-blocked": "search.freeTextChooseFirst",
+        "needs-run": "search.autoRunPersistNeedsRun",
+        "free-text-scan": "search.freeTextScanLogsOnly",
+        "edited-query": "search.queryActions.runEditedFirst",
+        "unrun-query": "search.queryActions.runFirst",
+      } as const;
+      return t(keys[code]);
+    };
+    const unrunQueryNote = (surface: PersistSurface, action: PersistAction) => {
+      if (persistReason(surface, action)) return null;
+      const decision = autoRun.engine.canPersistOrShare(surface, action);
+      if (decision.ok || decision.code !== "needs-run") return null;
+      return isQueryEdited.value
+        ? t("search.queryActions.usesEditedQuery")
+        : t("search.queryActions.usesUnrunQuery");
+    };
+    const isQueryEdited = computed(
+      () =>
+        !!(
+          searchObj.meta.executed ||
+          searchObj.meta.executedPatterns ||
+          searchObj.meta.executedPanel
+        ) &&
+        (autoRun.engine.isResultsStale() || !!searchObj.meta.editorDirty),
+    );
+    const queryRunReason = computed(() =>
+      isQueryEdited.value
+        ? t("search.queryActions.runEditedFirst")
+        : t("search.queryActions.runFirst"),
+    );
+    const saveViewReason = computed(() => persistReasonText(activeSurface.value, "save-view"));
+    const saveViewNote = computed(() => unrunQueryNote(activeSurface.value, "save-view"));
+    const shareReason = computed(() => persistReasonText(activeSurface.value, "share-link"));
+    const scheduleJobReason = computed(() => persistReasonText("logs", "search-job"));
+    const scheduleJobNote = computed(() => unrunQueryNote("logs", "search-job"));
+    const visualizeReason = computed(() =>
+      searchObj.meta.logsVisualizeToggle === "visualize"
+        ? null
+        : persistReasonText("logs", "visualize"),
+    );
+    const isGridInFlight = computed(
+      () =>
+        searchObj.meta.logsVisualizeToggle !== "patterns" &&
+        (searchObj.loading === true || searchObj.loadingHistogram === true),
+    );
+    const showRunPendingDot = computed(
+      () =>
+        !!searchObj.meta.runPending ||
+        !!searchObj.meta.editorDirty ||
+        (searchObj.meta.logsVisualizeToggle === "logs" && autoRun.engine.isRunDirty()),
+    );
+    const showRunQueryPending = computed(
+      () =>
+        showRunPendingDot.value && !(isNaturalLanguageDetected.value && !searchObj.meta.nlpMode),
+    );
+    const isRunQueryCancelShown = computed(
+      () =>
+        (searchObj.meta.logsVisualizeToggle === "patterns" && patternsState.value.loading) ||
+        (!(isNaturalLanguageDetected.value && !searchObj.meta.nlpMode) && isGridInFlight.value),
+    );
+    const blockWithReason = (reason: I18nText | null) => {
+      if (!reason) return false;
+      toast({ variant: "warning", message: reason });
+      return true;
+    };
 
     const {
       refreshData,
@@ -2335,6 +2492,13 @@ export default defineComponent({
 
     const hasInteractedWithAI = ref(false); // Track if user has used AI in non-NLP mode
     const isNaturalLanguageDetected = ref(false); // Track NL detection without switching modes
+    watch(
+      isNaturalLanguageDetected,
+      (detected) => {
+        searchObj.meta.nlDetected = detected;
+      },
+      { immediate: true },
+    );
 
     // Track window width for responsive toolbar layout
     const windowWidth = ref(window.innerWidth);
@@ -2443,7 +2607,9 @@ export default defineComponent({
               value: "visualize",
               icon: "timeline",
               label: t("search.visualize"),
-              disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1,
+              disabled:
+                (!searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1) ||
+                !!visualizeReason.value,
             },
           ]
         : []),
@@ -2648,6 +2814,18 @@ export default defineComponent({
       return columnNames;
     };
 
+    const sqlStatementLookup = {
+      hasStream: () => true,
+      fieldsOf: (name: string) => {
+        const list: any[] = searchObj.data.streamResults?.list ?? [];
+        const entry = list.find((stream: any) => stream?.name === name);
+        if (!entry) return list.length ? new Set<string>() : undefined;
+        return Array.isArray(entry.schema)
+          ? new Set<string>(entry.schema.map((field: any) => field.name))
+          : undefined;
+      },
+    };
+
     const updateQueryValue = (value: string) => {
       // During stream changes, the editor's debounced onDidChangeModelContent
       // callback can re-emit a stale value after onStreamChange has cleared the
@@ -2766,8 +2944,7 @@ export default defineComponent({
       if (
         searchObj.meta.sqlMode === false &&
         searchObj.meta.logsVisualizeToggle !== "build" &&
-        value.toLowerCase().includes("select") &&
-        value.toLowerCase().includes("from")
+        looksLikeSqlStatement(value, sqlStatementLookup)
       ) {
         searchObj.meta.sqlMode = true;
         searchObj.meta.sqlModeManualTrigger = true;
@@ -2820,7 +2997,7 @@ export default defineComponent({
 
                   // searchObj.data.stream.selectedStream = itemObj;
                   searchObj.data.stream.selectedStream.push(itemObj.value);
-                  onStreamChange(searchObj.data.query);
+                  onStreamChange(searchObj.data.query, { origin: "editor" });
                 }
               });
 
@@ -2856,6 +3033,7 @@ export default defineComponent({
       } catch (e) {
         console.log(e, "Logs: Error while updating query value");
       }
+      autoRun.engine.reconcileEditorDirty();
     };
     const handleEscKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -2863,15 +3041,50 @@ export default defineComponent({
       }
     };
 
-    // Debounced auto-run for absolute time — gives the user 2.5s to finish
-    // typing start/end time before firing the query.
-    const debouncedAutoRunAbsolute = debounce(() => {
-      emit("searchdata");
-    }, 2500);
+    // DateTime.setCustomDate keeps second-precision local date/time strings; a zoom is matched on those.
+    const zoomLabels = (range: { start: number; end: number }) => {
+      const label = (ms: number) => {
+        const d = new Date(Math.floor(ms));
+        const two = (n: number) => String(n).padStart(2, "0");
+        return {
+          date: `${d.getFullYear()}/${two(d.getMonth() + 1)}/${two(d.getDate())}`,
+          time: `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`,
+        };
+      };
+      const from = label(range.start);
+      const to = label(range.end);
+      return { from: from.date, to: to.date, startTime: from.time, endTime: to.time };
+    };
 
-    const debouncedAutoRunPatterns = debounce(() => {
-      emit("extractPatterns");
-    }, 2500);
+    let pendingZoom: ReturnType<typeof zoomLabels> | null = null;
+    const markZoom = (range: { start: number; end: number }) => {
+      const zoom = zoomLabels(range);
+      pendingZoom = zoom;
+      // An unchanged range never emits, so the zoom must not outlive the setCustomDate that follows.
+      setTimeout(() => {
+        if (pendingZoom === zoom) pendingZoom = null;
+      }, 0);
+    };
+
+    const takeZoom = (value: any): boolean => {
+      const zoom = pendingZoom;
+      const matches =
+        !!zoom &&
+        value.valueType === "absolute" &&
+        value.selectedDate?.from === zoom.from &&
+        value.selectedDate?.to === zoom.to &&
+        value.selectedTime?.startTime === zoom.startTime &&
+        value.selectedTime?.endTime === zoom.endTime;
+      if (!matches) pendingZoom = null;
+      return matches;
+    };
+
+    const requestTimeRun = (valueType: string, isZoom: boolean) => {
+      let reason: "zoom" | "time-typed" | "time" = "time";
+      if (isZoom) reason = "zoom";
+      else if (valueType === "absolute") reason = "time-typed";
+      autoRun.request(reason);
+    };
 
     let ignoreAutoTrigger = false;
     // Guard against the cascade that happens when we auto-clamp an absolute
@@ -2885,8 +3098,22 @@ export default defineComponent({
       searchObj.meta.logsVisualizeToggle === "logs" ||
       searchObj.meta.logsVisualizeToggle === "drilldown";
 
+    const keepsSubSecondWindow = (value: any): boolean => {
+      const current = searchObj.data.datetime;
+      const programmatic = value.userChangedValue === false || !!searchObj.shouldIgnoreWatcher;
+      if (!programmatic || value.relativeTimePeriod) return false;
+      if (current?.type !== "absolute") return false;
+      const toSecond = (us: unknown) => Math.floor(Number(us) / 1_000_000) * 1_000_000;
+      return (
+        toSecond(current.startTime) === Number(value.startTime) &&
+        toSecond(current.endTime) === Number(value.endTime)
+      );
+    };
+
     const updateDateTime = async (value: object) => {
       if (suppressUpdateDateTime) return;
+      const isZoom = takeZoom(value);
+      if (value.userChangedValue === true) noteUserScopeChange();
       ignoreAutoTrigger = searchObj.shouldIgnoreWatcher;
       if (
         value.valueType == "absolute" &&
@@ -2939,9 +3166,10 @@ export default defineComponent({
           }
         }
       }
+      const precise = keepsSubSecondWindow(value);
       searchObj.data.datetime = {
-        startTime: value.startTime,
-        endTime: value.endTime,
+        startTime: precise ? searchObj.data.datetime.startTime : value.startTime,
+        endTime: precise ? searchObj.data.datetime.endTime : value.endTime,
         relativeTimePeriod: value.relativeTimePeriod
           ? value.relativeTimePeriod
           : searchObj.data.datetime.relativeTimePeriod,
@@ -2989,26 +3217,11 @@ export default defineComponent({
         return;
       }
 
-      if (searchObj.meta.liveMode && ignoreAutoTrigger == false && isLogsResultsMode()) {
-        if (value.valueType === "absolute") {
-          debouncedAutoRunAbsolute();
-        } else {
-          emit("searchdata");
-        }
-      }
-
-      // Patterns tab: re-run when auto-run is enabled (live or non-live)
       if (
-        store.state.zoConfig.auto_query_enabled &&
-        searchObj.meta.logsVisualizeToggle === "patterns" &&
-        searchObj.loading == false &&
-        ignoreAutoTrigger == false
+        ignoreAutoTrigger === false &&
+        (isLogsResultsMode() || searchObj.meta.logsVisualizeToggle === "patterns")
       ) {
-        if (searchObj.meta.liveMode && value.valueType === "absolute") {
-          debouncedAutoRunPatterns();
-        } else {
-          emit("extractPatterns");
-        }
+        requestTimeRun(value.valueType, isZoom);
       }
     };
 
@@ -3022,7 +3235,13 @@ export default defineComponent({
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(searchObj.data.query);
     };
 
+    const showRanQuery = (text: string) => {
+      if (queryEditorRef.value?.replaceValue) queryEditorRef.value.replaceValue(text);
+      else updateQuery();
+    };
+
     const downloadLogs = async (data, format) => {
+      if (isDownloadDisabled.value) return;
       //here we are using a package json2csv which converts json to csv data
       //why package because we faced one issue where user has , in some of the fields so
       //it is treating it as seperate fields
@@ -3259,9 +3478,7 @@ export default defineComponent({
       searchObj.data.tempFunctionName = fnValue.name;
       searchObj.data.tempFunctionContent = fnValue.function;
 
-      if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
-        emit("searchdata");
-      }
+      if (!store.state.savedViewFlag) autoRun.request("function");
     };
 
     const fnSavedFunctionDialog = () => {
@@ -3325,6 +3542,7 @@ export default defineComponent({
         });
         return;
       }
+      if (blockWithReason(saveViewReason.value)) return;
       store.dispatch("setSavedViewDialog", true);
       isSavedViewAction.value = "create";
       savedViewDropdownModel.value = false;
@@ -3358,6 +3576,7 @@ export default defineComponent({
         });
         return;
       }
+      if (blockWithReason(saveViewReason.value)) return;
       savedViewsDropdownOpen.value = false;
       updateSavedViews(item.view_id, item.view_name);
     };
@@ -3382,10 +3601,7 @@ export default defineComponent({
           const currentQuery = { ...router.currentRoute.value.query };
           currentQuery.visualization_data = encoded;
 
-          await router.replace({
-            name: router.currentRoute.value.name,
-            query: currentQuery,
-          });
+          await writeLogsUrl("replace", currentQuery);
         }
       }
     };
@@ -3402,15 +3618,14 @@ export default defineComponent({
         delete currentQuery.build_data;
       }
 
-      await router.replace({
-        name: router.currentRoute.value.name,
-        query: currentQuery,
-      });
+      await writeLogsUrl("replace", currentQuery);
     };
 
     const applySavedView = async (item) => {
       savedViewDropdownModel.value = false;
-      await cancelQuery();
+      autoRun.engine.resetScope("saved-view");
+      clearPermalink();
+      clearColumnsFromUrl();
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
       savedviewsService
@@ -3503,7 +3718,7 @@ export default defineComponent({
               extractedObj.data.queryResults = [];
               extractedObj.meta.scrollInfo = {};
               //here we are merging deep to the searchObj with the extractedObj
-              mergeDeep(searchObj, extractedObj);
+              applySearchSnapshot(searchObj, extractedObj, mergeDeep);
               searchObj.shouldIgnoreWatcher = true;
 
               // Hand the saved builder chart to BuildQueryPage. Must be set
@@ -3696,7 +3911,7 @@ export default defineComponent({
               extractedObj.meta.scrollInfo = {};
               delete searchObj.data.queryResults.aggs;
 
-              mergeDeep(searchObj, extractedObj);
+              applySearchSnapshot(searchObj, extractedObj, mergeDeep);
               searchObj.data.streamResults = {};
 
               // Hand the saved builder chart to BuildQueryPage. Must be set
@@ -3781,14 +3996,12 @@ export default defineComponent({
             setTimeout(async () => {
               try {
                 searchObj.loadingHistogram = false;
-                searchObj.loading = true;
                 searchObj.meta.refreshHistogram = true;
                 // TODO OK: Remove all the instances of communicationMethod and below assignment aswell
                 searchObj.communicationMethod = "streaming";
                 await extractFields();
-                await getQueryData();
+                autoRun.engine.requestRun("saved-view", { op: "full" });
                 store.dispatch("setSavedViewFlag", false);
-                updateUrlQueryParams();
                 searchObj.shouldIgnoreWatcher = false;
               } catch (e) {
                 searchObj.shouldIgnoreWatcher = false;
@@ -3938,7 +4151,10 @@ export default defineComponent({
         // Transient hand-off to BuildQueryPage, never part of a saved view.
         delete savedSearchObj.meta.savedBuildConfig;
 
-        return savedSearchObj;
+        return prepareSearchForSave(
+          savedSearchObj,
+          searchObj as unknown as Record<string, unknown>,
+        );
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
       } catch (e) {
         console.log("Error while encoding search obj", e);
@@ -3949,6 +4165,7 @@ export default defineComponent({
     // spinner is form-driven and spans the request).
     const createSavedViews = (viewName: string) => {
       try {
+        if (blockWithReason(saveViewReason.value)) return;
         if (viewName.trim() == "") {
           toast({
             message: t("logs.searchBar.provideValidViewName"),
@@ -4011,6 +4228,7 @@ export default defineComponent({
 
     const updateSavedViews = (viewID: string, viewName: string) => {
       try {
+        if (blockWithReason(saveViewReason.value)) return;
         const viewObj: any = {
           data: getSearchObj(),
           view_name: viewName,
@@ -4119,6 +4337,7 @@ export default defineComponent({
     }
 
     const resetFilters = () => {
+      flushEditorValue();
       if (searchObj.meta.sqlMode == true) {
         const parsedSQL = fnParsedSQL();
         if (Object.hasOwn(parsedSQL, "from") && parsedSQL.from.length > 0) {
@@ -4169,12 +4388,10 @@ export default defineComponent({
       }
 
       queryEditorRef.value?.setValue(searchObj.data.query);
-      updateUrlQueryParams();
-      if (
-        store.state.zoConfig.query_on_stream_selection == false ||
-        (store.state.zoConfig.auto_query_enabled && searchObj.meta.liveMode)
-      ) {
+      if (store.state.zoConfig.query_on_stream_selection === false) {
         handleRunQueryFn();
+      } else {
+        autoRun.request("filter");
       }
     };
 
@@ -4189,15 +4406,39 @@ export default defineComponent({
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
     const showDownloadSubmenu = ref(false);
     const { isMobile } = useBreakpoint();
-    // A tap also fires mouseenter, so < md only the click toggles; taps on the submenu's own buttons are ignored.
-    const onDownloadRowClick = (e: MouseEvent) => {
-      if (!isMobile.value || isDownloadDisabled.value) return;
-      if ((e.target as HTMLElement | null)?.closest(".search-download-submenu")) return;
-      showDownloadSubmenu.value = !showDownloadSubmenu.value;
-    };
     const isDownloadDisabled = computed(
       () =>
-        !searchObj.data.stream.selectedStream?.length || !searchObj.data.queryResults?.hits?.length,
+        !searchObj.data.stream.selectedStream?.length ||
+        !searchObj.data.queryResults?.hits?.length ||
+        (!autoRun.searchAroundActive() && !searchObj.meta.executed?.complete),
+    );
+
+    watch(isDownloadDisabled, (disabled) => {
+      if (disabled) showDownloadSubmenu.value = false;
+    });
+
+    const downloadReason = computed<I18nText | null>(() => {
+      if (!autoRun.searchAroundActive() && !searchObj.meta.executed?.complete)
+        return queryRunReason.value;
+      if (!searchObj.data.stream.selectedStream?.length)
+        return t("logs.searchBar.selectStreamBeforeSchedule");
+      if (!searchObj.data.queryResults?.hits?.length) return t("logs.searchBar.noDataToDownload");
+      return null;
+    });
+    const customRangeReason = computed<I18nText | null>(() => {
+      if (autoRun.searchAroundActive()) return t("search.autoRunSearchAroundActive");
+      if (!searchObj.meta.executed?.complete) return queryRunReason.value;
+      return null;
+    });
+    const downloadNote = computed<I18nText | null>(() =>
+      !isDownloadDisabled.value && !autoRun.searchAroundActive() && autoRun.engine.isResultsStale()
+        ? t("search.queryActions.downloadsShownResults")
+        : null,
+    );
+    const customRangeNote = computed<I18nText | null>(() =>
+      !isDownloadDisabled.value && !customRangeReason.value && autoRun.engine.isResultsStale()
+        ? t("search.queryActions.downloadsLastRun")
+        : null,
     );
     const downloadCustomFileTypeOptions = ref([
       { label: "CSV", value: "csv" },
@@ -4247,15 +4488,36 @@ export default defineComponent({
 
     const handleHistogramMode = () => {};
 
-    const handleRunQueryFn = (clear_cache = false) => {
-      // Flush the Monaco editor value synchronously so the search uses what the
-      // user actually typed, not the last debounced emission. Without this, a Run
-      // click within 100ms of typing sends the stale searchObj.data.query value.
+    const flushEditorValue = () => {
       const currentEditorVal = queryEditorRef.value?.getValue?.();
       if (typeof currentEditorVal === "string") {
         searchObj.data.editorValue = currentEditorVal;
         searchObj.data.query = currentEditorVal;
       }
+    };
+
+    const updateFreeTextPreview = useFreeTextPreview(
+      searchObj,
+      () => store.state.zoConfig,
+      () => queryEditorRef.value?.getValue?.() ?? searchObj.data.query,
+      t,
+    );
+
+    const onEditorUserEdit = () => {
+      autoRun.engine.markEditorDirty();
+      updateFreeTextPreview();
+    };
+
+    const cancelRun = () => {
+      autoRun.engine.cancelGeneration(null, { cause: "user" });
+      toast({
+        variant: "info",
+        message: t("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
+      });
+    };
+
+    const handleRunQueryFn = (clear_cache = false) => {
+      flushEditorValue();
 
       if (
         searchObj.meta.logsVisualizeToggle == "visualize" ||
@@ -4299,6 +4561,8 @@ export default defineComponent({
         return;
       }
 
+      let tabRunPending: "tab" | "patterns" | null = null;
+      if (value === "visualize" && blockWithReason(visualizeReason.value)) return;
       // prevent action if visualize is disabled (SQL mode disabled with multiple streams)
       if (
         value === "visualize" &&
@@ -4322,12 +4586,10 @@ export default defineComponent({
           !Object.hasOwn(searchObj.data?.queryResults, "hits") ||
           searchObj.data?.queryResults?.hits?.length == 0
         ) {
-          searchObj.loading = true;
           if (searchObj.meta.sqlMode) {
             searchObj.data.queryResults.aggs = undefined;
           }
-          searchObj.meta.refreshHistogram = true;
-          getQueryData();
+          tabRunPending = "tab";
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
       } else if (
@@ -4344,14 +4606,7 @@ export default defineComponent({
         searchObj.meta.resultGrid.showPagination = true;
 
         if (!hasLogs) {
-          // No logs data - fetch them
-          // console.log("[SearchBar] Fetching logs data");
-          searchObj.loading = true;
-          searchObj.meta.refreshHistogram = true;
-          getQueryData();
-        } else {
-          // Logs exist - just switch the view
-          // console.log("[SearchBar] Reusing existing logs data");
+          tabRunPending = "tab";
         }
       } else if (
         value == "patterns" &&
@@ -4359,9 +4614,7 @@ export default defineComponent({
           searchObj.meta.logsVisualizeToggle == "visualize" ||
           searchObj.meta.logsVisualizeToggle == "drilldown")
       ) {
-        // Switching to patterns mode - this will be handled by a separate watcher in Index.vue
-        emit("extractPatterns");
-        // console.log("[SearchBar] Switching to patterns mode");
+        tabRunPending = "patterns";
       } else if (value == "visualize") {
         // validate query
         // return if query is empty and stream is not selected
@@ -4401,7 +4654,7 @@ export default defineComponent({
         }
 
         // cancel all the logs queries
-        cancelQuery();
+        autoRun.engine.cancelGeneration(null, { cause: "reset" });
       } else if (value == "build") {
         // Only generate SQL query if user is already in SQL mode (Case 3).
         // When SQL mode is OFF (Case 1), BuildQueryPage will set up builder
@@ -4434,7 +4687,8 @@ export default defineComponent({
         }
       }
       searchObj.meta.logsVisualizeToggle = value;
-      updateUrlQueryParams();
+      patchUrlViewState();
+      if (tabRunPending) autoRun.request(tabRunPending);
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {
         const hasLogs =
@@ -4555,19 +4809,34 @@ export default defineComponent({
 
         searchSchedulerJob.value = false;
         searchObj.meta.showSearchScheduler = false;
-        await getJobData();
+        const snapshot = guardJobSnapshot.value;
+        guardJobSnapshot.value = null;
+        await getJobData(false, snapshot);
       } catch (e) {
-        if (e.response.status != 403) {
-          toast({
-            variant: "error",
-            message: t("search.errorAddingJob"),
-          });
-          return;
-        }
+        const status = e?.response?.status;
+        toast({
+          variant: "error",
+          message:
+            status === 403
+              ? t("search.searchJobNoPermission")
+              : e?.response?.data?.message
+                ? raw(e.response.data.message)
+                : t("search.errorAddingJob"),
+        });
       }
     };
 
+    const guardJobSnapshot = ref<any>(null);
+
     const createScheduleJob = () => {
+      if (blockWithReason(scheduleJobReason.value)) return;
+      guardJobSnapshot.value = null;
+      searchSchedulerJob.value = true;
+      searchObj.meta.jobRecords = 100;
+    };
+
+    const openGuardSearchJob = (snapshot: any) => {
+      guardJobSnapshot.value = snapshot;
       searchSchedulerJob.value = true;
       searchObj.meta.jobRecords = 100;
     };
@@ -4579,8 +4848,13 @@ export default defineComponent({
       if (!searchObj.data.stream.selectedStream?.length) {
         return t("logs.searchBar.selectStreamBeforeSchedule");
       }
-      return null;
+      return persistReasonText(isPatternsTab.value ? "patterns" : "logs", "create-alert");
     });
+    const createAlertNote = computed(() =>
+      createAlertDisabledReason.value
+        ? null
+        : unrunQueryNote(isPatternsTab.value ? "patterns" : "logs", "create-alert"),
+    );
 
     /**
      * This page's contribution to alert creation: a plain snapshot of searchObj
@@ -4591,10 +4865,11 @@ export default defineComponent({
      * only the row count matters.
      */
     const buildLogsAlertPrefill = () => {
-      const payload = buildSearch(true, true);
+      const held = isFilterHeld(searchObj, store.state.zoConfig);
+      const payload = buildSearch(true, true, held ? "" : undefined);
 
       return buildPrefillFromLogs(
-        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone),
+        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone, held),
       );
     };
 
@@ -4740,6 +5015,7 @@ export default defineComponent({
       _sqlMode,
       _noStream,
       t,
+      { freeText: true },
     );
     // [END] query editor placeholder overlay
 
@@ -4756,6 +5032,23 @@ export default defineComponent({
     // [END] typewriter placeholder for AI query input
 
     return {
+      autoRun,
+      saveViewReason,
+      saveViewNote,
+      shareReason,
+      scheduleJobReason,
+      scheduleJobNote,
+      visualizeReason,
+      isGridInFlight,
+      showRunPendingDot,
+      showRunQueryPending,
+      isRunQueryCancelShown,
+      blockWithReason,
+      flushEditorValue,
+      onEditorUserEdit,
+      cancelRun,
+      markZoom,
+      openGuardSearchJob,
       t,
       store,
       router,
@@ -4766,9 +5059,12 @@ export default defineComponent({
       confirmDialogVisible,
       confirmCallback,
       showDownloadSubmenu,
-      onDownloadRowClick,
+      downloadReason,
       isMobile,
       isDownloadDisabled,
+      customRangeReason,
+      downloadNote,
+      customRangeNote,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
       updateQueryValue,
@@ -4778,6 +5074,7 @@ export default defineComponent({
       cancelConfirmDialog,
       confirmDialogOK,
       updateQuery,
+      showRanQuery,
       downloadLogs,
       saveFunction,
       resetFunctionContent,
@@ -4881,6 +5178,7 @@ export default defineComponent({
       buildAlertPrefill,
       createAlertSource,
       createAlertDisabledReason,
+      createAlertNote,
       searchInspectDialog,
       searchInspectTraceId,
       openSearchInspectDialog,
@@ -4992,6 +5290,7 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
+        this.flushEditorValue();
         // Never split the query on "|": the legacy "function | where" syntax is gone,
         // and the split is quote-unaware, so a pipe inside a term such as
         // match_all('text | error') would corrupt the query when a filter is added.
@@ -5094,9 +5393,13 @@ export default defineComponent({
             if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
               currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
             } else {
-              currentQuery[0].length == 0
-                ? (currentQuery[0] = filter)
-                : (currentQuery[0] += " and " + filter);
+              const streams = this.searchObj.data.stream.selectedStream;
+              currentQuery[0] = appendConjunct(
+                currentQuery[0],
+                filter,
+                streams,
+                buildFilterContext(this.searchObj, this.store.state.zoConfig),
+              );
             }
           }
 
@@ -5113,13 +5416,12 @@ export default defineComponent({
         this.searchObj.data.stream.addToFilter = "";
         this.searchObj.data.stream.addToFilterMode = "replace";
         if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(this.searchObj.data.query);
-        if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
-          this.$emit("searchdata");
-        }
+        this.autoRun.request("filter");
       }
     },
     removeFieldTerm(fieldName: string) {
       if (!fieldName) return;
+      this.flushEditorValue();
       let newValue: string;
       if (this.searchObj.meta.sqlMode) {
         try {
@@ -5144,9 +5446,7 @@ export default defineComponent({
       this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";
       if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
-      if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
-        this.$emit("searchdata");
-      }
+      this.autoRun.request("filter");
     },
     toggleTransformEditor(newVal) {
       if (newVal == false) {
@@ -5160,9 +5460,7 @@ export default defineComponent({
     resetFunction(newVal) {
       if (newVal == "" && store && !store?.state?.savedViewFlag) {
         this.resetFunctionContent();
-        if (this.store.state.zoConfig?.auto_query_enabled && this.searchObj.meta.liveMode) {
-          this.$emit("searchdata");
-        }
+        this.autoRun.request("function");
       }
     },
     resetFunctionDefinition(newVal) {

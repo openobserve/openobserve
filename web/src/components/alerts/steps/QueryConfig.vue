@@ -1565,11 +1565,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
+              <div
+                v-if="localTab === 'promql' && !isForecastMode"
+                class="flex flex-col gap-1 px-3 py-2"
+              >
+                <OFormSwitch
+                  name="query_condition.promql_rule_mode"
+                  :label="t('alerts.promRuleMode')"
+                  data-test="alert-prom-rule-mode"
+                  @update:model-value="onPromRuleModeChange"
+                />
+                <p class="text-text-secondary text-xs">{{ t("alerts.promRuleModeDescription") }}</p>
+              </div>
               <ForecastAlertFields v-if="localTab === 'promql' && isForecastMode" />
 
               <!-- PromQL: Alert if the value is + Having series -->
-              <template v-else-if="localTab === 'promql' && promqlCondition">
+              <template v-else-if="localTab === 'promql' && (promqlCondition || isPromRuleMode)">
                 <div
+                  v-if="!isPromRuleMode"
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
@@ -1674,24 +1687,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-                <!-- Simple vs Multi alert (M-9), PromQL flavour. Unlike the
-                     builder branches there is no group-by field to gate on:
-                     a PromQL alert's grouping is the expression's own
-                     `by (…)` clause, so the choice is always offered once a
-                     condition exists to classify each series against. -->
                 <AlertMultiToggle
                   :enabled="isPromqlMultiAlert"
+                  :disabled="isRuleMultiRequired"
                   name="query_condition.promql_multi_alert"
                   unit="series"
                   @change="onPromqlMultiAlertChange"
                 />
 
-                <!-- Series-count gate — hidden for a per-series alert, for the
-                     same reason the group-count row is: per-series evaluation
-                     fires on ANY breaching series, so a count rule has no
-                     meaning and M-10 rejects it at save time. -->
+                <p v-if="isRuleMultiRequired" class="text-text-secondary px-3 text-xs">
+                  {{ t("alerts.promRuleModePendingMulti") }}
+                </p>
+
+                <!-- Rule expressions own matching, so an extra series-count gate would change their semantics. -->
                 <div
-                  v-if="!isPromqlMultiAlert"
+                  v-if="!isPromqlMultiAlert && !isPromRuleMode"
                   class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
                 >
                   <span
@@ -1803,6 +1813,8 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
+import { savedBrowserTimezone } from "@/utils/timezoneAliases";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
@@ -1815,6 +1827,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import AlertMultiToggle from "@/components/alerts/AlertMultiToggle.vue";
@@ -1853,6 +1866,7 @@ export default defineComponent({
     OToggleGroupItem,
     OSelect,
     OSwitch,
+    OFormSwitch,
     OTooltip,
     OIcon,
     OFormInput,
@@ -2592,6 +2606,33 @@ export default defineComponent({
       (s: any) => !!s.values?.query_condition?.promql_multi_alert,
     );
     const isPromqlMultiAlert = computed(() => promqlMultiAlertStore.value);
+    const promRuleModeStore = form.useStore(
+      (s: any) => !!s.values?.query_condition?.promql_rule_mode,
+    );
+    const isPromRuleMode = computed(() => promRuleModeStore.value);
+    const pendingPeriodStore = form.useStore((s: any) => Number(s.values?.pending_period_sec ?? 0));
+    const isRuleMultiRequired = computed(
+      () => localTab.value === "promql" && isPromRuleMode.value && pendingPeriodStore.value > 0,
+    );
+    watch(
+      [isRuleMultiRequired, isPromqlMultiAlert],
+      ([required, enabled]) => {
+        if (required && !enabled) setFV("query_condition.promql_multi_alert", true);
+      },
+      { immediate: true },
+    );
+    const onPromRuleModeChange = (enabled: unknown) => {
+      if (enabled) {
+        setFV("query_condition.promql_condition", null);
+        setFV("query_condition.promql_warning_value", null);
+        setFV("trigger_condition.warning_threshold", null);
+        if (isRuleMultiRequired.value) setFV("query_condition.promql_multi_alert", true);
+        setFV("trigger_condition.operator", ">=");
+        setFV("trigger_condition.threshold", 1);
+      } else {
+        setFV("query_condition.promql_condition", { column: "value", operator: ">=", value: "" });
+      }
+    };
 
     // Forecast mode edits U and a few fields; the PromQL and its condition are generated from them.
     const forecastStore = form.useStore((s: any) => s.values?._ui?.forecast ?? null);
@@ -2611,6 +2652,7 @@ export default defineComponent({
     const THRESHOLD_FIELDS = [
       "query_condition.promql_condition",
       "query_condition.promql_multi_alert",
+      "query_condition.promql_rule_mode",
       "query_condition.promql_warning_value",
       "trigger_condition.threshold",
       "trigger_condition.operator",
@@ -2655,6 +2697,7 @@ export default defineComponent({
           H: 7,
         },
       );
+      setFV("query_condition.promql_rule_mode", false);
       setFV("trigger_condition.period", FORECAST_PERIOD_MINUTES);
       if (frequencyMode.value === "minutes") {
         checkEveryFrequency.value = FORECAST_FREQUENCY_MINUTES;
@@ -2767,6 +2810,7 @@ export default defineComponent({
       (tab) => {
         if (tab === "promql") {
           normalizePromqlMultiAlertFlag();
+          if (fv("query_condition.promql_rule_mode")) onPromRuleModeChange(true);
           if (fv("query_condition.aggregation.multi_alert")) {
             setFV("query_condition.aggregation.multi_alert", false);
           }
@@ -2892,8 +2936,6 @@ export default defineComponent({
     const cronDescription = computed(() =>
       describeCron(t, cronExpression.value, cronTimezone.value),
     );
-    const filteredTimezones = ref<string[]>([]);
-
     // Initialize timezone
     // Populate the timezone OPTIONS only. This must NOT seed the timezone value:
     // `cronTimezone` is now form-owned, so writing here would push a browser
@@ -2901,31 +2943,9 @@ export default defineComponent({
     // display ref, leaving the stored value untouched until the user entered cron
     // mode (onFrequencyUnitChange still seeds it there). defaultAlertValue()
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const browserTime = raw("Browser Time (" + browserTz + ")");
-    const initTimezones = () => {
-      try {
-        // @ts-ignore
-        const zones: string[] =
-          typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
-            ? // @ts-ignore
-              Intl.supportedValuesOf("timeZone")
-            : [cronTimezone.value || "UTC"];
-        // Convenience shortcuts first (matching the reports picker), then every
-        // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
-        filteredTimezones.value = [browserTime, "UTC", ...zones];
-      } catch {
-        filteredTimezones.value = ["UTC"];
-      }
-    };
-    initTimezones();
-
-    const timezoneSelectOptions = computed(() =>
-      filteredTimezones.value.map((tz: string) =>
-        tz === browserTime
-          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-          : { label: raw(tz), value: tz },
-      ),
+    // The stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+    const { zones: filteredTimezones, timezoneOptions: timezoneSelectOptions } = useTimezoneOptions(
+      { browserEntry: true, current: cronTimezone },
     );
 
     const validateCron = () => {
@@ -2981,7 +3001,7 @@ export default defineComponent({
           // Entering cron mode is where a timezone first gets SAVED (parity:
           // pre-migration seeded it here, not at mount).
           if (!cronTimezone.value) {
-            cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            cronTimezone.value = savedBrowserTimezone();
           }
         }
         validateCron();
@@ -3873,6 +3893,9 @@ export default defineComponent({
       onMultiAlertChange,
       onSqlMultiAlertChange,
       isPromqlMultiAlert,
+      isPromRuleMode,
+      isRuleMultiRequired,
+      onPromRuleModeChange,
       onPromqlMultiAlertChange,
       checkEveryFrequency,
       onCheckEveryChange,

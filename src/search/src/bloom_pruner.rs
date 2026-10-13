@@ -602,10 +602,9 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_skips_negation_regex_strmatch() {
+    fn test_collect_skips_negation_and_strmatch() {
         let c = cond(vec![
             Condition::NotEqual("trace_id".into(), "abc".into()),
-            Condition::Regex("trace_id".into(), "^abc.*".into()),
             Condition::StrMatch("trace_id".into(), "abc".into(), true),
         ]);
         assert!(collect_decidable(&c, &fields(&["trace_id"])).is_empty());

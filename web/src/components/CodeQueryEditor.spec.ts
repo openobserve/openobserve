@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
 
@@ -34,6 +34,7 @@ const mockModel = {
   getLineContent: vi.fn(() => ""),
   getValueInRange: vi.fn(() => ""),
   getWordUntilPosition: vi.fn(() => ({ word: "", startColumn: 1, endColumn: 1 })),
+  getValueLength: vi.fn(() => 13),
 };
 
 // Stable mock editor instance so tests can reference it directly
@@ -69,6 +70,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     setTheme: vi.fn(),
     setModelMarkers: vi.fn(),
     setModelLanguage: vi.fn(),
+    TrackedRangeStickiness: { NeverGrowsWhenTypingAtEdges: 1 },
   },
   languages: {
     // Real values, mirroring monaco-editor/esm/vs/editor/common/languages.js
@@ -102,6 +104,11 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
   },
   KeyMod: { CtrlCmd: 1 },
   KeyCode: { Enter: 13 },
+  Range: class {
+    constructor(...args: number[]) {
+      Object.assign(this, { args });
+    }
+  },
 }));
 
 // Mock dynamic imports
@@ -227,6 +234,53 @@ describe("CodeQueryEditor", () => {
       expect(monacoApi.editor.setModelLanguage.mock.calls[0][1]).toBe("hcl");
       // No second editor: the same instance was retokenized.
       expect(monacoApi.editor.create.mock.calls.length).toBe(createdBefore);
+      wrapper.unmount();
+    });
+  });
+
+  describe("free-text decorations (item 1 AC1.4)", () => {
+    it("decorates each searched range with o2-free-text-term and the hover, and clears them", async () => {
+      attachEditorHost();
+      const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+      mockModel.getPositionAt.mockImplementation((offset: number) => ({
+        lineNumber: 1,
+        column: offset + 1,
+      }));
+      mockEditorObj.deltaDecorations.mockImplementation(((_old: string[], next: any[]) =>
+        next.map((_d: any, i: number) => `d${i}`)) as any);
+      const wrapper = createWrapper({ query: "timeout error" });
+      await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalled());
+
+      await wrapper.setProps({
+        freeTextDecorations: {
+          ranges: [
+            { start: 0, end: 7 },
+            { start: 8, end: 13 },
+          ],
+          hover: "Full-text search in: body\n\nRuns as match_all('timeout')",
+        },
+      });
+      await vi.waitFor(() => expect(mockEditorObj.deltaDecorations).toHaveBeenCalled());
+
+      const [previous, next] = mockEditorObj.deltaDecorations.mock.calls.at(-1) as any[];
+      expect(previous).toEqual([]);
+      expect(next.map((d: any) => d.range.args)).toEqual([
+        [1, 1, 1, 8],
+        [1, 9, 1, 14],
+      ]);
+      expect(next[0].options.inlineClassName).toBe("o2-free-text-term");
+      expect(next[0].options.hoverMessage.map((m: any) => m.value)).toEqual([
+        "Full\\-text search in: body",
+        "Runs as match\\_all\\('timeout'\\)",
+      ]);
+
+      await wrapper.setProps({ freeTextDecorations: null });
+      await vi.waitFor(() =>
+        expect(mockEditorObj.deltaDecorations.mock.calls.at(-1)).toEqual([["d0", "d1"], []]),
+      );
+      mockModel.getPositionAt.mockReset();
+      mockModel.getPositionAt.mockImplementation(() => ({ lineNumber: 1, column: 1 }));
+      mockEditorObj.deltaDecorations.mockImplementation((() => []) as any);
       wrapper.unmount();
     });
   });
@@ -648,6 +702,58 @@ describe("CodeQueryEditor", () => {
 
       expect(wrapper.emitted("update:query")?.at(-1)?.[0]).toBe("up");
       mockEditorObj.getValue.mockReturnValue("");
+    });
+
+    describe("user-edit (AC4.4 dirty editor)", () => {
+      const changeHandler = () => mockEditorObj.onDidChangeModelContent.mock.calls[0][0];
+
+      afterEach(() => {
+        mockModel.pushEditOperations.mockReset();
+        mockModel.setValue.mockReset();
+        mockEditorObj.setValue.mockReset();
+        mockModel.getValue.mockReturnValue("");
+      });
+
+      it("emits user-edit at once for a keystroke, before the debounced update", async () => {
+        const wrapper = await mountAndSetup();
+        changeHandler()({ isFlush: false });
+        expect(wrapper.emitted("user-edit")).toHaveLength(1);
+        expect(wrapper.emitted("update:query")).toBeFalsy();
+      });
+
+      it("ignores a flush (a whole-model replace)", async () => {
+        const wrapper = await mountAndSetup();
+        changeHandler()({ isFlush: true });
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for its own setValue", async () => {
+        const wrapper = await mountAndSetup();
+        mockEditorObj.setValue.mockImplementation(() => changeHandler()({ isFlush: false }));
+        (wrapper.vm as any).setValue("level='error'");
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for the blur trim of a URL query with trailing whitespace", async () => {
+        const wrapper = await mountAndSetup();
+        mockModel.getValue.mockReturnValue("status=500   ");
+        mockModel.getLineCount.mockReturnValue(1);
+        mockModel.getLineLength.mockReturnValue(13);
+        mockModel.pushEditOperations.mockImplementation(() => changeHandler()({ isFlush: false }));
+        mockEditorObj.onDidBlurEditorWidget.mock.calls[0][0]();
+        expect(mockModel.pushEditOperations).toHaveBeenCalled();
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
+
+      it("never marks the editor dirty for the unfocused prop sync", async () => {
+        const wrapper = await mountAndSetup();
+        mockEditorObj.hasWidgetFocus.mockReturnValue(false);
+        mockModel.setValue.mockImplementation(() => changeHandler()({ isFlush: false }));
+        await wrapper.setProps({ query: "SELECT * FROM other" });
+        await flushPromises();
+        expect(mockModel.setValue).toHaveBeenCalled();
+        expect(wrapper.emitted("user-edit")).toBeFalsy();
+      });
     });
   });
 

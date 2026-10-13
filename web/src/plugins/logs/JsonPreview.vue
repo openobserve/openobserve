@@ -270,6 +270,7 @@ import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseF
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import { crossLinkQueryText } from "@/composables/useLogs/freeTextSearch";
 import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -494,7 +495,7 @@ export default {
     ): string => {
       const startTime = searchObj.data.datetime?.startTime || 0;
       const endTime = searchObj.data.datetime?.endTime || 0;
-      const query = searchObj.data.crossLinkQuery || searchObj.data.query || "";
+      const query = crossLinkQueryText(searchObj, store.state.zoConfig);
 
       return urlTemplate
         .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))

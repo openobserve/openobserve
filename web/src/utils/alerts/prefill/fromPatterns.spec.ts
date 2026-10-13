@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildPrefillFromPatterns, type PatternsPrefillInput } from "./fromPatterns";
 import { isPrefillBlocked, normalizePrefill } from "../alertPrefill";
+import enUS from "@/locales/languages/en-US.json";
 
 const ERROR_PATTERN = "Connection refused to upstream <*>";
 const TIMEOUT_PATTERN = "Request deadline exceeded after <*>";
@@ -141,6 +142,62 @@ describe("buildPrefillFromPatterns", () => {
     it("says so when a SQL-mode query could not be carried over", () => {
       const p = buildPrefillFromPatterns(patterns({ baseFilterDropped: true }));
       expect(keys(p)).toContain("sqlModeFilterDropped");
+    });
+
+    it("says so when a text filter could not be carried over, and never as the SQL-mode note", () => {
+      const p = buildPrefillFromPatterns(patterns({ textFilterDropped: true, mode: "include" }));
+      expect(keys(p)).toContain("textFilterDropped");
+      expect(keys(p)).not.toContain("sqlModeFilterDropped");
+      expect(keys(buildPrefillFromPatterns(patterns()))).not.toContain("textFilterDropped");
+    });
+
+    it("words each dropped-filter warning for its own cause", () => {
+      const copy = enUS.alerts.prefill.warnings as Record<string, string>;
+      expect(copy.textFilterDropped).toBe(
+        "Your search filter was not carried over because this stream has no full-text search (FTS) fields. Add it to the alert query if you need it.",
+      );
+      expect(copy.heldFilterDropped).toBe(
+        "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it.",
+      );
+    });
+
+    it("says a held filter is waiting for Run as, never that the stream has no FTS fields", () => {
+      const p = buildPrefillFromPatterns(patterns({ heldFilterDropped: true, mode: "include" }));
+      expect(keys(p)).toContain("heldFilterDropped");
+      expect(keys(p)).not.toContain("textFilterDropped");
+      expect(keys(buildPrefillFromPatterns(patterns()))).not.toContain("heldFilterDropped");
+    });
+
+    it.each([
+      [{ textFilterDropped: true }],
+      [{ heldFilterDropped: true }],
+      [{ baseFilterDropped: true }],
+    ])(
+      "never says the alert uses the search when the search was dropped and no pattern is usable: %o",
+      (dropped) => {
+        for (const mode of ["include", "exclude"] as const) {
+          const p = buildPrefillFromPatterns(
+            patterns({ templates: [WILDCARD_ONLY], mode, ...dropped }),
+          );
+          expect(p.sql).not.toContain("WHERE");
+          expect(keys(p)).not.toContain("patternsUnusable");
+          expect(keys(p)).toContain("broadMatch");
+        }
+      },
+    );
+
+    it("warns about breadth whenever the SQL has no WHERE, and not when patterns are matched", () => {
+      const none = buildPrefillFromPatterns(patterns({ mode: "none" }));
+      expect(none.sql).not.toContain("WHERE");
+      expect(keys(none)).toContain("broadMatch");
+      const empty = buildPrefillFromPatterns(patterns({ templates: [], totalCount: 0 }));
+      expect(keys(empty)).toContain("broadMatch");
+      const include = buildPrefillFromPatterns(patterns({ mode: "include" }));
+      expect(keys(include)).not.toContain("broadMatch");
+      const filtered = buildPrefillFromPatterns(
+        patterns({ mode: "none", baseFilter: "code = 500" }),
+      );
+      expect(keys(filtered)).not.toContain("broadMatch");
     });
   });
 
