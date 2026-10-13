@@ -362,6 +362,10 @@ export const FILTER_FIELDS: readonly SessionField[] = [
   "usr_anonymous_id",
 ];
 const MATCH_OPS: readonly MatchOp[] = ["eq", "in", "prefix", "suffix", "contains", "regex"];
+export const MAX_ATTRIBUTE_LENGTH = 128;
+// Mirrors the server: what ingest's flattening writes; `_` columns are internal.
+const FILTER_COLUMN = /^[a-z0-9][a-z0-9_]*$/;
+const PAGE_WIDE_FIELDS = ["env", "version"];
 const MAX_STEP_MS = 86400000;
 const NEW_USERS_LOOKBACK_US = 30 * 86400000000;
 const MIN_REMAINING_VALUES = 3;
@@ -823,7 +827,7 @@ export function decodeDef(param: string | undefined): unknown {
 const STEP_OPTION_KEYS = ["min", "fr", "er", "vc"];
 const EXCLUSION_KEYS = ["s", "a", "b", "w"];
 const FUNNEL_KEYS = ["s", "u", "w", "b", "x", "f"];
-const FILTER_KEYS = ["field", "op", "values"];
+const FILTER_KEYS = ["field", "op", "values", "not"];
 const PARAM_COND_KEYS = ["t", "key", "op", "values"];
 const REF_COND_KEYS = ["t", "op", "values"];
 
@@ -875,11 +879,23 @@ const parseStepFilters = (raw: unknown): StepFilters | null => {
 /** One Filter all steps row as the server accepts it, or null. */
 export function parseFunnelFilter(raw: unknown): FunnelFilter | null {
   if (!isRecord(raw) || !onlyKeys(raw, FILTER_KEYS)) return null;
-  const { field, op, values } = raw;
-  if (!FILTER_FIELDS.includes(field as SessionField)) return null;
+  const { field, op, values, not } = raw;
+  if (typeof field !== "string") return null;
+  if (!FILTER_FIELDS.includes(field as SessionField) && !isFilterColumn(field)) return null;
   if (!MATCH_OPS.includes(op as MatchOp)) return null;
+  if (not !== undefined && typeof not !== "boolean") return null;
   if (!valueList(values, (v) => matchValue(op, v))) return null;
-  return { field: field as SessionField, op: op as MatchOp, values: [...values] };
+  return { field, op: op as MatchOp, values: [...values], ...(not ? { not: true as const } : {}) };
+}
+
+/** A stream column Filter all steps can use beyond the built-in fields; env and version stay page-wide. */
+export function isFilterColumn(name: string): boolean {
+  return (
+    name.length <= MAX_ATTRIBUTE_LENGTH &&
+    FILTER_COLUMN.test(name) &&
+    !FILTER_FIELDS.includes(name as SessionField) &&
+    !PAGE_WIDE_FIELDS.includes(name)
+  );
 }
 
 export function parseStepRef(raw: unknown): StepRef | null {
@@ -990,7 +1006,12 @@ export function funnelParam(def: FunnelDef): Record<string, unknown> {
       ...(e.b !== undefined ? { b: e.b } : { w: e.withinMs }),
     }));
   if (def.f?.length)
-    out.f = def.f.map((r) => ({ field: r.field, op: r.op, values: [...r.values] }));
+    out.f = def.f.map((r) => ({
+      field: r.field,
+      op: r.op,
+      values: [...r.values],
+      ...(r.not ? { not: true } : {}),
+    }));
   return out;
 }
 

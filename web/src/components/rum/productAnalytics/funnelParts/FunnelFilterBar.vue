@@ -15,71 +15,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section class="flex flex-col gap-1" data-test="rum-analytics-funnel-filter-all">
-    <div class="flex flex-wrap items-center gap-2" :class="stacked ? '' : 'px-2'">
-      <span class="flex min-w-0 flex-1 flex-col">
-        <span class="text-text-heading text-sm font-semibold">{{
-          t("rum.analytics.funnel.filterAllTitle")
-        }}</span>
-        <span class="text-text-secondary text-xs">{{
-          t("rum.analytics.funnel.filterAllCaption")
-        }}</span>
-      </span>
+  <FunnelSectionRow
+    :title="t('rum.analytics.funnel.filterAllTitle')"
+    :caption="t('rum.analytics.funnel.filterAllCaption')"
+    :stacked="stacked"
+    :boxed="!!def.f?.length"
+    test-id="rum-analytics-funnel-filter-all"
+  >
+    <span
+      v-for="(r, i) in def.f ?? []"
+      :key="r.field"
+      class="flex min-w-0 items-center gap-1.5"
+      :class="stacked ? 'basis-full' : ''"
+    >
+      <span class="text-text-secondary shrink-0 text-xs">{{
+        i === 0 ? t("rum.analytics.funnel.filterWhere") : t("rum.analytics.funnel.filterAnd")
+      }}</span>
+      <OTag
+        :label="chipLabel(r)"
+        variant="primary-outline"
+        size="sm"
+        clickable
+        removable
+        class="max-w-full min-w-0"
+        :remove-label="t('rum.analytics.funnel.removeFilter')"
+        :data-test="`rum-analytics-funnel-filter-${r.field}`"
+        @click="edit(r.field)"
+        @remove="emit('update:def', removeFilter(def, r.field))"
+      >
+        <span class="min-w-0 truncate">{{ chipLabel(r) }}</span>
+        <OTooltip :content="chipLabel(r)" />
+      </OTag>
+    </span>
+    <template #action>
       <OPopover
         :open="open"
         side="bottom"
-        align="end"
-        content-class="p-3 w-80 max-w-[calc(100vw-1.5rem)]"
+        :align="stacked ? 'end' : 'start'"
+        content-class="p-3 w-96 max-w-[calc(100vw-1.5rem)]"
         @update:open="setOpen"
       >
         <template #trigger>
           <span>
             <OButton
-              variant="outline"
-              size="sm"
+              v-if="stacked"
+              variant="ghost"
+              size="icon-sm"
               icon-left="add"
               :disabled="!!blocked"
+              :aria-label="t('rum.analytics.funnel.addFilter')"
               data-test="rum-analytics-funnel-add-filter-btn"
               @click="editing = null"
-              >{{ t("rum.analytics.funnel.addFilter") }}</OButton
-            >
-            <OTooltip v-if="blocked" :content="blocked" />
+              ><OTooltip :content="blocked ?? t('rum.analytics.funnel.addFilter')"
+            /></OButton>
+            <template v-else>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                icon-left="add"
+                :disabled="!!blocked"
+                data-test="rum-analytics-funnel-add-filter-btn"
+                @click="editing = null"
+                >{{ t("rum.analytics.funnel.addFilter") }}</OButton
+              >
+              <OTooltip v-if="blocked" :content="blocked" />
+            </template>
           </span>
         </template>
         <SessionFieldPicker
           v-if="open"
           :key="editing ?? '+'"
           :fields="pickable"
+          :field-types="fieldTypes"
           :values="values"
-          :initial-field="editing ?? undefined"
-          :initial-values="editing ? (filterOn(def, editing)?.values ?? []) : []"
+          :initial="editing ? filterOn(def, editing) : undefined"
           :lock-field="!!editing"
           @load="(f) => emit('filter-values', f)"
           @apply="apply"
           @cancel="open = false"
         />
       </OPopover>
-    </div>
-    <div
-      v-if="def.f?.length"
-      class="flex flex-wrap items-center gap-1.5"
-      :class="stacked ? '' : 'px-2'"
-    >
-      <OTag
-        v-for="r in def.f"
-        :key="r.field"
-        :label="chipLabel(r)"
-        variant="default-outline"
-        size="sm"
-        clickable
-        removable
-        :remove-label="t('rum.analytics.funnel.removeFilter')"
-        :data-test="`rum-analytics-funnel-filter-${r.field}`"
-        @click="edit(r.field)"
-        @remove="emit('update:def', removeFilter(def, r.field))"
-      />
-    </div>
-  </section>
+    </template>
+  </FunnelSectionRow>
 </template>
 
 <script setup lang="ts">
@@ -89,33 +106,37 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import SessionFieldPicker from "@/components/rum/productAnalytics/funnelParts/SessionFieldPicker.vue";
 import {
+  conditionOf,
+  filterFieldLabel,
   filterOn,
   removeFilter,
   setFilter,
   type FilterValuesState,
 } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { MAX_FUNNEL_FILTERS, type SessionField } from "@/utils/rum/productAnalyticsModel";
+import { MAX_FUNNEL_FILTERS } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef, FunnelFilter } from "@/utils/rum/productAnalyticsQueries";
 
 defineOptions({ name: "FunnelFilterBar" });
 
 const props = defineProps<{
   def: FunnelDef;
-  fields: readonly SessionField[];
+  fields: readonly string[];
+  fieldTypes?: Readonly<Record<string, string>>;
   values: FilterValuesState;
   stacked?: boolean;
 }>();
 const emit = defineEmits<{
   "update:def": [FunnelDef];
-  "filter-values": [SessionField];
+  "filter-values": [string];
 }>();
 const { t } = useI18nTyped();
 
 const open = ref(false);
-const editing = ref<SessionField | null>(null);
+const editing = ref<string | null>(null);
 
 // One filter per field, so a field already filtered is edited from its chip, not picked again.
 const pickable = computed(() =>
@@ -129,8 +150,9 @@ const blocked = computed<I18nText | null>(() => {
 });
 
 const chipLabel = (r: FunnelFilter): I18nText =>
-  t("rum.analytics.funnel.filterChip", {
-    field: t(`rum.analytics.exclusions.fields.${r.field}`),
+  t("rum.analytics.funnel.filterChipCondition", {
+    field: filterFieldLabel(t, r.field),
+    condition: t(`rum.analytics.funnel.conditions.${conditionOf(r).id}`),
     values: raw(r.values.join(", ")),
   });
 
@@ -139,14 +161,14 @@ const setOpen = (v: boolean) => {
   if (!v) editing.value = null;
 };
 
-const edit = (field: SessionField) => {
+const edit = (field: string) => {
   editing.value = field;
   open.value = true;
 };
 
 // A refused edit keeps the picker open with its ticks, so the user can drop the value that broke it.
-const apply = (field: SessionField, values: string[]) => {
-  const next = setFilter(props.def, field, values);
+const apply = (rule: FunnelFilter) => {
+  const next = setFilter(props.def, rule);
   if (!next) {
     toast({ variant: "error", message: t("rum.analytics.funnel.filterRejected") });
     return;

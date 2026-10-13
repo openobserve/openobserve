@@ -15,80 +15,100 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <section class="flex flex-col gap-1" data-test="rum-analytics-funnel-exclusions">
-    <div class="flex flex-wrap items-center gap-2 px-2">
-      <span class="flex min-w-0 flex-1 flex-col">
-        <span class="text-text-heading text-sm font-semibold">{{
-          t("rum.analytics.funnel.exclusionStepsTitle")
-        }}</span>
-        <span class="text-text-secondary text-xs">{{
-          t("rum.analytics.funnel.exclusionStepsCaption")
-        }}</span>
-      </span>
+  <FunnelSectionRow
+    :title="t('rum.analytics.funnel.exclusionStepsTitle')"
+    :caption="t('rum.analytics.funnel.exclusionStepsCaption')"
+    :stacked="stacked"
+    test-id="rum-analytics-funnel-exclusions"
+  >
+    <template #action>
       <span>
         <OButton
-          variant="outline"
-          size="sm"
+          v-if="stacked"
+          variant="ghost"
+          size="icon-sm"
           icon-left="add"
           :disabled="!!blocked"
+          :aria-label="t('rum.analytics.funnel.addExclusionStep')"
           data-test="rum-analytics-funnel-add-exclusion-btn"
           @click="picking = true"
-          >{{ t("rum.analytics.funnel.addExclusionStep") }}</OButton
-        >
-        <OTooltip v-if="blocked" :content="blocked" />
+          ><OTooltip :content="blocked ?? t('rum.analytics.funnel.addExclusionStep')"
+        /></OButton>
+        <template v-else>
+          <OButton
+            variant="ghost-primary"
+            size="sm"
+            icon-left="add"
+            :disabled="!!blocked"
+            data-test="rum-analytics-funnel-add-exclusion-btn"
+            @click="picking = true"
+            >{{ t("rum.analytics.funnel.addExclusionStep") }}</OButton
+          >
+          <OTooltip v-if="blocked" :content="blocked" />
+        </template>
       </span>
-    </div>
-
-    <ExclusionRow
-      v-for="(x, j) in exclusions"
-      :key="j"
-      :x="x"
-      :test-id="`rum-analytics-funnel-exclusion-${j}`"
-      :step-count="def.steps.length"
-      :removed="removed[j] ?? null"
-      :problem="rowProblems[j] ?? null"
-      :sampled="sampled"
-      :events="events"
-      :events-status="eventsStatus"
-      @update="(next) => editRow(j, next)"
-      @remove="removeRow(j)"
-    />
-    <ExclusionRow
-      v-if="pending"
-      :x="pending"
-      test-id="rum-analytics-funnel-exclusion-pending"
-      :step-count="def.steps.length"
-      :removed="null"
-      :problem="exclusionProblem(def.steps, pending)"
-      :sampled="sampled"
-      :events="events"
-      :events-status="eventsStatus"
-      @update="editPending"
-      @remove="pending = null"
-    />
-
-    <span v-if="picking" class="flex items-center gap-1.5 px-2 max-md:w-full">
-      <span class="w-72 max-md:w-full">
-        <StepPicker
-          :model-value="null"
-          :placeholder="t('rum.analytics.funnel.exclusionPick')"
+    </template>
+    <template #body>
+      <div
+        v-for="(x, j) in exclusions"
+        :key="j"
+        :class="stacked ? 'border-border-default rounded-default border' : ''"
+      >
+        <ExclusionRow
+          :x="x"
+          :test-id="`rum-analytics-funnel-exclusion-${j}`"
+          :step-count="def.steps.length"
+          :removed="removed[j] ?? null"
+          :problem="rowProblems[j] ?? null"
+          :sampled="sampled"
           :events="events"
-          :kinds="STEP_KINDS"
-          data-test="rum-analytics-funnel-exclusion-select"
-          @update:model-value="(s) => s && pick(s)"
+          :events-status="eventsStatus"
+          @update="(next) => editRow(j, next)"
+          @remove="removeRow(j)"
         />
+      </div>
+      <div v-if="pending" :class="stacked ? 'border-accent rounded-default border' : ''">
+        <ExclusionRow
+          :x="pending"
+          test-id="rum-analytics-funnel-exclusion-pending"
+          :step-count="def.steps.length"
+          :removed="null"
+          :problem="exclusionProblem(def.steps, pending)"
+          :sampled="sampled"
+          :events="events"
+          :events-status="eventsStatus"
+          @update="editPending"
+          @remove="pending = null"
+        />
+      </div>
+
+      <span
+        v-if="picking"
+        class="flex items-center gap-1.5 max-md:w-full"
+        :class="stacked ? 'border-accent bg-surface-accent rounded-default border p-1.5' : 'px-2'"
+      >
+        <span class="max-md:w-full" :class="stacked ? 'min-w-0 flex-1' : 'w-72'">
+          <StepPicker
+            :model-value="null"
+            :placeholder="t('rum.analytics.funnel.exclusionPick')"
+            :events="events"
+            :kinds="STEP_KINDS"
+            data-test="rum-analytics-funnel-exclusion-select"
+            @update:model-value="(s) => s && pick(s)"
+          />
+        </span>
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="close"
+          :aria-label="t('common.cancel')"
+          data-test="rum-analytics-funnel-exclusion-cancel"
+          @click="picking = false"
+          ><OTooltip :content="t('common.cancel')"
+        /></OButton>
       </span>
-      <OButton
-        variant="ghost"
-        size="icon-sm"
-        icon-left="close"
-        :aria-label="t('common.cancel')"
-        data-test="rum-analytics-funnel-exclusion-cancel"
-        @click="picking = false"
-        ><OTooltip :content="t('common.cancel')"
-      /></OButton>
-    </span>
-  </section>
+    </template>
+  </FunnelSectionRow>
 </template>
 
 <script setup lang="ts">
@@ -96,6 +116,7 @@ import { computed, ref, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import StepPicker from "@/components/rum/productAnalytics/StepPicker.vue";
+import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import ExclusionRow from "@/components/rum/productAnalytics/funnelParts/ExclusionRow.vue";
 import { fitsSteps, newExclusion } from "@/components/rum/productAnalytics/funnelParts/funnelEdits";
 import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
@@ -119,6 +140,7 @@ const props = defineProps<{
   sampled: SampleRatio;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
+  stacked?: boolean;
 }>();
 const emit = defineEmits<{ "update:def": [FunnelDef] }>();
 const { t } = useI18nTyped();

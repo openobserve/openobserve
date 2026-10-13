@@ -1000,14 +1000,16 @@ describe("AnalyticsFunnels", () => {
       ["c", "b"],
     ]);
     for (const dt of [
-      "rum-analytics-funnel-add-dashboard-btn",
-      "rum-analytics-funnel-alert-btn",
       "rum-analytics-funnel-step-0-move-up",
       "rum-analytics-funnel-step-0-move-down",
       "rum-analytics-funnel-step-0-remove",
     ]) {
       expect(wrapper!.find(`[data-test="${dt}"]`).attributes("aria-label"), dt).toBeTruthy();
     }
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-alert-btn"]').text()).toBe("Alert");
+    expect(wrapper!.find('[data-test="rum-analytics-funnel-add-dashboard-btn"]').text()).toBe(
+      "Add to dashboard",
+    );
   });
 
   it("explains a disabled Alert me or Add to dashboard by its real reason", async () => {

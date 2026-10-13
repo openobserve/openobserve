@@ -47,6 +47,7 @@ pub const MAX_VIEW_CONDS: usize = 5;
 /// One day in ms, the bound of an exclusion window and of a step's time on page.
 pub const MAX_STEP_MS: i64 = 86_400_000;
 pub const MAX_PARAM_NAME_LENGTH: usize = 128;
+pub const MAX_ATTRIBUTE_LENGTH: usize = 128;
 pub const RULES_HASH_LENGTH: usize = 16;
 /// Bot labels removed by the built-in rule; raise `version` whenever the lists change.
 pub const BUILTIN_BOTS: BuiltinBotList = BuiltinBotList {
@@ -338,13 +339,23 @@ pub struct Exclusion {
     pub w: Option<i64>,
 }
 
-/// Filter all steps: keeps only sessions whose `field` matches one of `values`; NULL never matches.
+/// Filter all steps: keeps sessions where `field` matches one of `values`, or never does if `not`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FunnelFilter {
-    pub field: SessionField,
+    pub field: FilterField,
     pub op: MatchOp,
     pub values: Vec<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub not: bool,
+}
+
+/// A built-in session field, or any other column of the RUM stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(untagged)]
+pub enum FilterField {
+    Builtin(SessionField),
+    Attribute(String),
 }
 
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -892,10 +903,18 @@ fn validate_filters(filters: Option<&[FunnelFilter]>) -> Result<(), RumPaError> 
         )));
     }
     for filter in filters {
-        if matches!(filter.field, SessionField::Env | SessionField::Version) {
-            return Err(invalid_def(
-                "a funnel filter cannot use env or version".to_string(),
-            ));
+        match &filter.field {
+            FilterField::Builtin(SessionField::Env | SessionField::Version) => {
+                return Err(invalid_def(
+                    "a funnel filter cannot use env or version".to_string(),
+                ));
+            }
+            FilterField::Attribute(name) if !is_filter_column(name) => {
+                return Err(invalid_def(
+                    "a funnel filter field is a stream column name".to_string(),
+                ));
+            }
+            _ => {}
         }
         if filter.values.is_empty() || filter.values.len() > MAX_RULE_VALUES {
             return Err(invalid_def(format!(
@@ -907,6 +926,16 @@ fn validate_filters(filters: Option<&[FunnelFilter]>) -> Result<(), RumPaError> 
         }
     }
     Ok(())
+}
+
+// The name is quoted into SQL, so only what ingest writes passes; `_` columns are internal.
+fn is_filter_column(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= MAX_ATTRIBUTE_LENGTH
+        && !name.starts_with('_')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
 fn validate_exclusions(def: &FunnelDef, event_ids: &mut Vec<String>) -> Result<(), RumPaError> {
@@ -1747,7 +1776,7 @@ mod tests {
         assert!(plain.get("f").is_none(), "{plain}");
         for bad in [
             serde_json::json!([{"field": "geo_info_country", "op": "in", "values": ["x"], "x": 1}]),
-            serde_json::json!([{"field": "user_agent", "op": "in", "values": ["x"]}]),
+            serde_json::json!([{"field": 7, "op": "in", "values": ["x"]}]),
             serde_json::json!([{"field": "geo_info_country", "op": "like", "values": ["x"]}]),
         ] {
             let def = serde_json::json!({"s": [["p", "/a"], ["p", "/b"]], "f": bad});
@@ -1786,6 +1815,47 @@ mod tests {
             let f = serde_json::json!([{"field": field, "op": "in", "values": ["x"]}]);
             assert_eq!(def_code(with_f(f)), "ok", "{field}");
         }
+    }
+
+    #[test]
+    fn p4_f_a_field_is_any_stream_column_name() {
+        let on = |field: &str| {
+            def_code(with_f(
+                serde_json::json!([{"field": field, "op": "in", "values": ["x"]}]),
+            ))
+        };
+        for field in [
+            "context_promo_variant",
+            "usr_name",
+            "resource_url",
+            "view_loading_type",
+            "type",
+        ] {
+            assert_eq!(on(field), "ok", "{field}");
+        }
+        for field in [
+            "",
+            "Context_plan",
+            "context_plan-tier",
+            "context_plan\"",
+            "_all",
+            "_timestamp",
+            &"a".repeat(MAX_ATTRIBUTE_LENGTH + 1),
+        ] {
+            assert_eq!(on(field), "invalid_definition", "{field}");
+        }
+    }
+
+    #[test]
+    fn p4_f_not_is_stored_only_when_set() {
+        let f = |not: bool| serde_json::json!([{"field": "context_plan", "op": "contains", "values": ["pro"], "not": not}]);
+        let (negated, _) = with_f(f(true)).unwrap();
+        assert_eq!(negated["f"][0]["not"], serde_json::json!(true), "{negated}");
+        let (plain, _) = with_f(f(false)).unwrap();
+        assert!(plain["f"][0].get("not").is_none(), "{plain}");
+        let builtin = serde_json::json!([{"field": "usr_email", "op": "suffix", "values": ["@qa.io"], "not": true}]);
+        let (stored, _) = with_f(builtin.clone()).unwrap();
+        assert_eq!(stored["f"], builtin, "{stored}");
     }
 
     #[test]

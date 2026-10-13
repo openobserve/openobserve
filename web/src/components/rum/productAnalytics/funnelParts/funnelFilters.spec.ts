@@ -14,10 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { condOf, condProblem, draftOf, removeFilter, setFilter, withConds } from "./funnelFilters";
+import {
+  condOf,
+  conditionOf,
+  condProblem,
+  draftOf,
+  removeFilter,
+  setFilter,
+  withConds,
+} from "./funnelFilters";
 import { whyLines, type WhyInput } from "./whyEntered";
 import { fitsLink } from "./funnelEdits";
-import type { FunnelDef } from "@/utils/rum/productAnalyticsQueries";
+import type { FunnelDef, FunnelFilter } from "@/utils/rum/productAnalyticsQueries";
 
 const DEF: FunnelDef = {
   steps: [
@@ -29,11 +37,16 @@ const DEF: FunnelDef = {
   breakdown: null,
 };
 
+const isIn = (field: string, values: string[]): FunnelFilter => ({ field, op: "in", values });
+
 describe("Filter all steps edits", () => {
   it("one filter per field: setting a field again replaces its values", () => {
-    const one = setFilter(DEF, "geo_info_country", ["India", "India", "Brazil"])!;
+    const one = setFilter(DEF, isIn("geo_info_country", ["India", "India", "Brazil"]))!;
     expect(one.f).toEqual([{ field: "geo_info_country", op: "in", values: ["India", "Brazil"] }]);
-    const two = setFilter(setFilter(one, "usr_email", ["a@x.io"])!, "geo_info_country", ["Peru"])!;
+    const two = setFilter(
+      setFilter(one, isIn("usr_email", ["a@x.io"]))!,
+      isIn("geo_info_country", ["Peru"]),
+    )!;
     expect(two.f?.map((r) => [r.field, r.values])).toEqual([
       ["usr_email", ["a@x.io"]],
       ["geo_info_country", ["Peru"]],
@@ -41,12 +54,32 @@ describe("Filter all steps edits", () => {
   });
 
   it("refuses what the server would refuse", () => {
-    expect(setFilter(DEF, "geo_info_country", [])).toBeNull();
-    expect(setFilter(DEF, "env", ["prod"])).toBeNull();
+    expect(setFilter(DEF, isIn("geo_info_country", []))).toBeNull();
+    expect(setFilter(DEF, isIn("env", ["prod"]))).toBeNull();
+    expect(setFilter(DEF, isIn("_all", ["x"]))).toBeNull();
+    expect(setFilter(DEF, isIn("context_Plan", ["x"]))).toBeNull();
+    expect(setFilter(DEF, { field: "usr_email", op: "regex", values: ["(a"] })).toBeNull();
+  });
+
+  it("takes an attribute column and a negated condition, and keeps not only when set", () => {
+    const d = setFilter(DEF, {
+      field: "context_plan",
+      op: "contains",
+      values: ["pro"],
+      not: true,
+    })!;
+    expect(d.f).toEqual([{ field: "context_plan", op: "contains", values: ["pro"], not: true }]);
+    expect(conditionOf(d.f![0]).id).toBe("notContains");
+    expect(setFilter(DEF, isIn("usr_name", ["Ann"]))!.f![0]).not.toHaveProperty("not");
+  });
+
+  it("reads eq as is one of, since one listed value matches the same rows", () => {
+    expect(conditionOf({ op: "eq" }).id).toBe("in");
+    expect(conditionOf({ op: "eq", not: true }).id).toBe("notIn");
   });
 
   it("removing the last filter drops f entirely", () => {
-    const one = setFilter(DEF, "geo_info_city", ["Pune"])!;
+    const one = setFilter(DEF, isIn("geo_info_city", ["Pune"]))!;
     expect(removeFilter(one, "geo_info_city")).not.toHaveProperty("f");
     expect(removeFilter(one, "usr_id").f).toHaveLength(1);
   });
@@ -55,7 +88,7 @@ describe("Filter all steps edits", () => {
     const many = Array.from({ length: 20 }, (_, i) => `${"v".repeat(400)}${i}`);
     let d: FunnelDef | null = DEF;
     for (const field of ["geo_info_city", "usr_email", "usr_id"] as const)
-      d = d && setFilter(d, field, many);
+      d = d && setFilter(d, isIn(field, many));
     expect(d).not.toBeNull();
     expect(fitsLink(DEF)).toBe(true);
     expect(fitsLink(d!)).toBe(false);
