@@ -23,5 +23,6 @@ use openobserve_core as service;
 
 pub mod profiles;
 pub mod promql;
+pub mod rum;
 pub mod search;
 pub mod traces;
