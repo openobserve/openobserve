@@ -496,6 +496,17 @@ describe("RemoteTaskFormPage — test connection", () => {
       );
     });
 
+    it("does not offer a test for a secret-holding task that was never published", async () => {
+      const published = await get("acme", "head-1");
+      get.mockResolvedValue({ ...published, isDraft: true, version: 0 });
+      const wrapper = mountForm();
+      await flushPromises();
+
+      const panel = wrapper.findComponent({ name: "RemoteTaskTestPanel" });
+      expect(panel.props("canRun")).toBe(false);
+      expect(panel.props("hint")).toContain("has not been published yet");
+    });
+
     it("counts an explicit skip from the endpoint as a pass", async () => {
       testRun.mockResolvedValue([
         {

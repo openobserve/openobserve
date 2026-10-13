@@ -420,9 +420,11 @@
           :report="testReport"
           :error-message="testError"
           :hint="
-            testsStoredVersion
-              ? t('aiObservability.remoteTasks.testPanel.storedCredentialsHint')
-              : null
+            unpublishedSecret
+              ? t('aiObservability.remoteTasks.testPanel.unpublishedSecretHint')
+              : testsStoredVersion
+                ? t('aiObservability.remoteTasks.testPanel.storedCredentialsHint')
+                : null
           "
           @run="runCandidateTest"
         />
@@ -610,7 +612,9 @@ const testState = ref<"idle" | "running" | "passed" | "failed">("idle");
 const testReport = ref<RemoteTaskVerificationReport | null>(null);
 const testError = ref<I18nText | null>(null);
 
-const canRunTest = computed(() => Boolean(nameValue.value.trim() && endpointValue.value.trim()));
+const canRunTest = computed(
+  () => Boolean(nameValue.value.trim() && endpointValue.value.trim()) && !unpublishedSecret.value,
+);
 
 /**
  * Whether the task being edited holds a write-only secret. The form can never
@@ -618,6 +622,8 @@ const canRunTest = computed(() => Boolean(nameValue.value.trim() && endpointValu
  * tested through `test_run`, which uses the published version's stored secrets.
  */
 const testsStoredVersion = ref(false);
+/** A secret-holding task that was never published: nothing to test until Publish. */
+const unpublishedSecret = ref(false);
 
 const signingKey = form.useStore((state: any) => String(state.values.signingKey ?? ""));
 const signingKeyCopied = ref(false);
@@ -938,10 +944,13 @@ async function loadForEdit() {
       return;
     }
     draftFromVersion.value = task.isDraft ? undefined : task.version;
-    testsStoredVersion.value =
+    const holdsSecret =
       task.auth.usesSecret ||
       task.signing.usesSecret ||
       task.customHeaders.some((header) => header.usesSecret);
+    // test_run tests the published version, and a task never published has none.
+    testsStoredVersion.value = holdsSecret && !task.isDraft;
+    unpublishedSecret.value = holdsSecret && task.isDraft;
     form.reset(remoteTaskToFormValues(task));
   } catch (error: any) {
     toast({

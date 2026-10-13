@@ -94,7 +94,7 @@
           {{ t("aiObservability.remoteTasks.testPanel.run") }}
         </OButton>
         <span
-          v-if="!canRun && state !== 'running'"
+          v-if="!canRun && state !== 'running' && !hint"
           class="text-text-secondary text-2xs italic"
           data-test="ai-remote-task-test-disabled-hint"
         >
