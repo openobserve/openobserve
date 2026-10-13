@@ -191,6 +191,11 @@ struct ConfigResponse<'a> {
     histogram_enabled: bool,
     timechart_enabled: bool,
     max_query_range: i64,
+    cluster_name: String,
+    /// Hours back the ingester accepts a record's timestamp.
+    ingest_allowed_upto: i64,
+    /// Hours ahead the ingester accepts a record's timestamp.
+    ingest_allowed_in_future: i64,
     ai_enabled: bool,
     /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
     /// recovery window at all — deletion is immediate and permanent, which is what
@@ -212,6 +217,7 @@ struct ConfigResponse<'a> {
     query_values_default_num: i64,
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
+    downtimes_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
@@ -247,6 +253,7 @@ struct ConfigResponse<'a> {
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
     profiling_enabled: bool,
+    experimental: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
@@ -477,6 +484,7 @@ pub async fn zo_config(
     // AI needs o2-ai to answer; with no agent target its buttons could only fail, so report it off.
     let ai_enabled = enterprise_value!(false, o2cfg.ai.enabled && o2cfg.ai.has_agent_target());
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
+    let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
@@ -588,6 +596,9 @@ pub async fn zo_config(
         histogram_enabled: cfg.limit.histogram_enabled,
         timechart_enabled: cfg.limit.timechart_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
+        cluster_name: cfg.common.cluster_name.clone(),
+        ingest_allowed_upto: cfg.limit.ingest_allowed_upto,
+        ingest_allowed_in_future: cfg.limit.ingest_allowed_in_future,
         ai_enabled,
         org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
@@ -606,6 +617,7 @@ pub async fn zo_config(
         query_values_default_num: cfg.limit.query_values_default_num,
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
+        downtimes_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
@@ -623,6 +635,7 @@ pub async fn zo_config(
         search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
         profiling_enabled: cfg.common.profiling_enabled,
+        experimental: cfg.common.experimental,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
         #[cfg(feature = "enterprise")]
@@ -1830,6 +1843,7 @@ const CACHE_MODULES: &[&str] = &[
     "realtime_triggers",
     "org_users",
     "compact_retention",
+    "downtimes",
 ];
 
 // Helper function to reload cache for a specific module
@@ -1849,7 +1863,28 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "org_users" => db::org_users::cache().await,
         "org_ingestion_tokens" => db::org_ingestion_tokens::cache().await,
         "compact_retention" => db::compact::retention::cache().await,
+        "downtimes" => {
+            reload_downtimes(enterprise_value!(false, get_o2_config().downtimes.enabled)).await
+        }
         _ => Err(anyhow::anyhow!("unsupported module")),
+    }
+}
+
+/// `all` lists downtimes only with the flag on, so the reply and total match main otherwise.
+fn all_cache_modules(downtimes_enabled: bool) -> Vec<&'static str> {
+    CACHE_MODULES
+        .iter()
+        .copied()
+        .filter(|module| downtimes_enabled || *module != "downtimes")
+        .collect()
+}
+
+/// With the flag off the cache stays empty, so no evaluation or SLO pass reads a downtime.
+async fn reload_downtimes(enabled: bool) -> Result<(), anyhow::Error> {
+    if enabled {
+        db::downtimes::cache().await
+    } else {
+        Ok(())
     }
 }
 
@@ -1872,7 +1907,8 @@ pub async fn cache_reload(
 
     // Expand "all" to all available modules
     if modules.contains(&"all") {
-        modules = CACHE_MODULES.to_vec();
+        let downtimes_enabled = enterprise_value!(false, get_o2_config().downtimes.enabled);
+        modules = all_cache_modules(downtimes_enabled);
     }
 
     let total_modules = modules.len();
@@ -1923,6 +1959,19 @@ mod tests {
     use serde_json;
 
     use super::*;
+
+    #[test]
+    fn with_downtimes_off_all_names_the_modules_main_names() {
+        assert!(!all_cache_modules(false).contains(&"downtimes"));
+        assert_eq!(all_cache_modules(false).len(), CACHE_MODULES.len() - 1);
+        assert!(all_cache_modules(true).contains(&"downtimes"));
+    }
+
+    #[tokio::test]
+    async fn with_downtimes_off_a_cache_reload_loads_no_downtime() {
+        reload_downtimes(false).await.unwrap();
+        assert!(db::downtimes::all_cached().is_empty());
+    }
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
@@ -2432,6 +2481,24 @@ mod tests {
         assert_eq!(
             consume_login_state(Some(&state), Some("abd")).await,
             Err("invalid state in request")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_serves_the_ingest_window_and_cluster_name() {
+        let cfg = get_config();
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["cluster_name"], cfg.common.cluster_name.as_str());
+        assert_eq!(json["ingest_allowed_upto"], cfg.limit.ingest_allowed_upto);
+        assert_eq!(
+            json["ingest_allowed_in_future"],
+            cfg.limit.ingest_allowed_in_future
         );
     }
 }

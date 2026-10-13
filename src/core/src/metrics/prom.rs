@@ -216,6 +216,7 @@ pub async fn remote_write(
     let mut preload_uds_time = 0u128;
     let mut preload_schema_time = 0u128;
     let mut preload_alerts_time = 0u128;
+    let mut created_streams: HashSet<String> = HashSet::new();
 
     if !unique_metrics.is_empty() {
         let streams: Vec<StreamParams> = unique_metrics
@@ -255,13 +256,16 @@ pub async fn remote_write(
         for stream in &streams {
             let stream_name_str: &str = stream.stream_name.as_ref();
             if !metric_schema_map.contains_key(stream_name_str) {
-                let _schema_exists = stream_schema_exists(
+                let schema_exists = stream_schema_exists(
                     &stream.org_id,
                     &stream.stream_name,
                     stream.stream_type,
                     &mut metric_schema_map,
                 )
                 .await;
+                if !schema_exists.has_fields {
+                    created_streams.insert(stream.stream_name.to_string());
+                }
             }
         }
         preload_schema_time = t.elapsed().as_micros();
@@ -382,6 +386,7 @@ pub async fn remote_write(
 
         // every sample of a series shares its labels, so the identity is loop-invariant
         let series_hash = super::signature_of_series_labels(&label_pairs);
+        let schema = metric_schema_map.get(&metric_name);
 
         // a label the schema has not seen goes down the JSON path, which evolves the schema
         if event.histograms.is_empty()
@@ -393,14 +398,13 @@ pub async fn remote_write(
             let has_writable = event
                 .samples
                 .iter()
-                .any(|s| sample_cell(s.value, metric_schema_map.get(&metric_name)).is_some());
+                .any(|s| sample_cell(s.value, schema).is_some());
             if has_writable && !gate.admit().await {
                 ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
                 return Ok(());
             }
             for sample in &event.samples {
-                if let Some(value) = sample_cell(sample.value, metric_schema_map.get(&metric_name))
-                {
+                if let Some(value) = sample_cell(sample.value, schema) {
                     let timestamp = parse_i64_to_timestamp_micros(sample.timestamp);
                     columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
                 }
@@ -425,8 +429,7 @@ pub async fn remote_write(
         let can_move_labels = event.histograms.is_empty();
         for (sample_idx, sample) in event.samples.into_iter().enumerate() {
             sample_count += 1;
-            let Some(sample_val) = sample_cell(sample.value, metric_schema_map.get(&metric_name))
-            else {
+            let Some(sample_val) = sample_cell(sample.value, schema) else {
                 continue;
             };
 
@@ -568,6 +571,7 @@ pub async fn remote_write(
     let step_start = std::time::Instant::now();
 
     let entries_by_stream = ingest::entries_by_stream(org_id, metric_data_map, columnar_streams)?;
+    let first_data_streams = created_streams_with_entries(&created_streams, &entries_by_stream);
 
     let timings = ingest::write_streams(
         org_id,
@@ -598,6 +602,10 @@ pub async fn remote_write(
             timings.report_stats_micros as f64 / 1000.0,
             other_time as f64 / 1000.0,
         );
+    }
+
+    for stream_name in first_data_streams {
+        crate::onboarding::on_user_stream_created(org_id, StreamType::Metrics, &stream_name);
     }
 
     ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
@@ -1088,6 +1096,18 @@ fn finish_identity_columns(json_data: &mut [PendingRecord]) {
             json::Value::Number((*timestamp).into()),
         );
     }
+}
+
+/// Streams this request created that its write gave at least one entry; a NaN-only series has none.
+fn created_streams_with_entries<T>(
+    created: &HashSet<String>,
+    entries_by_stream: &HashMap<String, Vec<T>>,
+) -> Vec<String> {
+    created
+        .iter()
+        .filter(|name| entries_by_stream.get(*name).is_some_and(|e| !e.is_empty()))
+        .cloned()
+        .collect()
 }
 
 /// A sample's `value` cell, `None` for no row; a marker needs the `value` column samples create.
@@ -1918,5 +1938,24 @@ mod tests {
         .unwrap_err()
         .to_string();
         assert!(err.contains("larger than allowed"), "{err}");
+    }
+
+    #[test]
+    fn test_first_data_streams_need_written_entries() {
+        let created: HashSet<String> = ["real", "nan_only", "no_samples"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let entries: HashMap<String, Vec<u8>> = [
+            ("real".to_string(), vec![1]),
+            ("nan_only".to_string(), vec![]),
+            ("existing".to_string(), vec![1]),
+        ]
+        .into_iter()
+        .collect();
+        assert_eq!(created_streams_with_entries(&created, &entries), ["real"]);
+        assert!(
+            created_streams_with_entries(&created, &HashMap::<String, Vec<u8>>::new()).is_empty()
+        );
     }
 }

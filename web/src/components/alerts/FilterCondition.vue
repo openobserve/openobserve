@@ -76,7 +76,20 @@
       <OTooltip v-if="condition.operator" :content="condition.operator" />
     </div>
     <div v-if="!isUnaryOperator(condition.operator)" class="ms-0">
+      <OFormCombobox
+        v-if="valueSuggestions"
+        :name="`${namePrefix}.value`"
+        :items="valueSuggestions.options.value"
+        :placeholder="t('common.value')"
+        :help-text="valueSuggestions.hint.value"
+        :class="[
+          inputWidth ? inputWidth : store.state.isAiChatEnabled ? 'w-27.5' : computedValueWidth,
+        ]"
+        data-test="alert-conditions-value-combobox"
+        @update:model-value="() => emits('input:update', 'conditions', condition)"
+      />
       <OFormInput
+        v-else
         :name="`${namePrefix}.value`"
         :placeholder="t('common.value')"
         :class="[
@@ -94,6 +107,7 @@
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 const props = defineProps({
@@ -154,6 +168,12 @@ const props = defineProps({
     default: "",
     required: false,
   },
+  /** Operator values to offer; falls back to ConditionBuilder's, then to the full list. */
+  operators: {
+    type: Array as PropType<string[]>,
+    default: undefined,
+    required: false,
+  },
 });
 
 import { ref, computed, watch, inject, type PropType } from "vue";
@@ -162,6 +182,11 @@ import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
+import {
+  CONDITION_OPERATORS_KEY,
+  CONDITION_VALUE_SUGGEST_KEY,
+  siblingAndPairs,
+} from "./conditionOperators";
 
 const emits = defineEmits(["input:update"]);
 
@@ -189,7 +214,7 @@ const form = inject(FORM_CONTEXT_KEY, null);
 
 // Operator `value`s are the backend wire format (serde renames); labels stay
 // raw English like the rest of the list.
-const triggerOperators: SelectOptionInput[] = [
+const allOperators: SelectOptionInput[] = [
   "=",
   "!=",
   ">=",
@@ -203,6 +228,30 @@ const triggerOperators: SelectOptionInput[] = [
   { label: raw("Is Empty"), value: "is_empty" },
   { label: raw("Is Not Empty"), value: "is_not_empty" },
 ];
+
+const injectedOperators = inject(CONDITION_OPERATORS_KEY, null);
+const triggerOperators = computed<SelectOptionInput[]>(() => {
+  const allowed = props.operators ?? injectedOperators?.value;
+  if (!allowed) return allOperators;
+  return allOperators.filter((op) =>
+    allowed.includes(typeof op === "object" && op !== null ? String(op.value) : String(op)),
+  );
+});
+
+// The provider narrows by the other rows, so it reads the whole tree from the form root.
+const valueSuggest = inject(CONDITION_VALUE_SUGGEST_KEY, null);
+const rootName = props.namePrefix.match(/^[^.[]+/)?.[0] ?? "";
+const rootTree =
+  valueSuggest && form && rootName
+    ? form.useStore((s: { values?: Record<string, unknown> }) => s.values?.[rootName])
+    : null;
+const valueSuggestions = valueSuggest
+  ? valueSuggest(
+      () => String(props.condition.column ?? ""),
+      () => String(props.condition.value ?? ""),
+      () => siblingAndPairs(rootTree?.value, props.condition.id),
+    )
+  : null;
 
 // Null checks take no value; drop a stale one so it can't leak into the payload.
 const onOperatorChange = (operator: unknown) => {

@@ -321,6 +321,9 @@ export interface OTableProps<TData = any> {
   sortOrder?: "asc" | "desc";
   /** Maps TanStack column id → backend field name for server-side sort */
   sortFieldMap?: Record<string, string>;
+  sortClearable?: boolean;
+  sortDisabled?: boolean;
+  sortDisabledReason?: I18nText;
 
   // ── Filtering ──
   /** Global search/filter text */
@@ -469,6 +472,8 @@ export interface OTableProps<TData = any> {
   /** Text shown when data is empty and not loading */
   emptyMessage?: I18nText;
   dense?: boolean;
+  /** Short rows (`--table-row-height-compact`) with no cell padding, for small list dialogs; overrides `dense`. */
+  compact?: boolean;
   bordered?: boolean;
   /**
    * Draws the outer frame (border) around the whole table region. Default true.
@@ -478,6 +483,8 @@ export interface OTableProps<TData = any> {
   frame?: boolean;
   /** Draws the hairline divider under the toolbar row (default true); set false when a subheader below would read as a double line. */
   toolbarBordered?: boolean;
+  /** Draws the hairline above the built-in pager (default true); set false when the table sits flush in a dialog. */
+  paginationBordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
@@ -524,6 +531,7 @@ export interface OTableProps<TData = any> {
   rowTone?: (row: TData) => RowTone | null;
   /** Static class or dynamic function for row <tr> */
   rowClass?: string | ((row: TData) => string);
+  activeRowIndex?: number | null;
   /** Dynamic inline style for row */
   getRowStyle?: (row: TData) => Record<string, any>;
   /** Returns a CSS color for the status bar (4px left border) per row */

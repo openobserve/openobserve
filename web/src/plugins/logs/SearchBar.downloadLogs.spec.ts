@@ -37,6 +37,15 @@ describe("SearchBar — logs_downloaded analytics", () => {
         stubs: { QueryEditor: true },
       },
     });
+    wrapper.vm.searchObj.data.stream.selectedStream = ["app"];
+    wrapper.vm.searchObj.data.queryResults = { hits: [{ level: "info" }] };
+    wrapper.vm.searchObj.meta.executed = {
+      generation: 1,
+      signature: wrapper.vm.autoRun.readSignature(),
+      req: {},
+      complete: true,
+    };
+    wrapper.vm.searchObj.meta.editorDirty = false;
   });
 
   afterEach(() => {

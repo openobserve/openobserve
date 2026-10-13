@@ -285,7 +285,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
       });
     });
 
-    test('the Sessions list renders its empty list instead of failing on session_has_replay (ENT#2799)', {
+    test('the Sessions list renders its sessions instead of failing on session_has_replay (ENT#2799)', {
       tag: TAGS,
     }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
@@ -293,8 +293,13 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
       try {
         await pa.gotoRumSessions({ org: state.org, from: (state.nowMs - DAY_MS) * 1000, to: (Date.now() + HOUR_MS) * 1000 });
         await expect(pa.sessionsTable).toBeVisible({ timeout: 45000 });
-        // No session can have a replay without the field, so the list is empty by design (the 1 = 0 filter).
-        await expect(pa.sessionsNoData).toBeVisible({ timeout: 45000 });
+        // #15190: a missing session_has_replay no longer filters the list (the WHERE went
+        // from `1 = 0` to `1 = 1`) — replay is optional, so its absence only means no row
+        // can offer playback. The point of ENT#2799 is that the query does not reference
+        // the missing field at all, which the no-400 and no-"unknown field" checks below cover.
+        await expect(pa.sessionsRows.first()).toBeVisible({ timeout: 45000 });
+        await expect(pa.sessionsNoData).toBeHidden();
+        await expect(pa.sessionsPlayIcons, 'no session has a replay, so no row offers playback').toHaveCount(0);
         await pa.waitForNetworkQuiet();
         await pa.expectPageNotToContain(/unknown field/i);
         await expect(pa.toasts.filter({ hasText: 'session_has_replay' })).toHaveCount(0);
@@ -338,7 +343,7 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
       }
     });
 
-    test('Paths all and pages render, clicks-only is an empty state, and From lists pages (ENT#2800)', {
+    test('Paths all and pages render, clicks-only keeps the page anchor and ends at Left the app, and From lists pages (ENT#2800)', {
       tag: TAGS,
     }, async ({ page }, testInfo) => {
       const pa = new PageManager(page).rumProductAnalyticsPage;
@@ -353,10 +358,19 @@ test.describe('RUM Product Analytics schema-state regressions', () => {
         await pa.expectFlowRendered();
         for (const next of app.next) await expect(pa.pathsTopTable).toContainText(next, { timeout: 30000 });
 
+        // A page anchor stays in a clicks-only path (#15141); with no click captured, every session leaves right after it.
         await pa.setPathsInclude('clicks');
-        await expect(pa.pathsEmpty).toBeVisible({ timeout: 30000 });
-        await expect(pa.pathsEmpty).toContainText('No sessions reached');
-        await expect(pa.pathsEmpty).toContainText('in this range');
+        await pa.expectFlowRendered();
+        // One combined check, so a table that is empty while it reloads cannot satisfy the absence on its own.
+        await expect.poll(async () => {
+          const text = await pa.pathsTopText();
+          return text.includes('Left the app') && !app.next.some((k) => text.includes(k));
+        }, { timeout: 30000, message: 'Clicks only ends the page anchor at Left the app and lists no other page' }).toBe(true);
+        await expect(pa.pathsTopRow(0)).toContainText(app.landing);
+        await expect(pa.pathsTopRow(0)).toContainText('Left the app');
+        await expect(pa.topPathSessionsBtn(0)).toHaveText(new RegExp(`^${app.landingSessions} sessions$`));
+        await expect(pa.pathsTopRow(1)).toHaveCount(0);
+        await expect(pa.pathsEmpty).toHaveCount(0);
         await pa.expectNoPanelError('rum-analytics-paths');
 
         const options = await pa.pathsAnchorOptionLabels();

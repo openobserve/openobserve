@@ -152,6 +152,10 @@ export class RumProductAnalyticsPage {
 
         this.sessionsTable = page.locator('[data-test="rum-sessions-table"]');
         this.sessionsNoData = this.sessionsTable.locator('[data-test="no-data-message"]');
+        this.sessionsRows = this.sessionsTable.locator('tbody tr');
+        // Rendered per row only when that session has a replay to play (#15190). The icon
+        // carries no data-test, so this keys off its own semantic class in AppSessions.vue.
+        this.sessionsPlayIcons = this.sessionsTable.locator('.session-play-icon');
         this.toasts = page.locator('[data-test="o-toast-message"]');
     }
 

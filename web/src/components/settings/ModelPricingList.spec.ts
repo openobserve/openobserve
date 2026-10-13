@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -53,7 +54,8 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
   getImageURL: (path: string) => `mock://${path}`,
 }));
 
@@ -344,6 +346,8 @@ function mountComponent(extra: { store?: any; query?: Record<string, any> } = {}
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
+
+beforeEach(() => resetListViewState());
 
 describe("ModelPricingList.vue", () => {
   let wrapper: VueWrapper;
@@ -1329,6 +1333,45 @@ describe("ModelPricingList.vue", () => {
       expect(wrapper.vm.hasTimeBasedTiers(peakOffPeakModel())).toBe(true);
       expect(wrapper.vm.hasTimeBasedTiers(orgModel())).toBe(false);
       expect(wrapper.vm.hasTimeBasedTiers({ tiers: [{ utc_windows: [] }] })).toBe(false);
+    });
+  });
+});
+
+describe("list view state", () => {
+  it("restores search, page size, page and sort from the saved view", async () => {
+    Object.assign(useListViewState("model-pricing", {}), {
+      filterQuery: "abc",
+      selectedTab: "org",
+      pageSize: 50,
+      currentPage: 2,
+      sortBy: "name",
+      sortOrder: "desc",
+    });
+    const w: any = mountComponent();
+    await flushPromises();
+    expect(w.vm.filterQuery).toBe("abc");
+    expect(w.vm.selectedTab).toBe("org");
+    expect(w.vm.pageSize).toBe(50);
+    expect(w.vm.currentPage).toBe(2);
+    expect(w.vm.sortBy).toBe("name");
+    expect(w.vm.sortOrder).toBe("desc");
+    w.unmount();
+  });
+
+  it("saves list state so it survives unmount", async () => {
+    const w: any = mountComponent();
+    await flushPromises();
+    w.vm.filterQuery = "xyz";
+    w.vm.pageSize = 100;
+    w.vm.sortBy = "name";
+    w.vm.sortOrder = "desc";
+    await flushPromises();
+    w.unmount();
+    expect(useListViewState("model-pricing", {})).toMatchObject({
+      filterQuery: "xyz",
+      pageSize: 100,
+      sortBy: "name",
+      sortOrder: "desc",
     });
   });
 });

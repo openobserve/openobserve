@@ -134,6 +134,21 @@ const dbmEnterpriseGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+const downtimesRouteGuard = (to: any, from: any, next: any) => {
+  const zoConfig = store.state.zoConfig;
+  const isOss = zoConfig?.build_type === "opensource";
+  if (
+    isOss ||
+    (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+    zoConfig?.downtimes_enabled === false
+  ) {
+    next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
@@ -242,6 +257,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.home",
+        allowOnEmptyData: true,
       },
     },
     {
@@ -251,6 +267,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.search",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         // Back-compat: Search History / Scheduler used to be `?action=…` overlays
@@ -327,6 +344,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "menu.metrics",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         if (hasMetricsEditorParams(to.query) && to.query.mode !== "visualize") {
@@ -376,6 +394,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.traces",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         const tab = supportedTraceTab(to.query?.tab);
@@ -616,6 +635,7 @@ const useRoutes = () => {
       meta: {
         keepAlive: false,
         titleKey: "menu.dashboard",
+        allowOnEmptyData: true,
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -895,6 +915,51 @@ const useRoutes = () => {
           return;
         }
         routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "downtimes",
+      name: "downtimes",
+      component: () => import("@/components/alerts/downtimes/DowntimeList.vue"),
+      meta: {
+        titleKey: "menu.downtimes",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      // Literal segments before the :id catch-all.
+      path: "downtimes/add",
+      name: "addDowntime",
+      component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.newTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "downtimes/:id/edit",
+      name: "editDowntime",
+      component: () => import("@/components/alerts/downtimes/AddDowntime.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.editTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "downtimes/:id",
+      name: "downtimeDetail",
+      component: () => import("@/components/alerts/downtimes/DowntimeDetail.vue"),
+      meta: {
+        titleKey: "alerts.downtimes.detailTitle",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        downtimesRouteGuard(to, from, next);
       },
     },
     {

@@ -542,7 +542,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, onMounted, watch, nextTick } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
@@ -569,6 +569,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
+const route = useRoute();
 
 // Data
 // The query shape this page is currently reading (range + page + sort +
@@ -957,9 +958,10 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
+  const { folder, tab } = route.query;
   router.push({
     name: "alertList",
-    query: { org_identifier: store.state.selectedOrganization.identifier },
+    query: { org_identifier: store.state.selectedOrganization.identifier, folder, tab },
   });
 };
 

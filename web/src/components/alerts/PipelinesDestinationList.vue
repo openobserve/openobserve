@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
+          ref="oTableRef"
           :frame="false"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
@@ -44,8 +45,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[5, 10, 20, 50, 100]"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           sorting="client"
           :default-columns="false"
           :enable-column-resize="true"
@@ -219,6 +227,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -336,7 +345,37 @@ export default defineComponent({
     const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
     const router = useRouter();
-    const filterQuery = ref("");
+    const viewState = useListViewState("pipeline-destinations", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      destinations,
+      () => {
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true },
+    );
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -722,6 +761,11 @@ export default defineComponent({
       refreshDestinations,
       forbidden,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       filterData,
       editingDestination,
       templates,

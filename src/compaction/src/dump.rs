@@ -288,7 +288,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
 
         let cache = SchemaCache::new(FILE_LIST_SCHEMA.as_ref().to_owned());
         let mut w = STREAM_SCHEMAS_LATEST.write().await;
-        w.insert(dump_stream_key, cache);
+        infra::schema::insert_latest(&mut w, dump_stream_key, cache);
     }
 
     // calculate stats from files before they are moved

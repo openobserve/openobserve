@@ -140,7 +140,17 @@ const FlowStub = {
 };
 const DrawerStub = {
   name: "PathSessionsDrawer",
-  props: ["open", "def", "predicate", "stepDepth", "title", "expectedTotal", "sampled", "events"],
+  props: [
+    "open",
+    "def",
+    "predicate",
+    "stepDepth",
+    "title",
+    "expectedTotal",
+    "sampled",
+    "events",
+    "pathKeys",
+  ],
   emits: ["update:open", "build-funnel"],
   template: "<div data-test='branch-drawer-stub' />",
 };
@@ -516,6 +526,70 @@ describe("AnalyticsPaths", () => {
     const drawer = wrapper!.findComponent(DrawerStub);
     expect(drawer.props("predicate")).toContain("s1 = 'p:/web/dashboards'");
     expect(drawer.props("expectedTotal")).toBe(30);
+  });
+
+  it("a deep flow link keeps every intermediate step, not just the endpoints (bug: dropped steps)", async () => {
+    pathRows = [
+      {
+        s1: "p:/deals/new",
+        s2: "p:/search",
+        s3: "p:/products/:id",
+        sessions: 53,
+        anchor_sessions: 53,
+        path_count: 1,
+      },
+    ];
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = {
+        anchor: { kind: "p", key: "/" },
+        direction: "next",
+        depth: 3,
+        include: "all",
+        cohort: null,
+      };
+    });
+    // The band from /search (depth 2) to /products/:id (depth 3).
+    wrapper!.findComponent(FlowStub).vm.$emit("select", {
+      type: "link",
+      depth: 3,
+      key: "p:/products/:id",
+      parentKey: "p:/search",
+    });
+    await flushPromises();
+    const drawer = wrapper!.findComponent(DrawerStub);
+    expect(drawer.props("expectedTotal")).toBe(53);
+    expect(drawer.props("pathKeys")).toEqual(["p:/deals/new", "p:/search", "p:/products/:id"]);
+  });
+
+  it("a flow box keeps the full dominant path leading to it, not just the clicked key (bug: dropped steps)", async () => {
+    pathRows = [
+      {
+        s1: "p:/deals/new",
+        s2: "p:/search",
+        s3: "p:/products/:id",
+        sessions: 53,
+        anchor_sessions: 53,
+        path_count: 1,
+      },
+    ];
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = {
+        anchor: { kind: "p", key: "/" },
+        direction: "next",
+        depth: 3,
+        include: "all",
+        cohort: null,
+      };
+    });
+    wrapper!.findComponent(FlowStub).vm.$emit("select", {
+      type: "node",
+      depth: 3,
+      key: "p:/products/:id",
+      parentKey: null,
+    });
+    await flushPromises();
+    const drawer = wrapper!.findComponent(DrawerStub);
+    expect(drawer.props("pathKeys")).toEqual(["p:/deals/new", "p:/search", "p:/products/:id"]);
   });
 });
 

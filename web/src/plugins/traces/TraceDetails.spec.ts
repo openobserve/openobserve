@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+import { getManager } from "@/lib/vue-shortcut-manager";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -567,6 +568,181 @@ describe("TraceDetails", () => {
   //   expect(wrapper.vm.leftWidth).toBe(300); // 250 + (150 - 100)
   // });
   // });
+
+  describe("J/K follow the visible span order (item 4a §3.5)", () => {
+    const template = tracesMockData.tracesDetails.traceSpans.hits[0];
+    const base = template.start_time;
+    const span = (spanId: string, parentId: string, offsetMs: number, name: string) => ({
+      ...template,
+      span_id: spanId,
+      reference_parent_span_id: parentId,
+      operation_name: name,
+      start_time: base + offsetMs * 1_000_000,
+      end_time: base + (offsetMs + 50) * 1_000_000,
+      _start_time_ns: String(base + offsetMs * 1_000_000),
+      _end_time_ns: String(base + (offsetMs + 50) * 1_000_000),
+    });
+    const spans = [
+      span("R", "", 0, "GET /root"),
+      span("A", "R", 1, "op-a"),
+      span("A1", "A", 2, "op-a1"),
+      span("A2", "A", 3, "op-a2"),
+      span("B", "R", 4, "op-b"),
+    ];
+
+    beforeAll(() => {
+      const messages = {
+        traces: {
+          spanNav: {
+            firstSpan: "First span",
+            lastSpan: "Last span",
+            position: "Span {index} of {count}: {name}",
+          },
+        },
+      };
+      const global = i18n.global as unknown as {
+        locale: string | { value: string };
+        mergeLocaleMessage: (locale: string, messages: object) => void;
+      };
+      const current = typeof global.locale === "string" ? global.locale : global.locale.value;
+      for (const locale of new Set([current, "en-us"])) global.mergeLocaleMessage(locale, messages);
+    });
+
+    async function mountTrace(props: Record<string, unknown> = {}) {
+      wrapper.unmount();
+      wrapper = mount(TraceDetails, {
+        ...mountOptions,
+        props: {
+          mode: "embedded",
+          traceIdProp: "jk-trace-id",
+          streamNameProp: "test-stream",
+          spanListProp: spans,
+          ...props,
+        },
+      });
+      await flushPromises();
+      wrapper.vm.searchObj.data.traceDetails.selectedSpanId = null;
+      await flushPromises();
+    }
+
+    const press = async (key: "j" | "k") => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+      await flushPromises();
+    };
+    const selected = () => wrapper.vm.selectedSpanId ?? null;
+    const visible = () => wrapper.vm.spanPositionList.map((s: any) => s.spanId);
+    const liveText = () => wrapper.find('[data-test="trace-details-span-nav-live"]').text();
+
+    it("AC7.1: J ×5 from no selection visits R, A, A1, A2, B", async () => {
+      await mountTrace();
+      expect(visible()).toEqual(["R", "A", "A1", "A2", "B"]);
+      const visited: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        await press("j");
+        visited.push(selected());
+      }
+      expect(visited).toEqual(["R", "A", "A1", "A2", "B"]);
+    });
+
+    it("AC7.2: with A collapsed, J from A goes to B and never selects A1", async () => {
+      await mountTrace();
+      wrapper.vm.toggleSpanCollapse("A");
+      await flushPromises();
+      expect(visible()).toEqual(["R", "A", "B"]);
+
+      wrapper.vm.updateSelectedSpan("A");
+      await flushPromises();
+      await press("j");
+      expect(selected()).toBe("B");
+    });
+
+    it("AC7.3: from a hidden A1, J goes to B and K goes to A", async () => {
+      await mountTrace();
+      wrapper.vm.updateSelectedSpan("A1");
+      wrapper.vm.toggleSpanCollapse("A");
+      await flushPromises();
+      await press("j");
+      expect(selected()).toBe("B");
+
+      wrapper.vm.updateSelectedSpan("A1");
+      await flushPromises();
+      await press("k");
+      expect(selected()).toBe("A");
+    });
+
+    it("AC7.4: announces the position in the visible list", async () => {
+      await mountTrace();
+      wrapper.vm.toggleSpanCollapse("A");
+      wrapper.vm.updateSelectedSpan("A");
+      await flushPromises();
+      await press("j");
+      expect(liveText()).toBe("Span 3 of 3: op-b");
+    });
+
+    it("announces First span / Last span at the edges and keeps the selection", async () => {
+      await mountTrace();
+      wrapper.vm.updateSelectedSpan("B");
+      await flushPromises();
+      await press("j");
+      expect(selected()).toBe("B");
+      expect(liveText()).toBe("Last span");
+
+      wrapper.vm.updateSelectedSpan("R");
+      await flushPromises();
+      await press("k");
+      expect(selected()).toBe("R");
+      expect(liveText()).toBe("First span");
+    });
+
+    it("K with no selection does nothing", async () => {
+      await mountTrace();
+      await press("k");
+      expect(selected()).toBeNull();
+      expect(liveText()).toBe("");
+    });
+
+    it("the live region is a polite, atomic, visually hidden region", async () => {
+      await mountTrace();
+      const region = wrapper.find('[data-test="trace-details-span-nav-live"]');
+      expect(region.attributes("aria-live")).toBe("polite");
+      expect(region.attributes("aria-atomic")).toBe("true");
+      expect(region.classes()).toContain("sr-only");
+    });
+
+    it("stays finite on a trace whose parent links form a cycle", async () => {
+      await mountTrace({
+        spanListProp: [span("R", "", 0, "root"), span("X", "Y", 1, "x"), span("Y", "X", 2, "y")],
+      });
+      wrapper.vm.updateSelectedSpan("X");
+      await flushPromises();
+      await press("j");
+      await press("k");
+      expect(["R", "X", "Y"]).toContain(selected());
+    });
+
+    it("shortcutsActive=false registers nothing", async () => {
+      await mountTrace({ shortcutsActive: false });
+      const manager = getManager()!;
+      expect(manager.getById("traceNextSpan-0")).toBeUndefined();
+      expect(manager.getById("tracePrevSpan-0")).toBeUndefined();
+      expect(manager.getScope()).not.toBe("trace-detail");
+
+      await press("j");
+      expect(selected()).toBeNull();
+    });
+
+    it("shortcutsActive toggling registers and releases the trace-detail scope", async () => {
+      await mountTrace({ shortcutsActive: false });
+      const manager = getManager()!;
+      await wrapper.setProps({ shortcutsActive: true });
+      expect(manager.getById("traceNextSpan-0")?.key).toBe("j");
+      expect(manager.getScope()).toBe("trace-detail");
+
+      await wrapper.setProps({ shortcutsActive: false });
+      expect(manager.getById("traceNextSpan-0")).toBeUndefined();
+      expect(manager.getScope()).not.toBe("trace-detail");
+    });
+  });
 
   describe("Critical path", () => {
     const toggle = () => wrapper.find('[data-test="trace-details-critical-path-toggle-btn"]');

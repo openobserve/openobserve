@@ -47,6 +47,25 @@ pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
 #[cfg(not(feature = "enterprise"))]
 pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
+/// The tuples `set_ownership` would write for `obj`, for a caller that batches many objects
+/// into one write. The folder existence check of `set_ownership` is not repeated here.
+#[cfg(feature = "enterprise")]
+pub fn ownership_tuples(
+    org_id: &str,
+    obj_type: &str,
+    obj: &Authz,
+) -> Vec<o2_openfga::authorizer::authz::TupleKey> {
+    use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
+
+    let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
+    let parent_type = if obj.parent_type.is_empty() {
+        ""
+    } else {
+        OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
+    };
+    authorizer::authz::ownership_tuples(org_id, &obj_str, &obj.parent, parent_type)
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
     if o2_openfga::config::get_config().enabled {

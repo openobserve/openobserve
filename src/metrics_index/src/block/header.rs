@@ -78,31 +78,28 @@ impl Header {
         let mut ranges = vec![self.directory_range()];
         ranges.extend(
             self.projection(labels)?
-                .0
                 .into_iter()
                 .map(|index| self.labels[index].column.range.clone()),
         );
         Ok(ranges)
     }
 
-    /// Stored label indices and names absent from the file, both deduplicated in request order.
-    pub(super) fn projection(&self, labels: &[String]) -> Result<(Vec<usize>, Vec<String>)> {
+    /// Stored label indices in request order; labels absent from the source need no column.
+    pub(super) fn projection(&self, labels: &[String]) -> Result<Vec<usize>> {
         let mut projection = Vec::new();
-        let mut missing: Vec<String> = Vec::new();
         for name in labels {
             if let Some(index) = self.labels.iter().position(|label| &label.name == name) {
                 if !projection.contains(&index) {
                     projection.push(index);
                 }
-            } else if !missing.contains(name) {
+            } else {
                 ensure!(
                     self.source_schema.field_with_name(name).is_err(),
                     "requested source field lacks identity label metadata"
                 );
-                missing.push(name.clone());
             }
         }
-        Ok((projection, missing))
+        Ok(projection)
     }
 
     fn validate(

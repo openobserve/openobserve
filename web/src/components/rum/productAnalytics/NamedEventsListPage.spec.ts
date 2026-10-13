@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
 import { createStore } from "vuex";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const { confirmMock, toastMock } = vi.hoisted(() => ({
   confirmMock: vi.fn(async (_opts: Record<string, unknown>) => true),
@@ -109,6 +110,7 @@ describe("NamedEventsListPage (AC-44)", () => {
     resetNamedEvents();
     resetSavedFunnels();
     resetProductAnalytics();
+    resetListViewState();
   });
 
   afterEach(() => {
@@ -463,5 +465,16 @@ describe("NamedEventsListPage (AC-44)", () => {
     expect(api.service.listEvents.mock.calls.length).toBe(lists + 1);
     expect(api.service.listFunnels.mock.calls.length).toBe(funnels + 1);
     expect(rowText()).toEqual(["Added elsewhere", "Event 0"]);
+  });
+
+  it("restores the saved search and saves search changes", async () => {
+    seed(3);
+    useListViewState("rumNamedEvents", { filter: "Event 1" });
+    await mountList();
+    expect(rowText()).toEqual(["Event 1"]);
+    wrapper!.findComponent(NamedEventsListPage).vm.$.setupState.filter = "Event 2";
+    await flushPromises();
+    const saved: any = useListViewState("rumNamedEvents", {});
+    expect(saved.filter).toBe("Event 2");
   });
 });

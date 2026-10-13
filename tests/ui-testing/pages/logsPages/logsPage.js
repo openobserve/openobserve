@@ -122,7 +122,7 @@ export class LogsPage {
         this.savedViewDialog = '[data-test="search-bar-store-state-saved-view-dialog"]';
         this.savedViewArrow = '[data-test="logs-search-bar-utilities-menu-btn"]';
         // OInput convention §4: drive the auto-derived `-field` inner native input for fill().
-        this.savedViewSearchInput = '[data-test="log-search-saved-view-field-search-input-field"]';
+        this.savedViewSearchInput = '[data-test="logs-saved-views-dialog-search-field"]';
         // Matches both ConfirmDialog.vue (data-test="confirm-dialog") and SearchBar's inline
         // ODialog (data-test="search-bar-confirm-dialog") via substring selector.
         this.confirmButton = '[data-test*="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
@@ -133,7 +133,7 @@ export class LogsPage {
         this.menuTransformEditorToggleBtn = '[data-test="logs-search-bar-menu-transform-editor-toggle-btn"]';
         this.menuListSavedViewsBtn = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
         this.menuCreateSavedViewBtn = '[data-test="logs-search-bar-menu-create-saved-view-btn"]';
-        this.savedViewsListDialogEl = '[data-test="saved-views-list-dialog"]';
+        this.savedViewsListDialogEl = '[data-test="logs-saved-views-dialog"]';
         this.menuHistogramBtn = '[data-test="logs-search-bar-menu-histogram-btn"]';
         this.menuSqlModeBtn = '[data-test="logs-search-bar-menu-sql-mode-btn"]';
         this.menuSqlModeBtnState = '[data-test="logs-search-bar-menu-sql-mode-btn"] [data-state]';
@@ -384,6 +384,12 @@ export class LogsPage {
         this.logDetailCloseButton = '[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]';
         this.logDetailPreviousBtn = '[data-test="log-detail-previous-detail-btn"]';
         this.logDetailNextBtn = '[data-test="log-detail-next-detail-btn"]';
+        this.logDetailPreviousKbd = '[data-test="log-detail-previous-detail-btn-kbd"]';
+        this.logDetailNextKbd = '[data-test="log-detail-next-detail-btn-kbd"]';
+        this.logDetailPageLoading = '[data-test="log-detail-page-loading"]';
+        this.logsDetailNavLive = '[data-test="logs-detail-nav-live"]';
+        this.logsRowNavLive = '[data-test="logs-row-nav-live"]';
+        this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
         this.logDetailWrapToggle = '[data-test="log-detail-wrap-values-toggle-btn"]';
 
         // ===== VIEW RELATED / CORRELATION SELECTORS (Enterprise Feature) =====
@@ -2972,21 +2978,8 @@ export class LogsPage {
         await this.page.waitForTimeout(200);
     }
 
-    /**
-     * Click Run query and wait for query execution to complete.
-     * Uses button UI state (loading/disabled → ready) instead of response matching
-     * to avoid capturing stale responses from auto-searches.
-     * @param {number} timeout - Max wait time in ms (default 60000)
-     */
-    async runQueryAndWaitForResults(timeout = 60000) {
-        const btn = this.page.locator(this.queryButton);
-
-        // If a prior auto-search (e.g. from toggling SQL mode) is still running, the button
-        // renders as "Cancel query" via a v-if/v-else swap — wait for the run-mode variant
-        // to appear (not in Cancel state) before clicking, so we don't accidentally cancel it.
-        // Use the full timeout here (not a hard-coded 15 s) so a slow CI auto-search never
-        // causes us to force-click the Cancel button instead of the Run button.
-        let buttonWasInCancelState = false;
+    async waitForRunQueryButton(timeout = 60000) {
+        // An automatic search shares this button, so a premature click would cancel it.
         await this.page.waitForFunction(
             (selector) => {
                 const el = document.querySelector(selector);
@@ -2997,7 +2990,14 @@ export class LogsPage {
             },
             this.queryButton,
             { timeout }
-        ).catch(() => {
+        );
+    }
+
+    async runQueryAndWaitForResults(timeout = 60000) {
+        const btn = this.page.locator(this.queryButton);
+
+        let buttonWasInCancelState = false;
+        await this.waitForRunQueryButton(timeout).catch(() => {
             buttonWasInCancelState = true;
             testLogger.warn('runQueryAndWaitForResults: refresh button never exited Cancel state, force-clicking to cancel in-flight search');
         });
@@ -3183,10 +3183,7 @@ export class LogsPage {
     }
 
     async clickSearchBarRefreshButton() {
-        // Use .first() to avoid strict-mode violations when multiple data-test matches exist.
-        // waitForSearchBarRefreshButton() must be called first to ensure the button is enabled;
-        // OButton.handleClick() guards on props.loading/disabled and will not emit when loading,
-        // making force-click on a loading button a silent no-op.
+        await this.waitForRunQueryButton();
         return await this.page.locator(this.searchBarRefreshButton).first().click({ force: true });
     }
 
@@ -3349,7 +3346,7 @@ export class LogsPage {
     async clickSaveViewButton() {
         // Post-menu-migration: "Create saved view" moved into utilities ("More") menu.
         // Close any open menus/dialogs first, then open the menu and click the item.
-        const listDialog = this.page.locator('[data-test="saved-views-list-dialog"]');
+        const listDialog = this.page.locator(this.savedViewsListDialogEl);
         const isListOpen = await listDialog.isVisible({ timeout: 500 }).catch(() => false);
         if (isListOpen) {
             await listDialog.locator('[data-test="o-dialog-close-btn"]').click();
@@ -3460,17 +3457,23 @@ export class LogsPage {
         return await searchInput.fill(text);
     }
 
+    // The `-apply-` prefix keeps the favourites pane (`-favorites-apply-`) out of the match.
+    savedViewApplyLocator(name) {
+        if (typeof name !== 'string') {
+            throw new TypeError(`savedViewApplyLocator expects the exact view name, got ${name}`);
+        }
+        return this.page.locator(`[data-test^="logs-saved-views-dialog-apply-"][data-test-view-name="${LogsPage.escapeCssAttrValue(name)}"]`);
+    }
+
     async clickSavedViewByTitle(title) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${title}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(title).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         // force: true — ODropdown portal transiently detaches items during initial render
         return await element.click({ force: true });
     }
 
     async clickDeleteButton() {
-        // Delete buttons in saved views carry data-test="logs-search-bar-delete-{view_id}-saved-view-btn"
-        // Click the first visible delete button in the saved views area
-        const deleteBtn = this.page.locator('[data-test*="logs-search-bar-delete-"][data-test*="-saved-view-btn"]').first();
+        const deleteBtn = this.page.locator('[data-test="logs-saved-views-dialog-table"] [data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 5000 });
         return await deleteBtn.click();
     }
@@ -3523,13 +3526,13 @@ export class LogsPage {
     }
 
     async clickSavedViewByText(text) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(text).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click();
     }
 
     async waitForSavedViewText(text) {
-        return await this.page.locator(`[data-test="logs-search-bar-apply-${text}-saved-view-btn"]`).first().waitFor({ state: 'visible', timeout: 10000 });
+        return await this.savedViewApplyLocator(text).first().waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -3552,7 +3555,7 @@ export class LogsPage {
     async clickDeleteSavedViewButton(savedViewName) {
         // The caller (clickSavedViewByTitle) closes the dialog. Wait passively for it to
         // reach hidden state so the re-open sequence doesn't race the close animation.
-        await this.page.locator('[data-test="saved-views-list-dialog"]')
+        await this.page.locator(this.savedViewsListDialogEl)
             .waitFor({ state: 'hidden', timeout: 5000 })
             .catch(() => {});
 
@@ -3574,8 +3577,8 @@ export class LogsPage {
         // The delete button data-test uses view_id (a UUID), not the view name, so we
         // can't build the exact selector. Instead scope to the main saved-views table
         // (not favorites) — after filtering by name there is exactly one visible row.
-        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
-        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
+        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.scrollIntoViewIfNeeded();
         await deleteBtn.click();
@@ -3912,6 +3915,19 @@ export class LogsPage {
         testLogger.info('✓ Previous and Next navigation buttons are visible');
     }
 
+    logResultsRow(n) {
+        return this.page.locator(`[data-test="logs-search-result-logs-table"] [data-test="o2-table-row-${n}"]`);
+    }
+
+    async pressLogRowKey(key, options = {}) {
+        await this.page.keyboard.press(key, options);
+    }
+
+    async expectActiveLogRow(n) {
+        await expect(this.logResultsRow(n)).toHaveAttribute('aria-current', 'true');
+        await expect(this.page.locator('[data-test="logs-search-result-logs-table"] [data-active-row="true"]')).toHaveCount(1);
+    }
+
     // ===== VIEW RELATED / CORRELATION METHODS (Enterprise Feature) =====
 
     /**
@@ -4082,7 +4098,7 @@ export class LogsPage {
     }
 
     async clickSavedViewByLabel(label) {
-        const element = this.page.locator(`[data-test="logs-search-bar-apply-${label}-saved-view-btn"]`).first();
+        const element = this.savedViewApplyLocator(label).first();
         await element.waitFor({ state: 'visible', timeout: 10000 });
         return await element.click({ force: true });
     }
@@ -7139,26 +7155,19 @@ export class LogsPage {
 
             for (const row of rows) {
                 const text = row.textContent;
-                // OTable draws the spine as a ::before on the row's first cell, fed by
-                // the --row-status-color custom property set inline on the <tr>, and
-                // marks the row with data-status-bar. The level rides along on the row
-                // class (o2-log-level-<level>) so it stays machine-readable whichever
-                // column is shown.
-                const raw = row.style.getPropertyValue('--row-status-color').trim();
-                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
-                // The token resolves to a hex; callers normalise through rgbToHex,
-                // so hand back the rgb() form a computed style would have given.
-                let bgColor = raw;
-                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-                if (hex) {
-                    let h = hex[1];
-                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
-                    const n = parseInt(h, 16);
-                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
-                }
+                const firstCell = row.querySelector('td');
+                if (!firstCell) continue;
+                const spine = getComputedStyle(firstCell, '::before');
+                const backgroundImage = spine.backgroundImage;
+                const bgColor = spine.backgroundColor;
+                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
 
-                const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
+                const levelClass = Array.from(row.classList).find(
+                    (c) => c.startsWith('o2-log-level-') && !c.startsWith('o2-log-level-src-'),
+                );
                 const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;
+                const sourceClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-src-'));
+                const source = sourceClass ? sourceClass.replace('o2-log-level-src-', '') : null;
 
                 // Best-effort: also recover the raw severity number when the JSON
                 // source column is visible (kept for backward compatibility).
@@ -7178,7 +7187,7 @@ export class LogsPage {
                 }
 
                 if (level === null && severity === null) continue;
-                findings.push({ severity, level, color: bgColor });
+                findings.push({ severity, level, source, backgroundImage, color: bgColor });
             }
 
             return findings;
@@ -7558,12 +7567,11 @@ export class LogsPage {
     async clickShareLinkButton() {
         const btn = this.page.locator(this.shareLinkButton);
         await btn.waitFor({ state: 'visible', timeout: 10000 });
-        // ShareButton stays disabled until the authenticated /api/<org>/config supplies web_url; the public /config lacks it.
         const enabled = await expect(btn).toBeEnabled({ timeout: 30000 }).then(() => true).catch(() => false);
         if (!enabled) {
-            testLogger.warn('Share link button still disabled after 30s (org config not loaded); reloading once', { url: this.page.url() });
+            testLogger.warn('Share link button still disabled after 30s; reloading once', { url: this.page.url() });
             await this.page.reload({ waitUntil: 'domcontentloaded' });
-            await expect(btn, 'share link button never enabled: org config (web_url) did not load').toBeEnabled({ timeout: 30000 });
+            await expect(btn, 'share link button never enabled: the query has not run yet (G1), or web_url is missing from the org config').toBeEnabled({ timeout: 30000 });
         }
         await btn.click();
         testLogger.info('Clicked share link button');
@@ -8878,9 +8886,7 @@ export class LogsPage {
      * @param {string} name - Saved view name
      */
     async clickSavedViewByName(name) {
-        // SearchBar.vue uses data-test="logs-search-bar-apply-${value}-saved-view-btn" for the apply button.
-        // The previously used `logs-search-saved-view-item-${name}` does not exist in the DOM.
-        const savedView = this.page.locator(`[data-test="logs-search-bar-apply-${name}-saved-view-btn"]`).first();
+        const savedView = this.savedViewApplyLocator(name).first();
         await savedView.waitFor({ state: 'visible', timeout: 10000 });
         // force: true — ODropdown portal transiently detaches items during initial render
         await savedView.click({ force: true });
@@ -8954,8 +8960,8 @@ export class LogsPage {
      */
     async clickDeleteSavedViewByName(name) {
         // data-test uses view_id (UUID), not name — scope to main table after filtering.
-        const mainTable = this.page.locator('[data-test="log-search-saved-view-list-fields-table"]');
-        const deleteBtn = mainTable.locator('[data-test*="logs-search-bar-delete-"]').first();
+        const mainTable = this.page.locator('[data-test="logs-saved-views-dialog-table"]');
+        const deleteBtn = mainTable.locator('[data-test^="logs-saved-views-dialog-delete-"]:not([data-test$="-menu"])').first();
         await deleteBtn.waitFor({ state: 'visible', timeout: 10000 });
         await deleteBtn.click();
         testLogger.info(`Clicked delete for saved view: ${name}`);
@@ -11360,10 +11366,12 @@ export class LogsPage {
         const count = Math.min(await cells.count(), limit);
         const values = [];
         for (let i = 0; i < count; i++) {
-            let text = await cells.nth(i).textContent();
+            const valueSpan = cells.nth(i).locator('[data-test="log-row-timestamp-value"]');
+            let text = (await valueSpan.count()) > 0
+                ? await valueSpan.first().textContent()
+                : await cells.nth(i).textContent();
             text = text?.trim() || '';
             // Strip expand button icon text that appears before the timestamp
-            // The cell contains both the expand icon ("chevron_right" or "expand_more") and the timestamp
             text = text.replace(/^(chevron_right|expand_more|chevron_left|expand_less)/, '').trim();
             values.push(text);
         }
@@ -13295,6 +13303,63 @@ export class LogsPage {
             this.searchAroundButton().click(),
         ]);
         return request;
+    }
+
+    /** The sidebar row for `field` must be listed. */
+    async expectFieldListItemVisible(field) {
+        await expect(
+            this.page.locator(this.fieldListItem(field)).first(),
+            `Field "${field}" must be listed in the sidebar`
+        ).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * How many interesting-field (ⓘ) toggles the sidebar renders for `field`.
+     * FieldRow renders one in the row itself and one in the hover-actions tray, both
+     * carrying the same data-test, so an eligible field counts more than one.
+     */
+    async countInterestingFieldButtons(field) {
+        await this.expectFieldListItemVisible(field);
+        return await this.page.locator(this.interestingFieldBtn(field)).count();
+    }
+
+    /**
+     * Push `field` straight into searchObj.data.stream.interestingFieldList, which is
+     * how a list persisted by a build that still starred the field comes back. Throws
+     * if Vue state could not be reached, so a test can't pass on a silent no-op.
+     */
+    async forceInterestingFieldInState(field) {
+        const list = await this._mutateSearchObj((searchObj, name) => {
+            const fields = searchObj.data?.stream?.interestingFieldList;
+            if (!Array.isArray(fields)) return null;
+            if (!fields.includes(name)) fields.push(name);
+            return [...fields];
+        }, field);
+        if (!list?.includes(field)) {
+            throw new Error(`forceInterestingFieldInState: could not add "${field}" to interestingFieldList`);
+        }
+        testLogger.info(`interestingFieldList forced to: ${list.join(',')}`);
+        return list;
+    }
+
+    /** Reads searchObj.data.stream.interestingFieldList. */
+    async getInterestingFieldList() {
+        return await this._mutateSearchObj((searchObj) => [
+            ...(searchObj.data?.stream?.interestingFieldList || []),
+        ]);
+    }
+
+    /** The search must not have failed — asserts the error state is absent. */
+    async expectNoSearchError() {
+        const error = this.page.locator(this.errorMessage);
+        try {
+            await expect(error).toBeHidden();
+        } catch {
+            // Read the text only once the wait has settled on "visible", otherwise it
+            // is empty precisely when the error is the thing worth reporting.
+            const text = (await error.first().textContent().catch(() => '')) || '';
+            throw new Error(`Search must not error, but the error state shows: "${text.trim()}"`);
+        }
     }
 
 }

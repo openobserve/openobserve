@@ -204,6 +204,18 @@ pub struct FunnelRefList {
     pub list: Vec<FunnelRef>,
 }
 
+/// A deleted named event's id and the name it had when it was deleted.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NamedEventRef {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct NamedEventRefList {
+    pub list: Vec<NamedEventRef>,
+}
+
 /// The stored row a `version_conflict` returns.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(untagged)]

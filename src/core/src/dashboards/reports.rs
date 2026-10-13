@@ -135,9 +135,21 @@ pub async fn save(
     org_id: &str,
     folder_id: &str,
     name: &str,
-    mut report: Report,
+    report: Report,
     create: bool,
 ) -> Result<(), ReportError> {
+    let report = prepare_save(org_id, folder_id, name, report, create).await?;
+    write_save(org_id, folder_id, report, create).await
+}
+
+/// Runs every check [`save`] makes and returns the report it would write.
+pub async fn prepare_save(
+    org_id: &str,
+    folder_id: &str,
+    name: &str,
+    mut report: Report,
+    create: bool,
+) -> Result<Report, ReportError> {
     bind_to_path_org(&mut report, org_id)?;
 
     let conn = get_orm_client_rw().await;
@@ -238,7 +250,17 @@ pub async fn save(
     if try_join_all(tasks).await.is_err() {
         return Err(ReportError::DashboardTabNotFound);
     }
+    Ok(report)
+}
 
+/// Writes a report [`prepare_save`] accepted.
+pub async fn write_save(
+    org_id: &str,
+    folder_id: &str,
+    report: Report,
+    create: bool,
+) -> Result<(), ReportError> {
+    let conn = get_orm_client_rw().await;
     if create {
         let report_id = db::dashboards::reports::create(conn, folder_id, report)
             .await
@@ -409,11 +431,20 @@ pub async fn update_by_id(
     org_id: &str,
     report_id: &str,
     new_folder_id: Option<&str>,
-    mut report: Report,
+    report: Report,
 ) -> Result<(), ReportError> {
+    let (curr_folder, report) = prepare_update_by_id(org_id, report_id, report).await?;
+    write_update_by_id(org_id, report_id, new_folder_id, curr_folder, report).await
+}
+
+/// Runs every check [`update_by_id`] makes; returns the current folder and the report to write.
+pub async fn prepare_update_by_id(
+    org_id: &str,
+    report_id: &str,
+    mut report: Report,
+) -> Result<(Folder, Report), ReportError> {
     bind_to_path_org(&mut report, org_id)?;
 
-    let conn = get_orm_client_rw().await;
     let cfg = get_config();
 
     if cfg.common.report_server_url.is_empty() {
@@ -459,7 +490,18 @@ pub async fn update_by_id(
     let (curr_folder, old_report) = get_by_id(org_id, report_id).await?;
     report.owner = old_report.owner;
     report.updated_at = Some(datetime_now());
+    Ok((curr_folder, report))
+}
 
+/// Writes an update [`prepare_update_by_id`] accepted.
+pub async fn write_update_by_id(
+    org_id: &str,
+    report_id: &str,
+    new_folder_id: Option<&str>,
+    curr_folder: Folder,
+    report: Report,
+) -> Result<(), ReportError> {
+    let conn = get_orm_client_rw().await;
     db::dashboards::reports::update_by_id(conn, report_id, new_folder_id, report)
         .await
         .map_err(ReportError::DbError)?;
@@ -567,10 +609,7 @@ pub trait SendReport {
 impl SendReport for Report {
     /// Sends the report to subscribers
     async fn send_subscribers(&self) -> Result<(), SendReportError> {
-        if self.dashboards.is_empty() {
-            return Err(SendReportError::NoDashboards);
-        }
-        ensure_dashboards_readable(&self.org_id, &self.dashboards).await?;
+        check_send(self).await?;
 
         let cfg = get_config();
         let mut recipients = vec![];
@@ -737,6 +776,14 @@ pub enum GenerateReportError {
 
     #[error("span element indicator for data load not rendered yet")]
     DataLoadElementNotRendered,
+}
+
+/// The checks a send runs before it renders anything, so a caller can answer them first.
+pub async fn check_send(report: &Report) -> Result<(), SendReportError> {
+    if report.dashboards.is_empty() {
+        return Err(SendReportError::NoDashboards);
+    }
+    ensure_dashboards_readable(&report.org_id, &report.dashboards).await
 }
 
 async fn generate_report(

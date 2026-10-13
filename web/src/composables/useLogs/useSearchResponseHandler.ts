@@ -31,6 +31,8 @@ import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
+import { useLogsAutoRun } from "@/composables/useLogs/logsAutoRun";
+import { notePageLoad } from "@/composables/useLogs/logsRowNav";
 
 export const useSearchResponseHandler = () => {
   const { t } = useI18nTyped();
@@ -207,12 +209,15 @@ export const useSearchResponseHandler = () => {
     }
 
     refreshPagination(true);
-    await processPostPaginationData();
+    // An executed query page reuses the schema loaded for its first page.
+    await processPostPaginationData(
+      isPagination || !!(payload as { reuseSchema?: boolean }).reuseSchema,
+    );
   };
 
-  const processPostPaginationData = async () => {
+  const processPostPaginationData = async (reuseLoadedSchema = false) => {
     updateFieldValues();
-    await extractFields();
+    await extractFields({ reuseLoadedSchema });
     updateGridColumns();
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
@@ -236,7 +241,7 @@ export const useSearchResponseHandler = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
-    handleFunctionError(payload.queryReq, response);
+    handleFunctionError(payload.queryReq, response, (payload as any).generationId);
     handleAggregation(payload.queryReq, response);
     resetFieldValues();
 
@@ -352,10 +357,15 @@ export const useSearchResponseHandler = () => {
       searchObj.data.queryResults.aggs = [];
     }
 
-    if (searchObj.data.queryResults.aggs.length == 0 && response.content.results.hits.length > 0) {
+    const range = searchObj.data.customDownloadQueryObj?.query;
+    if (
+      range &&
+      searchObj.data.queryResults.aggs.length == 0 &&
+      response.content.results.hits.length > 0
+    ) {
       let date = new Date();
-      const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
-      const endDateTime = searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+      const startDateTime = range.start_time / 1000;
+      const endDateTime = range.end_time / 1000;
       const nowString = response.content.results.hits[0].zo_sql_key;
       const now = new Date(nowString);
       const day = String(now.getDate()).padStart(2, "0");
@@ -490,7 +500,11 @@ export const useSearchResponseHandler = () => {
     searchObj.data.queryResults.took += response.content.results.took;
   };
 
-  const handleFunctionError = (queryReq: SearchRequestPayload, response: any) => {
+  const handleFunctionError = (
+    queryReq: SearchRequestPayload,
+    response: any,
+    generationId?: number,
+  ) => {
     if (
       Object.prototype.hasOwnProperty.call(response.content.results, "function_error") &&
       response.content.results.function_error != ""
@@ -517,8 +531,12 @@ export const useSearchResponseHandler = () => {
       queryReq.query.end_time = response.content.results.new_end_time;
       searchObj.data.histogramQuery.query.start_time = response.content.results.new_start_time;
       searchObj.data.histogramQuery.query.end_time = response.content.results.new_end_time;
+      useLogsAutoRun().recordWindowMove(generationId, {
+        startUs: Number(response.content.results.new_start_time),
+        endUs: Number(response.content.results.new_end_time),
+      });
 
-      updateUrlQueryParams();
+      updateUrlQueryParams(null, null, "replace");
     }
   };
 
@@ -547,6 +565,10 @@ export const useSearchResponseHandler = () => {
     searchObj.loadingHistogramProgressPercentage = 0;
 
     const { message, trace_id, code, error_detail, error } = err.content;
+
+    if (request.type === "search" && request.isPagination && request.traceId) {
+      notePageLoad(searchObj, request.traceId, code === 20009 ? "cancelled" : "error");
+    }
 
     if (code === 20009) {
       showCancelSearchNotification(t);

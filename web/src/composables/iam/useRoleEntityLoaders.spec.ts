@@ -135,6 +135,14 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
     },
   });
 });
+vi.mock("@/services/downtimes", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock((await importOriginal()) as any, {
+    default: {
+      list: vi.fn(async () => ({ data: { items: [{ id: "d1", name: "D1" }] } })),
+    },
+  });
+});
 vi.mock("@/services/workflows", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock((await importOriginal()) as any, {
@@ -185,6 +193,7 @@ import reportService from "@/services/reports";
 import savedviewsService from "@/services/saved_views";
 import serviceAccountService from "@/services/service_accounts";
 import syntheticsService from "@/services/synthetics";
+import downtimesService from "@/services/downtimes";
 import templateService from "@/services/alert_templates";
 import workflowService from "@/services/workflows";
 
@@ -572,6 +581,41 @@ describe("useRoleEntityLoaders - folder children", () => {
       folder,
       ["id"],
       [{ id: "s1", name: "S1" }],
+      false,
+      "name",
+    );
+  });
+
+  it("getDowntimeFolders lists folder type downtimes with downtime as the child", async () => {
+    const { getDowntimeFolders, updateResourceEntities } = setup();
+
+    await getDowntimeFolders();
+
+    expect(commonService.list_Folders).toHaveBeenCalledWith(ORG, "downtimes");
+    expect(updateResourceEntities).toHaveBeenCalledWith(
+      "downtime_folder",
+      ["folderId"],
+      [
+        { folderId: "default", name: "default" },
+        { folderId: "f9", name: "F9" },
+      ],
+      true,
+      "name",
+      "downtime",
+    );
+  });
+
+  it("getDowntimes names rows by plain downtime id from the folder's list", async () => {
+    const { getDowntimes, updateEntityEntities } = setup();
+    const folder = row({ name: "f9", childName: "downtime" });
+
+    await getDowntimes(folder as any);
+
+    expect(downtimesService.list).toHaveBeenCalledWith(ORG, { folder_id: "f9", page_size: 500 });
+    expect(updateEntityEntities).toHaveBeenCalledWith(
+      folder,
+      ["id"],
+      [{ id: "d1", name: "D1" }],
       false,
       "name",
     );

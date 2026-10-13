@@ -21,10 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Drop it on any data-source detail page with a `slug`. If that slug has a
   registered card it renders the shared rich card (the same presentational
   component the AI integrations use); otherwise it falls back to the legacy
-  CopyContent + doc link so un-migrated data sources keep working unchanged.
+  CredentialCodeBlock + doc link so un-migrated data sources keep working unchanged.
 -->
 <script setup lang="ts">
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { computed, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -38,7 +38,7 @@ import {
   importSetupDashboard,
 } from "@/composables/useSetupDashboardImport";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import CopyContent from "@/components/CopyContent.vue";
+import CredentialCodeBlock from "@/components/ingestion/CredentialCodeBlock.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -53,7 +53,7 @@ const props = defineProps<{
    * fallbackContent/fallbackDocUrl is shown instead.
    */
   slug: string;
-  /** Legacy CopyContent body, shown when the slug has no registered card. */
+  /** Legacy snippet body, shown when the slug has no registered card. */
   fallbackContent?: string;
   /** Legacy doc link, shown alongside the fallback content. */
   fallbackDocUrl?: string;
@@ -230,7 +230,7 @@ const onStepAction = async (actionId: string) => {
       </template>
     </SetupCardRenderer>
     <template v-else>
-      <CopyContent v-if="fallbackContent" :content="raw(fallbackContent)" />
+      <CredentialCodeBlock v-if="fallbackContent" :slug="slug" :content="fallbackContent" />
       <IngestionDocLink v-if="fallbackDocUrl" :href="fallbackDocUrl" />
     </template>
   </div>

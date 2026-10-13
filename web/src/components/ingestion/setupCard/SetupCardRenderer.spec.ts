@@ -19,6 +19,7 @@
 // data source's copy.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { defineComponent, h } from "vue";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
@@ -32,7 +33,6 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: vi.fn() }),
 }));
 
-// Stage-1 existence probe, driven per test for the detected-emit cases only.
 const nameListMock = vi.fn();
 vi.mock("@/services/stream", () => ({
   default: { nameList: (...a: any[]) => nameListMock(...a) },
@@ -85,12 +85,27 @@ const CONTENT: RichCardContent = {
   },
 };
 
+const barStart = vi.fn();
+const barProbeNow = vi.fn();
+// The bar's own polling is covered by FirstEventStatus.spec; here it only reports into the card.
+const FirstEventStatusStub = defineComponent({
+  name: "FirstEventStatus",
+  props: ["org", "signal", "targetStream", "match", "filter", "guideName", "docUrl", "sourceLabel"],
+  emits: ["detected", "copy-command", "state"],
+  setup(_props, { expose }) {
+    expose({ start: barStart, probeNow: barProbeNow });
+    return () => h("div", { "data-test": "first-event-status-stub" });
+  },
+});
+
 const mountCard = (content: RichCardContent = CONTENT) =>
   mount(SetupCardRenderer, {
     props: { content, subs: SUBS },
-    global: { plugins: [store, router] },
+    global: { plugins: [store, router], stubs: { FirstEventStatus: FirstEventStatusStub } },
     attachTo: document.body,
   });
+
+const bar = (wrapper: VueWrapper<any>) => wrapper.findComponent(FirstEventStatusStub);
 
 describe("SetupCardRenderer — advanced section", () => {
   let wrapper: VueWrapper<any>;
@@ -271,14 +286,8 @@ describe("SetupCardRenderer — footer doc links", () => {
 });
 
 // T1.2 (design 4.2/§6): the one new emit + detect-gated action; existing cards listen to neither.
-describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
+describe("SetupCardRenderer — first-event bar, detected emit & showOnDetect actions", () => {
   let wrapper: VueWrapper<any>;
-
-  const HOST_STREAMS = [
-    { name: "system_cpu_time" },
-    { name: "system_memory_usage" },
-    { name: "system_network_io" },
-  ];
 
   const hostContent = (): RichCardContent => ({
     ...CONTENT,
@@ -302,36 +311,51 @@ describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    nameListMock.mockReset();
+    barStart.mockReset();
+    barProbeNow.mockReset();
   });
 
-  it("emits `detected` exactly once, with the stream count, on idle→connected", async () => {
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
-    wrapper = mountCard(hostContent());
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.emitted("detected")).toHaveLength(1);
-    expect(wrapper.emitted("detected")![0]).toEqual([HOST_STREAMS.length]);
+  it("mounts the bar on the detection step in place of the Test button", () => {
+    wrapper = mountCard();
+    expect(bar(wrapper).exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-c-test"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-c-statusbar"]').exists()).toBe(false);
   });
 
-  it("emits `detected` once on stalled→connected, not on the failed check", async () => {
-    nameListMock.mockResolvedValueOnce({ data: { list: [] } });
-    wrapper = mountCard(hostContent());
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
-    await flushPromises();
-    expect(wrapper.emitted("detected")).toBeUndefined();
+  it("hands the bar the card's own detect stream and filter, so Test and the bar never disagree", () => {
+    wrapper = mountCard();
+    expect(bar(wrapper).props()).toMatchObject({
+      org: "test-org",
+      signal: "logs",
+      targetStream: "default",
+      filter: "a IS NOT NULL",
+      guideName: "Demo",
+    });
+  });
 
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
-    await wrapper.find('[data-test="ai-c-recheck"]').trigger("click");
+  it("hands a keyword-matched card's name fragment and match mode to the bar", () => {
+    wrapper = mountCard(hostContent());
+    expect(bar(wrapper).props()).toMatchObject({
+      signal: "metrics",
+      targetStream: "system_",
+      match: "keyword",
+      filter: undefined,
+    });
+  });
+
+  it("emits `detected` exactly once, with the count, when the bar reports data", async () => {
+    wrapper = mountCard(hostContent());
+    bar(wrapper).vm.$emit("detected", { count: 3 });
     await flushPromises();
-    expect(wrapper.emitted("detected")).toHaveLength(1);
+    bar(wrapper).vm.$emit("detected", { count: 5 });
+    await flushPromises();
+    expect(wrapper.emitted("detected")).toEqual([[3]]);
   });
 
   it("tracks data_source_connected with the provider id, not its label, on connect", async () => {
     vi.mocked(analytics.track).mockClear();
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
     wrapper = mountCard(hostContent());
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    bar(wrapper).vm.$emit("detected", { count: 3 });
     await flushPromises();
     expect(analytics.track).toHaveBeenCalledTimes(1);
     expect(analytics.track).toHaveBeenCalledWith("data_source_connected", {
@@ -340,28 +364,16 @@ describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
     });
   });
 
-  it("does not track data_source_connected when the check finds nothing", async () => {
-    vi.mocked(analytics.track).mockClear();
-    nameListMock.mockResolvedValue({ data: { list: [] } });
-    wrapper = mountCard(hostContent());
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
-    await flushPromises();
-    expect(analytics.track).not.toHaveBeenCalledWith("data_source_connected", expect.anything());
-  });
-
   it("does not emit `detected` on a fresh mount (no transition happened)", async () => {
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
     wrapper = mountCard(hostContent());
     await flushPromises();
-    // Detection is click-driven; a remount starts idle and must stay silent.
     expect(wrapper.emitted("detected")).toBeUndefined();
   });
 
   it("hides a showOnDetect action pre-connect and reveals it post-connect", async () => {
-    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
     wrapper = mountCard(hostContent());
     expect(wrapper.find('[data-test="ai-step-action-view-host-dashboard"]').exists()).toBe(false);
-    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    bar(wrapper).vm.$emit("detected", { count: 3 });
     await flushPromises();
     expect(wrapper.find('[data-test="ai-step-action-view-host-dashboard"]').exists()).toBe(true);
   });
@@ -380,6 +392,53 @@ describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
     };
     wrapper = mountCard(content);
     expect(wrapper.find('[data-test="ai-step-action-launch-console"]').exists()).toBe(true);
+  });
+
+  it("shows the most-likely-fix box only once the bar has a diagnosis, and rechecks through the bar", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      extras: { ...CONTENT.extras, fixSnippet: "import otel_first" },
+    };
+    wrapper = mountCard(content);
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(false);
+    bar(wrapper).vm.$emit("state", "no-requests");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(true);
+    await wrapper.find('[data-test="ai-c-fix-recheck"]').trigger("click");
+    expect(barProbeNow).toHaveBeenCalledTimes(1);
+    bar(wrapper).vm.$emit("state", "received");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-fix-code"]').exists()).toBe(false);
+  });
+
+  it("re-copies through the first step's own block when the bar asks for the command", async () => {
+    wrapper = mountCard();
+    const copyBtn = wrapper.find('[data-test="ingestion-setup-code-block-copy-btn"]');
+    expect(copyBtn.exists()).toBe(true);
+    const clicked = vi.fn();
+    copyBtn.element.addEventListener("click", clicked);
+    bar(wrapper).vm.$emit("copy-command");
+    expect(clicked).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the cluster or host only once the user typed one, never the input's default (B5)", async () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        {
+          ...CONTENT.steps[0],
+          inputs: [{ id: "cluster", label: "Cluster", default: "acme-prod-eks" } as any],
+        },
+        CONTENT.steps[1],
+      ],
+    };
+    wrapper = mountCard(content);
+    expect(bar(wrapper).props("sourceLabel")).toBeUndefined();
+    const input = wrapper.find('[data-test="ai-input-cluster"] input');
+    await input.setValue("web-07");
+    expect(bar(wrapper).props("sourceLabel")).toBe("web-07");
+    await input.setValue("acme-prod-eks");
+    expect(bar(wrapper).props("sourceLabel")).toBeUndefined();
   });
 });
 
@@ -458,13 +517,46 @@ describe("SetupCardRenderer — product analytics", () => {
     if (wrapper) wrapper.unmount();
   });
 
-  it("tracks snippet_copied with the current route when a step is copied", () => {
+  it("tracks snippet_copied with the current route and partial flag, and restarts the bar's fast cadence", () => {
     wrapper = mountCard();
 
-    wrapper.findComponent(OCodeBlock).vm.$emit("copy");
+    wrapper.findComponent(OCodeBlock).vm.$emit("copy", { partial: true });
 
     expect(analytics.track).toHaveBeenCalledWith("snippet_copied", {
       route: router.currentRoute.value.name,
+      partial: true,
     });
+    expect(barStart).toHaveBeenCalledWith("copy");
+  });
+
+  it("makes every step block copy on click and names the token only where it is masked", () => {
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        { ...CONTENT.steps[0], code: { lang: "bash", raw: "key=pc", masked: "key=••" } },
+        CONTENT.steps[1],
+      ],
+    };
+    const tokenStore = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: {
+          organizationPasscode: "pc",
+          orgTokens: [{ name: "default", token: "pc" }],
+        },
+        theme: "light",
+      },
+    });
+    wrapper = mount(SetupCardRenderer, {
+      props: { content, subs: SUBS },
+      global: {
+        plugins: [tokenStore, router],
+        stubs: { FirstEventStatus: FirstEventStatusStub },
+      },
+    });
+    const block = wrapper.findComponent(OCodeBlock);
+    expect(block.props("copyOnClick")).toBe(true);
+    expect(block.props("tokenName")).toBe("default");
   });
 });

@@ -162,15 +162,13 @@ fn validate_time_alignment_daily(start_time: i64, end_time: i64) -> Result<(), a
     Ok(())
 }
 
-pub async fn create_backfill_job(
-    org_id: &str,
+/// Every check [`create_backfill_job`] makes before it writes, so a caller can answer them first.
+pub async fn check_backfill_job(
     pipeline_id: &str,
     start_time: i64,
     end_time: i64,
-    chunk_period_minutes: Option<i64>,
-    delay_between_chunks_secs: Option<i64>,
     delete_before_backfill: bool,
-) -> Result<String, anyhow::Error> {
+) -> Result<(), anyhow::Error> {
     // 1. Validate pipeline exists and is scheduled
     let pipeline = crate::pipeline::db::get_by_id(pipeline_id).await?;
 
@@ -230,6 +228,20 @@ pub async fn create_backfill_job(
             validate_time_alignment_daily(start_time, end_time)?;
         }
     }
+    Ok(())
+}
+
+pub async fn create_backfill_job(
+    org_id: &str,
+    pipeline_id: &str,
+    start_time: i64,
+    end_time: i64,
+    chunk_period_minutes: Option<i64>,
+    delay_between_chunks_secs: Option<i64>,
+    delete_before_backfill: bool,
+) -> Result<String, anyhow::Error> {
+    check_backfill_job(pipeline_id, start_time, end_time, delete_before_backfill).await?;
+    let now = Utc::now().timestamp_micros();
 
     // 3. Create backfill job in backfill_jobs table
     let backfill_job_id = Ksuid::new(None, None).to_string();
@@ -540,47 +552,22 @@ pub async fn resume_backfill_job(org_id: &str, job_id: &str) -> Result<(), anyho
     enable_backfill_job(org_id, job_id, true).await
 }
 
+/// Every check [`update_backfill_job`] makes before it writes, so a caller can answer them first.
+pub async fn check_backfill_update(
+    org_id: &str,
+    job_id: &str,
+    req: &BackfillRequest,
+) -> Result<(), anyhow::Error> {
+    update_preconditions(org_id, job_id, req).await.map(|_| ())
+}
+
 pub async fn update_backfill_job(
     org_id: &str,
     job_id: &str,
     req: BackfillRequest,
 ) -> Result<(), anyhow::Error> {
-    // Fetch existing config from backfill_jobs table
-    let existing_config = db::backfill::get(org_id, job_id).await?;
-
-    // Fetch the trigger using module_key (which is the job_id)
-    let trigger = db::scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
-
-    // Only allow updating paused or completed jobs
-    if trigger.status != db::scheduler::TriggerStatus::Completed {
-        return Err(anyhow::anyhow!(
-            "Can only update paused or completed backfill jobs. Current status: {:?}",
-            trigger.status
-        ));
-    }
-
-    // Parse trigger data to get current dynamic state
-    let trigger_data = ScheduledTriggerData::from_json_string(&trigger.data)?;
-    let _backfill_job = trigger_data
-        .backfill_job
-        .ok_or_else(|| anyhow::anyhow!("Backfill job data not found in trigger"))?;
-
-    // Validate deletion is not enabled for pipelines with remote destinations
-    if req.delete_before_backfill {
-        let pipeline = crate::pipeline::db::get_by_id(&existing_config.pipeline_id).await?;
-        let has_remote_destination = pipeline.nodes.iter().any(|node| {
-            matches!(
-                &node.data,
-                config::meta::pipeline::components::NodeData::RemoteStream(_)
-            )
-        });
-
-        if has_remote_destination {
-            return Err(anyhow::anyhow!(
-                "Deletion is not supported for pipelines with remote destinations"
-            ));
-        }
-    }
+    let (existing_config, trigger, trigger_data) =
+        update_preconditions(org_id, job_id, &req).await?;
 
     // Update backfill_jobs table with new config
     let updated_db_job = db::backfill::BackfillJob {
@@ -639,6 +626,57 @@ pub async fn update_backfill_job(
         org_id
     );
     Ok(())
+}
+
+async fn update_preconditions(
+    org_id: &str,
+    job_id: &str,
+    req: &BackfillRequest,
+) -> Result<
+    (
+        db::backfill::BackfillJob,
+        db::scheduler::Trigger,
+        ScheduledTriggerData,
+    ),
+    anyhow::Error,
+> {
+    // Fetch existing config from backfill_jobs table
+    let existing_config = db::backfill::get(org_id, job_id).await?;
+
+    // Fetch the trigger using module_key (which is the job_id)
+    let trigger = db::scheduler::get(org_id, TriggerModule::Backfill, job_id).await?;
+
+    // Only allow updating paused or completed jobs
+    if trigger.status != db::scheduler::TriggerStatus::Completed {
+        return Err(anyhow::anyhow!(
+            "Can only update paused or completed backfill jobs. Current status: {:?}",
+            trigger.status
+        ));
+    }
+
+    // Parse trigger data to get current dynamic state
+    let trigger_data = ScheduledTriggerData::from_json_string(&trigger.data)?;
+    if trigger_data.backfill_job.is_none() {
+        return Err(anyhow::anyhow!("Backfill job data not found in trigger"));
+    }
+
+    // Validate deletion is not enabled for pipelines with remote destinations
+    if req.delete_before_backfill {
+        let pipeline = crate::pipeline::db::get_by_id(&existing_config.pipeline_id).await?;
+        let has_remote_destination = pipeline.nodes.iter().any(|node| {
+            matches!(
+                &node.data,
+                config::meta::pipeline::components::NodeData::RemoteStream(_)
+            )
+        });
+
+        if has_remote_destination {
+            return Err(anyhow::anyhow!(
+                "Deletion is not supported for pipelines with remote destinations"
+            ));
+        }
+    }
+    Ok((existing_config, trigger, trigger_data))
 }
 
 #[cfg(test)]

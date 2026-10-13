@@ -459,15 +459,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              to the preset's cards), and the click goes to the in-app Data
              Sources metrics page, where ingestion is actually set up — not out
              to external docs. -->
-          <OEmptyState
+          <FirstDataPanel
             v-else-if="!grid.cards.value.length"
-            size="block"
-            preset="no-streams"
-            :title="t('metrics.explorer.noMetrics')"
-            :actions="noMetricsActions"
-            data-test="metrics-explorer-no-metrics"
-            @action="openMetricsIngestion"
-          />
+            signal="metrics"
+            variant="full"
+            @detected="grid.loadStreams(true)"
+          >
+            <OEmptyState
+              size="block"
+              preset="no-streams"
+              :title="t('metrics.explorer.noMetrics')"
+              :actions="noMetricsActions"
+              data-test="metrics-explorer-no-metrics"
+              @action="openMetricsIngestion"
+            />
+          </FirstDataPanel>
 
           <!-- FAVOURITES with none added yet — the reason is not "filters hid
              everything", so show the right guidance (add one in Explore) and NO
@@ -671,6 +677,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -749,6 +756,7 @@ const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 export default defineComponent({
   name: "MetricsExplorer",
   components: {
+    FirstDataPanel,
     DateTimePickerDashboard,
     AutoRefreshInterval,
     OButton,

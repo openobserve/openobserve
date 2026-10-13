@@ -76,6 +76,18 @@ pub async fn get(db: &DatabaseConnection, org: &str, id: &str) -> Result<Option<
     Ok(Some(to_slo(model)?))
 }
 
+/// Whether another SLO in the folder already holds `name`, as the unique index would refuse.
+pub async fn name_taken(db: &DatabaseConnection, slo: &Slo) -> Result<bool, Error> {
+    Ok(slos::Entity::find()
+        .filter(slos::Column::Org.eq(&slo.org))
+        .filter(slos::Column::FolderId.eq(&slo.folder_id))
+        .filter(slos::Column::Name.eq(&slo.name))
+        .filter(slos::Column::Id.ne(&slo.id))
+        .one(db)
+        .await?
+        .is_some())
+}
+
 /// Every enabled SLO across all orgs — what the ingest scheduler enumerates.
 pub async fn list_enabled(db: &DatabaseConnection) -> Result<Vec<Slo>, Error> {
     slos::Entity::find()
@@ -97,12 +109,19 @@ pub async fn list(
     if let Some(folder) = folder_id {
         q = q.filter(slos::Column::FolderId.eq(folder));
     }
-    q.order_by_asc(slos::Column::Name)
+    let rows = q.order_by_asc(slos::Column::Name).all(db).await?;
+    rows.into_iter().map(to_slo).collect()
+}
+
+/// [list] for the correction planner: a row that does not decode is logged and left out, so it
+/// cannot block the org's other SLOs; every other caller still sees the error.
+pub async fn list_decodable(db: &DatabaseConnection, org: &str) -> Result<Vec<Slo>, Error> {
+    let rows = slos::Entity::find()
+        .filter(slos::Column::Org.eq(org))
+        .order_by_asc(slos::Column::Name)
         .all(db)
-        .await?
-        .into_iter()
-        .map(to_slo)
-        .collect()
+        .await?;
+    Ok(rows.into_iter().filter_map(decoded).collect())
 }
 
 /// When the current generation began.
@@ -188,6 +207,9 @@ pub async fn update(
     };
 
     let mut model = to_model(slo, now)?;
+    if slo.owner.is_none() {
+        model.owner = Set(existing.owner.clone());
+    }
     model.created_at = Set(existing.created_at);
     model.updated_at = Set(now);
     model.last_edited_by = Set(editor.map(str::to_string));
@@ -441,6 +463,16 @@ pub async fn move_to_folder(
 // ---------------------------------------------------------------------------
 // conversion
 // ---------------------------------------------------------------------------
+
+/// One row that does not decode is logged and left out.
+fn decoded(m: slos::Model) -> Option<Slo> {
+    let id = m.id.clone();
+    to_slo(m)
+        .inspect_err(|e| {
+            log::error!("[slo] skipping SLO {id}, its stored row does not decode: {e}")
+        })
+        .ok()
+}
 
 fn to_slo(m: slos::Model) -> Result<Slo, Error> {
     let sli_config = serde_json::from_value(m.sli_config)?;
@@ -1345,6 +1377,32 @@ mod tests {
                 .definition_generation,
             1
         );
+    }
+
+    #[tokio::test]
+    async fn an_update_moves_the_owner_only_when_it_names_one() {
+        let db = db().await;
+        let owned = Slo {
+            owner: Some("alice".into()),
+            ..slo()
+        };
+        create(&db, &owned, 1_000, Some("alice")).await.unwrap();
+
+        let unnamed = Slo {
+            owner: None,
+            ..slo()
+        };
+        update(&db, &unnamed, 2_000, Some("bob")).await.unwrap();
+        let stored = get(&db, ORG, ID).await.unwrap().unwrap();
+        assert_eq!(stored.owner.as_deref(), Some("alice"));
+
+        let named = Slo {
+            owner: Some("carol".into()),
+            ..slo()
+        };
+        update(&db, &named, 3_000, Some("bob")).await.unwrap();
+        let stored = get(&db, ORG, ID).await.unwrap().unwrap();
+        assert_eq!(stored.owner.as_deref(), Some("carol"));
     }
 }
 

@@ -2,6 +2,8 @@
  * ODropdownItem.types.ts — public types for ODropdownItem.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { IconName } from "../../core/Icon/OIcon.icons";
 
 /** Visual intent of the item */
@@ -12,6 +14,10 @@ export interface DropdownItemProps {
   variant?: DropdownItemVariant;
   /** Prevents the user from interacting with this item */
   disabled?: boolean;
+  focusableUnavailable?: boolean;
+  as?: "div" | "button";
+  description?: I18nText | null;
+  descriptionId?: string;
   /** Text used for typeahead matching (overrides text content) */
   textValue?: string;
   /** Icon placed before the label — renders an OIcon internally */
