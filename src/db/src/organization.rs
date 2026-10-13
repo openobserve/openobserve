@@ -23,7 +23,7 @@ use common::{
 };
 use config::utils::json;
 use infra::{
-    db::put_into_db_coordinator,
+    db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{self, Error},
     table::organizations,
 };
@@ -34,6 +34,11 @@ use crate as db;
 pub const ORG_SETTINGS_KEY_PREFIX: &str = "/organization/setting";
 
 pub const ORG_KEY_PREFIX: &str = "/organization/org/";
+
+const ORG_SETTINGS_LOCK_PREFIX: &str = "/organization/setting_lock/";
+
+// dist_lock is a no-op in local mode, so writers on one node also queue here.
+static ORG_SETTINGS_WRITE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 pub async fn set_org_setting(org_name: &str, setting: &OrganizationSetting) -> errors::Result<()> {
     let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_name}");
@@ -109,6 +114,14 @@ pub async fn get_org_setting(org_id: &str) -> Result<OrganizationSetting, Error>
         .insert(key.to_string(), settings.clone());
     settings.free_trial_expiry = trial_period_expiry;
     Ok(settings)
+}
+
+/// Applies `apply` to the stored settings under a cluster lock; returns whether it wrote them.
+pub async fn update_org_setting<F>(org_id: &str, apply: F) -> Result<bool, anyhow::Error>
+where
+    F: FnOnce(&mut OrganizationSetting) -> bool,
+{
+    update_org_setting_in(infra::db::get_db().await.as_ref(), org_id, apply).await
 }
 
 /// Get the toggle ingestion logs setting for an org
@@ -187,6 +200,14 @@ pub async fn get_org_setting_red_insights_enabled(org_id: &str) -> Result<bool, 
     Ok(red_insights_enabled)
 }
 
+/// The coordinator delete evicts `ORGANIZATION_SETTING` on every node.
+pub async fn delete_org_setting(org_id: &str) -> errors::Result<()> {
+    let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+    db::delete_if_exists(&key, false, db::NEED_WATCH).await?;
+    ORGANIZATION_SETTING.write().await.remove(&key);
+    Ok(())
+}
+
 /// Cache the existing org settings in the beginning
 pub async fn org_settings_cache() -> Result<(), anyhow::Error> {
     let prefix = ORG_SETTINGS_KEY_PREFIX;
@@ -219,26 +240,32 @@ pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
             }
         };
 
-        if let db::Event::Put(ev) = ev {
-            let item_key = ev.key;
-            let json_val: OrganizationSetting = match db::get(&item_key).await {
-                Ok(val) => match json::from_slice(&val) {
-                    Ok(val) => val,
+        match ev {
+            db::Event::Put(ev) => {
+                let item_key = ev.key;
+                let json_val: OrganizationSetting = match db::get(&item_key).await {
+                    Ok(val) => match json::from_slice(&val) {
+                        Ok(val) => val,
+                        Err(e) => {
+                            log::error!("Error getting value: {e}");
+                            continue;
+                        }
+                    },
                     Err(e) => {
                         log::error!("Error getting value: {e}");
                         continue;
                     }
-                },
-                Err(e) => {
-                    log::error!("Error getting value: {e}");
-                    continue;
-                }
-            };
-            ORGANIZATION_SETTING
-                .clone()
-                .write()
-                .await
-                .insert(item_key, json_val);
+                };
+                ORGANIZATION_SETTING
+                    .clone()
+                    .write()
+                    .await
+                    .insert(item_key, json_val);
+            }
+            db::Event::Delete(ev) => {
+                ORGANIZATION_SETTING.write().await.remove(&ev.key);
+            }
+            db::Event::Empty => {}
         }
     }
 }
@@ -258,9 +285,8 @@ pub async fn cache() -> Result<(), anyhow::Error> {
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let key = ORG_KEY_PREFIX;
     let cluster_coordinator = db::get_coordinator().await;
-    let mut events = cluster_coordinator.watch(key).await?;
+    let mut events = cluster_coordinator.watch(ORG_KEY_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching organizations");
     loop {
@@ -272,27 +298,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
             }
         };
 
-        if let db::Event::Put(ev) = ev {
-            let item_key = ev.key.strip_prefix(key).unwrap();
-            let item_value = ev.value.unwrap();
-            let json_val: Organization = if !config::get_config().common.local_mode {
-                match get_org_from_db(item_key).await {
-                    Ok(val) => val,
-                    Err(e) => {
-                        log::error!("Error getting value: {e}");
-                        continue;
-                    }
-                }
-            } else {
-                json::from_slice(&item_value).unwrap()
-            };
-            organizations::invalidate_cache(Some(item_key)).await;
-            ORGANIZATIONS
-                .clone()
-                .write()
-                .await
-                .insert(item_key.to_string(), json_val);
-        }
+        apply_event(ev).await;
     }
 }
 
@@ -372,13 +378,52 @@ pub async fn delete_org(org_id: &str) -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("Error deleting org: {}", e));
     }
     organizations::invalidate_cache(Some(org_id)).await;
+    ORGANIZATIONS.clone().write().await.remove(org_id);
+    let key = format!("{ORG_KEY_PREFIX}{org_id}");
+    delete_from_db_coordinator(&key, false, true, None).await?;
     #[cfg(feature = "enterprise")]
-    super_cluster::organization_delete(&format!("{ORG_KEY_PREFIX}{org_id}")).await?;
+    super_cluster::organization_delete(&key).await?;
     Ok(())
 }
 
+/// Turns a `deleting` org row into a `deleted` tombstone; true only for the call that flipped it.
+pub async fn tombstone_org(org_id: &str) -> Result<bool, anyhow::Error> {
+    let won = organizations::set_status_if(org_id, "deleting", "deleted")
+        .await
+        .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?;
+    if !won {
+        // A retry after a later failure finds the tombstone already written.
+        organizations::invalidate_cache(Some(org_id)).await;
+        let status = organizations::get(org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Error tombstoning org: {e}"))?
+            .status;
+        if status != "deleted" {
+            return Err(anyhow::anyhow!(
+                "Cannot tombstone org {org_id} in status {status}"
+            ));
+        }
+    }
+    Ok(won)
+}
+
+/// Drops a tombstoned org from every node's org caches; safe to repeat on a step retry.
+pub async fn evict_org(org_id: &str) -> Result<(), anyhow::Error> {
+    organizations::invalidate_cache(Some(org_id)).await;
+    ORGANIZATIONS.clone().write().await.remove(org_id);
+    let key = format!("{ORG_KEY_PREFIX}{org_id}");
+    delete_from_db_coordinator(&key, false, true, None).await?;
+    #[cfg(feature = "enterprise")]
+    super_cluster::organization_delete(&key).await?;
+    Ok(())
+}
+
+/// Lists live orgs; tombstones stay out so caches, jobs and the org list never see them.
 pub async fn list(limit: Option<i64>) -> Result<Vec<Organization>, anyhow::Error> {
-    let filter = organizations::ListFilter::with_limit(limit);
+    let filter = organizations::ListFilter {
+        exclude_deleted: true,
+        ..organizations::ListFilter::with_limit(limit)
+    };
     let orgs = organizations::list(filter)
         .await
         .map_err(|e| anyhow::anyhow!("Error listing orgs: {}", e))?;
@@ -448,9 +493,171 @@ mod super_cluster {
     }
 }
 
+async fn update_org_setting_in<F>(
+    store: &dyn infra::db::Db,
+    org_id: &str,
+    apply: F,
+) -> Result<bool, anyhow::Error>
+where
+    F: FnOnce(&mut OrganizationSetting) -> bool,
+{
+    let _local = ORG_SETTINGS_WRITE_LOCK.lock().await;
+    let locker = infra::dist_lock::lock(&format!("{ORG_SETTINGS_LOCK_PREFIX}{org_id}"), 0).await?;
+    let result = async {
+        // Read the store's primary, not the cache or a replica: either can predate another writer.
+        let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+        let mut settings = match store.get_if_exists_from_primary(&key).await? {
+            Some(value) => json::from_slice(&value)?,
+            None => OrganizationSetting::default(),
+        };
+        if !apply(&mut settings) {
+            return Ok(false);
+        }
+        set_org_setting(org_id, &settings).await?;
+        Ok(true)
+    }
+    .await;
+    infra::dist_lock::unlock(&locker).await?;
+    result
+}
+
+async fn apply_event(ev: db::Event) {
+    match ev {
+        db::Event::Put(ev) => {
+            let Some(item_key) = ev.key.strip_prefix(ORG_KEY_PREFIX) else {
+                return;
+            };
+            // Invalidate before reading, or the cache-first read copies the stale row back.
+            organizations::invalidate_cache(Some(item_key)).await;
+            let json_val: Organization = if !config::get_config().common.local_mode {
+                match get_org_from_db(item_key).await {
+                    Ok(val) => val,
+                    Err(e) => {
+                        log::error!("Error getting value: {e}");
+                        return;
+                    }
+                }
+            } else {
+                json::from_slice(&ev.value.unwrap()).unwrap()
+            };
+            ORGANIZATIONS
+                .clone()
+                .write()
+                .await
+                .insert(item_key.to_string(), json_val);
+        }
+        db::Event::Delete(ev) => {
+            let Some(item_key) = ev.key.strip_prefix(ORG_KEY_PREFIX) else {
+                return;
+            };
+            organizations::invalidate_cache(Some(item_key)).await;
+            ORGANIZATIONS.clone().write().await.remove(item_key);
+        }
+        db::Event::Empty => {}
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use bytes::Bytes;
+    use hashbrown::HashMap;
+    use infra::db::{Db, Event, Stats, UpdateFn};
+    use tokio::sync::mpsc;
+
     use super::*;
+
+    #[derive(Default)]
+    struct UnreadableStore {
+        wrote: AtomicBool,
+    }
+
+    #[async_trait::async_trait]
+    impl Db for UnreadableStore {
+        async fn create_table(&self) -> errors::Result<()> {
+            Ok(())
+        }
+
+        async fn stats(&self) -> errors::Result<Stats> {
+            unimplemented!()
+        }
+
+        async fn get(&self, _key: &str) -> errors::Result<Bytes> {
+            Err(Error::Message("read failed".to_string()))
+        }
+
+        async fn put(
+            &self,
+            _key: &str,
+            _value: Bytes,
+            _need_watch: bool,
+            _start_dt: Option<i64>,
+        ) -> errors::Result<()> {
+            self.wrote.store(true, Ordering::SeqCst);
+            Ok(())
+        }
+
+        async fn get_for_update(
+            &self,
+            key: &str,
+            need_watch: bool,
+            start_dt: Option<i64>,
+            update_fn: Box<UpdateFn>,
+        ) -> errors::Result<()> {
+            // Same as nats.rs get_for_update: `.ok()` turns a failed read into a missing key.
+            if let Some((Some(value), _)) = update_fn(self.get(key).await.ok())? {
+                self.put(key, value, need_watch, start_dt).await?;
+            }
+            Ok(())
+        }
+
+        async fn delete(
+            &self,
+            _key: &str,
+            _with_prefix: bool,
+            _need_watch: bool,
+            _start_dt: Option<i64>,
+        ) -> errors::Result<()> {
+            unimplemented!()
+        }
+
+        async fn list(&self, _prefix: &str) -> errors::Result<HashMap<String, Bytes>> {
+            unimplemented!()
+        }
+
+        async fn list_keys(&self, _prefix: &str) -> errors::Result<Vec<String>> {
+            unimplemented!()
+        }
+
+        async fn list_values(&self, _prefix: &str) -> errors::Result<Vec<Bytes>> {
+            unimplemented!()
+        }
+
+        async fn list_values_by_start_dt(
+            &self,
+            _prefix: &str,
+            _start_dt: Option<(i64, i64)>,
+        ) -> errors::Result<Vec<(i64, Bytes)>> {
+            unimplemented!()
+        }
+
+        async fn count(&self, _prefix: &str) -> errors::Result<i64> {
+            unimplemented!()
+        }
+
+        async fn watch(&self, _prefix: &str) -> errors::Result<Arc<mpsc::Receiver<Event>>> {
+            unimplemented!()
+        }
+
+        async fn close(&self) -> errors::Result<()> {
+            Ok(())
+        }
+
+        async fn add_start_dt_column(&self) -> errors::Result<()> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn test_org_settings_key_prefix_value() {
@@ -460,6 +667,94 @@ mod tests {
     #[test]
     fn test_org_key_prefix_value() {
         assert_eq!(ORG_KEY_PREFIX, "/organization/org/");
+    }
+
+    #[test]
+    fn test_update_org_setting_rereads_and_writes_under_both_locks() {
+        let src = include_str!("organization.rs");
+        let start = src
+            .find("async fn update_org_setting_in<")
+            .expect("update_org_setting_in");
+        let body = src[start..].split("\n}\n").next().expect("body");
+        let local = body
+            .find("ORG_SETTINGS_WRITE_LOCK.lock()")
+            .expect("local lock");
+        let lock = body.find("dist_lock::lock(").expect("dist_lock");
+        let read = body
+            .find("store.get_if_exists_from_primary(&key)")
+            .expect("store re-read");
+        let write = body.find("set_org_setting(").expect("write");
+        let unlock = body.rfind("dist_lock::unlock(").expect("unlock");
+        assert!(local < lock && lock < read && read < write && write < unlock);
+    }
+
+    #[test]
+    fn test_update_org_setting_rereads_the_primary_not_a_replica() {
+        let src = include_str!("organization.rs");
+        let start = src
+            .find("async fn update_org_setting_in<")
+            .expect("update_org_setting_in");
+        let body = src[start..].split("\n}\n").next().expect("body");
+        assert!(
+            body.contains(".get_if_exists_from_primary("),
+            "primary read"
+        );
+        assert!(!body.contains("db::get("), "db::get reads a replica");
+        assert!(
+            !body.contains("get_for_update("),
+            "NATS get_for_update hides read errors"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_failed_settings_read_neither_completes_cleanup_nor_writes() {
+        let org_id = "unreadablesettingsorg";
+        let store = UnreadableStore::default();
+        let mut applied = false;
+        // Shaped like delete_org_domain_mappings, whose mappings field exists only under cloud.
+        let cleanup = update_org_setting_in(&store, org_id, |settings| {
+            applied = true;
+            let before = settings.cross_links.len();
+            settings.cross_links.clear();
+            settings.cross_links.len() != before
+        })
+        .await;
+        assert!(cleanup.is_err(), "cleanup reported done: {cleanup:?}");
+        assert!(!applied, "cleanup ran on default settings");
+
+        let mut applied = false;
+        let update = update_org_setting_in(&store, org_id, |settings| {
+            applied = true;
+            settings.scrape_interval += 1;
+            true
+        })
+        .await;
+        assert!(update.is_err(), "update reported done: {update:?}");
+        assert!(!applied, "update ran on default settings");
+        assert!(!store.wrote.load(Ordering::SeqCst));
+        let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+        assert!(!ORGANIZATION_SETTING.read().await.contains_key(&key));
+    }
+
+    #[tokio::test]
+    async fn test_org_watch_delete_evicts_organizations_cache() {
+        let org_id = "watchdelorg";
+        ORGANIZATIONS.clone().write().await.insert(
+            org_id.to_string(),
+            Organization {
+                identifier: org_id.to_string(),
+                name: org_id.to_string(),
+                org_type: "default".to_string(),
+                service_account: None,
+            },
+        );
+        apply_event(db::Event::Delete(infra::db::EventData {
+            key: format!("{ORG_KEY_PREFIX}{org_id}"),
+            value: None,
+            start_dt: None,
+        }))
+        .await;
+        assert!(!ORGANIZATIONS.read().await.contains_key(org_id));
     }
 
     #[test]

@@ -180,6 +180,21 @@ impl super::Db for PostgresDb {
         Ok(Bytes::from(value))
     }
 
+    async fn get_if_exists_from_primary(&self, key: &str) -> Result<Option<Bytes>> {
+        let (module, key1, key2) = super::parse_key(key);
+        let pool = CLIENT_RW.clone();
+        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
+        let query = "SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;";
+        let value: Option<String> = sqlx::query_scalar(query)
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| Error::from(DbError::DBOperError(e.to_string(), key.to_string())))?;
+        Ok(value.map(Bytes::from))
+    }
+
     async fn put(
         &self,
         key: &str,
@@ -433,7 +448,7 @@ impl super::Db for PostgresDb {
         if need_watch {
             // find all keys then send event
             let items = if with_prefix {
-                self.list_keys(key).await?
+                self.list_keys_from_primary(key).await?
             } else {
                 vec![key.to_string()]
             };
@@ -490,20 +505,20 @@ impl super::Db for PostgresDb {
             } else {
                 // module = $1, key1 = $2, key2 = $3, key2/% = $4 [, start_dt = $5]
                 if let Some(dt) = start_dt {
-                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4) AND start_dt = $5")
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4 ESCAPE '\\') AND start_dt = $5")
                         .bind(&module)
                         .bind(&key1)
                         .bind(&key2)
-                        .bind(format!("{}/%", key2))
+                        .bind(format!("{}/%", super::escape_like_prefix(&key2)))
                         .bind(dt)
                         .execute(&pool)
                         .await?;
                 } else {
-                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)")
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4 ESCAPE '\\')")
                         .bind(&module)
                         .bind(&key1)
                         .bind(&key2)
-                        .bind(format!("{}/%", key2))
+                        .bind(format!("{}/%", super::escape_like_prefix(&key2)))
                         .execute(&pool)
                         .await?;
                 }
@@ -546,14 +561,7 @@ impl super::Db for PostgresDb {
             params.push(key1);
         }
         if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
+            push_key2_filter(&mut sql, &mut params, key2);
         }
         sql.push_str(" ORDER BY start_dt ASC");
 
@@ -576,42 +584,11 @@ impl super::Db for PostgresDb {
     }
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
-        let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql =
-            "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta WHERE 1=1 ".to_string();
-        let mut params = Vec::new();
+        list_keys_in(&CLIENT_RO.clone(), prefix).await
+    }
 
-        if !module.is_empty() {
-            sql.push_str(" AND module = $1");
-            params.push(module);
-        }
-        if !key1.is_empty() {
-            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
-            params.push(key1);
-        }
-        if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
-        }
-        sql.push_str(" ORDER BY start_dt ASC");
-
-        let pool = CLIENT_RO.clone();
-        DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
-        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
-        for p in params {
-            query = query.bind(p);
-        }
-        let ret = query.fetch_all(&pool).await?;
-        Ok(ret
-            .into_iter()
-            .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
-            .collect())
+    async fn list_keys_from_primary(&self, prefix: &str) -> Result<Vec<String>> {
+        list_keys_in(&CLIENT_RW.clone(), prefix).await
     }
 
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>> {
@@ -668,14 +645,7 @@ impl super::Db for PostgresDb {
             params.push(key1);
         }
         if !key2.is_empty() {
-            sql.push_str(&format!(
-                " AND (key2 = ${} OR key2 LIKE ${})",
-                params.len() + 1,
-                params.len() + 2
-            ));
-            let key2_prefix = format!("{}/%", key2);
-            params.push(key2);
-            params.push(key2_prefix);
+            push_key2_filter(&mut sql, &mut params, key2);
         }
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
@@ -929,14 +899,7 @@ pub(crate) fn build_list_by_start_dt_sql(
         params.push(key1);
     }
     if !key2.is_empty() {
-        sql.push_str(&format!(
-            " AND (key2 = ${} OR key2 LIKE ${})",
-            params.len() + 1,
-            params.len() + 2
-        ));
-        let key2_prefix = format!("{key2}/%");
-        params.push(key2);
-        params.push(key2_prefix);
+        push_key2_filter(&mut sql, &mut params, key2);
     }
     // min_dt / max_dt are intentionally NOT pushed into params here.
     // The caller binds them as i64 after the string-params loop so that the
@@ -954,9 +917,81 @@ pub(crate) fn build_list_by_start_dt_sql(
     (sql, params)
 }
 
+async fn list_keys_in(pool: &Pool<Postgres>, prefix: &str) -> Result<Vec<String>> {
+    let (module, key1, key2) = super::parse_key(prefix);
+    let mut sql = "SELECT module, key1, key2 FROM meta WHERE 1=1 ".to_string();
+    let mut params = Vec::new();
+
+    if !module.is_empty() {
+        sql.push_str(" AND module = $1");
+        params.push(module);
+    }
+    if !key1.is_empty() {
+        sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+        params.push(key1);
+    }
+    if !key2.is_empty() {
+        push_key2_filter(&mut sql, &mut params, key2);
+    }
+    sql.push_str(" ORDER BY start_dt ASC");
+
+    DB_QUERY_NUMS.with_label_values(&["select", "meta"]).inc();
+    let mut query = sqlx::query_as::<_, (String, String, String)>(&sql);
+    for p in params {
+        query = query.bind(p);
+    }
+    let ret = query.fetch_all(pool).await?;
+    Ok(ret
+        .into_iter()
+        .map(|(module, key1, key2)| format!("/{module}/{key1}/{key2}"))
+        .collect())
+}
+
+fn push_key2_filter(sql: &mut String, params: &mut Vec<String>, key2: String) {
+    let n = params.len();
+    sql.push_str(&format!(
+        " AND (key2 = ${} OR key2 LIKE ${} ESCAPE '\\')",
+        n + 1,
+        n + 2
+    ));
+    let key2_prefix = format!("{}/%", super::escape_like_prefix(&key2));
+    params.push(key2);
+    params.push(key2_prefix);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_watched_prefix_delete_finds_its_keys_on_the_primary() {
+        let src = include_str!("postgres.rs");
+        let start = src.find("    async fn delete(\n").expect("delete");
+        let body = src[start..].split("\n    }\n").next().expect("body");
+        assert!(body.contains("self.list_keys_from_primary(key)"));
+        assert!(!body.contains("self.list_keys(key)"));
+    }
+
+    #[test]
+    fn test_get_if_exists_from_primary_reads_the_read_write_pool() {
+        let src = include_str!("postgres.rs");
+        let start = src
+            .find("    async fn get_if_exists_from_primary(")
+            .expect("get_if_exists_from_primary");
+        let body = src[start..].split("\n    }\n").next().expect("body");
+        assert!(body.contains("CLIENT_RW.clone()"));
+        assert!(!body.contains("CLIENT_RO"));
+    }
+
+    #[test]
+    fn test_list_keys_in_reads_only_the_key_columns() {
+        let src = include_str!("postgres.rs");
+        let start = src.find("async fn list_keys_in(").expect("list_keys_in");
+        let body = src[start..].split("\n}\n").next().expect("body");
+        assert!(body.contains("\"SELECT module, key1, key2 FROM meta WHERE 1=1 \""));
+        assert!(body.contains("query_as::<_, (String, String, String)>"));
+        assert!(!body.contains("AS value"));
+    }
 
     #[test]
     fn test_postgres_db_new() {
@@ -1306,7 +1341,7 @@ mod tests {
         );
         assert!(sql.contains("AND key1 = $2"), "key1 param missing: {sql}");
         assert!(
-            sql.contains("AND (key2 = $3 OR key2 LIKE $4)"),
+            sql.contains("AND (key2 = $3 OR key2 LIKE $4 ESCAPE '\\')"),
             "key2 param missing: {sql}"
         );
         // min_dt=$5, max_dt=$6 (one past the 4 string params)

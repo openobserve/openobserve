@@ -219,6 +219,11 @@ pub trait Db: Sync + Send + 'static {
         }
     }
 
+    /// Like `get_if_exists`, but never answered by a read replica.
+    async fn get_if_exists_from_primary(&self, key: &str) -> Result<Option<Bytes>> {
+        self.get_if_exists(key).await
+    }
+
     /// The value with a revision for `put_if_revision`, or `None` when `key` is missing.
     async fn get_with_revision(&self, key: &str) -> Result<Option<(Bytes, u64)>> {
         Ok(self.get_if_exists(key).await?.map(|value| {
@@ -284,6 +289,10 @@ pub trait Db: Sync + Send + 'static {
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>>;
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
+    /// Like `list_keys`, but never answered by a read replica; only Postgres has one to avoid.
+    async fn list_keys_from_primary(&self, prefix: &str) -> Result<Vec<String>> {
+        self.list_keys(prefix).await
+    }
     async fn list_values(&self, prefix: &str) -> Result<Vec<Bytes>>;
     async fn list_values_by_start_dt(
         &self,
@@ -328,6 +337,17 @@ pub fn parse_key(mut key: &str) -> (String, String, String) {
         }
     }
     (module, key1, key2)
+}
+
+pub fn escape_like_prefix(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            out.push('\\');
+        }
+        out.push(c);
+    }
+    out
 }
 
 pub fn build_key(module: &str, key1: &str, key2: &str, start_dt: i64) -> String {
@@ -405,6 +425,12 @@ impl<'a> IndexStatement<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_escape_like_prefix_escapes_wildcards() {
+        assert_eq!(escape_like_prefix("a_b%c\\d"), "a\\_b\\%c\\\\d");
+        assert_eq!(escape_like_prefix("acme-prod"), "acme-prod");
+    }
 
     #[test]
     fn test_parse_key_three_parts() {
