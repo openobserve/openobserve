@@ -53,6 +53,8 @@ const form = useOForm<RemoteTaskCredentialsValues>({
       });
       close();
     } catch (error: any) {
+      // http.ts already shows the grouped "Access Required" toast for a 403.
+      if (error?.response?.status === 403) return;
       toast({
         variant: "error",
         message:

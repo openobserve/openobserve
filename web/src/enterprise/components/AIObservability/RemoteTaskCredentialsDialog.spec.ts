@@ -107,4 +107,16 @@ describe("RemoteTaskCredentialsDialog", () => {
     expect(wrapper.emitted("update:open")).toBeUndefined();
     wrapper.unmount();
   });
+
+  it("leaves a 403 to the global Access Required toast", async () => {
+    replaceAuth.mockRejectedValue({
+      response: { status: 403, data: { message: "Unauthorized Access" } },
+    });
+    const wrapper = mountDialog({ type: "bearer", usesSecret: true });
+    await fill(wrapper, { token: "tok-2" });
+    expect(replaceAuth).toHaveBeenCalledTimes(1);
+    expect(toast).not.toHaveBeenCalled();
+    expect(wrapper.emitted("update:open")).toBeUndefined();
+    wrapper.unmount();
+  });
 });
