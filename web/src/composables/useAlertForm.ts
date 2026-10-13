@@ -2746,21 +2746,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     },
   );
 
-  // Watch for destination changes
-  watch(
-    () => props.destinations.length,
-    () => {
-      setF(
-        "destinations",
-        (formData.value.destinations ?? []).filter((destination: any) => {
-          return props.destinations.some((dest: any) => {
-            return dest.name === destination;
-          });
-        }),
-      );
-    },
-  );
-
   watch(
     triggerCols.value,
     () => {

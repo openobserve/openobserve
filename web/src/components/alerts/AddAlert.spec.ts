@@ -762,6 +762,53 @@ describe("AddAlert (OForm owner)", () => {
       },
     );
 
+    // RBAC lists only the destinations this user may read. One they cannot read must
+    // survive a list refresh (it shows as "Missing"), or saving would silently drop it.
+    it("keeps a saved destination that the refreshed destinations list does not include", async () => {
+      wrapper = mountAlert({
+        isUpdated: true,
+        modelValue: {
+          name: "rbac_alert",
+          stream_type: "metrics",
+          stream_name: "up",
+          is_real_time: false,
+          query_condition: {
+            type: "promql",
+            promql: "up",
+            promql_condition: null,
+            sql: "",
+            aggregation: null,
+            conditions: null,
+            vrl_function: "",
+            multi_time_range: [],
+          },
+          trigger_condition: {
+            period: 5,
+            operator: ">=",
+            frequency: 60,
+            threshold: 1,
+            silence: 0,
+            frequency_type: "minutes",
+            timezone: "UTC",
+          },
+          destinations: ["dest-a"],
+          context_attributes: {},
+          description: "",
+          row_template: "",
+          row_template_type: "String",
+          enabled: true,
+        },
+        destinations: [],
+      });
+      await flushPromises();
+
+      await wrapper.setProps({ destinations: [{ name: "dest-c" }] });
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.values.destinations).toEqual(["dest-a"]);
+      expect(wrapper.vm.getAlertPayload().destinations).toEqual(["dest-a"]);
+    });
+
     it("updates an existing alert via update_by_alert_id (beingUpdated)", async () => {
       wrapper = mountAlert({
         isUpdated: true,
