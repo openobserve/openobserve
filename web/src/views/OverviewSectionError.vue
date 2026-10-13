@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="border-border-default rounded-default bg-surface-base overflow-hidden border border-[0.0625em]"
     >
-      <OEmptyState size="inline" preset="load-error">
+      <OEmptyState v-if="forbidden" size="inline" preset="no-access" />
+      <OEmptyState v-else size="inline" preset="load-error">
         <template #actions>
           <OButton
             variant="outline"
@@ -48,6 +49,7 @@ import { useI18nTyped, type I18nText } from "@/types/i18n";
 const props = defineProps<{
   section: "incidents" | "services" | "anomalies" | "recentEvents";
   title: I18nText;
+  forbidden?: boolean;
 }>();
 
 const emit = defineEmits<{
