@@ -22,6 +22,7 @@ pub use super::{
     llm_prompt_labels::Entity as LlmPromptLabels, llm_prompt_versions::Entity as LlmPromptVersions,
     llm_prompt_webhook_deliveries::Entity as LlmPromptWebhookDeliveries,
     llm_prompts::Entity as LlmPrompts, org_domain_ownership::Entity as OrgDomainOwnership,
+    org_domain_requests::Entity as OrgDomainRequests,
     org_ingestion_tokens::Entity as OrgIngestionTokens,
     org_storage_providers::Entity as OrgStorageProviders, org_users::Entity as OrgUsers,
     organizations::Entity as Organizations, pipeline_last_errors::Entity as PipelineLastErrors,

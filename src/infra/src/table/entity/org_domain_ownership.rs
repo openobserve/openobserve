@@ -1,4 +1,4 @@
-//! `SeaORM` Entity for the status_page_custom_domains table.
+//! `SeaORM` Entity for the domain_org_ownership table.
 
 use sea_orm::entity::prelude::*;
 

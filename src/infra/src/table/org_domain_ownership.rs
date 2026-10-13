@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use config::utils::{rand::generate_random_string, time::now_micros};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter,
-    QuerySelect,
+    QuerySelect, sea_query::Expr,
 };
 
 use super::entity::{org_domain_ownership::*, prelude::OrgDomainOwnership};
@@ -70,7 +70,10 @@ pub async fn get_domains_for_org(org_id: &str) -> Result<Vec<Model>, anyhow::Err
     Ok(records)
 }
 
-pub async fn save_org_domain_mapping(record: OwnershipRecord) -> Result<(), anyhow::Error> {
+pub async fn save_org_domain_mapping(
+    record: OwnershipRecord,
+    meta_mapped: bool,
+) -> Result<(), anyhow::Error> {
     let client = get_orm_client_rw().await;
     let now = now_micros();
     let token = format!("o2v_{}_{}", record.org_id, generate_random_string(32));
@@ -87,7 +90,7 @@ pub async fn save_org_domain_mapping(record: OwnershipRecord) -> Result<(), anyh
         last_checked_at: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
-        meta_mapped: Set(false),
+        meta_mapped: Set(meta_mapped),
     };
     OrgDomainOwnership::insert(m).exec(client).await?;
     Ok(())
@@ -127,4 +130,21 @@ pub async fn list_all() -> Result<Vec<Model>, anyhow::Error> {
     let client = get_orm_client_ro().await;
     let res = OrgDomainOwnership::find().all(client).await?;
     Ok(res)
+}
+
+pub async fn mark_meta_mapped(org_id: &str, domain: &str) -> Result<(), anyhow::Error> {
+    let now = now_micros();
+    let client = get_orm_client_rw().await;
+    OrgDomainOwnership::update_many()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Domain.eq(domain))
+        .col_expr(Column::MetaMapped, Expr::value(true))
+        .col_expr(Column::LastCheckedAt, Expr::value(now))
+        .col_expr(
+            Column::VerificationState,
+            Expr::value(OwnershipState::Verfied as i32),
+        )
+        .exec(client)
+        .await?;
+    Ok(())
 }

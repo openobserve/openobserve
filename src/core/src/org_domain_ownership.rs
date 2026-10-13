@@ -77,7 +77,7 @@ pub async fn save_org_domain_mapping(org_id: &str, domain: &str) -> Result<(), a
         domain: domain.to_owned(),
         state: OwnershipState::Pending,
     };
-    infra::table::org_domain_ownership::save_org_domain_mapping(record).await
+    infra::table::org_domain_ownership::save_org_domain_mapping(record, false).await
 }
 
 pub async fn delete_linked_domain(record: Model) -> Result<(), anyhow::Error> {
@@ -158,6 +158,26 @@ pub async fn update_state(org_id: &str, domain: &str, new_state: i32) -> Result<
 pub async fn get_domains_for_org(org_id: &str) -> Result<Vec<Model>, anyhow::Error> {
     let records = infra::table::org_domain_ownership::get_domains_for_org(org_id).await?;
     Ok(records)
+}
+
+pub async fn link_from_meta(org_id: &str, domain: &str) -> Result<(), anyhow::Error> {
+    let domains = get_domains_for_org(org_id).await?;
+    let mapped = domains
+        .into_iter()
+        .filter(|v| v.domain == domain)
+        .next()
+        .is_some();
+    if mapped {
+        infra::table::org_domain_ownership::mark_meta_mapped(org_id, domain).await?;
+    } else {
+        let record = OwnershipRecord {
+            org_id: org_id.to_owned(),
+            domain: domain.to_owned(),
+            state: OwnershipState::Verfied,
+        };
+        infra::table::org_domain_ownership::save_org_domain_mapping(record, true).await?;
+    }
+    Ok(())
 }
 
 async fn emit_sync_event(org_id: &str, domain: &str) {

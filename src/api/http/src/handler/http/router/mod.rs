@@ -2070,6 +2070,9 @@ pub fn service_routes() -> Router {
                 "/{org_id}/settings/domains",
                 get(org_domains::get_linked_domain).post(org_domains::link_domain)
             )
+            .route("/{org_id}/settings/domains/requests",post(org_domains::raise_request).get(org_domains::list_requests))
+            .route("/{org_id}/settings/domain/request/{id}/approve",post(org_domains::approve_request))
+            .route("/{org_id}/settings/domain/request/{id}/reject",post(org_domains::reject_request))
             .route("/{org_id}/settings/domains/{domain}",delete(org_domains::delete_linked_domain))
             .route(
                 "/{org_id}/settings/domains/verify/{domain}",

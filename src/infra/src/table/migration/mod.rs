@@ -208,9 +208,10 @@ mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
-mod m20261005_000001_create_org_domain_ownership_table;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
 mod m20261008_000001_add_name_to_rum_pa_tombstones;
+mod m20261012_000001_create_org_domain_ownership_table;
+mod m20261012_000002_create_org_domain_ownership_req_table;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -525,10 +526,11 @@ impl MigratorTrait for Migrator {
             Box::new(m20260908_000001_create_synthetics_refs::Migration),
             Box::new(m20261001_000001_add_anomaly_band_settings::Migration),
             Box::new(m20261003_000001_create_rum_pa_tables::Migration),
-            Box::new(m20261005_000001_create_org_domain_ownership_table::Migration),
             Box::new(m20261004_000001_create_query_history::Migration),
             Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
             Box::new(m20261008_000001_add_name_to_rum_pa_tombstones::Migration),
+            Box::new(m20261012_000001_create_org_domain_ownership_table::Migration),
+            Box::new(m20261012_000002_create_org_domain_ownership_req_table::Migration),
         ]
     }
 }

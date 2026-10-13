@@ -89,6 +89,9 @@ async fn run_org_domain_ownership_validation() {
             }
         };
         for record in records {
+            if record.meta_mapped {
+                continue;
+            }
             let original_state = record.verification_state;
             let org_id = record.org_id.clone();
             let domain = record.domain.clone();
