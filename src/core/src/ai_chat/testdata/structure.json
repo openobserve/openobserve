@@ -1,0 +1,803 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_T",
+   "seq": 0,
+   "type": "session.created.1",
+   "data": {
+    "info": {
+     "title": "New session - 2026"
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_T",
+   "seq": 1,
+   "type": "session.updated.1",
+   "data": {
+    "info": {
+     "title": "New session - 2026"
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_T",
+   "seq": 2,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u1",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_3",
+   "aggregateID": "ses_T",
+   "seq": 3,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u1",
+     "sessionID": "ses_T",
+     "messageID": "msg_u1",
+     "type": "text",
+     "text": "first"
+    }
+   }
+  },
+  {
+   "id": "evt_4",
+   "aggregateID": "ses_T",
+   "seq": 4,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a1",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "parentID": "msg_u1"
+    }
+   }
+  },
+  {
+   "id": "evt_5",
+   "aggregateID": "ses_T",
+   "seq": 5,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_a",
+     "sessionID": "ses_T",
+     "messageID": "msg_a1",
+     "type": "text",
+     "text": "one"
+    }
+   }
+  },
+  {
+   "id": "evt_6",
+   "aggregateID": "ses_T",
+   "seq": 6,
+   "type": "session.updated.1",
+   "data": {
+    "info": {
+     "title": "  Real title  "
+    }
+   }
+  },
+  {
+   "id": "evt_7",
+   "aggregateID": "ses_T",
+   "seq": 7,
+   "type": "session.updated.1",
+   "data": {
+    "info": {
+     "title": "Child session - x"
+    }
+   }
+  },
+  {
+   "id": "evt_8",
+   "aggregateID": "ses_T",
+   "seq": 8,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a1b",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "error": {
+      "name": "APIError",
+      "data": {
+       "message": "rate limited"
+      }
+     },
+     "parentID": "msg_u1"
+    }
+   }
+  },
+  {
+   "id": "evt_9",
+   "aggregateID": "ses_T",
+   "seq": 9,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a1c",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "error": {
+      "name": "ProviderError"
+     },
+     "parentID": "msg_u1"
+    }
+   }
+  },
+  {
+   "id": "evt_10",
+   "aggregateID": "ses_T",
+   "seq": 10,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_c",
+     "sessionID": "ses_T",
+     "messageID": "msg_a1c",
+     "type": "text",
+     "text": "after error"
+    }
+   }
+  },
+  {
+   "id": "evt_11",
+   "aggregateID": "ses_T",
+   "seq": 11,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u2",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_12",
+   "aggregateID": "ses_T",
+   "seq": 12,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u2",
+     "sessionID": "ses_T",
+     "messageID": "msg_u2",
+     "type": "text",
+     "text": "second"
+    }
+   }
+  },
+  {
+   "id": "evt_13",
+   "aggregateID": "ses_T",
+   "seq": 13,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a2",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "parentID": "msg_u2"
+    }
+   }
+  },
+  {
+   "id": "evt_14",
+   "aggregateID": "ses_T",
+   "seq": 14,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a2",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "error": {
+      "name": "MessageAbortedError"
+     },
+     "parentID": "msg_u2"
+    }
+   }
+  },
+  {
+   "id": "evt_15",
+   "aggregateID": "ses_T",
+   "seq": 15,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a2b",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "error": {
+      "name": "X",
+      "data": {}
+     },
+     "parentID": "msg_u2"
+    }
+   }
+  },
+  {
+   "id": "evt_16",
+   "aggregateID": "ses_T",
+   "seq": 16,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_orphan",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "parentID": "msg_missing"
+    }
+   }
+  },
+  {
+   "id": "evt_17",
+   "aggregateID": "ses_T",
+   "seq": 17,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_o",
+     "sessionID": "ses_T",
+     "messageID": "msg_orphan",
+     "type": "text",
+     "text": "orphan"
+    }
+   }
+  },
+  {
+   "id": "evt_18",
+   "aggregateID": "ses_T",
+   "seq": 18,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u3b",
+     "sessionID": "ses_T",
+     "messageID": "msg_u3",
+     "type": "text",
+     "text": "b"
+    }
+   }
+  },
+  {
+   "id": "evt_19",
+   "aggregateID": "ses_T",
+   "seq": 19,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u3a",
+     "sessionID": "ses_T",
+     "messageID": "msg_u3",
+     "type": "text",
+     "text": "a"
+    }
+   }
+  },
+  {
+   "id": "evt_20",
+   "aggregateID": "ses_T",
+   "seq": 20,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u3",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 99
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_21",
+   "aggregateID": "ses_T",
+   "seq": 21,
+   "type": "message.part.removed.1",
+   "data": {
+    "messageID": "msg_u3",
+    "partID": "prt_u3b"
+   }
+  },
+  {
+   "id": "evt_22",
+   "aggregateID": "ses_T",
+   "seq": 22,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u3b",
+     "sessionID": "ses_T",
+     "messageID": "msg_u3",
+     "type": "text",
+     "text": "b again"
+    }
+   }
+  },
+  {
+   "id": "evt_23",
+   "aggregateID": "ses_T",
+   "seq": 23,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u3a",
+     "sessionID": "ses_T",
+     "messageID": "msg_u3",
+     "type": "text",
+     "text": "a2"
+    }
+   }
+  },
+  {
+   "id": "evt_24",
+   "aggregateID": "ses_T",
+   "seq": 24,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_img",
+     "sessionID": "ses_T",
+     "messageID": "msg_u3",
+     "type": "file",
+     "mime": "image/jpeg",
+     "url": "data:x"
+    }
+   }
+  },
+  {
+   "id": "evt_25",
+   "aggregateID": "ses_T",
+   "seq": 25,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_pdf",
+     "sessionID": "ses_T",
+     "messageID": "msg_u3",
+     "type": "file",
+     "mime": "application/pdf",
+     "url": "data:y"
+    }
+   }
+  },
+  {
+   "id": "evt_26",
+   "aggregateID": "ses_T",
+   "seq": 26,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_inj",
+     "sessionID": "ses_T",
+     "messageID": "msg_u3",
+     "type": "text",
+     "text": "[Context]\nx",
+     "metadata": {
+      "o2_injected": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_27",
+   "aggregateID": "ses_T",
+   "seq": 27,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u4",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_28",
+   "aggregateID": "ses_T",
+   "seq": 28,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u4",
+     "sessionID": "ses_T",
+     "messageID": "msg_u4",
+     "type": "text",
+     "text": "fourth"
+    }
+   }
+  },
+  {
+   "id": "evt_29",
+   "aggregateID": "ses_T",
+   "seq": 29,
+   "type": "message.removed.1",
+   "data": {
+    "messageID": "msg_u4"
+   }
+  },
+  {
+   "id": "evt_30",
+   "aggregateID": "ses_T",
+   "seq": 30,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u5",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_31",
+   "aggregateID": "ses_T",
+   "seq": 31,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u5",
+     "sessionID": "ses_T",
+     "messageID": "msg_u5",
+     "type": "text",
+     "text": "fifth"
+    }
+   }
+  },
+  {
+   "id": "evt_32",
+   "aggregateID": "ses_T",
+   "seq": 32,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u4",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_33",
+   "aggregateID": "ses_T",
+   "seq": 33,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a4",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "parentID": "msg_u4"
+    }
+   }
+  },
+  {
+   "id": "evt_34",
+   "aggregateID": "ses_T",
+   "seq": 34,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_a4",
+     "sessionID": "ses_T",
+     "messageID": "msg_a4",
+     "type": "text",
+     "text": "answer four"
+    }
+   }
+  },
+  {
+   "id": "evt_35",
+   "aggregateID": "ses_T",
+   "seq": 35,
+   "type": "message.updated.1",
+   "data": null
+  },
+  {
+   "id": "evt_36",
+   "aggregateID": "ses_T",
+   "seq": 36,
+   "type": "message.updated.1",
+   "data": "not a dict"
+  },
+  {
+   "id": "evt_37",
+   "aggregateID": "ses_T",
+   "seq": 37,
+   "type": "message.updated.1",
+   "data": {
+    "info": {
+     "id": "msg_x"
+    }
+   }
+  },
+  {
+   "id": "evt_38",
+   "aggregateID": "ses_T",
+   "seq": 38,
+   "type": "message.part.updated.1",
+   "data": {
+    "part": {
+     "id": "p"
+    }
+   }
+  },
+  {
+   "id": "evt_39",
+   "aggregateID": "ses_T",
+   "seq": 39,
+   "type": "permission.asked.1",
+   "data": {
+    "id": "per_1",
+    "permission": "bash"
+   }
+  },
+  {
+   "id": "evt_40",
+   "aggregateID": "ses_T",
+   "seq": 40,
+   "type": "session.idle",
+   "data": {}
+  },
+  {
+   "id": "evt_41",
+   "aggregateID": "ses_T",
+   "seq": 41,
+   "type": "message.part.updated.2",
+   "data": {
+    "part": {
+     "id": "prt_v2",
+     "messageID": "msg_a4",
+     "type": "text",
+     "text": " v2 "
+    }
+   }
+  },
+  {
+   "id": "evt_42",
+   "aggregateID": "ses_T",
+   "seq": 42,
+   "type": "message.updated.1",
+   "data": {
+    "info": {
+     "id": "msg_u6",
+     "role": "user"
+    }
+   }
+  },
+  {
+   "id": "evt_43",
+   "aggregateID": "ses_T",
+   "seq": 43,
+   "type": "message.part.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "part": {
+     "id": "prt_u6",
+     "sessionID": "ses_T",
+     "messageID": "msg_u6",
+     "type": "text",
+     "text": "[Context]\nonly context"
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_u1",
+    "created": 1,
+    "user": {
+     "text": "first",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "one"
+     },
+     {
+      "type": "message_delta",
+      "content": "after error"
+     },
+     {
+      "type": "error",
+      "error": "ProviderError",
+      "recoverable": false
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": "ProviderError",
+    "first_seq": 2,
+    "last_seq": 10
+   },
+   {
+    "user_message_id": "msg_u2",
+    "created": 1,
+    "user": {
+     "text": "second",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "error",
+      "error": "X",
+      "recoverable": false
+     },
+     {
+      "type": "cancelled"
+     }
+    ],
+    "error": "X",
+    "first_seq": 11,
+    "last_seq": 15
+   },
+   {
+    "user_message_id": "msg_u3",
+    "created": 99,
+    "user": {
+     "text": "a2\n\nb again",
+     "images": [
+      {
+       "filename": "image",
+       "mime": "image/jpeg",
+       "url": "data:x"
+      }
+     ]
+    },
+    "frames": [
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 18,
+    "last_seq": 26
+   },
+   {
+    "user_message_id": "msg_u5",
+    "created": 1,
+    "user": {
+     "text": "fifth",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 30,
+    "last_seq": 31
+   },
+   {
+    "user_message_id": "msg_u4",
+    "created": 1,
+    "user": {
+     "text": "fourth",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "message_delta",
+      "content": "answer four"
+     },
+     {
+      "type": "message_delta",
+      "content": " v2 "
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 27,
+    "last_seq": 41
+   },
+   {
+    "user_message_id": "msg_u6",
+    "created": null,
+    "user": {
+     "text": "[Context]\nonly context",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "complete"
+     }
+    ],
+    "error": null,
+    "first_seq": 42,
+    "last_seq": 43
+   }
+  ],
+  "title": "Real title",
+  "last_seq": 43
+ }
+}
