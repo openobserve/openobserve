@@ -78,6 +78,14 @@ struct RecordSink<'a> {
     json_data_by_stream: &'a mut JsonDataByStream,
 }
 
+impl RecordSink<'_> {
+    /// Whether this request already buffered a record for the stream.
+    fn has_records(&self, metric_name: &str) -> bool {
+        self.json_data_by_stream.contains_key(metric_name)
+            || self.pipeline_inputs.contains_key(metric_name)
+    }
+}
+
 /// HA replica election, run once per request at the first record that will actually be written.
 struct HaGate<'a> {
     first_line: &'a mut bool,
@@ -186,6 +194,8 @@ pub async fn remote_write(
     // Detailed performance tracking
     let mut event_count = 0;
     let mut sample_count = 0;
+    let mut exemplar_count = 0;
+    let mut dropped_exemplars = 0;
 
     // Pre-load all configurations for unique metrics to avoid repeated queries
     let preload_start = std::time::Instant::now();
@@ -307,7 +317,7 @@ pub async fn remote_write(
         pipeline_inputs: &mut stream_pipeline_inputs,
         json_data_by_stream: &mut json_data_by_stream,
     };
-    for event in request.timeseries {
+    for mut event in request.timeseries {
         event_count += 1;
         // get labels
         let mut replica_label = "";
@@ -409,7 +419,11 @@ pub async fn remote_write(
                     columnar.append(&label_pairs, label_bytes, value, timestamp, series_hash);
                 }
             }
-            continue;
+            if event.exemplars.is_empty() {
+                continue;
+            }
+            // only the exemplar host rows are left for the JSON path
+            event.samples.clear();
         }
 
         let mut labels: json::Map<String, json::Value> =
@@ -426,7 +440,7 @@ pub async fn remote_write(
 
         // parse samples
         let sample_total = event.samples.len();
-        let can_move_labels = event.histograms.is_empty();
+        let can_move_labels = event.histograms.is_empty() && event.exemplars.is_empty();
         for (sample_idx, sample) in event.samples.into_iter().enumerate() {
             sample_count += 1;
             let Some(sample_val) = sample_cell(sample.value, schema) else {
@@ -455,6 +469,34 @@ pub async fn remote_write(
                 known_hash,
                 &mut sink,
             );
+        }
+
+        if !event.exemplars.is_empty() {
+            exemplar_count += event.exemplars.len();
+            // a host row needs the `value` column samples create, like a stale marker does
+            if !ingest::has_value_column(schema) && !sink.has_records(&metric_name) {
+                dropped_exemplars += event.exemplars.len();
+            } else {
+                let host_labels = if event.histograms.is_empty() {
+                    std::mem::take(&mut labels)
+                } else {
+                    labels.clone()
+                };
+                let hosts = exemplar_host_records(host_labels, &event.exemplars);
+                if !hosts.is_empty() && !gate.admit().await {
+                    ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+                    return Ok(());
+                }
+                for (record, timestamp) in hosts {
+                    buffer_metric_record(
+                        &metric_name,
+                        json::Value::Object(record),
+                        timestamp,
+                        known_hash,
+                        &mut sink,
+                    );
+                }
+            }
         }
 
         if !event.histograms.is_empty() {
@@ -492,7 +534,7 @@ pub async fn remote_write(
         let other_time = parse_timeseries_us.saturating_sub(total_preload_time);
 
         log::info!(
-            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}) | \
+            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}, exemplars: {exemplar_count}, dropped_exemplars: {dropped_exemplars}) | \
             preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, alerts={:.1}ms), other={:.1}ms",
             unique_metrics.len(),
             total_preload_time as f64 / 1000.0,
@@ -708,6 +750,9 @@ fn get_metadata_object(schema: &Schema) -> Option<MetadataObject> {
 const DEFAULT_SERIES_LOOKBACK_MICROS: i64 = 24 * 3600 * 1_000_000;
 
 const WRITE_ENDPOINT: &str = "/prometheus/api/v1/write";
+
+// fallback hash exclusions; METRICS_HASH_EXCLUDED_LABELS would drop real Prometheus labels
+const PENDING_HASH_EXCLUDED: &[&str] = &[VALUE_LABEL, EXEMPLARS_LABEL];
 
 fn normalize_series_time_range(start: i64, end: i64) -> (i64, i64) {
     let end = if end <= 0 { now_micros() } else { end };
@@ -1088,8 +1133,8 @@ async fn apply_redaction(org_id: &str, stream_name: &str, json_data: &mut [Pendi
 fn finish_identity_columns(json_data: &mut [PendingRecord]) {
     for (val_map, timestamp, known_hash) in json_data.iter_mut() {
         // a `__hash__` the handler did not compute is an input field and gets overwritten
-        let hash =
-            known_hash.unwrap_or_else(|| super::signature_without_labels(val_map, &[VALUE_LABEL]));
+        let hash = known_hash
+            .unwrap_or_else(|| super::signature_without_labels(val_map, PENDING_HASH_EXCLUDED));
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         val_map.insert(
             TIMESTAMP_COL_NAME.to_string(),
@@ -1133,6 +1178,48 @@ fn build_metric_record(
         json::Value::Number(timestamp.into()),
     );
     record
+}
+
+/// One host row per exemplar timestamp: a NULL `value` plus the `exemplars` string OTLP writes.
+fn exemplar_host_records(
+    mut labels: json::Map<String, json::Value>,
+    exemplars: &[prom_decode::Exemplar<'_>],
+) -> Vec<(json::Map<String, json::Value>, i64)> {
+    let mut groups: Vec<(i64, Vec<json::Value>)> = Vec::with_capacity(exemplars.len());
+    for exemplar in exemplars {
+        let Some(value) = super::sanitize_metric_value(exemplar.value).value() else {
+            continue;
+        };
+        let timestamp = parse_i64_to_timestamp_micros(exemplar.timestamp);
+        let mut rec = json::Map::with_capacity(exemplar.labels.len() + 2);
+        for (name, val) in &exemplar.labels {
+            rec.insert((*name).to_string(), json::Value::String((*val).to_string()));
+        }
+        let rec = json::Value::Object(build_metric_record(rec, Some(value), timestamp));
+        match groups.iter_mut().find(|(ts, _)| *ts == timestamp) {
+            Some((_, group)) => group.push(rec),
+            None => groups.push((timestamp, vec![rec])),
+        }
+    }
+    let last = groups.len().saturating_sub(1);
+    groups
+        .into_iter()
+        .enumerate()
+        .map(|(idx, (timestamp, group))| {
+            // the last host row owns the label set; nothing reads it afterwards
+            let labels = if idx == last {
+                std::mem::take(&mut labels)
+            } else {
+                labels.clone()
+            };
+            let mut record = build_metric_record(labels, None, timestamp);
+            record.insert(
+                EXEMPLARS_LABEL.to_string(),
+                json::Value::String(json::Value::Array(group).to_string()),
+            );
+            (record, timestamp)
+        })
+        .collect()
 }
 
 fn buffer_metric_record(
@@ -1865,6 +1952,102 @@ mod tests {
         assert_eq!(
             crate::metrics::signature_without_labels(&marker, &[VALUE_LABEL]),
             crate::metrics::signature_without_labels(&sample, &[VALUE_LABEL])
+        );
+    }
+
+    #[test]
+    fn test_exemplar_host_records_group_by_timestamp_and_feed_the_exemplar_loader() {
+        use config::meta::promql::value::{Exemplar, LabelsExt};
+
+        let mut labels = json::Map::new();
+        labels.insert(NAME_LABEL.to_string(), json::json!("http_requests_total"));
+        labels.insert("job".to_string(), json::json!("api"));
+        let exemplars = [
+            prom_decode::Exemplar {
+                labels: vec![("trace_id", "abc"), ("span_id", "def")],
+                value: 2.5,
+                timestamp: 1_700_000_000_005,
+            },
+            prom_decode::Exemplar {
+                labels: vec![("trace_id", "ghi")],
+                value: f64::NAN,
+                timestamp: 1_700_000_000_006,
+            },
+            prom_decode::Exemplar {
+                labels: vec![("trace_id", "jkl")],
+                value: f64::INFINITY,
+                timestamp: 1_700_000_000_005,
+            },
+            prom_decode::Exemplar {
+                labels: vec![],
+                value: 1.0,
+                timestamp: 1_700_000_000_007,
+            },
+        ];
+
+        let hosts = exemplar_host_records(labels.clone(), &exemplars);
+
+        let timestamps: Vec<i64> = hosts.iter().map(|(_, ts)| *ts).collect();
+        assert_eq!(
+            timestamps,
+            vec![
+                parse_i64_to_timestamp_micros(1_700_000_000_005),
+                parse_i64_to_timestamp_micros(1_700_000_000_007)
+            ]
+        );
+        let (first, first_ts) = &hosts[0];
+        assert_eq!(first.get(VALUE_LABEL), Some(&json::Value::Null));
+        assert_eq!(first.get(TIMESTAMP_COL_NAME), Some(&json::json!(first_ts)));
+        assert_eq!(first.get("job"), Some(&json::json!("api")));
+        let stored: Vec<json::Value> =
+            json::from_str(first[EXEMPLARS_LABEL].as_str().unwrap()).unwrap();
+        assert_eq!(stored.len(), 2);
+        let exemplar = Exemplar::from(stored[0].as_object().unwrap());
+        assert_eq!(exemplar.value, 2.5);
+        assert_eq!(exemplar.timestamp, *first_ts);
+        assert_eq!(exemplar.labels.get_value("trace_id"), "abc");
+        assert_eq!(exemplar.labels.get_value("span_id"), "def");
+        assert_eq!(
+            Exemplar::from(stored[1].as_object().unwrap()).value,
+            f64::MAX
+        );
+        let (second, _) = &hosts[1];
+        let stored: Vec<json::Value> =
+            json::from_str(second[EXEMPLARS_LABEL].as_str().unwrap()).unwrap();
+        assert_eq!(
+            stored,
+            vec![json::json!({"value": 1.0, "_timestamp": hosts[1].1})]
+        );
+
+        assert!(exemplar_host_records(labels, &exemplars[1..2]).is_empty());
+    }
+
+    #[test]
+    fn test_exemplar_host_row_hashes_with_its_series_on_both_hash_paths() {
+        let label_pairs = vec![
+            (Cow::Borrowed(NAME_LABEL), Cow::Borrowed("up")),
+            (Cow::Borrowed("instance"), Cow::Borrowed("a")),
+        ];
+        let mut labels = json::Map::new();
+        for (name, value) in &label_pairs {
+            labels.insert(name.to_string(), json::json!(value));
+        }
+        let exemplar = prom_decode::Exemplar {
+            labels: vec![("trace_id", "abc")],
+            value: 1.0,
+            timestamp: 7,
+        };
+        let (host, _) = exemplar_host_records(labels.clone(), &[exemplar]).remove(0);
+        let sample = build_metric_record(labels, Some(1.0), 5);
+
+        let series = crate::metrics::signature_of_series_labels(&label_pairs);
+        assert_eq!(
+            crate::metrics::signature_without_labels(&sample, PENDING_HASH_EXCLUDED),
+            series
+        );
+        assert_eq!(
+            crate::metrics::signature_without_labels(&host, PENDING_HASH_EXCLUDED),
+            series
         );
     }
 

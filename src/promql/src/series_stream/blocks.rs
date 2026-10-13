@@ -32,7 +32,7 @@ use bytes::Bytes;
 use config::{
     meta::{
         promql::{
-            MetricsBlockScan, STALE_NAN_BITS,
+            EXEMPLAR_HOST_NAN_BITS, MetricsBlockScan, STALE_NAN_BITS,
             value::{EvalContext, Labels, Sample},
         },
         stream::FileKey,
@@ -375,7 +375,8 @@ impl SeriesStream for BlockSeriesStream {
                         .zip(block.value_bits.iter().copied())
                     {
                         // markers compacted while the flag was on stay invisible once it is off
-                        let dropped = !self.stale_markers && bits == STALE_NAN_BITS;
+                        let dropped = bits == EXEMPLAR_HOST_NAN_BITS
+                            || (!self.stale_markers && bits == STALE_NAN_BITS);
                         if timestamp >= self.window.0 && timestamp <= self.window.1 && !dropped {
                             let timestamp =
                                 timestamp.checked_add(self.offset).ok_or_else(|| {
@@ -1594,8 +1595,10 @@ mod tests {
     #[tokio::test]
     async fn stale_markers_are_dropped_on_read_when_markers_are_off() {
         let stale = config::meta::promql::STALE_NAN_BITS;
+        let host = config::meta::promql::EXEMPLAR_HOST_NAN_BITS;
         let data = file(&[
             (1, 20, 1.0, Some("a")),
+            (1, 25, f64::from_bits(host), Some("a")),
             (1, 30, f64::from_bits(stale), Some("a")),
         ]);
         let fixture = Fixture::new(std::slice::from_ref(&data), false).await;

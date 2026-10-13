@@ -28,7 +28,16 @@ pub(super) struct WriteRequest<'a> {
 pub(super) struct TimeSeries<'a> {
     pub labels: Vec<(&'a str, &'a str)>,
     pub samples: Vec<Sample>,
+    pub exemplars: Vec<Exemplar<'a>>,
     pub histograms: Vec<prometheus_rpc::Histogram>,
+}
+
+/// An exemplar as Prometheus sends it: a series entry of its own, usually without a sample.
+#[derive(Debug, PartialEq)]
+pub(super) struct Exemplar<'a> {
+    pub labels: Vec<(&'a str, &'a str)>,
+    pub value: f64,
+    pub timestamp: i64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -65,20 +74,22 @@ pub(super) fn decode(body: &[u8]) -> anyhow::Result<WriteRequest<'_>> {
 fn decode_timeseries(body: &[u8]) -> anyhow::Result<TimeSeries<'_>> {
     let mut labels = Vec::new();
     let mut samples = Vec::new();
+    let mut exemplars = Vec::new();
     let mut histograms = Vec::new();
     let mut fields = Fields::new(body);
     while let Some((field, wire)) = fields.next_tag()? {
         match (field, wire) {
             (1, WIRE_LEN) => labels.push(decode_label(fields.bytes()?)?),
             (2, WIRE_LEN) => samples.push(decode_sample(fields.bytes()?)?),
+            (3, WIRE_LEN) => exemplars.push(decode_exemplar(fields.bytes()?)?),
             (4, WIRE_LEN) => histograms.push(prometheus_rpc::Histogram::decode(fields.bytes()?)?),
-            // exemplars (3) are never stored, so they are not even walked
             _ => fields.skip(wire)?,
         }
     }
     Ok(TimeSeries {
         labels,
         samples,
+        exemplars,
         histograms,
     })
 }
@@ -110,6 +121,24 @@ fn decode_sample(body: &[u8]) -> anyhow::Result<Sample> {
         }
     }
     Ok(sample)
+}
+
+fn decode_exemplar(body: &[u8]) -> anyhow::Result<Exemplar<'_>> {
+    let mut exemplar = Exemplar {
+        labels: Vec::new(),
+        value: 0.0,
+        timestamp: 0,
+    };
+    let mut fields = Fields::new(body);
+    while let Some((field, wire)) = fields.next_tag()? {
+        match (field, wire) {
+            (1, WIRE_LEN) => exemplar.labels.push(decode_label(fields.bytes()?)?),
+            (2, WIRE_FIXED64) => exemplar.value = f64::from_bits(fields.fixed64()?),
+            (3, WIRE_VARINT) => exemplar.timestamp = fields.varint()? as i64,
+            _ => fields.skip(wire)?,
+        }
+    }
+    Ok(exemplar)
 }
 
 /// A cursor over one message's fields.
@@ -238,10 +267,15 @@ mod tests {
                         ..Default::default()
                     }],
                 },
+                // Prometheus sends an exemplar as a series entry of its own, without a sample
                 prometheus_rpc::TimeSeries {
                     labels: vec![label("__name__", "empty_value"), label("v", "")],
                     samples: vec![],
-                    exemplars: vec![],
+                    exemplars: vec![prometheus_rpc::Exemplar {
+                        labels: vec![],
+                        value: -1.0,
+                        timestamp: -3,
+                    }],
                     histograms: vec![],
                 },
             ],
@@ -280,9 +314,25 @@ mod tests {
             ]
         );
         assert_eq!(first.histograms, expected.timeseries[0].histograms);
+        assert_eq!(
+            first.exemplars,
+            vec![Exemplar {
+                labels: vec![("trace_id", "abc")],
+                value: 3.0,
+                timestamp: 7
+            }]
+        );
         let second = &decoded.timeseries[1];
         assert_eq!(second.labels, vec![("__name__", "empty_value"), ("v", "")]);
         assert!(second.samples.is_empty() && second.histograms.is_empty());
+        assert_eq!(
+            second.exemplars,
+            vec![Exemplar {
+                labels: vec![],
+                value: -1.0,
+                timestamp: -3
+            }]
+        );
         assert_eq!(decoded.metadata, expected.metadata);
     }
 
@@ -329,6 +379,15 @@ mod tests {
         let mut body = Vec::new();
         prost::encoding::bytes::encode(1, &ts, &mut body);
         assert!(decode(&body).unwrap_err().to_string().contains("utf-8"));
+
+        let mut exemplar = Vec::new();
+        prost::encoding::message::encode(1, &label("trace_id", "abc"), &mut exemplar);
+        exemplar.pop();
+        let mut ts = Vec::new();
+        prost::encoding::bytes::encode(3, &exemplar, &mut ts);
+        let mut body = Vec::new();
+        prost::encoding::bytes::encode(1, &ts, &mut body);
+        assert!(decode(&body).is_err());
 
         assert!(decode(&[]).unwrap().timeseries.is_empty());
     }

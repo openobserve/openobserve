@@ -49,7 +49,7 @@ use crate::{
     ScanSource,
     aggregations::AggOp,
     functions::keeps_metric_name,
-    utils::{apply_matchers, apply_time_window},
+    utils::{apply_matchers, apply_time_window, exclude_exemplar_hosts},
 };
 
 type SourceFuture = BoxFuture<'static, Result<SeriesSource>>;
@@ -178,6 +178,7 @@ async fn execute_hash_sorted(
         lookback,
     )?;
     let df = apply_matchers(df, selector.matchers)?;
+    let df = exclude_exemplar_hosts(df, config::get_config().prom.staleness_markers_enabled)?;
     let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
     for name in label_cols.group.iter().chain(&label_cols.series) {
         if !columns.contains(&name.as_str()) {

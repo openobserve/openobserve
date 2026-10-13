@@ -22,7 +22,7 @@ use arrow::{
     },
     datatypes::{DataType, Float64Type, Int64Type, SchemaRef, UInt64Type},
 };
-use config::meta::promql::STALE_NAN_BITS;
+use config::meta::promql::{EXEMPLAR_HOST_NAN_BITS, STALE_NAN_BITS};
 use parquet::{
     arrow::arrow_reader::{ArrowReaderMetadata, ArrowReaderOptions},
     file::metadata::ParquetMetaData,
@@ -42,6 +42,7 @@ pub struct BlockWriter<W: Write> {
     hash_index: usize,
     time_index: usize,
     value_index: usize,
+    exemplars_index: Option<usize>,
     max_block_rows: usize,
     previous: Option<(u64, i64)>,
     current_hash: Option<u64>,
@@ -79,6 +80,7 @@ impl<W: Write> BlockWriter<W> {
             hash_index: schema.index_of("__hash__")?,
             time_index: schema.index_of("_timestamp")?,
             value_index: schema.index_of("value")?,
+            exemplars_index: schema.index_of("exemplars").ok(),
             output,
             schema,
             label_indices,
@@ -204,6 +206,7 @@ impl<W: Write> BlockWriter<W> {
         let hashes = batch.column(self.hash_index).as_primitive::<UInt64Type>();
         let times = batch.column(self.time_index).as_primitive::<Int64Type>();
         let values = batch.column(self.value_index).as_primitive::<Float64Type>();
+        let exemplars = self.exemplars_index.map(|index| batch.column(index));
         ensure!(
             hashes.null_count() == 0 && times.null_count() == 0,
             "nullable samples unsupported"
@@ -234,11 +237,13 @@ impl<W: Write> BlockWriter<W> {
                 }
             }
             self.timestamps.push(timestamp);
-            // a NULL value is a stale marker, which the codecs carry as its NaN bits
-            self.values.push(if values.is_null(row) {
-                STALE_NAN_BITS
-            } else {
+            // a NULL value is a stale marker unless the row hosts exemplars; both ride as NaN bits
+            self.values.push(if !values.is_null(row) {
                 values.value(row).to_bits()
+            } else if exemplars.is_some_and(|column| column.is_valid(row)) {
+                EXEMPLAR_HOST_NAN_BITS
+            } else {
+                STALE_NAN_BITS
             });
             self.rows = self.rows.checked_add(1).context("row count overflow")?;
             self.previous = Some((hash, timestamp));

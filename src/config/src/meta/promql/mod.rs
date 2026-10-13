@@ -84,6 +84,8 @@ pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
 /// Prometheus' staleness-marker NaN; an ordinary NaN is not stale.
 pub const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
+/// A metrics index stores an exemplar host row's NULL `value` as these bits; it is never a sample.
+pub const EXEMPLAR_HOST_NAN_BITS: u64 = 0x7ff0_0000_0000_0003;
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///

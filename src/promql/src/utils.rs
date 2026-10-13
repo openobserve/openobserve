@@ -18,7 +18,8 @@ use std::ops::Range;
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
-        BUCKET_LABEL, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS, VALUE_LABEL, value::Sample,
+        BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, STALE_NAN_BITS, VALUE_LABEL,
+        value::Sample,
     },
 };
 use datafusion::{
@@ -153,6 +154,24 @@ pub(crate) fn apply_time_window(
     }
 }
 
+/// Drops exemplar host rows from a sample scan: a NULL `value` beside exemplars is not a marker.
+pub(crate) fn exclude_exemplar_hosts(df: DataFrame, stale_markers: bool) -> Result<DataFrame> {
+    // with markers off a NULL value yields no sample, so the host row is already invisible
+    if !stale_markers
+        || df
+            .schema()
+            .field_with_unqualified_name(EXEMPLARS_LABEL)
+            .is_err()
+    {
+        return Ok(df);
+    }
+    df.filter(
+        col(VALUE_LABEL)
+            .is_not_null()
+            .or(col(EXEMPLARS_LABEL).is_null()),
+    )
+}
+
 /// Length of the contiguous run of equal hashes starting at `start`.
 pub(crate) fn batch_run_len(hashes: &[u64], start: usize) -> usize {
     let hash = hashes[start];
@@ -209,8 +228,8 @@ mod tests {
 
     use datafusion::{
         arrow::{
-            array::{Int32Array, StringArray, StringViewArray},
-            datatypes::{DataType, Field, Schema as ArrowSchema},
+            array::{AsArray, Int32Array, Int64Array, StringArray, StringViewArray},
+            datatypes::{DataType, Field, Int64Type, Schema as ArrowSchema},
             record_batch::RecordBatch,
         },
         prelude::SessionContext,
@@ -258,6 +277,58 @@ mod tests {
         extend_samples(&mut samples, &timestamps, &values, 0..4, 0, false);
         let kept: Vec<_> = samples.iter().map(|s| (s.timestamp, s.value)).collect();
         assert_eq!(kept, vec![(10, 1.0), (30, 3.0)]);
+    }
+
+    #[tokio::test]
+    async fn test_exclude_exemplar_hosts_keeps_samples_and_stale_markers() {
+        let schema = Arc::new(ArrowSchema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(Int64Array::from(vec![1, 2, 3, 4])),
+                Arc::new(Float64Array::from(vec![Some(1.0), None, None, Some(4.0)])),
+                Arc::new(StringArray::from(vec![None, Some("[]"), None, Some("[]")])),
+            ],
+        )
+        .unwrap();
+        let df = SessionContext::new().read_batch(batch).unwrap();
+
+        let kept: Vec<i64> = exclude_exemplar_hosts(df.clone(), true)
+            .unwrap()
+            .collect()
+            .await
+            .unwrap()
+            .iter()
+            .flat_map(|b| {
+                b[TIMESTAMP_COL_NAME]
+                    .as_primitive::<Int64Type>()
+                    .values()
+                    .to_vec()
+            })
+            .collect();
+        assert_eq!(kept, vec![1, 3, 4]);
+        assert_eq!(
+            exclude_exemplar_hosts(df, false)
+                .unwrap()
+                .count()
+                .await
+                .unwrap(),
+            4
+        );
+
+        let (df, _) = make_df();
+        assert_eq!(
+            exclude_exemplar_hosts(df, true)
+                .unwrap()
+                .count()
+                .await
+                .unwrap(),
+            3
+        );
     }
 
     #[test]

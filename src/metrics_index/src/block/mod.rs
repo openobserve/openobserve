@@ -584,6 +584,43 @@ mod tests {
     }
 
     #[test]
+    fn exemplar_host_row_is_written_as_its_own_marker() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, true),
+            Field::new("exemplars", DataType::Utf8, true),
+        ]));
+        let input = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 1, 1])),
+                Arc::new(Int64Array::from(vec![10, 20, 30])),
+                Arc::new(Float64Array::from(vec![Some(1.0), None, None])),
+                Arc::new(StringArray::from(vec![None, Some("[]"), None])),
+            ],
+        )
+        .unwrap();
+        let parent = ParentMetadata {
+            rows: 3,
+            compressed_size: 123,
+        };
+        let mut writer = BlockWriter::new(Vec::new(), schema.clone(), MAX_BLOCK_ROWS).unwrap();
+        writer.write(&input).unwrap();
+        let blob = writer.finish_for_vortex(parent.clone(), schema).unwrap();
+
+        let index = decode_file(&blob, &parent, &[]).unwrap();
+        assert_eq!(
+            decoded_rows(&blob, &index),
+            vec![
+                (1, 10, 1f64.to_bits()),
+                (1, 20, config::meta::promql::EXEMPLAR_HOST_NAN_BITS),
+                (1, 30, config::meta::promql::STALE_NAN_BITS)
+            ]
+        );
+    }
+
+    #[test]
     fn numeric_parent_and_projection_are_validated() {
         let blob = fixture();
         let mut wrong = parent();
