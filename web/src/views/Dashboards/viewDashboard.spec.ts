@@ -248,6 +248,7 @@ vi.mock("moment-timezone", () => ({
 
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
+import enUS from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -500,7 +501,51 @@ describe("ViewDashboard", () => {
           .findAllComponents({ name: "OTooltip" })
           .map((tooltip: any) => tooltip.props("content"));
         expect(tooltips).toContain("dashboard.viewDashboard.autoRunDescription");
+        expect(tooltips).not.toContain("dashboard.viewDashboard.autoRunScope");
         expect(tooltips).not.toContain("search.autoRunEnabled");
+      });
+
+      it("says below the description that Auto Run applies beyond this dashboard", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+
+        const toggle = wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        const lines = toggle.findAll("div").map((line: any) => line.text());
+        expect(lines).toEqual([
+          "search.turnOffLiveMode",
+          "dashboard.viewDashboard.autoRunDescription",
+          "dashboard.viewDashboard.autoRunScope",
+        ]);
+        expect(toggle.find('[data-test="dashboard-auto-run-scope"]').classes()).toEqual(
+          expect.arrayContaining(["text-text-secondary", "text-xs"]),
+        );
+      });
+
+      it("keeps the scope line whether Auto Run is on or off", async () => {
+        setAutoQuery(true);
+        wrapper = mountWithToolbar();
+        await flushPromises();
+        const toggle = () => wrapper.find('[data-test="dashboard-auto-run-toggle-btn"]');
+        const scope = () => toggle().find('[data-test="dashboard-auto-run-scope"]');
+
+        expect(toggle().text()).toContain("search.turnOffLiveMode");
+        expect(scope().text()).toBe("dashboard.viewDashboard.autoRunScope");
+
+        wrapper.vm.toggleAutoRun();
+        await flushPromises();
+
+        expect(toggle().text()).toContain("search.turnOnLiveMode");
+        expect(scope().text()).toBe("dashboard.viewDashboard.autoRunScope");
+      });
+
+      it("ships the approved English copy for both lines", () => {
+        expect(enUS.dashboard.viewDashboard.autoRunDescription).toBe(
+          "Runs queries on open and on filter/time changes",
+        );
+        expect(enUS.dashboard.viewDashboard.autoRunScope).toBe(
+          "Applies to all dashboards, Logs and Traces",
+        );
       });
 
       it("provides a gate that needs Auto Run and a relative effective range", async () => {

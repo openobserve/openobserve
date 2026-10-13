@@ -172,6 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="text-text-secondary text-xs">
                       {{ t("dashboard.viewDashboard.autoRunDescription") }}
                     </div>
+                    <div class="text-text-secondary text-xs" data-test="dashboard-auto-run-scope">
+                      {{ t("dashboard.viewDashboard.autoRunScope") }}
+                    </div>
                   </span>
                 </ODropdownItem>
               </template>
