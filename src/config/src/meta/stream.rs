@@ -32,6 +32,12 @@ use crate::{
     },
 };
 
+/// The logs stream RUM data ingestion writes.
+pub const RUM_DATA_STREAM: &str = "_rumdata";
+/// `_rumdata` columns the trace-to-RUM lookup filters on, indexed by default.
+pub const RUM_DATA_INDEX_FIELDS: [&str; 4] =
+    ["_o2_trace_id", "_oo_trace_id", "view_id", "action_id"];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "PascalCase")]
 pub enum DataType {

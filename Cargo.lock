@@ -8130,7 +8130,6 @@ dependencies = [
  "opentelemetry-proto",
  "prost 0.14.4",
  "proto",
- "schema",
  "serde",
  "serde_json",
  "snap",

@@ -33,7 +33,7 @@ use config::{
             BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, NAME_LABEL, QUANTILE_LABEL,
             VALUE_LABEL,
         },
-        stream::{StreamSettings, StreamType},
+        stream::{RUM_DATA_INDEX_FIELDS, RUM_DATA_STREAM, StreamSettings, StreamType},
         traces::ALL_INFER_FIELDS,
     },
     metrics,
@@ -485,6 +485,27 @@ fn dedup_preserve_order(values: &mut Vec<String>) {
     values.retain(|value| seen.insert(value.clone()));
 }
 
+/// Metadata `merge` writes only when it creates the stream.
+fn create_metadata(
+    stream_name: &str,
+    stream_type: StreamType,
+    is_derived: bool,
+) -> HashMap<String, String> {
+    let mut metadata = HashMap::new();
+    if is_derived {
+        metadata.insert("is_derived".to_string(), "true".to_string());
+    }
+    // Existing `_rumdata` streams get the same fields from a migration.
+    if stream_type == StreamType::Logs && stream_name == RUM_DATA_STREAM {
+        let settings = StreamSettings {
+            index_fields: RUM_DATA_INDEX_FIELDS.map(String::from).to_vec(),
+            ..Default::default()
+        };
+        metadata.insert("settings".to_string(), json::to_string(&settings).unwrap());
+    }
+    metadata
+}
+
 pub async fn check_for_schema(
     org_id: &str,
     stream_name: &str,
@@ -683,18 +704,15 @@ pub async fn handle_diff_schema(
         );
     }
 
+    let create_metadata = create_metadata(stream_name, stream_type, is_derived);
+    let schema_with_metadata = (!create_metadata.is_empty())
+        .then(|| inferred_schema.clone().with_metadata(create_metadata));
+    let schema_for_merge = schema_with_metadata.as_ref().unwrap_or(inferred_schema);
     let mut retries = 0;
     let mut err: Option<anyhow::Error> = None;
     let mut ret: Option<_> = None;
     // retry x times for update schema
     while retries < cfg.limit.meta_transaction_retries {
-        let schema_for_merge = if is_derived {
-            let mut metadata = HashMap::with_capacity(1);
-            metadata.insert("is_derived".to_string(), "true".to_string());
-            &inferred_schema.clone().with_metadata(metadata)
-        } else {
-            inferred_schema
-        };
         match db::schema::merge(
             org_id,
             stream_name,
@@ -1333,6 +1351,41 @@ mod tests {
         .await
         .unwrap();
         assert!(!result.is_schema_changed);
+    }
+
+    #[tokio::test]
+    async fn test_new_rum_data_stream_is_created_with_index_fields() {
+        // The test meta store outlives a run, so each run creates its streams in a fresh org.
+        let org_id = format!("rum_create_{}", now_micros());
+        let record: json::Value =
+            json::from_str(r#"{"view_id": "v1", "_timestamp": 1234234234234}"#).unwrap();
+        infra::db::create_table().await.unwrap();
+
+        for stream_name in [RUM_DATA_STREAM, "other"] {
+            check_for_schema(
+                &org_id,
+                stream_name,
+                StreamType::Logs,
+                &mut HashMap::new(),
+                vec![record.as_object().unwrap()],
+                1234234234234,
+                false,
+            )
+            .await
+            .unwrap();
+        }
+
+        let schema = infra::schema::get_from_db(&org_id, RUM_DATA_STREAM, StreamType::Logs)
+            .await
+            .unwrap();
+        assert_eq!(
+            unwrap_stream_settings(&schema).unwrap().index_fields,
+            RUM_DATA_INDEX_FIELDS
+        );
+        let schema = infra::schema::get_from_db(&org_id, "other", StreamType::Logs)
+            .await
+            .unwrap();
+        assert!(unwrap_stream_settings(&schema).is_none());
     }
 
     /// The loser of a create race must adopt the winner's schema, not keep its empty one.
