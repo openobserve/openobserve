@@ -1103,7 +1103,10 @@ async function send(body: ExperimentCreatePayload) {
   } catch (error: any) {
     // 412 = over the cost warning threshold. Nothing was stored, so the
     // confirmed retry may reuse the same idempotency key.
+    // The preview on screen said no confirmation was needed, so it is out of
+    // date: refresh it so the dialog shows the cost the server used.
     if (error?.response?.status === 412) {
+      await runPreview();
       askCostConfirmation(body, error.response.data?.message);
       return;
     }

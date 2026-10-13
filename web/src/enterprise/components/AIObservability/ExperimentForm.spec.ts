@@ -484,6 +484,24 @@ describe("ExperimentForm", () => {
       expect(push).toHaveBeenCalled();
     });
 
+    it("refreshes the preview on a 412, so the dialog shows the server's cost", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, estimatedCost: 0.22, confirmationRequired: false },
+      });
+      (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      // The server now prices the run above the threshold.
+      (llmExperimentsService.preview as any).mockResolvedValue({ ...previewResult, costEstimate });
+      await submit(wrapper);
+
+      const message = String(costDialog(wrapper).props("message"));
+      expect(message).toContain("$42.50");
+      expect(message).not.toContain("$0.22");
+    });
+
     it("does not resend on cancel and keeps the form", async () => {
       (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
       wrapper = await createWrapper();
