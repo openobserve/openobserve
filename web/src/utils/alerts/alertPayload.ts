@@ -6,6 +6,7 @@ import { cloneDeep } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
+import { hasDeliveryTarget } from "./deliveryTarget";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
@@ -443,7 +444,9 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: t("toastMessages.alerts.alertUpdatedSuccessfully"),
+        message: hasDeliveryTarget(payload)
+          ? t("toastMessages.alerts.alertUpdatedSuccessfully")
+          : t("alerts.messages.alertUpdatedNoDestination"),
       });
     } else {
       await alertsService.create_by_alert_id(
@@ -454,7 +457,9 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: t("toastMessages.alerts.alertSavedSuccessfully"),
+        message: hasDeliveryTarget(payload)
+          ? t("toastMessages.alerts.alertSavedSuccessfully")
+          : t("alerts.messages.alertSavedNoDestination"),
       });
     }
     dismiss();
