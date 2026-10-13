@@ -23793,5 +23793,22 @@
     "loadFailed": "The Slack connection could not be loaded.",
     "connectFailed": "Slack could not be connected. Try again.",
     "disconnectFailed": "Slack could not be disconnected. Try again."
+  },
+  "oncallSlackApp": {
+    "title": "Slack app",
+    "subtitle": "One Slack app for this whole deployment",
+    "copyStep": "Copy the manifest.",
+    "copyStepHelp": "It already has this deployment's addresses.",
+    "createStep": "Create the app at {host} from this manifest.",
+    "openSlack": "Open Slack setup",
+    "distributeStep": "In the app's Manage Distribution page, click Activate Public Distribution.",
+    "distributeWhy": "Without it, only the workspace the app was built in can install it.",
+    "envStep": "Set these on every {product} node, then restart.",
+    "clientId": "the app's client id",
+    "clientSecret": "the app's client secret",
+    "signingSecret": "the app's signing secret",
+    "envRules": "Set all three or none. The address must start with {https}, and {masterKey} must be set. In a multi-region deployment, set them only after every region runs this version.",
+    "then": "Then org admins connect their organisation in Settings → Slack.",
+    "loadFailed": "The Slack app manifest could not be loaded."
   }
 }

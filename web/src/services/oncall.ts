@@ -59,6 +59,7 @@ import type {
   TelephonyView,
   OrgTelephonyView,
   ChatInstallView,
+  SlackManifestUrls,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -886,6 +887,10 @@ const oncall = {
     http().delete<{ message: string }>(
       `/api/${org_identifier}/oncall/chat/installs/${encodeURIComponent(workspace_id)}`,
     ),
+
+  /// This deployment's Slack app manifest URLs; only the admin org is answered.
+  getSlackManifestUrls: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<SlackManifestUrls>(`/api/${org_identifier}/oncall/chat/slack/manifest`),
 
   /// Somebody stands in for the rotation over a window. Outside it the
   /// rotation resolves as normal, which is what makes an override safe.

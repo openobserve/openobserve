@@ -147,6 +147,8 @@ export const oncallKeys = {
   telephony: (org: string) => orgKey(org, "oncall", "telephony"),
   /** The org's connected Slack workspace; a connect or disconnect moves it. */
   chatInstalls: (org: string) => orgKey(org, "oncall", "chat", "installs"),
+  /** The deployment's Slack app manifest URLs; only a config change moves them. */
+  slackManifestUrls: (org: string) => orgKey(org, "oncall", "chat", "slack", "manifest"),
 
   routingConfig: (org: string) => orgKey(org, "oncall", "routing", "config"),
 };

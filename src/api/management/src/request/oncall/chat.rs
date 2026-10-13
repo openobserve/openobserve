@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Native Slack for on-call: connecting, showing and disconnecting the org's workspace.
+//! Native Slack for on-call: connecting, showing and disconnecting the org's workspace, and the
+//! deployment's app manifest URLs.
 
 use axum::{extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
@@ -191,6 +192,46 @@ pub async fn delete_chat_install(
     }
 }
 
+/// The addresses the deployment's Slack app manifest needs; only the admin org is answered.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/chat/slack/manifest",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallSlackManifestUrls",
+    summary = "Get the Slack app manifest URLs",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Success",   content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden, or not the admin organization", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_slack_manifest(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::chat::install_flow::{self, InstallFlowError};
+
+        // Cheap refusal first, so other orgs never cost a permission lookup (IN-3).
+        if org_id != config::META_ORG_ID {
+            return refusal(InstallFlowError::Forbidden);
+        }
+        let permitted = allowed(&org_id, &user_email.user_id, SETTINGS, "GET").await;
+        match install_flow::manifest(&org_id, permitted) {
+            Ok(urls) => MetaHttpResponse::json(urls),
+            Err(e) => refusal(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 /// A storage failure is logged and answered as a bare 500; every other refusal is worded for the
 /// caller.
 #[cfg(feature = "enterprise")]
@@ -238,6 +279,7 @@ mod tests {
                     "T1".to_string(),
                 )))),
             ),
+            ("manifest", Box::pin(get_slack_manifest(org()))),
         ];
         for (name, handler) in cases {
             let resp = handler.await;

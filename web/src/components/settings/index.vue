@@ -101,6 +101,7 @@ export default defineComponent({
       pipelineDestinations: "pipeline_destinations",
       telephonySettings: "telephony",
       slackSettings: "slack",
+      slackAppSettings: "slack_app",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
       modelPricingEditor: "model_pricing",
@@ -142,7 +143,7 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes, License, Password policy, Query Management and Announcements are enterprise-only meta-org pages.
+      // Nodes, License, Password policy, Query Management, Announcements and Slack app are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
       if (
@@ -151,7 +152,8 @@ export default defineComponent({
           name === "passwordPolicy" ||
           name === "query_management" ||
           name === "announcementBanners" ||
-          name === "announcementBannerEditor") &&
+          name === "announcementBannerEditor" ||
+          name === "slackAppSettings") &&
         notMeta
       ) {
         toGeneral();
@@ -427,6 +429,19 @@ export default defineComponent({
           locked: !nodesAccess.allowed,
           lockedMessage: nodesAccess.message,
           dataTest: "nodes-tab",
+          group: "Operations",
+        },
+        {
+          key: "slack_app",
+          label: t("oncallSlackApp.title"),
+          description: t("oncallSlackApp.subtitle"),
+          icon: "slack",
+          to: { name: "slackAppSettings", query: { org_identifier: org } },
+          // Not gated on oncall_slack: the operator copies the manifest before Slack is set up.
+          visible: meta && z.oncall_enabled !== false && oncallAccess.visible,
+          locked: !oncallAccess.allowed,
+          lockedMessage: oncallAccess.message,
+          dataTest: "slack-app-settings-tab",
           group: "Operations",
         },
         {

@@ -1229,6 +1229,13 @@ export interface ChatInstallView {
   installed_at: number;
 }
 
+/** `GET /_meta/oncall/chat/slack/manifest`: the deployment addresses the Slack app manifest needs; never a secret. */
+export interface SlackManifestUrls {
+  command_url: string;
+  interact_url: string;
+  redirect_url: string;
+}
+
 /** `GET /telephony`: the deployment's account is reported by presence and From number only, never its SID or token. */
 export interface TelephonyView {
   deployment_account_present: boolean;

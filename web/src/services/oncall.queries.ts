@@ -26,6 +26,7 @@ import type {
   CauseGroup,
   ChatInstallView,
   Contact,
+  SlackManifestUrls,
   CoverageGaps,
   EscalationProgress,
   MyDeliveries,
@@ -428,6 +429,15 @@ export const chatInstallsQuery = (org: string) =>
     queryKey: oncallKeys.chatInstalls(org),
     queryFn: async (): Promise<ChatInstallView[]> =>
       (await oncallService.listChatInstalls({ org_identifier: org })).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** The deployment's Slack app manifest URLs; an admin-org settings read (IN-3). */
+export const slackManifestUrlsQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.slackManifestUrls(org),
+    queryFn: async (): Promise<SlackManifestUrls> =>
+      (await oncallService.getSlackManifestUrls({ org_identifier: org })).data,
     staleTime: NORMAL_STALE_TIME,
   });
 

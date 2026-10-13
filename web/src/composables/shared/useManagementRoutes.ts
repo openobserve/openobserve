@@ -228,6 +228,16 @@ const useManagementRoutes = () => {
           component: () => import("@/components/settings/SlackSettings.vue"),
           beforeEnter: withFeatureGate("oncall", oncallSlackRouteGuard),
         },
+        // Admin org only; the Settings page sends any other org back to General.
+        {
+          path: "slack_app",
+          name: "slackAppSettings",
+          meta: {
+            titleKey: "oncallSlackApp.title",
+          },
+          component: () => import("@/components/settings/SlackAppSettings.vue"),
+          beforeEnter: withFeatureGate("oncall", oncallRouteGuard),
+        },
         {
           path: "storage_settings",
           name: "storageSettings",
