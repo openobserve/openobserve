@@ -4534,6 +4534,12 @@
       "stoppedMeta": "Không có dữ liệu đến trong 60 phút",
       "stoppedHint": "Nếu dữ liệu đến muộn hơn, Trang chủ sẽ thông báo cho bạn trong lần truy cập tiếp theo.",
       "checkAgain": "Kiểm tra lại",
+      "idlePill": "Chưa kiểm tra",
+      "idleIn": "{stream} đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép lệnh.",
+      "idleInConfig": "{stream} đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép cấu hình.",
+      "idleMatches": "Các stream khớp đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép lệnh.",
+      "idleMatchesConfig": "Các stream khớp đã nhận dữ liệu. Quá trình kiểm tra bắt đầu khi bạn sao chép cấu hình.",
+      "checkNow": "Kiểm tra ngay",
       "receivedPill": "Đã nhận sự kiện đầu tiên",
       "receivedNewPill": "Đã nhận dữ liệu mới",
       "testPill": "Đã nhận sự kiện thử nghiệm",
@@ -4613,7 +4619,6 @@
       "changeSource": "Chọn nguồn khác",
       "copyCommand": "Sao chép lệnh",
       "copied": "Đã sao chép lệnh",
-      "clickToCopy": "Nhấp vào khối để sao chép lệnh",
       "waitingLogs": "Đang chờ nhật ký đầu tiên của bạn",
       "waitingMetrics": "Đang chờ chỉ số đầu tiên của bạn",
       "waitingTraces": "Đang chờ trace đầu tiên của bạn",
@@ -17795,8 +17800,7 @@
       "tokenLink": "token tổ chức · {name}",
       "tokenLinkTooltip": "Chọn token tiếp nhận dữ liệu mà các đoạn mã sử dụng",
       "copiedWithToken": "Đã sao chép với token tổ chức {name}",
-      "clickToCopy": "Nhấp vào khối để sao chép.",
-      "clickToCopyWithToken": "Nhấp vào khối để sao chép. Token tiếp nhận dữ liệu của tổ chức được bao gồm; nó vẫn ẩn ở đây."
+      "tokenIncludedHint": "Token tiếp nhận dữ liệu của tổ chức đã được bao gồm; token được ẩn ở đây."
     },
     "spinner": {
       "loading": "Đang tải"

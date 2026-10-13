@@ -4534,6 +4534,12 @@
       "stoppedMeta": "60 分鐘內沒有資料送達",
       "stoppedHint": "若資料稍後才送達，下次造訪時首頁會通知您。",
       "checkAgain": "再次檢查",
+      "idlePill": "尚未檢查",
+      "idleIn": "{stream} 已在接收數據。複製指令後即開始檢查。",
+      "idleInConfig": "{stream} 已在接收數據。複製設定後即開始檢查。",
+      "idleMatches": "符合的串流已在接收數據。複製指令後即開始檢查。",
+      "idleMatchesConfig": "符合的串流已在接收數據。複製設定後即開始檢查。",
+      "checkNow": "立即檢查",
       "receivedPill": "已收到第一個事件",
       "receivedNewPill": "已收到新資料",
       "testPill": "已收到測試事件",
@@ -4613,7 +4619,6 @@
       "changeSource": "選擇其他來源",
       "copyCommand": "複製指令",
       "copied": "已複製指令",
-      "clickToCopy": "點擊區塊以複製指令",
       "waitingLogs": "正在等待您的第一批日誌",
       "waitingMetrics": "正在等待您的第一批指標",
       "waitingTraces": "正在等待您的第一批追蹤",
@@ -17790,8 +17795,7 @@
       "tokenLink": "組織權杖 · {name}",
       "tokenLinkTooltip": "選擇程式碼片段使用的資料擷取權杖",
       "copiedWithToken": "已複製，使用組織權杖 {name}",
-      "clickToCopy": "點擊區塊即可複製。",
-      "clickToCopyWithToken": "點擊區塊即可複製。已包含組織的資料擷取權杖；在此處不會顯示。"
+      "tokenIncludedHint": "已包含組織的資料擷取權杖；在此保持隱藏。"
     },
     "spinner": {
       "loading": "載入中"

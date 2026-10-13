@@ -4534,6 +4534,12 @@
       "stoppedMeta": "60 dakika içinde veri gelmedi",
       "stoppedHint": "Veri daha sonra gelirse, Ana Sayfa bir sonraki ziyaretinizde size bildirir.",
       "checkAgain": "Tekrar kontrol et",
+      "idlePill": "Henüz kontrol edilmiyor",
+      "idleIn": "{stream} zaten veri alıyor. Kontroller, komutu kopyaladığınızda başlar.",
+      "idleInConfig": "{stream} zaten veri alıyor. Kontroller, yapılandırmayı kopyaladığınızda başlar.",
+      "idleMatches": "Eşleşen akışlar zaten veri alıyor. Kontroller, komutu kopyaladığınızda başlar.",
+      "idleMatchesConfig": "Eşleşen akışlar zaten veri alıyor. Kontroller, yapılandırmayı kopyaladığınızda başlar.",
+      "checkNow": "Şimdi kontrol et",
       "receivedPill": "İlk olay alındı",
       "receivedNewPill": "Yeni veri alındı",
       "testPill": "Test olayı alındı",
@@ -4613,7 +4619,6 @@
       "changeSource": "Farklı bir kaynak seçin",
       "copyCommand": "Komutu kopyala",
       "copied": "Komut kopyalandı",
-      "clickToCopy": "Komutu kopyalamak için bloğa tıklayın",
       "waitingLogs": "İlk günlükleriniz bekleniyor",
       "waitingMetrics": "İlk metrikleriniz bekleniyor",
       "waitingTraces": "İlk izleriniz bekleniyor",
@@ -17795,8 +17800,7 @@
       "tokenLink": "org tokeni · {name}",
       "tokenLinkTooltip": "Kod parçacıklarının hangi veri alımı tokenini kullanacağını seçin",
       "copiedWithToken": "org tokeni {name} ile kopyalandı",
-      "clickToCopy": "Kopyalamak için bloğa tıklayın.",
-      "clickToCopyWithToken": "Kopyalamak için bloğa tıklayın. Organizasyonun veri alımı tokeni dahildir; burada gizli kalır."
+      "tokenIncludedHint": "Kuruluşun veri alımı belirteci dahildir; burada gizli kalır."
     },
     "spinner": {
       "loading": "Yükleniyor"

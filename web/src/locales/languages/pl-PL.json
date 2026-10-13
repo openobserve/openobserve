@@ -4534,6 +4534,12 @@
       "stoppedMeta": "Żadne dane nie dotarły w ciągu 60 minut",
       "stoppedHint": "Jeśli dane dotrą później, Strona główna poinformuje Cię przy następnej wizycie.",
       "checkAgain": "Sprawdź ponownie",
+      "idlePill": "Sprawdzanie nieaktywne",
+      "idleIn": "{stream} już odbiera dane. Sprawdzanie rozpocznie się po skopiowaniu polecenia.",
+      "idleInConfig": "{stream} już odbiera dane. Sprawdzanie rozpocznie się po skopiowaniu konfiguracji.",
+      "idleMatches": "Pasujące strumienie już odbierają dane. Sprawdzanie rozpocznie się po skopiowaniu polecenia.",
+      "idleMatchesConfig": "Pasujące strumienie już odbierają dane. Sprawdzanie rozpocznie się po skopiowaniu konfiguracji.",
+      "checkNow": "Sprawdź teraz",
       "receivedPill": "Odebrano pierwsze zdarzenie",
       "receivedNewPill": "Odebrano nowe dane",
       "testPill": "Odebrano zdarzenie testowe",
@@ -4613,7 +4619,6 @@
       "changeSource": "Wybierz inne źródło",
       "copyCommand": "Kopiuj komendę",
       "copied": "Skopiowano komendę",
-      "clickToCopy": "Kliknij blok, aby skopiować komendę",
       "waitingLogs": "Oczekiwanie na pierwsze logi",
       "waitingMetrics": "Oczekiwanie na pierwsze metryki",
       "waitingTraces": "Oczekiwanie na pierwsze trace",
@@ -17795,8 +17800,7 @@
       "tokenLink": "token organizacji · {name}",
       "tokenLinkTooltip": "Wybierz, którego tokenu pozyskiwania danych używają fragmenty kodu",
       "copiedWithToken": "Skopiowano z tokenem organizacji {name}",
-      "clickToCopy": "Kliknij blok, aby skopiować.",
-      "clickToCopyWithToken": "Kliknij blok, aby skopiować. Token pozyskiwania danych organizacji jest dołączony; tutaj pozostaje ukryty."
+      "tokenIncludedHint": "Token pozyskiwania danych organizacji jest dołączony; pozostaje tu ukryty."
     },
     "spinner": {
       "loading": "Ładowanie"

@@ -4534,6 +4534,12 @@
       "stoppedMeta": "60分以内にデータが到着しませんでした",
       "stoppedHint": "それ以降にデータが到着した場合は、次回アクセス時にホームで確認できます。",
       "checkAgain": "再確認",
+      "idlePill": "まだ確認していません",
+      "idleIn": "{stream} はすでにデータを受信しています。コマンドをコピーするとチェックが開始されます。",
+      "idleInConfig": "{stream} はすでにデータを受信しています。設定をコピーするとチェックが開始されます。",
+      "idleMatches": "一致するストリームはすでにデータを受信しています。コマンドをコピーするとチェックが開始されます。",
+      "idleMatchesConfig": "一致するストリームはすでにデータを受信しています。設定をコピーするとチェックが開始されます。",
+      "checkNow": "今すぐ確認",
       "receivedPill": "最初のイベントを受信しました",
       "receivedNewPill": "新しいデータを受信しました",
       "testPill": "テストイベントを受信しました",
@@ -4613,7 +4619,6 @@
       "changeSource": "別のソースを選択",
       "copyCommand": "コマンドをコピー",
       "copied": "コマンドをコピーしました",
-      "clickToCopy": "ブロックをクリックしてコマンドをコピー",
       "waitingLogs": "最初のログを待機中",
       "waitingMetrics": "最初のメトリクスを待機中",
       "waitingTraces": "最初のトレースを待機中",
@@ -17795,8 +17800,7 @@
       "tokenLink": "組織トークン · {name}",
       "tokenLinkTooltip": "スニペットが使用する取り込みトークンを選択",
       "copiedWithToken": "組織トークン {name} でコピーしました",
-      "clickToCopy": "ブロックをクリックしてコピーします。",
-      "clickToCopyWithToken": "ブロックをクリックしてコピーします。組織の取り込みトークンが含まれますが、ここでは非表示のままです。"
+      "tokenIncludedHint": "組織の取り込みトークンが含まれています。ここでは非表示のままです。"
     },
     "spinner": {
       "loading": "読み込み中"

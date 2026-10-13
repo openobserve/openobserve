@@ -4534,6 +4534,12 @@
       "stoppedMeta": "No llegaron datos en 60 minutos",
       "stoppedHint": "Si los datos llegan más tarde, Inicio te lo indica en tu próxima visita.",
       "checkAgain": "Comprobar de nuevo",
+      "idlePill": "Aún no se verifica",
+      "idleIn": "{stream} ya recibe datos. Las verificaciones comienzan cuando copias el comando.",
+      "idleInConfig": "{stream} ya recibe datos. Las verificaciones comienzan cuando copias la configuración.",
+      "idleMatches": "Los streams coincidentes ya reciben datos. Las verificaciones comienzan cuando copias el comando.",
+      "idleMatchesConfig": "Los streams coincidentes ya reciben datos. Las verificaciones comienzan cuando copias la configuración.",
+      "checkNow": "Verificar ahora",
       "receivedPill": "Primer evento recibido",
       "receivedNewPill": "Nuevos datos recibidos",
       "testPill": "Evento de prueba recibido",
@@ -4613,7 +4619,6 @@
       "changeSource": "Elegir otra fuente",
       "copyCommand": "Copiar comando",
       "copied": "Comando copiado",
-      "clickToCopy": "Haz clic en el bloque para copiar el comando",
       "waitingLogs": "Esperando tus primeros logs",
       "waitingMetrics": "Esperando tus primeras métricas",
       "waitingTraces": "Esperando tus primeras trazas",
@@ -17795,8 +17800,7 @@
       "tokenLink": "token de la organización · {name}",
       "tokenLinkTooltip": "Elige qué token de ingesta usan los fragmentos de código",
       "copiedWithToken": "Copiado con el token de la organización {name}",
-      "clickToCopy": "Haz clic en el bloque para copiar.",
-      "clickToCopyWithToken": "Haz clic en el bloque para copiar. Se incluye el token de ingesta de la organización, que permanece oculto aquí."
+      "tokenIncludedHint": "El token de ingesta de la organización está incluido; permanece oculto aquí."
     },
     "spinner": {
       "loading": "Cargando"

@@ -4534,6 +4534,12 @@
       "stoppedMeta": "60 分钟内没有数据到达",
       "stoppedHint": "如果数据之后才到达，主页会在您下次访问时告知您。",
       "checkAgain": "再次检查",
+      "idlePill": "尚未检查",
+      "idleIn": "{stream} 已在接收数据。复制命令后将开始检查。",
+      "idleInConfig": "{stream} 已在接收数据。复制配置后将开始检查。",
+      "idleMatches": "匹配的数据流已在接收数据。复制命令后将开始检查。",
+      "idleMatchesConfig": "匹配的数据流已在接收数据。复制配置后将开始检查。",
+      "checkNow": "立即检查",
       "receivedPill": "已收到首个事件",
       "receivedNewPill": "已收到新数据",
       "testPill": "已收到测试事件",
@@ -4613,7 +4619,6 @@
       "changeSource": "选择其他数据源",
       "copyCommand": "复制命令",
       "copied": "命令已复制",
-      "clickToCopy": "点击代码块复制命令",
       "waitingLogs": "正在等待您的首批日志",
       "waitingMetrics": "正在等待您的首批指标",
       "waitingTraces": "正在等待您的首批追踪",
@@ -17795,8 +17800,7 @@
       "tokenLink": "组织令牌 · {name}",
       "tokenLinkTooltip": "选择代码片段使用的摄取令牌",
       "copiedWithToken": "已使用组织令牌 {name} 复制",
-      "clickToCopy": "点击代码块即可复制。",
-      "clickToCopyWithToken": "点击代码块即可复制。其中包含组织的摄取令牌；它在此处保持隐藏。"
+      "tokenIncludedHint": "已包含组织的摄取令牌；此处保持隐藏。"
     },
     "spinner": {
       "loading": "加载中"

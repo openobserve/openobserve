@@ -4534,6 +4534,12 @@
       "stoppedMeta": "Aucune donnée reçue en 60 minutes",
       "stoppedHint": "Si des données arrivent plus tard, Accueil vous en informe lors de votre prochaine visite.",
       "checkAgain": "Vérifier à nouveau",
+      "idlePill": "Pas encore de vérification",
+      "idleIn": "{stream} reçoit déjà des données. Les vérifications démarrent lorsque vous copiez la commande.",
+      "idleInConfig": "{stream} reçoit déjà des données. Les vérifications démarrent lorsque vous copiez la configuration.",
+      "idleMatches": "Les flux correspondants reçoivent déjà des données. Les vérifications démarrent lorsque vous copiez la commande.",
+      "idleMatchesConfig": "Les flux correspondants reçoivent déjà des données. Les vérifications démarrent lorsque vous copiez la configuration.",
+      "checkNow": "Vérifier maintenant",
       "receivedPill": "Premier événement reçu",
       "receivedNewPill": "Nouvelles données reçues",
       "testPill": "Événement de test reçu",
@@ -4613,7 +4619,6 @@
       "changeSource": "Choisir une autre source",
       "copyCommand": "Copier la commande",
       "copied": "Commande copiée",
-      "clickToCopy": "Cliquez sur le bloc pour copier la commande",
       "waitingLogs": "En attente de vos premiers logs",
       "waitingMetrics": "En attente de vos premières métriques",
       "waitingTraces": "En attente de vos premières traces",
@@ -17795,8 +17800,7 @@
       "tokenLink": "jeton d'organisation · {name}",
       "tokenLinkTooltip": "Choisissez le jeton d'ingestion utilisé par les extraits de code",
       "copiedWithToken": "Copié avec le jeton d'organisation {name}",
-      "clickToCopy": "Cliquez sur le bloc pour copier.",
-      "clickToCopyWithToken": "Cliquez sur le bloc pour copier. Le jeton d'ingestion de l'organisation est inclus ; il reste masqué ici."
+      "tokenIncludedHint": "Le jeton d'ingestion de l'organisation est inclus ; il reste masqué ici."
     },
     "spinner": {
       "loading": "Chargement"
