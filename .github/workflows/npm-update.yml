@@ -1,9 +1,9 @@
-name: Weekly NPM Update
+name: Quarterly NPM Update
 
 on:
   schedule:
-    # Run every Monday at 9:00 AM UTC
-    - cron: '0 9 * * 1'
+    # Run at 9:00 AM UTC on the 1st of Jan, Apr, Jul and Oct
+    - cron: '0 9 1 */3 *'
   workflow_dispatch: # Allow manual trigger
 
 permissions:
@@ -131,7 +131,7 @@ jobs:
             "$RUNNER_TEMP/upgrades.json")
 
           cat > "$RUNNER_TEMP/pr_body.md" <<EOF
-          ## 📦 Weekly NPM Dependencies Update
+          ## 📦 Quarterly NPM Dependencies Update
 
           This automated PR updates \`web/\` npm packages to their latest versions
           and regenerates \`package-lock.json\`.
@@ -156,7 +156,7 @@ jobs:
 
           ---
 
-          🤖 This PR was automatically created by the Weekly NPM Update workflow
+          🤖 This PR was automatically created by the Quarterly NPM Update workflow
           EOF
 
           echo "summary_created=true" >> $GITHUB_OUTPUT
