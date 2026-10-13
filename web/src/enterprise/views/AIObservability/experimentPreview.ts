@@ -42,7 +42,11 @@ export function withPreviewScorers(
   };
 }
 
-/** Cost estimates are always USD; two decimals matches the server's 412 text. */
+/**
+ * Cost estimates are always USD. Below one cent they keep 4 decimals, like the
+ * module's other costs, so a cheap run never reads as $0.00.
+ */
 export function formatEstimatedCost(cost: number): string {
-  return `$${cost.toFixed(2)}`;
+  const digits = cost > 0 && cost < 0.01 ? 4 : 2;
+  return `$${cost.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 }
