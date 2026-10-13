@@ -14380,7 +14380,15 @@
         "rawRequest": "Request Sent",
         "rawResponse": "Response Received",
         "idle": "The request and the response both appear here once you run a test.",
-        "disabledHint": "Fill in the name and endpoint first."
+        "disabledHint": "Fill in the name and endpoint first.",
+        "failure": {
+          "transport": "Could not reach the endpoint.",
+          "deadlineExceeded": "The endpoint did not answer in time.",
+          "httpStatus": "The endpoint answered with HTTP {status}.",
+          "badResponse": "The response could not be read with the response path.",
+          "outputTooLarge": "The response is too large.",
+          "requestError": "The request could not be built from the task."
+        }
       },
       "detail": {
         "backTo": "Remote Tasks",

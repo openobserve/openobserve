@@ -499,6 +499,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { remoteTaskKeys } from "@/services/llm-experiments.querykeys";
 import remoteTasksService, {
   type RemoteTask,
+  type RemoteTaskTestRunRow,
   type RemoteTaskVerificationReport,
 } from "@/services/remote-tasks.service";
 import RemoteTaskTestPanel from "./RemoteTaskTestPanel.vue";
@@ -773,7 +774,29 @@ async function runStoredVersionTest() {
   // An explicit skip is a well-formed answer, which verification also counts as a pass.
   testState.value = row && row.status !== "error" ? "passed" : "failed";
   if (testState.value === "failed") {
-    testError.value = raw(row?.error) || t("aiObservability.remoteTasks.form.testFailed");
+    testError.value = storedFailureMessage(row);
+  }
+}
+
+/** test_run reports a failure as a reason code; say it as a sentence. An unknown code shows as sent. */
+function storedFailureMessage(row?: RemoteTaskTestRunRow): I18nText {
+  switch (row?.error) {
+    case "transport":
+      return t("aiObservability.remoteTasks.testPanel.failure.transport");
+    case "deadline_exceeded":
+      return t("aiObservability.remoteTasks.testPanel.failure.deadlineExceeded");
+    case "http_status":
+      return t("aiObservability.remoteTasks.testPanel.failure.httpStatus", {
+        status: row.httpStatus ?? "?",
+      });
+    case "bad_response":
+      return t("aiObservability.remoteTasks.testPanel.failure.badResponse");
+    case "output_too_large":
+      return t("aiObservability.remoteTasks.testPanel.failure.outputTooLarge");
+    case "request_error":
+      return t("aiObservability.remoteTasks.testPanel.failure.requestError");
+    default:
+      return raw(row?.error) || t("aiObservability.remoteTasks.form.testFailed");
   }
 }
 

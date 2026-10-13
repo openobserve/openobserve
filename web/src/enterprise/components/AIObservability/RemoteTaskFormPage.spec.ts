@@ -539,5 +539,29 @@ describe("RemoteTaskFormPage — test connection", () => {
       expect((wrapper.vm as any).testState).toBe("failed");
       expect((wrapper.vm as any).testError).toBe("401 Unauthorized");
     });
+
+    it.each([
+      ["transport", undefined, "Could not reach the endpoint."],
+      ["http_status", 503, "The endpoint answered with HTTP 503."],
+    ])("says the %s reason code as a sentence", async (code, httpStatus, message) => {
+      testRun.mockResolvedValue([
+        {
+          rowId: "sample-0",
+          status: "error",
+          rawRequest: "{}",
+          rawResponse: "",
+          httpStatus,
+          latencyMs: 5,
+          attempts: 1,
+          error: code,
+        },
+      ]);
+      const wrapper = mountForm();
+      await flushPromises();
+
+      await runTest(wrapper);
+
+      expect((wrapper.vm as any).testError).toBe(message);
+    });
   });
 });
