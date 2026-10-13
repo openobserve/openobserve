@@ -276,6 +276,36 @@ const useManagementRoutes = () => {
       ],
     );
   }
+  // Announcements has no locked OSS page: its API exists only in enterprise.
+  if (config.isEnterprise == "true") {
+    routes[0].children.push(
+      ...[
+        {
+          path: "announcements",
+          name: "announcementBanners",
+          component: () => import("@/components/settings/AnnouncementBannerList.vue"),
+          meta: {
+            keepAlive: true,
+            titleKey: "announcements.settings.label",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "announcements/edit",
+          name: "announcementBannerEditor",
+          component: () => import("@/components/settings/AnnouncementBannerEditor.vue"),
+          meta: {
+            titleKey: "announcements.editor.routeTitle",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+      ],
+    );
+  }
   if (config.isCloud == "true") {
     routes[0].children.push(
       ...[

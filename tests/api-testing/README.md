@@ -114,11 +114,13 @@ file should pass strict ruff.
 | Marker | Meaning |
 |---|---|
 | `framework` | Self-tests for `support/` framework. Run with `-m framework`. |
+| `enterprise` | Needs an enterprise build (e.g. the on-call suite, whose routes an OSS server answers 404). Run with `-m enterprise`; deselect with `-m "not enterprise"`. |
 | `order(N)` | Run order pin (legacy — avoid in new tests). |
 
 ## Troubleshooting
 
 - **`KeyError: 'ZO_BASE_URL'` on collection** — `conftest.py` reads env vars at import. Export them before running pytest (even `--collect-only`).
+- **On-call ack-token tests skip** — they read the paging mail to get the acknowledgement token, which exists only in the delivered message. Start Mailpit (`MAILPIT_BASE_URL`, default `http://127.0.0.1:8025`) and point the server at it with `ZO_SMTP_ENABLED=true ZO_SMTP_HOST=127.0.0.1 ZO_SMTP_PORT=1025`. CI does not start Mailpit, so these skip there by design.
 - **`test_workflow.py` fails with SMTP error** — `ZO_SMTP_ENABLED=true` not set. CI does this; locally you'd need to wire an SMTP env.
 - **Test_organisations.py warning about `yield`** — `test_create_organization` uses pre-pytest-4 yield-style and is silently ignored. Scheduled for rewrite in Phase 4.
 
