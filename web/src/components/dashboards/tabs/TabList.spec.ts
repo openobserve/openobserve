@@ -41,8 +41,9 @@ vi.mock("./AddTab.vue", () => ({
 // Inline rename + reorder pull in i18n, the store, notifications and the tab
 // persistence helpers — mock them so the component mounts in isolation (mirrors
 // AddTab.spec).
+const mockT = vi.hoisted(() => vi.fn((key: string) => key));
 vi.mock("vue-i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({ t: mockT }),
 }));
 
 const mockStore = {
@@ -833,13 +834,23 @@ describe("TabList", () => {
     });
 
     it("describes the rename as old to new in the conflict dialog on a 409", async () => {
-      mockEditTab.mockRejectedValueOnce({ response: { status: 409 } });
+      const tab = { tabId: "tab1", name: "First Tab" };
+      // editTab renames the cached tab (the one on screen) before the save fails.
+      mockEditTab.mockImplementationOnce(async (...args: any[]) => {
+        tab.name = args[4].name;
+        throw { response: { status: 409 } };
+      });
       wrapper = createWrapper();
 
-      wrapper.vm.startRename({ tabId: "tab1", name: "First Tab" });
+      wrapper.vm.startRename(tab);
       await flushPromises();
       wrapper.vm.editingName = "Renamed Tab";
-      await wrapper.vm.commitRename({ tabId: "tab1", name: "First Tab" });
+      await wrapper.vm.commitRename(tab);
+
+      expect(mockT).toHaveBeenCalledWith("dashboard.saveConflict.change.renamedTab", {
+        from: "First Tab",
+        to: "Renamed Tab",
+      });
 
       // t() is mocked as identity, so the change carries the i18n key.
       expect(mockOpenConflict.mock.calls.at(-1)![0].change).toBe(

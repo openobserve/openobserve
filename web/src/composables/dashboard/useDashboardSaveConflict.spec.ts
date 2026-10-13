@@ -361,6 +361,7 @@ describe("regression pass on 093855bec9", () => {
 
     expect(toast).toHaveBeenCalledWith({
       variant: "success",
+      timeout: 15_000,
       message: `Loaded the latest version. Discarded your change: ${MY_CHANGE}`,
     });
     expect(toast.mock.invocationCallOrder[0]).toBeLessThan(onResolved.mock.invocationCallOrder[0]);
@@ -515,6 +516,7 @@ describe("fix round 1", () => {
     await dialog.reload();
     expect(toast).toHaveBeenCalledWith({
       variant: "success",
+      timeout: 15_000,
       message: `Loaded the latest version. Discarded your change: ${MY_CHANGE}`,
     });
   });

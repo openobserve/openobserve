@@ -332,6 +332,8 @@ export default defineComponent({
         return;
       }
 
+      // editTab renames the cached tab in place, and that is the object on screen, so read the old name first.
+      const previousName = tab?.name ?? "";
       try {
         await editTab(store, props.dashboardData?.dashboardId, folderId.value, tab.tabId, { name });
         emit("refresh");
@@ -340,7 +342,7 @@ export default defineComponent({
         notifyTabFailure(
           error,
           "dashboard.tabsSettings.tabUpdationFailed",
-          t("dashboard.saveConflict.change.renamedTab", { from: tab?.name ?? "", to: name }),
+          t("dashboard.saveConflict.change.renamedTab", { from: previousName, to: name }),
         );
       } finally {
         editingName.value = "";

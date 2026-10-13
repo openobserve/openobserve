@@ -75,6 +75,8 @@ interface ConflictSession {
   merged: any | null;
 }
 
+const RELOAD_TOAST_MS = 15_000;
+
 let session: ConflictSession | null = null;
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(toRaw(value) ?? null));
@@ -259,9 +261,10 @@ const reload = () =>
       return;
     }
     const discarded = changesText(s);
-    // Shown before the sites react: the panel editor navigates away when it hears "reloaded".
+    // Shown before the sites react (the panel editor navigates away), and kept longer than a routine success: it reports lost work.
     toast({
       variant: "success",
+      timeout: RELOAD_TOAST_MS,
       message: discarded
         ? s.ctx.t("dashboard.saveConflict.toastReloadedChange", { change: discarded })
         : s.ctx.t("dashboard.saveConflict.toastReloaded"),

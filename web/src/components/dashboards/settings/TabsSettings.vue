@@ -364,6 +364,8 @@ export default defineComponent({
     };
 
     const saveEdit = async () => {
+      // editTab renames the cached tab in place, so read the old name before it runs.
+      const previousName = tabNameOf(editTabObj.data.tabId);
       try {
         if (editTabId.value) {
           // only allowed to edit name
@@ -389,7 +391,7 @@ export default defineComponent({
             dashboardId: currentDashboardData.data.dashboardId,
             folderId: (route.query.folder as string) ?? "default",
             change: t("dashboard.saveConflict.change.renamedTab", {
-              from: tabNameOf(editTabObj.data.tabId),
+              from: previousName,
               to: editTabObj.data.name,
             }),
             onResolved: async () => {
@@ -428,6 +430,8 @@ export default defineComponent({
     };
 
     const confirmDelete = async (moveTabId: any) => {
+      // deleteTab removes the tab from the cached dashboard, so read its name first.
+      const deletedName = tabNameOf(tabIdToBeDeleted.value);
       try {
         await deleteTab(
           store,
@@ -451,7 +455,7 @@ export default defineComponent({
             dashboardId: currentDashboardData.data.dashboardId,
             folderId: (route.query.folder as string) ?? "default",
             change: t("dashboard.saveConflict.change.deletedTab", {
-              name: tabNameOf(tabIdToBeDeleted.value),
+              name: deletedName,
             }),
             onResolved: async () => {
               tabIdToBeDeleted.value = null;
