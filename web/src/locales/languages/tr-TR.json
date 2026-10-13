@@ -17800,7 +17800,8 @@
       "tokenLink": "org tokeni · {name}",
       "tokenLinkTooltip": "Kod parçacıklarının hangi veri alımı tokenini kullanacağını seçin",
       "copiedWithToken": "org tokeni {name} ile kopyalandı",
-      "tokenIncludedHint": "Kuruluşun veri alımı belirteci dahildir; burada gizli kalır."
+      "tokenIncludedHint": "Kopyalama, organizasyonun veri alımı token'ını içerir; bu token burada gizli kalır.",
+      "maskedSelectionWarning": "Gizli token noktalar olarak kopyalandı. Kopyala'yı kullanın veya önce Göster'e tıklayın."
     },
     "spinner": {
       "loading": "Yükleniyor"

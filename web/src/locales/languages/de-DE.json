@@ -17800,7 +17800,8 @@
       "tokenLink": "Organisations-Token · {name}",
       "tokenLinkTooltip": "Wählen Sie, welches Datenerfassungs-Token die Snippets verwenden",
       "copiedWithToken": "Mit Organisations-Token {name} kopiert",
-      "tokenIncludedHint": "Das Datenerfassungs-Token der Organisation ist enthalten; es bleibt hier ausgeblendet."
+      "tokenIncludedHint": "Kopieren enthält das Datenerfassungs-Token der Organisation, das hier ausgeblendet bleibt.",
+      "maskedSelectionWarning": "Das ausgeblendete Token wurde als Punkte kopiert. Verwenden Sie Kopieren oder zeigen Sie es zuerst an."
     },
     "spinner": {
       "loading": "Wird geladen"

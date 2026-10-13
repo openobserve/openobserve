@@ -17800,7 +17800,8 @@
       "tokenLink": "org-token · {name}",
       "tokenLinkTooltip": "Kies welk ingestietoken de snippets gebruiken",
       "copiedWithToken": "Gekopieerd met org-token {name}",
-      "tokenIncludedHint": "Het ingestietoken van de organisatie is inbegrepen; het blijft hier verborgen."
+      "tokenIncludedHint": "Kopiëren bevat het ingestietoken van de organisatie, dat hier verborgen blijft.",
+      "maskedSelectionWarning": "Het verborgen token is als punten gekopieerd. Gebruik Kopiëren of maak het eerst zichtbaar."
     },
     "spinner": {
       "loading": "Laden"

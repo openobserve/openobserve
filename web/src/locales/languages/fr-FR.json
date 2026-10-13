@@ -17800,7 +17800,8 @@
       "tokenLink": "jeton d'organisation · {name}",
       "tokenLinkTooltip": "Choisissez le jeton d'ingestion utilisé par les extraits de code",
       "copiedWithToken": "Copié avec le jeton d'organisation {name}",
-      "tokenIncludedHint": "Le jeton d'ingestion de l'organisation est inclus ; il reste masqué ici."
+      "tokenIncludedHint": "La copie inclut le token d'ingestion de l'organisation, qui reste masqué ici.",
+      "maskedSelectionWarning": "Le token masqué a été copié sous forme de points. Utilisez Copier ou Révéler d'abord."
     },
     "spinner": {
       "loading": "Chargement"

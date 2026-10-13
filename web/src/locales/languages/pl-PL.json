@@ -17800,7 +17800,8 @@
       "tokenLink": "token organizacji · {name}",
       "tokenLinkTooltip": "Wybierz, którego tokenu pozyskiwania danych używają fragmenty kodu",
       "copiedWithToken": "Skopiowano z tokenem organizacji {name}",
-      "tokenIncludedHint": "Token pozyskiwania danych organizacji jest dołączony; pozostaje tu ukryty."
+      "tokenIncludedHint": "Kopiowanie obejmuje token pozyskiwania danych organizacji, który pozostaje tutaj ukryty.",
+      "maskedSelectionWarning": "Ukryty token został skopiowany jako kropki. Użyj opcji Kopiuj lub najpierw go pokaż."
     },
     "spinner": {
       "loading": "Ładowanie"

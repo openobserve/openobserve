@@ -17800,7 +17800,8 @@
       "tokenLink": "token de la organización · {name}",
       "tokenLinkTooltip": "Elige qué token de ingesta usan los fragmentos de código",
       "copiedWithToken": "Copiado con el token de la organización {name}",
-      "tokenIncludedHint": "El token de ingesta de la organización está incluido; permanece oculto aquí."
+      "tokenIncludedHint": "Copiar incluye el token de ingesta de la organización, que permanece oculto aquí.",
+      "maskedSelectionWarning": "El token oculto se copió como puntos. Usa Copiar o Revélalo primero."
     },
     "spinner": {
       "loading": "Cargando"

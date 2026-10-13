@@ -17795,7 +17795,8 @@
       "tokenLink": "組織權杖 · {name}",
       "tokenLinkTooltip": "選擇程式碼片段使用的資料擷取權杖",
       "copiedWithToken": "已複製，使用組織權杖 {name}",
-      "tokenIncludedHint": "已包含組織的資料擷取權杖；在此保持隱藏。"
+      "tokenIncludedHint": "複製的內容包含組織的資料擷取 token，該 token 在此處會保持隱藏。",
+      "maskedSelectionWarning": "隱藏的 token 已複製為點號。請使用「複製」，或先將其顯示。"
     },
     "spinner": {
       "loading": "載入中"

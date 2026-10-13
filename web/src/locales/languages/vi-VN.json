@@ -17800,7 +17800,8 @@
       "tokenLink": "token tổ chức · {name}",
       "tokenLinkTooltip": "Chọn token tiếp nhận dữ liệu mà các đoạn mã sử dụng",
       "copiedWithToken": "Đã sao chép với token tổ chức {name}",
-      "tokenIncludedHint": "Token tiếp nhận dữ liệu của tổ chức đã được bao gồm; token được ẩn ở đây."
+      "tokenIncludedHint": "Việc sao chép bao gồm token tiếp nhận dữ liệu của tổ chức, token này vẫn được ẩn ở đây.",
+      "maskedSelectionWarning": "Token ẩn đã được sao chép dưới dạng dấu chấm. Hãy dùng Sao chép, hoặc Hiện nó trước."
     },
     "spinner": {
       "loading": "Đang tải"

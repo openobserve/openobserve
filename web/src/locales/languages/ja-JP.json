@@ -17800,7 +17800,8 @@
       "tokenLink": "組織トークン · {name}",
       "tokenLinkTooltip": "スニペットが使用する取り込みトークンを選択",
       "copiedWithToken": "組織トークン {name} でコピーしました",
-      "tokenIncludedHint": "組織の取り込みトークンが含まれています。ここでは非表示のままです。"
+      "tokenIncludedHint": "コピーには組織の取り込みトークンが含まれますが、ここでは非表示のままです。",
+      "maskedSelectionWarning": "非表示のトークンはドットとしてコピーされました。コピーを使用するか、先に表示してください。"
     },
     "spinner": {
       "loading": "読み込み中"

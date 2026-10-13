@@ -17800,7 +17800,8 @@
       "tokenLink": "token org · {name}",
       "tokenLinkTooltip": "Scegli quale token di ingestione usano gli snippet",
       "copiedWithToken": "Copiato con il token org {name}",
-      "tokenIncludedHint": "Il token di ingestione dell'organizzazione è incluso; qui rimane nascosto."
+      "tokenIncludedHint": "La copia include il token di ingestione dell'organizzazione, che resta nascosto qui.",
+      "maskedSelectionWarning": "Il token nascosto è stato copiato come punti. Usa Copia oppure rivelalo prima."
     },
     "spinner": {
       "loading": "Caricamento"

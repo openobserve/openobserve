@@ -17800,7 +17800,8 @@
       "tokenLink": "조직 토큰 · {name}",
       "tokenLinkTooltip": "코드 조각에서 사용할 수집 토큰 선택",
       "copiedWithToken": "조직 토큰 {name}(으)로 복사됨",
-      "tokenIncludedHint": "조직의 수집 토큰이 포함되어 있으며 여기서는 숨겨진 상태로 유지됩니다."
+      "tokenIncludedHint": "복사 내용에는 조직의 수집 토큰이 포함되며, 이 토큰은 여기에서 숨김 상태로 유지됩니다.",
+      "maskedSelectionWarning": "숨겨진 토큰이 점으로 복사되었습니다. 복사를 사용하거나 먼저 표시하세요."
     },
     "spinner": {
       "loading": "로딩 중"

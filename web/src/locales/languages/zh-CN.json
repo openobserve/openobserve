@@ -17800,7 +17800,8 @@
       "tokenLink": "组织令牌 · {name}",
       "tokenLinkTooltip": "选择代码片段使用的摄取令牌",
       "copiedWithToken": "已使用组织令牌 {name} 复制",
-      "tokenIncludedHint": "已包含组织的摄取令牌；此处保持隐藏。"
+      "tokenIncludedHint": "复制内容中包含组织的摄取令牌，该令牌在此处保持隐藏。",
+      "maskedSelectionWarning": "隐藏的令牌已以圆点形式复制。请使用复制，或先将其显示。"
     },
     "spinner": {
       "loading": "加载中"
