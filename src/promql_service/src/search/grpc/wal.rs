@@ -32,7 +32,7 @@ use hashbrown::HashSet;
 use infra::cluster::get_cached_online_ingester_nodes;
 use promql::{
     ScanContext,
-    utils::{apply_label_selector, apply_matchers},
+    utils::{apply_label_selector, apply_matchers, exclude_exemplar_hosts},
 };
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
@@ -57,6 +57,7 @@ pub(crate) async fn create_context(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
+    query_exemplars: bool,
 ) -> Result<Vec<ScanContext>> {
     let mut resp = vec![];
     // fetch all schema versions, get latest schema
@@ -82,6 +83,7 @@ pub(crate) async fn create_context(
         time_range,
         matchers,
         label_selector,
+        query_exemplars,
     )
     .await?;
     let warnings = if partial_err.is_empty() {
@@ -153,6 +155,7 @@ async fn get_wal_batches(
     time_range: (i64, i64),
     matchers: Matchers,
     label_selector: HashSet<String>,
+    query_exemplars: bool,
 ) -> Result<(ScanStats, Vec<RecordBatch>, Arc<Schema>, String)> {
     let cfg = get_config();
     let Some(nodes) = get_cached_online_ingester_nodes()
@@ -192,6 +195,10 @@ async fn get_wal_batches(
     };
 
     df = apply_matchers(df, &matchers)?;
+    // the label projection below drops `exemplars`, so host rows must go before it
+    if !query_exemplars {
+        df = exclude_exemplar_hosts(df, cfg.prom.staleness_markers_enabled)?;
+    }
 
     match apply_label_selector(df, &schema, &label_selector) {
         Some(dataframe) => df = dataframe,

@@ -59,6 +59,7 @@ struct GroupPlan {
 struct StorageProvider {
     trace_id: String,
     need_wal: bool,
+    query_exemplars: bool,
 }
 
 #[async_trait]
@@ -100,6 +101,7 @@ impl TableProvider for StorageProvider {
                 time_range,
                 matchers,
                 label_selector,
+                self.query_exemplars,
             )
             .await?;
             for ctx in wal_ctx_list {
@@ -412,6 +414,7 @@ pub async fn search_inner(
         StorageProvider {
             trace_id: trace_id.to_string(),
             need_wal: req.need_wal,
+            query_exemplars: query.query_exemplars,
         },
         query.label_selector.clone(),
     );

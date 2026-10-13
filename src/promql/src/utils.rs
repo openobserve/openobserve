@@ -155,7 +155,7 @@ pub(crate) fn apply_time_window(
 }
 
 /// Drops exemplar host rows from a sample scan: a NULL `value` beside exemplars is not a marker.
-pub(crate) fn exclude_exemplar_hosts(df: DataFrame, stale_markers: bool) -> Result<DataFrame> {
+pub fn exclude_exemplar_hosts(df: DataFrame, stale_markers: bool) -> Result<DataFrame> {
     // with markers off a NULL value yields no sample, so the host row is already invisible
     if !stale_markers
         || df

@@ -196,6 +196,7 @@ pub async fn remote_write(
     let mut sample_count = 0;
     let mut exemplar_count = 0;
     let mut dropped_exemplars = 0;
+    let mut bucket_value_columns: HashMap<String, bool> = HashMap::new();
 
     // Pre-load all configurations for unique metrics to avoid repeated queries
     let preload_start = std::time::Instant::now();
@@ -471,34 +472,6 @@ pub async fn remote_write(
             );
         }
 
-        if !event.exemplars.is_empty() {
-            exemplar_count += event.exemplars.len();
-            // a host row needs the `value` column samples create, like a stale marker does
-            if !ingest::has_value_column(schema) && !sink.has_records(&metric_name) {
-                dropped_exemplars += event.exemplars.len();
-            } else {
-                let host_labels = if event.histograms.is_empty() {
-                    std::mem::take(&mut labels)
-                } else {
-                    labels.clone()
-                };
-                let hosts = exemplar_host_records(host_labels, &event.exemplars);
-                if !hosts.is_empty() && !gate.admit().await {
-                    ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
-                    return Ok(());
-                }
-                for (record, timestamp) in hosts {
-                    buffer_metric_record(
-                        &metric_name,
-                        json::Value::Object(record),
-                        timestamp,
-                        known_hash,
-                        &mut sink,
-                    );
-                }
-            }
-        }
-
         if !event.histograms.is_empty() {
             match buffer_native_histograms(
                 &event.histograms,
@@ -516,6 +489,47 @@ pub async fn remote_write(
                     return Ok(());
                 }
             }
+        }
+
+        if event.exemplars.is_empty() {
+            continue;
+        }
+        exemplar_count += event.exemplars.len();
+        let Some(host_stream) = exemplar_host_stream(
+            org_id,
+            &metric_name,
+            schema,
+            &sink,
+            &mut bucket_value_columns,
+        )
+        .await
+        else {
+            dropped_exemplars += event.exemplars.len();
+            continue;
+        };
+        // a bucket stream names its rows after itself, and their hash is computed on write
+        let host_hash = if host_stream == metric_name {
+            known_hash
+        } else {
+            labels.insert(
+                NAME_LABEL.to_string(),
+                json::Value::String(host_stream.clone()),
+            );
+            None
+        };
+        let hosts = exemplar_host_records(std::mem::take(&mut labels), &event.exemplars);
+        if !hosts.is_empty() && !gate.admit().await {
+            ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
+            return Ok(());
+        }
+        for (record, timestamp) in hosts {
+            buffer_metric_record(
+                &host_stream,
+                json::Value::Object(record),
+                timestamp,
+                host_hash,
+                &mut sink,
+            );
         }
     }
 
@@ -1178,6 +1192,36 @@ fn build_metric_record(
         json::Value::Number(timestamp.into()),
     );
     record
+}
+
+/// The stream a host row lands in: the series' own, else a native histogram's bucket stream.
+async fn exemplar_host_stream(
+    org_id: &str,
+    metric_name: &str,
+    schema: Option<&SchemaCache>,
+    sink: &RecordSink<'_>,
+    bucket_value_columns: &mut HashMap<String, bool>,
+) -> Option<String> {
+    // a host row needs the `value` column samples create, like a stale marker does
+    if ingest::has_value_column(schema) || sink.has_records(metric_name) {
+        return Some(metric_name.to_string());
+    }
+    // a native histogram writes only its classic streams, so its exemplars sit by the buckets
+    let bucket = format!("{metric_name}{}", CLASSIC_HISTOGRAM_SUFFIXES[0]);
+    if sink.has_records(&bucket) {
+        return Some(bucket);
+    }
+    let has_value = match bucket_value_columns.get(&bucket) {
+        Some(known) => *known,
+        None => {
+            let has_value = infra::schema::get_cache(org_id, &bucket, StreamType::Metrics)
+                .await
+                .is_ok_and(|cache| ingest::has_value_column(Some(&cache)));
+            bucket_value_columns.insert(bucket.clone(), has_value);
+            has_value
+        }
+    };
+    has_value.then_some(bucket)
 }
 
 /// One host row per exemplar timestamp: a NULL `value` plus the `exemplars` string OTLP writes.
@@ -2020,6 +2064,51 @@ mod tests {
         );
 
         assert!(exemplar_host_records(labels, &exemplars[1..2]).is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_exemplar_host_stream_falls_back_to_a_native_histogram_bucket_stream() {
+        use datafusion::arrow::datatypes::{DataType, Field};
+
+        let pipelines = HashMap::new();
+        let uds = HashMap::new();
+        let mut pipeline_inputs = HashMap::new();
+        let mut json_data_by_stream: JsonDataByStream = HashMap::new();
+        json_data_by_stream.insert("rpc_latency_bucket".to_string(), vec![]);
+        let sink = RecordSink {
+            pipelines: &pipelines,
+            user_defined_schema: &uds,
+            pipeline_inputs: &mut pipeline_inputs,
+            json_data_by_stream: &mut json_data_by_stream,
+        };
+        let with_value = SchemaCache::new(Schema::new(vec![Field::new(
+            VALUE_LABEL,
+            DataType::Float64,
+            true,
+        )]));
+        let mut known = HashMap::new();
+
+        // the series' own stream wins whenever it has or gets a value column
+        assert_eq!(
+            exemplar_host_stream("o", "up", Some(&with_value), &sink, &mut known).await,
+            Some("up".to_string())
+        );
+        // buckets buffered by this request host a native histogram's exemplars
+        assert_eq!(
+            exemplar_host_stream("o", "rpc_latency", None, &sink, &mut known).await,
+            Some("rpc_latency_bucket".to_string())
+        );
+        // a bucket stream already known to lack a value column drops them
+        known.insert("http_latency_bucket".to_string(), false);
+        assert_eq!(
+            exemplar_host_stream("o", "http_latency", None, &sink, &mut known).await,
+            None
+        );
+        known.insert("db_latency_bucket".to_string(), true);
+        assert_eq!(
+            exemplar_host_stream("o", "db_latency", None, &sink, &mut known).await,
+            Some("db_latency_bucket".to_string())
+        );
     }
 
     #[test]
