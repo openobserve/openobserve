@@ -122,12 +122,12 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oncall_team: Option<String>,
     /// Normalized selection tags (PT-6). Omitted when empty.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     /// Names of the notification destinations this alert delivers to
     /// (`Alert.destinations`). Lets the destination↔alert dependency view build
     /// the linkage from the list alone; omitted when empty.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub destinations: Vec<String>,
     /// Alert-level template override (`Alert.template`): when set it replaces the
     /// destination-level template for every destination above. Absent when the
