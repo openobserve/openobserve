@@ -870,23 +870,37 @@ pub async fn get_label_values(
 
     if label_name == NAME_LABEL {
         // Lists stream names; no SQL needed, just filter the schema catalogue.
-        let name_matchers: Vec<_> = selector
-            .as_ref()
+        let sel = selector.as_ref();
+
+        // OR matchers cannot be evaluated correctly against the flat catalogue.
+        if sel.is_some_and(|s| !s.matchers.or_matchers.is_empty()) {
+            return Err(Error::Message(
+                "match[] with OR matchers is not supported for __name__ label values".to_owned(),
+            ));
+        }
+
+        // Bare selectors store the metric in selector.name rather than in matchers.
+        let mut name_matchers: Vec<_> = sel
             .map(|s| s.matchers.find_matchers(NAME_LABEL))
             .unwrap_or_default();
+        if let Some(name) = sel
+            .and_then(|s| s.name.as_deref())
+            .filter(|n| !n.is_empty())
+        {
+            name_matchers.push(promql_parser::label::Matcher {
+                name: NAME_LABEL.to_string(),
+                op: MatchOp::Equal,
+                value: name.to_string(),
+            });
+        }
+
         let stream_schemas = db::schema::list(org_id, Some(stream_type), true)
             .await
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
         'schema: for schema in stream_schemas {
             for matcher in &name_matchers {
-                let ok = match &matcher.op {
-                    MatchOp::Equal => matcher.value == schema.stream_name,
-                    MatchOp::NotEqual => matcher.value != schema.stream_name,
-                    MatchOp::Re(re) => re.is_match(&schema.stream_name),
-                    MatchOp::NotRe(re) => !re.is_match(&schema.stream_name),
-                };
-                if !ok {
+                if !matcher.is_match(&schema.stream_name) {
                     continue 'schema;
                 }
             }
@@ -1924,37 +1938,46 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("match[]"));
     }
 
-    fn matches_name_matchers(name: &str, matchers: &[Matcher]) -> bool {
-        for matcher in matchers {
-            let ok = match &matcher.op {
-                MatchOp::Equal => matcher.value == name,
-                MatchOp::NotEqual => matcher.value != name,
-                MatchOp::Re(re) => re.is_match(name),
-                MatchOp::NotRe(re) => !re.is_match(name),
-            };
-            if !ok {
-                return false;
-            }
-        }
-        true
+    #[tokio::test]
+    async fn test_get_label_values_name_bare_selector_uses_selector_name() {
+        use promql_parser::parser;
+        let parser::Expr::VectorSelector(sel) = parser::parse("up").unwrap() else {
+            panic!("expected vector selector");
+        };
+        assert_eq!(sel.name.as_deref(), Some("up"));
+        assert!(sel.matchers.find_matchers(NAME_LABEL).is_empty());
+        let result =
+            get_label_values("default", NAME_LABEL.to_owned(), Some(sel), 0, i64::MAX).await;
+        let names = result.expect("should succeed");
+        assert!(
+            names.iter().all(|n| n == "up"),
+            "bare selector must filter to only the named metric, got: {names:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_label_values_name_rejects_or_matchers() {
+        use promql_parser::parser;
+        let parser::Expr::VectorSelector(sel) =
+            parser::parse(r#"{__name__=~"up" or __name__=~"node_cpu"}"#).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        assert!(!sel.matchers.or_matchers.is_empty());
+        let result =
+            get_label_values("default", NAME_LABEL.to_owned(), Some(sel), 0, i64::MAX).await;
+        assert!(result.is_err(), "OR matchers must be rejected");
     }
 
     #[test]
     fn test_name_matchers_filter_equal() {
-        // MatchOp::Equal keeps only the exact name
         let matcher = Matcher {
             name: NAME_LABEL.to_string(),
             op: MatchOp::Equal,
             value: "node_cpu".to_string(),
         };
-        assert!(matches_name_matchers(
-            "node_cpu",
-            std::slice::from_ref(&matcher)
-        ));
-        assert!(!matches_name_matchers(
-            "node_memory",
-            std::slice::from_ref(&matcher)
-        ));
+        assert!(matcher.is_match("node_cpu"));
+        assert!(!matcher.is_match("node_memory"));
     }
 
     #[test]
@@ -1964,14 +1987,8 @@ mod tests {
             op: MatchOp::NotEqual,
             value: "node_cpu".to_string(),
         };
-        assert!(!matches_name_matchers(
-            "node_cpu",
-            std::slice::from_ref(&matcher)
-        ));
-        assert!(matches_name_matchers(
-            "node_memory",
-            std::slice::from_ref(&matcher)
-        ));
+        assert!(!matcher.is_match("node_cpu"));
+        assert!(matcher.is_match("node_memory"));
     }
 
     #[test]
@@ -1982,9 +1999,9 @@ mod tests {
             panic!("expected vector selector");
         };
         let matchers = sel.matchers.find_matchers(NAME_LABEL);
-        assert!(matches_name_matchers("node_cpu", &matchers));
-        assert!(matches_name_matchers("node_memory", &matchers));
-        assert!(!matches_name_matchers("http_requests", &matchers));
+        assert!(matchers.iter().all(|m| m.is_match("node_cpu")));
+        assert!(matchers.iter().all(|m| m.is_match("node_memory")));
+        assert!(!matchers.iter().all(|m| m.is_match("http_requests")));
     }
 
     #[test]
@@ -1996,14 +2013,8 @@ mod tests {
             panic!("expected vector selector");
         };
         let matchers = sel.matchers.find_matchers(NAME_LABEL);
-        assert!(!matches_name_matchers("node_cpu", &matchers));
-        assert!(matches_name_matchers("http_requests", &matchers));
-    }
-
-    #[test]
-    fn test_name_matchers_filter_empty_passes_all() {
-        // no matchers = no filter = every name passes
-        assert!(matches_name_matchers("anything", &[]));
+        assert!(!matchers.iter().all(|m| m.is_match("node_cpu")));
+        assert!(matchers.iter().all(|m| m.is_match("http_requests")));
     }
 
     #[tokio::test]

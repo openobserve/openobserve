@@ -1864,11 +1864,11 @@ mod tests {
                 "{matcher}"
             );
         }
-        // __name__ accepts regex and negation matchers — the exact-name requirement does not apply
+        // __name__ accepts regex and negation matchers without requiring an exact metric name
         for matcher in [
             r#"{__name__=~"node.*"}"#,
-            r#"{__name__!~"up.*"}"#,
-            r#"{__name__!="up"}"#,
+            r#"{__name__=~".+", __name__!~"up.*"}"#,
+            r#"{__name__=~".+", __name__!="up"}"#,
             r#"{job="prometheus"}"#,
         ] {
             assert!(
