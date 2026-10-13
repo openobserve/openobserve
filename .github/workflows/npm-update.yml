@@ -94,6 +94,16 @@ jobs:
           # Apply the same upgrades that were just reported.
           npx --yes npm-check-updates -u $NCU_ARGS
 
+          # Locked typescript-eslint family versions conflict with the bumped peer ranges (ERESOLVE); re-resolve them.
+          node -e '
+            const fs = require("fs");
+            const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+            for (const k of Object.keys(lock.packages)) {
+              if (/node_modules\/(@typescript-eslint\/|typescript-eslint$)/.test(k)) delete lock.packages[k];
+            }
+            fs.writeFileSync("package-lock.json", JSON.stringify(lock, null, 2) + "\n");
+          '
+
           # Regenerate package-lock.json only — node_modules is never needed
           # here, and skipping the install keeps this job to well under a minute.
           npm install --package-lock-only
