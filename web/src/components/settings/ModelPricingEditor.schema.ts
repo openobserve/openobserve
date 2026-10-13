@@ -279,21 +279,25 @@ function conditionRange(c: NonNullable<TieTier["condition"]>) {
 }
 
 function provablyExclusive(a: TieTier, b: TieTier): boolean {
-  for (const ra of a.rules ?? []) {
-    if (ra.op !== "in") continue;
-    const keysA = splitList(ra.keys ?? "")
-      .map(normalizeRuleKey)
-      .join(",");
-    const valuesA = new Set(splitList(ra.values ?? "").map((v) => v.toLowerCase()));
-    for (const rb of b.rules ?? []) {
-      if (rb.op !== "in") continue;
-      if (
-        splitList(rb.keys ?? "")
-          .map(normalizeRuleKey)
-          .join(",") !== keysA
-      )
-        continue;
-      if (!splitList(rb.values ?? "").some((v) => valuesA.has(v.toLowerCase()))) return true;
+  const setRule = (r: NonNullable<TieTier["rules"]>[number]) =>
+    r.op === "in" || r.op === "not_in"
+      ? {
+          op: r.op,
+          keys: splitList(r.keys ?? "")
+            .map(normalizeRuleKey)
+            .join(","),
+          values: splitList(r.values ?? "").map((v) => v.toLowerCase()),
+        }
+      : null;
+  for (const ra of (a.rules ?? []).map(setRule)) {
+    if (!ra) continue;
+    for (const rb of (b.rules ?? []).map(setRule)) {
+      if (!rb || rb.keys !== ra.keys) continue;
+      if (ra.op === "in" && rb.op === "in" && !rb.values.some((v) => ra.values.includes(v)))
+        return true;
+      const [inc, exc] = ra.op === "in" ? [ra, rb] : [rb, ra];
+      if (inc.op === "in" && exc.op === "not_in" && inc.values.every((v) => exc.values.includes(v)))
+        return true;
     }
   }
   if (a.condition && b.condition && a.condition.usage_key === b.condition.usage_key) {
@@ -314,7 +318,7 @@ function provablyExclusive(a: TieTier, b: TieTier): boolean {
 export function findAmbiguousTiers(tiers: TieTier[]): Array<[number, number]> {
   const info = tiers.map((tier, i) => {
     const items = restrictionItems(tier);
-    return { i, tier, items, set: new Set(items), priority: Number(tier.priority) || 0 };
+    return { i, tier, items, priority: Number(tier.priority) || 0 };
   });
   const candidates = info.filter((t) => t.i > 0 && t.items.length > 0);
   const outranks = (k: (typeof info)[number], x: (typeof info)[number]) =>
@@ -326,12 +330,10 @@ export function findAmbiguousTiers(tiers: TieTier[]): Array<[number, number]> {
       const y = candidates[b];
       if (x.priority !== y.priority || x.items.length !== y.items.length) continue;
       if (provablyExclusive(x.tier, y.tier)) continue;
+      // A tier built only from x's and y's restrictions matches every span both match.
+      const union = new Set([...x.items, ...y.items]);
       const covered = candidates.some(
-        (k) =>
-          k !== x &&
-          k !== y &&
-          outranks(k, x) &&
-          [...x.items, ...y.items].every((item) => k.set.has(item)),
+        (k) => outranks(k, x) && k.items.every((item) => union.has(item)),
       );
       if (!covered) pairs.push([x.i, y.i]);
     }

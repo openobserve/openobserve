@@ -117,6 +117,14 @@ pub async fn sync_built_in_from_github(force_refresh: bool) -> Result<SyncResult
             updated_at: 0,
             children: Vec::new(),
         };
+        // An invalid entry could overprice every span; keep the previously stored row.
+        if let Err(e) = definition.validate_tiers(true) {
+            log::warn!(
+                "[model_pricing_sync] skipping invalid entry '{}': {e}",
+                definition.name
+            );
+            continue;
+        }
 
         match table::model_pricing::put(definition).await {
             Ok(_) => {

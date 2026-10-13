@@ -938,6 +938,28 @@ describe("ModelPricingEditor.vue", () => {
         ).toEqual([]);
       });
 
+      it("is not resolved by a combined tier with an extra restriction", () => {
+        const region = { keys: "resource.cloud.region", op: "in", values: "eu-west-1" };
+        expect(
+          findAmbiguousTiers([
+            base,
+            { ...base, condition: extended },
+            { ...base, rules: [flexRule("priority")] },
+            { ...base, condition: extended, rules: [flexRule("priority"), region] },
+          ]),
+        ).toEqual([[1, 2]]);
+      });
+
+      it("treats in against a not_in excluding its values as exclusive", () => {
+        expect(
+          findAmbiguousTiers([
+            base,
+            { ...base, rules: [flexRule("flex")] },
+            { ...base, rules: [{ ...flexRule("flex, priority"), op: "not_in" }] },
+          ]),
+        ).toEqual([]);
+      });
+
       it("is resolved by giving one tier a different priority", () => {
         expect(
           findAmbiguousTiers([
