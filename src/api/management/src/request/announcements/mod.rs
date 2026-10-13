@@ -202,10 +202,21 @@ async fn save_config(mut body: serde_json::Value) -> Response {
     let revision = stored.as_ref().map_or(0, |s| s.revision);
 
     // A body without a revision comes from a client that predates it, and is saved as before.
-    let based_on = body
+    let based_on = match body
         .as_object_mut()
         .and_then(|obj| obj.remove(storage::REVISION_FIELD))
-        .and_then(|r| r.as_u64());
+    {
+        None | Some(serde_json::Value::Null) => None,
+        // Read as absent, a malformed revision would skip the conflict check entirely.
+        Some(r) => match r.as_u64() {
+            Some(r) => Some(r),
+            None => {
+                return MetaHttpResponse::bad_request(
+                    "\"revision\" must be a non-negative integer",
+                );
+            }
+        },
+    };
     if based_on.is_some_and(|r| r != revision) {
         return MetaHttpResponse::conflict(
             "The announcement banners were changed by someone else. Reload and try again.",

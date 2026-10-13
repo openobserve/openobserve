@@ -599,6 +599,7 @@ import {
   type BannerDraft,
   type BannerStyle,
 } from "./announcementDrafts";
+import { formatStamp } from "./announcementSummaries";
 import {
   AnnouncementConflictError,
   sameAuthored,
@@ -796,9 +797,6 @@ const saveLabel = computed(() => {
   if (pendingStatus.value === "scheduled") return t("announcements.editor.schedule");
   return t("common.save");
 });
-
-const formatStamp = (ms: number) =>
-  new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
 /** One line saying when the banner will actually be up, so the two choices read as a sentence. */
 const scheduleHint = computed(() => {

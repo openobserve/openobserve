@@ -24,7 +24,7 @@ const STAMP: Intl.DateTimeFormatOptions = {
 };
 
 /** A short local stamp; `withZone` names the zone once per summary so the times are unambiguous. */
-const formatStamp = (value: string, withZone = false) =>
+export const formatStamp = (value: string | number, withZone = false) =>
   new Date(value).toLocaleString(undefined, withZone ? { ...STAMP, timeZoneName: "short" } : STAMP);
 
 const RELATIVE_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
