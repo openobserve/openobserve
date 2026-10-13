@@ -546,7 +546,7 @@
           type="button"
           variant="outline"
           size="sm-action"
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || sendingConfirmed"
           data-test="ai-experiment-form-cancel-btn"
           @click="goBack"
         >
@@ -556,7 +556,7 @@
           type="submit"
           variant="primary"
           size="sm-action"
-          :loading="isSubmitting"
+          :loading="isSubmitting || sendingConfirmed"
           data-test="ai-experiment-form-submit-btn"
         >
           {{
@@ -675,6 +675,9 @@ const costDialog = reactive({
   message: "" as I18nText,
   body: null as ExperimentCreatePayload | null,
 });
+// True while a confirmed create runs: it starts from the dialog, outside the
+// form's own submit, so isSubmitting does not cover it.
+const sendingConfirmed = ref(false);
 let allowLeave = false;
 
 /** A query value only when it is really there — an absent key must fall through
@@ -1071,9 +1074,16 @@ function askCostConfirmation(body: ExperimentCreatePayload) {
   costDialog.show = true;
 }
 
-function confirmCost() {
-  if (costDialog.body) send({ ...costDialog.body, confirmCostEstimate: true });
+async function confirmCost() {
+  const body = costDialog.body;
   costDialog.body = null;
+  if (!body) return;
+  sendingConfirmed.value = true;
+  try {
+    await send({ ...body, confirmCostEstimate: true });
+  } finally {
+    sendingConfirmed.value = false;
+  }
 }
 
 /** What a preview depends on: the payload without its name, description and key. */
@@ -1082,6 +1092,7 @@ function previewKey(payload: ExperimentCreatePayload): string {
 }
 
 async function onSubmit(values: ExperimentForm) {
+  if (sendingConfirmed.value) return;
   // The server pins scorer versions itself; reusing the preview's pins when
   // one is in hand just closes the gap if a version ships mid-edit.
   const payload = buildPayload(values);

@@ -556,6 +556,27 @@ describe("ExperimentForm", () => {
       expect(message).not.toContain("confirmCostEstimate");
     });
 
+    it("stays busy until the confirmed create ends, and sends it once", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({ ...previewResult, costEstimate });
+      (llmExperimentsService.create as any).mockReturnValue(new Promise(() => {}));
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      await submit(wrapper);
+      costDialog(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+
+      const submitBtn = wrapper
+        .findAllComponents({ name: "OButton" })
+        .find((b: any) => b.attributes("data-test") === "ai-experiment-form-submit-btn");
+      expect(submitBtn.props("loading")).toBe(true);
+
+      await submit(wrapper); // a second click while the first create is pending
+      if (costDialog(wrapper).props("modelValue")) costDialog(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+      expect(llmExperimentsService.create).toHaveBeenCalledTimes(1);
+    });
+
     it("does not resend on cancel and keeps the form", async () => {
       (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
       wrapper = await createWrapper();
