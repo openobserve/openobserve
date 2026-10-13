@@ -29,7 +29,12 @@ jobs:
       # `--peer` cannot catch this: vue-tsc declares `typescript: >=5.0.0`, which
       # 7.x satisfies. Bump TypeScript by hand, together with a vue-tsc release
       # that supports it (5.x and 6.x are both fine today).
-      NCU_ARGS: --target latest --peer --reject typescript
+      #
+      # The other rejected packages have majors that break the build; bump them by hand:
+      # monaco-editor (restricted import paths), @tanstack/vue-table (v9 drops useVueTable),
+      # eslint (v10 drops @eslint/js, plugins need eslint 9), js-yaml (v5 drops the default export),
+      # vite (v8 swaps esbuild for rolldown), jsdom (v30 needs a newer Node).
+      NCU_ARGS: --target latest --peer --reject typescript,monaco-editor,@tanstack/vue-table,eslint,js-yaml,vite,jsdom,@types/jsdom,@eslint/css,eslint-plugin-cypress,vite-plugin-istanbul,unplugin-icons
 
     steps:
       - name: Clone the current repo
@@ -52,6 +57,10 @@ jobs:
         run: |
           # Commit as the PAT owner so the commit and the PR share one author.
           read -r LOGIN ID < <(gh api user --jq '"\(.login) \(.id)"')
+          if [ -z "$LOGIN" ] || [ -z "$ID" ]; then
+            echo "::error::gh api user returned no identity; check that ORG_ADMIN_TOKEN is valid"
+            exit 1
+          fi
           git config user.name "$LOGIN"
           git config user.email "${ID}+${LOGIN}@users.noreply.github.com"
 
@@ -96,15 +105,8 @@ jobs:
           # Apply the same upgrades that were just reported.
           npx --yes npm-check-updates -u $NCU_ARGS
 
-          # Locked typescript-eslint family versions conflict with the bumped peer ranges (ERESOLVE); re-resolve them.
-          node -e '
-            const fs = require("fs");
-            const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
-            for (const k of Object.keys(lock.packages)) {
-              if (/node_modules\/(@typescript-eslint\/|typescript-eslint$)/.test(k)) delete lock.packages[k];
-            }
-            fs.writeFileSync("package-lock.json", JSON.stringify(lock, null, 2) + "\n");
-          '
+          # Locked entries can conflict with bumped peer ranges (ERESOLVE); re-resolve from scratch.
+          rm package-lock.json
 
           # Regenerate package-lock.json only — node_modules is never needed
           # here, and skipping the install keeps this job to well under a minute.
