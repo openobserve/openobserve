@@ -267,7 +267,7 @@ class APICleanup {
         });
         await this.waitForStreamSchema(streamName);
 
-        // Alert creation requires at least one destination (or workflow) attached.
+        // Seed alerts deliver somewhere, so they get a destination.
         const templateName = `${prefix}_tmpl`;
         const destinationName = `${prefix}_dest`;
         await this.createAlertTemplate(templateName);

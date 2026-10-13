@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :model-value="model"
       :options="options"
       multiple
+      :placeholder="placeholder"
       :error="error"
       :collapsible-groups="workflowsEnabled"
       pin-selected-in-groups
@@ -125,6 +126,7 @@ const props = defineProps<{
   workflowsLocked?: boolean;
   workflowsLockMessage?: I18nText;
   error?: boolean;
+  placeholder?: I18nText;
 }>();
 
 const emit = defineEmits<{

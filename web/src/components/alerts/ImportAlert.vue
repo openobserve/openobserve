@@ -166,13 +166,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-import-destination-name-input"
                         :model-value="userSelectedDestinations[index] || []"
                         :options="filteredDestinations"
-                        :label="t('alerts.destinationsRequiredLabel')"
+                        :label="t('alerts.destinationsLabel')"
+                        :placeholder="t('alerts.summary.noDestination')"
+                        :help-text="
+                          userSelectedDestinations[index]?.length
+                            ? undefined
+                            : t('alerts.alertSettings.noDestinationNote')
+                        "
                         multiple
                         searchable
                         @search="filterDestinations"
                         class="w-75!"
-                        :error="!userSelectedDestinations[index]?.length"
-                        :error-message="t('alerts.validation.fieldRequired')"
                         @update:model-value="
                           (val) => {
                             userSelectedDestinations[index] = val as string[];
@@ -906,13 +910,10 @@ export default defineComponent({
         alertErrors.push(t("alerts.import.cronExpressionInvalid", { index }));
       }
 
-      if (
-        !input.destinations ||
-        !Array.isArray(input.destinations) ||
-        input.destinations.length === 0
-      ) {
+      // Absent or empty is valid; null is not, since the server reads it as a wrong type.
+      if (input.destinations !== undefined && !Array.isArray(input.destinations)) {
         alertErrors.push({
-          message: t("alerts.import.destinationsRequired", { index }),
+          message: t("alerts.import.destinationsArray", { index }),
           field: "destination_name",
         });
       }
@@ -936,14 +937,16 @@ export default defineComponent({
         });
       }
 
-      input.destinations.forEach((destination: any) => {
-        if (!checkDestinationInList(props.destinations, destination)) {
-          alertErrors.push({
-            message: t("alerts.import.destinationNotExist", { index, destination }),
-            field: "destination_name",
-          });
-        }
-      });
+      if (Array.isArray(input.destinations)) {
+        input.destinations.forEach((destination: any) => {
+          if (!checkDestinationInList(props.destinations, destination)) {
+            alertErrors.push({
+              message: t("alerts.import.destinationNotExist", { index, destination }),
+              field: "destination_name",
+            });
+          }
+        });
+      }
 
       // This condition is added to avoid the error when the updated_at is not a number
       if (typeof input.updated_at !== "number") {
@@ -952,6 +955,15 @@ export default defineComponent({
 
       // Log all alert errors at the end
       if (alertErrors.length > 0) {
+        // Show in the picker what a retry will import: the names this org has, or none.
+        // Otherwise the picker reads empty while the JSON still holds the failing value.
+        if (alertErrors.some((e: any) => e?.field === "destination_name")) {
+          const known = Array.isArray(input.destinations)
+            ? input.destinations.filter((d: any) => checkDestinationInList(props.destinations, d))
+            : [];
+          userSelectedDestinations.value[alertErrorsToDisplay.value.length] = known;
+          updateUserSelectedDestinations(known, index - 1);
+        }
         alertErrorsToDisplay.value.push(alertErrors);
         return false;
       }
