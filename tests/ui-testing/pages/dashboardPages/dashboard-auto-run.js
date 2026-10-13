@@ -1,7 +1,21 @@
 // Backs dashboard-variables-auto-run.spec.js (openobserve#15216).
 import { expect } from "@playwright/test";
+import testLogger from "../../playwright-tests/utils/test-logger.js";
+import DashboardSetting from "./dashboard-settings";
+import DashboardVariablesScoped from "./dashboard-variables-scoped.js";
+import {
+  ORG,
+  STREAM,
+  NAMESPACES,
+  NAMESPACE_FIELD,
+  createDashboard,
+  pinAutoQuery,
+  trackPanelRuns,
+} from "../../playwright-tests/utils/dashboard-auto-run-fixtures.js";
 
 const AUTO_RUN_STORAGE_KEY = "oo_toggle_auto_run";
+// Longer than the 300ms Auto Run debounce plus a panel request round trip.
+const QUIET_MS = 2500;
 
 export default class DashboardAutoRun {
   constructor(page) {
@@ -16,6 +30,9 @@ export default class DashboardAutoRun {
     this.viewRefreshBtn = page.locator('[data-test="dashboard-viewpanel-refresh-data-btn"]');
     this.viewCloseBtn = page.locator('[data-test="dashboard-viewpanel-close-btn"]');
     this.viewTable = this.viewPanel.locator('[data-test="dashboard-panel-table"]');
+    this.dashboardSetting = new DashboardSetting(page);
+    this.scopedVariables = new DashboardVariablesScoped(page);
+    this.panelRuns = null;
   }
 
   panel(panelId) {
@@ -47,6 +64,38 @@ export default class DashboardAutoRun {
     );
     for (const panelId of panelIds) {
       await this.panel(panelId).waitFor({ state: "visible", timeout: 30000 });
+    }
+  }
+
+  async pinAutoQuery(enabled) {
+    await pinAutoQuery(this.page, enabled);
+  }
+
+  // Dashboard and panels come from the API; the variables under test are created through the Settings UI.
+  async setupDashboard({ name, panels, variable, multiSelect = false, variableOptions = {}, dependents = [], reloadAfterCreate = false }) {
+    const id = await createDashboard(`${name}_${Date.now()}_${Math.floor(Math.random() * 1e4)}`, { panels });
+    this.panelRuns = trackPanelRuns(this.page);
+    await this.openDashboard(ORG(), id, panels.map((p) => p.id));
+    await this.addVariablesFromSettings([
+      { name: variable, options: { showMultipleValues: multiSelect, ...variableOptions } },
+      ...dependents,
+    ]);
+    if (reloadAfterCreate) await this.reloadDashboard(panels[0].id);
+    // A query values variable defaults to the stream's first value, so the change targets are the other namespaces.
+    const [initial] = await this.getSelectedVariableValues(variable);
+    const [first, second] = NAMESPACES.filter((ns) => ns !== initial);
+    testLogger.info("Variable created from the UI", { variable, initial, first, second });
+    return { initial, first, second };
+  }
+
+  async addVariablesFromSettings(variables) {
+    await this.dashboardSetting.openSetting();
+    for (const { name, field = NAMESPACE_FIELD, options = {} } of variables) {
+      await this.scopedVariables.addScopedVariable(name, "logs", STREAM, field, { scope: "global", ...options });
+    }
+    await this.dashboardSetting.closeSettingWindow();
+    for (const { name } of variables) {
+      await this.scopedVariables.waitForVariableIdle(name);
     }
   }
 
@@ -138,6 +187,37 @@ export default class DashboardAutoRun {
   async closeViewPanel() {
     await this.viewCloseBtn.click();
     await expect(this.viewPanel).toBeHidden({ timeout: 10000 });
+  }
+
+  runsOf(key) {
+    return this.panelRuns.of(key);
+  }
+
+  async waitForRuns(key, count) {
+    await expect.poll(() => this.runsOf(key).length, { timeout: 30000 }).toBe(count);
+  }
+
+  // Saving a variable re-runs the panels, so counts are measured from the point the dashboard stops querying.
+  async settledRunCount(key) {
+    let last = -1;
+    await expect
+      .poll(
+        () => {
+          const now = this.runsOf(key).length;
+          const stable = now === last && now > 0;
+          last = now;
+          return stable;
+        },
+        { timeout: 30000, intervals: [1500] }
+      )
+      .toBe(true);
+    return last;
+  }
+
+  async expectNoNewRun(key, count) {
+    // Absence has no event to wait on: a run, if any, starts after the debounce.
+    await this.page.waitForTimeout(QUIET_MS);
+    expect(this.runsOf(key)).toHaveLength(count);
   }
 
   async expectSelectedVariableValue(name, value) {

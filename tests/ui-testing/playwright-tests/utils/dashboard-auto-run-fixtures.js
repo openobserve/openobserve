@@ -27,6 +27,7 @@ const CONTAINER_FIELD = 'kubernetes_container_name';
 const CONTAINER_OF = { ziox: 'ziox', 'ingress-nginx': 'controller', velero: 'velero' };
 
 let layoutSeq = 0;
+const createdDashboardIds = [];
 
 function customAxis(alias) {
   return { label: '', alias, column: alias, type: 'custom', color: null, functionName: null, args: [] };
@@ -77,7 +78,9 @@ async function createDashboard(title, { panels }) {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`create dashboard -> ${res.status}: ${JSON.stringify(body)}`);
   const inner = body[`v${body.version}`] || body;
-  return inner.dashboardId || inner.dashboard_id;
+  const id = inner.dashboardId || inner.dashboard_id;
+  createdDashboardIds.push(id);
+  return id;
 }
 
 async function deleteDashboard(dashboardId) {
@@ -86,6 +89,10 @@ async function deleteDashboard(dashboardId) {
     method: 'DELETE',
     headers: getAuthHeaders(),
   }).catch(() => {});
+}
+
+async function deleteCreatedDashboards() {
+  while (createdDashboardIds.length) await deleteDashboard(createdDashboardIds.pop());
 }
 
 // ZO_AUTO_QUERY_ENABLED is read once at server start, so it is pinned in the config response instead of needing its own shard.
@@ -134,6 +141,7 @@ module.exports = {
   namespaceTablePanel,
   createDashboard,
   deleteDashboard,
+  deleteCreatedDashboards,
   pinAutoQuery,
   trackPanelRuns,
 };
