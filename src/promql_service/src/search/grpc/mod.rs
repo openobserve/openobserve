@@ -466,10 +466,11 @@ async fn get_max_file_list(
     walk_expr(&mut visitor, &ast).map_err(|e| DataFusionError::Execution(e.to_string()))?;
     let mut metrics_name = visitor.into_names();
     if query_exemplars {
-        metrics_name = metrics_name
-            .iter()
-            .map(|name| config::meta::promql::exemplars_stream_name(name))
-            .collect();
+        let mut mapped = std::collections::HashSet::with_capacity(metrics_name.len());
+        for name in &metrics_name {
+            mapped.insert(promql::utils::exemplars_stream_for(org_id, name).await);
+        }
+        metrics_name = mapped;
     }
     let window = selector_window(&ast);
 

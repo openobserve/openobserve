@@ -510,7 +510,7 @@ async fn query_range(
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
-            for name in scanned_streams(visitor.into_names(), query_exemplars) {
+            for name in scanned_streams(org_id, visitor.into_names(), query_exemplars).await {
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
@@ -1785,17 +1785,18 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
 /// The streams a query reads, which authorization checks: an exemplar query reads each
 /// metric's exemplar stream instead of the metric itself.
 #[cfg(any(feature = "enterprise", test))]
-fn scanned_streams(
+async fn scanned_streams(
+    org_id: &str,
     metric_names: std::collections::HashSet<String>,
     query_exemplars: bool,
 ) -> Vec<String> {
     if !query_exemplars {
         return metric_names.into_iter().collect();
     }
-    let mut streams: Vec<String> = metric_names
-        .iter()
-        .map(|name| config::meta::promql::exemplars_stream_name(name))
-        .collect();
+    let mut streams = Vec::with_capacity(metric_names.len());
+    for name in &metric_names {
+        streams.push(promql::utils::exemplars_stream_for(org_id, name).await);
+    }
     streams.sort();
     streams.dedup();
     streams
@@ -2183,19 +2184,19 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_scanned_streams_names_the_exemplar_streams_of_an_exemplar_query() {
-        let names: std::collections::HashSet<String> =
-            ["up", "rpc_latency_bucket", "rpc_latency_count"]
-                .into_iter()
-                .map(String::from)
-                .collect();
-        let mut plain = scanned_streams(names.clone(), false);
+    #[tokio::test]
+    async fn test_scanned_streams_names_the_exemplar_streams_of_an_exemplar_query() {
+        let names: std::collections::HashSet<String> = ["up", "queue_count"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let mut plain = scanned_streams("org", names.clone(), false).await;
         plain.sort();
-        assert_eq!(plain, ["rpc_latency_bucket", "rpc_latency_count", "up"]);
+        assert_eq!(plain, ["queue_count", "up"]);
+        // the streams the scan reads, not the names in the expression
         assert_eq!(
-            scanned_streams(names, true),
-            ["rpc_latency_exemplars", "up_exemplars"]
+            scanned_streams("org", names, true).await,
+            ["queue_count_exemplars", "up_exemplars"]
         );
     }
 }

@@ -611,12 +611,29 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_query_exemplars_reads_the_family_stream_for_a_classic_histogram_selector() {
-        let trace_id = "test_exemplar_family_stream";
+    /// Puts a metrics stream with `labels` into the schema cache the exemplar mapping reads.
+    async fn seed_stream_schema(org_id: &str, name: &str, labels: &[&str]) {
+        use datafusion::arrow::datatypes::{DataType, Field, Schema};
+        use infra::schema::{
+            SCHEMA_KEY, STREAM_SCHEMAS_LATEST, SchemaCache, insert_latest, mk_key,
+        };
+
+        let key = mk_key(org_id, config::meta::stream::StreamType::Metrics, name);
+        let key = key.strip_prefix(SCHEMA_KEY).unwrap().to_string();
+        let fields: Vec<Field> = labels
+            .iter()
+            .map(|name| Field::new(*name, DataType::Utf8, true))
+            .collect();
+        let mut w = STREAM_SCHEMAS_LATEST.write().await;
+        insert_latest(&mut w, key, SchemaCache::new(Schema::new(fields)));
+    }
+
+    /// The streams an exemplar query over `query` scans, and how many exemplars it returns.
+    async fn exemplar_streams_scanned(org_id: &str, query: &str) -> (Vec<String>, usize) {
+        let trace_id = "test_exemplar_streams";
         let query_ctx = Arc::new(QueryContext {
             trace_id: trace_id.to_string(),
-            org_id: "org".to_string(),
+            org_id: org_id.to_string(),
             query_exemplars: true,
             query_data: false,
             need_wal: false,
@@ -635,27 +652,51 @@ mod tests {
         let mut ctx = PromqlContext::new(query_ctx, provider, vec![]);
         let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
         let stmt = EvalStmt {
-            expr: parser::parse(
-                "histogram_quantile(0.9, sum by (le) (rate(review_latency_bucket[5m]))) + up",
-            )
-            .unwrap(),
+            expr: parser::parse(query).unwrap(),
             start: at(WINDOW_START),
             end: at(WINDOW_START + 60 * MINUTE),
             interval: Duration::from_secs(15),
             lookback_delta: DEFAULT_LOOKBACK,
         };
-
         let (value, ..) = ctx.query_exemplars(trace_id, stmt).await.unwrap();
+        let mut scanned = streams.lock().unwrap().clone();
+        scanned.sort();
+        let count = match value {
+            Value::Matrix(series) => series
+                .iter()
+                .map(|s| s.exemplars.as_ref().map_or(0, Vec::len))
+                .sum(),
+            Value::None => 0,
+            other => panic!("unexpected result: {other:?}"),
+        };
+        (scanned, count)
+    }
+
+    #[tokio::test]
+    async fn test_query_exemplars_reads_the_family_stream_for_a_histogram_bucket_selector() {
+        seed_stream_schema("family_org", "review_latency_bucket", &["le", "job"]).await;
+
+        let (streams, count) = exemplar_streams_scanned(
+            "family_org",
+            "histogram_quantile(0.9, sum by (le) (rate(review_latency_bucket[5m]))) + up",
+        )
+        .await;
 
         // remote-write bucket exemplars and OTLP/native ones share the family's stream
-        let mut streams = streams.lock().unwrap().clone();
-        streams.sort();
         assert_eq!(streams, ["review_latency_exemplars", "up_exemplars"]);
-        let Value::Matrix(series) = value else {
-            panic!("expected a matrix");
-        };
-        assert_eq!(series.len(), 1);
-        assert_eq!(series[0].exemplars.as_ref().unwrap().len(), 2);
+        assert_eq!(count, 2);
+    }
+
+    #[tokio::test]
+    async fn test_query_exemplars_keeps_metrics_merely_named_like_a_family_apart() {
+        seed_stream_schema("gauge_org", "queue", &["job"]).await;
+        seed_stream_schema("gauge_org", "queue_count", &["job"]).await;
+        seed_stream_schema("gauge_org", "queue_bucket", &["job"]).await;
+
+        let (streams, _) =
+            exemplar_streams_scanned("gauge_org", "queue_count + queue_bucket").await;
+
+        assert_eq!(streams, ["queue_bucket_exemplars", "queue_count_exemplars"]);
     }
 
     #[tokio::test]

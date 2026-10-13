@@ -211,7 +211,8 @@ pub async fn remote_write(
                 }
             }
             if !event.exemplars.is_empty() {
-                unique_metrics.insert(exemplars_stream_name(&metric_name));
+                let is_bucket = event.labels.iter().any(|(name, _)| *name == BUCKET_LABEL);
+                unique_metrics.insert(exemplars_stream_for_series(&metric_name, is_bucket));
             }
         }
     }
@@ -489,12 +490,13 @@ pub async fn remote_write(
             continue;
         }
         exemplar_count += event.exemplars.len();
+        let exemplars_stream =
+            exemplars_stream_for_series(&metric_name, labels.contains_key(BUCKET_LABEL));
         let rows = exemplar_records(std::mem::take(&mut labels), &event.exemplars);
         if !rows.is_empty() && !gate.admit().await {
             ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
             return Ok(());
         }
-        let exemplars_stream = exemplars_stream_name(&metric_name);
         for (record, timestamp) in rows {
             buffer_metric_record(
                 &exemplars_stream,
@@ -1165,6 +1167,15 @@ fn build_metric_record(
         json::Value::Number(timestamp.into()),
     );
     record
+}
+
+/// A histogram bucket's exemplars live with its family, where OTLP writes a histogram's; the
+/// `le` label is what makes a `_bucket` series a bucket rather than a metric named like one.
+fn exemplars_stream_for_series(metric_name: &str, is_bucket: bool) -> String {
+    match histogram_family(metric_name) {
+        Some(family) if is_bucket => exemplars_stream_name(family),
+        _ => exemplars_stream_name(metric_name),
+    }
 }
 
 /// One row per exemplar for the metric's exemplar stream: the series labels, the exemplar's
@@ -1983,6 +1994,23 @@ mod tests {
         assert_eq!(rows[1].0.get(VALUE_LABEL), Some(&json::json!(f64::MAX)));
 
         assert!(exemplar_records(labels, &exemplars[1..2]).is_empty());
+    }
+
+    #[test]
+    fn test_exemplars_stream_for_series_joins_a_family_only_through_a_bucket() {
+        assert_eq!(
+            exemplars_stream_for_series("rpc_latency_bucket", true),
+            "rpc_latency_exemplars"
+        );
+        // a metric merely named like a bucket, and count/sum series, keep their own stream
+        assert_eq!(
+            exemplars_stream_for_series("rpc_latency_bucket", false),
+            "rpc_latency_bucket_exemplars"
+        );
+        assert_eq!(
+            exemplars_stream_for_series("queue_count", true),
+            "queue_count_exemplars"
+        );
     }
 
     #[test]

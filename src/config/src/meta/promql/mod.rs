@@ -86,8 +86,8 @@ pub const EXEMPLARS_LABEL: &str = "exemplars";
 pub const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 /// Exemplars live in a stream of their own next to the metric, never in its sample rows.
 pub const EXEMPLARS_STREAM_SUFFIX: &str = "_exemplars";
-/// The classic streams a histogram family degrades into, whose exemplars sit under the family.
-pub const CLASSIC_HISTOGRAM_SUFFIXES: [&str; 3] = ["_bucket", "_count", "_sum"];
+/// The stream a histogram's buckets degrade into; `le` on it is what marks a histogram family.
+pub const BUCKET_STREAM_SUFFIX: &str = "_bucket";
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///
@@ -109,15 +109,16 @@ pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
     crate::INDEX_FIELD_NAME_FOR_ALL,
 ];
 
-/// The stream that holds `metric`'s exemplars; a histogram family shares one, whatever the
-/// protocol put them on its base name or on a classic `_bucket`/`_count`/`_sum` stream.
+/// The stream that holds `metric`'s exemplars.
 pub fn exemplars_stream_name(metric: &str) -> String {
-    let family = CLASSIC_HISTOGRAM_SUFFIXES
-        .iter()
-        .find_map(|suffix| metric.strip_suffix(suffix))
-        .filter(|base| !base.is_empty())
-        .unwrap_or(metric);
-    format!("{family}{EXEMPLARS_STREAM_SUFFIX}")
+    format!("{metric}{EXEMPLARS_STREAM_SUFFIX}")
+}
+
+/// The histogram family a bucket stream name belongs to; the caller supplies the `le` evidence.
+pub fn histogram_family(bucket_stream: &str) -> Option<&str> {
+    bucket_stream
+        .strip_suffix(BUCKET_STREAM_SUFFIX)
+        .filter(|family| !family.is_empty())
 }
 
 #[inline]
@@ -518,30 +519,27 @@ pub enum ApiErrorType {
 
 #[cfg(test)]
 mod tests {
+    use expect_test::expect;
+
+    use super::*;
+
     #[test]
-    fn test_exemplars_stream_name_is_shared_by_a_histogram_family() {
+    fn test_histogram_family_is_named_by_its_bucket_stream_only() {
         assert_eq!(
             exemplars_stream_name("http_requests_total"),
             "http_requests_total_exemplars"
         );
+        assert_eq!(histogram_family("rpc_latency_bucket"), Some("rpc_latency"));
+        // count and sum names are not evidence of a family; neither is a bare suffix
         for name in [
-            "rpc_latency",
-            "rpc_latency_bucket",
             "rpc_latency_count",
             "rpc_latency_sum",
+            "_bucket",
+            "queue_count",
         ] {
-            assert_eq!(
-                exemplars_stream_name(name),
-                "rpc_latency_exemplars",
-                "{name}"
-            );
+            assert_eq!(histogram_family(name), None, "{name}");
         }
-        assert_eq!(exemplars_stream_name("_sum"), "_sum_exemplars");
     }
-
-    use expect_test::expect;
-
-    use super::*;
 
     #[test]
     fn test_metric_type_display() {
