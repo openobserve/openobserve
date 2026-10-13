@@ -15,8 +15,10 @@
 
 use config::utils::json;
 
+use super::HOUR_US;
+
 // A page view outlives any trace started from it, so its rows are searched around the request.
-const PAGE_VIEW_WINDOW_US: i64 = 3_600_000_000;
+const PAGE_VIEW_WINDOW_US: i64 = HOUR_US;
 
 pub(super) struct PagePlan {
     pub(super) view_ids: Vec<String>,
@@ -26,7 +28,7 @@ pub(super) struct PagePlan {
 
 impl PagePlan {
     /// Ids come from every traced resource, the time anchor from the first one.
-    pub(super) fn from_bridge(traced_resources: &[json::Value], trace_end: i64) -> Self {
+    pub(super) fn from_traced_resources(traced_resources: &[json::Value], trace_end: i64) -> Self {
         let mut view_ids: Vec<String> = Vec::new();
         let mut action_ids: Vec<String> = Vec::new();
         for hit in traced_resources {
@@ -83,14 +85,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_page_plan_from_bridge() {
+    fn test_page_plan_from_traced_resources() {
         let traced = vec![
             json!({"view_id": "v1", "date": 1_700_000_000_000i64, "action_id": "[\"a1\",\"a2\"]"}),
             json!({"view_id": "v2", "action_id": "[\"a3\"]"}),
             json!({"view_id": "v1", "action_id": "[\"a2\"]"}),
             json!({"view_id": ""}),
         ];
-        let plan = PagePlan::from_bridge(&traced, 5);
+        let plan = PagePlan::from_traced_resources(&traced, 5);
         assert_eq!(plan.view_ids, vec!["v1", "v2"]);
         assert_eq!(plan.action_ids, vec!["a1", "a2", "a3"]);
         assert_eq!(
@@ -105,7 +107,7 @@ mod tests {
     #[test]
     fn test_page_plan_falls_back_to_trace_end() {
         let traced = vec![json!({"view_id": "v1", "date": 0, "action_id": "not json"})];
-        let plan = PagePlan::from_bridge(&traced, 10 * PAGE_VIEW_WINDOW_US);
+        let plan = PagePlan::from_traced_resources(&traced, 10 * PAGE_VIEW_WINDOW_US);
         assert!(plan.action_ids.is_empty());
         assert_eq!(
             plan.range,

@@ -42,11 +42,13 @@ use crate::common::{
 
 const RUM_DATA_STREAM: &str = "_rumdata";
 const TRACE_ID_FIELDS: [&str; 2] = ["_o2_trace_id", "_oo_trace_id"];
+// W3C width; shorter hex ids are zero-padded to it before matching.
 const TRACE_ID_HEX_LENGTH: usize = 32;
+const MINUTE_US: i64 = 60_000_000;
+const HOUR_US: i64 = 60 * MINUTE_US;
 // A browser request starts before the trace but is stamped on completion, so the tail is longer.
-const BRIDGE_LEAD_US: i64 = 60_000_000;
-const BRIDGE_LAG_US: i64 = 300_000_000;
-const HOUR_US: i64 = 3_600_000_000;
+const BROWSER_REQUEST_LEAD_US: i64 = MINUTE_US;
+const BROWSER_REQUEST_LAG_US: i64 = 5 * MINUTE_US;
 
 /// Body of a trace-to-RUM lookup.
 #[derive(Debug, Deserialize, ToSchema)]
@@ -175,20 +177,20 @@ async fn run_lookup(ctx: &LookupContext, req: &RumLookupRequest) -> RumLookupRes
     if ctx.trace_columns.is_empty() {
         return response;
     }
-    let bridge_range = (
-        req.start_time.saturating_sub(BRIDGE_LEAD_US),
-        req.end_time.saturating_add(BRIDGE_LAG_US),
+    let browser_request_range = (
+        req.start_time.saturating_sub(BROWSER_REQUEST_LEAD_US),
+        req.end_time.saturating_add(BROWSER_REQUEST_LAG_US),
     );
     let trace_ids = trace_id_variants(&req.trace_id);
     response.traced_resources = ctx
-        .run(RumQuery::TracedResources, &trace_ids, bridge_range)
+        .run(RumQuery::TracedResources, &trace_ids, browser_request_range)
         .await;
     let traced = response
         .traced_resources
         .as_ref()
         .map_or(&[][..], |r| r.hits.as_slice());
     if !traced.is_empty() {
-        let plan = PagePlan::from_bridge(traced, req.end_time);
+        let plan = PagePlan::from_traced_resources(traced, req.end_time);
         (response.views, response.actions, response.context_events) = tokio::join!(
             ctx.run(RumQuery::Views, &plan.view_ids, plan.range),
             ctx.run(RumQuery::Actions, &plan.action_ids, plan.range),
