@@ -106,6 +106,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   content-class="tab_content"
                 />
                 <q-route-tab
+                  v-if="config.isEnterprise == 'true' && isMetaOrg"
+                  data-test="announcement-banners-tab"
+                  name="announcements"
+                  :to="{
+                    name: 'announcementBanners',
+                    query: {
+                      org_identifier: store.state.selectedOrganization?.identifier,
+                    },
+                  }"
+                  icon="campaign"
+                  :label="t('announcements.list.tabLabel')"
+                  content-class="tab_content"
+                />
+                <q-route-tab
                   data-test="alert-destinations-tab"
                   name="alert_destinations"
                   :to="{
@@ -292,6 +306,14 @@ import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
 import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+
+const META_ORG_ONLY_ROUTES = [
+  "license",
+  "passwordPolicy",
+  "announcementBanners",
+  "announcementBannerEditor",
+];
+
 export default defineComponent({
   name: "AppSettings",
   components: {
@@ -339,7 +361,7 @@ export default defineComponent({
         }
 
       }
-      else if (["license", "passwordPolicy"].includes(router.currentRoute.value.name)) {
+      else if (META_ORG_ONLY_ROUTES.includes(router.currentRoute.value.name)) {
         if(!isMetaOrg.value || config.isEnterprise === "false") {
           settingsTab.value = "general";
           router.push({
