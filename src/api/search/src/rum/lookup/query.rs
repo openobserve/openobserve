@@ -214,7 +214,8 @@ pub(super) struct LookupContext {
     pub(super) trace_id: String,
     pub(super) trace_columns: Vec<&'static str>,
     pub(super) deadline: Instant,
-    pub(super) max_query_range_us: i64,
+    /// In hours; 0 means no limit.
+    pub(super) max_query_range: i64,
 }
 
 impl LookupContext {
@@ -288,7 +289,7 @@ impl LookupContext {
     }
 
     fn clamp_range(&self, range: (i64, i64)) -> ((i64, i64), String) {
-        let max_range_us = self.max_query_range_us;
+        let max_range_us = self.max_query_range.saturating_mul(HOUR_US);
         if max_range_us <= 0 || range.1.saturating_sub(range.0) <= max_range_us {
             return (range, String::new());
         }
@@ -296,7 +297,7 @@ impl LookupContext {
             (range.1 - max_range_us, range.1),
             format!(
                 "Query duration is modified due to query range restriction of {} hours",
-                max_range_us / HOUR_US
+                self.max_query_range
             ),
         )
     }
@@ -307,14 +308,14 @@ mod tests {
     use super::*;
     use crate::rum::lookup::tests::search_response;
 
-    fn context(max_query_range_us: i64) -> LookupContext {
+    fn context(max_query_range: i64) -> LookupContext {
         LookupContext {
             org_id: String::new(),
             user_id: String::new(),
             trace_id: String::new(),
             trace_columns: vec![],
             deadline: Instant::now(),
-            max_query_range_us,
+            max_query_range,
         }
     }
 
@@ -424,10 +425,10 @@ mod tests {
             ((0, 3 * HOUR_US), String::new())
         );
         assert_eq!(
-            context(3 * HOUR_US).clamp_range((0, 3 * HOUR_US)),
+            context(3).clamp_range((0, 3 * HOUR_US)),
             ((0, 3 * HOUR_US), String::new())
         );
-        let (range, message) = context(HOUR_US).clamp_range((0, 3 * HOUR_US));
+        let (range, message) = context(1).clamp_range((0, 3 * HOUR_US));
         assert_eq!(range, (2 * HOUR_US, 3 * HOUR_US));
         assert!(message.contains("1 hours"));
     }

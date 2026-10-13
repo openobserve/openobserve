@@ -30,7 +30,7 @@ use openobserve_core::auth::UserEmail;
 use plan::PagePlan;
 use query::{LookupContext, RumQuery};
 pub use query::{RumQueryError, RumQueryErrorKind, RumQueryResult, RumQueryStats};
-use search_service::query_range::get_settings_max_query_range;
+use search_service::query_range::get_max_query_range;
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
 use tracing::Span;
@@ -154,7 +154,13 @@ pub async fn lookup(
         trace_id: get_or_create_trace_id(&headers, &Span::none()),
         trace_columns: trace_id_columns(&org_id).await,
         deadline: started + Duration::from_secs(get_config().limit.query_timeout),
-        max_query_range_us: max_query_range_us(&org_id, &user_id).await,
+        max_query_range: get_max_query_range(
+            &[RUM_DATA_STREAM.to_string()],
+            &org_id,
+            &user_id,
+            StreamType::Logs,
+        )
+        .await,
         org_id,
         user_id,
     };
@@ -232,18 +238,6 @@ async fn check_search_allowed(org_id: &str) -> Result<(), Response> {
     #[cfg(not(feature = "enterprise"))]
     let _ = org_id;
     Ok(())
-}
-
-/// Matches `_search`, which clamps only streams that have settings.
-async fn max_query_range_us(org_id: &str, user_id: &str) -> i64 {
-    let Some(settings) =
-        infra::schema::get_settings(org_id, RUM_DATA_STREAM, StreamType::Logs).await
-    else {
-        return 0;
-    };
-    get_settings_max_query_range(settings.max_query_range, org_id, Some(user_id))
-        .await
-        .saturating_mul(HOUR_US)
 }
 
 /// The trace id columns the stream has; naming a missing column fails the whole query.
