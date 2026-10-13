@@ -163,6 +163,26 @@ pub(crate) async fn build_for_stream(
     Ok(true)
 }
 
+/// The `file_list_deleted` entry that retires the `.bf` of one (stream, hour, `bloom_ver`).
+pub(crate) fn bloom_file_deleted(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_key: &str,
+    bloom_ver: i64,
+) -> FileListDeleted {
+    let path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
+    let account = storage::get_account(org_id, &path).unwrap_or_default();
+    FileListDeleted {
+        id: 0,
+        account,
+        file: path,
+        index_file: false, // a `.bf` has no companion `.ttv`
+        mindex_file: false,
+        flattened: false,
+    }
+}
+
 // B for this chunk is sized from the chunk's MAX record count, used as
 // a safe NDV upper bound: a file can't hold more distinct values than
 // rows. This never under-sizes (no saturation) for the target
@@ -313,16 +333,13 @@ async fn cleanup_orphan_blooms(
         {
             Ok(true) => {} // still referenced by a live file — keep the `.bf`
             Ok(false) => {
-                let path = bloom_path(org_id, stream_type, stream_name, date_key, v_old);
-                let account = storage::get_account(org_id, &path).unwrap_or_default();
-                orphans.push(FileListDeleted {
-                    id: 0,
-                    account,
-                    file: path,
-                    index_file: false, // a `.bf` has no companion `.ttv`
-                    mindex_file: false,
-                    flattened: false,
-                });
+                orphans.push(bloom_file_deleted(
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    date_key,
+                    v_old,
+                ));
             }
             Err(e) => {
                 log::warn!(
