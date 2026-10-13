@@ -17,11 +17,13 @@
 
 use config::{
     ider,
-    meta::oncall::{CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeRow},
+    meta::oncall::{
+        CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeRow, SendDecision, code_send_decision, next_counts,
+    },
 };
 use sea_orm::{
-    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, Set, SqlErr,
-    TransactionTrait,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+    Select, Set, SqlErr, TransactionTrait,
     sea_query::{Expr, Func, SimpleExpr},
 };
 
@@ -67,6 +69,23 @@ pub async fn store_code(
         expected_sent_at,
         sends_today,
         day_started_at,
+        now,
+    )
+    .await
+}
+
+/// Decides and stores a send under one lock; `None` when this person no longer holds it. [strong]
+pub async fn reserve_code(
+    user_email: &str,
+    target: &str,
+    code_hash: &str,
+    now: i64,
+) -> Result<Option<SendDecision>, errors::Error> {
+    reserve_code_in(
+        get_orm_client_rw().await,
+        user_email,
+        target,
+        code_hash,
         now,
     )
     .await
@@ -191,6 +210,75 @@ async fn store_code_in<C: ConnectionTrait>(
     Ok(stored == 1)
 }
 
+async fn reserve_code_in<C: TransactionTrait>(
+    db: &C,
+    user_email: &str,
+    target: &str,
+    code_hash: &str,
+    now: i64,
+) -> Result<Option<SendDecision>, errors::Error> {
+    let txn = db.begin().await?;
+    let email = user_email.to_lowercase();
+    let locked = profiles_to_lock(user_email, target).all(&txn).await?;
+    // Every sender to this number then locks this row too, so their sends queue behind this one.
+    if !locked
+        .iter()
+        .any(|p| p.user_email.to_lowercase() == email && p.phone.as_deref() == Some(target))
+    {
+        return Ok(None);
+    }
+    let rows =
+        |stored: Vec<StoredCode>| -> Vec<CodeRow> { stored.into_iter().map(|s| s.row).collect() };
+    let user_rows = rows(list_for_user_in(&txn, user_email).await?);
+    let number_rows = rows(list_for_target_in(&txn, target).await?);
+    let decision = code_send_decision(user_email, target, &user_rows, &number_rows, now);
+    match decision {
+        SendDecision::Send => {
+            let pair = user_rows.iter().find(|r| r.target == target);
+            let (sends_today, day_started_at) = next_counts(pair, now);
+            let expected = pair.map(|r| r.sent_at);
+            if !store_code_in(
+                &txn,
+                user_email,
+                target,
+                code_hash,
+                expected,
+                sends_today,
+                day_started_at,
+                now,
+            )
+            .await?
+            {
+                return Err(errors::DbError::SeaORMError(format!(
+                    "oncall_phone_verifications: the code row for {target} changed under its lock"
+                ))
+                .into());
+            }
+        }
+        SendDecision::Wait { .. } => {}
+    }
+    txn.commit().await?;
+    Ok(Some(decision))
+}
+
+/// Every profile of this person or holding this number, locked in id order.
+fn profiles_to_lock(user_email: &str, target: &str) -> Select<oncall_user_contacts::Entity> {
+    // Profiles predate any code row, so first sends queue too (`rum_pa::lock_app_ordered`).
+    oncall_user_contacts::Entity::find()
+        .filter(
+            Condition::any()
+                .add(
+                    Expr::expr(Func::lower(Expr::col(
+                        oncall_user_contacts::Column::UserEmail,
+                    )))
+                    .eq(user_email.to_lowercase()),
+                )
+                .add(oncall_user_contacts::Column::Phone.eq(target)),
+        )
+        .order_by_asc(oncall_user_contacts::Column::Id)
+        .lock_exclusive()
+}
+
 async fn claim_attempt_in<C: ConnectionTrait>(
     conn: &C,
     user_email: &str,
@@ -262,7 +350,8 @@ fn profile_with_number(user_email: &str, target: &str) -> Condition {
 #[cfg(test)]
 mod tests {
     use sea_orm::{
-        ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, Schema, Statement,
+        ActiveModelTrait, ConnectOptions, Database, DatabaseConnection, QueryTrait, Schema,
+        Statement,
     };
 
     use super::*;
@@ -494,6 +583,51 @@ mod tests {
         );
 
         assert_eq!(all(&db).await, before);
+    }
+
+    /// V7: a send is decided and stored under the lock, only for a holder of the number.
+    #[tokio::test]
+    async fn test_a_reservation_stores_only_for_a_holder_and_inside_the_limits() {
+        let db = db().await;
+        contact(&db, "acme", "Ana@O2.ai", NUMBER).await;
+
+        let stranger = reserve_code_in(&db, "bo@o2.ai", NUMBER, "h", 100).await;
+        assert_eq!(stranger.unwrap(), None);
+        assert!(all(&db).await.is_empty());
+
+        let first = reserve_code_in(&db, "ana@o2.ai", NUMBER, "h1", 100).await;
+        assert_eq!(first.unwrap(), Some(SendDecision::Send));
+        let stored = all(&db).await;
+        assert_eq!(stored[0].code_hash.as_deref(), Some("h1"));
+        assert_eq!((stored[0].row.sends_today, stored[0].row.sent_at), (1, 100));
+
+        let again = reserve_code_in(&db, "ana@o2.ai", NUMBER, "h2", 200).await;
+        assert!(matches!(again.unwrap(), Some(SendDecision::Wait { .. })));
+        assert_eq!(all(&db).await, stored, "a refused send stores nothing");
+    }
+
+    /// The lock clause is the whole V7 race fix on PostgreSQL; SQLite has one writer connection.
+    #[test]
+    fn test_the_reservation_locks_the_profiles_on_postgres() {
+        let sql = profiles_to_lock("ana@o2.ai", NUMBER)
+            .build(sea_orm::DatabaseBackend::Postgres)
+            .to_string();
+        assert!(sql.ends_with("FOR UPDATE"), "{sql}");
+    }
+
+    #[tokio::test]
+    async fn test_a_failed_reservation_stores_nothing() {
+        let db = db().await;
+        contact(&db, "acme", "ana@o2.ai", NUMBER).await;
+        fail_writes(&db).await;
+
+        assert!(
+            reserve_code_in(&db, "ana@o2.ai", NUMBER, "h", 100)
+                .await
+                .is_err()
+        );
+
+        assert!(all(&db).await.is_empty());
     }
 
     #[tokio::test]

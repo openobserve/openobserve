@@ -50,8 +50,7 @@ pub async fn get(org_id: &str, user_email: &str) -> Result<Option<Contact>, erro
         .map(to_contact))
 }
 
-/// The profiles on file for these people, keyed by lower-cased email; a person with no row is
-/// absent.
+/// One profile per person (see `pick_rank`), keyed by lower-cased email; no row means absent.
 pub async fn list_for(
     org_id: &str,
     emails: &[String],
@@ -200,8 +199,22 @@ async fn list_for_in<C: ConnectionTrait>(
         .all(conn)
         .await?
         .into_iter()
-        .map(|m| (m.user_email.to_lowercase(), to_contact(m)))
+        .map(|m| (m.id.clone(), to_contact(m)))
+        .fold(HashMap::new(), |mut picked, row| {
+            let key = row.1.user_email.to_lowercase();
+            if picked.get(&key).is_none_or(|held| pick_rank(held) < pick_rank(&row)) {
+                picked.insert(key, row);
+            }
+            picked
+        })
+        .into_iter()
+        .map(|(email, (_, contact))| (email, contact))
         .collect())
+}
+
+/// Among one person's case variants the highest wins: a verified phone, then the newest, then id.
+fn pick_rank((id, c): &(String, Contact)) -> (bool, i64, &str) {
+    (c.phone_is_pageable(), c.updated_at, id)
 }
 
 #[cfg(test)]
@@ -292,6 +305,39 @@ mod tests {
         assert_eq!(found.len(), 2);
         assert_eq!(found["bo@o2.ai"].user_email, "Bo@o2.ai");
         assert_eq!(found["cy@o2.ai"].user_email, "cy@o2.ai");
+    }
+
+    /// Case variants of one person resolve to one row, so reachability and dispatch agree on it.
+    #[tokio::test]
+    async fn test_list_for_picks_the_verified_phone_then_the_newest_among_case_variants() {
+        let db = db_with(&[]).await;
+        for (id, email, verified, updated) in [
+            ("c_1", "Ana@o2.ai", Some(5), 1),
+            ("c_2", "ana@o2.ai", None, 9),
+            ("c_3", "bo@o2.ai", None, 1),
+            ("c_4", "BO@o2.ai", None, 2),
+        ] {
+            let row = oncall_user_contacts::Model {
+                id: id.into(),
+                user_email: email.into(),
+                phone_verified_at: verified,
+                updated_at: updated,
+                ..model()
+            };
+            oncall_user_contacts::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+        let emails = ["ana@o2.ai", "bo@o2.ai"].map(String::from);
+
+        let found = list_for_in(&db, "default", &emails).await.unwrap();
+
+        assert_eq!(
+            found["ana@o2.ai"].user_email, "Ana@o2.ai",
+            "verified phone first"
+        );
+        assert_eq!(found["bo@o2.ai"].user_email, "BO@o2.ai", "then the newest");
     }
 
     fn phone(number: &str) -> ContactPatch {
