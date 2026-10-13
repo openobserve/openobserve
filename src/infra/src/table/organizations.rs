@@ -13,15 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::{Arc, LazyLock as Lazy};
+use std::sync::{
+    Arc, LazyLock as Lazy,
+    atomic::{AtomicU64, Ordering},
+};
 
 #[cfg(feature = "cloud")]
 use config::utils::time::day_micros;
 use config::{RwAHashMap, meta::organization::OrganizationType};
 use hashbrown::HashMap;
 use sea_orm::{
-    ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set, entity::prelude::*,
+    ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, Schema, Set, entity::prelude::*,
 };
 
 use super::entity::organizations::{ActiveModel, Column, Entity, Model};
@@ -30,8 +33,12 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
+const STATUS_DELETED: &str = "deleted";
+
 static CACHE: Lazy<Arc<RwAHashMap<String, OrganizationRecord>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
+// Bumped under the cache lock by every invalidation, so a fill read before one is dropped.
+static CACHE_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone)]
 pub struct OrganizationRecord {
@@ -85,6 +92,7 @@ pub struct ListFilter {
     pub created_after: Option<i64>,
     pub created_before: Option<i64>,
     pub limit: Option<i64>,
+    pub exclude_deleted: bool,
 }
 
 impl ListFilter {
@@ -93,6 +101,7 @@ impl ListFilter {
             created_after: None,
             created_before: None,
             limit,
+            exclude_deleted: false,
         }
     }
 }
@@ -100,6 +109,18 @@ impl ListFilter {
 #[derive(FromQueryResult, Debug)]
 pub struct OrgId {
     pub identifier: String,
+}
+
+/// A tombstone and its `updated_at`, which tells it apart from a later org with the same id.
+#[derive(FromQueryResult, Debug, Clone, PartialEq)]
+pub struct TombstoneRow {
+    pub identifier: String,
+    pub updated_at: i64,
+}
+
+#[derive(FromQueryResult, Debug)]
+struct OrgStatusRow {
+    status: String,
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
@@ -230,28 +251,28 @@ pub async fn remove(org_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn get(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
-    let client = get_orm_client_rw().await;
     {
         let cache = CACHE.read().await;
         if let Some(v) = cache.get(org_id) {
             return Ok(v.clone());
         }
     }
+    let epoch = cache_epoch();
+    let org = get_from_db(org_id).await?;
+    fill_cache(org_id, org.clone(), epoch).await;
+    Ok(org)
+}
+
+/// The org row read from the primary, bypassing the cache and leaving it untouched.
+pub async fn get_from_db(org_id: &str) -> Result<OrganizationRecord, errors::Error> {
     let record = Entity::find()
         .filter(Column::Identifier.eq(org_id))
-        .one(client)
+        .one(get_orm_client_rw().await)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
         .ok_or_else(|| {
             Error::DbError(DbError::SeaORMError("Organization not found".to_string()))
         })?;
-
-    let org = OrganizationRecord::from(record.clone());
-    {
-        let mut cache = CACHE.write().await;
-        cache.insert(org_id.to_string(), org);
-    }
-
     Ok(OrganizationRecord::from(record))
 }
 
@@ -266,6 +287,9 @@ pub async fn list(filter: ListFilter) -> Result<Vec<OrganizationRecord>, errors:
     }
     if let Some(end) = filter.created_after {
         res = res.filter(Column::CreatedAt.gt(end))
+    }
+    if filter.exclude_deleted {
+        res = res.filter(Column::Status.ne(STATUS_DELETED));
     }
     let records = res
         .all(client)
@@ -359,22 +383,36 @@ pub async fn set_status_if(
     expected_status: &str,
     new_status: &str,
 ) -> Result<bool, errors::Error> {
-    let client = get_orm_client_rw().await;
+    let won = set_status_if_in(
+        get_orm_client_rw().await,
+        org_id,
+        expected_status,
+        new_status,
+    )
+    .await?;
+    if won {
+        invalidate_cache(Some(org_id)).await;
+    }
+    Ok(won)
+}
+
+/// `set_status_if` on a caller's connection; the caller invalidates the cache after commit.
+pub async fn set_status_if_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    expected_status: &str,
+    new_status: &str,
+) -> Result<bool, errors::Error> {
     let now = config::utils::time::now_micros();
     let result = Entity::update_many()
         .col_expr(Column::Status, Expr::value(new_status))
         .col_expr(Column::UpdatedAt, Expr::value(now))
         .filter(Column::Identifier.eq(org_id))
         .filter(Column::Status.eq(expected_status))
-        .exec(client)
+        .exec(conn)
         .await
         .map_err(|e| errors::Error::Message(e.to_string()))?;
-    if result.rows_affected > 0 {
-        invalidate_cache(Some(org_id)).await;
-        Ok(true)
-    } else {
-        Ok(false)
-    }
+    Ok(result.rows_affected > 0)
 }
 
 /// CAS update that also sets `deleted_at` in the same statement. Sets status to
@@ -405,8 +443,69 @@ pub async fn set_status_if_with_deleted_at(
     }
 }
 
+pub async fn list_ids_by_status(status: &str) -> Result<Vec<String>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::Identifier)
+        .filter(Column::Status.eq(status))
+        .into_tuple::<String>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Ids of tombstoned orgs whose deletion finished (`updated_at`) before `before`.
+pub async fn list_expired_tombstones(before: i64) -> Result<Vec<String>, errors::Error> {
+    Ok(list_expired_tombstone_rows(before)
+        .await?
+        .into_iter()
+        .map(|r| r.identifier)
+        .collect())
+}
+
+/// Tombstones whose deletion finished (`updated_at`) before `before`.
+pub async fn list_expired_tombstone_rows(before: i64) -> Result<Vec<TombstoneRow>, errors::Error> {
+    let client = get_orm_client_ro().await;
+    Entity::find()
+        .select_only()
+        .column(Column::Identifier)
+        .column(Column::UpdatedAt)
+        .filter(Column::Status.eq(STATUS_DELETED))
+        .filter(Column::UpdatedAt.lt(before))
+        .into_model::<TombstoneRow>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Deletes the org row only while it is still a tombstone; the caller broadcasts the eviction.
+pub async fn remove_tombstone(org_id: &str) -> Result<bool, errors::Error> {
+    delete_tombstone_row(org_id, None).await
+}
+
+/// Like `remove_tombstone`, but only for the tombstone written at `updated_at`.
+pub async fn remove_tombstone_at(org_id: &str, updated_at: i64) -> Result<bool, errors::Error> {
+    delete_tombstone_row(org_id, Some(updated_at)).await
+}
+
+/// The row's status read from the database, bypassing the cache; `None` when no row exists.
+pub async fn get_status_uncached(org_id: &str) -> Result<Option<String>, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let row = Entity::find()
+        .select_only()
+        .column(Column::Status)
+        .filter(Column::Identifier.eq(org_id))
+        .into_model::<OrgStatusRow>()
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(row.map(|r| r.status))
+}
+
 pub async fn invalidate_cache(org_id: Option<&str>) {
     let mut cache = CACHE.write().await;
+    CACHE_EPOCH.fetch_add(1, Ordering::AcqRel);
     if let Some(v) = org_id {
         cache.remove(v);
     } else {
@@ -414,11 +513,52 @@ pub async fn invalidate_cache(org_id: Option<&str>) {
     }
 }
 
+fn cache_epoch() -> u64 {
+    CACHE_EPOCH.load(Ordering::Acquire)
+}
+
+async fn fill_cache(org_id: &str, org: OrganizationRecord, epoch: u64) {
+    let mut cache = CACHE.write().await;
+    if CACHE_EPOCH.load(Ordering::Acquire) == epoch {
+        cache.insert(org_id.to_string(), org);
+    }
+}
+
+async fn delete_tombstone_row(
+    org_id: &str,
+    updated_at: Option<i64>,
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
+    let mut query = Entity::delete_many()
+        .filter(Column::Identifier.eq(org_id))
+        .filter(Column::Status.eq(STATUS_DELETED));
+    if let Some(updated_at) = updated_at {
+        query = query.filter(Column::UpdatedAt.eq(updated_at));
+    }
+    let result = query
+        .exec(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_cache(Some(org_id)).await;
+    Ok(result.rows_affected > 0)
+}
+
 #[cfg(test)]
 mod tests {
     use config::meta::organization::OrganizationType;
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_a_fill_read_before_an_invalidation_is_dropped() {
+        let org_id = "t-stale-fill";
+        let epoch = cache_epoch();
+        invalidate_cache(Some(org_id)).await;
+        let stale = OrganizationRecord::new(org_id, org_id, OrganizationType::Default);
+        fill_cache(org_id, stale, epoch).await;
+        let cached = CACHE.write().await.remove(org_id).is_some();
+        assert!(!cached, "a row read before the invalidation was cached");
+    }
 
     #[test]
     fn test_organization_record_new_fields() {
