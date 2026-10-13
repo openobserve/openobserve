@@ -871,12 +871,8 @@ pub async fn get_label_values(
     if label_name == NAME_LABEL {
         // Lists stream names; no SQL needed, just filter the schema catalogue.
         let sel = selector.as_ref();
-
-        // OR matchers cannot be evaluated correctly against the flat catalogue.
-        if sel.is_some_and(|s| !s.matchers.or_matchers.is_empty()) {
-            return Err(Error::Message(
-                "match[] with OR matchers is not supported for __name__ label values".to_owned(),
-            ));
+        if let Some(s) = sel {
+            validate_name_label_values_selector(s)?;
         }
 
         // Bare selectors store the metric in selector.name rather than in matchers.
@@ -990,6 +986,26 @@ pub fn try_into_metric_name(selector: &parser::VectorSelector) -> Option<String>
         .into_iter()
         .find(|matcher| matches!(matcher.op, MatchOp::Equal) && !matcher.value.is_empty())
         .map(|matcher| matcher.value)
+}
+
+pub fn validate_name_label_values_selector(selector: &parser::VectorSelector) -> Result<()> {
+    if !selector.matchers.or_matchers.is_empty() {
+        return Err(Error::Message(
+            "match[] with OR matchers is not supported for __name__ label values".to_owned(),
+        ));
+    }
+    if selector
+        .matchers
+        .matchers
+        .iter()
+        .any(|m| m.name != NAME_LABEL)
+    {
+        return Err(Error::Message(
+            "match[] with non-__name__ label filters is not supported for __name__ label values"
+                .to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 fn series_sql(
@@ -1963,10 +1979,22 @@ mod tests {
         else {
             panic!("expected vector selector");
         };
-        assert!(!sel.matchers.or_matchers.is_empty());
         let result =
             get_label_values("default", NAME_LABEL.to_owned(), Some(sel), 0, i64::MAX).await;
         assert!(result.is_err(), "OR matchers must be rejected");
+    }
+
+    #[tokio::test]
+    async fn test_get_label_values_name_rejects_non_name_filters() {
+        use promql_parser::parser;
+        let parser::Expr::VectorSelector(sel) =
+            parser::parse(r#"{__name__=~"node.*", job="missing"}"#).unwrap()
+        else {
+            panic!("expected vector selector");
+        };
+        let result =
+            get_label_values("default", NAME_LABEL.to_owned(), Some(sel), 0, i64::MAX).await;
+        assert!(result.is_err(), "non-__name__ filters must be rejected");
     }
 
     #[test]
