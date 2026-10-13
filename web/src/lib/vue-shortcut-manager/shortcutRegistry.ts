@@ -213,6 +213,12 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
       { id: "openCheatsheet", key: "shift+?", descriptionKey: "shortcuts.actions.openCheatsheet" },
       { id: "closeDialog", key: "escape", descriptionKey: "shortcuts.actions.closeDialog" },
       {
+        id: "dismissNotification",
+        key: "escape",
+        descriptionKey: "shortcuts.actions.dismissNotification",
+        allowInInput: true,
+      },
+      {
         id: "aiChatToggle",
         keyForWindows: "ctrl+b",
         keyForMac: "meta+b",

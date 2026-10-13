@@ -17660,6 +17660,7 @@
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
       "closeDialog": "Close any dialog, drawer, or modal",
+      "dismissNotification": "Dismiss the access notification",
       "focusSearch": "Focus search bar",
       "focusQuery": "Focus query editor",
       "logsRunQuery": "Run search query",
@@ -17845,7 +17846,7 @@
       "loading": "Loading"
     },
     "toast": {
-      "affectedSections": "Affected Sections",
+      "affectedSections": "Affected sections",
       "dismissNotification": "Dismiss notification"
     },
     "color": {
@@ -18365,7 +18366,7 @@
       "pleaseWaitWhileLoadingStreams": "Please wait while loading streams...",
       "copied": "Copied!",
       "copyDetails": "Copy details",
-      "accessRequiredTitle": "Access Required",
+      "accessRequiredTitle": "Access required",
       "accessRequiredMessage": "Some sections couldn't load because you don't have the required permissions. Contact your administrator if you believe you should have access.",
       "resourceFallback": "Resource",
       "resources": {

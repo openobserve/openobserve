@@ -16,7 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ToastProvider, ToastViewport } from "reka-ui";
-import { useToast, toastRecords } from "./useToast";
+import { computed } from "vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { useToast, toastRecords, dismiss } from "./useToast";
 import { viewportPositionClasses } from "./OToastProvider.types";
 import type { ToastPosition } from "./OToast.types";
 import OToast from "./OToast.vue";
@@ -27,11 +29,26 @@ const { toasts } = useToast();
 // Reka UI's single-viewport-per-provider constraint is satisfied — if all toasts
 // shared one provider with two viewports the last-mounted viewport would win and
 // all toasts would appear there regardless of their intended position.
-const positions: ToastPosition[] = ["bottom-center"];
+const positions: ToastPosition[] = ["bottom-center", "bottom-right"];
 
 function toastsForPosition(pos: ToastPosition) {
   return toasts.filter((t) => t.position === pos);
 }
+
+const hasGroupedToast = computed(() => toasts.some((t) => t.open && t.details?.length));
+
+useShortcuts(
+  [
+    {
+      id: "dismissNotification",
+      handler: () => {
+        toasts.filter((t) => t.open && t.details?.length).forEach((t) => dismiss(t.id));
+      },
+    },
+  ],
+  undefined,
+  { active: hasGroupedToast },
+);
 
 function handleOpenChange(id: string, open: boolean): void {
   if (!open) {

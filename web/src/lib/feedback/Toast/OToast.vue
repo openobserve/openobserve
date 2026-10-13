@@ -109,11 +109,20 @@ const screenReaderTitle = computed(() => (props.title ? props.title : props.mess
 
 const isTopPosition = computed(() => props.position.startsWith("top-"));
 
+const isGrouped = computed(() => (props.details?.length ?? 0) > 0);
+
 const detailsExpanded = ref(false);
 
 // Temporary success state for the action button (e.g. "Copied!")
 const actionSucceeded = ref(false);
 let actionResetTimer: ReturnType<typeof setTimeout> | undefined;
+
+const actionClasses = computed(() => [
+  'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
+  actionSucceeded.value
+    ? 'bg-toast-success-icon focus-visible:ring-toast-success-icon text-white'
+    : 'bg-toast-action-text hover:bg-toast-action-hover focus-visible:ring-toast-action-text text-white',
+]);
 
 function handleActionClick() {
   if (!props.action) return;
@@ -138,7 +147,7 @@ onUnmounted(() => {
     :duration="0"
     :class="[
       'pointer-events-auto relative',
-      details && details.length > 0 ? 'w-[28rem]' : 'w-[22rem]',
+      isGrouped ? 'w-[30rem]' : 'w-[22rem]',
       'max-w-[calc(100vw-2rem)]',
       'data-[state=open]:animate-in data-[state=open]:fade-in-0',
       isTopPosition
@@ -196,8 +205,71 @@ onUnmounted(() => {
         <OIcon name="info" size="sm" v-else-if="variant === 'info'" class="size-5" />
       </div>
 
+      <!-- Grouped content: one summary line; the message and sections open on demand -->
+      <div v-if="isGrouped" class="min-w-0 flex-1" data-test="o-toast-grouped">
+        <div class="flex items-center gap-2">
+          <ToastTitle class="text-toast-fg text-sm leading-snug font-semibold whitespace-nowrap">
+            {{ title ?? screenReaderTitle }}
+          </ToastTitle>
+          <OTag v-if="titleCount !== undefined" type="countChip" value="errorstrong">{{
+            titleCount
+          }}</OTag>
+          <ToastDescription class="sr-only" data-test="o-toast-message">
+            {{ message }}
+          </ToastDescription>
+          <div class="ms-auto flex items-center gap-2">
+            <button
+              v-if="action"
+              type="button"
+              data-test="o-toast-action-btn"
+              :class="actionClasses"
+              @click.stop="handleActionClick"
+            >
+              <OIcon
+                v-if="actionSucceeded"
+                name="check"
+                size="sm"
+                class="size-3.5"
+                aria-hidden="true"
+              />
+              {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
+            </button>
+            <button
+              type="button"
+              class="text-toast-fg-secondary hover:text-toast-fg flex cursor-pointer items-center gap-0.5 text-xs font-semibold whitespace-nowrap transition-colors"
+              :aria-expanded="detailsExpanded"
+              data-test="o-toast-details-toggle"
+              @click.stop="detailsExpanded = !detailsExpanded"
+            >
+              {{ t("components.toast.affectedSections") }}
+              <OIcon
+                :name="detailsExpanded ? 'expand-less' : 'expand-more'"
+                size="sm"
+                class="size-3.5"
+                aria-hidden="true"
+              />
+            </button>
+          </div>
+        </div>
+        <div v-if="detailsExpanded" class="mt-2" data-test="o-toast-details">
+          <p class="text-toast-fg-secondary text-xs leading-snug">{{ message }}</p>
+          <ul class="mt-2 space-y-1.5" data-test="o-toast-details-list">
+            <li
+              v-for="detail in details"
+              :key="detail.url"
+              class="flex items-baseline justify-between gap-2 text-xs"
+            >
+              <span class="text-toast-fg shrink-0 font-medium">{{ detail.label }}</span>
+              <OTruncatedText class="text-toast-fg-secondary text-right font-mono">{{
+                detail.url
+              }}</OTruncatedText>
+            </li>
+          </ul>
+        </div>
+      </div>
+
       <!-- Content -->
-      <div class="min-w-0 flex-1">
+      <div v-else class="min-w-0 flex-1">
         <!-- Title row: text + optional count badge side-by-side -->
         <div :class="['flex items-center gap-2', !title ? 'sr-only' : '']">
           <ToastTitle class="text-toast-fg text-sm leading-snug font-semibold">
@@ -225,12 +297,7 @@ onUnmounted(() => {
             v-if="action"
             type="button"
             data-test="o-toast-action-btn"
-            :class="[
-              'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
-              actionSucceeded
-                ? 'bg-toast-success-icon focus-visible:ring-toast-success-icon text-white'
-                : 'bg-toast-action-text hover:bg-toast-action-hover focus-visible:ring-toast-action-text text-white',
-            ]"
+            :class="actionClasses"
             @click.stop="handleActionClick"
           >
             <OIcon
@@ -242,37 +309,6 @@ onUnmounted(() => {
             />
             {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
           </button>
-        </div>
-
-        <!-- Expandable affected-sections list -->
-        <div v-if="details && details.length > 0" class="mt-2 w-full" data-test="o-toast-details">
-          <button
-            type="button"
-            class="text-toast-fg-secondary hover:text-toast-fg flex cursor-pointer items-center gap-1 text-xs font-semibold tracking-wide uppercase transition-colors"
-            :aria-expanded="detailsExpanded"
-            data-test="o-toast-details-toggle"
-            @click.stop="detailsExpanded = !detailsExpanded"
-          >
-            <OIcon
-              :name="detailsExpanded ? 'expand-less' : 'expand-more'"
-              size="sm"
-              class="size-3.5"
-              aria-hidden="true"
-            />
-            {{ t("components.toast.affectedSections") }}
-          </button>
-          <ul v-if="detailsExpanded" class="mt-1.5 space-y-1.5" data-test="o-toast-details-list">
-            <li
-              v-for="detail in details"
-              :key="detail.url"
-              class="flex items-baseline justify-between gap-2 text-xs"
-            >
-              <span class="text-toast-fg shrink-0 font-medium">{{ detail.label }}</span>
-              <OTruncatedText class="text-toast-fg-secondary text-right font-mono">{{
-                detail.url
-              }}</OTruncatedText>
-            </li>
-          </ul>
         </div>
       </div>
 

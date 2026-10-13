@@ -150,6 +150,7 @@ function flushGroupedToast(): void {
   // No explicit timeout — the default error timeout (30 s) applies.
   toast({
     variant: "error",
+    position: "bottom-right",
     title,
     message,
     titleCount: details.length,

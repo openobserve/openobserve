@@ -241,5 +241,5 @@ export function useToast(): UseToastReturn {
 }
 
 // ── Direct export — for use outside Vue tree (services, main.ts) ─────────────
-export { toast, toastRecords, dismissAll, pauseTimer, resumeTimer, updateToast };
+export { toast, toastRecords, dismiss, dismissAll, pauseTimer, resumeTimer, updateToast };
 export type { ToastRecord, DismissFn };
