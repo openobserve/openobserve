@@ -336,16 +336,30 @@ describe("LibraryInstallDialog", () => {
       expect(options).toEqual(expect.arrayContaining(["ops-slack", "oncall-pagerduty"]));
     });
 
-    it("will not advance until a destination is chosen", async () => {
+    it("advances without a destination, which is optional", async () => {
       const wrapper = await mountDialog();
       expect(
         wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeDefined();
-
-      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
-      expect(
-        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
       ).toBeUndefined();
+    });
+
+    it("installs with no destination when none is chosen", async () => {
+      const wrapper = await mountDialog();
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+
+      expect(wrapper.find('[data-test="alert-library-install-summary"]').text()).toContain(
+        (i18n.global.t as any)("common.none"),
+      );
+      await click(wrapper, "alert-library-install-run");
+
+      expect(mocks.createAlert).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({ destinations: [] }),
+        "default",
+      );
     });
 
     it("does not mistake a failed request for an org with no destinations", async () => {
@@ -388,10 +402,10 @@ describe("LibraryInstallDialog", () => {
       expect(wrapper.find('[data-test="alert-library-install-open-destinations"]').exists()).toBe(
         true,
       );
-      // Nothing to pick, so nothing to advance with.
+      // The alerts install without one, so the wizard still moves on.
       expect(
         wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeDefined();
+      ).toBeUndefined();
     });
 
     it("routes to the Destinations page for every type, not just a custom one", async () => {

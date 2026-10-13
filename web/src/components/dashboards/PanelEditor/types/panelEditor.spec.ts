@@ -23,7 +23,7 @@ describe("panelEditor types and utilities", () => {
           showQueryBuilder: true,
           showVariablesSelector: true,
           showLastRefreshedTime: true,
-          showOutdatedWarning: true,
+          showOutdatedWarning: false,
           showAddToDashboardButton: false,
           showQueryTypeSelector: false,
           showGeneratedQueryDisplay: false,
