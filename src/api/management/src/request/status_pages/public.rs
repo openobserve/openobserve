@@ -72,9 +72,6 @@ static CACHE: LazyLock<Vec<Shard>> = LazyLock::new(|| {
 static READ_RPM: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
 /// Password attempts, keyed by "{ip}|{slug}".
 static AUTH_ATTEMPTS: LazyLock<Counters> = LazyLock::new(|| RwLock::new(Default::default()));
-#[cfg(feature = "enterprise")]
-static OWN_HOST: LazyLock<Option<String>> =
-    LazyLock::new(|| own_host_of(&config::get_config().common.web_url));
 
 type Counters = RwLock<HashMap<String, (u32, Instant)>>;
 type Shard = RwLock<HashMap<String, CacheEntry>>;
@@ -342,14 +339,15 @@ pub async fn host_route_middleware(
         HostRouteDecision, PageRoute, resolve_host_route,
     };
 
-    if !config::get_config().synthetics.enabled {
+    let cfg = config::get_config();
+    if !cfg.synthetics.enabled {
         return next.run(request).await;
     }
     let Some(host) = host_header(request.headers()) else {
         return next.run(request).await;
     };
-    // Keeps the app's own traffic off the meta store even on a cold host cache.
-    if OWN_HOST.as_deref() == Some(host.as_str()) {
+    // Keeps the app's own traffic off the meta store; read per request so a config reload applies.
+    if own_host_of(&cfg.common.web_url).as_deref() == Some(host.as_str()) {
         return next.run(request).await;
     }
     let method = request.method().as_str().to_owned();
