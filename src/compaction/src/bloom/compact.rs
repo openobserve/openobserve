@@ -132,23 +132,31 @@ pub(crate) async fn build_for_stream(
     // `max_files_per_bf` and write one `.bf` per chunk, each with its own
     // `bloom_ver`. The search side groups by `(date, bloom_ver)`, so it
     // naturally reads one block-row per chunk. Total read bytes stay
-    // `M × 32`; only the request count grows to `ceil(M / max_files_per_bf)`.
+    // `M × 32`; only the request count grows to one per chunk.
     //
-    // Files are sorted by record count first so similar-sized files share a
-    // chunk — minimizes the uniform-`B` padding waste (B is sized to each
-    // chunk's max cardinality).
+    // Files only share a chunk within one size class (same per-file `B`), so no
+    // file's filter is padded up to a bigger file in the same `.bf`.
     let fpp = cfg.common.bloom_filter_fpp;
     let max_files_per_bf = cfg.common.bloom_filter_max_files_per_bf.max(1);
-    files.sort_by_key(|k| std::cmp::Reverse(k.meta.records));
+    let chunks = plan_chunks(&mut files, max_files_per_bf, fpp);
 
     let base_ver = now_micros();
-    let chunk_total = files.len().div_ceil(max_files_per_bf);
-    for (chunk_idx, chunk) in files.chunks(max_files_per_bf).enumerate() {
+    let chunk_total = chunks.len();
+    for (chunk_idx, (num_blocks, chunk)) in chunks.into_iter().enumerate() {
         let bloom_ver = base_ver + chunk_idx as i64;
         let bloom_path = bloom_path(org_id, stream_type, stream_name, date_key, bloom_ver);
-        match build_for_chunk(org_id, bloom_ver, &bloom_path, chunk, &target_fields, fpp).await {
-            Ok((_, _, 0)) => {}
-            Ok((took, num_blocks, contributing_ids)) => {
+        match build_for_chunk(
+            org_id,
+            bloom_ver,
+            &bloom_path,
+            chunk,
+            &target_fields,
+            num_blocks,
+        )
+        .await
+        {
+            Ok((_, 0)) => {}
+            Ok((took, contributing_ids)) => {
                 log::info!(
                     "[BLOOM_BUILD] {bloom_path}: wrote chunk {}/{chunk_total}, num_blocks={num_blocks} covering {contributing_ids} files in {took} ms",
                     chunk_idx + 1,
@@ -163,29 +171,34 @@ pub(crate) async fn build_for_stream(
     Ok(true)
 }
 
-// B for this chunk is sized from the chunk's MAX record count, used as
-// a safe NDV upper bound: a file can't hold more distinct values than
-// rows. This never under-sizes (no saturation) for the target
-// high-cardinality fields where distinct ≈ rows. It over-sizes for
-// fields that repeat heavily (distinct ≪ rows) — acceptable; exact
-// sizing would read each file's tantivy term count in a pre-pass.
+// B is sized from the record count, used as a safe NDV upper bound: a file
+// can't hold more distinct values than rows. It over-sizes for fields that
+// repeat heavily (distinct ≪ rows); exact sizing would read each file's
+// tantivy term count in a pre-pass.
+fn plan_chunks(files: &mut [FileKey], max_files_per_bf: usize, fpp: f64) -> Vec<(u32, &[FileKey])> {
+    files.sort_by_key(|file| std::cmp::Reverse(file.meta.records));
+    let num_blocks =
+        |file: &FileKey| infra::bloom::num_blocks_for(file.meta.records.max(1) as u64, fpp);
+    files
+        .chunk_by(|a, b| num_blocks(a) == num_blocks(b))
+        .flat_map(|size_class| {
+            let class_blocks = num_blocks(&size_class[0]);
+            size_class
+                .chunks(max_files_per_bf)
+                .map(move |chunk| (class_blocks, chunk))
+        })
+        .collect()
+}
+
 async fn build_for_chunk(
     org_id: &str,
     bloom_ver: i64,
     bf_path: &str,
     files: &[FileKey],
     target_fields: &[String],
-    fpp: f64,
-) -> Result<(u64, u32, usize)> {
+    num_blocks: u32,
+) -> Result<(u64, usize)> {
     let start = std::time::Instant::now();
-
-    let max_records = files
-        .iter()
-        .map(|f| f.meta.records.max(0) as u64)
-        .max()
-        .unwrap_or(0)
-        .max(1);
-    let num_blocks = infra::bloom::num_blocks_for(max_records, fpp);
 
     let mut all_blooms: Vec<FieldBloom> = Vec::new();
     let mut contributing_ids: Vec<i64> = Vec::new();
@@ -205,7 +218,7 @@ async fn build_for_chunk(
         }
     }
     if all_blooms.is_empty() {
-        return Ok((0, 0, 0));
+        return Ok((0, 0));
     }
 
     // Distinct bloom_ver per chunk (base + idx) → distinct `.bf` path.
@@ -225,7 +238,7 @@ async fn build_for_chunk(
 
     let took = start.elapsed().as_millis() as u64;
 
-    Ok((took, num_blocks, contributing_ids.len()))
+    Ok((took, contributing_ids.len()))
 }
 
 async fn build_for_file(
@@ -350,4 +363,66 @@ async fn cleanup_orphan_blooms(
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::FileMeta;
+
+    use super::*;
+
+    const FPP: f64 = 0.01;
+
+    fn files_with_records(records: &[i64]) -> Vec<FileKey> {
+        records
+            .iter()
+            .map(|&records| {
+                FileKey::new(
+                    0,
+                    String::new(),
+                    format!("files/org/logs/app/2026/08/19/07/{records}.parquet"),
+                    FileMeta {
+                        records,
+                        ..Default::default()
+                    },
+                    false,
+                )
+            })
+            .collect()
+    }
+
+    fn planned(files: &mut [FileKey], max_files_per_bf: usize) -> Vec<(u32, Vec<i64>)> {
+        plan_chunks(files, max_files_per_bf, FPP)
+            .into_iter()
+            .map(|(num_blocks, chunk)| {
+                (
+                    num_blocks,
+                    chunk.iter().map(|file| file.meta.records).collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_plan_chunks_sizes_every_file_by_its_own_record_count() {
+        let mut files = files_with_records(&[118, 1_700_000, 50_000, 1_600_000, 100]);
+        assert_eq!(
+            planned(&mut files, 256),
+            vec![
+                (65_536, vec![1_700_000, 1_600_000]),
+                (2_048, vec![50_000]),
+                (8, vec![118]),
+                (4, vec![100]),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_plan_chunks_splits_a_size_class_at_max_files_per_bf() {
+        let mut files = files_with_records(&[1_000, 1_001, 1_002, 0]);
+        assert_eq!(
+            planned(&mut files, 2),
+            vec![(64, vec![1_002, 1_001]), (64, vec![1_000]), (1, vec![0]),]
+        );
+    }
 }

@@ -2079,7 +2079,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_BLOOM_FILTER_MAX_FILES_PER_BF",
         default = 256,
-        help = "Max number of files packed into one `.bf` (transposed bloom layout). A bigger value means fewer `.bf` reads per query but more compactor memory at build time (≈ files × per-file-SBBF). One hour bucket is split into ceil(files / this) `.bf` files."
+        help = "Max number of files packed into one `.bf` (transposed bloom layout). A bigger value means fewer `.bf` reads per query but more compactor memory at build time (≈ files × per-file-SBBF). Only files of similar record count (same filter size) share a `.bf`, so one hour bucket gets one `.bf` per size class, split again every this many files."
     )]
     pub bloom_filter_max_files_per_bf: usize,
     #[env_config(
