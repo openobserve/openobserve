@@ -22,16 +22,15 @@ function isCorrelationAvailable(): boolean {
   return config.isEnterprise === "true" || config.isCloud === "true";
 }
 
-interface OrgCorrelationConfig {
-  trackedIds: string[];
+interface SemanticGroupsLookup {
   idToFields: Map<string, string[]>;
-  cacheable: boolean;
+  cancelled: boolean;
 }
 
 // ── Cache ────────────────────────────────────────────────────────────────────
 
 const fieldNamesCache = new Map<string, string[]>();
-const pendingOrgConfigs = new Map<string, Promise<OrgCorrelationConfig>>();
+const pendingGroupsLookups = new Map<string, Promise<SemanticGroupsLookup>>();
 let lastSeenOrgId: string | null = null;
 
 function evictOrgCacheIfSwitched(orgId: string): void {
@@ -39,47 +38,37 @@ function evictOrgCacheIfSwitched(orgId: string): void {
     for (const key of fieldNamesCache.keys()) {
       if (key.startsWith(`${lastSeenOrgId}/`)) fieldNamesCache.delete(key);
     }
-    pendingOrgConfigs.delete(lastSeenOrgId);
+    pendingGroupsLookups.delete(lastSeenOrgId);
   }
   lastSeenOrgId = orgId;
 }
 
 // ── Field resolution ─────────────────────────────────────────────────────────
 
-async function fetchOrgCorrelationConfig(orgId: string): Promise<OrgCorrelationConfig> {
-  const idToFields = new Map<string, string[]>();
-  let identityConfig: any;
-  try {
-    identityConfig = await loadIdentityConfig(orgId);
-  } catch {
-    return { trackedIds: [], idToFields, cacheable: false };
-  }
-
-  const trackedIds: string[] = identityConfig?.tracked_alias_ids ?? [];
-  if (!trackedIds.length) return { trackedIds, idToFields, cacheable: false };
-
+async function fetchSemanticGroupsLookup(orgId: string): Promise<SemanticGroupsLookup> {
   let cancelled = false;
-  // Another page force-refreshing the shared query cancels this load; its [] must not be cached as "no fields".
   const semanticGroups = await loadSemanticGroups(orgId, (err) => {
     cancelled = isCancelledError(err);
   });
+  const idToFields = new Map<string, string[]>();
   for (const group of semanticGroups) idToFields.set(group.id, group.fields);
-  return { trackedIds, idToFields, cacheable: !cancelled };
+  return { idToFields, cancelled };
 }
 
-// Every query watcher and streaming chunk lands here at once on a cold load, so they share one org lookup.
-function loadOrgCorrelationConfig(orgId: string): Promise<OrgCorrelationConfig> {
-  const pending = pendingOrgConfigs.get(orgId);
+// Every query watcher and streaming chunk lands here at once on a cold load; one shared lookup also logs a failure once.
+function loadSemanticGroupsLookup(orgId: string): Promise<SemanticGroupsLookup> {
+  const pending = pendingGroupsLookups.get(orgId);
   if (pending) return pending;
-  const lookup: Promise<OrgCorrelationConfig> = fetchOrgCorrelationConfig(orgId).finally(() => {
-    if (pendingOrgConfigs.get(orgId) === lookup) pendingOrgConfigs.delete(orgId);
+  const lookup: Promise<SemanticGroupsLookup> = fetchSemanticGroupsLookup(orgId).finally(() => {
+    if (pendingGroupsLookups.get(orgId) === lookup) pendingGroupsLookups.delete(orgId);
   });
-  pendingOrgConfigs.set(orgId, lookup);
+  pendingGroupsLookups.set(orgId, lookup);
   return lookup;
 }
 
 function matchTrackedFields(
-  { trackedIds, idToFields }: OrgCorrelationConfig,
+  trackedIds: string[],
+  idToFields: Map<string, string[]>,
   streamSchemaFields: { name: string }[],
 ): string[] {
   const schemaFieldNames = new Set(streamSchemaFields.map((f) => f.name));
@@ -109,10 +98,21 @@ export async function getCorrelationFieldNames(
   // Query watchers sync before the schema loads; caching that empty match would block every later save for the stream.
   if (!streamSchemaFields.length) return [];
 
-  const orgConfig = await loadOrgCorrelationConfig(orgId);
-  const matched = matchTrackedFields(orgConfig, streamSchemaFields);
+  let identityConfig: any;
+  try {
+    identityConfig = await loadIdentityConfig(orgId);
+  } catch {
+    return [];
+  }
+  const trackedIds: string[] = identityConfig?.tracked_alias_ids ?? [];
+  if (!trackedIds.length) return [];
+
+  const { idToFields, cancelled } = await loadSemanticGroupsLookup(orgId);
+  // A force-refresh elsewhere cancels the shared load; raw alias ids alone would make sync() clear saved alias filters.
+  if (cancelled) return [];
+  const matched = matchTrackedFields(trackedIds, idToFields, streamSchemaFields);
   // A lookup that finishes after an org switch must not repopulate the evicted org's entries.
-  if (orgConfig.cacheable && lastSeenOrgId === orgId) fieldNamesCache.set(key, matched);
+  if (lastSeenOrgId === orgId) fieldNamesCache.set(key, matched);
   return matched;
 }
 
@@ -204,7 +204,7 @@ export function clearCorrelationFilters(
 
 export function clearCorrelationCache(): void {
   fieldNamesCache.clear();
-  pendingOrgConfigs.clear();
+  pendingGroupsLookups.clear();
   clearSemanticGroupsCache();
   lastSeenOrgId = null;
 }

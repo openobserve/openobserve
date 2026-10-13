@@ -200,6 +200,17 @@ describe("buildCorrelationWhereClause", () => {
   });
 });
 
+const deferGroups = () => {
+  let release!: (v: { data: unknown }) => void;
+  vi.mocked(serviceStreamsApi.getSemanticGroups).mockReturnValueOnce(
+    new Promise((resolve) => {
+      release = resolve;
+    }) as never,
+  );
+  return (data: unknown) => release({ data });
+};
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
 // ── getCorrelationFieldNames ──────────────────────────────────────────────────
 
 describe("getCorrelationFieldNames", () => {
@@ -267,7 +278,7 @@ describe("getCorrelationFieldNames", () => {
     expect(await getCorrelationFieldNames("org1", "reloading", [])).toEqual(["host"]);
   });
 
-  it("resolves concurrent cold-cache callers with one identity and one groups lookup", async () => {
+  it("resolves concurrent cold-cache callers with one groups lookup", async () => {
     vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
     vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: [] });
     await Promise.all(
@@ -275,8 +286,22 @@ describe("getCorrelationFieldNames", () => {
         getCorrelationFieldNames("org1", "one-lookup", [{ name: "host" }]),
       ),
     );
-    expect(loadIdentityConfig).toHaveBeenCalledTimes(1);
     expect(serviceStreamsApi.getSemanticGroups).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses identity settings that change while a groups lookup is pending", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["machine"] });
+    const release = deferGroups();
+    const before = getCorrelationFieldNames("org1", "old-stream", [{ name: "host" }]);
+    await tick();
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["environment"] });
+    const after = getCorrelationFieldNames("org1", "new-stream", [{ name: "namespace" }]);
+    release([
+      { id: "machine", fields: ["host"] },
+      { id: "environment", fields: ["namespace"] },
+    ]);
+    expect(await before).toEqual(["host"]);
+    expect(await after).toEqual(["namespace"]);
   });
 
   it("logs a failed groups load once for a burst of concurrent callers", async () => {
@@ -303,17 +328,6 @@ describe("getCorrelationFieldNames", () => {
     expect(errorSpy).not.toHaveBeenCalled();
     errorSpy.mockRestore();
   });
-
-  const deferGroups = () => {
-    let release!: (v: { data: unknown }) => void;
-    vi.mocked(serviceStreamsApi.getSemanticGroups).mockReturnValueOnce(
-      new Promise((resolve) => {
-        release = resolve;
-      }) as never,
-    );
-    return (data: unknown) => release({ data });
-  };
-  const tick = () => new Promise((r) => setTimeout(r, 0));
 
   it("matches each concurrent caller against its own schema", async () => {
     vi.mocked(loadIdentityConfig).mockResolvedValue({
@@ -468,6 +482,24 @@ describe("useCorrelationFilters", () => {
       expect(serviceStreamsApi.getSemanticGroups).toHaveBeenCalledTimes(1);
       expect(loadCorrelationFilters("org1", "logs", "mystream")).toEqual([
         { field: "host", value: "web-01" },
+      ]);
+    });
+
+    it("keeps saved alias filters when the shared groups load is cancelled", async () => {
+      vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host", "machine"] });
+      const release = deferGroups();
+      saveCorrelationFilters("org1", "logs", "mystream", [{ field: "hostname", value: "web-01" }]);
+      const opts = makeOpts({
+        getQuery: () => "hostname = 'web-01'",
+        streamSchemaFields: () => [{ name: "host" }, { name: "hostname" }],
+      });
+      const saving = useCorrelationFilters(opts).save();
+      await tick();
+      clearSemanticGroupsCacheForOrg("org1");
+      await saving;
+      release([{ id: "machine", fields: ["hostname"] }]);
+      expect(loadCorrelationFilters("org1", "logs", "mystream")).toEqual([
+        { field: "hostname", value: "web-01" },
       ]);
     });
 
