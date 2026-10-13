@@ -41,7 +41,10 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 import { loadIdentityConfig } from "@/utils/identityConfig";
-import { clearSemanticGroupsCache } from "@/utils/semanticGroupsCache";
+import {
+  clearSemanticGroupsCache,
+  clearSemanticGroupsCacheForOrg,
+} from "@/utils/semanticGroupsCache";
 import serviceStreamsApi from "@/services/service_streams";
 
 // ── localStorage helpers ──────────────────────────────────────────────────────
@@ -299,6 +302,85 @@ describe("getCorrelationFieldNames", () => {
     ]);
     expect(errorSpy).not.toHaveBeenCalled();
     errorSpy.mockRestore();
+  });
+
+  const deferGroups = () => {
+    let release!: (v: { data: unknown }) => void;
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockReturnValueOnce(
+      new Promise((resolve) => {
+        release = resolve;
+      }) as never,
+    );
+    return (data: unknown) => release({ data });
+  };
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  it("matches each concurrent caller against its own schema", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({
+      tracked_alias_ids: ["host", "service_name"],
+    });
+    const release = deferGroups();
+    const logs = getCorrelationFieldNames("org1", "default", [{ name: "host" }]);
+    const traces = getCorrelationFieldNames("org1", "default", [{ name: "service_name" }]);
+    await tick();
+    release([]);
+    expect(await logs).toEqual(["host"]);
+    expect(await traces).toEqual(["service_name"]);
+  });
+
+  it("resolves the newer schema when it replaces stale fields during a lookup", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
+    const release = deferGroups();
+    const stale = getCorrelationFieldNames("org1", "swap", [{ name: "_timestamp" }]);
+    const fresh = getCorrelationFieldNames("org1", "swap", [{ name: "host" }]);
+    await tick();
+    release([]);
+    expect(await stale).toEqual([]);
+    expect(await fresh).toEqual(["host"]);
+    expect(await getCorrelationFieldNames("org1", "swap", [{ name: "host" }])).toEqual(["host"]);
+  });
+
+  it("does not reuse an in-flight lookup from an org that was switched away from", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
+    const release = deferGroups();
+    const schema = [{ name: "host" }, { name: "service_name" }];
+    const abandoned = getCorrelationFieldNames("org1", "s", schema);
+    await tick();
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: [] });
+    await getCorrelationFieldNames("org2", "s", schema);
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["service_name"] });
+    const back = getCorrelationFieldNames("org1", "s", schema);
+    release([]);
+    await abandoned;
+    expect(await back).toEqual(["service_name"]);
+  });
+
+  it("does not cache an empty match when the shared groups request is cancelled", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["machine"] });
+    const release = deferGroups();
+    const cancelled = getCorrelationFieldNames("org1", "cancel", [{ name: "host" }]);
+    await tick();
+    clearSemanticGroupsCacheForOrg("org1");
+    expect(await cancelled).toEqual([]);
+    release([{ id: "machine", fields: ["host"] }]);
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({
+      data: [{ id: "machine", fields: ["host"] }],
+    });
+    expect(await getCorrelationFieldNames("org1", "cancel", [{ name: "host" }])).toEqual(["host"]);
+  });
+
+  it("reloads semantic mappings after clearCorrelationCache", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["machine"] });
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({
+      data: [{ id: "machine", fields: ["host"] }],
+    });
+    const schema = [{ name: "host" }, { name: "hostname" }];
+    expect(await getCorrelationFieldNames("org1", "reset", schema)).toEqual(["host"]);
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({
+      data: [{ id: "machine", fields: ["hostname"] }],
+    });
+    clearCorrelationCache();
+    expect(await getCorrelationFieldNames("org1", "reset", schema)).toEqual(["hostname"]);
   });
 
   it("shares one semantic-groups request across concurrent cold-cache callers", async () => {

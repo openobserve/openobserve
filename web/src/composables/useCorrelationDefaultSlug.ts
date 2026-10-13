@@ -13,18 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { isCancelledError } from "@tanstack/vue-query";
 import { loadIdentityConfig } from "@/utils/identityConfig";
-import { loadSemanticGroups } from "@/utils/semanticGroupsCache";
+import { clearSemanticGroupsCache, loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import config from "@/aws-exports";
 
 function isCorrelationAvailable(): boolean {
   return config.isEnterprise === "true" || config.isCloud === "true";
 }
 
+interface OrgCorrelationConfig {
+  trackedIds: string[];
+  idToFields: Map<string, string[]>;
+  cacheable: boolean;
+}
+
 // ── Cache ────────────────────────────────────────────────────────────────────
 
 const fieldNamesCache = new Map<string, string[]>();
-const pendingFieldNames = new Map<string, Promise<string[]>>();
+const pendingOrgConfigs = new Map<string, Promise<OrgCorrelationConfig>>();
 let lastSeenOrgId: string | null = null;
 
 function evictOrgCacheIfSwitched(orgId: string): void {
@@ -32,31 +39,49 @@ function evictOrgCacheIfSwitched(orgId: string): void {
     for (const key of fieldNamesCache.keys()) {
       if (key.startsWith(`${lastSeenOrgId}/`)) fieldNamesCache.delete(key);
     }
+    pendingOrgConfigs.delete(lastSeenOrgId);
   }
   lastSeenOrgId = orgId;
 }
 
 // ── Field resolution ─────────────────────────────────────────────────────────
 
-async function resolveCorrelationFieldNames(
-  orgId: string,
-  key: string,
-  streamSchemaFields: { name: string }[],
-): Promise<string[]> {
+async function fetchOrgCorrelationConfig(orgId: string): Promise<OrgCorrelationConfig> {
+  const idToFields = new Map<string, string[]>();
   let identityConfig: any;
   try {
     identityConfig = await loadIdentityConfig(orgId);
   } catch {
-    return [];
+    return { trackedIds: [], idToFields, cacheable: false };
   }
 
-  const trackedIds: string[] = identityConfig?.tracked_alias_ids;
-  if (!trackedIds?.length) return [];
+  const trackedIds: string[] = identityConfig?.tracked_alias_ids ?? [];
+  if (!trackedIds.length) return { trackedIds, idToFields, cacheable: false };
 
-  const semanticGroups = await loadSemanticGroups(orgId);
-  const idToFields = new Map<string, string[]>();
+  let cancelled = false;
+  // Another page force-refreshing the shared query cancels this load; its [] must not be cached as "no fields".
+  const semanticGroups = await loadSemanticGroups(orgId, (err) => {
+    cancelled = isCancelledError(err);
+  });
   for (const group of semanticGroups) idToFields.set(group.id, group.fields);
+  return { trackedIds, idToFields, cacheable: !cancelled };
+}
 
+// Every query watcher and streaming chunk lands here at once on a cold load, so they share one org lookup.
+function loadOrgCorrelationConfig(orgId: string): Promise<OrgCorrelationConfig> {
+  const pending = pendingOrgConfigs.get(orgId);
+  if (pending) return pending;
+  const lookup: Promise<OrgCorrelationConfig> = fetchOrgCorrelationConfig(orgId).finally(() => {
+    if (pendingOrgConfigs.get(orgId) === lookup) pendingOrgConfigs.delete(orgId);
+  });
+  pendingOrgConfigs.set(orgId, lookup);
+  return lookup;
+}
+
+function matchTrackedFields(
+  { trackedIds, idToFields }: OrgCorrelationConfig,
+  streamSchemaFields: { name: string }[],
+): string[] {
   const schemaFieldNames = new Set(streamSchemaFields.map((f) => f.name));
   const matched: string[] = [];
   for (const aliasId of trackedIds) {
@@ -69,8 +94,6 @@ async function resolveCorrelationFieldNames(
       matched.push(aliasId);
     }
   }
-
-  fieldNamesCache.set(key, matched);
   return matched;
 }
 
@@ -86,18 +109,11 @@ export async function getCorrelationFieldNames(
   // Query watchers sync before the schema loads; caching that empty match would block every later save for the stream.
   if (!streamSchemaFields.length) return [];
 
-  // Every query watcher and streaming chunk lands here at once on a cold load, so they share one lookup.
-  const pending = pendingFieldNames.get(key);
-  if (pending) return pending;
-  const lookup: Promise<string[]> = resolveCorrelationFieldNames(
-    orgId,
-    key,
-    streamSchemaFields,
-  ).finally(() => {
-    if (pendingFieldNames.get(key) === lookup) pendingFieldNames.delete(key);
-  });
-  pendingFieldNames.set(key, lookup);
-  return lookup;
+  const orgConfig = await loadOrgCorrelationConfig(orgId);
+  const matched = matchTrackedFields(orgConfig, streamSchemaFields);
+  // A lookup that finishes after an org switch must not repopulate the evicted org's entries.
+  if (orgConfig.cacheable && lastSeenOrgId === orgId) fieldNamesCache.set(key, matched);
+  return matched;
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -188,7 +204,8 @@ export function clearCorrelationFilters(
 
 export function clearCorrelationCache(): void {
   fieldNamesCache.clear();
-  pendingFieldNames.clear();
+  pendingOrgConfigs.clear();
+  clearSemanticGroupsCache();
   lastSeenOrgId = null;
 }
 
