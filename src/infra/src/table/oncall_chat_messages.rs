@@ -17,8 +17,8 @@
 
 use config::meta::oncall::{ChatMessage, ChatMessageKind, ChatMessageStatus, ChatPlatform};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
-    QueryOrder, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
+    QueryFilter, QueryOrder, TransactionTrait,
 };
 
 use super::entity::oncall_chat_messages::{Column, Entity, Model};
@@ -37,6 +37,25 @@ pub async fn list_for_response(response_id: &str) -> Result<Vec<ChatMessage>, er
 /// Removes a page's message rows in one statement and returns how many went. [strong]
 pub async fn delete_for_response(response_id: &str) -> Result<u64, errors::Error> {
     delete_for_response_in(get_orm_client_rw().await, response_id).await
+}
+
+/// Applies a replicated message row unless a stored row sharing a key is as new (FL-3). [strong]
+pub async fn put_replica(message: &ChatMessage) -> Result<(), errors::Error> {
+    put_replica_in(get_orm_client_rw().await, message).await
+}
+
+/// Rows sharing the id or the posted message with `message`; an unposted row has no message key.
+fn clashes(message: &ChatMessage) -> Condition {
+    let same_id = Condition::any().add(Column::Id.eq(&message.id));
+    let Some(ts) = &message.message_ts else {
+        return same_id;
+    };
+    same_id.add(
+        Condition::all()
+            .add(Column::Platform.eq(message.platform.to_i32()))
+            .add(Column::ChannelId.eq(&message.channel_id))
+            .add(Column::MessageTs.eq(ts)),
+    )
 }
 
 /// Reads a row back into the meta type; a discriminant this build cannot read is an error.
@@ -126,6 +145,29 @@ async fn list_for_response_in<C: ConnectionTrait>(
         .collect()
 }
 
+/// [`put_replica`] against a caller-supplied connection.
+async fn put_replica_in<C: TransactionTrait>(
+    conn: &C,
+    message: &ChatMessage,
+) -> Result<(), errors::Error> {
+    let txn = conn.begin().await?;
+    let stored = Entity::find().filter(clashes(message)).all(&txn).await?;
+    // A tie loses too, so a replayed Put is a no-op and two regions never swap rows.
+    if stored.iter().all(|m| m.updated_at < message.updated_at) {
+        Entity::delete_many()
+            .filter(clashes(message))
+            .exec(&txn)
+            .await?;
+        to_model(message)
+            .into_active_model()
+            .reset_all()
+            .insert(&txn)
+            .await?;
+    }
+    txn.commit().await?;
+    Ok(())
+}
+
 /// [`delete_for_response`] against a caller-supplied connection.
 async fn delete_for_response_in<C: ConnectionTrait>(
     conn: &C,
@@ -140,7 +182,7 @@ async fn delete_for_response_in<C: ConnectionTrait>(
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+    use sea_orm::{ConnectOptions, Database, DatabaseConnection, Statement};
 
     use super::*;
 
@@ -218,5 +260,81 @@ mod tests {
         assert_eq!(delete_for_response_in(&db, "r1").await.unwrap(), 2);
         assert!(list_for_response_in(&db, "r1").await.unwrap().is_empty());
         assert_eq!(list_for_response_in(&db, "r2").await.unwrap().len(), 1);
+    }
+
+    /// FL-3: in either arrival order, two regions keep the newer of two clashing rows.
+    #[tokio::test]
+    async fn test_two_regions_converge_on_the_newer_message_row() {
+        let posted = |id: &str, updated_at: i64| ChatMessage {
+            message_ts: Some("1700000000.000100".into()),
+            status: ChatMessageStatus::Sent,
+            updated_at,
+            ..message(id, "r1", 100)
+        };
+        let older = posted("m1", 150);
+        let same_post = posted("m2", 200);
+        let done = ChatMessage {
+            status: ChatMessageStatus::Done,
+            ..posted("m1", 200)
+        };
+        for newer in [same_post, done] {
+            for order in [[&older, &newer], [&newer, &older]] {
+                let db = db().await;
+                for put in order {
+                    put_replica_in(&db, put).await.unwrap();
+                }
+                assert_eq!(
+                    list_for_response_in(&db, "r1").await.unwrap(),
+                    vec![newer.clone()],
+                    "{}",
+                    newer.id
+                );
+            }
+        }
+    }
+
+    /// Unposted rows have no message key, so two queued DMs of one page never clash.
+    #[tokio::test]
+    async fn test_unposted_rows_only_clash_on_their_id() {
+        let db = db().await;
+        let first = message("m1", "r1", 100);
+        let second = message("m2", "r1", 100);
+        put_replica_in(&db, &first).await.unwrap();
+        put_replica_in(&db, &second).await.unwrap();
+
+        assert_eq!(
+            list_for_response_in(&db, "r1").await.unwrap(),
+            vec![first, second]
+        );
+    }
+
+    /// Every later insert into the table aborts, as a lost connection would.
+    async fn fail_inserts(db: &DatabaseConnection) {
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            "CREATE TRIGGER fail_insert BEFORE INSERT ON oncall_chat_messages \
+             BEGIN SELECT RAISE(ABORT, 'forced'); END"
+                .to_string(),
+        ))
+        .await
+        .unwrap();
+    }
+
+    /// A replica Put whose insert fails after its delete leaves the clashing row in place.
+    #[tokio::test]
+    async fn test_a_failed_replica_put_leaves_the_table() {
+        let db = db().await;
+        let posted = |id: &str, updated_at: i64| ChatMessage {
+            message_ts: Some("1700000000.000100".into()),
+            updated_at,
+            ..message(id, "r1", 100)
+        };
+        put_in(&db, &posted("m1", 100)).await.unwrap();
+        let before = list_for_response_in(&db, "r1").await.unwrap();
+        fail_inserts(&db).await;
+
+        assert!(put_replica_in(&db, &posted("m2", 200)).await.is_err());
+
+        assert_eq!(list_for_response_in(&db, "r1").await.unwrap(), before);
     }
 }

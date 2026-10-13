@@ -68,35 +68,7 @@ pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
     let existing = oncall_teams::Entity::find_by_id(&team.id)
         .one(client)
         .await?;
-    let model = oncall_teams::Model {
-        id: team.id.clone(),
-        org_id: team.org_id.clone(),
-        name: team.name.clone(),
-        timezone: team.timezone.clone(),
-        description: team.description.clone(),
-        // The channel rides the snapshot now that `Team` carries it, so a room
-        // set in one region is the room the other region posts to. It used to
-        // be preserved from the local row instead, which meant it never
-        // replicated at all — a failover would page correctly and then talk to
-        // nobody.
-        channel_destinations: team
-            .channel_destinations
-            .as_ref()
-            .map(serde_json::to_string)
-            .transpose()
-            .map_err(|e| {
-                errors::Error::Message(format!("team channel is not serialisable: {e}"))
-            })?,
-        // `Team` does not carry the Slack room yet, so the local row's value is kept.
-        slack_workspace_id: existing.as_ref().and_then(|e| e.slack_workspace_id.clone()),
-        slack_channel_id: existing.as_ref().and_then(|e| e.slack_channel_id.clone()),
-        slack_channel_name: existing.as_ref().and_then(|e| e.slack_channel_name.clone()),
-        slack_same_room_destination: existing
-            .as_ref()
-            .and_then(|e| e.slack_same_room_destination.clone()),
-        created_at: team.created_at,
-        updated_at: team.updated_at,
-    };
+    let model = team_model(team)?;
     match existing {
         Some(_) => {
             model.into_active_model().reset_all().update(client).await?;
@@ -596,6 +568,31 @@ async fn put_contact_in<C: ConnectionTrait>(
     Ok(())
 }
 
+/// The whole team row a snapshot writes, Slack room included.
+fn team_model(team: &Team) -> Result<oncall_teams::Model, errors::Error> {
+    Ok(oncall_teams::Model {
+        id: team.id.clone(),
+        org_id: team.org_id.clone(),
+        name: team.name.clone(),
+        timezone: team.timezone.clone(),
+        description: team.description.clone(),
+        channel_destinations: team
+            .channel_destinations
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()
+            .map_err(|e| {
+                errors::Error::Message(format!("team channel is not serialisable: {e}"))
+            })?,
+        slack_workspace_id: team.slack_workspace_id.clone(),
+        slack_channel_id: team.slack_channel_id.clone(),
+        slack_channel_name: team.slack_channel_name.clone(),
+        slack_same_room_destination: team.slack_same_room_destination.clone(),
+        created_at: team.created_at,
+        updated_at: team.updated_at,
+    })
+}
+
 /// A content-dedup predicate an absent value can actually satisfy. `col.eq(None)`
 /// renders `col = NULL`, which matches nothing — so the columns a non-delivery
 /// entry leaves empty would fail their own dedup check and every redelivery
@@ -891,6 +888,68 @@ mod tests {
             .unwrap();
         assert_eq!(row.state, ResponseState::Acknowledged.to_i32());
         assert_eq!(row.home_region.as_deref(), Some("eu"));
+    }
+
+    /// FL-6: a snapshot without a region is a page from an older region, not a move.
+    #[tokio::test]
+    async fn test_a_snapshot_without_a_region_keeps_the_stored_one() {
+        let db = db().await;
+        let opened = Response {
+            home_region: Some("eu".to_string()),
+            ..a_response()
+        };
+        put_response_in(&db, &opened).await.unwrap();
+        let acked = Response {
+            state: ResponseState::Acknowledged,
+            home_region: None,
+            updated_at: opened.updated_at + 1,
+            ..a_response()
+        };
+        put_response_in(&db, &acked).await.unwrap();
+
+        let row = oncall_responses::Entity::find_by_id("resp_1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.state, ResponseState::Acknowledged.to_i32());
+        assert_eq!(row.home_region.as_deref(), Some("eu"));
+    }
+
+    /// FL-2: the team's Slack room rides `TeamPut`, so a failover posts to the same room.
+    #[test]
+    fn test_a_team_snapshot_carries_the_slack_room() {
+        let team = Team {
+            id: "team_1".into(),
+            org_id: "acme".into(),
+            name: "Platform".into(),
+            timezone: "UTC".into(),
+            description: None,
+            channel_destinations: None,
+            slack_workspace_id: Some("T1".into()),
+            slack_channel_id: Some("C1".into()),
+            slack_channel_name: Some("#oncall".into()),
+            slack_same_room_destination: Some("oncall-hook".into()),
+            created_at: 1,
+            updated_at: 2,
+        };
+
+        let row = team_model(&team).unwrap();
+
+        assert_eq!(
+            [
+                row.slack_workspace_id,
+                row.slack_channel_id,
+                row.slack_channel_name,
+                row.slack_same_room_destination
+            ],
+            [
+                team.slack_workspace_id,
+                team.slack_channel_id,
+                team.slack_channel_name,
+                team.slack_same_room_destination
+            ]
+        );
     }
 
     /// The retry of a failed send is the same page at a later `at`, so it must

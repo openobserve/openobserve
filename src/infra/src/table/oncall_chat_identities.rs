@@ -17,8 +17,8 @@
 
 use config::meta::oncall::{ChatIdentity, ChatPlatform};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
+    QueryFilter, TransactionTrait,
 };
 
 use super::entity::oncall_chat_identities::{Column, Entity, Model};
@@ -68,12 +68,33 @@ pub async fn delete(id: &str) -> Result<bool, errors::Error> {
     delete_in(get_orm_client_rw().await, id).await
 }
 
+/// Applies a replicated link unless a stored row sharing a key is as new (FL-3). [strong]
+pub async fn put_replica(identity: &ChatIdentity) -> Result<(), errors::Error> {
+    put_replica_in(get_orm_client_rw().await, identity).await
+}
+
 /// Rows of one org's workspace on one platform.
 fn scoped(org_id: &str, platform: ChatPlatform, workspace_id: &str) -> sea_orm::Select<Entity> {
     Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Platform.eq(platform.to_i32()))
         .filter(Column::WorkspaceId.eq(workspace_id))
+}
+
+/// Rows sharing the id or either unique key with `identity`.
+fn clashes(identity: &ChatIdentity) -> Condition {
+    let workspace = Condition::all()
+        .add(Column::OrgId.eq(&identity.org_id))
+        .add(Column::Platform.eq(identity.platform.to_i32()))
+        .add(Column::WorkspaceId.eq(&identity.workspace_id));
+    Condition::any()
+        .add(Column::Id.eq(&identity.id))
+        .add(
+            workspace
+                .clone()
+                .add(Column::UserEmail.eq(&identity.user_email)),
+        )
+        .add(workspace.add(Column::PlatformUserId.eq(&identity.platform_user_id)))
 }
 
 /// Reads a row back into the meta type; a platform this build cannot read is an error.
@@ -172,9 +193,32 @@ async fn delete_in<C: ConnectionTrait>(conn: &C, id: &str) -> Result<bool, error
     Ok(deleted == 1)
 }
 
+/// [`put_replica`] against a caller-supplied connection.
+async fn put_replica_in<C: TransactionTrait>(
+    conn: &C,
+    identity: &ChatIdentity,
+) -> Result<(), errors::Error> {
+    let txn = conn.begin().await?;
+    let stored = Entity::find().filter(clashes(identity)).all(&txn).await?;
+    // A tie loses too, so a replayed Put is a no-op and two regions never swap rows.
+    if stored.iter().all(|m| m.changed_at < identity.changed_at) {
+        Entity::delete_many()
+            .filter(clashes(identity))
+            .exec(&txn)
+            .await?;
+        to_model(identity)
+            .into_active_model()
+            .reset_all()
+            .insert(&txn)
+            .await?;
+    }
+    txn.commit().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ConnectOptions, Database, DatabaseConnection};
+    use sea_orm::{ConnectOptions, Database, DatabaseConnection, Statement};
 
     use super::*;
 
@@ -246,5 +290,77 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(gone, None);
+    }
+
+    /// Every row in the table, by id.
+    async fn rows(db: &DatabaseConnection) -> Vec<ChatIdentity> {
+        let mut all: Vec<ChatIdentity> = Entity::find()
+            .all(db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|m| to_identity(m).unwrap())
+            .collect();
+        all.sort_by(|a, b| a.id.cmp(&b.id));
+        all
+    }
+
+    /// FL-3: whichever order two regions receive clashing links in, both keep the newer one.
+    #[tokio::test]
+    async fn test_two_regions_converge_on_the_newer_link() {
+        let older = identity("l1", "U1", "ana@o2.ai");
+        let same_email = ChatIdentity {
+            changed_at: 200,
+            ..identity("l2", "U2", "ana@o2.ai")
+        };
+        let same_user = ChatIdentity {
+            changed_at: 200,
+            ..identity("l3", "U1", "bo@o2.ai")
+        };
+        let unlinked = ChatIdentity {
+            unlinked_at: Some(200),
+            changed_at: 200,
+            ..older.clone()
+        };
+        for newer in [same_email, same_user, unlinked] {
+            for order in [[&older, &newer], [&newer, &older]] {
+                let db = db().await;
+                for put in order {
+                    put_replica_in(&db, put).await.unwrap();
+                }
+                assert_eq!(rows(&db).await, vec![newer.clone()], "{}", newer.id);
+            }
+        }
+    }
+
+    /// Every later insert into the table aborts, as a lost connection would.
+    async fn fail_inserts(db: &DatabaseConnection) {
+        db.execute(Statement::from_string(
+            db.get_database_backend(),
+            "CREATE TRIGGER fail_insert BEFORE INSERT ON oncall_chat_identities \
+             BEGIN SELECT RAISE(ABORT, 'forced'); END"
+                .to_string(),
+        ))
+        .await
+        .unwrap();
+    }
+
+    /// A replica Put whose insert fails after its delete leaves the clashing row in place.
+    #[tokio::test]
+    async fn test_a_failed_replica_put_leaves_the_table() {
+        let db = db().await;
+        put_in(&db, &identity("l1", "U1", "ana@o2.ai"))
+            .await
+            .unwrap();
+        let before = rows(&db).await;
+        fail_inserts(&db).await;
+
+        let newer = ChatIdentity {
+            changed_at: 200,
+            ..identity("l2", "U2", "ana@o2.ai")
+        };
+        assert!(put_replica_in(&db, &newer).await.is_err());
+
+        assert_eq!(rows(&db).await, before);
     }
 }

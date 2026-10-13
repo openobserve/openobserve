@@ -118,6 +118,10 @@ fn to_team(m: oncall_teams::Model) -> Team {
         description: m.description,
         // Carried on the struct, so a whole-row super-cluster snapshot replicates the team's room.
         channel_destinations: to_channel(m.channel_destinations),
+        slack_workspace_id: m.slack_workspace_id,
+        slack_channel_id: m.slack_channel_id,
+        slack_channel_name: m.slack_channel_name,
+        slack_same_room_destination: m.slack_same_room_destination,
         created_at: m.created_at,
         updated_at: m.updated_at,
     }
@@ -526,10 +530,10 @@ mod tests {
             timezone: "Asia/Kolkata".into(),
             description: Some("owns queriers".into()),
             channel_destinations: None,
-            slack_workspace_id: None,
-            slack_channel_id: None,
-            slack_channel_name: None,
-            slack_same_room_destination: None,
+            slack_workspace_id: Some("T1".into()),
+            slack_channel_id: Some("C1".into()),
+            slack_channel_name: Some("#oncall".into()),
+            slack_same_room_destination: Some("oncall-hook".into()),
             created_at: 10,
             updated_at: 20,
         };
@@ -539,6 +543,20 @@ mod tests {
         assert_eq!(t.timezone, "Asia/Kolkata");
         assert_eq!(t.description.as_deref(), Some("owns queriers"));
         assert_eq!((t.created_at, t.updated_at), (10, 20));
+        assert_eq!(
+            [
+                t.slack_workspace_id,
+                t.slack_channel_id,
+                t.slack_channel_name,
+                t.slack_same_room_destination
+            ],
+            [
+                m.slack_workspace_id,
+                m.slack_channel_id,
+                m.slack_channel_name,
+                m.slack_same_room_destination
+            ]
+        );
     }
 
     /// Membership is a flat fact: this person is on this team. Which rung

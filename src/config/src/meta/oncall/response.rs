@@ -645,6 +645,12 @@ impl Response {
     pub fn is_exhausted(&self) -> bool {
         self.exhausted_at.is_some() && !self.state.is_terminal()
     }
+
+    /// Whether this region sends the page's chat (FL-6); no home region counts as empty. [pure]
+    pub fn sends_for(&self, this_region: &str, super_cluster_on: bool) -> bool {
+        let home = self.home_region.as_deref().unwrap_or_default();
+        home == this_region && !(home.is_empty() && super_cluster_on)
+    }
 }
 
 // G16 dampens on the re-fire, not the close, and from `closed_at`: a bug delays, never sticks.
@@ -1706,6 +1712,34 @@ mod tests {
             "order_service has not confirmed yet"
         );
         assert!(dependents_all_clear(&[], "anything"));
+    }
+
+    /// FL-6: only the home region sends; empty is single-region and needs super cluster off.
+    #[test]
+    fn test_sends_for_only_the_home_region() {
+        let cases = [
+            (Some("eu"), "eu", true, true),
+            (Some("eu"), "us", true, false),
+            (Some("eu"), "eu", false, true),
+            (Some("eu"), "", false, false),
+            (Some(""), "", false, true),
+            (Some(""), "", true, false),
+            (Some(""), "eu", true, false),
+            (None, "", false, true),
+            (None, "", true, false),
+            (None, "eu", true, false),
+        ];
+        for (home, here, super_cluster_on, want) in cases {
+            let page = Response {
+                home_region: home.map(str::to_string),
+                ..sample(None, None)
+            };
+            assert_eq!(
+                page.sends_for(here, super_cluster_on),
+                want,
+                "home {home:?}, here {here:?}, super cluster {super_cluster_on}"
+            );
+        }
     }
 
     // ── The team channel's copy of the record (Change 1) ────────────────────
