@@ -465,6 +465,19 @@ describe("ExperimentForm", () => {
       );
     });
 
+    it("does not qualify a missing cost as scoring cost only", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, estimatedCost: null, taskCostEstimated: false },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      const text = wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text();
+      expect(text).toContain("Cost could not be estimated");
+      expect(text).not.toContain("scoring cost only");
+    });
+
     it("asks before creating when the preview requires confirmation", async () => {
       (llmExperimentsService.preview as any).mockResolvedValue({ ...previewResult, costEstimate });
       wrapper = await createWrapper();

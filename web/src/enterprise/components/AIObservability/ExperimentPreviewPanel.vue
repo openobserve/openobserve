@@ -68,7 +68,7 @@
           <template v-if="costEstimate.estimatedCost !== null && costEstimate.hasUnpricedModel">
             · {{ t("aiObservability.experiments.form.costLowerBound") }}
           </template>
-          <template v-if="!costEstimate.taskCostEstimated">
+          <template v-if="costEstimate.estimatedCost !== null && !costEstimate.taskCostEstimated">
             · {{ t("aiObservability.experiments.form.costScoringOnly") }}
           </template>
         </p>
