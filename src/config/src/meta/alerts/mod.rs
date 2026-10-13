@@ -367,6 +367,11 @@ impl TriggerCondition {
             .max(REALTIME_MIN_SILENCE_SECS)
             .saturating_mul(1_000_000)
     }
+
+    /// The realtime floor alone, without the alert's own silence.
+    pub fn min_silence_micros() -> i64 {
+        REALTIME_MIN_SILENCE_SECS * 1_000_000
+    }
 }
 
 impl TriggerCondition {

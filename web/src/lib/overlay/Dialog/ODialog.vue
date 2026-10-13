@@ -61,7 +61,6 @@ const props = withDefaults(defineProps<DialogProps>(), {
   showClose: true,
   width: undefined,
   maxHeight: undefined,
-  initialFocus: "primary",
   primaryButtonVariant: "primary",
   secondaryButtonVariant: "outline",
   neutralButtonVariant: "ghost",
@@ -71,6 +70,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   primaryButtonLoading: false,
   secondaryButtonLoading: false,
   neutralButtonLoading: false,
+  initialFocus: "primary",
 });
 
 const emit = defineEmits<DialogEmits>();
@@ -285,7 +285,7 @@ function handleOpenAutoFocus(event: Event) {
       field.focus();
       return;
     }
-    // No form field found → focus primary button (confirm dialog pattern)
+    // No form field found → focus the chosen footer button (confirm dialog pattern)
     const btnRef = props.initialFocus === "secondary" ? secondaryBtnRef : primaryBtnRef;
     const btnEl = (btnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {

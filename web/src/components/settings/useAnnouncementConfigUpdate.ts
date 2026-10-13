@@ -18,7 +18,6 @@ import { useMutation, useQueryClient } from "@tanstack/vue-query";
 import { isEqual } from "lodash-es";
 import { useStore } from "vuex";
 
-import { notifyAnnouncementsChanged } from "@/composables/useAnnouncementBanners";
 import {
   announcementConfigQuery,
   saveAnnouncementConfigMutation,
@@ -88,7 +87,6 @@ export function useAnnouncementConfigUpdate() {
         if (attempt >= MAX_SAVE_ATTEMPTS) throw new AnnouncementConflictError();
       }
     }
-    notifyAnnouncementsChanged();
   };
 
   return { update, isPending: saveConfig.isPending };

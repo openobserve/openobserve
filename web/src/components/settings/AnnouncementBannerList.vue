@@ -173,7 +173,7 @@ import { useStore } from "vuex";
 import AnnouncementBar from "@/components/announcements/AnnouncementBar.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { announcementServerNow } from "@/composables/useAnnouncementBanners";
+import { serverNowMs } from "@/composables/useAnnouncementBanners";
 import { useTheme } from "@/composables/useTheme";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
@@ -255,13 +255,13 @@ const configQuery = useQuery(() =>
 );
 const { update } = useAnnouncementConfigUpdate();
 
-const now = ref(announcementServerNow());
+const now = ref(serverNowMs());
 let statusTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
-  statusTimer = setInterval(() => (now.value = announcementServerNow()), STATUS_TICK_MS);
+  statusTimer = setInterval(() => (now.value = serverNowMs()), STATUS_TICK_MS);
 });
 onBeforeUnmount(() => clearInterval(statusTimer));
-onActivated(() => (now.value = announcementServerNow()));
+onActivated(() => (now.value = serverNowMs()));
 
 // The dialog closes itself before it emits `ok`, so the target must outlive the open flag.
 const deleteOpen = ref(false);

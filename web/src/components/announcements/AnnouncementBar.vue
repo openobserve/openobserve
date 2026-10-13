@@ -23,8 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :colors="bannerColorsFor(colors, mode)"
     :data-test="dataTest"
   >
-    <!-- eslint-disable-next-line vue/no-v-html -- renderBannerMessage sanitizes to inline emphasis and http(s) links -->
-    <span class="announcement-message" v-html="html" />
+    <slot>
+      <!-- eslint-disable-next-line vue/no-v-html -- renderBannerMessage sanitizes to inline emphasis and http(s) links -->
+      <span class="announcement-message" v-html="html" />
+    </slot>
+
+    <template v-if="$slots.footer" #footer>
+      <slot name="footer" />
+    </template>
 
     <template v-if="$slots.actions" #actions>
       <slot name="actions" />

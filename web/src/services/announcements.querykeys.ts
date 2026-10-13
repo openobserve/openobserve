@@ -15,7 +15,9 @@
 
 import { orgKey } from "@/composables/query/keys";
 
+/** The banner composable polls outside the query cache and refetches when a write names this scope. */
 export const announcementKeys = {
-  all: (org: string) => orgKey(org, "settings", "announcements"),
-  config: (org: string) => orgKey(org, "settings", "announcements", "config"),
+  all: (org: string) => orgKey(org, "announcements"),
+  active: (org: string) => orgKey(org, "announcements", "active"),
+  config: (org: string) => orgKey(org, "announcements", "config"),
 };

@@ -109,12 +109,19 @@ pub async fn list(
     if let Some(folder) = folder_id {
         q = q.filter(slos::Column::FolderId.eq(folder));
     }
-    q.order_by_asc(slos::Column::Name)
+    let rows = q.order_by_asc(slos::Column::Name).all(db).await?;
+    rows.into_iter().map(to_slo).collect()
+}
+
+/// [list] for the correction planner: a row that does not decode is logged and left out, so it
+/// cannot block the org's other SLOs; every other caller still sees the error.
+pub async fn list_decodable(db: &DatabaseConnection, org: &str) -> Result<Vec<Slo>, Error> {
+    let rows = slos::Entity::find()
+        .filter(slos::Column::Org.eq(org))
+        .order_by_asc(slos::Column::Name)
         .all(db)
-        .await?
-        .into_iter()
-        .map(to_slo)
-        .collect()
+        .await?;
+    Ok(rows.into_iter().filter_map(decoded).collect())
 }
 
 /// When the current generation began.
@@ -456,6 +463,16 @@ pub async fn move_to_folder(
 // ---------------------------------------------------------------------------
 // conversion
 // ---------------------------------------------------------------------------
+
+/// One row that does not decode is logged and left out.
+fn decoded(m: slos::Model) -> Option<Slo> {
+    let id = m.id.clone();
+    to_slo(m)
+        .inspect_err(|e| {
+            log::error!("[slo] skipping SLO {id}, its stored row does not decode: {e}")
+        })
+        .ok()
+}
 
 fn to_slo(m: slos::Model) -> Result<Slo, Error> {
     let sli_config = serde_json::from_value(m.sli_config)?;

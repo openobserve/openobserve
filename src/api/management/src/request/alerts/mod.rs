@@ -49,7 +49,7 @@ use {
 #[cfg(feature = "enterprise")]
 use crate::models::alerts::requests::UpdateAnomalyAlertFields;
 #[cfg(feature = "enterprise")]
-use crate::models::alerts::responses::anomaly_config_to_list_item;
+use crate::models::alerts::responses::anomaly_list_items;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::alerts::{
@@ -708,6 +708,8 @@ fn composite_list_item(
         child_count: None,
         referenced_by_composite_count: None,
         expression_summary: None,
+        active_downtime: None,
+        downtime_dimensions: Default::default(),
     })
 }
 
@@ -2983,9 +2985,9 @@ pub async fn list_alerts(
         // would return every anomaly config alongside the matching alerts.
         let before = list.len();
         list.extend(
-            configs
-                .iter()
-                .filter_map(anomaly_config_to_list_item)
+            anomaly_list_items(&org_id, &configs)
+                .await
+                .into_iter()
                 .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
                 .filter(|item| match &priority_filter {
                     None => true,
@@ -3033,6 +3035,7 @@ pub async fn list_alerts(
     let mut list = list;
     enrich_with_run_state(&mut list).await;
     enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
+    crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
 
     // Feature-scoped fields: keep destinations/template off the default list path
     // (bytes + module-scoped names) unless the dependency view explicitly opted in.
@@ -3665,7 +3668,7 @@ pub async fn trigger_alert(
     }
     let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
-        Ok(_) => MetaHttpResponse::ok("Alert triggered"),
+        Ok(triggered) => MetaHttpResponse::ok(triggered.response_message()),
         Err(AlertError::AlertNotFound) => {
             if let Some(_composite) =
                 openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())

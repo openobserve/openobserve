@@ -265,6 +265,7 @@ describe("QueryConfig.vue", () => {
     qcOverrides: Record<string, any> = {},
     formOverrides: Record<string, any> = {},
     storeOverride?: any,
+    onSubmit: (values: any) => void = () => {},
   ) {
     const props = reactive({ ...baseQCProps(), ...qcOverrides });
     const theStore = storeOverride ?? mockStore;
@@ -274,9 +275,10 @@ describe("QueryConfig.vue", () => {
         schema: addAlertSchema,
         defaultValues: hostDefaults(formOverrides),
         qcProps: props,
+        onSubmit,
       }),
       template: `
-        <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+        <OForm :schema="schema" :default-values="defaultValues" @submit="onSubmit">
           <QueryConfig v-bind="qcProps" />
         </OForm>
       `,
@@ -350,6 +352,55 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.onCronTimezoneChange("Browser Time (America/Los_Angeles)");
       await nextTick();
       expect(wrapper.vm.cronTimezone).toBe("America/Los_Angeles");
+    });
+
+    it("keeps a loaded Asia/Calcutta through mount and an unchanged save, shown as Asia/Kolkata", async () => {
+      host.unmount();
+      const submitted: any[] = [];
+      const triggerCondition = {
+        ...hostDefaults().trigger_condition,
+        frequency_type: "cron",
+        cron: "0 */5 * * * *",
+        timezone: "Asia/Calcutta",
+      };
+      const { h } = mountHost(
+        { triggerCondition },
+        { trigger_condition: triggerCondition },
+        undefined,
+        (values) => submitted.push(values),
+      );
+      host = h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.timezone")).toBe("Asia/Calcutta");
+
+      const options = wrapper.vm.timezoneSelectOptions as {
+        label: string;
+        value: string;
+        searchText?: string;
+      }[];
+      const stored = options.find((o) => o.value === "Asia/Calcutta");
+      expect(stored?.label).toBe("Asia/Kolkata");
+      expect(stored?.searchText).toContain("Calcutta");
+      expect(options.filter((o) => o.label === "Asia/Kolkata")).toHaveLength(1);
+
+      const picker = host
+        .findAllComponents(OFormSelect)
+        .find((c: any) => c.props("name") === "trigger_condition.timezone");
+      expect(picker?.findComponent(OSelect).props("modelValue")).toBe("Asia/Calcutta");
+      expect(picker?.text()).toContain("Asia/Kolkata");
+
+      await hostForm().handleSubmit();
+      await flushPromises();
+      expect(hostForm().state.errors).toEqual([]);
+      expect(submitted).toHaveLength(1);
+      expect(submitted[0].trigger_condition.timezone).toBe("Asia/Calcutta");
+    });
+
+    it("onCronTimezoneChange stores a legacy zone as picked, as main did", async () => {
+      wrapper.vm.onCronTimezoneChange("Asia/Calcutta");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("Asia/Calcutta");
     });
   });
 
