@@ -2624,6 +2624,7 @@
   "login": {
     "lockedOut": "Te veel mislukte aanmeldpogingen. Probeer het over {duration} opnieuw, of neem contact op met uw beheerder.",
     "redirectingToSsoMessage": "Doorverwijzen naar SSO-inlogpagina. Als je niet wordt doorgestuurd, ",
+    "signingIn": "Je wordt ingelogd...",
     "clickHere": "klik hier",
     "loginWithSso": "Inloggen met SSO",
     "loginAsInternalUser": "Inloggen als interne gebruiker",

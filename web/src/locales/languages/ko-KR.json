@@ -2624,6 +2624,7 @@
   "login": {
     "lockedOut": "로그인 시도 실패 횟수가 너무 많습니다. {duration} 후에 다시 시도하거나 관리자에게 문의하세요.",
     "redirectingToSsoMessage": "SSO 로그인 페이지로 리디렉션합니다. 리디렉션되지 않으면",
+    "signingIn": "로그인 중...",
     "clickHere": "여기를 클릭하세요",
     "loginWithSso": "SSO로 로그인",
     "loginAsInternalUser": "내부 사용자로 로그인",

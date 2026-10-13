@@ -2624,6 +2624,7 @@
   "login": {
     "lockedOut": "Troppi tentativi di accesso non riusciti. Riprova tra {duration} o contatta l'amministratore.",
     "redirectingToSsoMessage": "Reindirizzamento alla pagina di accesso SSO. Se non vieni reindirizzato, per favore",
+    "signingIn": "Accesso in corso...",
     "clickHere": "clicca qui",
     "loginWithSso": "Accedi con SSO",
     "loginAsInternalUser": "Accedi come utente interno",
