@@ -61,4 +61,45 @@ test.describe("Settings Query Management Redirect testcases", () => {
     await pm.queryManagementPage.navigateToQueryManagement(orgId);
     await pm.queryManagementPage.expectGeneralPageTitleVisible();
   });
+
+  test("drills into a user's queries from User Summary on every click, not only the first (enterprise)", {
+    tag: ['@query-management-drill-through', '@all', '@enterprise', '@P2']
+  }, async ({ page }) => {
+    const edition = await pm.editionFeaturesPage.detectEdition();
+    test.skip(edition !== 'enterprise', `Runs only on Enterprise build (detected: ${edition})`);
+
+    // o2-enterprise#2876: the second drill-through left the User Summary table showing.
+    const email = 'drill.user@example.com';
+    const now = Date.now() * 1000;
+    const runningQuery = (traceId, userId) => ({
+      trace_id: traceId,
+      user_id: userId,
+      org_id: '_meta',
+      search_type: 'dashboards',
+      created_at: now - 5000000,
+      started_at: now - 5000000,
+      status: 'running',
+      work_group: 'default',
+      stream_type: 'logs',
+      query: { start_time: now - 60000000, end_time: now, sql: 'SELECT 1' },
+      scan_stats: { files: 1, records: 1, original_size: 1, compressed_size: 1 },
+      search_event_context: { folder_name: 'f', dashboard_name: 'd' },
+    });
+    await pm.queryManagementPage.stubRunningQueries('_meta', [
+      runningQuery('trace-a', email),
+      runningQuery('trace-b', email),
+      runningQuery('trace-c', 'other.user@example.com'),
+    ]);
+
+    await pm.queryManagementPage.navigateToRunningQueries('_meta');
+
+    for (const round of [1, 2, 3]) {
+      testLogger.info(`Drill-through round ${round}`);
+      await pm.queryManagementPage.drillIntoUser(email);
+      await pm.queryManagementPage.expectAllQueriesViewFor(email);
+
+      await pm.queryManagementPage.selectQueryTypeTab('summary');
+      await expect(pm.queryManagementPage.summaryList).toBeVisible();
+    }
+  });
 });
