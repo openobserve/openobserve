@@ -2065,16 +2065,16 @@ describe("ViewDashboard", () => {
         expect(drafted.tabs[0].panels[0].layout.x).toBe(10);
       });
 
-      it("the banner's Resolve saves the current draft again instead of reopening an older one", async () => {
+      it("the banner's Resolve reopens the dialog without saving again, and edit mode stays", async () => {
         await conflictLost();
         await dragPanelTo(20);
-        mockSaveExecute.mockResolvedValueOnce(false);
 
         await wrapper.find('[data-test="dashboard-unsaved-conflict-resolve"]').trigger("click");
         await flushPromises();
 
-        expect(mockSaveExecute).toHaveBeenCalledTimes(2);
+        expect(mockSaveExecute).toHaveBeenCalledTimes(1);
         expect(wrapper.vm.isEditingLayout).toBe(true);
+        expect(panelLayout().x).toBe(20);
       });
     });
   });

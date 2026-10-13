@@ -123,6 +123,37 @@ describe("DashboardSaveConflictDialog", () => {
     await flushPromises();
   };
 
+  it("stacks above a settings drawer or dialog that is already open", async () => {
+    const drawer = document.createElement("div");
+    drawer.setAttribute("role", "dialog");
+    drawer.setAttribute("data-state", "open");
+    document.body.appendChild(drawer);
+    try {
+      await openConflict();
+      await mountDialog();
+      const panel = wrapper.find("[data-o2-dialog]").element as HTMLElement;
+      expect(Number(panel.style.zIndex)).toBe(7000);
+    } finally {
+      drawer.remove();
+    }
+  });
+
+  it("keeps the relative time of their save current while the dialog stays open", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    try {
+      await openConflict();
+      await mountDialog();
+      const savedBy = () => byTest(wrapper, "dashboard-save-conflict-saved-by").text();
+      expect(savedBy()).toContain("4 minutes ago");
+
+      vi.advanceTimersByTime(60_000);
+      await flushPromises();
+      expect(savedBy()).toContain("5 minutes ago");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows when the other save happened and what it changed", async () => {
     await openConflict();
     await mountDialog();

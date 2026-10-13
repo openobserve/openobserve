@@ -324,6 +324,49 @@ describe("o2-enterprise#2875: closing the dialog and editing again", () => {
   });
 });
 
+describe("regression pass on 093855bec9", () => {
+  it("Resolve reopens without the 'not applied' notice, which belongs to a real save attempt", async () => {
+    await editPanelAndConflict();
+    dialog.close();
+    service.save.mockRejectedValueOnce(conflict());
+    await expect(
+      updateDashboard(
+        store,
+        "acme",
+        DASH,
+        store.state.organizationData.allDashboardData[DASH],
+        FOLDER,
+      ),
+    ).rejects.toBeTruthy();
+    service.get_Dashboard.mockResolvedValueOnce(response(LATEST, "h2"));
+    await openDashboardConflict(
+      { dashboardId: DASH, folderId: FOLDER },
+      { store, t, locale: "en-US" },
+    );
+    expect(state.notice).toBe("stillUnresolved");
+    dialog.close();
+
+    const seq = state.openSeq;
+    dialog.reopen();
+
+    expect(state).toMatchObject({ open: true, step: "main", notice: null });
+    expect(state.openSeq).toBe(seq + 1);
+  });
+
+  it("Reload shows its toast before the site reacts, so a page that navigates away still shows it", async () => {
+    const { onResolved } = await editPanelAndConflict();
+    service.get_Dashboard.mockResolvedValueOnce(response(LATEST, "h2"));
+
+    await dialog.reload();
+
+    expect(toast).toHaveBeenCalledWith({
+      variant: "success",
+      message: `Loaded the latest version. Discarded your change: ${MY_CHANGE}`,
+    });
+    expect(toast.mock.invocationCallOrder[0]).toBeLessThan(onResolved.mock.invocationCallOrder[0]);
+  });
+});
+
 describe("save helpers do nothing when the id is not found", () => {
   beforeEach(async () => {
     service.get_Dashboard.mockResolvedValueOnce(response(BASE, "h1"));

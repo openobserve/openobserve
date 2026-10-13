@@ -227,7 +227,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
     <PaidOverageConsentDialog v-if="config.isCloud == 'true'" />
-    <DashboardSaveConflictDialog v-if="dashboardSaveConflict.mounted" />
+    <DashboardSaveConflictDialog
+      v-if="dashboardSaveConflict.mounted"
+      :key="dashboardSaveConflict.openSeq"
+    />
   </div>
 </template>
 

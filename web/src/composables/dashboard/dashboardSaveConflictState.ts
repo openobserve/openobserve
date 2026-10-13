@@ -35,6 +35,8 @@ export interface MergedPanelRow {
 // Kept free of service imports so the app shell can mount the dialog lazily.
 export const dashboardSaveConflictState = reactive({
   mounted: false,
+  /** Bumped on every open so the dialog remounts and stacks above whatever is open at that moment. */
+  openSeq: 0,
   open: false,
   step: "loading" as ConflictStep,
   busy: null as ConflictAction | null,

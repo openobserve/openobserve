@@ -351,7 +351,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
+import { provideDialogLayerAboveOpenOverlays } from "@/lib/overlay/Dialog/dialogStacking";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -416,13 +417,28 @@ const {
   close,
 } = useDashboardSaveConflictDialog();
 
+// Mounted at the app root, so it is outside any settings drawer or dialog that triggered the save; stack above them.
+provideDialogLayerAboveOpenOverlays();
+
+const RELATIVE_TIME_TICK_MS = 15_000;
+const now = ref(Date.now());
+let clock: ReturnType<typeof setInterval> | undefined;
+
 const changesOpen = ref(true);
 watch(
   () => state.open,
   (open) => {
-    if (open) changesOpen.value = true;
+    clearInterval(clock);
+    clock = undefined;
+    if (!open) return;
+    changesOpen.value = true;
+    now.value = Date.now();
+    // "Saved by someone else N seconds ago" keeps counting while the user decides.
+    clock = setInterval(() => (now.value = Date.now()), RELATIVE_TIME_TICK_MS);
   },
+  { immediate: true },
 );
+onUnmounted(() => clearInterval(clock));
 
 const actionsReady = computed(() => state.step === "main" && !state.busy);
 
@@ -559,7 +575,7 @@ const savedByText = computed(() => {
   const ms = state.latestUpdatedAt;
   if (!ms) return t("dashboard.saveConflict.savedByUnknown");
   return t("dashboard.saveConflict.savedBy", {
-    relative: formatRelativeTime(ms, locale.value),
+    relative: formatRelativeTime(ms, locale.value, now.value),
     time: formatClockTime(ms, locale.value),
   });
 });

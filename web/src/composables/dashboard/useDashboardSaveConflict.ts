@@ -189,6 +189,7 @@ export const openDashboardConflict = async (
   session = s;
   Object.assign(state, {
     mounted: true,
+    openSeq: state.openSeq + 1,
     open: true,
     step: "loading",
     busy: null,
@@ -258,13 +259,14 @@ const reload = () =>
       return;
     }
     const discarded = changesText(s);
-    await finish(s, "reloaded");
+    // Shown before the sites react: the panel editor navigates away when it hears "reloaded".
     toast({
       variant: "success",
       message: discarded
         ? s.ctx.t("dashboard.saveConflict.toastReloadedChange", { change: discarded })
         : s.ctx.t("dashboard.saveConflict.toastReloaded"),
     });
+    await finish(s, "reloaded");
   });
 
 const confirmOverwrite = () =>
@@ -355,9 +357,15 @@ const close = () => {
   state.open = false;
 };
 
+// Reopening is not a save attempt, so it never carries a save notice; it re-reads the working copy as it is now.
 const reopen = () => {
-  if (!session) return;
+  const s = session;
+  if (!s) return;
   if (state.step !== "loading" && state.step !== "error") setStep("main");
+  state.notice = null;
+  s.mine = clone(workingCopy(s));
+  if (s.latest) recompute(s);
+  state.openSeq += 1;
   state.open = true;
 };
 

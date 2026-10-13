@@ -1927,9 +1927,8 @@ export default defineComponent({
       { deep: true },
     );
 
-    // While editing, the draft may have moved on since the dialog closed, so Resolve saves it again to compare the current layout.
-    const resolveSaveConflict = () =>
-      isEditingLayout.value && layoutSaveConflicted ? saveLayout() : reopenSaveConflict();
+    // Resolve only reopens the dialog: no save is attempted, and the dialog re-reads the working copy, so an edit-mode draft that moved on is what Overwrite saves.
+    const resolveSaveConflict = () => reopenSaveConflict();
 
     onDashboardConflictResolved((dashboardId, outcome) => {
       if (dashboardId !== route.query.dashboard) return;
