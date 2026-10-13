@@ -168,6 +168,10 @@ pub async fn create(
         description: Set(description),
         // Not `[]`: an empty list means "no channel" and ignores the destinations it inherits.
         channel_destinations: Set(None),
+        slack_workspace_id: Set(None),
+        slack_channel_id: Set(None),
+        slack_channel_name: Set(None),
+        slack_same_room_destination: Set(None),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -522,6 +526,10 @@ mod tests {
             timezone: "Asia/Kolkata".into(),
             description: Some("owns queriers".into()),
             channel_destinations: None,
+            slack_workspace_id: None,
+            slack_channel_id: None,
+            slack_channel_name: None,
+            slack_same_room_destination: None,
             created_at: 10,
             updated_at: 20,
         };

@@ -5436,6 +5436,7 @@ mod tests {
             ladder_anchor: None,
             ladder_run: Some(1),
             exhausted_at: None,
+            home_region: None,
             responder_role: ResponderRole::Owner,
             origin_response_id: None,
             priority: 2,

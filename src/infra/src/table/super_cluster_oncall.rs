@@ -51,8 +51,8 @@ use config::meta::oncall::{
     TeamMember, Unavailability,
 };
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
-    TransactionTrait, sea_query::SimpleExpr,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, NotSet,
+    QueryFilter, Set, TransactionTrait, sea_query::SimpleExpr,
 };
 
 use super::entity::{
@@ -87,6 +87,13 @@ pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
             .map_err(|e| {
                 errors::Error::Message(format!("team channel is not serialisable: {e}"))
             })?,
+        // `Team` does not carry the Slack room yet, so the local row's value is kept.
+        slack_workspace_id: existing.as_ref().and_then(|e| e.slack_workspace_id.clone()),
+        slack_channel_id: existing.as_ref().and_then(|e| e.slack_channel_id.clone()),
+        slack_channel_name: existing.as_ref().and_then(|e| e.slack_channel_name.clone()),
+        slack_same_room_destination: existing
+            .as_ref()
+            .and_then(|e| e.slack_same_room_destination.clone()),
         created_at: team.created_at,
         updated_at: team.updated_at,
     };
@@ -459,6 +466,7 @@ async fn put_response_in<C: ConnectionTrait>(
         // replication.
         runbook_url: None,
         exhausted_at: response.exhausted_at,
+        home_region: response.home_region.clone(),
         updated_at: response.updated_at,
     };
     match oncall_responses::Entity::find_by_id(&response.id)
@@ -469,8 +477,11 @@ async fn put_response_in<C: ConnectionTrait>(
         // and the write have to be one statement, or a newer snapshot landing
         // between them is overwritten by this one.
         Some(_) => {
+            let mut update = model.into_active_model().reset_all();
+            // FL-6: the home region is set once, by the insert below or at open.
+            update.home_region = NotSet;
             oncall_responses::Entity::update_many()
-                .set(model.into_active_model().reset_all())
+                .set(update)
                 .filter(oncall_responses::Column::Id.eq(&response.id))
                 .filter(oncall_responses::Column::UpdatedAt.lte(response.updated_at))
                 .exec(conn)
@@ -677,6 +688,7 @@ mod tests {
             acked_at: None,
             closed_at: None,
             incident_id: None,
+            home_region: None,
             updated_at: 10,
         }
     }
@@ -853,6 +865,32 @@ mod tests {
         assert_eq!(row.state, ResponseState::Acknowledged.to_i32());
         assert_eq!(row.acked_by.as_deref(), Some("ana@o2.ai"));
         assert_eq!(row.acked_at, Some(99));
+    }
+
+    /// FL-6: the opening region owns the page's chat sends, so a snapshot must not move it.
+    #[tokio::test]
+    async fn test_a_snapshot_never_changes_the_home_region() {
+        let db = db().await;
+        let opened = Response {
+            home_region: Some("eu".to_string()),
+            ..a_response()
+        };
+        put_response_in(&db, &opened).await.unwrap();
+        let acked = Response {
+            state: ResponseState::Acknowledged,
+            home_region: Some("us".to_string()),
+            updated_at: opened.updated_at + 1,
+            ..a_response()
+        };
+        put_response_in(&db, &acked).await.unwrap();
+
+        let row = oncall_responses::Entity::find_by_id("resp_1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.state, ResponseState::Acknowledged.to_i32());
+        assert_eq!(row.home_region.as_deref(), Some("eu"));
     }
 
     /// The retry of a failed send is the same page at a later `at`, so it must
