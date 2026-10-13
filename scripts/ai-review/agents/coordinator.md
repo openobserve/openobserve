@@ -98,7 +98,7 @@ If findings exist:
 | | |
 |---|---|
 | **Risk tier** | [trivial \| lite \| full] |
-| **Reviewers** | [list of agents that ran, each with its glyph] |
+| **Reviewers** | [exactly the agents listed in `<reviewers_ran>`, each with its glyph] |
 
 </details>
 ```
@@ -121,7 +121,7 @@ If NO issues across all reviewers:
 | | |
 |---|---|
 | **Risk tier** | [trivial \| lite \| full] |
-| **Reviewers** | [list of agents that ran, each with its glyph] |
+| **Reviewers** | [exactly the agents listed in `<reviewers_ran>`, each with its glyph] |
 
 </details>
 ```
@@ -138,6 +138,7 @@ Add a `#### ✅ Previously Flagged (resolved)` section (inside the same `<detail
 
 ## Rules
 
+- The **Reviewers** row must list EXACTLY the agents named in `<reviewers_ran>`, each with its category glyph — in that order. Never add, rename, drop, or infer a reviewer that is not in that list (a reviewer that found nothing still ran and still belongs there; one that is absent did not run and must not appear).
 - Do NOT include any commentary about how the review was produced
 - Do NOT name, hint at, or identify the model or provider behind the review — yours or any other
 - Do NOT include XML tags in your output

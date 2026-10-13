@@ -898,7 +898,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     } else if (agentDef.requiresFocus) {
       console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — no files in focus`);
       TRACE.endSpan(reviewerSpan, { "review.skipped": true, "review.skip_reason": "no_focus_files" });
-      return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: null, genAIResponseId: "" };
+      return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: null, genAIResponseId: "", skipped: true };
     }
   }
 
@@ -1002,7 +1002,7 @@ function sanitizeReviewBody(body) {
     "changed_files", "existing_inline_findings", "previous_review",
     "custom_review_instructions", "review_task", "pr_context", "diff",
     "all_findings", "coordinator_task", "overall_pr_context", "risk_tier",
-    "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
+    "reviewers_ran", "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
     "category", "severity", "file", "line", "description", "suggestion"];
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
@@ -1056,10 +1056,16 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     ? `\n<failed_reviewers>${failedAgents.map(r => r.agentName).join(", ")}</failed_reviewers>`
     : "";
 
+  // Authoritative list of reviewers that actually ran (not skipped, not failed). The coordinator
+  // must render the "Reviewers" row from THIS, not infer it — a reviewer with no findings sends no
+  // <reviewer> block, so without this the LLM guesses and can invent an agent that never ran.
+  const ranReviewers = agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName);
+
   const userPrompt = [
     `<coordinator_task>`,
     `<overall_pr_context>${prContext}</overall_pr_context>`,
     `<risk_tier>${tier}</risk_tier>`,
+    `<reviewers_ran>${ranReviewers.join(", ")}</reviewers_ran>`,
     `<all_findings>${findingsSections}</all_findings>`,
     failedNote,
     existingReview ? `<previous_review>${existingReview}</previous_review>` : "",
@@ -1217,7 +1223,7 @@ ${sections.join("\n")}
 ---
 
 - Risk tier: ${tier}
-- Reviewers completed: ${agentResults.filter(r => !r.error).map(r => r.agentName).join(", ") || "none"}
+- Reviewers completed: ${agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName).join(", ") || "none"}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
 
 </details>`;
@@ -1435,14 +1441,17 @@ async function main() {
 
     const results = agentResults.map(r => r.status === "fulfilled" ? r.value : { agentKey: "unknown", agentName: "unknown", findings: [], error: r.reason?.message || "Unknown error", genAIResponseId: "" });
     const totalFindings = results.reduce((sum, r) => sum + r.findings.length, 0);
-    const failedAgents = results.filter(r => r.error);
-    const completedAgents = results.filter(r => !r.error);
+    // A requiresFocus agent that saw no files in its domain opted out — it is neither expected
+    // nor completed, so it must not count toward coverage.
+    const ranResults = results.filter(r => !r.skipped);
+    const failedAgents = ranResults.filter(r => r.error);
+    const completedAgents = ranResults.filter(r => !r.error);
     const failedAgentNames = failedAgents.map(r => r.agentName);
     const failureReasons = Object.fromEntries(
       failedAgents.map(r => [r.agentName, r.error]),
     );
-    const coverageRatio = results.length > 0 ? completedAgents.length / results.length : 0;
-    if (failedAgents.length > 0 && failedAgents.length < results.length) {
+    const coverageRatio = ranResults.length > 0 ? completedAgents.length / ranResults.length : 0;
+    if (failedAgents.length > 0 && failedAgents.length < ranResults.length) {
       outcome = "partial_success";
     }
     const reviewerResponseIds = results.map(r => r.genAIResponseId).filter(Boolean);
@@ -1453,7 +1462,7 @@ async function main() {
       "review.failure_reasons": failureReasons,
       "review.completed_agents": completedAgents.map(r => r.agentName),
       "review.completed_agent_count": completedAgents.length,
-      "review.expected_agent_count": results.length,
+      "review.expected_agent_count": ranResults.length,
       "review.coverage_ratio": coverageRatio,
       "review.degraded": failedAgents.length > 0,
     });
@@ -1467,7 +1476,7 @@ async function main() {
     // manufactured from a total outage. Report the failure instead, skip the coordinator
     // (saving another AGENT_TIMEOUT_MS of waiting on a provider that is already failing),
     // and exit non-zero so the check surfaces as red.
-    const allAgentsFailed = results.length > 0 && failedAgents.length === results.length;
+    const allAgentsFailed = ranResults.length > 0 && failedAgents.length === ranResults.length;
     let finalReview;
     let responseIds = reviewerResponseIds;
 
@@ -1477,7 +1486,7 @@ async function main() {
       const detail = failedAgents
         .map(r => `- ${r.agentName}: ${r.error}`)
         .join("\n");
-      console.error(`[${isoNow()}] All ${results.length} reviewers failed — skipping coordinator and reporting failure.`);
+      console.error(`[${isoNow()}] All ${ranResults.length} reviewers failed — skipping coordinator and reporting failure.`);
       TRACE.setSpanAttributes(rootSpan, {
         "review.all_agents_failed": true,
         "review.coordinator_skipped": true,
@@ -1487,7 +1496,7 @@ async function main() {
         ``,
         `> [!CAUTION]`,
         `> ### ⛔ Not reviewed`,
-        `> All ${results.length} reviewers failed, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        `> All ${ranResults.length} reviewers failed, so there are no findings to report — this is an infrastructure failure, not an approval.`,
         ``,
         `<details>`,
         `<summary>🧾 Reviewer failures (${failedAgents.length})</summary>`,
@@ -1549,7 +1558,7 @@ async function main() {
     // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands
     // (not at detection time) to guarantee both happen.
     if (allAgentsFailed) {
-      const err = new Error(`All ${results.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
+      const err = new Error(`All ${ranResults.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
       err.suppressFatalLog = true;
       throw err;
     }
