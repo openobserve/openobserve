@@ -510,7 +510,7 @@ async fn query_range(
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
-            for name in scanned_streams(org_id, visitor.into_names(), query_exemplars).await {
+            for name in visitor.into_names() {
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
@@ -1782,26 +1782,6 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
     }
 }
 
-/// The streams a query reads, which authorization checks: an exemplar query reads each
-/// metric's exemplar stream instead of the metric itself.
-#[cfg(any(feature = "enterprise", test))]
-async fn scanned_streams(
-    org_id: &str,
-    metric_names: std::collections::HashSet<String>,
-    query_exemplars: bool,
-) -> Vec<String> {
-    if !query_exemplars {
-        return metric_names.into_iter().collect();
-    }
-    let mut streams = Vec::with_capacity(metric_names.len());
-    for name in &metric_names {
-        streams.push(promql::utils::exemplars_stream_for(org_id, name).await);
-    }
-    streams.sort();
-    streams.dedup();
-    streams
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2182,21 +2162,5 @@ mod tests {
             Some("1700000100".to_string()),
         );
         assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_scanned_streams_names_the_exemplar_streams_of_an_exemplar_query() {
-        let names: std::collections::HashSet<String> = ["up", "queue_count"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let mut plain = scanned_streams("org", names.clone(), false).await;
-        plain.sort();
-        assert_eq!(plain, ["queue_count", "up"]);
-        // the streams the scan reads, not the names in the expression
-        assert_eq!(
-            scanned_streams("org", names, true).await,
-            ["queue_count_exemplars", "up_exemplars"]
-        );
     }
 }
