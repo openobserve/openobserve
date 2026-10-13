@@ -24,7 +24,7 @@ use axum::{
     http::HeaderMap,
     response::{IntoResponse, Response},
 };
-use config::{get_config, meta::stream::StreamType};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use plan::PagePlan;
@@ -42,6 +42,42 @@ use crate::common::{
 
 const RUM_DATA_STREAM: &str = "_rumdata";
 const TRACE_ID_FIELDS: [&str; 2] = ["_o2_trace_id", "_oo_trace_id"];
+// Every field the trace view reads off a RUM row; internal fields are listed under both spellings.
+const RESULT_FIELDS: [&str; 33] = [
+    TIMESTAMP_COL_NAME,
+    "type",
+    "date",
+    "service",
+    "session_id",
+    "session_has_replay",
+    "view_id",
+    "action_id",
+    "_o2_trace_id",
+    "_oo_trace_id",
+    "_o2_span_id",
+    "_oo_span_id",
+    "_o2_document_version",
+    "_oo_document_version",
+    "view_url",
+    "view_name",
+    "view_time_spent",
+    "view_loading_time",
+    "action_type",
+    "action_target_name",
+    "action_loading_time",
+    "resource_id",
+    "resource_url",
+    "resource_method",
+    "resource_status_code",
+    "resource_type",
+    "resource_duration",
+    "error_id",
+    "error_message",
+    "error_type",
+    "error_duration",
+    "long_task_id",
+    "long_task_duration",
+];
 // W3C width; shorter hex ids are zero-padded to it before matching.
 const TRACE_ID_HEX_LENGTH: usize = 32;
 const MINUTE_US: i64 = 60_000_000;
@@ -166,9 +202,11 @@ pub async fn lookup(
         return response;
     }
 
+    let (trace_columns, result_columns) = stream_columns(&org_id).await;
     let ctx = LookupContext {
         trace_id,
-        trace_columns: trace_id_columns(&org_id).await,
+        trace_columns,
+        result_columns,
         deadline: started + Duration::from_secs(get_config().limit.query_timeout),
         max_query_range: get_max_query_range(
             &[RUM_DATA_STREAM.to_string()],
@@ -275,19 +313,23 @@ async fn check_search_allowed(org_id: &str) -> Result<(), Response> {
     Ok(())
 }
 
-/// The trace id columns the stream has; naming a missing column fails the whole query.
-async fn trace_id_columns(org_id: &str) -> Vec<&'static str> {
+/// The trace id and result columns the stream has; naming a missing column fails the whole query.
+async fn stream_columns(org_id: &str) -> (Vec<&'static str>, Vec<&'static str>) {
     let schema = match infra::schema::get_cache(org_id, RUM_DATA_STREAM, StreamType::Logs).await {
         Ok(schema) => schema,
         Err(e) => {
             log::warn!("[RUM] lookup could not load the schema of {org_id}/{RUM_DATA_STREAM}: {e}");
-            return Vec::new();
+            return (Vec::new(), Vec::new());
         }
     };
-    TRACE_ID_FIELDS
-        .into_iter()
-        .filter(|field| schema.contains_field(field))
-        .collect()
+    let present = |fields: &[&'static str]| -> Vec<&'static str> {
+        fields
+            .iter()
+            .copied()
+            .filter(|field| schema.contains_field(field))
+            .collect()
+    };
+    (present(&TRACE_ID_FIELDS), present(&RESULT_FIELDS))
 }
 
 /// The padded id plus the zero-stripped form some SDK versions stored; non-hex ids match as given.
@@ -357,6 +399,19 @@ mod tests {
         assert_eq!(
             trace_id_variants("4bf92f3577b34da6a3ce929d0e0e47360"),
             vec!["4bf92f3577b34da6a3ce929d0e0e47360"]
+        );
+    }
+
+    #[test]
+    fn test_result_fields_are_unique_and_keep_the_trace_id() {
+        let unique = RESULT_FIELDS
+            .iter()
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(unique.len(), RESULT_FIELDS.len());
+        assert!(
+            TRACE_ID_FIELDS
+                .iter()
+                .all(|field| RESULT_FIELDS.contains(field))
         );
     }
 

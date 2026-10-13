@@ -59,7 +59,7 @@ impl RumQuery {
     }
 
     /// `ids` are trace id variants for the traced resources, else view or action ids.
-    fn sql(self, trace_columns: &[&str], ids: &[String]) -> String {
+    fn sql(self, trace_columns: &[&str], result_columns: &[&str], ids: &[String]) -> String {
         let ids_in = |column: &str| key_in_predicate(column, ids.iter().map(String::as_str));
         let (filter, order) = match self {
             Self::TracedResources => {
@@ -85,8 +85,13 @@ impl RumQuery {
                 "ASC",
             ),
         };
+        let columns = result_columns
+            .iter()
+            .map(|column| quote_identifier(column))
+            .collect::<Vec<_>>()
+            .join(", ");
         format!(
-            "SELECT * FROM {} WHERE {filter} ORDER BY {TIMESTAMP_COL_NAME} {order}",
+            "SELECT {columns} FROM {} WHERE {filter} ORDER BY {TIMESTAMP_COL_NAME} {order}",
             quote_identifier(RUM_DATA_STREAM)
         )
     }
@@ -213,6 +218,7 @@ pub(super) struct LookupContext {
     pub(super) user_id: String,
     pub(super) trace_id: String,
     pub(super) trace_columns: Vec<&'static str>,
+    pub(super) result_columns: Vec<&'static str>,
     pub(super) deadline: Instant,
     /// In hours; 0 means no limit.
     pub(super) max_query_range: i64,
@@ -249,7 +255,7 @@ impl LookupContext {
             );
         }
 
-        let sql = query.sql(&self.trace_columns, ids);
+        let sql = query.sql(&self.trace_columns, &self.result_columns, ids);
         let request = query.request(sql, range, remaining);
         let search = SearchService::cache::search(
             &trace_id,
@@ -342,12 +348,15 @@ mod tests {
     use super::*;
     use crate::rum::lookup::tests::search_response;
 
+    const COLUMNS: [&str; 2] = ["_timestamp", "view_id"];
+
     fn context(max_query_range: i64) -> LookupContext {
         LookupContext {
             org_id: String::new(),
             user_id: String::new(),
             trace_id: String::new(),
             trace_columns: vec![],
+            result_columns: vec![],
             deadline: Instant::now(),
             max_query_range,
         }
@@ -358,13 +367,14 @@ mod tests {
         assert_eq!(
             RumQuery::TracedResources.sql(
                 &["_o2_trace_id", "_oo_trace_id"],
+                &COLUMNS,
                 &["0abc".to_string(), "abc".to_string()]
             ),
-            "SELECT * FROM \"_rumdata\" WHERE (\"_o2_trace_id\" IN ('0abc', 'abc') OR \"_oo_trace_id\" IN ('0abc', 'abc')) ORDER BY _timestamp ASC"
+            "SELECT \"_timestamp\", \"view_id\" FROM \"_rumdata\" WHERE (\"_o2_trace_id\" IN ('0abc', 'abc') OR \"_oo_trace_id\" IN ('0abc', 'abc')) ORDER BY _timestamp ASC"
         );
         assert_eq!(
-            RumQuery::TracedResources.sql(&["_oo_trace_id"], &["it's".to_string()]),
-            "SELECT * FROM \"_rumdata\" WHERE (\"_oo_trace_id\" IN ('it''s')) ORDER BY _timestamp ASC"
+            RumQuery::TracedResources.sql(&["_oo_trace_id"], &COLUMNS, &["it's".to_string()]),
+            "SELECT \"_timestamp\", \"view_id\" FROM \"_rumdata\" WHERE (\"_oo_trace_id\" IN ('it''s')) ORDER BY _timestamp ASC"
         );
     }
 
@@ -372,16 +382,16 @@ mod tests {
     fn test_page_queries_keep_their_filters_and_order() {
         let ids = vec!["v1".to_string(), "v'2".to_string()];
         assert_eq!(
-            RumQuery::Views.sql(&[], &ids),
-            "SELECT * FROM \"_rumdata\" WHERE \"view_id\" IN ('v1', 'v''2') AND type = 'view' ORDER BY _timestamp DESC"
+            RumQuery::Views.sql(&[], &COLUMNS, &ids),
+            "SELECT \"_timestamp\", \"view_id\" FROM \"_rumdata\" WHERE \"view_id\" IN ('v1', 'v''2') AND type = 'view' ORDER BY _timestamp DESC"
         );
         assert_eq!(
-            RumQuery::Actions.sql(&[], &["a1".to_string()]),
-            "SELECT * FROM \"_rumdata\" WHERE \"action_id\" IN ('a1') AND type = 'action' ORDER BY _timestamp ASC"
+            RumQuery::Actions.sql(&[], &COLUMNS, &["a1".to_string()]),
+            "SELECT \"_timestamp\", \"view_id\" FROM \"_rumdata\" WHERE \"action_id\" IN ('a1') AND type = 'action' ORDER BY _timestamp ASC"
         );
         assert_eq!(
-            RumQuery::ContextEvents.sql(&[], &ids),
-            "SELECT * FROM \"_rumdata\" WHERE \"view_id\" IN ('v1', 'v''2') AND type IN ('error', 'resource', 'long_task', 'action') ORDER BY _timestamp ASC"
+            RumQuery::ContextEvents.sql(&[], &COLUMNS, &ids),
+            "SELECT \"_timestamp\", \"view_id\" FROM \"_rumdata\" WHERE \"view_id\" IN ('v1', 'v''2') AND type IN ('error', 'resource', 'long_task', 'action') ORDER BY _timestamp ASC"
         );
     }
 
