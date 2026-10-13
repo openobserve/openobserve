@@ -571,12 +571,13 @@ function isFrontendFile(filePath) {
   return /\.(vue|ts|js|css)$/.test(filePath);
 }
 
-// Playwright E2E tests + their page objects/utils, plus the suite's config. Scoped to
-// tests/ui-testing on purpose: web/src unit specs are the frontend agent's concern, and this
-// agent's POM/selector-cross-validation rules only apply to the E2E suite.
+// Playwright E2E tests + their page objects/utils, plus the suite's config. Anchored to
+// tests/ui-testing on purpose: web/src unit specs are the frontend agent's concern, and the
+// other suites under tests/ (mobile-testing, api-testing, …) are out of this agent's remit —
+// its POM/selector-cross-validation rules only apply to the ui-testing E2E suite.
 function isTestFile(filePath) {
-  if (/^tests\/ui-testing\/.*\.(spec\.js|js)$/.test(filePath)) return true;
-  return /playwright[^/]*\.config\.[jt]s$/.test(filePath);
+  if (!filePath.startsWith("tests/ui-testing/")) return false;
+  return /\.(spec\.js|js)$/.test(filePath) || /playwright[^/]*\.config\.[jt]s$/.test(filePath);
 }
 
 function filterDiff(diff) {

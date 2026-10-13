@@ -23,9 +23,9 @@ the rest of this README covers **setup, activation, and rollback** of the brande
 
 ## The Frontend UI Reviewer
 
-`frontend` is the one **conditional** agent: it is appended to whatever the tier selected whenever
-the diff touches `web/src` (excluding specs), so a 6-line UI change still gets reviewed even at the
-`trivial` tier. `requiresFocus: true` is the other half of that contract — the generic focus filter
+`frontend` is one of the **conditional** agents (see `qa` below): it is appended to whatever the
+tier selected whenever the diff touches `web/src` (excluding specs), so a 6-line UI change still
+gets reviewed even at the `trivial` tier. `requiresFocus: true` is the other half of that contract — the generic focus filter
 falls back to the *full* diff when an agent matches no files, which would otherwise have the
 frontend reviewer opining on Rust; with the flag set it skips the PR entirely instead.
 
@@ -41,7 +41,8 @@ out of scope — see the "What NOT to Flag" table in `agents/frontend.md`.
 ## The QA / Test Reviewer
 
 `qa` is a conditional agent on the same contract as `frontend`, appended whenever the diff touches
-the Playwright E2E suite (`tests/ui-testing/**` specs/pages/utils or a `playwright*.config`). It is
+the Playwright E2E suite — a `.js` file under `tests/ui-testing/` (specs/pages/utils) or a
+`tests/ui-testing/playwright*.config.{js,ts}`. It is
 a **static** review of the *tests themselves* — it never runs them, so a green CI run clears none of
 its findings. It folds in the Council's Sentinel rules (POM compliance incl. selectors inside
 `expect(...)`, `testLogger` not `console.log`, real assertions — no `expect(true).toBe(true)`,
