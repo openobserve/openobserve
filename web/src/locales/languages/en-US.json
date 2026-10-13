@@ -23772,5 +23772,26 @@
       "accountRejected": "{provider} did not accept this account. Check the Account SID and auth token, and that the account is active.",
       "unreadable": "This organisation's phone provider account could not be read."
     }
+  },
+  "oncallSlack": {
+    "title": "Slack",
+    "subtitle": "Pages in your team's Slack channels and DMs",
+    "emptyTitle": "No Slack workspace connected",
+    "emptyDescription": "Connect Slack so pages post in your teams' Slack channels and people can acknowledge from Slack.",
+    "connect": "Connect Slack",
+    "connectDesc": "Approve four permissions in a Slack popup",
+    "needsKey": "Ask your operator to set the encryption key.",
+    "notAdmin": "Only org admins can connect Slack",
+    "connected": "Connected",
+    "revoked": "Disconnected in Slack",
+    "workspace": "Workspace",
+    "disconnect": "Disconnect",
+    "reconnect": "Reconnect",
+    "nextSteps": "Next: in each team's Slack channel, type {command}. People link their own Slack account on My on-call.",
+    "disconnectTitle": "Disconnect Slack?",
+    "disconnectMessage": "Also remove the app in Slack. Reconnecting needs the app invited to each team's Slack channel again.",
+    "loadFailed": "The Slack connection could not be loaded.",
+    "connectFailed": "Slack could not be connected. Try again.",
+    "disconnectFailed": "Slack could not be disconnected. Try again."
   }
 }

@@ -24,6 +24,7 @@ import {
 } from "@/composables/query/cachePolicy";
 import type {
   CauseGroup,
+  ChatInstallView,
   Contact,
   CoverageGaps,
   EscalationProgress,
@@ -418,6 +419,15 @@ export const telephonyQuery = (org: string) =>
     queryKey: oncallKeys.telephony(org),
     queryFn: async (): Promise<TelephonyView | null> =>
       (await oncallService.getTelephony({ org_identifier: org })).data ?? null,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** The org's connected Slack workspace; a settings read, at most one row (IN-8). */
+export const chatInstallsQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.chatInstalls(org),
+    queryFn: async (): Promise<ChatInstallView[]> =>
+      (await oncallService.listChatInstalls({ org_identifier: org })).data ?? [],
     staleTime: NORMAL_STALE_TIME,
   });
 
@@ -878,4 +888,27 @@ export const deleteTelephonyMutation = (org: string) =>
   mutationOptions({
     mutationFn: () => oncallService.deleteTelephony({ org_identifier: org }),
     meta: { invalidates: telephonyWriteScopes(org), silentError: true },
+  });
+
+/** Stores nothing, so it expires nothing; the page renders its refusals itself. */
+export const startSlackInstallMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.startSlackInstall({ org_identifier: org }),
+    meta: { silentError: true },
+  });
+
+/** Finishes a connect with the relayed code and state, then re-reads the workspace. */
+export const exchangeSlackInstallMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: ({ code, state }: { code: string; state: string }) =>
+      oncallService.exchangeSlackInstall({ org_identifier: org, code, state }),
+    meta: { invalidates: [oncallKeys.chatInstalls(org)], silentError: true },
+  });
+
+/** Disconnects the org's workspace, then re-reads it. */
+export const deleteChatInstallMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (workspaceId: string) =>
+      oncallService.deleteChatInstall({ org_identifier: org, workspace_id: workspaceId }),
+    meta: { invalidates: [oncallKeys.chatInstalls(org)], silentError: true },
   });

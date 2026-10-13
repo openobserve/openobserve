@@ -1217,6 +1217,18 @@ export interface VerificationRefusalBody {
   retry_after_secs?: number;
 }
 
+/** `/config` `oncall_slack`: whether this deployment offers Slack to orgs (IN-2). */
+export type SlackAvailability = "off" | "needs_key" | "on";
+
+/** `GET /oncall/chat/installs` row: the org's connected Slack workspace; the bot token never comes back. */
+export interface ChatInstallView {
+  workspace_id: string;
+  workspace_name: string;
+  status: "active" | "revoked";
+  installed_by: string;
+  installed_at: number;
+}
+
 /** `GET /telephony`: the deployment's account is reported by presence and From number only, never its SID or token. */
 export interface TelephonyView {
   deployment_account_present: boolean;

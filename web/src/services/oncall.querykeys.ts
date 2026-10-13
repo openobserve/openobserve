@@ -145,6 +145,8 @@ export const oncallKeys = {
   contactsAll: (org: string) => orgKey(org, "oncall", "contacts"),
   contact: (org: string, userEmail: string) => orgKey(org, "oncall", "contacts", userEmail),
   telephony: (org: string) => orgKey(org, "oncall", "telephony"),
+  /** The org's connected Slack workspace; a connect or disconnect moves it. */
+  chatInstalls: (org: string) => orgKey(org, "oncall", "chat", "installs"),
 
   routingConfig: (org: string) => orgKey(org, "oncall", "routing", "config"),
 };

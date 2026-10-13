@@ -58,6 +58,7 @@ import type {
   PutTelephonyBody,
   TelephonyView,
   OrgTelephonyView,
+  ChatInstallView,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -850,6 +851,41 @@ const oncall = {
 
   deleteTelephony: ({ org_identifier }: { org_identifier: string }) =>
     http().delete<{ deleted: boolean }>(`/api/${org_identifier}/telephony`),
+
+  /// Issues the Slack approval URL; nothing opens before this answers, so a 403 never shows a popup.
+  startSlackInstall: ({ org_identifier }: { org_identifier: string }) =>
+    http().post<{ url: string }>(`/api/${org_identifier}/oncall/chat/slack/install/start`),
+
+  /// Redeems the code the callback page relayed; a workspace another org holds answers 409.
+  exchangeSlackInstall: ({
+    org_identifier,
+    code,
+    state,
+  }: {
+    org_identifier: string;
+    code: string;
+    state: string;
+  }) =>
+    http().post<ChatInstallView>(`/api/${org_identifier}/oncall/chat/slack/install/exchange`, {
+      code,
+      state,
+    }),
+
+  /// The org's connected Slack workspace, if any; never the bot token.
+  listChatInstalls: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<ChatInstallView[]>(`/api/${org_identifier}/oncall/chat/installs`),
+
+  /// Disconnects the workspace; people's links are kept for a reconnect.
+  deleteChatInstall: ({
+    org_identifier,
+    workspace_id,
+  }: {
+    org_identifier: string;
+    workspace_id: string;
+  }) =>
+    http().delete<{ message: string }>(
+      `/api/${org_identifier}/oncall/chat/installs/${encodeURIComponent(workspace_id)}`,
+    ),
 
   /// Somebody stands in for the rotation over a window. Outside it the
   /// rotation resolves as normal, which is what makes an override safe.
