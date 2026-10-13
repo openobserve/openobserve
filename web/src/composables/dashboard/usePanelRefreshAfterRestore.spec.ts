@@ -78,19 +78,20 @@ describe("usePanelRefreshAfterRestore", () => {
     const refresh = usePanelRefreshAfterRestore({ state, panelSchema: ref({ id: "P1" }) });
 
     expect(refresh.queueRefresh()).toBe(false);
-    refresh.holdIfQueued();
-    expect(refresh.isRefreshingInBackground.value).toBe(false);
+    startRun(state, refresh);
+    expect(refresh.shownResult.data.value).toEqual([]);
   });
 
   it("holds only a queued refresh", () => {
     const { state, refresh } = setup();
 
-    refresh.holdIfQueued();
-    expect(refresh.isRefreshingInBackground.value).toBe(false);
+    startRun(state, refresh);
+    expect(refresh.shownResult.data.value).toEqual([]);
 
+    state.data = [["restored"]];
+    state.loading = false;
     expect(refresh.queueRefresh()).toBe(true);
     startRun(state, refresh);
-    expect(refresh.isRefreshingInBackground.value).toBe(true);
     expect(refresh.shownResult.data.value).toEqual([["restored"]]);
   });
 
@@ -104,7 +105,6 @@ describe("usePanelRefreshAfterRestore", () => {
 
     state.data = [["fresh"]];
     state.loading = false;
-    expect(refresh.isRefreshingInBackground.value).toBe(false);
     expect(refresh.shownResult.data.value).toEqual([["fresh"]]);
     expect(refresh.shownResult.errorDetail.value.message).toBe("");
   });

@@ -341,7 +341,6 @@ describe("usePanelDataLoader: fresh on open", () => {
       await settle();
 
       expect(fakes.streams).toHaveLength(1);
-      expect(loader.isRefreshingInBackground.value).toBe(false);
       sendHits(0, 7);
       expect(loader.data.value).toEqual([hits(7)]);
     });
@@ -375,14 +374,14 @@ describe("usePanelDataLoader: fresh on open", () => {
   });
 
   describe("hold and swap", () => {
-    it("keeps the restored chart while the refresh streams, then swaps on completion", async () => {
+    it("keeps the restored chart and its age, with loading on, until the refresh completes", async () => {
       await seedCache(10);
       const restoredAt = fakes.cache.get("panel-1").value.lastTriggeredAt;
       const { loader } = mountPanel({ visit: createVisit() });
       await settle();
 
-      expect(loader.isRefreshingInBackground.value).toBe(true);
       expect(loader.loading.value).toBe(true);
+      expect(loader.lastTriggeredAt.value).toBe(restoredAt);
 
       sendHits(0, 42);
       await settle();
@@ -392,7 +391,6 @@ describe("usePanelDataLoader: fresh on open", () => {
       expect(fakes.saves).toHaveLength(0);
 
       endStream(0);
-      expect(loader.isRefreshingInBackground.value).toBe(false);
       expect(loader.loading.value).toBe(false);
       expect(loader.data.value).toEqual([hits(42)]);
       expect(loader.lastTriggeredAt.value).toBeGreaterThan(restoredAt);
@@ -408,7 +406,7 @@ describe("usePanelDataLoader: fresh on open", () => {
       const { payload, handlers } = fakes.streams[0];
       handlers.error(payload, { content: { message: "querier timed out", code: 504 } });
 
-      expect(loader.isRefreshingInBackground.value).toBe(false);
+      expect(loader.loading.value).toBe(false);
       expect(loader.errorDetail.value.message).toBe("querier timed out");
       expect(loader.data.value).not.toEqual([hits(10)]);
     });
@@ -423,7 +421,6 @@ describe("usePanelDataLoader: fresh on open", () => {
 
       window.dispatchEvent(new Event("cancelQuery"));
 
-      expect(loader.isRefreshingInBackground.value).toBe(false);
       expect(loader.loading.value).toBe(false);
       expect(loader.data.value).toEqual([hits(10)]);
       expect(loader.isPartialData.value).toBe(false);
@@ -464,7 +461,7 @@ describe("usePanelDataLoader: fresh on open", () => {
 
       endStream(1);
       expect(loader.data.value).toEqual([hits(99)]);
-      expect(loader.isRefreshingInBackground.value).toBe(false);
+      expect(loader.loading.value).toBe(false);
     });
   });
 
@@ -644,9 +641,7 @@ describe("usePanelDataLoader: fresh on open", () => {
 
       expect(fakes.streams).toHaveLength(1);
       expect(loader.data.value).not.toEqual([hits(10)]);
-      expect(loader.isRefreshingInBackground.value).toBe(false);
       sendHits(0, 7);
-      endStream(0);
       expect(loader.data.value).toEqual([hits(7)]);
     });
 

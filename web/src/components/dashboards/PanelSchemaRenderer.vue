@@ -577,7 +577,6 @@ export default defineComponent({
     "limit-number-of-series-warning-message-update",
     "sparkline-warning-update",
     "is-partial-data-update",
-    "is-refreshing-in-background-update",
     "series-data-update",
     "contextmenu",
     "show-legends",
@@ -784,7 +783,6 @@ export default defineComponent({
       searchRequestTraceIds,
       loadingProgressPercentage,
       isPartialData,
-      isRefreshingInBackground,
       isFirstLoadSettled,
       reloadAnnotations,
     } = usePanelDataLoader(
@@ -2006,11 +2004,6 @@ export default defineComponent({
     watch(isPartialData, (newValue) => {
       emit("is-partial-data-update", newValue);
     });
-
-    watch(
-      () => !!isRefreshingInBackground?.value,
-      (refreshing) => emit("is-refreshing-in-background-update", refreshing),
-    );
 
     // Surface the sparkline-unavailable warning (e.g. JOIN queries) on the header.
     watch(sparklineWarning, (newValue) => {

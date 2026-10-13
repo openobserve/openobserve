@@ -886,7 +886,6 @@ export const usePanelDataLoader = (
   return {
     ...toRefs(state),
     ...refreshAfterRestore.shownResult,
-    isRefreshingInBackground: refreshAfterRestore.isRefreshingInBackground,
     isFirstLoadSettled,
     loadData,
     reloadAnnotations,

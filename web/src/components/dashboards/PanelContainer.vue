@@ -227,7 +227,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
           :lastTriggeredAt="lastTriggeredAt"
-          :isRefreshing="isRefreshingInBackground"
           :viewOnly="viewOnly"
           :exemplarError="exemplarErrorMessage"
           @retry-exemplars="PanleSchemaRendererRef?.retryExemplars()"
@@ -420,7 +419,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         @error="onError"
         @is-partial-data-update="handleIsPartialDataUpdate"
-        @is-refreshing-in-background-update="isRefreshingInBackground = $event"
         @contextmenu="$emit('contextmenu', $event)"
         ref="PanleSchemaRendererRef"
         :allowAnnotationsAdd="true"
@@ -735,7 +733,6 @@ export default defineComponent({
     const handleLastTriggeredAtUpdate = (data: any) => {
       lastTriggeredAt.value = data;
     };
-    const isRefreshingInBackground = ref(false);
 
     // to store and show warning if the cached data is different with current time range
     const isCachedDataDifferWithCurrentTimeRange: any = ref(false);
@@ -1207,7 +1204,6 @@ export default defineComponent({
       isCachedDataDifferWithCurrentTimeRange,
       handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
       lastTriggeredAt,
-      isRefreshingInBackground,
       maxQueryRangeWarning,
       metaData,
     };

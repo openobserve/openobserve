@@ -109,11 +109,9 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
     { flush: "sync" },
   );
 
-  const isRefreshingInBackground = computed(() => heldResult.value !== null);
-
   // "Refresh cache & reload" stays set for the visit, but this refresh must read the server cache.
   const clearCacheUnlessHolding = (shouldRefreshWithoutCache?: Ref<any>) =>
-    computed(() => !isRefreshingInBackground.value && !!shouldRefreshWithoutCache?.value);
+    computed(() => heldResult.value === null && !!shouldRefreshWithoutCache?.value);
 
   // Any complete result cached this visit is fresh, whichever run produced it.
   const markIfComplete = () => {
@@ -145,6 +143,5 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
     clearCacheUnlessHolding,
     markIfComplete,
     shownResult,
-    isRefreshingInBackground,
   };
 };

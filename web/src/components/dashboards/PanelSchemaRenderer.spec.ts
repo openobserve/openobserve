@@ -1258,33 +1258,7 @@ describe("PanelSchemaRenderer", () => {
     });
   });
 
-  describe("Background refresh after a cache restore", () => {
-    it("forwards the loader's refreshing state to the panel header", async () => {
-      const isRefreshingInBackground = ref(false);
-      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
-        data: ref([]),
-        loading: ref(false),
-        errorDetail: ref({ message: "", code: "" }),
-        metadata: ref({}),
-        resultMetaData: ref({}),
-        annotations: ref([]),
-        lastTriggeredAt: ref(null),
-        isCachedDataDifferWithCurrentTimeRange: ref(false),
-        searchRequestTraceIds: ref([]),
-        loadingProgressPercentage: ref(0),
-        isPartialData: ref(false),
-        isRefreshingInBackground,
-      } as any);
-      wrapper = createWrapper();
-
-      isRefreshingInBackground.value = true;
-      await flushPromises();
-      isRefreshingInBackground.value = false;
-      await flushPromises();
-
-      expect(wrapper.emitted("is-refreshing-in-background-update")).toEqual([[true], [false]]);
-    });
-
+  describe("Cache restore and the first load", () => {
     describe("before the first load settles", () => {
       const loaderWith = (overrides: Record<string, any>) => ({
         data: ref([]),
@@ -1384,11 +1358,33 @@ describe("PanelSchemaRenderer", () => {
       });
     });
 
-    it("does not emit when the loader has no refreshing state", async () => {
-      wrapper = createWrapper();
+    it("keeps the line loader on, over the restored chart, while a refresh loads", async () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([{ resultType: "matrix", result: [{ metric: {}, values: [[1, "4"]] }] }]),
+        loading: ref(true),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [] }),
+        resultMetaData: ref([]),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+        isFirstLoadSettled: ref(true),
+      } as any);
+      wrapper = createWrapper({
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queryType: "promql",
+          queries: [{ query: "up", fields: {}, config: {} }],
+        },
+      });
       await flushPromises();
 
-      expect(wrapper.emitted("is-refreshing-in-background-update")).toBeUndefined();
+      expect(wrapper.find('[data-test="loading-progress"]').attributes("loading")).toBe("true");
+      expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(false);
     });
   });
 

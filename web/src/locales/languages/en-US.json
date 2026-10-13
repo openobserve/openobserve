@@ -6534,8 +6534,7 @@
       "cachedDataDiffers": "The data shown is cached and is different from the selected time range.",
       "partialData": "The data shown is incomplete because the loading was interrupted. Refresh to load complete data.",
       "lastRefreshed": "Last Refreshed: ",
-      "lastRefreshedAt": "Last Refreshed At: ",
-      "refreshing": "Refreshing…"
+      "lastRefreshedAt": "Last Refreshed At: "
     },
     "dashboardSankeyChartBuilder": {
       "maxFieldAllowed": "Max {count} field in {axis} is allowed.",

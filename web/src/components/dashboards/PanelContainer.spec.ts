@@ -1353,23 +1353,26 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.isPanelLoading).toBe(true);
     });
 
-    it("shows Refreshing… in the header while the renderer refreshes a restored result", async () => {
+    it("keeps the previous last-refreshed age in the header while a restored panel refreshes", async () => {
       wrapper = createWrapper({}, { PanelErrorButtons });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      const shownAge = () => {
+        expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(true);
+        return wrapper.findComponent(PanelErrorButtons).props("lastTriggeredAt");
+      };
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
 
-      await renderer.vm.$emit("last-triggered-at-update", Date.now() - 10 * 60 * 1000);
-      await renderer.vm.$emit("is-refreshing-in-background-update", true);
+      await renderer.vm.$emit("last-triggered-at-update", tenMinutesAgo);
+      await renderer.vm.$emit("loading-state-change", true);
       await flushPromises();
-      expect(wrapper.find('[data-test="panel-refreshing-in-background"]').text()).toContain(
-        "Refreshing…",
-      );
-      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(false);
+      expect(wrapper.vm.isPanelLoading).toBe(true);
+      expect(shownAge()).toBe(tenMinutesAgo);
 
-      await renderer.vm.$emit("last-triggered-at-update", Date.now());
-      await renderer.vm.$emit("is-refreshing-in-background-update", false);
+      const freshAt = Date.now();
+      await renderer.vm.$emit("last-triggered-at-update", freshAt);
+      await renderer.vm.$emit("loading-state-change", false);
       await flushPromises();
-      expect(wrapper.find('[data-test="panel-refreshing-in-background"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="panel-last-refreshed-at"]').exists()).toBe(true);
+      expect(shownAge()).toBe(freshAt);
     });
   });
 
