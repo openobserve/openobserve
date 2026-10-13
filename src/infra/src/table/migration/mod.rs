@@ -216,6 +216,7 @@ mod m20261009_000002_add_muted_by_downtime_id_to_alert_incidents;
 mod m20261009_000003_add_last_downtime_id_to_alert_states;
 mod m20261009_000004_add_kind_to_slo_backfill_jobs;
 mod m20261009_000005_create_downtime_notifications;
+mod m20261012_000001_create_alert_calibration_configs;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -331,6 +332,15 @@ pub(crate) async fn create_downtime_notifications_for_test(
 ) -> Result<(), DbErr> {
     use sea_orm_migration::MigrationTrait;
     m20261009_000005_create_downtime_notifications::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_alert_calibration_configs_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261012_000001_create_alert_calibration_configs::Migration
         .up(&SchemaManager::new(db))
         .await
 }
@@ -552,6 +562,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261009_000003_add_last_downtime_id_to_alert_states::Migration),
             Box::new(m20261009_000004_add_kind_to_slo_backfill_jobs::Migration),
             Box::new(m20261009_000005_create_downtime_notifications::Migration),
+            Box::new(m20261012_000001_create_alert_calibration_configs::Migration),
         ]
     }
 }
@@ -613,6 +624,7 @@ mod tests {
         (100, "m20261009_000001_add_promql_rule_mode"),
         (101, "m20261009_000004_add_kind_to_slo_backfill_jobs"),
         (102, "m20261009_000005_create_downtime_notifications"),
+        (103, "m20261012_000001_create_alert_calibration_configs"),
     ];
 
     #[test]
