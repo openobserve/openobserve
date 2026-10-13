@@ -4613,7 +4613,6 @@
       "changeSource": "Choose a different source",
       "copyCommand": "Copy command",
       "copied": "Command copied",
-      "clickToCopy": "Click the block to copy the command",
       "waitingLogs": "Waiting for your first logs",
       "waitingMetrics": "Waiting for your first metrics",
       "waitingTraces": "Waiting for your first traces",
@@ -17795,8 +17794,7 @@
       "tokenLink": "org token · {name}",
       "tokenLinkTooltip": "Choose which ingestion token the snippets use",
       "copiedWithToken": "Copied with org token {name}",
-      "clickToCopy": "Click the block to copy.",
-      "clickToCopyWithToken": "Click the block to copy. The org's ingestion token is included; it stays hidden here."
+      "tokenIncludedHint": "The org's ingestion token is included; it stays hidden here."
     },
     "spinner": {
       "loading": "Loading"

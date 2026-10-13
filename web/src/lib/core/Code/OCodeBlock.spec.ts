@@ -213,7 +213,7 @@ describe("OCodeBlock", () => {
     });
   });
 
-  describe("copy on click and masked selection", () => {
+  describe("copy and masked selection", () => {
     const TOKEN = "abcd1234secretwxyz";
     const MASK = "abcd\u2022\u2022\u2022\u2022wxyz";
     const code = `curl -u me@x.io:${TOKEN} -k https://h/api/o/default/_json`;
@@ -221,7 +221,7 @@ describe("OCodeBlock", () => {
 
     const mountAttached = (props: Record<string, unknown>) =>
       mount(OCodeBlock, {
-        props: { code, codeMasked: masked, copyOnClick: true, ...props } as any,
+        props: { code, codeMasked: masked, ...props } as any,
         global: { stubs },
         attachTo: document.body,
       });
@@ -262,110 +262,48 @@ describe("OCodeBlock", () => {
       window.getSelection()?.removeAllRanges();
     });
 
-    it("copies the real code and focuses the block on the first click", async () => {
+    it("copies the real code from the copy button", async () => {
       const wrapper = mountAttached({ tokenName: "prod-ingest" });
-      const pre = wrapper.find("pre");
-      await pre.trigger("pointerdown");
-      await pre.trigger("click");
+      await wrapper.find('[data-test="code-block-copy-btn"]').trigger("click");
       await flushPromises();
       expect(copyMock).toHaveBeenCalledTimes(1);
       expect(copyMock.mock.calls[0][0]).toBe(code);
       expect(copyMock.mock.calls[0][2].successMessage).toBe("Copied with org token prod-ingest");
-      expect(document.activeElement).toBe(pre.element);
       expect(wrapper.emitted("copy")).toEqual([[{ partial: false }]]);
       wrapper.unmount();
     });
 
-    it("treats later clicks on the focused block as plain text", async () => {
+    it("never copies on a click or Enter on the block itself", async () => {
       const wrapper = mountAttached({});
       const pre = wrapper.find("pre");
       await pre.trigger("pointerdown");
       await pre.trigger("click");
-      await pre.trigger("pointerdown");
-      await pre.trigger("click");
-      expect(copyMock).toHaveBeenCalledTimes(1);
-      wrapper.unmount();
-    });
-
-    it("does not copy on a click that ends a drag selection", async () => {
-      const wrapper = mountAttached({});
-      const codeEl = wrapper.find("code").element;
-      select(codeEl, 0, 4);
-      await wrapper.find("pre").trigger("click");
-      expect(copyMock).not.toHaveBeenCalled();
-      wrapper.unmount();
-    });
-
-    it("copies again on Enter while focused", async () => {
-      const wrapper = mountAttached({});
-      await wrapper.find("pre").trigger("keydown", { key: "Enter" });
+      await pre.trigger("keydown", { key: "Enter" });
       await flushPromises();
-      expect(copyMock).toHaveBeenCalledTimes(1);
-      expect(copyMock.mock.calls[0][0]).toBe(code);
-      wrapper.unmount();
-    });
-
-    it("leaves clicks alone without copyOnClick", async () => {
-      const wrapper = mountAttached({ copyOnClick: false });
-      const pre = wrapper.find("pre");
-      await pre.trigger("click");
       expect(copyMock).not.toHaveBeenCalled();
       expect(pre.attributes("tabindex")).toBeUndefined();
+      expect(wrapper.emitted("copy")).toBeUndefined();
       wrapper.unmount();
     });
 
-    it("puts the real token in the clipboard for a selection across the mask", async () => {
+    it("keeps the mask in a selection that crosses the token", () => {
       const wrapper = mountAttached({ tokenName: "prod-ingest" });
       const codeEl = wrapper.find("code").element;
-      const from = masked.indexOf("me@");
-      const to = masked.indexOf(" https");
-      select(codeEl, from, to);
-      const { setData, event } = fireCopy(codeEl);
-      expect(setData).toHaveBeenCalledWith("text/plain", `me@x.io:${TOKEN} -k`);
-      expect(event.defaultPrevented).toBe(true);
-      expect(codeEl.textContent).toBe(masked);
-      expect(toastMock.mock.calls[0][0].message).toBe("Copied with org token prod-ingest");
-      expect(wrapper.emitted("copy")).toEqual([[{ partial: true }]]);
-      wrapper.unmount();
-    });
-
-    it("copies the whole token when the selection only touches part of the mask", () => {
-      const wrapper = mountAttached({});
-      const codeEl = wrapper.find("code").element;
-      const bullets = masked.indexOf("\u2022");
-      select(codeEl, bullets + 1, bullets + 3);
-      const { setData } = fireCopy(codeEl);
-      expect(setData).toHaveBeenCalledWith("text/plain", "1234secret");
-      wrapper.unmount();
-    });
-
-    it("copies a selection without the token unchanged", () => {
-      const wrapper = mountAttached({});
-      const codeEl = wrapper.find("code").element;
-      select(codeEl, masked.indexOf("https"), masked.length);
+      select(codeEl, masked.indexOf("me@"), masked.indexOf(" https"));
       const { setData, event } = fireCopy(codeEl);
       expect(setData).not.toHaveBeenCalled();
       expect(event.defaultPrevented).toBe(false);
+      expect(toastMock).not.toHaveBeenCalled();
       expect(wrapper.emitted("copy")).toEqual([[{ partial: true }]]);
       wrapper.unmount();
     });
 
-    it("does not rewrite when the mask does not line up with the code", () => {
-      const wrapper = mountAttached({ codeMasked: "unrelated \u2022\u2022\u2022 text" });
-      const codeEl = wrapper.find("code").element;
-      select(codeEl, 0, 14);
-      const { setData } = fireCopy(codeEl);
-      expect(setData).not.toHaveBeenCalled();
-      wrapper.unmount();
-    });
-
-    it("does not rewrite once the secret is revealed", async () => {
+    it("reports a selection copy as partial", () => {
       const wrapper = mountAttached({});
-      await wrapper.find('[data-test="code-block-reveal-btn"]').trigger("click");
       const codeEl = wrapper.find("code").element;
-      select(codeEl, 0, code.length);
-      const { setData } = fireCopy(codeEl);
-      expect(setData).not.toHaveBeenCalled();
+      select(codeEl, masked.indexOf("https"), masked.length);
+      fireCopy(codeEl);
+      expect(wrapper.emitted("copy")).toEqual([[{ partial: true }]]);
       wrapper.unmount();
     });
 

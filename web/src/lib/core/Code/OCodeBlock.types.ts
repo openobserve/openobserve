@@ -64,8 +64,6 @@ export interface CodeBlockProps {
    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
    */
   dataTest?: string;
-  /** First click on an unfocused block copies `code` and focuses it; Enter copies again. */
-  copyOnClick?: boolean;
   /** Name of the credential inside `code`, shown as a toolbar link and in the copy toast. */
   tokenName?: string;
 }
