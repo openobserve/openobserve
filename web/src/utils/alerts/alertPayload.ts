@@ -39,6 +39,9 @@ export interface PayloadFormData {
     aggregation?: any;
     conditions: any[];
     promql_condition?: any;
+    promql_rule_mode?: boolean;
+    promql_multi_alert?: boolean;
+    promql_warning_value?: number | string | null;
     sql: string;
     vrl_function?: string | null;
     multi_time_range?: any[] | null;
@@ -191,9 +194,11 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   // though the field is unreachable in that template — same belt-and-suspenders
   // as the warning_threshold strip below, in case a stale value survives a
   // realtime<->scheduled toggle without a full remount.
-  payload.pending_period_sec = payload.is_real_time
-    ? 0
-    : Math.round((parseInt(formData.pending_period_sec as any, 10) || 0) * 60);
+  const pendingMinutes =
+    payload.query_condition.type === "promql" && payload.query_condition.promql_rule_mode
+      ? Number(formData.pending_period_sec)
+      : parseInt(formData.pending_period_sec as any, 10);
+  payload.pending_period_sec = payload.is_real_time ? 0 : Math.round((pendingMinutes || 0) * 60);
 
   payload.description = raw(formData.description.trim());
 
@@ -214,6 +219,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   if (getSelectedTab.value === "sql" || getSelectedTab.value === "custom") {
     payload.query_condition.promql_condition = null;
+    payload.query_condition.promql_rule_mode = false;
   }
 
   // Feature 5 (§6b.6). The backend enforces `query_type == slo` IFF
@@ -364,6 +370,14 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     payload.lastTriggeredAt = new Date().getTime();
     payload.lastEditedBy = store.state.userInfo.email;
     formData.updatedAt = new Date().toISOString();
+  }
+
+  if (
+    payload.query_condition.type === "promql" &&
+    payload.query_condition.promql_rule_mode &&
+    Number(payload.pending_period_sec) > 0
+  ) {
+    payload.query_condition.promql_multi_alert = true;
   }
 
   return payload;

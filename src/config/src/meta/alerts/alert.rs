@@ -22,7 +22,7 @@ use utoipa::ToSchema;
 use crate::{
     meta::{
         alerts::{
-            QueryCondition, TriggerCondition, deduplication::DeduplicationConfig,
+            Operator, QueryCondition, TriggerCondition, deduplication::DeduplicationConfig,
             priority::AlertPriority,
         },
         stream::StreamType,
@@ -277,6 +277,24 @@ impl Default for Alert {
 }
 
 impl Alert {
+    /// Pending rule mode needs per-series state; the default count gate means any series.
+    pub fn normalize_promql_rule_mode(&mut self) {
+        if self.query_condition.query_type != super::QueryType::PromQL
+            || !self.query_condition.promql_rule_mode
+        {
+            return;
+        }
+        if self.trigger_condition.operator == Operator::EqualTo
+            && self.trigger_condition.threshold == 0
+        {
+            self.trigger_condition.operator = Operator::GreaterThanEquals;
+            self.trigger_condition.threshold = 1;
+        }
+        if self.pending_period_sec > 0 {
+            self.query_condition.promql_multi_alert = true;
+        }
+    }
+
     /// Get the unique identifier of the alert.
     /// For now it ruturns the `stream_type` and `stream_name` concatenated
     /// along with alert name. In future, once the migration to v2 alerts
@@ -515,6 +533,68 @@ mod tests {
 
     use super::*;
     use crate::ider;
+
+    #[test]
+    fn rule_pending_normalizes_multi_but_zero_keeps_the_choice() {
+        for (pending, initial, expected) in [(0, false, false), (0, true, true), (240, false, true)]
+        {
+            let mut alert = Alert {
+                query_condition: QueryCondition {
+                    query_type: crate::meta::alerts::QueryType::PromQL,
+                    promql_rule_mode: true,
+                    promql_multi_alert: initial,
+                    ..Default::default()
+                },
+                pending_period_sec: pending,
+                ..Default::default()
+            };
+            alert.normalize_promql_rule_mode();
+            assert_eq!(alert.query_condition.promql_multi_alert, expected);
+        }
+        let mut ordinary = Alert {
+            pending_period_sec: 240,
+            ..Default::default()
+        };
+        ordinary.query_condition.query_type = crate::meta::alerts::QueryType::PromQL;
+        ordinary.normalize_promql_rule_mode();
+        assert!(!ordinary.query_condition.promql_multi_alert);
+    }
+
+    #[test]
+    fn rule_default_gate_is_normalized_without_rewriting_explicit_gates() {
+        for (operator, threshold, expected_operator, expected_threshold) in [
+            (Operator::EqualTo, 0, Operator::GreaterThanEquals, 1),
+            (Operator::GreaterThan, 0, Operator::GreaterThan, 0),
+            (
+                Operator::GreaterThanEquals,
+                2,
+                Operator::GreaterThanEquals,
+                2,
+            ),
+        ] {
+            let mut alert = Alert::default();
+            alert.query_condition.query_type = super::super::QueryType::PromQL;
+            alert.query_condition.promql_rule_mode = true;
+            alert.trigger_condition.operator = operator;
+            alert.trigger_condition.threshold = threshold;
+            alert.normalize_promql_rule_mode();
+            assert_eq!(alert.trigger_condition.operator, expected_operator);
+            assert_eq!(alert.trigger_condition.threshold, expected_threshold);
+            assert_eq!(
+                crate::meta::alerts::grouping::validate_multi_alert(
+                    &alert.query_condition,
+                    &alert.trigger_condition,
+                    false,
+                )
+                .is_ok(),
+                threshold != 2,
+            );
+        }
+        let mut ordinary = Alert::default();
+        ordinary.normalize_promql_rule_mode();
+        assert_eq!(ordinary.trigger_condition.operator, Operator::EqualTo);
+        assert_eq!(ordinary.trigger_condition.threshold, 0);
+    }
 
     #[test]
     fn test_alert_default() {

@@ -24,29 +24,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <QueryErrorState
-    :error-code="errorCode"
+    :error-code="effectiveCode"
     :error-msg="errorMsg"
     :error-detail="errorDetail"
     :ai-enabled="aiEnabled"
     :resource-name="streamName"
+    :free-text-candidate="freeTextCandidate ?? undefined"
+    :run-suggestion="runSuggestion ?? undefined"
     size="hero"
     illustration="broken-panel"
     @ask-ai="emit('ask-ai')"
     @fix-query="emit('fix-query')"
     @configure-resource="emit('configure-stream')"
     @widen-range="emit('widen-range')"
+    @search-text="(text: string) => emit('search-text', text)"
+    @run-suggestion="(text: string) => emit('run-suggestion', text)"
   />
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import QueryErrorState from "@/components/common/QueryErrorState.vue";
+import { QUERY_ERROR_CODES } from "@/composables/useQueryError";
+import { queryErrorCodeFromText } from "@/utils/query/sqlDiagnostics";
 
-defineProps<{
+const props = defineProps<{
   errorCode: number;
   errorMsg: string;
   errorDetail?: string;
   aiEnabled: boolean;
   streamName?: string;
+  freeTextCandidate?: string | null;
+  runSuggestion?: string | null;
+  filterMode?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -54,5 +64,12 @@ const emit = defineEmits<{
   "fix-query": [];
   "configure-stream": [];
   "widen-range": [];
+  "search-text": [text: string];
+  "run-suggestion": [text: string];
 }>();
+
+const effectiveCode = computed(() => {
+  if (!props.filterMode || QUERY_ERROR_CODES.has(props.errorCode)) return props.errorCode;
+  return queryErrorCodeFromText(`${props.errorMsg} ${props.errorDetail ?? ""}`) ?? props.errorCode;
+});
 </script>

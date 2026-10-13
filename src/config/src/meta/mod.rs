@@ -22,6 +22,7 @@ pub mod dashboards;
 pub mod db_monitoring;
 pub mod db_normalizer;
 pub mod destinations;
+pub mod downtimes;
 pub mod enrichment_table;
 pub mod folder;
 pub mod function;

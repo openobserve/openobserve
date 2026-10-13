@@ -292,7 +292,6 @@ describe("useHttpStreaming", () => {
         data: [],
         error: [mockHandlers.error],
         complete: [],
-        reset: [],
         abortController: new AbortController(),
       };
 

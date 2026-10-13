@@ -560,6 +560,18 @@
       "description": "Uzak görev, deneylerinizin çıktı üretmek için çağırdığı bir HTTP hizmetidir. Bir kez yayınlayın, bağlantının çalıştığını doğrulayın ve her deney, üzerinde çalıştığı tam sürümü sabitleyebilir.",
       "action": "Yeni Görev",
       "actionDesc": "OpenObserve'i uç noktanıza yönlendirin ve bağlantıyı test edin."
+    },
+    "noDowntimes": {
+      "title": "Henüz kesinti yok",
+      "description": "Bir kesinti; uyarıların, anomali algılamalarının ve sentetik kontrollerin çalışmaya devam etmesini sağlar ve planladığınız bir zaman aralığı boyunca bildirimlerini durdurur.",
+      "action": "Kesinti planla",
+      "actionDesc": "Tek seferlik, günlük veya haftalık. Hızlıca sessize almak için uyarı listesindeki Sessize Al seçeneğini kullanın."
+    },
+    "searchCancelled": {
+      "title": "Arama iptal edildi",
+      "description": "Hiçbir sonuç yüklenmedi. Olayları yüklemek için sorguyu çalıştırın.",
+      "action": "Sorguyu çalıştır",
+      "actionDesc": "Aynı sorguyu tekrar çalıştır"
     }
   },
   "common": {
@@ -1271,9 +1283,129 @@
     "aliasNotAllowed": "Takma ad '{alias}' izin verilmiyor.",
     "commonGroupFields": "Ortak Grup Alanları",
     "queryRangeHours": "{count} saat | {count} saat",
-    "menuGroupAlerts": "Uyarılar"
+    "menuGroupAlerts": "Uyarılar",
+    "runQueryPendingLabel": "Sorguyu çalıştır, değişiklikler henüz uygulanmadı",
+    "queryActions": {
+      "runEditedFirst": "Önce düzenlediğiniz sorguyu çalıştırın",
+      "runFirst": "Önce sorgunuzu çalıştırın",
+      "usesEditedQuery": "Düzenlediğiniz sorguyu kullanır (henüz çalıştırılmadı)",
+      "usesUnrunQuery": "Sorgunuzu kullanır (henüz çalıştırılmadı)",
+      "downloadsShownResults": "Düzenlemenizi değil, gösterilen sonuçları indirir",
+      "downloadsLastRun": "Düzenlemenizi değil, en son çalıştırılan sorguyu kullanır"
+    },
+    "noFtsRecovery": {
+      "title": "{stream} için tam metin arama alanları yapılandırılmamış",
+      "description": "Alan değerlerini arayın veya bu zaman aralığındaki günlükleri görmek için tüm sorguyu temizleyin.",
+      "searchField": "Belirli bir alanda ara",
+      "searchFieldHint": "Hariç tutulan sözcükleri koruyarak arama için bir alan seçin.",
+      "clearRun": "Bu arama olmadan günlükleri göster",
+      "clearRunHint": "Tüm sorguyu temizleyin ve aynı zaman aralığında çalıştırın.",
+      "editPermission": "Akış ayarlarını düzenlemek için izniniz olmalı.",
+      "scope": "{stream} akışını geçerli zaman aralığında arayın.",
+      "singleStreamScope": "Yalnızca {stream} arayın; {otherStreams} seçimi kaldırılacak.",
+      "stream": "Akış",
+      "field": "Alan",
+      "match": "Eşleşme",
+      "value": "Değer",
+      "contains": "Metin içerir",
+      "equals": "Eşittir",
+      "preview": "Filtre önizlemesi",
+      "replacement": "Bu, tüm sorguyu bir alan filtresiyle değiştirir ve hariç tutulan sözcükleri korur. Tam metin alanı gerekmez.",
+      "run": "Alan aramasını çalıştır",
+      "close": "Alan aramasını kapat",
+      "skipped": "{stream} atlandı çünkü yapılandırılmış tam metin arama alanı yok.",
+      "resultsScope": "Bu sonuçlar yalnızca {streams} akışlarından geliyor.",
+      "noFields": "Bu akışta alan araması için kullanılabilir alan yok.",
+      "valueRequired": "Aramak için bir değer girin.",
+      "fieldRequired": "Aramak için bir alan seçin.",
+      "invalidValue": "Bu alan için geçerli bir değer girin.",
+      "configureHint": "Bu akış için tam metin aramasını hızlandırır."
+    },
+    "autoRunPersistNeedsRun": "Önce sorguyu çalıştırın: bu işlem çalıştırdığınızı kaydeder veya paylaşır",
+    "autoRunSearchAroundActive": "Bir satırın etrafındaki kayıtlar gösteriliyor: sonuçlara dönmek için sorguyu çalıştırın",
+    "autoRunStaleTooltip": "Sonuçları güncellemek için sorguyu çalıştırın",
+    "searchCancelledNotice": "Arama iptal edildi.",
+    "linePermalink": {
+      "disabledFunction": "Tek bir satırı bağlamak için fonksiyonu kapatın",
+      "disabledTimestampRewrite": "Bu sorgu zaman damgasını yeniden yazar",
+      "disabledNotSingleLines": "Bu sorgudan gelen satırlar tek günlük satırları değil",
+      "disabledNoTimestamp": "Bu satırın zaman damgası yok",
+      "disabledEnrichmentTable": "Zenginleştirme tablosu satırları bağlanamaz",
+      "toastNotUnique": "Zaman damgasına bir bağlantı kopyalandı; bu satır benzersiz şekilde tanımlanamadı.",
+      "toastWideStream": "Bu akış tek bir satırı tam olarak bağlamak için çok geniş; zaman damgasına bir bağlantı kopyalandı",
+      "bannerInvalid": "Bu bağlantı hatalı biçimlendirilmiş; yalnızca paylaşılan arama gösteriliyor",
+      "bannerDenied": "{stream} akışına erişiminiz yok.",
+      "bannerStreamMissing": "{stream} akışı artık mevcut değil",
+      "bannerError": "Paylaşılan günlük satırı yüklenemedi.",
+      "bannerIncomplete": "Bu zaman damgasındaki her satır aranamadı",
+      "bannerGone": "Bu günlük satırı artık kullanılamıyor. Akışın saklama süresi geçmiş veya silinmiş olabilir.",
+      "bannerGoneRetention": "Bu günlük satırı artık kullanılamıyor. Akışın saklama süresi ({days} gün) geçmiş veya silinmiş olabilir. | Bu günlük satırı artık kullanılamıyor. Akışın saklama süresi ({days} gün) geçmiş veya silinmiş olabilir.",
+      "bannerFound": "Paylaşılan bir günlük satırı gösteriliyor",
+      "bannerAmbiguous": "Bu zaman damgasında {count} satır var; tam satır belirlenemedi | Bu zaman damgasında {count} satır var; tam satır belirlenemedi",
+      "bannerChanged": "Bağlantı oluşturulduğundan beri satır değişmiş olabilir",
+      "actionShowLines": "Bu satırları göster",
+      "actionShowInContext": "Bağlamda göster",
+      "bannerAmbiguousTieHeavy": "Bu zaman damgasını {count} satır paylaşıyor ve akışta _o2_id yok, bu nedenle tam satır belirlenemedi. O zaman damgasındaki satırlar vurgulanır. | Bu zaman damgasını {count} satır paylaşıyor ve akışta _o2_id yok, bu nedenle tam satır belirlenemedi. O zaman damgasındaki satırlar vurgulanır.",
+      "bannerDismiss": "Kapat",
+      "copyLink": "Bağlantıyı kopyala",
+      "copyLinkTooltip": "Bu günlük satırına bir bağlantı kopyala",
+      "copyLinkMenu": "Bu günlük satırına bağlantı kopyala",
+      "toastCopied": "Günlük satırına bağlantı kopyalandı",
+      "toastCopiedValid": "Günlük satırına bağlantı kopyalandı · {days} gün geçerli | Günlük satırına bağlantı kopyalandı · {days} gün geçerli",
+      "toastLookupFailed": "Bu satır aranamadı; zaman damgasına bir bağlantı kopyalandı",
+      "toastShortFailed": "Bağlantı kısaltılamadı; bunun yerine tam bağlantı kopyalandı",
+      "toastFailed": "Bu günlük satırına bağlantı oluşturulamadı",
+      "toastScopeChanged": "Bağlantı oluşturulurken organizasyon veya akış değişti; hiçbir şey kopyalanmadı",
+      "popoverTitle": "Bu günlük satırına bağlantı",
+      "popoverDesc": "Tarayıcınız otomatik kopyalamayı engelledi. Bağlantıyı seçip kopyalayın veya düğmeyi kullanın.",
+      "pageNotice": "Bu bağlantı {page}. sayfadaydı.",
+      "pageGo": "{page}. sayfaya git",
+      "pageGoLast": "Son sayfaya git ({page})"
+    },
+    "autoRunPendingDot": "En son değişiklikleri uygulamak için sorguyu çalıştır",
+    "autoRunAppliesTo": "Günlükler ve İzler için geçerlidir",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "Bu arama yaklaşık {size} tarayacak",
+    "autoRunGuardLinkTitle": "Bu bağlantı yaklaşık {size} tarayacak",
+    "autoRunGuardDescAutoRun": "{scope}. Önce daraltabilmeniz için Otomatik Çalıştırma duraklatıldı.",
+    "autoRunGuardDescPaused": "{scope}. Önce daraltabilmeniz için duraklatıldı.",
+    "autoRunGuardDescLink": "Bir bağlantıdan açıldı · {scope}. Kapsamı gözden geçirin, ardından çalıştırın.",
+    "autoRunGuardHint": "Filtre ve zaman değişikliklerini elle uygulamak için Otomatik Çalıştırmayı kapatın.",
+    "autoRunGuardUnknownTitle": "Bu pencere için boyut bilinmiyor",
+    "autoRunGuardUnknownDesc": "{streams} için henüz boyut istatistiği yok, bu nedenle Otomatik Çalıştırma yalnızca 1 saat veya daha kısa pencereleri çalıştırır.",
+    "autoRunGuardUnknownManyDesc": "{count} akış için henüz boyut istatistiği yok, bu nedenle Otomatik Çalıştırma sizi bekler. {scope}. | {count} akış için henüz boyut istatistiği yok, bu nedenle Otomatik Çalıştırma sizi bekler. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Bölgeler arası çalıştırmaya hazır",
+    "autoRunGuardSuperClusterDesc": "Çok bölgeli bir kümede arama boyutu henüz tahmin edilemiyor, bu nedenle Otomatik Çalıştırma sizi bekler. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Akış kullanılamıyor",
+    "autoRunGuardUnresolvedDesc": "{streams} akışı mevcut değil veya erişiminiz yok.",
+    "autoRunGuardBanner": "Bu değişiklik yaklaşık {size} ({scope}) tarayacak, bu nedenle Otomatik Çalıştırma duraklatıldı. Aşağıdaki sonuçlar önceki sorgudan.",
+    "autoRunGuardBannerPaused": "Bu değişiklik yaklaşık {size} ({scope}) tarayacak, bu nedenle duraklatıldı. Aşağıdaki sonuçlar önceki sorgudan.",
+    "autoRunGuardBannerUnknown": "Bu pencere için boyut bilinmiyor ({scope}), bu nedenle duraklatıldı. Aşağıdaki sonuçlar önceki sorgudan.",
+    "autoRunGuardBannerRefresh": "Otomatik yenileme her yenilemede yaklaşık {size} ({scope}) tarayacak, bu nedenle bunu bir kez çalıştırana kadar duraklatıldı. Aşağıdaki sonuçlar önceki sorgudan.",
+    "autoRunGuardRunAnyway": "Yine de çalıştır",
+    "autoRunGuardRunQuery": "Sorguyu çalıştır",
+    "autoRunGuardNarrow": "{period} olarak daralt",
+    "autoRunGuardNarrowWithSize": "{period} aralığına daralt (~{size})",
+    "autoRunGuardSearchJob": "Arama işi olarak çalıştır",
+    "autoRunGuardSelectStream": "Bir akış seçin",
+    "searchJobNoPermission": "Arama işi oluşturma izniniz yok",
+    "missingStreamAndNoFts": "\"{missingStreams}\" içinde bir veya daha fazla filtre alanı mevcut değil, bu nedenle belirtilen akışta arama yapılmaz.\n Aranmadı: {noFtsStreams} (tam metin alanı yok).",
+    "freeTextChooseFirst": "Önce metnin nasıl aranacağını seçin",
+    "freeTextScanLogsOnly": "Tarama modu yalnızca günlükler görünümünde çalışır; burada metin araması kullanmak için bir tam metin alanı ayarlayın",
+    "freeTextSearchedFields": "Tam metin araması: {fields} (tüm kelimeler, herhangi bir sırayla)",
+    "freeTextPreview": "Tam metin araması: {fields} (tüm kelimeler, herhangi bir sırayla)\n\n{sql} olarak çalışır",
+    "freeTextRunsAs": "{sql} olarak çalışır",
+    "freeTextNotSearched": "Aranmadı: {streams} (tam metin alanı yok).",
+    "freeTextSetField": "Tam metin arama alanlarını yapılandır",
+    "freeTextNoFtsTitle": "\"{stream}\" için tam metin alanı yok",
+    "freeTextNoFtsTitleMulti": "Seçilen akışlarda tam metin alanı yok",
+    "freeTextNoTextFields": "Bu akışta aranacak metin alanı yok.",
+    "freeTextNoTextFieldsNamed": "Aranmadı: {streams} (metin alanı yok).",
+    "freeTextBuildNotice": "Bu filtrede metin araması var; SQL'de düzenleyin."
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "PRO Planına Yükselt",
     "home": "Ana Sayfa",
     "about": "Hakkında",
@@ -1320,6 +1452,7 @@
     "topQueries": "En Çok Kullanılan Sorgular",
     "profiles": "Profiller",
     "productAnalytics": "Ürün Analitiği",
+    "downtimes": "Kesintiler",
     "trialEndedTitle": "Deneme süreniz sona erdi",
     "trialPageNeedsPlan": "{page} için bir plan gerekli",
     "trialPageNeedsPlanToast": "{page} için bir plan gerekli. Kullanmaya devam etmek için bu sayfadan bir plan seçin.",
@@ -2491,6 +2624,7 @@
   "login": {
     "lockedOut": "Çok fazla başarısız oturum açma denemesi. {duration} sonra tekrar deneyin veya yöneticinizle iletişime geçin.",
     "redirectingToSsoMessage": "SSO giriş sayfasına yönlendiriliyorsunuz. Yönlendirilmezseniz, lütfen",
+    "signingIn": "Oturumunuz açılıyor...",
     "clickHere": "buraya tıklayın",
     "loginWithSso": "SSO ile giriş yap",
     "loginAsInternalUser": "Dahili kullanıcı olarak giriş yap",
@@ -2852,6 +2986,7 @@
       "scopeCoveredByParent": "Kilitli eylemler, {module} içinde ayarlanan {scope} kapsamından gelir",
       "scopeAllOf": "Tüm {module}",
       "scopeIncludesFuture": "Sonradan oluşturulan kaynakları içerir",
+      "scopeDowntimeHint": "Bir kesinti klasörü, bir kesintiyi kimin yöneteceğini sınırlar, neyi susturacağını değil. Bir modülün Tüm klasörlerini susturmak için, kullanıcının o modülün her klasörünü listeleme yetkisine sahip olması gerekir. Susturulmuş çipler ve banner'lar, kullanıcının listeleyemediği bir kesintiyi adlandırabilir.",
       "grantedByWiderScope": "Daha geniş bir kapsam tarafından verildi",
       "grantedHereAndByWiderScope": "Burada ve daha geniş bir kapsam tarafından verildi",
       "stillGrantedByWiderScope": "Burada kaldırıldı, hâlâ daha geniş bir kapsam tarafından veriliyor",
@@ -7505,6 +7640,11 @@
     "SearchSQLCancelled": "Hata: Search SQL iptal edildi."
   },
   "alerts": {
+    "promRuleMode": "Kural modu",
+    "promRulePreview": "{count} döndürülen seri şu anda eşleşiyor. Her seri, tetiklenmeden önce bekleme süresini tamamlamalıdır.",
+    "promRuleModeDescription": "İfade herhangi bir seri döndürdüğünde eşleşir. Bekleme süresi sıfır olduğunda Tek veya Çoklu uyarı seçin; bir bekleme süresi Çoklu uyarıyı otomatik olarak etkinleştirir. Referans verilen bir metrik akışını çıkarsamak için akışı boş bırakın.",
+    "promRuleModePendingMulti": "Bir bekleme süresi her seri için bağımsız bir zamanlayıcı gerektirir, bu nedenle Çoklu uyarı devre dışı bırakılamaz.",
+    "promRuleModeConflict": "Kural modu Kritik veya Uyarı değer eşiklerini kullanamaz; bir bekleme süresi Çoklu uyarı gerektirir.",
     "allAlerts": "Tüm Uyarılar",
     "compositeAlert": "Bileşik",
     "import": {
@@ -8440,6 +8580,8 @@
         "alertDescription": "Uyarının açıklama metni",
         "alertStartTime": "Pencere başlangıç zamanı (ISO 8601)",
         "alertEndTime": "Pencere bitiş zamanı (ISO 8601)",
+        "alertStartTimeMillis": "Pencere başlangıç zamanı epoch milisaniye cinsinden",
+        "alertEndTimeMillis": "Pencere bitiş zamanı epoch milisaniye cinsinden",
         "alertUrl": "İncelemek için OpenObserve'e dönüş bağlantısı",
         "alertTriggerTime": "Uyarının tetiklendiği zaman (ISO 8601)",
         "alertTriggerTimeMillis": "Epoch milisaniye cinsinden tetikleme zamanı",
@@ -9046,7 +9188,9 @@
         "dbmLockSampling": "Kilit etkinliği aralıklarla örneklenir, bu nedenle iki örnek arasında başlayıp sona eren çekişme asla kaydedilmedi. Sessiz bir uyarı, engelleme olmadığının kanıtı değildir.",
         "dbmNoInstance": "Tek bir veritabanı örneği tanımlanmadı, bu nedenle bu uyarı bu motorun her örneğini izler.",
         "rumFunnelSnapshot": "Bu uyarı, huninin SQL'inin bir kopyasını tutar. Hunide veya adlandırılmış olaylarında sonradan yapılan düzenlemeler bunu değiştirmez.",
-        "rumFunnelSteps": "Bir huninin dönüşüm üzerine uyarı verebilmesi için en az iki adıma ihtiyacı vardır."
+        "rumFunnelSteps": "Bir huninin dönüşüm üzerine uyarı verebilmesi için en az iki adıma ihtiyacı vardır.",
+        "textFilterDropped": "Arama filtreniz taşınamadı çünkü bu akışta tam metin arama (FTS) alanı yok. Gerekirse uyarı sorgusuna ekleyin.",
+        "heldFilterDropped": "Arama filtreniz taşınamadı çünkü önce günlükler sayfasında bir 'Run as' seçimi gerekiyor. Gerekirse uyarı sorgusuna ekleyin."
       }
     },
     "saveFailed": "Uyarı kaydedilemedi.",
@@ -9058,7 +9202,501 @@
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
     "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
-    "seconds": "Saniye"
+    "seconds": "Saniye",
+    "downtimes": {
+      "newTitle": "Yeni kesinti",
+      "editTitle": "Kesintiyi düzenle",
+      "detailTitle": "Kesinti",
+      "modules": {
+        "alerts": "Uyarılar",
+        "anomaly_detections": "Anomali algılamaları",
+        "synthetics": "Sentetik kontroller",
+        "slos": "SLO'lar"
+      },
+      "modulesShort": {
+        "alerts": "Uyarılar",
+        "anomaly_detections": "Anomali",
+        "synthetics": "Sentetikler",
+        "slos": "SLO'lar"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "Pencere boyunca olaylar",
+          "muted": "Oluşturulur ve sessize alınır (varsayılan)",
+          "mutedHelp": "Olaylar her zamanki gibi açılır ancak pencere bitene kadar kimseye bildirim gönderilmez.",
+          "none": "Oluşturulmaz",
+          "noneHelp": "Pencere boyunca olay açılmaz; pencereden sonraki ilk tetikleme bir olay açar ve bildirim gönderir.",
+          "summary": "olay yok"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}",
+        "condition": "koşul",
+        "allFolders": "tüm klasörler",
+        "oneFolder": "{name} klasörü",
+        "nFolders": "{count} klasör | {count} klasör",
+        "tags": "etiket {tags}",
+        "nItems": "{count} öğe | {count} öğe",
+        "asGood": "iyi olarak",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}",
+        "noIncidents": "Pencere boyunca hiçbir olay açılmaz."
+      },
+      "duration": {
+        "days": "{count} g",
+        "hours": "{count} sa",
+        "minutes": "{count} dk"
+      },
+      "schedule": {
+        "windowRange": "{start} - {end} {zone}",
+        "onceSentence": "Bir kez · {start} - {end} · {zone}",
+        "dailySentence": "Günlük · {time}, {duration} boyunca · {zone}",
+        "weeklySentence": "Haftalık {days} · {time}, {duration} boyunca · {zone}",
+        "fromNoEnd": "{schedule}, {start} tarihinden itibaren, bitiş tarihi yok",
+        "fromUntil": "{schedule}, {start} ile {until} arasında"
+      },
+      "validation": {
+        "conditionRequired": "Bir koşul ekleyin veya koşul bloğunu kaldırın.",
+        "pairKey": "Her satır için bir boyut seçin.",
+        "pairOperator": "Bir kesinti koşulunda = veya != kullanın.",
+        "pairValue": "Her satır için bir değer girin.",
+        "loneStar": "Bir değer tek başına * olamaz.",
+        "innerStar": "* yalnızca bir değerin sonunda kullanılabilir.",
+        "emptyGroup": "Bir koşul grubu boş olamaz.",
+        "tooDeep": "Bir koşulda gruplar en fazla 3 seviye iç içe yerleştirilebilir.",
+        "tooManyPairs": "Bir koşul en fazla 32 çift içerebilir.",
+        "needsEq": "En az bir = koşulu ekleyin. Yalnızca != satırlarından oluşan bir koşul diğer her şeyi sessize alır.",
+        "modulesRequired": "En az bir modül seçin.",
+        "foldersRequired": "Tüm klasörler seçeneğini veya en az bir klasör seçin.",
+        "tagsRequired": "Bir etiket ekleyin veya etiketler bloğunu kaldırın.",
+        "idsRequired": "Bir öğe seçin veya belirli öğeler bloğunu kaldırın.",
+        "idOutsideFolders": "Seçilen bazı öğeler seçilen klasörlerde değil.",
+        "tooManyFolders": "En fazla {max} klasör veya Tüm klasörler seçin.",
+        "tooManyTags": "En fazla {max} etiket ekleyin.",
+        "tooManyIds": "En fazla {max} öğe seçin.",
+        "nameTooLong": "Bir ad en fazla 256 karakter olabilir.",
+        "timezoneRequired": "Bir saat dilimi seçin.",
+        "startRequired": "Bir başlangıç tarihi ve saati girin.",
+        "endRequired": "Bir bitiş tarihi ve saati girin.",
+        "endAfterStart": "Bitiş, başlangıçtan sonra olmalıdır.",
+        "windowTooLong": "Bir pencere en fazla 7 gün sürebilir.",
+        "windowTooShort": "Bir pencere en az 1 dakika sürmelidir.",
+        "startTimeRequired": "Başlangıç saatini SS:DD olarak girin.",
+        "durationInvalid": "90dk veya 1sa 30dk gibi bir süre girin.",
+        "weekdaysRequired": "En az bir gün seçin.",
+        "untilAfterStart": "Yineleme bitişi, ilk gün veya sonrasında olmalıdır.",
+        "reasonTooLong": "Bir neden en fazla {max} karakter olabilir.",
+        "windowOutlastsRepeat": "Pencere, tekrarlar arasındaki süreden uzun olamaz.",
+        "startDateRequired": "İlk günü seçin."
+      },
+      "title": "Kesintiler",
+      "subtitle": "Uyarıları, anomali algılamalarını ve sentetik kontrolleri çalışır durumda tutan ancak bildirimlerini durduran planlanmış pencereler",
+      "newDowntime": "Yeni kesinti",
+      "filterAll": "Tümü",
+      "filterOnce": "Tek seferlik",
+      "filterRecurring": "Yinelenen",
+      "search": "Ada, boyuta veya oluşturana göre ara",
+      "searchAcross": "Tüm klasörlerde ara",
+      "thisFolder": "Bu klasör",
+      "allFolders": "Tüm klasörler",
+      "thisFolderTooltip": "Seçili klasörde ara",
+      "allFoldersTooltip": "Her klasörde ara",
+      "noFolder": "Kesinti kaydedebileceğiniz bir klasör yok",
+      "truncated": "{total} kesintinin ilk {shown} tanesi gösteriliyor",
+      "stats": {
+        "active": "Etkin",
+        "scheduled": "Planlanmış",
+        "recurring": "Yinelenen",
+        "ended": "Sona erdi",
+        "cancelled": "İptal edildi",
+        "endedEarly": "Erken bitti",
+        "total": "Toplam"
+      },
+      "columns": {
+        "name": "Ad",
+        "status": "Durum",
+        "targets": "Hedefler",
+        "schedule": "Zamanlama",
+        "when": "Bitiş / sonraki",
+        "matched": "Eşleşen",
+        "createdBy": "Oluşturan",
+        "folder": "Klasör"
+      },
+      "oneTime": "Tek seferlik",
+      "recurring": "Yinelenen",
+      "bannerOn": "Bu kesinti etkinken kuruluştaki herkese bir banner gösterilir",
+      "endsLabel": "bitiş",
+      "confirmEndNow": {
+        "title": "Bu kesinti şimdi bitirilsin mi?",
+        "message": "Bildirimler hemen yeniden başlar. Kesinti listede erken bitti olarak kalır.",
+        "ok": "Şimdi bitir",
+        "keep": "Devam etsin"
+      },
+      "extend": {
+        "menu": "Uzatma süresi",
+        "notActive": "Yalnızca etkin bir kesinti uzatılabilir",
+        "dialogTitle": "{name} uzat",
+        "newEnd": "Yeni bitiş",
+        "confirmUntil": "{time} saatine kadar uzat",
+        "followUp": "Bu kesinti tekrarlandığı için zamanlaması olduğu gibi kalır. Geçerli pencerenin bitişinden itibaren {name} adlı tek seferlik bir kesinti oluşturulur.",
+        "endAfterCurrent": "Yeni bitiş, geçerli bitişten sonra olmalıdır."
+      },
+      "nextLabel": "sonraki",
+      "matched": {
+        "alerts": "{count} uyarı | {count} uyarılar",
+        "anomalies": "{count} anomali | {count} anomaliler",
+        "synthetics": "{count} kontrol | {count} kontroller",
+        "slos": "{count} SLO | {count} SLO'lar"
+      },
+      "actions": {
+        "endNow": "Şimdi bitir",
+        "edit": "Düzenle",
+        "duplicate": "Çoğalt",
+        "moveToFolder": "Klasöre taşı",
+        "cancel": "Kesintiyi iptal et",
+        "delete": "Sil",
+        "more": "Diğer işlemler",
+        "muteForHour": "Şimdi 1 saat sessize al",
+        "extend": "Uzat"
+      },
+      "confirmCancel": {
+        "title": "Kesinti süresini iptal et",
+        "message": "Bildirimler hemen devam eder. Kesinti süresi geçmiş için listede kalır.",
+        "bulkMessage": "{count} kesinti süresi iptal edilsin mi? Bildirimler hemen devam eder. | {count} kesinti süresi iptal edilsin mi? Bildirimler hemen devam eder.",
+        "confirm": "Kesinti süresini iptal et | Kesinti sürelerini iptal et",
+        "keep": "Kesinti süresini koru | Kesinti sürelerini koru"
+      },
+      "confirmDelete": {
+        "title": "Kesinti süresini sil",
+        "message": "Kesinti süresi ve geçmişi kaldırılır. Bu geri alınamaz."
+      },
+      "copyOf": "{name} kopyası",
+      "form": {
+        "matches": {
+          "alerts": "{count} uyarı eşleşiyor | {count} uyarı eşleşiyor",
+          "anomaly_detections": "{count} algılama eşleşiyor | {count} algılama eşleşiyor",
+          "synthetics": "{count} kontrol eşleşiyor | {count} kontrol eşleşiyor",
+          "slos": "{count} SLO eşleşiyor | {count} SLO eşleşiyor"
+        },
+        "alertFolders": "Uyarı klasörleri",
+        "syntheticsFolders": "Sentetik klasörleri",
+        "noAlertFolderAccess": "Uyarı klasörlerine erişiminiz yok.",
+        "noSyntheticsFolderAccess": "Sentetik klasörlerine erişiminiz yok.",
+        "tags": "Etiketler",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "Her etiket kontrolde bulunmalıdır.",
+        "removeBlock": "Bu bloğu kaldır",
+        "specificItems": "Belirli öğeler",
+        "itemsHint": "Yalnızca seçilen klasörlerdeki öğeler sunulur.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Etiket ekle",
+        "addItems": "Belirli öğe ekle",
+        "sloMode": "Pencere içindeki SLO puanı",
+        "sloExclude": "Pencereyi hariç tut",
+        "sloCountAsGood": "Pencereyi iyi olarak say",
+        "sloExcludeCaption": "Pencere içindeki süre ne iyi ne de kötü olarak sayılır. Bu SLO'lardaki yakma oranı uyarıları bunun için tetiklenmez.",
+        "sloCountAsGoodCaption": "Pencere içindeki süre tamamen iyi olarak sayılır. Bunu yalnızca SLO sözleşmeniz planlı bakımın çalışma süresi olduğunu söylüyorsa kullanın.",
+        "cardCaption": "Önce klasörler, ardından isteğe bağlı bloklar daha da daraltır. Yukarıdaki boyut koşulu bu modül için de geçerlidir.",
+        "noConditionForChecks": "Yukarıdaki boyut koşulu kontroller için geçerli değildir.",
+        "appliesTo": "Şunlara uygulanır",
+        "tabTargets": "Hedefler",
+        "tabSchedule": "Zamanlama",
+        "tabAdvanced": "Gelişmiş",
+        "modeInFolder": "{mode} içinde",
+        "newMode": "Yeni kesinti süresi",
+        "editMode": "Kesinti süresini düzenle",
+        "namePlaceholder": "Kesinti süresi adı",
+        "nameLabel": "Kesinti süresi adı",
+        "renameHint": "Yeniden adlandırmak için tıklayın",
+        "reason": "Neden",
+        "reasonHelp": "İsteğe bağlı. Listede, ayrıntı sayfasında ve Sessize alındı ipucunda gösterilir.",
+        "cancel": "İptal",
+        "save": "Kaydet",
+        "activeBanner": "Bu kesinti süresi etkin. Bir düzenleme bir sonraki değerlendirmede geçerli olur ve SLO modundaki bir değişiklik başlamış olan pencereleri yeniden ölçer.",
+        "changedMeanwhile": "Siz yükledikten sonra biri bu kesinti süresini değiştirdi. Yeniden yükleyip tekrar deneyin.",
+        "reload": "Yeniden yükle",
+        "noModule": "Şunlara uygulanır bölümünden bir modül seçin.",
+        "checkSchedule": "Zamanlamayı kontrol edin, ardından yeniden kaydedin."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "uyarılar",
+          "anomaly_detections": "anomali algılamaları",
+          "synthetics": "sentetik kontrolleri",
+          "slos": "SLO'lar"
+        },
+        "whenOnce": "Bir kez, {start} ile {end} arasında {zone}",
+        "whenDaily": "Her gün {time} {zone}, {duration} boyunca",
+        "whenWeekly": "Her {days} {time} {zone}, {duration} boyunca",
+        "inFolders": "{names} klasöründe | {names} klasörlerinde",
+        "withCondition": "{condition} ile",
+        "tagged": "{tags} etiketli",
+        "named": "{count} adlandırılmış öğeyle sınırlı | {count} adlandırılmış öğeyle sınırlı",
+        "stopNotifying": "{when}: {targets} bildirim göndermeyi durdurur.",
+        "nothingMuted": "{when}: hiçbir uyarı veya kontrol sessize alınmaz.",
+        "sloUnchanged": "SLO puanları değişmez.",
+        "sloExcluded": "{slos} bu aralığı puanından hariç tutar.",
+        "sloAsGood": "{slos} bu aralığı iyi süre olarak sayar."
+      },
+      "autoName": {
+        "once": "bir kez",
+        "onceOn": "bir kez {date}",
+        "daily": "günlük",
+        "weekly": "haftalık",
+        "all": {
+          "alerts": "Tüm uyarılar",
+          "anomaly_detections": "Tüm anomali tespitleri",
+          "synthetics": "Tüm sentetik kontroller",
+          "slos": "Tüm SLO'lar"
+        }
+      },
+      "condition": {
+        "none": "Boyut koşulu yok",
+        "add": "Ekle",
+        "title": "Boyut koşulu",
+        "onePer": "Her kesinti için bir tane",
+        "remove": "Boyut koşulunu kaldır",
+        "caption": "Uyarılar, anomali algılamaları ve SLO'lar için geçerlidir. Sentetik kontrollerin boyutu yoktur ve etiket kullanır. Tüm çiftler eşleşmelidir. Alternatifler için bir OR grubu kullanın. Bir değer * ile bitebilir."
+      },
+      "resources": {
+        "refineBy": "Kaynağa göre daralt",
+        "load": "Kaynakları yükle",
+        "needsEq": "Kaynağa göre daraltmadan önce en az bir = koşulu ekleyin.",
+        "tooMany": "Bu koşulla birlikte {count} değer görülüyor. Kaynak seçmek için koşulu daraltın.",
+        "lastSeen": "Son görülme",
+        "streams": "Akışlar",
+        "footer": "{total} öğeden {selected} tanesi seçildi · {source}",
+        "fromRegistry": "hizmet kayıt defterinden",
+        "fromSearch": "son 24 saatlik veriden",
+        "apply": "Uygula",
+        "loadFailed": "Kaynaklar yüklenemedi",
+        "notSeen": "Son bir saatte görülmedi.",
+        "partial": "Bazı kaynaklar yanıt vermedi.",
+        "items": "Öğeler",
+        "fromValues": "uyarılardan, hizmet kayıt defterinden ve son bir saatin verilerinden",
+        "noValues": "Bu boyut için henüz değer görülmedi."
+      },
+      "scheduleForm": {
+        "once": "Bir kez",
+        "daily": "Günlük",
+        "weekly": "Haftalık",
+        "startDate": "Başlangıç tarihi",
+        "startTime": "Başlangıç saati",
+        "endDate": "Bitiş tarihi",
+        "endTime": "Bitiş saati",
+        "days": "Günler",
+        "startsAt": "Başlangıç",
+        "duration": "Süre",
+        "durationPlaceholder": "1sa 30dk",
+        "durationHelp": "En fazla 7 gün, örneğin 90dk veya 1sa 30dk.",
+        "until": "Şu tarihe kadar tekrarla",
+        "untilPlaceholder": "Bitiş tarihi yok",
+        "timezone": "Saat dilimi",
+        "noWindow": "Önümüzdeki 8 gün içinde başlayan bir zaman aralığı yok.",
+        "nextWindow": "Sonraki pencere: {window}. Bir pencere gece yarısını geçebilir.",
+        "nextWindowWithUtc": "Sonraki pencere: {window} ({utc}). Bir pencere gece yarısını geçebilir.",
+        "startsOn": "Başlangıç tarihi"
+      },
+      "preview": {
+        "title": "Önizleme",
+        "failed": "Önizleme yüklenemedi.",
+        "andMore": "ve {count} tane daha",
+        "noMatch": "Şu anda hiçbir şey eşleşmiyor",
+        "fireTime": "{count} uyarı kimliğini tetiklenme anında belirler | {count} uyarı kimliğini tetiklenme anında belirler",
+        "undecidable": "{key} ile ayırt edilemiyor",
+        "showAll": "Tam listeyi göster",
+        "showLess": "Daha az göster",
+        "finishCondition": "Önizlemeyi görmek için koşulu tamamlayın."
+      },
+      "muteAllDialog": {
+        "title": "Tüm modüller sessize alınsın mı?",
+        "intro": "Hiçbir klasör, öğe, etiket veya koşul bu modülleri daraltmıyor, bu nedenle bu kesinti şunları sessize alır:",
+        "every": {
+          "alerts": "Bu organizasyondaki tüm uyarılar",
+          "anomaly_detections": "Bu organizasyondaki tüm anomali tespitleri",
+          "synthetics": "Bu organizasyondaki tüm sentetik kontroller",
+          "slos": "Bu organizasyondaki tüm SLO'lar"
+        },
+        "matchedNow": "bugün {matched}",
+        "outro": "Pencere içinde hepsi için bildirimler, nöbet çağrıları ve iş akışları durur.",
+        "cancel": "İptal",
+        "confirm": "Tümünü sessize al",
+        "titleOne": {
+          "alerts": "Bu organizasyondaki her uyarı sessize alınsın mı?",
+          "anomaly_detections": "Bu organizasyondaki her anomali tespiti sessize alınsın mı?",
+          "synthetics": "Bu organizasyondaki her sentetik kontrol sessize alınsın mı?",
+          "slos": "Bu organizasyondaki her SLO sessize alınsın mı?"
+        },
+        "window": "Pencere: {window}"
+      },
+      "summaryPane": {
+        "title": "Özet",
+        "filedIn": "Kayıtlı olduğu yer",
+        "window": "Pencere",
+        "nextWindow": "Sonraki pencere",
+        "inUtc": "UTC olarak",
+        "largeMatch": "{modules}: kesinti, öğelerin yarısından fazlasıyla eşleşiyor. Bu organizasyonun büyük kısmı pencere içinde bildirim göndermeyecek.",
+        "whatHappens": "Ne olur",
+        "keepRunning": "Değerlendirmeler ve kontroller çalışmaya devam eder ve geçmişlerini korur.",
+        "noNotifications": "Bildirimler, nöbet çağrıları ve iş akışları durur.",
+        "mutedIncidents": "Olaylar sessiz olarak açılır ve pencere sonrasında bildirim gönderir."
+      },
+      "band": {
+        "now": "şimdi",
+        "none": "Henüz hiçbir pencere çalışmadı ve planlanmış bir pencere yok.",
+        "active": "Etkin",
+        "next": "Sonraki",
+        "past": "Çalıştı",
+        "track": "Pencereler",
+        "aria": "{kind}: {start} - {end}"
+      },
+      "detail": {
+        "overview": "Genel Bakış",
+        "affected": "Etkilenen · {count}",
+        "suppressed": "Bastırılan · {count}",
+        "details": "Ayrıntılar",
+        "condition": "Koşul",
+        "noTarget": "Hedef yok",
+        "banner": "Banner",
+        "bannerOn": "Etkin olduğu sürece organizasyona gösterilir",
+        "bannerOff": "Banner yok",
+        "occurrences": "Gerçekleşmeler",
+        "nextWindow": "Sonraki pencere: {window}. Sizin saatinizle: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Eşleştiren",
+        "matchedBy": {
+          "query": "Sorgu",
+          "source_alert": "Kaynak uyarı",
+          "tag": "Etiket",
+          "id": "Adlandırılmış",
+          "folder": "Klasör",
+          "org": "Tüm organizasyon"
+        },
+        "source": "Kaynak",
+        "wouldHaveNotified": "Bildirim gönderilirdi",
+        "noSuppressed": "Henüz hiçbir şey bastırılmadı",
+        "muteHourName": "{name} · 1 sa sustur",
+        "notFoundTitle": "Kesinti süresi bulunamadı",
+        "notFoundDescription": "Silinmiş olabilir veya bağlantı başka bir kuruluşu gösteriyor olabilir.",
+        "backToList": "Kesinti sürelerine dön"
+      },
+      "mute": {
+        "title": {
+          "alerts": "{count} uyarıyı sustur | {count} uyarıyı sustur",
+          "anomaly_detections": "{count} anomali tespitini sustur | {count} anomali tespitini sustur",
+          "synthetics": "{count} kontrolü sustur | {count} kontrolü sustur",
+          "slos": "{count} SLO'yu sustur | {count} SLO'yu sustur",
+          "items": "{count} öğeyi sustur | {count} öğeyi sustur"
+        },
+        "subtitle": "Çalışmaya devam eder ve geçmişlerini korurlar. Bildirimler, çağrılar ve iş akışları pencere bitene kadar durur.",
+        "muteFor": "Susturma süresi",
+        "fileIn": "Dosyalama yeri",
+        "presets": {
+          "30m": "30 dk",
+          "1h": "1 sa",
+          "2h": "2 sa",
+          "4h": "4 sa",
+          "custom": "Özel"
+        },
+        "endsAt": "Bitiş",
+        "endsIn": "{duration} içinde.",
+        "confirm": "Sustur",
+        "confirmUntil": "{time} zamanına kadar sustur",
+        "menu": "Bildirimleri sustur",
+        "until": "Şu zamana kadar…",
+        "bulk": "Sustur",
+        "muted": "Susturuldu · {duration} içinde bitiyor",
+        "mutedTooltip": "{name} tarafından {end} zamanına kadar susturuldu",
+        "exclude": "Bir zaman aralığını hariç tut…",
+        "firingMuted": "Tetikleniyor · sessize alındı",
+        "firingMutedTooltip": "Hâlâ tetikleniyor. Bildirimler {name} tarafından sessize alındı."
+      },
+      "corrected": "Düzeltildi",
+      "correctedBy": "Puan {names} tarafından düzeltildi",
+      "incident": {
+        "mutedBy": "Susturuldu · {name}",
+        "notLoaded": "Kesinti yüklenmedi",
+        "notLoadedTooltip": "{id} kesintisi tarafından sessize alındı; bu kesinti yüklenenler arasında değil.",
+        "banner": "{name} tarafından susturuldu. Kimseye çağrı gönderilmedi. Pencereden sonraki ilk tetiklenme, gecikmiş açılış bildirimini gönderir.",
+        "bannerUntil": "{name} tarafından {end} zamanına kadar susturuldu. Kimseye çağrı gönderilmedi. Pencereden sonraki ilk tetiklenme, gecikmiş açılış bildirimini gönderir."
+      },
+      "banner": {
+        "ended": "bitti",
+        "endsInUnderMinute": "bir dakikadan kısa süre içinde bitiyor",
+        "endsInMinutes": "{count} dakika içinde bitiyor | {count} dakika içinde bitiyor",
+        "endsIn": "{duration} içinde bitiyor",
+        "firstEndsInUnderMinute": "ilki bir dakikadan kısa sürede bitiyor",
+        "firstEndsInMinutes": "ilki {count} dakika içinde bitiyor | ilki {count} dakika içinde bitiyor",
+        "firstEndsIn": "ilki {duration} içinde bitiyor",
+        "count": "{module} {count}",
+        "showBanner": "Bu kesinti aktifken organizasyondaki herkese bir banner göster",
+        "showBannerCaption": "Banner adı, etkilenen sayıları ve kalan süreyi gösterir. Hiçbir zaman bir uyarının adını vermez.",
+        "preview": "Önizleme",
+        "previewMessage": "{name} aktif.",
+        "tooLong": "Banner yalnızca en fazla 7 günlük pencereler için kullanılabilir."
+      },
+      "sloCorrections": {
+        "title": "Durum düzeltmeleri:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "SLO diliminden kısa, hiçbir dakika düzeltilmedi"
+      },
+      "notify": {
+        "title": "Bildir",
+        "caption": "Hedeflere kesinti süresinin kendisini bildirin: başladığında, bitmeden önce ve bittiğinde.",
+        "destinations": "Hedefler",
+        "lead": "Bitişten önce hatırlat",
+        "leadHelp": "Örneğin 10m veya 1h, 1 dakika ile pencere uzunluğu arasında.",
+        "regionNote": "Süper kümede, kesinti süresinin oluşturulduğu bölge gönderir. Bu ayardan önce oluşturulan bir kesinti süresi her bölgeden gönderir.",
+        "tab": "Bildirimler",
+        "events": {
+          "started": "Başladığında",
+          "startedHelp": "Her pencere başlarken bir ileti.",
+          "ending_soon": "Bitmeden önce",
+          "ending_soonHelp": "Bitişten önce bir hatırlatma; uyarılar yeniden bildirim gönderdiğinde kimse şaşırmaz.",
+          "ended": "Bittiğinde",
+          "endedHelp": "Her pencere kapanırken bir ileti.",
+          "cancelled": "İptal edildiğinde",
+          "cancelledHelp": "Biri kesinti süresini bitirdiğinde veya iptal ettiğinde hemen gönderilir.",
+          "extended": "Uzatıldığında",
+          "extendedHelp": "Yeni bitişle birlikte hemen gönderilir."
+        },
+        "validation": {
+          "tooMany": "En fazla {max} hedef bildirilebilir.",
+          "eventRequired": "En az bir olay seçin veya hedefleri kaldırın.",
+          "leadInvalid": "Hatırlatma, bitişten 1 dakika ile pencere uzunluğu kadar önce arasında gelmelidir."
+        },
+        "summary": {
+          "none": "Kendi bildirimini göndermez.",
+          "sentence": "{destinations} hedeflerini bildirir: {events}.",
+          "started": "başladığında",
+          "endingSoon": "bitişten {lead} önce",
+          "ended": "bittiğinde",
+          "cancelled": "iptal edildiğinde",
+          "extended": "uzatıldığında"
+        },
+        "log": {
+          "time": "Zaman",
+          "event": "Olay",
+          "destinations": "Hedefler",
+          "result": "Sonuç",
+          "ok": "Gönderildi",
+          "pending": "Gönderiliyor",
+          "empty": "Henüz bildirim gönderilmedi",
+          "events": {
+            "started": "Başladı",
+            "ending_soon": "Yakında bitiyor",
+            "ended": "Bitti",
+            "cancelled": "İptal edildi",
+            "extended": "Uzatıldı"
+          }
+        },
+        "test": {
+          "send": "Test gönder",
+          "sent": "Test {count} hedefe gönderildi | Test {count} hedefe gönderildi",
+          "failed": "Test {names} hedefine ulaşmadı."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -9095,7 +9733,8 @@
     "countWorkflow": "{count} iş akışı | {count} iş akışı",
     "countAnomalyDetection": "{count} anomali dedektörü | {count} anomali dedektörü",
     "countIncidentIntegration": "{count} olay entegrasyonu | {count} olay entegrasyonu",
-    "sectionOtherConsumers": "Ayrıca kullananlar"
+    "sectionOtherConsumers": "Ayrıca kullananlar",
+    "countDowntime": "{count} kesinti süresi | {count} kesinti süresi"
   },
   "alert_library": {
     "header": "Uyarı Kitaplığı",
@@ -11639,7 +12278,21 @@
     "eventClusterAriaLabelPlural": "{count} olay, {errors} hata",
     "eventMarkerTooltip": "Olay: {name}",
     "exceptionMarkerTooltip": "İstisna: {type}",
-    "spanEventFallback": "span olayı"
+    "spanEventFallback": "span olayı",
+    "spanNav": {
+      "firstSpan": "İlk span",
+      "lastSpan": "Son span",
+      "position": "Span {index} / {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "İz {row} / {count}, sayfa {page}",
+      "spanPosition": "Span {row} / {count}, sayfa {page}",
+      "firstResult": "İlk sonuç",
+      "lastResult": "Son sonuç",
+      "loadingPage": "Sayfa {page} yükleniyor",
+      "pageFailed": "Sayfa {page} yüklenemedi",
+      "pageEmpty": "Sayfa {page} sonuç içermiyor"
+    }
   },
   "aiToolset": {
     "header": "Yapay Zeka Araç Setleri",
@@ -14876,7 +15529,8 @@
       "selectStreamDesc": "Günlükler, trace'ler, metrikler ve Gerçek Kullanıcı İzleme stream'lerine göz atın",
       "queryGuide": "Sorgu kılavuzunu okuyun",
       "queryGuideDesc": "Filtreler, SQL modu, VRL ve kaydedilmiş görünümler",
-      "recent": "En son:"
+      "recent": "Son kullanılan:",
+      "descriptionAutoRun": "En son günlüklerini görmek için bir akış seçin. Sonuçlar geldikten sonra filtreler, bir VRL işlevi ve özel bir zaman aralığı ile daraltabilirsiniz."
     },
     "noEvents": {
       "title": "Olay bulunamadı",
@@ -14930,7 +15584,8 @@
       "fixErrorsAndRetry": "Bazı hatalar var, lütfen düzeltip tekrar deneyin."
     },
     "buildQueryPage": {
-      "validationErrors": "Bazı hatalar var, lütfen düzeltip tekrar deneyin."
+      "validationErrors": "Bazı hatalar var, lütfen düzeltip tekrar deneyin.",
+      "parserLoadFailed": "Sorgu ayrıştırıcısı yüklenemedi, bu nedenle arama filtresi grafiğe eklenemiyor. Yüklenene kadar çalıştırmalar duraklatıldı."
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL Sorgusu :",
@@ -15132,6 +15787,45 @@
     },
     "logsNoEventsState": {
       "lastData": "Son veri: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "Önem derecesi {level}",
+      "srTextInferred": "Önem derecesi {level}, tahmin edildi",
+      "inferredLabel": "{level} · tahmin edildi",
+      "popoverTitle": "Önem derecesi: {level}",
+      "popoverAriaLabel": "Önem derecesi kanıtı",
+      "evidence": "Kanıt",
+      "fromField": "{field} alanından",
+      "inferredFrom": "{field} metninden tahmin edildi.",
+      "notSearchable": "Aranamaz; histogram bunu kullanmaz.",
+      "noLevelField": "Bu satırda düzey alanı yok ve taranacak metin alanı da yok.",
+      "noLevelWordInField": "Bu satırda düzey alanı yok ve {field} içinde düzey sözcüğü yok.",
+      "notInSelectedColumns": "Düzey alanı seçili sütunlarda değil",
+      "levels": {
+        "emergency": "acil durum",
+        "alert": "alarm",
+        "critical": "kritik",
+        "error": "hata",
+        "warning": "uyarı",
+        "notice": "bildirim",
+        "info": "bilgi",
+        "debug": "hata ayıklama",
+        "trace": "iz",
+        "ok": "Tamam",
+        "unknown": "Bilinmiyor"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "Otomatik yenileme açık; sayfaları değiştirmek için kapatın",
+      "position": "Günlük {row}/{count}, sayfa {page}",
+      "positionLabel": "Günlük {row}/{count} · Sayfa {page}",
+      "loadingPage": "Sayfa {page} yükleniyor…",
+      "loadingPageAnnouncement": "Sayfa {page} yükleniyor",
+      "resultsChanged": "Sonuçlar değişti",
+      "notInPage": "Geçerli sayfada değil",
+      "loadingResults": "Sonuçlar yükleniyor…",
+      "previousLog": "Önceki günlük",
+      "nextLog": "Sonraki günlük"
     }
   },
   "queryError": {
@@ -15166,7 +15860,10 @@
     "traceId": "Trace ID:",
     "askAi": "AI'dan sorgumu düzeltmesini isteyin",
     "showDetail": "Ayrıntıları göster",
-    "hideDetail": "Ayrıntıları gizle"
+    "hideDetail": "Ayrıntıları gizle",
+    "runAs": "Şu olarak çalıştır",
+    "searchTextFor": "\"{text}\" için metin ara",
+    "searchTextDesc": "Tüm girdiyi tek bir ifade olarak ara"
   },
   "refreshButton": {
     "justNow": "Hemen şimdi",
@@ -16952,7 +17649,8 @@
       "sourceMaps": "RUM - Kaynak Haritaları",
       "oncall": "Nöbet",
       "oncallDetail": "Nöbet sayfası",
-      "syntheticsJourney": "Sentetikler yolculuğu"
+      "syntheticsJourney": "Sentetikler yolculuğu",
+      "downtimes": "Kesintiler"
     },
     "actions": {
       "openCheatsheet": "Klavye kısayolları hile sayfasını aç",
@@ -17064,7 +17762,19 @@
       "oncallEscalate": "Yükselt",
       "oncallSnooze": "Ertele",
       "oncallResolve": "Çöz",
-      "functionsImport": "Fonksiyonu içe aktar"
+      "downtimesCreate": "Yeni kesinti",
+      "downtimesRefresh": "Kesintileri yenile",
+      "functionsImport": "Fonksiyonu içe aktar",
+      "logsNextRow": "Sonraki günlük (ayrıntıları açar)",
+      "logsPrevRow": "Önceki günlük (ayrıntıları açar)",
+      "logsRowFocusMove": "Satırlar arasında odağı taşı",
+      "logsRowOpen": "Odaklanan satırı aç",
+      "logsDetailClose": "Ayrıntıları kapat ve satıra dön",
+      "tracesNextRow": "Sonraki izi seç",
+      "tracesPrevRow": "Önceki izi seç",
+      "tracesRowOpen": "Seçili izi aç",
+      "traceNextVisibleSpan": "Sonraki görünür Span",
+      "tracePrevVisibleSpan": "Önceki görünür Span"
     }
   },
   "components": {
@@ -17437,7 +18147,13 @@
         "debug": "Hata Ayıklama",
         "info": "Bilgi",
         "warn": "UYARI",
-        "fatal": "Ölümcül"
+        "fatal": "Ölümcül",
+        "emergency": "Acil",
+        "alert": "Uyarı",
+        "critical": "Kritik",
+        "notice": "Bildirim",
+        "ok": "Tamam",
+        "unknown": "Bilinmiyor"
       },
       "pipelineRunOutcome": {
         "firing": "Tetiklendi",
@@ -17502,6 +18218,13 @@
         "belowTopN": "üst-N altında",
         "truncated": "kesilmiş",
         "gap": "boşluk"
+      },
+      "downtimeStatus": {
+        "scheduled": "Planlandı",
+        "active": "Etkin",
+        "ended": "Sona erdi",
+        "cancelled": "İptal edildi",
+        "endedEarly": "Erken bitti"
       }
     }
   },
@@ -17898,6 +18621,24 @@
     },
     "iam": {
       "userSaveFailed": "Kullanıcı kaydedilemedi"
+    },
+    "downtimes": {
+      "cancelled": "Kesinti iptal edildi",
+      "cancelledMany": "{count} kesinti iptal edildi | {count} kesinti iptal edildi",
+      "cancelFailed": "Kesinti iptal edilemedi",
+      "extended": "{time} saatine kadar uzatıldı",
+      "extendedFollowUp": "{name} oluşturuldu, {time} saatine kadar sürüyor",
+      "extendFailed": "Kesinti uzatılamadı",
+      "reload": "Yeniden yükle",
+      "deleted": "Kesinti silindi",
+      "deleteFailed": "Kesinti silinemedi",
+      "created": "Kesinti oluşturuldu",
+      "updated": "Kesinti kaydedildi",
+      "saveFailed": "Kesinti kaydedilemedi",
+      "muted": "{count} öğe {time} zamanına kadar sessize alındı. {folder} klasörüne kaydedildi. | {count} öğe {time} zamanına kadar sessize alındı. {folder} klasörüne kaydedildi.",
+      "muteFailed": "Sessize alma oluşturulamadı",
+      "viewDowntime": "Kesintiyi görüntüle",
+      "itemsDropped": "{count} seçilen öğe, seçilen klasörlerin dışında olduğu için kaldırıldı. | {count} seçilen öğe, seçilen klasörlerin dışında olduğu için kaldırıldı."
     }
   },
   "cipherKeys": {
@@ -18188,7 +18929,9 @@
       "budgetNote": "Son nokta, yukarıdaki Kalan Bütçe karosuna eşittir. %0'daki kesikli çizgi tükenmeyi gösterir; altında SLO, hedefin izin verdiğinden daha fazla hata tüketmiştir. Boşluklar, hiçbir şeyin ölçülmediği bölmelerdir; bu sıfır ile aynı şey değildir.",
       "burnExplain": "Bütçenin her kovada ne kadar hızlı tükendiği, bütçe-nötr oranın katı olarak.",
       "burnFormula": "tükenme oranı = (100% − SLI) ÷ (100% − hedef)\nSLI = 100 × iyi ÷ toplam, yalnızca o bölme için\n\nsağ eksen (aynı çizginin SLI olarak okunuşu):\nSLI = 100% − tükenme oranı × (100% − hedef)",
-      "burnNote": "×1 bütçeyi pencerenin tam sonunda harcar, ×2 yarısında; ×1 altında bütçe biriktiriliyor. Kova başına olduğu ve kümülatif olmadığı için, buradaki bir ani artış görünür kalır, ortalamaya karışıp kaybolmaz. Sağ eksen aşağı doğru sayar: grafik yukarısı daha fazla yanma demektir, bu da daha düşük bir SLI'dır."
+      "burnNote": "×1 bütçeyi pencerenin tam sonunda harcar, ×2 yarısında; ×1 altında bütçe biriktiriliyor. Kova başına olduğu ve kümülatif olmadığı için, buradaki bir ani artış görünür kalır, ortalamaya karışıp kaybolmaz. Sağ eksen aşağı doğru sayar: grafik yukarısı daha fazla yanma demektir, bu da daha düşük bir SLI'dır.",
+      "corrected": "Bir kesinti tarafından düzeltildi",
+      "correctedTooltip": "Bir kesinti tarafından düzeltildi: hariç tutuldu, bu yüzden bütçe çizgisi düz."
     },
     "alerts": {
       "title": "Uyarılar",
@@ -21712,5 +22455,1079 @@
     "modeExhausted": "Tükendi",
     "modeFree": "Ücretsiz",
     "modeUnknown": "Bilinmiyor"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "Verinizi gönderin. OpenObserve sorunları bulur ve en iyi neden değerlendirmesiyle birlikte size bildirir. Sessiz olduğunda, neleri kontrol ettiğini ve neleri göremediğini gösterir.",
+    "phase2": "Aşama 2",
+    "tabs": {
+      "issues": "Sorunlar",
+      "coverage": "Kapsam",
+      "activity": "Etkinlik",
+      "policy": "İlke"
+    },
+    "loops": {
+      "coverage": "Kapsam",
+      "calibration": "Kalibrasyon",
+      "investigation": "İnceleme",
+      "action": "Eylem"
+    },
+    "signals": {
+      "requests": "İstekler",
+      "errors": "Hatalar",
+      "latency": "Gecikme",
+      "saturation": "Doygunluk",
+      "logPatterns": "Günlük kalıpları",
+      "dependencies": "Bağımlılıklar"
+    },
+    "ledgerStatus": {
+      "autoApplied": "Otomatik uygulandı",
+      "awaiting": "Onay bekliyor",
+      "approved": "Onaylandı",
+      "rejected": "Reddedildi",
+      "rolledBack": "Geri alındı",
+      "kept": "Korundu — kontroller geçti"
+    },
+    "issues": {
+      "subtitle": "SRE ajanı tarafından gruplandırılan ve incelenen olaylar. Her sorun için tek bildirim; neden eklenir ya da triyaj zaman aşımına uğrar veya başarısız olursa aynı başlık altında devam eder.",
+      "open": "Açık",
+      "recent": "Çözüldü",
+      "all": "Tümü",
+      "heldForDigest": "Cuma özeti için bekletiliyor",
+      "colId": "Olay",
+      "colTitle": "Sorun",
+      "colSeverity": "Önem derecesi",
+      "colServices": "Etkilenen hizmetler",
+      "colStarted": "Başladı",
+      "colStatus": "Durum",
+      "colCause": "Neden",
+      "emptyTitle": "Burada hiçbir şey yok",
+      "emptyDescription": "Bu filtreyle eşleşen sorun yok.",
+      "subsetNote": "{shown} gösteriliyor. Bu demo, bu haftanın {total} olayından bir seçkiyi gösterir.",
+      "searchLabel": "Sorunlarda ara",
+      "searchPlaceholder": "Sorun, hizmet, neden veya INC-… ara",
+      "noMatch": "“{query}” ile eşleşen sorun yok",
+      "clearSearch": "Aramayı temizle",
+      "matchCount": "Eşleşen sorun yok | 1 sorun eşleşiyor | {count} sorun eşleşiyor",
+      "colSignal": "Sinyal",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → şimdi",
+      "minutes": "{count} dk",
+      "grouped": "{count} uyarı → 1 olay | {count} uyarı → 1 olay",
+      "confidence": "{level} güven",
+      "proposed": "Önerilen",
+      "reversible": "geri alınabilir",
+      "proposalFor": "{title} için önerilen düzeltme"
+    },
+    "drawer": {
+      "rca": "Kök neden",
+      "rcaSummary": "Özet",
+      "likelyCause": "Olası neden",
+      "confidence": "Güven",
+      "confidenceValue": "Güven: {value} (henüz kalibre edilmiş puan yok)",
+      "nextStep": "Önerilen sonraki adım",
+      "evidence": "Kanıtlar",
+      "blastRadius": "Etki alanı",
+      "upstream": "Yukarı akış çağıranları",
+      "affected": "Etkilenen",
+      "downstream": "Aşağı akış bağımlılıkları",
+      "none": "Yok",
+      "timeline": "Zaman çizelgesi",
+      "notification": "Bildirim gönderildi",
+      "notSent": "Sayfa yok: bu düşük önem dereceli sorun Cuma özeti için bekletildi. Ürün içi gelen kutusuna kaydedildi.",
+      "sender": "AutoObserve",
+      "threadReply": "ileti dizisinde yanıtladı",
+      "p1Note": "P1 hemen bildirir, araştırma tamamlanmadan önce. Neden aynı ileti dizisinde gelir.",
+      "gateNote": "P2 ve P3 bildirimleri araştırma için 2 dakikaya kadar bekler, bu nedenle ilk mesaj genellikle nedeni taşır. Ön değerlendirme zaman aşımına uğrar veya başarısız olursa, mesaj araştırmanın hâlâ sürdüğünü ya da başarısız olduğunu belirtir ve neden aynı ileti dizisinde gelir. P4 sorunları kimseye bildirim göndermez; Cuma özetine girer.",
+      "caughtEarlier": "Bunu daha erken yakalayabilecek olan",
+      "analyzedAt": "Araştırma {time} itibarıyla tamamlandı.",
+      "triggersSample": "{total} tetiklenmeden {shown} tanesi gösteriliyor",
+      "waitingForOk": "Onayınız bekleniyor",
+      "proposedFix": "Önerilen düzeltme",
+      "unfoldTab": "Nasıl geliştiği",
+      "seeEvidence": "Kanıtları görün ({count}) →"
+    },
+    "unfold": {
+      "hint": "Soldan sağa okuyun: neyin değiştiği, tetiklediği sinyaller ve ardından ekibinize ulaşanlar. Tetiklenmeleri için bir kart seçin.",
+      "legend": "Kart türleri",
+      "team": "Ekibiniz",
+      "kind": {
+        "metric": "Metrik",
+        "log": "Günlük",
+        "trace": "İz",
+        "change": "Değişiklik"
+      },
+      "likelyCause": "Olası neden",
+      "linesUpWith": "Şununla örtüşüyor",
+      "times": "×{count}",
+      "sameMinute": "aynı dakika",
+      "plusMinutes": "+{count} dk",
+      "plusHours": "+{hours} sa {minutes} dk",
+      "firstFired": "İlk tetiklenme",
+      "lastFired": "Son tetiklenme",
+      "firings": "Tetiklenmeler",
+      "peak": "Tepe",
+      "normal": "Karşılaştırma",
+      "detector": "Algılayıcı",
+      "firedAt": "Tetiklenme zamanı",
+      "when": "Ne zaman",
+      "chartNote": "Sorunun ana grafiği, Kanıt bölümündeki gibi",
+      "outcome": {
+        "paged": "Nöbetçiye çağrı gönderildi",
+        "asked": "Onay istendi",
+        "notified": "Mesaj gönderildi, çağrı yok",
+        "held": "Cuma özeti için bekletildi",
+        "fixFailed": "Düzeltme işe yaramadı",
+        "fixed": "Düzeltildi",
+        "resolved": "Çözüldü",
+        "open": "Hâlâ açık"
+      }
+    },
+    "coverage": {
+      "showing": "{total} hizmetten {shown} tanesi gösteriliyor",
+      "watched": "İzleniyor",
+      "learning": "Öğreniyor",
+      "gap": "Boşluk",
+      "na": "Uygulanamaz",
+      "anomaly": "Anomali",
+      "threshold": "Eşik",
+      "service": "Hizmet",
+      "lastScanned": "Son tarama",
+      "detector": "Algılayıcı",
+      "methodAnomaly": "Anomali algılayıcı, öğrenilmiş temel değer",
+      "methodThreshold": "Kütüphaneden statik eşik",
+      "libraryEntry": "Kütüphane girdisi",
+      "predicate": "Uygulanabilirlik",
+      "predicateMatched": "{predicate} — {stream} akışında eşleşti",
+      "predicateUnmatched": "{predicate} — eşleşmedi",
+      "reason": "Neden",
+      "history": "{total} günlük geçmişin {days} günü",
+      "notScanned": "İlk tarama sürüyor — bilinmiyor, tamamlanana kadar kapsanmaz",
+      "guardrails": "Öğrenme sırasında etkin koruma önlemleri: hata oranı üst sınırı · tazelik kontrolü (akış durursa tetiklenir)",
+      "alsoWatchedBy": "Ayrıca izleyen",
+      "searchLabel": "Hizmet ara",
+      "searchPlaceholder": "Hizmet veya akış ara",
+      "matchCount": "Hizmet eşleşmiyor | 1 hizmet eşleşiyor | {count} hizmet eşleşiyor",
+      "noMatch": "“{query}” ile eşleşen hizmet veya akış yok",
+      "clearSearch": "Aramayı temizle",
+      "filterLabel": "Hizmetleri kapsama göre filtrele",
+      "all": "Tümü",
+      "gaps": "Boşluklar",
+      "cantWatch": "İzlenemiyor",
+      "detectorCount": "1 algılayıcı | {count} algılayıcı",
+      "stream": "Akış",
+      "coverage": "Kapsam",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "{total} uygulanabilir sinyalin {watched} tanesi izleniyor",
+      "legendLabel": "Gösterge",
+      "gapChip": "BOŞLUK",
+      "daysShort": "{days}/{total}g",
+      "tipAnomaly": "{signal}: anomali algılayıcı, öğrenilmiş temel değer",
+      "tipThreshold": "{signal}: kütüphaneden statik eşik",
+      "tipLearning": "{signal}: öğreniyor, {total} günlük geçmişin {days} günü",
+      "tipGap": "{signal}: boşluk, henüz izlenemiyor",
+      "tipNa": "{signal}: uygulanamaz",
+      "config": "Dedektör yapılandırması",
+      "lastFired": "Son tetiklenme",
+      "never": "Hiç",
+      "hoursAgo": "1 saat önce | {count} saat önce",
+      "daysAgo": "1 gün önce | {count} gün önce",
+      "fixNoLink": "service.name etiketi ekle",
+      "fixStopped": "Toplayıcıyı kontrol edin",
+      "fixQueued": "Yalnızca mock: {service} için “{action}” hiçbir yere gönderilmedi",
+      "viewLabel": "Kapsam görünümü",
+      "viewMap": "Harita",
+      "viewTable": "Tablo",
+      "fillBy": "Doldurma ölçütü",
+      "fillState": "Kapsam durumu",
+      "fillLearning": "Öğrenme ilerlemesi",
+      "fillDetectors": "Dedektör sayısı",
+      "fillScanned": "Son taramadan bu yana geçen süre",
+      "summaryWatched": "{total} hizmetten {watched} tanesi tamamen izleniyor · {pct}%",
+      "addedThisWeek": "Bu hafta 1 yeni hizmet | Bu hafta {count} yeni hizmet",
+      "splitLabel": "{watched} tamamen izleniyor, {learning} öğreniyor, {gaps} henüz izlenemiyor",
+      "stateWatched": "Tamamen izleniyor",
+      "stateLearning": "Öğreniyor · {total} günün {days} günü",
+      "stateGap": "Henüz izlenemiyor",
+      "hexName": "{service}, {state}, {stream}, {detectors}",
+      "legendOf": "{fill} için açıklama, vurgulamak için seçin",
+      "mapLabel": "Kapsam haritası, {fill} ile doldurulmuş 1 hizmet | Kapsam haritası, {fill} ile doldurulmuş {count} hizmet",
+      "bucketLearned": "Öğrenildi",
+      "bucketDays67": "6–7 gün",
+      "bucketDays35": "3–5 gün",
+      "bucketDays02": "0–2 gün",
+      "bucketNoData": "Veri yok",
+      "bucketSix": "6 dedektör",
+      "bucketFive": "5 dedektör",
+      "bucketFewer": "1–4 dedektör",
+      "bucketNone": "Yok",
+      "bucketFresh": "5 dakikanın altında",
+      "bucketRecent": "5–15 dk",
+      "bucketHour": "15–60 dk",
+      "bucketStale": "1 saatten fazla",
+      "bucketNotScanned": "Taranmadı",
+      "signals": "Sinyaller",
+      "details": "Ayrıntılar",
+      "detailsFor": "{metric} için ayrıntıları göster",
+      "readyCaption": "Normal aralık {day} tarihinde hazır · {total} günün {days} günü",
+      "chartLearning": "{metric}, şu anda {value}, öğreniyor, henüz normal aralık yok",
+      "chartOverThreshold": "{metric}, şu anda {value}, {threshold} eşiğinin üzerinde",
+      "chartUnderThreshold": "{metric}, şu anda {value}, {threshold} eşiğinin altında",
+      "chartAbove": "{metric}, şu anda {value}, normal aralığın üzerinde",
+      "chartBelow": "{metric}, şu anda {value}, normal aralığın altında",
+      "chartWithin": "{metric}, şimdi {value}, normal aralıkta",
+      "tipNormal": "Normal {low} – {high}",
+      "openTraces": "İzler",
+      "openCatalog": "Hizmet Kataloğu",
+      "rangeLabel": "Zaman aralığı",
+      "logPatternsValue": "{known} bilinen · bugün {fresh} yeni",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "İzlenmiyor",
+      "signalsWatched": "İzlenen sinyaller",
+      "chipAria": "{signal}: {state}",
+      "deltaUp": "Aralığın başlangıcından bu yana {change} artış",
+      "deltaDown": "Aralığın başlangıcından bu yana {change} azalış",
+      "deltaFlat": "Aralığın başlangıcından bu yana değişiklik yok",
+      "badgeLearning": "Öğreniliyor {days}/{total}g",
+      "badgeAnomaly": "Anomali · öğrenildi",
+      "badgeThreshold": "Eşik > {threshold}",
+      "now": "Şimdi",
+      "bandLearning": "Temel değer öğreniliyor · {total} günün {days}. günü · normal aralık {day} tarihinde hazır",
+      "metric": {
+        "requests": "İstekler",
+        "errors": "Hatalar",
+        "latencyP95": "Gecikme p95",
+        "cpu": "CPU",
+        "pool": "Kullanımdaki havuz",
+        "memory": "Bellek",
+        "queries": "Sorgular",
+        "queryLatency": "Sorgu gecikmesi p95",
+        "connections": "Kullanımdaki bağlantılar",
+        "ops": "İşlemler",
+        "rejections": "Reddedilen bağlantılar",
+        "latency": "Gecikme",
+        "messages": "Mesajlar",
+        "failed": "Başarısız (sahipsiz mesajlar)",
+        "lag": "Tüketici gecikmesi",
+        "depth": "Kuyruk derinliği"
+      }
+    },
+    "activity": {
+      "allLoops": "Tüm döngüler",
+      "allStatuses": "Tüm durumlar",
+      "ledgerHint": "AutoObserve'un önerdiği veya yaptığı her değişiklik burada kaydedilir.",
+      "userBuilt": "Kullanıcı tarafından oluşturulan uyarı",
+      "confidence": "Güven: {value}",
+      "evidence": "Kanıt:",
+      "before": "Önce",
+      "after": "Sonra",
+      "neverAutoRetire": "Bir uyarının kullanımdan kaldırılması asla otomatik değildir.",
+      "neverSilent": "Kullanıcı tarafından oluşturulan uyarılar asla sessizce değiştirilmez.",
+      "undo": "Geri al",
+      "approve": "Onayla",
+      "edit": "Düzenle",
+      "reject": "Reddet",
+      "saveApprove": "Kaydet ve onayla",
+      "undoneNote": "Tarafınızdan geri alındı — önceki durum anlık görüntüden geri yüklendi",
+      "undoneToast": "Geri alındı. Bu demonun kayıt defterinde geri alındı olarak işaretlendi.",
+      "approvedToast": "Onaylandı. Bu demonun kayıt defterinde onaylandı olarak işaretlendi.",
+      "rejectedNote": "Tarafınızdan reddedildi",
+      "rejectedToast": "Reddedildi. Bu eylem sınıfına kaydedildi.",
+      "emptyTitle": "Kayıt yok",
+      "emptyDescription": "Kayıt defterinde bu filtrelerle eşleşen bir şey yok.",
+      "reviewWindow": "{window} boyunca incelemede — kontrolleri geçerse otomatik olarak korunur, başarısız olursa geri alınır. Önceki yapılandırma sessizce değerlendirilmeye devam eder, böylece bu değişikliğin gizleyeceği her şey yine de görünür. Geri al, önceki durumu hemen geri yükler.",
+      "approvedNote": "{time} tarihinde tarafınızdan onaylandı.",
+      "applyingNote": "{time} tarihinde tarafınızdan onaylandı; şimdi uygulanıyor.",
+      "appliedNote": "{time} tarihinde tarafınızdan onaylandı ve uygulandı.",
+      "declinedNote": "Tarafınızdan reddedildi.",
+      "needsApproval": "Onayınızı gerektirir",
+      "awaiting": "Bekliyor",
+      "auto": "Otomatik",
+      "outcomeFilter": "Sonuca göre filtrele",
+      "loopFilter": "Döngüye göre filtrele",
+      "columns": {
+        "time": "Zaman",
+        "loop": "Döngü",
+        "action": "Eylem",
+        "target": "Hedef",
+        "change": "Değişiklik",
+        "confidence": "Güven",
+        "decision": "Karar",
+        "outcome": "Sonuç",
+        "actions": "Eylemler"
+      },
+      "showDetails": "{target} üzerindeki {action} için ayrıntıları göster",
+      "hideDetails": "{target} üzerindeki {action} için ayrıntıları gizle",
+      "approveFor": "{target} üzerindeki {action} eylemini onayla",
+      "rejectFor": "{target} üzerindeki {action} eylemini reddet",
+      "editFor": "{target} üzerindeki {action} eylemini düzenle",
+      "undoFor": "{target} üzerindeki {action} eylemini geri al",
+      "openIncident": "{id} olayını aç",
+      "confidenceHint": "{value} — henüz kalibre edilmiş puan yok",
+      "diff": "Önerilen değişiklik, kaldırılan ve eklenen satırlar",
+      "daysLeft": "{count} gün kaldı | {count} gün kaldı",
+      "reviewProgress": "İnceleme süresi doldu",
+      "entryId": "Kayıt",
+      "logged": "Kaydedildi"
+    },
+    "policy": {
+      "gateHint": "Mevcut uyarılara yönelik değişiklikler arasında yalnızca yinelenenleri kaldırma kendi başına uygulanır; önceki durumun bir anlık görüntüsü ve bir inceleme süresiyle birlikte: kontrolleri geçerse korunur, başarısız olursa geri alınır. Diğer her şey tek tıklamalı onay bekler.",
+      "off": "Kapalı",
+      "suggest": "Öner",
+      "auto": "Otomatik",
+      "phase2Title": "Eylem — iyileştirme",
+      "phase2Hint": "Üretim düzeltmeleri. Her sınıf, seviyesini ölçülen geçmiş performansından kazanır ve asla bu seviyenin üzerinde hareket etmez.",
+      "investigation": "İnceleme",
+      "outcomesTitle": "Sonuçlar",
+      "outcomesBody": "AutoObserve her eylemin ne yaptığını ölçer: hata oranı düzeldi mi, nöbet bildirimi kesildi mi, geri alındı mı. Sürekli iyi sonuç veren bir sınıf, tek seferde bir sınıf olmak üzere daha fazla özerklik kazanır; bir başarısızlık ona karşı sayılır ve sürekli ihtiyaç duyulan bir düzeltme otomatikleştirilmek yerine hata olarak bildirilir.",
+      "outcomesExample": "ScaleQueueWorkers, 7 onaylı ölçeklendirme işe yaradıktan sonra Otomatik'e geçti. 2 Ekim'deki tek başarısızlığı bir ön kontrol ekledi ve ikinci bir başarısızlık onu tekrar Öner'e taşır. AbortRollout onayınızı bekliyor; RollbackDeploy bir geçmiş performansa sahip olana kadar Kapalı kalır.",
+      "triage": {
+        "parallel": "Paralel",
+        "gate": "Kapı",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "Hemen çağrı gönderir ve eşzamanlı olarak araştırır; kök neden aynı ileti dizisinde gelir. P1 için Gate kullanılamaz.",
+        "gateDesc": "Araştırma tamamlanana kadar çağrıyı en fazla 2 dakika bekletir. Hata durumunda açık davranır: triyaj zaman aşımına uğrar veya başarısız olursa yine de çağrı gönderir; araştırmanın hâlâ sürdüğünü veya başarısız olduğunu söyler ve kök neden aynı ileti dizisinde gelir."
+      },
+      "classes": {
+        "EnableDeduplication": "Dakikalar içinde tekrarlayan bir uyarı için tekilleştirmeyi aç.",
+        "CreateDetector": "Bir hizmetin istekleri, hataları veya gecikmesi üzerinde anomali dedektörü oluştur.",
+        "RaiseThreshold": "Sağlıklı günlerde tetiklenen bir eşiği yükselt.",
+        "LengthenEvaluationWindow": "Sürekli açılıp kapanan bir uyarının penceresini uzat.",
+        "FixAlertQuery": "Yanlış şeyi ölçen veya hiçbir zaman eşleşemeyen bir uyarı sorgusunu düzelt.",
+        "AttachDestination": "Tetiklenip hiçbir yere ulaşmayan bir dedektöre hedef bağla.",
+        "AddLibraryAlert": "Koşulunun eşleştiği kitaplıktan zamanlanmış bir uyarı ekle.",
+        "MoveToIncidentDelivery": "Kullanıcı tarafından oluşturulan bir uyarıyı kendi rotası yerine olayı üzerinden ilet.",
+        "ReviewForDeletion": "Kimsenin işlem yapmadığı bir uyarının kaldırılmasını öner.",
+        "RollbackDeploy": "Soruna neden olan dağıtımı geri al.",
+        "ScaleService": "Doygun bir hizmeti yatay ölçeklendir.",
+        "RestartPod": "Replikaları sağlıklıyken hizmet vermeyi durduran bir pod'u yeniden başlat; tekrarında bunun yerine bir hata kaydı açılır.",
+        "ToggleFeatureFlag": "Bir sorunun arkasındaki özellik bayrağını kapat.",
+        "RunRunbookStep": "Hizmetin runbook'undan bir adım çalıştır.",
+        "LowerThreshold": "Bir olaydan önce uyarmak için çok geç tetiklenen bir eşiği düşür.",
+        "RevertConfigChange": "Bir sorunun başlamasına neden olan son ayar değişikliğini, o değişiklik olmadan replikalar sağlıklıysa geri al.",
+        "EvictLeakedConnections": "Bir hizmetin havuzdan alıp hiç geri vermediği bağlantıları (sızıntı algılama tarafından bulunur) kapat; devam eden sorgulara dokunma. Her biri sızıntının hata kaydıyla ilişkilendirilir.",
+        "AbortRollout": "Yalnızca yeni sürümün pod'ları dağıtım ortasında başarısız olduğunda trafiği önceki sürüme geri gönder. Tek tıkla kaldığı yerden sürdürülebilir.",
+        "ScaleQueueWorkers": "Birikmiş bir kuyruğa üst sınıra kadar worker ekle; boşaltma hızı iyileşmezse kendi kendine geri ölçeklendirir."
+      },
+      "triageHint": "Önem derecesine göre L0 triyajı. 1. aşamada sabittir.",
+      "channels": "Kanallar",
+      "channelInbox": "Ürün içi gelen kutusu",
+      "channelEmailAdmins": "Kuruluş yöneticilerine e-posta",
+      "channelDefault": "Her kuruluş için varsayılan. Her zaman açık.",
+      "alwaysOn": "Her zaman açık",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "Bağlandı. İsteğe bağlı; gelen kutusu ve e-posta onsuz çalışır.",
+      "connected": "Bağlandı",
+      "defaultsNote": "1. aşama sabit ürün varsayılanlarıyla gelir. Kuruluş bazlı geçersiz kılmalar daha sonra gelir.",
+      "groupCoverage": "Kapsam — dedektörleri otomatik oluşturur",
+      "groupCoverageHint": "Her yeni hizmet ortaya çıkar çıkmaz anomali dedektörlerini ve eşleşen kitaplık uyarılarını alır; öğrenirken temel güvenlik kontrolleri uygulanır. Her oluşturma kaydedilir, geri alınabilir ve bir inceleme penceresinden geçer.",
+      "groupCalibration": "Kalibrasyon — mevcut uyarılarda yapılan değişiklikler",
+      "channelEmail": "E-posta {address}",
+      "paging": "Çağrı",
+      "pagingHint": "Önem derecesi, bir sorunun insanlara nasıl ulaşacağını belirler.",
+      "routing": {
+        "p1p2": "P1 ve P2",
+        "p1p2Desc": "Müşterilere zarar verir. Nöbetteki kişiyi her saatte çağırır.",
+        "page": "Çağrı",
+        "p3": "P3",
+        "p3Desc": "Hazır olur olmaz gönderilen bir Slack mesajı. Hiç kimseyi çağırmaz.",
+        "message": "Mesaj",
+        "p4": "P4",
+        "p4Desc": "Cuma özetine girer.",
+        "summary": "Cuma özeti"
+      },
+      "nav": {
+        "coverage": "Kapsam",
+        "alerts": "Uyarı değişiklikleri",
+        "fixes": "Düzeltmeler",
+        "investigation": "İnceleme ve çağrı",
+        "channels": "Kanallar"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} bağlı"
+      }
+    },
+    "notInDemo": "Bu demoda kullanılamaz",
+    "confidence": {
+      "high": "Yüksek",
+      "medium": "Orta",
+      "low": "Düşük",
+      "uncalibrated": "henüz kalibre edilmiş puan yok"
+    },
+    "analysis": {
+      "verdict": "Karar",
+      "unconfirmed": "Henüz doğrulanmadı",
+      "lasted": "{count} dk sürdü",
+      "soFar": "şu ana kadar {count} dk",
+      "checked": "Neleri kontrol ettim",
+      "verdicts": {
+        "confirmed": "Doğrulandı",
+        "ruled_out": "Elendi",
+        "open": "Hâlâ açık"
+      },
+      "comparison": "Sağlıklı ve etkilenen",
+      "kinds": {
+        "affected": "Etkilenen",
+        "healthy": "Sağlıklı",
+        "limit": "Sınır"
+      },
+      "trail": "Kanıt izi",
+      "seeInUnfold": "Nasıl gelişti bölümünde gör",
+      "nextStep": "Sonraki adım",
+      "fullReport": "Tam rapor",
+      "fullReportHint": "Yukarıdakilerin tümü tek bir dokümanda, kopyalamaya veya indirmeye hazır"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "Demo",
+    "scenarioLabel": "Demo senaryosu",
+    "scenarios": {
+      "demo": "Demo haftası",
+      "allClear": "Her şey yolunda",
+      "incident": "Aktif olay",
+      "cantSee": "Görünmüyor",
+      "noBaseline": "Temel değer yok"
+    },
+    "nav": {
+      "history": "Geçmiş",
+      "settings": "Ayarlar",
+      "howItWorks": "Nasıl çalışır",
+      "searchLabel": "Sorun ara",
+      "searchPlaceholder": "Sorun ara"
+    },
+    "recent": {
+      "ranges": {
+        "day": "Son 24 saat",
+        "week": "Son 7 gün",
+        "month": "Son 30 gün"
+      },
+      "within": {
+        "day": "son 24 saat içinde",
+        "week": "son 7 gün içinde",
+        "month": "son 30 gün içinde"
+      },
+      "groups": {
+        "thisWeek": "Bu hafta",
+        "lastWeek": "Geçen hafta",
+        "weeksAgo": "{count} hafta önce"
+      },
+      "all": "Tümü",
+      "none": "{priority} sorun {within} yok.",
+      "allIssues": "Tüm sorunlar",
+      "priorityLabel": "Öncelik",
+      "showing": "{count} sorun gösteriliyor | {count} sorun gösteriliyor"
+    },
+    "noProblems": "{within} sorun yok. Gece gündüz {count} hizmeti kontrol ettim. | {within} sorun yok. Gece gündüz {count} hizmeti kontrol ettim.",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "{count} tane daha göster",
+    "showFewer": "Daha az göster",
+    "days": {
+      "today": "Bugün",
+      "monday": "Pazartesi",
+      "tuesday": "Salı",
+      "wednesday": "Çarşamba",
+      "thursday": "Perşembe",
+      "friday": "Cuma",
+      "jul18": "18 Temmuz",
+      "jul30": "30 Temmuz",
+      "aug13": "13 Ağustos",
+      "aug26": "26 Ağustos",
+      "sep4": "4 Eylül",
+      "sep12": "12 Eylül",
+      "sep24": "24 Eylül",
+      "sep30": "30 Eylül",
+      "oct1": "1 Ekim",
+      "oct2": "2 Ekim",
+      "sep23": "23 Eylül"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db yaklaşık 3 gün içinde disk alanını tüketecek",
+        "summary": "Perşembe günkü orders sürümü denetim günlüğünü artırdığından beri diski günde yaklaşık 18 GB doluyor, bu yüzden Çarşamba sabahı civarında dolar. Dolduğunda checkout, orders ve refunds başarısız olmaya başlayacak. Henüz bir şey bozulmadı, bu yüzden çağrı göndermek yerine ekibinize önceden haber verdim.",
+        "notify1": "orders-db yaklaşık 3 gün içinde, Çarşamba 11:00 civarında disk alanını tüketecek.",
+        "notify2": "Neden: Perşembe günü orders 3.8.0 yayına girdiğinden beri denetim günlüğü günde yaklaşık 18 GB yazıyor. Öncesinde disk günde yaklaşık 6 GB büyüyordu.",
+        "notify3": "Çarşamba'dan önce denetim günlüğünü tekrar kısın veya disk alanı ekleyin. Dolduğunda checkout, orders ve refunds başarısız olacak. Henüz bir şey bozulmadı, bu yüzden bu bir çağrı değil, önceden bir uyarı.",
+        "chartCaption": "disk · tam dolu ~Çar 11:00",
+        "chartLabel": "Disk kullanımı 14 günde 500 GB'ın 334'ünden 445'ine yükseldi, Perşembe'den beri daha hızlı ve Çarşamba 11:00 civarında tamamen dolacağı öngörülüyor."
+      },
+      "search": {
+        "title": "Arama yavaş ve search-2 sürekli çöküyor",
+        "titleFixed": "search-2 sürekli çökerken arama yavaştı",
+        "summary": "10:27'den beri aramaların yaklaşık 5'te 1'i 3 saniyeden uzun sürüyor. search-2'de 10:16'da değişen bir ayar belleğinin tükenmesine neden oluyor. Nöbetçiye çağrı gönderdim ve hâlâ devam ediyor.",
+        "notify1": "Arama yavaş: 10:27'den beri aramaların yaklaşık 5'te 1'i 3 saniyeden uzun sürüyor.",
+        "notify2": "Neden: search-2'de 10:16'da değişen bir ayar belleğini dolduruyor. 10:20'den beri yaklaşık 10 kez çöktü. Diğer 4 düğümde bu değişiklik yok ve iyi durumdalar.",
+        "notify3": "Eski ayarı geri koymak sorunu çözmelidir ve geri alabilirim. \"revert\" yanıtını verin, yapayım. Değişikliği yapan kişi nedenini kontrol etmeli.",
+        "summaryFixed": "10:27'de başladı, çünkü search-2'de değişen bir ayar belleğini doldurdu. Eski ayarı geri koymayı onayladınız, ben de yaptım ve aramalar normale döndü.",
+        "summaryFixing": "10:27'de başladı, çünkü search-2'de değişen bir ayar belleğini dolduruyor. Eski ayarı geri koymayı onayladınız, şimdi onu yapıyorum.",
+        "chartCaption": "p95 gecikmesi · 3.4 sn zirve",
+        "chartLabel": "p95 gecikmesi 10:27'de 0.38 sn'den 3.4 sn'ye yükseldi ve hâlâ yüksek",
+        "chartLabelFixed": "p95 gecikmesi 10:27'de 0.38 sn'den 3.4 sn'ye yükseldi ve ayar geri konulunca normale döndü"
+      },
+      "checkout": {
+        "title": "Bir dağıtımdan sonra 12 ödemeden 1'i başarısız oldu",
+        "summary": "payments-api 2.3.1, ödeme veritabanından izin verdiğinden daha fazla bağlantı istedi. Hatalar başladıktan 18 dakika sonra geri alma işlemi sorunu çözdü.",
+        "notify1": "Checkout 14:02'den beri yaklaşık 12 ödemeden 1'inde başarısız oluyor.",
+        "notify2": "Olası neden: payments-api 2.3.1 14:01'de yayına girdi ve sunucu başına bağlantı havuzunu 20'den 50'ye çıkardı. 6 sunucu × 50, ödeme veritabanının izin verdiği 200'den fazladır.",
+        "notify3": "2.3.0'a geri dönmek en hızlı çözümdür.",
+        "chartCaption": "başarısız ödemeler · 12'de 1 zirve",
+        "chartLabel": "Başarısız ödemeler 14:02'de %0,1'den 12'de 1'e sıçradı ve geri alma işleminden sonra 18 dakika içinde normale döndü"
+      },
+      "pool": {
+        "title": "Checkout'un veritabanı bağlantıları tükendi",
+        "summary": "Sızan bağlantılar boştaki tüm bağlantıları tüketti ve ödemeler zaman aşımına uğramaya başladı. Bunları temizlemeyi onayladınız, ben de yaptım. Ödemeler 2 dakika sonra düzeldi.",
+        "notify1": "Checkout'un veritabanı bağlantıları tükendi ve 11:18'den beri yaklaşık 9 ödemeden 1'i zaman aşımına uğruyor.",
+        "notify2": "Neden: 50 bağlantıdan 48'i, kendilerini hiç geri bırakmayan iade dışa aktarımları tarafından tutuluyor. Bu, CHK-482 sızıntısı; iki hafta içinde üçüncü kez.",
+        "notify3": "Yalnızca sızan bağlantıları kapatmak sorunu çözmeli; sürmekte olan ödemelere dokunulmaz. \"yes\" yazın, ben yaparım.",
+        "chartCaption": "zaman aşımları · zirvede 9'da 1",
+        "chartLabel": "Ödeme zaman aşımları 11:18'de yaklaşık 9'da 1'e yükseldi ve 11:21'deki düzeltmeden 2 dakika sonra düzeldi"
+      },
+      "email": {
+        "title": "Sipariş e-postaları 9 dakikaya kadar gecikti",
+        "summary": "Gece boyunca tüm posta çalışanları aynı anda değiştirildi ve kuyruk yaklaşık 20 dakika içinde kendi kendine yetişti. Önemsizdi, bu yüzden Cuma özetine girdi.",
+        "chartCaption": "e-posta gecikmesi · zirvede 9 dk",
+        "chartLabel": "E-posta gecikmesi 03:15'ten itibaren 9 dakikaya yükseldi ve 03:36'da kendi kendine düzeldi"
+      },
+      "recs": {
+        "title": "Öneriler 15 dakika boyunca yavaşladı",
+        "summary": "Saniyenin çeyreğinden neredeyse bir saniyeye çıktılar. Gece yapılan önbellek yeniden oluşturma işlemi öğleden sonra elle başlatılmıştı ve kendi kendine tamamlandı. Bunu Cuma özeti için beklettim.",
+        "chartCaption": "p95 gecikme · zirvede 0,94 sn",
+        "chartLabel": "p95 gecikme 16:40'ta 0,26 sn'den 0,94 sn'ye yükseldi ve 15 dakika sonra kendi kendine düzeldi"
+      },
+      "login": {
+        "title": "Oturum açma yaklaşık 25 dakika boyunca yavaştı",
+        "summary": "8 kişiden 1'i 5 saniyeden fazla bekledi. Bir trafik artışının ardından oturum önbelleğinin alanı tükendi ve bazı kişilerin oturumunu kapattı. Ekibiniz alan ekledi ve sorun düzeldi.",
+        "notify1": "Oturum açma yavaş: 10:12'den beri yaklaşık 8 kişiden 1'i 5 saniyeden fazla bekliyor.",
+        "notify2": "Neden: 10:05'te trafik iki katına çıktıktan sonra oturum önbelleği doldu.",
+        "notify3": "Önbelleğe alan eklemek sorunu çözmeli.",
+        "chartCaption": "p95 oturum açma · zirvede 5,8 sn",
+        "chartLabel": "p95 oturum açma süresi 10:12'de 0,6 sn'den 5,8 sn'ye yükseldi ve 10:31'de önbellek alanı eklendikten sonra düzeldi"
+      },
+      "queue": {
+        "title": "Siparişler kuyrukta birikti",
+        "summary": "En kötü anda yaklaşık 4.000'i bekliyordu. İzin verdiğiniz gibi çalışan ekledim ama işe yaramadı, ben de geri aldım ve nöbetçiye çağrı gönderdim. Gerçek neden, bir geçişin bozuk bıraktığı bir veritabanı indeksiydi; ekibiniz başlamasından 40 dakika sonra düzeltti.",
+        "notify1": "Siparişler birikiyor: 21:30'dan beri yaklaşık 4.000'i bekliyor.",
+        "notify2": "İzin verdiğiniz gibi 21:33'te çalışan ekledim ama işe yaramadı, bu yüzden geri aldım.",
+        "notify3": "Sipariş sorguları 21:20'deki veritabanı geçişinden beri yaklaşık 40 kat daha yavaş. Önce orders_by_status indeksini kontrol edin.",
+        "chartCaption": "birikim · zirvede 4.120",
+        "chartLabel": "Bekleyen siparişler 21:30'dan itibaren 4.120'ye çıktı, çalışan eklendikten sonra da artmaya devam etti ve indeks 21:52'de yeniden oluşturulunca eridi"
+      },
+      "uploads": {
+        "title": "Görsel yüklemeleri 40 kişiden 1'i için başarısız oldu",
+        "summary": "Bir sunucu yenisini yükleyemeden bir sertifikanın süresi dolduğu için 10 dakika sürdü. Kendi kendine düzeldi, ben de bunu Cuma özeti için beklettim.",
+        "chartCaption": "başarısız yüklemeler · zirvede 40'ta 1",
+        "chartLabel": "Başarısız yüklemeler 07:05'te yaklaşık 40'ta 1'e yükseldi ve 10 dakika sonra kendi kendine düzeldi"
+      },
+      "push": {
+        "title": "Anlık bildirimler 2 dakika gecikmeli geldi",
+        "summary": "Bunları ileten sağlayıcı yavaş olduğu için yarım saat sürdü. Önemsizdi, bu yüzden Cuma özetini bekledi.",
+        "chartCaption": "teslimat gecikmesi · zirvede 2 dk",
+        "chartLabel": "Teslimat gecikmesi 13:50'de 4 sn'den yaklaşık 2 dakikaya yükseldi ve 30 dakika sonra kendi kendine düzeldi"
+      },
+      "checkoutNow": {
+        "title": "Checkout 6 ödemeden 1'inde başarısız oluyor",
+        "titleFixed": "Checkout 6 ödemeden 1'inde başarısız oldu",
+        "summary": "10:43'te başladı ve nedenini hâlâ araştırıyorum. Şu ana kadar 10:41'de çıkan 2.4.0 sürümüyle örtüşüyor ve nöbetçiye çağrı gönderdim.",
+        "notify1": "Checkout 10:43'ten beri yaklaşık 6 ödemeden 1'inde başarısız oluyor.",
+        "notify2": "Nedenini hâlâ araştırıyorum. Şu ana kadar 10:41'de çıkan checkout 2.4.0 ile örtüşüyor.",
+        "notify3": "Yalnızca 2.4.0 üzerindeki sunucular başarısız oluyor. \"stop\" yazın, trafiği eski sürüme geri göndereyim; eski sunucularda bunun için yer var. payments-db'yi doğrudan göremiyorum, bu yüzden onu göz ardı edemem.",
+        "summaryFixing": "2.4.0 sürümü çıktıktan hemen sonra, 10:43'te başladı. Dağıtımı durdurmayı onayladınız, ben de şimdi trafiği eski sürüme geri gönderiyorum.",
+        "summaryFixed": "2.4.0 sürümü çıktıktan sonra, 10:43'te başladı. Dağıtımı durdurmayı onayladınız ve trafik eski sürüme dönünce hatalar durdu. 2.4.0'ın neden başarısız olduğunu hâlâ ekibinizin bulması gerekiyor.",
+        "chartCaption": "başarısız ödemeler · zirvede 6'da 1",
+        "chartLabel": "Başarısız ödemeler 10:43'te %0,1'den yaklaşık 6'da 1'e sıçradı ve hâlâ başarısız oluyor",
+        "chartLabelFixed": "Başarısız ödemeler 10:43'te %0,1'den yaklaşık 6'da 1'e sıçradı ve dağıtım durdurulunca normale döndü"
+      },
+      "gateway": {
+        "title": "API 30 istekten 1'ini reddetti",
+        "summary": "Bir yapılandırma değişikliğinden sonra başladı. Ekibiniz değişikliği geri aldı ve başladıktan 13 dakika sonra her şey normale döndü.",
+        "notify1": "API, 15:22'den beri yaklaşık 30 istekten 1'ini reddediyor.",
+        "notify2": "Olası neden: 15:20'deki bir yapılandırma değişikliği, oturum açma belirteçlerinin geçerlilik süresini kısalttı.",
+        "notify3": "Bu değişikliği geri almak sorunu çözmelidir.",
+        "chartCaption": "reddedilen · zirvede 30'da 1",
+        "chartLabel": "Reddedilen istekler 15:22'de 30'da 1'e yükseldi ve yapılandırma değişikliği 15:34'te geri alındığında normale döndü."
+      },
+      "poolSep": {
+        "title": "Checkout'ta veritabanı bağlantıları tükendi",
+        "summary": "Sızan bağlantılar tüm boş bağlantıları tüketti ve ödemeler zaman aşımına uğramaya başladı. Sızıntının izini iade dışa aktarımlarına kadar sürdüm ve sızan bağlantıların temizlenmesini onayladınız. Ödemeler 2 dakika sonra toparlandı.",
+        "notify1": "Checkout'ta veritabanı bağlantıları tükendi ve 15:42'den beri yaklaşık 9 ödemeden 1'i zaman aşımına uğruyor.",
+        "notify2": "Neden: 50 bağlantıdan 47'si, onları hiç geri bırakmayan iade dışa aktarımları tarafından tutuluyor. İade dışa aktarma kodunda bir sızıntı gibi görünüyor.",
+        "notify3": "Yalnızca sızan bağlantıları kapatmak sorunu çözmelidir; devam eden ödemelere dokunulmaz. \"evet\" yazın, ben yapayım.",
+        "chartCaption": "zaman aşımları · zirvede 9'da 1",
+        "chartLabel": "Ödeme zaman aşımları 15:42'de yaklaşık 9'da 1'e yükseldi ve 15:45'teki düzeltmeden 2 dakika sonra toparlandı."
+      },
+      "poolOct": {
+        "title": "Checkout'ta veritabanı bağlantıları yine tükendi",
+        "summary": "Aynı iade dışa aktarma sızıntısıydı (CHK-482). Sızan bağlantıların temizlenmesini onayladınız ve ödemeler 2 dakika sonra toparlandı.",
+        "notify1": "Checkout'ta veritabanı bağlantıları tükendi ve 10:05'ten beri yaklaşık 9 ödemeden 1'i zaman aşımına uğruyor.",
+        "notify2": "Neden: 50 bağlantıdan 46'sı iade dışa aktarımları tarafından tutuluyor. Yine CHK-482 sızıntısı, 8 günde ikinci kez.",
+        "notify3": "Yalnızca sızan bağlantıları kapatmak sorunu çözmelidir; devam eden ödemelere dokunulmaz. \"evet\" yazın, ben yapayım.",
+        "chartCaption": "zaman aşımları · zirvede 9'da 1",
+        "chartLabel": "Ödeme zaman aşımları 10:05'te yaklaşık 9'da 1'e yükseldi ve 10:08'deki düzeltmeden 2 dakika sonra toparlandı."
+      },
+      "lagSep": {
+        "title": "Yeni ürünlerin aramada görünmesi 40 dakikaya kadar sürdü",
+        "summary": "1.12.0 sürümü parti başına ayrılan süreyi kısalttıktan sonra search-indexer katalog güncellemelerinde geri kaldı. Ekibiniz sürümü geri aldı ve başladıktan 40 dakika sonra yetişti.",
+        "notify1": "Yeni ve değişen ürünler aramada görünmüyor: search-indexer 14:06'dan beri yaklaşık 48.000 katalog güncellemesi geride.",
+        "notify2": "Neden: search-indexer 1.12.0 13:58'de devreye girdi ve Kafka yoklama aralığını 30 sn'ye indirdi. Büyük partiler yaklaşık 45 sn sürüyor, bu yüzden tüketici grubundan sürekli çıkarılıyor.",
+        "notify3": "1.11.4'e geri dönmek yetişmesini sağlamalı. Aramanın kendisi hâlâ çalışıyor; yalnızca daha eski ürünleri gösteriyor.",
+        "chartCaption": "tüketici gecikmesi · zirvede 48.000",
+        "chartLabel": "Tüketici gecikmesi 14:06'dan itibaren yaklaşık 200'den 48.000 mesaja yükseldi ve 14:39'daki geri alma işleminden sonra azaldı."
+      },
+      "poolAug": {
+        "title": "İade dışa aktarımı sırasında Checkout'ta veritabanı bağlantıları tükendi",
+        "summary": "Gece çalışan iade dışa aktarımı Checkout'un veritabanı bağlantılarının neredeyse tamamını tuttu ve yaklaşık 12 ödemeden 1'i zaman aşımına uğradı. Dışa aktarım bittiğinde, başlangıcından 13 dakika sonra ortadan kalktı.",
+        "notify1": "Checkout'ta veritabanı bağlantıları tükendi ve 02:04'ten beri yaklaşık 12 ödemeden 1'i zaman aşımına uğruyor.",
+        "notify2": "Neden: 50 bağlantıdan 44'ü, ay sonu indirimi sonrasında normal boyutunun yaklaşık 3 katı olan gece iade dışa aktarımı tarafından tutuluyor.",
+        "notify3": "Dışa aktarım bittiğinde sorun ortadan kalkmalı. Kalkmazsa, dışa aktarımı durdurmak bağlantıları serbest bırakır.",
+        "chartCaption": "zaman aşımları · zirvede 12'de 1",
+        "chartLabel": "Ödeme zaman aşımları 02:04'te yaklaşık 12'de 1'e yükseldi ve dışa aktarım 02:17'de bittiğinde kendiliğinden düzeldi."
+      },
+      "throttleAug": {
+        "title": "Dolandırıcılık kontrolleri 35 dakika boyunca yavaştı",
+        "summary": "Bir toplu iş aynı sunuculara denk geldi ve boştaki CPU'larını aldı, bu yüzden dolandırıcılık kontrolleri 1,4 saniyeye kadar sürdü. Checkout yine de çalışıyordu, sadece daha yavaştı ve iş bittiğinde düzeldi; ben de bunu Cuma'nın özeti için beklettim.",
+        "chartCaption": "p95 dolandırıcılık kontrolü · zirvede 1,4 sn",
+        "chartLabel": "p95 dolandırıcılık kontrol süresi 11:20'de 0,18 sn'den 1,4 sn'ye yükseldi ve toplu iş 11:55'te bittiğinde kendiliğinden düzeldi."
+      },
+      "tlsJul": {
+        "title": "Faturalar 43 dakika boyunca gönderilemedi",
+        "summary": "invoice-service'in billing-api için kullandığı sertifikanın süresi doldu, bu yüzden hiçbir fatura gönderilemedi. Ekibiniz sertifikayı yeniledi ve kuyruktaki tüm faturalar gönderildi.",
+        "notify1": "Hiçbir fatura gönderilmiyor: 09:01'den beri invoice-service'ten yapılan her gönderim başarısız oluyor.",
+        "notify2": "Neden: invoice-service'in billing-api için kullandığı istemci sertifikasının süresi 09:00'da doldu ve billing-api ondan gelen her bağlantıyı reddediyor.",
+        "notify3": "Sertifikayı yenilemek sorunu çözmeli. Faturalar kaybolmuyor, kuyruğa giriyor.",
+        "chartCaption": "başarısız gönderimler · hepsi",
+        "chartLabel": "Başarısız fatura gönderimleri 09:01'de %0,2'den %100'e fırladı ve sertifika 09:41'de yenilendikten sonra normale döndü."
+      },
+      "dnsJul": {
+        "title": "Sepet fiyatları 4 kişiden 1'inde kayboldu",
+        "summary": "Bir DNS değişikliği, kümedeki DNS sunucularının yarısının dahili adlara yanıt vermesini durdurdu, bu yüzden sepet currency'ye ulaşamadı. Ekibiniz değişikliği başladıktan 31 dakika sonra geri aldı.",
+        "notify1": "16:22'den beri yaklaşık 4 sepet yüklemesinden 1'inde fiyat görünmüyor.",
+        "notify2": "Neden: 16:20'deki bir DNS yapılandırma değişikliği, dahili bölgeyi kümedeki 4 DNS sunucusundan 2'sinden düşürdü, bu yüzden sepet bu sorgulamalarda currency.internal'ı bulamıyor.",
+        "notify3": "DNS değişikliğini geri almak sorunu çözmeli. Siparişler ödeme adımında hâlâ tamamlanıyor.",
+        "chartCaption": "eksik fiyatlar · zirvede 4'te 1",
+        "chartLabel": "Fiyatsız sepet yüklemeleri %0,1'den 16:22'de yaklaşık 4'te 1'e yükseldi ve DNS değişikliği 16:51'de geri alındığında normale döndü"
+      }
+    },
+    "drawer": {
+      "worked": "İşe yaradı",
+      "didntHelp": "İşe yaramadı",
+      "now": "Şimdi"
+    },
+    "needs": {
+      "more": "Daha fazla",
+      "less": "Daha az",
+      "canUndo": "Geri alabilirsiniz",
+      "undo": "Geri al",
+      "undone": "Geri alındı. Bu, yanıtınızı yeniden bekliyor.",
+      "shiftTo": "→",
+      "retune": {
+        "body": "{host} üzerindeki \"{alert}\" uyarısı bu ay {fired} kez tetiklendi ve kimsenin harekete geçmesi gerekmedi. Disk, gece temizliği sırasında yaklaşık %85'e çıkıyor ve sabaha kadar %70 civarına geri dönüyor. En yoğun gününde bile %90'dan dolması 3 günden fazla sürer. Bunu %{to} seviyesine yükseltmek istiyorum. Disk bir gün içinde dolacak gibi olursa sizi yine uyarırım.",
+        "yes": "Evet, değiştir",
+        "no": "Olduğu gibi bırak",
+        "doneYes": "Tamam. %{to} seviyesine yükselttim. Dolum uyarısı açık kalıyor.",
+        "doneNo": "Tamam, %{from} seviyesinde bırakıyorum.",
+        "headline": "ingest-3 üzerindeki 'disk 80%' uyarısı %90'a yükseltilsin mi?",
+        "why": "Bu ay 41 kez tetiklendi ve kimsenin harekete geçmesi gerekmedi.",
+        "cost": "Dolum uyarısı açık kalır"
+      },
+      "fixNow": {
+        "search": {
+          "body": "Arama yavaş çünkü search-2 düğümünde 10:16'da değiştirilen bir ayar belleğini dolduruyor, bu yüzden sürekli çöküyor. Diğer 4 düğüm hâlâ eski ayarda ve sorunsuz. Eski haline döndürebilir miyim? Bunu geri alabilirim.",
+          "yes": "Eski haline döndür",
+          "no": "Ben ilgilenirim",
+          "doneYes": "Tamam. Şimdi eski haline döndürüyorum.",
+          "doneNo": "Tamam, sende. İzlemeye devam ederim.",
+          "doneSettled": "Tamam. search-2 geri döndü ve aramalar normal.",
+          "headline": "search-2'nin önbellek ayarı %10'a geri döndürülsün mü?",
+          "why": "10:16'da yapılan bir değişiklik belleğini dolduruyor, bu yüzden sürekli çöküyor.",
+          "cost": "search-2'nin bir kez yeniden başlatılması"
+        },
+        "checkoutNow": {
+          "body": "checkout, ödemelerin yaklaşık 6'da 1'inde başarısız oluyor ve yalnızca 2.4.0 çalıştıran sunucular başarısız oluyor. Eski sürümdeki 6 sunucuda tüm trafiği karşılayacak kapasite var. Dağıtımı durdurup trafiği onlara geri yönlendirebilir miyim? 2.4.0, ekibinizin incelemesi için dağıtılmış halde kalır.",
+          "yes": "Dağıtımı durdur",
+          "no": "Ben ilgilenirim",
+          "doneYes": "Tamam. Dağıtımı şimdi durduruyorum.",
+          "doneNo": "Tamam, sende. İzlemeye devam ederim.",
+          "doneSettled": "Tamam. Ödemeler normale döndü.",
+          "headline": "checkout'un 2.4.0 dağıtımı durdurulsun mu?",
+          "why": "Yaklaşık 6 ödemeden 1'i başarısız oluyor, hepsi 2.4.0'da. Eski sürüm tüm trafiği karşılayabilir.",
+          "cost": "2.4.0 dağıtılmış halde kalır"
+        }
+      },
+      "fromNowOn": {
+        "body": "Artık {done} kez oldu: yeni bir sürüm, dağıtım sırasında yalnızca kendi sunucularının başarısız olmasına neden oldu. Her seferinde trafiğin eski sürüme geri yönlendirilmesini istedim ve hatalar 2 dakika içinde durdu. Bundan sonra bir dağıtım sırasında bunu kendi başıma yapabilir miyim? Yeni sürümü ekibiniz için yerinde bırakacağım ve onlara hemen haber vereceğim.",
+        "yes": "Evet, kendi başına",
+        "no": "Bana sormaya devam et",
+        "doneYes": "Tamam. Hatalı dağıtımları kendi başıma durduracağım ve her seferinde size haber vereceğim.",
+        "doneNo": "Tamam, önce size sormaya devam edeceğim.",
+        "headline": "Bundan sonra hatalı dağıtımları kendi başıma durdurayım mı?",
+        "why": "Evet dediğiniz 6 seferin hepsinde hatalar 2 dakika içinde durdu.",
+        "cost": "Yalnızca bir dağıtım sırasında"
+      },
+      "labels": {
+        "fixNow": "Şimdi düzelt",
+        "fromNowOn": "Bunu bana bırak",
+        "retune": "Daha sessiz uyarı"
+      },
+      "needsOk": "Onayınız gerekiyor"
+    },
+    "footer": {
+      "text": "Ben de kendimi kontrol ederim: çalışmayı bırakırsam, bunu size bildiririm.",
+      "seeAll": "İzlediğim her şeyi gör",
+      "seeChanges": "Değiştirdiğim her şeyi gör"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1 dakika önce | {count} dakika önce",
+        "stale": "1 dakikadır yeni veri yok ({since} itibarıyla) | {count} dakikadır yeni veri yok ({since} itibarıyla)"
+      },
+      "summaryWatching": "{total} hizmetinizden {watched} tanesini izliyorum.",
+      "summaryAll": "{total} hizmetinizin tamamını izliyorum.",
+      "summaryWithClauses": "{head} {clauses}.",
+      "clauseLearning": "{count} hâlâ öğreniyor | {count} hâlâ öğreniyor",
+      "clauseUnseen": "göremediğim bir tane var | göremediğim {count} tane var",
+      "legend": {
+        "watching": "Tamamen izleniyor",
+        "learning": "Öğreniyor",
+        "unseen": "Görülemiyor"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "{total} hizmetinizin tamamını izliyorum ve her biri için normalin neye benzediğini hâlâ öğreniyorum."
+    },
+    "coveragePage": {
+      "title": "İzlediğim her şey",
+      "back": "Geri"
+    },
+    "issuesPage": {
+      "title": "Tüm sorunlar",
+      "sentence": "{within} açtığım her sorun. Ne olduğunu ve bu konuda ne yaptığımı görmek için birini seçin.",
+      "back": "Geri",
+      "ranges": {
+        "week": "Son 7 gün",
+        "month": "Son 30 gün",
+        "quarter": "Son 90 gün"
+      },
+      "within": {
+        "week": "son 7 günde",
+        "month": "son 30 günde",
+        "quarter": "son 90 günde"
+      }
+    },
+    "activityPage": {
+      "title": "Değiştirdiklerim",
+      "stats": {
+        "window": "Son 7 gün",
+        "made": "Değişiklik | Değişiklik",
+        "worked": "İşe yaradı",
+        "review": "İncelemede",
+        "undone": "Geri alındı"
+      },
+      "filters": {
+        "all": "Tümü",
+        "fixes": "Düzeltmeler",
+        "watching": "İzleme",
+        "tuning": "Uyarı ince ayarı"
+      },
+      "status": {
+        "applying": "Şu anda uygulanıyor",
+        "worked": "İşe yaradı",
+        "done": "Tamamlandı",
+        "review": "İncelemede",
+        "reviewDays": "İncelemede · {count} gün kaldı | İncelemede · {count} gün kaldı",
+        "didntHelp": "İşe yaramadı",
+        "undone": "Geri alındı"
+      },
+      "actions": {
+        "undo": "Geri al",
+        "showDetails": "Ayrıntıları göster",
+        "hideDetails": "Ayrıntıları gizle"
+      },
+      "details": {
+        "name": "Değişiklik",
+        "target": "Üzerinde",
+        "confidence": "Güven",
+        "saw": "Gördüklerim",
+        "recurring": "Bu düzeltme aynı sızıntı ({bug}) için sürekli gerekiyor, bu yüzden düzeltilene kadar her zaman önce soracağım.",
+        "undoDecided": "Geri al, bunu eski haline döndürür ve sana tekrar sorarım."
+      },
+      "toast": {
+        "undone": "Geri alındı. Eskisi gibi oldu.",
+        "undoDecided": "Geri alındı. Sana tekrar soracağım."
+      },
+      "empty": {
+        "filter": "Şu anda burada hiçbir şey yok.",
+        "scenario": "Henüz hiçbir şeyi değiştirmedim. Bir değişiklik yaptığımda burada göreceksin."
+      },
+      "entries": {
+        "L-313": {
+          "done": "checkout'ın 2.4.0 sürüm dağıtımını durdurdum",
+          "why": "Yalnızca 2.4.0 üzerindeki 6 sunucu hata veriyor; eski sürümdeki 6 sunucu tüm trafiği kaldırabilir.",
+          "from": "12 pod'un 6'sı",
+          "to": "trafik yok",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "search-2'nin önbellek ayarını %10'a geri döndürdüm",
+          "why": "10:16'da %60'a çıktı ve search-2 o zamandan beri belleği tükeniyor.",
+          "from": "%60",
+          "to": "%10",
+          "on": "önbellek boyutu · search-2"
+        },
+        "L-309": {
+          "done": "ingest-3 üzerindeki 'disk %80' uyarısını %90'a yükselttim",
+          "why": "Bu ay 41 kez tetiklendi ve kimsenin müdahale etmesi gerekmedi. Doluluk uyarısı açık kalıyor.",
+          "from": "%80",
+          "to": "%90",
+          "on": "disk uyarısı · ingest-3"
+        },
+        "L-310": {
+          "done": "returns, exchanges ve gift-cards'ı izlemeye başladım",
+          "why": "Onları bu sabah buldum. 7 gün boyunca onlar için normalin ne olduğunu öğreniyorum.",
+          "from": "izlenmiyor",
+          "to": "izleniyor",
+          "on": "3 hizmet"
+        },
+        "L-314": {
+          "done": "Bu sabah bulduğum 6 hizmeti izlemeye başladım",
+          "why": "Bugün izlerinizde göründüler. 7 gün boyunca onlar için normalin ne olduğunu öğreniyorum.",
+          "from": "izlenmiyor",
+          "to": "izleniyor",
+          "on": "6 hizmet"
+        },
+        "L-311": {
+          "done": "Kötü sürüm dağıtımlarını kendi başıma durdurmak için onayını aldım",
+          "why": "60 gün içinde onayınla 6 tanesini durdurdum; her seferinde hatalar 2 dakika içinde normale döndü.",
+          "from": "önce sor",
+          "to": "kendi başıma",
+          "on": "sürüm dağıtımlarını durdurma"
+        },
+        "L-304": {
+          "done": "checkout'ın 48 sızmış veritabanı bağlantısını temizledim",
+          "why": "Ödemeler zaman aşımına uğruyordu. 2 dakika sonra normale döndüler.",
+          "from": "50'nin 50'si kullanımda",
+          "to": "2 kullanımda",
+          "on": "checkout havuzu"
+        },
+        "L-299": {
+          "done": "checkout'ın 46 sızmış veritabanı bağlantısını temizledim",
+          "why": "23 Eylül'dekiyle aynı sızıntı. Ödemeler 2 dakika sonra normale döndü.",
+          "from": "50'nin 50'si kullanımda",
+          "to": "4 kullanımda",
+          "on": "checkout havuzu"
+        },
+        "L-296": {
+          "done": "checkout'ın 47 sızmış veritabanı bağlantısını temizledim",
+          "why": "Yeni bir sızıntı, bu yüzden sonrasında checkout ekibine CHK-482 olarak kaydettim.",
+          "from": "50'nin 50'si kullanımda",
+          "to": "3 kullanımda",
+          "on": "checkout havuzu"
+        },
+        "L-301": {
+          "done": "billing-api, billing-worker ve invoice-service'i izlemeye başladım",
+          "why": "Onları izlerinizde buldum. Onlar için normalin ne olduğunu hâlâ öğreniyorum.",
+          "from": "izlenmiyor",
+          "to": "izleniyor",
+          "on": "3 hizmet"
+        },
+        "L-307": {
+          "done": "payments-api bağlantı uyarısını tüm sunucuları sayacak şekilde düzelttim",
+          "why": "Her sunucuyu ayrı ayrı kontrol ediyordu, bu yüzden Salı günkü kesintide hiç tetiklenmedi.",
+          "from": "her pod %95 üzeri",
+          "to": "tüm podlar %85 üzeri",
+          "on": "bağlantı uyarısı"
+        },
+        "L-302": {
+          "done": "3 checkout gecikme uyarısını tek bir uyarı halinde grupladım",
+          "why": "Zamanın %94'ünde birlikte tetikleniyorlardı, bu yüzden tek bir yavaşlama size 3 kez bildirim gönderdi.",
+          "from": "3 uyarı",
+          "to": "1",
+          "on": "checkout gecikmesi"
+        },
+        "L-303": {
+          "done": "ingest-1 üzerindeki 'disk %80' uyarısını %90'a yükselttim",
+          "why": "30 günde 29 kez tetiklendi ve kimsenin harekete geçmesi gerekmedi. Doluluk uyarısı açık kalıyor.",
+          "from": "%80",
+          "to": "%90",
+          "on": "disk uyarısı · ingest-1"
+        },
+        "L-305": {
+          "done": "Bir birikimi temizlemek için 4 orders-consumer çalışanı ekledim",
+          "why": "İşe yaramadı, bu yüzden 4'e geri indirdim ve 3 dakika sonra nöbetçiye bildirim gönderdim.",
+          "from": "4 çalışan",
+          "to": "8 çalışan",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "Kuyruk çalışanlarını kendi başıma eklemek için onayınızı aldım",
+          "why": "Trafik patlamaları sırasında bunu 7 kez onayladınız ve birikim her seferinde temizlendi.",
+          "from": "önce sor",
+          "to": "kendi başıma",
+          "on": "kuyruk çalışanı ekleme"
+        },
+        "L-312": {
+          "done": "Bağlandığınızda bulduğum 18 hizmeti izlemeye başladım",
+          "why": "Her biri için normalin ne olduğunu öğreniyorum. Uyarıları bu hazır olduğunda başlar.",
+          "from": "izlenmiyor",
+          "to": "izleniyor",
+          "on": "18 hizmet"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "Geçmiş",
+      "seeChange": "Değişikliği gör",
+      "filters": {
+        "all": "Tümü",
+        "problems": "Sorunlar",
+        "changes": "Değişiklikler",
+        "fixes": "Düzeltmeler",
+        "decisions": "Kararlarınız"
+      },
+      "empty": "Burada henüz bir şey yok.",
+      "entries": {
+        "checkoutNowPaged": "checkout'un ödemelerde başarısız olmasıyla ilgili nöbetçiye bildirim gönderdim.",
+        "searchPaged": "search'ün yavaş olmasıyla ilgili nöbetçiye bildirim gönderdim.",
+        "searchAsked": "search-2'nin önbellek ayarını geri koyabilir miyim diye sordum.",
+        "euStopped": "{cluster} kümesinden bu saatten beri hiçbir şey gelmedi. Size burada ve Slack'te bildirdim.",
+        "fridaySummary": "{count} küçük sorunla Cuma özetini gönderdim. | {count} küçük sorunla Cuma özetini gönderdim.",
+        "emailHeld": "Cuma özeti için sipariş e-postalarıyla ilgili küçük bir sorunu beklettim.",
+        "poolFixed": "checkout'un sızdıran veritabanı bağlantılarını kapattım. Ödemeler 2 dakika sonra toparlandı.",
+        "poolApproved": "checkout'ın sızdırdığı veritabanı bağlantılarını kapatmayı onayladınız.",
+        "billingWatch": "billing-api, billing-worker ve invoice-service'i izlemeye başladım.",
+        "checkoutPaged": "checkout ödemeleri başarısız kıldığı için nöbetçiye bildirim gönderdim.",
+        "recsHeld": "recommendations ile ilgili küçük bir sorunu Cuma günkü özet için beklettim.",
+        "diskApproved": "ingest-1'deki disk uyarısını %{to} değerine yükseltmeyi onayladınız.",
+        "latencyGrouped": "Üç checkout yavaşlama uyarısını tek bir uyarıda birleştirdim, böylece tek bir yavaşlama yalnızca bir kez bildirim gönderir.",
+        "queueFixed": "orders kuyruğuna çalışan ekledim, ama kuyruk büyümeye devam etti; ben de onları geri aldım ve nöbetçiye bildirim gönderdim.",
+        "loginPaged": "Yavaş oturum açma hakkında nöbetçiye bildirim gönderdim.",
+        "queuePermission": "Kuyruğa kendi başıma, en fazla 8 çalışan eklememe izin verdiniz.",
+        "gatewayPaged": "API'nin istekleri reddetmesi hakkında nöbetçiye bildirim gönderdim.",
+        "found18": "{count} hizmet buldum ve onlar için normalin neye benzediğini öğrenmeye başladım.",
+        "connected": "Beni verilerinize bağladınız.",
+        "thresholdApproved": "payments-api bağlantı uyarısının veritabanının 200'lük sınırına göre tüm sunucuları saymasını sağlamayı onayladınız.",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "search-2'nin ayarını eski haline döndürmeyi onayladınız.",
+              "no": "search-2 ile kendiniz ilgileneceğinizi söylediniz.",
+              "undoYes": "search-2'nin ayarını eski haline döndürmeyi geri aldınız. %60'ı yeniden uyguladım, böylece search-2 tekrar belleği tüketmeye başlayacak; nöbetçiye haber verdim.",
+              "cancel": "search-2'nin ayarını eski haline döndürmeyi ben uygulamadan iptal ettiniz. search-2 hâlâ belleği tüketiyor; nöbetçiye haber verdim.",
+              "undoNo": "search-2 ile kendiniz ilgileneceğinizi söyleminizi geri aldınız."
+            },
+            "checkoutNow": {
+              "yes": "checkout 2.4.0 kullanıma sunmasını durdurmayı onayladınız.",
+              "no": "checkout kullanıma sunmasıyla kendiniz ilgileneceğinizi söylediniz.",
+              "undoYes": "2.4.0 kullanıma sunmasını durdurmayı geri aldınız. Trafik yeniden 2.4.0'a yönleniyor, bu yüzden ödemeler yeniden başarısız olmaya başlayabilir; nöbetçiye haber verdim ve izliyorum.",
+              "cancel": "2.4.0 kullanıma sunmasını durdurmayı ben yapmadan iptal ettiniz. Ödemeler hâlâ başarısız oluyor; nöbetçiye haber verdim.",
+              "undoNo": "checkout kullanıma sunmasıyla kendiniz ilgileneceğinizi söyleminizi geri aldınız."
+            }
+          },
+          "retune": {
+            "yes": "ingest-3'teki disk uyarısını %90'a yükseltmeyi onayladınız.",
+            "no": "ingest-3'teki disk uyarısını yükseltmeye şimdi olmaz dediniz.",
+            "undoYes": "ingest-3'teki disk uyarısını yükseltmeyi geri aldınız. Tekrar %80'e döndü, bu yüzden sağlıklı gecelerde yeniden tetiklenmeye başlayacak.",
+            "undoNo": "ingest-3'teki disk uyarısı için 'şimdi olmaz' kararınızı geri aldınız."
+          },
+          "fromNowOn": {
+            "yes": "Kötü kullanıma sunmaları kendi başıma durdurmama izin vermeyi onayladınız.",
+            "no": "Kötü kullanıma sunmaları kendi başıma durdurmama şimdi olmaz dediniz.",
+            "undoYes": "Kötü kullanıma sunmaları kendi başıma durdurmama izin vermenizi geri aldınız.",
+            "undoNo": "Kötü kullanıma sunmaları kendi başıma durdurmama ilişkin 'şimdi olmaz' kararınızı geri aldınız."
+          }
+        },
+        "fixedNow": {
+          "search": "search-2'nin ayarını eski haline döndürdüm. Aramalar normale döndü.",
+          "checkoutNow": "Trafiği eski sürüme geri yönlendirdim ve hatalar durdu. 2.4.0'ın neden başarısız olduğunu bulmak hâlâ ekibinize kalmış; onlar için dağıtılmış halde bıraktım."
+        },
+        "checkoutNowAsked": "checkout 2.4.0 kullanıma sunmasını durdurup durduramayacağımı sordum.",
+        "newWatch": "Bu sabah {count} yeni hizmet buldum (returns, exchanges ve gift-cards) ve onları hemen izlemeye başladım.",
+        "foundWatch": "Bu sabah {count} yeni hizmet buldum ve onları hemen izlemeye başladım."
+      }
+    },
+    "settingsDrawer": {
+      "title": "Ayarlar",
+      "reach": "Size nereden ulaşayım?",
+      "destSlack": "Slack: {channel}",
+      "destEmail": "E-posta: {address}",
+      "autonomy": "Kendi başıma ne kadarını yapmalıyım?",
+      "tell": "Bana söyle",
+      "ask": "Önce bana sor",
+      "fix": "Düzelt, sonra bana söyle",
+      "tellHint": "Ne yapacağımı size söylerim ve yapmayı size bırakırım.",
+      "askHint": "Her düzeltmeden önce sorarım ve siz evet dediğinizde yaparım.",
+      "fixHint": "Geçmişte başarısı kanıtlanmış düzeltme türlerinde, belirlediğiniz sınırlar içinde harekete geçerim ve hemen ardından size haber veririm.",
+      "advanced": "Gelişmiş",
+      "perKind": "Her düzeltme türü",
+      "digestDay": "Özet günü",
+      "excluded": "Yok saymam gereken hizmetler",
+      "excludedNone": "Hiçbiri",
+      "kinds": {
+        "pool": "Sızdırılan veritabanı bağlantılarını kapat",
+        "queueWorker": "Birikme sırasında kuyruk çalışanları ekle",
+        "retune": "Gürültülü bir uyarının eşiğini yükselt",
+        "rollback": "Bir dağıtımı geri al",
+        "record": "{done} kez yapıldı, {worked} kez işe yaradı.",
+        "keptRecord": "{done} kez yapıldı, {worked} kez tutuldu.",
+        "noRecord": "Henüz hiç yapılmadı, bu yüzden bir geçmişi olana kadar kendi başıma yapmayacağım.",
+        "revertConfig": "Son bir ayar değişikliğini geri al",
+        "abortRollout": "Kötü bir dağıtımı durdur",
+        "recurringRecord": "{done} kez yapıldı, hepsi aynı sızıntı için ({bug}). Düzeltilene kadar sormaya devam edeceğim."
+      },
+      "weekdays": {
+        "monday": "Pazartesi",
+        "tuesday": "Salı",
+        "wednesday": "Çarşamba",
+        "thursday": "Perşembe",
+        "friday": "Cuma"
+      },
+      "saved": "Kaydedildi",
+      "noDestination": "Kimseye ulaşamayacağım.",
+      "routing": "Sizi çağırdığımda",
+      "routingNote": "Müşterilere zarar veren her şey için çağrı gönderirim. Daha küçük şeyler kimseyi uyandırmayacak bir mesaj alır, en küçükler ise Cuma özetine gider."
+    },
+    "howItWorks": {
+      "title": "Nasıl çalışır",
+      "intro": "İşte yaptıklarım, beş adımda.",
+      "gotIt": "Anladım",
+      "s1Title": "Hizmetlerinizi bulurum",
+      "s1": "Zaten gönderdiğiniz verilere bakarım ve içindeki her hizmeti bulurum. Yeni bir hizmet ortaya çıktığında, aynı gün onu izlemeye başlarım; sormanıza gerek yok.",
+      "s2Title": "Onları izlerim",
+      "s2": "Her hizmet için normalin neye benzediğini öğrenirim: günün her saati için hataları, yavaşlığı ve trafiği, haftalık desenler zamanla keskinleşir. Öğrenene kadar, temel güvenlik kontrollerini kullanırım.",
+      "s3Title": "Gerçek olmadıkça sessiz kalırım",
+      "s3": "Çoğu tuhaf an sorun değildir. Bir şey müşterilere zarar verdiğinde ekibinizi çağırırım, daha küçük sorunlar için kimseyi uyandırmayacak bir mesaj gönderirim ve önemsiz şeyleri Cuma özetine saklarım.",
+      "s4Title": "Her çağrıyı açıklarım",
+      "s4": "Her mesaj neyin bozulduğunu, ne zamandan beri olduğunu ve nedenine dair en iyi tahminimi, ne kadar emin olduğumla birlikte söyler.",
+      "s5Title": "İzin verdiğiniz şeyleri düzeltirim",
+      "s5": "Yalnızca izin verdiğiniz şeyleri düzeltirim. İşe yarayan bir düzeltme biraz güven kazandırır, yardımcı olmayan ise bana karşı sayılır. Aynı düzeltmeye ihtiyaç duymaya devam edersem, bu otomatikleştirdiğim bir alışkanlık değil, ekibinize bildirdiğim bir hatadır."
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "1 dakika önce kontrol edildi | {count} dakika önce kontrol edildi"
+    },
+    "outcome": {
+      "active": "Şu anda oluyor",
+      "fixed": "AutoObserve tarafından düzeltildi",
+      "resolved": "{minutes} dk içinde çözüldü",
+      "held": "Cuma özetinde",
+      "fixing": "Şimdi düzeltiliyor",
+      "contained": "AutoObserve tarafından kontrol altına alındı",
+      "predicted": "Tahmin edildi"
+    },
+    "view": {
+      "standard": "Standart",
+      "nerd": "Nerd",
+      "standardTooltip": "Standart görünüm kısa özeti verir: size neyin ihtiyacı olduğu ve son 7 günde ne olduğu",
+      "nerdTooltip": "Nerd görünümü her dedektörü, döngüyü ve ayarı tam olarak gösterir",
+      "label": "Görünüm"
+    },
+    "rail": {
+      "more": "Aşağıda daha fazla"
+    },
+    "suggestions": {
+      "title": "Öneriler",
+      "subtitle": "Bir dakikanız olduğunda — bunlar gürültüyü azaltır veya size zaman kazandırır."
+    }
   }
 }

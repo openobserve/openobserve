@@ -452,4 +452,9 @@ describe("OEmptyState", () => {
       expect(buttons).toHaveLength(2);
     });
   });
+  it("uses compact spacing above an inline recovery form", () => {
+    wrapper = buildWrapper({ size: "compact" });
+    expect(wrapper.classes()).toContain("min-h-0");
+    expect(wrapper.classes()).toContain("py-4");
+  });
 });

@@ -39,6 +39,13 @@ use crate::{
     common::meta::authz::Authz,
 };
 
+pub const DOWNTIME_TEMPLATE: &str = "prebuilt_downtime";
+pub const DOWNTIME_EMAIL_TEMPLATE: &str = "prebuilt_downtime_email";
+pub const DOWNTIME_EMAIL_TITLE: &str = "OpenObserve downtime {downtime_name}: {downtime_event}";
+
+const DOWNTIME_HTTP_BODY: &str = r#"{"text": "Downtime {downtime_name}: {downtime_event}. {downtime_starts_at} to {downtime_ends_at}, muting {downtime_counts}. {downtime_url}", "downtime": {"name": "{downtime_name}", "event": "{downtime_event}", "reason": "{downtime_reason}", "starts_at": "{downtime_starts_at}", "ends_at": "{downtime_ends_at}", "targets": "{downtime_targets}", "counts": "{downtime_counts}", "url": "{downtime_url}", "org": "{org_name}"}}"#;
+const DOWNTIME_EMAIL_BODY: &str = r#"<h3>Downtime {downtime_name}: {downtime_event}</h3><p>Window: {downtime_starts_at} to {downtime_ends_at}</p><p>Covers {downtime_targets}, muting {downtime_counts}.</p><p>Reason: {downtime_reason}</p><p>Organization: {org_name}</p><p><a href="{downtime_url}">Open downtimes in OpenObserve</a></p>"#;
+
 /// Sticky-kind rule (design §6.2): create defaults absent→Custom; update
 /// preserves the existing kind when the client didn't specify one.
 pub(crate) fn resolve_kind(
@@ -167,6 +174,32 @@ pub async fn delete(org_id: &str, name: &str, is_root: bool) -> Result<(), Templ
 
 pub(crate) const PREBUILT_REVISION_KEY: &str = "prebuilt_templates_revision";
 
+pub fn downtime_templates() -> [Template; 2] {
+    let template = |name: &str, body: &str, template_type| Template {
+        id: None,
+        org_id: DEFAULT_ORG.to_string(),
+        name: name.to_string(),
+        is_default: true,
+        template_type,
+        body: body.to_string(),
+        kind: TemplateKind::Custom,
+    };
+    [
+        template(DOWNTIME_TEMPLATE, DOWNTIME_HTTP_BODY, TemplateType::Http),
+        template(
+            DOWNTIME_EMAIL_TEMPLATE,
+            DOWNTIME_EMAIL_BODY,
+            TemplateType::Email {
+                title: DOWNTIME_EMAIL_TITLE.to_string(),
+            },
+        ),
+    ]
+}
+
+pub fn is_downtime_template_name(name: &str) -> bool {
+    name == DOWNTIME_TEMPLATE || name == DOWNTIME_EMAIL_TEMPLATE
+}
+
 /// Reseed gate (design §6.3): overwrite a stored prebuilt template when the
 /// shipped revision is newer, or when revisions are equal but the stored
 /// body/type drifted — equal-revision drift is the old-binary-revert
@@ -220,85 +253,86 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     let mut updated_count = 0;
     let mut skipped_count = 0;
 
-    for prebuilt_type in prebuilt_types {
-        if let Some(mut template) = get_prebuilt_template(prebuilt_type) {
-            // Set org_id to DEFAULT_ORG for global visibility
-            template.org_id = DEFAULT_ORG.to_string();
+    let prebuilt = prebuilt_types
+        .into_iter()
+        .filter_map(get_prebuilt_template)
+        .chain(seeded_downtime_templates());
+    for mut template in prebuilt {
+        // Set org_id to DEFAULT_ORG for global visibility
+        template.org_id = DEFAULT_ORG.to_string();
 
-            // Check if template already exists
-            match db::alerts::templates::get(DEFAULT_ORG, &template.name).await {
-                Ok(existing) => {
-                    // System templates are protected from user edits, so the
-                    // prebuilt definition is the source of truth. Refresh the
-                    // stored copy when it has drifted (e.g. a shipped fix to the
-                    // body/title) so existing installs pick up the correction —
-                    // but only when the reseed gate says to (revision-gated, see
-                    // `should_apply_prebuilt`).
-                    let drifted = existing.body != template.body
-                        || existing.template_type != template.template_type;
-                    if should_apply_prebuilt(shipped_rev, applied_rev, drifted) && drifted {
-                        // Preserve the stored id so this is an update, not an insert.
-                        template.id = existing.id;
-                        match db::alerts::templates::set(template.clone()).await {
-                            Ok(_) => {
-                                updated_count += 1;
-                                log::info!(
-                                    "[TEMPLATES] Updated system template '{}' in {}",
-                                    template.name,
-                                    DEFAULT_ORG
-                                );
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "[TEMPLATES] Failed to update system template '{}' in {}: {}",
-                                    template.name,
-                                    DEFAULT_ORG,
-                                    e
-                                );
-                            }
-                        }
-                    } else {
-                        skipped_count += 1;
-                        log::debug!(
-                            "[TEMPLATES] System template '{}' already up to date in {}",
-                            template.name,
-                            DEFAULT_ORG
-                        );
-                    }
-                }
-                Err(TemplateError::NotFound) => {
-                    // Template doesn't exist, create it
+        // Check if template already exists
+        match db::alerts::templates::get(DEFAULT_ORG, &template.name).await {
+            Ok(existing) => {
+                // System templates are protected from user edits, so the
+                // prebuilt definition is the source of truth. Refresh the
+                // stored copy when it has drifted (e.g. a shipped fix to the
+                // body/title) so existing installs pick up the correction —
+                // but only when the reseed gate says to (revision-gated, see
+                // `should_apply_prebuilt`).
+                let drifted = existing.body != template.body
+                    || existing.template_type != template.template_type;
+                if should_apply_prebuilt(shipped_rev, applied_rev, drifted) && drifted {
+                    // Preserve the stored id so this is an update, not an insert.
+                    template.id = existing.id;
                     match db::alerts::templates::set(template.clone()).await {
                         Ok(_) => {
-                            created_count += 1;
+                            updated_count += 1;
                             log::info!(
-                                "[TEMPLATES] Created system template '{}' in {}",
+                                "[TEMPLATES] Updated system template '{}' in {}",
                                 template.name,
                                 DEFAULT_ORG
                             );
                         }
                         Err(e) => {
                             log::error!(
-                                "[TEMPLATES] Failed to create system template '{}' in {}: {}",
+                                "[TEMPLATES] Failed to update system template '{}' in {}: {}",
                                 template.name,
                                 DEFAULT_ORG,
                                 e
                             );
                         }
                     }
-                }
-                Err(e) => {
-                    log::error!(
-                        "[TEMPLATES] Error checking system template '{}' in {}: {}",
+                } else {
+                    skipped_count += 1;
+                    log::debug!(
+                        "[TEMPLATES] System template '{}' already up to date in {}",
                         template.name,
-                        DEFAULT_ORG,
-                        e
+                        DEFAULT_ORG
                     );
                 }
             }
+            Err(TemplateError::NotFound) => {
+                // Template doesn't exist, create it
+                match db::alerts::templates::set(template.clone()).await {
+                    Ok(_) => {
+                        created_count += 1;
+                        log::info!(
+                            "[TEMPLATES] Created system template '{}' in {}",
+                            template.name,
+                            DEFAULT_ORG
+                        );
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[TEMPLATES] Failed to create system template '{}' in {}: {}",
+                            template.name,
+                            DEFAULT_ORG,
+                            e
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "[TEMPLATES] Error checking system template '{}' in {}: {}",
+                    template.name,
+                    DEFAULT_ORG,
+                    e
+                );
+            }
         }
     }
-
     // Seed the compiled-in default content template's DB copy — same
     // dist_lock + revision-gate scope as the prebuilt loop above, so it
     // converges on the same startup pass rather than racing it.
@@ -348,9 +382,36 @@ pub async fn ensure_system_templates() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn seeded_downtime_templates() -> Vec<Template> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .downtimes
+        .enabled
+    {
+        return downtime_templates().into();
+    }
+    vec![]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_downtime_templates_are_reserved_and_use_only_downtime_variables() {
+        let [http, email] = downtime_templates();
+        assert_eq!(http.template_type, TemplateType::Http);
+        assert!(matches!(email.template_type, TemplateType::Email { .. }));
+        assert!(serde_json::from_str::<serde_json::Value>(&http.body).is_ok());
+        for t in [&http, &email] {
+            assert!(is_downtime_template_name(&t.name));
+            assert!(
+                super::super::notifications::default_template::is_reserved_template_name(&t.name)
+            );
+            assert!(!t.body.contains("{alert_"));
+        }
+        assert!(!is_downtime_template_name("prebuilt_slack_downtime"));
+    }
 
     #[test]
     fn test_should_apply_prebuilt_gate() {
