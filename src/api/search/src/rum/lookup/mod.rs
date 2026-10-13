@@ -24,7 +24,10 @@ use axum::{
     http::HeaderMap,
     response::{IntoResponse, Response},
 };
-use config::{TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType};
+use config::{
+    TIMESTAMP_COL_NAME, get_config,
+    meta::stream::{RUM_DATA_STREAM, StreamType},
+};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use plan::PagePlan;
@@ -40,7 +43,6 @@ use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
-const RUM_DATA_STREAM: &str = "_rumdata";
 const TRACE_ID_FIELDS: [&str; 2] = ["_o2_trace_id", "_oo_trace_id"];
 // Every field the trace view reads off a RUM row; internal fields are listed under both spellings.
 const RESULT_FIELDS: [&str; 33] = [
