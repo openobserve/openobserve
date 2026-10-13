@@ -15,7 +15,7 @@ import type { FormInlineEditProps, FormInlineEditEmits } from "./OFormInlineEdit
 
 defineOptions({ inheritAttrs: false });
 
-const props = defineProps<FormInlineEditProps>();
+const props = withDefaults(defineProps<FormInlineEditProps>(), { submitOnEnter: true });
 const emit = defineEmits<FormInlineEditEmits>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
@@ -45,6 +45,7 @@ defineExpose({ focus: () => inlineEditRef.value?.focus() });
         :maxlength="props.maxlength"
         :disabled="props.disabled"
         :readonly="props.readonly"
+        :submit-on-enter="props.submitOnEnter"
         :error="field.state.meta.errors.length > 0"
         :error-message="
           field.state.meta.errors.length > 0

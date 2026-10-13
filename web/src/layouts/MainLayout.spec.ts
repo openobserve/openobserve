@@ -2070,6 +2070,7 @@ describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenu
         "manage-accounts",
         "settings",
         "notifications-active",
+        "notifications-paused",
         "schema",
         "auto-awesome",
         "radar",

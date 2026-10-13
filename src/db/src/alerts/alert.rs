@@ -63,11 +63,19 @@ pub async fn get_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<Option<Alert>, infra::errors::Error> {
+    let alert = get_by_name_with_folder(org_id, stream_type, stream_name, name).await?;
+    Ok(alert.map(|(_f, a)| a))
+}
+
+/// [get_by_name] with the alert's parent folder, read from the table.
+pub async fn get_by_name_with_folder(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    name: &str,
+) -> Result<Option<(Folder, Alert)>, infra::errors::Error> {
     let client = get_orm_client_ro().await;
-    let alert =
-        table::get_by_name(client, org_id, "default", stream_type, stream_name, name).await?;
-    let value = alert.map(|(_f, a)| a);
-    Ok(value)
+    table::get_by_name(client, org_id, "default", stream_type, stream_name, name).await
 }
 
 pub async fn set(org_id: &str, alert: Alert, create: bool) -> Result<Alert, infra::errors::Error> {

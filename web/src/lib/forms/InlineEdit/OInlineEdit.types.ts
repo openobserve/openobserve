@@ -43,6 +43,8 @@ export interface InlineEditProps {
   error?: boolean;
   /** Message rendered below the control (absolutely, so the header never reflows). */
   errorMessage?: I18nText;
+  /** Whether Enter also submits the owning form; `false` makes Enter only commit. @default true */
+  submitOnEnter?: boolean;
 }
 
 export interface InlineEditEmits {

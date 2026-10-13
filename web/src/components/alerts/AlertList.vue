@@ -247,6 +247,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
+                  <MutedChip
+                    v-if="row.active_downtime"
+                    :downtime="row.active_downtime"
+                    :data-test="`alert-list-${row.name}-muted`"
+                  />
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
                       variant="warning-soft"
@@ -487,7 +492,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   whatever outcome it last recorded, so showing it would display
                   "Firing" forever on something that is not running.
                 -->
-                <OTooltip v-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
+                <OTooltip
+                  v-if="showRunOutcome(row) && isMutedFiring(row)"
+                  :content="
+                    t('alerts.downtimes.mute.firingMutedTooltip', {
+                      name: row.active_downtime.name,
+                    })
+                  "
+                >
+                  <OTag
+                    variant="default-soft"
+                    icon="notifications-paused"
+                    size="sm"
+                    :label="t('alerts.downtimes.mute.firingMuted')"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
+                <OTooltip v-else-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
                   <OTag
                     type="alertState"
                     :value="row.last_outcome"
@@ -646,6 +667,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("common.move") }}
                     </ODropdownItem>
+                    <template v-if="downtimesEnabled">
+                      <ODropdownSeparator />
+                      <MuteMenuItems
+                        :data-test-prefix="`alert-list-${row.name}-mute`"
+                        @preset="(secs) => muteAndRefresh([row], secs)"
+                        @until="openMuteDialog([row])"
+                      />
+                    </template>
                     <ODropdownSeparator />
                     <ODropdownItem
                       :data-test="`alert-list-${row.name}-delete-alert`"
@@ -770,6 +799,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="bulkToggleAlerts('resume')"
                   >{{ t("alerts.resume") }}</OButton
                 >
+                <ODropdown v-if="downtimesEnabled" side="top">
+                  <template #trigger>
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      icon-left="notifications-paused"
+                      data-test="alert-list-mute-alerts-btn"
+                    >
+                      {{ t("alerts.downtimes.mute.bulk") }}
+                    </OButton>
+                  </template>
+                  <MuteMenuItems
+                    data-test-prefix="alert-list-bulk-mute"
+                    @preset="(secs) => muteAndRefresh(selectedAlerts, secs)"
+                    @until="openMuteDialog(selectedAlerts)"
+                  />
+                </ODropdown>
                 <OButton
                   data-test="alert-list-delete-alerts-btn"
                   variant="outline-destructive"
@@ -891,6 +937,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-move-to-another-folder-dialog"
       />
     </template>
+    <QuickMuteDialog
+      v-if="downtimesEnabled"
+      v-model:open="muteDialogOpen"
+      :selection="muteSelection"
+      @muted="refreshAlerts"
+    />
     <ExportResourceDialog
       v-model:open="showExportDialog"
       :items="alertsToExport"
@@ -942,7 +994,7 @@ import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import { isFiringOutcome, outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
@@ -970,6 +1022,10 @@ import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDi
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
+import MutedChip from "./downtimes/MutedChip.vue";
+import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
+import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
+import { useRowMute } from "@/composables/downtimes/useRowMute";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useListViewState } from "@/composables/useListViewState";
@@ -1011,6 +1067,9 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "AlertList",
   components: {
+    MutedChip,
+    MuteMenuItems,
+    QuickMuteDialog,
     OPageLayout,
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
     OEmptyState,
@@ -1052,6 +1111,11 @@ export default defineComponent({
     // On-call is separately gated, so the column and its lookup vanish with it
     // rather than showing a header nothing can ever fill.
     const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
+    const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialog } =
+      useRowMute<any>(
+        (row) => (row.type === "anomaly" ? "anomaly_detections" : "alerts"),
+        (row) => String(row.type === "anomaly" ? row.anomaly_id : row.alert_id),
+      );
     const oncallTeams = ref<OnCallTeam[]>([]);
 
     /// The alert stores a team id; a woken engineer needs the name. Falls back
@@ -1357,6 +1421,10 @@ export default defineComponent({
     // advertise "Firing" indefinitely.
     const showRunOutcome = (row: any): boolean =>
       shouldShowRunOutcome(row?.enabled, row?.last_outcome);
+
+    // A firing that an active downtime keeps quiet: the state stays Firing, only the badge goes quiet.
+    const isMutedFiring = (row: { active_downtime?: unknown; last_outcome?: unknown }): boolean =>
+      !!row.active_downtime && isFiringOutcome(row.last_outcome);
 
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
@@ -1815,6 +1883,7 @@ export default defineComponent({
     const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
+      active_downtime: anomaly.active_downtime ?? null,
       name: anomaly.name,
       alert_type: "anomaly_detection",
       stream_name: anomaly.stream_name || "--",
@@ -2041,6 +2110,7 @@ export default defineComponent({
             groups_firing_is_lower_bound: data.groups_firing_is_lower_bound,
             last_outcome_at: data.last_outcome_at ?? null,
             last_outcome_since: data.last_outcome_since ?? null,
+            active_downtime: data.active_downtime ?? null,
             selected: false,
             type: data.condition.type,
             // The SLO this alert belongs to (Feature 5, Phase 2). Read from the
@@ -2261,6 +2331,14 @@ export default defineComponent({
       const apiType =
         tab === "realTime" ? "realtime" : tab === "anomalyDetection" ? "anomaly_detection" : tab;
       await getAlertsFn(store, activeFolderId.value, "", true, apiType);
+    };
+
+    // The rows paint from `fetchQuery`, with no observer the mutation's invalidation can
+    // refetch, so the Muted chip of a fresh quick mute needs an explicit reload.
+    const muteAndRefresh = async (rows: any[], seconds: number) => {
+      const id = await muteRows(rows, seconds);
+      if (id) await refreshAlerts();
+      return id;
     };
 
     const refreshAlerts = async () => {
@@ -3773,6 +3851,11 @@ export default defineComponent({
     ]);
 
     return {
+      downtimesEnabled,
+      muteDialogOpen,
+      muteSelection,
+      muteAndRefresh,
+      openMuteDialog,
       oncallEnabled,
       oncallTeamName,
       lgUp,
@@ -3845,6 +3928,7 @@ export default defineComponent({
       splitterModel,
       alertStateLoadingMap,
       showRunOutcome,
+      isMutedFiring,
       runOutcomeTooltip,
       toggleAlertState,
       templates,
