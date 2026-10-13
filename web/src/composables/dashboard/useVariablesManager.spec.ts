@@ -1201,6 +1201,65 @@ describe("useVariablesManager live apply and commit-once", () => {
     expect(service.isVariableLoadingPending).toBe(true);
   });
 
+  const queryChainConfig = (parent: Partial<VariableConfig> = {}): VariableConfig[] => [
+    {
+      name: "ns",
+      type: "query_values",
+      scope: "global",
+      value: null,
+      query_data: { field: "ns" },
+      ...parent,
+    },
+    {
+      name: "pod",
+      type: "query_values",
+      scope: "global",
+      value: null,
+      query_data: { field: "pod", filter: [{ filter: "ns=$ns" }] },
+    },
+  ];
+
+  it("opening an all-default parent leaves its loaded children alone", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(
+      queryChainConfig({ multiSelect: true, selectAllValueForMultiSelect: "all" }),
+      {},
+    );
+    const [, pod] = manager.variablesData.global;
+    finishLoading(pod, ["p1"]);
+
+    manager.onVariablePartiallyLoaded("ns@global");
+
+    expect(pod.value).toEqual(["p1"]);
+    expect(pod.isVariableLoadingPending).toBe(false);
+  });
+
+  it("opening a URL-restored parent leaves its URL-restored children alone", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(queryChainConfig(), {});
+    manager.loadFromUrl({ query: { "var-ns": "a", "var-pod": "p1" } });
+    const [ns, pod] = manager.variablesData.global;
+
+    manager.onVariablePartiallyLoaded("ns@global");
+
+    expect(ns.value).toBe("a");
+    expect(pod.value).toBe("p1");
+    expect(pod.isVariableLoadingPending).toBe(false);
+  });
+
+  it("a URL-restored parent whose fetch lands on a new value reloads its children", async () => {
+    const manager = useVariablesManager(gt);
+    await manager.initialize(queryChainConfig(), {});
+    manager.loadFromUrl({ query: { "var-ns": "a", "var-pod": "p1" } });
+    const [ns, pod] = manager.variablesData.global;
+
+    ns.value = "b";
+    manager.onVariablePartiallyLoaded("ns@global");
+
+    expect(pod.value).toBe(null);
+    expect(pod.isVariableLoadingPending).toBe(true);
+  });
+
   it("an aborted dependent load releases the commit", async () => {
     const { manager, service, commits } = await setupSettled();
     manager.setLiveMode(true);

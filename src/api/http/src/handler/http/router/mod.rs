@@ -31,12 +31,14 @@ use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, folders, ingest_rejections, kv,
-    metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
+    kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
     short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
-use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
+use openobserve_api_search::{
+    profiles as profiles_query, promql, rum as rum_query, search, traces,
+};
 use openobserve_core::auth::AuthExtractor;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
@@ -876,7 +878,8 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    let mut router = Router::new();
+    // Downtimes live in their own table to keep this function under the line limit.
+    let mut router = Router::new().merge(downtime_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -1274,6 +1277,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/sourcemaps",get(sourcemaps::list).post(sourcemaps::upload_maps).delete(sourcemaps::delete))
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
         .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
+
+        // RUM trace lookup
+        .route("/{org_id}/rum/lookup", post(rum_query::lookup::lookup))
 
         // RUM Product Analytics
         .route("/{org_id}/rum/analytics/named_events", get(rum_analytics::list_named_events).post(rum_analytics::create_named_event))
@@ -2091,6 +2097,20 @@ pub fn service_routes() -> Router {
                 response
             }
         }))
+}
+
+/// Downtimes routes; the literal segments stay before the {downtime_id} catch-all.
+#[rustfmt::skip]
+pub fn downtime_routes() -> Router {
+    Router::new()
+        .route("/v2/{org_id}/downtimes", get(downtimes::list_downtimes).post(downtimes::create_downtime))
+        .route("/v2/{org_id}/downtimes/preview", post(downtimes::preview_downtime))
+        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
+        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
+        .route("/v2/{org_id}/downtimes/move", patch(downtimes::move_downtimes))
+        .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/extend", post(downtimes::extend_downtime))
 }
 
 /// Create other service routes (AWS, GCP, RUM)

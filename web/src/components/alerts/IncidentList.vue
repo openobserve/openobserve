@@ -35,7 +35,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :page-size-options="[20, 50, 100, 250, 500]"
         :current-page="currentPage"
         @update:current-page="onPageChange"
+        @update:page-size="pageSize = $event"
         sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         filter-mode="client"
         :default-columns="false"
         show-index
@@ -131,9 +136,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
         <template #cell-title="{ row }">
-          <span>
-            {{ row.title || formatDimensions(row.group_values) }}
-          </span>
+          <div class="flex min-w-0 items-center gap-1">
+            <OTruncatedText class="min-w-0">
+              {{ row.title || formatDimensions(row.group_values) }}
+            </OTruncatedText>
+            <OTag
+              v-if="row.muted_by_downtime_id"
+              type="downtimeStatus"
+              value="active"
+              class="max-w-60 min-w-12 shrink-4"
+              data-test="incident-list-muted"
+            >
+              <span class="truncate">{{ mutedLabel(row.muted_by_downtime_id) }}</span>
+              <OTooltip :content="mutedTooltip(row.muted_by_downtime_id)" />
+            </OTag>
+          </div>
         </template>
         <template #cell-dimensions="{ row }">
           <div
@@ -284,6 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useDowntimeLookup } from "@/composables/downtimes/useDowntimeLookup";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { incidentsQuery } from "@/services/incidents.queries";
@@ -293,6 +311,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, { Incident } from "@/services/incidents";
+import { useListViewState } from "@/composables/useListViewState";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -300,6 +319,7 @@ import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -326,6 +346,7 @@ export default defineComponent({
     ORefreshButton,
     OSearchInput,
     OTooltip,
+    OTruncatedText,
     OIcon,
     OTable,
     OTag,
@@ -381,6 +402,19 @@ export default defineComponent({
     // keeps the filter computeds and the table's row-model rebuild off the
     // reactivity hot path — the difference is very visible at a few hundred rows.
     const allIncidents = shallowRef<Incident[]>([]);
+    // The downtimes list is read only to name a muted row's downtime.
+    const { nameOf, notLoaded } = useDowntimeLookup(() =>
+      allIncidents.value.some((incident) => !!incident.muted_by_downtime_id),
+    );
+    // A downtime past the lookup's one page says so, with its id kept for the tooltip.
+    const mutedLabel = (id: string) =>
+      t("alerts.downtimes.incident.mutedBy", {
+        name: notLoaded(id) ? t("alerts.downtimes.incident.notLoaded") : nameOf(id),
+      });
+    const mutedTooltip = (id: string) =>
+      notLoaded(id)
+        ? t("alerts.downtimes.incident.notLoadedTooltip", { id })
+        : t("alerts.downtimes.incident.mutedBy", { name: nameOf(id) });
     const searchQuery = ref("");
     // Primary filter groups the lifecycle like other list pages: Active covers
     // both open and acknowledged (still needs attention), Resolved is done.
@@ -393,7 +427,15 @@ export default defineComponent({
         : "active",
     );
     const isRestoringState = ref(false);
-    const pageSize = ref(20);
+    const viewState = useListViewState("incidents", {
+      severityFilter: "all",
+      pageSize: 20,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const pageSize = ref(viewState.pageSize);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
     // Restored from the Vuex incidents store (same mechanism as searchQuery/statusFilter) so returning from a detail view lands back on the same page.
     const currentPage = ref(1);
     const onPageChange = (page: number) => {
@@ -401,7 +443,15 @@ export default defineComponent({
       savePageState();
     };
     // Severity facet — independent of status ("all" | "P1".."P4").
-    const severityFilter = ref("all");
+    const severityFilter = ref(viewState.severityFilter);
+    watch([severityFilter, pageSize, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        severityFilter: severityFilter.value,
+        pageSize: pageSize.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
 
     const columns: OTableColumnDef[] = [
       {
@@ -660,7 +710,7 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: currentPage.value, rowsPerPage: 20 },
+        pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
 
@@ -677,7 +727,7 @@ export default defineComponent({
       store.dispatch("incidents/setIncidents", {
         searchQuery: searchQuery.value,
         statusFilter: statusFilter.value,
-        pagination: { page: currentPage.value, rowsPerPage: 20 },
+        pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
         organizationIdentifier: store.state.selectedOrganization.identifier,
       });
     };
@@ -886,7 +936,7 @@ export default defineComponent({
         store.dispatch("incidents/setIncidents", {
           searchQuery: searchQuery.value,
           statusFilter: statusFilter.value,
-          pagination: { page: currentPage.value, rowsPerPage: 20 },
+          pagination: { page: currentPage.value, rowsPerPage: pageSize.value },
           organizationIdentifier: store.state.selectedOrganization.identifier,
         });
       }
@@ -917,6 +967,8 @@ export default defineComponent({
     ]);
 
     return {
+      mutedLabel,
+      mutedTooltip,
       raw,
       t,
       loading,
@@ -935,6 +987,8 @@ export default defineComponent({
       clearFilters,
       columns,
       pageSize,
+      sortBy,
+      sortOrder,
       currentPage,
       onPageChange,
       loadIncidents,

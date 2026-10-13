@@ -190,11 +190,6 @@ const store = createStore({
       allAlertsListByFolderId: {},
       allAlertsListByNames: {},
     },
-    alertListFilters: {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-    },
     githubDashboardGallery: {
       dashboards: [] as any[],
       lastFetched: null as number | null,
@@ -378,9 +373,6 @@ const store = createStore({
     },
     clearPendingShortURL() {
       // Mock mutation for tests - clears pending short URL state
-    },
-    setAlertListFilters(state, payload) {
-      state.alertListFilters = { ...state.alertListFilters, ...payload };
     },
     setAlertLibraryManifest(state, payload) {
       state.alertLibrary.manifest = payload;

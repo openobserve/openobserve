@@ -230,9 +230,10 @@ pub async fn search(
     };
 
     let mut scan_stats = ScanStats::default();
-    for (value, _result_type, stats, _took) in results {
+    for (value, _result_type, stats, _took, warnings) in results {
         add_value(&mut resp, value);
         scan_stats.add(&stats);
+        resp.warnings.extend(warnings);
     }
     resp.scan_stats = Some(cluster_rpc::ScanStats::from(&scan_stats));
 
@@ -253,7 +254,8 @@ pub async fn data(
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
 
-    let (data_tx, mut data_rx) = mpsc::channel::<(value::Value, String, ScanStats, i64)>(2);
+    let (data_tx, mut data_rx) =
+        mpsc::channel::<(value::Value, String, ScanStats, i64, Vec<String>)>(2);
     let data_trace_id = trace_id.clone();
     let job = req.job.clone();
     tokio::task::spawn(async move {
@@ -263,11 +265,12 @@ pub async fn data(
                     log::info!("[trace_id {data_trace_id}] promql->data->grpc: data streaming end");
                     break;
                 }
-                Some((value, result_type, stats, took)) => {
+                Some((value, result_type, stats, took, warnings)) => {
                     let mut resp = cluster_rpc::MetricsQueryResponse {
                         job: job.clone(),
                         took: took as i32,
                         result_type: result_type.clone(),
+                        warnings,
                         ..Default::default()
                     };
 
@@ -365,7 +368,7 @@ pub async fn data(
 #[tracing::instrument(name = "promql:search:grpc:search_inner", skip_all, fields(org_id = req.org_id))]
 pub async fn search_inner(
     req: &cluster_rpc::MetricsQueryRequest,
-) -> Result<(value::Value, String, ScanStats, i64)> {
+) -> Result<(value::Value, String, ScanStats, i64, Vec<String>)> {
     let start = std::time::Instant::now();
     let trace_id = req.job.as_ref().unwrap().trace_id.to_string();
     let org_id = &req.org_id;
@@ -413,7 +416,7 @@ pub async fn search_inner(
         query.label_selector.clone(),
     );
 
-    let (value, result_type, mut scan_stats) = if query.query_exemplars {
+    let (value, result_type, mut scan_stats, warnings) = if query.query_exemplars {
         ctx.query_exemplars(&trace_id, eval_stmt).await?
     } else {
         ctx.exec(&trace_id, eval_stmt).await?
@@ -428,7 +431,7 @@ pub async fn search_inner(
 
     scan_stats.format_to_mb();
     let took = start.elapsed().as_millis() as i64;
-    Ok((value, result_type, scan_stats, took))
+    Ok((value, result_type, scan_stats, took, warnings))
 }
 
 async fn get_max_file_list(

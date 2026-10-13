@@ -30,6 +30,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
+import downtimesService from "@/services/downtimes";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
 import workflowService from "@/services/workflows";
 import onlineEvalsService from "@/services/online-evals.service";
@@ -115,6 +116,8 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       rfolder: getReportFolders,
       synthetic_folder: getSyntheticsFolders,
       synthetics: getSynthetics,
+      downtime_folder: getDowntimeFolders,
+      downtime: getDowntimes,
       synthetic_environment: getSyntheticEnvironments,
       workflow_folder: getWorkflowFolders,
       workflows: getWorkflows,
@@ -291,6 +294,44 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       "name",
       "synthetics",
     );
+    return new Promise((resolve) => {
+      resolve(true);
+    });
+  };
+  const getDowntimeFolders = async () => {
+    // Same shape as getSyntheticsFolders — downtime folders live under folder type "downtimes".
+    const folders: any = await commonService.list_Folders(
+      store.state.selectedOrganization.identifier,
+      "downtimes",
+    );
+
+    let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
+
+    if (!isDefaultPresent) {
+      folders.data.list.unshift({ folderId: "default", name: "default" });
+    }
+
+    updateResourceEntities(
+      "downtime_folder",
+      ["folderId"],
+      [...folders.data.list],
+      true,
+      "name",
+      "downtime",
+    );
+    return new Promise((resolve) => {
+      resolve(true);
+    });
+  };
+  const getDowntimes = async (resource: Entity | Resource) => {
+    // Downtimes of one folder. Their FGA entities are plain downtime ids, as synthetics.
+    const res: any = await downtimesService.list(store.state.selectedOrganization.identifier, {
+      folder_id: resource.name,
+      page_size: 500,
+    });
+
+    updateEntityEntities(resource, ["id"], [...(res.data?.items ?? [])], false, "name");
+
     return new Promise((resolve) => {
       resolve(true);
     });
@@ -738,6 +779,8 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getAlertFolders,
     getSyntheticsFolders,
     getSynthetics,
+    getDowntimeFolders,
+    getDowntimes,
     getSyntheticEnvironments,
     getWorkflowFolders,
     getWorkflows,

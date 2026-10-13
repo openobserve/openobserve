@@ -4,6 +4,7 @@ import i18n from "@/locales";
 import SearchHistory from "./SearchHistory.vue";
 import searchService from "@/services/search";
 import { useRouter, useRoute } from "vue-router";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // Mock Toast
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -81,6 +82,7 @@ describe("SearchHistory Component", () => {
   let routerPushMock;
 
   beforeEach(() => {
+    resetListViewState();
     // Setup mock store
     mockStore = {
       state: {
@@ -603,6 +605,67 @@ describe("SearchHistory Component", () => {
       const columns = wrapper.vm.generateColumns([{ some: "data" }]);
       expect(columns.length).toBeGreaterThan(0);
       expect(columns[0].sortable).toBeDefined();
+    });
+  });
+
+  describe("View state restore", () => {
+    const mountRestored = () =>
+      mount(SearchHistory, {
+        global: {
+          plugins: [i18n],
+          provide: {
+            store: {
+              state: { ...mockStore.state, zoConfig: { usage_enabled: true } },
+            },
+          },
+          stubs: {
+            OTable: true,
+            DateTime: { template: "<div />", methods: { setAbsoluteTime: vi.fn() } },
+            AppTabs: true,
+          },
+        },
+      });
+
+    it("restores date range, page, size and sort", () => {
+      resetListViewState();
+      useListViewState("searchHistory", {
+        valueType: "absolute",
+        relativeTimePeriod: "",
+        startTime: 1700000000000000,
+        endTime: 1700000900000000,
+        pageSize: 20,
+        currentPage: 2,
+        sortBy: "sql",
+        sortOrder: "desc",
+      });
+      const restored = mountRestored();
+      expect(restored.vm.restoredDate.absolute).toEqual({
+        startTime: 1700000000000000,
+        endTime: 1700000900000000,
+      });
+      expect(restored.vm.pageSize).toBe(20);
+      expect(restored.vm.currentPage).toBe(2);
+      expect(restored.vm.sortBy).toBe("sql");
+      expect(restored.vm.sortOrder).toBe("desc");
+      restored.unmount();
+    });
+
+    it("saves table and date changes", async () => {
+      const live = mountRestored();
+      live.vm.pageSize = 50;
+      live.vm.sortBy = "sql";
+      await live.vm.updateDateTime({
+        valueType: "relative",
+        relativeTimePeriod: "1h",
+        startTime: 1,
+        endTime: 2,
+      });
+      await live.vm.$nextTick();
+      live.unmount();
+      const saved = useListViewState("searchHistory", {});
+      expect(saved.pageSize).toBe(50);
+      expect(saved.sortBy).toBe("sql");
+      expect(saved.relativeTimePeriod).toBe("1h");
     });
   });
 });

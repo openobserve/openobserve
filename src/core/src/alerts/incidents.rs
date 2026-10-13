@@ -39,6 +39,8 @@ use config::{
 const UNKNOWN_SERVICE: &str = "unknown";
 /// Window behind the alert in which a service-graph edge counts as a dependency.
 const INCIDENT_EDGE_RANGE_SECS: i64 = 3600;
+/// How many of an alert's latest firings a Firing run after a window looks through for open pages.
+const MUTED_RESOLVES_SCANNED: u64 = 10;
 
 /// Service Discovery correlation result
 struct ServiceDiscoveryResult {
@@ -92,6 +94,14 @@ struct ParallelCorrelationResult {
     final_group_values: HashMap<String, String>,
     final_key_type: config::meta::alerts::incidents::KeyType,
     correlation_reason: String,
+}
+
+/// What a firing does to the downtime mute of the incident it joins.
+#[derive(Debug, PartialEq)]
+enum MuteChange<'a> {
+    Keep,
+    Unmute(&'a str),
+    Retarget { from: &'a str, to: &'a str },
 }
 
 /// Extract semantic dimensions using configured distinguish_by groups only
@@ -571,6 +581,7 @@ pub async fn correlate_alert_to_incident(
     // Warning → P3). None (manual triggers, single-level alerts) keeps the
     // enterprise default.
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    downtime: Option<&config::meta::downtimes::ActiveDowntime>,
 ) -> Result<Option<CorrelatedIncident>, anyhow::Error> {
     let mut labels = labels_from_row(result_row);
 
@@ -679,6 +690,7 @@ pub async fn correlate_alert_to_incident(
         &correlation_reason,
         &service_name,
         eval_level,
+        downtime.map(|d| d.id.as_str()),
     )
     .await?;
 
@@ -688,6 +700,7 @@ pub async fn correlate_alert_to_incident(
         incident_id,
         service_name,
     } = &outcome
+        && downtime.is_none()
         && o2_enterprise::enterprise::oncall::is_enabled()
     {
         // Single-sourced with `scheduler::handlers`: the row, then the alert's own conditions.
@@ -770,11 +783,10 @@ pub async fn correlate_alert_to_incident(
         }
     }
 
-    // Send incident notification unless rows are empty (manual trigger path)
-    // or the outcome is a repeated alert (suppressed by design).
+    // No notification for the manual-trigger path (no rows), a suppressed firing, or a repeat.
     let mut notify_error = None;
     let mut notify_attempted = false;
-    if !notify_rows.is_empty() {
+    if !notify_rows.is_empty() && downtime.is_none() {
         match &outcome {
             IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. }
             | IncidentCorrelationOutcome::NewAlertTypeJoined { incident_id, .. }
@@ -899,6 +911,7 @@ pub async fn correlate_external_event(
         &correlation_reason,
         &service_name,
         None, // external events carry no evaluated alert level
+        None,
     )
     .await?;
 
@@ -942,6 +955,7 @@ pub async fn correlate_external_event(
 /// assigned incident is a human's to close. `auto_resolve_after_minutes` stays as the backstop.
 pub async fn resolve_alert_firing(
     event: &config::meta::alerts::recovery::RecoveryEvent,
+    muted: bool,
 ) -> Result<(), anyhow::Error> {
     let Some(incident_id) = event.incident_id.as_deref() else {
         return Ok(());
@@ -987,17 +1001,41 @@ pub async fn resolve_alert_firing(
         return Ok(());
     }
 
-    update_status(
+    update_status_as(
         &event.org_id,
         incident_id,
         "resolved",
         "system@openobserve.ai",
+        muted,
     )
     .await?;
     log::info!(
         "[incidents] Auto-resolved incident {incident_id} — all {} contributing alert(s) recovered",
         links.len()
     );
+    Ok(())
+}
+
+/// The on-call recovery a muted [resolve_alert_firing] skipped, over the recent resolved incidents.
+pub async fn recover_muted_resolves(org_id: &str, alert_id: &str) -> Result<(), anyhow::Error> {
+    if !o2_enterprise::enterprise::oncall::is_enabled() {
+        return Ok(());
+    }
+    let resolved = infra::table::alert_incidents::resolved_incidents_for_alert(
+        org_id,
+        alert_id,
+        MUTED_RESOLVES_SCANNED,
+    )
+    .await?;
+    let mut records = HashMap::with_capacity(resolved.len());
+    for incident_id in &resolved {
+        let held = infra::table::oncall_responses::list_for_incident(org_id, incident_id).await?;
+        records.insert(incident_id.clone(), held);
+    }
+    for incident_id in left_open(&resolved, &records) {
+        o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
+            .await?;
+    }
     Ok(())
 }
 
@@ -1194,6 +1232,221 @@ fn spawn_topology_enrichment(
     });
 }
 
+/// Starts the first RCA of an incident: at creation, or when a downtime mute is lifted.
+#[cfg(feature = "enterprise")]
+async fn spawn_initial_rca(org_id: &str, incident_id: &str) {
+    if !rca_will_run(org_id, incident_id).await {
+        return;
+    }
+    #[cfg(feature = "cloud")]
+    let usage_permit = {
+        let usage_context = crate::trial_quota::AiUsageContext {
+            user_email: "system@openobserve.ai".to_string(),
+            incident_id: Some(incident_id.to_string()),
+            ..Default::default()
+        };
+        match crate::trial_quota::authorize_ai_usage(
+            org_id,
+            crate::trial_quota::TrialQuotaFeature::NewIncident,
+            &usage_context,
+        )
+        .await
+        {
+            Ok(permit) => Some(permit),
+            Err(error) => {
+                log::info!(
+                    "[INCIDENTS::RCA] New incident {incident_id} retained without RCA: {error}"
+                );
+                // §6: no verdict is coming, so nothing may go on holding a page for one.
+                o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                    org_id,
+                    incident_id,
+                )
+                .await;
+                None
+            }
+        }
+    };
+    #[cfg(not(feature = "cloud"))]
+    let usage_permit = None;
+
+    if cfg!(feature = "cloud") && usage_permit.is_none() {
+        return;
+    }
+    if let Err(e) = crate::incidents::append_event(
+        org_id,
+        incident_id,
+        config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
+    )
+    .await
+    {
+        log::error!(
+            "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{incident_id}: {e}"
+        );
+    }
+
+    let org_id_rca = org_id.to_string();
+    let incident_id_rca = incident_id.to_string();
+    let handle = tokio::spawn(async move {
+        if let Err(e) = trigger_rca_for_incident(
+            org_id_rca.clone(),
+            incident_id_rca.clone(),
+            false,
+            true,
+            "system@openobserve.ai".to_string(),
+            // First analysis for this incident — there is nothing to build on.
+            false,
+            usage_permit,
+        )
+        .await
+        {
+            log::debug!(
+                "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
+            );
+
+            emit_analysis_failure(
+                &org_id_rca,
+                &incident_id_rca,
+                config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
+                "Background spawn failed",
+                Some(&e),
+            )
+            .await;
+        }
+        unregister_rca_task(&org_id_rca, &incident_id_rca);
+    });
+    register_rca_task(org_id, incident_id, handle.abort_handle());
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn spawn_initial_rca(_org_id: &str, _incident_id: &str) {}
+
+/// Runs the incident-created workflows; an error must not block the incident flow.
+async fn trigger_created_workflows(org_id: &str, incident_id: &str) {
+    if let Err(e) =
+        crate::incidents::send_incident_event_trigger(org_id, incident_id, IncidentEvent::created())
+            .await
+    {
+        log::error!(
+            "error triggering workflow for incident created for {org_id} incident id {incident_id} : {e}"
+        );
+    }
+}
+
+/// Clears a downtime mute; `true` only for the compare-and-set winner, so "opened" goes once.
+async fn unmute_for_firing(
+    org_id: &str,
+    incident: &infra::table::entity::alert_incidents::Model,
+    muted_by: Option<&str>,
+) -> bool {
+    let downtime_id = match mute_change(muted_by, incident.muted_by_downtime_id.as_deref()) {
+        MuteChange::Keep => return false,
+        MuteChange::Retarget { from, to } => {
+            retarget_mute(org_id, &incident.id, from, to).await;
+            return false;
+        }
+        MuteChange::Unmute(downtime_id) => downtime_id,
+    };
+    match infra::table::alert_incidents::clear_muted_by_downtime_id(
+        org_id,
+        &incident.id,
+        downtime_id,
+    )
+    .await
+    {
+        Ok(true) => {}
+        Ok(false) => return false,
+        Err(e) => {
+            log::error!(
+                "[incidents] could not un-mute incident {}: {e}",
+                incident.id
+            );
+            return false;
+        }
+    }
+    #[cfg(feature = "enterprise")]
+    if db::downtimes::replicates()
+        && let Err(e) =
+            o2_enterprise::enterprise::super_cluster::queue::incidents_unmute(org_id, &incident.id)
+                .await
+    {
+        log::error!("[SUPER_CLUSTER] Failed to publish incident unmute: {e}");
+    }
+    log::info!(
+        "[incidents] Incident {} un-muted by a firing after downtime {downtime_id}",
+        incident.id
+    );
+    true
+}
+
+/// A firing outside every window un-mutes; one muted by another downtime moves the mute to it.
+fn mute_change<'a>(muted_by: Option<&'a str>, recorded: Option<&'a str>) -> MuteChange<'a> {
+    match (muted_by, recorded) {
+        (None, Some(recorded)) => MuteChange::Unmute(recorded),
+        (Some(current), Some(recorded)) if current != recorded => MuteChange::Retarget {
+            from: recorded,
+            to: current,
+        },
+        _ => MuteChange::Keep,
+    }
+}
+
+/// Joins first, so a failed join leaves the mute for the next firing to clear and reopen.
+async fn join_then_unmute<T>(
+    join: impl std::future::Future<Output = Result<T, infra::errors::Error>>,
+    unmute: impl AsyncFnOnce() -> bool,
+) -> Result<(T, bool), infra::errors::Error> {
+    let joined = join.await?;
+    Ok((joined, unmute().await))
+}
+
+/// The chip and the resolved comment name the downtime that mutes the incident now.
+async fn retarget_mute(org_id: &str, incident_id: &str, from: &str, to: &str) {
+    match infra::table::alert_incidents::retarget_muted_by_downtime_id(
+        org_id,
+        incident_id,
+        from,
+        to,
+    )
+    .await
+    {
+        Ok(true) => log::info!(
+            "[incidents] Incident {incident_id} now muted by downtime {to} instead of {from}"
+        ),
+        Ok(false) => {}
+        Err(e) => log::error!("[incidents] could not re-mute incident {incident_id} by {to}: {e}"),
+    }
+}
+
+/// An un-muted incident runs as a fresh one: workflows, RCA, then the page and "opened".
+async fn reopened_after_mute(
+    org_id: &str,
+    incident_id: String,
+    service_name: &str,
+) -> IncidentCorrelationOutcome {
+    trigger_created_workflows(org_id, &incident_id).await;
+    spawn_initial_rca(org_id, &incident_id).await;
+    IncidentCorrelationOutcome::NewIncidentCreated {
+        incident_id,
+        service_name: service_name.to_string(),
+    }
+}
+
+/// The un-mute already won, so a failed severity raise is logged and the "opened" page still goes.
+async fn escalate_then_reopen(
+    org_id: &str,
+    incident_id: &str,
+    escalate: impl std::future::Future<Output = Result<bool, anyhow::Error>>,
+    reopen: impl std::future::Future<Output = IncidentCorrelationOutcome>,
+) -> IncidentCorrelationOutcome {
+    if let Err(e) = escalate.await {
+        log::error!(
+            "[incidents] severity of reopened incident {org_id}/{incident_id} not raised: {e}"
+        );
+    }
+    reopen.await
+}
+
 /// Create a brand new incident and set up its initial state.
 #[allow(clippy::too_many_arguments)]
 async fn create_new_incident(
@@ -1205,6 +1458,7 @@ async fn create_new_incident(
     correlation_reason: &str,
     service_name: &str,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    muted_by: Option<&str>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     // Pre-mapped severity from the subject (external events) wins; otherwise
     // T-8's evaluated level maps to incident severity — Critical opens a P2,
@@ -1222,13 +1476,14 @@ async fn create_new_incident(
     let title =
         o2_enterprise::enterprise::alerts::incidents::generate_title(&subject.name, group_values);
 
-    let incident = infra::table::alert_incidents::create(
+    let incident = infra::table::alert_incidents::create_with_mute(
         org_id,
         &severity,
         serde_json::to_value(group_values)?,
         &key_type.to_string(),
         triggered_at,
         Some(title.clone()),
+        muted_by.map(str::to_string),
     )
     .await?;
 
@@ -1240,18 +1495,8 @@ async fn create_new_incident(
         );
     }
 
-    // error in sending workflow trigger should not block the incident flow
-    if let Err(e) = crate::incidents::send_incident_event_trigger(
-        org_id,
-        &incident.id,
-        IncidentEvent::created(),
-    )
-    .await
-    {
-        log::error!(
-            "error triggering workflow for incident created for {org_id} incident id {} : {e}",
-            incident.id
-        );
+    if muted_by.is_none() {
+        trigger_created_workflows(org_id, &incident.id).await;
     }
 
     // Add the first alert to the incident
@@ -1310,13 +1555,17 @@ async fn create_new_incident(
         .super_cluster
         .enabled
         && !config::get_config().common.local_mode
-        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_create(
+        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::incidents_create_with_mute(
             org_id,
             &key_type.to_string(),
             &severity,
             serde_json::to_value(group_values)?,
             triggered_at,
             Some(title),
+            // Without replication the other region never gets the un-mute, so it gets no mute.
+            muted_by
+                .filter(|_| db::downtimes::replicates())
+                .map(str::to_string),
         )
         .await
     {
@@ -1334,96 +1583,90 @@ async fn create_new_incident(
         triggered_at,
     );
 
-    // Trigger immediate RCA for new incident.
-    #[cfg(feature = "enterprise")]
-    {
-        if rca_will_run(org_id, &incident.id).await {
-            #[cfg(feature = "cloud")]
-            let usage_permit = {
-                let usage_context = crate::trial_quota::AiUsageContext {
-                    user_email: "system@openobserve.ai".to_string(),
-                    incident_id: Some(incident.id.clone()),
-                    ..Default::default()
-                };
-                match crate::trial_quota::authorize_ai_usage(
-                    org_id,
-                    crate::trial_quota::TrialQuotaFeature::NewIncident,
-                    &usage_context,
-                )
-                .await
-                {
-                    Ok(permit) => Some(permit),
-                    Err(error) => {
-                        log::info!(
-                            "[INCIDENTS::RCA] New incident {} retained without RCA: {error}",
-                            incident.id
-                        );
-                        // §6: no verdict is coming, so nothing may go on holding a page for one.
-                        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-                            org_id,
-                            &incident.id,
-                        )
-                        .await;
-                        None
-                    }
-                }
-            };
-            #[cfg(not(feature = "cloud"))]
-            let usage_permit = None;
-
-            if !cfg!(feature = "cloud") || usage_permit.is_some() {
-                if let Err(e) = crate::incidents::append_event(
-                    org_id,
-                    &incident.id,
-                    config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
-                )
-                .await
-                {
-                    log::error!(
-                        "[INCIDENTS::RCA] Failed to emit AIAnalysisBegin for {org_id}/{}: {e}",
-                        incident.id
-                    );
-                }
-
-                let org_id_rca = org_id.to_string();
-                let incident_id_rca = incident.id.clone();
-                let handle = tokio::spawn(async move {
-                    if let Err(e) = trigger_rca_for_incident(
-                        org_id_rca.clone(),
-                        incident_id_rca.clone(),
-                        false,
-                        true,
-                        "system@openobserve.ai".to_string(),
-                        // First analysis for this incident — there is nothing to build on.
-                        false,
-                        usage_permit,
-                    )
-                    .await
-                    {
-                        log::debug!(
-                            "[INCIDENTS::RCA] Immediate trigger failed for incident {incident_id_rca}: {e}"
-                        );
-
-                        emit_analysis_failure(
-                            &org_id_rca,
-                            &incident_id_rca,
-                            config::meta::alerts::incidents::AnalysisTriggerType::AutomaticNewIncident,
-                            "Background spawn failed",
-                            Some(&e),
-                        )
-                        .await;
-                    }
-                    unregister_rca_task(&org_id_rca, &incident_id_rca);
-                });
-                register_rca_task(org_id, &incident.id, handle.abort_handle());
-            }
-        }
+    if muted_by.is_none() {
+        spawn_initial_rca(org_id, &incident.id).await;
     }
 
     Ok(IncidentCorrelationOutcome::NewIncidentCreated {
         incident_id: incident.id,
         service_name: service_name.to_string(),
     })
+}
+
+/// A repeat at a more urgent level raises the severity; the alert's own priority beats the level.
+async fn escalate_severity(
+    org_id: &str,
+    incident: &infra::table::entity::alert_incidents::Model,
+    subject: &CorrelationSubject,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+) -> Result<bool, anyhow::Error> {
+    let Some((current_severity, new_severity)) =
+        escalated_severity(&incident.severity, subject.severity, eval_level)
+    else {
+        return Ok(false);
+    };
+    infra::table::alert_incidents::update_severity(org_id, &incident.id, &new_severity.to_string())
+        .await?;
+    if let Err(e) = infra::table::incident_events::append(
+        org_id,
+        &incident.id,
+        IncidentEvent::severity_upgrade(
+            current_severity,
+            new_severity,
+            format!("alert '{}' escalated to {}", subject.name, new_severity),
+        ),
+    )
+    .await
+    {
+        log::error!(
+            "[Incidents] Failed to record severity-upgrade event for incident {org_id}/{}: {e}",
+            incident.id
+        );
+    }
+    log::info!(
+        "[Incidents] Incident {} escalated {current_severity} -> {new_severity} by alert '{}'",
+        incident.id,
+        subject.name
+    );
+    Ok(true)
+}
+
+/// The current and the raised severity when the firing's level is more urgent than the incident.
+fn escalated_severity(
+    current: &str,
+    subject_severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+) -> Option<(
+    config::meta::alerts::incidents::IncidentSeverity,
+    config::meta::alerts::incidents::IncidentSeverity,
+)> {
+    use config::meta::alerts::incidents::IncidentSeverity;
+    let level_severity = subject_severity.or_else(|| {
+        eval_level.and_then(|l| match l {
+            config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
+            config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
+            _ => None,
+        })
+    });
+    // P1 is most urgent; higher urgency = escalation.
+    let urgency = |s: IncidentSeverity| match s {
+        IncidentSeverity::P1 => 4u8,
+        IncidentSeverity::P2 => 3,
+        IncidentSeverity::P3 => 2,
+        IncidentSeverity::P4 => 1,
+    };
+    let new_severity = level_severity?;
+    let current_severity = current.parse::<IncidentSeverity>().ok()?;
+    (urgency(new_severity) > urgency(current_severity)).then_some((current_severity, new_severity))
+}
+
+/// A suppressed firing, or one that joins a still-muted incident, starts no workflow and no page.
+fn firing_is_muted(
+    muted_by: Option<&str>,
+    incident: &infra::table::entity::alert_incidents::Model,
+    reopened: bool,
+) -> bool {
+    muted_by.is_some() || (incident.muted_by_downtime_id.is_some() && !reopened)
 }
 
 /// Find an existing open incident or create a new one
@@ -1437,6 +1680,7 @@ async fn find_or_create_incident(
     correlation_reason: &str,
     service_name: &str,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    muted_by: Option<&str>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
 
@@ -1449,13 +1693,16 @@ async fn find_or_create_incident(
             infra::table::alert_incidents::find_open_incident_by_alert_id(org_id, &alert_id).await?
         {
             // Found existing AlertId incident for this alert - join it
-            let _ = infra::table::alert_incidents::add_alert_to_incident(
-                &incident.id,
-                &alert_id,
-                &subject.name,
-                subject.kind.as_str(),
-                triggered_at,
-                correlation_reason,
+            let (_, reopened) = join_then_unmute(
+                infra::table::alert_incidents::add_alert_to_incident(
+                    &incident.id,
+                    &alert_id,
+                    &subject.name,
+                    subject.kind.as_str(),
+                    triggered_at,
+                    correlation_reason,
+                ),
+                async || unmute_for_firing(org_id, &incident, muted_by).await,
             )
             .await?;
 
@@ -1474,12 +1721,14 @@ async fn find_or_create_incident(
                 );
             }
 
-            if let Err(e) = crate::incidents::send_incident_event_trigger(
-                org_id,
-                &incident.id,
-                IncidentEvent::alert(&alert_id, &subject.name, triggered_at),
-            )
-            .await
+            if muted_by.is_none()
+                && !reopened
+                && let Err(e) = crate::incidents::send_incident_event_trigger(
+                    org_id,
+                    &incident.id,
+                    IncidentEvent::alert(&alert_id, &subject.name, triggered_at),
+                )
+                .await
             {
                 log::error!(
                     "error triggering workflow for alert added for {org_id} incident id {} : {e}",
@@ -1495,66 +1744,21 @@ async fn find_or_create_incident(
                 &subject.name,
                 triggered_at,
             );
+            if reopened {
+                // Recomputed from the un-muting firing, so "opened" carries the right level.
+                return Ok(escalate_then_reopen(
+                    org_id,
+                    &incident.id,
+                    escalate_severity(org_id, &incident, subject, eval_level),
+                    reopened_after_mute(org_id, incident.id.clone(), service_name),
+                )
+                .await);
+            }
 
-            // T-8/§7.1: a repeat at HIGHER severity is an ESCALATION, not a
-            // repeat. A Warning-created P3 incident must upgrade to P2 and
-            // notify when the alert re-fires at Critical — the scheduler's
-            // silence layer explicitly let this delivery through, and
-            // suppressing it here would lose the only page for the
-            // escalation.
-            //
-            // B-29: `subject.severity` (alert.priority, when set) is the same
-            // precedence signal `create_new_incident` uses and takes the same
-            // priority here — otherwise a P1 alert repeating against an
-            // incident it didn't create could be capped at the eval_level
-            // default (P2) instead of escalating to the priority it's
-            // actually configured for.
-            use config::meta::alerts::incidents::{IncidentEvent, IncidentSeverity};
-            let level_severity = subject.severity.or_else(|| {
-                eval_level.and_then(|l| match l {
-                    config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
-                    config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
-                    _ => None,
-                })
-            });
-            // P1 is most urgent; higher urgency = escalation.
-            let urgency = |s: IncidentSeverity| match s {
-                IncidentSeverity::P1 => 4u8,
-                IncidentSeverity::P2 => 3,
-                IncidentSeverity::P3 => 2,
-                IncidentSeverity::P4 => 1,
-            };
-            if let Some(new_severity) = level_severity
-                && let Ok(current_severity) = incident.severity.parse::<IncidentSeverity>()
-                && urgency(new_severity) > urgency(current_severity)
+            // A muted firing must not raise the severity silently; the un-muting firing does it.
+            if !firing_is_muted(muted_by, &incident, reopened)
+                && escalate_severity(org_id, &incident, subject, eval_level).await?
             {
-                infra::table::alert_incidents::update_severity(
-                    org_id,
-                    &incident.id,
-                    &new_severity.to_string(),
-                )
-                .await?;
-                if let Err(e) = infra::table::incident_events::append(
-                    org_id,
-                    &incident.id,
-                    IncidentEvent::severity_upgrade(
-                        current_severity,
-                        new_severity,
-                        format!("alert '{}' escalated to {}", subject.name, new_severity),
-                    ),
-                )
-                .await
-                {
-                    log::error!(
-                        "[Incidents] Failed to record severity-upgrade event for incident {org_id}/{}: {e}",
-                        incident.id
-                    );
-                }
-                log::info!(
-                    "[Incidents] Incident {} escalated {current_severity} -> {new_severity} by alert '{}'",
-                    incident.id,
-                    subject.name
-                );
                 return Ok(IncidentCorrelationOutcome::SeverityEscalated {
                     incident_id: incident.id,
                     service_name: service_name.to_string(),
@@ -1599,13 +1803,16 @@ async fn find_or_create_incident(
             let mut merged_dims = existing_dims.clone();
             let dimensions_changed = merge_dimensions(&mut merged_dims, group_values, &existing.id);
 
-            let is_new_alert_type = infra::table::alert_incidents::add_alert_to_incident(
-                &existing.id,
-                &subject.id,
-                &subject.name,
-                subject.kind.as_str(),
-                triggered_at,
-                correlation_reason,
+            let (is_new_alert_type, reopened) = join_then_unmute(
+                infra::table::alert_incidents::add_alert_to_incident(
+                    &existing.id,
+                    &subject.id,
+                    &subject.name,
+                    subject.kind.as_str(),
+                    triggered_at,
+                    correlation_reason,
+                ),
+                async || unmute_for_firing(org_id, &existing, muted_by).await,
             )
             .await?;
 
@@ -1625,6 +1832,8 @@ async fn find_or_create_incident(
             }
 
             if !is_new_alert_type
+                && muted_by.is_none()
+                && !reopened
                 && let Err(e) = crate::incidents::send_incident_event_trigger(
                     org_id,
                     &existing.id,
@@ -1658,13 +1867,14 @@ async fn find_or_create_incident(
                 )
                 .await?;
 
-                if let Err(e) = crate::incidents::append_event(
+                if let Err(e) = append_event_unless_muted(
                     org_id,
                     &existing.id,
                     config::meta::alerts::incidents::IncidentEvent::dimensions_upgraded(
                         old_key_type_str,
                         new_key_type_str,
                     ),
+                    firing_is_muted(muted_by, &existing, reopened),
                 )
                 .await
                 {
@@ -1713,10 +1923,19 @@ async fn find_or_create_incident(
                 &subject.name,
                 triggered_at,
             );
+            if reopened {
+                return Ok(escalate_then_reopen(
+                    org_id,
+                    &existing.id,
+                    escalate_severity(org_id, &existing, subject, eval_level),
+                    reopened_after_mute(org_id, existing.id.clone(), service_name),
+                )
+                .await);
+            }
 
             if is_new_alert_type {
                 #[cfg(feature = "enterprise")]
-                {
+                if muted_by.is_none() {
                     let org_id_rca = org_id.to_string();
                     let incident_id_rca = existing.id.clone();
                     let cooldown = o2_enterprise::enterprise::common::config::get_config()
@@ -1826,6 +2045,7 @@ async fn find_or_create_incident(
         correlation_reason,
         service_name,
         eval_level,
+        muted_by,
     )
     .await
 }
@@ -2699,7 +2919,48 @@ async fn model_to_incident(
     Ok(model_to_incident_with_topology(db_model, topology))
 }
 
+/// The resolved incidents whose on-call record a muted resolve left open, in scan order.
+fn left_open<'a>(
+    resolved: &'a [String],
+    records: &HashMap<String, Vec<config::meta::oncall::Response>>,
+) -> Vec<&'a str> {
+    resolved
+        .iter()
+        .filter(|id| records.get(*id).is_some_and(|held| holds_open_record(held)))
+        .map(String::as_str)
+        .collect()
+}
+
+/// A record still open on a resolved incident is the page a muted resolve left escalating.
+fn holds_open_record(records: &[config::meta::oncall::Response]) -> bool {
+    records.iter().any(|record| !record.state.is_terminal())
+}
+
+/// Only a resolve can clear a mute, and only an org with downtimes can have one.
+fn reads_mute_before(status: &str, downtimes_enabled: bool) -> bool {
+    downtimes_enabled && status == "resolved"
+}
+
+/// A quiet change or a muted incident pages nobody and starts no workflow.
+fn status_change_is_muted(quiet: bool, muted_by_downtime_id: Option<&str>) -> bool {
+    quiet || muted_by_downtime_id.is_some()
+}
+
 /// Convert database model to domain model with pre-fetched topology
+/// A muted incident keeps its timeline but starts no workflow (D3).
+async fn append_event_unless_muted(
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+    muted: bool,
+) -> Result<(), anyhow::Error> {
+    if muted {
+        infra::table::incident_events::append(org_id, incident_id, event).await?;
+        return Ok(());
+    }
+    crate::incidents::append_event(org_id, incident_id, event).await
+}
+
 fn model_to_incident_with_topology(
     db_model: infra::table::entity::alert_incidents::Model,
     topology_context: Option<IncidentTopology>,
@@ -2722,7 +2983,34 @@ fn model_to_incident_with_topology(
         group_values: db_model.group_values,
         key_type: config::meta::alerts::incidents::KeyType::from_stored(&db_model.key_type),
         topology_context,
+        muted_by_downtime_id: db_model.muted_by_downtime_id,
     }
+}
+
+/// Clears the mute before the events, so a failed append cannot leave it muted.
+async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    incident_id: &str,
+    downtime_id: &str,
+) -> Result<(), anyhow::Error> {
+    infra::table::alert_incidents::clear_muted_by_downtime_id_with(
+        conn,
+        org_id,
+        incident_id,
+        downtime_id,
+    )
+    .await?;
+    let resolved = IncidentEvent::resolved(None);
+    infra::table::incident_events::append_with(conn, org_id, incident_id, resolved).await?;
+    let name = infra::table::downtimes::get_with(conn, org_id, downtime_id)
+        .await
+        .ok()
+        .flatten()
+        .map_or_else(|| downtime_id.to_string(), |d| d.name);
+    let comment = IncidentEvent::comment("system", format!("Resolved while muted by {name}"));
+    infra::table::incident_events::append_with(conn, org_id, incident_id, comment).await?;
+    Ok(())
 }
 
 /// Update incident status
@@ -2732,10 +3020,30 @@ pub async fn update_status(
     status: &str,
     user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
+    update_status_as(org_id, incident_id, status, user_id, false).await
+}
+
+/// [update_status]; `quiet` treats the incident as muted for this change only.
+pub async fn update_status_as(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    user_id: &str,
+    quiet: bool,
+) -> Result<Incident, anyhow::Error> {
     // Acknowledging goes through a dedicated atomic path so the actor and
     // timestamp land on the row itself (not just the event log) and a
     // second/concurrent acknowledge can't silently overwrite the first
     // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
+    let muted_before = reads_mute_before(
+        status,
+        o2_enterprise::enterprise::common::config::get_config()
+            .downtimes
+            .enabled,
+    ) && infra::table::alert_incidents::get(org_id, incident_id)
+        .await?
+        .is_some_and(|m| m.muted_by_downtime_id.is_some());
     let updated = if status == "acknowledged" {
         infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
             .await?
@@ -2744,9 +3052,14 @@ pub async fn update_status(
         infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
     };
 
+    let muted = status_change_is_muted(
+        quiet || muted_before,
+        updated.muted_by_downtime_id.as_deref(),
+    );
     // Every resolution path lands here, so closing the record once covers all of them.
     #[cfg(feature = "enterprise")]
     if status == "resolved"
+        && !muted
         && o2_enterprise::enterprise::oncall::is_enabled()
         && let Err(e) =
             o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
@@ -2764,7 +3077,7 @@ pub async fn update_status(
         _ => None,
     };
     if let Some(evt) = event
-        && let Err(e) = crate::incidents::append_event(org_id, incident_id, evt).await
+        && let Err(e) = append_event_unless_muted(org_id, incident_id, evt, muted).await
     {
         log::error!("[Incidents] Failed to record status event: org_id: {org_id}, error: {e}");
     }
@@ -2772,7 +3085,7 @@ pub async fn update_status(
     // Trigger RCA reanalysis when incident is reopened — context is fresh,
     // cooldown is bypassed, but in-flight guard still applies.
     #[cfg(feature = "enterprise")]
-    if status == "open" {
+    if status == "open" && !muted {
         let org_id_rca = org_id.to_string();
         let incident_id_rca = incident_id.to_string();
         let cooldown = o2_enterprise::enterprise::common::config::get_config()
@@ -2881,6 +3194,20 @@ pub async fn update_status(
     model_to_incident(updated).await
 }
 
+/// Records the resolved event of the auto-resolve job; a muted incident notifies nobody (D3).
+pub async fn record_auto_resolved(
+    org_id: &str,
+    incident_id: &str,
+    muted_by_downtime_id: Option<&str>,
+) -> Result<(), anyhow::Error> {
+    let Some(downtime_id) = muted_by_downtime_id else {
+        return crate::incidents::append_event(org_id, incident_id, IncidentEvent::resolved(None))
+            .await;
+    };
+    let conn = infra::db::get_orm_client_rw().await;
+    record_muted_auto_resolve(conn, org_id, incident_id, downtime_id).await
+}
+
 /// Update incident title
 pub async fn update_title(
     org_id: &str,
@@ -2933,8 +3260,9 @@ pub async fn update_severity(
         infra::table::alert_incidents::update_severity(org_id, incident_id, severity).await?;
 
     // Emit severity override event and notify only when the severity actually changed
+    let muted = updated.muted_by_downtime_id.is_some();
     if from_severity != to_severity {
-        if let Err(e) = crate::incidents::append_event(
+        if let Err(e) = append_event_unless_muted(
             org_id,
             incident_id,
             config::meta::alerts::incidents::IncidentEvent::severity_override(
@@ -2942,6 +3270,7 @@ pub async fn update_severity(
                 to_severity,
                 user_id,
             ),
+            muted,
         )
         .await
         {
@@ -2949,7 +3278,9 @@ pub async fn update_severity(
                 "[Incidents] Failed to record severity event: org_id: {org_id}, error: {e}"
             );
         }
-        send_incident_severity_notification(org_id, incident_id).await;
+        if !muted {
+            send_incident_severity_notification(org_id, incident_id).await;
+        }
     }
 
     model_to_incident(updated).await
@@ -2963,6 +3294,16 @@ mod tests {
     /// alert, so an unset priority has to mean the same thing on both. They used
     /// to differ — P2 here, P3 in `scheduler::handlers` — which made
     /// `creates_incident` a hidden severity switch.
+    #[test]
+    fn a_resolve_caused_by_a_muted_recovery_is_quiet() {
+        assert!(
+            status_change_is_muted(true, None),
+            "an incident opened before the window"
+        );
+        assert!(status_change_is_muted(false, Some("dt-1")));
+        assert!(!status_change_is_muted(false, None));
+    }
+
     #[test]
     fn test_the_incident_path_uses_the_shared_default_priority() {
         assert_eq!(
@@ -3222,5 +3563,278 @@ mod tests {
             UNKNOWN_SERVICE,
             "the guard compares against this exact value, so the two must agree"
         );
+    }
+
+    fn incident(muted_by: Option<&str>) -> infra::table::entity::alert_incidents::Model {
+        infra::table::entity::alert_incidents::Model {
+            id: "inc-1".to_string(),
+            org_id: "default".to_string(),
+            status: "open".to_string(),
+            severity: "P2".to_string(),
+            group_values: serde_json::json!({}),
+            key_type: "alert_id".to_string(),
+            topology_context: None,
+            first_alert_at: 1,
+            last_alert_at: 1,
+            resolved_at: None,
+            alert_count: 1,
+            title: None,
+            assigned_to: None,
+            acknowledged_by: None,
+            acknowledged_at: None,
+            created_at: 1,
+            updated_at: 1,
+            muted_by_downtime_id: muted_by.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn a_muted_firing_escalates_nothing_and_the_unmuting_firing_does() {
+        use config::meta::alerts::{incidents::IncidentSeverity, level::AlertLevel};
+        let mut opened_at_p3 = incident(Some("dt-1"));
+        opened_at_p3.severity = "P3".to_string();
+        assert!(firing_is_muted(Some("dt-1"), &opened_at_p3, false));
+        assert!(firing_is_muted(None, &opened_at_p3, false));
+        assert!(!firing_is_muted(None, &opened_at_p3, true));
+        assert!(firing_is_muted(Some("dt-1"), &incident(None), false));
+        assert!(!firing_is_muted(None, &incident(None), false));
+        assert_eq!(
+            escalated_severity(&opened_at_p3.severity, None, Some(AlertLevel::Critical)),
+            Some((IncidentSeverity::P3, IncidentSeverity::P2)),
+            "the opened message after the window carries P2"
+        );
+        assert_eq!(
+            escalated_severity("P3", None, Some(AlertLevel::Warning)),
+            None
+        );
+        assert_eq!(
+            escalated_severity("P2", Some(IncidentSeverity::P1), Some(AlertLevel::Warning)),
+            Some((IncidentSeverity::P2, IncidentSeverity::P1))
+        );
+        assert_eq!(escalated_severity("P2", None, None), None);
+    }
+
+    #[test]
+    fn a_suppressed_firing_never_unmutes_and_names_the_downtime_that_mutes_it_now() {
+        assert_eq!(
+            mute_change(Some("dt-2"), Some("dt-1")),
+            MuteChange::Retarget {
+                from: "dt-1",
+                to: "dt-2"
+            }
+        );
+        assert_eq!(mute_change(Some("dt-1"), Some("dt-1")), MuteChange::Keep);
+        assert_eq!(mute_change(Some("dt-1"), None), MuteChange::Keep);
+        assert_eq!(mute_change(None, Some("dt-1")), MuteChange::Unmute("dt-1"));
+        assert_eq!(mute_change(None, None), MuteChange::Keep);
+    }
+
+    fn oncall_record(
+        incident_id: &str,
+        state: config::meta::oncall::ResponseState,
+    ) -> config::meta::oncall::Response {
+        use config::meta::oncall::{ResponderRole, Response, SubjectRef, SubjectType};
+        Response {
+            id: format!("resp_{incident_id}"),
+            org_id: "acme".into(),
+            subject: SubjectRef::new(SubjectType::Alert, "al_1", 1),
+            team_id: Some("team_1".into()),
+            title: None,
+            cause: None,
+            cause_note: None,
+            snoozed_until: None,
+            ladder_anchor: None,
+            ladder_run: None,
+            priority: 2,
+            responder_role: ResponderRole::Owner,
+            exhausted_at: None,
+            origin_response_id: None,
+            state,
+            opened_at: 0,
+            acked_by: None,
+            acked_at: None,
+            closed_at: None,
+            incident_id: Some(incident_id.into()),
+            updated_at: 0,
+        }
+    }
+
+    #[test]
+    fn only_a_resolved_incident_with_an_open_record_is_recovered_after_the_window() {
+        use config::meta::oncall::ResponseState;
+        let record = |state| oncall_record("inc_1", state);
+        assert!(holds_open_record(&[record(ResponseState::Triggered)]));
+        assert!(holds_open_record(&[
+            record(ResponseState::Resolved),
+            record(ResponseState::Acknowledged)
+        ]));
+        assert!(!holds_open_record(&[record(ResponseState::Resolved)]));
+        assert!(!holds_open_record(&[]));
+    }
+
+    #[test]
+    fn a_resolve_reads_the_mute_only_with_downtimes_on() {
+        assert!(reads_mute_before("resolved", true));
+        assert!(
+            !reads_mute_before("resolved", false),
+            "no extra get with the flag off"
+        );
+        assert!(!reads_mute_before("acknowledged", true));
+        assert!(!reads_mute_before("open", true));
+    }
+
+    #[tokio::test]
+    async fn a_failed_join_leaves_the_mute_so_the_next_firing_still_reopens() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let muted = AtomicBool::new(true);
+        let failed = join_then_unmute(
+            async { Err::<bool, _>(infra::errors::Error::Message("db down".to_string())) },
+            async || muted.swap(false, Ordering::SeqCst),
+        )
+        .await;
+        assert!(failed.is_err());
+        assert!(
+            muted.load(Ordering::SeqCst),
+            "the mute stays for the next firing"
+        );
+        let (_, reopened) = join_then_unmute(async { Ok(false) }, async || {
+            muted.swap(false, Ordering::SeqCst)
+        })
+        .await
+        .unwrap();
+        assert!(
+            reopened,
+            "the next firing reopens, so it yields NewIncidentCreated"
+        );
+        assert!(!muted.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn an_incident_that_is_not_muted_has_nothing_to_unmute() {
+        assert!(!unmute_for_firing("default", &incident(None), None).await);
+    }
+
+    #[tokio::test]
+    async fn a_muted_auto_resolve_whose_event_append_fails_still_clears_the_mute() {
+        use infra::table::entity::alert_incidents;
+        use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, EntityTrait, Schema};
+
+        // Only the incidents table exists, so both event appends fail.
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let table = Schema::new(backend).create_table_from_entity(alert_incidents::Entity);
+        db.execute(backend.build(&table)).await.unwrap();
+        let row: alert_incidents::ActiveModel = incident(Some("dt-1")).into();
+        alert_incidents::Entity::insert(row.reset_all())
+            .exec(&db)
+            .await
+            .unwrap();
+
+        let recorded = record_muted_auto_resolve(&db, "default", "inc-1", "dt-1").await;
+        assert!(recorded.is_err());
+        let stored = alert_incidents::Entity::find_by_id("inc-1".to_string())
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.muted_by_downtime_id, None);
+    }
+
+    #[tokio::test]
+    async fn a_newer_open_incident_does_not_hide_the_page_a_muted_resolve_left_open() {
+        use config::meta::oncall::ResponseState;
+        use infra::table::entity::{alert_incident_alerts, alert_incidents};
+        use sea_orm::{ActiveModelTrait, ConnectionTrait, Database, EntityTrait, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(alert_incidents::Entity),
+            schema.create_table_from_entity(alert_incident_alerts::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        // I1 resolved quietly under the ended window; the Firing run after it opened I2.
+        for (id, status, fired_at) in [("i1", "resolved", 1), ("i2", "open", 2)] {
+            let mut model = incident(None);
+            model.id = id.to_string();
+            model.status = status.to_string();
+            let row: alert_incidents::ActiveModel = model.into();
+            alert_incidents::Entity::insert(row.reset_all())
+                .exec(&db)
+                .await
+                .unwrap();
+            let link = alert_incident_alerts::Model {
+                incident_id: id.to_string(),
+                alert_id: "a1".to_string(),
+                alert_fired_at: fired_at,
+                alert_name: "a1".to_string(),
+                alert_kind: "alert".to_string(),
+                correlation_reason: None,
+                created_at: fired_at,
+                resolved_at: None,
+            };
+            let link: alert_incident_alerts::ActiveModel = link.into();
+            alert_incident_alerts::Entity::insert(link.reset_all())
+                .exec(&db)
+                .await
+                .unwrap();
+        }
+        let resolved = infra::table::alert_incidents::resolved_incidents_for_alert_with(
+            &db,
+            "default",
+            "a1",
+            MUTED_RESOLVES_SCANNED,
+        )
+        .await
+        .unwrap();
+        assert_eq!(resolved, ["i1"]);
+
+        let records = HashMap::from([
+            (
+                "i1".to_string(),
+                vec![oncall_record("i1", ResponseState::Triggered)],
+            ),
+            (
+                "i2".to_string(),
+                vec![oncall_record("i2", ResponseState::Triggered)],
+            ),
+        ]);
+        assert_eq!(
+            left_open(&resolved, &records),
+            ["i1"],
+            "I1's page is closed; the live I2 keeps its own"
+        );
+        let closed = HashMap::from([(
+            "i1".to_string(),
+            vec![oncall_record("i1", ResponseState::Resolved)],
+        )]);
+        assert!(left_open(&resolved, &closed).is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_failed_severity_raise_after_the_unmute_still_sends_the_opened_page() {
+        let mut paged = 0;
+        let outcome = escalate_then_reopen(
+            "default",
+            "inc-1",
+            async { Err(anyhow::anyhow!("db down")) },
+            async {
+                paged += 1;
+                IncidentCorrelationOutcome::NewIncidentCreated {
+                    incident_id: "inc-1".to_string(),
+                    service_name: "payments".to_string(),
+                }
+            },
+        )
+        .await;
+        assert!(matches!(
+            outcome,
+            IncidentCorrelationOutcome::NewIncidentCreated { ref incident_id, .. }
+                if incident_id == "inc-1"
+        ));
+        assert_eq!(paged, 1, "the delayed opened message goes out once");
     }
 }
