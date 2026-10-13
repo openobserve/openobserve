@@ -48,11 +48,13 @@ import { HOST_AGENT_SLUGS } from "./content/osAgent";
 import {
   READY_MADE_SOURCE_BY_SETUP_SLUG,
   getReadyMadeSource,
+  type ReadyMadeSourceId,
 } from "@/composables/readyMade/catalog";
 import {
   installReadyMade,
   type ReadyMadeInstallResult,
 } from "@/composables/readyMade/installReadyMade";
+import { readReadyMadeSettings } from "@/composables/readyMade/readyMadeSettings";
 import { useReadyMadeDetection } from "@/composables/readyMade/useReadyMadeDetection";
 
 const props = defineProps<{
@@ -176,18 +178,26 @@ const rememberReadyMade = (org: string, result: ReadyMadeInstallResult) => {
   return readyMadeTarget.value;
 };
 
+// Forced: this read gates a write, and an answer given in another tab is not in this tab's cache.
+const isReadyMadeUnanswered = async (org: string, userId: string, sourceId: ReadyMadeSourceId) => {
+  if (!org || !userId) return false;
+  const memory = await readReadyMadeSettings(org, userId, { force: true }).catch(() => null);
+  return !!memory && !memory.sources[sourceId];
+};
+
 const onReadyMadeDetected = async () => {
   const sourceId = readyMadeSourceId.value;
   if (!sourceId) return;
   const org = store.state.selectedOrganization?.identifier ?? "";
+  const userId = store.state.userInfo?.email ?? "";
+  // Detection fires on page open with no click, so an earlier answer or an unreadable memory keeps this silent.
+  if (!(await isReadyMadeUnanswered(org, userId, sourceId))) return;
   // Kubernetes Test passes on logs alone; without the metrics its Cluster dashboard would open empty.
   if (sourceId === "kubernetes") {
     const detected = await readyMadeDetection?.detect({ force: true }).catch(() => null);
     if (!detected?.includes("kubernetes")) return;
   }
-  const result = await installReadyMade(org, sourceId, {
-    userId: store.state.userInfo?.email,
-  });
+  const result = await installReadyMade(org, sourceId, { userId });
   // The user didn't invoke the install, so a failure here stays silent.
   const target = rememberReadyMade(org, result);
   if (!target || result.status === "error") return;

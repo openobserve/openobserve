@@ -22,6 +22,14 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { ref } from "vue";
 import DataSourceSetupCard from "./DataSourceSetupCard.vue";
 import i18n from "@/locales";
+import settings from "@/services/settings";
+import { settingKeys } from "@/services/settings.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  READY_MADE_SETTING_KEY,
+  resetReadyMadeSessionMemory,
+  saveReadyMadeStates,
+} from "@/composables/readyMade/readyMadeSettings";
 
 const {
   importHostMetricsDashboard,
@@ -41,6 +49,13 @@ vi.mock("@/composables/readyMade/installReadyMade", () => ({ installReadyMade })
 vi.mock("@/composables/readyMade/useReadyMadeDetection", () => ({
   useReadyMadeDetection: () => ({ detect: detectReadyMade }),
 }));
+// The memory read stays real; only its transport is faked.
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { getSetting: vi.fn(), setUserSetting: vi.fn() },
+  });
+});
 
 vi.mock("@/composables/useSetupDashboardImport", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/composables/useSetupDashboardImport")>()),
@@ -455,11 +470,11 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
   let wrapper: VueWrapper<any>;
   let router: any;
 
-  const mountCard = (slug: string) => {
+  const mountCard = (slug: string, userInfo: Record<string, unknown> = { email: "t@e.com" }) => {
     const store = createStore({
       state: {
         selectedOrganization: { identifier: "test-org" },
-        userInfo: { email: "t@e.com" },
+        userInfo,
         organizationData: { organizationPasscode: "pc" },
         theme: "light",
       },
@@ -481,6 +496,24 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
   const tp = (key: string, named: Record<string, unknown>, count: number) =>
     (i18n.global as any).t(key, named, count);
 
+  const getSetting = settings.getSetting as unknown as ReturnType<typeof vi.fn>;
+  const setUserSetting = settings.setUserSetting as unknown as ReturnType<typeof vi.fn>;
+  const httpError = (status: number) =>
+    Object.assign(new Error(String(status)), { response: { status } });
+  const stored = (sources: Record<string, "added" | "dismissed">) => ({
+    data: {
+      setting_value: {
+        version: 1,
+        sources: Object.fromEntries(
+          Object.entries(sources).map(([id, state]) => [id, { state, at: "2026-10-01T00:00:00Z" }]),
+        ),
+      },
+    },
+  });
+  /** What the server holds as this user's memory; nothing stored is a 404. */
+  const answered = (sources: Record<string, "added" | "dismissed">) =>
+    getSetting.mockResolvedValue(stored(sources));
+
   const installed = (sourceId: string, count = 1, status = "created") => ({
     status,
     sourceId,
@@ -497,8 +530,12 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetReadyMadeSessionMemory();
+    queryClient.clear();
     installReadyMade.mockResolvedValue(installed("postgresql"));
     detectReadyMade.mockResolvedValue(["kubernetes"]);
+    getSetting.mockRejectedValue(httpError(404));
+    setUserSetting.mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -510,19 +547,101 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
     ["mySQL", "mysql"],
     ["mariaDB", "mysql"],
     ["redis", "redis"],
-  ])("Test on the %s card installs %s silently and toasts the folder", async (slug, sourceId) => {
-    wrapper = mountCard(slug);
+  ])(
+    "detection on the %s card with no earlier answer installs %s silently and toasts the folder",
+    async (slug, sourceId) => {
+      wrapper = mountCard(slug);
+      renderer().vm.$emit("detected", 2);
+      await flushPromises();
+      expect(getSetting).toHaveBeenCalledWith("test-org", READY_MADE_SETTING_KEY, "t@e.com");
+      expect(installReadyMade).toHaveBeenCalledWith("test-org", sourceId, { userId: "t@e.com" });
+      expect(detectReadyMade).not.toHaveBeenCalled();
+      const arg = toastMock.mock.calls[0][0];
+      expect(arg.variant).toBe("success");
+      arg.action.handler();
+      expect(router.push).toHaveBeenCalledWith({
+        path: "/dashboards/view",
+        query: { org_identifier: "test-org", dashboard: "dash-0", folder: "f-1" },
+      });
+    },
+  );
+
+  it.each(["dismissed", "added"] as const)(
+    "detection does nothing when this user's answer for the source is %s",
+    async (state) => {
+      answered({ postgresql: state });
+      wrapper = mountCard("postgres");
+      renderer().vm.$emit("detected", 2);
+      await flushPromises();
+      expect(getSetting).toHaveBeenCalledWith("test-org", READY_MADE_SETTING_KEY, "t@e.com");
+      expect(installReadyMade).not.toHaveBeenCalled();
+      expect(setUserSetting).not.toHaveBeenCalled();
+      expect(toastMock).not.toHaveBeenCalled();
+      // The embedding page still hears about the data.
+      expect(wrapper.emitted("detected")).toEqual([[2]]);
+    },
+  );
+
+  it("another source's answer does not silence this one", async () => {
+    answered({ redis: "dismissed", mysql: "added" });
+    wrapper = mountCard("postgres");
     renderer().vm.$emit("detected", 2);
     await flushPromises();
-    expect(installReadyMade).toHaveBeenCalledWith("test-org", sourceId, { userId: "t@e.com" });
-    expect(detectReadyMade).not.toHaveBeenCalled();
-    const arg = toastMock.mock.calls[0][0];
-    expect(arg.variant).toBe("success");
-    arg.action.handler();
-    expect(router.push).toHaveBeenCalledWith({
-      path: "/dashboards/view",
-      query: { org_identifier: "test-org", dashboard: "dash-0", folder: "f-1" },
+    expect(installReadyMade).toHaveBeenCalledWith("test-org", "postgresql", { userId: "t@e.com" });
+    expect(toastMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([500, 403])("detection does nothing when the memory read fails (%s)", async (status) => {
+    getSetting.mockRejectedValue(httpError(status));
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(getSetting).toHaveBeenCalledTimes(1);
+    expect(installReadyMade).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("the MariaDB card honours the mysql answer", async () => {
+    answered({ mysql: "dismissed" });
+    wrapper = mountCard("mariaDB");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(installReadyMade).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("reads the server's copy, so an answer given in another tab wins over this tab's cache", async () => {
+    queryClient.setQueryData(settingKeys.one("test-org", READY_MADE_SETTING_KEY, "t@e.com"), {
+      version: 1,
+      sources: {},
     });
+    answered({ postgresql: "dismissed" });
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(getSetting).toHaveBeenCalledTimes(1);
+    expect(installReadyMade).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("honours an answer whose save failed earlier in this session", async () => {
+    setUserSetting.mockRejectedValue(new Error("down"));
+    const { saved } = await saveReadyMadeStates("test-org", "t@e.com", { postgresql: "dismissed" });
+    expect(saved).toBe(false);
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(installReadyMade).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("stays silent without a signed-in user id, whose answer could be neither read nor saved", async () => {
+    wrapper = mountCard("postgres", {});
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(getSetting).not.toHaveBeenCalled();
+    expect(installReadyMade).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalled();
   });
 
   it("names the dashboard and folder in the toast", async () => {
@@ -542,13 +661,15 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
     expect(toastMock).not.toHaveBeenCalled();
   });
 
-  it("Kubernetes installs on Test only when its metrics rule passes", async () => {
+  it("Kubernetes with no earlier answer installs only when its metrics rule passes", async () => {
     detectReadyMade.mockResolvedValue([]);
     wrapper = mountCard("kubernetes");
     renderer().vm.$emit("detected", 1);
     await flushPromises();
+    expect(getSetting).toHaveBeenCalledWith("test-org", READY_MADE_SETTING_KEY, "t@e.com");
     expect(detectReadyMade).toHaveBeenCalledWith({ force: true });
     expect(installReadyMade).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalled();
 
     detectReadyMade.mockResolvedValue(["kubernetes"]);
     installReadyMade.mockResolvedValue(installed("kubernetes", 4));
@@ -559,6 +680,19 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
       tp("dashboard.readyMade.addedOne", { name: "Kubernetes", folder: "Kubernetes", count: 4 }, 4),
     );
   });
+
+  it.each(["dismissed", "added"] as const)(
+    "Kubernetes with a %s answer skips the metrics re-check and the install",
+    async (state) => {
+      answered({ kubernetes: state });
+      wrapper = mountCard("kubernetes");
+      renderer().vm.$emit("detected", 1);
+      await flushPromises();
+      expect(detectReadyMade).not.toHaveBeenCalled();
+      expect(installReadyMade).not.toHaveBeenCalled();
+      expect(toastMock).not.toHaveBeenCalled();
+    },
+  );
 
   it("the Kubernetes step button always installs and opens Cluster, rule or not", async () => {
     detectReadyMade.mockResolvedValue([]);
@@ -571,6 +705,36 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
       path: "/dashboards/view",
       query: { org_identifier: "test-org", dashboard: "dash-0", folder: "f-1" },
     });
+  });
+
+  it("the step button still installs and opens after No thanks, without consulting the memory", async () => {
+    answered({ postgresql: "dismissed" });
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(installReadyMade).not.toHaveBeenCalled();
+    getSetting.mockClear();
+
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    expect(getSetting).not.toHaveBeenCalled();
+    // The shared install is what records "added"; the click hands it this user.
+    expect(installReadyMade).toHaveBeenCalledTimes(1);
+    expect(installReadyMade).toHaveBeenCalledWith("test-org", "postgresql", { userId: "t@e.com" });
+    expect(analytics.track).toHaveBeenCalledWith("dashboard_created");
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "test-org", dashboard: "dash-0", folder: "f-1" },
+    });
+  });
+
+  it("the step button installs and opens even when the memory cannot be read", async () => {
+    getSetting.mockRejectedValue(httpError(500));
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    expect(installReadyMade).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
 
   it("the step button reuses the Test-time install", async () => {
@@ -600,6 +764,9 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
   });
 
   it("leaves Host Metrics and NVIDIA flows alone", async () => {
+    const imported = { status: "created", dashboardId: "dash-1", folderId: "default" };
+    importHostMetricsDashboard.mockResolvedValue(imported);
+    importSetupDashboard.mockResolvedValue(imported);
     wrapper = mountCard("linux");
     renderer().vm.$emit("detected", 2);
     renderer().vm.$emit("step-action", "open-ready-made-dashboard");
@@ -610,5 +777,9 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
     renderer().vm.$emit("detected", 2);
     await flushPromises();
     expect(installReadyMade).not.toHaveBeenCalled();
+    // Host and NVIDIA imports never consult the ready-made memory.
+    expect(getSetting).not.toHaveBeenCalled();
+    expect(importHostMetricsDashboard).toHaveBeenCalledTimes(1);
+    expect(importSetupDashboard).toHaveBeenCalledTimes(1);
   });
 });
