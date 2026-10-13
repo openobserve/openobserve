@@ -578,10 +578,12 @@ function isFrontendFile(filePath) {
 // POM/selector rules must not touch app code. No separate *.spec.js rule: every real spec lives
 // under playwright-tests/**, already covered by the tree branch, and an un-anchored one would also
 // pull in committed fixtures/** specs. (Archived specs under test-archives/ are gitignored, so they
-// never reach a diff either way.)
+// never reach a diff either way.) The tree branch takes .js or .ts: the suite is all .js today, but
+// matching .ts keeps it consistent with the config branch and qa.md and future-proofs a TS
+// migration — otherwise a future .ts spec would silently go unreviewed.
 function isTestFile(filePath) {
   if (!filePath.startsWith("tests/ui-testing/")) return false;
-  if (/^tests\/ui-testing\/(playwright-tests|pages|utils)\/.*\.js$/.test(filePath)) return true;
+  if (/^tests\/ui-testing\/(playwright-tests|pages|utils)\/.*\.(js|ts)$/.test(filePath)) return true;
   return /^tests\/ui-testing\/playwright[^/]*\.config\.[jt]s$/.test(filePath);
 }
 
