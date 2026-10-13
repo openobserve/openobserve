@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :model-value="chip"
         :aria-label="t('autoobserve.activity.outcomeFilter')"
         mobile-dropdown
-        class="rounded-full!"
         data-test="autoobserve-activity-status"
         @update:model-value="(v) => v && (chip = v as ChipFilter)"
       >
@@ -33,7 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="c"
           :value="c"
           size="sm"
-          class="rounded-full! px-3!"
           :disabled="!counts[c] && c !== chip"
           :data-test="`autoobserve-activity-chip-${c}`"
         >
