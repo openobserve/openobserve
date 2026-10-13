@@ -147,7 +147,7 @@ export function generateAnomalySummary(
       } else {
         parts.push(
           t("alerts.anomaly.summaryAlertingNoDestination", {
-            warning: chip(t("alerts.anomaly.summaryNoDestinationSet")),
+            warning: chip(t("alerts.summary.noDestination")),
           }),
         );
       }

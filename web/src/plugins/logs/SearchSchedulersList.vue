@@ -325,9 +325,8 @@
 <script lang="ts">
 //@ts-nocheck
 import {
-  ref,
   onMounted,
-  onUnmounted,
+  ref,
   computed,
   defineAsyncComponent,
   defineComponent,
@@ -365,7 +364,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
@@ -906,15 +905,10 @@ export default defineComponent({
         },
       },
     ]);
-    // Own page: claim the keyboard scope and load jobs on mount, then hand the
-    // scope back to the logs page on leave.
     onMounted(() => {
-      getManager()?.setScope("search-schedulers");
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      getManager()?.setScope("logs");
-    });
+
     return {
       searchObj,
       store,

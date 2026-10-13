@@ -88,6 +88,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           @mouseleave="onUnhoverSpan"
           :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
+          :aria-current="
+            (spans as any[])[virtualRow.index].spanId === selectedSpanId ? 'true' : undefined
+          "
         >
           <div :style="{ width: leftWidth + 'px' }" class="ps-1.5">
             <div

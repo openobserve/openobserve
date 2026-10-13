@@ -96,6 +96,10 @@ export interface ButtonProps extends PrimitiveProps {
   size?: ButtonSize;
   /** Disables the button and all interaction */
   disabled?: boolean;
+  /** Keeps an unavailable button focusable so its reason can be reached. */
+  focusableUnavailable?: boolean;
+  /** Associates the unavailable button with its reason. */
+  descriptionId?: string;
   /** Shows loading state and disables interaction */
   loading?: boolean;
   /** Applies active/selected state styling (overrides variant to primary appearance) */
@@ -122,6 +126,8 @@ export interface ButtonEmits {
 export interface ButtonSlots {
   /** Main label / content */
   default?: () => unknown;
+  /** Explains why the focusable button cannot perform its action. */
+  "unavailable-reason"?: () => unknown;
   /** Icon placed before the label */
   "icon-left"?: () => unknown;
   /** Icon placed after the label */

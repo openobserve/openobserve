@@ -288,7 +288,8 @@
       "logsQueryBuilder-filters-advanced.spec.js",
       "logsquickmode.spec.js",
       "logshistogram.spec.js",
-      "logsQuickPick.spec.js"
+      "logsQuickPick.spec.js",
+      "logs-jk-navigation.spec.js"
     ],
     "disabled": []
   },
@@ -300,7 +301,9 @@
       "logsQueryBuilder-chart.spec.js",
       "logsQueryBuilder-filters-basic.spec.js",
       "pagination.spec.js",
-      "unflattened.spec.js"
+      "unflattened.spec.js",
+      "logsFreeText.spec.js",
+      "logsNoFtsRecovery.spec.js"
     ],
     "disabled": []
   },
@@ -346,12 +349,22 @@
       "indexquery.spec.js",
       "region.spec.js",
       "timezoneDisplay.spec.js",
-      "searchPatternsMultiStream.spec.js"
+      "searchPatternsMultiStream.spec.js",
+      "logsActionReasons.spec.js",
+      "logsSearchCancelled.spec.js"
     ],
     "disabled": [
       {
         "file": "searchJobInspector.spec.js",
         "reason": "TODO: update for new correlation feature"
+      },
+      {
+        "file": "logsShippedDefaults.spec.js",
+        "reason": "Backend phase: /config must expose auto_query_max_scan_mb (the spec skips itself without it), and its beforeAll waits 120s for stream stats, which the server default ZO_CALCULATE_STATS_INTERVAL=600 cannot deliver."
+      },
+      {
+        "file": "logsAutoRunGuard.spec.js",
+        "reason": "Same backend-phase prerequisite as logsShippedDefaults, and it seeds 24h of backdated rows, so it also needs a shard with ingest_allowed_upto >= 24 (the workflow default is 5h)."
       }
     ]
   },
@@ -520,7 +533,8 @@
       "traces-autocomplete-suggestions.spec.js",
       "traceGenAiParts.spec.js",
       "tracesCharts.spec.js",
-      "traceSessionReplay.spec.js"
+      "traceSessionReplay.spec.js",
+      "traces-jk-navigation.spec.js"
     ],
     "disabled": []
   },

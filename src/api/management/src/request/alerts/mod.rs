@@ -49,7 +49,7 @@ use {
 #[cfg(feature = "enterprise")]
 use crate::models::alerts::requests::UpdateAnomalyAlertFields;
 #[cfg(feature = "enterprise")]
-use crate::models::alerts::responses::anomaly_config_to_list_item;
+use crate::models::alerts::responses::anomaly_list_items;
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::alerts::{
@@ -214,7 +214,7 @@ fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Val
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations array is required with valid destination names. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Create a new alert rule with flexible query options. IMPORTANT: Alert name must use snake_case (no spaces/special chars like :,#,?,&,%,/,quotes), destinations must name existing destinations and may be empty. QueryCondition supports 3 query types: (1) Custom - uses conditions, aggregation, vrl_function, search_event_type, multi_time_range; (2) SQL - uses sql, vrl_function, search_event_type; (3) PromQL - uses promql, promql_condition, multi_time_range", "category": "alerts"}))
     )
 )]
 pub async fn create_alert(
@@ -708,6 +708,8 @@ fn composite_list_item(
         child_count: None,
         referenced_by_composite_count: None,
         expression_summary: None,
+        active_downtime: None,
+        downtime_dimensions: Default::default(),
     })
 }
 
@@ -1613,6 +1615,7 @@ pub async fn list_alert_group_transitions(
                     to_outcome: t.to_outcome.to_string(),
                     at: t.at,
                     value: t.value,
+                    rule_value: t.rule_value,
                 })
                 .collect(),
         }),
@@ -2982,9 +2985,9 @@ pub async fn list_alerts(
         // would return every anomaly config alongside the matching alerts.
         let before = list.len();
         list.extend(
-            configs
-                .iter()
-                .filter_map(anomaly_config_to_list_item)
+            anomaly_list_items(&org_id, &configs)
+                .await
+                .into_iter()
                 .filter(|item| enabled_filter.is_none_or(|enabled| item.enabled == enabled))
                 .filter(|item| match &priority_filter {
                     None => true,
@@ -3032,6 +3035,7 @@ pub async fn list_alerts(
     let mut list = list;
     enrich_with_run_state(&mut list).await;
     enrich_with_composite_metadata(&org_id, &visibility, &mut list).await;
+    crate::models::alerts::responses::fill_active_downtimes(&org_id, &mut list).await;
 
     // Feature-scoped fields: keep destinations/template off the default list path
     // (bytes + module-scoped names) unless the dependency view explicitly opted in.
@@ -3664,7 +3668,7 @@ pub async fn trigger_alert(
     }
     let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
-        Ok(_) => MetaHttpResponse::ok("Alert triggered"),
+        Ok(triggered) => MetaHttpResponse::ok(triggered.response_message()),
         Err(AlertError::AlertNotFound) => {
             if let Some(_composite) =
                 openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
@@ -4218,14 +4222,6 @@ mod tests {
     }
 
     #[test]
-    fn test_alert_destination_missing_is_bad_request() {
-        assert_eq!(
-            status(AlertError::AlertDestinationMissing),
-            StatusCode::BAD_REQUEST
-        );
-    }
-
-    #[test]
     fn test_alert_id_missing_is_bad_request() {
         assert_eq!(status(AlertError::AlertIdMissing), StatusCode::BAD_REQUEST);
     }
@@ -4733,14 +4729,14 @@ mod tests {
             let (status, body) = create(
                 "sa_org1",
                 &caller,
-                json!({"name": "a4", "stream_type": "logs", "stream_name": "secret",
+                json!({"name": "a:4", "stream_type": "logs", "stream_name": "secret",
                        "query_condition": {"type": "sql", "sql": "SELECT * FROM secret"}}),
             )
             .await;
             assert_eq!(status, StatusCode::BAD_REQUEST);
             assert_eq!(
                 body["message"],
-                AlertError::AlertDestinationMissing.to_string()
+                AlertError::AlertNameOfgaUnsupported.to_string()
             );
         }
 

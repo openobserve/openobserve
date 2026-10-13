@@ -370,6 +370,9 @@ export const useHistogram = () => {
   };
 
   const generateHistogramSkeleton = () => {
+    // A held or empty run builds no request, which leaves no time range to lay the skeleton on.
+    const startTime = searchObj.data.customDownloadQueryObj?.query?.start_time;
+    if (startTime === undefined) return;
     if (
       Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "aggs") &&
       searchObj.data.queryResults.aggs
@@ -384,7 +387,7 @@ export const useHistogram = () => {
       searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval
         ? searchObj.data.queryResults.histogram_interval * 1000000
         : intervalMs;
-      const startTimeDate = new Date(searchObj.data.customDownloadQueryObj.query.start_time / 1000); // Convert microseconds to milliseconds
+      const startTimeDate = new Date(startTime / 1000); // Convert microseconds to milliseconds
       if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
         startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 0, 0); // Round to the nearest whole minute
       } else if (searchObj.meta.resultGrid.chartInterval.includes("1 minute")) {

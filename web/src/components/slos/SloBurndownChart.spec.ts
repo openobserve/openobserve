@@ -337,3 +337,49 @@ describe("SloBurndownChart", () => {
     });
   });
 });
+
+describe("SloBurndownChart — downtime corrections", () => {
+  beforeEach(() => search.mockReset());
+
+  it("shades corrected buckets on the budget chart", async () => {
+    respond([
+      { ...bucket(0, 100, 100), corrected: 0 },
+      { ...bucket(1, 0, 0), corrected: 1 },
+      { ...bucket(2, 0, 0), corrected: 1 },
+      { ...bucket(3, 100, 100), corrected: 0 },
+    ]);
+    const wrapper = await createWrapper();
+    const area = options(wrapper, "budget").series[0].markArea.data;
+    expect(area).toHaveLength(1);
+    expect(area[0][0].xAxis).toBe(1);
+    expect(area[0][1].xAxis).toBe(3);
+    wrapper.unmount();
+  });
+
+  it("gives a one-bucket correction a band with width, labelled inside it", async () => {
+    respond([
+      { ...bucket(0, 100, 100), corrected: 0 },
+      { ...bucket(1, 0, 0), corrected: 1 },
+      { ...bucket(2, 100, 100), corrected: 0 },
+    ]);
+    const wrapper = await createWrapper();
+    const markArea = options(wrapper, "budget").series[0].markArea;
+    expect(markArea.data[0][0].xAxis).toBe(1);
+    expect(markArea.data[0][1].xAxis).toBe(2);
+    expect(markArea.label.position).toBe("insideTop");
+    expect(markArea.itemStyle.opacity).toBeGreaterThan(0);
+    wrapper.unmount();
+  });
+
+  it("retries without the column when the error names corrected_by", async () => {
+    search
+      .mockRejectedValueOnce(new Error("Schema error: No field named corrected_by"))
+      .mockResolvedValueOnce({ data: { hits: clean(3) } } as any);
+    const wrapper = await createWrapper();
+    expect(search).toHaveBeenCalledTimes(2);
+    const retrySql = (search.mock.calls[1][0] as any).query.query.sql as string;
+    expect(retrySql).not.toContain("corrected_by");
+    expect(options(wrapper, "budget").series[0].markArea.data).toEqual([]);
+    wrapper.unmount();
+  });
+});

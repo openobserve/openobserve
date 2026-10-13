@@ -62,8 +62,6 @@ pub enum Condition {
     StrMatch(String, String, bool),
     // field, values, negated
     In(String, Vec<String>, bool),
-    // field, pattern
-    Regex(String, String),
     // term
     MatchAll(String),
     // term, distance
@@ -95,7 +93,6 @@ impl Condition {
                     format!("{} IN ({})", field, values.join(","))
                 }
             }
-            Condition::Regex(field, value) => format!("{field}=~{value}"),
             Condition::MatchAll(value) => {
                 let tokens = o2_collect_search_tokens(value);
                 format!("({INDEX_FIELD_NAME_FOR_ALL}:{value}):({tokens:?})")
@@ -236,10 +233,6 @@ impl Condition {
                     query
                 }
             }
-            Condition::Regex(field, value) => {
-                let field = schema.get_field(field)?;
-                Box::new(RegexQuery::from_pattern(value, field)?)
-            }
             Condition::StrMatch(field, value, case_sensitive) => {
                 let field = schema.get_field(field)?;
                 Box::new(ContainsQuery::new(value, field, *case_sensitive)?)
@@ -342,7 +335,7 @@ impl Condition {
     pub fn need_all_term_fields(&self) -> HashSet<String> {
         let mut fields = HashSet::new();
         match self {
-            Condition::StrMatch(field, ..) | Condition::Regex(field, _) => {
+            Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(value) => {
@@ -374,7 +367,6 @@ impl Condition {
             Condition::Equal(field, _)
             | Condition::NotEqual(field, _)
             | Condition::In(field, ..)
-            | Condition::Regex(field, _)
             | Condition::StrMatch(field, ..) => {
                 fields.insert(field.clone());
             }
@@ -399,8 +391,7 @@ impl Condition {
             Condition::Equal(field, _)
             | Condition::NotEqual(field, _)
             | Condition::StrMatch(field, ..)
-            | Condition::In(field, ..)
-            | Condition::Regex(field, _) => {
+            | Condition::In(field, ..) => {
                 fields.insert(field.clone());
             }
             Condition::MatchAll(_) | Condition::FuzzyMatchAll(..) => {
@@ -452,9 +443,6 @@ impl Condition {
                 Ok(Arc::new(InListExpr::try_new(
                     left, values, *negated, schema,
                 )?))
-            }
-            Condition::Regex(..) => {
-                unreachable!("Condition::Regex query only support for promql")
             }
             Condition::MatchAll(value) => {
                 let value = value
@@ -559,7 +547,6 @@ impl Condition {
             Condition::NotEqual(..) => true,
             Condition::StrMatch(..) => true,
             Condition::In(..) => true,
-            Condition::Regex(..) => false,
             Condition::MatchAll(v) => is_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
             Condition::All() => true,
@@ -599,15 +586,6 @@ mod tests {
 
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field2"));
-    }
-
-    #[test]
-    fn test_condition_get_tantivy_fields_regex() {
-        let condition = Condition::Regex("field3".to_string(), "pattern.*".to_string());
-        let fields = condition.get_tantivy_fields();
-
-        assert_eq!(fields.len(), 1);
-        assert!(fields.contains("field3"));
     }
 
     #[test]
@@ -675,7 +653,7 @@ mod tests {
     #[test]
     fn test_condition_get_tantivy_fields_and_with_overlap() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
-        let right = Condition::Regex("field1".to_string(), "pattern.*".to_string());
+        let right = Condition::StrMatch("field1".to_string(), "pattern".to_string(), true);
         let condition = Condition::And(vec![left, right]);
         let fields = condition.get_tantivy_fields();
 
@@ -708,28 +686,26 @@ mod tests {
 
     #[test]
     fn test_condition_get_tantivy_fields_all_types_mixed() {
-        // Test with all different condition types mixed together
         let equal_cond = Condition::Equal("equal_field".to_string(), "value".to_string());
         let in_cond = Condition::In("in_field".to_string(), vec!["val1".to_string()], false);
-        let regex_cond = Condition::Regex("regex_field".to_string(), "pattern.*".to_string());
+        let str_match_cond =
+            Condition::StrMatch("str_match_field".to_string(), "pattern".to_string(), true);
         let match_all_cond = Condition::MatchAll("search_term".to_string());
         let fuzzy_match_cond = Condition::FuzzyMatchAll("fuzzy_term".to_string(), 1);
         let all_cond = Condition::All();
 
-        // Create nested structure: ((equal OR in) AND (regex OR match_all)) OR (fuzzy_match_all AND
-        // all)
         let left_or = Condition::Or(vec![equal_cond, in_cond]);
-        let right_or = Condition::Or(vec![regex_cond, match_all_cond]);
+        let right_or = Condition::Or(vec![str_match_cond, match_all_cond]);
         let left_and = Condition::And(vec![left_or, right_or]);
         let right_and = Condition::And(vec![fuzzy_match_cond, all_cond]);
         let condition = Condition::Or(vec![left_and, right_and]);
 
         let fields = condition.get_tantivy_fields();
 
-        assert_eq!(fields.len(), 4); // equal_field, in_field, regex_field, _all (match_all and fuzzy_match_all both use _all, so deduplicated)
+        assert_eq!(fields.len(), 4);
         assert!(fields.contains("equal_field"));
         assert!(fields.contains("in_field"));
-        assert!(fields.contains("regex_field"));
+        assert!(fields.contains("str_match_field"));
         assert!(fields.contains(INDEX_FIELD_NAME_FOR_ALL));
     }
 
@@ -805,12 +781,6 @@ mod tests {
 
         let condition = Condition::In("field1".to_string(), vec!["value1".to_string()], true);
         assert_eq!(condition.to_query(), "field1 NOT IN (value1)");
-    }
-
-    #[test]
-    fn test_condition_to_query_regex() {
-        let condition = Condition::Regex("field1".to_string(), "pattern.*".to_string());
-        assert_eq!(condition.to_query(), "field1=~pattern.*");
     }
 
     #[test]
@@ -920,9 +890,10 @@ mod tests {
         )));
         assert!(exact.need_all_term_fields().is_empty());
 
-        let expansion = Condition::Not(Box::new(Condition::Regex(
+        let expansion = Condition::Not(Box::new(Condition::StrMatch(
             "field1".to_string(),
-            "value.*".to_string(),
+            "value".to_string(),
+            true,
         )));
         assert_eq!(
             expansion.need_all_term_fields(),
@@ -934,12 +905,6 @@ mod tests {
     fn test_condition_can_remove_filter_equal() {
         let condition = Condition::Equal("field1".to_string(), "value1".to_string());
         assert!(condition.can_remove_filter());
-    }
-
-    #[test]
-    fn test_condition_can_remove_filter_regex() {
-        let condition = Condition::Regex("field1".to_string(), "pattern.*".to_string());
-        assert!(!condition.can_remove_filter());
     }
 
     #[test]
@@ -968,7 +933,7 @@ mod tests {
         assert!(condition.can_remove_filter());
 
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
-        let right = Condition::Regex("field2".to_string(), "pattern.*".to_string());
+        let right = Condition::FuzzyMatchAll("pattern".to_string(), 1);
         let condition = Condition::Or(vec![left, right]);
         assert!(!condition.can_remove_filter());
     }

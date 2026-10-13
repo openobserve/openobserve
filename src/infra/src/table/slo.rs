@@ -258,8 +258,8 @@ pub async fn apply_status_in_txn<C: ConnectionTrait>(
 }
 
 /// Read one status row. `group_key = ""` is the rollup.
-pub async fn load_status(
-    db: &DatabaseConnection,
+pub async fn load_status<C: ConnectionTrait>(
+    db: &C,
     slo_id: &str,
     group_key: &str,
 ) -> Result<Option<slo_status::Model>, errors::Error> {
@@ -268,6 +268,21 @@ pub async fn load_status(
             .one(db)
             .await?,
     )
+}
+
+/// The rollup row, locked until the transaction ends; SQLite has one writer connection instead.
+pub async fn load_rollup_for_update<C: ConnectionTrait>(
+    db: &C,
+    slo_id: &str,
+) -> Result<Option<slo_status::Model>, errors::Error> {
+    use sea_orm::QuerySelect;
+    Ok(slo_status::Entity::find_by_id((
+        slo_id.to_string(),
+        slo_status::ROLLUP_GROUP_KEY.to_string(),
+    ))
+    .lock_exclusive()
+    .one(db)
+    .await?)
 }
 
 /// Every status row for one SLO — the rollup plus each group.
@@ -337,8 +352,8 @@ pub async fn bump_generation(
 /// This is what makes at-least-once publication safe (D64): the running
 /// aggregate is a cache, and this rebuilds it from the slices that are the
 /// source of truth. It is therefore **load-bearing**, not hygiene.
-pub async fn reconcile_from_slices(
-    db: &DatabaseConnection,
+pub async fn reconcile_from_slices<C: ConnectionTrait>(
+    db: &C,
     slo_id: &str,
     group_key: &str,
     recomputed: (f64, f64, i32),
@@ -356,6 +371,29 @@ pub async fn reconcile_from_slices(
         .exec(db)
         .await?;
     Ok(())
+}
+
+/// Replaces the rollup's burn cache; false if its generation or watermark moved.
+pub async fn replace_burn_cache<C: ConnectionTrait>(
+    db: &C,
+    slo_id: &str,
+    definition_generation: i32,
+    watermark_end: i64,
+    trailing_slices: serde_json::Value,
+    burn_windows: serde_json::Value,
+) -> Result<bool, errors::Error> {
+    let res = slo_status::Entity::update_many()
+        .col_expr(
+            slo_status::Column::TrailingSlices,
+            Expr::value(trailing_slices),
+        )
+        .col_expr(slo_status::Column::BurnWindows, Expr::value(burn_windows))
+        .filter(row_of(slo_id, slo_status::ROLLUP_GROUP_KEY))
+        .filter(slo_status::Column::DefinitionGeneration.eq(definition_generation))
+        .filter(slo_status::Column::WatermarkEnd.eq(watermark_end))
+        .exec(db)
+        .await?;
+    Ok(res.rows_affected > 0)
 }
 
 /// Delete every status row belonging to an org's SLOs — the org-teardown path.
@@ -758,6 +796,48 @@ mod tests {
             Some(serde_json::json!({"9600": [10.0, 10.0]})),
             "write-on-change compares against this; losing it would re-emit \
              every trailing slice on every pass"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_burn_cache_replace_at_the_stored_watermark_lands() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+
+        let windows = serde_json::json!({ "3600": { "good": 12.0, "total": 12.0 } });
+        let trailing = serde_json::json!({"9600": [0.0, 0.0]});
+        assert!(
+            replace_burn_cache(&db, SLO, 1, 9_900, trailing.clone(), windows.clone())
+                .await
+                .unwrap()
+        );
+        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+        assert_eq!(status.burn_windows, Some(windows));
+        assert_eq!(status.trailing_slices, Some(trailing));
+    }
+
+    #[tokio::test]
+    async fn a_burn_cache_replace_after_the_watermark_moved_writes_nothing() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+        let before = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+
+        let empty = serde_json::json!({});
+        assert!(
+            !replace_burn_cache(&db, SLO, 1, 9_600, empty.clone(), empty.clone())
+                .await
+                .unwrap()
+        );
+        assert!(
+            !replace_burn_cache(&db, SLO, 2, 9_900, empty.clone(), empty)
+                .await
+                .unwrap()
+        );
+        assert_eq!(
+            load_status(&db, SLO, ROLLUP).await.unwrap().unwrap(),
+            before
         );
     }
 
