@@ -134,9 +134,9 @@ impl StreamSearchSettings {
             .iter()
             .any(|f| self.default_index_fields.contains(&f.as_str()))
         {
-            let default_index_updated_at =
-                infra::db::tantivy_index::get_ttv_stream_default_index_updated_at().await;
-            index_updated_at = index_updated_at.max(default_index_updated_at);
+            let rum_data_index_updated_at =
+                infra::db::tantivy_index::get_ttv_rum_data_index_updated_at().await;
+            index_updated_at = index_updated_at.max(rum_data_index_updated_at);
         }
         let ttv_timestamp_updated_at =
             infra::db::tantivy_index::get_ttv_timestamp_updated_at().await;
