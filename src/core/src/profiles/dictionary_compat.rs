@@ -211,8 +211,8 @@ mod tests {
     use super::{super::otlp_json_compat, *};
 
     #[test]
-    fn collector_pprof_json_and_protobuf_preserve_zero_index_frames_and_weights() {
-        let json = collector_request();
+    fn compacted_json_and_protobuf_preserve_zero_index_frames_and_weights() {
+        let json = compacted_request();
         let proto = ExportProfilesServiceRequest::decode(json.encode_to_vec().as_slice()).unwrap();
         for mut request in [json, proto] {
             normalize(&mut request).unwrap();
@@ -241,13 +241,8 @@ mod tests {
             assert_eq!(records[0]["value"], 30_000_000);
             assert_eq!(records[0]["profile_type"], "cpu");
             assert_eq!(records[0]["profile_unit"], "nanoseconds");
-            assert_eq!(records[0]["service_name"], "audit-go");
-            assert!(
-                records[0]["stack"]
-                    .as_str()
-                    .unwrap()
-                    .starts_with("runtime.mallocgcSmallNoscan;")
-            );
+            assert_eq!(records[0]["service_name"], "test-service");
+            assert!(records[0]["stack"].as_str().unwrap().starts_with("leaf;"));
             assert_eq!(records[0]["frame_count"], 5);
             let normalized = request.clone();
             normalize(&mut request).unwrap();
@@ -258,13 +253,13 @@ mod tests {
     #[test]
     fn compacted_negative_and_out_of_bounds_indices_are_rejected_before_rebasing() {
         for index in [-1, i32::MAX] {
-            let mut request = collector_request();
+            let mut request = compacted_request();
             request.resource_profiles[0].scope_profiles[0].profiles[0].samples[0].stack_index =
                 index;
             let original = request.clone();
             assert!(normalize(&mut request).unwrap_err().contains("stack_index"));
             assert_eq!(request, original);
-            let mut request = collector_request();
+            let mut request = compacted_request();
             request.dictionary.as_mut().unwrap().location_table[0].lines[0].function_index = index;
             assert!(
                 normalize(&mut request)
@@ -276,7 +271,7 @@ mod tests {
 
     #[test]
     fn compacted_links_and_nested_dictionary_attributes_are_rebased() {
-        let mut request = collector_request();
+        let mut request = compacted_request();
         request.dictionary.as_mut().unwrap().link_table =
             vec![opentelemetry_proto::tonic::profiles::v1development::Link {
                 trace_id: vec![1; 16],
@@ -325,7 +320,7 @@ mod tests {
 
     #[test]
     fn retained_optional_sentinels_do_not_become_synthetic_functions_or_mappings() {
-        let mut request = collector_request();
+        let mut request = compacted_request();
         let dictionary = request.dictionary.as_mut().unwrap();
         dictionary.function_table[0] = Default::default();
         dictionary.mapping_table.insert(0, Default::default());
@@ -352,7 +347,7 @@ mod tests {
 
     #[test]
     fn canonical_exports_and_malformed_canonical_sentinels_are_unchanged() {
-        let mut request = collector_request();
+        let mut request = compacted_request();
         normalize(&mut request).unwrap();
         let canonical = request.clone();
         normalize(&mut request).unwrap();
@@ -370,9 +365,35 @@ mod tests {
         validation::validate(&empty).unwrap();
     }
 
-    fn collector_request() -> ExportProfilesServiceRequest {
-        let mut payload =
-            serde_json::from_str(include_str!("testdata/collector_0_153_pprof.json")).unwrap();
+    fn compacted_request() -> ExportProfilesServiceRequest {
+        let mut payload = serde_json::json!({
+            "dictionary": {
+                "stringTable": ["leaf", "caller", "worker", "loop", "root", "cpu",
+                    "nanoseconds", "service.name", "test-service", "demo", "build_id"],
+                "mappingTable": [{"filenameStrindex": 9, "attributeIndices": [0]}],
+                "locationTable": (0..5).map(|index| serde_json::json!({
+                    "address": index + 1,
+                    "mappingIndex": 0,
+                    "lines": [{"functionIndex": index}]
+                })).collect::<Vec<_>>(),
+                "functionTable": (0..5).map(|index| serde_json::json!({
+                    "nameStrindex": index, "systemNameStrindex": index, "filenameStrindex": 9
+                })).collect::<Vec<_>>(),
+                "attributeTable": [{"keyStrindex": 10, "value": {"stringValue": "demo"}}],
+                "stackTable": [{"locationIndices": [0, 1, 2, 3, 4]}, {"locationIndices": [4]}]
+            },
+            "resourceProfiles": [{
+                "resource": {"attributes": [{"keyStrindex": 7, "value": {"stringValueStrindex": 8}}]},
+                "scopeProfiles": [{"profiles": [{
+                    "sampleType": {"typeStrindex": 5, "unitStrindex": 6},
+                    "periodType": {"typeStrindex": 5, "unitStrindex": 6},
+                    "timeUnixNano": "1000000000", "durationNano": "1000000000", "period": "10000000",
+                    "attributeIndices": [0],
+                    "samples": [{"stackIndex": 0, "values": ["30000000"]},
+                        {"stackIndex": 1, "values": ["10000000"]}]
+                }]}]
+            }]
+        });
         otlp_json_compat::normalize(&mut payload);
         otlp_json_compat::deserialize(payload).unwrap()
     }
