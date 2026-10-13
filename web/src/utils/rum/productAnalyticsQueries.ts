@@ -364,9 +364,11 @@ export function scopeClause(scope: AnalyticsScope, sample: SampleRatio = 1): str
 const rowScope = (scope: AnalyticsScope): string => scopeWhere(scope, 1, true);
 
 // One `WHEN` per app, so a compared app's flag never reads another app's rules.
+// MAX flags a session on any matching row; MIN only when every row matches, as row filters drop it whole.
 const appFlag = (
   scope: AnalyticsScope,
   cond: (ex: AppExclusions | undefined) => string[],
+  agg: "MAX" | "MIN" = "MAX",
 ): string => {
   const apps = scopeApps(scope);
   const whens = apps.flatMap((a) => {
@@ -375,7 +377,13 @@ const appFlag = (
     const app = apps.length > 1 ? `application_id = ${lit(a)} AND ` : "";
     return [`WHEN ${app}${anyOf(conds)} THEN 1`];
   });
-  return whens.length ? `MAX(CASE ${whens.join(" ")} ELSE 0 END)` : "0";
+  return whens.length ? `${agg}(CASE ${whens.join(" ")} ELSE 0 END)` : "0";
+};
+
+const eitherFlag = (a: string, b: string): string => {
+  if (a === "0") return b;
+  if (b === "0") return a;
+  return `CASE WHEN ${a} = 1 OR ${b} = 1 THEN 1 ELSE 0 END`;
 };
 
 interface SessionPass {
@@ -630,17 +638,25 @@ const sumWhen = (conds: string[], value: string, alias: string): string =>
 export function summarySql(scope: AnalyticsScope, currentStartUs: number): string {
   const cs = Math.trunc(currentStartUs);
   const ids = presentCandidates(scope);
-  const xb = appFlag(scope, (ex) => {
-    const keeps = builtinKeeps(scope, ex);
-    return keeps.length ? [`NOT (${keeps.join(" AND ")})`] : [];
-  });
-  const xr = appFlag(scope, (ex) => {
-    const keeps = savedRules(scope, ex, false).flatMap(ruleKeeps);
-    return [
-      ...(keeps.length ? [`NOT (${keeps.join(" AND ")})`] : []),
-      ...savedRules(scope, ex, true).flatMap(ruleMatches),
-    ];
-  });
+  const xb = appFlag(
+    scope,
+    (ex) => {
+      const keeps = builtinKeeps(scope, ex);
+      return keeps.length ? [`NOT (${keeps.join(" AND ")})`] : [];
+    },
+    "MIN",
+  );
+  const xr = eitherFlag(
+    appFlag(
+      scope,
+      (ex) => {
+        const keeps = savedRules(scope, ex, false).flatMap(ruleKeeps);
+        return keeps.length ? [`NOT (${keeps.join(" AND ")})`] : [];
+      },
+      "MIN",
+    ),
+    appFlag(scope, (ex) => savedRules(scope, ex, true).flatMap(ruleMatches)),
+  );
   const tagged = ids.map(
     (f) =>
       `array_agg(DISTINCT CASE WHEN _timestamp >= ${cs} AND NULLIF(${f}, '') IS NOT NULL THEN ${lit(`${f}:`)} || ${f} END)`,
