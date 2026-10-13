@@ -80,6 +80,8 @@
       :destination-options="destinationOptions"
       :error="fieldError('destinations') || undefined"
       :notifies-nobody="!hasDeliveryTarget(form)"
+      show-status
+      :placeholder="t('alerts.summary.noDestination')"
       data-test="slo-alert-form-targets"
       @refresh="loadDestinations"
     />

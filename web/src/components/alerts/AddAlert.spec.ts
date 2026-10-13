@@ -276,6 +276,12 @@ describe("AddAlert (OForm owner)", () => {
       expect(form.state.isValid).toBe(true);
       expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
       expect((alertsService.create_by_alert_id as any).mock.calls[0][1].destinations).toEqual([]);
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: i18n.global.t("alerts.messages.alertSavedNoDestination"),
+        }),
+      );
     });
   });
 

@@ -192,7 +192,7 @@ export function generateAlertSummary(
   // A workflow or on-call team still notifies someone, but only their ids are known here.
   if (!hasDeliveryTarget(formData)) {
     parts.push(
-      `✓ ${translate("alerts.summary.sendsTo")}: ${clickable(translate("alerts.summary.noDestination"), "destinations")} ${translate("alerts.summary.notifiesNobody")}`,
+      `✓ ${translate("alerts.summary.sendsTo")}: ${clickable(translate("alerts.summary.noDestination"), "destinations")}`,
     );
   } else if (selectedDestinations.length > 0) {
     const uniqueNames = Array.from(new Set(selectedDestinations));

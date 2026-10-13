@@ -95,6 +95,7 @@ import {
 } from "@/utils/alerts/alertDataTransforms";
 import { AlertFocusManager } from "@/utils/alerts/focusManager";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
+import { hasDeliveryTarget } from "@/utils/alerts/deliveryTarget";
 import { getAlertSource } from "@/utils/alerts/alertSourceRegistry";
 import type { AlertPrefill, AlertPrefillWarning } from "@/ts/interfaces/alertPrefill";
 import {
@@ -2380,6 +2381,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     const payload = getAlertPayload();
+    // Read before the save: resetForm in .then clears the form the payload came from.
+    const sendsNowhere = !hasDeliveryTarget(payload);
 
     const dismiss = toast({
       variant: "loading",
@@ -2428,7 +2431,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           dismiss();
           toast({
             variant: "success",
-            message: t("alerts.messages.alertUpdated"),
+            message: sendsNowhere
+              ? t("alerts.messages.alertUpdatedNoDestination")
+              : t("alerts.messages.alertUpdated"),
           });
           showSaveWarnings(res);
         })
@@ -2466,7 +2471,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           dismiss();
           toast({
             variant: "success",
-            message: t("alerts.messages.alertSaved"),
+            message: sendsNowhere
+              ? t("alerts.messages.alertSavedNoDestination")
+              : t("alerts.messages.alertSaved"),
           });
           showSaveWarnings(res);
         })

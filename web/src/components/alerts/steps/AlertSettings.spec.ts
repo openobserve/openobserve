@@ -98,6 +98,7 @@ function makeDescendantHost(
   isRealTime = "true",
   defaultOverrides: Record<string, any> = {},
   formDataOverrides: Record<string, any> = {},
+  destinations: string[] = [],
 ) {
   return defineComponent({
     components: { OForm, AlertSettings },
@@ -110,14 +111,14 @@ function makeDescendantHost(
         ...defaultOverrides,
       };
       const formData = makeFormData(formDataOverrides);
-      return { schema, defaultValues, formData, isRealTime };
+      return { schema, defaultValues, formData, isRealTime, destinations };
     },
     template: `
       <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
         <AlertSettings
           :form-data="formData"
           :is-real-time="isRealTime"
-          :destinations="[]"
+          :destinations="destinations"
           :formatted-destinations="['dest-a','dest-b']"
         />
       </OForm>
@@ -170,7 +171,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(host.text()).toContain(SILENCE_REQUIRED_MESSAGE);
   });
 
-  it("submits with no destination and says the alert notifies nobody", async () => {
+  it("submits with no destination and says no destination is notified", async () => {
     const host = mountDescendant("true");
     const parentForm = hostForm(host);
 
@@ -188,7 +189,7 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
   it.each([
     ["an on-call team is set", "sre", false],
     ["the on-call team is blank", "  ", true],
-  ])("shows the notifies-nobody note only when needed: %s", (_case, team, shown) => {
+  ])("shows the no-destination note only when needed: %s", (_case, team, shown) => {
     // On-call teams only page in enterprise and cloud builds.
     const isEnterprise = config.isEnterprise;
     config.isEnterprise = "true";
@@ -308,6 +309,46 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
 // Incidents is an enterprise feature: the OSS backend always reports
 // `incidents_enabled: false`, and the enterprise one only correlates when it
 // is on. The toggle follows the same gate as the Incidents menu.
+// A recovery closes what a firing delivered, so with nowhere to send there is nothing to recover.
+describe("AlertSettings — Notify on recovery with nowhere to send", () => {
+  const SWITCH = '[data-test="alert-notify-on-recovery-toggle-btn"]';
+  const mountScheduled = (recoveryOn: boolean, destinations: string[] = []) =>
+    mount(
+      makeDescendantHost(
+        "false",
+        { notify_on_recovery: recoveryOn },
+        { notify_on_recovery: recoveryOn },
+        destinations,
+      ),
+      { global: { plugins: [makeStore(), i18n] } },
+    );
+  const recoveryFieldShown = (host: any) =>
+    host
+      .findAllComponents({ name: "AlertDestinationsField" })
+      .some(
+        (field: any) => field.props("label") === t("alerts.alertSettings.recoveryDestinations"),
+      );
+
+  it("cannot be turned on without a destination", () => {
+    expect(mountScheduled(false).find(SWITCH).attributes("disabled")).toBeDefined();
+  });
+
+  // Left on from before, it must stay switchable so the user can clear it.
+  it("can still be turned off, but hides what it would send", () => {
+    const host = mountScheduled(true);
+    expect(host.find(SWITCH).attributes("disabled")).toBeUndefined();
+    expect(host.find('[data-test^="alert-notify-on-recovery-plan-"]').exists()).toBe(false);
+    expect(recoveryFieldShown(host)).toBe(false);
+  });
+
+  it("works as before once a destination is picked", () => {
+    const host = mountScheduled(true, ["dest-a"]);
+    expect(host.find(SWITCH).attributes("disabled")).toBeUndefined();
+    expect(host.find('[data-test="alert-notify-on-recovery-plan-dest-a"]').exists()).toBe(true);
+    expect(recoveryFieldShown(host)).toBe(true);
+  });
+});
+
 describe("AlertSettings — Creates Incident toggle visibility", () => {
   const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
   afterEach(() => {
@@ -432,7 +473,7 @@ describe("AlertSettings.schema — period rules unchanged by the silence fix", (
   });
 });
 
-// ── Destinations are optional: the field notes "notifies nobody" instead of erroring ──
+// ── Destinations are optional: the field notes that no destination is notified instead of erroring ──
 describe("AlertSettings.schema — destinations are optional", () => {
   const schema = createAlertSettingsSchema(t, false);
   const base = {

@@ -131,6 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destination-options="formattedDestinations"
             :error="destinationsError"
             :notifies-nobody="notifiesNobody"
+            show-status
+            :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"
@@ -292,6 +294,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :destination-options="formattedDestinations"
             :error="destinationsError"
             :notifies-nobody="notifiesNobody"
+            show-status
+            :placeholder="t('alerts.summary.noDestination')"
             @update:destinations="$emit('update:destinations', $event)"
             @update:workflows="$emit('update:workflows', $event)"
             @refresh="$emit('refresh:destinations')"
@@ -314,11 +318,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
               {{ t("alerts.alertSettings.notifyOnRecovery") }}
               <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
-              <OTooltip :content="t('alerts.alertSettings.notifyOnRecoveryTooltip')" side="right" />
+              <OTooltip
+                :content="
+                  notifiesNobody
+                    ? t('alerts.alertSettings.notifyOnRecoveryNeedsDestination')
+                    : t('alerts.alertSettings.notifyOnRecoveryTooltip')
+                "
+                side="right"
+              />
             </div>
             <div class="flex flex-col gap-1">
-              <OFormSwitch name="notify_on_recovery" data-test="alert-notify-on-recovery-toggle" />
-              <template v-if="formData?.notify_on_recovery">
+              <!-- A recovery closes what a firing delivered; with no target nothing is
+                   delivered, so it cannot be turned on. It can still be turned off. -->
+              <OFormSwitch
+                name="notify_on_recovery"
+                :disabled="notifiesNobody && !formData?.notify_on_recovery"
+                data-test="alert-notify-on-recovery-toggle"
+              />
+              <template v-if="formData?.notify_on_recovery && !notifiesNobody">
                 <div
                   v-for="row in recoveryPlan"
                   :key="row.name"
@@ -339,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <AlertDestinationsField
-            v-if="formData?.notify_on_recovery"
+            v-if="formData?.notify_on_recovery && !notifiesNobody"
             class="me-2 mb-4!"
             :destinations="recoveryDestinations"
             :workflows="[]"

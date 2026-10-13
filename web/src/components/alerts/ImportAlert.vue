@@ -167,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :model-value="userSelectedDestinations[index] || []"
                         :options="filteredDestinations"
                         :label="t('alerts.destinationsLabel')"
+                        :placeholder="t('alerts.summary.noDestination')"
                         multiple
                         searchable
                         @search="filterDestinations"

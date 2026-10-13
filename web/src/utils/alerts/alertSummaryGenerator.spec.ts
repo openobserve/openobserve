@@ -114,7 +114,7 @@ describe("generateAlertSummary: Compare-with-Past windows", () => {
 });
 
 describe("generateAlertSummary: where it sends", () => {
-  const nobody = t("alerts.summary.notifiesNobody");
+  const noDestination = t("alerts.summary.noDestination");
   // Workflows and on-call teams only count where they run: enterprise and cloud builds.
   const isEnterprise = config.isEnterprise;
   beforeEach(() => {
@@ -124,8 +124,11 @@ describe("generateAlertSummary: where it sends", () => {
     config.isEnterprise = isEnterprise;
   });
 
-  it("says an alert with nowhere to send notifies nobody", () => {
-    expect(summary(forecastForm())).toContain(nobody);
+  // On-call routing can still page a team, so the summary claims no more than "no destination".
+  it("says an alert with nowhere to send has no destination", () => {
+    const text = summary(forecastForm());
+    expect(text).toContain(noDestination);
+    expect(text).not.toMatch(/nobody/i);
   });
 
   it.each([
@@ -133,6 +136,6 @@ describe("generateAlertSummary: where it sends", () => {
     ["only a workflow", { workflows: ["wf-1"] }],
     ["only an on-call team", { oncall_team: "sre" }],
   ])("does not say so for %s", (_case, targets) => {
-    expect(summary({ ...forecastForm(), ...targets })).not.toContain(nobody);
+    expect(summary({ ...forecastForm(), ...targets })).not.toContain(noDestination);
   });
 });

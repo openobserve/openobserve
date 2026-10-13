@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="destinationOptions"
               size="sm"
               :label="t('alert_library.install.destinationLabel')"
-              :placeholder="t('alert_library.install.destinationPlaceholder')"
+              :placeholder="t('alerts.summary.noDestination')"
               clearable
               data-test="alert-library-install-destination"
               @update:model-value="onDestinationPicked"

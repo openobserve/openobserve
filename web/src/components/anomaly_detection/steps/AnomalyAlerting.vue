@@ -92,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               valueKey="name"
               multiple
               searchable
+              :placeholder="t('alerts.summary.noDestination')"
               class="h-auto! min-h-auto! max-w-105 min-w-0 flex-1 basis-75"
               data-test="anomaly-destination"
             >
@@ -136,15 +137,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.anomaly.addNewDestination") }}
             </OButton>
           </div>
-          <OBanner
-            v-if="config.alert_destination_ids.length === 0"
-            variant="info"
-            icon="info"
-            dense
-            class="mt-1 max-w-125"
-            :content="t('alerts.anomaly.noDestinationNote')"
-            data-test="anomaly-destination-note"
-          />
+          <!-- Same field hint as the alert form's Destination field. -->
+          <p
+            class="text-input-help-text pt-1 text-xs"
+            :data-test="
+              config.alert_destination_ids.length === 0
+                ? 'anomaly-destination-note'
+                : 'anomaly-destination-status'
+            "
+          >
+            {{ destinationStatus }}
+          </p>
         </div>
       </div>
 
@@ -252,7 +255,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import {
@@ -263,7 +265,7 @@ import {
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, OSwitch, OSelect, OInput, OTagInput, OTooltip, OIcon, OTag, OBanner },
+  components: { OButton, OSwitch, OSelect, OInput, OTagInput, OTooltip, OIcon, OTag },
 
   props: {
     config: {
@@ -334,6 +336,17 @@ export default defineComponent({
       t("alerts.anomaly.windowShareHint", anomalyWindowShareEffective(props.config)),
     );
 
+    // One name reads better than "1 destination"; more than one is a count.
+    const destinationStatus = computed(() => {
+      const ids = props.config.alert_destination_ids;
+      if (ids.length === 0) return t("alerts.anomaly.noDestinationNote");
+      const targets =
+        ids.length === 1
+          ? ids[0]
+          : t("alert_dependencies.countDestinations", { count: ids.length }, ids.length);
+      return t("alerts.anomaly.sendsToStatus", { targets });
+    });
+
     // Dynamically decide how many chips to show based on text length.
     // Restored from pre-refactor version; the template still depends on it.
     const MAX_CHARS = 42;
@@ -371,6 +384,7 @@ export default defineComponent({
       tagsModel,
       openAddDestination,
       visibleChipCount,
+      destinationStatus,
       directionOptions,
       directionModel,
       windowShareErrors,

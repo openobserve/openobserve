@@ -80,6 +80,7 @@ const silenceMinutes = computed({
         :label="t('synthetics.scheduleAlert.destinations')"
         tooltip=""
         :supports-workflows="false"
+        :placeholder="t('alerts.summary.noDestination')"
         data-test="synthetics-check-alerts-destinations"
         @update:destinations="localDestinations = $event"
         @refresh="emit('refresh:destinations')"
