@@ -496,6 +496,14 @@ describe("RemoteTaskFormPage — test connection", () => {
       );
     });
 
+    it("names the published version and endpoint the stored test calls", async () => {
+      const wrapper = mountForm();
+      await flushPromises();
+      const hint = wrapper.findComponent({ name: "RemoteTaskTestPanel" }).props("hint");
+      expect(hint).toContain("v2");
+      expect(hint).toContain("https://tasks.example.com/run");
+    });
+
     it("does not offer a test for a secret-holding task that was never published", async () => {
       const published = await get("acme", "head-1");
       get.mockResolvedValue({ ...published, isDraft: true, version: 0 });

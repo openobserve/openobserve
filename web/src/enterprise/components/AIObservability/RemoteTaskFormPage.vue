@@ -423,7 +423,7 @@
             unpublishedSecret
               ? t('aiObservability.remoteTasks.testPanel.unpublishedSecretHint')
               : testsStoredVersion
-                ? t('aiObservability.remoteTasks.testPanel.storedCredentialsHint')
+                ? t('aiObservability.remoteTasks.testPanel.storedCredentialsHint', storedTarget)
                 : null
           "
           @run="runCandidateTest"
@@ -476,7 +476,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -624,6 +624,8 @@ const canRunTest = computed(
 const testsStoredVersion = ref(false);
 /** A secret-holding task that was never published: nothing to test until Publish. */
 const unpublishedSecret = ref(false);
+/** What a stored-version test calls, named in the hint so a pass is not read as one for the form. */
+const storedTarget = reactive({ version: 0, endpoint: "" });
 
 const signingKey = form.useStore((state: any) => String(state.values.signingKey ?? ""));
 const signingKeyCopied = ref(false);
@@ -950,6 +952,7 @@ async function loadForEdit() {
       task.customHeaders.some((header) => header.usesSecret);
     // test_run tests the published version, and a task never published has none.
     testsStoredVersion.value = holdsSecret && !task.isDraft;
+    Object.assign(storedTarget, { version: task.version, endpoint: task.endpoint });
     unpublishedSecret.value = holdsSecret && task.isDraft;
     form.reset(remoteTaskToFormValues(task));
   } catch (error: any) {

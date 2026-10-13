@@ -14358,7 +14358,7 @@
       },
       "testPanel": {
         "title": "Test Connection",
-        "storedCredentialsHint": "Tests the published version with its stored credentials. Your unsaved edits are tested when you publish.",
+        "storedCredentialsHint": "Tests published v{version} ({endpoint}) with its stored credentials. Your unsaved edits are tested when you publish.",
         "unpublishedSecretHint": "This task has not been published yet, so there is no stored version to test. Publish Changes tests the saved draft with its stored credentials and publishes it if the test passes.",
         "sourceLabel": "Sample Input",
         "sourceDataset": "From a Dataset",
