@@ -406,13 +406,17 @@ fn select_tier<'a>(
     span_ts_micros: Option<i64>,
     ctx: &PricingContext,
 ) -> Option<&'a PricingTierDefinition> {
-    // Highest (priority, restriction count) wins; min_by_key keeps the first of equal ranks.
-    definition
+    let mut matching = definition
         .tiers
         .iter()
-        .filter(|t| !t.is_default() && tier_matches(t, usage, span_ts_micros, ctx))
-        .min_by_key(|t| std::cmp::Reverse(t.rank()))
-        .or_else(|| definition.tiers.iter().find(|t| t.is_default()))
+        .filter(|t| !t.is_default() && tier_matches(t, usage, span_ts_micros, ctx));
+    // Highest (priority, restriction count) wins; min_by_key keeps the first of equal ranks.
+    let chosen = if definition.ranks_tiers() {
+        matching.min_by_key(|t| std::cmp::Reverse(t.rank()))
+    } else {
+        matching.next()
+    };
+    chosen.or_else(|| definition.tiers.iter().find(|t| t.is_default()))
 }
 
 // ── Startup: cache + watch ────────────────────────────────────────────────────
@@ -1779,9 +1783,8 @@ mod tests {
     }
 
     #[test]
-    fn test_condition_plus_window_beats_earlier_condition_only_tier() {
-        // Behaviour change from first-match: the more specific tier wins regardless of order.
-        let def = make_definition(vec![
+    fn test_rule_less_definitions_keep_first_match() {
+        let mut def = make_definition(vec![
             PricingTierDefinition {
                 name: "Default".to_string(),
                 prices: input_price(1.0),
@@ -1802,12 +1805,15 @@ mod tests {
             },
         ]);
         let usage = HashMap::from([("input".to_string(), 300_000i64)]);
-        let at = |h| {
-            calculate_cost_from_definition(&def, &usage, at_utc(h, 0), &PricingContext::unknown())
+        let at = |def: &ModelPricingDefinition, h| {
+            calculate_cost_from_definition(def, &usage, at_utc(h, 0), &PricingContext::unknown())
                 .tier_name
         };
-        assert_eq!(at(2), "Peak Extended");
-        assert_eq!(at(14), "Extended");
+        assert_eq!(at(&def, 2), "Extended");
+        // A priority opts the definition into ranking.
+        def.tiers[2].priority = 1;
+        assert_eq!(at(&def, 2), "Peak Extended");
+        assert_eq!(at(&def, 14), "Extended");
     }
 
     #[test]
