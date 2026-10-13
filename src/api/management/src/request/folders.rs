@@ -52,6 +52,9 @@ fn folder_error_response(value: FolderError) -> Response {
         FolderError::DeleteWithWorkflows => MetaHttpResponse::bad_request(
             "Folder contains workflows, please move/delete workflows from folder",
         ),
+        FolderError::DeleteWithDowntimes => MetaHttpResponse::bad_request(
+            "Folder contains downtimes, please move/delete downtimes from folder",
+        ),
         FolderError::DeleteWithPrompts => MetaHttpResponse::bad_request(
             "Folder contains prompts, please move/delete prompts from folder",
         ),
@@ -62,6 +65,25 @@ fn folder_error_response(value: FolderError) -> Response {
             "Folder with this name already exists in this organization",
         ),
     }
+}
+
+/// An old node never meets the downtimes folder type while the feature is off.
+fn refused_folder_type(
+    folder_type: config::meta::folder::FolderType,
+    downtimes_enabled: bool,
+) -> Option<Response> {
+    (folder_type == config::meta::folder::FolderType::Downtimes && !downtimes_enabled)
+        .then(|| MetaHttpResponse::forbidden("Downtimes are not enabled"))
+}
+
+#[cfg(feature = "enterprise")]
+fn downtimes_enabled() -> bool {
+    openobserve_core::downtimes::ensure_enabled().is_ok()
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn downtimes_enabled() -> bool {
+    false
 }
 
 /// CreateFolder
@@ -102,8 +124,12 @@ pub async fn create_folder(
     Path((org_id, folder_type)): Path<(String, FolderType)>,
     axum::Json(body): axum::Json<CreateFolderRequestBody>,
 ) -> Response {
+    let folder_type: config::meta::folder::FolderType = folder_type.into();
+    if let Some(refused) = refused_folder_type(folder_type, downtimes_enabled()) {
+        return refused;
+    }
     let folder = body.into();
-    match folders::save_folder(&org_id, folder, folder_type.into(), false).await {
+    match folders::save_folder(&org_id, folder, folder_type, false).await {
         Ok(folder) => {
             let body: CreateFolderResponseBody = folder.into();
             MetaHttpResponse::json(body)
@@ -196,8 +222,16 @@ pub async fn list_folders(
     #[cfg(feature = "enterprise")]
     let user_id = Some(user_email.user_id.as_str());
 
-    match folders::list_folders(&org_id, user_id, folder_type.into()).await {
+    let folder_type = folder_type.into();
+    match folders::list_folders(&org_id, user_id, folder_type).await {
         Ok(folders) => {
+            #[cfg(feature = "enterprise")]
+            let folders = if folder_type == config::meta::folder::FolderType::Downtimes {
+                openobserve_core::downtimes::listable_folders(&org_id, &user_email.user_id, folders)
+                    .await
+            } else {
+                folders
+            };
             let body: ListFoldersResponseBody = folders.into();
             MetaHttpResponse::json(body)
         }
@@ -269,11 +303,29 @@ pub async fn get_folder(
         ("x-o2-mcp" = json!({"description": "Get folder by name", "category": "folders"}))
     ),
 )]
+#[allow(unused_variables)]
 pub async fn get_folder_by_name(
     Path((org_id, folder_type, folder_name)): Path<(String, FolderType, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    match folders::get_folder_by_name(&org_id, &folder_name, folder_type.into()).await {
+    let folder_type = folder_type.into();
+    match folders::get_folder_by_name(&org_id, &folder_name, folder_type).await {
         Ok(folder) => {
+            #[cfg(feature = "enterprise")]
+            let folder = if folder_type == config::meta::folder::FolderType::Downtimes {
+                let listed = openobserve_core::downtimes::listable_folders(
+                    &org_id,
+                    &user_email.user_id,
+                    vec![folder],
+                )
+                .await;
+                match listed.into_iter().next() {
+                    Some(folder) => folder,
+                    None => return MetaHttpResponse::forbidden("Unauthorized Access"),
+                }
+            } else {
+                folder
+            };
             let body: CreateFolderResponseBody = folder.into();
             MetaHttpResponse::json(body)
         }
@@ -600,6 +652,16 @@ mod tests {
             let response = folder_error_response(error);
             assert_eq!(response.status().as_u16(), expected_status);
         }
+    }
+
+    #[test]
+    fn a_downtimes_folder_is_forbidden_while_the_flag_is_off() {
+        use config::meta::folder::FolderType as Stored;
+
+        let refused = refused_folder_type(Stored::Downtimes, false).expect("refused");
+        assert_eq!(refused.status().as_u16(), 403);
+        assert!(refused_folder_type(Stored::Downtimes, true).is_none());
+        assert!(refused_folder_type(Stored::Alerts, false).is_none());
     }
 
     #[test]
