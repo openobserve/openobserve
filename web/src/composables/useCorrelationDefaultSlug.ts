@@ -88,12 +88,13 @@ function matchTrackedFields(
 
 export async function getCorrelationFieldNames(
   orgId: string,
+  streamType: string,
   streamName: string,
   streamSchemaFields: { name: string }[],
 ): Promise<string[]> {
   if (!isCorrelationAvailable()) return [];
   evictOrgCacheIfSwitched(orgId);
-  const key = `${orgId}/${streamName}`;
+  const key = `${orgId}/${streamType}/${streamName}`;
   if (fieldNamesCache.has(key)) return fieldNamesCache.get(key)!;
   // Query watchers sync before the schema loads; caching that empty match would block every later save for the stream.
   if (!streamSchemaFields.length) return [];
@@ -246,6 +247,7 @@ export function useCorrelationFilters(opts: CorrelationFiltersOptions) {
 
       const trackedFields = await getCorrelationFieldNames(
         orgId,
+        streamType,
         streamName,
         opts.streamSchemaFields(),
       );
