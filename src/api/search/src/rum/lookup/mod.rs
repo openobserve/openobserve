@@ -143,15 +143,31 @@ pub async fn lookup(
     Json(req): Json<RumLookupRequest>,
 ) -> Response {
     let started = Instant::now();
+    let trace_id = get_or_create_trace_id(&headers, &Span::none());
+
     if let Err(message) = validate(&req) {
+        log::warn!("[trace_id {trace_id}] rum lookup {org_id} invalid request: {message}");
         return MetaHttpResponse::bad_request(message);
     }
+
+    log::info!(
+        "[trace_id {trace_id}] rum lookup {org_id} start for trace {}, span range [{}, {}]",
+        req.trace_id,
+        req.start_time,
+        req.end_time
+    );
+
     let user_id = user_email.user_id;
     if let Err(response) = check_search_allowed(&org_id).await {
+        log::warn!(
+            "[trace_id {trace_id}] rum lookup {org_id} rejected with {}",
+            response.status()
+        );
         return response;
     }
+
     let ctx = LookupContext {
-        trace_id: get_or_create_trace_id(&headers, &Span::none()),
+        trace_id,
         trace_columns: trace_id_columns(&org_id).await,
         deadline: started + Duration::from_secs(get_config().limit.query_timeout),
         max_query_range: get_max_query_range(
@@ -164,6 +180,7 @@ pub async fn lookup(
         org_id,
         user_id,
     };
+
     let mut response = run_lookup(&ctx, &req).await;
     response.took = started.elapsed().as_millis() as usize;
     log::info!(
@@ -175,14 +192,21 @@ pub async fn lookup(
         response.partial,
         response.took
     );
+
     Json(response).into_response()
 }
 
 async fn run_lookup(ctx: &LookupContext, req: &RumLookupRequest) -> RumLookupResponse {
     let mut response = RumLookupResponse::default();
     if ctx.trace_columns.is_empty() {
+        log::info!(
+            "[trace_id {}] rum lookup {}/{RUM_DATA_STREAM} has no trace id column, skipped",
+            ctx.trace_id,
+            ctx.org_id
+        );
         return response;
     }
+
     let browser_request_range = (
         req.start_time.saturating_sub(BROWSER_REQUEST_LEAD_US),
         req.end_time.saturating_add(BROWSER_REQUEST_LAG_US),
@@ -191,18 +215,29 @@ async fn run_lookup(ctx: &LookupContext, req: &RumLookupRequest) -> RumLookupRes
     response.traced_resources = ctx
         .run(RumQuery::TracedResources, &trace_ids, browser_request_range)
         .await;
+
     let traced = response
         .traced_resources
         .as_ref()
         .map_or(&[][..], |r| r.hits.as_slice());
     if !traced.is_empty() {
         let plan = PagePlan::from_traced_resources(traced, req.end_time);
+        log::info!(
+            "[trace_id {}] rum lookup page plan: {} view ids, {} action ids, range [{}, {}]",
+            ctx.trace_id,
+            plan.view_ids.len(),
+            plan.action_ids.len(),
+            plan.range.0,
+            plan.range.1
+        );
+
         (response.views, response.actions, response.context_events) = tokio::join!(
             ctx.run(RumQuery::Views, &plan.view_ids, plan.range),
             ctx.run(RumQuery::Actions, &plan.action_ids, plan.range),
             ctx.run(RumQuery::ContextEvents, &plan.view_ids, plan.range),
         );
     }
+
     response.finish()
 }
 

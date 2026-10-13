@@ -226,21 +226,31 @@ impl LookupContext {
         ids: &[String],
         range: (i64, i64),
     ) -> Option<RumQueryResult> {
+        let trace_id = format!("{}-{}", self.trace_id, query.as_str());
         if ids.is_empty() {
+            log::info!("[trace_id {trace_id}] rum lookup skipped, no ids to filter on");
             return None;
         }
+
         let started = Instant::now();
         let remaining = self.deadline.saturating_duration_since(started);
         if remaining.is_zero() {
+            log::warn!("[trace_id {trace_id}] rum lookup deadline passed before the query started");
             return Some(RumQueryResult::failed(
                 RumQueryErrorKind::Timeout,
                 "lookup deadline passed before the query started".to_string(),
             ));
         }
+
         let (range, range_error) = self.clamp_range(range);
+        if !range_error.is_empty() {
+            log::info!(
+                "[trace_id {trace_id}] rum lookup range clamped to {range:?}: {range_error}",
+            );
+        }
+
         let sql = query.sql(&self.trace_columns, ids);
         let request = query.request(sql, range, remaining);
-        let trace_id = format!("{}-{}", self.trace_id, query.as_str());
         let search = SearchService::cache::search(
             &trace_id,
             &self.org_id,
@@ -252,8 +262,13 @@ impl LookupContext {
             None,
             false,
         );
+
         // The search's own timeout starts only at execution, after file listing and queueing.
         let Ok(response) = tokio::time::timeout(remaining, search).await else {
+            log::warn!(
+                "[trace_id {trace_id}] rum lookup timed out after {} ms, cancelling",
+                remaining.as_millis()
+            );
             self.cancel(trace_id);
             return Some(RumQueryResult::failed(
                 RumQueryErrorKind::Timeout,
@@ -263,12 +278,31 @@ impl LookupContext {
                 ),
             ));
         };
-        Some(match response {
+
+        let result = match response {
             Ok(response) => {
                 RumQueryResult::from_response(query, range, started.elapsed(), response)
             }
             Err(e) => RumQueryResult::failed(RumQueryErrorKind::from(&e), e.to_string()),
-        })
+        };
+
+        match &result.error {
+            None => log::info!(
+                "[trace_id {trace_id}] rum lookup done: {} hits, truncated {}, took {} ms",
+                result.hits.len(),
+                result.truncated,
+                started.elapsed().as_millis()
+            ),
+            Some(error) => log::warn!(
+                "[trace_id {trace_id}] rum lookup {:?}: {}, {} hits, took {} ms",
+                error.kind,
+                error.message,
+                result.hits.len(),
+                started.elapsed().as_millis()
+            ),
+        }
+
+        Some(result)
     }
 
     /// Dropping a search skips its cleanup, so a timed-out one is cancelled to free its slot.
