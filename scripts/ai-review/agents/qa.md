@@ -8,19 +8,19 @@ Use category `QA` for every finding.
 
 Only review files under `tests/ui-testing/` — specs (`*.spec.js`), page objects (`pages/**`), utils (`playwright-tests/utils/**`), and the suite's Playwright config (`playwright*.config.{js,ts}`). You may still `grep`/`read` other files (Vue components, the `playwright.yml` workflow) to verify a selector or a registration, but do not raise findings on application, backend, or other-suite code — the other reviewers own that.
 
-## What to Flag — Framework Compliance (usually critical)
+## What to Flag — Coverage-integrity failures (critical)
 
-- **Raw selectors in spec files** — `page.locator(`, `page.getByRole(`, `page.getByText(`, `page.getByTestId(`, `page.$(` in a `.spec.js`. All selectors belong in page objects. **This includes selectors inside assertions** — `await expect(page.locator('[data-test="x"]')).toContainText(...)` is a violation. (critical)
-- **Missing assertions** — a test (`test(...)` / `it(...)`) with no `expect()` at all. (critical)
-- **Vacuous / always-pass assertions** — `expect(true).toBe(true)`, `expect(true).toBeTruthy()`, `expect(1).toBe(1)`, or a conditional whose `else` branch asserts one of these so the test can never fail. Always check *what* is asserted, not just that an `expect()` is present. This is the single most dangerous pattern (incident PR #10749: "19 broken selectors, 14/14 green"). (critical)
-- **Missing `await`** — a Playwright call (`click`, `fill`, `goto`, `waitFor`, `expect(locator)...`, page-object method returning a promise) used without `await`. (critical)
-- **Soft assertions** — `expect.soft(` lets a test report pass with failed expectations. (critical)
-- **`console.log` / `console.info` / `console.warn`** in test or page-object code — must use `testLogger`. (warning; critical if it leaks credentials/tokens)
-- **Hardcoded credentials** — literal `password`, `secret`, `apiKey`, `token` values not sourced from `process.env.*`. (critical)
+These are the reason this agent exists: a test that **passes while verifying nothing real**. Per the shared severity rules (rule 5), a coverage-integrity failure is `critical` — a green check with no coverage behind it is false confidence, as dangerous as a production bug, and blocks merge.
+
+- **Missing assertions** — a test (`test(...)` / `it(...)`) with no `expect()` at all.
+- **Vacuous / always-pass assertions** — `expect(true).toBe(true)`, `expect(true).toBeTruthy()`, `expect(1).toBe(1)`, or a conditional whose `else` branch asserts one of these so the test can never fail. Always check *what* is asserted, not just that an `expect()` is present. The single most dangerous pattern (incident PR #10749: "19 broken selectors, 14/14 green").
+- **Soft assertions** — `expect.soft(` lets a test report pass with failed expectations.
+- **Missing `await` on an assertion or action** — an un-awaited `expect(locator)...` or Playwright call (`click`, `fill`, `goto`, `waitFor`, a page-object method returning a promise) can resolve *after* the test has already ended, so the check never actually runs.
+- **Selector mismatch** — see Selector Cross-Validation below.
 
 ## What to Flag — Selector Cross-Validation (critical)
 
-This is the highest-value check. For every `data-test` selector **added or changed** in a page object in this PR:
+The highest-value check, and a coverage-integrity failure in the same sense as above. For every `data-test` selector **added or changed** in a page object in this PR:
 
 1. Identify the Vue component the selector is meant to target (from the feature/area the page object covers).
 2. `grep` that selector string across `web/src/**` (`grep -rn 'data-test="<value>"' web/src` or the `:data-test` / `data-test` attribute form).
@@ -28,8 +28,16 @@ This is the highest-value check. For every `data-test` selector **added or chang
 
 Do not flag selectors you cannot resolve because the component lives in enterprise code not present in this checkout — say so instead of guessing.
 
-## What to Flag — Anti-patterns (warning)
+## What to Flag — Security (critical)
 
+- **Hardcoded credentials** — literal `password`, `secret`, `apiKey`, `token` values not sourced from `process.env.*`.
+
+## What to Flag — Framework & flakiness (warning)
+
+These hurt maintainability or make tests flaky, but do not by themselves void coverage, so they are `warning`, not `critical`.
+
+- **Raw selectors in spec files** — `page.locator(`, `page.getByRole(`, `page.getByText(`, `page.getByTestId(`, `page.$(` in a `.spec.js`, **including inside assertions** (`await expect(page.locator('[data-test="x"]')).toContainText(...)`). Selectors belong in page objects.
+- **`console.log` / `console.info` / `console.warn`** in test or page-object code — must use `testLogger`. (critical only if it leaks a credential/token.)
 - **Brittle selectors** — xpath, `nth-child`, `:nth(`, or framework-generated classes (`.q-…`, hashed CSS modules) where a `data-test` exists.
 - **Excessive hardcoded waits** — more than ~3 `waitForTimeout(` in one test, or a `waitForTimeout` standing in for a real condition wait.
 - **Created data without cleanup** — a test that creates an org/stream/alert/dashboard/user with no corresponding teardown (in `afterEach`/`afterAll` or `cleanup.spec.js`). Leaked fixtures flake later runs.
@@ -46,4 +54,4 @@ Do not flag selectors you cannot resolve because the component lives in enterpri
 
 ## Severity discipline
 
-A selector mismatch or a vacuous/missing assertion is `critical` — it means the test provides no real coverage despite passing. Be certain before flagging critical: quote the exact line and, for selector mismatches, name the components you searched. When unsure whether a test genuinely asserts the intended behavior, prefer a `warning` over silence, but never invent a mismatch you did not actually grep for.
+`critical` is reserved for **coverage-integrity failures** (a test that passes while asserting nothing real — missing/vacuous/soft/un-awaited assertion, or a selector that matches no component) and **hardcoded credentials**. Everything else — POM violations, `console.log`, brittle selectors, missing cleanup — is `warning`; the coordinator owns any further escalation. Be certain before flagging critical: quote the exact line, and for selector mismatches name the components you searched. When unsure whether a test genuinely asserts the intended behavior, prefer a `warning` over silence, but never invent a mismatch you did not actually grep for.

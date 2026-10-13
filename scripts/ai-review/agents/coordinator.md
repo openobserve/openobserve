@@ -21,7 +21,7 @@ Bias toward approval. A single warning in an otherwise clean PR still gets `appr
 
 ## Severity Definitions
 
-- **critical**: Will cause an outage, data loss, or is exploitable. Must block merge.
+- **critical**: Will cause an outage, data loss, or is exploitable — or, for test changes, a coverage-integrity failure (a test that passes while asserting nothing real: a missing/vacuous/soft/un-awaited assertion, or a selector that matches no component). Must block merge.
 - **warning**: Measurable regression, concrete risk, or pattern that leads to bugs. Should be addressed.
 - **suggestion**: An improvement worth considering. Does not block merge.
 
