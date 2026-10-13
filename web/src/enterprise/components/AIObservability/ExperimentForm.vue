@@ -663,6 +663,8 @@ const resolvedPrompt = ref<ResolvedPrompt | null>(null);
 const resolvingPrompt = ref(false);
 let promptResolveRequest = 0;
 const previewRequests = createPreviewRequestGate();
+/** previewKey() of the values the preview on screen was built for. */
+let previewedFor = "";
 const nextIdempotencyKey = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 const idempotencyKey = ref(nextIdempotencyKey());
 const leaveDialog = reactive({ show: false, onConfirm: () => {} });
@@ -1074,10 +1076,21 @@ function confirmCost() {
   costDialog.body = null;
 }
 
+/** What a preview depends on: the payload without its name, description and key. */
+function previewKey(payload: ExperimentCreatePayload): string {
+  return JSON.stringify({ ...payload, name: "", description: null, idempotencyKey: null });
+}
+
 async function onSubmit(values: ExperimentForm) {
   // The server pins scorer versions itself; reusing the preview's pins when
   // one is in hand just closes the gap if a version ships mid-edit.
   const payload = buildPayload(values);
+  // A preview that is still loading, or was built before the last edit, carries
+  // the old scorers and the old cost, so decide on a fresh one.
+  if (previewing.value || previewedFor !== previewKey(payload)) {
+    runPreviewAfterTyping.cancel();
+    await runPreview();
+  }
   const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
   if (preview.value?.costEstimate?.confirmationRequired) {
     askCostConfirmation(body);
@@ -1134,12 +1147,13 @@ async function runPreview() {
   previewing.value = true;
   previewFailed.value = false;
   previewErrorMessage.value = "";
+  const payload = buildPayload(form.state.values);
   try {
-    const result = await llmExperimentsService.preview(
-      orgId.value,
-      buildPayload(form.state.values),
-    );
-    if (previewRequests.isCurrent(request)) preview.value = result;
+    const result = await llmExperimentsService.preview(orgId.value, payload);
+    if (previewRequests.isCurrent(request)) {
+      preview.value = result;
+      previewedFor = previewKey(payload);
+    }
   } catch (error: any) {
     if (previewRequests.isCurrent(request)) {
       preview.value = null;

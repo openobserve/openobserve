@@ -502,6 +502,31 @@ describe("ExperimentForm", () => {
       expect(message).not.toContain("$0.22");
     });
 
+    it("does not send a judge removed while the next preview is loading", async () => {
+      const pinned = (ids: string[]) => ids.map((id) => ({ id, version: 1 }));
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        pinnedScorers: pinned(["sc-1", "sc-2"]),
+        costEstimate,
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      setField(wrapper, "scorerIds", ["sc-1", "sc-2"]);
+      await flushPromises();
+
+      // The preview for the edit below never lands; a fresh one does.
+      (llmExperimentsService.preview as any)
+        .mockReturnValueOnce(new Promise(() => {}))
+        .mockResolvedValue({ ...previewResult, pinnedScorers: pinned(["sc-1"]), costEstimate });
+      setField(wrapper, "scorerIds", ["sc-1"]);
+      await submit(wrapper);
+      costDialog(wrapper).vm.$emit("update:ok");
+      await flushPromises();
+
+      const sent = (llmExperimentsService.create as any).mock.calls[0][1];
+      expect(sent.scorers.map((s: any) => s.id)).toEqual(["sc-1"]);
+    });
+
     it("does not resend on cancel and keeps the form", async () => {
       (llmExperimentsService.create as any).mockRejectedValueOnce(overThreshold);
       wrapper = await createWrapper();
