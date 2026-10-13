@@ -13,14 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Per-org alert hygiene config: one row per org, keyed by a stable id the scheduler can use.
+//! Per-org alert calibration config: one row per org, keyed by a stable id the scheduler can use.
 
 use config::{ider, utils::time::now_micros};
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, sea_query::OnConflict,
 };
 
-use super::entity::alert_hygiene_configs::{ActiveModel, Column, Entity, Model};
+use super::entity::alert_calibration_configs::{ActiveModel, Column, Entity, Model};
 use crate::errors::{DbError, Error};
 
 pub const DEFAULT_FREQUENCY_MINUTES: i32 = 1440;
@@ -78,7 +78,7 @@ async fn write_config<C: ConnectionTrait>(
         .await?;
     get_by_org(conn, org).await?.ok_or_else(|| {
         Error::DbError(DbError::SeaORMError(
-            "alert_hygiene config disappeared between its upsert and its read-back".to_string(),
+            "alert_calibration config disappeared between its upsert and its read-back".to_string(),
         ))
     })
 }
@@ -115,7 +115,7 @@ mod tests {
     use sea_orm::{Database, DatabaseBackend, DatabaseConnection, PaginatorTrait, QueryTrait};
 
     use super::*;
-    use crate::table::migration::create_alert_hygiene_configs_for_test;
+    use crate::table::migration::create_alert_calibration_configs_for_test;
 
     const ORG: &str = "acme";
     const OTHER_ORG: &str = "globex";
@@ -123,7 +123,9 @@ mod tests {
 
     async fn db() -> DatabaseConnection {
         let db = Database::connect("sqlite::memory:").await.unwrap();
-        create_alert_hygiene_configs_for_test(&db).await.unwrap();
+        create_alert_calibration_configs_for_test(&db)
+            .await
+            .unwrap();
         db
     }
 

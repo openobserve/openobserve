@@ -210,7 +210,7 @@ mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
 mod m20261008_000001_add_name_to_rum_pa_tombstones;
-mod m20261012_000001_create_alert_hygiene_configs;
+mod m20261012_000001_create_alert_calibration_configs;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -318,10 +318,10 @@ pub(crate) async fn create_slo_tables_for_test(
 }
 
 #[cfg(test)]
-pub(crate) async fn create_alert_hygiene_configs_for_test(
+pub(crate) async fn create_alert_calibration_configs_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
-    m20261012_000001_create_alert_hygiene_configs::Migration
+    m20261012_000001_create_alert_calibration_configs::Migration
         .up(&SchemaManager::new(db))
         .await
 }
@@ -537,7 +537,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261004_000001_create_query_history::Migration),
             Box::new(m20261007_000001_scope_alert_dedup_state_by_org::Migration),
             Box::new(m20261008_000001_add_name_to_rum_pa_tombstones::Migration),
-            Box::new(m20261012_000001_create_alert_hygiene_configs::Migration),
+            Box::new(m20261012_000001_create_alert_calibration_configs::Migration),
         ]
     }
 }
@@ -596,7 +596,7 @@ mod tests {
         (97, "m20261004_000001_create_query_history"),
         (98, "m20261007_000001_scope_alert_dedup_state_by_org"),
         (99, "m20261008_000001_add_name_to_rum_pa_tombstones"),
-        (102, "m20261012_000001_create_alert_hygiene_configs"),
+        (102, "m20261012_000001_create_alert_calibration_configs"),
     ];
 
     #[test]

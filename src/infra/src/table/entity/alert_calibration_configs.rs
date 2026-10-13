@@ -1,9 +1,9 @@
-//! `SeaORM` Entity for the alert_hygiene_configs table.
+//! `SeaORM` Entity for the alert_calibration_configs table.
 
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, serde::Serialize, serde::Deserialize)]
-#[sea_orm(table_name = "alert_hygiene_configs")]
+#[sea_orm(table_name = "alert_calibration_configs")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,

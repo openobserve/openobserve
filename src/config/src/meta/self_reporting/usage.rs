@@ -244,8 +244,8 @@ pub enum TriggerDataType {
     SloBackfill,
     #[serde(rename = "composite")]
     CompositeAlert,
-    #[serde(rename = "alert_hygiene")]
-    AlertHygiene,
+    #[serde(rename = "alert_calibration")]
+    AlertCalibration,
 }
 
 impl TriggerDataType {
@@ -1186,7 +1186,7 @@ mod run_outcome_tests {
         assert!(!TriggerDataType::Synthetics.is_condition_bearing());
         assert!(!TriggerDataType::Backfill.is_condition_bearing());
         assert!(!TriggerDataType::AnomalyDetectionTraining.is_condition_bearing());
-        assert!(!TriggerDataType::AlertHygiene.is_condition_bearing());
+        assert!(!TriggerDataType::AlertCalibration.is_condition_bearing());
     }
 
     // ── normalize_outcome: the read-side migration (Part III) ───────────────
@@ -1715,8 +1715,8 @@ mod tests {
             "\"report\""
         );
         assert_eq!(
-            serde_json::to_string(&TriggerDataType::AlertHygiene).unwrap(),
-            "\"alert_hygiene\""
+            serde_json::to_string(&TriggerDataType::AlertCalibration).unwrap(),
+            "\"alert_calibration\""
         );
         assert_eq!(
             serde_json::to_string(&TriggerDataType::CachedReport).unwrap(),
@@ -1739,8 +1739,8 @@ mod tests {
             TriggerDataType::Report
         );
         assert_eq!(
-            serde_json::from_str::<TriggerDataType>("\"alert_hygiene\"").unwrap(),
-            TriggerDataType::AlertHygiene
+            serde_json::from_str::<TriggerDataType>("\"alert_calibration\"").unwrap(),
+            TriggerDataType::AlertCalibration
         );
         assert_eq!(
             serde_json::from_str::<TriggerDataType>("\"cached_report\"").unwrap(),

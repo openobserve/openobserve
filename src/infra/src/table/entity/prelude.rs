@@ -2,9 +2,9 @@
 #[cfg(feature = "cloud")]
 pub use super::trial_quota_usage::Entity as TrialQuotaUsage;
 pub use super::{
+    alert_calibration_configs::Entity as AlertCalibrationConfigs,
     alert_composite_children::Entity as AlertCompositeChildren,
     alert_composites::Entity as AlertComposites,
-    alert_hygiene_configs::Entity as AlertHygieneConfigs,
     alert_incident_alerts::Entity as AlertIncidentAlerts,
     alert_incidents::Entity as AlertIncidents, alerts::Entity as Alerts,
     anomaly_detection_config::Entity as AnomalyDetectionConfig,

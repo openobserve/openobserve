@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Per-org alert hygiene configuration.
+//! Per-org alert calibration configuration.
 
 use sea_orm_migration::prelude::*;
 
@@ -31,7 +31,7 @@ impl MigrationTrait for Migration {
         manager
             .drop_table(
                 Table::drop()
-                    .table(AlertHygieneConfigs::Table)
+                    .table(AlertCalibrationConfigs::Table)
                     .if_exists()
                     .to_owned(),
             )
@@ -41,44 +41,44 @@ impl MigrationTrait for Migration {
 
 fn table_statement() -> TableCreateStatement {
     Table::create()
-        .table(AlertHygieneConfigs::Table)
+        .table(AlertCalibrationConfigs::Table)
         .if_not_exists()
         .col(
-            ColumnDef::new(AlertHygieneConfigs::Id)
+            ColumnDef::new(AlertCalibrationConfigs::Id)
                 .string_len(27)
                 .not_null()
                 .primary_key(),
         )
         .col(
-            ColumnDef::new(AlertHygieneConfigs::Org)
+            ColumnDef::new(AlertCalibrationConfigs::Org)
                 .string_len(100)
                 .not_null(),
         )
         .col(
-            ColumnDef::new(AlertHygieneConfigs::Enabled)
+            ColumnDef::new(AlertCalibrationConfigs::Enabled)
                 .boolean()
                 .not_null()
                 .default(false),
         )
         .col(
-            ColumnDef::new(AlertHygieneConfigs::FrequencyMinutes)
+            ColumnDef::new(AlertCalibrationConfigs::FrequencyMinutes)
                 .integer()
                 .not_null()
                 .default(1440),
         )
         .col(
-            ColumnDef::new(AlertHygieneConfigs::WindowMinutes)
+            ColumnDef::new(AlertCalibrationConfigs::WindowMinutes)
                 .integer()
                 .not_null()
                 .default(43200),
         )
         .col(
-            ColumnDef::new(AlertHygieneConfigs::CreatedAt)
+            ColumnDef::new(AlertCalibrationConfigs::CreatedAt)
                 .big_integer()
                 .not_null(),
         )
         .col(
-            ColumnDef::new(AlertHygieneConfigs::UpdatedAt)
+            ColumnDef::new(AlertCalibrationConfigs::UpdatedAt)
                 .big_integer()
                 .not_null(),
         )
@@ -87,16 +87,16 @@ fn table_statement() -> TableCreateStatement {
 
 fn org_index_statement() -> IndexCreateStatement {
     Index::create()
-        .name("idx_alert_hygiene_configs_org")
-        .table(AlertHygieneConfigs::Table)
-        .col(AlertHygieneConfigs::Org)
+        .name("idx_alert_calibration_configs_org")
+        .table(AlertCalibrationConfigs::Table)
+        .col(AlertCalibrationConfigs::Org)
         .unique()
         .if_not_exists()
         .to_owned()
 }
 
 #[derive(DeriveIden)]
-enum AlertHygieneConfigs {
+enum AlertCalibrationConfigs {
     Table,
     Id,
     Org,
@@ -112,7 +112,7 @@ mod tests {
     use sea_orm::{ConnectionTrait, Database, DatabaseConnection, DbBackend, Statement};
 
     use super::*;
-    use crate::table::alert_hygiene::{DEFAULT_FREQUENCY_MINUTES, DEFAULT_WINDOW_MINUTES};
+    use crate::table::alert_calibration::{DEFAULT_FREQUENCY_MINUTES, DEFAULT_WINDOW_MINUTES};
 
     async fn migrated() -> DatabaseConnection {
         let db = Database::connect("sqlite::memory:").await.unwrap();
@@ -133,7 +133,7 @@ mod tests {
         let db = migrated().await;
         let columns: Vec<(String, String, i32, i32)> = query(
             &db,
-            "SELECT name, type, \"notnull\", pk FROM pragma_table_info('alert_hygiene_configs') \
+            "SELECT name, type, \"notnull\", pk FROM pragma_table_info('alert_calibration_configs') \
              ORDER BY cid",
         )
         .await
@@ -163,7 +163,7 @@ mod tests {
     #[tokio::test]
     async fn one_row_per_org_and_the_defaults_match_the_writer() {
         let db = migrated().await;
-        let insert = "INSERT INTO alert_hygiene_configs (id, org, created_at, updated_at) \
+        let insert = "INSERT INTO alert_calibration_configs (id, org, created_at, updated_at) \
                       VALUES ('{id}', 'acme', 1, 1)";
         db.execute_unprepared(&insert.replace("{id}", "a"))
             .await
@@ -176,7 +176,7 @@ mod tests {
         );
         let row = &query(
             &db,
-            "SELECT enabled, frequency_minutes, window_minutes FROM alert_hygiene_configs",
+            "SELECT enabled, frequency_minutes, window_minutes FROM alert_calibration_configs",
         )
         .await[0];
         assert!(!row.try_get::<bool>("", "enabled").unwrap());
@@ -195,6 +195,11 @@ mod tests {
         let db = migrated().await;
         let manager = SchemaManager::new(&db);
         Migration.down(&manager).await.unwrap();
-        assert!(!manager.has_table("alert_hygiene_configs").await.unwrap());
+        assert!(
+            !manager
+                .has_table("alert_calibration_configs")
+                .await
+                .unwrap()
+        );
     }
 }
