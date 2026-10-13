@@ -18,7 +18,7 @@ import type { NamedEventsStatus } from "@/composables/rum/useNamedEvents";
 import type { AppFilterCounts } from "@/composables/rum/useAppFilterCounts";
 import type { I18nText } from "@/types/i18n";
 import type { FilterValuesState } from "@/components/rum/productAnalytics/funnelParts/funnelFilters";
-import type { FunnelResult, NamedEvent, SessionField } from "@/utils/rum/productAnalyticsModel";
+import type { FunnelResult, NamedEvent } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef, SampleRatio, StepRef } from "@/utils/rum/productAnalyticsQueries";
 
 export interface FunnelLayoutSetting {
@@ -45,8 +45,10 @@ export interface FunnelLayoutProps {
   appFilters: AppFilterCounts | null;
   includeHidden: boolean;
   settings: FunnelLayoutSetting[];
-  filterFields: readonly SessionField[];
+  filterFields: readonly string[];
+  filterFieldTypes?: Readonly<Record<string, string>>;
   filterValues: FilterValuesState;
+  failed?: boolean;
 }
 
 export interface FunnelLayoutEmits {
@@ -54,6 +56,14 @@ export interface FunnelLayoutEmits {
   dropoff: [number];
   "suggestions-retry": [];
   "include-hidden": [];
+  "hide-hidden": [];
   "edit-app-filters": [];
-  "filter-values": [SessionField];
+  "filter-values": [string];
+}
+
+/** A layout places the page's card header, its notices and its footer, so it decides where the card sits. */
+export interface FunnelLayoutSlots {
+  header?: () => unknown;
+  notices?: () => unknown;
+  footer?: () => unknown;
 }

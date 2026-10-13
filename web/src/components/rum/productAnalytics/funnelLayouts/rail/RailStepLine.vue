@@ -16,13 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <span class="flex min-w-0 flex-wrap items-center gap-1.5 text-start text-xs">
-    <span class="text-text-secondary tabular-nums">{{ index + 1 }}</span>
     <OTag :label="kindLabel(step)" :variant="kindVariant(step)" size="xs" />
     <span class="text-text-body min-w-0 font-mono break-all">{{ labelOf(step) }}</span>
-    <template v-if="chips.length">
-      <OTag v-for="c in chips" :key="c" :label="c" variant="default-outline" size="xs" />
-    </template>
-    <span v-else class="text-text-secondary">{{ t("rum.analytics.funnel.railNoConditions") }}</span>
+    <span v-if="chips.length" class="flex basis-full flex-wrap items-center gap-1 ps-3">
+      <span class="text-text-secondary">{{ t("rum.analytics.funnel.where") }}</span>
+      <OTag v-for="c in chips" :key="c" :label="c" variant="primary-outline" size="xs" />
+    </span>
   </span>
 </template>
 
@@ -37,7 +36,6 @@ import type { StepRef } from "@/utils/rum/productAnalyticsQueries";
 
 const props = defineProps<{
   step: StepRef;
-  index: number;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
 }>();

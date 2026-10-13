@@ -16,6 +16,7 @@
 import { sqlIn, sqlLiteral } from "@/utils/query/sqlFilterBuilder";
 import {
   CONTAINER_SUFFIXES,
+  FILTER_FIELDS,
   type AppExclusions,
   type MatchOp,
   type NamedEvent,
@@ -74,8 +75,13 @@ export interface FunnelDef {
   x?: ExclusionStep[];
   f?: FunnelFilter[];
 }
-/** Filter all steps: keeps a session whose field matches one of the values; NULL never matches. */
-export type FunnelFilter = SessionRule;
+/** Filter all steps on a built-in session field or an attribute column; `not` keeps sessions that never match. */
+export interface FunnelFilter {
+  field: string;
+  op: MatchOp;
+  values: string[];
+  not?: true;
+}
 export interface FunnelCohort {
   funnel: FunnelDef;
   stepIndex: number;
@@ -409,36 +415,65 @@ const sessionPass = (scope: AnalyticsScope): SessionPass | null => {
   };
 };
 
+const isBuiltinFilter = (field: string): boolean =>
+  (FILTER_FIELDS as readonly string[]).includes(field);
+
+// An attribute name is parsed to [a-z0-9_] before it gets here, so quoting it is safe.
+const filterColumn = (field: string): string => (isBuiltinFilter(field) ? field : `"${field}"`);
+
+// Attribute columns may be numeric or boolean, and the filter's values are text.
+const filterValue = (field: string): string =>
+  isBuiltinFilter(field) ? field : `CAST("${field}" AS VARCHAR)`;
+
+const funnelFilterConds = (r: FunnelFilter): string[] => {
+  const col = filterValue(r.field);
+  return (r.op === "in" ? [r.values] : r.values).map(
+    (v) => `${filterColumn(r.field)} IS NOT NULL AND ${opMatch(r.op, col, v)}`,
+  );
+};
+
 // A field the stream lacks is NULL on every row, so it matches nothing.
 const filterMatch = (scope: AnalyticsScope, r: FunnelFilter): string =>
-  has(scope, r.field) ? `(${anyOf(ruleMatches(r))})` : "(1 = 0)";
+  has(scope, r.field) ? `(${anyOf(funnelFilterConds(r))})` : "(1 = 0)";
 
-const funnelFilters = (def: FunnelDef, identity: boolean): FunnelFilter[] =>
-  (def.f ?? []).filter((r) => isIdentityRule(r) === identity);
+const rowFilterMatch = (scope: AnalyticsScope, r: FunnelFilter): string =>
+  r.not ? `NOT ${filterMatch(scope, r)}` : filterMatch(scope, r);
+
+// Identity and attribute values are missing from a session's first views, so they are checked per session.
+const isSessionFilter = (r: FunnelFilter): boolean =>
+  (IDENTITY_FIELDS as readonly string[]).includes(r.field) || !isBuiltinFilter(r.field);
+
+const funnelFilters = (def: FunnelDef, perSession: boolean): FunnelFilter[] =>
+  (def.f ?? []).filter((r) => isSessionFilter(r) === perSession);
 
 /** Filter all steps on fields every row carries, as WHERE predicates so rows are pruned early. */
 const funnelFilterKeeps = (scope: AnalyticsScope, def: FunnelDef): string =>
   funnelFilters(def, false)
-    .map((r) => ` AND ${filterMatch(scope, r)}`)
+    .map((r) => ` AND ${rowFilterMatch(scope, r)}`)
     .join("");
 
-// Identity filters flag the whole session, like identity rules, because its first views carry no identity yet.
+const sessionFilterWiden = (scope: AnalyticsScope, filters: FunnelFilter[]): string =>
+  [...new Set(filters.map((r) => r.field))]
+    .filter((f) => has(scope, f))
+    .map((f) => ` OR ${filterColumn(f)} IS NOT NULL`)
+    .join("");
+
+const sessionFilterFlags = (scope: AnalyticsScope, filters: FunnelFilter[]): string[] =>
+  filters.map((r, i) => `MAX(CASE WHEN ${filterMatch(scope, r)} THEN 1 ELSE 0 END) AS ki${i + 1}`);
+
+// A negated filter keeps the sessions where no event ever matched.
+const sessionFilterKeep = (r: FunnelFilter, flag: string): string => `${flag} = ${r.not ? 0 : 1}`;
+
 const funnelPass = (scope: AnalyticsScope, def: FunnelDef): SessionPass | null => {
   const base = sessionPass(scope);
   const ids = funnelFilters(def, true);
   if (!ids.length) return base;
   const n = range1(ids.length);
-  const fields = [...new Set(ids.map((r) => r.field))].filter((f) => has(scope, f));
   return {
-    xi: [
-      ...(base ? [base.xi] : []),
-      ...ids.map(
-        (r, i) => `MAX(CASE WHEN ${filterMatch(scope, r)} THEN 1 ELSE 0 END) AS ki${i + 1}`,
-      ),
-    ].join(", "),
-    widen: `${base?.widen ?? ""}${fields.map((f) => ` OR ${f} IS NOT NULL`).join("")}`,
+    xi: [...(base ? [base.xi] : []), ...sessionFilterFlags(scope, ids)].join(", "),
+    widen: `${base?.widen ?? ""}${sessionFilterWiden(scope, ids)}`,
     over: [...(base?.over ?? []), ...n.map((i) => `MAX(ki${i}) OVER (PARTITION BY sid) AS ks${i}`)],
-    keep: [...(base?.keep ?? []), ...n.map((i) => `ks${i} = 1`)],
+    keep: [...(base?.keep ?? []), ...ids.map((r, i) => sessionFilterKeep(r, `ks${i + 1}`))],
   };
 };
 
@@ -722,7 +757,8 @@ export function identityTopSql(scope: AnalyticsScope, field: IdentityField): str
 /** A Filter all steps field's top values with their sessions, shaped like identityTopSql. */
 export function filterValuesSql(scope: AnalyticsScope, field: FunnelFilter["field"]): string {
   if (!has(scope, field)) throw new Error(`Field ${field} is not in the stream`);
-  return `SELECT ${field} AS v, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${rowScope(scope)} AND ${field} IS NOT NULL AND ${field} <> '' GROUP BY ${field} ORDER BY sessions DESC, v LIMIT 20`;
+  const v = filterValue(field);
+  return `SELECT ${v} AS v, COUNT(DISTINCT session_id) AS sessions FROM "_rumdata" WHERE ${rowScope(scope)} AND ${filterColumn(field)} IS NOT NULL AND ${v} <> '' GROUP BY ${v} ORDER BY sessions DESC, v LIMIT 20`;
 }
 
 /** Top browser and device families over the scope without any exclusion, for the likely-bot suggestions. */
@@ -1620,20 +1656,21 @@ export function whyEnteredSql(scope: AnalyticsScope, def: FunnelDef, opts: Build
   const s1 = def.steps[0];
   const conds = (s1.f?.vc ?? []).map((c) => ` AND ${viewCondRaw(c, scope)}`).join("");
   const opened = `(${stepPredicateRaw(s1, scope, opts.events)}${conds})`;
-  const keeps = funnelFilters(def, false).map((r) => filterMatch(scope, r));
+  const keeps = funnelFilters(def, false).map((r) => rowFilterMatch(scope, r));
   const kept = [opened, ...keeps].join(" AND ");
   const base = sessionPass(scope);
   const ids = funnelFilters(def, true);
-  const fields = [...new Set(ids.map((r) => r.field))].filter((f) => has(scope, f));
-  const widen = `${base?.widen ?? ""}${fields.map((f) => ` OR ${f} IS NOT NULL`).join("")}`;
+  const widen = `${base?.widen ?? ""}${sessionFilterWiden(scope, ids)}`;
   const g = [
     "session_id AS sid",
     `MAX(CASE WHEN ${opened} THEN 1 ELSE 0 END) AS o1`,
     `MAX(CASE WHEN ${kept} THEN 1 ELSE 0 END) AS k1`,
-    ...ids.map((r, i) => `MAX(CASE WHEN ${filterMatch(scope, r)} THEN 1 ELSE 0 END) AS ki${i + 1}`),
+    ...sessionFilterFlags(scope, ids),
     ...(base ? [base.xi] : []),
   ];
-  const inFilter = ["k1 = 1", ...ids.map((_, i) => `ki${i + 1} = 1`)].join(" AND ");
+  const inFilter = ["k1 = 1", ...ids.map((r, i) => sessionFilterKeep(r, `ki${i + 1}`))].join(
+    " AND ",
+  );
   return withCtes(
     [
       `g AS (SELECT ${g.join(", ")} FROM "_rumdata" WHERE ${scopeClause(scope, opts.sample)} AND (${opened}${widen}) GROUP BY session_id)`,

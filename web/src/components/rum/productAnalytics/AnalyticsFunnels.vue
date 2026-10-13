@@ -15,13 +15,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col" data-test="rum-analytics-funnels">
+  <div class="flex h-full min-h-0 flex-col" data-test="rum-analytics-funnels">
     <SavedFunnelBar
       :events="events"
       :events-ready="pa.eventsStatus.value === 'ready'"
       :compile-sql="savedSql"
-    />
-    <div class="px-page-edge flex flex-col gap-3 py-3">
+    >
+      <template v-if="def.steps.length" #actions>
+        <ODropdown v-if="recent.length" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="sm"
+              icon-left="history"
+              data-test="rum-analytics-funnel-recent-btn"
+              >{{ t("rum.analytics.funnel.recent") }}</OButton
+            >
+          </template>
+          <ODropdownItem
+            v-for="(r, i) in recent"
+            :key="i"
+            :data-test="`rum-analytics-funnel-recent-menu-${i}`"
+            @select="funnelDraft.startNew(r)"
+          >
+            <KeySequence :keys="r.steps" :events="events" />
+          </ODropdownItem>
+        </ODropdown>
+        <OButton
+          variant="ghost"
+          size="sm"
+          data-test="rum-analytics-funnel-clear-btn"
+          @click="clear"
+          >{{ t("rum.analytics.funnel.clear") }}</OButton
+        >
+        <span>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="shield-alert-outline"
+            :disabled="!alertReady"
+            data-test="rum-analytics-funnel-alert-btn"
+            @click="openAlert"
+            >{{ t("rum.analytics.funnel.alert") }}</OButton
+          >
+          <OTooltip :content="alertTip" />
+        </span>
+        <span>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="dashboard-customize"
+            :disabled="!dashboardReady"
+            data-test="rum-analytics-funnel-add-dashboard-btn"
+            @click="dashboardOpen = true"
+            >{{ t("rum.analytics.dashboard.add") }}</OButton
+          >
+          <OTooltip v-if="!dashboardReady" :content="dashboardTip" />
+        </span>
+      </template>
+    </SavedFunnelBar>
+    <div class="px-page-edge flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-3">
       <OBanner
         v-if="usersFallback"
         variant="info"
@@ -127,160 +180,134 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OEmptyState>
       </OCard>
 
-      <OCard
+      <component
+        :is="FunnelLayout"
         v-else
-        variant="outlined"
-        class="rounded-surface flex flex-col"
-        data-test="rum-analytics-funnel-card"
+        :def="def"
+        :result="result"
+        :removed="removed"
+        :suggestions="suggestions"
+        :suggestions-state="suggestionsState"
+        :state="funnelPanel"
+        :sampled="1"
+        :events="events"
+        :events-status="eventsStatus"
+        :deleted-names="namedEvents.deletedNames.value"
+        :unit-label="unitLabel"
+        :unit-noun="unitNoun"
+        :hide-time="!!def.breakdown"
+        :app="pa.state.app"
+        :app-filters="appFilters.counts.value"
+        :include-hidden="pa.state.includeExcluded"
+        :settings="layoutSettings"
+        :filter-fields="filterFields"
+        :filter-field-types="pa.schemaTypes.value"
+        :filter-values="filterValues"
+        :failed="funnelFailed"
+        @update:def="applyDef"
+        @filter-values="loadFilterValues"
+        @dropoff="openDropoff"
+        @suggestions-retry="retrySuggestions"
+        @include-hidden="appFilters.setIncludeHidden(router, true)"
+        @hide-hidden="appFilters.setIncludeHidden(router, false)"
+        @edit-app-filters="emit('open-exclusions')"
       >
-        <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
-          <span
-            class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2"
-            data-test="rum-analytics-funnel-overall"
-          >
-            <span class="text-text-heading text-sm font-semibold">{{
-              t("rum.analytics.funnel.overall")
-            }}</span>
-            <template v-if="result && funnelPanel.status === 'ok'">
-              <span class="text-text-heading text-xl font-semibold tabular-nums">{{
-                pct(overallRate)
+        <template #header>
+          <div class="border-border-default flex flex-wrap items-center gap-2 border-b px-4 py-2">
+            <span
+              class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2"
+              data-test="rum-analytics-funnel-overall"
+            >
+              <span class="text-text-heading text-sm font-semibold">{{
+                t("rum.analytics.funnel.overall")
               }}</span>
-              <span class="text-text-secondary text-xs">{{
-                t("rum.analytics.funnel.overallOf", {
-                  last: formatCount(lastUnits, 1),
-                  first: formatCount(firstUnits, 1),
-                  unit: unitNoun,
-                })
-              }}</span>
-              <span
-                v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0"
-                class="text-text-secondary text-xs"
-                data-test="rum-analytics-funnel-overall-time"
-                >{{
-                  t("rum.analytics.funnel.overallTime", {
-                    median: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
-                    p90: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
+              <template v-if="result && funnelPanel.status === 'ok'">
+                <span class="text-text-heading text-xl font-semibold tabular-nums">{{
+                  pct(overallRate)
+                }}</span>
+                <span class="text-text-secondary text-xs">{{
+                  t("rum.analytics.funnel.overallOf", {
+                    last: formatCount(lastUnits, 1),
+                    first: formatCount(firstUnits, 1),
+                    unit: unitNoun,
                   })
-                }}</span
+                }}</span>
+                <span
+                  v-if="!def.breakdown && def.steps.length > 1 && lastUnits > 0"
+                  class="text-text-secondary text-xs"
+                  data-test="rum-analytics-funnel-overall-time"
+                  >{{
+                    t("rum.analytics.funnel.overallTime", {
+                      median: raw(formatDuration(result.steps[result.steps.length - 1].medianMs)),
+                      p90: raw(formatDuration(result.steps[result.steps.length - 1].p90Ms)),
+                    })
+                  }}</span
+                >
+                <WhyEnteredPopover
+                  v-if="!usersMode && def.steps.length > 1"
+                  :count="firstUnits"
+                  :app="pa.state.app"
+                  :step1="firstLabel"
+                  :state="whyState"
+                  :lines="why"
+                  :estimated="funnelPanel.sampled > 1"
+                  @open="onWhyOpen"
+                  @retry="loadWhy(true)"
+                />
+              </template>
+            </span>
+            <OToggleGroup
+              :model-value="def.unit"
+              type="single"
+              :label="t('rum.analytics.funnel.countBy')"
+              label-position="left"
+              data-test="rum-analytics-funnel-count-by"
+              @update:model-value="onUnit"
+            >
+              <OToggleGroupItem
+                value="sessions"
+                size="xs"
+                data-test="rum-analytics-funnel-count-by-sessions"
+                >{{ t("rum.analytics.funnel.sessions") }}</OToggleGroupItem
               >
-              <WhyEnteredPopover
-                v-if="!usersMode && def.steps.length > 1"
-                :count="firstUnits"
-                :app="pa.state.app"
-                :step1="firstLabel"
-                :state="whyState"
-                :lines="why"
-                :estimated="funnelPanel.sampled > 1"
-                @open="onWhyOpen"
-                @retry="loadWhy(true)"
-              />
-            </template>
-          </span>
-          <OToggleGroup
-            :model-value="def.unit"
-            type="single"
-            :label="t('rum.analytics.funnel.countBy')"
-            label-position="left"
-            data-test="rum-analytics-funnel-count-by"
-            @update:model-value="onUnit"
-          >
-            <OToggleGroupItem
-              value="sessions"
-              size="xs"
-              data-test="rum-analytics-funnel-count-by-sessions"
-              >{{ t("rum.analytics.funnel.sessions") }}</OToggleGroupItem
-            >
-            <OToggleGroupItem
-              value="users"
-              size="xs"
-              :disabled="!identitySql"
-              :tooltip="usersTooltip"
-              data-test="rum-analytics-funnel-count-by-users"
-              >{{ pa.usersUnit.value.label }}</OToggleGroupItem
-            >
-          </OToggleGroup>
-          <OSelect
-            v-if="usersMode"
-            :model-value="def.window"
-            :options="windowOptions"
-            size="sm"
-            class="w-40"
-            data-test="rum-analytics-funnel-window-select"
-            @update:model-value="(v) => update({ window: v as FunnelWindow })"
-          />
-          <OTag
-            v-else
-            :label="t('rum.analytics.funnel.windowSession')"
-            variant="default-outline"
-            size="sm"
-            data-test="rum-analytics-funnel-window-fixed"
-          />
-          <OSelect
-            :model-value="def.breakdown ?? 'none'"
-            :options="breakdownOptions"
-            size="sm"
-            class="w-36"
-            data-test="rum-analytics-funnel-breakdown-select"
-            @update:model-value="
-              (v) => update({ breakdown: v === 'none' ? null : (v as BreakdownDim) })
-            "
-          />
-          <span>
-            <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="dashboard-customize"
-              :disabled="!dashboardReady"
-              :aria-label="dashboardTip"
-              data-test="rum-analytics-funnel-add-dashboard-btn"
-              @click="dashboardOpen = true"
-            />
-            <OTooltip :content="dashboardTip" />
-          </span>
-          <span>
-            <OButton
-              variant="outline"
-              size="icon-toolbar"
-              icon-left="shield-alert-outline"
-              :disabled="!alertReady"
-              :aria-label="alertTip"
-              data-test="rum-analytics-funnel-alert-btn"
-              @click="openAlert"
-            />
-            <OTooltip :content="alertTip" />
-          </span>
-          <ODropdown v-if="recent.length" side="bottom" align="end">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="sm"
-                icon-left="history"
-                data-test="rum-analytics-funnel-recent-btn"
-                >{{ t("rum.analytics.funnel.recent") }}</OButton
+              <OToggleGroupItem
+                value="users"
+                size="xs"
+                :disabled="!identitySql"
+                :tooltip="usersTooltip"
+                data-test="rum-analytics-funnel-count-by-users"
+                >{{ pa.usersUnit.value.label }}</OToggleGroupItem
               >
-            </template>
-            <ODropdownItem
-              v-for="(r, i) in recent"
-              :key="i"
-              :data-test="`rum-analytics-funnel-recent-menu-${i}`"
-              @select="funnelDraft.startNew(r)"
-            >
-              <KeySequence :keys="r.steps" :events="events" />
-            </ODropdownItem>
-          </ODropdown>
-          <OButton
-            variant="ghost"
-            size="sm"
-            data-test="rum-analytics-funnel-clear-btn"
-            @click="clear"
-            >{{ t("rum.analytics.funnel.clear") }}</OButton
-          >
-        </div>
-
-        <div class="flex flex-col gap-2 px-4 py-3">
-          <span class="text-text-secondary text-xs" data-test="rum-analytics-funnel-order-label">{{
-            t("rum.analytics.funnel.orderLabel")
-          }}</span>
+            </OToggleGroup>
+            <OSelect
+              v-if="usersMode"
+              :model-value="def.window"
+              :options="windowOptions"
+              size="sm"
+              width="sm"
+              data-test="rum-analytics-funnel-window-select"
+              @update:model-value="(v) => update({ window: v as FunnelWindow })"
+            />
+            <OTag
+              v-else
+              :label="t('rum.analytics.funnel.windowSession')"
+              variant="default-outline"
+              size="sm"
+              data-test="rum-analytics-funnel-window-fixed"
+            />
+            <OSelect
+              :model-value="def.breakdown ?? 'none'"
+              :options="breakdownOptions"
+              size="sm"
+              width="sm"
+              data-test="rum-analytics-funnel-breakdown-select"
+              @update:model-value="
+                (v) => update({ breakdown: v === 'none' ? null : (v as BreakdownDim) })
+              "
+            />
+          </div>
+        </template>
+        <template #notices>
           <span
             v-if="usersMode && result && result.step1Sessions !== null"
             class="text-text-secondary flex items-center gap-1 text-xs"
@@ -329,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <AnalyticsPanelState
-            v-if="funnelPanel.status === 'error' || funnelPanel.status === 'forbidden'"
+            v-if="funnelFailed"
             :state="funnelPanel"
             data-test="rum-analytics-funnel"
             @retry="compute(true)"
@@ -363,41 +390,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </template>
             </OEmptyState>
-            <component
-              :is="FunnelLayout"
-              :def="def"
-              :result="result"
-              :removed="removed"
-              :suggestions="suggestions"
-              :suggestions-state="suggestionsState"
-              :state="funnelPanel"
-              :sampled="1"
-              :events="events"
-              :events-status="eventsStatus"
-              :deleted-names="namedEvents.deletedNames.value"
-              :unit-label="unitLabel"
-              :unit-noun="unitNoun"
-              :hide-time="!!def.breakdown"
-              :app="pa.state.app"
-              :app-filters="appFilters.counts.value"
-              :include-hidden="pa.state.includeExcluded"
-              :settings="layoutSettings"
-              :filter-fields="filterFields"
-              :filter-values="filterValues"
-              @update:def="applyDef"
-              @filter-values="loadFilterValues"
-              @dropoff="openDropoff"
-              @suggestions-retry="retrySuggestions"
-              @include-hidden="appFilters.setIncludeHidden(router, true)"
-              @edit-app-filters="emit('open-exclusions')"
-            />
-            <span
-              v-if="def.x?.length"
-              class="text-text-secondary text-xs"
-              data-test="rum-analytics-funnel-exclusions-caption"
-              >{{ exclusionsCaption }}</span
-            >
           </template>
+        </template>
+        <template #footer>
+          <span
+            v-if="!funnelFailed && def.x?.length"
+            class="text-text-secondary text-xs"
+            data-test="rum-analytics-funnel-exclusions-caption"
+            >{{ exclusionsCaption }}</span
+          >
           <template v-if="def.breakdown && breakdown && funnelPanel.status === 'ok'">
             <span class="text-text-secondary text-xs">{{
               t("rum.analytics.funnel.breakdownTimeHidden")
@@ -418,8 +419,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :builtin-only="builtinOnlyApps"
             />
           </template>
-        </div>
-      </OCard>
+        </template>
+      </component>
       <AddToDashboard
         v-if="dashboardOpen"
         v-model:open="dashboardOpen"
@@ -505,11 +506,11 @@ import {
   formatCount,
   formatDuration,
   funnelParam,
+  isFilterColumn,
   toFunnelResult,
   type FunnelResult,
   type NamedEvent,
   type SavedFunnel,
-  type SessionField,
 } from "@/utils/rum/productAnalyticsModel";
 import {
   DIMENSIONS,
@@ -564,7 +565,7 @@ const eventsStatus = computed(() => (usesEvents.value ? pa.eventsStatus.value : 
 const { entries, entriesLoading, entriesFailed, recent, loadEntries, refreshRecent, pushRecent } =
   useFunnelQuickStarts(() => events.value);
 const dropoffCohort = ref<FunnelCohort | null>(null);
-const valuesField = ref<SessionField | null>(null);
+const valuesField = ref<string | null>(null);
 const whyOpen = ref(false);
 const dashboardOpen = ref(false);
 // The tab is kept alive, so the window choice is re-read on every activation, not only at setup.
@@ -689,7 +690,10 @@ const removed = computed<(number | null)[]>(() =>
     : [],
 );
 
-const filterFields = computed(() => FILTER_FIELDS.filter((f) => pa.schema.value[f]));
+const filterFields = computed(() => [
+  ...FILTER_FIELDS.filter((f) => pa.schema.value[f]),
+  ...Object.keys(pa.schema.value).filter(isFilterColumn).sort(),
+]);
 
 // Rows from another field or scope must never be offered as this field's values.
 const filterValues = computed<FilterValuesState>(() => {
@@ -809,6 +813,9 @@ const suggestionsState = computed(() =>
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 // Undercounted numbers would seed the alert threshold, so a partial result holds Alert me back.
+const funnelFailed = computed(
+  () => funnelPanel.value.status === "error" || funnelPanel.value.status === "forbidden",
+);
 const partial = computed(() => funnelPanel.value.status === "ok" && !!funnelPanel.value.partial);
 const alertReady = computed(() => def.value.steps.length > 1 && !!result.value && !partial.value);
 const alertTip = computed<I18nText>(() => {
@@ -1027,7 +1034,7 @@ const retrySuggestions = () => {
   });
 };
 
-const loadFilterValues = (field: SessionField) => {
+const loadFilterValues = (field: string) => {
   valuesField.value = field;
   if (!pa.schema.value[field]) return;
   const key = `${pa.scopeKey.value}|${field}`;

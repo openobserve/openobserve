@@ -288,6 +288,14 @@ export default function useProductAnalytics() {
     return Object.fromEntries(Object.keys(fields).map((f) => [f, true]));
   });
 
+  const schemaTypes = computed<Record<string, string>>(() => {
+    const fields: Record<string, { type?: unknown }> =
+      performanceState.data.streams?._rumdata?.schema ?? {};
+    return Object.fromEntries(
+      Object.entries(fields).map(([f, v]) => [f, typeof v?.type === "string" ? v.type : ""]),
+    );
+  });
+
   const comparedApps = computed(() =>
     [...new Set(state.apps)].filter((a) => a !== state.app).sort(),
   );
@@ -1052,6 +1060,7 @@ export default function useProductAnalytics() {
     newUsersRange,
     eventPreviewSql,
     schema,
+    schemaTypes,
     identity: readonly(identity),
     identityTops: readonly(identityTops),
     identityNote,

@@ -18,7 +18,7 @@ import { mount } from "@vue/test-utils";
 import AppFiltersSummary from "./AppFiltersSummary.vue";
 
 const mountSummary = (props: Record<string, unknown>) =>
-  mount(AppFiltersSummary, { props: { counts: null, included: false, ...props } });
+  mount(AppFiltersSummary, { props: { counts: null, included: false, app: "shop-web", ...props } });
 const LINE = '[data-test="rum-analytics-funnel-app-filters"]';
 
 describe("AppFiltersSummary", () => {

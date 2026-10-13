@@ -16,6 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col" data-test="rum-analytics-funnel-steps-table">
+    <span
+      class="text-text-secondary px-2 pb-1 text-xs"
+      data-test="rum-analytics-funnel-order-label"
+      >{{ t("rum.analytics.funnel.orderLabel") }}</span
+    >
     <div
       class="text-text-secondary border-border-default grid items-end gap-x-3 border-b px-2 pb-1.5 text-xs max-md:hidden"
       :class="gridClass"
@@ -30,12 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('rum.analytics.funnel.timeTooltip', { unit: unitNoun })" />
       </span>
       <span>{{ t("rum.analytics.funnel.reached") }}</span>
-      <span />
+      <span v-if="!railEdits" />
     </div>
     <VueDraggableNext
       :model-value="def.steps"
       handle=".funnel-drag-handle"
       item-key="key"
+      :disabled="railEdits"
       @update:model-value="onDrag"
     >
       <div v-for="(step, i) in def.steps" :key="`${step.kind}:${step.key}:${i}`">
@@ -46,6 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="flex items-center gap-1">
             <OIcon
+              v-if="!railEdits"
               name="drag-indicator"
               size="sm"
               class="funnel-drag-handle text-text-secondary cursor-grab"
@@ -60,13 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-body min-w-0 font-mono text-xs break-all">{{
               labelOf(step)
             }}</span>
-            <OTag
-              v-for="chip in filterChips(step)"
-              :key="chip"
-              :label="chip"
-              variant="default-outline"
-              size="xs"
-            />
             <OTag
               v-if="
                 step.kind === 'e' && (eventsStatus === 'failed' || eventsStatus === 'forbidden')
@@ -91,6 +91,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               :data-test="`rum-analytics-funnel-step-${i}-not-seen`"
             />
+            <span
+              v-if="filterChips(step).length"
+              class="flex basis-full flex-wrap items-center gap-1 text-xs"
+              :data-test="`rum-analytics-funnel-step-${i}-where`"
+            >
+              <span class="text-text-secondary">{{ t("rum.analytics.funnel.where") }}</span>
+              <OTag
+                v-for="chip in filterChips(step)"
+                :key="chip"
+                :label="chip"
+                variant="primary-outline"
+                size="xs"
+              />
+            </span>
           </span>
           <template v-if="numbersReady && result && result.steps[i]">
             <span
@@ -137,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>
             <OSkeleton v-for="n in hideTime ? 4 : 5" :key="n" type="text" class="h-5 w-full" />
           </template>
-          <span class="flex items-center justify-end gap-0.5">
+          <span v-if="!railEdits" class="flex items-center justify-end gap-0.5">
             <StepConditionPopover
               v-if="step.kind === 'p'"
               :step="step"
@@ -255,6 +269,7 @@ const props = defineProps<{
   unitLabel: I18nText;
   unitNoun: I18nText;
   hideTime: boolean;
+  railEdits?: boolean;
 }>();
 const emit = defineEmits<{
   "update:def": [FunnelDef];
@@ -267,11 +282,15 @@ const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
 );
 const dash = raw("—");
 
-const gridClass = computed(() =>
-  props.hideTime
+const gridClass = computed(() => {
+  if (props.railEdits)
+    return props.hideTime
+      ? "grid-cols-[2rem_minmax(0,1fr)_5.5rem_5rem_5rem_minmax(6rem,18rem)]"
+      : "grid-cols-[2rem_minmax(0,1fr)_5.5rem_5rem_5rem_6.5rem_minmax(6rem,18rem)]";
+  return props.hideTime
     ? "grid-cols-[3rem_minmax(0,1fr)_5.5rem_5rem_5rem_minmax(6rem,18rem)_6.5rem]"
-    : "grid-cols-[3rem_minmax(0,1fr)_5.5rem_5rem_5rem_6.5rem_minmax(6rem,18rem)_6.5rem]",
-);
+    : "grid-cols-[3rem_minmax(0,1fr)_5.5rem_5rem_5rem_6.5rem_minmax(6rem,18rem)_6.5rem]";
+});
 
 const numbersReady = computed(() => props.state.status === "ok");
 // A panel held for unreadable events has nothing coming, so a skeleton would promise numbers that never arrive.

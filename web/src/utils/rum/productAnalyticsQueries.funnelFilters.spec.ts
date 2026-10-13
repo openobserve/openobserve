@@ -106,6 +106,28 @@ describe("Filter all steps (f) in the funnel SQL", () => {
     expect(sql).toContain("WHERE ks1 = 1 AND (");
   });
 
+  it("an attribute filter checks the whole session, quoted and compared as text", () => {
+    const schema = { ...FULL, context_promo_variant: true };
+    const f: FunnelFilter = { field: "context_promo_variant", op: "in", values: ["B"] };
+    const sql = funnelSql(scope({ schema }), null, fdef({ f: [f] }), opts);
+    expect(x00(sql)).toContain(
+      `MAX(CASE WHEN ("context_promo_variant" IS NOT NULL AND CAST("context_promo_variant" AS VARCHAR) IN ('B')) THEN 1 ELSE 0 END) AS ki1`,
+    );
+    expect(x00(sql)).toContain(' OR "context_promo_variant" IS NOT NULL)');
+    expect(sql).toContain("WHERE ks1 = 1 AND (");
+  });
+
+  it("a negated session filter keeps sessions where no event matched", () => {
+    const sql = funnelSql(scope(), null, fdef({ f: [{ ...EMAIL, not: true }] }), opts);
+    expect(x00(sql)).toContain(EMAIL_KI);
+    expect(sql).toContain("WHERE ks1 = 0 AND (");
+  });
+
+  it("a negated row filter keeps rows that do not match, NULL included", () => {
+    const sql = funnelSql(scope(), null, fdef({ f: [{ ...COUNTRY, not: true }] }), opts);
+    expect(x00(sql)).toContain(` AND NOT ${COUNTRY_PRED} AND (`);
+  });
+
   it("an identity filter and an identity app rule keep their own flags", () => {
     const rules = {
       ...NO_RULES,
@@ -227,6 +249,13 @@ describe("filter value suggestions", () => {
     expect(sql).toContain("SELECT geo_info_country AS v, COUNT(DISTINCT session_id) AS sessions");
     expect(sql).toContain("geo_info_country IS NOT NULL AND geo_info_country <> ''");
     expect(() => filterValuesSql(scope({ schema: {} }), "geo_info_country")).toThrow();
+  });
+
+  it("lists an attribute's values as text, so numeric and boolean columns group alike", () => {
+    const schema = { ...FULL, context_cart_value: true };
+    const sql = filterValuesSql(scope({ schema }), "context_cart_value");
+    expect(sql).toContain('SELECT CAST("context_cart_value" AS VARCHAR) AS v');
+    expect(sql).toContain('"context_cart_value" IS NOT NULL');
   });
 });
 
