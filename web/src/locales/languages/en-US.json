@@ -13734,7 +13734,7 @@
         "costConfirmTitle": "Run this costly experiment?",
         "costConfirmMessage": "This experiment is estimated to cost about {cost}, above the {threshold} warning threshold. Create and run it anyway?",
         "costConfirmMessageUnpriced": "This experiment is estimated to cost more than the warning threshold. Create and run it anyway?",
-        "costConfirmOk": "Create anyway",
+        "costConfirmOk": "Create Anyway",
         "skippedFully": "{count} rows fully skipped — every selected scorer needs an expected output. Skipped rows cost nothing to run.",
         "skippedPartially": "{count} rows partially skipped — the task still runs, but reference-based scorers cannot score rows without an expected output.",
         "skippedNone": "Every matched row can be scored on at least one dimension.",
@@ -14494,8 +14494,8 @@
         "resultsTitle": "Results"
       },
       "credentialsDialog": {
-        "open": "Replace credentials",
-        "title": "Replace credentials",
+        "open": "Replace Credentials",
+        "title": "Replace Credentials",
         "body": "The new value replaces the stored one in place. The task keeps its version, and the stored value is never shown.",
         "submit": "Replace",
         "success": "Credentials replaced",
