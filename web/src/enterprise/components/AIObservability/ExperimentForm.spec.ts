@@ -402,6 +402,27 @@ describe("ExperimentForm", () => {
         .find((d: any) => d.props("title") === "Run this costly experiment?");
     }
 
+    // The server prices the task from every message (characters / 4) times the
+    // task model's price, so these edits must refresh the estimate.
+    it.each([
+      ["userPrompt", "Summarise this much longer prompt: {{ input }}"],
+      ["systemPrompt", "Answer from context only."],
+      ["model", "gpt-4o-mini"],
+    ])("re-requests the preview when %s changes", async (field, value) => {
+      const settle = () => new Promise((resolve) => setTimeout(resolve, 600)); // past the typing debounce
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await settle();
+      await flushPromises();
+      expect(llmExperimentsService.preview).toHaveBeenCalled();
+      (llmExperimentsService.preview as any).mockClear();
+
+      setField(wrapper, field, value);
+      await settle();
+      await flushPromises();
+      expect(llmExperimentsService.preview).toHaveBeenCalled();
+    });
+
     it("shows the estimate in the preview panel", async () => {
       (llmExperimentsService.preview as any).mockResolvedValue({
         ...previewResult,

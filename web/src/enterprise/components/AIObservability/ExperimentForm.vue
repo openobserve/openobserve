@@ -586,7 +586,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { debounce } from "lodash-es";
 import { useStore } from "vuex";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -711,6 +712,7 @@ const temperature = form.useStore((s: any) => s.values.temperature as number);
 // Read through useStore, never form.state: the latter is an untracked snapshot,
 // so a computed built on it silently serves a stale value.
 const userPrompt = form.useStore((s: any) => s.values.userPrompt as string);
+const systemPrompt = form.useStore((s: any) => s.values.systemPrompt as string);
 const sources = form.useStore((s: any) => (s.values.sources ?? []) as string[]);
 const isDirty = form.useStore((s: any) => s.isDirty as boolean);
 
@@ -1148,15 +1150,18 @@ async function runPreview() {
   }
 }
 
-// Only the fields that change the slot maths re-request; typing a prompt does
-// not. Every trigger here is a click, so there is nothing to debounce — the
-// request gate inside runPreview is what keeps a slow response from landing on
-// top of a newer one.
+// The fields that change the slot maths or the server's cost estimate re-request.
+// The messages and the model are priced too (characters / 4 times the model's
+// price), so typing in them re-requests after a pause. The request gate inside
+// runPreview keeps a slow response from landing on top of a newer one.
 watch(
-  [datasetId, trialCount, scorerIds, sources, taskType, taskRef, promptVersion, providerId],
+  [datasetId, trialCount, scorerIds, sources, taskType, taskRef, promptVersion, providerId, model],
   runPreview,
   { deep: true },
 );
+const runPreviewAfterTyping = debounce(runPreview, 500);
+watch([systemPrompt, userPrompt], runPreviewAfterTyping);
+onBeforeUnmount(() => runPreviewAfterTyping.cancel());
 watch([promptId, promptSelectionMode, promptLabel, promptVersion], resolvePromptSelection);
 
 onBeforeRouteLeave((to, _from, next) => {
