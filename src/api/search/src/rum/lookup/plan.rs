@@ -32,11 +32,15 @@ impl PagePlan {
         let mut view_ids: Vec<String> = Vec::new();
         let mut action_ids: Vec<String> = Vec::new();
         for hit in traced_resources {
-            if let Some(id) = hit["view_id"].as_str().filter(|id| !id.is_empty()) {
-                push_unique(&mut view_ids, id.to_string());
+            if let Some(id) = hit["view_id"].as_str().filter(|id| !id.is_empty())
+                && !view_ids.iter().any(|seen| seen == id)
+            {
+                view_ids.push(id.to_string());
             }
             for id in parse_action_ids(&hit["action_id"]) {
-                push_unique(&mut action_ids, id);
+                if !action_ids.contains(&id) {
+                    action_ids.push(id);
+                }
             }
         }
         let anchor = traced_resources
@@ -51,12 +55,6 @@ impl PagePlan {
                 anchor.saturating_add(PAGE_VIEW_WINDOW_US),
             ),
         }
-    }
-}
-
-fn push_unique(ids: &mut Vec<String>, id: String) {
-    if !ids.contains(&id) {
-        ids.push(id);
     }
 }
 
