@@ -2458,6 +2458,12 @@ pub struct Common {
         help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
     )]
     pub profiling_enabled: bool,
+    #[env_config(
+        name = "ZO_EXPERIMENTAL",
+        default = false,
+        help = "Show experimental features in the UI. Hidden by default"
+    )]
+    pub experimental: bool,
 }
 
 impl Common {

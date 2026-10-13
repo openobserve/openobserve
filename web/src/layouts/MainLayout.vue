@@ -512,6 +512,10 @@ export default defineComponent({
       return Boolean(store.state.zoConfig?.profiling_enabled);
     });
 
+    const isExperimentalEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.experimental);
+    });
+
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
       { label: Number, value: String },
@@ -851,8 +855,12 @@ export default defineComponent({
     };
 
     const updateAutoObserveMenu = () => {
-      if (config.isEnterprise != "true") return;
-      if (linksList.value.some((link) => link.name === "autoobserve")) return;
+      const existingIndex = linksList.value.findIndex((link) => link.name === "autoobserve");
+      if (config.isEnterprise != "true" || !isExperimentalEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
       const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
       linksList.value.splice(alertIndex === -1 ? linksList.value.length : alertIndex, 0, {
         title: t("menu.autoobserve"),
@@ -861,6 +869,8 @@ export default defineComponent({
         name: "autoobserve",
       });
     };
+
+    watch(isExperimentalEnabled, () => updateAutoObserveMenu(), { immediate: false });
 
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
