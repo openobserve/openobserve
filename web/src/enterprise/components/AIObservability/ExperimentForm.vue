@@ -1058,7 +1058,7 @@ async function submitClone(payload: ExperimentCreatePayload): Promise<string> {
   ).id;
 }
 
-function askCostConfirmation(body: ExperimentCreatePayload, serverMessage?: string) {
+function askCostConfirmation(body: ExperimentCreatePayload) {
   const estimate = preview.value?.costEstimate;
   costDialog.message =
     estimate?.estimatedCost != null
@@ -1066,7 +1066,7 @@ function askCostConfirmation(body: ExperimentCreatePayload, serverMessage?: stri
           cost: formatEstimatedCost(estimate.estimatedCost),
           threshold: formatEstimatedCost(estimate.warningThreshold),
         })
-      : raw(serverMessage ?? "");
+      : t("aiObservability.experiments.form.costConfirmMessageUnpriced");
   costDialog.body = body;
   costDialog.show = true;
 }
@@ -1120,7 +1120,7 @@ async function send(body: ExperimentCreatePayload) {
     // date: refresh it so the dialog shows the cost the server used.
     if (error?.response?.status === 412) {
       await runPreview();
-      askCostConfirmation(body, error.response.data?.message);
+      askCostConfirmation(body);
       return;
     }
     // An AxiosError IS an Error, so error.message is only ever "Request failed

@@ -13733,6 +13733,7 @@
         "costScoringOnly": "scoring cost only",
         "costConfirmTitle": "Run this costly experiment?",
         "costConfirmMessage": "This experiment is estimated to cost about {cost}, above the {threshold} warning threshold. Create and run it anyway?",
+        "costConfirmMessageUnpriced": "This experiment is estimated to cost more than the warning threshold. Create and run it anyway?",
         "costConfirmOk": "Create anyway",
         "skippedFully": "{count} rows fully skipped — every selected scorer needs an expected output. Skipped rows cost nothing to run.",
         "skippedPartially": "{count} rows partially skipped — the task still runs, but reference-based scorers cannot score rows without an expected output.",

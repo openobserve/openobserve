@@ -472,8 +472,10 @@ describe("ExperimentForm", () => {
       expect(llmExperimentsService.create).toHaveBeenCalledTimes(1);
       const dialog = costDialog(wrapper);
       expect(dialog.props("modelValue")).toBe(true);
-      // No estimate on the preview, so the server's own text is shown.
-      expect(dialog.props("message")).toContain("42.50 USD");
+      // No estimate on the preview: the app's own words, never the API text.
+      expect(dialog.props("message")).toBe(
+        "This experiment is estimated to cost more than the warning threshold. Create and run it anyway?",
+      );
 
       dialog.vm.$emit("update:ok");
       await flushPromises();
@@ -525,6 +527,19 @@ describe("ExperimentForm", () => {
 
       const sent = (llmExperimentsService.create as any).mock.calls[0][1];
       expect(sent.scorers.map((s: any) => s.id)).toEqual(["sc-1"]);
+    });
+
+    it("explains the cost even when the 412 has no message", async () => {
+      (llmExperimentsService.create as any).mockRejectedValueOnce({
+        response: { status: 412, data: {} },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await submit(wrapper);
+
+      const message = String(costDialog(wrapper).props("message"));
+      expect(message).toContain("warning threshold");
+      expect(message).not.toContain("confirmCostEstimate");
     });
 
     it("does not resend on cancel and keeps the form", async () => {
