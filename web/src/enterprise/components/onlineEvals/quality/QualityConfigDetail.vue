@@ -49,9 +49,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex min-h-0 flex-1 flex-col max-lg:min-h-128"
       data-test="quality-detail-loading"
     >
-      <div class="px-page-edge border-border-default flex shrink-0 flex-col gap-2 border-b py-1.5">
-        <OSkeleton type="text" class="h-3 w-32" />
-        <OSkeleton type="rect" class="h-24 w-full" />
+      <div
+        class="px-page-edge border-border-default grid shrink-0 grid-cols-2 gap-2.5 border-b py-2 max-lg:grid-cols-1"
+      >
+        <OSkeleton v-for="card in 2" :key="card" type="rect" class="h-62 w-full" />
       </div>
       <div class="px-page-edge border-border-default shrink-0 border-b py-1.5">
         <OSkeleton type="text" class="h-7 w-64" />
@@ -92,30 +93,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <template v-else>
+      <!-- Two equal cards with the LLM Insights chart height; they stack below lg. -->
       <div
-        class="px-page-edge border-border-default shrink-0 border-b pt-1.5"
-        data-test="quality-detail-distribution"
+        class="px-page-edge border-border-default grid shrink-0 grid-cols-2 gap-2.5 border-b py-2 max-lg:grid-cols-1"
       >
-        <div class="flex flex-wrap items-baseline gap-2 text-xs">
-          <span class="text-text-heading font-semibold">{{
+        <LLMPanelCard
+          class="min-w-0"
+          :title="
             isNumeric
-              ? t("onlineEvals.quality.detail.distributionNumeric")
-              : t("onlineEvals.quality.detail.distributionValues")
-          }}</span>
-          <template v-if="isNumeric && average != null">
-            <span class="text-text-secondary">·</span>
-            <span class="text-text-heading font-semibold" data-test="quality-detail-average">{{
-              t("onlineEvals.quality.detail.averageValue", { value: average.toFixed(2) })
-            }}</span>
-          </template>
-        </div>
-        <div class="h-28 min-h-0">
-          <QualityDistributionChart
-            :buckets="distribution"
-            :filter="filter"
-            @select="onBarSelect"
-          />
-        </div>
+              ? t('onlineEvals.quality.detail.distributionNumeric')
+              : t('onlineEvals.quality.detail.distributionValues')
+          "
+          :subtitle="
+            isNumeric && average != null
+              ? t('onlineEvals.quality.detail.averageValue', { value: average.toFixed(2) })
+              : undefined
+          "
+          data-test="quality-detail-distribution"
+        >
+          <div class="h-55 w-full">
+            <QualityDistributionChart
+              :buckets="distribution"
+              :filter="filter"
+              @select="onBarSelect"
+            />
+          </div>
+        </LLMPanelCard>
+        <LLMPanelCard
+          class="min-w-0"
+          :title="t(`onlineEvals.quality.detail.trendTitle.${trend}`)"
+          data-test="quality-detail-trend"
+        >
+          <div class="h-55 w-full">
+            <QualityTrendChart
+              :timeline="timeline"
+              :kind="trend"
+              :range="numericRange"
+              :threshold="threshold"
+            />
+          </div>
+        </LLMPanelCard>
       </div>
 
       <div class="flex min-h-0 flex-1 flex-col max-lg:min-h-128" data-test="quality-detail-review">
@@ -262,19 +279,22 @@ import type {
 import { SCORES_PAGE_SIZE, useQualityDetail } from "../composables/useQualityDetail";
 import type { DateWindow } from "../composables/useQualityList";
 import { dataTypeOf } from "../utils/evalEntity";
-import { thresholdForConfig } from "../utils/scoreThreshold";
+import { numericThreshold, thresholdForConfig } from "../utils/scoreThreshold";
 import {
   QUALITY_SCOPES,
   chartFilterLabel,
   distributionDataType,
   formatScoreValue,
   nextChartFilter,
+  trendKind,
   type QualityOnly,
   type QualityRow,
   type QualityScope,
 } from "../utils/qualityFormat";
 import QualityDistributionChart from "./QualityDistributionChart.vue";
 import QualityScorePane from "./QualityScorePane.vue";
+import QualityTrendChart from "./QualityTrendChart.vue";
+import LLMPanelCard from "@/plugins/traces/LLMPanelCard.vue";
 
 const props = defineProps<{
   configId: string;
@@ -308,6 +328,7 @@ const {
   filter,
   page,
   distribution,
+  timeline,
   summary,
   list,
   total,
@@ -345,6 +366,14 @@ const thresholdLabel = computed(
     props.row?.thresholdLabel ??
     (props.config ? String(thresholdForConfig(props.config).label) : ""),
 );
+const trend = computed(() => trendKind(timeline.value, dataType.value));
+const threshold = computed(() => (props.config ? numericThreshold(props.config) : null));
+// The numeric buckets span the config's range, so the average axis matches the distribution.
+const numericRange = computed(() => {
+  const first = distribution.value[0]?.lower;
+  const last = distribution.value[distribution.value.length - 1]?.upper;
+  return first != null && last != null ? { min: first, max: last } : null;
+});
 const multiScope = computed(
   () => QUALITY_SCOPES.filter((scope) => (props.row?.scopeCounts[scope] ?? 0) > 0).length > 1,
 );

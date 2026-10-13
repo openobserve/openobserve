@@ -12,6 +12,18 @@ export function escapeSqlString(s: string): string {
 }
 
 /** The healthy rule as text; empty when the config has no usable threshold. */
+/** A numeric config's threshold as a value and a direction, for the trend's threshold line; null otherwise. */
+export function numericThreshold(
+  config: ScoreConfig,
+): { value: number; direction: "gte" | "lte" } | null {
+  const ht = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
+  if (dataTypeOf(config) !== "numeric" || ht?.value == null || !ht.direction) return null;
+  const value = Number(ht.value);
+  return Number.isFinite(value)
+    ? { value, direction: ht.direction === "gte" ? "gte" : "lte" }
+    : null;
+}
+
 export function thresholdForConfig(config: ScoreConfig): { label: I18nText } {
   const ht = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
   const type = dataTypeOf(config);

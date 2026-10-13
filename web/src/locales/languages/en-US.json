@@ -16057,6 +16057,20 @@
         "legendScores": "Scores",
         "chartTooltip": "{count} scores, {unhealthy} unhealthy",
         "chartTooltipCount": "{count} scores",
+        "trendTitle": {
+          "score": "Trend",
+          "healthyRate": "Healthy rate over time",
+          "trueRate": "True rate over time",
+          "count": "Scores over time"
+        },
+        "trendLegend": {
+          "healthyRate": "Healthy rate",
+          "trueRate": "True rate",
+          "count": "Scores"
+        },
+        "legendAvg": "Avg",
+        "legendThreshold": "threshold {direction} {value}",
+        "markLineHealthy": "healthy {direction} {value}",
         "filterRange": "{from} to {to}",
         "clearFilter": "Clear filter"
       },

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { gt } from "@/types/i18n";
-import type { QualityDistributionBucket, QualityScore } from "@/services/online-evals.service";
+import type {
+  QualityDistributionBucket,
+  QualityScore,
+  QualityTimelineBucket,
+} from "@/services/online-evals.service";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
 import {
@@ -11,6 +15,8 @@ import {
   chartFilterParams,
   contentSpan,
   distributionDataType,
+  trendKind,
+  trendPoints,
   evaluatorAgentWhere,
   evaluatorTraceLink,
   healthSortValue,
@@ -170,6 +176,46 @@ describe("summaries", () => {
   it("labels numeric buckets by range and the others by value", () => {
     expect(bucketLabel(numericBuckets[3])).toBe("0.3–0.4");
     expect(bucketLabel({ key: false, count: 1, unhealthy: 0 })).toBe("false");
+  });
+});
+
+describe("trend", () => {
+  const hour = 3_600_000_000;
+  const bucket = (
+    index: number,
+    fields: Partial<QualityTimelineBucket>,
+  ): QualityTimelineBucket => ({
+    start: index * hour,
+    end: (index + 1) * hour,
+    count: 0,
+    unhealthy: null,
+    trueCount: null,
+    average: null,
+    p95: null,
+    ...fields,
+  });
+
+  it("draws the score for numeric configs, the healthy rate with a threshold, else the true rate or the count", () => {
+    expect(trendKind([bucket(0, { count: 4, unhealthy: 1 })], "numeric")).toBe("score");
+    expect(trendKind([bucket(0, { count: 4, unhealthy: 1 })], "categorical")).toBe("healthyRate");
+    expect(trendKind([bucket(0, { count: 4, trueCount: 3 })], "boolean")).toBe("trueRate");
+    expect(trendKind([bucket(0, { count: 4 })], "categorical")).toBe("count");
+  });
+
+  it("plots only buckets with scores, at their midpoint", () => {
+    const timeline = [
+      bucket(0, { count: 4, unhealthy: 1, trueCount: 3, average: 0.25, p95: 0.6 }),
+      bucket(1, { count: 0, unhealthy: 0 }),
+      bucket(2, { count: 2, unhealthy: 2, trueCount: 0, average: 0.5, p95: 0.9 }),
+    ];
+    expect(trendPoints(timeline, "average")).toEqual([
+      [1_800_000, 0.25],
+      [9_000_000, 0.5],
+    ]);
+    expect(trendPoints(timeline, "p95").map(([, value]) => value)).toEqual([0.6, 0.9]);
+    expect(trendPoints(timeline, "healthyRate").map(([, value]) => value)).toEqual([75, 0]);
+    expect(trendPoints(timeline, "trueRate").map(([, value]) => value)).toEqual([75, 0]);
+    expect(trendPoints(timeline, "count").map(([, value]) => value)).toEqual([4, 2]);
   });
 });
 

@@ -89,6 +89,26 @@ const PAGE: QualityScorePage = {
     { key: "low", count: 47, unhealthy: 0 },
     { key: "medium", count: 67, unhealthy: 67 },
   ],
+  timeline: [
+    {
+      start: 0,
+      end: 7_200_000_000,
+      count: 100,
+      unhealthy: 60,
+      trueCount: null,
+      average: null,
+      p95: null,
+    },
+    {
+      start: 7_200_000_000,
+      end: 14_400_000_000,
+      count: 14,
+      unhealthy: 7,
+      trueCount: null,
+      average: null,
+      p95: null,
+    },
+  ],
   list: [],
   total: 114,
   from: 0,
@@ -124,6 +144,7 @@ function mountDetail(
       stubs: {
         ...(extra.realTable ? {} : { OTable: OTableStub }),
         QualityDistributionChart: true,
+        QualityTrendChart: true,
         QualityScorePane: PaneStub,
       },
     },
@@ -149,10 +170,46 @@ describe("QualityConfigDetail", () => {
     expect(wrapper.find('[data-test="quality-detail-only-all"]').text().replace(/\s+/g, " ")).toBe(
       "All 114",
     );
-    expect(wrapper.find('[data-test="quality-detail-distribution"] .h-28').exists()).toBe(true);
+    expect(wrapper.find('[data-test="quality-detail-distribution"] .h-55').exists()).toBe(true);
     expect(wrapper.find('[data-test="quality-detail-review"]').classes()).toEqual(
       expect.arrayContaining(["flex-1", "min-h-0"]),
     );
+  });
+
+  it("shows the distribution and the trend as two equal bordered cards, stacked below lg", async () => {
+    const wrapper = mountDetail();
+    await flushPromises();
+    const distribution = wrapper.find('[data-test="quality-detail-distribution"]');
+    const trend = wrapper.find('[data-test="quality-detail-trend"]');
+    expect(distribution.element.parentElement!.className).toContain("grid-cols-2");
+    expect(distribution.element.parentElement!.className).toContain("max-lg:grid-cols-1");
+    for (const card of [distribution, trend]) {
+      expect(card.classes()).toEqual(expect.arrayContaining(["border", "border-border-default"]));
+    }
+    expect(trend.text()).toContain("Healthy rate over time");
+    expect(trend.find(".h-55").exists()).toBe(true);
+  });
+
+  it("titles the trend by what it plots when the config has no threshold", async () => {
+    const timeline = PAGE.timeline.map((bucket) => ({ ...bucket, unhealthy: null }));
+    scores.mockResolvedValue({ ...PAGE, timeline });
+    const counts = mountDetail();
+    await flushPromises();
+    expect(counts.find('[data-test="quality-detail-trend"]').text()).toContain("Scores over time");
+    const booleans = mountDetail({ dataType: "boolean" });
+    await flushPromises();
+    expect(booleans.find('[data-test="quality-detail-trend"]').text()).toContain(
+      "True rate over time",
+    );
+
+    scores.mockResolvedValue({
+      ...PAGE,
+      distribution: [{ key: 0, lower: 0, upper: 1, count: 114, unhealthy: null }],
+      timeline,
+    });
+    const averages = mountDetail({ dataType: "numeric" });
+    await flushPromises();
+    expect(averages.find('[data-test="quality-detail-trend"]').text()).toContain("Trend");
   });
 
   it("puts the average of a numeric config in the chart title", async () => {
@@ -167,7 +224,8 @@ describe("QualityConfigDetail", () => {
     const wrapper = mountDetail({ dataType: "numeric", thresholdLabel: "≥ 0.5" });
     await flushPromises();
     const title = wrapper.find('[data-test="quality-detail-distribution"]').text();
-    expect(title.replace(/\s*·\s*/g, " · ")).toContain("Score distribution · average 0.37");
+    expect(title).toContain("Score distribution");
+    expect(title).toContain("average 0.37");
   });
 
   it("keeps the boolean and categorical chart titles without an average", async () => {
