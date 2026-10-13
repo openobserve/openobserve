@@ -38,6 +38,18 @@ but wrong (`text-[0.8125rem]`, a `parseInt`-read px converted to rem), and i18n 
 `lint:design:strict`, stylelint or `type-check:app` already fails the build on is explicitly
 out of scope — see the "What NOT to Flag" table in `agents/frontend.md`.
 
+## The QA / Test Reviewer
+
+`qa` is a conditional agent on the same contract as `frontend`, appended whenever the diff touches
+the Playwright E2E suite (`tests/ui-testing/**` specs/pages/utils or a `playwright*.config`). It is
+a **static** review of the *tests themselves* — it never runs them, so a green CI run clears none of
+its findings. It folds in the Council's Sentinel rules (POM compliance incl. selectors inside
+`expect(...)`, `testLogger` not `console.log`, real assertions — no `expect(true).toBe(true)`,
+awaited async, no hardcoded creds) plus the Test Inspector's highest-value check: **`data-test` ↔
+component selector cross-validation** (grep each added selector across `web/src` and flag any the
+test relies on that no component renders — the "19 broken selectors, 14/14 green" failure mode).
+Actually executing the suite stays with `playwright.yml`; this agent only reads.
+
 Adding another conditional agent: define it in `AGENTS` (with `requiresFocus` if it is
 domain-scoped), add a `{ agent, matches }` entry to `CONDITIONAL_AGENTS`, register
 `ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy, and add its glyph to

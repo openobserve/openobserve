@@ -81,6 +81,7 @@ const CATEGORY_GLYPH = {
   documentation: "📝", docs: "📝",
   release: "📦",
   frontend: "🎨", ui: "🎨",
+  qa: "🧪", test: "🧪",
 };
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -146,6 +147,17 @@ const AGENTS = {
     fileFocus: isFrontendFile,
     requiresFocus: true,
   },
+  // Reviews only Playwright E2E tests + page objects (static QA: framework compliance,
+  // test anti-patterns, and data-test↔component selector cross-validation). `requiresFocus`
+  // keeps it off backend/app code — it only ever sees the test-file slice of the diff. Added
+  // via CONDITIONAL_AGENTS so a one-line spec tweak (which is "trivial" by size) still gets it.
+  qa: {
+    name: "QA / Test Reviewer",
+    promptFile: "agents/qa.md",
+    opencodeAgent: "ai-review-qa",
+    fileFocus: isTestFile,
+    requiresFocus: true,
+  },
 };
 
 // ─── Risk tiers ────────────────────────────────────────────────────────────
@@ -174,6 +186,7 @@ const RISK_TIERS = {
 // product name in the locale catalogue, so tier alone must not decide whether it gets reviewed.
 const CONDITIONAL_AGENTS = [
   { agent: "frontend", matches: isFrontendFile },
+  { agent: "qa", matches: isTestFile },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -556,6 +569,14 @@ function isFrontendFile(filePath) {
   if (!filePath.startsWith("web/src/")) return false;
   if (/\.(spec|test)\.[jt]sx?$/.test(filePath)) return false;
   return /\.(vue|ts|js|css)$/.test(filePath);
+}
+
+// Playwright E2E tests + their page objects/utils, plus the suite's config. Scoped to
+// tests/ui-testing on purpose: web/src unit specs are the frontend agent's concern, and this
+// agent's POM/selector-cross-validation rules only apply to the E2E suite.
+function isTestFile(filePath) {
+  if (/^tests\/ui-testing\/.*\.(spec\.js|js)$/.test(filePath)) return true;
+  return /playwright[^/]*\.config\.[jt]s$/.test(filePath);
 }
 
 function filterDiff(diff) {
