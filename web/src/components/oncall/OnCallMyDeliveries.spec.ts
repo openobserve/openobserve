@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallMyDeliveries from "@/components/oncall/OnCallMyDeliveries.vue";
 import i18n from "@/locales";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import type { MyDelivery } from "@/ts/interfaces/oncall";
@@ -34,8 +35,8 @@ const service = vi.mocked(oncallService);
 const stubs = {
   OTable: {
     name: "OTable",
-    props: ["data", "columns"],
-    emits: ["row-click"],
+    props: ["data", "columns", "currentPage", "pageSize"],
+    emits: ["row-click", "update:currentPage", "update:pageSize"],
     template: `<div>
       <div v-for="(row, i) in (data || [])" :key="i" data-test="row" @click="$emit('row-click', row)">
         <slot v-for="c in (columns || [])" :key="c.id" :name="'cell-' + c.id" :row="row" />
@@ -103,6 +104,7 @@ function render(props: Record<string, unknown> = {}) {
 describe("OnCallMyDeliveries", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
     service.myDeliveries.mockResolvedValue({
       data: { total: 0, unread: 0, deliveries: [] },
     } as any);
@@ -362,5 +364,41 @@ describe("OnCallMyDeliveries", () => {
 
     const button = wrapper.find('[data-test="oncall-my-delivery-toggle-ev_88"]');
     expect(button.find(".max-md\\:sr-only").text()).toBe("Mark read");
+  });
+
+  describe("list view state", () => {
+    const defaults = { unreadOnly: false, currentPage: 1, pageSize: 20 };
+    const rows = {
+      data: { total: 1, unread: 1, deliveries: [delivery({ event_id: "ev_1" })] },
+    } as any;
+
+    it("restores page, page size and the unread-only read", async () => {
+      Object.assign(useListViewState("oncall-my-deliveries", defaults), {
+        unreadOnly: true,
+        currentPage: 2,
+        pageSize: 50,
+      });
+      service.myDeliveries.mockResolvedValue(rows);
+      const wrapper = render();
+      await flushPromises();
+
+      expect(service.myDeliveries).toHaveBeenCalledWith(
+        expect.objectContaining({ unread_only: true }),
+      );
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("currentPage")).toBe(2);
+      expect(table.props("pageSize")).toBe(50);
+    });
+
+    it("saves page changes", async () => {
+      service.myDeliveries.mockResolvedValue(rows);
+      const wrapper = render();
+      await flushPromises();
+      wrapper.findComponent({ name: "OTable" }).vm.$emit("update:currentPage", 3);
+      await flushPromises();
+
+      const saved = useListViewState("oncall-my-deliveries", defaults) as Record<string, unknown>;
+      expect(saved.currentPage).toBe(3);
+    });
   });
 });

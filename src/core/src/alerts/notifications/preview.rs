@@ -173,6 +173,8 @@ pub fn synthetic_context(level: Option<AlertLevel>) -> NotificationContext {
         alert_threshold_warn: "80".into(),
         alert_start_time: "2026-08-01T10:00:00".into(),
         alert_end_time: "2026-08-01T10:10:00".into(),
+        alert_start_time_millis: "1785578400000".into(),
+        alert_end_time_millis: "1785579000000".into(),
         alert_url: "https://example.openobserve.ai/alerts/sample".into(),
         alert_trigger_time: 1_754_000_000_000_000,
         alert_trigger_time_str: "2026-08-01T10:10:00".into(),

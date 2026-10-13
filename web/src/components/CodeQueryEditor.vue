@@ -217,9 +217,17 @@ export default defineComponent({
       type: Function as PropType<(field: string) => Promise<string[]>>,
       default: null,
     },
+    freeTextDecorations: {
+      type: Object as PropType<{
+        ranges: { start: number; end: number }[];
+        hover: I18nText;
+      } | null>,
+      default: null,
+    },
   },
   emits: [
     "update-query",
+    "user-edit",
     "run-query",
     "update:query",
     "focus",
@@ -237,6 +245,16 @@ export default defineComponent({
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
     let editorObj: any = null;
+    let programmatic = false;
+    const asProgrammatic = (edit: () => void) => {
+      const previous = programmatic;
+      programmatic = true;
+      try {
+        edit();
+      } finally {
+        programmatic = previous;
+      }
+    };
     // Emits the editor's content immediately instead of waiting out the change
     // debounce. Assigned when the editor is created; see `commitModelChange`.
     let commitPendingChange: (() => void) | null = null;
@@ -488,7 +506,7 @@ export default defineComponent({
           // Update editor value if different from current
           const currentValue = editorObj?.getValue();
           if (currentValue !== props.query?.trim()) {
-            editorObj.setValue(props.query?.trim() || "");
+            asProgrammatic(() => editorObj.setValue(props.query?.trim() || ""));
           }
 
           // Update readonly option if different
@@ -594,7 +612,10 @@ export default defineComponent({
       // the query.
       commitPendingChange = () => commitModelChange.flush();
 
-      editorObj.onDidChangeModelContent(commitModelChange);
+      editorObj.onDidChangeModelContent((e: any) => {
+        if (!e?.isFlush && !programmatic) emit("user-edit");
+        commitModelChange(e);
+      });
 
       // Fires on the text area's own blur. onDidBlurEditorWidget waits a timer tick, so a fast click on Run reads the previous query.
       editorObj.onDidBlurEditorText(() => commitModelChange.flush());
@@ -637,15 +658,17 @@ export default defineComponent({
           // Create an edit operation that replaces the entire content
           // This preserves undo history becuase it treats this as a single edit operation
           //and it will be in the undo stack as one operation
-          model.pushEditOperations(
-            [],
-            [
-              {
-                range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
-                text: trimmedValue,
-              },
-            ],
-            () => null,
+          asProgrammatic(() =>
+            model.pushEditOperations(
+              [],
+              [
+                {
+                  range: new monaco.Range(1, 1, lastLine, lastLineLength + 1),
+                  text: trimmedValue,
+                },
+              ],
+              () => null,
+            ),
           );
         }
 
@@ -726,9 +749,38 @@ export default defineComponent({
       },
     );
 
+    let freeTextDecorationIds: string[] = [];
+    const escapeMarkdown = (text: string) => text.replace(/[\\`*_{}[\]()#+\-.!|<>~]/g, "\\$&");
+    const applyFreeTextDecorations = () => {
+      const model = editorObj?.getModel?.();
+      if (!model || !monaco) return;
+      const decorations = props.freeTextDecorations;
+      const length = model.getValueLength();
+      const next = (decorations?.ranges ?? [])
+        .filter((range) => range.end <= length)
+        .map((range) => {
+          const start = model.getPositionAt(range.start);
+          const end = model.getPositionAt(range.end);
+          return {
+            range: new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column),
+            options: {
+              inlineClassName: "o2-free-text-term",
+              hoverMessage: (decorations?.hover ?? "")
+                .split("\n\n")
+                .map((line) => ({ value: escapeMarkdown(line) })),
+              stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+            },
+          };
+        });
+      freeTextDecorationIds = editorObj.deltaDecorations(freeTextDecorationIds, next);
+    };
+
+    watch(() => props.freeTextDecorations, applyFreeTextDecorations, { deep: true });
+
     onMounted(async () => {
       await loadLanguageContribution(props.language);
       setupEditor();
+      applyFreeTextDecorations();
     });
 
     onActivated(async () => {
@@ -812,7 +864,7 @@ export default defineComponent({
           (props.readOnly || !hasFocus) && currentValue?.trim() !== newValue?.trim();
 
         if (shouldUpdate) {
-          editorObj.getModel()?.setValue(newValue);
+          asProgrammatic(() => editorObj.getModel()?.setValue(newValue));
         }
       },
     );
@@ -821,9 +873,22 @@ export default defineComponent({
       if (editorObj?.setValue) {
         // Monaco's setValue throws "Illegal argument" for null/undefined —
         // coerce to a string so mode switches (e.g. PromQL → SQL) can't crash the editor
-        editorObj.setValue(value ?? "");
+        asProgrammatic(() => editorObj.setValue(value ?? ""));
         editorObj?.layout();
       }
+    };
+
+    const replaceValue = (value: string) => {
+      const model = editorObj?.getModel?.();
+      if (!model) return setValue(value);
+      if (model.getValue() === value) return;
+      asProgrammatic(() => {
+        editorObj.pushUndoStop();
+        editorObj.executeEdits("replace-value", [
+          { range: model.getFullModelRange(), text: value },
+        ]);
+        editorObj.pushUndoStop();
+      });
     };
 
     /**
@@ -1188,6 +1253,7 @@ export default defineComponent({
         return editorObj;
       },
       setValue,
+      replaceValue,
       resetEditorLayout,
       disableSuggestionPopup,
       triggerAutoComplete,
@@ -1258,6 +1324,11 @@ export default defineComponent({
   background-color: color-mix(in srgb, var(--color-status-negative) 10%, transparent);
   text-decoration: underline;
   text-decoration-color: var(--color-status-negative);
+}
+
+.logs-query-editor :deep(.o2-free-text-term) {
+  background-color: var(--color-surface-accent-hover);
+  border-bottom: 0.0625rem dashed var(--color-accent);
 }
 
 /* PromQL brackets render plain (like Prometheus). The rainbow colours are

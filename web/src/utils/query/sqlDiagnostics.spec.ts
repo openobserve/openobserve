@@ -33,6 +33,7 @@ import {
   locateIdentifier,
   rangesFromServerError,
   type SqlErrorRange,
+  queryErrorCodeFromText,
 } from "./sqlDiagnostics";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import basicSelect from "../../../../tests/test-data/query-agent/queries/basic_select.json";
@@ -900,5 +901,24 @@ describe("rangesFromServerError — syntax errors", () => {
       query: "SELECT * FROM t WHERE x = ",
     });
     expect(ranges.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("queryErrorCodeFromText (logs search stream, item 1)", () => {
+  it("maps the server's query-error messages back to their codes", () => {
+    expect(queryErrorCodeFromText('Error# SQL error: ParserError("Expected: an expression")')).toBe(
+      20001,
+    );
+    expect(queryErrorCodeFromText("Search SQL not valid")).toBe(20001);
+    expect(queryErrorCodeFromText('Search field not found: No field named "x"')).toBe(20004);
+    expect(queryErrorCodeFromText("Search function not defined: foo")).toBe(20005);
+    expect(queryErrorCodeFromText("Search field has no compatible data type: x")).toBe(20007);
+    expect(queryErrorCodeFromText("Search SQL execute error Error during planning")).toBe(20008);
+  });
+
+  it("returns null for errors that are not about the query", () => {
+    expect(queryErrorCodeFromText("Search query timed out")).toBeNull();
+    expect(queryErrorCodeFromText("Ratelimit exceeded")).toBeNull();
+    expect(queryErrorCodeFromText("")).toBeNull();
   });
 });

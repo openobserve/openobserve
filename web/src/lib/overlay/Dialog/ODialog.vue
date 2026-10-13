@@ -70,6 +70,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   primaryButtonLoading: false,
   secondaryButtonLoading: false,
   neutralButtonLoading: false,
+  initialFocus: "primary",
 });
 
 const emit = defineEmits<DialogEmits>();
@@ -249,6 +250,7 @@ const contentStyle = computed(() => {
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
+const secondaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 
 // Text fields take priority; a select/combobox trigger (OSelect listbox
 // trigger, reka SelectTrigger) is the second tier so a dialog whose
@@ -283,8 +285,9 @@ function handleOpenAutoFocus(event: Event) {
       field.focus();
       return;
     }
-    // No form field found → focus primary button (confirm dialog pattern)
-    const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
+    // No form field found → focus the chosen footer button (confirm dialog pattern)
+    const btnRef = props.initialFocus === "secondary" ? secondaryBtnRef : primaryBtnRef;
+    const btnEl = (btnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
     }
@@ -606,6 +609,7 @@ watch(shown, (open) => {
             <div class="flex items-center gap-2">
               <OButton
                 v-if="secondaryButtonLabel"
+                ref="secondaryBtnRef"
                 data-test="o-dialog-secondary-btn"
                 :variant="secondaryButtonVariant"
                 size="sm-action"

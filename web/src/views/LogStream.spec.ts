@@ -22,6 +22,7 @@ import router from "@/test/unit/helpers/router";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 import analytics from "@/services/product_analytics";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // Mock services
 vi.mock("@/services/stream", async (importOriginal) => {
@@ -196,6 +197,7 @@ describe("LogStream Component", () => {
     // Reset mocks completely
     vi.clearAllMocks();
     mockNotify.mockClear();
+    resetListViewState();
 
     // Setup mock implementations with fresh instances
     mockUseStreams = {
@@ -312,6 +314,39 @@ describe("LogStream Component", () => {
       expect(typeof wrapper.vm.sortBy).toBe("string");
       // After successful loading, totalCount should reflect our mock data
       expect(wrapper.vm.totalCount).toBe(1);
+    });
+  });
+
+  describe("View state restore", () => {
+    it("restores saved filter, type, page and sort on mount", async () => {
+      resetListViewState();
+      useListViewState("logStreams", {
+        filterQuery: "abc",
+        streamType: "metrics",
+        pageSize: 50,
+        currentPage: 3,
+        sortBy: "doc_num",
+        sortOrder: "desc",
+      });
+      const restored = mountLogStream();
+      await flushPromises();
+      expect(restored.vm.filterQuery).toBe("abc");
+      expect(restored.vm.selectedStreamType).toBe("metrics");
+      expect(restored.vm.streamActiveTab).toBe("metrics");
+      expect(restored.vm.pageSize).toBe(50);
+      expect(restored.vm.currentPage).toBe(3);
+      expect(restored.vm.sortBy).toBe("doc_num");
+      expect(restored.vm.sortOrder).toBe("desc");
+      restored.unmount();
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper.vm.pageSize = 100;
+      wrapper.vm.sortOrder = "desc";
+      await flushPromises();
+      const saved: any = useListViewState("logStreams", {});
+      expect(saved.pageSize).toBe(100);
+      expect(saved.sortOrder).toBe("desc");
     });
   });
 

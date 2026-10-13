@@ -54,7 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size-options="perPageOptionsList"
             :current-page="currentPage"
             @update:current-page="onPageChange"
+            @update:page-size="selectedPerPage = $event"
             sorting="client"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             filter-mode="client"
             show-index
             :show-global-filter="false"
@@ -475,9 +480,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
-import { computed, defineComponent, onBeforeMount, onMounted, ref } from "vue";
+import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useListViewState } from "@/composables/useListViewState";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
@@ -551,14 +557,22 @@ export default defineComponent({
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
-    const filterQuery = ref("");
+    const viewState = useListViewState("enrichmentTables", {
+      filterQuery: "",
+      filter: "all",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
     const loading = ref(false);
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
     const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
-    const currentPage = ref(1);
+    const currentPage = ref(viewState.currentPage);
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
@@ -824,9 +838,22 @@ export default defineComponent({
     };
 
     const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
+    const selectedPerPage = ref<number>(viewState.pageSize);
     const selectedEnrichmentTable = ref<any>(null);
-    const selectedFilter = ref<string>("all");
+    const selectedFilter = ref<string>(viewState.filter);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    watch([filterQuery, selectedFilter], () => (currentPage.value = 1));
+    watch([filterQuery, selectedFilter, selectedPerPage, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        filter: selectedFilter.value,
+        pageSize: selectedPerPage.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
 
     const changePagination = (val: { label: string; value: any }) => {
       selectedPerPage.value = val.value;
@@ -1198,6 +1225,8 @@ export default defineComponent({
       bulkDeleteEnrichmentTables,
       bulkDeleteLoading,
       selectedFilter,
+      sortBy,
+      sortOrder,
       showUrlJobsDialog,
       showUrlJobsDialogState,
       selectedTableForUrlJobs,

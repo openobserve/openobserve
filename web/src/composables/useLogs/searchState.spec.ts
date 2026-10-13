@@ -534,6 +534,44 @@ describe("searchState composable", () => {
       (wrapper.vm.store.state as any).logs = originalLogs;
     });
 
+    it("restores with the drawer closed and no row, crossing or page request left over (4a §3.2.5)", async () => {
+      const store = wrapper.vm.store as any;
+      const live = JSON.parse(JSON.stringify(wrapper.vm.searchObj));
+      live.meta.showDetailTab = true;
+      live.meta.resultGrid.navigation = {
+        currentRowIndex: 12,
+        selectionActive: true,
+        pendingPageSelection: { page: 3, position: "first", requestId: "t9" },
+      };
+      live.data.resultGrid.pageRequest = { requestId: "t9" };
+      live.data.resultGrid.pageLoad = { requestId: "t8", ok: true, reason: "done" };
+      live.data.resultGrid.hitsSettled = false;
+      live.data.queryResults = { hits: [{ a: 1 }] };
+      live.data.sortedQueryResults = [];
+      store.state.logs = { isInitialized: true };
+      Object.defineProperty(store.getters, "logs/getLogs", {
+        get: () => live,
+        configurable: true,
+      });
+      try {
+        await wrapper.vm.initialLogsState();
+      } finally {
+        delete store.getters["logs/getLogs"];
+        store.state.logs = undefined;
+      }
+
+      const { meta, data } = wrapper.vm.searchObj;
+      expect(meta.showDetailTab).toBe(false);
+      expect(meta.resultGrid.navigation).toEqual({
+        currentRowIndex: null,
+        selectionActive: false,
+        pendingPageSelection: null,
+      });
+      expect(data.resultGrid.pageRequest).toBeNull();
+      expect(data.resultGrid.pageLoad).toBeNull();
+      expect(data.resultGrid.hitsSettled).toBe(true);
+    });
+
     it("should return true even when the store getter throws an error", async () => {
       // Simulate isInitialized = true but getLogs getter absent (throws),
       // so the catch branch executes and resolves to true via finally.

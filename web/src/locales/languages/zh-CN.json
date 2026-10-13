@@ -560,6 +560,18 @@
       "description": "远程任务是实验调用以生成输出的 HTTP 服务。发布一次并验证连接可用后，每个实验都能固定它所使用的确切版本。",
       "action": "新建任务",
       "actionDesc": "将 OpenObserve 指向您的端点并测试连接。"
+    },
+    "noDowntimes": {
+      "title": "暂无静默期",
+      "description": "静默期会让告警、异常检测和合成监控检查继续运行，并在您设定的时间窗口内停止发送通知。",
+      "action": "安排静默期",
+      "actionDesc": "一次性、每天或每周。如需快速静音，请使用告警列表中的“静音”。"
+    },
+    "searchCancelled": {
+      "title": "搜索已取消",
+      "description": "未加载任何结果。请运行查询以加载事件。",
+      "action": "运行查询",
+      "actionDesc": "再次运行同一查询"
     }
   },
   "common": {
@@ -1271,9 +1283,129 @@
     "aliasNotAllowed": "不允许使用别名 '{alias}'。",
     "commonGroupFields": "常用分组字段",
     "queryRangeHours": "{count} 小时 | {count} 小时",
-    "menuGroupAlerts": "告警"
+    "menuGroupAlerts": "告警",
+    "runQueryPendingLabel": "运行查询，更改尚未应用",
+    "queryActions": {
+      "runEditedFirst": "请先运行编辑后的查询",
+      "runFirst": "请先运行查询",
+      "usesEditedQuery": "使用您编辑后的查询(尚未运行)",
+      "usesUnrunQuery": "使用您的查询(尚未运行)",
+      "downloadsShownResults": "下载当前显示的结果，而非您编辑的内容",
+      "downloadsLastRun": "使用上次运行的查询，而非您编辑的内容"
+    },
+    "noFtsRecovery": {
+      "title": "{stream} 未配置全文搜索字段",
+      "description": "搜索字段值，或清空整个查询以查看此时间范围内的日志。",
+      "searchField": "搜索指定字段",
+      "searchFieldHint": "选择用于搜索的字段，并保留排除词。",
+      "clearRun": "不应用此搜索显示日志",
+      "clearRunHint": "清空整个查询并在相同时间范围内运行。",
+      "editPermission": "您需要权限才能编辑数据流设置。",
+      "scope": "在当前时间范围内搜索 {stream}。",
+      "singleStreamScope": "仅搜索 {stream}；将取消选择 {otherStreams}。",
+      "stream": "数据流",
+      "field": "字段",
+      "match": "匹配",
+      "value": "值",
+      "contains": "包含文本",
+      "equals": "等于",
+      "preview": "过滤器预览",
+      "replacement": "这会将整个查询替换为字段过滤器，并保留排除词。无需全文搜索字段。",
+      "run": "运行字段搜索",
+      "close": "关闭字段搜索",
+      "skipped": "已跳过 {stream}，因为它未配置全文搜索字段。",
+      "resultsScope": "这些结果仅来自 {streams}。",
+      "noFields": "此数据流没有可用于字段搜索的字段。",
+      "valueRequired": "请输入要搜索的值。",
+      "fieldRequired": "请选择要搜索的字段。",
+      "invalidValue": "请输入此字段的有效值。",
+      "configureHint": "使此数据流的全文搜索更快。"
+    },
+    "autoRunPersistNeedsRun": "请先运行查询：此操作会保存或分享您运行的结果",
+    "autoRunSearchAroundActive": "正在显示某一行附近的记录：运行查询以返回结果",
+    "autoRunStaleTooltip": "运行查询以更新结果",
+    "searchCancelledNotice": "搜索已取消。",
+    "linePermalink": {
+      "disabledFunction": "关闭函数以链接单行",
+      "disabledTimestampRewrite": "此查询重写了时间戳",
+      "disabledNotSingleLines": "此查询返回的行不是单条日志行",
+      "disabledNoTimestamp": "此行没有时间戳",
+      "disabledEnrichmentTable": "无法链接富化表的行",
+      "toastNotUnique": "已复制指向时间戳的链接；无法唯一标识此行。",
+      "toastWideStream": "此数据流字段过多，无法精确链接单行；已复制指向时间戳的链接",
+      "bannerInvalid": "此链接格式有误；仅显示分享的搜索",
+      "bannerDenied": "您没有访问数据流 {stream} 的权限。",
+      "bannerStreamMissing": "数据流 {stream} 已不存在",
+      "bannerError": "无法加载共享的日志行。",
+      "bannerIncomplete": "无法检索此时间戳下的所有日志行",
+      "bannerGone": "此日志行已不可用。可能已超出数据流的保留期限或被删除。",
+      "bannerGoneRetention": "此日志行已不可用。可能已超出数据流的保留期限（{days} 天）或被删除。 | 此日志行已不可用。可能已超出数据流的保留期限（{days} 天）或被删除。",
+      "bannerFound": "正在显示共享的日志行",
+      "bannerAmbiguous": "此时间戳下有 {count} 行日志，无法确定具体是哪一行 | 此时间戳下有 {count} 行日志，无法确定具体是哪一行",
+      "bannerChanged": "自创建链接以来，该行可能已发生变化",
+      "actionShowLines": "显示这些行",
+      "actionShowInContext": "在上下文中显示",
+      "bannerAmbiguousTieHeavy": "有 {count} 行日志共享此时间戳，且该数据流没有 _o2_id，因此无法确定具体是哪一行。该时间戳下的日志行已高亮显示。 | 有 {count} 行日志共享此时间戳，且该数据流没有 _o2_id，因此无法确定具体是哪一行。该时间戳下的日志行已高亮显示。",
+      "bannerDismiss": "关闭",
+      "copyLink": "复制链接",
+      "copyLinkTooltip": "复制指向此日志行的链接",
+      "copyLinkMenu": "复制指向此日志行的链接",
+      "toastCopied": "已复制日志行链接",
+      "toastCopiedValid": "已复制日志行链接 · 有效期 {days} 天 | 已复制日志行链接 · 有效期 {days} 天",
+      "toastLookupFailed": "无法查找此行；已复制指向该时间戳的链接",
+      "toastShortFailed": "无法缩短链接；已改为复制完整链接",
+      "toastFailed": "无法创建指向此日志行的链接",
+      "toastScopeChanged": "创建链接期间组织或数据流发生了变化；未复制任何内容",
+      "popoverTitle": "此日志行的链接",
+      "popoverDesc": "您的浏览器阻止了自动复制。请选中链接并复制，或使用按钮。",
+      "pageNotice": "此链接位于第 {page} 页。",
+      "pageGo": "转到第 {page} 页",
+      "pageGoLast": "转到最后一页（{page}）"
+    },
+    "autoRunPendingDot": "运行查询以应用最新更改",
+    "autoRunAppliesTo": "适用于日志和追踪",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "此搜索将扫描约 {size}",
+    "autoRunGuardLinkTitle": "此链接将扫描约 {size}",
+    "autoRunGuardDescAutoRun": "{scope}。已暂停自动运行，以便您先缩小范围。",
+    "autoRunGuardDescPaused": "{scope}。已暂停，以便您先缩小范围。",
+    "autoRunGuardDescLink": "通过链接打开 · {scope}。请检查范围，然后运行。",
+    "autoRunGuardHint": "关闭自动运行，以手动应用过滤器和时间更改。",
+    "autoRunGuardUnknownTitle": "此时间窗口的大小未知",
+    "autoRunGuardUnknownDesc": "{streams} 尚无大小统计信息，因此自动运行仅在其上运行不超过 1 小时的时间窗口。",
+    "autoRunGuardUnknownManyDesc": "{count} 个数据流尚无大小统计信息，因此自动运行会等待您操作。{scope}。 | {count} 个数据流尚无大小统计信息，因此自动运行会等待您操作。{scope}。",
+    "autoRunGuardSuperClusterTitle": "已可就绪跨区域运行",
+    "autoRunGuardSuperClusterDesc": "多区域集群上尚无法估算搜索大小，因此自动运行会等待您操作。{scope}。",
+    "autoRunGuardUnresolvedTitle": "数据流不可用",
+    "autoRunGuardUnresolvedDesc": "数据流 {streams} 不存在，或您无权访问。",
+    "autoRunGuardBanner": "此更改将扫描约 {size}（{scope}），因此已暂停自动运行。下方结果来自上一次查询。",
+    "autoRunGuardBannerPaused": "此更改将扫描约 {size}（{scope}），因此已暂停。下方结果来自上一次查询。",
+    "autoRunGuardBannerUnknown": "此时间窗口（{scope}）的大小未知，因此已暂停。下方结果来自上一次查询。",
+    "autoRunGuardBannerRefresh": "自动刷新每次将扫描约 {size}（{scope}），因此在您运行一次之前将保持暂停。下方结果来自上一次查询。",
+    "autoRunGuardRunAnyway": "仍然运行",
+    "autoRunGuardRunQuery": "运行查询",
+    "autoRunGuardNarrow": "缩小到 {period}",
+    "autoRunGuardNarrowWithSize": "缩小到 {period}（约 {size}）",
+    "autoRunGuardSearchJob": "作为搜索任务运行",
+    "autoRunGuardSelectStream": "选择数据流",
+    "searchJobNoPermission": "您没有创建搜索任务的权限",
+    "missingStreamAndNoFts": "一个或多个过滤器字段在 \"{missingStreams}\" 中不存在，因此不会在提到的数据流中执行搜索。\n 未搜索：{noFtsStreams}（无全文检索字段）。",
+    "freeTextChooseFirst": "请先选择文本搜索方式",
+    "freeTextScanLogsOnly": "扫描模式仅在日志视图中可用；请设置全文检索字段以在此处使用文本搜索",
+    "freeTextSearchedFields": "全文检索范围：{fields}（所有词，顺序不限）",
+    "freeTextPreview": "全文检索范围：{fields}（所有词，顺序不限）\n\n以 {sql} 运行",
+    "freeTextRunsAs": "以 {sql} 运行",
+    "freeTextNotSearched": "未搜索：{streams}（无全文检索字段）。",
+    "freeTextSetField": "配置全文检索字段",
+    "freeTextNoFtsTitle": "\"{stream}\" 没有全文检索字段",
+    "freeTextNoFtsTitleMulti": "所选数据流没有全文检索字段",
+    "freeTextNoTextFields": "此数据流没有可搜索的文本字段。",
+    "freeTextNoTextFieldsNamed": "未搜索：{streams}（无文本字段）。",
+    "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。"
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "升级到 PRO 计划",
     "home": "主页",
     "about": "关于",
@@ -1320,6 +1452,7 @@
     "topQueries": "热门查询",
     "profiles": "性能分析",
     "productAnalytics": "产品分析",
+    "downtimes": "静默期",
     "trialEndedTitle": "您的试用已结束",
     "trialPageNeedsPlan": "{page} 需要订阅计划",
     "trialPageNeedsPlanToast": "{page} 需要订阅计划。请在本页选择一个计划以继续使用。",
@@ -1386,6 +1519,10 @@
     "sessionReplayResumesOnItsOwn": "播放将自动恢复",
     "sessionReplayLoadingUpTo": "正在加载至 {time}…",
     "sessionReplaySinglePageHint": "此会话只有一个页面，因此必须先加载 {time} 之前的所有内容",
+    "sessionReplayNowShowingTab": "当前显示另一个标签页：{page}",
+    "sessionReplayTabGap": "此标签页的录制从 {time} 起存在空缺。在页面发生变化之前，屏幕可能与用户当时看到的内容不一致。",
+    "sessionReplayMissingTab": "用户切换到了此回放无法显示的另一个标签页。屏幕显示的是上一个标签页。",
+    "sessionReplayMultiTabHint": "此会话打开了多个标签页，因此加载会更早开始。",
     "sessionReplayNotLoadedYet": "尚未加载",
     "sessionReplayTruncatedTooltip": "不可用：已超出 50,000 个片段的限制",
     "sessionReplaySkippedParts": "· {n} 个部分无法加载 | · {n} 个部分无法加载",
@@ -2848,6 +2985,7 @@
       "scopeCoveredByParent": "锁定的操作来自 {scope}，在 {module} 中设置",
       "scopeAllOf": "所有 {module}",
       "scopeIncludesFuture": "包括之后创建的资源",
+      "scopeDowntimeHint": "静默期文件夹限制的是谁可以管理某个静默期，而不是它会静默什么。要静默某个模块的所有文件夹，用户需要拥有列出该模块每个文件夹的权限。已静默的标签和横幅可能会提及用户无法列出的静默期。",
       "grantedByWiderScope": "由更大范围授予",
       "grantedHereAndByWiderScope": "在此处及更大范围授予",
       "stillGrantedByWiderScope": "已在此处移除，但仍由更大范围授予",
@@ -4295,6 +4433,48 @@
     "inspectBtnLabel": "检查",
     "analyzeBtnLabel": "见解"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "企业版功能",
+    "featuresPageTitle": "企业版功能",
+    "category": {
+      "security": "安全与合规",
+      "scale": "规模与性能",
+      "ai": "AI 与自动化",
+      "analysis": "分析与数据流"
+    },
+    "legendBeta": "抢先体验",
+    "legendHa": "高可用性",
+    "docsFooter": "每项功能都附带文档链接。",
+    "viewAllDocs": "查看全部文档",
+    "locked": "使用 OpenObserve 企业版解锁 {feature}。",
+    "availableIn": "适用于 OpenObserve 企业版",
+    "rbacDisabled": "该组织的 RBAC 已关闭。请联系管理员启用。",
+    "pitch": {
+      "incidents": "自动将触发中的告警转化为可跟踪的事件。",
+      "workflows": "自动化运行手册，替您响应告警。",
+      "oncall": "安排值班轮换，并自动将呼叫路由给合适的人员。",
+      "serviceGraph": "查看服务之间的调用关系，在故障扩散前及时发现。",
+      "rbac": "为团队创建具有细粒度权限的自定义角色。",
+      "logPatterns": "自动识别重复出现的日志模式，无需逐行阅读。",
+      "correlation": "从一行日志直接跳转到其相关的指标和追踪。",
+      "aiAssistant": "让 AI 编写查询，并用通俗语言解释您的数据。",
+      "alertInsights": "查看告警的触发频率，并一眼发现相关联的告警。",
+      "anomalyDetection": "自动捕捉异常的指标行为，在触发阈值告警之前就发现。",
+      "agentGraph": "以图的形式查看 AI 智能体与工具之间的调用关系。",
+      "agentBehavior": "发现智能体工具调用行为随时间出现的异常。",
+      "discovery": "自动呈现值得复查的 AI 会话。",
+      "queues": "将被标记的 AI 会话转给审核人员进行人工标注。",
+      "datasets": "从真实会话中整理数据集，用于评估和微调您的 AI。",
+      "prompts": "对驱动 AI 功能的提示词进行版本管理。",
+      "playground": "在发布变更前，对提示词和模型进行并排测试。",
+      "experiments": "在发布前，基于数据集对比模型和提示词变更。",
+      "remoteTasks": "对远程模型和智能体运行评估与评分任务。",
+      "evaluations": "自动为 AI 质量评分并持续跟踪。",
+      "genAiAgentMapping": "按生成追踪的 AI 智能体进行分组，并并排对比不同版本。",
+      "scheduledSearch": "按计划自动运行已保存的搜索，无需手动重复执行。",
+      "customBranding": "用您自己的品牌标识替换默认徽标和文字。"
+    }
+  },
   "errorInsights": {
     "title": "标题",
     "tabLabel": "错误",
@@ -5429,6 +5609,25 @@
     "gpuExporter": "GPU 导出器"
   },
   "dashboard": {
+    "layoutEdit": {
+      "enter": "编辑布局",
+      "edit": "编辑",
+      "editing": "编辑中",
+      "undo": "撤销",
+      "redo": "重做",
+      "changes": "无更改 | {count} 处更改 | {count} 处更改",
+      "discard": "放弃",
+      "discardTooltip": "放弃更改",
+      "save": "保存",
+      "saveTooltip": "保存布局",
+      "discardTitle": "放弃未保存的布局更改?",
+      "discardMessage": "您有 {count} 处未保存的布局更改。放弃后仪表板将恢复为上次保存的布局。 | 您有 {count} 处未保存的布局更改。放弃后仪表板将恢复为上次保存的布局。",
+      "leaveMessage": "您有 {count} 处未保存的布局更改。离开此页面将放弃该更改。 | 您有 {count} 处未保存的布局更改。离开此页面将放弃这些更改。",
+      "keepEditing": "继续编辑",
+      "stay": "留下",
+      "discardAndLeave": "放弃并离开",
+      "apply": "应用"
+    },
     "approximately": "大约",
     "tableRowsWillBeDisplayed": "将显示表行",
     "unitPixelHint": "1 单位 = 30px",
@@ -7440,6 +7639,11 @@
     "SearchSQLCancelled": "错误：搜索 SQL 已取消。"
   },
   "alerts": {
+    "promRuleMode": "规则模式",
+    "promRulePreview": "{count} 个返回的序列当前匹配。每个序列必须在触发前完成待处理期。",
+    "promRuleModeDescription": "当表达式返回任意序列时匹配。待处理期为零时，请选择单告警或多告警；设置待处理期会自动启用多告警。将数据流留空可推断所引用的指标数据流。",
+    "promRuleModePendingMulti": "待处理期需要为每个序列使用独立的计时器，因此无法禁用多告警。",
+    "promRuleModeConflict": "规则模式不能使用严重或警告值阈值；待处理期需要启用多告警。",
     "allAlerts": "所有告警",
     "compositeAlert": "复合",
     "import": {
@@ -8375,6 +8579,8 @@
         "alertDescription": "告警的描述文本",
         "alertStartTime": "窗口开始时间（ISO 8601）",
         "alertEndTime": "窗口结束时间（ISO 8601）",
+        "alertStartTimeMillis": "窗口开始时间（epoch 毫秒）",
+        "alertEndTimeMillis": "窗口结束时间（epoch 毫秒）",
         "alertUrl": "返回 OpenObserve 调查的链接",
         "alertTriggerTime": "告警触发时间（ISO 8601）",
         "alertTriggerTimeMillis": "触发时间（epoch 毫秒）",
@@ -8981,7 +9187,9 @@
         "dbmLockSampling": "锁活动按时间间隔采样，因此两次采样之间发生并解除的争用不会被记录。没有触发告警并不证明没有阻塞。",
         "dbmNoInstance": "未识别到单个数据库实例，因此此告警会监控此引擎的每个实例。",
         "rumFunnelSnapshot": "此告警保留了漏斗 SQL 的副本。之后对漏斗或其命名事件的编辑不会更改它。",
-        "rumFunnelSteps": "漏斗至少需要两个步骤才能对转化进行告警。"
+        "rumFunnelSteps": "漏斗至少需要两个步骤才能对转化进行告警。",
+        "textFilterDropped": "您的搜索过滤器未带入，因为此数据流没有全文搜索（FTS）字段。如需使用，请将其添加到告警查询中。",
+        "heldFilterDropped": "您的搜索过滤器未带入，因为它需要先在日志页面选择运行身份。如需使用，请将其添加到告警查询中。"
       }
     },
     "saveFailed": "无法保存告警。",
@@ -8993,7 +9201,501 @@
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
     "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。",
-    "seconds": "秒"
+    "seconds": "秒",
+    "downtimes": {
+      "newTitle": "新建静默期",
+      "editTitle": "编辑静默期",
+      "detailTitle": "静默期",
+      "modules": {
+        "alerts": "告警",
+        "anomaly_detections": "异常检测",
+        "synthetics": "合成监控检查",
+        "slos": "SLO"
+      },
+      "modulesShort": {
+        "alerts": "告警",
+        "anomaly_detections": "异常",
+        "synthetics": "合成监控",
+        "slos": "SLO"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "在窗口期间，事件将",
+          "muted": "创建并静音（默认）",
+          "mutedHelp": "事件照常创建，但在窗口结束前不通知任何人。",
+          "none": "不创建",
+          "noneHelp": "窗口期间不创建事件；窗口结束后的首次触发会创建事件并发送通知。",
+          "summary": "不创建事件"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} 个 {key} | {count} 个 {key}",
+        "condition": "条件",
+        "allFolders": "所有文件夹",
+        "oneFolder": "{name} 文件夹",
+        "nFolders": "{count} 个文件夹 | {count} 个文件夹",
+        "tags": "标签 {tags}",
+        "nItems": "{count} 个项 | {count} 个项",
+        "asGood": "视为正常",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}",
+        "noIncidents": "窗口期间不会开启任何事件。"
+      },
+      "duration": {
+        "days": "{count} 天",
+        "hours": "{count} 小时",
+        "minutes": "{count} 分钟"
+      },
+      "schedule": {
+        "windowRange": "{start} 至 {end} {zone}",
+        "onceSentence": "一次 · {start} 至 {end} · {zone}",
+        "dailySentence": "每天 · {time} 持续 {duration} · {zone}",
+        "weeklySentence": "每周 {days} · {time} 持续 {duration} · {zone}",
+        "fromNoEnd": "{schedule}，自 {start} 起，无结束日期",
+        "fromUntil": "{schedule}，自 {start} 至 {until}"
+      },
+      "validation": {
+        "conditionRequired": "请添加条件，或移除条件块。",
+        "pairKey": "请为每一行选择维度。",
+        "pairOperator": "在静默期条件中请使用 = 或 !=。",
+        "pairValue": "请为每一行输入值。",
+        "loneStar": "值不能只是一个 *。",
+        "innerStar": "* 只能出现在值的末尾。",
+        "emptyGroup": "条件组不能为空。",
+        "tooDeep": "条件中的分组最多只能嵌套 3 层。",
+        "tooManyPairs": "一个条件最多可包含 32 对。",
+        "needsEq": "请至少添加一个 = 条件。如果条件只由 != 行组成，将会静默其他所有内容。",
+        "modulesRequired": "请至少选择一个模块。",
+        "foldersRequired": "请选择“所有文件夹”或至少一个文件夹。",
+        "tagsRequired": "请添加标签，或移除标签块。",
+        "idsRequired": "请选择一项，或移除特定项块。",
+        "idOutsideFolders": "部分所选项目不在所选文件夹中。",
+        "tooManyFolders": "最多选择 {max} 个文件夹，或选择所有文件夹。",
+        "tooManyTags": "最多添加 {max} 个标签。",
+        "tooManyIds": "最多选择 {max} 个项目。",
+        "nameTooLong": "名称最多为 256 个字符。",
+        "timezoneRequired": "请选择时区。",
+        "startRequired": "请输入开始日期和时间。",
+        "endRequired": "请输入结束日期和时间。",
+        "endAfterStart": "结束时间必须晚于开始时间。",
+        "windowTooLong": "时间窗口最长可持续 7 天。",
+        "windowTooShort": "时间窗口最短必须持续 1 分钟。",
+        "startTimeRequired": "请按 HH:MM 格式输入开始时间。",
+        "durationInvalid": "请输入时长，例如 90m 或 1h 30m。",
+        "weekdaysRequired": "请至少选择一天。",
+        "untilAfterStart": "重复截止日期必须不早于第一天。",
+        "reasonTooLong": "原因最多 {max} 个字符。",
+        "windowOutlastsRepeat": "时间窗口不能长于两次重复之间的时间。",
+        "startDateRequired": "请选择第一天。"
+      },
+      "title": "停机时间",
+      "subtitle": "按计划执行的时间窗口，在此期间告警、异常检测和合成监控检查继续运行，但停止发送通知",
+      "newDowntime": "新建停机时间",
+      "filterAll": "全部",
+      "filterOnce": "一次性",
+      "filterRecurring": "重复",
+      "search": "按名称、维度或创建者搜索",
+      "searchAcross": "搜索所有文件夹",
+      "thisFolder": "当前文件夹",
+      "allFolders": "所有文件夹",
+      "thisFolderTooltip": "在所选文件夹中搜索",
+      "allFoldersTooltip": "在所有文件夹中搜索",
+      "noFolder": "没有可用于存放停机时间的文件夹",
+      "truncated": "显示 {total} 个停机时间中的前 {shown} 个",
+      "stats": {
+        "active": "生效中",
+        "scheduled": "已计划",
+        "recurring": "重复",
+        "ended": "已结束",
+        "cancelled": "已取消",
+        "endedEarly": "提前结束",
+        "total": "总计"
+      },
+      "columns": {
+        "name": "名称",
+        "status": "状态",
+        "targets": "目标",
+        "schedule": "计划",
+        "when": "结束 / 下次",
+        "matched": "匹配",
+        "createdBy": "创建者",
+        "folder": "文件夹"
+      },
+      "oneTime": "一次性",
+      "recurring": "重复",
+      "bannerOn": "此停机时间生效期间，组织内所有人都会看到横幅提示",
+      "endsLabel": "结束",
+      "confirmEndNow": {
+        "title": "立即结束此停机？",
+        "message": "通知会立即恢复。该停机将以提前结束状态保留在列表中。",
+        "ok": "立即结束",
+        "keep": "继续运行"
+      },
+      "extend": {
+        "menu": "延长时长",
+        "notActive": "只能延长处于活动状态的停机",
+        "dialogTitle": "延长 {name}",
+        "newEnd": "新的结束时间",
+        "confirmUntil": "延长至 {time}",
+        "followUp": "此停机会重复，因此其计划保持不变。将从当前窗口结束时创建名为 {name} 的一次性停机。",
+        "endAfterCurrent": "新的结束时间必须晚于当前结束时间。"
+      },
+      "nextLabel": "下次",
+      "matched": {
+        "alerts": "{count} 条告警 | {count} 条告警",
+        "anomalies": "{count} 个异常 | {count} 个异常",
+        "synthetics": "{count} 项检查 | {count} 项检查",
+        "slos": "{count} 个 SLO | {count} 个 SLO"
+      },
+      "actions": {
+        "endNow": "立即结束",
+        "edit": "编辑",
+        "duplicate": "复制",
+        "moveToFolder": "移动到文件夹",
+        "cancel": "取消停机时间",
+        "delete": "删除",
+        "more": "更多操作",
+        "muteForHour": "立即静音 1 小时",
+        "extend": "延长"
+      },
+      "confirmCancel": {
+        "title": "取消静默时段",
+        "message": "通知将立即恢复。该静默时段会保留在列表中作为历史记录。",
+        "bulkMessage": "取消 {count} 个静默时段？通知将立即恢复。 | 取消 {count} 个静默时段？通知将立即恢复。",
+        "confirm": "取消静默时段",
+        "keep": "保留静默时段"
+      },
+      "confirmDelete": {
+        "title": "删除静默时段",
+        "message": "该静默时段及其历史记录将被删除。此操作无法撤销。"
+      },
+      "copyOf": "{name} 的副本",
+      "form": {
+        "matches": {
+          "alerts": "{count} 个告警匹配 | {count} 个告警匹配",
+          "anomaly_detections": "{count} 个检测匹配 | {count} 个检测匹配",
+          "synthetics": "{count} 个检查匹配 | {count} 个检查匹配",
+          "slos": "{count} 个 SLO 匹配 | {count} 个 SLO 匹配"
+        },
+        "alertFolders": "告警文件夹",
+        "syntheticsFolders": "合成监控文件夹",
+        "noAlertFolderAccess": "您无权访问告警文件夹。",
+        "noSyntheticsFolderAccess": "您无权访问合成监控文件夹。",
+        "tags": "标签",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "每个标签都必须在该检查上。",
+        "removeBlock": "移除此区块",
+        "specificItems": "指定项目",
+        "itemsHint": "仅提供所选文件夹中的项目。",
+        "itemOption": "{name} · {folder}",
+        "addTags": "添加标签",
+        "addItems": "添加指定项目",
+        "sloMode": "窗口内的 SLO 得分",
+        "sloExclude": "排除该窗口",
+        "sloCountAsGood": "将该窗口计为良好",
+        "sloExcludeCaption": "窗口内的时间既不计为良好，也不计为不良。这些 SLO 上的燃烧率告警不会针对该时间触发。",
+        "sloCountAsGoodCaption": "窗口内的时间全部计为良好。仅当您的 SLO 约定计划内维护属于正常运行时间时才使用此项。",
+        "cardCaption": "先按文件夹筛选，再由可选区块进一步缩小范围。上方的维度条件同样适用于此模块。",
+        "noConditionForChecks": "上方的维度条件不适用于检查。",
+        "appliesTo": "适用于",
+        "tabTargets": "目标",
+        "tabSchedule": "计划",
+        "tabAdvanced": "高级",
+        "modeInFolder": "{mode} 位于",
+        "newMode": "新建静默时段",
+        "editMode": "编辑静默时段",
+        "namePlaceholder": "静默时段名称",
+        "nameLabel": "静默时段名称",
+        "renameHint": "点击重命名",
+        "reason": "原因",
+        "reasonHelp": "可选。将显示在列表、详情页面以及“已静音”提示中。",
+        "cancel": "取消",
+        "save": "保存",
+        "activeBanner": "此静默时段已生效。编辑将在下次评估时生效，而更改 SLO 模式会重新计算已开始的窗口。",
+        "changedMeanwhile": "自您加载后，有人更改了此静默时段。请重新加载后重试。",
+        "reload": "重新加载",
+        "noModule": "请在“适用于”中选择一个模块。",
+        "checkSchedule": "请检查计划，然后再次保存。"
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "告警",
+          "anomaly_detections": "异常检测",
+          "synthetics": "合成监控检查",
+          "slos": "SLO"
+        },
+        "whenOnce": "单次，从 {start} 到 {end} {zone}",
+        "whenDaily": "每天 {time} {zone}，持续 {duration}",
+        "whenWeekly": "每{days} {time} {zone}，持续 {duration}",
+        "inFolders": "在文件夹 {names} 中 | 在文件夹 {names} 中",
+        "withCondition": "条件为 {condition}",
+        "tagged": "标记为 {tags}",
+        "named": "限于 {count} 个指定项 | 限于 {count} 个指定项",
+        "stopNotifying": "{when}：{targets} 停止通知。",
+        "nothingMuted": "{when}：没有告警或检查被静默。",
+        "sloUnchanged": "SLO 评分不会改变。",
+        "sloExcluded": "{slos} 将该时间窗口从评分中排除。",
+        "sloAsGood": "{slos} 将该时间窗口计为正常时间。"
+      },
+      "autoName": {
+        "once": "单次",
+        "onceOn": "单次 {date}",
+        "daily": "每天",
+        "weekly": "每周",
+        "all": {
+          "alerts": "所有告警",
+          "anomaly_detections": "所有异常检测",
+          "synthetics": "所有合成监控检查",
+          "slos": "所有 SLO"
+        }
+      },
+      "condition": {
+        "none": "无维度条件",
+        "add": "添加",
+        "title": "维度条件",
+        "onePer": "每个静默时段一个",
+        "remove": "移除维度条件",
+        "caption": "适用于告警、异常检测和 SLO。合成监控检查没有维度，使用标签。所有条件对都必须匹配。使用 OR 组表示备选条件。值可以 * 结尾。"
+      },
+      "resources": {
+        "refineBy": "按资源细化",
+        "load": "加载资源",
+        "needsEq": "按资源细化之前，请至少添加一个 = 条件。",
+        "tooMany": "有 {count} 个值与该条件同时出现。请缩小条件范围以选择资源。",
+        "lastSeen": "上次出现",
+        "streams": "数据流",
+        "footer": "已选择 {selected}/{total} · {source}",
+        "fromRegistry": "来自服务注册表",
+        "fromSearch": "来自最近 24 小时的数据",
+        "apply": "应用",
+        "loadFailed": "无法加载资源",
+        "notSeen": "过去一小时内未出现。",
+        "partial": "部分来源未响应。",
+        "items": "项目",
+        "fromValues": "来自告警、服务注册表和过去一小时的数据",
+        "noValues": "此维度尚未出现任何值。"
+      },
+      "scheduleForm": {
+        "once": "单次",
+        "daily": "每天",
+        "weekly": "每周",
+        "startDate": "开始日期",
+        "startTime": "开始时间",
+        "endDate": "结束日期",
+        "endTime": "结束时间",
+        "days": "星期",
+        "startsAt": "开始于",
+        "duration": "时长",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "最长 7 天，例如 90m 或 1h 30m。",
+        "until": "重复截止",
+        "untilPlaceholder": "无结束日期",
+        "timezone": "时区",
+        "noWindow": "未来 8 天内没有窗口开始。",
+        "nextWindow": "下一个窗口：{window}。窗口可以跨越午夜。",
+        "nextWindowWithUtc": "下一个窗口：{window}（{utc}）。窗口可以跨越午夜。",
+        "startsOn": "开始日期"
+      },
+      "preview": {
+        "title": "预览",
+        "failed": "无法加载预览。",
+        "andMore": "以及另外 {count} 项",
+        "noMatch": "当前没有匹配项",
+        "fireTime": "{count} 个告警在触发时确定其身份 | {count} 个告警在触发时确定其身份",
+        "undecidable": "无法通过 {key} 区分",
+        "showAll": "显示完整列表",
+        "showLess": "收起",
+        "finishCondition": "完成条件后即可查看预览。"
+      },
+      "muteAllDialog": {
+        "title": "静默整个模块？",
+        "intro": "没有文件夹、项、标签或条件收窄这些模块，因此此停用时段会静默：",
+        "every": {
+          "alerts": "此组织中的每个告警",
+          "anomaly_detections": "此组织中的每个异常检测",
+          "synthetics": "此组织中的每个合成监控检查",
+          "slos": "此组织中的每个 SLO"
+        },
+        "matchedNow": "今天 {matched}",
+        "outro": "在窗口内，所有这些的通知、值班呼叫和工作流都会停止。",
+        "cancel": "取消",
+        "confirm": "全部静默",
+        "titleOne": {
+          "alerts": "静默此组织中的每条告警？",
+          "anomaly_detections": "静默此组织中的每个异常检测？",
+          "synthetics": "静默此组织中的每个合成监控检查？",
+          "slos": "静默此组织中的每个 SLO？"
+        },
+        "window": "时间窗口：{window}"
+      },
+      "summaryPane": {
+        "title": "摘要",
+        "filedIn": "归档于",
+        "window": "窗口",
+        "nextWindow": "下一个窗口",
+        "inUtc": "UTC 时间",
+        "largeMatch": "{modules}：此停用时段匹配超过半数的项。此组织的大部分内容在窗口内不会发送通知。",
+        "whatHappens": "会发生什么",
+        "keepRunning": "评估和检查会继续运行并保留其历史记录。",
+        "noNotifications": "通知、值班呼叫和工作流会停止。",
+        "mutedIncidents": "事件以静默状态开启，并在窗口结束后发送通知。"
+      },
+      "band": {
+        "now": "现在",
+        "none": "尚无窗口运行过，也未计划任何窗口。",
+        "active": "进行中",
+        "next": "下一个",
+        "past": "已运行",
+        "track": "窗口",
+        "aria": "{kind}：{start} 至 {end}"
+      },
+      "detail": {
+        "overview": "概览",
+        "affected": "受影响 · {count}",
+        "suppressed": "已抑制 · {count}",
+        "details": "详情",
+        "condition": "条件",
+        "noTarget": "无目标",
+        "banner": "横幅",
+        "bannerOn": "激活期间向组织显示",
+        "bannerOff": "无横幅",
+        "occurrences": "发生次数",
+        "nextWindow": "下一个窗口：{window}。您的时间：{local}。",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "匹配依据",
+        "matchedBy": {
+          "query": "查询",
+          "source_alert": "源告警",
+          "tag": "标签",
+          "id": "命名",
+          "folder": "文件夹",
+          "org": "整个组织"
+        },
+        "source": "来源",
+        "wouldHaveNotified": "本应通知",
+        "noSuppressed": "尚未抑制任何内容",
+        "muteHourName": "{name} · 静音 1 小时",
+        "notFoundTitle": "未找到停机时段",
+        "notFoundDescription": "它可能已被删除，或链接指向其他组织。",
+        "backToList": "返回停机时段"
+      },
+      "mute": {
+        "title": {
+          "alerts": "静音 {count} 个告警 | 静音 {count} 个告警",
+          "anomaly_detections": "静音 {count} 个异常检测 | 静音 {count} 个异常检测",
+          "synthetics": "静音 {count} 个检查 | 静音 {count} 个检查",
+          "slos": "静音 {count} 个 SLO | 静音 {count} 个 SLO",
+          "items": "静音 {count} 个项目 | 静音 {count} 个项目"
+        },
+        "subtitle": "它们会继续运行并保留历史记录。通知、值班呼叫和工作流会在窗口结束前停止。",
+        "muteFor": "静音时长",
+        "fileIn": "归档到",
+        "presets": {
+          "30m": "30 分钟",
+          "1h": "1 小时",
+          "2h": "2 小时",
+          "4h": "4 小时",
+          "custom": "自定义"
+        },
+        "endsAt": "结束于",
+        "endsIn": "将在 {duration} 后结束。",
+        "confirm": "静音",
+        "confirmUntil": "静音至 {time}",
+        "menu": "静音通知",
+        "until": "至…",
+        "bulk": "静音",
+        "muted": "已静音 · {duration}后结束",
+        "mutedTooltip": "由 {name} 静音，至 {end}",
+        "exclude": "排除一个时间窗口…",
+        "firingMuted": "触发中 · 已静音",
+        "firingMutedTooltip": "仍在触发。通知已被 {name} 静音。"
+      },
+      "corrected": "已修正",
+      "correctedBy": "评分已由 {names} 修正",
+      "incident": {
+        "mutedBy": "已静音 · {name}",
+        "notLoaded": "停机时间未加载",
+        "notLoadedTooltip": "已被停机时间 {id} 静音，该停机时间不在已加载的列表中。",
+        "banner": "由 {name} 静音。无人被呼叫。窗口结束后的首次触发会发送延迟的已开启通知。",
+        "bannerUntil": "由 {name} 静音，至 {end}。无人被呼叫。窗口结束后的首次触发会发送延迟的已开启通知。"
+      },
+      "banner": {
+        "ended": "已结束",
+        "endsInUnderMinute": "不到 1 分钟后结束",
+        "endsInMinutes": "{count} 分钟后结束 | {count} 分钟后结束",
+        "endsIn": "{duration}后结束",
+        "firstEndsInUnderMinute": "最早的一个不到一分钟后结束",
+        "firstEndsInMinutes": "最早的一个 {count} 分钟后结束 | 最早的一个 {count} 分钟后结束",
+        "firstEndsIn": "最早的一个 {duration}后结束",
+        "count": "{module} {count}",
+        "showBanner": "在此静音时段生效期间，向组织内所有人显示横幅",
+        "showBannerCaption": "横幅会显示名称、受影响的数量和剩余时间。它绝不会显示具体的告警名称。",
+        "preview": "预览",
+        "previewMessage": "{name} 生效中。",
+        "tooLong": "横幅仅适用于最长 7 天的窗口。"
+      },
+      "sloCorrections": {
+        "title": "状态修正：",
+        "item": "{name}（{status}）",
+        "shorterThanSlice": "短于 SLO 的切片，未校正任何分钟"
+      },
+      "notify": {
+        "title": "通知",
+        "caption": "向目标告知停机本身：开始时、结束前和结束时。",
+        "destinations": "目标",
+        "lead": "结束前提醒",
+        "leadHelp": "例如 10m 或 1h，介于 1 分钟和窗口长度之间。",
+        "regionNote": "在超级集群中，由创建停机的区域发送。此设置之前创建的停机会从每个区域发送。",
+        "tab": "通知",
+        "events": {
+          "started": "开始时",
+          "startedHelp": "每个窗口开始时发送一条消息。",
+          "ending_soon": "结束前",
+          "ending_soonHelp": "结束前的提醒，告警再次通知时不会让人意外。",
+          "ended": "结束时",
+          "endedHelp": "每个窗口结束时发送一条消息。",
+          "cancelled": "取消时",
+          "cancelledHelp": "有人结束或取消停机时立即发送。",
+          "extended": "延长时",
+          "extendedHelp": "带着新的结束时间立即发送。"
+        },
+        "validation": {
+          "tooMany": "最多可通知 {max} 个目标。",
+          "eventRequired": "请至少选择一个事件，或移除目标。",
+          "leadInvalid": "提醒必须在结束前 1 分钟到窗口长度之间。"
+        },
+        "summary": {
+          "none": "不发送自己的通知。",
+          "sentence": "通知 {destinations}：{events}。",
+          "started": "开始时",
+          "endingSoon": "结束前 {lead}",
+          "ended": "结束时",
+          "cancelled": "取消时",
+          "extended": "延长时"
+        },
+        "log": {
+          "time": "时间",
+          "event": "事件",
+          "destinations": "目标",
+          "result": "结果",
+          "ok": "已发送",
+          "pending": "发送中",
+          "empty": "尚未发送通知",
+          "events": {
+            "started": "已开始",
+            "ending_soon": "即将结束",
+            "ended": "已结束",
+            "cancelled": "已取消",
+            "extended": "已延长"
+          }
+        },
+        "test": {
+          "send": "发送测试",
+          "sent": "已向 {count} 个目标发送测试 | 已向 {count} 个目标发送测试",
+          "failed": "测试未送达 {names}。"
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -9030,7 +9732,8 @@
     "countWorkflow": "{count} 个工作流 | {count} 个工作流",
     "countAnomalyDetection": "{count} 个异常检测器 | {count} 个异常检测器",
     "countIncidentIntegration": "{count} 个事件集成 | {count} 个事件集成",
-    "sectionOtherConsumers": "还被以下使用"
+    "sectionOtherConsumers": "还被以下使用",
+    "countDowntime": "{count} 个停机 | {count} 个停机"
   },
   "alert_library": {
     "header": "告警库",
@@ -11574,7 +12277,21 @@
     "eventClusterAriaLabelPlural": "{count} 个事件，{errors} 个错误",
     "eventMarkerTooltip": "事件：{name}",
     "exceptionMarkerTooltip": "异常：{type}",
-    "spanEventFallback": "Span 事件"
+    "spanEventFallback": "Span 事件",
+    "spanNav": {
+      "firstSpan": "第一个 Span",
+      "lastSpan": "最后一个 Span",
+      "position": "Span {index}/{count}：{name}"
+    },
+    "rowNav": {
+      "tracePosition": "追踪 {row}/{count}，第 {page} 页",
+      "spanPosition": "Span {row}/{count}，第 {page} 页",
+      "firstResult": "第一个结果",
+      "lastResult": "最后一个结果",
+      "loadingPage": "正在加载第 {page} 页",
+      "pageFailed": "无法加载第 {page} 页",
+      "pageEmpty": "第 {page} 页没有结果"
+    }
   },
   "aiToolset": {
     "header": "AI 工具集",
@@ -14811,7 +15528,8 @@
       "selectStreamDesc": "浏览日志、追踪、指标和 RUM 数据流",
       "queryGuide": "阅读查询指南",
       "queryGuideDesc": "过滤器、SQL 模式、VRL 和保存的视图",
-      "recent": "最近："
+      "recent": "最近使用：",
+      "descriptionAutoRun": "选择一个数据流以查看其最新日志。结果返回后，您可以使用过滤器、VRL 函数和自定义时间范围进一步细化。"
     },
     "noEvents": {
       "title": "未找到事件",
@@ -14865,7 +15583,8 @@
       "fixErrorsAndRetry": "存在一些错误，请修复后重试"
     },
     "buildQueryPage": {
-      "validationErrors": "存在一些错误，请修复后重试"
+      "validationErrors": "存在一些错误，请修复后重试",
+      "parserLoadFailed": "无法加载查询解析器，因此无法将搜索过滤器添加到图表中。加载完成前，运行将暂停。"
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL查询：",
@@ -15067,6 +15786,45 @@
     },
     "logsNoEventsState": {
       "lastData": "最新数据：{formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "严重级别 {level}",
+      "srTextInferred": "严重级别 {level}，推断得出",
+      "inferredLabel": "{level} · 推断",
+      "popoverTitle": "严重级别：{level}",
+      "popoverAriaLabel": "严重级别依据",
+      "evidence": "依据",
+      "fromField": "来自字段 {field}",
+      "inferredFrom": "从 {field} 文本推断得出。",
+      "notSearchable": "不可搜索；直方图不使用它。",
+      "noLevelField": "此行没有级别字段，也没有可扫描的文本字段。",
+      "noLevelWordInField": "此行没有级别字段，{field} 中也没有级别词。",
+      "notInSelectedColumns": "级别字段不在所选列中",
+      "levels": {
+        "emergency": "紧急",
+        "alert": "告警",
+        "critical": "严重",
+        "error": "错误",
+        "warning": "警告",
+        "notice": "通知",
+        "info": "信息",
+        "debug": "调试",
+        "trace": "追踪",
+        "ok": "正常",
+        "unknown": "未知"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "自动刷新已开启；请关闭后再切换页面",
+      "position": "第 {row} 条日志，共 {count} 条，第 {page} 页",
+      "positionLabel": "第 {row} 条日志，共 {count} 条 · 第 {page} 页",
+      "loadingPage": "正在加载第 {page} 页…",
+      "loadingPageAnnouncement": "正在加载第 {page} 页",
+      "resultsChanged": "结果已变化",
+      "notInPage": "不在当前页",
+      "loadingResults": "正在加载结果…",
+      "previousLog": "上一条日志",
+      "nextLog": "下一条日志"
     }
   },
   "queryError": {
@@ -15101,7 +15859,10 @@
     "traceId": "追踪编号：",
     "askAi": "让 AI 修复我的查询",
     "showDetail": "显示详情",
-    "hideDetail": "隐藏细节"
+    "hideDetail": "隐藏细节",
+    "runAs": "运行身份",
+    "searchTextFor": "搜索文本“{text}”",
+    "searchTextDesc": "将整个输入作为短语进行搜索"
   },
   "refreshButton": {
     "justNow": "刚才",
@@ -16887,7 +17648,8 @@
       "sourceMaps": "RUM — 源映射",
       "oncall": "值班",
       "oncallDetail": "值班页面",
-      "syntheticsJourney": "合成监控旅程"
+      "syntheticsJourney": "合成监控旅程",
+      "downtimes": "停机"
     },
     "actions": {
       "openCheatsheet": "打开键盘快捷键备忘单",
@@ -16904,6 +17666,9 @@
       "dashboardRefresh": "刷新所有面板",
       "dashboardAddPanel": "添加新面板",
       "dashboardSave": "保存仪表板",
+      "dashboardLayoutUndo": "撤销布局更改",
+      "dashboardLayoutRedo": "重做布局更改",
+      "dashboardLayoutExit": "退出布局编辑",
       "dashboardFullscreen": "切换全屏",
       "dashboardExport": "导出仪表板",
       "tableRowEdit": "编辑悬停的行",
@@ -16996,7 +17761,19 @@
       "oncallEscalate": "升级",
       "oncallSnooze": "暂停",
       "oncallResolve": "解决",
-      "functionsImport": "导入函数"
+      "downtimesCreate": "新建停机",
+      "downtimesRefresh": "刷新停机",
+      "functionsImport": "导入函数",
+      "logsNextRow": "下一条日志（打开详情）",
+      "logsPrevRow": "上一条日志（打开详情）",
+      "logsRowFocusMove": "在行之间移动焦点",
+      "logsRowOpen": "打开聚焦的行",
+      "logsDetailClose": "关闭详情并返回该行",
+      "tracesNextRow": "选择下一条追踪",
+      "tracesPrevRow": "选择上一条追踪",
+      "tracesRowOpen": "打开选中的追踪",
+      "traceNextVisibleSpan": "下一个可见 Span",
+      "tracePrevVisibleSpan": "上一个可见 Span"
     }
   },
   "components": {
@@ -17369,7 +18146,13 @@
         "debug": "调试",
         "info": "信息",
         "warn": "警告",
-        "fatal": "致命"
+        "fatal": "致命",
+        "emergency": "紧急",
+        "alert": "告警",
+        "critical": "严重",
+        "notice": "注意",
+        "ok": "OK",
+        "unknown": "未知"
       },
       "pipelineRunOutcome": {
         "firing": "触发中",
@@ -17434,6 +18217,13 @@
         "belowTopN": "top-N 以下",
         "truncated": "已截断",
         "gap": "缺口"
+      },
+      "downtimeStatus": {
+        "scheduled": "已计划",
+        "active": "生效中",
+        "ended": "已结束",
+        "cancelled": "已取消",
+        "endedEarly": "提前结束"
       }
     }
   },
@@ -17830,6 +18620,24 @@
     },
     "iam": {
       "userSaveFailed": "无法保存用户"
+    },
+    "downtimes": {
+      "cancelled": "停机已取消",
+      "cancelledMany": "{count} 个停机已取消 | {count} 个停机已取消",
+      "cancelFailed": "无法取消停机",
+      "extended": "已延长至 {time}",
+      "extendedFollowUp": "已创建 {name}，运行至 {time}",
+      "extendFailed": "无法延长停机",
+      "reload": "重新加载",
+      "deleted": "停机已删除",
+      "deleteFailed": "无法删除停机",
+      "created": "停机已创建",
+      "updated": "停机已保存",
+      "saveFailed": "无法保存停机",
+      "muted": "已将 {count} 个项目静音，直到 {time}。已归档到 {folder}。 | 已将 {count} 个项目静音，直到 {time}。已归档到 {folder}。",
+      "muteFailed": "无法创建静音",
+      "viewDowntime": "查看停机",
+      "itemsDropped": "{count} 个所选项目不在所选文件夹内，已被移除。 | {count} 个所选项目不在所选文件夹内，已被移除。"
     }
   },
   "cipherKeys": {
@@ -18120,7 +18928,9 @@
       "budgetNote": "最后一个点等于上方的剩余预算磁贴。0% 处的虚线表示耗尽；低于该线表示 SLO 已消耗的错误超过目标允许的范围。间隙是没有测量数据的时间桶，这与零不同。",
       "burnExplain": "每个桶中预算燃烧的速度，以预算中性率的倍数表示。",
       "burnFormula": "燃烧速率 = (100% − SLI) ÷ (100% − 目标)\nSLI = 100 × 良好 ÷ 总计，仅针对该时间桶\n\n右轴（同一条线读作 SLI）：\nSLI = 100% − 燃烧速率 × (100% − 目标)",
-      "burnNote": "×1 在窗口结束时正好用完预算，×2 则在一半时用完；低于 ×1 表示预算正在累积。由于这是按桶而非累计，所以此处的尖峰仍可见，而不会被平均掉。右轴向下计数：图表越往上表示燃烧越多，即 SLI 越低。"
+      "burnNote": "×1 在窗口结束时正好用完预算，×2 则在一半时用完；低于 ×1 表示预算正在累积。由于这是按桶而非累计，所以此处的尖峰仍可见，而不会被平均掉。右轴向下计数：图表越往上表示燃烧越多，即 SLI 越低。",
+      "corrected": "已由停机校正",
+      "correctedTooltip": "已由停机校正：已排除，因此预算线保持平稳"
     },
     "alerts": {
       "title": "告警",
@@ -21644,5 +22454,1079 @@
     "modeExhausted": "已用尽",
     "modeFree": "免费",
     "modeUnknown": "未知"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "发送您的数据。OpenObserve 会发现问题并告知您，同时给出对原因的最佳判断。当一切平静时，它会展示已检查的内容以及无法看到的内容。",
+    "phase2": "阶段 2",
+    "tabs": {
+      "issues": "问题",
+      "coverage": "覆盖范围",
+      "activity": "活动",
+      "policy": "策略"
+    },
+    "loops": {
+      "coverage": "覆盖范围",
+      "calibration": "校准",
+      "investigation": "调查",
+      "action": "操作"
+    },
+    "signals": {
+      "requests": "请求",
+      "errors": "错误",
+      "latency": "延迟",
+      "saturation": "饱和度",
+      "logPatterns": "日志模式",
+      "dependencies": "依赖项"
+    },
+    "ledgerStatus": {
+      "autoApplied": "已自动应用",
+      "awaiting": "等待批准",
+      "approved": "已批准",
+      "rejected": "已拒绝",
+      "rolledBack": "已回滚",
+      "kept": "已保留 — 检查通过"
+    },
+    "issues": {
+      "subtitle": "由 SRE 代理分组并调查的事件。每个问题只发送一条通知；原因会一并附上，若分诊超时或失败，则会在同一会话中跟进。",
+      "open": "未解决",
+      "recent": "已解决",
+      "all": "全部",
+      "heldForDigest": "保留至周五的汇总",
+      "colId": "事件",
+      "colTitle": "问题",
+      "colSeverity": "严重程度",
+      "colServices": "受影响的服务",
+      "colStarted": "开始时间",
+      "colStatus": "状态",
+      "colCause": "原因",
+      "emptyTitle": "这里空空如也",
+      "emptyDescription": "没有符合此过滤器的问题。",
+      "subsetNote": "已显示 {shown} 条。此演示展示了本周 {total} 个事件中的一部分。",
+      "searchLabel": "搜索问题",
+      "searchPlaceholder": "搜索问题、服务、原因或 INC-…",
+      "noMatch": "没有与“{query}”匹配的问题",
+      "clearSearch": "清除搜索",
+      "matchCount": "没有匹配的问题 | 1 个问题匹配 | {count} 个问题匹配",
+      "colSignal": "信号",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → 现在",
+      "minutes": "{count} 分钟",
+      "grouped": "{count} 条告警 → 1 个事件 | {count} 条告警 → 1 个事件",
+      "confidence": "{level} 置信度",
+      "proposed": "建议",
+      "reversible": "可撤销",
+      "proposalFor": "针对 {title} 的建议修复"
+    },
+    "drawer": {
+      "rca": "根本原因",
+      "rcaSummary": "摘要",
+      "likelyCause": "可能原因",
+      "confidence": "置信度",
+      "confidenceValue": "置信度：{value}（暂无校准评分）",
+      "nextStep": "建议的下一步",
+      "evidence": "证据",
+      "blastRadius": "影响范围",
+      "upstream": "上游调用方",
+      "affected": "受影响",
+      "downstream": "下游依赖",
+      "none": "无",
+      "timeline": "时间线",
+      "notification": "通知已发送",
+      "notSent": "未呼叫：该低严重度问题被暂缓，留待周五汇总。已记录到产品内收件箱。",
+      "sender": "AutoObserve",
+      "threadReply": "在会话中回复",
+      "p1Note": "P1 会立即呼叫，早于调查结果生成。原因会在同一会话中跟进。",
+      "gateNote": "P2 和 P3 通知最多等待 2 分钟以获取调查结果，因此首条消息通常已包含原因。如果分诊超时或失败，消息会说明调查仍在进行或已失败，原因会在同一会话中跟进。P4 问题不会通知任何人，只计入周五汇总。",
+      "caughtEarlier": "什么本可以更早发现此问题",
+      "analyzedAt": "调查结果生成于 {time}。",
+      "triggersSample": "显示 {shown} / {total} 次触发",
+      "waitingForOk": "等待您确认",
+      "proposedFix": "建议修复",
+      "unfoldTab": "如何演变",
+      "seeEvidence": "查看证据（{count}）→"
+    },
+    "unfold": {
+      "hint": "从左到右阅读：发生了什么变更、触发了哪些信号，以及最终到达您团队的内容。选择卡片可查看其触发记录。",
+      "legend": "卡片类型",
+      "team": "您的团队",
+      "kind": {
+        "metric": "指标",
+        "log": "日志",
+        "trace": "追踪",
+        "change": "变更"
+      },
+      "likelyCause": "可能原因",
+      "linesUpWith": "与…吻合",
+      "times": "×{count}",
+      "sameMinute": "同一分钟",
+      "plusMinutes": "+{count} 分钟",
+      "plusHours": "+{hours} 小时 {minutes} 分钟",
+      "firstFired": "首次触发",
+      "lastFired": "最近触发",
+      "firings": "触发次数",
+      "peak": "峰值",
+      "normal": "对比",
+      "detector": "检测器",
+      "firedAt": "触发时间",
+      "when": "时间",
+      "chartNote": "问题的主要图表，与 Evidence 中一致",
+      "outcome": {
+        "paged": "已呼叫值班",
+        "asked": "请求确认",
+        "notified": "已发送消息，未呼叫",
+        "held": "暂缓，留到周五汇总",
+        "fixFailed": "修复未奏效",
+        "fixed": "已修复",
+        "resolved": "已解决",
+        "open": "仍未解决"
+      }
+    },
+    "coverage": {
+      "showing": "显示 {shown}/{total} 个服务",
+      "watched": "已监控",
+      "learning": "学习中",
+      "gap": "缺口",
+      "na": "不适用",
+      "anomaly": "异常",
+      "threshold": "阈值",
+      "service": "服务",
+      "lastScanned": "上次扫描",
+      "detector": "检测器",
+      "methodAnomaly": "异常检测器，学习基线",
+      "methodThreshold": "来自库的静态阈值",
+      "libraryEntry": "库条目",
+      "predicate": "适用性",
+      "predicateMatched": "{predicate} — 在数据流 {stream} 中匹配",
+      "predicateUnmatched": "{predicate} — 未匹配",
+      "reason": "原因",
+      "history": "{days}/{total} 天历史",
+      "notScanned": "首次扫描进行中 — 未知，扫描完成前尚未覆盖",
+      "guardrails": "学习期间启用护栏：错误率上限 · 新鲜度检查（数据流停止时触发）",
+      "alsoWatchedBy": "同时由以下监控",
+      "searchLabel": "搜索服务",
+      "searchPlaceholder": "搜索服务或数据流",
+      "matchCount": "没有匹配的服务 | 1 个服务匹配 | {count} 个服务匹配",
+      "noMatch": "没有服务或数据流匹配“{query}”",
+      "clearSearch": "清除搜索",
+      "filterLabel": "按覆盖情况筛选服务",
+      "all": "全部",
+      "gaps": "缺口",
+      "cantWatch": "无法监控",
+      "detectorCount": "1 个检测器 | {count} 个检测器",
+      "stream": "数据流",
+      "coverage": "覆盖率",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "已监控 {watched}/{total} 个适用信号",
+      "legendLabel": "图例",
+      "gapChip": "GAP",
+      "daysShort": "{days}/{total}天",
+      "tipAnomaly": "{signal}：异常检测器，学习基线",
+      "tipThreshold": "{signal}：来自库的静态阈值",
+      "tipLearning": "{signal}：学习中，{days}/{total} 天历史",
+      "tipGap": "{signal}：存在缺口，尚无法监控",
+      "tipNa": "{signal}：不适用",
+      "config": "检测器配置",
+      "lastFired": "最近触发",
+      "never": "从未",
+      "hoursAgo": "1 小时前 | {count} 小时前",
+      "daysAgo": "1 天前 | {count} 天前",
+      "fixNoLink": "添加 service.name 标签",
+      "fixStopped": "检查采集器",
+      "fixQueued": "仅模拟：“{action}”（针对 {service}）未发送到任何位置",
+      "viewLabel": "覆盖率视图",
+      "viewMap": "地图",
+      "viewTable": "表格",
+      "fillBy": "填充依据",
+      "fillState": "覆盖率状态",
+      "fillLearning": "学习进度",
+      "fillDetectors": "检测器数量",
+      "fillScanned": "距上次扫描时间",
+      "summaryWatched": "{total} 个中有 {watched} 个已完全监控 · {pct}%",
+      "addedThisWeek": "本周新增 1 个服务 | 本周新增 {count} 个服务",
+      "splitLabel": "{watched} 个已完全监控，{learning} 个学习中，{gaps} 个尚无法监控",
+      "stateWatched": "已完全监控",
+      "stateLearning": "学习中 · {days}/{total} 天",
+      "stateGap": "尚无法监控",
+      "hexName": "{service}，{state}，{stream}，{detectors}",
+      "legendOf": "{fill} 的图例，选择以高亮",
+      "mapLabel": "覆盖率地图，1 个服务按 {fill} 填充 | 覆盖率地图，{count} 个服务按 {fill} 填充",
+      "bucketLearned": "已学习",
+      "bucketDays67": "6–7 天",
+      "bucketDays35": "3–5 天",
+      "bucketDays02": "0–2 天",
+      "bucketNoData": "无数据",
+      "bucketSix": "6 个检测器",
+      "bucketFive": "5 个检测器",
+      "bucketFewer": "1–4 个检测器",
+      "bucketNone": "无",
+      "bucketFresh": "5 分钟内",
+      "bucketRecent": "5–15 分钟",
+      "bucketHour": "15–60 分钟",
+      "bucketStale": "超过 1 小时",
+      "bucketNotScanned": "未扫描",
+      "signals": "信号",
+      "details": "详情",
+      "detailsFor": "显示 {metric} 的详情",
+      "readyCaption": "正常范围将于 {day} 就绪 · {days}/{total} 天",
+      "chartLearning": "{metric}，当前 {value}，学习中，尚无正常范围",
+      "chartOverThreshold": "{metric}，当前 {value}，超过其 {threshold} 阈值",
+      "chartUnderThreshold": "{metric}，当前 {value}，低于其 {threshold} 阈值",
+      "chartAbove": "{metric}，当前 {value}，高于正常范围",
+      "chartBelow": "{metric}，当前 {value}，低于正常范围",
+      "chartWithin": "{metric}，当前 {value}，处于正常范围",
+      "tipNormal": "正常 {low} – {high}",
+      "openTraces": "追踪",
+      "openCatalog": "服务目录",
+      "rangeLabel": "时间范围",
+      "logPatternsValue": "{known} 个已知 · {fresh} 个今日新增",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "未监控",
+      "signalsWatched": "已监控信号",
+      "chipAria": "{signal}：{state}",
+      "deltaUp": "较区间开始上升 {change}",
+      "deltaDown": "较区间开始下降 {change}",
+      "deltaFlat": "自区间开始以来无变化",
+      "badgeLearning": "学习中 {days}/{total} 天",
+      "badgeAnomaly": "异常 · 已学习",
+      "badgeThreshold": "阈值 > {threshold}",
+      "now": "现在",
+      "bandLearning": "正在学习基线 · {total} 天中的第 {days} 天 · 正常范围将于 {day} 就绪",
+      "metric": {
+        "requests": "请求",
+        "errors": "错误",
+        "latencyP95": "延迟 p95",
+        "cpu": "CPU",
+        "pool": "使用中的池",
+        "memory": "内存",
+        "queries": "查询",
+        "queryLatency": "查询延迟 p95",
+        "connections": "使用中的连接",
+        "ops": "操作",
+        "rejections": "被拒绝的连接",
+        "latency": "延迟",
+        "messages": "消息",
+        "failed": "失败（死信）",
+        "lag": "消费者滞后",
+        "depth": "队列深度"
+      }
+    },
+    "activity": {
+      "allLoops": "所有循环",
+      "allStatuses": "所有状态",
+      "ledgerHint": "AutoObserve 提出的或执行的每一项变更都会记录在此。",
+      "userBuilt": "用户创建的告警",
+      "confidence": "置信度：{value}",
+      "evidence": "证据：",
+      "before": "变更前",
+      "after": "变更后",
+      "neverAutoRetire": "停用告警绝不会自动执行。",
+      "neverSilent": "用户创建的告警绝不会被静默修改。",
+      "undo": "撤销",
+      "approve": "批准",
+      "edit": "编辑",
+      "reject": "拒绝",
+      "saveApprove": "保存并批准",
+      "undoneNote": "已由您撤销 — 已恢复之前的状态",
+      "undoneToast": "已撤销。已在演示账本中标记为回滚。",
+      "approvedToast": "已批准。已在演示账本中标记为批准。",
+      "rejectedNote": "由您拒绝",
+      "rejectedToast": "已拒绝。已记录到此操作类别。",
+      "emptyTitle": "无条目",
+      "emptyDescription": "账本中没有符合这些过滤器的内容。",
+      "reviewWindow": "审核中，为期 {window}——检查通过则自动保留，失败则回滚。先前配置会继续静默评估，因此此更改本会隐藏的内容仍会显示。撤销可立即恢复先前状态。",
+      "approvedNote": "您已于 {time} 批准。",
+      "applyingNote": "您已于 {time} 批准；正在应用。",
+      "appliedNote": "您已于 {time} 批准并已应用。",
+      "declinedNote": "由您拒绝。",
+      "needsApproval": "需要您的批准",
+      "awaiting": "等待中",
+      "auto": "自动",
+      "outcomeFilter": "按结果过滤",
+      "loopFilter": "按循环过滤",
+      "columns": {
+        "time": "时间",
+        "loop": "循环",
+        "action": "操作",
+        "target": "目标",
+        "change": "变更",
+        "confidence": "置信度",
+        "decision": "决策",
+        "outcome": "结果",
+        "actions": "操作"
+      },
+      "showDetails": "显示 {target} 上 {action} 的详情",
+      "hideDetails": "隐藏 {target} 上 {action} 的详情",
+      "approveFor": "批准 {target} 上的 {action}",
+      "rejectFor": "拒绝 {target} 上的 {action}",
+      "editFor": "编辑 {target} 上的 {action}",
+      "undoFor": "撤销 {target} 上的 {action}",
+      "openIncident": "打开事件 {id}",
+      "confidenceHint": "{value} — 尚无校准评分",
+      "diff": "建议的变更，删除和新增的行",
+      "daysLeft": "{count} 天剩余 | {count} 天剩余",
+      "reviewProgress": "审核窗口已结束",
+      "entryId": "条目",
+      "logged": "已记录"
+    },
+    "policy": {
+      "gateHint": "在对现有告警的更改中，只有去重可单独应用，并带有先前状态快照和审核窗口：检查通过则保留，失败则回滚。其他所有更改都需一键批准。",
+      "off": "关闭",
+      "suggest": "建议",
+      "auto": "自动",
+      "phase2Title": "操作 — 修复",
+      "phase2Hint": "生产环境修复。每个类别根据其已测量的历史记录获得相应等级，绝不会超出该等级行事。",
+      "investigation": "调查",
+      "outcomesTitle": "结果",
+      "outcomesBody": "AutoObserve 会衡量每个操作的效果：错误率是否恢复、呼叫告警是否停止、是否被撤销。表现持续良好的类别会一次一个地获得更多自主权；一次失误会对其不利，而反复需要人工修复的问题会被报告为缺陷，而不是自动化处理。",
+      "outcomesExample": "ScaleQueueWorkers 在 7 次已批准的扩容成功后转为自动。其唯一一次失误发生在 10 月 2 日，因此增加了一项预检查，而第二次失误会将其退回建议。AbortRollout 等待您的确认；RollbackDeploy 在有历史记录之前保持关闭。",
+      "triage": {
+        "parallel": "并行",
+        "gate": "门控",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "立即呼叫值班并同步调查；原因会在同一线程中跟进。P1 不允许使用门控。",
+        "gateDesc": "将告警暂缓到调查完成，最长 2 分钟。失败时放行：如果分诊超时或失败，仍会发出告警，并说明调查仍在进行或已失败，原因会在同一线程中跟进。"
+      },
+      "classes": {
+        "EnableDeduplication": "为在几分钟内重复出现的告警开启去重。",
+        "CreateDetector": "针对服务的请求、错误或延迟创建异常检测器。",
+        "RaiseThreshold": "提高在健康日也会触发的阈值。",
+        "LengthenEvaluationWindow": "延长反复抖动告警的评估窗口。",
+        "FixAlertQuery": "修正衡量对象错误或永远无法匹配的告警查询。",
+        "AttachDestination": "为触发后无处送达的检测器附加目标。",
+        "AddLibraryAlert": "在谓词匹配时，从库中添加定时告警。",
+        "MoveToIncidentDelivery": "通过事件投递用户构建的告警，而不是走其自身的路由。",
+        "ReviewForDeletion": "建议停用无人处理的告警。",
+        "RollbackDeploy": "回滚导致问题的部署。",
+        "ScaleService": "对已饱和的服务进行横向扩容。",
+        "RestartPod": "重启已停止提供服务但副本仍健康的 Pod；若再次发生，则改为创建缺陷。",
+        "ToggleFeatureFlag": "关闭问题背后的功能开关。",
+        "RunRunbookStep": "运行服务运行手册中的步骤。",
+        "LowerThreshold": "降低触发太晚、未能在事件前预警的阈值。",
+        "RevertConfigChange": "当未应用该变更的副本健康时，还原最近导致问题发生的设置变更。",
+        "EvictLeakedConnections": "关闭服务借出后从未归还的连接（由泄漏检测发现），不处理正在进行的查询。每个连接都会关联到该泄漏对应的缺陷。",
+        "AbortRollout": "当只有新版本的 Pod 在发布中途失败时，将流量切回上一版本。可一键恢复。",
+        "ScaleQueueWorkers": "为积压的队列增加工作进程，直至上限；如果消费速率没有改善，则自动缩减。"
+      },
+      "triageHint": "按严重级别进行 L0 分诊。第 1 阶段固定。",
+      "channels": "渠道",
+      "channelInbox": "产品内收件箱",
+      "channelEmailAdmins": "向组织管理员发送电子邮件",
+      "channelDefault": "每个组织的默认渠道。始终开启。",
+      "alwaysOn": "始终开启",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "已连接。可选；没有它，收件箱和电子邮件也能正常工作。",
+      "connected": "已连接",
+      "defaultsNote": "第 1 阶段提供固定的产品默认值。按组织覆盖的设置后续提供。",
+      "groupCoverage": "覆盖范围 — 自动创建检测器",
+      "groupCoverageHint": "每个新服务一经出现，就会获得异常检测器和匹配的库告警，并在学习期间进行基本安全检查。每次创建都会被记录、可撤销，并经过审核窗口。",
+      "groupCalibration": "校准 — 对现有告警的变更",
+      "channelEmail": "电子邮件 {address}",
+      "paging": "呼叫",
+      "pagingHint": "严重级别决定问题以何种方式通知人员。",
+      "routing": {
+        "p1p2": "P1 和 P2",
+        "p1p2Desc": "影响客户。全天候呼叫值班人员。",
+        "page": "呼叫",
+        "p3": "P3",
+        "p3Desc": "准备就绪后立即发送 Slack 消息。绝不呼叫任何人。",
+        "message": "消息",
+        "p4": "P4",
+        "p4Desc": "会纳入周五摘要。",
+        "summary": "周五摘要"
+      },
+      "nav": {
+        "coverage": "覆盖范围",
+        "alerts": "告警变更",
+        "fixes": "修复",
+        "investigation": "调查与寻呼",
+        "channels": "渠道"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} 个已连接"
+      }
+    },
+    "notInDemo": "此演示中不可用",
+    "confidence": {
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "uncalibrated": "尚无校准评分"
+    },
+    "analysis": {
+      "verdict": "结论",
+      "unconfirmed": "尚未确认",
+      "lasted": "持续 {count} 分钟",
+      "soFar": "目前 {count} 分钟",
+      "checked": "我检查的内容",
+      "verdicts": {
+        "confirmed": "已确认",
+        "ruled_out": "已排除",
+        "open": "仍未解决"
+      },
+      "comparison": "健康与受影响",
+      "kinds": {
+        "affected": "受影响",
+        "healthy": "健康",
+        "limit": "限制"
+      },
+      "trail": "证据链",
+      "seeInUnfold": "在“事件经过”中查看",
+      "nextStep": "下一步",
+      "fullReport": "完整报表",
+      "fullReportHint": "将上述全部内容整理为一份文档，可随时复制或下载"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "演示",
+    "scenarioLabel": "演示场景",
+    "scenarios": {
+      "demo": "演示周",
+      "allClear": "一切正常",
+      "incident": "活跃事件",
+      "cantSee": "无法查看",
+      "noBaseline": "无基线"
+    },
+    "nav": {
+      "history": "历史",
+      "settings": "设置",
+      "howItWorks": "工作原理",
+      "searchLabel": "搜索问题",
+      "searchPlaceholder": "搜索问题"
+    },
+    "recent": {
+      "ranges": {
+        "day": "最近 24 小时",
+        "week": "最近 7 天",
+        "month": "最近 30 天"
+      },
+      "within": {
+        "day": "在过去 24 小时内",
+        "week": "在过去 7 天内",
+        "month": "在过去 30 天内"
+      },
+      "groups": {
+        "thisWeek": "本周",
+        "lastWeek": "上周",
+        "weeksAgo": "{count} 周前"
+      },
+      "all": "全部",
+      "none": "没有{priority}问题，{within}。",
+      "allIssues": "所有问题",
+      "priorityLabel": "优先级",
+      "showing": "{count} 个问题已显示 | {count} 个问题已显示"
+    },
+    "noProblems": "{within}没有问题。我全天候检查了 {count} 个服务。 | {within}没有问题。我全天候检查了 {count} 个服务。",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "再显示 {count} 个",
+    "showFewer": "显示更少",
+    "days": {
+      "today": "今天",
+      "monday": "星期一",
+      "tuesday": "星期二",
+      "wednesday": "星期三",
+      "thursday": "星期四",
+      "friday": "星期五",
+      "jul18": "7月18日",
+      "jul30": "7月30日",
+      "aug13": "8月13日",
+      "aug26": "8月26日",
+      "sep4": "9月4日",
+      "sep12": "9月12日",
+      "sep24": "9月24日",
+      "sep30": "9月30日",
+      "oct1": "10月1日",
+      "oct2": "10月2日",
+      "sep23": "9月23日"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db 将在大约 3 天后磁盘空间耗尽",
+        "summary": "自周四的 orders 版本启用审计日志以来，其磁盘每天增加约 18 GB，因此它将在周三上午左右填满。当它填满时，checkout、orders 和 refunds 将开始失败。目前还没有出问题，所以我向你的团队发送了提醒，而不是呼叫。",
+        "notify1": "orders-db 将在大约 3 天后磁盘空间耗尽，大约在周三 11:00。",
+        "notify2": "原因：自周四 orders 3.8.0 发布以来，审计日志每天写入约 18 GB。在此之前，磁盘每天增长约 6 GB。",
+        "notify3": "在周三之前降低审计日志级别或增加磁盘空间。当它填满时，checkout、orders 和 refunds 将失败。目前还没有出问题，所以这是提醒，不是呼叫。",
+        "chartCaption": "磁盘 · 已满 ~周三 11:00",
+        "chartLabel": "磁盘使用量在 14 天内从 334 GB 增长到 445 GB（共 500 GB），自周四起增长加快，预计将在周三 11:00 左右满。"
+      },
+      "search": {
+        "title": "搜索缓慢，search-2 不断崩溃",
+        "titleFixed": "搜索曾缓慢，而 search-2 不断崩溃",
+        "summary": "自 10:27 起，大约五分之一次的搜索耗时超过 3 秒。search-2 上在 10:16 更改了一项设置，导致其内存耗尽。我已呼叫值班人员，问题仍在发生。",
+        "notify1": "搜索缓慢：自 10:27 起，大约五分之一次的搜索耗时超过 3 秒。",
+        "notify2": "原因：search-2 上在 10:16 更改的一项设置使其内存填满。自 10:20 起它已崩溃约 10 次。其他 4 个节点没有此更改，运行正常。",
+        "notify3": "恢复旧设置应该可以修复它，我可以撤销。回复 \"revert\"，我就执行。做出更改的人应该检查原因。",
+        "summaryFixed": "问题始于 10:27，因为 search-2 上更改的一项设置填满了其内存。你批准恢复旧设置，所以我执行了，搜索已恢复正常。",
+        "summaryFixing": "问题始于 10:27，因为 search-2 上更改的一项设置填满了其内存。你批准恢复旧设置，所以我正在执行。",
+        "chartCaption": "p95 延迟 · 峰值 3.4 秒",
+        "chartLabel": "p95 延迟在 10:27 从 0.38 秒升至 3.4 秒，且仍然很高",
+        "chartLabelFixed": "p95 延迟在 10:27 从 0.38 秒升至 3.4 秒，在设置恢复后回落至正常"
+      },
+      "checkout": {
+        "title": "部署后每 12 笔支付中有 1 笔失败",
+        "summary": "payments-api 2.3.1 向支付数据库请求了超出其允许的连接数。在故障开始 18 分钟后，回滚修复了问题。",
+        "notify1": "自 14:02 起，结账大约每 12 笔支付中有 1 笔失败。",
+        "notify2": "可能的原因：payments-api 2.3.1 在 14:01 发布，将其每台服务器的连接池从 20 提高到 50。6 台服务器 × 50 超过了支付数据库允许的 200。",
+        "notify3": "回滚到 2.3.0 是最快的修复方法。",
+        "chartCaption": "支付失败 · 峰值十二分之一",
+        "chartLabel": "支付失败率在 14:02 从 0.1% 跃升至 1/12，回滚后 18 分钟恢复正常"
+      },
+      "pool": {
+        "title": "结账服务用尽了数据库连接",
+        "summary": "泄漏的连接占用了所有空闲连接，支付开始超时。您批准了清理这些连接，我便执行了。支付在 2 分钟后恢复。",
+        "notify1": "结账服务已用尽数据库连接，自 11:18 起约 1/9 的支付超时。",
+        "notify2": "原因：50 个连接中有 48 个被从未归还连接的退款导出占用。这是 CHK-482 泄漏，两周内第三次。",
+        "notify3": "只关闭泄漏的连接应该就能解决；进行中的支付不受影响。回复“yes”，我就执行。",
+        "chartCaption": "超时 · 峰值 1/9",
+        "chartLabel": "支付超时在 11:18 升至约 1/9，并在 11:21 修复后 2 分钟恢复"
+      },
+      "email": {
+        "title": "订单邮件最多延迟 9 分钟",
+        "summary": "所有邮件工作进程在夜间被一次性替换，队列在约 20 分钟内自行追平。这属于轻微问题，因此纳入了周五的汇总。",
+        "chartCaption": "邮件延迟 · 峰值 9 分钟",
+        "chartLabel": "邮件延迟自 03:15 起升至 9 分钟，并在 03:36 自行恢复"
+      },
+      "recs": {
+        "title": "推荐服务变慢了 15 分钟",
+        "summary": "响应时间从四分之一秒升至接近一秒。夜间缓存重建在下午被手动启动，并自行完成。我将其留到周五的汇总中。",
+        "chartCaption": "p95 延迟 · 峰值 0.94 秒",
+        "chartLabel": "p95 延迟在 16:40 从 0.26 秒升至 0.94 秒，并在 15 分钟后自行恢复"
+      },
+      "login": {
+        "title": "登录缓慢持续约 25 分钟",
+        "summary": "每 8 人中有 1 人等待超过 5 秒。会话缓存在流量激增后空间耗尽，导致部分用户被登出。您的团队增加了空间，随后恢复。",
+        "notify1": "登录缓慢：自 10:12 起，约每 8 人中有 1 人等待超过 5 秒。",
+        "notify2": "原因：10:05 流量翻倍后，会话缓存已满。",
+        "notify3": "为缓存增加空间应该可以解决。",
+        "chartCaption": "p95 登录 · 峰值 5.8 秒",
+        "chartLabel": "p95 登录时间在 10:12 从 0.6 秒升至 5.8 秒，并在 10:31 增加缓存空间后恢复"
+      },
+      "queue": {
+        "title": "订单在队列中积压",
+        "summary": "最严重时约有 4,000 个订单在等待。我按您的授权增加了工作进程，但没有帮助，因此我将它们回退并呼叫了值班人员。真正的原因是一次迁移遗留的数据库索引损坏；您的团队在开始后 40 分钟修复了它。",
+        "notify1": "订单正在积压：自 21:30 起约有 4,000 个在等待。",
+        "notify2": "我在 21:33 按您的授权增加了工作进程，但没有帮助，因此我已将它们回退。",
+        "notify3": "自 21:20 数据库迁移以来，订单查询慢了约 40 倍。请先检查 orders_by_status 索引。",
+        "chartCaption": "积压 · 峰值 4,120",
+        "chartLabel": "等待中的订单自 21:30 起攀升至 4,120，在增加工作进程后仍继续上升，并在 21:52 索引重建后清空"
+      },
+      "uploads": {
+        "title": "每 40 人中有 1 人图片上传失败",
+        "summary": "持续了 10 分钟，原因是某台服务器在加载替换证书之前旧证书已过期。它自行解决，因此我将其留到周五的汇总中。",
+        "chartCaption": "上传失败 · 峰值 1/40",
+        "chartLabel": "上传失败在 07:05 升至约 1/40，并在 10 分钟后自行恢复"
+      },
+      "push": {
+        "title": "推送通知延迟 2 分钟送达",
+        "summary": "持续了半小时，期间负责投递的提供商响应缓慢。属于轻微问题，因此留到周五的汇总中。",
+        "chartCaption": "投递延迟 · 峰值 2 分钟",
+        "chartLabel": "投递延迟在 13:50 从 4 秒升至约 2 分钟，并在 30 分钟后自行恢复"
+      },
+      "checkoutNow": {
+        "title": "结账服务每 6 笔支付中有 1 笔失败",
+        "titleFixed": "结账服务曾出现 1/6 的支付失败",
+        "summary": "问题始于 10:43，我仍在排查原因。目前看来与 10:41 发布的 2.4.0 版本吻合，我已呼叫值班人员。",
+        "notify1": "自 10:43 起，结账服务约每 6 笔支付中有 1 笔失败。",
+        "notify2": "我仍在排查原因。目前看来与 10:41 发布的结账服务 2.4.0 版本吻合。",
+        "notify3": "只有运行 2.4.0 的服务器在失败。回复“stop”，我就会将流量切回旧版本；旧服务器有足够的容量承接。我无法直接查看 payments-db，因此尚未排除它的可能。",
+        "summaryFixing": "问题始于 10:43，就在 2.4.0 版本发布之后。您批准了停止发布，因此我现在正将流量切回旧版本。",
+        "summaryFixed": "问题始于 10:43，在 2.4.0 版本发布之后。您批准了停止发布，流量切回旧版本后失败便停止了。2.4.0 为何失败仍需您的团队查明。",
+        "chartCaption": "支付失败 · 峰值 1/6",
+        "chartLabel": "支付失败率在 10:43 从 0.1% 跃升至约 1/6，目前仍在失败",
+        "chartLabelFixed": "支付失败率在 10:43 从 0.1% 跃升至约 1/6，并在停止发布后回落至正常水平"
+      },
+      "gateway": {
+        "title": "API 每 30 个请求中拒绝了 1 个",
+        "summary": "它始于一次配置变更。你们团队将其回滚，问题在开始 13 分钟后恢复正常。",
+        "notify1": "自 15:22 起，API 大约每 30 个请求就有 1 个被拒绝。",
+        "notify2": "可能原因：15:20 的一次配置变更缩短了登录令牌的有效期。",
+        "notify3": "回滚该变更应可修复此问题。",
+        "chartCaption": "被拒绝 · 峰值 1/30",
+        "chartLabel": "被拒绝的请求在 15:22 升至每 30 个请求中 1 个，并在 15:34 回滚配置变更后恢复正常"
+      },
+      "poolSep": {
+        "title": "Checkout 的数据库连接耗尽",
+        "summary": "泄漏的连接占用了全部空闲连接，支付开始超时。我将泄漏追踪到退款导出，你批准了清除泄漏的连接。支付在 2 分钟后恢复。",
+        "notify1": "Checkout 的数据库连接已耗尽，自 15:42 起，约每 9 笔支付就有 1 笔超时。",
+        "notify2": "原因：50 个连接中有 47 个被从未归还连接的退款导出占用。这看起来是退款导出代码中的泄漏。",
+        "notify3": "仅关闭泄漏的连接即可解决；进行中的支付不会受到影响。回复 \"yes\"，我就执行。",
+        "chartCaption": "超时 · 峰值 1/9",
+        "chartLabel": "支付超时在 15:42 升至约每 9 笔中 1 笔，并在 15:45 修复后 2 分钟恢复"
+      },
+      "poolOct": {
+        "title": "Checkout 再次耗尽数据库连接",
+        "summary": "还是同一个退款导出泄漏（CHK-482）。你批准了清除泄漏的连接，支付在 2 分钟后恢复。",
+        "notify1": "Checkout 的数据库连接已耗尽，自 10:05 起，约每 9 笔支付就有 1 笔超时。",
+        "notify2": "原因：50 个连接中有 46 个被退款导出占用。又是 CHK-482 泄漏，8 天内的第二次。",
+        "notify3": "仅关闭泄漏的连接即可解决；进行中的支付不会受到影响。回复 \"yes\"，我就执行。",
+        "chartCaption": "超时 · 峰值 1/9",
+        "chartLabel": "支付超时在 10:05 升至约每 9 笔中 1 笔，并在 10:08 修复后 2 分钟恢复"
+      },
+      "lagSep": {
+        "title": "新产品最多需要 40 分钟才出现在搜索中",
+        "summary": "在 1.12.0 版本缩短了每批允许的处理时长后，search-indexer 在目录更新上出现滞后。你们团队将其回滚，问题在开始 40 分钟后追平。",
+        "notify1": "新增和变更的产品未出现在搜索中：自 14:06 起，search-indexer 落后约 48,000 条目录更新。",
+        "notify2": "原因：search-indexer 1.12.0 于 13:58 发布，将 Kafka 轮询间隔缩短至 30 秒。大批次需要约 45 秒，因此消费者不断被移出其消费组。",
+        "notify3": "回滚到 1.11.4 应能让它追平。搜索本身仍可用，只是显示较旧的产品。",
+        "chartCaption": "消费者滞后 · 峰值 48,000",
+        "chartLabel": "消费者滞后从约 200 条消息在 14:06 升至 48,000 条，并在 14:39 回滚后清空"
+      },
+      "poolAug": {
+        "title": "Checkout 在退款导出期间耗尽数据库连接",
+        "summary": "夜间退款导出占用了 Checkout 几乎所有的数据库连接，约每 12 笔支付就有 1 笔超时。导出完成后问题即消除，距开始 13 分钟。",
+        "notify1": "Checkout 的数据库连接已耗尽，自 02:04 起，约每 12 笔支付就有 1 笔超时。",
+        "notify2": "原因：50 个连接中有 44 个被夜间退款导出占用，该导出在月末促销后约为平时的 3 倍规模。",
+        "notify3": "导出完成后问题应会消除。如果没有，停止导出将释放这些连接。",
+        "chartCaption": "超时 · 峰值 1/12",
+        "chartLabel": "支付超时在 02:04 升至约每 12 笔中 1 笔，并在 02:17 导出完成时自行恢复"
+      },
+      "throttleAug": {
+        "title": "欺诈检查变慢持续 35 分钟",
+        "summary": "一个批处理任务落在相同的服务器上并占用了其空闲 CPU，因此欺诈检查耗时最高达 1.4 秒。Checkout 仍能运行，只是变慢，并在任务完成后恢复，所以我将它留到周五的汇总中。",
+        "chartCaption": "p95 欺诈检查 · 峰值 1.4 秒",
+        "chartLabel": "p95 欺诈检查耗时在 11:20 从 0.18 秒升至 1.4 秒，并在 11:55 批处理任务完成时自行恢复"
+      },
+      "tlsJul": {
+        "title": "发票停止发送持续 43 分钟",
+        "summary": "invoice-service 用于 billing-api 的证书已过期，因此所有发票都发送失败。你们团队续期了证书，排队的发票全部发出。",
+        "notify1": "没有发票发出：自 09:01 起，来自 invoice-service 的每次发送都失败。",
+        "notify2": "原因：invoice-service 用于 billing-api 的客户端证书于 09:00 过期，billing-api 拒绝了来自它的所有连接。",
+        "notify3": "续期证书应可修复此问题。发票正在排队，并未丢失。",
+        "chartCaption": "失败的发送 · 全部",
+        "chartLabel": "发票发送失败率在 09:01 从 0.2% 跃升至 100%，并在 09:41 续期证书后恢复正常"
+      },
+      "dnsJul": {
+        "title": "每 4 个人中就有 1 个人的购物车价格缺失",
+        "summary": "一次 DNS 变更导致集群中一半的 DNS 服务器不再应答内部名称，因此 cart 无法访问 currency。你们团队在开始 31 分钟后将其回滚。",
+        "notify1": "自 16:22 起，约每 4 次购物车加载就有 1 次不显示价格。",
+        "notify2": "原因：16:20 的一次 DNS 配置变更从集群 4 台 DNS 服务器中的 2 台上移除了内部区域，因此 cart 在这些查询中找不到 currency.internal。",
+        "notify3": "回滚该 DNS 变更应可修复此问题。结账时订单仍可完成。",
+        "chartCaption": "缺少价格 · 峰值时 4 次中有 1 次",
+        "chartLabel": "缺少价格的购物车加载从 0.1% 上升到 16:22 时的约 1/4，并在 16:51 撤销 DNS 变更后回落至正常水平"
+      }
+    },
+    "drawer": {
+      "worked": "有帮助",
+      "didntHelp": "没帮助",
+      "now": "现在"
+    },
+    "needs": {
+      "more": "更多",
+      "less": "更少",
+      "canUndo": "你可以撤销",
+      "undo": "撤销",
+      "undone": "已撤销。这条再次等待你的回复。",
+      "shiftTo": "到",
+      "retune": {
+        "body": "{host} 上的“{alert}”告警本月触发了 {fired} 次，但没有人需要处理。磁盘在夜间清理期间会升至约 85%，到早上又回到接近 70%。即使在最繁忙的一天，从 90% 开始也需要 3 天以上才会写满。我想把它提高到 {to}%。如果磁盘有可能在一天内写满，我仍会提醒你。",
+        "yes": "是的，修改它",
+        "no": "保持不变",
+        "doneYes": "已完成。我已将其提高到 {to}%。写满警告保持开启。",
+        "doneNo": "好的，我将其保持在 {from}%。",
+        "headline": "将 ingest-3 上的“磁盘 80%”告警提高到 90%？",
+        "why": "它本月触发了 41 次，但没有人需要处理。",
+        "cost": "写满警告保持开启"
+      },
+      "fixNow": {
+        "search": {
+          "body": "搜索变慢是因为 search-2 节点在 10:16 变更的设置占满了它的内存，导致它不断崩溃。其他 4 个节点仍使用旧设置，运行正常。我可以把它改回去吗？此操作可以撤销。",
+          "yes": "改回去",
+          "no": "我来处理",
+          "doneYes": "已完成。正在改回去。",
+          "doneNo": "好的，交给你了。我会继续观察。",
+          "doneSettled": "已完成。search-2 已恢复，搜索正常。",
+          "headline": "将 search-2 的缓存设置改回 10%？",
+          "why": "10:16 的一次变更占满了它的内存，导致它不断崩溃。",
+          "cost": "重启 search-2 一次"
+        },
+        "checkoutNow": {
+          "body": "结账流程中约有 1/6 的支付失败，且只有运行 2.4.0 的服务器在失败。旧版本的 6 台服务器有足够的容量承载全部流量。我可以停止发布并将流量切回它们吗？2.4.0 会保持部署，供你的团队查看。",
+          "yes": "停止发布",
+          "no": "我来处理",
+          "doneYes": "已完成。正在停止发布。",
+          "doneNo": "好的，交给你了。我会继续观察。",
+          "doneSettled": "已完成。支付已恢复正常。",
+          "headline": "停止结账服务的 2.4.0 发布？",
+          "why": "约 1/6 的支付失败，全部发生在 2.4.0 上。旧版本可以承载全部流量。",
+          "cost": "2.4.0 保持部署"
+        }
+      },
+      "fromNowOn": {
+        "body": "到现在已经有 {done} 次，新版本在发布过程中只让自身的服务器失败。每次我请求将流量切回旧版本，故障都在 2 分钟内停止。从今往后，我可以在发布期间自行这样做吗？我会保留新版本供你的团队查看，并立即通知他们。",
+        "yes": "是的，可自行操作",
+        "no": "继续先问我",
+        "doneYes": "已完成。我会自行停止有问题的发布，并在每次操作后告知你。",
+        "doneNo": "好的，我会继续先征求你的意见。",
+        "headline": "从今往后自行停止有问题的发布？",
+        "why": "6 次你说“可以”之后，故障都在 2 分钟内停止。",
+        "cost": "仅在发布期间"
+      },
+      "labels": {
+        "fixNow": "立即修复",
+        "fromNowOn": "让我来处理",
+        "retune": "降低告警噪音"
+      },
+      "needsOk": "需要你确认"
+    },
+    "footer": {
+      "text": "我也会自查：如果我停止工作，你会收到通知。",
+      "seeAll": "查看我关注的所有内容",
+      "seeChanges": "查看我更改的所有内容"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1 分钟前 | {count} 分钟前",
+        "stale": "1 分钟没有新数据（自 {since} 起） | {count} 分钟没有新数据（自 {since} 起）"
+      },
+      "summaryWatching": "我正在关注您的 {total} 项服务中的 {watched} 项。",
+      "summaryAll": "我正在关注您的全部 {total} 项服务。",
+      "summaryWithClauses": "{head} {clauses}。",
+      "clauseLearning": "{count} 项仍在学习 | {count} 项仍在学习",
+      "clauseUnseen": "有 1 个我看不到 | 有 {count} 个我看不到",
+      "legend": {
+        "watching": "完全关注",
+        "learning": "学习中",
+        "unseen": "看不到"
+      },
+      "legendAria": "{label}：{count}",
+      "summaryAllLearning": "我正在关注您的全部 {total} 项服务，并且仍在学习每项服务的正常状态是什么样的。"
+    },
+    "coveragePage": {
+      "title": "我关注的所有内容",
+      "back": "返回"
+    },
+    "issuesPage": {
+      "title": "所有问题",
+      "sentence": "我在{within}开启的每个问题。选择一个，查看发生了什么以及我做了哪些处理。",
+      "back": "返回",
+      "ranges": {
+        "week": "最近 7 天",
+        "month": "最近 30 天",
+        "quarter": "最近 90 天"
+      },
+      "within": {
+        "week": "在过去 7 天内",
+        "month": "在过去 30 天内",
+        "quarter": "在过去 90 天内"
+      }
+    },
+    "activityPage": {
+      "title": "我更改的内容",
+      "stats": {
+        "window": "最近 7 天",
+        "made": "更改 | 更改",
+        "worked": "已生效",
+        "review": "审核中",
+        "undone": "已撤销"
+      },
+      "filters": {
+        "all": "全部",
+        "fixes": "修复",
+        "watching": "关注中",
+        "tuning": "告警调优"
+      },
+      "status": {
+        "applying": "正在应用",
+        "worked": "已生效",
+        "done": "完成",
+        "review": "审核中",
+        "reviewDays": "审核中 · 剩余 {count} 天 | 审核中 · 剩余 {count} 天",
+        "didntHelp": "没起作用",
+        "undone": "已撤销"
+      },
+      "actions": {
+        "undo": "撤销",
+        "showDetails": "显示详情",
+        "hideDetails": "隐藏详情"
+      },
+      "details": {
+        "name": "更改",
+        "target": "作用于",
+        "confidence": "置信度",
+        "saw": "我观察到的情况",
+        "recurring": "同一个泄漏问题（{bug}）反复需要此修复，因此在它被修复之前，我会每次都先征询您的意见。",
+        "undoDecided": "撤销会将其恢复，我会再次询问你。"
+      },
+      "toast": {
+        "undone": "已撤销。已恢复原样。",
+        "undoDecided": "已撤销。我会再次询问你。"
+      },
+      "empty": {
+        "filter": "这里目前没有任何内容。",
+        "scenario": "我还没有做任何更改。当我做出更改时，你会在这里看到。"
+      },
+      "entries": {
+        "L-313": {
+          "done": "已停止 checkout 的 2.4.0 发布",
+          "why": "只有运行 2.4.0 的 6 台服务器在故障；旧版本的 6 台可以承担全部流量。",
+          "from": "12 个 Pod 中的 6 个",
+          "to": "无流量",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "将 search-2 的缓存设置改回 10%",
+          "why": "它在 10:16 升到了 60%，此后 search-2 一直内存不足。",
+          "from": "60%",
+          "to": "10%",
+          "on": "缓存大小 · search-2"
+        },
+        "L-309": {
+          "done": "将 ingest-3 上的“磁盘 80%”告警阈值提高到 90%",
+          "why": "本月它触发了 41 次，无人需要处理。填充警告保持开启。",
+          "from": "80%",
+          "to": "90%",
+          "on": "磁盘告警 · ingest-3"
+        },
+        "L-310": {
+          "done": "开始监控退货、换货和礼品卡",
+          "why": "今天早上发现了它们。将在 7 天内学习它们的正常状态。",
+          "from": "未监控",
+          "to": "监控中",
+          "on": "3 个服务"
+        },
+        "L-314": {
+          "done": "开始监控我今天早上发现的 6 个服务",
+          "why": "它们今天出现在你的追踪中。将在 7 天内学习它们的正常状态。",
+          "from": "未监控",
+          "to": "监控中",
+          "on": "6 个服务"
+        },
+        "L-311": {
+          "done": "获得你的许可，可自行停止不良发布",
+          "why": "在 60 天内，我经你批准停止了 6 次；每次错误都在 2 分钟内恢复正常。",
+          "from": "先询问",
+          "to": "自行处理",
+          "on": "停止发布"
+        },
+        "L-304": {
+          "done": "清理了 checkout 的 48 个泄漏的数据库连接",
+          "why": "支付出现超时。2 分钟后恢复正常。",
+          "from": "50 个中 50 个在使用",
+          "to": "2 个在使用",
+          "on": "checkout 连接池"
+        },
+        "L-299": {
+          "done": "清理了 checkout 的 46 个泄漏的数据库连接",
+          "why": "与 9 月 23 日相同的泄漏。2 分钟后支付恢复正常。",
+          "from": "50 个中 50 个在使用",
+          "to": "4 个在使用",
+          "on": "checkout 连接池"
+        },
+        "L-296": {
+          "done": "清理了 checkout 的 47 个泄漏的数据库连接",
+          "why": "这是一次新的泄漏，因此我随后以 CHK-482 提交给了 checkout 团队。",
+          "from": "50 个中 50 个在使用",
+          "to": "3 个在使用",
+          "on": "checkout 连接池"
+        },
+        "L-301": {
+          "done": "开始监控 billing-api、billing-worker 和 invoice-service",
+          "why": "在您的追踪中发现了它们。仍在学习它们的正常状态。",
+          "from": "未监控",
+          "to": "已监控",
+          "on": "3 个服务"
+        },
+        "L-307": {
+          "done": "修复了 payments-api 连接告警，使其统计所有服务器",
+          "why": "它单独检查每台服务器，因此在周二的故障期间从未触发。",
+          "from": "每个 pod 超过 95%",
+          "to": "所有 pod 超过 85%",
+          "on": "连接告警"
+        },
+        "L-302": {
+          "done": "将 3 个 checkout 延迟告警合并为一个",
+          "why": "它们有 94% 的时间同时触发，因此一次变慢就向您呼叫了 3 次。",
+          "from": "3 个告警",
+          "to": "1",
+          "on": "checkout 延迟"
+        },
+        "L-303": {
+          "done": "将 ingest-1 上的“磁盘 80%”告警提升到 90%",
+          "why": "它在 30 天内触发了 29 次，且无人需要处理。容量填充警告保持开启。",
+          "from": "80%",
+          "to": "90%",
+          "on": "磁盘告警 · ingest-1"
+        },
+        "L-305": {
+          "done": "新增 4 个 orders-consumer worker 以清理积压",
+          "why": "没有帮助，因此我缩减回 4 个，并在 3 分钟后呼叫了值班人员。",
+          "from": "4 个 worker",
+          "to": "8 个 worker",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "获得您的许可，可自行新增队列 worker",
+          "why": "您在流量高峰期间批准了 7 次，且每次积压都得以清理。",
+          "from": "先询问",
+          "to": "自行处理",
+          "on": "新增队列 worker"
+        },
+        "L-312": {
+          "done": "开始监控在您连接时发现的 18 个服务",
+          "why": "正在学习每个服务的正常状态。准备就绪后，它们的告警将开始。",
+          "from": "未监控",
+          "to": "已监控",
+          "on": "18 个服务"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "历史记录",
+      "seeChange": "查看变更",
+      "filters": {
+        "all": "全部",
+        "problems": "问题",
+        "changes": "变更",
+        "fixes": "修复",
+        "decisions": "您的决策"
+      },
+      "empty": "这里还没有内容。",
+      "entries": {
+        "checkoutNowPaged": "我就 checkout 支付失败呼叫了值班人员。",
+        "searchPaged": "我就搜索缓慢呼叫了值班人员。",
+        "searchAsked": "我询问是否可以恢复 search-2 的缓存设置。",
+        "euStopped": "自该时间起，{cluster} 集群没有任何数据到达。我在这里和 Slack 中都已告知您。",
+        "fridaySummary": "我发送了周五的总结，其中包含 {count} 个次要问题。 | 我发送了周五的总结，其中包含 {count} 个次要问题。",
+        "emailHeld": "我将订单邮件的一个次要问题保留到周五的总结中。",
+        "poolFixed": "我关闭了 checkout 泄漏的数据库连接。支付在 2 分钟后恢复。",
+        "poolApproved": "您批准关闭 checkout 泄漏的数据库连接。",
+        "billingWatch": "我开始监控 billing-api、billing-worker 和 invoice-service。",
+        "checkoutPaged": "我就 checkout 支付失败问题呼叫了值班。",
+        "recsHeld": "我把 recommendations 的一个小问题留到了周五的摘要。",
+        "diskApproved": "您批准将 ingest-1 上的磁盘告警阈值提高到 {to}%。",
+        "latencyGrouped": "我把 checkout 的三个变慢告警合并为一个，这样单个变慢只会呼叫一次。",
+        "queueFixed": "我为 orders 增加了队列 worker，但队列仍在增长，所以我把它们改了回来，并呼叫了值班。",
+        "loginPaged": "我就登录变慢问题呼叫了值班。",
+        "queuePermission": "您允许我自行增加队列 worker，最多 8 个。",
+        "gatewayPaged": "我就 API 拒绝请求问题呼叫了值班。",
+        "found18": "我发现了 {count} 个服务，并开始了解它们的正常状态是什么样的。",
+        "connected": "您将我接入了您的数据。",
+        "thresholdApproved": "您批准将 payments-api 连接告警改为对照数据库 200 的上限统计所有服务器。",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "您批准将 search-2 的设置改回。",
+              "no": "您说 search-2 由您自己处理。",
+              "undoYes": "您撤销了将 search-2 设置改回的操作。我重新应用了 60%，因此 search-2 将再次出现内存不足；我已通知值班。",
+              "cancel": "在我应用之前，您取消了将 search-2 设置改回的操作。search-2 仍处于内存不足状态；我已通知值班。",
+              "undoNo": "您收回了由您自己处理 search-2 的说法。"
+            },
+            "checkoutNow": {
+              "yes": "您批准停止 checkout 2.4.0 的发布。",
+              "no": "您说 checkout 的发布由您自己处理。",
+              "undoYes": "您撤销了停止 2.4.0 发布的操作。流量再次流向 2.4.0，因此支付可能再次失败；我已通知值班，并正在持续观察。",
+              "cancel": "在我执行之前，您取消了停止 2.4.0 发布的操作。支付仍在失败；我已通知值班。",
+              "undoNo": "您收回了由您自己处理 checkout 发布的说法。"
+            }
+          },
+          "retune": {
+            "yes": "您批准将 ingest-3 上的磁盘告警阈值提高到 90%。",
+            "no": "您表示现在暂不提高 ingest-3 上的磁盘告警阈值。",
+            "undoYes": "您撤销了提高 ingest-3 磁盘告警阈值的操作。它又回到 80%，因此在运行正常的夜晚也会再次告警。",
+            "undoNo": "您收回了对 ingest-3 磁盘告警暂不调整的决定。"
+          },
+          "fromNowOn": {
+            "yes": "您批准让我自行停止有问题的发布。",
+            "no": "您表示现在还不让我自行停止有问题的发布。",
+            "undoYes": "您收回了让我自行停止有问题的发布的授权。",
+            "undoNo": "您收回了关于暂不让我自行停止有问题发布的决定。"
+          }
+        },
+        "fixedNow": {
+          "search": "我改回了 search-2 的设置。搜索已恢复正常。",
+          "checkoutNow": "我将流量切回旧版本，故障随之停止。2.4.0 为何失败仍需您的团队排查；我为此保留了它的部署。"
+        },
+        "checkoutNowAsked": "我询问是否可以停止 checkout 2.4.0 的发布。",
+        "newWatch": "今天早上我发现了 {count} 个新服务（returns、exchanges 和 gift-cards），并立即开始监控它们。",
+        "foundWatch": "今天早上我发现了 {count} 个新服务，并立即开始监控它们。"
+      }
+    },
+    "settingsDrawer": {
+      "title": "设置",
+      "reach": "我该在哪里联系您？",
+      "destSlack": "Slack：{channel}",
+      "destEmail": "邮箱：{address}",
+      "autonomy": "我可以自行处理多少事情？",
+      "tell": "告诉我",
+      "ask": "先问我",
+      "fix": "修复后告诉我",
+      "tellHint": "我会告诉您我会怎么做，具体执行交由您决定。",
+      "askHint": "每次修复前我都会先询问，您同意后我再执行。",
+      "fixHint": "对于有可靠记录的修复类型，我会在您设定的范围内直接执行，并立即告知您。",
+      "advanced": "高级",
+      "perKind": "各类修复",
+      "digestDay": "摘要日期",
+      "excluded": "应忽略的服务",
+      "excludedNone": "无",
+      "kinds": {
+        "pool": "关闭泄漏的数据库连接",
+        "queueWorker": "在积压期间增加队列工作进程",
+        "retune": "提高噪音告警的阈值",
+        "rollback": "回滚部署",
+        "record": "已完成 {done} 次，成功 {worked} 次。",
+        "keptRecord": "已完成 {done} 次，保持有效 {worked} 次。",
+        "noRecord": "从未执行过，因此在没有成功记录之前，我不会自行执行。",
+        "revertConfig": "撤销最近的设置更改",
+        "abortRollout": "停止异常发布",
+        "recurringRecord": "已完成 {done} 次，均针对同一个泄漏（{bug}）。在修复之前，我会持续询问。"
+      },
+      "weekdays": {
+        "monday": "星期一",
+        "tuesday": "星期二",
+        "wednesday": "星期三",
+        "thursday": "星期四",
+        "friday": "星期五"
+      },
+      "saved": "已保存",
+      "noDestination": "我将无法联系到任何人。",
+      "routing": "当我呼叫您时",
+      "routingNote": "任何影响客户的问题我都会发起呼叫。较小的问题会发送一条不会吵醒任何人的消息，最小的问题则归入周五摘要。"
+    },
+    "howItWorks": {
+      "title": "工作原理",
+      "intro": "以下是我所做的工作，共五步。",
+      "gotIt": "知道了",
+      "s1Title": "我会发现您的服务",
+      "s1": "我会查看您已发送的数据，并找出其中的每项服务。当新服务出现时，我会当天开始监控它；您无需提出请求。",
+      "s2Title": "我会监控它们",
+      "s2": "我会学习每项服务的正常状态：每天各小时的错误、延迟和流量，并随着时间推移不断细化每周模式。在掌握之前，我会使用基本的安全检查。",
+      "s3Title": "除非确有问题，否则我保持安静",
+      "s3": "大多数异常时刻并不是问题。当某些情况影响客户时，我会呼叫您的团队；对于较小的问题，会发送不会吵醒任何人的消息；而次要事项则留到周五摘要中。",
+      "s4Title": "我会解释每一次呼叫",
+      "s4": "每条消息都会说明出了什么问题、从何时开始，以及我对原因的最佳判断和确信程度。",
+      "s5Title": "我只修复您允许我修复的内容",
+      "s5": "我只修复您已允许我修复的事项。有效的修复会赢得一点信任，而没有帮助的修复会对我产生不利。如果我反复需要同一种修复，那是我向您的团队报告的 bug，而不是我会自动化的习惯。"
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "1 分钟前检查过 | {count} 分钟前检查过"
+    },
+    "outcome": {
+      "active": "正在发生",
+      "fixed": "由 AutoObserve 修复",
+      "resolved": "在 {minutes} 分钟内解决",
+      "held": "在周五摘要中",
+      "fixing": "正在修复",
+      "contained": "已由 AutoObserve 遏制",
+      "predicted": "已预测"
+    },
+    "view": {
+      "standard": "标准",
+      "nerd": "极客",
+      "standardTooltip": "标准视图提供简要信息：需要您处理的事项以及过去 7 天发生的情况",
+      "nerdTooltip": "极客视图完整显示每个检测器、循环和设置",
+      "label": "视图"
+    },
+    "rail": {
+      "more": "下方更多"
+    },
+    "suggestions": {
+      "title": "建议",
+      "subtitle": "有空时看看——这些能减少噪音或节省您的时间。"
+    }
   }
 }

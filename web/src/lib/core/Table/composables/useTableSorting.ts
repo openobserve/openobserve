@@ -11,6 +11,7 @@ export function useTableSorting<TData>(
     sortBy?: string;
     sortOrder?: "asc" | "desc";
     sortFieldMap?: Record<string, string>;
+    sortClearable?: boolean;
   },
   emit: any,
 ) {
@@ -32,6 +33,10 @@ export function useTableSorting<TData>(
         emit("update:sortBy", field);
         emit("update:sortOrder", "desc");
         emit("sort-change", { column: field, order: "desc" });
+      } else if (props.sortClearable === false) {
+        emit("update:sortBy", field);
+        emit("update:sortOrder", "asc");
+        emit("sort-change", { column: field, order: "asc" });
       } else {
         // was desc → clear sort
         emit("update:sortBy", "");

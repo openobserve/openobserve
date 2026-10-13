@@ -235,6 +235,7 @@ import { configFullQuery } from "@/services/config.queries";
 import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import AppHeader from "../components/Header.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
@@ -491,9 +492,10 @@ export default defineComponent({
 
     // The AI Observability menu entry itself ships on true OSS builds too —
     // Monitor (LLM Insights + Sessions) needs no backend flag, unlike the rest
-    // of the module. AIObservabilityShell (Index.vue) shows only the Monitor
-    // group there; Evaluate/Experiment/Annotate/Agent Graph/Agent Behavior stay
-    // behind `isOnlineEvalsEnabled` as before.
+    // of the module. AIObservabilityShell (Index.vue) renders Evaluate/
+    // Experiment/Annotate/Agent Graph/Agent Behavior too, but locked (lock
+    // icon + tooltip) rather than hidden, so this entry point itself doesn't
+    // need to wait on `isOnlineEvalsEnabled` for those.
     const isOssBuild = !(config.isEnterprise == "true" || config.isCloud == "true");
     const isAiObservabilityMenuVisible = computed(() => isOnlineEvalsEnabled.value || isOssBuild);
 
@@ -508,6 +510,10 @@ export default defineComponent({
     // `ZO_FEATURE_PROFILING_ENABLED` is off by default while Profiles is early-stage.
     const isProfilingEnabled = computed(() => {
       return Boolean(store.state.zoConfig?.profiling_enabled);
+    });
+
+    const isExperimentalEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.experimental);
     });
 
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
@@ -796,45 +802,108 @@ export default defineComponent({
       }
     });
 
-    const updateIncidentsMenu = () => {
-      if (isIncidentsEnabled.value) {
-        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+    // Shows the entry — locked, if this edition doesn't unlock `featureKey` —
+    // whenever `enabledByRuntimeFlag` is true OR the edition flat-out doesn't
+    // unlock it (so the locked entry stays discoverable rather than only
+    // appearing once an admin has also flipped the runtime flag on). Hides it
+    // only when the edition allows the feature but the runtime flag is off —
+    // that's a deployment choice, not something to upsell.
+    const syncGatedMenuEntry = (
+      name: string,
+      featureKey: "incidents" | "workflows",
+      enabledByRuntimeFlag: boolean,
+      anchorName: string,
+      entry: Omit<NavItem, "locked" | "lockedMessage">,
+    ) => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === name);
+      const access = checkFeatureAccess(featureKey, buildFeatureGateContext(store.state.zoConfig));
+      const shouldShow = enabledByRuntimeFlag || !access.allowed;
 
-        const incidentExists = linksList.value.some((link) => link.name === "incidentList");
-
-        if (alertIndex !== -1 && !incidentExists) {
-          linksList.value.splice(alertIndex + 1, 0, {
-            title: t("menu.incidents"),
-            icon: "notifications-active",
-            link: "/incidents",
-            name: "incidentList",
-          });
-        }
+      if (!shouldShow) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
       }
+
+      if (existingIndex !== -1) {
+        linksList.value[existingIndex].locked = !access.allowed;
+        linksList.value[existingIndex].lockedMessage = access.message;
+        return;
+      }
+
+      const anchor = linksList.value.findIndex((link) => link.name === anchorName);
+      if (anchor === -1) return;
+      linksList.value.splice(anchor + 1, 0, {
+        ...entry,
+        locked: !access.allowed,
+        lockedMessage: access.message,
+      });
     };
+
+    const updateIncidentsMenu = () => {
+      syncGatedMenuEntry(
+        "incidentList",
+        "incidents",
+        Boolean(isIncidentsEnabled.value),
+        "alertList",
+        {
+          title: t("menu.incidents"),
+          icon: "notifications-active",
+          link: "/incidents",
+          name: "incidentList",
+        },
+      );
+    };
+
+    const updateAutoObserveMenu = () => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === "autoobserve");
+      if (config.isEnterprise != "true" || !isExperimentalEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+      const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+      linksList.value.splice(alertIndex === -1 ? linksList.value.length : alertIndex, 0, {
+        title: t("menu.autoobserve"),
+        icon: "navigation",
+        link: "/autoobserve",
+        name: "autoobserve",
+      });
+    };
+
+    watch(isExperimentalEnabled, () => updateAutoObserveMenu(), { immediate: false });
+
+    // Absorbed into the Reliability flyout (navGroups.ts), which places it after Incidents.
+    const isDowntimesEnabled = computed(
+      () =>
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig?.downtimes_enabled === true,
+    );
+    const updateDowntimesMenu = () => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === "downtimes");
+      if (!isDowntimesEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+      const anchor = linksList.value.findIndex((link) => link.name === "alertList");
+      if (anchor === -1) return;
+      linksList.value.splice(anchor + 1, 0, {
+        title: t("menu.downtimes"),
+        icon: "notifications-paused",
+        link: "/downtimes",
+        name: "downtimes",
+      });
+    };
+    watch(isDowntimesEnabled, () => updateDowntimesMenu(), { immediate: false });
 
     // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
-      const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
-
-      if (isWorkflowsEnabled.value) {
-        if (existingIndex !== -1) return;
-
-        const anchor = linksList.value.findIndex((link) => link.name === "alertList");
-        if (anchor === -1) return;
-
-        linksList.value.splice(anchor + 1, 0, {
-          title: t("menu.workflows"),
-          icon: "schema",
-          link: "/workflows",
-          name: "workflows",
-        });
-      } else if (existingIndex !== -1) {
-        // The entry must be REMOVED, not just skipped: the menu is rebuilt on
-        // org switch and `workflows_enabled` can differ per deployment, so an
-        // add-only guard would leave a stale entry behind.
-        linksList.value.splice(existingIndex, 1);
-      }
+      syncGatedMenuEntry("workflows", "workflows", isWorkflowsEnabled.value, "alertList", {
+        title: t("menu.workflows"),
+        icon: "schema",
+        link: "/workflows",
+        name: "workflows",
+      });
     };
 
     // If `/config` resolves after this component mounted (or the flag flips),
@@ -930,7 +999,9 @@ export default defineComponent({
     // A separate top-level rail item here would be a second gate to keep in
     // sync.
     const filterMenus = () => {
+      updateAutoObserveMenu();
       updateIncidentsMenu();
+      updateDowntimesMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
       updateProfilesMenu();

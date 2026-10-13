@@ -80,6 +80,7 @@ pub fn compiled_default_content() -> ContentSpec {
 pub fn is_reserved_template_name(name: &str) -> bool {
     config::prebuilt_loader::is_prebuilt_template_name(name)
         || name == DEFAULT_CONTENT_TEMPLATE_NAME
+        || crate::alerts::templates::is_downtime_template_name(name)
 }
 
 /// Create-if-missing (and overwrite under the same `should_apply_prebuilt`

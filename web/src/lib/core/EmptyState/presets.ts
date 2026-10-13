@@ -119,6 +119,21 @@ export const emptyStatePresets = {
     ],
   },
 
+  "search-cancelled": {
+    illustration: "query",
+    variant: "neutral",
+    titleKey: "emptyState.searchCancelled.title",
+    descriptionKey: "emptyState.searchCancelled.description",
+    actions: [
+      {
+        id: "run",
+        icon: "play-arrow",
+        titleKey: "emptyState.searchCancelled.action",
+        descriptionKey: "emptyState.searchCancelled.actionDesc",
+      },
+    ],
+  },
+
   // --- first-run "create your first X" -------------------------------------
   "no-dashboards": {
     illustration: "board",
@@ -682,6 +697,20 @@ export const emptyStatePresets = {
         icon: "add",
         titleKey: "emptyState.noAlertSources.action",
         descriptionKey: "emptyState.noAlertSources.actionDesc",
+      },
+    ],
+  },
+  "no-downtimes": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noDowntimes.title",
+    descriptionKey: "emptyState.noDowntimes.description",
+    actions: [
+      {
+        id: "create",
+        icon: "notifications-paused",
+        titleKey: "emptyState.noDowntimes.action",
+        descriptionKey: "emptyState.noDowntimes.actionDesc",
       },
     ],
   },
