@@ -228,14 +228,14 @@ pub(crate) mod tests {
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::{
-            AggregateExpr, BinaryExpr, Call, Extension, Function, FunctionArgs, MatrixSelector,
-            NumberLiteral, Offset, ParenExpr, StringLiteral, SubqueryExpr, UnaryExpr,
-            VectorSelector, token, value::ValueType,
+            AggregateExpr, BinaryExpr, Call, EvalStmt, Extension, Function, FunctionArgs,
+            MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, SubqueryExpr,
+            UnaryExpr, VectorSelector, token, value::ValueType,
         },
     };
 
     use super::*;
-    use crate::exec::PromqlContext;
+    use crate::{DEFAULT_LOOKBACK, exec::PromqlContext};
 
     const T0: i64 = 1_640_995_200_000_000;
 
@@ -357,7 +357,7 @@ pub(crate) mod tests {
     }
 
     /// Serves `m{job="api"}` on instances `a` = 100 and `b` = 200, sampled every minute.
-    struct TwoInstanceProvider(datafusion::prelude::SessionContext);
+    struct TwoInstanceProvider(datafusion::prelude::SessionContext, Vec<String>);
 
     #[async_trait::async_trait]
     impl crate::TableProvider for TwoInstanceProvider {
@@ -371,12 +371,15 @@ pub(crate) mod tests {
             _filters: &mut [(String, Vec<String>)],
             _streaming: bool,
         ) -> Result<Vec<crate::ScanContext>> {
-            Ok(vec![crate::ScanContext::table(
-                self.0.clone(),
-                two_instance_schema(),
-                config::meta::search::ScanStats::default(),
-                true,
-            )])
+            Ok(vec![
+                crate::ScanContext::table(
+                    self.0.clone(),
+                    two_instance_schema(),
+                    config::meta::search::ScanStats::default(),
+                    true,
+                )
+                .with_warnings(self.1.clone()),
+            ])
         }
     }
 
@@ -420,7 +423,7 @@ pub(crate) mod tests {
                 .unwrap();
         let ctx = datafusion::prelude::SessionContext::new();
         ctx.register_table("m", Arc::new(table)).unwrap();
-        TwoInstanceProvider(ctx)
+        TwoInstanceProvider(ctx, vec![])
     }
 
     #[test]
@@ -1285,5 +1288,32 @@ pub(crate) mod tests {
             assert_eq!(series[0].samples.len(), 1, "{query}");
             assert_eq!(series[0].samples[0].value, expected, "{query}");
         }
+    }
+
+    #[tokio::test]
+    async fn test_exec_returns_scan_context_warnings_with_the_data() {
+        let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
+        let stmt = |query: &str| EvalStmt {
+            expr: promql_parser::parser::parse(query).unwrap(),
+            start: at(T0),
+            end: at(T0),
+            interval: Duration::ZERO,
+            lookback_delta: DEFAULT_LOOKBACK,
+        };
+        let query_ctx = create_test_query_ctx("test_trace", "test_org", 30);
+
+        let mut ctx = PromqlContext::new(query_ctx.clone(), two_instance_provider(), vec![]);
+        let (_, _, _, warnings) = ctx.exec("test_trace", stmt("m")).await.unwrap();
+        assert!(warnings.is_empty());
+
+        let mut provider = two_instance_provider();
+        provider.1 = vec!["ingester down".to_string()];
+        let mut ctx = PromqlContext::new(query_ctx, provider, vec![]);
+        let (value, _, _, warnings) = ctx.exec("test_trace", stmt("m + m")).await.unwrap();
+        let Value::Vector(series) = value else {
+            panic!("expected a vector");
+        };
+        assert_eq!(series.len(), 2);
+        assert_eq!(warnings, vec!["ingester down"; 2]);
     }
 }

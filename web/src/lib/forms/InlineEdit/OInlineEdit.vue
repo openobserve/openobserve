@@ -35,6 +35,7 @@ const props = withDefaults(defineProps<InlineEditProps>(), {
   disabled: false,
   readonly: false,
   error: false,
+  submitOnEnter: true,
 });
 
 const emit = defineEmits<InlineEditEmits>();
@@ -149,8 +150,10 @@ const restoreTriggerFocus = async () => {
 // submission can't carry it: closing the editor unmounts the input before the
 // keypress that would have triggered it, so ask the form directly. A title with
 // no form owner (a workflow name, an incident title) submits nothing.
-const onEnter = () => {
-  const owner = inputRef.value?.form ?? null;
+const onEnter = (event: KeyboardEvent) => {
+  // Without the submit, the browser's implicit submission must not fire either.
+  if (!props.submitOnEnter) event.preventDefault();
+  const owner = props.submitOnEnter ? (inputRef.value?.form ?? null) : null;
   // Swallow the re-activation this same Enter would fire on the trigger once
   // focus returns to it (see startEdit); cleared after the key event settles.
   ignoreNextActivation = true;

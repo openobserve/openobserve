@@ -31,6 +31,22 @@ pub const STATS_STREAM: &str = "stats";
 pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
+/// Every stream name O2 writes itself; web/src/utils/internalStreams.ts must list the same names.
+pub const INTERNAL_STREAM_NAMES: [&str; 13] = [
+    USAGE_STREAM,
+    AUDIT_STREAM,
+    STATS_STREAM,
+    TRIGGERS_STREAM,
+    ERROR_STREAM,
+    DATA_RETENTION_USAGE_STREAM,
+    "cloud_events",
+    "_agent_signals",
+    super::redaction::REDACTION_EVIDENCE_STREAM,
+    super::evaluator::EVALUATOR_STREAM,
+    super::llm_scores::LLM_SCORES_STREAM,
+    super::llm_experiments::LLM_EXPERIMENT_STREAM,
+    "_anomalies",
+];
 
 /// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
 /// are rejected. OTLP has no guard: collectors write `_o2_dbm_server` there.
@@ -92,6 +108,9 @@ pub enum RunOutcome {
     /// transitioning to firing
     #[serde(rename = "pending")]
     Pending,
+    /// Condition matched inside a downtime window; nothing was delivered.
+    #[serde(rename = "suppressed")]
+    Suppressed,
 }
 
 impl RunOutcome {
@@ -113,6 +132,7 @@ impl RunOutcome {
             Self::Skipped => 4,
             Self::NotifyFailed => 5,
             Self::Pending => 6,
+            Self::Suppressed => 7,
         }
     }
 
@@ -125,6 +145,7 @@ impl RunOutcome {
             4 => Some(Self::Skipped),
             5 => Some(Self::NotifyFailed),
             6 => Some(Self::Pending),
+            7 => Some(Self::Suppressed),
             _ => None,
         }
     }
@@ -138,6 +159,7 @@ impl RunOutcome {
             Self::Skipped => "skipped",
             Self::NotifyFailed => "notify_failed",
             Self::Pending => "pending",
+            Self::Suppressed => "suppressed",
         }
     }
 }
@@ -180,6 +202,7 @@ pub fn normalize_outcome(
         "skipped" => Some(RunOutcome::Skipped),
         "notify_failed" => Some(RunOutcome::NotifyFailed),
         "pending" => Some(RunOutcome::Pending),
+        "suppressed" => Some(RunOutcome::Suppressed),
 
         // ── legacy vocabulary ──
         "condition_not_satisfied" => Some(RunOutcome::Normal),
@@ -286,6 +309,9 @@ pub struct TriggerData {
     /// search cap is reached.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actual_value: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// PromQL sample text preserves special floats that cannot populate numeric actual_value.
+    pub rule_value: Option<String>,
     /// The threshold that matched. `None` on `normal` rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub threshold_value: Option<f64>,
@@ -311,6 +337,8 @@ pub struct TriggerData {
     /// The venue the failed synthetics slot was scheduled for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synthetics_location: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub downtime_id: Option<String>,
     /// Whether a firing tried a destination, workflow or incident notification; None on old rows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delivery_attempted: Option<bool>,
@@ -346,6 +374,7 @@ impl Default for TriggerData {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -353,6 +382,7 @@ impl Default for TriggerData {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         }
     }
@@ -397,6 +427,7 @@ impl TriggerData {
             grouped: Some(false),
             group_size: Some(0),
             actual_value: Some(0.0),
+            rule_value: Some(String::new()),
             threshold_value: Some(0.0),
             threshold_operator: Some(String::new()),
             level: Some(0),
@@ -404,6 +435,7 @@ impl TriggerData {
             value_is_lower_bound: Some(false),
             synthetics_error_source: Some(String::new()),
             synthetics_location: Some(String::new()),
+            downtime_id: Some(String::new()),
             delivery_attempted: Some(true),
         }
     }
@@ -1127,6 +1159,8 @@ mod run_outcome_tests {
         assert_eq!(RunOutcome::from_i32(3), Some(RunOutcome::Error));
         assert_eq!(RunOutcome::from_i32(4), Some(RunOutcome::Skipped));
         assert_eq!(RunOutcome::from_i32(5), Some(RunOutcome::NotifyFailed));
+        assert_eq!(RunOutcome::Suppressed.to_i32(), 7);
+        assert_eq!(RunOutcome::from_i32(7), Some(RunOutcome::Suppressed));
     }
 
     #[test]
@@ -1138,6 +1172,8 @@ mod run_outcome_tests {
             RunOutcome::Error,
             RunOutcome::Skipped,
             RunOutcome::NotifyFailed,
+            RunOutcome::Pending,
+            RunOutcome::Suppressed,
         ] {
             let n = outcome.to_i32();
             assert_eq!(
@@ -1146,6 +1182,30 @@ mod run_outcome_tests {
                 "i32 roundtrip failed for {outcome:?} (got {n})"
             );
         }
+    }
+
+    #[test]
+    fn a_suppressed_run_carries_its_downtime_id_through_serde() {
+        assert_eq!(
+            serde_json::to_string(&RunOutcome::Suppressed).unwrap(),
+            "\"suppressed\""
+        );
+        assert_eq!(
+            normalize_outcome("suppressed", &TriggerDataType::Alert, None),
+            Some(RunOutcome::Suppressed)
+        );
+        let td = TriggerData {
+            status: RunOutcome::Suppressed,
+            downtime_id: Some("2f9K".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&td).unwrap();
+        assert_eq!(json["status"], "suppressed");
+        assert_eq!(json["downtime_id"], "2f9K");
+        assert_eq!(serde_json::from_value::<TriggerData>(json).unwrap(), td);
+        let bare = serde_json::to_value(TriggerData::default()).unwrap();
+        assert!(bare.get("downtime_id").is_none());
+        assert!(TriggerData::get_field_names().contains(&"downtime_id".to_string()));
     }
 
     #[test]
@@ -1471,6 +1531,67 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
     }
 
+    /// Quoted names inside the `INTERNAL_STREAM_NAMES` array literal of a TypeScript source.
+    fn ts_internal_stream_names(source: &str) -> Vec<String> {
+        let start = source
+            .find("INTERNAL_STREAM_NAMES")
+            .expect("INTERNAL_STREAM_NAMES missing from internalStreams.ts");
+        let rest = &source[start..];
+        let assign = rest
+            .find('=')
+            .expect("INTERNAL_STREAM_NAMES is not assigned");
+        let open = rest[assign..]
+            .find('[')
+            .expect("INTERNAL_STREAM_NAMES has no array literal")
+            + assign;
+        let close = rest[open..].find(']').expect("unterminated array literal") + open;
+        rest[open + 1..close]
+            .lines()
+            .map(|line| line.split("//").next().unwrap_or(""))
+            .flat_map(|line| line.split(','))
+            .map(|item| {
+                item.trim()
+                    .trim_matches(|c| c == '"' || c == '\'' || c == '`')
+            })
+            .filter(|item| !item.is_empty())
+            .map(str::to_string)
+            .collect()
+    }
+
+    #[test]
+    fn test_internal_stream_names_match_web_list() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../web/src/utils/internalStreams.ts");
+        let source = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let mut web = ts_internal_stream_names(&source);
+        web.sort();
+        let mut rust = INTERNAL_STREAM_NAMES.map(str::to_string).to_vec();
+        rust.sort();
+        assert_eq!(web, rust);
+    }
+
+    #[test]
+    fn test_ts_internal_stream_names_parses_quotes_and_comments() {
+        let source = "export const INTERNAL_STREAM_NAMES: readonly string[] = [\n  \"usage\", // billing\n  'audit',\n] as const;\nconst OTHER = [\"x\"];";
+        assert_eq!(ts_internal_stream_names(source), vec!["usage", "audit"]);
+    }
+
+    #[test]
+    fn test_internal_stream_names_leave_is_internal_stream_unchanged() {
+        assert_eq!(INTERNAL_STREAM_NAMES.len(), 13);
+        for name in [
+            ERROR_STREAM,
+            STATS_STREAM,
+            TRIGGERS_STREAM,
+            USAGE_STREAM,
+            "cloud_events",
+        ] {
+            assert!(INTERNAL_STREAM_NAMES.contains(&name));
+            assert!(!is_internal_stream(name), "{name} must stay discoverable");
+        }
+    }
+
     #[test]
     fn test_is_internal_stream() {
         for name in [
@@ -1698,6 +1819,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -1705,6 +1827,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 

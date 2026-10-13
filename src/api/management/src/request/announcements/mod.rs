@@ -163,10 +163,23 @@ pub async fn get_announcements(Path(org_id): Path<String>) -> Response {
             }
         };
 
+        let mut banners = announcements::resolve_for_org(&config, &org_id, now);
+        let mut next_boundary = next_boundary_for_org(&config, &org_id, now);
+        let downtimes = &o2_enterprise::enterprise::common::config::get_config().downtimes;
+        if downtimes.enabled && downtimes.banner_enabled {
+            match openobserve_core::downtimes::banners_for_org(&org_id, now).await {
+                Ok((generated, boundary)) => {
+                    banners.extend(generated);
+                    next_boundary = next_boundary.into_iter().chain(boundary).min();
+                }
+                Err(e) => log::error!("Error building downtime banners for {org_id}: {e}"),
+            }
+        }
+
         MetaHttpResponse::json(AnnouncementsResponse {
-            banners: announcements::resolve_for_org(&config, &org_id, now),
+            banners,
             now,
-            next_boundary: next_boundary_for_org(&config, &org_id, now),
+            next_boundary,
         })
     }
 

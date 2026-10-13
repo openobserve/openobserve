@@ -50,6 +50,7 @@ export function resetManager(): void {
 export class ShortcutManager {
   private shortcuts = new Map<string, RegisteredShortcut[]>();
   private activeScope = "global";
+  private scopeStack: { token: symbol; scope: string }[] = [];
   private sequenceBuffer: string[] = [];
   private sequenceTimeout: ReturnType<typeof setTimeout> | null = null;
   private options: ShortcutManagerOptions;
@@ -70,7 +71,17 @@ export class ShortcutManager {
   }
 
   getScope(): string {
-    return this.activeScope;
+    return this.scopeStack.at(-1)?.scope ?? this.activeScope;
+  }
+
+  acquireScope(scope: string): symbol {
+    const token = Symbol(scope);
+    this.scopeStack.push({ token, scope });
+    return token;
+  }
+
+  releaseScope(token: symbol): void {
+    this.scopeStack = this.scopeStack.filter((entry) => entry.token !== token);
   }
 
   // ---------- Change listeners (for reactivity) ----------
@@ -234,8 +245,9 @@ export class ShortcutManager {
 
   private findMatch(key: string): RegisteredShortcut | undefined {
     const list = this.shortcuts.get(key) ?? [];
+    const scope = this.getScope();
     return (
-      list.find((s) => (s.scope ?? "global") === this.activeScope) ??
+      list.find((s) => (s.scope ?? "global") === scope) ??
       list.find((s) => (s.scope ?? "global") === "global")
     );
   }
@@ -252,6 +264,9 @@ export class ShortcutManager {
   }
 
   private triggerShortcut(shortcut: RegisteredShortcut, e: KeyboardEvent): void {
+    const target = e.composedPath?.()[0] ?? e.target;
+    if (shortcut.skipInInput && isInputFocused(target)) return;
+
     // Guard: never intercept single-letter shortcuts while the user is typing
     // in an input/textarea/contenteditable. Modifier-key shortcuts (Ctrl+S,
     // ⌘+Enter, etc.) are always allowed through regardless of focus, and a
@@ -261,7 +276,7 @@ export class ShortcutManager {
     if (
       !shortcut.allowInInput &&
       !ShortcutManager.hasModifier(shortcut.key) &&
-      isInputFocused(e.composedPath?.()[0] ?? e.target)
+      isInputFocused(target)
     ) {
       return;
     }
@@ -282,6 +297,6 @@ export class ShortcutManager {
 
     if (this.options.preventDefault && e.key !== "Escape") e.preventDefault();
     if (this.options.stopPropagation) e.stopPropagation();
-    shortcut.handler();
+    shortcut.handler(e);
   }
 }

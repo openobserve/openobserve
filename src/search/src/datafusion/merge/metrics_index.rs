@@ -56,7 +56,7 @@ pub(super) enum Blocks {
 impl Blocks {
     pub fn try_new(schema: &Arc<Schema>) -> anyhow::Result<Self> {
         let (file, path) = new_file()?;
-        let writer = BlockWriter::new_pending(
+        let writer = BlockWriter::new(
             file,
             Arc::clone(schema),
             metrics_index::block::MAX_BLOCK_ROWS,

@@ -389,6 +389,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -396,6 +397,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 
@@ -940,6 +942,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -947,6 +950,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 
@@ -1022,6 +1026,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -1029,6 +1034,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 
@@ -1089,6 +1095,7 @@ mod tests {
             grouped: None,
             group_size: None,
             actual_value: None,
+            rule_value: None,
             threshold_value: None,
             threshold_operator: None,
             level: None,
@@ -1096,6 +1103,7 @@ mod tests {
             value_is_lower_bound: None,
             synthetics_error_source: None,
             synthetics_location: None,
+            downtime_id: None,
             delivery_attempted: None,
         };
 

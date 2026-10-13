@@ -2,6 +2,7 @@
  * OContextMenuItem.types.ts — public types for OContextMenuItem.
  */
 
+import type { I18nText } from "@/types/i18n";
 import type { IconName } from "../../core/Icon/OIcon.icons";
 
 /** Visual intent of the item */
@@ -12,6 +13,10 @@ export interface ContextMenuItemProps {
   variant?: ContextMenuItemVariant;
   /** Prevents the user from interacting with this item */
   disabled?: boolean;
+  /** Keeps an unavailable item in keyboard navigation. */
+  focusableUnavailable?: boolean;
+  /** Explains why the item cannot be activated. */
+  description?: I18nText;
   /** Text used for typeahead matching (overrides text content) */
   textValue?: string;
   /** Icon placed before the label — renders an OIcon internally */

@@ -26,10 +26,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="emit('click')"
   >
     <span
+      v-if="image"
+      class="es-ing-card__icon rounded-default inline-flex h-10 w-10 shrink-0 items-center justify-center max-md:size-8"
+      :class="iconClass"
+    >
+      <img :src="image" class="h-6 w-6 object-contain max-md:size-5" alt="" />
+    </span>
+    <span
+      v-else
       class="es-ing-card__icon rounded-default group-hover:bg-button-primary inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150 group-hover:text-white max-md:size-8"
       :class="iconClass"
     >
-      <OIcon :name="icon" size="md" />
+      <OIcon v-if="icon" :name="icon" size="md" />
     </span>
     <span class="es-ing-card__body flex min-w-0 flex-1 flex-col gap-0.5">
       <OTruncatedText class="text-compact text-text-heading font-semibold">{{
@@ -56,7 +64,8 @@ type IconVariant = "default" | "blue" | "teal" | "purple" | "amber" | "orange";
 
 const props = withDefaults(
   defineProps<{
-    icon: IconName;
+    icon?: IconName;
+    image?: string;
     label: I18nText;
     sublabel?: I18nText;
     iconVariant?: IconVariant;

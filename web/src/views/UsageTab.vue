@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="usage-tab h-full">
     <!-- Main content when data exists -->
     <div
-      v-if="!no_data_ingest && !isLoadingSummary"
+      v-if="!no_data_ingest && !isLoadingSummary && !summaryFailed"
       class="px-page-edge flex h-full w-full flex-col overflow-y-auto pt-2 pb-1"
     >
       <!-- Banners — each component renders nothing when inactive, so this whole
@@ -544,6 +544,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <HomeNoDataState />
     </div>
 
+    <div
+      v-if="summaryFailed && !isLoadingSummary"
+      class="px-page-edge flex h-full flex-col pt-2"
+      data-test="home-usage-tab-load-error"
+    >
+      <OEmptyState
+        preset="load-error"
+        size="hero"
+        data-test="usage-load-error-empty-state"
+        @action="() => getSummary(store.state.selectedOrganization.identifier)"
+      />
+    </div>
+
     <!-- Loading state -->
     <div v-if="isLoadingSummary" class="h-full" data-test="home-usage-tab-loading">
       <HomeViewSkeleton />
@@ -578,6 +591,7 @@ import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -588,6 +602,9 @@ const no_data_ingest = ref(false);
 const alertsPanelDataKey = ref(0);
 const pipelinesPanelDataKey = ref(0);
 const isLoadingSummary = ref(false);
+const flagOn = computed(() => store.state.zoConfig?.restricted_routes_on_empty_data === true);
+// flag-on only: the flag-off page keeps its toasts and its populated fall-through
+const summaryFailed = ref(false);
 
 // Animated counters
 const animatedStreamsCount = ref(0);
@@ -635,11 +652,14 @@ const animateValue = (targetRef: any, start: number, end: number, duration: numb
 
 const getSummary = (org_id: any) => {
   isLoadingSummary.value = true;
-  const dismiss = toast({
-    variant: "loading",
-    message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
-    timeout: 0,
-  });
+  summaryFailed.value = false;
+  const dismiss = flagOn.value
+    ? () => {}
+    : toast({
+        variant: "loading",
+        message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
+        timeout: 0,
+      });
   queryClient
     .fetchQuery(orgSummaryQuery(org_id))
     .then((data: any) => {
@@ -707,6 +727,10 @@ const getSummary = (org_id: any) => {
     .catch((err) => {
       console.log(err);
       dismiss();
+      if (flagOn.value) {
+        summaryFailed.value = true;
+        return;
+      }
       toast({
         variant: "error",
         message: t("toastMessages.views.errorWhilePullingSummary"),

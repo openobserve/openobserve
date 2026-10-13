@@ -296,8 +296,16 @@ pub async fn append(
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<(), sea_orm::DbErr> {
-    let db = get_orm_client_rw().await;
+    append_with(get_orm_client_rw().await, org_id, incident_id, event).await
+}
 
+/// [append] on a given connection.
+pub async fn append_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+) -> Result<(), sea_orm::DbErr> {
     let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()

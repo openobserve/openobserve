@@ -59,13 +59,13 @@ function baseQuery(ctx: SyntheticsNavContext): Record<string, string> {
   return query;
 }
 
-/** The checks list. `section: "private"` opens the Private Locations tab. */
+/** The checks list. Any `section` other than "checks" opens that tab. */
 export function syntheticsListRoute(
   ctx: SyntheticsNavContext,
-  opts: { section?: "checks" | "private" } = {},
+  opts: { section?: "checks" | "private" | "status-pages" | "variables" } = {},
 ): RouteLocationRaw {
   const query = baseQuery(ctx);
-  if (opts.section === "private") query.section = "private";
+  if (opts.section && opts.section !== "checks") query.section = opts.section;
   return { name: "synthetics", query };
 }
 
@@ -96,9 +96,10 @@ export function statusPageEditRoute(ctx: SyntheticsNavContext, id: string): Rout
 export function syntheticsResultsRoute(
   ctx: SyntheticsNavContext,
   id: string,
-  opts: { name?: string; lastTriggeredAt?: number } = {},
+  opts: { name?: string; lastTriggeredAt?: number; extra?: Record<string, string> } = {},
 ): RouteLocationRaw {
   const query = baseQuery(ctx);
+  Object.assign(query, opts.extra);
   if (opts.name) query.name = opts.name;
   if (opts.lastTriggeredAt && opts.lastTriggeredAt > 0) {
     query.last_triggered_at = String(opts.lastTriggeredAt);

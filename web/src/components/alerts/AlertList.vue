@@ -112,6 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :page-size-options="pageSizeOptions"
               :current-page="currentPage"
               @update:current-page="onPageChange"
+              @update:page-size="pageSize = $event"
+              :sort-by="sortBy"
+              :sort-order="sortOrder"
+              @update:sort-by="sortBy = $event"
+              @update:sort-order="sortOrder = $event"
               width="100%"
               :show-global-filter="false"
               :default-columns="false"
@@ -154,17 +159,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-tabs"
                     @update:model-value="(v) => onAlertTabChange(v as string)"
                   >
-                    <OToggleGroupItem
-                      v-for="tab in alertTabs"
-                      :key="tab.value"
-                      :value="tab.value"
-                      size="sm"
-                      :icon-left="tab.icon"
-                      :title="lgUp ? undefined : tab.label"
-                      :data-test="`alert-list-tab-${tab.value}`"
-                    >
-                      <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
-                    </OToggleGroupItem>
+                    <template v-for="tab in alertTabs" :key="tab.value">
+                      <OToggleGroupItem
+                        :value="tab.value"
+                        size="sm"
+                        :icon-left="tab.icon"
+                        :title="lgUp && !tab.locked ? undefined : tab.label"
+                        :data-test="`alert-list-tab-${tab.value}`"
+                      >
+                        <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
+                        <template v-if="tab.locked" #icon-right>
+                          <OIcon name="lock" size="xs" class="text-warning-600 shrink-0" />
+                        </template>
+                      </OToggleGroupItem>
+                    </template>
                   </OToggleGroup>
                   <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
                   <div class="min-w-0 flex-1 md:max-lg:min-w-80">
@@ -238,6 +246,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
                   </span>
                   <OTruncatedText>{{ row.name || "--" }}</OTruncatedText>
+                  <MutedChip
+                    v-if="row.active_downtime"
+                    :downtime="row.active_downtime"
+                    :data-test="`alert-list-${row.name}-muted`"
+                  />
                   <template v-if="row.alert_type === 'Composite'">
                     <OTag
                       variant="warning-soft"
@@ -478,7 +491,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   whatever outcome it last recorded, so showing it would display
                   "Firing" forever on something that is not running.
                 -->
-                <OTooltip v-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
+                <OTooltip
+                  v-if="showRunOutcome(row) && isMutedFiring(row)"
+                  :content="
+                    t('alerts.downtimes.mute.firingMutedTooltip', {
+                      name: row.active_downtime.name,
+                    })
+                  "
+                >
+                  <OTag
+                    variant="default-soft"
+                    icon="notifications-paused"
+                    size="sm"
+                    :label="t('alerts.downtimes.mute.firingMuted')"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
+                <OTooltip v-else-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
                   <OTag
                     type="alertState"
                     :value="row.last_outcome"
@@ -637,6 +666,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("common.move") }}
                     </ODropdownItem>
+                    <template v-if="downtimesEnabled">
+                      <ODropdownSeparator />
+                      <MuteMenuItems
+                        :data-test-prefix="`alert-list-${row.name}-mute`"
+                        @preset="(secs) => muteAndRefresh([row], secs)"
+                        @until="openMuteDialog([row])"
+                      />
+                    </template>
                     <ODropdownSeparator />
                     <ODropdownItem
                       :data-test="`alert-list-${row.name}-delete-alert`"
@@ -753,6 +790,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="bulkToggleAlerts('resume')"
                   >{{ t("alerts.resume") }}</OButton
                 >
+                <ODropdown v-if="downtimesEnabled" side="top">
+                  <template #trigger>
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      icon-left="notifications-paused"
+                      data-test="alert-list-mute-alerts-btn"
+                    >
+                      {{ t("alerts.downtimes.mute.bulk") }}
+                    </OButton>
+                  </template>
+                  <MuteMenuItems
+                    data-test-prefix="alert-list-bulk-mute"
+                    @preset="(secs) => muteAndRefresh(selectedAlerts, secs)"
+                    @until="openMuteDialog(selectedAlerts)"
+                  />
+                </ODropdown>
                 <OButton
                   data-test="alert-list-delete-alerts-btn"
                   variant="outline-destructive"
@@ -874,6 +928,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-move-to-another-folder-dialog"
       />
     </template>
+    <QuickMuteDialog
+      v-if="downtimesEnabled"
+      v-model:open="muteDialogOpen"
+      :selection="muteSelection"
+      @muted="refreshAlerts"
+    />
     <ExportResourceDialog
       v-model:open="showExportDialog"
       :items="alertsToExport"
@@ -925,7 +985,7 @@ import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
+import { isFiringOutcome, outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import { oncallTeamsQuery } from "@/services/oncall.queries";
@@ -949,11 +1009,17 @@ import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert } from "@/ts/interfaces/index";
 import type { OnCallTeam } from "@/ts/interfaces/oncall";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
+import MutedChip from "./downtimes/MutedChip.vue";
+import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
+import QuickMuteDialog from "./downtimes/QuickMuteDialog.vue";
+import { useRowMute } from "@/composables/downtimes/useRowMute";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useListViewState } from "@/composables/useListViewState";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -992,6 +1058,9 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "AlertList",
   components: {
+    MutedChip,
+    MuteMenuItems,
+    QuickMuteDialog,
     OPageLayout,
     AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
     OEmptyState,
@@ -1033,6 +1102,11 @@ export default defineComponent({
     // On-call is separately gated, so the column and its lookup vanish with it
     // rather than showing a header nothing can ever fill.
     const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
+    const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialog } =
+      useRowMute<any>(
+        (row) => (row.type === "anomaly" ? "anomaly_detections" : "alerts"),
+        (row) => String(row.type === "anomaly" ? row.anomaly_id : row.alert_id),
+      );
     const oncallTeams = ref<OnCallTeam[]>([]);
 
     /// The alert stores a team id; a woken engineer needs the name. Falls back
@@ -1058,7 +1132,16 @@ export default defineComponent({
     // Flag to skip clearing search state on the first folder emission after mount.
     // When returning from add/edit screens, the FolderList emits the active folder
     // which would normally clear restored search filters. This flag prevents that.
-    const savedAlertListFilters = store.state.alertListFilters || {};
+    const savedAlertListFilters = useListViewState("alerts", {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      stateFilter: null as "active" | "paused" | "failed" | "recent" | null,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      perPage: 20,
+      currentPage: 1,
+    });
     const isRestoringState = ref(
       !!savedAlertListFilters.searchQuery ||
         !!savedAlertListFilters.filterQuery ||
@@ -1195,6 +1278,7 @@ export default defineComponent({
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           folder: row.folder_id || router.currentRoute.value.query.folder || "default",
+          tab: activeTab.value,
         },
       });
     };
@@ -1208,17 +1292,26 @@ export default defineComponent({
       window.removeEventListener("resize", onWindowResize);
     });
 
-    // Show anomaly detection only when the backend is an enterprise or cloud build.
-    // The frontend build flag alone is not sufficient — an enterprise UI can be
-    // pointed at an OSS backend which does not have the feature.
-    // The backend can also disable it at runtime via O2_ANOMALY_DETECTION_DISABLED,
-    // surfaced as anomaly_detection_enabled in the config API response.
+    // Anomaly detection needs BOTH an entitled build (backend compiled with
+    // the feature AND a frontend that shows it: the frontend build flag alone
+    // is not sufficient — an enterprise UI can be pointed at an OSS backend)
+    // AND the runtime toggle the backend also exposes
+    // (O2_ANOMALY_DETECTION_DISABLED, surfaced as anomaly_detection_enabled).
+    // Only the entitlement half is a lockable upsell; an entitled build whose
+    // admin has turned the runtime toggle off still never sees the tab at all
+    // — same reasoning as RBAC's own enabled/disabled split.
+    const anomalyDetectionEntitled = computed(
+      () => store.state.zoConfig.build_type !== "opensource" && config.isEnterprise === "true",
+    );
+    const anomalyDetectionTabVisible = computed(
+      () =>
+        !anomalyDetectionEntitled.value || store.state.zoConfig.anomaly_detection_enabled === true,
+    );
     const isAnomalyDetectionEnabled = computed(
       () =>
-        store.state.zoConfig.build_type !== "opensource" &&
-        config.isEnterprise === "true" &&
-        store.state.zoConfig.anomaly_detection_enabled === true,
+        anomalyDetectionEntitled.value && store.state.zoConfig.anomaly_detection_enabled === true,
     );
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     // Initialize activeTab from URL query parameter, default to "all".
     // Prevent forcing anomalyDetection tab when the feature is not available.
@@ -1319,6 +1412,10 @@ export default defineComponent({
     // advertise "Firing" indefinitely.
     const showRunOutcome = (row: any): boolean =>
       shouldShowRunOutcome(row?.enabled, row?.last_outcome);
+
+    // A firing that an active downtime keeps quiet: the state stays Firing, only the badge goes quiet.
+    const isMutedFiring = (row: { active_downtime?: unknown; last_outcome?: unknown }): boolean =>
+      !!row.active_downtime && isFiringOutcome(row.last_outcome);
 
     // Never present the outcome as live state: it is the result of the LAST
     // evaluation, so it is always qualified with when that ran.
@@ -1473,7 +1570,9 @@ export default defineComponent({
     // Clicking a summary tile filters the table to that state (toggle); the
     // "total" tile clears it. Counts on the tiles stay full (from filteredResults)
     // so you always see the folder totals; only the table rows are filtered.
-    const stateFilter = ref<"active" | "paused" | "failed" | "recent" | null>(null);
+    const stateFilter = ref<"active" | "paused" | "failed" | "recent" | null>(
+      savedAlertListFilters.stateFilter,
+    );
     const displayedAlerts = computed(() => {
       const rows = filteredResults.value || [];
       const f = stateFilter.value;
@@ -1501,17 +1600,18 @@ export default defineComponent({
 
     // Tabs for alerts view
     const alertTabs = computed(() => {
-      const tabs: { label: I18nText; value: string; icon?: IconName }[] = [
+      const tabs: { label: I18nText; value: string; icon?: IconName; locked?: boolean }[] = [
         { label: t("alerts.all"), value: "all", icon: "format-list-bulleted" },
         { label: t("alerts.scheduled"), value: "scheduled", icon: "schedule" },
         { label: t("alerts.realTime"), value: "realTime", icon: "bolt" },
         { label: t("alerts.compositeAlert"), value: "composite", icon: "account-tree" },
       ];
-      if (isAnomalyDetectionEnabled.value) {
+      if (anomalyDetectionTabVisible.value) {
         tabs.push({
           label: t("alerts.anomalyDetection"),
           value: "anomalyDetection",
           icon: "query-stats",
+          locked: !isAnomalyDetectionEnabled.value,
         });
       }
       return tabs;
@@ -1774,6 +1874,7 @@ export default defineComponent({
     const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
+      active_downtime: anomaly.active_downtime ?? null,
       name: anomaly.name,
       alert_type: "anomaly_detection",
       stream_name: anomaly.stream_name || "--",
@@ -2000,6 +2101,7 @@ export default defineComponent({
             groups_firing_is_lower_bound: data.groups_firing_is_lower_bound,
             last_outcome_at: data.last_outcome_at ?? null,
             last_outcome_since: data.last_outcome_since ?? null,
+            active_downtime: data.active_downtime ?? null,
             selected: false,
             type: data.condition.type,
             // The SLO this alert belongs to (Feature 5, Phase 2). Read from the
@@ -2209,10 +2311,25 @@ export default defineComponent({
     };
 
     const onAlertTabChange = async (tab: string) => {
+      // OToggleGroup is controlled (`:model-value`), so refusing to advance
+      // `activeTab` here is what keeps a locked tab from becoming active —
+      // clicking it opens the upgrade dialog instead of switching.
+      if (tab === "anomalyDetection" && !isAnomalyDetectionEnabled.value) {
+        openUpgradeDialog();
+        return;
+      }
       activeTab.value = tab;
       const apiType =
         tab === "realTime" ? "realtime" : tab === "anomalyDetection" ? "anomaly_detection" : tab;
       await getAlertsFn(store, activeFolderId.value, "", true, apiType);
+    };
+
+    // The rows paint from `fetchQuery`, with no observer the mutation's invalidation can
+    // refetch, so the Muted chip of a fresh quick mute needs an explicit reload.
+    const muteAndRefresh = async (rows: any[], seconds: number) => {
+      const id = await muteRows(rows, seconds);
+      if (id) await refreshAlerts();
+      return id;
     };
 
     const refreshAlerts = async () => {
@@ -2445,6 +2562,8 @@ export default defineComponent({
     const onPageChange = (page: number) => {
       currentPage.value = page;
     };
+    const sortBy = ref<string>(savedAlertListFilters.sortBy);
+    const sortOrder = ref<"asc" | "desc">(savedAlertListFilters.sortOrder);
     // No timezone suffix in this table, unlike the other lists.
     const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
@@ -3004,6 +3123,8 @@ export default defineComponent({
         name: "alertInsights",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
+          tab: activeTab.value,
         },
       });
     };
@@ -3013,6 +3134,8 @@ export default defineComponent({
         name: "alertHistory",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
+          tab: activeTab.value,
         },
       });
     };
@@ -3319,15 +3442,40 @@ export default defineComponent({
       }
     });
     // Persist filter state to Vuex so it survives navigation to add/edit screens
-    watch([searchQuery, filterQuery, searchAcrossFolders, pageSize, currentPage], () => {
-      store.commit("setAlertListFilters", {
-        searchQuery: searchQuery.value || "",
-        filterQuery: filterQuery.value || "",
-        searchAcrossFolders: !!searchAcrossFolders.value,
-        perPage: pageSize.value,
-        currentPage: currentPage.value,
-      });
+    // Closing the editor remounts FolderList, whose first emit would otherwise clear the active search as a same-folder click.
+    watch([showAddAlertDialog, showImportAlertDialog], ([adding, importing]) => {
+      if (
+        !adding &&
+        !importing &&
+        (searchQuery.value || filterQuery.value || searchAcrossFolders.value)
+      ) {
+        isRestoringState.value = true;
+      }
     });
+    watch(
+      [
+        searchQuery,
+        filterQuery,
+        searchAcrossFolders,
+        stateFilter,
+        sortBy,
+        sortOrder,
+        pageSize,
+        currentPage,
+      ],
+      () => {
+        Object.assign(savedAlertListFilters, {
+          searchQuery: searchQuery.value || "",
+          filterQuery: filterQuery.value || "",
+          searchAcrossFolders: !!searchAcrossFolders.value,
+          stateFilter: stateFilter.value,
+          sortBy: sortBy.value,
+          sortOrder: sortOrder.value,
+          perPage: pageSize.value,
+          currentPage: currentPage.value,
+        });
+      },
+    );
     watch(activeTab, async (newVal) => {
       //here we are resetting the filterQuery when the activeTab is changed
       //this is done because we need to trigger again the filterQuery watch
@@ -3694,6 +3842,11 @@ export default defineComponent({
     ]);
 
     return {
+      downtimesEnabled,
+      muteDialogOpen,
+      muteSelection,
+      muteAndRefresh,
+      openMuteDialog,
       oncallEnabled,
       oncallTeamName,
       lgUp,
@@ -3725,6 +3878,8 @@ export default defineComponent({
       refreshList,
       pageSize,
       pageSizeOptions,
+      sortBy,
+      sortOrder,
       currentPage,
       onPageChange,
       oTableRef,
@@ -3764,6 +3919,7 @@ export default defineComponent({
       splitterModel,
       alertStateLoadingMap,
       showRunOutcome,
+      isMutedFiring,
       runOutcomeTooltip,
       toggleAlertState,
       templates,

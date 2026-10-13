@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { nextTick } from "vue";
 import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelectFolderDropdown.vue";
@@ -29,6 +29,19 @@ vi.mock("vue-router", () => ({
 vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn().mockResolvedValue([]),
 }));
+
+vi.mock("@/services/common", async (importOriginal) => {
+  const actual = await importOriginal<{ default: Record<string, unknown> }>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      list_Folders: vi.fn(() =>
+        Promise.resolve({ data: { list: [{ folderId: "ops", name: "Ops" }] } }),
+      ),
+    },
+  };
+});
 
 // ─── Store setup helpers ──────────────────────────────────────────────────────
 
@@ -531,6 +544,25 @@ describe("InlineSelectFolderDropdown.vue", () => {
       wrapper = createWrapper({ type: "missing-type" });
       expect(wrapper.exists()).toBe(true);
       expect((wrapper.vm as any).folderOptions).toEqual([]);
+    });
+  });
+
+  describe("downtimes", () => {
+    it("lists the folders the server permits, without the injected default", async () => {
+      store.state.selectedOrganization = {
+        ...store.state.selectedOrganization,
+        identifier: "default",
+      } as any;
+      setStoreFolders("downtimes", [
+        { folderId: "default", name: "default" },
+        { folderId: "ops", name: "Ops" },
+      ]);
+      wrapper = createWrapper({ type: "downtimes", modelValue: "ops" });
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vi.waitFor(() =>
+        expect(vm.folderOptions.map((o: { value: string }) => o.value)).toEqual(["ops"]),
+      );
     });
   });
 });

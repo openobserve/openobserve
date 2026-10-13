@@ -923,6 +923,7 @@ export default defineComponent({
         path: "/alerts",
         query: {
           folder: alertForm.activeFolderId.value ?? "default",
+          tab: alertForm.router.currentRoute.value.query.tab,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });

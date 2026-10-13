@@ -377,6 +377,59 @@ describe("useStreams Composable", () => {
       expect(result.schema.map((f: any) => f.name)).toEqual(["field1", "field2"]);
     });
 
+    it("records the removed columns in removedSchemaFields and leaves schema as before", () => {
+      const streamData = {
+        name: "test",
+        schema: [
+          { name: "field1", type: "Utf8" },
+          { name: "_o2_id", type: "Int64" },
+          { name: "_original", type: "Utf8" },
+          { name: "_all_values", type: "LargeUtf8" },
+          { name: "field2", type: "Int64" },
+        ],
+      };
+
+      const result = streamsInstance.removeSchemaFields(streamData);
+
+      expect(result.schema).toEqual([
+        { name: "field1", type: "Utf8" },
+        { name: "field2", type: "Int64" },
+      ]);
+      expect(result.removedSchemaFields).toEqual([
+        { name: "_o2_id", type: "Int64" },
+        { name: "_original", type: "Utf8" },
+        { name: "_all_values", type: "LargeUtf8" },
+      ]);
+    });
+
+    it("records an empty removedSchemaFields when nothing is removed", () => {
+      const result = streamsInstance.removeSchemaFields({
+        name: "test",
+        schema: [{ name: "field1", type: "Utf8" }],
+      });
+
+      expect(result.schema).toEqual([{ name: "field1", type: "Utf8" }]);
+      expect(result.removedSchemaFields).toEqual([]);
+    });
+
+    it("stores removedSchemaFields on a fetched stream", async () => {
+      mockStore.state.streams.logs = { list: [{ name: "test-stream", schema: [] }] } as any;
+      mockStore.state.streams.streamsIndexMapping.logs["test-stream"] = 0;
+
+      await streamsInstance.getStream("test-stream", "logs", true);
+
+      const setStreams = mockStore.dispatch.mock.calls.filter(
+        (call: any[]) => call[0] === "streams/setStreams",
+      );
+      const stream = setStreams.at(-1)?.[1].streams.list[0];
+      expect(stream.schema.map((f: any) => f.name)).toEqual(["field1"]);
+      expect(stream.removedSchemaFields.map((f: any) => f.name)).toEqual([
+        "_o2_id",
+        "_original",
+        "_all_values",
+      ]);
+    });
+
     it("should handle removeSchemaFields with no schema", () => {
       const streamData = { name: "test" };
 
@@ -860,6 +913,26 @@ describe("useStreams Composable", () => {
       streamsInstance.setStreams("logs", []);
 
       expect(mockStore.dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
+    });
+
+    it("should not set isDataIngested for internal streams or non-user types", () => {
+      mockStore.state.organizationData.isDataIngested = false;
+
+      streamsInstance.setStreams("logs", [
+        { name: "usage", stream_type: "logs" },
+        { name: "_o2_db_stats", stream_type: "logs" },
+      ]);
+      streamsInstance.setStreams("metadata", [{ name: "default", stream_type: "metadata" }]);
+
+      expect(mockStore.dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
+    });
+
+    it("should set isDataIngested for a RUM stream", () => {
+      mockStore.state.organizationData.isDataIngested = false;
+
+      streamsInstance.setStreams("logs", [{ name: "_rumdata", stream_type: "logs" }]);
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", true);
     });
 
     it("should handle deepEqual with nested objects", () => {
