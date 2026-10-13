@@ -192,9 +192,135 @@ pub struct ChatMessage {
     pub updated_at: i64,
 }
 
+/// Where a team's page posts go right now: its native Slack room, its webhooks, and the fallback.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RoomPlan {
+    pub native: Option<NativeRoom>,
+    /// For stage posts and step broadcasts only; gap and L0 verdict posts keep the full list.
+    pub stage_webhooks: Vec<String>,
+    /// The same-room destination still in the team's list, used when the room cannot be posted to.
+    pub fallback_destination: Option<String>,
+}
+
+/// The team's Slack channel in the org's connected workspace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeRoom {
+    pub workspace_id: String,
+    pub channel_id: String,
+    /// Display only.
+    pub channel_name: Option<String>,
+}
+
+/// Decides the team's native room, stage webhooks and fallback from its stored Slack fields. [pure]
+pub fn room_plan(
+    team_workspace_id: Option<&str>,
+    team_channel_id: Option<&str>,
+    team_channel_name: Option<&str>,
+    same_room_destination: Option<&str>,
+    install: Option<&ChatInstall>,
+    destinations: &[String],
+) -> RoomPlan {
+    let native = match (install, team_workspace_id, team_channel_id) {
+        (Some(install), Some(workspace_id), Some(channel_id))
+            if install.status == InstallStatus::Active && install.workspace_id == workspace_id =>
+        {
+            Some(NativeRoom {
+                workspace_id: workspace_id.to_string(),
+                channel_id: channel_id.to_string(),
+                channel_name: team_channel_name.map(str::to_string),
+            })
+        }
+        _ => None,
+    };
+    // RO-1: a destination removed from the team's list since it was ticked no longer counts.
+    let counted = same_room_destination.filter(|d| destinations.iter().any(|x| x == d));
+    let stage_webhooks = match (&native, counted) {
+        (Some(_), Some(same_room)) => destinations
+            .iter()
+            .filter(|d| *d != same_room)
+            .cloned()
+            .collect(),
+        _ => destinations.to_vec(),
+    };
+    RoomPlan {
+        native,
+        stage_webhooks,
+        fallback_destination: counted.map(str::to_string),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // An install of workspace `T1` in `status`.
+    fn install(status: InstallStatus) -> ChatInstall {
+        ChatInstall {
+            id: "i1".to_string(),
+            org_id: "default".to_string(),
+            platform: ChatPlatform::Slack,
+            workspace_id: "T1".to_string(),
+            workspace_name: "Acme".to_string(),
+            enterprise_id: None,
+            app_id: "A1".to_string(),
+            bot_user_id: "U0".to_string(),
+            bot_token_cipher: "x".to_string(),
+            scopes: "chat:write".to_string(),
+            status,
+            installed_by: "ann@o2.ai".to_string(),
+            installed_at: 1,
+            updated_at: 1,
+        }
+    }
+
+    #[test]
+    fn test_room_plan_strips_the_same_room_destination_only_with_a_native_room() {
+        let active = install(InstallStatus::Active);
+        let revoked = install(InstallStatus::Revoked);
+        let native = Some(NativeRoom {
+            workspace_id: "T1".to_string(),
+            channel_id: "C1".to_string(),
+            channel_name: Some("pay".to_string()),
+        });
+        // (case, team workspace, team channel, install, expected native)
+        let rooms = [
+            ("match", Some("T1"), Some("C1"), Some(&active), native),
+            (
+                "workspace mismatch",
+                Some("T2"),
+                Some("C1"),
+                Some(&active),
+                None,
+            ),
+            ("revoked", Some("T1"), Some("C1"), Some(&revoked), None),
+            ("no install", Some("T1"), Some("C1"), None, None),
+            ("no channel", Some("T1"), None, Some(&active), None),
+        ];
+        let list = vec!["slack-old".to_string(), "pagerduty".to_string()];
+        // (case, stored same-room destination, the counted one)
+        let destinations = [
+            ("present", Some("slack-old"), Some("slack-old")),
+            ("left the list", Some("gone"), None),
+            ("absent", None, None),
+        ];
+        for (room, workspace, channel, inst, native) in &rooms {
+            for (dest_case, stored, counted) in destinations {
+                let plan = room_plan(*workspace, *channel, Some("pay"), stored, *inst, &list);
+                let stage_webhooks = match (native, counted) {
+                    (Some(_), Some(_)) => vec!["pagerduty".to_string()],
+                    _ => list.clone(),
+                };
+                let expected = RoomPlan {
+                    native: native.clone(),
+                    stage_webhooks,
+                    fallback_destination: counted.map(str::to_string),
+                };
+                assert_eq!(plan, expected, "{room} / {dest_case}");
+            }
+        }
+        let unnamed = room_plan(Some("T1"), Some("C1"), None, None, Some(&active), &list);
+        assert_eq!(unnamed.native.map(|n| n.channel_name), Some(None));
+    }
 
     #[test]
     fn test_stored_ids_are_fixed_and_round_trip() {
