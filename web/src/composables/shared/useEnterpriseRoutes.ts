@@ -393,6 +393,22 @@ const useEnterpriseRoutes = () => {
     },
   );
 
+  if (config.isEnterprise == "true") {
+    routes.push({
+      path: "autoobserve",
+      name: "autoobserve",
+      component: () => import("@/views/AutoObserveHome.vue"),
+      meta: { titleKey: "menu.autoobserve", allowOnEmptyData: true },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+    routes.push({
+      path: "auto-observe-2",
+      redirect: (to: any) => ({ name: "autoobserve", query: to.query }),
+    });
+  }
+
   // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
   // renders in its <router-view> for add/edit.
   routes.push({

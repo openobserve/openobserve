@@ -209,7 +209,9 @@ describe("ONavbar", () => {
       expect(reliability.attributes("data-children")).toBe(
         "alertList,alertDestinations,alertTemplates,alertLibrary,onCallResponses,onCallTeams,onCallRouting",
       );
-      expect(reliability.attributes("data-filtered")).toBe("sloList,incidentList,alertSources");
+      expect(reliability.attributes("data-filtered")).toBe(
+        "sloList,incidentList,downtimes,alertSources",
+      );
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
     });
 

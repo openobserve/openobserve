@@ -1813,6 +1813,8 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useStreams from "@/composables/useStreams";
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
+import { savedBrowserTimezone } from "@/utils/timezoneAliases";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { alertPromqlSamples } from "@/utils/alerts/promqlSamples";
 import AlertQueryPreview from "@/components/alerts/AlertQueryPreview.vue";
@@ -2934,8 +2936,6 @@ export default defineComponent({
     const cronDescription = computed(() =>
       describeCron(t, cronExpression.value, cronTimezone.value),
     );
-    const filteredTimezones = ref<string[]>([]);
-
     // Initialize timezone
     // Populate the timezone OPTIONS only. This must NOT seed the timezone value:
     // `cronTimezone` is now form-owned, so writing here would push a browser
@@ -2943,31 +2943,9 @@ export default defineComponent({
     // display ref, leaving the stored value untouched until the user entered cron
     // mode (onFrequencyUnitChange still seeds it there). defaultAlertValue()
     // already seeds `timezone: "UTC"`, so the control is never blank anyway.
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const browserTime = raw("Browser Time (" + browserTz + ")");
-    const initTimezones = () => {
-      try {
-        // @ts-ignore
-        const zones: string[] =
-          typeof Intl !== "undefined" && typeof Intl.supportedValuesOf === "function"
-            ? // @ts-ignore
-              Intl.supportedValuesOf("timeZone")
-            : [cronTimezone.value || "UTC"];
-        // Convenience shortcuts first (matching the reports picker), then every
-        // IANA zone. This only populates OPTIONS — it must not seed cronTimezone.
-        filteredTimezones.value = [browserTime, "UTC", ...zones];
-      } catch {
-        filteredTimezones.value = ["UTC"];
-      }
-    };
-    initTimezones();
-
-    const timezoneSelectOptions = computed(() =>
-      filteredTimezones.value.map((tz: string) =>
-        tz === browserTime
-          ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-          : { label: raw(tz), value: tz },
-      ),
+    // The stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+    const { zones: filteredTimezones, timezoneOptions: timezoneSelectOptions } = useTimezoneOptions(
+      { browserEntry: true, current: cronTimezone },
     );
 
     const validateCron = () => {
@@ -3023,7 +3001,7 @@ export default defineComponent({
           // Entering cron mode is where a timezone first gets SAVED (parity:
           // pre-migration seeded it here, not at mount).
           if (!cronTimezone.value) {
-            cronTimezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            cronTimezone.value = savedBrowserTimezone();
           }
         }
         validateCron();

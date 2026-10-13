@@ -46,7 +46,8 @@ export type DepNodeKind =
   | "oncall_team_channel"
   | "workflow"
   | "anomaly_detection"
-  | "incident_integration";
+  | "incident_integration"
+  | "downtime";
 
 /** A destination's non-alert consumer kinds, in the order badges render. */
 export type DepConsumerKind = Exclude<DepNodeKind, "template" | "destination" | "alert">;
@@ -61,6 +62,7 @@ export const DEP_CONSUMER_KINDS: DepConsumerKind[] = [
   "workflow",
   "anomaly_detection",
   "incident_integration",
+  "downtime",
 ];
 
 /** One destination `uses` entry — matches `DestinationUseResponse` on the backend. */
@@ -290,6 +292,7 @@ const CONSUMER_LABEL_KEYS: Record<DepConsumerKind, I18nKey> = {
   workflow: "alert_dependencies.countWorkflow",
   anomaly_detection: "alert_dependencies.countAnomalyDetection",
   incident_integration: "alert_dependencies.countIncidentIntegration",
+  downtime: "alert_dependencies.countDowntime",
 };
 
 export const depConsumerLabelKey = (kind: DepConsumerKind): I18nKey => CONSUMER_LABEL_KEYS[kind];

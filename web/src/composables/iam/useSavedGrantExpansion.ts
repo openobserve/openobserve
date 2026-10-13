@@ -125,6 +125,24 @@ export const useSavedGrantExpansion = (deps: ExpansionDeps) => {
           }
         }
 
+        if (!resourceMapper[resource] && resource === "downtime") {
+          if (!resourceMapper["downtime_folder"]) {
+            resourceMapper["downtime_folder"] = getResourceByName(
+              permissionsState.permissions,
+              "downtime_folder",
+            ) as Resource;
+          }
+
+          await getResourceEntities(resourceMapper["downtime_folder"]);
+
+          if (!resourceMapper[resource]) {
+            resourceMapper[resource] = getResourceByName(
+              permissionsState.permissions,
+              resource,
+            ) as Resource;
+          }
+        }
+
         if (!resourceMapper[resource] && resource === "workflows") {
           if (!resourceMapper["workflow_folder"]) {
             resourceMapper["workflow_folder"] = getResourceByName(
@@ -188,6 +206,11 @@ export const useSavedGrantExpansion = (deps: ExpansionDeps) => {
           // owning folder can't be derived from the entity — load every folder's
           // monitors so the permission can be matched to its row.
           for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ?? []) {
+            await getResourceEntities(folderEntity as Entity);
+          }
+        } else if (resource === "downtime") {
+          // Plain downtime ids too, so the same sweep applies.
+          for (const folderEntity of resourceMapper["downtime_folder"]?.entities ?? []) {
             await getResourceEntities(folderEntity as Entity);
           }
         } else if (resource === "workflows") {

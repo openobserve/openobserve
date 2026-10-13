@@ -184,3 +184,22 @@ describe("useRoleScopes - folder scopes [characterization]", () => {
     expect(scopes.map((scope) => scope.covers)).toEqual([["afolder", "alert"], ["alert"]]);
   });
 });
+
+describe("useRoleScopes - downtime scopes", () => {
+  it("warns that a downtime grant limits who manages a downtime, not what it mutes", () => {
+    const { moduleScopes, folderScopes, resourceMapper } = setup();
+    resourceMapper.value.downtime_folder = {
+      name: "downtime_folder",
+      display_name: "Downtime Folders",
+      entities: [],
+    };
+    const [typeScope] = moduleScopes("downtime_folder");
+    expect(typeScope.hint).toBe(t("iam.editRole.scopeDowntimeHint"));
+
+    const [, thisFolder] = folderScopes("downtime_folder", {
+      name: "default",
+      childName: "downtime",
+    });
+    expect(thisFolder.hint).toBe(t("iam.editRole.scopeDowntimeHint"));
+  });
+});

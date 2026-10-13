@@ -23,13 +23,35 @@
 //! Idempotency: Checks for existing incidents before creation to prevent duplicates.
 
 use infra::{errors::Result, table::alert_incidents};
-use o2_enterprise::enterprise::super_cluster::queue::{IncidentMessage, Message};
+use o2_enterprise::enterprise::super_cluster::queue::{
+    IncidentMessage, IncidentUnmuteMessage, Message,
+};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let msg = msg.try_into().map_err(|e| {
         infra::errors::Error::Message(format!("[INCIDENTS] Failed to deserialize: {e}"))
     })?;
     process_msg(msg).await
+}
+
+pub(crate) async fn process_unmute(msg: Message) -> Result<()> {
+    let IncidentUnmuteMessage {
+        org_id,
+        incident_id,
+    } = msg.try_into().map_err(|e| {
+        infra::errors::Error::Message(format!("[INCIDENTS] Failed to deserialize unmute: {e}"))
+    })?;
+    log::debug!("[SUPER_CLUSTER:incidents] Unmute org={org_id} id={incident_id}");
+    // The primary, not a lagging replica: a missing incident redelivers until its Create lands.
+    let Some(incident) = alert_incidents::get_rw(&org_id, &incident_id).await? else {
+        return Err(infra::errors::Error::Message(format!(
+            "[INCIDENTS] unmute for {org_id}/{incident_id} arrived before the incident; retrying"
+        )));
+    };
+    if let Some(downtime_id) = incident.muted_by_downtime_id {
+        alert_incidents::clear_muted_by_downtime_id(&org_id, &incident_id, &downtime_id).await?;
+    }
+    Ok(())
 }
 
 pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
@@ -41,17 +63,19 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             stable_dimensions: group_values,
             first_alert_at,
             title,
+            muted_by_downtime_id,
         } => {
             log::debug!(
                 "[SUPER_CLUSTER:incidents] Create incident org={org_id} key_type={key_type}"
             );
-            alert_incidents::create(
+            alert_incidents::create_with_mute(
                 &org_id,
                 &severity,
                 group_values,
                 &key_type,
                 first_alert_at,
                 title,
+                muted_by_downtime_id,
             )
             .await?;
         }
