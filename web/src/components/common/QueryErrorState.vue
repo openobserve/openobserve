@@ -105,6 +105,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Caller can replace all action cards via #actions slot -->
         <slot name="actions" v-bind="slotProps">
           <EmptyStateActionCard
+            v-if="showRunSuggestion"
+            icon="play-arrow"
+            :label="t('queryError.runAs')"
+            :sublabel="raw(runSuggestionText)"
+            data-test="query-error-run-suggestion-card"
+            @click="emit('run-suggestion', runSuggestionText)"
+          />
+          <template v-if="showSearchText">
+            <EmptyStateActionCard
+              icon="search"
+              :label="t('queryError.searchTextFor', { text: searchTextFull })"
+              :sublabel="t('queryError.searchTextDesc')"
+              data-test="query-error-search-text-card"
+              @click="emit('search-text', searchTextFull)"
+            >
+              <template #label>
+                <span class="flex min-w-0">
+                  <OTruncatedText>{{
+                    t("queryError.searchTextFor", { text: searchTextFull })
+                  }}</OTruncatedText>
+                </span>
+              </template>
+            </EmptyStateActionCard>
+          </template>
+          <EmptyStateActionCard
             v-if="errorCode === 20003"
             icon="settings"
             :label="t('queryError.configureResource')"
@@ -302,8 +327,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { computed, ref } from "vue";
-import { useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useAiIcon } from "@/composables/useAiIcon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -338,6 +364,8 @@ const props = withDefaults(
     title?: I18nText;
     /** Override the error code's default description. */
     description?: I18nText;
+    freeTextCandidate?: string;
+    runSuggestion?: string;
   }>(),
   { size: "hero", aiEnabled: false },
 );
@@ -353,6 +381,8 @@ const emit = defineEmits<{
   "configure-resource": [];
   /** User clicked "Try a different time range". */
   "widen-range": [];
+  "search-text": [text: string];
+  "run-suggestion": [suggestion: string];
 }>();
 
 // ── Error parsing ──────────────────────────────────────────────────────────
@@ -380,6 +410,13 @@ const {
 const { t } = useI18nTyped();
 const resolvedTitle = computed(() => props.title ?? defaultTitle.value);
 const resolvedDescription = computed(() => props.description ?? defaultDescription.value);
+
+const runSuggestionText = computed(() => props.runSuggestion?.trim() ?? "");
+const showRunSuggestion = computed(() => isQueryError.value && runSuggestionText.value !== "");
+const searchTextFull = computed(() => props.freeTextCandidate?.trim() ?? "");
+const showSearchText = computed(
+  () => isQueryError.value && searchTextFull.value !== "" && !showRunSuggestion.value,
+);
 
 // ── Copy feedback — show "Copied!" for 2 s after the user clicks ───────────
 

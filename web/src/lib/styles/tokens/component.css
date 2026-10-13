@@ -2114,6 +2114,16 @@
   --color-lang-vrl-bg: var(--color-lang-vrl-bg);
   --color-lang-vrl-text: var(--color-lang-vrl-text);
   --color-latency-p95: var(--color-latency-p95);
+  --color-log-severity-emergency-indicator: var(--color-log-severity-emergency-indicator);
+  --color-log-severity-alert-indicator: var(--color-log-severity-alert-indicator);
+  --color-log-severity-critical-indicator: var(--color-log-severity-critical-indicator);
+  --color-log-severity-error-indicator: var(--color-log-severity-error-indicator);
+  --color-log-severity-warning-indicator: var(--color-log-severity-warning-indicator);
+  --color-log-severity-notice-indicator: var(--color-log-severity-notice-indicator);
+  --color-log-severity-info-indicator: var(--color-log-severity-info-indicator);
+  --color-log-severity-debug-indicator: var(--color-log-severity-debug-indicator);
+  --color-log-severity-trace-indicator: var(--color-log-severity-trace-indicator);
+  --color-log-severity-ok-indicator: var(--color-log-severity-ok-indicator);
   --color-log-table-row-bg: var(--color-log-table-row-bg);
   --color-log-table-row-border: var(--color-log-table-row-border);
   --color-purple-700: var(--color-purple-700);

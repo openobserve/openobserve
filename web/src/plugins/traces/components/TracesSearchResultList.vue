@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="traces-table-container flex h-auto! flex-col"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
-      <div data-test="traces-search-result-list" class="relative h-auto! w-full">
+      <div ref="listRef" data-test="traces-search-result-list" class="relative h-auto! w-full">
         <!-- Row/cell actions live in a right-click context menu, same as logs:
              anchored to the pointer, so every cell can offer actions regardless
              of how narrow it is. -->
@@ -50,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data="hits"
                 :loading="loading"
                 :row-class="traceRowClass"
+                :active-row-index="activeRowIndex"
                 sorting="server"
                 :sort-by="props.sortBy"
                 :sort-order="props.sortOrder"
@@ -246,7 +247,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { nextRowTarget } from "@/utils/rowNavigation";
+import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
+import { announceTracesRowNav as announce } from "@/plugins/traces/composables/tracesRowNav";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -338,6 +342,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   "row-click": [row: any];
   "page-change": [page: number];
+  "cross-page": [page: number];
   "rows-per-page-change": [rowsPerPage: number];
   "sort-change": [sortBy: string, sortOrder: "asc" | "desc"];
   copy: [value: any];
@@ -543,6 +548,134 @@ const noResults = computed(
 );
 
 const hasResults = computed(() => props.searchPerformed && props.hits.length > 0);
+
+const listRef = ref<HTMLElement | null>(null);
+const navigation = () => searchObj.meta.resultGrid.navigation;
+
+const totalPages = computed(() =>
+  props.total && props.rowsPerPage ? Math.max(1, Math.ceil(props.total / props.rowsPerPage)) : 1,
+);
+const canChangePage = computed(() => props.showPagination);
+const activeRowIndex = computed(() =>
+  navigation().selectionActive ? (navigation().currentRowIndex ?? null) : null,
+);
+
+const rowElement = (index: number): HTMLElement | null =>
+  listRef.value?.querySelector<HTMLElement>(`[data-test="o2-table-row-${index}"]`) ?? null;
+
+const focusedRow = (): number | null => {
+  const row = (document.activeElement as HTMLElement | null)?.closest?.<HTMLElement>(
+    '[data-test^="o2-table-row-"]',
+  );
+  if (!row || !listRef.value?.contains(row)) return null;
+  const match = /^o2-table-row-(\d+)$/.exec(row.dataset.test ?? "");
+  return match ? Number(match[1]) : null;
+};
+
+const isOtherDialogOpen = () => !!document.querySelector('[role="dialog"][data-state="open"]');
+
+const announcePosition = (index: number, count: number, page: number) =>
+  announce(
+    t(props.searchMode === "spans" ? "traces.rowNav.spanPosition" : "traces.rowNav.tracePosition", {
+      row: index + 1,
+      count,
+      page,
+    }),
+  );
+
+const selectRow = (index: number, count = props.hits.length, page = props.currentPage) => {
+  navigation().currentRowIndex = index;
+  navigation().selectionActive = true;
+  nextTick(() => {
+    const row = rowElement(index);
+    row?.scrollIntoView({ block: "nearest" });
+    row?.focus({ preventScroll: true });
+  });
+  announcePosition(index, count, page);
+};
+
+const clearSelection = () => {
+  navigation().selectionActive = false;
+  navigation().currentRowIndex = null;
+  navigation().pendingPageSelection = null;
+};
+
+const edgeMessage = (edge: "first" | "last") => {
+  return edge === "last" ? t("traces.rowNav.lastResult") : t("traces.rowNav.firstResult");
+};
+
+const stepTraceRow = (direction: 1 | -1, isRepeat = false) => {
+  if (props.loading || navigation().pendingPageSelection || isOtherDialogOpen()) return;
+  if (!props.hits.length) return;
+  const focused = focusedRow();
+  const anchor =
+    focused ?? (navigation().selectionActive ? (navigation().currentRowIndex ?? null) : null);
+  const target = nextRowTarget({
+    anchor,
+    count: props.hits.length,
+    direction,
+    page: props.currentPage,
+    pageCount: totalPages.value,
+    canChangePage: canChangePage.value,
+    isRepeat,
+  });
+  if (target.kind === "select") {
+    selectRow(target.index);
+  } else if (target.kind === "page") {
+    navigation().pendingPageSelection = {
+      page: target.page,
+      position: target.position,
+      requestId: null,
+    };
+    announce(t("traces.rowNav.loadingPage", { page: target.page }));
+    emit("cross-page", target.page);
+    if (navigation().pendingPageSelection?.requestId === null) failCrossing(target.page);
+  } else if (target.kind === "edge") {
+    announce(edgeMessage(target.edge));
+  }
+};
+
+const failCrossing = (page: number, cancelled = false) => {
+  clearSelection();
+  if (!cancelled) announce(t("traces.rowNav.pageFailed", { page }));
+};
+
+const resolveCrossing = (pending: PendingPageSelection, load: PageLoad) => {
+  if (!load.ok) {
+    failCrossing(pending.page, load.reason === "cancelled");
+    return;
+  }
+  navigation().pendingPageSelection = null;
+  const count = (searchObj.data.queryResults?.hits ?? []).length;
+  if (!count) {
+    clearSelection();
+    announce(t("traces.rowNav.pageEmpty", { page: pending.page }));
+    return;
+  }
+  selectRow(pending.position === "first" ? 0 : count - 1, count, pending.page);
+};
+
+watch(
+  () => searchObj.data.resultGrid.pageLoad,
+  (load) => {
+    const pending = navigation().pendingPageSelection ?? null;
+    if (pending && acceptsPageLoad(pending, load ?? null)) resolveCrossing(pending, load!);
+  },
+  { flush: "sync" },
+);
+
+onMounted(() => {
+  const id = navigation().lastOpenedId;
+  if (!id) return;
+  const key = props.searchMode === "spans" ? "span_id" : "trace_id";
+  const index = props.hits.findIndex((hit) => hit?.[key] === id);
+  if (index >= 0) {
+    navigation().currentRowIndex = index;
+    navigation().selectionActive = true;
+  }
+});
+
+defineExpose({ stepTraceRow });
 </script>
 
 <style scoped>

@@ -16,14 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OTable
+    ref="oTableRef"
     v-model:selected-ids="localSelectedIds"
     :columns="columns"
     :data="data"
     :loading="loading"
     :forbidden="forbidden"
     pagination="client"
-    :page-size="20"
+    :page-size="pageSize"
     :page-size-options="[10, 20, 25, 50]"
+    :current-page="currentPage"
+    :sort-by="sortBy"
+    :sort-order="sortOrder"
     row-key="id"
     selection="multiple"
     :show-global-filter="false"
@@ -37,6 +41,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :get-row-style="monitorRowStyle"
     show-index
     @row-click="(row: any) => emit('row-click', row)"
+    @update:current-page="emit('update:currentPage', $event)"
+    @update:page-size="emit('update:pageSize', $event)"
+    @update:sort-by="emit('update:sortBy', $event)"
+    @update:sort-order="emit('update:sortOrder', $event)"
   >
     <!-- Summary strip supplied by the parent (it owns the status facet). -->
     <template v-if="$slots.subheader" #subheader>
@@ -71,6 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
           <span class="cursor-pointer truncate">{{ (row as any).name || "—" }}</span>
+          <MutedChip
+            v-if="(row as any).active_downtime"
+            :downtime="(row as any).active_downtime"
+            :data-test="`${dataTest}-${(row as any).id}-muted`"
+          />
         </div>
       </OTooltip>
       <span v-else class="truncate">—</span>
@@ -393,6 +406,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("synthetics.table.move") }}
           </ODropdownItem>
 
+          <template v-if="downtimesEnabled">
+            <ODropdownSeparator />
+            <MuteMenuItems
+              :data-test-prefix="`${dataTest}-mute`"
+              @preset="(secs) => muteRows([row], secs)"
+              @until="openMuteDialog([row])"
+            />
+          </template>
+
           <ODropdownSeparator />
 
           <ODropdownItem
@@ -478,6 +500,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="emit('move-selected')"
         >{{ t("synthetics.table.move") }}</OButton
       >
+      <ODropdown v-if="downtimesEnabled" side="top">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="notifications-paused"
+            :data-test="`${dataTest}-mute-selected-btn`"
+          >
+            {{ t("alerts.downtimes.mute.bulk") }}
+          </OButton>
+        </template>
+        <MuteMenuItems
+          :data-test-prefix="`${dataTest}-bulk-mute`"
+          @preset="(secs) => muteRows(selectedRows, secs)"
+          @until="openMuteDialog(selectedRows)"
+        />
+      </ODropdown>
       <OButton
         variant="outline-destructive"
         size="sm"
@@ -489,6 +528,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </template>
   </OTable>
+
+  <QuickMuteDialog
+    v-if="downtimesEnabled"
+    v-model:open="muteDialogOpen"
+    :selection="muteSelection"
+  />
 
   <!-- Spark bar detail tooltip -->
   <Teleport to="body">
@@ -560,6 +605,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import MutedChip from "@/components/alerts/downtimes/MutedChip.vue";
+import MuteMenuItems from "@/components/alerts/downtimes/MuteMenuItems.vue";
+import QuickMuteDialog from "@/components/alerts/downtimes/QuickMuteDialog.vue";
+import { useRowMute } from "@/composables/downtimes/useRowMute";
 
 type Mode = "all" | "browser";
 
@@ -613,8 +662,13 @@ const props = withDefaults(
      *  human label. Falls back to the raw id when a location isn't in the map
      *  (e.g. deleted since the check last ran). */
     locationNames?: Record<string, string>;
+    pageSize?: number;
+    currentPage?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
   }>(),
   {
+    pageSize: 20,
     loading: false,
     dataTest: "monitor-table",
     toggleLoadingMap: () => ({}),
@@ -647,7 +701,15 @@ const emit = defineEmits<{
   "trigger-selected": [];
   "navigate-to-folder": [folderId: string];
   "empty-action": [actionId: string];
+  "update:currentPage": [page: number];
+  "update:pageSize": [size: number];
+  "update:sortBy": [columnId: string];
+  "update:sortOrder": [order: "asc" | "desc"];
 }>();
+
+const oTableRef = ref<any>(null);
+
+defineExpose({ restorePage: (page: number) => oTableRef.value?.restorePage?.(page) });
 
 const { t } = useI18nTyped();
 
@@ -658,6 +720,16 @@ const localSelectedIds = computed({
   get: () => props.selectedIds ?? [],
   set: (val: string[]) => emit("update:selectedIds", val),
 });
+
+const { downtimesEnabled, muteDialogOpen, muteSelection, muteRows, openMuteDialog } =
+  useRowMute<any>(
+    () => "synthetics",
+    (row) => String(row.id),
+  );
+
+const selectedRows = computed(() =>
+  props.data.filter((row: any) => localSelectedIds.value.includes(String(row.id))),
+);
 
 // ── Column definitions per mode ─────────────────────────────────────
 

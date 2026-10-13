@@ -154,6 +154,8 @@ export default defineComponent({
           return "synthetic_ids";
         case "workflows":
           return "workflow_ids";
+        case "downtimes":
+          return "downtime_ids";
         default:
           return "alert_ids";
       }

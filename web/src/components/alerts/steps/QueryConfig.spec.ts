@@ -265,6 +265,7 @@ describe("QueryConfig.vue", () => {
     qcOverrides: Record<string, any> = {},
     formOverrides: Record<string, any> = {},
     storeOverride?: any,
+    onSubmit: (values: any) => void = () => {},
   ) {
     const props = reactive({ ...baseQCProps(), ...qcOverrides });
     const theStore = storeOverride ?? mockStore;
@@ -274,9 +275,10 @@ describe("QueryConfig.vue", () => {
         schema: addAlertSchema,
         defaultValues: hostDefaults(formOverrides),
         qcProps: props,
+        onSubmit,
       }),
       template: `
-        <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
+        <OForm :schema="schema" :default-values="defaultValues" @submit="onSubmit">
           <QueryConfig v-bind="qcProps" />
         </OForm>
       `,
@@ -350,6 +352,55 @@ describe("QueryConfig.vue", () => {
       wrapper.vm.onCronTimezoneChange("Browser Time (America/Los_Angeles)");
       await nextTick();
       expect(wrapper.vm.cronTimezone).toBe("America/Los_Angeles");
+    });
+
+    it("keeps a loaded Asia/Calcutta through mount and an unchanged save, shown as Asia/Kolkata", async () => {
+      host.unmount();
+      const submitted: any[] = [];
+      const triggerCondition = {
+        ...hostDefaults().trigger_condition,
+        frequency_type: "cron",
+        cron: "0 */5 * * * *",
+        timezone: "Asia/Calcutta",
+      };
+      const { h } = mountHost(
+        { triggerCondition },
+        { trigger_condition: triggerCondition },
+        undefined,
+        (values) => submitted.push(values),
+      );
+      host = h;
+      wrapper = host.findComponent(QueryConfig) as unknown as VueWrapper<any>;
+      await flushPromises();
+      expect(hostForm().getFieldValue("trigger_condition.timezone")).toBe("Asia/Calcutta");
+
+      const options = wrapper.vm.timezoneSelectOptions as {
+        label: string;
+        value: string;
+        searchText?: string;
+      }[];
+      const stored = options.find((o) => o.value === "Asia/Calcutta");
+      expect(stored?.label).toBe("Asia/Kolkata");
+      expect(stored?.searchText).toContain("Calcutta");
+      expect(options.filter((o) => o.label === "Asia/Kolkata")).toHaveLength(1);
+
+      const picker = host
+        .findAllComponents(OFormSelect)
+        .find((c: any) => c.props("name") === "trigger_condition.timezone");
+      expect(picker?.findComponent(OSelect).props("modelValue")).toBe("Asia/Calcutta");
+      expect(picker?.text()).toContain("Asia/Kolkata");
+
+      await hostForm().handleSubmit();
+      await flushPromises();
+      expect(hostForm().state.errors).toEqual([]);
+      expect(submitted).toHaveLength(1);
+      expect(submitted[0].trigger_condition.timezone).toBe("Asia/Calcutta");
+    });
+
+    it("onCronTimezoneChange stores a legacy zone as picked, as main did", async () => {
+      wrapper.vm.onCronTimezoneChange("Asia/Calcutta");
+      await nextTick();
+      expect(wrapper.vm.cronTimezone).toBe("Asia/Calcutta");
     });
   });
 
@@ -889,6 +940,68 @@ describe("QueryConfig.vue", () => {
         promqlCondition: { operator: ">=", value: 1 },
       });
       await flushPromises();
+    });
+
+    it("rule mode clears thresholds, keeps Single at zero pending and preserves frequency", async () => {
+      const previousFrequency = hostForm().state.values.trigger_condition.frequency;
+      hostForm().setFieldValue("query_condition.promql_warning_value", 4);
+      await flushPromises();
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      const value = hostForm().state.values;
+      expect(value.query_condition.promql_rule_mode).toBe(true);
+      expect(value.query_condition.promql_condition).toBeNull();
+      expect(value.query_condition.promql_warning_value).toBeNull();
+      expect(value.query_condition.promql_multi_alert).toBe(false);
+      expect(value.trigger_condition.frequency).toBe(previousFrequency);
+      expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(false);
+      expect(await submit()).toBe(true);
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_rule_mode).toBe(false);
+      expect(wrapper.find('[data-test="alert-threshold-value-input"]').exists()).toBe(true);
+    });
+
+    it("locks Multi only while rule mode has a pending duration", async () => {
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      const toggle = () => wrapper.findComponent({ name: "AlertMultiToggle" });
+      expect(toggle().props("disabled")).toBe(false);
+      hostForm().setFieldValue("pending_period_sec", 4);
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(true);
+      expect(toggle().props("disabled")).toBe(true);
+      expect(wrapper.find('[data-test-value="false"]').attributes("disabled")).toBeDefined();
+      hostForm().setFieldValue("query_condition.promql_multi_alert", false);
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(true);
+      expect(await submit()).toBe(true);
+      hostForm().setFieldValue("pending_period_sec", 0);
+      await flushPromises();
+      expect(toggle().props("disabled")).toBe(false);
+      await wrapper.find('[data-test-value="false"]').trigger("click");
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(false);
+      expect(await submit()).toBe(true);
+    });
+
+    it.each(["custom", "sql"])("keeps rule mode valid after a %s tab round trip", async (tab) => {
+      await wrapper.find('[data-test="alert-prom-rule-mode-btn"]').trigger("click");
+      await flushPromises();
+      wrapper.vm.localTab = tab;
+      await setQCProps({ tab });
+      await flushPromises();
+      expect(hostForm().state.values.query_condition.promql_multi_alert).toBe(false);
+      hostForm().setFieldValue("trigger_condition.threshold", 3);
+      hostForm().setFieldValue("trigger_condition.warning_threshold", 2);
+      wrapper.vm.localTab = "promql";
+      await setQCProps({ tab: "promql" });
+      await flushPromises();
+      const query = hostForm().state.values.query_condition;
+      expect(query.promql_rule_mode).toBe(true);
+      expect(query.promql_multi_alert).toBe(false);
+      expect(query.promql_condition).toBeNull();
+      expect(await submit()).toBe(true);
     });
 
     it("passes with a complete promql condition (§4 restore)", async () => {

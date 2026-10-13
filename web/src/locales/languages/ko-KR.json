@@ -560,6 +560,18 @@
       "description": "원격 태스크는 실험이 출력을 생성하기 위해 호출하는 HTTP 서비스입니다. 한 번 게시하고 연결이 작동하는지 확인하면 모든 실험이 실행한 정확한 버전을 고정할 수 있습니다.",
       "action": "새 태스크",
       "actionDesc": "OpenObserve를 엔드포인트에 연결하고 연결을 테스트하세요."
+    },
+    "noDowntimes": {
+      "title": "아직 다운타임이 없습니다",
+      "description": "다운타임은 알림, 이상 탐지, Synthetics 검사가 계속 실행되도록 유지하면서 예약한 시간 동안 해당 알림 전송을 중지합니다.",
+      "action": "다운타임 예약",
+      "actionDesc": "일회성, 매일 또는 매주. 빠르게 음소거하려면 알림 목록에서 음소거를 사용하세요."
+    },
+    "searchCancelled": {
+      "title": "검색 취소됨",
+      "description": "결과가 로드되지 않았습니다. 쿼리를 실행하여 이벤트를 로드하세요.",
+      "action": "쿼리 실행",
+      "actionDesc": "동일한 쿼리를 다시 실행"
     }
   },
   "common": {
@@ -1271,9 +1283,129 @@
     "aliasNotAllowed": "별칭 '{alias}'은(는) 허용되지 않습니다.",
     "commonGroupFields": "공통 그룹 필드",
     "queryRangeHours": "{count}시간 | {count}시간",
-    "menuGroupAlerts": "알림"
+    "menuGroupAlerts": "알림",
+    "runQueryPendingLabel": "쿼리 실행, 변경 사항이 아직 적용되지 않음",
+    "queryActions": {
+      "runEditedFirst": "먼저 수정한 쿼리를 실행하세요",
+      "runFirst": "먼저 쿼리를 실행하세요",
+      "usesEditedQuery": "수정한 쿼리를 사용합니다 (아직 실행되지 않음)",
+      "usesUnrunQuery": "쿼리를 사용합니다 (아직 실행되지 않음)",
+      "downloadsShownResults": "수정 사항이 아닌 표시된 결과를 다운로드합니다",
+      "downloadsLastRun": "수정 사항이 아닌 마지막으로 실행된 쿼리를 사용합니다"
+    },
+    "noFtsRecovery": {
+      "title": "{stream}에 전체 텍스트 검색 필드가 구성되어 있지 않습니다",
+      "description": "필드 값을 검색하거나 전체 쿼리를 지워 이 시간 범위의 로그를 확인하세요.",
+      "searchField": "특정 필드 검색",
+      "searchFieldHint": "제외 단어를 유지하면서 검색할 필드를 선택하세요.",
+      "clearRun": "이 검색 없이 로그 표시",
+      "clearRunHint": "전체 쿼리를 지우고 동일한 시간 범위에서 실행합니다.",
+      "editPermission": "스트림 설정을 편집할 권한이 필요합니다.",
+      "scope": "현재 시간 범위에서 {stream}을 검색합니다.",
+      "singleStreamScope": "{stream}만 검색하며, {otherStreams} 선택이 해제됩니다.",
+      "stream": "스트림",
+      "field": "필드",
+      "match": "일치",
+      "value": "값",
+      "contains": "텍스트 포함",
+      "equals": "같음",
+      "preview": "필터 미리보기",
+      "replacement": "전체 쿼리를 필드 필터로 대체하며 제외 단어는 유지됩니다. 전체 텍스트 필드는 필요하지 않습니다.",
+      "run": "필드 검색 실행",
+      "close": "필드 검색 닫기",
+      "skipped": "{stream}에 전체 텍스트 검색 필드가 구성되어 있지 않아 건너뛰었습니다.",
+      "resultsScope": "이 결과는 {streams}에서만 가져온 것입니다.",
+      "noFields": "이 스트림에는 필드 검색에 사용할 수 있는 필드가 없습니다.",
+      "valueRequired": "검색할 값을 입력하세요.",
+      "fieldRequired": "검색할 필드를 선택하세요.",
+      "invalidValue": "이 필드에 유효한 값을 입력하세요.",
+      "configureHint": "이 스트림의 전체 텍스트 검색을 빠르게 합니다."
+    },
+    "autoRunPersistNeedsRun": "먼저 쿼리를 실행하세요: 이 작업은 실행한 내용을 저장하거나 공유합니다",
+    "autoRunSearchAroundActive": "특정 라인 주변의 레코드를 표시 중입니다: 쿼리를 실행하여 결과로 돌아가세요",
+    "autoRunStaleTooltip": "쿼리를 실행하여 결과를 업데이트하세요",
+    "searchCancelledNotice": "검색이 취소되었습니다.",
+    "linePermalink": {
+      "disabledFunction": "단일 라인을 링크하려면 함수를 끄세요",
+      "disabledTimestampRewrite": "이 쿼리는 타임스탬프를 재작성합니다",
+      "disabledNotSingleLines": "이 쿼리의 행은 단일 로그 라인이 아닙니다",
+      "disabledNoTimestamp": "이 행에는 타임스탬프가 없습니다",
+      "disabledEnrichmentTable": "보강 테이블 행은 링크할 수 없습니다",
+      "toastNotUnique": "타임스탬프 링크를 복사했습니다. 이 라인은 고유하게 식별할 수 없습니다.",
+      "toastWideStream": "이 스트림은 너무 넓어 하나의 라인을 정확히 링크할 수 없습니다. 타임스탬프 링크를 복사했습니다",
+      "bannerInvalid": "이 링크가 잘못되었습니다. 공유된 검색만 표시합니다",
+      "bannerDenied": "{stream} 스트림에 대한 액세스 권한이 없습니다.",
+      "bannerStreamMissing": "스트림 {stream}이(가) 더 이상 존재하지 않습니다",
+      "bannerError": "공유된 로그 라인을 불러올 수 없습니다.",
+      "bannerIncomplete": "이 타임스탬프의 모든 라인을 검색할 수 없습니다",
+      "bannerGone": "이 로그 라인은 더 이상 사용할 수 없습니다. 스트림 보존 기간이 지났거나 삭제되었을 수 있습니다.",
+      "bannerGoneRetention": "이 로그 라인은 더 이상 사용할 수 없습니다. 스트림 보존 기간({days}일)이 지났거나 삭제되었을 수 있습니다. | 이 로그 라인은 더 이상 사용할 수 없습니다. 스트림 보존 기간({days}일)이 지났거나 삭제되었을 수 있습니다.",
+      "bannerFound": "공유된 로그 라인을 표시하는 중",
+      "bannerAmbiguous": "이 타임스탬프에 {count}개의 라인이 있으며 정확한 라인을 식별할 수 없습니다 | 이 타임스탬프에 {count}개의 라인이 있으며 정확한 라인을 식별할 수 없습니다",
+      "bannerChanged": "링크가 생성된 이후 라인이 변경되었을 수 있습니다",
+      "actionShowLines": "이 라인들 표시",
+      "actionShowInContext": "컨텍스트에서 표시",
+      "bannerAmbiguousTieHeavy": "이 타임스탬프를 공유하는 라인이 {count}개 있고 스트림에 _o2_id가 없어 정확한 라인을 식별할 수 없습니다. 해당 타임스탬프의 라인이 강조 표시됩니다. | 이 타임스탬프를 공유하는 라인이 {count}개 있고 스트림에 _o2_id가 없어 정확한 라인을 식별할 수 없습니다. 해당 타임스탬프의 라인이 강조 표시됩니다.",
+      "bannerDismiss": "닫기",
+      "copyLink": "링크 복사",
+      "copyLinkTooltip": "이 로그 라인에 대한 링크 복사",
+      "copyLinkMenu": "이 로그 라인 링크 복사",
+      "toastCopied": "로그 라인 링크가 복사되었습니다",
+      "toastCopiedValid": "로그 라인 링크가 복사되었습니다 · {days}일 동안 유효 | 로그 라인 링크가 복사되었습니다 · {days}일 동안 유효",
+      "toastLookupFailed": "이 라인을 조회할 수 없어 타임스탬프에 대한 링크를 복사했습니다",
+      "toastShortFailed": "링크를 단축할 수 없어 전체 링크를 대신 복사했습니다",
+      "toastFailed": "이 로그 라인에 대한 링크를 만들 수 없습니다",
+      "toastScopeChanged": "링크를 생성하는 동안 조직 또는 스트림이 변경되어 아무것도 복사되지 않았습니다",
+      "popoverTitle": "이 로그 라인에 대한 링크",
+      "popoverDesc": "브라우저가 자동 복사를 차단했습니다. 링크를 선택하여 복사하거나 버튼을 사용하세요.",
+      "pageNotice": "이 링크는 페이지 {page}에 있었습니다.",
+      "pageGo": "페이지 {page}(으)로 이동",
+      "pageGoLast": "마지막 페이지({page})(으)로 이동"
+    },
+    "autoRunPendingDot": "최신 변경 사항을 적용하려면 쿼리 실행",
+    "autoRunAppliesTo": "로그와 트레이스에 적용됩니다",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "이 검색은 약 {size}을(를) 스캔합니다",
+    "autoRunGuardLinkTitle": "이 링크는 약 {size}을(를) 스캔합니다",
+    "autoRunGuardDescAutoRun": "{scope}. 먼저 범위를 좁힐 수 있도록 자동 실행이 일시 중지되었습니다.",
+    "autoRunGuardDescPaused": "{scope}. 먼저 범위를 좁힐 수 있도록 일시 중지되었습니다.",
+    "autoRunGuardDescLink": "링크에서 열림 · {scope}. 범위를 확인한 후 실행하세요.",
+    "autoRunGuardHint": "필터 및 시간 변경을 수동으로 적용하려면 자동 실행을 끄세요.",
+    "autoRunGuardUnknownTitle": "이 기간의 크기를 알 수 없습니다",
+    "autoRunGuardUnknownDesc": "{streams}에 아직 크기 통계가 없어 자동 실행은 1시간 이하의 기간만 실행합니다.",
+    "autoRunGuardUnknownManyDesc": "{count}개의 스트림에 아직 크기 통계가 없어 자동 실행이 대기합니다. {scope}. | {count}개의 스트림에 아직 크기 통계가 없어 자동 실행이 대기합니다. {scope}.",
+    "autoRunGuardSuperClusterTitle": "여러 리전에서 실행할 준비가 되었습니다",
+    "autoRunGuardSuperClusterDesc": "다중 리전 클러스터에서는 아직 검색 크기를 추정할 수 없어 자동 실행이 대기합니다. {scope}.",
+    "autoRunGuardUnresolvedTitle": "스트림을 사용할 수 없음",
+    "autoRunGuardUnresolvedDesc": "스트림 {streams}이(가) 존재하지 않거나 액세스 권한이 없습니다.",
+    "autoRunGuardBanner": "이 변경은 약 {size}({scope})을(를) 스캔하므로 자동 실행이 일시 중지되었습니다. 아래 결과는 이전 쿼리의 결과입니다.",
+    "autoRunGuardBannerPaused": "이 변경은 약 {size}({scope})을(를) 스캔하므로 일시 중지되었습니다. 아래 결과는 이전 쿼리의 결과입니다.",
+    "autoRunGuardBannerUnknown": "이 기간({scope})의 크기를 알 수 없어 일시 중지되었습니다. 아래 결과는 이전 쿼리의 결과입니다.",
+    "autoRunGuardBannerRefresh": "자동 새로 고침은 새로 고침할 때마다 약 {size}({scope})을(를) 스캔하므로 한 번 실행할 때까지 일시 중지됩니다. 아래 결과는 이전 쿼리의 결과입니다.",
+    "autoRunGuardRunAnyway": "그래도 실행",
+    "autoRunGuardRunQuery": "쿼리 실행",
+    "autoRunGuardNarrow": "{period}(으)로 좁히기",
+    "autoRunGuardNarrowWithSize": "{period}(으)로 좁히기 (~{size})",
+    "autoRunGuardSearchJob": "검색 작업으로 실행",
+    "autoRunGuardSelectStream": "스트림 선택",
+    "searchJobNoPermission": "검색 작업을 생성할 권한이 없습니다",
+    "missingStreamAndNoFts": "하나 이상의 필터 필드가 \"{missingStreams}\"에 존재하지 않으므로 해당 스트림에서는 검색이 수행되지 않습니다.\n 검색하지 않음: {noFtsStreams}(전체 텍스트 필드 없음).",
+    "freeTextChooseFirst": "먼저 텍스트 검색 방법을 선택하세요",
+    "freeTextScanLogsOnly": "스캔 모드는 로그 보기에서만 작동합니다. 여기에서 텍스트 검색을 사용하려면 전체 텍스트 필드를 설정하세요",
+    "freeTextSearchedFields": "전체 텍스트 검색 대상: {fields} (모든 단어, 순서 무관)",
+    "freeTextPreview": "전체 텍스트 검색 대상: {fields} (모든 단어, 순서 무관)\n\n{sql}(으)로 실행",
+    "freeTextRunsAs": "{sql}(으)로 실행",
+    "freeTextNotSearched": "검색하지 않음: {streams}(전체 텍스트 필드 없음).",
+    "freeTextSetField": "전체 텍스트 검색 필드 구성",
+    "freeTextNoFtsTitle": "\"{stream}\"에 전체 텍스트 필드가 없습니다",
+    "freeTextNoFtsTitleMulti": "선택한 스트림에 전체 텍스트 필드가 없습니다",
+    "freeTextNoTextFields": "이 스트림에는 검색할 텍스트 필드가 없습니다.",
+    "freeTextNoTextFieldsNamed": "검색하지 않음: {streams}(텍스트 필드 없음).",
+    "freeTextBuildNotice": "이 필터에는 텍스트 검색이 있습니다. SQL에서 편집하세요."
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "PRO 플랜으로 업그레이드",
     "home": "홈",
     "about": "정보",
@@ -1320,6 +1452,7 @@
     "topQueries": "상위 쿼리",
     "profiles": "프로파일",
     "productAnalytics": "제품 분석",
+    "downtimes": "다운타임",
     "trialEndedTitle": "체험판이 종료되었습니다",
     "trialPageNeedsPlan": "{page}에는 플랜이 필요합니다",
     "trialPageNeedsPlanToast": "{page}에는 플랜이 필요합니다. 계속 사용하려면 이 페이지에서 플랜을 선택하세요.",
@@ -2491,6 +2624,7 @@
   "login": {
     "lockedOut": "로그인 시도 실패 횟수가 너무 많습니다. {duration} 후에 다시 시도하거나 관리자에게 문의하세요.",
     "redirectingToSsoMessage": "SSO 로그인 페이지로 리디렉션합니다. 리디렉션되지 않으면",
+    "signingIn": "로그인 중...",
     "clickHere": "여기를 클릭하세요",
     "loginWithSso": "SSO로 로그인",
     "loginAsInternalUser": "내부 사용자로 로그인",
@@ -2852,6 +2986,7 @@
       "scopeCoveredByParent": "잠긴 작업은 {module}에 설정된 {scope}에서 비롯됩니다",
       "scopeAllOf": "모든 {module}",
       "scopeIncludesFuture": "나중에 생성되는 리소스 포함",
+      "scopeDowntimeHint": "다운타임 폴더는 다운타임이 무엇을 음소거하는지가 아니라 누가 다운타임을 관리하는지를 제한합니다. 모듈의 모든 폴더를 음소거하려면 사용자에게 해당 모듈의 모든 폴더를 나열할 수 있는 권한이 필요합니다. 음소거된 칩과 배너는 사용자가 나열할 수 없는 다운타임을 가리킬 수 있습니다.",
       "grantedByWiderScope": "더 넓은 범위에서 부여됨",
       "grantedHereAndByWiderScope": "여기와 더 넓은 범위에서 부여됨",
       "stillGrantedByWiderScope": "여기서 제거됨, 더 넓은 범위에서 계속 부여됨",
@@ -4299,6 +4434,48 @@
     "inspectBtnLabel": "검사",
     "analyzeBtnLabel": "인사이트"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "엔터프라이즈 기능",
+    "featuresPageTitle": "엔터프라이즈 기능",
+    "category": {
+      "security": "보안 및 규정 준수",
+      "scale": "확장성 및 성능",
+      "ai": "AI 옵저버빌리티 및 자동화",
+      "analysis": "분석 및 데이터 흐름"
+    },
+    "legendBeta": "얼리 액세스",
+    "legendHa": "고가용성",
+    "docsFooter": "모든 기능은 해당 문서로 연결됩니다.",
+    "viewAllDocs": "전체 문서 보기",
+    "locked": "{feature} 기능은 OpenObserve 엔터프라이즈에서 사용할 수 있습니다.",
+    "availableIn": "OpenObserve 엔터프라이즈에서 사용 가능",
+    "rbacDisabled": "이 조직에서는 RBAC가 사용 중지되어 있습니다. 관리자에게 활성화를 요청하세요.",
+    "pitch": {
+      "incidents": "발생 중인 알림을 자동으로 추적되는 인시던트로 전환합니다.",
+      "workflows": "알림에 대응하는 런북을 자동화합니다.",
+      "oncall": "온콜 교대 일정을 예약하고 페이지를 적절한 담당자에게 자동 라우팅합니다.",
+      "serviceGraph": "서비스 간 호출 관계를 파악하고 장애가 확산되기 전에 감지하세요.",
+      "rbac": "팀을 위한 세분화된 권한의 사용자 정의 역할을 생성합니다.",
+      "logPatterns": "한 줄씩 읽지 않고도 반복되는 로그 패턴을 자동으로 찾아냅니다.",
+      "correlation": "로그 라인에서 관련 메트릭과 트레이스로 바로 이동합니다.",
+      "aiAssistant": "AI 어시스턴트에게 쿼리 작성을 요청하고 데이터를 쉬운 말로 설명받으세요.",
+      "alertInsights": "알림이 얼마나 자주 발생하는지 확인하고 연관된 알림을 한눈에 파악합니다.",
+      "anomalyDetection": "임계값 알림이 발생하기 전에 비정상적인 메트릭 동작을 자동으로 감지합니다.",
+      "agentGraph": "AI 에이전트와 도구가 서로를 호출하는 방식을 그래프로 시각화하여 확인합니다.",
+      "agentBehavior": "시간 경과에 따른 에이전트 도구 호출 동작의 이상 징후를 감지합니다.",
+      "discovery": "검토할 가치가 있는 AI 세션을 자동으로 표시합니다.",
+      "queues": "플래그된 AI 세션을 검토자에게 전달해 사람이 직접 주석을 달도록 합니다.",
+      "datasets": "실제 세션에서 데이터셋을 구성하여 AI를 평가하고 미세 조정합니다.",
+      "prompts": "AI 기능을 구동하는 프롬프트를 버전 관리하고 관리합니다.",
+      "playground": "변경 사항을 배포하기 전에 프롬프트와 모델을 나란히 테스트합니다.",
+      "experiments": "배포 전에 데이터셋을 기준으로 모델 및 프롬프트 변경 사항을 비교합니다.",
+      "remoteTasks": "원격 모델과 에이전트를 대상으로 평가 및 채점 작업을 실행합니다.",
+      "evaluations": "AI 품질을 자동으로 채점하고 시간 경과에 따라 추적합니다.",
+      "genAiAgentMapping": "트레이스를 이를 생성한 AI 에이전트별로 그룹화하고 버전을 나란히 비교합니다.",
+      "scheduledSearch": "저장된 검색을 수동으로 다시 실행하는 대신 일정에 따라 자동으로 실행합니다.",
+      "customBranding": "기본 로고와 텍스트를 자체 브랜딩으로 교체합니다."
+    }
+  },
   "errorInsights": {
     "title": "인사이트",
     "tabLabel": "오류",
@@ -5433,6 +5610,25 @@
     "gpuExporter": "GPU 익스포터"
   },
   "dashboard": {
+    "layoutEdit": {
+      "enter": "레이아웃 편집",
+      "edit": "편집",
+      "editing": "편집 중",
+      "undo": "실행 취소",
+      "redo": "다시 실행",
+      "changes": "변경 사항 없음 | 변경 {count}건 | 변경 {count}건",
+      "discard": "취소",
+      "discardTooltip": "변경 사항 취소",
+      "save": "저장",
+      "saveTooltip": "레이아웃 저장",
+      "discardTitle": "저장되지 않은 레이아웃 변경 사항을 취소할까요?",
+      "discardMessage": "저장되지 않은 레이아웃 변경이 {count}건 있습니다. 취소하면 대시보드가 마지막으로 저장된 레이아웃으로 돌아갑니다. | 저장되지 않은 레이아웃 변경이 {count}건 있습니다. 취소하면 대시보드가 마지막으로 저장된 레이아웃으로 돌아갑니다.",
+      "leaveMessage": "저장되지 않은 레이아웃 변경이 {count}건 있습니다. 이 페이지를 나가면 사라집니다. | 저장되지 않은 레이아웃 변경이 {count}건 있습니다. 이 페이지를 나가면 사라집니다.",
+      "keepEditing": "계속 편집",
+      "stay": "머무르기",
+      "discardAndLeave": "취소하고 나가기",
+      "apply": "적용"
+    },
     "approximately": "약",
     "tableRowsWillBeDisplayed": "테이블 행이 표시됩니다",
     "unitPixelHint": "1 단위 = 30px",
@@ -7444,6 +7640,11 @@
     "SearchSQLCancelled": "오류: 검색 SQL이 취소되었습니다."
   },
   "alerts": {
+    "promRuleMode": "규칙 모드",
+    "promRulePreview": "{count}개의 반환된 시계열이 현재 일치합니다. 각 시계열은 발화하기 전에 대기 기간을 완료해야 합니다.",
+    "promRuleModeDescription": "표현식이 시계열을 반환하면 일치합니다. 대기 기간이 0이면 단일 또는 다중 알림을 선택하세요. 대기 기간을 설정하면 다중 알림이 자동으로 활성화됩니다. 참조된 메트릭 스트림을 추론하려면 스트림을 비워 두세요.",
+    "promRuleModePendingMulti": "대기 기간은 각 시계열마다 독립적인 타이머가 필요하므로 다중 알림을 비활성화할 수 없습니다.",
+    "promRuleModeConflict": "규칙 모드에서는 심각 또는 경고 값 임계값을 사용할 수 없으며, 대기 기간을 설정하려면 다중 알림이 필요합니다.",
     "allAlerts": "모든 알림",
     "compositeAlert": "복합",
     "import": {
@@ -8379,6 +8580,8 @@
         "alertDescription": "알림 설명 텍스트",
         "alertStartTime": "창 시작 시간 (ISO 8601)",
         "alertEndTime": "창 종료 시간 (ISO 8601)",
+        "alertStartTimeMillis": "에포크 밀리초 단위의 윈도우 시작 시간",
+        "alertEndTimeMillis": "에포크 밀리초 단위의 윈도우 종료 시간",
         "alertUrl": "조사를 위해 OpenObserve로 돌아가는 링크",
         "alertTriggerTime": "알림이 발생한 시간 (ISO 8601)",
         "alertTriggerTimeMillis": "에포크 밀리초 단위의 트리거 시간",
@@ -8985,7 +9188,9 @@
         "dbmLockSampling": "잠금 활동은 일정 간격으로 샘플링되므로 두 샘플 사이에 시작되고 해소된 경합은 기록되지 않습니다. 조용한 알림은 차단이 없었다는 증거가 아닙니다.",
         "dbmNoInstance": "단일 데이터베이스 인스턴스가 식별되지 않았으므로 이 알림은 이 엔진의 모든 인스턴스를 감시합니다.",
         "rumFunnelSnapshot": "이 알림은 퍼널의 SQL 사본을 유지합니다. 나중에 퍼널이나 명명된 이벤트를 편집해도 변경되지 않습니다.",
-        "rumFunnelSteps": "퍼널이 전환에 대해 알림을 보내려면 단계가 최소 두 개 필요합니다."
+        "rumFunnelSteps": "퍼널이 전환에 대해 알림을 보내려면 단계가 최소 두 개 필요합니다.",
+        "textFilterDropped": "이 스트림에 전체 텍스트 검색(FTS) 필드가 없어 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요.",
+        "heldFilterDropped": "로그 페이지에서 먼저 Run as를 선택해야 하므로 검색 필터가 반영되지 않았습니다. 필요한 경우 알림 쿼리에 추가하세요."
       }
     },
     "saveFailed": "경고를 저장할 수 없습니다.",
@@ -8997,7 +9202,501 @@
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
     "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
-    "seconds": "초"
+    "seconds": "초",
+    "downtimes": {
+      "newTitle": "새 다운타임",
+      "editTitle": "다운타임 편집",
+      "detailTitle": "다운타임",
+      "modules": {
+        "alerts": "알림",
+        "anomaly_detections": "이상 탐지",
+        "synthetics": "Synthetics 검사",
+        "slos": "SLO"
+      },
+      "modulesShort": {
+        "alerts": "알림",
+        "anomaly_detections": "이상",
+        "synthetics": "Synthetics",
+        "slos": "SLO"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "기간 동안 인시던트는",
+          "muted": "생성 후 음소거 (기본값)",
+          "mutedHelp": "인시던트는 평소처럼 열리지만 기간이 끝날 때까지 아무에게도 알리지 않습니다.",
+          "none": "생성 안 함",
+          "noneHelp": "기간 동안 인시던트가 열리지 않으며, 기간 이후 첫 발생 시 인시던트를 열고 알립니다.",
+          "summary": "인시던트 없음"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}",
+        "condition": "조건",
+        "allFolders": "모든 폴더",
+        "oneFolder": "{name} 폴더",
+        "nFolders": "{count} 폴더 | {count} 폴더",
+        "tags": "태그 {tags}",
+        "nItems": "{count} 항목 | {count} 항목",
+        "asGood": "정상으로 처리",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}",
+        "noIncidents": "기간 동안에는 인시던트가 열리지 않습니다."
+      },
+      "duration": {
+        "days": "{count}일",
+        "hours": "{count}시간",
+        "minutes": "{count}분"
+      },
+      "schedule": {
+        "windowRange": "{start} ~ {end} {zone}",
+        "onceSentence": "1회 · {start} ~ {end} · {zone}",
+        "dailySentence": "매일 · {time}, {duration} 동안 · {zone}",
+        "weeklySentence": "매주 {days} · {time}, {duration} 동안 · {zone}",
+        "fromNoEnd": "{schedule}, {start}부터 (종료일 없음)",
+        "fromUntil": "{schedule}, {start}부터 {until}까지"
+      },
+      "validation": {
+        "conditionRequired": "조건을 추가하거나 조건 블록을 제거하세요.",
+        "pairKey": "모든 행에 대해 차원을 선택하세요.",
+        "pairOperator": "다운타임 조건에는 = 또는 != 를 사용하세요.",
+        "pairValue": "모든 행에 값을 입력하세요.",
+        "loneStar": "값은 * 단독으로 사용할 수 없습니다.",
+        "innerStar": "* 는 값의 끝에만 사용할 수 있습니다.",
+        "emptyGroup": "조건 그룹은 비워둘 수 없습니다.",
+        "tooDeep": "조건은 그룹을 최대 3단계까지 중첩할 수 있습니다.",
+        "tooManyPairs": "조건은 최대 32개의 쌍을 포함할 수 있습니다.",
+        "needsEq": "최소 하나의 = 조건을 추가하세요. != 행으로만 구성된 조건은 나머지 모든 항목을 음소거합니다.",
+        "modulesRequired": "하나 이상의 모듈을 선택하세요.",
+        "foldersRequired": "모든 폴더 또는 하나 이상의 폴더를 선택하세요.",
+        "tagsRequired": "태그를 추가하거나 태그 블록을 제거하세요.",
+        "idsRequired": "항목을 선택하거나 특정 항목 블록을 제거하세요.",
+        "idOutsideFolders": "선택한 항목 중 일부가 선택한 폴더에 없습니다.",
+        "tooManyFolders": "폴더는 최대 {max}개까지 선택하거나 모든 폴더를 선택하세요.",
+        "tooManyTags": "태그는 최대 {max}개까지 추가할 수 있습니다.",
+        "tooManyIds": "항목은 최대 {max}개까지 선택할 수 있습니다.",
+        "nameTooLong": "이름은 최대 256자까지 가능합니다.",
+        "timezoneRequired": "시간대를 선택하세요.",
+        "startRequired": "시작 날짜와 시간을 입력하세요.",
+        "endRequired": "종료 날짜와 시간을 입력하세요.",
+        "endAfterStart": "종료는 시작 이후여야 합니다.",
+        "windowTooLong": "기간은 최대 7일까지 가능합니다.",
+        "windowTooShort": "기간은 최소 1분 이상이어야 합니다.",
+        "startTimeRequired": "시작 시간을 HH:MM 형식으로 입력하세요.",
+        "durationInvalid": "90m 또는 1h 30m과 같은 기간을 입력하세요.",
+        "weekdaysRequired": "요일을 하나 이상 선택하세요.",
+        "untilAfterStart": "반복 종료일은 첫 날짜 이후여야 합니다.",
+        "reasonTooLong": "사유는 최대 {max}자까지 입력할 수 있습니다.",
+        "windowOutlastsRepeat": "기간은 반복 간격보다 길 수 없습니다.",
+        "startDateRequired": "첫날을 선택하세요."
+      },
+      "title": "다운타임",
+      "subtitle": "알림, 이상 탐지, Synthetics 검사는 계속 실행하되 알림 전송을 중지하는 예약된 기간",
+      "newDowntime": "새 다운타임",
+      "filterAll": "전체",
+      "filterOnce": "일회성",
+      "filterRecurring": "반복",
+      "search": "이름, 차원 또는 생성자로 검색",
+      "searchAcross": "모든 폴더 검색",
+      "thisFolder": "이 폴더",
+      "allFolders": "모든 폴더",
+      "thisFolderTooltip": "선택한 폴더에서 검색",
+      "allFoldersTooltip": "모든 폴더에서 검색",
+      "noFolder": "다운타임을 저장할 수 있는 폴더가 없습니다",
+      "truncated": "다운타임 {total}개 중 처음 {shown}개를 표시합니다",
+      "stats": {
+        "active": "활성",
+        "scheduled": "예약됨",
+        "recurring": "반복",
+        "ended": "종료됨",
+        "cancelled": "취소됨",
+        "endedEarly": "조기 종료",
+        "total": "전체"
+      },
+      "columns": {
+        "name": "이름",
+        "status": "상태",
+        "targets": "대상",
+        "schedule": "일정",
+        "when": "종료 / 다음",
+        "matched": "일치",
+        "createdBy": "생성자",
+        "folder": "폴더"
+      },
+      "oneTime": "일회성",
+      "recurring": "반복",
+      "bannerOn": "이 다운타임이 활성 상태인 동안 조직의 모든 사용자에게 배너가 표시됩니다",
+      "endsLabel": "종료",
+      "confirmEndNow": {
+        "title": "이 다운타임을 지금 종료할까요?",
+        "message": "알림이 즉시 다시 시작됩니다. 다운타임은 조기 종료로 목록에 남습니다.",
+        "ok": "지금 종료",
+        "keep": "계속 실행"
+      },
+      "extend": {
+        "menu": "연장 시간",
+        "notActive": "활성 다운타임만 연장할 수 있습니다",
+        "dialogTitle": "{name} 연장",
+        "newEnd": "새 종료",
+        "confirmUntil": "{time}까지 연장",
+        "followUp": "이 다운타임은 반복되므로 일정은 그대로 유지됩니다. 현재 창이 끝나는 시점부터 {name}(이)라는 일회성 다운타임이 생성됩니다.",
+        "endAfterCurrent": "새 종료는 현재 종료보다 늦어야 합니다."
+      },
+      "nextLabel": "다음",
+      "matched": {
+        "alerts": "{count}개 알림 | {count}개 알림",
+        "anomalies": "{count}개 이상 탐지 | {count}개 이상 탐지",
+        "synthetics": "{count}개 검사 | {count}개 검사",
+        "slos": "{count}개 SLO | {count}개 SLO"
+      },
+      "actions": {
+        "endNow": "지금 종료",
+        "edit": "편집",
+        "duplicate": "복제",
+        "moveToFolder": "폴더로 이동",
+        "cancel": "다운타임 취소",
+        "delete": "삭제",
+        "more": "추가 작업",
+        "muteForHour": "지금 1시간 음소거",
+        "extend": "연장"
+      },
+      "confirmCancel": {
+        "title": "다운타임 취소",
+        "message": "알림이 즉시 재개됩니다. 다운타임은 이력용으로 목록에 남습니다.",
+        "bulkMessage": "{count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다. | {count}개의 다운타임을 취소하시겠습니까? 알림이 즉시 재개됩니다.",
+        "confirm": "다운타임 취소",
+        "keep": "다운타임 유지"
+      },
+      "confirmDelete": {
+        "title": "다운타임 삭제",
+        "message": "다운타임과 이력이 삭제됩니다. 이 작업은 되돌릴 수 없습니다."
+      },
+      "copyOf": "{name}의 사본",
+      "form": {
+        "matches": {
+          "alerts": "{count}개 알림 일치 | {count}개 알림 일치",
+          "anomaly_detections": "{count}개 탐지 일치 | {count}개 탐지 일치",
+          "synthetics": "{count}개 검사 일치 | {count}개 검사 일치",
+          "slos": "{count}개 SLO 일치 | {count}개 SLO 일치"
+        },
+        "alertFolders": "알림 폴더",
+        "syntheticsFolders": "Synthetics 폴더",
+        "noAlertFolderAccess": "알림 폴더에 대한 접근 권한이 없습니다.",
+        "noSyntheticsFolderAccess": "Synthetics 폴더에 대한 접근 권한이 없습니다.",
+        "tags": "태그",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "모든 태그가 검사에 있어야 합니다.",
+        "removeBlock": "이 블록 제거",
+        "specificItems": "특정 항목",
+        "itemsHint": "선택한 폴더의 항목만 제공됩니다.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "태그 추가",
+        "addItems": "특정 항목 추가",
+        "sloMode": "기간 내 SLO 점수",
+        "sloExclude": "기간 제외",
+        "sloCountAsGood": "기간을 정상으로 계산",
+        "sloExcludeCaption": "기간 내 시간은 정상으로도 비정상으로도 계산되지 않습니다. 이 SLO의 소진율 알림은 해당 시간에 대해 발생하지 않습니다.",
+        "sloCountAsGoodCaption": "기간 내 시간을 완전히 정상으로 계산합니다. SLO 계약에서 계획된 유지보수를 가동 시간으로 간주하는 경우에만 사용하세요.",
+        "cardCaption": "폴더가 먼저 적용되고, 선택적 블록이 범위를 더 좁힙니다. 위의 차원 조건은 이 모듈에도 적용됩니다.",
+        "noConditionForChecks": "위의 차원 조건은 검사에 적용되지 않습니다.",
+        "appliesTo": "적용 대상",
+        "tabTargets": "대상",
+        "tabSchedule": "일정",
+        "tabAdvanced": "고급",
+        "modeInFolder": "{mode} 내",
+        "newMode": "새 다운타임",
+        "editMode": "다운타임 편집",
+        "namePlaceholder": "다운타임 이름",
+        "nameLabel": "다운타임 이름",
+        "renameHint": "클릭하여 이름 변경",
+        "reason": "사유",
+        "reasonHelp": "선택 사항입니다. 목록, 상세 페이지, 음소거 툴팁에 표시됩니다.",
+        "cancel": "취소",
+        "save": "저장",
+        "activeBanner": "이 다운타임은 활성 상태입니다. 편집은 다음 평가 시 적용되며, SLO 모드를 변경하면 이미 시작된 기간이 다시 측정됩니다.",
+        "changedMeanwhile": "불러온 후 다른 사용자가 이 다운타임을 변경했습니다. 다시 불러온 후 다시 시도하세요.",
+        "reload": "다시 불러오기",
+        "noModule": "'적용 대상'에서 모듈을 선택하세요.",
+        "checkSchedule": "일정을 확인한 후 다시 저장하세요."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "알림",
+          "anomaly_detections": "이상 탐지",
+          "synthetics": "Synthetics 검사",
+          "slos": "SLO"
+        },
+        "whenOnce": "1회, {start}부터 {end} {zone}까지",
+        "whenDaily": "매일 {time} {zone}에, {duration} 동안",
+        "whenWeekly": "매주 {days} {time} {zone}에, {duration} 동안",
+        "inFolders": "폴더 {names}에 | 폴더 {names}에",
+        "withCondition": "{condition} 조건으로",
+        "tagged": "태그 {tags}",
+        "named": "{count}개 항목으로 제한 | {count}개 항목으로 제한",
+        "stopNotifying": "{when}: {targets} 알림이 중지됩니다.",
+        "nothingMuted": "{when}: 음소거된 알림이나 검사가 없습니다.",
+        "sloUnchanged": "SLO 점수는 변경되지 않습니다.",
+        "sloExcluded": "{slos}는 해당 기간을 점수에서 제외합니다.",
+        "sloAsGood": "{slos}는 해당 기간을 정상 시간으로 계산합니다."
+      },
+      "autoName": {
+        "once": "1회",
+        "onceOn": "{date}에 1회",
+        "daily": "매일",
+        "weekly": "매주",
+        "all": {
+          "alerts": "모든 알림",
+          "anomaly_detections": "모든 이상 탐지",
+          "synthetics": "모든 Synthetics 검사",
+          "slos": "모든 SLO"
+        }
+      },
+      "condition": {
+        "none": "차원 조건 없음",
+        "add": "추가",
+        "title": "차원 조건",
+        "onePer": "다운타임당 하나",
+        "remove": "차원 조건 제거",
+        "caption": "알림, 이상 탐지, SLO에 적용됩니다. Synthetics 검사에는 차원이 없으며 태그를 사용합니다. 모든 쌍이 일치해야 합니다. 대안에는 OR 그룹을 사용하세요. 값은 *로 끝날 수 있습니다."
+      },
+      "resources": {
+        "refineBy": "리소스로 세분화",
+        "load": "리소스 불러오기",
+        "needsEq": "리소스로 세분화하기 전에 = 조건을 하나 이상 추가하세요.",
+        "tooMany": "이 조건과 함께 발생하는 값이 {count}개입니다. 리소스를 선택하려면 조건을 좁히세요.",
+        "lastSeen": "마지막 확인",
+        "streams": "스트림",
+        "footer": "{total}개 중 {selected}개 선택됨 · {source}",
+        "fromRegistry": "서비스 레지스트리에서",
+        "fromSearch": "최근 24시간 데이터에서",
+        "apply": "적용",
+        "loadFailed": "리소스를 불러오지 못했습니다",
+        "notSeen": "지난 1시간 동안 확인되지 않았습니다.",
+        "partial": "일부 소스가 응답하지 않았습니다.",
+        "items": "항목",
+        "fromValues": "알림, 서비스 레지스트리 및 지난 1시간 데이터에서",
+        "noValues": "이 차원의 값이 아직 확인되지 않았습니다."
+      },
+      "scheduleForm": {
+        "once": "1회",
+        "daily": "매일",
+        "weekly": "매주",
+        "startDate": "시작 날짜",
+        "startTime": "시작 시간",
+        "endDate": "종료 날짜",
+        "endTime": "종료 시간",
+        "days": "요일",
+        "startsAt": "시작 시각",
+        "duration": "기간",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "최대 7일, 예: 90m 또는 1h 30m.",
+        "until": "반복 종료",
+        "untilPlaceholder": "종료 날짜 없음",
+        "timezone": "시간대",
+        "noWindow": "앞으로 8일 내에 시작되는 기간이 없습니다.",
+        "nextWindow": "다음 기간: {window}. 기간은 자정을 넘을 수 있습니다.",
+        "nextWindowWithUtc": "다음 기간: {window} ({utc}). 기간은 자정을 넘을 수 있습니다.",
+        "startsOn": "시작일"
+      },
+      "preview": {
+        "title": "미리보기",
+        "failed": "미리보기를 불러올 수 없습니다.",
+        "andMore": "외 {count}개",
+        "noMatch": "현재 일치하는 항목이 없습니다",
+        "fireTime": "{count}개 알림이 발생 시점에 ID를 결정합니다 | {count}개 알림이 발생 시점에 ID를 결정합니다",
+        "undecidable": "{key}(으)로 구분할 수 없습니다",
+        "showAll": "전체 목록 보기",
+        "showLess": "간단히 보기",
+        "finishCondition": "미리 보기를 보려면 조건을 완성하세요."
+      },
+      "muteAllDialog": {
+        "title": "모듈 전체를 음소거할까요?",
+        "intro": "폴더, 항목, 태그 또는 조건이 이 모듈의 범위를 좁히지 않으므로 이 다운타임은 다음을 음소거합니다:",
+        "every": {
+          "alerts": "이 조직의 모든 알림",
+          "anomaly_detections": "이 조직의 모든 이상 탐지",
+          "synthetics": "이 조직의 모든 Synthetics 검사",
+          "slos": "이 조직의 모든 SLO"
+        },
+        "matchedNow": "오늘 {matched}",
+        "outro": "기간 내에 이들 모두에 대한 알림, 온콜 호출 및 워크플로우가 중지됩니다.",
+        "cancel": "취소",
+        "confirm": "모두 음소거",
+        "titleOne": {
+          "alerts": "이 조직의 모든 알림을 음소거할까요?",
+          "anomaly_detections": "이 조직의 모든 이상 탐지를 음소거할까요?",
+          "synthetics": "이 조직의 모든 Synthetics 검사를 음소거할까요?",
+          "slos": "이 조직의 모든 SLO를 음소거할까요?"
+        },
+        "window": "기간: {window}"
+      },
+      "summaryPane": {
+        "title": "요약",
+        "filedIn": "등록 위치",
+        "window": "기간",
+        "nextWindow": "다음 기간",
+        "inUtc": "UTC 기준",
+        "largeMatch": "{modules}: 이 다운타임이 항목의 절반 이상과 일치합니다. 이 조직의 대부분은 기간 내에 알림을 보내지 않습니다.",
+        "whatHappens": "발생하는 일",
+        "keepRunning": "평가와 검사는 계속 실행되고 기록을 유지합니다.",
+        "noNotifications": "알림, 온콜 호출 및 워크플로우가 중지됩니다.",
+        "mutedIncidents": "인시던트는 음소거된 상태로 열리고 기간 이후에 알림을 보냅니다."
+      },
+      "band": {
+        "now": "현재",
+        "none": "아직 실행된 기간이 없고 예정된 기간도 없습니다.",
+        "active": "활성",
+        "next": "다음",
+        "past": "실행됨",
+        "track": "기간",
+        "aria": "{kind}: {start} ~ {end}"
+      },
+      "detail": {
+        "overview": "개요",
+        "affected": "영향받음 · {count}",
+        "suppressed": "억제됨 · {count}",
+        "details": "세부 정보",
+        "condition": "조건",
+        "noTarget": "대상 없음",
+        "banner": "배너",
+        "bannerOn": "활성 상태 동안 조직에 표시됨",
+        "bannerOff": "배너 없음",
+        "occurrences": "발생 횟수",
+        "nextWindow": "다음 기간: {window}. 현지 시간: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "일치 기준",
+        "matchedBy": {
+          "query": "쿼리",
+          "source_alert": "소스 알림",
+          "tag": "태그",
+          "id": "이름 지정",
+          "folder": "폴더",
+          "org": "전체 조직"
+        },
+        "source": "소스",
+        "wouldHaveNotified": "알림이 전송되었을 항목",
+        "noSuppressed": "아직 억제된 항목이 없습니다",
+        "muteHourName": "{name} · 1시간 음소거",
+        "notFoundTitle": "다운타임을 찾을 수 없습니다",
+        "notFoundDescription": "삭제되었거나 링크가 다른 조직을 가리키고 있을 수 있습니다.",
+        "backToList": "다운타임 목록으로 돌아가기"
+      },
+      "mute": {
+        "title": {
+          "alerts": "알림 {count}개 음소거 | 알림 {count}개 음소거",
+          "anomaly_detections": "이상 감지 {count}개 음소거 | 이상 감지 {count}개 음소거",
+          "synthetics": "검사 {count}개 음소거 | 검사 {count}개 음소거",
+          "slos": "SLO {count}개 음소거 | SLO {count}개 음소거",
+          "items": "항목 {count}개 음소거 | 항목 {count}개 음소거"
+        },
+        "subtitle": "계속 실행되며 기록도 유지됩니다. 알림, 호출, 워크플로우는 기간이 끝날 때까지 중단됩니다.",
+        "muteFor": "음소거 기간",
+        "fileIn": "저장 위치",
+        "presets": {
+          "30m": "30분",
+          "1h": "1시간",
+          "2h": "2시간",
+          "4h": "4시간",
+          "custom": "사용자 지정"
+        },
+        "endsAt": "종료 시각",
+        "endsIn": "{duration} 후.",
+        "confirm": "음소거",
+        "confirmUntil": "{time}까지 음소거",
+        "menu": "알림 음소거",
+        "until": "까지…",
+        "bulk": "음소거",
+        "muted": "음소거됨 · {duration} 후 종료",
+        "mutedTooltip": "{name}이(가) {end}까지 음소거함",
+        "exclude": "제외할 기간…",
+        "firingMuted": "발생 중 · 음소거됨",
+        "firingMutedTooltip": "여전히 발생 중입니다. {name}에 의해 알림이 음소거되었습니다."
+      },
+      "corrected": "수정됨",
+      "correctedBy": "{names}이(가) 점수 수정",
+      "incident": {
+        "mutedBy": "음소거됨 · {name}",
+        "notLoaded": "다운타임이 로드되지 않음",
+        "notLoadedTooltip": "다운타임 {id}에 의해 음소거되었으며, 로드된 다운타임에 포함되어 있지 않습니다.",
+        "banner": "{name}이(가) 음소거했습니다. 아무도 호출되지 않았습니다. 기간이 끝난 후 첫 발화 시 지연된 열림 알림이 전송됩니다.",
+        "bannerUntil": "{name}이(가) {end}까지 음소거했습니다. 아무도 호출되지 않았습니다. 기간이 끝난 후 첫 발화 시 지연된 열림 알림이 전송됩니다."
+      },
+      "banner": {
+        "ended": "종료됨",
+        "endsInUnderMinute": "1분 이내에 종료",
+        "endsInMinutes": "{count}분 후 종료 | {count}분 후 종료",
+        "endsIn": "{duration} 후 종료",
+        "firstEndsInUnderMinute": "첫 번째가 1분 이내에 종료",
+        "firstEndsInMinutes": "첫 번째가 {count}분 후 종료 | 첫 번째가 {count}분 후 종료",
+        "firstEndsIn": "첫 번째가 {duration} 후 종료",
+        "count": "{module} {count}",
+        "showBanner": "이 다운타임이 활성 상태인 동안 조직의 모든 사용자에게 배너 표시",
+        "showBannerCaption": "배너에는 이름, 영향받은 개수, 남은 시간이 표시됩니다. 알림 이름은 표시되지 않습니다.",
+        "preview": "미리보기",
+        "previewMessage": "{name}이(가) 활성 상태입니다.",
+        "tooLong": "배너는 최대 7일까지의 기간에만 사용할 수 있습니다."
+      },
+      "sloCorrections": {
+        "title": "상태 수정:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "SLO 슬라이스보다 짧아 보정된 시간이 없습니다"
+      },
+      "notify": {
+        "title": "알림",
+        "caption": "다운타임 자체를 대상에 알립니다: 시작할 때, 끝나기 전, 끝날 때.",
+        "destinations": "대상",
+        "lead": "종료 전 미리 알림",
+        "leadHelp": "예: 10m 또는 1h, 1분에서 기간 길이 사이.",
+        "regionNote": "슈퍼 클러스터에서는 다운타임을 만든 리전이 보냅니다. 이 설정 이전에 만든 다운타임은 모든 리전에서 보냅니다.",
+        "tab": "알림",
+        "events": {
+          "started": "시작할 때",
+          "startedHelp": "각 기간이 시작될 때 메시지 하나를 보냅니다.",
+          "ending_soon": "끝나기 전",
+          "ending_soonHelp": "종료 전 미리 알림으로, 알림이 다시 울려도 놀라지 않게 합니다.",
+          "ended": "끝날 때",
+          "endedHelp": "각 기간이 끝날 때 메시지 하나를 보냅니다.",
+          "cancelled": "취소될 때",
+          "cancelledHelp": "누군가 다운타임을 끝내거나 취소하면 즉시 보냅니다.",
+          "extended": "연장될 때",
+          "extendedHelp": "새 종료 시간과 함께 즉시 보냅니다."
+        },
+        "validation": {
+          "tooMany": "최대 {max}개의 대상에 알릴 수 있습니다.",
+          "eventRequired": "이벤트를 하나 이상 선택하거나 대상을 제거하세요.",
+          "leadInvalid": "미리 알림은 종료 1분 전부터 기간 길이 전 사이여야 합니다."
+        },
+        "summary": {
+          "none": "자체 알림을 보내지 않습니다.",
+          "sentence": "{destinations}에 알림: {events}.",
+          "started": "시작할 때",
+          "endingSoon": "종료 {lead} 전",
+          "ended": "끝날 때",
+          "cancelled": "취소될 때",
+          "extended": "연장될 때"
+        },
+        "log": {
+          "time": "시간",
+          "event": "이벤트",
+          "destinations": "대상",
+          "result": "결과",
+          "ok": "전송됨",
+          "pending": "전송 중",
+          "empty": "아직 보낸 알림이 없습니다",
+          "events": {
+            "started": "시작됨",
+            "ending_soon": "곧 종료",
+            "ended": "종료됨",
+            "cancelled": "취소됨",
+            "extended": "연장됨"
+          }
+        },
+        "test": {
+          "send": "테스트 보내기",
+          "sent": "{count}개 대상에 테스트를 보냈습니다 | {count}개 대상에 테스트를 보냈습니다",
+          "failed": "테스트가 {names}에 도달하지 못했습니다."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -9034,7 +9733,8 @@
     "countWorkflow": "{count}개의 워크플로우 | {count}개의 워크플로우",
     "countAnomalyDetection": "{count}개의 이상 탐지기 | {count}개의 이상 탐지기",
     "countIncidentIntegration": "{count}개의 인시던트 통합 | {count}개의 인시던트 통합",
-    "sectionOtherConsumers": "다음에서도 사용"
+    "sectionOtherConsumers": "다음에서도 사용",
+    "countDowntime": "{count}개의 다운타임 | {count}개의 다운타임"
   },
   "alert_library": {
     "header": "알림 라이브러리",
@@ -11578,7 +12278,21 @@
     "eventClusterAriaLabelPlural": "{count} 이벤트, {errors} 오류",
     "eventMarkerTooltip": "이벤트: {name}",
     "exceptionMarkerTooltip": "예외: {type}",
-    "spanEventFallback": "Span 이벤트"
+    "spanEventFallback": "Span 이벤트",
+    "spanNav": {
+      "firstSpan": "첫 번째 Span",
+      "lastSpan": "마지막 Span",
+      "position": "Span {index}/{count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "트레이스 {row}/{count}, 페이지 {page}",
+      "spanPosition": "Span {row}/{count}, 페이지 {page}",
+      "firstResult": "첫 번째 결과",
+      "lastResult": "마지막 결과",
+      "loadingPage": "페이지 {page} 로드 중",
+      "pageFailed": "페이지 {page}을(를) 로드할 수 없습니다",
+      "pageEmpty": "페이지 {page}에 결과가 없습니다"
+    }
   },
   "aiToolset": {
     "header": "AI 툴셋",
@@ -14815,7 +15529,8 @@
       "selectStreamDesc": "로그, 트레이스, 메트릭 및 실제 사용자 모니터링 스트림 찾아보기",
       "queryGuide": "쿼리 가이드 읽기",
       "queryGuideDesc": "필터, SQL 모드, VRL 및 저장된 뷰",
-      "recent": "최근:"
+      "recent": "최근 사용:",
+      "descriptionAutoRun": "스트림을 선택하면 최신 로그를 볼 수 있습니다. 결과가 들어오면 필터, VRL 함수, 사용자 지정 시간 범위로 세부 조정할 수 있습니다."
     },
     "noEvents": {
       "title": "이벤트 없음",
@@ -14869,7 +15584,8 @@
       "fixErrorsAndRetry": "오류가 있습니다. 수정 후 다시 시도하세요."
     },
     "buildQueryPage": {
-      "validationErrors": "오류가 있습니다. 수정 후 다시 시도하세요."
+      "validationErrors": "오류가 있습니다. 수정 후 다시 시도하세요.",
+      "parserLoadFailed": "쿼리 파서를 로드할 수 없어 검색 필터를 차트에 추가할 수 없습니다. 로드될 때까지 실행이 일시 중지됩니다."
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL 쿼리:",
@@ -15071,6 +15787,45 @@
     },
     "logsNoEventsState": {
       "lastData": "마지막 데이터: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "심각도 {level}",
+      "srTextInferred": "심각도 {level}, 추론됨",
+      "inferredLabel": "{level} · 추론됨",
+      "popoverTitle": "심각도: {level}",
+      "popoverAriaLabel": "심각도 근거",
+      "evidence": "근거",
+      "fromField": "필드 {field}에서",
+      "inferredFrom": "{field} 텍스트에서 추론되었습니다.",
+      "notSearchable": "검색할 수 없음. 히스토그램에서 사용하지 않습니다.",
+      "noLevelField": "이 행에 레벨 필드가 없고 스캔할 텍스트 필드도 없습니다.",
+      "noLevelWordInField": "이 행에 레벨 필드가 없고 {field}에 레벨 단어도 없습니다.",
+      "notInSelectedColumns": "레벨 필드가 선택한 열에 없습니다",
+      "levels": {
+        "emergency": "긴급",
+        "alert": "경보",
+        "critical": "치명적",
+        "error": "오류",
+        "warning": "경고",
+        "notice": "알림",
+        "info": "정보",
+        "debug": "디버그",
+        "trace": "트레이스",
+        "ok": "정상",
+        "unknown": "알 수 없음"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "자동 새로 고침이 켜져 있습니다. 페이지를 변경하려면 끄세요.",
+      "position": "로그 {row}/{count}, 페이지 {page}",
+      "positionLabel": "로그 {row}/{count} · 페이지 {page}",
+      "loadingPage": "페이지 {page} 로드 중…",
+      "loadingPageAnnouncement": "페이지 {page} 로드 중",
+      "resultsChanged": "결과가 변경되었습니다",
+      "notInPage": "현재 페이지에 없음",
+      "loadingResults": "결과 로드 중…",
+      "previousLog": "이전 로그",
+      "nextLog": "다음 로그"
     }
   },
   "queryError": {
@@ -15105,7 +15860,10 @@
     "traceId": "트레이스 ID:",
     "askAi": "AI에게 쿼리 수정 요청하기",
     "showDetail": "세부 정보 보기",
-    "hideDetail": "세부 정보 숨기기"
+    "hideDetail": "세부 정보 숨기기",
+    "runAs": "다른 사용자로 실행",
+    "searchTextFor": "\"{text}\"에 대한 텍스트 검색",
+    "searchTextDesc": "전체 입력을 하나의 구문으로 검색"
   },
   "refreshButton": {
     "justNow": "바로 지금",
@@ -16891,7 +17649,8 @@
       "sourceMaps": "RUM — 소스 맵",
       "oncall": "온콜",
       "oncallDetail": "온콜 페이지",
-      "syntheticsJourney": "Synthetics 여정"
+      "syntheticsJourney": "Synthetics 여정",
+      "downtimes": "다운타임"
     },
     "actions": {
       "openCheatsheet": "키보드 단축키 치트시트 열기",
@@ -16908,6 +17667,9 @@
       "dashboardRefresh": "모든 패널 새로 고침",
       "dashboardAddPanel": "새 패널 추가",
       "dashboardSave": "대시보드 저장",
+      "dashboardLayoutUndo": "레이아웃 변경 실행 취소",
+      "dashboardLayoutRedo": "레이아웃 변경 다시 실행",
+      "dashboardLayoutExit": "레이아웃 편집 종료",
       "dashboardFullscreen": "전체 화면 전환",
       "dashboardExport": "대시보드 내보내기",
       "tableRowEdit": "마우스로 가리킨 행 편집",
@@ -17000,7 +17762,19 @@
       "oncallEscalate": "에스컬레이션",
       "oncallSnooze": "스누즈",
       "oncallResolve": "해결",
-      "functionsImport": "함수 가져오기"
+      "downtimesCreate": "새 다운타임",
+      "downtimesRefresh": "다운타임 새로고침",
+      "functionsImport": "함수 가져오기",
+      "logsNextRow": "다음 로그(세부 정보 열기)",
+      "logsPrevRow": "이전 로그(세부 정보 열기)",
+      "logsRowFocusMove": "행 간에 포커스 이동",
+      "logsRowOpen": "포커스된 행 열기",
+      "logsDetailClose": "세부 정보를 닫고 해당 행으로 돌아가기",
+      "tracesNextRow": "다음 트레이스 선택",
+      "tracesPrevRow": "이전 트레이스 선택",
+      "tracesRowOpen": "선택한 트레이스 열기",
+      "traceNextVisibleSpan": "다음 표시된 Span",
+      "tracePrevVisibleSpan": "이전 표시된 Span"
     }
   },
   "components": {
@@ -17373,7 +18147,13 @@
         "debug": "디버그",
         "info": "정보",
         "warn": "경고",
-        "fatal": "치명적"
+        "fatal": "치명적",
+        "emergency": "긴급",
+        "alert": "경보",
+        "critical": "심각",
+        "notice": "주의",
+        "ok": "정상",
+        "unknown": "알 수 없음"
       },
       "pipelineRunOutcome": {
         "firing": "발화 중",
@@ -17438,6 +18218,13 @@
         "belowTopN": "상위 N개 아래",
         "truncated": "잘림",
         "gap": "갭"
+      },
+      "downtimeStatus": {
+        "scheduled": "예약됨",
+        "active": "활성",
+        "ended": "종료됨",
+        "cancelled": "취소됨",
+        "endedEarly": "조기 종료"
       }
     }
   },
@@ -17834,6 +18621,24 @@
     },
     "iam": {
       "userSaveFailed": "사용자를 저장할 수 없습니다"
+    },
+    "downtimes": {
+      "cancelled": "다운타임이 취소되었습니다",
+      "cancelledMany": "{count}개의 다운타임이 취소되었습니다 | {count}개의 다운타임이 취소되었습니다",
+      "cancelFailed": "다운타임을 취소할 수 없습니다",
+      "extended": "{time}까지 연장됨",
+      "extendedFollowUp": "{name} 생성됨, {time}까지 실행",
+      "extendFailed": "다운타임을 연장할 수 없습니다",
+      "reload": "다시 불러오기",
+      "deleted": "다운타임이 삭제되었습니다",
+      "deleteFailed": "다운타임을 삭제할 수 없습니다",
+      "created": "다운타임이 생성되었습니다",
+      "updated": "다운타임이 저장되었습니다",
+      "saveFailed": "다운타임을 저장할 수 없습니다",
+      "muted": "{time}까지 {count}개 항목을 음소거했습니다. {folder}에 저장되었습니다. | {time}까지 {count}개 항목을 음소거했습니다. {folder}에 저장되었습니다.",
+      "muteFailed": "음소거를 생성할 수 없습니다",
+      "viewDowntime": "다운타임 보기",
+      "itemsDropped": "선택한 항목 {count}개가 선택한 폴더 외부에 있어 제거되었습니다. | 선택한 항목 {count}개가 선택한 폴더 외부에 있어 제거되었습니다."
     }
   },
   "cipherKeys": {
@@ -18124,7 +18929,9 @@
       "budgetNote": "마지막 지점은 위의 예산 잔여 타일과 같습니다. 0%의 점선은 소진을 의미하며, 그 아래에서는 SLO가 목표가 허용하는 것보다 더 많은 오류를 소비했습니다. 공백은 측정된 것이 없는 버킷으로, 0과 동일하지 않습니다.",
       "burnExplain": "각 버킷에서 예산이 소진되는 속도를 예산 중립 비율의 배수로 표시합니다.",
       "burnFormula": "소진율 = (100% − SLI) ÷ (100% − 목표)\nSLI = 100 × 좋음 ÷ 전체, 해당 버킷에 대해서만\n\n오른쪽 축 (같은 선을 SLI로 읽음):\nSLI = 100% − 소진율 × (100% − 목표)",
-      "burnNote": "×1은 창이 끝날 때 정확히 예산을 소진하고, ×2는 절반 시점에 소진합니다. ×1 미만이면 예산이 축적됩니다. 버킷별이며 누적이 아니므로 여기의 급증은 평균으로 사라지지 않고 계속 표시됩니다. 오른쪽 축은 아래로 갈수록 값이 커집니다: 차트 위로 갈수록 더 많은 소진을 의미하며, 이는 더 낮은 SLI를 뜻합니다."
+      "burnNote": "×1은 창이 끝날 때 정확히 예산을 소진하고, ×2는 절반 시점에 소진합니다. ×1 미만이면 예산이 축적됩니다. 버킷별이며 누적이 아니므로 여기의 급증은 평균으로 사라지지 않고 계속 표시됩니다. 오른쪽 축은 아래로 갈수록 값이 커집니다: 차트 위로 갈수록 더 많은 소진을 의미하며, 이는 더 낮은 SLI를 뜻합니다.",
+      "corrected": "다운타임으로 보정됨",
+      "correctedTooltip": "다운타임으로 보정됨: 제외되었으므로 예산 라인이 평탄합니다"
     },
     "alerts": {
       "title": "알림",
@@ -21648,5 +22455,1079 @@
     "modeExhausted": "소진됨",
     "modeFree": "무료",
     "modeUnknown": "알 수 없음"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "데이터를 전송하세요. OpenObserve가 문제를 찾아내고 원인에 대한 최선의 해석과 함께 알려드립니다. 조용할 때는 무엇을 확인했고 무엇을 볼 수 없는지 보여줍니다.",
+    "phase2": "2단계",
+    "tabs": {
+      "issues": "이슈",
+      "coverage": "커버리지",
+      "activity": "활동",
+      "policy": "정책"
+    },
+    "loops": {
+      "coverage": "커버리지",
+      "calibration": "보정",
+      "investigation": "조사",
+      "action": "조치"
+    },
+    "signals": {
+      "requests": "요청",
+      "errors": "오류",
+      "latency": "지연 시간",
+      "saturation": "포화도",
+      "logPatterns": "로그 패턴",
+      "dependencies": "종속성"
+    },
+    "ledgerStatus": {
+      "autoApplied": "자동 적용됨",
+      "awaiting": "승인 대기 중",
+      "approved": "승인됨",
+      "rejected": "거부됨",
+      "rolledBack": "롤백됨",
+      "kept": "유지됨 — 검사 통과"
+    },
+    "issues": {
+      "subtitle": "SRE 에이전트가 그룹화하고 조사한 인시던트입니다. 문제당 알림 하나가 전송되며, 원인이 함께 첨부되거나 트리아지가 시간 초과 또는 실패하는 경우 같은 스레드에서 이어서 제공됩니다.",
+      "open": "열림",
+      "recent": "해결됨",
+      "all": "전체",
+      "heldForDigest": "금요일 요약을 위해 보류됨",
+      "colId": "인시던트",
+      "colTitle": "문제",
+      "colSeverity": "심각도",
+      "colServices": "영향받은 서비스",
+      "colStarted": "시작 시간",
+      "colStatus": "상태",
+      "colCause": "원인",
+      "emptyTitle": "표시할 항목이 없습니다",
+      "emptyDescription": "이 필터와 일치하는 문제가 없습니다.",
+      "subsetNote": "{shown}개 표시됨. 이 데모는 이번 주 인시던트 {total}건 중 일부를 보여줍니다.",
+      "searchLabel": "이슈 검색",
+      "searchPlaceholder": "이슈, 서비스, 원인 또는 INC-… 검색",
+      "noMatch": "“{query}”와 일치하는 이슈가 없습니다",
+      "clearSearch": "검색 지우기",
+      "matchCount": "일치하는 이슈 없음 | 이슈 1건 일치 | 이슈 {count}건 일치",
+      "colSignal": "시그널",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → 현재",
+      "minutes": "{count}분",
+      "grouped": "{count}개 알림 → 인시던트 1건 | {count}개 알림 → 인시던트 1건",
+      "confidence": "{level} 신뢰도",
+      "proposed": "제안됨",
+      "reversible": "되돌릴 수 있음",
+      "proposalFor": "{title}에 대한 제안된 수정"
+    },
+    "drawer": {
+      "rca": "근본 원인",
+      "rcaSummary": "요약",
+      "likelyCause": "예상 원인",
+      "confidence": "신뢰도",
+      "confidenceValue": "신뢰도: {value} (아직 보정된 점수 없음)",
+      "nextStep": "권장 다음 단계",
+      "evidence": "증거",
+      "blastRadius": "영향 범위",
+      "upstream": "업스트림 호출자",
+      "affected": "영향받음",
+      "downstream": "다운스트림 종속성",
+      "none": "없음",
+      "timeline": "타임라인",
+      "notification": "알림 전송됨",
+      "notSent": "페이지 없음: 이 낮은 심각도의 문제는 금요일 요약을 위해 보류되었습니다. 제품 내 인박스에 기록되었습니다.",
+      "sender": "AutoObserve",
+      "threadReply": "스레드에서 답장함",
+      "p1Note": "P1은 조사가 완료되기 전에 즉시 페이지를 보냅니다. 원인은 같은 스레드에서 이어집니다.",
+      "gateNote": "P2 및 P3 알림은 조사를 최대 2분까지 기다리므로, 첫 메시지에 보통 원인이 포함됩니다. 트리아지가 시간 초과되거나 실패하면 메시지에 조사가 아직 진행 중이거나 실패했다고 표시되며, 원인은 같은 스레드에서 이어집니다. P4 문제는 아무에게도 알리지 않고 금요일 요약에 포함됩니다.",
+      "caughtEarlier": "이 문제를 더 일찍 감지할 수 있었던 방법",
+      "analyzedAt": "조사가 {time}에 완료되었습니다.",
+      "triggersSample": "{total}건의 발동 중 {shown}건 표시",
+      "waitingForOk": "승인 대기 중",
+      "proposedFix": "제안된 수정",
+      "unfoldTab": "전개 과정",
+      "seeEvidence": "증거 보기 ({count}) →"
+    },
+    "unfold": {
+      "hint": "왼쪽에서 오른쪽으로 읽으세요: 무엇이 변경되었는지, 그것이 촉발한 신호, 그다음 팀에 도달한 내용입니다. 카드를 선택하면 해당 발동 내역을 볼 수 있습니다.",
+      "legend": "카드 유형",
+      "team": "내 팀",
+      "kind": {
+        "metric": "메트릭",
+        "log": "로그",
+        "trace": "트레이스",
+        "change": "변경"
+      },
+      "likelyCause": "예상 원인",
+      "linesUpWith": "일치",
+      "times": "×{count}",
+      "sameMinute": "같은 분",
+      "plusMinutes": "+{count}분",
+      "plusHours": "+{hours}시간 {minutes}분",
+      "firstFired": "최초 발동",
+      "lastFired": "마지막 발동",
+      "firings": "발동",
+      "peak": "최고치",
+      "normal": "비교 기준",
+      "detector": "탐지기",
+      "firedAt": "발동 시각",
+      "when": "시점",
+      "chartNote": "Evidence에서처럼 문제의 기본 차트",
+      "outcome": {
+        "paged": "온콜 호출",
+        "asked": "확인 요청",
+        "notified": "메시지 전송, 호출 없음",
+        "held": "금요일 요약까지 보류",
+        "fixFailed": "수정이 도움이 되지 않음",
+        "fixed": "수정됨",
+        "resolved": "해결됨",
+        "open": "여전히 미해결"
+      }
+    },
+    "coverage": {
+      "showing": "{total}개 서비스 중 {shown}개 표시",
+      "watched": "감시 중",
+      "learning": "학습 중",
+      "gap": "공백",
+      "na": "해당 없음",
+      "anomaly": "이상",
+      "threshold": "임계값",
+      "service": "서비스",
+      "lastScanned": "마지막 스캔",
+      "detector": "탐지기",
+      "methodAnomaly": "이상 탐지기, 학습된 기준선",
+      "methodThreshold": "라이브러리의 정적 임계값",
+      "libraryEntry": "라이브러리 항목",
+      "predicate": "적용 가능성",
+      "predicateMatched": "{predicate} — 스트림 {stream}에서 일치",
+      "predicateUnmatched": "{predicate} — 일치하지 않음",
+      "reason": "이유",
+      "history": "{total}일 중 {days}일의 이력",
+      "notScanned": "첫 스캔 진행 중 — 알 수 없음, 완료될 때까지 커버되지 않음",
+      "guardrails": "학습 중 가드레일 활성: 오류 비율 상한 · 최신성 검사(스트림이 멈추면 트리거됨)",
+      "alsoWatchedBy": "함께 감시하는 항목",
+      "searchLabel": "서비스 검색",
+      "searchPlaceholder": "서비스 또는 스트림 검색",
+      "matchCount": "일치하는 서비스 없음 | 1개 서비스 일치 | {count}개 서비스 일치",
+      "noMatch": "“{query}”와 일치하는 서비스 또는 스트림이 없습니다",
+      "clearSearch": "검색 지우기",
+      "filterLabel": "커버리지로 서비스 필터링",
+      "all": "전체",
+      "gaps": "공백",
+      "cantWatch": "감시할 수 없음",
+      "detectorCount": "탐지기 1개 | 탐지기 {count}개",
+      "stream": "스트림",
+      "coverage": "커버리지",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "적용 가능한 신호 {total}개 중 {watched}개 감시 중",
+      "legendLabel": "범례",
+      "gapChip": "GAP",
+      "daysShort": "{days}/{total}일",
+      "tipAnomaly": "{signal}: 이상 탐지기, 학습된 기준선",
+      "tipThreshold": "{signal}: 라이브러리의 정적 임계값",
+      "tipLearning": "{signal}: 학습 중, {total}일 중 {days}일의 이력",
+      "tipGap": "{signal}: 공백, 아직 감시할 수 없음",
+      "tipNa": "{signal}: 해당 없음",
+      "config": "탐지기 구성",
+      "lastFired": "마지막 발생",
+      "never": "없음",
+      "hoursAgo": "1시간 전 | {count}시간 전",
+      "daysAgo": "1일 전 | {count}일 전",
+      "fixNoLink": "service.name 레이블 추가",
+      "fixStopped": "컬렉터 확인",
+      "fixQueued": "모의 전용: {service}의 “{action}”이(가) 어디에도 전송되지 않았습니다",
+      "viewLabel": "커버리지 보기",
+      "viewMap": "맵",
+      "viewTable": "테이블",
+      "fillBy": "채우기 기준",
+      "fillState": "커버리지 상태",
+      "fillLearning": "학습 진행률",
+      "fillDetectors": "탐지기 수",
+      "fillScanned": "마지막 스캔 경과 시간",
+      "summaryWatched": "{total}개 중 {watched}개 완전 감시 · {pct}%",
+      "addedThisWeek": "이번 주 신규 서비스 1개 | 이번 주 신규 서비스 {count}개",
+      "splitLabel": "{watched} 완전 감시, {learning} 학습 중, {gaps} 아직 감시 불가",
+      "stateWatched": "완전 감시",
+      "stateLearning": "학습 중 · {total}일 중 {days}일",
+      "stateGap": "아직 감시할 수 없음",
+      "hexName": "{service}, {state}, {stream}, {detectors}",
+      "legendOf": "{fill} 범례, 선택하여 강조 표시",
+      "mapLabel": "커버리지 맵, {fill} 기준으로 채워진 서비스 1개 | 커버리지 맵, {fill} 기준으로 채워진 서비스 {count}개",
+      "bucketLearned": "학습 완료",
+      "bucketDays67": "6–7일",
+      "bucketDays35": "3–5일",
+      "bucketDays02": "0–2일",
+      "bucketNoData": "데이터 없음",
+      "bucketSix": "탐지기 6개",
+      "bucketFive": "탐지기 5개",
+      "bucketFewer": "탐지기 1–4개",
+      "bucketNone": "없음",
+      "bucketFresh": "5분 미만",
+      "bucketRecent": "5–15분",
+      "bucketHour": "15–60분",
+      "bucketStale": "1시간 초과",
+      "bucketNotScanned": "스캔 안 됨",
+      "signals": "시그널",
+      "details": "세부 정보",
+      "detailsFor": "{metric}의 세부 정보 표시",
+      "readyCaption": "정상 범위 준비 {day} · {total}일 중 {days}일",
+      "chartLearning": "{metric}, 현재 {value}, 학습 중, 아직 정상 범위 없음",
+      "chartOverThreshold": "{metric}, 현재 {value}, {threshold} 임계값 초과",
+      "chartUnderThreshold": "{metric}, 현재 {value}, {threshold} 임계값 미만",
+      "chartAbove": "{metric}, 현재 {value}, 정상 범위 초과",
+      "chartBelow": "{metric}, 현재 {value}, 정상 범위 미만",
+      "chartWithin": "{metric}, 현재 {value}, 정상 범위 내",
+      "tipNormal": "정상 {low} – {high}",
+      "openTraces": "트레이스",
+      "openCatalog": "서비스 카탈로그",
+      "rangeLabel": "시간 범위",
+      "logPatternsValue": "{known}개 기존 · 오늘 {fresh}개 신규",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "감시되지 않음",
+      "signalsWatched": "감시 중인 신호",
+      "chipAria": "{signal}: {state}",
+      "deltaUp": "범위 시작 이후 {change} 상승",
+      "deltaDown": "범위 시작 이후 {change} 하락",
+      "deltaFlat": "범위 시작 이후 변화 없음",
+      "badgeLearning": "학습 중 {days}/{total}일",
+      "badgeAnomaly": "이상 · 학습됨",
+      "badgeThreshold": "임계값 > {threshold}",
+      "now": "현재",
+      "bandLearning": "기준선 학습 중 · {total}일 중 {days}일 · 정상 범위 준비 {day}",
+      "metric": {
+        "requests": "요청",
+        "errors": "오류",
+        "latencyP95": "지연 시간 p95",
+        "cpu": "CPU",
+        "pool": "사용 중인 풀",
+        "memory": "메모리",
+        "queries": "쿼리",
+        "queryLatency": "쿼리 지연 시간 p95",
+        "connections": "사용 중인 연결",
+        "ops": "작업",
+        "rejections": "거부된 연결",
+        "latency": "지연 시간",
+        "messages": "메시지",
+        "failed": "실패(데드 레터)",
+        "lag": "컨슈머 지연",
+        "depth": "큐 깊이"
+      }
+    },
+    "activity": {
+      "allLoops": "모든 루프",
+      "allStatuses": "모든 상태",
+      "ledgerHint": "AutoObserve가 제안하거나 수행한 모든 변경 사항이 여기에 기록됩니다.",
+      "userBuilt": "사용자 생성 알림",
+      "confidence": "신뢰도: {value}",
+      "evidence": "근거:",
+      "before": "이전",
+      "after": "이후",
+      "neverAutoRetire": "알림 해제는 절대 자동으로 이루어지지 않습니다.",
+      "neverSilent": "사용자 생성 알림은 절대 조용히 변경되지 않습니다.",
+      "undo": "실행 취소",
+      "approve": "승인",
+      "edit": "편집",
+      "reject": "거부",
+      "saveApprove": "저장 및 승인",
+      "undoneNote": "사용자가 실행 취소함 — 스냅샷에서 이전 상태 복원됨",
+      "undoneToast": "실행 취소되었습니다. 이 데모의 기록부에서 롤백됨으로 표시되었습니다.",
+      "approvedToast": "승인되었습니다. 이 데모의 기록부에서 승인됨으로 표시되었습니다.",
+      "rejectedNote": "귀하가 거부함",
+      "rejectedToast": "거부되었습니다. 이 작업 분류에 대해 기록되었습니다.",
+      "emptyTitle": "항목 없음",
+      "emptyDescription": "기록부에서 이 필터와 일치하는 항목이 없습니다.",
+      "reviewWindow": "{window} 동안 검토 중입니다 — 검사를 통과하면 자동으로 유지되고, 실패하면 롤백됩니다. 이전 구성은 계속 조용히 평가되므로, 이 변경으로 인해 숨겨졌을 항목도 여전히 표시됩니다. 실행 취소하면 이전 상태로 즉시 복원됩니다.",
+      "approvedNote": "{time}에 승인하셨습니다.",
+      "applyingNote": "{time}에 승인하셨으며, 지금 적용 중입니다.",
+      "appliedNote": "{time}에 승인하셨고 적용되었습니다.",
+      "declinedNote": "거절하셨습니다.",
+      "needsApproval": "승인이 필요합니다",
+      "awaiting": "대기 중",
+      "auto": "자동",
+      "outcomeFilter": "결과별 필터",
+      "loopFilter": "루프별 필터",
+      "columns": {
+        "time": "시각",
+        "loop": "루프",
+        "action": "작업",
+        "target": "대상",
+        "change": "변경",
+        "confidence": "신뢰도",
+        "decision": "결정",
+        "outcome": "결과",
+        "actions": "작업"
+      },
+      "showDetails": "{target}의 {action} 세부 정보 표시",
+      "hideDetails": "{target}의 {action} 세부 정보 숨기기",
+      "approveFor": "{target}의 {action} 승인",
+      "rejectFor": "{target}의 {action} 거부",
+      "editFor": "{target}의 {action} 편집",
+      "undoFor": "{target}의 {action} 실행 취소",
+      "openIncident": "인시던트 {id} 열기",
+      "confidenceHint": "{value} — 아직 보정된 점수 없음",
+      "diff": "제안된 변경, 제거 및 추가된 줄",
+      "daysLeft": "{count}일 남음 | {count}일 남음",
+      "reviewProgress": "검토 기간 경과",
+      "entryId": "항목",
+      "logged": "기록됨"
+    },
+    "policy": {
+      "gateHint": "기존 알림에 대한 변경 중에서는 중복 제거만 이전 상태 스냅샷과 검토 기간을 동반하여 자체적으로 적용됩니다: 검사를 통과하면 유지되고, 실패하면 롤백됩니다. 그 외의 모든 변경은 원클릭 승인을 기다립니다.",
+      "off": "꺼짐",
+      "suggest": "제안",
+      "auto": "자동",
+      "phase2Title": "작업 — 문제 해결",
+      "phase2Hint": "프로덕션 수정. 각 분류는 측정된 실적을 기반으로 등급을 획득하며, 그 등급 이상으로 행동하지 않습니다.",
+      "investigation": "조사",
+      "outcomesTitle": "결과",
+      "outcomesBody": "AutoObserve는 각 작업이 무엇을 했는지 측정합니다: 오류율이 회복되었는지, 온콜 호출이 중단되었는지, 실행 취소되었는지. 계속 좋은 결과를 내는 분류는 한 번에 하나씩 더 많은 자율성을 얻습니다; 실패는 불리하게 작용하며, 계속 필요해지는 수정은 자동화되는 대신 버그로 보고됩니다.",
+      "outcomesExample": "ScaleQueueWorkers는 7번의 승인된 스케일 아웃이 성공한 후 자동으로 전환되었습니다. 10월 2일의 한 번의 실패로 사전 검사가 추가되었고, 두 번째 실패가 발생하면 제안으로 다시 이동합니다. AbortRollout은 승인을 기다리고, RollbackDeploy는 실적이 쌓일 때까지 꺼짐으로 유지됩니다.",
+      "triage": {
+        "parallel": "병렬",
+        "gate": "게이트",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "즉시 호출하고 동시에 조사합니다. 원인은 같은 스레드에 이어서 표시됩니다. P1에는 게이트를 사용할 수 없습니다.",
+        "gateDesc": "조사 결과가 나올 때까지 최대 2분간 호출을 보류합니다. 실패 시 열림(fail open): 트리아지가 시간 초과되거나 실패하면 그대로 호출하고, 조사가 아직 진행 중이거나 실패했다고 알리며, 원인은 스레드에 이어서 표시됩니다."
+      },
+      "classes": {
+        "EnableDeduplication": "몇 분 내에 반복되는 알림에 대해 중복 제거를 켭니다.",
+        "CreateDetector": "서비스의 요청, 오류 또는 지연 시간에 대한 이상 탐지기를 만듭니다.",
+        "RaiseThreshold": "정상적인 날에 발생하는 임계값을 높입니다.",
+        "LengthenEvaluationWindow": "요동치는 알림의 평가 기간을 늘립니다.",
+        "FixAlertQuery": "잘못된 대상을 측정하거나 절대 일치할 수 없는 알림 쿼리를 수정합니다.",
+        "AttachDestination": "어디에도 전달되지 않는 탐지기에 대상을 연결합니다.",
+        "AddLibraryAlert": "조건이 일치하는 라이브러리의 예약 알림을 추가합니다.",
+        "MoveToIncidentDelivery": "사용자가 만든 알림을 자체 경로 대신 인시던트를 통해 전달합니다.",
+        "ReviewForDeletion": "아무도 대응하지 않는 알림의 폐기를 제안합니다.",
+        "RollbackDeploy": "문제를 일으킨 배포를 롤백합니다.",
+        "ScaleService": "포화된 서비스를 스케일 아웃합니다.",
+        "RestartPod": "레플리카는 정상인데 서비스를 중단한 파드를 재시작합니다. 반복되면 대신 버그가 열립니다.",
+        "ToggleFeatureFlag": "문제의 원인이 된 기능 플래그를 끕니다.",
+        "RunRunbookStep": "서비스 런북의 단계를 실행합니다.",
+        "LowerThreshold": "인시던트 전에 경고하기에 너무 늦게 발생한 임계값을 낮춥니다.",
+        "RevertConfigChange": "해당 설정이 없는 레플리카는 정상일 때, 문제가 시작된 최근 설정 변경을 되돌립니다.",
+        "EvictLeakedConnections": "서비스가 대여하고 반환하지 않은 연결을 닫습니다(누수 탐지로 발견). 진행 중인 쿼리는 그대로 둡니다. 각 연결은 해당 누수의 버그에 연결됩니다.",
+        "AbortRollout": "롤아웃 중 새 버전의 파드만 실패할 때 트래픽을 이전 버전으로 되돌립니다. 클릭 한 번으로 재개할 수 있습니다.",
+        "ScaleQueueWorkers": "적체된 큐에 워커를 추가합니다(상한까지). 처리 속도가 개선되지 않으면 자동으로 축소합니다."
+      },
+      "triageHint": "심각도별 L0 트리아지. 1단계에서 고정됩니다.",
+      "channels": "채널",
+      "channelInbox": "제품 내 인박스",
+      "channelEmailAdmins": "조직 관리자에게 이메일",
+      "channelDefault": "모든 조직의 기본값. 항상 켜짐.",
+      "alwaysOn": "항상 켜짐",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "연결됨. 선택 사항이며, 인박스와 이메일은 이것 없이도 작동합니다.",
+      "connected": "연결됨",
+      "defaultsNote": "1단계에서는 고정된 제품 기본값을 제공합니다. 조직별 재정의는 나중에 제공됩니다.",
+      "groupCoverage": "적용 범위 — 탐지기를 자동으로 생성합니다",
+      "groupCoverageHint": "새 서비스가 나타나는 즉시 이상 탐지기와 일치하는 라이브러리 알림이 생성되며, 학습하는 동안 기본적인 안전 검사를 수행합니다. 각 생성은 기록되고, 되돌릴 수 있으며, 검토 기간을 거칩니다.",
+      "groupCalibration": "캘리브레이션 — 기존 알림에 대한 변경",
+      "channelEmail": "이메일 {address}",
+      "paging": "호출",
+      "pagingHint": "심각도가 문제가 사람에게 전달되는 방식을 결정합니다.",
+      "routing": {
+        "p1p2": "P1 및 P2",
+        "p1p2Desc": "고객에게 영향을 줍니다. 시간에 관계없이 온콜을 호출합니다.",
+        "page": "호출",
+        "p3": "P3",
+        "p3Desc": "준비되는 즉시 전송되는 Slack 메시지. 누구에게도 호출하지 않습니다.",
+        "message": "메시지",
+        "p4": "P4",
+        "p4Desc": "금요일 요약에 포함됩니다.",
+        "summary": "금요일 요약"
+      },
+      "nav": {
+        "coverage": "적용 범위",
+        "alerts": "알림 변경",
+        "fixes": "수정 사항",
+        "investigation": "조사 및 페이징",
+        "channels": "채널"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count}개 연결됨"
+      }
+    },
+    "notInDemo": "이 데모에서는 사용할 수 없습니다",
+    "confidence": {
+      "high": "높음",
+      "medium": "보통",
+      "low": "낮음",
+      "uncalibrated": "아직 보정된 점수가 없습니다"
+    },
+    "analysis": {
+      "verdict": "판정",
+      "unconfirmed": "아직 확인되지 않음",
+      "lasted": "{count}분 지속됨",
+      "soFar": "지금까지 {count}분",
+      "checked": "확인한 항목",
+      "verdicts": {
+        "confirmed": "확인됨",
+        "ruled_out": "배제됨",
+        "open": "여전히 미해결"
+      },
+      "comparison": "정상 vs 영향받음",
+      "kinds": {
+        "affected": "영향받음",
+        "healthy": "정상",
+        "limit": "한계"
+      },
+      "trail": "증거 추적",
+      "seeInUnfold": "전개 과정에서 보기",
+      "nextStep": "다음 단계",
+      "fullReport": "전체 보고서",
+      "fullReportHint": "위의 모든 내용을 하나의 문서로, 복사하거나 다운로드할 수 있습니다"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "데모",
+    "scenarioLabel": "데모 시나리오",
+    "scenarios": {
+      "demo": "데모 주간",
+      "allClear": "이상 없음",
+      "incident": "활성 인시던트",
+      "cantSee": "볼 수 없음",
+      "noBaseline": "기준선 없음"
+    },
+    "nav": {
+      "history": "기록",
+      "settings": "설정",
+      "howItWorks": "작동 방식",
+      "searchLabel": "이슈 검색",
+      "searchPlaceholder": "이슈 검색"
+    },
+    "recent": {
+      "ranges": {
+        "day": "최근 24시간",
+        "week": "최근 7일",
+        "month": "최근 30일"
+      },
+      "within": {
+        "day": "최근 24시간 내",
+        "week": "최근 7일 내",
+        "month": "최근 30일 내"
+      },
+      "groups": {
+        "thisWeek": "이번 주",
+        "lastWeek": "지난주",
+        "weeksAgo": "{count}주 전"
+      },
+      "all": "전체",
+      "none": "{within} {priority} 문제가 없습니다.",
+      "allIssues": "모든 이슈",
+      "priorityLabel": "우선순위",
+      "showing": "{count}개 문제 표시됨 | {count}개 문제 표시됨"
+    },
+    "noProblems": "{within} 문제가 없습니다. {count}개 서비스를 24시간 내내 확인했습니다. | {within} 문제가 없습니다. {count}개 서비스를 24시간 내내 확인했습니다.",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "{count}개 더 보기",
+    "showFewer": "접기",
+    "days": {
+      "today": "오늘",
+      "monday": "월요일",
+      "tuesday": "화요일",
+      "wednesday": "수요일",
+      "thursday": "목요일",
+      "friday": "금요일",
+      "jul18": "7월 18일",
+      "jul30": "7월 30일",
+      "aug13": "8월 13일",
+      "aug26": "8월 26일",
+      "sep4": "9월 4일",
+      "sep12": "9월 12일",
+      "sep24": "9월 24일",
+      "sep30": "9월 30일",
+      "oct1": "10월 1일",
+      "oct2": "10월 2일",
+      "sep23": "9월 23일"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db의 디스크가 약 3일 후에 가득 찹니다",
+        "summary": "목요일 orders 릴리스에서 감사 로깅이 켜진 이후 디스크가 하루 약 18 GB씩 차오르고 있어 수요일 아침쯤 가득 찹니다. 가득 차면 결제, 주문, 환불이 실패하기 시작합니다. 아직 문제가 발생한 것은 아니므로, 호출 대신 팀에 미리 알렸습니다.",
+        "notify1": "orders-db의 디스크가 약 3일 후, 수요일 11:00경 가득 찹니다.",
+        "notify2": "원인: 목요일 orders 3.8.0이 배포된 이후 감사 로깅이 하루 약 18 GB를 기록합니다. 그 전에는 디스크가 하루 약 6 GB씩 증가했습니다.",
+        "notify3": "수요일 전에 감사 로깅을 다시 줄이거나 디스크 공간을 추가하세요. 가득 차면 결제, 주문, 환불이 실패합니다. 아직 문제가 발생한 것은 아니므로, 이는 호출이 아닌 사전 알림입니다.",
+        "chartCaption": "디스크 · 수요일 11:00경 가득 참",
+        "chartLabel": "디스크 사용량이 14일 동안 500 GB 중 334 GB에서 445 GB로 증가했고, 목요일 이후 더 빨라져 수요일 11:00경 가득 찰 것으로 예상됩니다"
+      },
+      "search": {
+        "title": "검색이 느리고 search-2가 계속 충돌합니다",
+        "titleFixed": "search-2가 계속 충돌하는 동안 검색이 느렸습니다",
+        "summary": "10:27부터 검색 5건 중 약 1건이 3초를 넘습니다. 10:16에 search-2에서 변경된 설정 때문에 메모리가 부족해집니다. 온콜을 호출했으며, 아직도 계속 발생하고 있습니다.",
+        "notify1": "검색이 느립니다: 10:27부터 검색 5건 중 약 1건이 3초를 넘습니다.",
+        "notify2": "원인: 10:16에 search-2에서 변경된 설정이 메모리를 가득 채웁니다. 10:20 이후 약 10회 충돌했습니다. 나머지 4개 노드에는 변경 사항이 없어 정상입니다.",
+        "notify3": "이전 설정으로 되돌리면 해결될 것이며, 제가 되돌릴 수 있습니다. \"revert\"라고 답장하시면 실행하겠습니다. 변경한 사람은 이유를 확인해야 합니다.",
+        "summaryFixed": "10:27에 시작되었으며, search-2에서 변경된 설정이 메모리를 가득 채운 것이 원인이었습니다. 이전 설정으로 되돌리는 것을 승인하셔서 실행했고, 검색이 정상으로 돌아왔습니다.",
+        "summaryFixing": "10:27에 시작되었으며, search-2에서 변경된 설정이 메모리를 가득 채우고 있습니다. 이전 설정으로 되돌리는 것을 승인하셔서 지금 실행 중입니다.",
+        "chartCaption": "p95 지연 시간 · 최대 3.4초",
+        "chartLabel": "p95 지연 시간이 10:27에 0.38초에서 3.4초로 상승했으며 여전히 높습니다",
+        "chartLabelFixed": "p95 지연 시간이 10:27에 0.38초에서 3.4초로 상승했고, 설정을 되돌리자 정상으로 복구되었습니다"
+      },
+      "checkout": {
+        "title": "배포 후 결제 12건 중 1건이 실패했습니다",
+        "summary": "payments-api 2.3.1이 결제 데이터베이스에 허용된 것보다 많은 연결을 요청했습니다. 롤백하여 장애 시작 18분 후 해결되었습니다.",
+        "notify1": "14:02부터 결제 12건 중 약 1건이 실패하고 있습니다.",
+        "notify2": "유력한 원인: 14:01에 배포된 payments-api 2.3.1이 서버당 연결 풀을 20에서 50으로 늘렸습니다. 6개 서버 × 50은 결제 데이터베이스가 허용하는 200을 초과합니다.",
+        "notify3": "2.3.0으로 롤백하는 것이 가장 빠른 해결책입니다.",
+        "chartCaption": "실패한 결제 · 최대 12건 중 1건",
+        "chartLabel": "결제 실패가 14:02에 0.1%에서 12건 중 1건으로 급증했고, 롤백 후 18분 만에 정상으로 돌아왔습니다"
+      },
+      "pool": {
+        "title": "체크아웃의 데이터베이스 연결이 고갈되었습니다",
+        "summary": "누수된 연결이 모든 유휴 연결을 소진하면서 결제 시간 초과가 시작되었습니다. 승인하셔서 해당 연결을 정리했고, 2분 후 결제가 복구되었습니다.",
+        "notify1": "체크아웃의 데이터베이스 연결이 고갈되어 11:18부터 결제 약 9건 중 1건이 시간 초과되고 있습니다.",
+        "notify2": "원인: 50개 연결 중 48개가 반환되지 않은 환불 내보내기에 의해 점유되어 있습니다. CHK-482 누수이며, 2주 만에 세 번째입니다.",
+        "notify3": "누수된 연결만 닫으면 해결될 것입니다. 진행 중인 결제는 영향을 받지 않습니다. \"yes\"라고 답해 주시면 실행하겠습니다.",
+        "chartCaption": "시간 초과 · 최대 9건 중 1건",
+        "chartLabel": "결제 시간 초과가 11:18에 약 9건 중 1건으로 증가했고, 11:21 수정 후 2분 만에 복구되었습니다"
+      },
+      "email": {
+        "title": "주문 이메일이 최대 9분 지연되었습니다",
+        "summary": "야간에 모든 메일 워커가 한꺼번에 교체되었고, 큐는 약 20분 만에 스스로 따라잡았습니다. 경미한 사안이라 금요일 요약에 포함되었습니다.",
+        "chartCaption": "이메일 지연 · 최대 9분",
+        "chartLabel": "이메일 지연이 03:15부터 9분까지 증가했고 03:36에 스스로 복구되었습니다"
+      },
+      "recs": {
+        "title": "추천이 15분 동안 느려졌습니다",
+        "summary": "0.25초에서 거의 1초로 늘어났습니다. 야간 캐시 재구성이 오후에 수동으로 시작되었고 스스로 완료되었습니다. 금요일 요약으로 보류했습니다.",
+        "chartCaption": "p95 지연 시간 · 최대 0.94초",
+        "chartLabel": "p95 지연 시간이 16:40에 0.26초에서 0.94초로 증가했고 15분 후 스스로 복구되었습니다"
+      },
+      "login": {
+        "title": "로그인이 약 25분 동안 느렸습니다",
+        "summary": "8명 중 1명이 5초 이상 기다렸습니다. 트래픽 급증 후 세션 캐시 공간이 부족해져 일부 사용자가 로그아웃되었습니다. 팀에서 공간을 추가하여 복구되었습니다.",
+        "notify1": "로그인이 느립니다: 10:12부터 약 8명 중 1명이 5초 이상 기다리고 있습니다.",
+        "notify2": "원인: 10:05에 트래픽이 두 배로 늘어난 후 세션 캐시가 가득 찼습니다.",
+        "notify3": "캐시에 공간을 추가하면 해결될 것입니다.",
+        "chartCaption": "p95 로그인 · 최대 5.8초",
+        "chartLabel": "p95 로그인 시간이 10:12에 0.6초에서 5.8초로 증가했고, 10:31에 캐시 공간이 추가된 후 복구되었습니다"
+      },
+      "queue": {
+        "title": "주문이 큐에 적체되었습니다",
+        "summary": "최악의 경우 약 4,000건이 대기 중이었습니다. 허용하신 대로 워커를 추가했지만 효과가 없어 되돌리고 온콜을 호출했습니다. 실제 원인은 마이그레이션이 깨뜨린 데이터베이스 인덱스였고, 팀에서 시작 40분 후 수정했습니다.",
+        "notify1": "주문이 적체되고 있습니다: 21:30부터 약 4,000건이 대기 중입니다.",
+        "notify2": "허용하신 대로 21:33에 워커를 추가했지만 효과가 없어 되돌렸습니다.",
+        "notify3": "21:20 데이터베이스 마이그레이션 이후 주문 조회가 약 40배 느려졌습니다. 먼저 orders_by_status 인덱스를 확인하세요.",
+        "chartCaption": "백로그 · 최대 4,120",
+        "chartLabel": "대기 중인 주문이 21:30부터 4,120건까지 증가했고, 워커 추가 후에도 계속 증가하다가 21:52에 인덱스가 재구성된 후 해소되었습니다"
+      },
+      "uploads": {
+        "title": "이미지 업로드가 40명 중 1명에게 실패했습니다",
+        "summary": "한 서버가 교체 인증서를 로드하기 전에 인증서가 만료되어 10분간 지속되었습니다. 스스로 해결되어 금요일 요약으로 보류했습니다.",
+        "chartCaption": "실패한 업로드 · 최대 40건 중 1건",
+        "chartLabel": "실패한 업로드가 07:05에 약 40건 중 1건으로 증가했고 10분 후 스스로 복구되었습니다"
+      },
+      "push": {
+        "title": "푸시 알림이 2분 지연되어 도착했습니다",
+        "summary": "이를 전송하는 제공자가 느려지면서 30분간 지속되었습니다. 경미한 사안이라 금요일 요약으로 보류했습니다.",
+        "chartCaption": "전송 지연 · 최대 2분",
+        "chartLabel": "전송 지연이 13:50에 4초에서 약 2분으로 증가했고 30분 후 스스로 복구되었습니다"
+      },
+      "checkoutNow": {
+        "title": "체크아웃이 결제 6건 중 1건 실패하고 있습니다",
+        "titleFixed": "체크아웃이 결제 6건 중 1건 실패했습니다",
+        "summary": "10:43에 시작되었고 아직 원인을 조사 중입니다. 지금까지는 10:41에 배포된 버전 2.4.0과 일치하며, 온콜을 호출했습니다.",
+        "notify1": "10:43부터 체크아웃이 결제 약 6건 중 1건 실패하고 있습니다.",
+        "notify2": "아직 원인을 조사 중입니다. 지금까지는 10:41에 배포된 체크아웃 2.4.0과 일치합니다.",
+        "notify3": "2.4.0을 실행하는 서버만 실패하고 있습니다. \"stop\"이라고 답해 주시면 트래픽을 이전 버전으로 되돌리겠습니다. 이전 서버에는 여유가 있습니다. payments-db를 직접 볼 수 없어 배제하지 못했습니다.",
+        "summaryFixing": "버전 2.4.0이 배포된 직후인 10:43에 시작되었습니다. 롤아웃 중단을 승인하셔서 지금 트래픽을 이전 버전으로 되돌리고 있습니다.",
+        "summaryFixed": "버전 2.4.0이 배포된 후 10:43에 시작되었습니다. 롤아웃 중단을 승인하셨고, 트래픽이 이전 버전으로 돌아가자 실패가 멈췄습니다. 2.4.0이 실패하는 이유는 팀에서 찾아야 합니다.",
+        "chartCaption": "실패한 결제 · 최대 6건 중 1건",
+        "chartLabel": "결제 실패가 10:43에 0.1%에서 약 6건 중 1건으로 급증했고 여전히 실패하고 있습니다",
+        "chartLabelFixed": "결제 실패가 10:43에 0.1%에서 약 6건 중 1건으로 급증했고, 롤아웃이 중단되자 정상으로 돌아왔습니다"
+      },
+      "gateway": {
+        "title": "API가 요청 30건 중 1건을 거부했습니다",
+        "summary": "구성 변경 이후에 시작되었습니다. 팀에서 이를 되돌렸고, 시작된 지 13분 후에 정상으로 돌아왔습니다.",
+        "notify1": "API가 15:22부터 약 30건 중 1건의 요청을 거부하고 있습니다.",
+        "notify2": "유력한 원인: 15:20의 구성 변경으로 로그인 토큰의 유효 시간이 짧아졌습니다.",
+        "notify3": "해당 변경을 되돌리면 해결됩니다.",
+        "chartCaption": "거부 · 최대 30건 중 1건",
+        "chartLabel": "거부된 요청이 15:22에 30건 중 1건으로 증가했고, 15:34에 구성 변경이 되돌려지면서 정상으로 돌아왔습니다"
+      },
+      "poolSep": {
+        "title": "Checkout에서 데이터베이스 연결이 고갈되었습니다",
+        "summary": "누수된 연결이 모든 여유 연결을 소진하여 결제가 타임아웃되기 시작했습니다. 누수 원인을 환불 내보내기로 추적했고, 누수된 연결 정리를 승인하셨습니다. 결제는 2분 후 복구되었습니다.",
+        "notify1": "Checkout에서 데이터베이스 연결이 고갈되어 15:42부터 약 9건 중 1건의 결제가 타임아웃되고 있습니다.",
+        "notify2": "원인: 50개 연결 중 47개를 연결을 반환하지 않는 환불 내보내기가 점유하고 있습니다. 환불 내보내기 코드의 누수로 보입니다.",
+        "notify3": "누수된 연결만 닫으면 해결됩니다. 진행 중인 결제는 영향을 받지 않습니다. \"yes\"라고 답해 주시면 실행하겠습니다.",
+        "chartCaption": "타임아웃 · 최대 9건 중 1건",
+        "chartLabel": "결제 타임아웃이 15:42에 약 9건 중 1건으로 증가했고, 15:45 수정 후 2분 만에 복구되었습니다"
+      },
+      "poolOct": {
+        "title": "Checkout에서 다시 데이터베이스 연결이 고갈되었습니다",
+        "summary": "동일한 환불 내보내기 누수(CHK-482)였습니다. 누수된 연결 정리를 승인하셨고, 결제는 2분 후 복구되었습니다.",
+        "notify1": "Checkout에서 데이터베이스 연결이 고갈되어 10:05부터 약 9건 중 1건의 결제가 타임아웃되고 있습니다.",
+        "notify2": "원인: 50개 연결 중 46개를 환불 내보내기가 점유하고 있습니다. CHK-482 누수가 8일 만에 두 번째로 발생했습니다.",
+        "notify3": "누수된 연결만 닫으면 해결됩니다. 진행 중인 결제는 영향을 받지 않습니다. \"yes\"라고 답해 주시면 실행하겠습니다.",
+        "chartCaption": "타임아웃 · 최대 9건 중 1건",
+        "chartLabel": "결제 타임아웃이 10:05에 약 9건 중 1건으로 증가했고, 10:08 수정 후 2분 만에 복구되었습니다"
+      },
+      "lagSep": {
+        "title": "신규 상품이 검색에 나타나기까지 최대 40분이 걸렸습니다",
+        "summary": "버전 1.12.0에서 배치당 허용 시간이 짧아진 후 search-indexer가 카탈로그 업데이트를 따라가지 못했습니다. 팀에서 롤백했고, 시작된 지 40분 후에 따라잡았습니다.",
+        "notify1": "신규 및 변경된 상품이 검색에서 누락되어 있습니다. search-indexer가 14:06부터 약 48,000건의 카탈로그 업데이트를 따라가지 못하고 있습니다.",
+        "notify2": "원인: 13:58에 배포된 search-indexer 1.12.0이 Kafka 폴링 간격을 30초로 줄였습니다. 대규모 배치는 약 45초가 걸려 컨슈머가 계속 그룹에서 제거되고 있습니다.",
+        "notify3": "1.11.4로 롤백하면 따라잡을 수 있습니다. 검색 자체는 여전히 작동하며, 다만 오래된 상품이 표시됩니다.",
+        "chartCaption": "컨슈머 지연 · 최대 48,000",
+        "chartLabel": "컨슈머 지연이 14:06부터 약 200건에서 48,000건으로 증가했고, 14:39 롤백 이후 해소되었습니다"
+      },
+      "poolAug": {
+        "title": "환불 내보내기 중 Checkout에서 데이터베이스 연결이 고갈되었습니다",
+        "summary": "야간 환불 내보내기가 Checkout의 데이터베이스 연결 거의 전부를 점유하여 약 12건 중 1건의 결제가 타임아웃되었습니다. 내보내기가 끝나면서 시작된 지 13분 후에 해소되었습니다.",
+        "notify1": "Checkout에서 데이터베이스 연결이 고갈되어 02:04부터 약 12건 중 1건의 결제가 타임아웃되고 있습니다.",
+        "notify2": "원인: 50개 연결 중 44개를 야간 환불 내보내기가 점유하고 있으며, 월말 세일 이후 평소의 약 3배 규모입니다.",
+        "notify3": "내보내기가 끝나면 해소될 것입니다. 그렇지 않으면 내보내기를 중단하여 연결을 확보할 수 있습니다.",
+        "chartCaption": "타임아웃 · 최대 12건 중 1건",
+        "chartLabel": "결제 타임아웃이 02:04에 약 12건 중 1건으로 증가했고, 02:17에 내보내기가 끝나면서 스스로 복구되었습니다"
+      },
+      "throttleAug": {
+        "title": "사기 검사가 35분 동안 느려졌습니다",
+        "summary": "배치 작업이 같은 서버에서 실행되어 여유 CPU를 차지했고, 그 결과 사기 검사가 최대 1.4초까지 걸렸습니다. Checkout은 여전히 작동했지만 느려졌고, 작업이 끝나자 복구되었기에 금요일 요약을 위해 보류했습니다.",
+        "chartCaption": "p95 사기 검사 · 최대 1.4초",
+        "chartLabel": "p95 사기 검사 시간이 11:20에 0.18초에서 1.4초로 증가했고, 11:55에 배치 작업이 끝나면서 스스로 복구되었습니다"
+      },
+      "tlsJul": {
+        "title": "인보이스 발송이 43분 동안 중단되었습니다",
+        "summary": "invoice-service의 billing-api용 인증서가 만료되어 모든 인보이스 발송이 실패했습니다. 팀에서 갱신했고, 대기 중이던 인보이스가 모두 발송되었습니다.",
+        "notify1": "인보이스가 전혀 발송되지 않습니다. 09:01부터 invoice-service의 모든 발송이 실패하고 있습니다.",
+        "notify2": "원인: invoice-service의 billing-api용 클라이언트 인증서가 09:00에 만료되어 billing-api가 해당 연결을 모두 거부하고 있습니다.",
+        "notify3": "인증서를 갱신하면 해결됩니다. 인보이스는 대기 중이며 유실되지 않았습니다.",
+        "chartCaption": "실패한 발송 · 전부",
+        "chartLabel": "실패한 인보이스 발송이 09:01에 0.2%에서 100%로 급증했고, 09:41에 인증서가 갱신된 후 정상으로 돌아왔습니다"
+      },
+      "dnsJul": {
+        "title": "장바구니 가격이 4명 중 1명에게 표시되지 않았습니다",
+        "summary": "DNS 변경으로 클러스터 DNS 서버 절반이 내부 이름에 응답하지 않게 되어 cart가 currency에 접속할 수 없었습니다. 팀에서 시작된 지 31분 후에 이를 되돌렸습니다.",
+        "notify1": "16:22부터 약 4건 중 1건의 장바구니 로드에서 가격이 표시되지 않습니다.",
+        "notify2": "원인: 16:20의 DNS 구성 변경으로 4대의 클러스터 DNS 서버 중 2대에서 내부 존이 제거되어, cart가 해당 조회에서 currency.internal을 찾지 못합니다.",
+        "notify3": "DNS 변경을 되돌리면 해결됩니다. 주문은 결제 단계에서 여전히 처리됩니다.",
+        "chartCaption": "가격 누락 · 최대 4건 중 1건",
+        "chartLabel": "가격 없는 장바구니 로드가 16:22에 0.1%에서 약 4건 중 1건으로 증가했고, 16:51에 DNS 변경이 되돌려지면서 정상으로 돌아왔습니다"
+      }
+    },
+    "drawer": {
+      "worked": "효과 있었음",
+      "didntHelp": "도움이 안 됨",
+      "now": "지금"
+    },
+    "needs": {
+      "more": "더 많이",
+      "less": "더 적게",
+      "canUndo": "되돌릴 수 있습니다",
+      "undo": "실행 취소",
+      "undone": "실행 취소되었습니다. 이 항목은 다시 답변을 기다리고 있습니다.",
+      "shiftTo": "로",
+      "retune": {
+        "body": "{host}의 \"{alert}\" 알림이 이번 달에 {fired}번 발생했지만 아무도 조치할 필요가 없었습니다. 디스크는 야간 정리 중 약 85%까지 올라가고 아침에는 다시 70% 근처로 돌아옵니다. 가장 바쁜 날에도 90%에서 가득 차기까지 3일 이상 걸립니다. 이를 {to}%로 올리고 싶습니다. 디스크가 하루 안에 가득 찰 것으로 예상되면 계속 경고해 드리겠습니다.",
+        "yes": "예, 변경하세요",
+        "no": "그대로 두기",
+        "doneYes": "완료했습니다. {to}%로 올렸습니다. 가득 참 경고는 계속 켜져 있습니다.",
+        "doneNo": "알겠습니다. {from}%로 그대로 두겠습니다.",
+        "headline": "ingest-3의 'disk 80%' 알림을 90%로 올릴까요?",
+        "why": "이번 달에 41번 발생했지만 아무도 조치할 필요가 없었습니다.",
+        "cost": "가득 참 경고 유지"
+      },
+      "fixNow": {
+        "search": {
+          "body": "검색이 느린 이유는 10:16에 search-2 노드에서 변경된 설정이 메모리를 가득 채워 계속 충돌하기 때문입니다. 나머지 4개 노드는 여전히 이전 설정을 사용하고 있어 정상입니다. 되돌려도 될까요? 이 작업은 실행 취소할 수 있습니다.",
+          "yes": "되돌리기",
+          "no": "제가 처리할게요",
+          "doneYes": "완료했습니다. 지금 되돌리는 중입니다.",
+          "doneNo": "알겠습니다. 직접 처리하세요. 계속 지켜보겠습니다.",
+          "doneSettled": "완료했습니다. search-2가 복구되었고 검색이 정상입니다.",
+          "headline": "search-2의 캐시 설정을 10%로 되돌릴까요?",
+          "why": "10:16의 변경으로 메모리가 가득 차서 계속 충돌합니다.",
+          "cost": "search-2 재시작 1회"
+        },
+        "checkoutNow": {
+          "body": "결제가 약 6건 중 1건 실패하고 있으며, 2.4.0을 사용하는 서버에서만 실패합니다. 이전 버전을 사용하는 6개 서버는 모든 트래픽을 감당할 여력이 있습니다. 롤아웃을 중단하고 트래픽을 해당 서버로 되돌려도 될까요? 2.4.0은 팀에서 확인할 수 있도록 배포된 상태로 유지됩니다.",
+          "yes": "롤아웃 중단",
+          "no": "제가 처리할게요",
+          "doneYes": "완료했습니다. 지금 롤아웃을 중단합니다.",
+          "doneNo": "알겠습니다. 직접 처리하세요. 계속 지켜보겠습니다.",
+          "doneSettled": "완료했습니다. 결제가 정상으로 돌아왔습니다.",
+          "headline": "checkout의 2.4.0 롤아웃을 중단할까요?",
+          "why": "약 6건 중 1건의 결제가 실패하며, 모두 2.4.0에서 발생합니다. 이전 버전이 모든 트래픽을 감당할 수 있습니다.",
+          "cost": "2.4.0은 배포된 상태로 유지"
+        }
+      },
+      "fromNowOn": {
+        "body": "지금까지 {done}번, 새 버전이 롤아웃되는 동안 자체 서버에서만 실패가 발생했습니다. 매번 이전 버전으로 트래픽을 되돌리자고 요청했고, 실패는 2분 이내에 멈췄습니다. 앞으로는 롤아웃 중에 제가 직접 처리해도 될까요? 새 버전은 팀에서 확인할 수 있도록 그대로 두고, 즉시 알려드리겠습니다.",
+        "yes": "예, 직접 처리하세요",
+        "no": "계속 물어보세요",
+        "doneYes": "완료했습니다. 잘못된 롤아웃은 제가 직접 중단하고 매번 알려드리겠습니다.",
+        "doneNo": "알겠습니다. 계속 먼저 여쭤보겠습니다.",
+        "headline": "앞으로 잘못된 롤아웃을 직접 중단해도 될까요?",
+        "why": "6번 모두 승인해 주셨고, 실패는 2분 이내에 멈췄습니다.",
+        "cost": "롤아웃 중에만"
+      },
+      "labels": {
+        "fixNow": "지금 수정",
+        "fromNowOn": "제가 처리하도록 하기",
+        "retune": "더 조용한 알림"
+      },
+      "needsOk": "승인이 필요합니다"
+    },
+    "footer": {
+      "text": "저 자신도 점검합니다. 제가 작동을 멈추면 알려드리겠습니다.",
+      "seeAll": "내가 지켜보는 모든 것 보기",
+      "seeChanges": "내가 변경한 모든 것 보기"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1분 전 | {count}분 전",
+        "stale": "1분 동안 새 데이터 없음 ({since} 이후) | {count}분 동안 새 데이터 없음 ({since} 이후)"
+      },
+      "summaryWatching": "{total}개 서비스 중 {watched}개를 지켜보고 있습니다.",
+      "summaryAll": "{total}개 서비스를 모두 지켜보고 있습니다.",
+      "summaryWithClauses": "{head} {clauses}.",
+      "clauseLearning": "{count}개는 아직 학습 중 | {count}개는 아직 학습 중",
+      "clauseUnseen": "볼 수 없는 것이 1개 있습니다 | 볼 수 없는 것이 {count}개 있습니다",
+      "legend": {
+        "watching": "완전 모니터링",
+        "learning": "학습 중",
+        "unseen": "볼 수 없음"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "{total}개 서비스를 모두 지켜보고 있으며, 각 서비스의 정상 상태가 어떤 모습인지 아직 학습 중입니다."
+    },
+    "coveragePage": {
+      "title": "내가 지켜보는 모든 것",
+      "back": "뒤로"
+    },
+    "issuesPage": {
+      "title": "모든 이슈",
+      "sentence": "{within} 제가 생성한 모든 문제입니다. 하나를 선택하면 무슨 일이 있었고 제가 어떻게 대응했는지 확인할 수 있습니다.",
+      "back": "뒤로",
+      "ranges": {
+        "week": "지난 7일",
+        "month": "지난 30일",
+        "quarter": "지난 90일"
+      },
+      "within": {
+        "week": "지난 7일 동안",
+        "month": "지난 30일 동안",
+        "quarter": "지난 90일 동안"
+      }
+    },
+    "activityPage": {
+      "title": "내가 변경한 것",
+      "stats": {
+        "window": "지난 7일",
+        "made": "변경 | 변경",
+        "worked": "효과 있음",
+        "review": "검토 중",
+        "undone": "되돌림"
+      },
+      "filters": {
+        "all": "전체",
+        "fixes": "수정",
+        "watching": "모니터링",
+        "tuning": "알림 튜닝"
+      },
+      "status": {
+        "applying": "적용 중",
+        "worked": "효과 있음",
+        "done": "완료",
+        "review": "검토 중",
+        "reviewDays": "검토 중 · {count}일 남음 | 검토 중 · {count}일 남음",
+        "didntHelp": "효과 없음",
+        "undone": "되돌림"
+      },
+      "actions": {
+        "undo": "실행 취소",
+        "showDetails": "세부 정보 보기",
+        "hideDetails": "세부 정보 숨기기"
+      },
+      "details": {
+        "name": "변경",
+        "target": "대상",
+        "confidence": "신뢰도",
+        "saw": "내가 확인한 내용",
+        "recurring": "동일한 누수({bug})에 이 수정이 계속 필요하므로, 해결될 때까지 항상 먼저 확인하겠습니다.",
+        "undoDecided": "실행 취소하면 이 변경이 되돌려지고, 다시 여쭤볼게요."
+      },
+      "toast": {
+        "undone": "실행 취소했습니다. 원래대로 돌아왔어요.",
+        "undoDecided": "실행 취소했습니다. 다시 여쭤볼게요."
+      },
+      "empty": {
+        "filter": "지금은 여기에 아무것도 없습니다.",
+        "scenario": "아직 아무것도 변경하지 않았습니다. 변경하면 여기에 표시됩니다."
+      },
+      "entries": {
+        "L-313": {
+          "done": "checkout의 2.4.0 롤아웃을 중지했습니다",
+          "why": "2.4.0을 실행하는 6개 서버만 실패하고 있으며, 이전 버전을 실행하는 6개 서버는 모든 트래픽을 처리할 수 있습니다.",
+          "from": "12개 파드 중 6개",
+          "to": "트래픽 없음",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "search-2의 캐시 설정을 10%로 되돌렸습니다",
+          "why": "10:16에 60%로 올라갔고, 그 이후로 search-2가 메모리 부족을 겪고 있습니다.",
+          "from": "60%",
+          "to": "10%",
+          "on": "캐시 크기 · search-2"
+        },
+        "L-309": {
+          "done": "ingest-3의 'disk 80%' 알림을 90%로 올렸습니다",
+          "why": "이번 달에 41번 발생했지만 아무도 조치할 필요가 없었습니다. 사용량 경고는 계속 켜둡니다.",
+          "from": "80%",
+          "to": "90%",
+          "on": "디스크 알림 · ingest-3"
+        },
+        "L-310": {
+          "done": "returns, exchanges 및 gift-cards 모니터링을 시작했습니다",
+          "why": "오늘 아침에 발견했습니다. 7일 동안 이들의 정상 상태를 학습 중입니다.",
+          "from": "모니터링 안 함",
+          "to": "모니터링 중",
+          "on": "서비스 3개"
+        },
+        "L-314": {
+          "done": "오늘 아침에 발견한 6개 서비스를 모니터링하기 시작했습니다",
+          "why": "오늘 트레이스에 나타났습니다. 7일 동안 이들의 정상 상태를 학습 중입니다.",
+          "from": "모니터링 안 함",
+          "to": "모니터링 중",
+          "on": "서비스 6개"
+        },
+        "L-311": {
+          "done": "제가 스스로 잘못된 롤아웃을 중지해도 된다는 승인을 받았습니다",
+          "why": "지난 60일 동안 승인을 받아 6건을 중지했고, 매번 2분 이내에 오류가 정상으로 돌아왔습니다.",
+          "from": "먼저 물어보기",
+          "to": "스스로",
+          "on": "롤아웃 중지"
+        },
+        "L-304": {
+          "done": "checkout의 누수된 데이터베이스 연결 48개를 정리했습니다",
+          "why": "결제가 타임아웃되고 있었습니다. 2분 후 정상으로 돌아왔습니다.",
+          "from": "50개 중 50개 사용 중",
+          "to": "2개 사용 중",
+          "on": "checkout 풀"
+        },
+        "L-299": {
+          "done": "checkout의 누수된 데이터베이스 연결 46개를 정리했습니다",
+          "why": "9월 23일과 동일한 누수입니다. 2분 후 결제가 정상으로 돌아왔습니다.",
+          "from": "50개 중 50개 사용 중",
+          "to": "4개 사용 중",
+          "on": "checkout 풀"
+        },
+        "L-296": {
+          "done": "checkout의 누수된 데이터베이스 연결 47개를 정리했습니다",
+          "why": "새로운 누수라서 이후 checkout 팀에 CHK-482로 등록했습니다.",
+          "from": "50개 중 50개 사용 중",
+          "to": "3개 사용 중",
+          "on": "checkout 풀"
+        },
+        "L-301": {
+          "done": "billing-api, billing-worker, invoice-service 모니터링을 시작했습니다",
+          "why": "트레이스에서 이들을 찾았습니다. 아직 이들의 정상 상태를 학습 중입니다.",
+          "from": "모니터링 안 함",
+          "to": "모니터링 중",
+          "on": "서비스 3개"
+        },
+        "L-307": {
+          "done": "payments-api 연결 알림이 모든 서버를 집계하도록 수정했습니다",
+          "why": "각 서버를 따로 확인해서 화요일 장애 때 전혀 울리지 않았습니다.",
+          "from": "각 파드 95% 초과",
+          "to": "모든 파드 85% 초과",
+          "on": "연결 알림"
+        },
+        "L-302": {
+          "done": "checkout 지연 알림 3개를 하나로 그룹화했습니다",
+          "why": "94%의 경우 함께 울려서, 지연 한 번에 3번 호출되었습니다.",
+          "from": "알림 3개",
+          "to": "1",
+          "on": "checkout 지연"
+        },
+        "L-303": {
+          "done": "ingest-1의 '디스크 80%' 알림을 90%로 상향했습니다",
+          "why": "30일 동안 29번 울렸지만 조치할 필요가 없었습니다. 용량 경고는 계속 켜둡니다.",
+          "from": "80%",
+          "to": "90%",
+          "on": "디스크 알림 · ingest-1"
+        },
+        "L-305": {
+          "done": "백로그를 해소하려고 orders-consumer 워커 4개를 추가했습니다",
+          "why": "도움이 되지 않아 다시 4개로 줄였고, 3분 후 온콜을 호출했습니다.",
+          "from": "워커 4개",
+          "to": "워커 8개",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "큐 워커를 자체적으로 추가해도 된다는 승인을 받았습니다",
+          "why": "트래픽 급증 때 7번 승인하셨고, 매번 백로그가 해소되었습니다.",
+          "from": "먼저 문의",
+          "to": "자체적으로",
+          "on": "큐 워커 추가"
+        },
+        "L-312": {
+          "done": "연결했을 때 찾은 서비스 18개 모니터링을 시작했습니다",
+          "why": "각 서비스의 정상 상태를 학습 중입니다. 준비되면 알림이 시작됩니다.",
+          "from": "모니터링 안 함",
+          "to": "모니터링 중",
+          "on": "서비스 18개"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "기록",
+      "seeChange": "변경 내용 보기",
+      "filters": {
+        "all": "전체",
+        "problems": "문제",
+        "changes": "변경",
+        "fixes": "수정",
+        "decisions": "사용자의 결정"
+      },
+      "empty": "아직 아무것도 없습니다.",
+      "entries": {
+        "checkoutNowPaged": "checkout의 결제 실패 문제로 온콜을 호출했습니다.",
+        "searchPaged": "검색이 느린 문제로 온콜을 호출했습니다.",
+        "searchAsked": "search-2의 캐시 설정을 되돌려도 되는지 문의했습니다.",
+        "euStopped": "{cluster} 클러스터에서 이 시각 이후로 아무 데이터도 도착하지 않았습니다. 여기와 Slack에서 알려드렸습니다.",
+        "fridaySummary": "{count}건의 사소한 문제를 포함한 금요일 요약을 보냈습니다. | {count}건의 사소한 문제를 포함한 금요일 요약을 보냈습니다.",
+        "emailHeld": "주문 이메일 관련 사소한 문제를 금요일 요약을 위해 보류했습니다.",
+        "poolFixed": "checkout의 누수된 데이터베이스 연결을 닫았습니다. 2분 후 결제가 복구되었습니다.",
+        "poolApproved": "checkout의 누수된 데이터베이스 연결을 닫는 것을 승인하셨습니다.",
+        "billingWatch": "billing-api, billing-worker, invoice-service를 지켜보기 시작했습니다.",
+        "checkoutPaged": "checkout의 결제 실패 건으로 온콜을 호출했습니다.",
+        "recsHeld": "recommendations의 사소한 문제는 금요일 요약을 위해 보류했습니다.",
+        "diskApproved": "ingest-1의 디스크 알림을 {to}%로 올리는 것을 승인하셨습니다.",
+        "latencyGrouped": "checkout 지연 알림 세 개를 하나로 묶었습니다. 그래서 한 번의 지연에 대해 한 번만 호출됩니다.",
+        "queueFixed": "orders 큐 워커를 추가했지만 큐가 계속 커져서, 다시 되돌리고 온콜을 호출했습니다.",
+        "loginPaged": "느린 로그인 건으로 온콜을 호출했습니다.",
+        "queuePermission": "제가 직접 큐 워커를 최대 8개까지 추가할 수 있도록 허용하셨습니다.",
+        "gatewayPaged": "API가 요청을 거부하는 건으로 온콜을 호출했습니다.",
+        "found18": "{count}개의 서비스를 찾았고, 이들의 정상 상태가 어떤지 파악하기 시작했습니다.",
+        "connected": "제게 데이터를 연결해 주셨습니다.",
+        "thresholdApproved": "payments-api 연결 알림이 데이터베이스 한도 200을 기준으로 모든 서버를 집계하도록 하는 것을 승인하셨습니다.",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "search-2의 설정을 되돌리는 것을 승인하셨습니다.",
+              "no": "search-2는 직접 처리하겠다고 하셨습니다.",
+              "undoYes": "search-2의 설정 되돌리기를 취소하셨습니다. 제가 60%를 다시 적용해서 search-2가 다시 메모리 부족을 겪기 시작할 것입니다. 온콜에 알렸습니다.",
+              "cancel": "제가 적용하기 전에 search-2의 설정 되돌리기를 취소하셨습니다. search-2는 여전히 메모리 부족 상태입니다. 온콜에 알렸습니다.",
+              "undoNo": "search-2를 직접 처리하겠다는 말을 철회하셨습니다."
+            },
+            "checkoutNow": {
+              "yes": "checkout 2.4.0 롤아웃을 중단하는 것을 승인하셨습니다.",
+              "no": "checkout 롤아웃은 직접 처리하겠다고 하셨습니다.",
+              "undoYes": "2.4.0 롤아웃 중단을 취소하셨습니다. 트래픽이 다시 2.4.0으로 가고 있어 결제가 다시 실패하기 시작할 수 있습니다. 온콜에 알렸고 지켜보고 있습니다.",
+              "cancel": "제가 실행하기 전에 2.4.0 롤아웃 중단을 취소하셨습니다. 결제는 여전히 실패하고 있습니다. 온콜에 알렸습니다.",
+              "undoNo": "checkout 롤아웃을 직접 처리하겠다는 말을 철회하셨습니다."
+            }
+          },
+          "retune": {
+            "yes": "ingest-3의 디스크 알림을 90%로 올리는 것을 승인하셨습니다.",
+            "no": "ingest-3의 디스크 알림을 올리는 것에 대해 지금은 안 된다고 하셨습니다.",
+            "undoYes": "ingest-3의 디스크 알림 올리기를 취소하셨습니다. 80%로 되돌아가서 정상적인 밤에도 다시 울리기 시작할 것입니다.",
+            "undoNo": "ingest-3 디스크 알림에 대한 '지금은 안 됨' 결정을 철회하셨습니다."
+          },
+          "fromNowOn": {
+            "yes": "제가 직접 잘못된 롤아웃을 중단할 수 있도록 하는 것을 승인하셨습니다.",
+            "no": "제가 직접 잘못된 롤아웃을 중단하도록 하는 것에 대해 지금은 안 된다고 하셨습니다.",
+            "undoYes": "제가 직접 잘못된 롤아웃을 중단하도록 한 것을 철회하셨습니다.",
+            "undoNo": "제가 직접 잘못된 롤아웃을 중단하도록 하는 것에 대한 '지금은 안 됨' 결정을 철회하셨습니다."
+          }
+        },
+        "fixedNow": {
+          "search": "search-2의 설정을 되돌렸습니다. 검색이 정상으로 돌아왔습니다.",
+          "checkoutNow": "트래픽을 이전 버전으로 되돌렸고 실패가 멈췄습니다. 2.4.0이 왜 실패하는지는 여전히 팀에서 찾아야 합니다. 조사할 수 있도록 배포 상태는 유지했습니다."
+        },
+        "checkoutNowAsked": "checkout 2.4.0 롤아웃을 중단해도 되는지 여쭤봤습니다.",
+        "newWatch": "오늘 아침 {count}개의 새 서비스(returns, exchanges, gift-cards)를 찾았고 곧바로 지켜보기 시작했습니다.",
+        "foundWatch": "오늘 아침 {count}개의 새 서비스를 찾았고 곧바로 지켜보기 시작했습니다."
+      }
+    },
+    "settingsDrawer": {
+      "title": "설정",
+      "reach": "어디로 연락드리면 될까요?",
+      "destSlack": "Slack: {channel}",
+      "destEmail": "이메일: {address}",
+      "autonomy": "얼마나 직접 처리할까요?",
+      "tell": "알려주기",
+      "ask": "먼저 물어보기",
+      "fix": "고친 뒤 알려주기",
+      "tellHint": "제가 무엇을 할지 알려드리고, 실행은 직접 하시도록 남겨두겠습니다.",
+      "askHint": "각 조치 전에 여쭤보고, 승인하시면 실행하겠습니다.",
+      "fixHint": "검증된 실적이 있는 유형의 조치에 대해서는 설정하신 한도 내에서 바로 진행하고, 직후에 알려드리겠습니다.",
+      "advanced": "고급",
+      "perKind": "조치 유형별",
+      "digestDay": "요약 요일",
+      "excluded": "무시할 서비스",
+      "excludedNone": "없음",
+      "kinds": {
+        "pool": "누수된 데이터베이스 연결 닫기",
+        "queueWorker": "백로그 발생 시 큐 워커 추가",
+        "retune": "노이즈가 많은 알림의 임계값 높이기",
+        "rollback": "배포 롤백",
+        "record": "{done}회 수행, {worked}회 성공.",
+        "keptRecord": "{done}회 수행, {worked}회 유지.",
+        "noRecord": "아직 수행한 적이 없으므로, 실적이 쌓일 때까지 스스로 실행하지 않습니다.",
+        "revertConfig": "최근 설정 변경 되돌리기",
+        "abortRollout": "잘못된 롤아웃 중지",
+        "recurringRecord": "{done}회 수행, 모두 동일한 누수({bug})에 대한 것입니다. 수정될 때까지 계속 요청하겠습니다."
+      },
+      "weekdays": {
+        "monday": "월요일",
+        "tuesday": "화요일",
+        "wednesday": "수요일",
+        "thursday": "목요일",
+        "friday": "금요일"
+      },
+      "saved": "저장됨",
+      "noDestination": "아무에게도 연락할 수 없습니다.",
+      "routing": "호출 기준",
+      "routingNote": "고객에게 피해를 주는 모든 문제는 호출합니다. 작은 문제는 아무도 깨우지 않는 메시지로 보내고, 가장 사소한 문제는 금요일 요약에 포함합니다."
+    },
+    "howItWorks": {
+      "title": "작동 방식",
+      "intro": "제가 하는 일을 다섯 단계로 소개합니다.",
+      "gotIt": "확인",
+      "s1Title": "서비스를 찾습니다",
+      "s1": "이미 전송 중인 데이터를 살펴보고 그 안의 모든 서비스를 찾습니다. 새로운 서비스가 나타나면 같은 날부터 모니터링을 시작하며, 별도로 요청할 필요가 없습니다.",
+      "s2Title": "서비스를 모니터링합니다",
+      "s2": "각 서비스의 정상 상태를 학습합니다. 시간대별 오류, 지연, 트래픽을 파악하고 주간 패턴은 시간이 지날수록 정교해집니다. 학습이 완료되기 전까지는 기본 안전 점검을 사용합니다.",
+      "s3Title": "실제 문제일 때만 알립니다",
+      "s3": "대부분의 이상 징후는 문제가 아닙니다. 고객에게 피해를 주는 문제가 발생하면 팀을 호출하고, 작은 문제는 아무도 깨우지 않는 메시지로 보내며, 사소한 문제는 금요일 요약에 남겨둡니다.",
+      "s4Title": "모든 호출을 설명합니다",
+      "s4": "모든 메시지는 무엇이 고장 났는지, 언제부터인지, 제가 판단한 가장 유력한 원인과 그 확신도를 알려줍니다.",
+      "s5Title": "허용한 범위 내에서 수정합니다",
+      "s5": "허용한 것만 수정합니다. 성공한 수정은 신뢰를 조금씩 쌓고, 도움이 되지 않은 수정은 불이익으로 계산됩니다. 동일한 수정이 계속 필요하면 이를 자동화된 습관으로 만들지 않고 팀에 보고할 버그로 간주합니다."
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "1분 전 확인 | {count}분 전 확인"
+    },
+    "outcome": {
+      "active": "현재 발생 중",
+      "fixed": "AutoObserve가 수정함",
+      "resolved": "{minutes}분 만에 해결됨",
+      "held": "금요일 요약에 포함",
+      "fixing": "지금 수정 중",
+      "contained": "AutoObserve가 격리함",
+      "predicted": "예측됨"
+    },
+    "view": {
+      "standard": "표준",
+      "nerd": "너드",
+      "standardTooltip": "표준 보기는 간략한 정보를 제공합니다. 주의가 필요한 항목과 지난 7일간 발생한 일을 보여줍니다",
+      "nerdTooltip": "너드 보기는 모든 감지기, 루프, 설정을 전체적으로 보여줍니다",
+      "label": "보기"
+    },
+    "rail": {
+      "more": "아래에 더 있음"
+    },
+    "suggestions": {
+      "title": "제안",
+      "subtitle": "시간이 되실 때 확인해 보세요 — 노이즈를 줄이거나 시간을 절약해 줍니다."
+    }
   }
 }

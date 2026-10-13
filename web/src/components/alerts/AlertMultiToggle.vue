@@ -55,6 +55,7 @@
           orientation="horizontal"
           size="sm"
           :options="options"
+          :disabled="disabled"
           data-test="alerts-alertmultitoggle-choice"
           @update:model-value="emit('change', $event)"
         />
@@ -76,6 +77,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 const props = withDefaults(
   defineProps<{
     enabled: boolean;
+    disabled?: boolean;
     /**
      * Field this choice writes. Defaults to the aggregation flag; a PromQL
      * alert passes `query_condition.promql_multi_alert`, because it has no
@@ -92,6 +94,7 @@ const props = withDefaults(
   }>(),
   {
     name: "query_condition.aggregation.multi_alert",
+    disabled: false,
     unit: "group",
   },
 );

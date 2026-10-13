@@ -15,6 +15,7 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi, type MockedFunction } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import PipelinesList from "@/components/pipeline/PipelinesList.vue";
 import i18n from "@/locales";
 import { nextTick, reactive } from "vue";
@@ -222,6 +223,7 @@ describe("PipelinesList", () => {
   }
 
   beforeEach(async () => {
+    resetListViewState();
     store = createStore({
       state: {
         theme: "light",
@@ -1045,6 +1047,38 @@ describe("PipelinesList", () => {
 
       expect(wrapper.vm.currentPage).toBe(1);
       expect(wrapper.vm.activeTab).toBe("scheduled");
+    });
+  });
+
+  describe("view state restore", () => {
+    it("restores search, tab, state facet, size and sort", () => {
+      resetListViewState();
+      useListViewState("pipelines", {
+        filterQuery: "etl",
+        tab: "scheduled",
+        stateFilter: "paused",
+        pageSize: 50,
+        sortBy: "name",
+        sortOrder: "desc",
+      });
+      const restored = createWrapper();
+      const vm = restored.vm as any;
+      expect(vm.filterQuery).toBe("etl");
+      expect(vm.activeTab).toBe("scheduled");
+      expect(vm.stateFilter).toBe("paused");
+      expect(vm.pageSize).toBe(50);
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+      restored.unmount();
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper.vm.filterQuery = "abc";
+      wrapper.vm.pageSize = 100;
+      await nextTick();
+      const saved: any = useListViewState("pipelines", {});
+      expect(saved.filterQuery).toBe("abc");
+      expect(saved.pageSize).toBe(100);
     });
   });
 });

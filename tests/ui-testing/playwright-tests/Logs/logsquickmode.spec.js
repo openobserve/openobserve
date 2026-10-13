@@ -141,18 +141,11 @@ test.describe("Logs Quickmode testcases", () => {
   }, async ({ page }) => {
     testLogger.info('Testing error handling with random text in histogram mode');
 
-    // Enable SQL mode so "oooo" is invalid SQL and triggers a backend parse error
-    // (in quick/FTS mode "oooo" is a valid full-text search term that returns empty results, not an error)
+    // SELECT keeps SQL mode active so the unknown field reaches backend validation.
     await pm.logsPage.enableSqlModeIfNeeded();
-
-    // Replace the entire editor content with "oooo" (typeQuery does select-all + fill,
-    // ensuring the full SQL query is exactly "oooo" — not appended to an existing valid query
-    // that DataFusion could interpret as a table alias and return results instead of an error).
     await pm.logsPage.waitForQueryEditorTextbox();
-    await pm.logsPage.typeQuery("oooo");
-
-    // Wait for the editor model to reflect the new value before refreshing
-    await pm.logsPage.expectQueryEditorContainsText("oooo");
+    await pm.logsPage.typeQuery('SELECT oooo FROM "e2e_automate"');
+    await pm.logsPage.expectQueryEditorContainsText("SELECT oooo");
     await pm.logsPage.waitForSearchBarRefreshButton();
     await pm.logsPage.clickSearchBarRefreshButton();
 
@@ -212,6 +205,10 @@ test.describe("Logs Quickmode testcases", () => {
     await pm.logsPage.ensureFieldIsInteresting("kubernetes_pod_id");
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickSearchBarRefreshButton();
+    await page.waitForURL(
+      (url) => url.searchParams.get('sql_mode') === 'true' && url.searchParams.has('query'),
+      { timeout: 30000 }
+    );
     await pm.logsPage.page.reload();
     // Use domcontentloaded, not networkidle: with streaming enabled (cloud/alpha) the
     // long-lived SSE/search connections keep the network busy, so networkidle never

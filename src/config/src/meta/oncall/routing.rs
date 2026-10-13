@@ -138,7 +138,7 @@ impl std::error::Error for OwnershipError {}
 /// A trailing `*` is a prefix claim and nothing more: `host=db-*` owns `db-01`
 /// and `db-primary`. §7: "no regex, no boolean logic", because a routing table
 /// people cannot read at a glance is one they stop trusting.
-fn pair_matches(want: &str, actual: &str) -> bool {
+pub fn pair_matches(want: &str, actual: &str) -> bool {
     match want.strip_suffix('*') {
         Some(prefix) => actual.starts_with(prefix),
         None => want == actual,

@@ -58,6 +58,8 @@ export interface SelectOption {
   expandable?: boolean;
   /** Nests this option under the `expandable` row with this value. */
   parentValue?: SelectValue;
+  /** Extra text the search matches besides the label, e.g. a zone's legacy names. */
+  searchText?: string;
   [key: string]: unknown;
 }
 

@@ -1168,6 +1168,23 @@ describe("TraceTree", () => {
       expect(row.exists()).toBe(true);
       expect(row.classes()).not.toContain("span-row-selected");
     });
+
+    it("marks only the selected span row with aria-current", async () => {
+      await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
+      await flushPromises();
+
+      const current = wrapper.findAll('[data-test^="trace-tree-span-container-"][aria-current]');
+      expect(current).toHaveLength(1);
+      expect(current[0].attributes("data-test")).toBe("trace-tree-span-container-d9603ec7f76eb499");
+      expect(current[0].attributes("aria-current")).toBe("true");
+    });
+
+    it("does not mark a merely hovered span row with aria-current", async () => {
+      await wrapper.setProps({ selectedSpanId: "", hoveredSpanId: "d9603ec7f76eb499" });
+      await flushPromises();
+
+      expect(wrapper.findAll("[aria-current]")).toHaveLength(0);
+    });
   });
 
   describe("LLM trace functionality", () => {

@@ -560,6 +560,18 @@
       "description": "リモートタスクとは、実験が出力を生成するために呼び出すHTTPサービスです。一度公開して接続を確認すれば、すべての実験で使用した正確なバージョンを固定できます。",
       "action": "新規タスク",
       "actionDesc": "OpenObserveをエンドポイントに指定して接続をテストします。"
+    },
+    "noDowntimes": {
+      "title": "ダウンタイムはまだありません",
+      "description": "ダウンタイムは、指定した時間枠の間、アラート、異常検知、合成モニタリングチェックを実行したまま、それらの通知を停止します。",
+      "action": "ダウンタイムをスケジュール",
+      "actionDesc": "1 回限り、毎日、または毎週。すぐにミュートするには、アラート一覧の [ミュート] を使用します。"
+    },
+    "searchCancelled": {
+      "title": "検索がキャンセルされました",
+      "description": "結果が読み込まれていません。クエリを実行してイベントを読み込んでください。",
+      "action": "クエリを実行",
+      "actionDesc": "同じクエリをもう一度実行します"
     }
   },
   "common": {
@@ -1271,9 +1283,129 @@
     "aliasNotAllowed": "エイリアス '{alias}' は許可されていません。",
     "commonGroupFields": "共通グループフィールド",
     "queryRangeHours": "{count} 時間 | {count} 時間",
-    "menuGroupAlerts": "アラート"
+    "menuGroupAlerts": "アラート",
+    "runQueryPendingLabel": "クエリを実行、変更はまだ適用されていません",
+    "queryActions": {
+      "runEditedFirst": "先に編集したクエリを実行してください",
+      "runFirst": "先にクエリを実行してください",
+      "usesEditedQuery": "編集したクエリを使用します（まだ実行されていません）",
+      "usesUnrunQuery": "クエリを使用します（まだ実行されていません）",
+      "downloadsShownResults": "表示中の結果をダウンロードします（編集内容ではありません）",
+      "downloadsLastRun": "最後に実行したクエリを使用します（編集内容ではありません）"
+    },
+    "noFtsRecovery": {
+      "title": "{stream} に全文検索フィールドが設定されていません",
+      "description": "フィールド値を検索するか、クエリ全体をクリアしてこの時間範囲のログを表示してください。",
+      "searchField": "特定のフィールドを検索",
+      "searchFieldHint": "除外語を保持したまま、検索するフィールドを選択します。",
+      "clearRun": "この検索なしでログを表示",
+      "clearRunHint": "クエリ全体をクリアし、同じ時間範囲で実行します。",
+      "editPermission": "ストリーム設定を編集する権限が必要です。",
+      "scope": "現在の時間範囲で {stream} を検索します。",
+      "singleStreamScope": "{stream} のみを検索します。{otherStreams} は選択解除されます。",
+      "stream": "ストリーム",
+      "field": "フィールド",
+      "match": "一致",
+      "value": "値",
+      "contains": "テキストを含む",
+      "equals": "等しい",
+      "preview": "フィルタープレビュー",
+      "replacement": "クエリ全体をフィールドフィルターに置き換え、除外語を保持します。全文検索フィールドは不要です。",
+      "run": "フィールド検索を実行",
+      "close": "フィールド検索を閉じる",
+      "skipped": "{stream} は全文検索フィールドが設定されていないためスキップされました。",
+      "resultsScope": "これらの結果は {streams} のみからのものです。",
+      "noFields": "このストリームにはフィールド検索に使用できるフィールドがありません。",
+      "valueRequired": "検索する値を入力してください。",
+      "fieldRequired": "検索するフィールドを選択してください。",
+      "invalidValue": "このフィールドに有効な値を入力してください。",
+      "configureHint": "このストリームの全文検索を高速化します。"
+    },
+    "autoRunPersistNeedsRun": "先にクエリを実行してください。この操作は実行した内容を保存または共有します",
+    "autoRunSearchAroundActive": "ある行の前後のレコードを表示中です。クエリを実行して結果に戻ってください",
+    "autoRunStaleTooltip": "クエリを実行して結果を更新します",
+    "searchCancelledNotice": "検索がキャンセルされました。",
+    "linePermalink": {
+      "disabledFunction": "単一の行をリンクするには関数をオフにしてください",
+      "disabledTimestampRewrite": "このクエリはタイムスタンプを書き換えます",
+      "disabledNotSingleLines": "このクエリの行は単一のログ行ではありません",
+      "disabledNoTimestamp": "この行にはタイムスタンプがありません",
+      "disabledEnrichmentTable": "エンリッチメントテーブルの行はリンクできません",
+      "toastNotUnique": "タイムスタンプへのリンクをコピーしました。この行を一意に特定できませんでした。",
+      "toastWideStream": "このストリームは列が多すぎて 1 行を正確にリンクできないため、タイムスタンプへのリンクをコピーしました",
+      "bannerInvalid": "このリンクは不正です。共有された検索のみを表示しています",
+      "bannerDenied": "ストリーム {stream} へのアクセス権がありません。",
+      "bannerStreamMissing": "ストリーム {stream} は存在しなくなりました",
+      "bannerError": "共有されたログ行を読み込めませんでした。",
+      "bannerIncomplete": "このタイムスタンプのすべての行を検索できませんでした",
+      "bannerGone": "このログ行は利用できなくなりました。ストリームの保持期間を過ぎたか、削除された可能性があります。",
+      "bannerGoneRetention": "このログ行は利用できなくなりました。ストリームの保持期間（{days} 日）を過ぎたか、削除された可能性があります。 | このログ行は利用できなくなりました。ストリームの保持期間（{days} 日）を過ぎたか、削除された可能性があります。",
+      "bannerFound": "共有されたログ行を表示しています",
+      "bannerAmbiguous": "このタイムスタンプに {count} 行ありますが、正確な行を特定できませんでした | このタイムスタンプに {count} 行ありますが、正確な行を特定できませんでした",
+      "bannerChanged": "リンクの作成後にこの行が変更された可能性があります",
+      "actionShowLines": "これらの行を表示",
+      "actionShowInContext": "コンテキスト内で表示",
+      "bannerAmbiguousTieHeavy": "このタイムスタンプを共有する行が {count} 件あり、ストリームに _o2_id がないため、正確な行を特定できませんでした。そのタイムスタンプの行はハイライトされています。 | このタイムスタンプを共有する行が {count} 件あり、ストリームに _o2_id がないため、正確な行を特定できませんでした。そのタイムスタンプの行はハイライトされています。",
+      "bannerDismiss": "閉じる",
+      "copyLink": "リンクをコピー",
+      "copyLinkTooltip": "このログ行へのリンクをコピー",
+      "copyLinkMenu": "このログ行へのリンクをコピー",
+      "toastCopied": "ログ行へのリンクをコピーしました",
+      "toastCopiedValid": "ログ行へのリンクをコピーしました · {days} 日間有効 | ログ行へのリンクをコピーしました · {days} 日間有効",
+      "toastLookupFailed": "この行を検索できませんでした。タイムスタンプへのリンクをコピーしました",
+      "toastShortFailed": "リンクを短縮できませんでした。代わりに完全なリンクをコピーしました",
+      "toastFailed": "このログ行へのリンクを作成できませんでした",
+      "toastScopeChanged": "リンクの作成中に組織またはストリームが変更されたため、何もコピーされませんでした",
+      "popoverTitle": "このログ行へのリンク",
+      "popoverDesc": "ブラウザが自動コピーをブロックしました。リンクを選択してコピーするか、ボタンを使用してください。",
+      "pageNotice": "このリンクは {page} ページにありました。",
+      "pageGo": "{page} ページへ移動",
+      "pageGoLast": "最後のページ（{page}）へ移動"
+    },
+    "autoRunPendingDot": "クエリを実行して最新の変更を適用",
+    "autoRunAppliesTo": "ログとトレースに適用されます",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "この検索は約 {size} をスキャンします",
+    "autoRunGuardLinkTitle": "このリンクは約 {size} をスキャンします",
+    "autoRunGuardDescAutoRun": "{scope}。先に絞り込めるよう、自動実行を一時停止しました。",
+    "autoRunGuardDescPaused": "{scope}。先に絞り込めるよう一時停止しました。",
+    "autoRunGuardDescLink": "リンクから開きました · {scope}。スコープを確認してから実行してください。",
+    "autoRunGuardHint": "フィルターと時間の変更を手動で適用するには、自動実行をオフにしてください。",
+    "autoRunGuardUnknownTitle": "このウィンドウのサイズは不明です",
+    "autoRunGuardUnknownDesc": "{streams} にはまだサイズ統計がないため、自動実行は 1 時間以下のウィンドウのみを実行します。",
+    "autoRunGuardUnknownManyDesc": "{count} 個のストリームにはまだサイズ統計がないため、自動実行は待機します。{scope}。 | {count} 個のストリームにはまだサイズ統計がないため、自動実行は待機します。{scope}。",
+    "autoRunGuardSuperClusterTitle": "リージョンをまたいで実行する準備ができました",
+    "autoRunGuardSuperClusterDesc": "マルチリージョンクラスターではまだ検索サイズを見積もれないため、自動実行は待機します。{scope}。",
+    "autoRunGuardUnresolvedTitle": "ストリームを利用できません",
+    "autoRunGuardUnresolvedDesc": "ストリーム {streams} は存在しないか、アクセス権がありません。",
+    "autoRunGuardBanner": "この変更は約 {size}（{scope}）をスキャンするため、自動実行を一時停止しました。以下の結果は前回のクエリのものです。",
+    "autoRunGuardBannerPaused": "この変更は約 {size}（{scope}）をスキャンするため、一時停止しています。以下の結果は前回のクエリのものです。",
+    "autoRunGuardBannerUnknown": "このウィンドウ（{scope}）のサイズが不明なため、一時停止しています。以下の結果は前回のクエリのものです。",
+    "autoRunGuardBannerRefresh": "自動更新は 1 回の更新あたり約 {size}（{scope}）をスキャンするため、一度実行するまで一時停止しています。以下の結果は前回のクエリのものです。",
+    "autoRunGuardRunAnyway": "そのまま実行",
+    "autoRunGuardRunQuery": "クエリを実行",
+    "autoRunGuardNarrow": "{period} に絞り込む",
+    "autoRunGuardNarrowWithSize": "{period} に絞り込む (~{size})",
+    "autoRunGuardSearchJob": "検索ジョブとして実行",
+    "autoRunGuardSelectStream": "ストリームを選択",
+    "searchJobNoPermission": "検索ジョブを作成する権限がありません",
+    "missingStreamAndNoFts": "1 つ以上のフィルタフィールドが「{missingStreams}」に存在しないため、該当するストリームでは検索が実行されません。\n 未検索: {noFtsStreams}（全文検索フィールドなし）。",
+    "freeTextChooseFirst": "先にテキストの検索方法を選択してください",
+    "freeTextScanLogsOnly": "スキャンモードはログビューでのみ動作します。ここでテキスト検索を使用するには、全文検索フィールドを設定してください",
+    "freeTextSearchedFields": "全文検索対象: {fields}（すべての単語、任意の順序）",
+    "freeTextPreview": "全文検索対象: {fields}（すべての単語、任意の順序）\n\n{sql} として実行",
+    "freeTextRunsAs": "{sql} として実行",
+    "freeTextNotSearched": "未検索: {streams}（全文検索フィールドなし）。",
+    "freeTextSetField": "全文検索フィールドを設定",
+    "freeTextNoFtsTitle": "「{stream}」には全文検索フィールドがありません",
+    "freeTextNoFtsTitleMulti": "選択したストリームには全文検索フィールドがありません",
+    "freeTextNoTextFields": "このストリームには検索可能なテキストフィールドがありません。",
+    "freeTextNoTextFieldsNamed": "未検索: {streams}（テキストフィールドなし）。",
+    "freeTextBuildNotice": "このフィルタにはテキスト検索が含まれています。SQL で編集してください。"
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "PROプランにアップグレード",
     "home": "ホーム",
     "about": "概要",
@@ -1320,6 +1452,7 @@
     "topQueries": "トップクエリ",
     "profiles": "プロファイル",
     "productAnalytics": "プロダクト分析",
+    "downtimes": "ダウンタイム",
     "trialEndedTitle": "トライアルが終了しました",
     "trialPageNeedsPlan": "{page}にはプランが必要です",
     "trialPageNeedsPlanToast": "{page}にはプランが必要です。引き続き使用するには、このページでプランを選択してください。",
@@ -2491,6 +2624,7 @@
   "login": {
     "lockedOut": "サインインの失敗回数が多すぎます。{duration}後に再試行するか、管理者にお問い合わせください。",
     "redirectingToSsoMessage": "SSOログインページにリダイレクトしています。リダイレクトされない場合は、",
+    "signingIn": "サインインしています...",
     "clickHere": "ここをクリック",
     "loginWithSso": "SSOでログイン",
     "loginAsInternalUser": "内部ユーザーとしてログイン",
@@ -2852,6 +2986,7 @@
       "scopeCoveredByParent": "ロックされたアクションは {scope} に由来し、{module} で設定されます",
       "scopeAllOf": "すべての {module}",
       "scopeIncludesFuture": "後から作成されるリソースを含みます",
+      "scopeDowntimeHint": "ダウンタイムフォルダは、誰がダウンタイムを管理するかを制限し、何をミュートするかは制限しません。モジュールのすべてのフォルダをミュートするには、ユーザーがそのモジュールのすべてのフォルダを一覧表示する権限を持っている必要があります。ミュートされたチップやバナーには、ユーザーが一覧表示できないダウンタイム名が表示される場合があります。",
       "grantedByWiderScope": "より広いスコープで付与済み",
       "grantedHereAndByWiderScope": "ここで付与済み、かつより広いスコープでも付与済み",
       "stillGrantedByWiderScope": "ここでは削除済み、より広いスコープでは付与済みのまま",
@@ -4299,6 +4434,48 @@
     "inspectBtnLabel": "検査",
     "analyzeBtnLabel": "インサイト"
   },
+  "enterpriseFeature": {
+    "lockedTitle": "エンタープライズ機能",
+    "featuresPageTitle": "エンタープライズ機能",
+    "category": {
+      "security": "セキュリティとコンプライアンス",
+      "scale": "スケールとパフォーマンス",
+      "ai": "AI と自動化",
+      "analysis": "分析とデータフロー"
+    },
+    "legendBeta": "早期アクセス",
+    "legendHa": "高可用性",
+    "docsFooter": "各機能はドキュメントにリンクしています。",
+    "viewAllDocs": "すべてのドキュメントを表示",
+    "locked": "OpenObserve Enterprise で {feature} のロックを解除します。",
+    "availableIn": "OpenObserve Enterprise で利用可能",
+    "rbacDisabled": "この組織では RBAC が無効になっています。有効にするには管理者に依頼してください。",
+    "pitch": {
+      "incidents": "発火中のアラートを自動的に追跡対象のインシデントに変換します。",
+      "workflows": "アラートに応答するランブックを自動化します。",
+      "oncall": "オンコールのローテーションをスケジュールし、ページ通知を適切な担当者に自動ルーティングします。",
+      "serviceGraph": "サービス同士がどのように呼び出し合っているかを把握し、障害が広がる前に検知できます。",
+      "rbac": "チーム向けにきめ細かい権限を持つカスタムロールを作成できます。",
+      "logPatterns": "1行ずつ読む代わりに、繰り返し発生するログパターンを自動的に検出します。",
+      "correlation": "ログ行から関連するメトリクスとトレースに直接移動できます。",
+      "aiAssistant": "AI にクエリの作成を依頼し、データをわかりやすい言葉で説明してもらえます。",
+      "alertInsights": "アラートがどのくらいの頻度で発火するかを把握し、相関するアラートを一目で確認できます。",
+      "anomalyDetection": "しきい値アラートが発火する前に、異常なメトリクスの挙動を自動的に検知します。",
+      "agentGraph": "AI エージェントとツールが互いにどのように呼び出し合っているかを、グラフで可視化して確認できます。",
+      "agentBehavior": "エージェントのツール呼び出し動作における異常を経時的に検出します。",
+      "discovery": "レビューする価値のある AI セッションを自動的に抽出します。",
+      "queues": "フラグが付いた AI セッションを、ヒューマン・イン・ザ・ループのアノテーションのためにレビュアーにルーティングします。",
+      "datasets": "実際のセッションからデータセットをキュレーションし、AI を評価・微調整します。",
+      "prompts": "AI 機能を支えるプロンプトのバージョン管理と運用を行います。",
+      "playground": "変更をリリースする前に、プロンプトとモデルを並べてテストします。",
+      "experiments": "ロールアウト前に、モデルとプロンプトの変更をデータセットと比較します。",
+      "remoteTasks": "リモートモデルとエージェントに対して評価とスコアリングのジョブを実行します。",
+      "evaluations": "AI の品質を自動的にスコアリングし、経時的に追跡します。",
+      "genAiAgentMapping": "トレースを生成した AI エージェントごとにグループ化し、バージョンを並べて比較します。",
+      "scheduledSearch": "保存した検索を手作業で再実行する代わりに、スケジュールに従って自動的に実行します。",
+      "customBranding": "デフォルトのロゴとテキストを独自のブランディングに置き換えます。"
+    }
+  },
   "errorInsights": {
     "title": "インサイト",
     "tabLabel": "エラー",
@@ -5433,6 +5610,25 @@
     "gpuExporter": "GPU エクスポーター"
   },
   "dashboard": {
+    "layoutEdit": {
+      "enter": "レイアウトを編集",
+      "edit": "編集",
+      "editing": "編集中",
+      "undo": "元に戻す",
+      "redo": "やり直す",
+      "changes": "変更なし | {count} 件の変更 | {count} 件の変更",
+      "discard": "破棄",
+      "discardTooltip": "変更を破棄",
+      "save": "保存",
+      "saveTooltip": "レイアウトを保存",
+      "discardTitle": "保存されていないレイアウトの変更を破棄しますか?",
+      "discardMessage": "保存されていないレイアウトの変更が {count} 件あります。破棄するとダッシュボードは最後に保存したレイアウトに戻ります。 | 保存されていないレイアウトの変更が {count} 件あります。破棄するとダッシュボードは最後に保存したレイアウトに戻ります。",
+      "leaveMessage": "保存されていないレイアウトの変更が {count} 件あります。このページを離れると破棄されます。 | 保存されていないレイアウトの変更が {count} 件あります。このページを離れると破棄されます。",
+      "keepEditing": "編集を続ける",
+      "stay": "留まる",
+      "discardAndLeave": "破棄して移動",
+      "apply": "適用"
+    },
     "approximately": "約",
     "tableRowsWillBeDisplayed": "テーブルの行が表示されます",
     "unitPixelHint": "1ユニット = 30px",
@@ -7444,6 +7640,11 @@
     "SearchSQLCancelled": "エラー:検索 SQL はキャンセルされました。"
   },
   "alerts": {
+    "promRuleMode": "ルールモード",
+    "promRulePreview": "{count} 件の返されたシリーズが現在一致しています。各シリーズは発火する前に保留期間を完了する必要があります。",
+    "promRuleModeDescription": "式がシリーズを返したときに一致します。保留期間がゼロの場合はシングルアラートまたはマルチアラートを選択してください。保留期間を設定すると、マルチアラートが自動的に有効になります。参照されたメトリクスストリームを推測するには、ストリームを空のままにしてください。",
+    "promRuleModePendingMulti": "保留期間ではシリーズごとに独立したタイマーが必要なため、マルチアラートを無効にすることはできません。",
+    "promRuleModeConflict": "ルールモードではクリティカルまたは警告の値しきい値を使用できません。保留期間にはマルチアラートが必要です。",
     "allAlerts": "すべてのアラート",
     "compositeAlert": "複合",
     "import": {
@@ -8379,6 +8580,8 @@
         "alertDescription": "アラートの説明テキスト",
         "alertStartTime": "ウィンドウ開始時刻（ISO 8601）",
         "alertEndTime": "ウィンドウ終了時刻（ISO 8601）",
+        "alertStartTimeMillis": "ウィンドウ開始時刻（エポックミリ秒）",
+        "alertEndTimeMillis": "ウィンドウ終了時刻（エポックミリ秒）",
         "alertUrl": "調査のためにOpenObserveに戻るリンク",
         "alertTriggerTime": "アラート発火時刻（ISO 8601）",
         "alertTriggerTimeMillis": "トリガー時刻（エポックミリ秒）",
@@ -8985,7 +9188,9 @@
         "dbmLockSampling": "ロックアクティビティは間隔でサンプリングされるため、2つのサンプルの間に発生して解消された競合は記録されません。アラートが出ないことは、ブロックがなかったことの証明にはなりません。",
         "dbmNoInstance": "単一のデータベースインスタンスが特定されなかったため、このアラートはこのエンジンのすべてのインスタンスを監視します。",
         "rumFunnelSnapshot": "このアラートはファネルの SQL のコピーを保持します。後でファネルやその名前付きイベントを編集しても、このアラートは変更されません。",
-        "rumFunnelSteps": "ファネルでコンバージョンをアラートするには、少なくとも 2 つのステップが必要です。"
+        "rumFunnelSteps": "ファネルでコンバージョンをアラートするには、少なくとも 2 つのステップが必要です。",
+        "textFilterDropped": "このストリームには全文検索（FTS）フィールドがないため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。",
+        "heldFilterDropped": "ログページで先に「Run as」を選択する必要があるため、検索フィルターは引き継がれませんでした。必要な場合はアラートクエリに追加してください。"
       }
     },
     "saveFailed": "アラートを保存できませんでした。",
@@ -8997,7 +9202,501 @@
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
     "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
-    "seconds": "秒"
+    "seconds": "秒",
+    "downtimes": {
+      "newTitle": "新規ダウンタイム",
+      "editTitle": "ダウンタイムを編集",
+      "detailTitle": "ダウンタイム",
+      "modules": {
+        "alerts": "アラート",
+        "anomaly_detections": "異常検知",
+        "synthetics": "合成モニタリングチェック",
+        "slos": "SLOs"
+      },
+      "modulesShort": {
+        "alerts": "アラート",
+        "anomaly_detections": "異常",
+        "synthetics": "合成モニタリング",
+        "slos": "SLOs"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "ウィンドウ中のインシデントは",
+          "muted": "作成してミュート (デフォルト)",
+          "mutedHelp": "インシデントは通常どおり作成されますが、ウィンドウ終了まで誰にも通知されません。",
+          "none": "作成しない",
+          "noneHelp": "ウィンドウ中はインシデントを作成しません。終了後の最初の発火で作成され、通知されます。",
+          "summary": "インシデントなし"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} 件の {key} | {count} 件の {key}",
+        "condition": "条件",
+        "allFolders": "すべてのフォルダ",
+        "oneFolder": "{name} フォルダ",
+        "nFolders": "{count} フォルダ | {count} フォルダ",
+        "tags": "タグ {tags}",
+        "nItems": "{count} 項目 | {count} 項目",
+        "asGood": "良好として",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}",
+        "noIncidents": "ウィンドウ中はインシデントがオープンされません。"
+      },
+      "duration": {
+        "days": "{count} 日",
+        "hours": "{count} 時間",
+        "minutes": "{count} 分"
+      },
+      "schedule": {
+        "windowRange": "{start} ～ {end} {zone}",
+        "onceSentence": "1 回 · {start} ～ {end} · {zone}",
+        "dailySentence": "毎日 · {time}、{duration} 間 · {zone}",
+        "weeklySentence": "毎週 {days} · {time}、{duration} 間 · {zone}",
+        "fromNoEnd": "{schedule}、{start} から（終了日なし）",
+        "fromUntil": "{schedule}、{start} から {until} まで"
+      },
+      "validation": {
+        "conditionRequired": "条件を追加するか、条件ブロックを削除してください。",
+        "pairKey": "すべての行でディメンションを選択してください。",
+        "pairOperator": "ダウンタイム条件では = または != を使用してください。",
+        "pairValue": "すべての行に値を入力してください。",
+        "loneStar": "値に単独の * は使用できません。",
+        "innerStar": "* は値の末尾にのみ使用できます。",
+        "emptyGroup": "条件グループを空にすることはできません。",
+        "tooDeep": "条件グループは最大 3 レベルまでネストできます。",
+        "tooManyPairs": "1 つの条件に含められるペアは最大 32 個です。",
+        "needsEq": "少なくとも 1 つの = 条件を追加してください。!= の行だけで構成された条件は、それ以外のすべての通知を停止してしまいます。",
+        "modulesRequired": "少なくとも 1 つのモジュールを選択してください。",
+        "foldersRequired": "「すべてのフォルダ」または少なくとも 1 つのフォルダを選択してください。",
+        "tagsRequired": "タグを追加するか、タグブロックを削除してください。",
+        "idsRequired": "項目を選択するか、特定の項目ブロックを削除してください。",
+        "idOutsideFolders": "選択した一部の項目が、選択したフォルダに含まれていません。",
+        "tooManyFolders": "選択できるフォルダは最大 {max} 個です。または「すべてのフォルダ」を選択してください。",
+        "tooManyTags": "追加できるタグは最大 {max} 個です。",
+        "tooManyIds": "選択できる項目は最大 {max} 個です。",
+        "nameTooLong": "名前は最大 256 文字です。",
+        "timezoneRequired": "タイムゾーンを選択してください。",
+        "startRequired": "開始日時を入力してください。",
+        "endRequired": "終了日時を入力してください。",
+        "endAfterStart": "終了は開始より後である必要があります。",
+        "windowTooLong": "ウィンドウは最長7日間です。",
+        "windowTooShort": "ウィンドウは最低1分間必要です。",
+        "startTimeRequired": "開始時刻を HH:MM 形式で入力してください。",
+        "durationInvalid": "90m や 1h 30m のような期間を入力してください。",
+        "weekdaysRequired": "少なくとも1日を選択してください。",
+        "untilAfterStart": "繰り返しの終了は最初の日以降である必要があります。",
+        "reasonTooLong": "理由は最大 {max} 文字までです。",
+        "windowOutlastsRepeat": "ウィンドウは繰り返しの間隔より長くできません。",
+        "startDateRequired": "初日を選択してください。"
+      },
+      "title": "ダウンタイム",
+      "subtitle": "アラート、異常検知、合成モニタリングのチェックは実行したまま、その通知のみを停止するスケジュールされたウィンドウ",
+      "newDowntime": "新しいダウンタイム",
+      "filterAll": "すべて",
+      "filterOnce": "一回限り",
+      "filterRecurring": "繰り返し",
+      "search": "名前、ディメンション、作成者で検索",
+      "searchAcross": "すべてのフォルダを検索",
+      "thisFolder": "このフォルダ",
+      "allFolders": "すべてのフォルダ",
+      "thisFolderTooltip": "選択したフォルダ内を検索",
+      "allFoldersTooltip": "すべてのフォルダ内を検索",
+      "noFolder": "ダウンタイムを保存できるフォルダーがありません",
+      "truncated": "{total} 件中最初の {shown} 件のダウンタイムを表示しています",
+      "stats": {
+        "active": "アクティブ",
+        "scheduled": "スケジュール済み",
+        "recurring": "繰り返し",
+        "ended": "終了",
+        "cancelled": "キャンセル済み",
+        "endedEarly": "早期終了",
+        "total": "合計"
+      },
+      "columns": {
+        "name": "名前",
+        "status": "ステータス",
+        "targets": "対象",
+        "schedule": "スケジュール",
+        "when": "終了 / 次回",
+        "matched": "一致",
+        "createdBy": "作成者",
+        "folder": "フォルダ"
+      },
+      "oneTime": "一回限り",
+      "recurring": "繰り返し",
+      "bannerOn": "このダウンタイムが有効な間、組織内の全員にバナーが表示されます",
+      "endsLabel": "終了",
+      "confirmEndNow": {
+        "title": "このダウンタイムを今すぐ終了しますか？",
+        "message": "通知はすぐに再開されます。ダウンタイムは早期終了としてリストに残ります。",
+        "ok": "今すぐ終了",
+        "keep": "継続する"
+      },
+      "extend": {
+        "menu": "延長時間",
+        "notActive": "延長できるのはアクティブなダウンタイムのみです",
+        "dialogTitle": "{name} を延長",
+        "newEnd": "新しい終了",
+        "confirmUntil": "{time} まで延長",
+        "followUp": "このダウンタイムは繰り返しのため、スケジュールは変更されません。現在のウィンドウの終了時刻から {name} という一回限りのダウンタイムが作成されます。",
+        "endAfterCurrent": "新しい終了は現在の終了より後にしてください。"
+      },
+      "nextLabel": "次回",
+      "matched": {
+        "alerts": "{count} 件のアラート | {count} 件のアラート",
+        "anomalies": "{count} 件の異常 | {count} 件の異常",
+        "synthetics": "{count} 件のチェック | {count} 件のチェック",
+        "slos": "{count} 件のSLO | {count} 件のSLO"
+      },
+      "actions": {
+        "endNow": "今すぐ終了",
+        "edit": "編集",
+        "duplicate": "複製",
+        "moveToFolder": "フォルダへ移動",
+        "cancel": "ダウンタイムをキャンセル",
+        "delete": "削除",
+        "more": "その他のアクション",
+        "muteForHour": "今すぐ 1 時間ミュート",
+        "extend": "延長"
+      },
+      "confirmCancel": {
+        "title": "ダウンタイムをキャンセル",
+        "message": "通知はすぐに再開されます。ダウンタイムは履歴として一覧に残ります。",
+        "bulkMessage": "{count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。 | {count} 件のダウンタイムをキャンセルしますか？通知はすぐに再開されます。",
+        "confirm": "ダウンタイムをキャンセル",
+        "keep": "ダウンタイムを維持"
+      },
+      "confirmDelete": {
+        "title": "ダウンタイムを削除",
+        "message": "ダウンタイムとその履歴が削除されます。この操作は元に戻せません。"
+      },
+      "copyOf": "{name} のコピー",
+      "form": {
+        "matches": {
+          "alerts": "{count} 件のアラートが一致します | {count} 件のアラートが一致します",
+          "anomaly_detections": "{count} 件の検出が一致します | {count} 件の検出が一致します",
+          "synthetics": "{count} 件のチェックが一致します | {count} 件のチェックが一致します",
+          "slos": "{count} 件の SLO が一致します | {count} 件の SLO が一致します"
+        },
+        "alertFolders": "アラートフォルダ",
+        "syntheticsFolders": "合成モニタリングフォルダ",
+        "noAlertFolderAccess": "アラートフォルダへのアクセス権がありません。",
+        "noSyntheticsFolderAccess": "合成モニタリングフォルダへのアクセス権がありません。",
+        "tags": "タグ",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "すべてのタグがチェックに含まれている必要があります。",
+        "removeBlock": "このブロックを削除",
+        "specificItems": "特定の項目",
+        "itemsHint": "選択したフォルダ内の項目のみが表示されます。",
+        "itemOption": "{name} · {folder}",
+        "addTags": "タグを追加",
+        "addItems": "特定の項目を追加",
+        "sloMode": "ウィンドウ内の SLO スコア",
+        "sloExclude": "ウィンドウを除外",
+        "sloCountAsGood": "ウィンドウを正常としてカウント",
+        "sloExcludeCaption": "ウィンドウ内の時間は正常にも異常にもカウントされません。これらの SLO のバーンレートアラートはこの時間に対して発報されません。",
+        "sloCountAsGoodCaption": "ウィンドウ内の時間は完全に正常としてカウントされます。SLO 契約で計画メンテナンスが稼働時間とみなされる場合にのみ使用してください。",
+        "cardCaption": "まずフォルダで絞り込み、その後に任意のブロックでさらに絞り込みます。上記のディメンション条件はこのモジュールにも適用されます。",
+        "noConditionForChecks": "上記のディメンション条件はチェックには適用されません。",
+        "appliesTo": "適用対象",
+        "tabTargets": "ターゲット",
+        "tabSchedule": "スケジュール",
+        "tabAdvanced": "詳細設定",
+        "modeInFolder": "{mode} 内",
+        "newMode": "新規ダウンタイム",
+        "editMode": "ダウンタイムを編集",
+        "namePlaceholder": "ダウンタイム名",
+        "nameLabel": "ダウンタイム名",
+        "renameHint": "クリックして名前を変更",
+        "reason": "理由",
+        "reasonHelp": "任意。一覧、詳細ページ、ミュートのツールチップに表示されます。",
+        "cancel": "キャンセル",
+        "save": "保存",
+        "activeBanner": "このダウンタイムは有効です。編集は次回の評価時に反映され、SLO モードの変更はすでに開始されたウィンドウを再測定します。",
+        "changedMeanwhile": "読み込んだ後に、このダウンタイムが他のユーザーによって変更されました。再読み込みしてからもう一度お試しください。",
+        "reload": "再読み込み",
+        "noModule": "「適用対象」でモジュールを選択してください。",
+        "checkSchedule": "スケジュールを確認してから、もう一度保存してください。"
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "アラート",
+          "anomaly_detections": "異常検出",
+          "synthetics": "合成モニタリングチェック",
+          "slos": "SLOs"
+        },
+        "whenOnce": "1 回、{start} から {end} {zone} まで",
+        "whenDaily": "毎日 {time} {zone} に、{duration} の間",
+        "whenWeekly": "毎週 {days} の {time} {zone} に、{duration} の間",
+        "inFolders": "フォルダ {names} 内 | フォルダ {names} 内",
+        "withCondition": "条件 {condition}",
+        "tagged": "タグ {tags}",
+        "named": "名前付き項目 {count} 件に限定 | 名前付き項目 {count} 件に限定",
+        "stopNotifying": "{when}: {targets} は通知を停止します。",
+        "nothingMuted": "{when}: ミュートされるアラートまたはチェックはありません。",
+        "sloUnchanged": "SLO スコアは変更されません。",
+        "sloExcluded": "{slos} はこの時間枠をスコアから除外します。",
+        "sloAsGood": "{slos} はこの時間枠を正常時間としてカウントします。"
+      },
+      "autoName": {
+        "once": "1 回",
+        "onceOn": "1 回 {date}",
+        "daily": "毎日",
+        "weekly": "毎週",
+        "all": {
+          "alerts": "すべてのアラート",
+          "anomaly_detections": "すべての異常検知",
+          "synthetics": "すべての合成モニタリングチェック",
+          "slos": "すべての SLO"
+        }
+      },
+      "condition": {
+        "none": "ディメンション条件なし",
+        "add": "追加",
+        "title": "ディメンション条件",
+        "onePer": "ダウンタイムごとに 1 つ",
+        "remove": "ディメンション条件を削除",
+        "caption": "アラート、異常検知、SLOs に適用されます。合成モニタリングのチェックにはディメンションがなく、タグを使用します。すべてのペアが一致する必要があります。代替には OR グループを使用します。値の末尾には * を使用できます。"
+      },
+      "resources": {
+        "refineBy": "リソースで絞り込む",
+        "load": "リソースを読み込む",
+        "needsEq": "リソースで絞り込む前に、少なくとも 1 つの = 条件を追加してください。",
+        "tooMany": "この条件と同時に出現する値が {count} 件あります。条件を絞り込んでリソースを選択してください。",
+        "lastSeen": "最終確認",
+        "streams": "ストリーム",
+        "footer": "{total} 中 {selected} 件を選択 · {source}",
+        "fromRegistry": "サービスレジストリから",
+        "fromSearch": "直近 24 時間のデータから",
+        "apply": "適用",
+        "loadFailed": "リソースを読み込めませんでした",
+        "notSeen": "過去 1 時間に確認されていません。",
+        "partial": "一部のソースが応答しませんでした。",
+        "items": "項目",
+        "fromValues": "アラート、サービスレジストリ、過去 1 時間のデータから",
+        "noValues": "このディメンションの値はまだ確認されていません。"
+      },
+      "scheduleForm": {
+        "once": "1 回",
+        "daily": "毎日",
+        "weekly": "毎週",
+        "startDate": "開始日",
+        "startTime": "開始時刻",
+        "endDate": "終了日",
+        "endTime": "終了時刻",
+        "days": "曜日",
+        "startsAt": "開始",
+        "duration": "期間",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "最大 7 日間、例: 90m または 1h 30m。",
+        "until": "繰り返し終了",
+        "untilPlaceholder": "終了日なし",
+        "timezone": "タイムゾーン",
+        "noWindow": "今後 8 日間に開始する時間枠はありません。",
+        "nextWindow": "次のウィンドウ: {window}。ウィンドウは日付をまたぐことがあります。",
+        "nextWindowWithUtc": "次のウィンドウ: {window} ({utc})。ウィンドウは日付をまたぐことがあります。",
+        "startsOn": "開始日"
+      },
+      "preview": {
+        "title": "プレビュー",
+        "failed": "プレビューを読み込めませんでした。",
+        "andMore": "他 {count} 件",
+        "noMatch": "現在一致するものはありません",
+        "fireTime": "{count} 件のアラートは発火時に識別子が確定します | {count} 件のアラートは発火時に識別子が確定します",
+        "undecidable": "{key} では区別できません",
+        "showAll": "全リストを表示",
+        "showLess": "表示を減らす",
+        "finishCondition": "プレビューを表示するには条件を完成させてください。"
+      },
+      "muteAllDialog": {
+        "title": "モジュール全体をミュートしますか？",
+        "intro": "フォルダ、アイテム、タグ、条件のいずれもこれらのモジュールを絞り込んでいないため、このダウンタイムは以下をミュートします:",
+        "every": {
+          "alerts": "この組織内のすべてのアラート",
+          "anomaly_detections": "この組織内のすべての異常検知",
+          "synthetics": "この組織内のすべての合成モニタリングチェック",
+          "slos": "この組織内のすべての SLO"
+        },
+        "matchedNow": "本日 {matched}",
+        "outro": "ウィンドウ内では、それらすべてについて通知、オンコールページ、ワークフローが停止します。",
+        "cancel": "キャンセル",
+        "confirm": "すべてミュート",
+        "titleOne": {
+          "alerts": "この組織のすべてのアラートをミュートしますか？",
+          "anomaly_detections": "この組織のすべての異常検知をミュートしますか？",
+          "synthetics": "この組織のすべての合成モニタリングチェックをミュートしますか？",
+          "slos": "この組織のすべての SLO をミュートしますか？"
+        },
+        "window": "期間: {window}"
+      },
+      "summaryPane": {
+        "title": "サマリー",
+        "filedIn": "登録先",
+        "window": "ウィンドウ",
+        "nextWindow": "次のウィンドウ",
+        "inUtc": "UTC 表記",
+        "largeMatch": "{modules}: このダウンタイムはアイテムの半数以上に一致しています。この組織の大部分はウィンドウ内で通知されません。",
+        "whatHappens": "何が起こるか",
+        "keepRunning": "評価とチェックは実行され続け、履歴も保持されます。",
+        "noNotifications": "通知、オンコールページ、ワークフローが停止します。",
+        "mutedIncidents": "インシデントはミュート状態でオープンし、ウィンドウ終了後に通知されます。"
+      },
+      "band": {
+        "now": "現在",
+        "none": "まだウィンドウは実行されておらず、予定もありません。",
+        "active": "アクティブ",
+        "next": "次回",
+        "past": "実行済み",
+        "track": "ウィンドウ",
+        "aria": "{kind}: {start} から {end}"
+      },
+      "detail": {
+        "overview": "概要",
+        "affected": "影響対象 · {count}",
+        "suppressed": "抑制済み · {count}",
+        "details": "詳細",
+        "condition": "条件",
+        "noTarget": "ターゲットなし",
+        "banner": "バナー",
+        "bannerOn": "アクティブな間、組織に表示されます",
+        "bannerOff": "バナーなし",
+        "occurrences": "発生回数",
+        "nextWindow": "次のウィンドウ: {window}。あなたのタイムゾーン: {local}。",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "一致条件",
+        "matchedBy": {
+          "query": "クエリ",
+          "source_alert": "ソースアラート",
+          "tag": "タグ",
+          "id": "名前付き",
+          "folder": "フォルダ",
+          "org": "組織全体"
+        },
+        "source": "ソース",
+        "wouldHaveNotified": "通知されていたはず",
+        "noSuppressed": "まだ何も抑制されていません",
+        "muteHourName": "{name} · 1 時間ミュート",
+        "notFoundTitle": "ダウンタイムが見つかりません",
+        "notFoundDescription": "削除されたか、リンクが別の組織を指している可能性があります。",
+        "backToList": "ダウンタイム一覧に戻る"
+      },
+      "mute": {
+        "title": {
+          "alerts": "{count} 件のアラートをミュート | {count} 件のアラートをミュート",
+          "anomaly_detections": "{count} 件の異常検出をミュート | {count} 件の異常検出をミュート",
+          "synthetics": "{count} 件のチェックをミュート | {count} 件のチェックをミュート",
+          "slos": "{count} 件の SLO をミュート | {count} 件の SLO をミュート",
+          "items": "{count} 件の項目をミュート | {count} 件の項目をミュート"
+        },
+        "subtitle": "実行と履歴の記録は継続されます。通知、ページ通知、ワークフローはウィンドウが終了するまで停止します。",
+        "muteFor": "ミュート期間",
+        "fileIn": "保存先",
+        "presets": {
+          "30m": "30 分",
+          "1h": "1 時間",
+          "2h": "2 時間",
+          "4h": "4 時間",
+          "custom": "カスタム"
+        },
+        "endsAt": "終了日時",
+        "endsIn": "{duration} 後に終了。",
+        "confirm": "ミュート",
+        "confirmUntil": "{time} までミュート",
+        "menu": "通知をミュート",
+        "until": "日時を指定…",
+        "bulk": "ミュート",
+        "muted": "ミュート中 · {duration} 後に終了",
+        "mutedTooltip": "{name} により {end} までミュート",
+        "exclude": "ウィンドウを除外…",
+        "firingMuted": "発火中 · ミュート",
+        "firingMutedTooltip": "発火は継続中です。通知は {name} によりミュートされています。"
+      },
+      "corrected": "修正済み",
+      "correctedBy": "スコアは {names} により修正",
+      "incident": {
+        "mutedBy": "ミュート中 · {name}",
+        "notLoaded": "ダウンタイムが読み込まれていません",
+        "notLoadedTooltip": "ダウンタイム {id} によりミュート中です。このダウンタイムは読み込まれた一覧に含まれていません。",
+        "banner": "{name} によりミュート。誰もページ通知を受けていません。ウィンドウ終了後の最初の発火で、遅延したオープン通知が送信されます。",
+        "bannerUntil": "{name} により {end} までミュート。誰もページ通知を受けていません。ウィンドウ終了後の最初の発火で、遅延したオープン通知が送信されます。"
+      },
+      "banner": {
+        "ended": "終了",
+        "endsInUnderMinute": "1 分未満で終了",
+        "endsInMinutes": "{count} 分後に終了 | {count} 分後に終了",
+        "endsIn": "{duration} 後に終了",
+        "firstEndsInUnderMinute": "最初の終了まで 1 分未満",
+        "firstEndsInMinutes": "最初の終了まで {count} 分 | 最初の終了まで {count} 分",
+        "firstEndsIn": "最初の終了まで {duration}",
+        "count": "{module} {count}",
+        "showBanner": "このダウンタイムが有効な間、組織内の全員にバナーを表示する",
+        "showBannerCaption": "バナーには名前、影響を受ける件数、残り時間が表示されます。アラート名が表示されることはありません。",
+        "preview": "プレビュー",
+        "previewMessage": "{name} が有効です。",
+        "tooLong": "バナーは最長 7 日間のウィンドウでのみ利用できます。"
+      },
+      "sloCorrections": {
+        "title": "ステータスの修正:",
+        "item": "{name}（{status}）",
+        "shorterThanSlice": "SLO のスライスより短いため、補正された分はありません"
+      },
+      "notify": {
+        "title": "通知",
+        "caption": "ダウンタイム自体について宛先に知らせます: 開始時、終了前、終了時。",
+        "destinations": "宛先",
+        "lead": "終了前のリマインダー",
+        "leadHelp": "例: 10m または 1h。1 分からウィンドウの長さまで。",
+        "regionNote": "スーパークラスターでは、ダウンタイムを作成したリージョンが送信します。この設定より前に作成されたダウンタイムはすべてのリージョンから送信されます。",
+        "tab": "通知",
+        "events": {
+          "started": "開始時",
+          "startedHelp": "各ウィンドウの開始時に 1 通送信します。",
+          "ending_soon": "終了前",
+          "ending_soonHelp": "終了前のリマインダーです。アラートが再び通知を始めても驚かずに済みます。",
+          "ended": "終了時",
+          "endedHelp": "各ウィンドウの終了時に 1 通送信します。",
+          "cancelled": "キャンセル時",
+          "cancelledHelp": "誰かがダウンタイムを終了または中止したときにすぐ送信します。",
+          "extended": "延長時",
+          "extendedHelp": "新しい終了時刻とともにすぐ送信します。"
+        },
+        "validation": {
+          "tooMany": "通知できる宛先は最大 {max} 件です。",
+          "eventRequired": "イベントを 1 つ以上選ぶか、宛先を削除してください。",
+          "leadInvalid": "リマインダーは終了の 1 分前からウィンドウの長さ前までの間に設定してください。"
+        },
+        "summary": {
+          "none": "独自の通知は送信しません。",
+          "sentence": "{destinations} に通知: {events}。",
+          "started": "開始時",
+          "endingSoon": "終了の {lead} 前",
+          "ended": "終了時",
+          "cancelled": "キャンセル時",
+          "extended": "延長時"
+        },
+        "log": {
+          "time": "時刻",
+          "event": "イベント",
+          "destinations": "宛先",
+          "result": "結果",
+          "ok": "送信済み",
+          "pending": "送信中",
+          "empty": "まだ通知は送信されていません",
+          "events": {
+            "started": "開始",
+            "ending_soon": "まもなく終了",
+            "ended": "終了",
+            "cancelled": "キャンセル",
+            "extended": "延長"
+          }
+        },
+        "test": {
+          "send": "テスト送信",
+          "sent": "{count} 件の宛先にテストを送信しました | {count} 件の宛先にテストを送信しました",
+          "failed": "テストは {names} に届きませんでした。"
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -9034,7 +9733,8 @@
     "countWorkflow": "{count} 件のワークフロー | {count} 件のワークフロー",
     "countAnomalyDetection": "{count} 件の異常検知器 | {count} 件の異常検知器",
     "countIncidentIntegration": "{count} 件のインシデント連携 | {count} 件のインシデント連携",
-    "sectionOtherConsumers": "その他の使用元"
+    "sectionOtherConsumers": "その他の使用元",
+    "countDowntime": "{count} 件のダウンタイム | {count} 件のダウンタイム"
   },
   "alert_library": {
     "header": "アラートライブラリ",
@@ -11578,7 +12278,21 @@
     "eventClusterAriaLabelPlural": "{count} イベント, {errors} エラー",
     "eventMarkerTooltip": "イベント: {name}",
     "exceptionMarkerTooltip": "例外: {type}",
-    "spanEventFallback": "スパンイベント"
+    "spanEventFallback": "スパンイベント",
+    "spanNav": {
+      "firstSpan": "最初のスパン",
+      "lastSpan": "最後のスパン",
+      "position": "スパン {index} / {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "トレース {row} / {count}、ページ {page}",
+      "spanPosition": "スパン {row} / {count}、ページ {page}",
+      "firstResult": "最初の結果",
+      "lastResult": "最後の結果",
+      "loadingPage": "ページ {page} を読み込み中",
+      "pageFailed": "ページ {page} を読み込めませんでした",
+      "pageEmpty": "ページ {page} に結果がありません"
+    }
   },
   "aiToolset": {
     "header": "AI ツールセット",
@@ -14815,7 +15529,8 @@
       "selectStreamDesc": "ログ、トレース、メトリクス、RUM ストリームを参照",
       "queryGuide": "クエリガイドを読む",
       "queryGuideDesc": "フィルター、SQL モード、VRL、保存済みビュー",
-      "recent": "最近:"
+      "recent": "最近使用:",
+      "descriptionAutoRun": "ストリームを選択すると最新のログが表示されます。結果が届いたら、フィルタ、VRL 関数、カスタム時間範囲で絞り込めます。"
     },
     "noEvents": {
       "title": "イベントが見つかりません",
@@ -14869,7 +15584,8 @@
       "fixErrorsAndRetry": "いくつかのエラーがあります。修正して再試行してください。"
     },
     "buildQueryPage": {
-      "validationErrors": "いくつかのエラーがあります。修正して再試行してください。"
+      "validationErrors": "いくつかのエラーがあります。修正して再試行してください。",
+      "parserLoadFailed": "クエリパーサーを読み込めなかったため、検索フィルターをチャートに追加できません。読み込まれるまで実行は一時停止します。"
     },
     "searchHistory": {
       "sqlQueryLabel": "SQLクエリ:",
@@ -15071,6 +15787,45 @@
     },
     "logsNoEventsState": {
       "lastData": "最終データ: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "重大度 {level}",
+      "srTextInferred": "重大度 {level}、推測",
+      "inferredLabel": "{level} · 推測",
+      "popoverTitle": "重大度: {level}",
+      "popoverAriaLabel": "重大度の根拠",
+      "evidence": "根拠",
+      "fromField": "フィールド {field} から",
+      "inferredFrom": "{field} のテキストから推測。",
+      "notSearchable": "検索できません。ヒストグラムでは使用されません。",
+      "noLevelField": "この行にはレベルフィールドがなく、スキャンできるテキストフィールドもありません。",
+      "noLevelWordInField": "この行にはレベルフィールドがなく、{field} にもレベルを示す単語がありません。",
+      "notInSelectedColumns": "レベルフィールドが選択した列にありません",
+      "levels": {
+        "emergency": "緊急",
+        "alert": "アラート",
+        "critical": "クリティカル",
+        "error": "エラー",
+        "warning": "警告",
+        "notice": "通知",
+        "info": "情報",
+        "debug": "デバッグ",
+        "trace": "トレース",
+        "ok": "OK",
+        "unknown": "不明"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "自動更新がオンになっています。ページを変更するにはオフにしてください",
+      "position": "ログ {row} / {count}、ページ {page}",
+      "positionLabel": "ログ {row} / {count} · ページ {page}",
+      "loadingPage": "ページ {page} を読み込み中…",
+      "loadingPageAnnouncement": "ページ {page} を読み込み中",
+      "resultsChanged": "結果が変更されました",
+      "notInPage": "現在のページにありません",
+      "loadingResults": "結果を読み込み中…",
+      "previousLog": "前のログ",
+      "nextLog": "次のログ"
     }
   },
   "queryError": {
@@ -15105,7 +15860,10 @@
     "traceId": "トレース ID:",
     "askAi": "AI にクエリの修正を依頼する",
     "showDetail": "詳細を表示",
-    "hideDetail": "詳細を非表示にする"
+    "hideDetail": "詳細を非表示にする",
+    "runAs": "実行者",
+    "searchTextFor": "「{text}」のテキストを検索",
+    "searchTextDesc": "入力全体を 1 つのフレーズとして検索"
   },
   "refreshButton": {
     "justNow": "たった今",
@@ -16891,7 +17649,8 @@
       "sourceMaps": "RUM — ソースマップ",
       "oncall": "オンコール",
       "oncallDetail": "オンコールページ",
-      "syntheticsJourney": "合成モニタリングジャーニー"
+      "syntheticsJourney": "合成モニタリングジャーニー",
+      "downtimes": "ダウンタイム"
     },
     "actions": {
       "openCheatsheet": "キーボードショートカットのチートシートを開く",
@@ -16908,6 +17667,9 @@
       "dashboardRefresh": "すべてのパネルを更新",
       "dashboardAddPanel": "新しいパネルを追加",
       "dashboardSave": "ダッシュボードを保存",
+      "dashboardLayoutUndo": "レイアウトの変更を元に戻す",
+      "dashboardLayoutRedo": "レイアウトの変更をやり直す",
+      "dashboardLayoutExit": "レイアウト編集を終了",
       "dashboardFullscreen": "全画面表示に切り替え",
       "dashboardExport": "ダッシュボードをエクスポート",
       "tableRowEdit": "カーソルを合わせた行を編集",
@@ -17000,7 +17762,19 @@
       "oncallEscalate": "エスカレート",
       "oncallSnooze": "スヌーズ",
       "oncallResolve": "解決",
-      "functionsImport": "関数をインポート"
+      "downtimesCreate": "新規ダウンタイム",
+      "downtimesRefresh": "ダウンタイムを更新",
+      "functionsImport": "関数をインポート",
+      "logsNextRow": "次のログ（詳細を開く）",
+      "logsPrevRow": "前のログ（詳細を開く）",
+      "logsRowFocusMove": "行間でフォーカスを移動",
+      "logsRowOpen": "フォーカスされた行を開く",
+      "logsDetailClose": "詳細を閉じて行に戻る",
+      "tracesNextRow": "次のトレースを選択",
+      "tracesPrevRow": "前のトレースを選択",
+      "tracesRowOpen": "選択したトレースを開く",
+      "traceNextVisibleSpan": "次の表示中のスパン",
+      "tracePrevVisibleSpan": "前の表示中のスパン"
     }
   },
   "components": {
@@ -17373,7 +18147,13 @@
         "debug": "デバッグ",
         "info": "情報",
         "warn": "警告",
-        "fatal": "致命的"
+        "fatal": "致命的",
+        "emergency": "緊急",
+        "alert": "アラート",
+        "critical": "重大",
+        "notice": "通知",
+        "ok": "OK",
+        "unknown": "不明"
       },
       "pipelineRunOutcome": {
         "firing": "発火中",
@@ -17438,6 +18218,13 @@
         "belowTopN": "上位N未満",
         "truncated": "省略",
         "gap": "ギャップ"
+      },
+      "downtimeStatus": {
+        "scheduled": "スケジュール済み",
+        "active": "アクティブ",
+        "ended": "終了",
+        "cancelled": "キャンセル済み",
+        "endedEarly": "早期終了"
       }
     }
   },
@@ -17834,6 +18621,24 @@
     },
     "iam": {
       "userSaveFailed": "ユーザーを保存できませんでした"
+    },
+    "downtimes": {
+      "cancelled": "ダウンタイムをキャンセルしました",
+      "cancelledMany": "{count} 件のダウンタイムをキャンセルしました | {count} 件のダウンタイムをキャンセルしました",
+      "cancelFailed": "ダウンタイムをキャンセルできませんでした",
+      "extended": "{time} まで延長しました",
+      "extendedFollowUp": "{name} を作成しました（{time} まで）",
+      "extendFailed": "ダウンタイムを延長できませんでした",
+      "reload": "再読み込み",
+      "deleted": "ダウンタイムを削除しました",
+      "deleteFailed": "ダウンタイムを削除できませんでした",
+      "created": "ダウンタイムを作成しました",
+      "updated": "ダウンタイムを保存しました",
+      "saveFailed": "ダウンタイムを保存できませんでした",
+      "muted": "{count} 件のアイテムを {time} までミュートしました。{folder} に保存しました。 | {count} 件のアイテムを {time} までミュートしました。{folder} に保存しました。",
+      "muteFailed": "ミュートを作成できませんでした",
+      "viewDowntime": "ダウンタイムを表示",
+      "itemsDropped": "選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。 | 選択した {count} 件のアイテムは選択したフォルダ外にあるため、削除されました。"
     }
   },
   "cipherKeys": {
@@ -18124,7 +18929,9 @@
       "budgetNote": "最後の点は上の予算残量タイルと等しくなります。0%の点線は枯渇を表し、その下ではSLOがターゲットで許容されるよりも多くのエラーを消費しています。ギャップは何も測定されていないバケットであり、ゼロとは同じではありません。",
       "burnExplain": "各バケット単独でバジェットが消費される速さを、バジェット中立レートの倍数で示します。",
       "burnFormula": "バーンレート = (100% − SLI) ÷ (100% − ターゲット)\nSLI = 100 × 良好 ÷ 合計（そのバケットのみ）\n\n右軸（同じラインをSLIとして読む）:\nSLI = 100% − バーンレート × (100% − ターゲット)",
-      "burnNote": "×1 はウィンドウの終了時にちょうどバジェットを使い切り、×2 はその半分の時点で使い切ります。×1 未満ではバジェットが蓄積されます。これはバケットごとの値で累積ではないため、スパイクは平均化されずに表示されたままになります。右軸は下向きにカウントされます。チャートの上方向はバーンが大きいことであり、SLI が低いことを意味します。"
+      "burnNote": "×1 はウィンドウの終了時にちょうどバジェットを使い切り、×2 はその半分の時点で使い切ります。×1 未満ではバジェットが蓄積されます。これはバケットごとの値で累積ではないため、スパイクは平均化されずに表示されたままになります。右軸は下向きにカウントされます。チャートの上方向はバーンが大きいことであり、SLI が低いことを意味します。",
+      "corrected": "ダウンタイムによる補正",
+      "correctedTooltip": "ダウンタイムによる補正: 除外されるため、バジェットラインはフラットになります"
     },
     "alerts": {
       "title": "アラート",
@@ -21648,5 +22455,1079 @@
     "modeExhausted": "使い切り",
     "modeFree": "無料",
     "modeUnknown": "不明"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "データを送信してください。OpenObserve が問題を検出し、原因についての最善の見解とともに通知します。問題がないときは、チェックした内容と、確認できない内容を示します。",
+    "phase2": "フェーズ2",
+    "tabs": {
+      "issues": "インシデント",
+      "coverage": "カバレッジ",
+      "activity": "アクティビティ",
+      "policy": "ポリシー"
+    },
+    "loops": {
+      "coverage": "カバレッジ",
+      "calibration": "キャリブレーション",
+      "investigation": "調査",
+      "action": "アクション"
+    },
+    "signals": {
+      "requests": "リクエスト",
+      "errors": "エラー",
+      "latency": "レイテンシ",
+      "saturation": "飽和",
+      "logPatterns": "ログパターン",
+      "dependencies": "依存関係"
+    },
+    "ledgerStatus": {
+      "autoApplied": "自動適用済み",
+      "awaiting": "承認待ち",
+      "approved": "承認済み",
+      "rejected": "却下",
+      "rolledBack": "ロールバック済み",
+      "kept": "保持 — チェック合格"
+    },
+    "issues": {
+      "subtitle": "SRE エージェントによってグループ化され調査されるインシデント。問題ごとに通知は 1 件で、原因が添付されるか、トリアージがタイムアウトまたは失敗した場合は同じスレッドで続けて通知されます。",
+      "open": "未解決",
+      "recent": "解決済み",
+      "all": "すべて",
+      "heldForDigest": "金曜日のサマリー用に保留",
+      "colId": "インシデント",
+      "colTitle": "問題",
+      "colSeverity": "重大度",
+      "colServices": "影響を受けるサービス",
+      "colStarted": "開始",
+      "colStatus": "ステータス",
+      "colCause": "原因",
+      "emptyTitle": "ここには何もありません",
+      "emptyDescription": "このフィルターに一致する問題はありません。",
+      "subsetNote": "{shown} 件を表示中。このデモでは、今週の {total} 件のインシデントの一部を表示しています。",
+      "searchLabel": "インシデントを検索",
+      "searchPlaceholder": "インシデント、サービス、原因、または INC-… を検索",
+      "noMatch": "「{query}」に一致するインシデントはありません",
+      "clearSearch": "検索をクリア",
+      "matchCount": "一致するインシデントはありません | 一致するインシデントが 1 件あります | 一致するインシデントが {count} 件あります",
+      "colSignal": "シグナル",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → 現在",
+      "minutes": "{count} 分",
+      "grouped": "{count} 件のアラート → 1 件のインシデント | {count} 件のアラート → 1 件のインシデント",
+      "confidence": "{level} の信頼度",
+      "proposed": "提案",
+      "reversible": "可逆",
+      "proposalFor": "{title} の修正案"
+    },
+    "drawer": {
+      "rca": "根本原因",
+      "rcaSummary": "サマリー",
+      "likelyCause": "考えられる原因",
+      "confidence": "信頼度",
+      "confidenceValue": "信頼度: {value}（校正済みスコアはまだありません）",
+      "nextStep": "推奨される次のステップ",
+      "evidence": "エビデンス",
+      "blastRadius": "影響範囲",
+      "upstream": "上流の呼び出し元",
+      "affected": "影響あり",
+      "downstream": "下流の依存関係",
+      "none": "なし",
+      "timeline": "タイムライン",
+      "notification": "通知を送信しました",
+      "notSent": "ページ通知なし: この低重要度の問題は金曜日のサマリー用に保留されました。製品内の受信トレイに記録されています。",
+      "sender": "AutoObserve",
+      "threadReply": "スレッドで返信しました",
+      "p1Note": "P1 は調査が完了する前に即座にページ通知します。原因は同じスレッドで続きます。",
+      "gateNote": "P2 と P3 の通知は調査を最大 2 分待つため、通常は最初のメッセージに原因が含まれます。トリアージがタイムアウトまたは失敗した場合、メッセージには調査が実行中または失敗したことが示され、原因は同じスレッドで続きます。P4 の問題は誰にも通知されず、金曜日のサマリーに入ります。",
+      "caughtEarlier": "これをより早く検知できたもの",
+      "analyzedAt": "調査は {time} に完了しました。",
+      "triggersSample": "{total} 件の発火のうち {shown} 件を表示",
+      "waitingForOk": "承認待ち",
+      "proposedFix": "修正案",
+      "unfoldTab": "どのように展開したか",
+      "seeEvidence": "エビデンスを見る（{count}）→"
+    },
+    "unfold": {
+      "hint": "左から右へ読んでください: 何が変更されたか、それが引き起こしたシグナル、そしてチームに届いたもの。カードを選択すると発火が表示されます。",
+      "legend": "カードの種類",
+      "team": "あなたのチーム",
+      "kind": {
+        "metric": "メトリクス",
+        "log": "ログ",
+        "trace": "トレース",
+        "change": "変更"
+      },
+      "likelyCause": "考えられる原因",
+      "linesUpWith": "一致する",
+      "times": "×{count}",
+      "sameMinute": "同じ分",
+      "plusMinutes": "+{count} 分",
+      "plusHours": "+{hours} 時間 {minutes} 分",
+      "firstFired": "初回発火",
+      "lastFired": "最終発火",
+      "firings": "発火",
+      "peak": "ピーク",
+      "normal": "比較対象",
+      "detector": "検出器",
+      "firedAt": "発火時刻",
+      "when": "日時",
+      "chartNote": "問題のメインチャート（Evidence と同様）",
+      "outcome": {
+        "paged": "オンコールにページ通知",
+        "asked": "OK を求めた",
+        "notified": "メッセージ送信、ページなし",
+        "held": "金曜のサマリーまで保留",
+        "fixFailed": "修正は効果なし",
+        "fixed": "修正済み",
+        "resolved": "解決済み",
+        "open": "未解決のまま"
+      }
+    },
+    "coverage": {
+      "showing": "{total} 件中 {shown} 件のサービスを表示中",
+      "watched": "監視中",
+      "learning": "学習中",
+      "gap": "ギャップ",
+      "na": "該当なし",
+      "anomaly": "異常",
+      "threshold": "しきい値",
+      "service": "サービス",
+      "lastScanned": "最終スキャン",
+      "detector": "検出器",
+      "methodAnomaly": "異常検出器、学習済みベースライン",
+      "methodThreshold": "ライブラリの静的しきい値",
+      "libraryEntry": "ライブラリエントリ",
+      "predicate": "適用可否",
+      "predicateMatched": "{predicate} — ストリーム {stream} で一致",
+      "predicateUnmatched": "{predicate} — 一致なし",
+      "reason": "理由",
+      "history": "{total} 日中の {days} 日の履歴",
+      "notScanned": "初回スキャン実行中 — 不明、完了するまでカバーされません",
+      "guardrails": "学習中はガードレールが有効: エラー率の上限 · 鮮度チェック（ストリームが停止すると発火）",
+      "alsoWatchedBy": "他に監視",
+      "searchLabel": "サービスを検索",
+      "searchPlaceholder": "サービスまたはストリームを検索",
+      "matchCount": "一致するサービスなし | 1 件のサービスが一致 | {count} 件のサービスが一致",
+      "noMatch": "「{query}」に一致するサービスまたはストリームはありません",
+      "clearSearch": "検索をクリア",
+      "filterLabel": "カバレッジでサービスを絞り込む",
+      "all": "すべて",
+      "gaps": "ギャップ",
+      "cantWatch": "監視不可",
+      "detectorCount": "1 件の検出器 | {count} 件の検出器",
+      "stream": "ストリーム",
+      "coverage": "カバレッジ",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "適用可能な {total} シグナル中 {watched} 件を監視中",
+      "legendLabel": "凡例",
+      "gapChip": "GAP",
+      "daysShort": "{days}/{total}日",
+      "tipAnomaly": "{signal}: 異常検出器、学習済みベースライン",
+      "tipThreshold": "{signal}: ライブラリの静的しきい値",
+      "tipLearning": "{signal}: 学習中、{total} 日中の {days} 日の履歴",
+      "tipGap": "{signal}: ギャップ、まだ監視できません",
+      "tipNa": "{signal}: 対象外",
+      "config": "検出器の設定",
+      "lastFired": "最終発火",
+      "never": "なし",
+      "hoursAgo": "1 時間前 | {count} 時間前",
+      "daysAgo": "1 日前 | {count} 日前",
+      "fixNoLink": "service.name ラベルを追加",
+      "fixStopped": "コレクターを確認",
+      "fixQueued": "モックのみ: {service} の「{action}」はどこにも送信されませんでした",
+      "viewLabel": "カバレッジ表示",
+      "viewMap": "マップ",
+      "viewTable": "テーブル",
+      "fillBy": "塗り分け基準",
+      "fillState": "カバレッジ状態",
+      "fillLearning": "学習の進捗",
+      "fillDetectors": "検出器数",
+      "fillScanned": "最終スキャンからの経過時間",
+      "summaryWatched": "{total} 件中 {watched} 件を完全監視 · {pct}%",
+      "addedThisWeek": "今週 1 件の新規サービス | 今週 {count} 件の新規サービス",
+      "splitLabel": "完全監視 {watched}、学習中 {learning}、監視不可 {gaps}",
+      "stateWatched": "完全監視",
+      "stateLearning": "学習中 · {total} 日中 {days} 日",
+      "stateGap": "まだ監視できません",
+      "hexName": "{service}、{state}、{stream}、{detectors}",
+      "legendOf": "{fill} の凡例、選択してハイライト",
+      "mapLabel": "{fill} で塗り分けたカバレッジマップ、サービス 1 件 | {fill} で塗り分けたカバレッジマップ、サービス {count} 件",
+      "bucketLearned": "学習済み",
+      "bucketDays67": "6–7 日",
+      "bucketDays35": "3–5 日",
+      "bucketDays02": "0–2 日",
+      "bucketNoData": "データなし",
+      "bucketSix": "検出器 6 件",
+      "bucketFive": "検出器 5 件",
+      "bucketFewer": "検出器 1–4 件",
+      "bucketNone": "なし",
+      "bucketFresh": "5 分未満",
+      "bucketRecent": "5–15 分",
+      "bucketHour": "15–60 分",
+      "bucketStale": "1 時間超",
+      "bucketNotScanned": "未スキャン",
+      "signals": "シグナル",
+      "details": "詳細",
+      "detailsFor": "{metric} の詳細を表示",
+      "readyCaption": "正常範囲の準備完了 {day} · {total} 日中 {days} 日",
+      "chartLearning": "{metric}、現在 {value}、学習中、正常範囲はまだありません",
+      "chartOverThreshold": "{metric}、現在 {value}、しきい値 {threshold} を超過",
+      "chartUnderThreshold": "{metric}、現在 {value}、しきい値 {threshold} 未満",
+      "chartAbove": "{metric}、現在 {value}、正常範囲を上回っています",
+      "chartBelow": "{metric}、現在 {value}、正常範囲を下回っています",
+      "chartWithin": "{metric}、{value} 現在、正常範囲内",
+      "tipNormal": "正常 {low} – {high}",
+      "openTraces": "トレース",
+      "openCatalog": "サービスカタログ",
+      "rangeLabel": "時間範囲",
+      "logPatternsValue": "{known} 既知 · 本日 {fresh} 件の新規",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "未監視",
+      "signalsWatched": "監視中のシグナル",
+      "chipAria": "{signal}: {state}",
+      "deltaUp": "範囲の開始時点から {change} 増加",
+      "deltaDown": "範囲の開始時点から {change} 減少",
+      "deltaFlat": "範囲の開始時点から変化なし",
+      "badgeLearning": "学習中 {days}/{total}日",
+      "badgeAnomaly": "異常 · 学習済み",
+      "badgeThreshold": "しきい値 > {threshold}",
+      "now": "現在",
+      "bandLearning": "ベースラインを学習中 · {total} 日中 {days} 日 · 正常範囲の準備完了 {day}",
+      "metric": {
+        "requests": "リクエスト",
+        "errors": "エラー",
+        "latencyP95": "レイテンシ p95",
+        "cpu": "CPU",
+        "pool": "使用中のプール",
+        "memory": "メモリ",
+        "queries": "クエリ",
+        "queryLatency": "クエリレイテンシ p95",
+        "connections": "使用中の接続",
+        "ops": "オペレーション",
+        "rejections": "拒否された接続",
+        "latency": "レイテンシ",
+        "messages": "メッセージ",
+        "failed": "失敗 (デッドレター)",
+        "lag": "コンシューマーラグ",
+        "depth": "キューの深さ"
+      }
+    },
+    "activity": {
+      "allLoops": "すべてのループ",
+      "allStatuses": "すべてのステータス",
+      "ledgerHint": "AutoObserve が提案または実行したすべての変更はここに記録されます。",
+      "userBuilt": "ユーザー作成アラート",
+      "confidence": "信頼度: {value}",
+      "evidence": "エビデンス:",
+      "before": "変更前",
+      "after": "変更後",
+      "neverAutoRetire": "アラートの廃止が自動で行われることはありません。",
+      "neverSilent": "ユーザー作成アラートが無言で変更されることはありません。",
+      "undo": "元に戻す",
+      "approve": "承認",
+      "edit": "編集",
+      "reject": "却下",
+      "saveApprove": "保存して承認",
+      "undoneNote": "あなたが元に戻しました — 以前の状態が復元されました",
+      "undoneToast": "元に戻しました。このデモの台帳ではロールバック済みとして記録されました。",
+      "approvedToast": "承認しました。このデモの台帳では承認済みとして記録されました。",
+      "rejectedNote": "あなたが却下しました",
+      "rejectedToast": "却下しました。このアクションクラスに対して記録されました。",
+      "emptyTitle": "エントリがありません",
+      "emptyDescription": "これらのフィルターに一致する台帳の項目はありません。",
+      "reviewWindow": "{window} の間レビュー中です。チェックに合格すれば自動的に保持され、失敗すればロールバックされます。以前の構成は引き続きサイレントに評価されるため、この変更によって隠されるはずだったものも引き続き表示されます。元に戻すと、以前の状態が即座に復元されます。",
+      "approvedNote": "{time} にあなたが承認しました。",
+      "applyingNote": "{time} にあなたが承認しました。現在適用中です。",
+      "appliedNote": "{time} にあなたが承認し、適用されました。",
+      "declinedNote": "あなたが辞退しました。",
+      "needsApproval": "あなたの承認が必要です",
+      "awaiting": "待機中",
+      "auto": "自動",
+      "outcomeFilter": "結果でフィルター",
+      "loopFilter": "ループでフィルター",
+      "columns": {
+        "time": "日時",
+        "loop": "ループ",
+        "action": "アクション",
+        "target": "ターゲット",
+        "change": "変更",
+        "confidence": "信頼度",
+        "decision": "判断",
+        "outcome": "結果",
+        "actions": "アクション"
+      },
+      "showDetails": "{target} の {action} の詳細を表示",
+      "hideDetails": "{target} の {action} の詳細を非表示",
+      "approveFor": "{target} の {action} を承認",
+      "rejectFor": "{target} の {action} を却下",
+      "editFor": "{target} の {action} を編集",
+      "undoFor": "{target} の {action} を元に戻す",
+      "openIncident": "インシデント {id} を開く",
+      "confidenceHint": "{value} — まだキャリブレーションされたスコアはありません",
+      "diff": "提案された変更、削除された行と追加された行",
+      "daysLeft": "残り {count} 日 | 残り {count} 日",
+      "reviewProgress": "レビュー期間が経過しました",
+      "entryId": "エントリ",
+      "logged": "記録済み"
+    },
+    "policy": {
+      "gateHint": "既存のアラートへの変更のうち、単独で適用されるのは重複排除のみで、以前の状態のスナップショットとレビュー期間が付きます。チェックに合格すれば保持され、失敗すればロールバックされます。それ以外はすべてワンクリック承認を待ちます。",
+      "off": "オフ",
+      "suggest": "提案",
+      "auto": "自動",
+      "phase2Title": "アクション — 修復",
+      "phase2Hint": "本番環境の修正。各クラスは測定された実績に基づいてレベルを獲得し、そのレベルを超えて動作することはありません。",
+      "investigation": "調査",
+      "outcomesTitle": "結果",
+      "outcomesBody": "AutoObserve は各アクションが何を行ったかを測定します。エラー率が回復したか、ページが止まったか、元に戻されたか。うまく機能し続けるクラスは、一度に 1 クラスずつ、より多くの自律性を獲得します。失敗はマイナスに数えられ、繰り返し必要とされる修正は自動化されるのではなくバグとして報告されます。",
+      "outcomesExample": "ScaleQueueWorkers は、7 件の承認されたスケールアウトが機能した後、自動に移行しました。10 月 2 日の 1 件の失敗により事前チェックが追加され、2 回目の失敗で提案に戻ります。AbortRollout はあなたの承認を待ちます。RollbackDeploy は実績ができるまでオフのままです。",
+      "triage": {
+        "parallel": "並列",
+        "gate": "ゲート",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "即座にページ通知し、並行して調査します。原因は同じスレッドで続きます。P1ではゲートは許可されません。",
+        "gateDesc": "調査が完了するまで最大2分間、ページ通知を保留します。フェイルオープン: トリアージがタイムアウトまたは失敗した場合は、そのままページ通知し、調査がまだ実行中または失敗したことを伝え、原因はスレッドで続きます。"
+      },
+      "classes": {
+        "EnableDeduplication": "数分以内に繰り返すアラートの重複排除を有効にします。",
+        "CreateDetector": "サービスのリクエスト、エラー、レイテンシに対して異常検知を作成します。",
+        "RaiseThreshold": "正常な日にも発火するしきい値を引き上げます。",
+        "LengthenEvaluationWindow": "フラップするアラートの評価ウィンドウを延長します。",
+        "FixAlertQuery": "誤ったものを測定している、または決して一致しないアラートクエリを修正します。",
+        "AttachDestination": "通知先がないまま発火する検知に送信先を関連付けます。",
+        "AddLibraryAlert": "述語が一致するライブラリからスケジュールされたアラートを追加します。",
+        "MoveToIncidentDelivery": "ユーザー作成のアラートを、独自のルートではなくインシデント経由で配信します。",
+        "ReviewForDeletion": "誰も対応しないアラートの廃止を提案します。",
+        "RollbackDeploy": "問題を引き起こしたデプロイをロールバックします。",
+        "ScaleService": "飽和したサービスをスケールアウトします。",
+        "RestartPod": "レプリカが正常なのに応答を停止したPodを再起動します。再発した場合は代わりにバグを作成します。",
+        "ToggleFeatureFlag": "問題の背後にあるフィーチャーフラグをオフにします。",
+        "RunRunbookStep": "サービスのランブックからステップを実行します。",
+        "LowerThreshold": "インシデント前の警告には遅すぎたしきい値を引き下げます。",
+        "RevertConfigChange": "問題の発生源となった最近の設定変更を元に戻します（その変更がないレプリカが正常な場合）。",
+        "EvictLeakedConnections": "サービスが取得したまま返さなかった接続（リーク検出で特定）を閉じます。実行中のクエリには手を付けません。それぞれはリークのバグにリンクされます。",
+        "AbortRollout": "ロールアウト中に新しいバージョンのPodのみが失敗した場合、トラフィックを以前のバージョンに戻します。ワンクリックで再開できます。",
+        "ScaleQueueWorkers": "滞留したキューにワーカーを追加します（上限まで）。排出速度が改善しなければ自動的に元に戻します。"
+      },
+      "triageHint": "重大度ごとのL0トリアージ。フェーズ1で固定。",
+      "channels": "チャネル",
+      "channelInbox": "プロダクト内受信トレイ",
+      "channelEmailAdmins": "組織管理者へのメール",
+      "channelDefault": "すべての組織のデフォルト。常にオン。",
+      "alwaysOn": "常にオン",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "接続済み。任意。これがなくても受信トレイとメールは機能します。",
+      "connected": "接続済み",
+      "defaultsNote": "フェーズ1では固定のプロダクトデフォルトを提供します。組織ごとの上書きは後で対応します。",
+      "groupCoverage": "カバレッジ — 検知を自動的に作成します",
+      "groupCoverageHint": "新しいサービスが登場するとすぐに、異常検知と一致するライブラリアラートが付与されます。学習中は基本的な安全チェックが行われます。各作成は記録され、元に戻すことができ、レビュー期間を経ます。",
+      "groupCalibration": "キャリブレーション — 既存のアラートへの変更",
+      "channelEmail": "メール {address}",
+      "paging": "ページング",
+      "pagingHint": "重大度によって、問題がどのように人に届くかが決まります。",
+      "routing": {
+        "p1p2": "P1 および P2",
+        "p1p2Desc": "顧客に影響を与えます。時間を問わずオンコールにページ通知します。",
+        "page": "ページ",
+        "p3": "P3",
+        "p3Desc": "準備ができ次第送信されるSlackメッセージ。誰にもページ通知しません。",
+        "message": "メッセージ",
+        "p4": "P4",
+        "p4Desc": "金曜のサマリーに含まれます。",
+        "summary": "金曜のサマリー"
+      },
+      "nav": {
+        "coverage": "カバレッジ",
+        "alerts": "アラートの変更",
+        "fixes": "修正",
+        "investigation": "調査とページング",
+        "channels": "チャネル"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count}件接続済み"
+      }
+    },
+    "notInDemo": "このデモでは利用できません",
+    "confidence": {
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "uncalibrated": "キャリブレーション済みスコアはまだありません"
+    },
+    "analysis": {
+      "verdict": "判定",
+      "unconfirmed": "まだ確認されていません",
+      "lasted": "{count}分間継続",
+      "soFar": "これまで{count}分",
+      "checked": "確認した内容",
+      "verdicts": {
+        "confirmed": "確認済み",
+        "ruled_out": "除外",
+        "open": "依然として未解決"
+      },
+      "comparison": "正常 vs 影響あり",
+      "kinds": {
+        "affected": "影響あり",
+        "healthy": "正常",
+        "limit": "制限"
+      },
+      "trail": "エビデンスの記録",
+      "seeInUnfold": "「経緯」で確認する",
+      "nextStep": "次のステップ",
+      "fullReport": "レポート全文",
+      "fullReportHint": "上記のすべてを1つのドキュメントにまとめたもので、コピーまたはダウンロードできます"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "デモ",
+    "scenarioLabel": "デモシナリオ",
+    "scenarios": {
+      "demo": "デモ週間",
+      "allClear": "異常なし",
+      "incident": "アクティブなインシデント",
+      "cantSee": "認識できない",
+      "noBaseline": "ベースラインなし"
+    },
+    "nav": {
+      "history": "履歴",
+      "settings": "設定",
+      "howItWorks": "仕組み",
+      "searchLabel": "問題を検索",
+      "searchPlaceholder": "問題を検索"
+    },
+    "recent": {
+      "ranges": {
+        "day": "過去24時間",
+        "week": "過去7日間",
+        "month": "過去30日間"
+      },
+      "within": {
+        "day": "過去24時間以内",
+        "week": "過去7日以内",
+        "month": "過去30日以内"
+      },
+      "groups": {
+        "thisWeek": "今週",
+        "lastWeek": "先週",
+        "weeksAgo": "{count}週間前"
+      },
+      "all": "すべて",
+      "none": "{within}に{priority}の問題はありません。",
+      "allIssues": "すべての問題",
+      "priorityLabel": "優先度",
+      "showing": "{count} 件の問題を表示 | {count} 件の問題を表示"
+    },
+    "noProblems": "{within}に問題はありません。{count} 件のサービスを 24 時間監視しました。 | {within}に問題はありません。{count} 件のサービスを 24 時間監視しました。",
+    "entryLabel": "{when} · {service}",
+    "when": "{day} {time}",
+    "showMore": "さらに {count} 件を表示",
+    "showFewer": "表示を減らす",
+    "days": {
+      "today": "今日",
+      "monday": "月曜日",
+      "tuesday": "火曜日",
+      "wednesday": "水曜日",
+      "thursday": "木曜日",
+      "friday": "金曜日",
+      "jul18": "7月18日",
+      "jul30": "7月30日",
+      "aug13": "8月13日",
+      "aug26": "8月26日",
+      "sep4": "9月4日",
+      "sep12": "9月12日",
+      "sep24": "9月24日",
+      "sep30": "9月30日",
+      "oct1": "10月1日",
+      "oct2": "10月2日",
+      "sep23": "9月23日"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db は約 3 日でディスクが満杯になります",
+        "summary": "木曜日の orders リリースで監査ログが有効になった以降、ディスクは 1 日あたり約 18 GB ずつ増えており、水曜日の朝ごろに満杯になります。満杯になると、チェックアウト、注文、返金が失敗し始めます。まだ何も壊れていないため、ページ通知ではなく、チームに事前警告を送りました。",
+        "notify1": "orders-db は約 3 日後、水曜日の 11:00 ごろにディスクが満杯になります。",
+        "notify2": "原因: 木曜日に orders 3.8.0 がリリースされて以降、監査ログが 1 日あたり約 18 GB を書き込んでいます。それ以前は、ディスクの増加は 1 日あたり約 6 GB でした。",
+        "notify3": "水曜日までに監査ログを元に戻すか、ディスク容量を追加してください。満杯になると、チェックアウト、注文、返金が失敗します。まだ何も壊れていないため、これは事前警告であり、ページ通知ではありません。",
+        "chartCaption": "ディスク · 満杯 ~水 11:00",
+        "chartLabel": "ディスク使用量は 14 日間で 500 GB 中 334 GB から 445 GB に増加し、木曜日以降は増加が速く、水曜日の 11:00 ごろに満杯になると予測されます"
+      },
+      "search": {
+        "title": "検索が遅く、search-2 が繰り返しクラッシュしています",
+        "titleFixed": "search-2 が繰り返しクラッシュしている間、検索が遅くなっていました",
+        "summary": "10:27 以降、検索の約 5 回に 1 回が 3 秒以上かかっています。10:16 に search-2 で変更された設定により、メモリが不足しています。オンコールにページ通知を送りましたが、現在も発生しています。",
+        "notify1": "検索が遅くなっています。10:27 以降、検索の約 5 回に 1 回が 3 秒以上かかっています。",
+        "notify2": "原因: 10:16 に search-2 で変更された設定によりメモリが一杯になります。10:20 以降、約 10 回クラッシュしています。他の 4 ノードにはこの変更がなく、正常です。",
+        "notify3": "古い設定に戻せば解決するはずで、私が元に戻せます。「revert」と返信していただければ実行します。変更を行った担当者は理由を確認してください。",
+        "summaryFixed": "10:27 に始まりました。search-2 で変更された設定がメモリを一杯にしたためです。古い設定に戻すことを承認されたので実行し、検索は正常に戻りました。",
+        "summaryFixing": "10:27 に始まりました。search-2 で変更された設定がメモリを一杯にするためです。古い設定に戻すことを承認されたので、現在実行しています。",
+        "chartCaption": "p95 レイテンシ · ピーク 3.4 秒",
+        "chartLabel": "p95 レイテンシは 10:27 に 0.38 秒から 3.4 秒に上昇し、現在も高い状態です",
+        "chartLabelFixed": "p95 レイテンシは 10:27 に 0.38 秒から 3.4 秒に上昇し、設定を元に戻した後に正常に戻りました"
+      },
+      "checkout": {
+        "title": "デプロイ後に 12 件に 1 件の支払いが失敗しました",
+        "summary": "payments-api 2.3.1 が、許可されている数を超える接続を payments データベースに要求しました。ロールバックにより、障害発生から 18 分後に解決しました。",
+        "notify1": "14:02 以降、チェックアウトで支払いの約 12 件に 1 件が失敗しています。",
+        "notify2": "考えられる原因: 14:01 に payments-api 2.3.1 がリリースされ、サーバーあたりの接続プールが 20 から 50 に増えました。6 サーバー × 50 は、payments データベースが許可する 200 を超えています。",
+        "notify3": "2.3.0 にロールバックするのが最速の修正です。",
+        "chartCaption": "失敗した支払い · ピーク 12 件に 1 件",
+        "chartLabel": "決済失敗が 0.1% から 12 件に 1 件へと 14:02 に急増し、ロールバック後の 18 分後に平常に戻りました"
+      },
+      "pool": {
+        "title": "チェックアウトのデータベース接続が枯渇しました",
+        "summary": "リークした接続が空き接続をすべて使い切り、決済がタイムアウトし始めました。クリアを承認されたので実行しました。決済は 2 分後に回復しました。",
+        "notify1": "チェックアウトのデータベース接続が枯渇し、11:18 以降、決済の約 9 件に 1 件がタイムアウトしています。",
+        "notify2": "原因: 50 接続のうち 48 が、返却されない返金エクスポートに保持されています。CHK-482 リークで、2 週間で 3 回目です。",
+        "notify3": "リークした接続のみを閉じれば解消されるはずです。進行中の決済には影響しません。「yes」と返信いただければ実行します。",
+        "chartCaption": "タイムアウト · ピーク時 9 件に 1 件",
+        "chartLabel": "決済タイムアウトが 11:18 に約 9 件に 1 件まで上昇し、11:21 の修正の 2 分後に回復しました"
+      },
+      "email": {
+        "title": "注文メールが最大 9 分遅延しました",
+        "summary": "夜間にメールワーカーが一斉に置き換えられ、キューは約 20 分で自然に追いつきました。軽微だったため、金曜のサマリーに含めました。",
+        "chartCaption": "メール遅延 · ピーク 9 分",
+        "chartLabel": "メール遅延が 03:15 から 9 分に上昇し、03:36 までに自然に回復しました"
+      },
+      "recs": {
+        "title": "レコメンデーションが 15 分間遅くなりました",
+        "summary": "0.25 秒からほぼ 1 秒になりました。夜間のキャッシュ再構築が午後に手動で開始され、自然に完了しました。金曜のサマリーまで保留しました。",
+        "chartCaption": "p95 レイテンシ · ピーク 0.94 秒",
+        "chartLabel": "p95 レイテンシが 16:40 に 0.26 秒から 0.94 秒に上昇し、15 分後に自然に回復しました"
+      },
+      "login": {
+        "title": "サインインが約 25 分間遅くなりました",
+        "summary": "8 人に 1 人が 5 秒以上待ちました。トラフィック急増後にセッションキャッシュの容量が不足し、一部のユーザーがサインアウトされました。チームが容量を追加し、回復しました。",
+        "notify1": "サインインが遅延しています: 10:12 以降、約 8 人に 1 人が 5 秒以上待っています。",
+        "notify2": "原因: 10:05 にトラフィックが 2 倍になった後、セッションキャッシュが満杯です。",
+        "notify3": "キャッシュに容量を追加すれば修正されるはずです。",
+        "chartCaption": "p95 サインイン · ピーク 5.8 秒",
+        "chartLabel": "p95 サインイン時間が 10:12 に 0.6 秒から 5.8 秒に上昇し、10:31 にキャッシュ容量が追加された後に回復しました"
+      },
+      "queue": {
+        "title": "注文がキューに滞留しました",
+        "summary": "最悪時には約 4,000 件が待機していました。許可されている通りワーカーを追加しましたが効果がなかったため元に戻し、オンコールにページしました。実際の原因は、マイグレーションが壊したままにしたデータベースインデックスでした。チームが発生から 40 分後に修正しました。",
+        "notify1": "注文が滞留しています: 21:30 以降、約 4,000 件が待機中です。",
+        "notify2": "許可されている通り 21:33 にワーカーを追加しましたが効果がなかったため、元に戻しました。",
+        "notify3": "21:20 のデータベースマイグレーション以降、注文検索が約 40 倍遅くなっています。まず orders_by_status インデックスを確認してください。",
+        "chartCaption": "バックログ · ピーク 4,120",
+        "chartLabel": "待機中の注文は 21:30 から 4,120 まで増加し、ワーカー追加後も増え続け、21:52 にインデックスが再構築されると解消しました"
+      },
+      "uploads": {
+        "title": "40 人に 1 人で画像アップロードが失敗しました",
+        "summary": "あるサーバーが代替を読み込む前に証明書が失効したため、10 分間続きました。自然に解決したため、金曜のサマリーまで保留しました。",
+        "chartCaption": "失敗したアップロード · ピーク時 40 件に 1 件",
+        "chartLabel": "失敗したアップロードが 07:05 に約 40 件に 1 件まで上昇し、10 分後に自然に回復しました"
+      },
+      "push": {
+        "title": "プッシュ通知が 2 分遅れて届きました",
+        "summary": "配信プロバイダーが遅かったため、30 分間続きました。軽微だったため、金曜のサマリーまで待ちました。",
+        "chartCaption": "配信遅延 · ピーク 2 分",
+        "chartLabel": "配信遅延が 13:50 に 4 秒から約 2 分に上昇し、30 分後に自然に回復しました"
+      },
+      "checkoutNow": {
+        "title": "チェックアウトで 6 件に 1 件の決済が失敗しています",
+        "titleFixed": "チェックアウトで 6 件に 1 件の決済が失敗しました",
+        "summary": "10:43 に始まり、原因を引き続き調査中です。現時点では 10:41 にリリースされたバージョン 2.4.0 と一致します。オンコールにページしました。",
+        "notify1": "10:43 以降、チェックアウトで約 6 件に 1 件の決済が失敗しています。",
+        "notify2": "原因を引き続き調査中です。現時点では 10:41 にリリースされたチェックアウト 2.4.0 と一致します。",
+        "notify3": "2.4.0 のサーバーのみが失敗しています。「stop」と返信いただければトラフィックを旧バージョンに戻します。旧サーバーには余裕があります。payments-db を直接確認できないため、除外はしていません。",
+        "summaryFixing": "バージョン 2.4.0 のリリース直後の 10:43 に始まりました。ロールアウトの中止を承認されたので、現在トラフィックを旧バージョンに戻しています。",
+        "summaryFixed": "バージョン 2.4.0 のリリース後の 10:43 に始まりました。ロールアウトの中止を承認され、トラフィックが旧バージョンに戻ると失敗は止まりました。2.4.0 がなぜ失敗するかは、引き続きチームでの調査が必要です。",
+        "chartCaption": "失敗した決済 · ピーク時 6 件に 1 件",
+        "chartLabel": "決済失敗が 10:43 に 0.1% から約 6 件に 1 件へ急増し、現在も失敗しています",
+        "chartLabelFixed": "決済失敗が 10:43 に 0.1% から約 6 件に 1 件へ急増し、ロールアウトが中止されると平常に戻りました"
+      },
+      "gateway": {
+        "title": "API が 30 件に 1 件のリクエストを拒否しました",
+        "summary": "設定変更の後に始まりました。チームが元に戻し、発生から13分後に正常に復帰しました。",
+        "notify1": "API は約30件に1件のリクエストを拒否しています（15:22以降）。",
+        "notify2": "考えられる原因: 15:20の設定変更により、サインイントークンの有効期間が短縮されました。",
+        "notify3": "その変更を元に戻せば解決するはずです。",
+        "chartCaption": "拒否 · ピーク時30件に1件",
+        "chartLabel": "拒否されたリクエストは15:22に30件に1件まで上昇し、15:34に設定変更が元に戻された時点で正常に戻りました"
+      },
+      "poolSep": {
+        "title": "チェックアウトでデータベース接続が枯渇しました",
+        "summary": "リークした接続が空き接続をすべて使い切り、決済でタイムアウトが発生し始めました。リークの原因を返金エクスポートまで突き止め、承認を得てリークした接続をクリアしました。決済は2分後に回復しました。",
+        "notify1": "チェックアウトでデータベース接続が枯渇し、約9件に1件の決済がタイムアウトしています（15:42以降）。",
+        "notify2": "原因: 50件中47件の接続が、接続を返さない返金エクスポートに保持されています。返金エクスポートのコードにリークがあるようです。",
+        "notify3": "リークした接続のみを閉じれば解消するはずです。処理中の決済には影響しません。「yes」と返信いただければ実行します。",
+        "chartCaption": "タイムアウト · ピーク時9件に1件",
+        "chartLabel": "決済のタイムアウトは15:42に約9件に1件まで上昇し、15:45の修正から2分後に回復しました"
+      },
+      "poolOct": {
+        "title": "チェックアウトで再びデータベース接続が枯渇しました",
+        "summary": "同じ返金エクスポートのリーク（CHK-482）でした。承認を得てリークした接続をクリアし、決済は2分後に回復しました。",
+        "notify1": "チェックアウトでデータベース接続が枯渇し、約9件に1件の決済がタイムアウトしています（10:05以降）。",
+        "notify2": "原因: 50件中46件の接続が返金エクスポートに保持されています。再びCHK-482のリークで、8日間で2回目です。",
+        "notify3": "リークした接続のみを閉じれば解消するはずです。処理中の決済には影響しません。「yes」と返信いただければ実行します。",
+        "chartCaption": "タイムアウト · ピーク時9件に1件",
+        "chartLabel": "決済のタイムアウトは10:05に約9件に1件まで上昇し、10:08の修正から2分後に回復しました"
+      },
+      "lagSep": {
+        "title": "新商品が検索に表示されるまで最大40分かかりました",
+        "summary": "バージョン1.12.0でバッチあたりの許容時間が短縮された後、search-indexer のカタログ更新が遅延しました。チームがロールバックし、発生から40分後に追いつきました。",
+        "notify1": "新規および変更された商品が検索から欠落しています。search-indexer は約48,000件のカタログ更新に遅れています（14:06以降）。",
+        "notify2": "原因: 13:58にリリースされた search-indexer 1.12.0 が Kafka のポーリング間隔を30秒に短縮しました。大きなバッチには約45秒かかるため、コンシューマーがグループから繰り返し削除されています。",
+        "notify3": "1.11.4 にロールバックすれば追いつくはずです。検索自体は機能しており、古い商品が表示されるだけです。",
+        "chartCaption": "コンシューマーラグ · ピーク時48,000",
+        "chartLabel": "コンシューマーラグは14:06から約200件から48,000メッセージに増加し、14:39のロールバック後に解消されました"
+      },
+      "poolAug": {
+        "title": "返金エクスポート中にチェックアウトでデータベース接続が枯渇しました",
+        "summary": "夜間の返金エクスポートがチェックアウトのデータベース接続をほぼすべて占有し、約12件に1件の決済がタイムアウトしました。エクスポートの完了時に解消され、発生から13分後のことでした。",
+        "notify1": "チェックアウトでデータベース接続が枯渇し、約12件に1件の決済がタイムアウトしています（02:04以降）。",
+        "notify2": "原因: 50件中44件の接続が夜間の返金エクスポートに保持されています。月末セール後のため、通常の約3倍の規模です。",
+        "notify3": "エクスポートが完了すれば解消するはずです。解消しない場合は、エクスポートを停止すれば接続が解放されます。",
+        "chartCaption": "タイムアウト · ピーク時12件に1件",
+        "chartLabel": "決済のタイムアウトは02:04に約12件に1件まで上昇し、02:17にエクスポートが完了した時点で自然に回復しました"
+      },
+      "throttleAug": {
+        "title": "不正チェックが35分間遅延しました",
+        "summary": "バッチジョブが同じサーバー上で実行され空き CPU を消費したため、不正チェックに最大1.4秒かかりました。チェックアウトは動作しており遅いだけでしたが、ジョブの完了時に回復したため、金曜のサマリーまで保留しました。",
+        "chartCaption": "p95 不正チェック · ピーク時1.4秒",
+        "chartLabel": "p95 不正チェック時間は11:20に0.18秒から1.4秒に上昇し、11:55にバッチジョブが完了した時点で自然に回復しました"
+      },
+      "tlsJul": {
+        "title": "請求書の送信が43分間停止しました",
+        "summary": "invoice-service の billing-api 用証明書が期限切れになり、すべての請求書の送信が失敗しました。チームが更新し、キューに溜まった請求書はすべて送信されました。",
+        "notify1": "請求書がまったく送信されていません。invoice-service からの送信がすべて失敗しています（09:01以降）。",
+        "notify2": "原因: invoice-service の billing-api 用クライアント証明書が09:00に期限切れになり、billing-api がそこからの接続をすべて拒否しています。",
+        "notify3": "証明書を更新すれば解決するはずです。請求書はキューに溜まっているだけで、失われてはいません。",
+        "chartCaption": "送信失敗 · すべて",
+        "chartLabel": "請求書の送信失敗率は09:01に0.2%から100%に急上昇し、09:41に証明書が更新された後に正常に戻りました"
+      },
+      "dnsJul": {
+        "title": "カートの価格が4人に1人で表示されなくなりました",
+        "summary": "DNS 変更によりクラスタの DNS サーバーの半数が内部名に応答しなくなり、カートが currency に到達できなくなりました。チームが発生から31分後に元に戻しました。",
+        "notify1": "カートの読み込みの約4件に1件で価格が表示されません（16:22以降）。",
+        "notify2": "原因: 16:20の DNS 設定変更により、4台のクラスタ DNS サーバーのうち2台から内部ゾーンが削除されたため、カートはそれらのルックアップで currency.internal を見つけられません。",
+        "notify3": "DNS 変更を元に戻せば解決するはずです。注文はチェックアウトで引き続き完了します。",
+        "chartCaption": "価格欠落 · ピーク時は4分の1",
+        "chartLabel": "16:22に、価格なしのカート読み込みが0.1%から約4分の1に上昇し、16:51にDNS変更が元に戻されたときに通常に戻りました。"
+      }
+    },
+    "drawer": {
+      "worked": "うまくいった",
+      "didntHelp": "役に立たなかった",
+      "now": "今"
+    },
+    "needs": {
+      "more": "もっと",
+      "less": "少なく",
+      "canUndo": "元に戻せます",
+      "undo": "元に戻す",
+      "undone": "元に戻しました。これは再びあなたの回答を待っています。",
+      "shiftTo": "に",
+      "retune": {
+        "body": "{host} の「{alert}」アラートは今月 {fired} 回発報しましたが、誰も対応する必要がありませんでした。ディスクは夜間のクリーンアップ中に約85%まで上昇し、朝には70%近くに戻ります。最も忙しい日でも、90%から満杯になるまで3日以上かかります。これを{to}%に引き上げたいと思います。ディスクが1日以内に満杯になる見込みの場合は、引き続き警告します。",
+        "yes": "はい、変更してください",
+        "no": "そのままにする",
+        "doneYes": "完了しました。{to}%に引き上げました。満杯警告はオンのままです。",
+        "doneNo": "了解しました。{from}%のままにします。",
+        "headline": "ingest-3 の「disk 80%」アラートを90%に引き上げますか？",
+        "why": "今月41回発報しましたが、誰も対応する必要がありませんでした。",
+        "cost": "満杯警告はオンのまま"
+      },
+      "fixNow": {
+        "search": {
+          "body": "検索が遅いのは、10:16にノード search-2 で変更された設定がメモリを圧迫し、クラッシュを繰り返しているためです。他の4つのノードはまだ古い設定で正常に動作しています。元に戻してもよいですか？これは元に戻せます。",
+          "yes": "元に戻す",
+          "no": "私が対応します",
+          "doneYes": "完了しました。今、元に戻しています。",
+          "doneNo": "了解しました。お任せします。引き続き監視します。",
+          "doneSettled": "完了しました。search-2 が復旧し、検索は正常です。",
+          "headline": "search-2 のキャッシュ設定を10%に戻しますか？",
+          "why": "10:16の変更がメモリを圧迫し、クラッシュを繰り返しています。",
+          "cost": "search-2 の再起動が1回"
+        },
+        "checkoutNow": {
+          "body": "チェックアウトでは約6件に1件の支払いが失敗しており、失敗しているのは2.4.0のサーバーのみです。古いバージョンの6台のサーバーにはすべてのトラフィックを処理する余裕があります。ロールアウトを停止し、トラフィックをそれらに戻してもよいですか？2.4.0はチームが確認できるようにデプロイされたままにします。",
+          "yes": "ロールアウトを停止する",
+          "no": "私が対応します",
+          "doneYes": "完了しました。今、ロールアウトを停止しています。",
+          "doneNo": "了解しました。お任せします。引き続き監視します。",
+          "doneSettled": "完了しました。支払いは正常に戻りました。",
+          "headline": "チェックアウトの2.4.0ロールアウトを停止しますか？",
+          "why": "約6件に1件の支払いが失敗し、すべて2.4.0で発生しています。古いバージョンで全トラフィックを処理できます。",
+          "cost": "2.4.0はデプロイされたまま"
+        }
+      },
+      "fromNowOn": {
+        "body": "これまで{done}回、新しいバージョンがロールアウト中にそれ自身のサーバーのみを失敗させました。毎回、古いバージョンにトラフィックを戻すよう依頼し、障害は2分以内に収まりました。今後はロールアウト中にそれを自分で行ってもよいですか？新しいバージョンはチームのためにそのままにし、すぐに伝えます。",
+        "yes": "はい、自動で",
+        "no": "毎回確認してください",
+        "doneYes": "完了しました。不正なロールアウトを自分で停止し、毎回知らせます。",
+        "doneNo": "了解しました。今後もまずあなたに確認します。",
+        "headline": "今後は不正なロールアウトを自分で停止しますか？",
+        "why": "あなたがはいと言った6回すべてで、障害は2分以内に収まりました。",
+        "cost": "ロールアウト中のみ"
+      },
+      "labels": {
+        "fixNow": "今すぐ修正",
+        "fromNowOn": "私に任せてください",
+        "retune": "アラートを静かに"
+      },
+      "needsOk": "承認が必要"
+    },
+    "footer": {
+      "text": "私自身もチェックしています。私が動作を停止したら、お知らせします。",
+      "seeAll": "私が見ているすべてを表示",
+      "seeChanges": "私が変更したすべてを表示"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1分前 | {count}分前",
+        "stale": "1分間新しいデータがありません（{since}以降） | {count}分間新しいデータがありません（{since}以降）"
+      },
+      "summaryWatching": "{total}件のサービスのうち{watched}件を監視しています。",
+      "summaryAll": "{total}件すべてのサービスを監視しています。",
+      "summaryWithClauses": "{head}、{clauses}。",
+      "clauseLearning": "{count}件はまだ学習中です | {count}件はまだ学習中です",
+      "clauseUnseen": "見えないものが1つあります | 見えないものが{count}件あります",
+      "legend": {
+        "watching": "完全に監視中",
+        "learning": "学習中",
+        "unseen": "未検知"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "{total}件すべてのサービスを監視していますが、それぞれの正常な状態はまだ学習中です。"
+    },
+    "coveragePage": {
+      "title": "私が監視しているすべて",
+      "back": "戻る"
+    },
+    "issuesPage": {
+      "title": "すべての問題",
+      "sentence": "{within}に私が起票したすべての問題です。1つ選ぶと、何が起きたか、それに対して私が何をしたかを確認できます。",
+      "back": "戻る",
+      "ranges": {
+        "week": "過去7日間",
+        "month": "過去30日間",
+        "quarter": "過去90日間"
+      },
+      "within": {
+        "week": "過去7日間",
+        "month": "過去30日間",
+        "quarter": "過去90日間"
+      }
+    },
+    "activityPage": {
+      "title": "私が変更したもの",
+      "stats": {
+        "window": "過去7日間",
+        "made": "変更 | 変更",
+        "worked": "効果あり",
+        "review": "レビュー中",
+        "undone": "取り消し済み"
+      },
+      "filters": {
+        "all": "すべて",
+        "fixes": "修正",
+        "watching": "監視",
+        "tuning": "アラートチューニング"
+      },
+      "status": {
+        "applying": "適用中",
+        "worked": "効果あり",
+        "done": "完了",
+        "review": "レビュー中",
+        "reviewDays": "レビュー中 · 残り{count}日 | レビュー中 · 残り{count}日",
+        "didntHelp": "効果なし",
+        "undone": "取り消し済み"
+      },
+      "actions": {
+        "undo": "取り消す",
+        "showDetails": "詳細を表示",
+        "hideDetails": "詳細を非表示"
+      },
+      "details": {
+        "name": "変更",
+        "target": "対象",
+        "confidence": "信頼度",
+        "saw": "確認した内容",
+        "recurring": "同じリーク（{bug}）に対してこの修正が繰り返し必要になるため、解消されるまでは必ず先に確認します。",
+        "undoDecided": "元に戻すとこれが取り消され、もう一度確認します。"
+      },
+      "toast": {
+        "undone": "取り消しました。元の状態に戻りました。",
+        "undoDecided": "取り消しました。もう一度確認します。"
+      },
+      "empty": {
+        "filter": "現在ここには何もありません。",
+        "scenario": "まだ何も変更していません。変更を加えると、ここに表示されます。"
+      },
+      "entries": {
+        "L-313": {
+          "done": "checkoutの2.4.0ロールアウトを停止しました",
+          "why": "2.4.0の6台のサーバーのみが障害中です。旧バージョンの6台で全トラフィックを処理できます。",
+          "from": "12ポッド中6",
+          "to": "トラフィックなし",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "search-2のキャッシュ設定を10%に戻しました",
+          "why": "10:16に60%に上がり、それ以降search-2はメモリ不足になっています。",
+          "from": "60%",
+          "to": "10%",
+          "on": "キャッシュサイズ · search-2"
+        },
+        "L-309": {
+          "done": "ingest-3の「ディスク80%」アラートを90%に引き上げました",
+          "why": "今月41回発火しましたが、対応が必要なものはありませんでした。容量警告はオンのままです。",
+          "from": "80%",
+          "to": "90%",
+          "on": "ディスクアラート · ingest-3"
+        },
+        "L-310": {
+          "done": "returns、exchanges、gift-cardsの監視を開始しました",
+          "why": "今朝見つけました。7日間かけて、これらの正常な状態を学習します。",
+          "from": "未監視",
+          "to": "監視中",
+          "on": "3サービス"
+        },
+        "L-314": {
+          "done": "今朝見つけた6つのサービスの監視を開始しました",
+          "why": "今日のトレースに現れました。7日間かけて、これらの正常な状態を学習します。",
+          "from": "未監視",
+          "to": "監視中",
+          "on": "6サービス"
+        },
+        "L-311": {
+          "done": "不正なロールアウトを独自に停止する承認を得ました",
+          "why": "60日間で承認のもと6件を停止しました。いずれも2分以内にエラーが正常に戻りました。",
+          "from": "事前確認",
+          "to": "独自に",
+          "on": "ロールアウトの停止"
+        },
+        "L-304": {
+          "done": "checkoutの漏洩した48件のデータベース接続をクリアしました",
+          "why": "支払いがタイムアウトしていました。2分後に正常に戻りました。",
+          "from": "50/50使用中",
+          "to": "2使用中",
+          "on": "checkoutプール"
+        },
+        "L-299": {
+          "done": "checkoutの漏洩した46件のデータベース接続をクリアしました",
+          "why": "9月23日と同じリークです。2分後に支払いが正常に戻りました。",
+          "from": "50/50使用中",
+          "to": "4使用中",
+          "on": "checkoutプール"
+        },
+        "L-296": {
+          "done": "checkoutの漏洩した47件のデータベース接続をクリアしました",
+          "why": "新しいリークのため、後でcheckoutチームにCHK-482として起票しました。",
+          "from": "50/50使用中",
+          "to": "3使用中",
+          "on": "checkoutプール"
+        },
+        "L-301": {
+          "done": "billing-api、billing-worker、invoice-service の監視を開始しました",
+          "why": "トレースからこれらを見つけました。まだそれぞれの正常な状態を学習中です。",
+          "from": "未監視",
+          "to": "監視中",
+          "on": "3 サービス"
+        },
+        "L-307": {
+          "done": "payments-api の接続アラートを修正し、すべてのサーバーをカウントするようにしました",
+          "why": "サーバーごとに個別にチェックしていたため、火曜日の障害時にも発報しませんでした。",
+          "from": "各 Pod が 95% 超",
+          "to": "すべての Pod が 85% 超",
+          "on": "接続アラート"
+        },
+        "L-302": {
+          "done": "checkout レイテンシの 3 つのアラートを 1 つにグループ化しました",
+          "why": "94% の確率で同時に発報していたため、1 回の遅延で 3 回通知されていました。",
+          "from": "3 アラート",
+          "to": "1",
+          "on": "checkout レイテンシ"
+        },
+        "L-303": {
+          "done": "ingest-1 の「disk 80%」アラートを 90% に引き上げました",
+          "why": "30 日間に 29 回発報しましたが、対応が必要になることはありませんでした。ディスク使用率の警告はオンのままです。",
+          "from": "80%",
+          "to": "90%",
+          "on": "ディスクアラート · ingest-1"
+        },
+        "L-305": {
+          "done": "バックログを解消するため orders-consumer のワーカーを 4 つ追加しました",
+          "why": "効果がなかったため 4 に戻し、3 分後にオンコールへ通知しました。",
+          "from": "ワーカー 4 つ",
+          "to": "ワーカー 8 つ",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "キュー ワーカーを自ら追加することについて承認を得ました",
+          "why": "トラフィック急増時に 7 回承認され、そのたびにバックログが解消されました。",
+          "from": "事前に確認",
+          "to": "自ら実行",
+          "on": "キューワーカーの追加"
+        },
+        "L-312": {
+          "done": "接続時に検出した 18 のサービスの監視を開始しました",
+          "why": "それぞれの正常な状態を学習しています。準備ができ次第アラートが開始されます。",
+          "from": "未監視",
+          "to": "監視中",
+          "on": "18 サービス"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "履歴",
+      "seeChange": "変更内容を見る",
+      "filters": {
+        "all": "すべて",
+        "problems": "問題",
+        "changes": "変更",
+        "fixes": "修正",
+        "decisions": "あなたの判断"
+      },
+      "empty": "まだ何もありません。",
+      "entries": {
+        "checkoutNowPaged": "checkout で支払いが失敗している件についてオンコールに通知しました。",
+        "searchPaged": "search が遅い件についてオンコールに通知しました。",
+        "searchAsked": "search-2 のキャッシュ設定を元に戻してよいか確認しました。",
+        "euStopped": "この時刻以降、{cluster} クラスターから何も届いていません。ここで、および Slack でお伝えしました。",
+        "fridaySummary": "金曜日のサマリーを {count} 件の軽微な問題とともに送信しました。 | 金曜日のサマリーを {count} 件の軽微な問題とともに送信しました。",
+        "emailHeld": "金曜日のサマリー用に、注文メールに関する軽微な問題を保留しました。",
+        "poolFixed": "checkout でリークしていたデータベース接続をクローズしました。2 分後に決済が復旧しました。",
+        "poolApproved": "チェックアウトで漏れていたデータベース接続を閉じることを承認しました。",
+        "billingWatch": "billing-api、billing-worker、invoice-service の監視を開始しました。",
+        "checkoutPaged": "チェックアウトの支払い失敗についてオンコールにページ通知を送りました。",
+        "recsHeld": "レコメンデーションの軽微な問題は、金曜のサマリーまで保留しました。",
+        "diskApproved": "ingest-1 のディスクアラートを {to}% に引き上げることを承認しました。",
+        "latencyGrouped": "チェックアウトの遅延アラート3件を1つにまとめたので、1回の遅延でページ通知は一度だけです。",
+        "queueFixed": "orders のキューワーカーを追加しましたが、キューは増え続けたため元に戻し、オンコールにページ通知を送りました。",
+        "loginPaged": "サインインの遅延についてオンコールにページ通知を送りました。",
+        "queuePermission": "キュー ワーカーを最大8個まで自力で追加することを許可しました。",
+        "gatewayPaged": "API がリクエストを拒否している件についてオンコールにページ通知を送りました。",
+        "found18": "{count} 件のサービスを検出し、それぞれの正常な状態を学習し始めました。",
+        "connected": "あなたは私をデータに接続しました。",
+        "thresholdApproved": "payments-api の接続アラートを、データベースの上限200に対して全サーバーをカウントするようにすることを承認しました。",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "search-2 の設定を元に戻すことを承認しました。",
+              "no": "search-2 はご自身で対応するとのことでした。",
+              "undoYes": "search-2 の設定を元に戻した操作を取り消しました。60% を再適用したため、search-2 は再びメモリ不足になります。オンコールに伝えました。",
+              "cancel": "適用前に search-2 の設定を元に戻す操作をキャンセルしました。search-2 は依然としてメモリ不足です。オンコールに伝えました。",
+              "undoNo": "search-2 をご自身で対応するという発言を撤回しました。"
+            },
+            "checkoutNow": {
+              "yes": "チェックアウト 2.4.0 のロールアウトを停止することを承認しました。",
+              "no": "チェックアウトのロールアウトはご自身で対応するとのことでした。",
+              "undoYes": "2.4.0 のロールアウト停止を取り消しました。トラフィックが再び 2.4.0 に流れるため、支払いが再び失敗する可能性があります。オンコールに伝え、監視しています。",
+              "cancel": "実行前に 2.4.0 のロールアウト停止をキャンセルしました。支払いは依然として失敗しています。オンコールに伝えました。",
+              "undoNo": "チェックアウトのロールアウトをご自身で対応するという発言を撤回しました。"
+            }
+          },
+          "retune": {
+            "yes": "ingest-3 のディスクアラートを 90% に引き上げることを承認しました。",
+            "no": "ingest-3 のディスクアラートの引き上げは今ではないとのことでした。",
+            "undoYes": "ingest-3 のディスクアラートの引き上げを取り消しました。80% に戻ったため、健全な夜にも再び発報するようになります。",
+            "undoNo": "ingest-3 のディスクアラートについての「今ではない」を撤回しました。"
+          },
+          "fromNowOn": {
+            "yes": "不正なロールアウトを自力で停止することを承認しました。",
+            "no": "不正なロールアウトを自力で停止することは今ではないとのことでした。",
+            "undoYes": "不正なロールアウトを自力で停止する許可を撤回しました。",
+            "undoNo": "不正なロールアウトを自力で停止することについての「今ではない」を撤回しました。"
+          }
+        },
+        "fixedNow": {
+          "search": "search-2 の設定を元に戻しました。検索は正常に戻りました。",
+          "checkoutNow": "トラフィックを旧バージョンに戻し、失敗は止まりました。2.4.0 が失敗する原因の調査は引き続きチームの担当です。チームのためにデプロイは維持しています。"
+        },
+        "checkoutNowAsked": "チェックアウト 2.4.0 のロールアウトを停止してよいか確認しました。",
+        "newWatch": "今朝 {count} 件の新しいサービス（returns、exchanges、gift-cards）を検出し、すぐに監視を開始しました。",
+        "foundWatch": "今朝 {count} 件の新しいサービスを検出し、すぐに監視を開始しました。"
+      }
+    },
+    "settingsDrawer": {
+      "title": "設定",
+      "reach": "どこに連絡すればよいですか？",
+      "destSlack": "Slack: {channel}",
+      "destEmail": "メール: {address}",
+      "autonomy": "どこまで自力で実行してよいですか？",
+      "tell": "教えて",
+      "ask": "先に確認して",
+      "fix": "修正してから教えて",
+      "tellHint": "私が何をするかを伝え、実行はお任せします。",
+      "askHint": "各修正の前に確認し、承認されたら実行します。",
+      "fixHint": "実績のある種類の修正については、設定した範囲内でそのまま実行し、直後に伝えます。",
+      "advanced": "詳細設定",
+      "perKind": "修正の種類ごと",
+      "digestDay": "サマリーの曜日",
+      "excluded": "無視するサービス",
+      "excludedNone": "なし",
+      "kinds": {
+        "pool": "リークしたデータベース接続を閉じる",
+        "queueWorker": "バックログ発生時にキューワーカーを追加する",
+        "retune": "ノイズの多いアラートのしきい値を引き上げる",
+        "rollback": "デプロイをロールバックする",
+        "record": "実行 {done} 回、成功 {worked} 回。",
+        "keptRecord": "実行 {done} 回、維持 {worked} 回。",
+        "noRecord": "まだ一度も実行していないため、実績ができるまでは自分からは実行しません。",
+        "revertConfig": "最近の設定変更を元に戻す",
+        "abortRollout": "問題のあるロールアウトを停止する",
+        "recurringRecord": "実行 {done} 回、すべて同じリーク（{bug}）が原因です。修正されるまで問い続けます。"
+      },
+      "weekdays": {
+        "monday": "月曜日",
+        "tuesday": "火曜日",
+        "wednesday": "水曜日",
+        "thursday": "木曜日",
+        "friday": "金曜日"
+      },
+      "saved": "保存しました",
+      "noDestination": "誰にも連絡できません。",
+      "routing": "ページ通知を送る条件",
+      "routingNote": "顧客に害を与えるものにはページ通知を送ります。より小さな問題には誰も起こさないメッセージを送り、最も小さなものは金曜日のサマリーに入れます。"
+    },
+    "howItWorks": {
+      "title": "仕組み",
+      "intro": "私が行うことを 5 つのステップで説明します。",
+      "gotIt": "了解",
+      "s1Title": "サービスを検出します",
+      "s1": "すでに送信されているデータを調べて、そこに含まれるすべてのサービスを検出します。新しいサービスが現れると、その日のうちに監視を開始します。依頼は不要です。",
+      "s2Title": "サービスを監視します",
+      "s2": "各サービスの正常な状態を学習します。1 日の各時間帯におけるエラー、遅延、トラフィックを把握し、週次のパターンは時間の経過とともに精度が上がります。学習が完了するまでは、基本的な安全チェックを使用します。",
+      "s3Title": "本当の問題でなければ黙っています",
+      "s3": "ほとんどの異常な瞬間は問題ではありません。顧客に影響する問題が発生した場合はチームにページ通知を送り、より小さな問題には誰も起こさないメッセージを送り、軽微なものは金曜日のサマリーに残します。",
+      "s4Title": "すべてのページ通知を説明します",
+      "s4": "すべてのメッセージには、何が壊れたか、いつからか、原因についての最善の見解、およびその確信度が含まれます。",
+      "s5Title": "許可されたものだけを修正します",
+      "s5": "許可されたものだけを修正します。うまくいった修正は少し信頼を獲得し、役に立たなかった修正は信頼を損ないます。同じ修正が必要になり続ける場合は、習慣化するのではなく、チームに報告すべきバグです。"
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "1 分前に確認 | {count} 分前に確認"
+    },
+    "outcome": {
+      "active": "現在発生中",
+      "fixed": "AutoObserve が修正",
+      "resolved": "{minutes} 分で解決",
+      "held": "金曜日のサマリーに含まれます",
+      "fixing": "現在修正中",
+      "contained": "AutoObserve が封じ込め",
+      "predicted": "予測済み"
+    },
+    "view": {
+      "standard": "標準",
+      "nerd": "マニアック",
+      "standardTooltip": "標準ビューでは要点を表示します。対応が必要なものと、過去 7 日間に発生したことです。",
+      "nerdTooltip": "マニアックビューでは、すべての検出器、ループ、設定を完全に表示します",
+      "label": "表示"
+    },
+    "rail": {
+      "more": "さらに下にあります"
+    },
+    "suggestions": {
+      "title": "提案",
+      "subtitle": "お時間のあるときに — これらはノイズを削減するか、時間を節約します。"
+    }
   }
 }

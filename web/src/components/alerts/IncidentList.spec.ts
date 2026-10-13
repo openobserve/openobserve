@@ -28,6 +28,11 @@ vi.mock("@/services/incidents", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/downtimes", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { list: vi.fn() } });
+});
+
 vi.mock("@/utils/date", () => ({
   formatToReadable: vi.fn((ts: number) => `ts-${ts}`),
   formatDate: vi.fn((ts: number) => `date-${ts}`),
@@ -51,10 +56,13 @@ vi.mock("@/composables/useConfirmDialog", () => ({
 }));
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import IncidentList from "./IncidentList.vue";
 import incidentsService from "@/services/incidents";
+import downtimesService from "@/services/downtimes";
+import { queryClient } from "@/composables/query/queryClient";
 import type { Incident } from "@/services/incidents";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -140,6 +148,7 @@ describe("IncidentList.vue", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetListViewState();
 
     store.state.selectedOrganization = {
       label: "default Organization",
@@ -290,6 +299,59 @@ describe("IncidentList.vue", () => {
       await (wrapper.vm as any).refreshIncidents();
       await flushPromises();
       expect(incidentsService.list).toHaveBeenCalled();
+    });
+  });
+
+  describe("Muted chip", () => {
+    it("shows the chip on a list row that carries muted_by_downtime_id", async () => {
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({ id: "1", muted_by_downtime_id: "dt-1" }),
+            createIncident({ id: "2" }),
+          ],
+          total: 2,
+        },
+      });
+      wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="row-1"] [data-test="incident-list-muted"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="row-2"] [data-test="incident-list-muted"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("says the downtime was not loaded when the lookup list is capped", async () => {
+      queryClient.clear();
+      const zoConfig = store.state.zoConfig;
+      store.state.zoConfig = { ...zoConfig, downtimes_enabled: true };
+      vi.mocked(downtimesService.list).mockResolvedValue({
+        data: { items: [{ id: "dt-1", name: "Deploy freeze" }], total: 600 },
+      } as any);
+      (incidentsService.list as any).mockResolvedValue({
+        data: {
+          incidents: [
+            createIncident({ id: "1", muted_by_downtime_id: "dt-1" }),
+            createIncident({ id: "2", muted_by_downtime_id: "dt-far" }),
+          ],
+          total: 2,
+        },
+      });
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+        const chip = (row: string) =>
+          wrapper.find(`[data-test="row-${row}"] [data-test="incident-list-muted"]`);
+        expect(chip("1").text()).toContain("Muted · Deploy freeze");
+        expect(chip("2").text()).toContain("Muted · Downtime not loaded");
+        expect(chip("2").text()).not.toContain("dt-far");
+        expect((wrapper.vm as any).mutedTooltip("dt-far")).toContain("dt-far");
+      } finally {
+        store.state.zoConfig = zoConfig;
+        queryClient.clear();
+      }
     });
   });
 
@@ -670,6 +732,32 @@ describe("IncidentList.vue", () => {
       expect(restorePage).toHaveBeenCalledWith(3);
       store.state.incidents = { incidents: {}, isInitialized: false };
       vi.useRealTimers();
+    });
+  });
+
+  describe("View state restore", () => {
+    it("restores severity, page size and sort", () => {
+      useListViewState("incidents", {
+        severityFilter: "P2",
+        pageSize: 50,
+        sortBy: "title",
+        sortOrder: "desc",
+      });
+      wrapper = createWrapper();
+      expect(wrapper.vm.severityFilter).toBe("P2");
+      expect(wrapper.vm.pageSize).toBe(50);
+      expect(wrapper.vm.sortBy).toBe("title");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+    });
+
+    it("saves changes to the view state", async () => {
+      wrapper = createWrapper();
+      wrapper.vm.severityFilter = "P1";
+      wrapper.vm.pageSize = 100;
+      await flushPromises();
+      const saved: any = useListViewState("incidents", {});
+      expect(saved.severityFilter).toBe("P1");
+      expect(saved.pageSize).toBe(100);
     });
   });
 });
