@@ -75,7 +75,7 @@ describe("SessionFieldPicker", () => {
   const mountPicker = (props: Record<string, unknown> = {}) => {
     wrapper = mount(SessionFieldPicker, {
       props: {
-        fields: ["geo_info_country", "usr_email"],
+        fields: ["geo_info_country", "usr_email", "resource_url"],
         values: { field: null, status: "idle", rows: [] },
         ...props,
       },
@@ -83,20 +83,44 @@ describe("SessionFieldPicker", () => {
     });
     return wrapper;
   };
+  const field = (w: VueWrapper, name: string) =>
+    w.find(dt(`rum-analytics-funnel-field-picker-field-${name}`));
+  const typeValue = async (w: VueWrapper, value: string) => {
+    const input = w.find(`${dt("rum-analytics-funnel-field-picker-typed")} input`);
+    await input.setValue(value);
+    await input.trigger("keydown", { key: "Enter" });
+  };
+  const country = { field: "geo_info_country", op: "in", values: [] };
 
-  it("lists the fields under Who the session is, and picking one asks for its values", async () => {
+  it("lists every stream field in the Logs field list, built-in names readable, and picking one asks for its values", async () => {
     const w = mountPicker();
-    expect(w.text()).toContain("Who the session is");
-    expect(w.find(dt("rum-analytics-funnel-field-picker-field-geo_info_country")).text()).toBe(
-      "Country",
-    );
-    await w.find(dt("rum-analytics-funnel-field-picker-field-geo_info_country")).trigger("click");
+    expect(field(w, "geo_info_country").text()).toBe("Country");
+    expect(field(w, "resource_url").text()).toBe("resource_url");
+    await field(w, "geo_info_country").trigger("click");
     expect(w.emitted("load")).toEqual([["geo_info_country"]]);
-    expect(w.text()).toContain("Country is one of");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-condition")).text()).toContain("is one of");
+  });
+
+  it("the field search matches readable names too, narrows the list and says when nothing matches", async () => {
+    const w = mountPicker();
+    expect(w.text()).toMatch(/key fields/i);
+    const search = w.find(`${dt("o-field-list-search")} input`);
+    await search.setValue("resource");
+    expect(field(w, "resource_url").exists()).toBe(true);
+    expect(field(w, "usr_email").exists()).toBe(false);
+    await search.setValue("user email");
+    expect(field(w, "usr_email").exists()).toBe(true);
+    await field(w, "usr_email").trigger("click");
+    expect(w.emitted("load")).toEqual([["usr_email"]]);
+    await w.find(dt("rum-analytics-funnel-field-picker-back")).trigger("click");
+    // The list remounts after Back, with the search cleared.
+    expect(field(w, "resource_url").exists()).toBe(true);
+    await w.find(`${dt("o-field-list-search")} input`).setValue("nothing-like-it");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-no-field")).exists()).toBe(true);
   });
 
   it("shows values with session counts, none ticked, and Apply stays disabled until one is", async () => {
-    const w = mountPicker({ values: COUNTRIES, initialField: "geo_info_country" });
+    const w = mountPicker({ values: COUNTRIES, initial: country });
     const row0 = w.find(dt("rum-analytics-funnel-field-picker-value-0"));
     expect(row0.text()).toContain("India");
     expect(row0.text()).toContain("212");
@@ -107,25 +131,58 @@ describe("SessionFieldPicker", () => {
     expect(apply().attributes("disabled")).toBeDefined();
     await row0.find('[role="checkbox"], input[type="checkbox"]').trigger("click");
     expect(apply().attributes("disabled")).toBeUndefined();
-    expect(w.findAll('[role="checkbox"][data-state="checked"]')).toHaveLength(1);
+    expect(w.find(dt("rum-analytics-funnel-field-picker-count")).text()).toBe("1 selected");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-picked-India")).exists()).toBe(true);
     await apply().trigger("click");
-    expect(w.emitted("apply")).toEqual([["geo_info_country", ["India"]]]);
+    expect(w.emitted("apply")).toEqual([
+      [{ field: "geo_info_country", op: "in", values: ["India"] }],
+    ]);
   });
 
-  it("never offers another field's values, and a typed value joins the ticked list", async () => {
-    const w = mountPicker({ values: COUNTRIES, initialField: "usr_email" });
+  it("the value search filters the list, and Enter adds a value no row carries", async () => {
+    const w = mountPicker({ values: COUNTRIES, initial: country });
+    await w.find(`${dt("rum-analytics-funnel-field-picker-typed")} input`).setValue("bra");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-value-0")).text()).toContain("Brazil");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-value-1")).exists()).toBe(false);
+    await typeValue(w, "Peru");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-picked-Peru")).exists()).toBe(true);
+    await w.find(dt("rum-analytics-funnel-field-picker-clear")).trigger("click");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-count")).text()).toBe("0 selected");
+  });
+
+  it("never offers another field's values", () => {
+    const w = mountPicker({
+      values: COUNTRIES,
+      initial: { field: "usr_email", op: "in", values: [] },
+    });
     expect(w.find(dt("rum-analytics-funnel-field-picker-value-0")).exists()).toBe(false);
-    await w.find(`${dt("rum-analytics-funnel-field-picker-typed")} input`).setValue("a@x.io");
-    await w.find(dt("rum-analytics-funnel-field-picker-add-typed")).trigger("click");
-    expect(w.find(dt("rum-analytics-funnel-field-picker-value-0")).text()).toContain("a@x.io");
+  });
+
+  it("a negated condition applies the picked values with not", async () => {
+    const w = mountPicker({ values: COUNTRIES, initial: country });
+    w.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", "notContains");
+    await w.vm.$nextTick();
+    await typeValue(w, "Ind");
     await w.find(dt("rum-analytics-funnel-field-picker-apply")).trigger("click");
-    expect(w.emitted("apply")).toEqual([["usr_email", ["a@x.io"]]]);
+    expect(w.emitted("apply")).toEqual([
+      [{ field: "geo_info_country", op: "contains", values: ["Ind"], not: true }],
+    ]);
+  });
+
+  it("an edited filter opens on its own condition and values", () => {
+    const w = mountPicker({
+      initial: { field: "usr_email", op: "suffix", values: ["@qa.io"], not: true },
+      lockField: true,
+    });
+    expect(w.findComponent({ name: "OSelect" }).props("modelValue")).toBe("notSuffix");
+    expect(w.find(dt("rum-analytics-funnel-field-picker-picked-@qa.io")).exists()).toBe(true);
+    expect(w.find(dt("rum-analytics-funnel-field-picker-back")).exists()).toBe(false);
   });
 
   it("offers Retry when the values fail", async () => {
     const w = mountPicker({
       values: { field: "geo_info_country", status: "error", rows: [] },
-      initialField: "geo_info_country",
+      initial: country,
     });
     await w.find(dt("rum-analytics-funnel-field-picker-retry")).trigger("click");
     expect(w.emitted("load")?.at(-1)).toEqual(["geo_info_country"]);
@@ -162,16 +219,30 @@ describe("FunnelFilterBar", () => {
     const w = mountBar();
     await w.find(dt("rum-analytics-funnel-add-filter-btn")).trigger("click");
     await w.find(dt("rum-analytics-funnel-field-picker-field-usr_email")).trigger("click");
-    await w
-      .find(`${dt("rum-analytics-funnel-field-picker-typed")} input`)
-      .setValue("a".repeat(1025));
-    await w.find(dt("rum-analytics-funnel-field-picker-add-typed")).trigger("click");
+    const typed = w.find(`${dt("rum-analytics-funnel-field-picker-typed")} input`);
+    await typed.setValue("a".repeat(1025));
+    await typed.trigger("keydown", { key: "Enter" });
     await w.find(dt("rum-analytics-funnel-field-picker-apply")).trigger("click");
     expect(w.emitted("update:def")).toBeUndefined();
     expect(toastSpy).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.stringContaining("cannot be used as a filter") }),
     );
     expect(w.find(dt("rum-analytics-funnel-field-picker-apply")).exists()).toBe(true);
+  });
+
+  it("reads as where / and rows, one chip per filter", () => {
+    const w = mountBar({
+      ...DEF,
+      f: [
+        { field: "geo_info_country", op: "in", values: ["India"] },
+        { field: "resource_url", op: "contains", values: ["/api"] },
+      ],
+    });
+    const text = w.find(dt("rum-analytics-funnel-filter-all")).text();
+    expect(text).toMatch(/where\s*Country is one of India\s*and\s*resource_url contains \/api/);
+    const chip = w.find(dt("rum-analytics-funnel-filter-resource_url"));
+    expect(chip.classes()).toContain("max-w-full");
+    expect(chip.find("span.truncate").exists()).toBe(true);
   });
 
   it("shows a chip per filter that removes it", async () => {
@@ -181,6 +252,16 @@ describe("FunnelFilterBar", () => {
     await chip.find("button").trigger("click");
     const [[next]] = w.emitted("update:def") as [FunnelDef][];
     expect(next).not.toHaveProperty("f");
+  });
+
+  it("a chip names the attribute and its condition, negation included", () => {
+    const w = mountBar({
+      ...DEF,
+      f: [{ field: "context_plan", op: "contains", values: ["pro", "max"], not: true }],
+    });
+    expect(w.find(dt("rum-analytics-funnel-filter-context_plan")).text()).toContain(
+      "context_plan does not contain pro, max",
+    );
   });
 });
 

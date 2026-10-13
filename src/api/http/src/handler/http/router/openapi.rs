@@ -634,6 +634,8 @@ use crate::{
             openobserve_core::rum_pa::MatchOp,
             openobserve_core::rum_pa::SessionField,
             openobserve_core::rum_pa::SessionRule,
+            openobserve_core::rum_pa::FunnelFilter,
+            openobserve_core::rum_pa::FilterField,
             openobserve_core::rum_pa::PageOp,
             openobserve_core::rum_pa::PageRule,
             openobserve_core::rum_pa::PutAppSettings,

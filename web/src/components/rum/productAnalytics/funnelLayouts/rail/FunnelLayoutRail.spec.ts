@@ -27,6 +27,12 @@ const popoverStub = {
   template:
     '<div><div @click="shown = true"><slot name="trigger" /></div><slot v-if="shown" /></div>',
 };
+const draggableStub = {
+  name: "VueDraggableNext",
+  props: ["modelValue"],
+  emits: ["update:modelValue"],
+  template: "<div><slot /></div>",
+};
 const IDLE = { status: "idle", rows: [], error: null } as never;
 const DEF = {
   steps: [
@@ -71,7 +77,7 @@ describe("FunnelLayoutRail", () => {
       global: {
         plugins: [store],
         stubs: {
-          VueDraggableNext: { template: "<div><slot /></div>" },
+          VueDraggableNext: draggableStub,
           OPopover: popoverStub,
           StepPicker: true,
         },
@@ -92,9 +98,7 @@ describe("FunnelLayoutRail", () => {
     const steps = w.find('[data-test="rum-analytics-funnel-rail-steps"]').text();
     expect(steps).toContain("/web");
     expect(steps).toContain("errored");
-    expect(w.find('[data-test="rum-analytics-funnel-rail-step-1"]').text()).toContain(
-      "No conditions",
-    );
+    expect(w.find('[data-test="rum-analytics-funnel-rail-step-1"]').text()).not.toContain("where");
     expect(w.find('[data-test="rum-analytics-funnel-exclusions"]').text()).toContain(
       "Exclusion steps",
     );
@@ -108,9 +112,12 @@ describe("FunnelLayoutRail", () => {
     expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
   });
 
-  it("clicking a page step opens the shared condition popover and emits update:def", async () => {
+  it("a page step's filter button expands its conditions in place and emits update:def", async () => {
     const w = mountRail();
-    await w.find('[data-test="rum-analytics-funnel-rail-step-0"]').trigger("click");
+    expect(w.find('[data-test="rum-analytics-funnel-step-0-filters-popover"]').exists()).toBe(
+      false,
+    );
+    await w.find('[data-test="rum-analytics-funnel-rail-step-0-filters"]').trigger("click");
     const popover = w.find('[data-test="rum-analytics-funnel-step-0-filters-popover"]');
     expect(popover.text()).toMatch(/time on page/i);
     popover.findAllComponents({ name: "OCheckbox" }).at(0)!.vm.$emit("update:modelValue", true);
@@ -119,9 +126,81 @@ describe("FunnelLayoutRail", () => {
     expect(def.steps[0].f).toEqual({ frustrated: true, errored: true });
   });
 
-  it("a step removed from the table reaches the rail's owner as update:def", async () => {
+  it("a click step has no condition editor", () => {
+    expect(
+      mountRail().find('[data-test="rum-analytics-funnel-rail-step-1-filters"]').exists(),
+    ).toBe(false);
+  });
+
+  it("the table leaves step edits to the rail", () => {
     const w = mountRail();
-    await w.find('[data-test="rum-analytics-funnel-step-1-remove"]').trigger("click");
+    expect(w.find('[data-test="rum-analytics-funnel-step-1-remove"]').exists()).toBe(false);
+    expect(w.find('[data-test="rum-analytics-funnel-step-0-filters"]').exists()).toBe(false);
+    expect(
+      w.find('[data-test="rum-analytics-funnel-steps-table"] .funnel-drag-handle').exists(),
+    ).toBe(false);
+  });
+
+  it("rail steps drag by the handle over their number, and a drop reorders the funnel", async () => {
+    const w = mountRail();
+    const handle = w.find('[data-test="rum-analytics-funnel-rail-step-0-drag"]');
+    expect(handle.classes()).toContain("funnel-drag-handle");
+    w.findComponent(draggableStub).vm.$emit("update:modelValue", [DEF.steps[1], DEF.steps[0]]);
+    await w.vm.$nextTick();
+    const def = w.emitted("update:def")!.at(-1)![0] as FunnelDef;
+    expect(def.steps.map((s) => s.key)).toEqual(["save-btn", "/web"]);
+    expect(def.x).toEqual([]);
+  });
+
+  it("puts the card beside the rail, with the page's header, notices and footer in it", () => {
+    const base = mountRail();
+    const props = base.props() as never;
+    base.unmount();
+    wrapper = mount(FunnelLayoutRail, {
+      props,
+      slots: {
+        header: "<div data-test='h' />",
+        notices: "<div data-test='n' />",
+        footer: "<div data-test='f' />",
+      },
+      global: {
+        plugins: [store],
+        stubs: { VueDraggableNext: { template: "<div><slot /></div>" } },
+      },
+    });
+    const card = wrapper.find('[data-test="rum-analytics-funnel-card"]');
+    for (const id of ["h", "n", "f"]) expect(card.find(`[data-test="${id}"]`).exists()).toBe(true);
+    expect(wrapper.find("aside").find('[data-test="rum-analytics-funnel-card"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("a failed panel keeps the rail but drops the steps table", () => {
+    const w = mountRail({ failed: true });
+    expect(w.find('[data-test="rum-analytics-funnel-rail-steps"]').exists()).toBe(true);
+    expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(false);
+  });
+
+  it("the Steps + opens the add-step box", async () => {
+    const w = mountRail();
+    expect(w.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()).toBe(false);
+    await w.find('[data-test="rum-analytics-funnel-rail-add-step-btn"]').trigger("click");
+    expect(w.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()).toBe(true);
+  });
+
+  it("the app filters switch turns hidden traffic off as well as on", async () => {
+    const w = mountRail({
+      appFilters: { builtin: 5, rules: 0, synthetic: 0 },
+      includeHidden: true,
+    });
+    w.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", false);
+    await w.vm.$nextTick();
+    expect(w.emitted("hide-hidden")).toHaveLength(1);
+  });
+
+  it("a step removed from the rail reaches the rail's owner as update:def", async () => {
+    const w = mountRail();
+    await w.find('[data-test="rum-analytics-funnel-rail-step-1-remove"]').trigger("click");
     const def = w.emitted("update:def")!.at(-1)![0] as FunnelDef;
     expect(def.steps).toHaveLength(1);
     expect(def.x).toEqual([]);

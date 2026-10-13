@@ -46,7 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="rum-analytics-funnel-saved-read-only"
       >{{ t("rum.analytics.saved.readOnly") }}</span
     >
-    <span class="ms-auto flex shrink-0 items-center gap-1">
+    <span class="ms-auto flex shrink-0 flex-wrap items-center justify-end gap-1 max-md:shrink">
+      <slot name="actions" />
       <span v-if="canWrite">
         <OButton
           variant="primary"

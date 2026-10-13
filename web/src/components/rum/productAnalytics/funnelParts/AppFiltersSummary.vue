@@ -15,41 +15,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <FunnelSectionRow
     v-if="items.length || always"
-    class="text-text-secondary flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs"
-    data-test="rum-analytics-funnel-app-filters"
+    :title="t('rum.analytics.exclusions.title', { app: raw(app) })"
+    :stacked="stacked"
+    :boxed="stacked"
+    test-id="rum-analytics-funnel-app-filters"
   >
-    <span v-if="!items.length" data-test="rum-analytics-funnel-app-filters-none">{{
-      t("rum.analytics.appFilters.nothingHidden")
-    }}</span>
-    <span v-else>{{ t("rum.analytics.appFilters.hiddenLabel") }}</span>
-    <template v-for="(item, i) in items" :key="item.id">
-      <span v-if="i > 0" aria-hidden="true">{{ separator }}</span>
-      <span :data-test="`rum-analytics-funnel-app-filters-${item.id}`">{{ item.text }}</span>
+    <span
+      v-if="!items.length"
+      class="text-text-secondary text-xs"
+      data-test="rum-analytics-funnel-app-filters-none"
+      >{{ t("rum.analytics.appFilters.nothingHidden") }}</span
+    >
+    <template v-if="stacked">
+      <span
+        v-for="item in items"
+        :key="item.id"
+        class="text-text-body basis-full"
+        :data-test="`rum-analytics-funnel-app-filters-${item.id}`"
+        >{{ item.text }}</span
+      >
+      <span class="basis-full">
+        <OSwitch
+          :model-value="included"
+          :label="t('rum.analytics.appFilters.switchLabel')"
+          size="sm"
+          :disabled="!included && !canInclude"
+          data-test="rum-analytics-funnel-app-filters-switch"
+          @update:model-value="(v) => (v ? emit('include') : emit('hide'))"
+        />
+      </span>
     </template>
-    <span v-if="items.length" aria-hidden="true">{{ separator }}</span>
-    <OButton
-      v-if="canInclude"
-      variant="ghost-primary"
-      size="xs"
-      data-test="rum-analytics-funnel-app-filters-include"
-      @click="emit('include')"
-      >{{ t("rum.analytics.appFilters.includeHidden") }}</OButton
-    >
-    <OButton
-      variant="ghost-primary"
-      size="xs"
-      data-test="rum-analytics-funnel-app-filters-edit"
-      @click="emit('edit')"
-      >{{ t("rum.analytics.appFilters.edit") }}</OButton
-    >
-  </div>
+    <template v-else>
+      <OTag
+        v-for="item in items"
+        :key="item.id"
+        :label="item.text"
+        variant="default-soft"
+        size="sm"
+        :data-test="`rum-analytics-funnel-app-filters-${item.id}`"
+      />
+    </template>
+    <template #trailing>
+      <OButton
+        v-if="canInclude && !stacked"
+        variant="ghost-primary"
+        size="xs"
+        data-test="rum-analytics-funnel-app-filters-include"
+        @click="emit('include')"
+        >{{ t("rum.analytics.appFilters.includeHidden") }}</OButton
+      >
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        data-test="rum-analytics-funnel-app-filters-edit"
+        @click="emit('edit')"
+        >{{ t("rum.analytics.appFilters.edit") }}</OButton
+      >
+    </template>
+  </FunnelSectionRow>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import FunnelSectionRow from "@/components/rum/productAnalytics/funnelParts/FunnelSectionRow.vue";
 import type { AppFilterCounts } from "@/composables/rum/useAppFilterCounts";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { addCommasToNumber } from "@/utils/formatters";
@@ -57,11 +90,12 @@ import { addCommasToNumber } from "@/utils/formatters";
 const props = defineProps<{
   counts: AppFilterCounts | null;
   included: boolean;
+  app: string;
   always?: boolean;
+  stacked?: boolean;
 }>();
-const emit = defineEmits<{ include: []; edit: [] }>();
+const emit = defineEmits<{ include: []; hide: []; edit: [] }>();
 const { t } = useI18nTyped();
-const separator = raw("·");
 
 // Included rule traffic is no longer removed from the view, so only synthetic sessions stay listed.
 const items = computed<{ id: string; text: I18nText }[]>(() => {

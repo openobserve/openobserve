@@ -53,7 +53,7 @@ describe("Filter all steps (f) in the link", () => {
     ["an unknown key", { ...FILTER, x: 1 }],
     ["env, which stays page-wide", { field: "env", op: "in", values: ["prod"] }],
     ["version, which stays page-wide", { field: "version", op: "in", values: ["1"] }],
-    ["an unknown field", { field: "user_agent", op: "in", values: ["x"] }],
+    ["an internal column", { field: "_all", op: "in", values: ["x"] }],
     ["an unknown op", { field: "geo_info_city", op: "like", values: ["x"] }],
     ["no values", { field: "geo_info_city", op: "in", values: [] }],
     [
@@ -62,9 +62,25 @@ describe("Filter all steps (f) in the link", () => {
     ],
     ["an empty value", { field: "geo_info_city", op: "in", values: [""] }],
     ["a pattern the engine cannot compile", { field: "usr_email", op: "regex", values: ["(a"] }],
+    ["a name with a dash", { field: "user-agent", op: "in", values: ["x"] }],
+    ["an attribute name ingest never writes", { field: "context_Plan", op: "in", values: ["x"] }],
+    ["a quote in an attribute name", { field: 'context_a"b', op: "in", values: ["x"] }],
+    ["a non-boolean not", { ...FILTER, not: "yes" }],
   ])("refuses a filter with %s, and the whole funnel with it", (_why, filter) => {
     expect(parseFunnelFilter(filter)).toBeNull();
     expect(parseFunnelDef({ s: S, f: [filter] })).toBeNull();
+  });
+
+  it("takes the app's attribute columns and a negated condition, and keeps not through the link", () => {
+    const f = [
+      { field: "context_promo_variant", op: "in", values: ["B"] },
+      { field: "usr_name", op: "contains", values: ["bot"], not: true },
+      { field: "resource_url", op: "prefix", values: ["https://api."] },
+    ];
+    const def = parseFunnelDef({ s: S, f });
+    expect(def?.f).toEqual(f);
+    expect(funnelParam(def!).f).toEqual(f);
+    expect(parseFunnelFilter({ ...FILTER, not: false })).toEqual(FILTER);
   });
 
   it("holds at most ten filters", () => {
