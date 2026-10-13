@@ -2017,6 +2017,24 @@ describe("P5 gap fixes: SQL builders", () => {
         expect(() => assertJoinFree(sql)).not.toThrow();
       });
 
+      it("a session counts as removed only when the views would drop every row of it", () => {
+        expect(item(g, "xb")).toMatch(/^MIN\(CASE WHEN /);
+        const country = item(cte(summarySql(ruled({ sessions: [COUNTRY] }), CS), "g"), "xr");
+        expect(country).toMatch(/^MIN\(CASE WHEN /);
+      });
+
+      it("an identity rule still removes the whole session on any matching row, as sessionPass does", () => {
+        const staff = item(
+          cte(summarySql(ruled({ bots: false, sessions: [STAFF] }), CS), "g"),
+          "xr",
+        );
+        expect(staff).toMatch(/^MAX\(CASE WHEN /);
+        const both = item(g, "xr");
+        expect(both).toContain("MIN(CASE WHEN ");
+        expect(both).toContain("MAX(CASE WHEN ");
+        expect(both).toMatch(/^CASE WHEN MIN\(.* = 1 OR MAX\(.* = 1 THEN 1 ELSE 0 END$/);
+      });
+
       it("P5-R8: xb is constant 0 with bots off, and both flags are 0 under xall", () => {
         const off = cte(summarySql(ruled({ bots: false, sessions: [COUNTRY] }), CS), "g");
         expect(item(off, "xb")).toBe("0");
