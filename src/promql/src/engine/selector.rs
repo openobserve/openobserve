@@ -18,7 +18,7 @@
 
 use std::time::Duration;
 
-use config::meta::promql::{NAME_LABEL, is_stale_marker, value::*};
+use config::meta::promql::{NAME_LABEL, exemplars_stream_name, is_stale_marker, value::*};
 use datafusion::error::{DataFusionError, Result};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
@@ -35,7 +35,7 @@ use crate::{
     ast::rewrite::remove_filter_all,
     functions, micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
-    utils::{exemplars_stream_for, metric_name, offset_micros},
+    utils::{metric_name, offset_micros},
 };
 
 pub(super) type SelectorContexts = Vec<ScanContext>;
@@ -375,7 +375,7 @@ impl Engine {
         let exemplar_selector;
         let selector = if self.ctx.query_ctx.query_exemplars {
             let mut mapped = selector.clone();
-            mapped.name = Some(exemplars_stream_for(&self.ctx.query_ctx.org_id, table_name).await);
+            mapped.name = Some(exemplars_stream_name(table_name));
             exemplar_selector = mapped;
             &exemplar_selector
         } else {

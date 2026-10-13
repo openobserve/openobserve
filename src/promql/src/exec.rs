@@ -570,6 +570,94 @@ mod tests {
         assert_eq!(timestamps, vec![t10, t40, t55]);
     }
 
+    /// Records the streams an exemplar query asked for, serving one exemplar row from each.
+    struct StreamRecordingProvider {
+        streams: Arc<std::sync::Mutex<Vec<String>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl TableProvider for StreamRecordingProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: promql_parser::label::Matchers,
+            _label_selector: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+            _streaming: bool,
+        ) -> Result<Vec<crate::ScanContext>> {
+            self.streams.lock().unwrap().push(stream_name.to_string());
+            let ts = WINDOW_START + MINUTE;
+            // identical exemplars are deduplicated, so each stream serves its own trace
+            let trace = if stream_name.starts_with("up") {
+                "up"
+            } else {
+                "family"
+            };
+            SpreadExemplarProvider {
+                rows: vec![(ts, vec![(ts, trace)])],
+            }
+            .create_context(
+                "org",
+                stream_name,
+                (0, 0),
+                promql_parser::label::Matchers::empty(),
+                hashbrown::HashSet::new(),
+                &mut [],
+                false,
+            )
+            .await
+        }
+    }
+
+    #[tokio::test]
+    async fn test_query_exemplars_reads_the_family_stream_for_a_classic_histogram_selector() {
+        let trace_id = "test_exemplar_family_stream";
+        let query_ctx = Arc::new(QueryContext {
+            trace_id: trace_id.to_string(),
+            org_id: "org".to_string(),
+            query_exemplars: true,
+            query_data: false,
+            need_wal: false,
+            use_cache: false,
+            timeout: 30,
+            search_event_type: None,
+            regions: vec![],
+            clusters: vec![],
+            is_super_cluster: false,
+            search_event_context: None,
+        });
+        let streams = Arc::new(std::sync::Mutex::new(vec![]));
+        let provider = StreamRecordingProvider {
+            streams: Arc::clone(&streams),
+        };
+        let mut ctx = PromqlContext::new(query_ctx, provider, vec![]);
+        let at = |us: i64| std::time::UNIX_EPOCH + Duration::from_micros(us as u64);
+        let stmt = EvalStmt {
+            expr: parser::parse(
+                "histogram_quantile(0.9, sum by (le) (rate(review_latency_bucket[5m]))) + up",
+            )
+            .unwrap(),
+            start: at(WINDOW_START),
+            end: at(WINDOW_START + 60 * MINUTE),
+            interval: Duration::from_secs(15),
+            lookback_delta: DEFAULT_LOOKBACK,
+        };
+
+        let (value, ..) = ctx.query_exemplars(trace_id, stmt).await.unwrap();
+
+        // remote-write bucket exemplars and OTLP/native ones share the family's stream
+        let mut streams = streams.lock().unwrap().clone();
+        streams.sort();
+        assert_eq!(streams, ["review_latency_exemplars", "up_exemplars"]);
+        let Value::Matrix(series) = value else {
+            panic!("expected a matrix");
+        };
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].exemplars.as_ref().unwrap().len(), 2);
+    }
+
     #[tokio::test]
     async fn test_query_exemplars_scans_the_whole_window_for_a_short_range_selector() {
         let times = [1, 2, 3, 7].map(|m| WINDOW_START + m * MINUTE);

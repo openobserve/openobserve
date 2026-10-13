@@ -100,25 +100,6 @@ pub fn apply_label_selector(
     Some(df)
 }
 
-/// The stream an exemplar query reads for `selector_name`: its own exemplar stream, or the
-/// histogram family's when a classic stream has none.
-pub async fn exemplars_stream_for(org_id: &str, selector_name: &str) -> String {
-    let (own, family) = config::meta::promql::exemplars_stream_candidates(selector_name);
-    match family {
-        Some(family)
-            if !infra::schema::is_cached(
-                org_id,
-                &own,
-                config::meta::stream::StreamType::Metrics,
-            )
-            .await =>
-        {
-            family
-        }
-        _ => own,
-    }
-}
-
 /// Zeroes the step of local exemplar loads only; older peers divide by the forwarded step.
 pub(crate) fn exemplar_load_step(
     query_ctx: &config::meta::promql::value::QueryContext,

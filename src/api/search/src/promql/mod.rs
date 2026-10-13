@@ -510,7 +510,7 @@ async fn query_range(
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
-            for name in visitor.into_names() {
+            for name in scanned_streams(visitor.into_names(), query_exemplars) {
                 let user: config::meta::user::User =
                     get_cached_user_org(org_id, user_email).unwrap();
                 if user.is_external
@@ -1782,6 +1782,25 @@ impl promql_parser::util::ExprVisitor for MaxLookbackWindowVisitor {
     }
 }
 
+/// The streams a query reads, which authorization checks: an exemplar query reads each
+/// metric's exemplar stream instead of the metric itself.
+#[cfg(any(feature = "enterprise", test))]
+fn scanned_streams(
+    metric_names: std::collections::HashSet<String>,
+    query_exemplars: bool,
+) -> Vec<String> {
+    if !query_exemplars {
+        return metric_names.into_iter().collect();
+    }
+    let mut streams: Vec<String> = metric_names
+        .iter()
+        .map(|name| config::meta::promql::exemplars_stream_name(name))
+        .collect();
+    streams.sort();
+    streams.dedup();
+    streams
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2162,5 +2181,21 @@ mod tests {
             Some("1700000100".to_string()),
         );
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_scanned_streams_names_the_exemplar_streams_of_an_exemplar_query() {
+        let names: std::collections::HashSet<String> =
+            ["up", "rpc_latency_bucket", "rpc_latency_count"]
+                .into_iter()
+                .map(String::from)
+                .collect();
+        let mut plain = scanned_streams(names.clone(), false);
+        plain.sort();
+        assert_eq!(plain, ["rpc_latency_bucket", "rpc_latency_count", "up"]);
+        assert_eq!(
+            scanned_streams(names, true),
+            ["rpc_latency_exemplars", "up_exemplars"]
+        );
     }
 }

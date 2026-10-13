@@ -109,19 +109,15 @@ pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
     crate::INDEX_FIELD_NAME_FOR_ALL,
 ];
 
-/// The stream that holds `metric`'s exemplars.
+/// The stream that holds `metric`'s exemplars; a histogram family shares one, whatever the
+/// protocol put them on its base name or on a classic `_bucket`/`_count`/`_sum` stream.
 pub fn exemplars_stream_name(metric: &str) -> String {
-    format!("{metric}{EXEMPLARS_STREAM_SUFFIX}")
-}
-
-/// The exemplar stream a selector reads, and the family's when the name is a classic stream.
-pub fn exemplars_stream_candidates(selector_name: &str) -> (String, Option<String>) {
     let family = CLASSIC_HISTOGRAM_SUFFIXES
         .iter()
-        .find_map(|suffix| selector_name.strip_suffix(suffix))
+        .find_map(|suffix| metric.strip_suffix(suffix))
         .filter(|base| !base.is_empty())
-        .map(exemplars_stream_name);
-    (exemplars_stream_name(selector_name), family)
+        .unwrap_or(metric);
+    format!("{family}{EXEMPLARS_STREAM_SUFFIX}")
 }
 
 #[inline]
@@ -523,19 +519,24 @@ pub enum ApiErrorType {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn test_exemplars_stream_candidates() {
+    fn test_exemplars_stream_name_is_shared_by_a_histogram_family() {
         assert_eq!(
-            exemplars_stream_candidates("http_requests_total"),
-            ("http_requests_total_exemplars".to_string(), None)
+            exemplars_stream_name("http_requests_total"),
+            "http_requests_total_exemplars"
         );
-        assert_eq!(
-            exemplars_stream_candidates("rpc_latency_bucket"),
-            (
-                "rpc_latency_bucket_exemplars".to_string(),
-                Some("rpc_latency_exemplars".to_string())
-            )
-        );
-        assert_eq!(exemplars_stream_candidates("_sum").1, None);
+        for name in [
+            "rpc_latency",
+            "rpc_latency_bucket",
+            "rpc_latency_count",
+            "rpc_latency_sum",
+        ] {
+            assert_eq!(
+                exemplars_stream_name(name),
+                "rpc_latency_exemplars",
+                "{name}"
+            );
+        }
+        assert_eq!(exemplars_stream_name("_sum"), "_sum_exemplars");
     }
 
     use expect_test::expect;
