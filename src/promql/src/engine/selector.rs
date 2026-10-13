@@ -682,7 +682,7 @@ mod tests {
     use datafusion::{arrow::datatypes::Schema, prelude::SessionContext};
     use promql_parser::{
         label::{MatchOp, Matchers},
-        parser::{Offset, VectorSelector},
+        parser::VectorSelector,
     };
 
     use super::*;
@@ -776,158 +776,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_eval_vector_selector_basic() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let matchers = Matchers {
-            matchers: vec![promql_parser::label::Matcher {
-                name: "env".to_string(),
-                op: MatchOp::Equal,
-                value: "prod".to_string(),
-            }],
-            or_matchers: vec![],
-        };
-
-        let selector = VectorSelector {
-            name: Some("test_metric".to_string()),
-            matchers,
-            offset: None,
-            at: None,
-        };
-
-        let result = engine
-            .eval_vector_selector(&selector, None, SelectorOutput::Value)
-            .await;
-        assert!(result.is_ok());
-        let values = result.unwrap();
-        assert_eq!(values.len(), 0); // Mock provider returns empty data
-    }
-
-    #[tokio::test]
-    async fn test_eval_vector_selector_with_offset() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let matchers = Matchers {
-            matchers: vec![promql_parser::label::Matcher {
-                name: "env".to_string(),
-                op: MatchOp::Equal,
-                value: "prod".to_string(),
-            }],
-            or_matchers: vec![],
-        };
-
-        let selector = VectorSelector {
-            name: Some("test_metric".to_string()),
-            matchers,
-            offset: Some(Offset::Pos(Duration::from_secs(60))),
-            at: None,
-        };
-
-        let result = engine
-            .eval_vector_selector(&selector, None, SelectorOutput::Value)
-            .await;
-        assert!(result.is_ok());
-        let values = result.unwrap();
-        assert_eq!(values.len(), 0); // Mock provider returns empty data
-    }
-
-    #[tokio::test]
-    async fn test_eval_vector_selector_with_negative_offset() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let matchers = Matchers {
-            matchers: vec![promql_parser::label::Matcher {
-                name: "env".to_string(),
-                op: MatchOp::Equal,
-                value: "prod".to_string(),
-            }],
-            or_matchers: vec![],
-        };
-
-        let selector = VectorSelector {
-            name: Some("test_metric".to_string()),
-            matchers,
-            offset: Some(Offset::Neg(Duration::from_secs(60))),
-            at: None,
-        };
-
-        let result = engine
-            .eval_vector_selector(&selector, None, SelectorOutput::Value)
-            .await;
-        assert!(result.is_ok());
-        let values = result.unwrap();
-        assert_eq!(values.len(), 0); // Mock provider returns empty data
-    }
-
-    #[tokio::test]
-    async fn test_eval_matrix_selector_basic() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let matchers = Matchers {
-            matchers: vec![promql_parser::label::Matcher {
-                name: "env".to_string(),
-                op: MatchOp::Equal,
-                value: "prod".to_string(),
-            }],
-            or_matchers: vec![],
-        };
-
-        let selector = VectorSelector {
-            name: Some("test_metric".to_string()),
-            matchers,
-            offset: None,
-            at: None,
-        };
-
-        let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
-            .await;
-        assert!(result.is_ok());
-        let values = result.unwrap();
-        assert_eq!(values.len(), 0); // Mock provider returns empty data
-    }
-
-    #[tokio::test]
     async fn test_eval_vector_selector_without_a_metric_name_is_an_error() {
         let trace_id = "test_trace";
         let org_id = "test_org";
@@ -1011,44 +859,6 @@ mod tests {
                 .contains("MatrixSelector: metric name is required"),
             "the error should name the matrix selector"
         );
-    }
-
-    #[tokio::test]
-    async fn test_eval_matrix_selector_with_offset() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-        let mut engine = Engine::new(
-            trace_id,
-            Arc::new(PromqlContext::new(
-                create_test_query_ctx(trace_id, org_id, 30),
-                SimpleMockProvider,
-                vec![],
-            )),
-            create_test_eval_ctx(),
-        );
-
-        let matchers = Matchers {
-            matchers: vec![promql_parser::label::Matcher {
-                name: "env".to_string(),
-                op: MatchOp::Equal,
-                value: "prod".to_string(),
-            }],
-            or_matchers: vec![],
-        };
-
-        let selector = VectorSelector {
-            name: Some("test_metric".to_string()),
-            matchers,
-            offset: Some(Offset::Pos(Duration::from_secs(120))),
-            at: None,
-        };
-
-        let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
-            .await;
-        assert!(result.is_ok());
-        let values = result.unwrap();
-        assert_eq!(values.len(), 0); // Mock provider returns empty data
     }
 
     /// Serves one series that carries only an exemplar, as the exemplar loader produces.

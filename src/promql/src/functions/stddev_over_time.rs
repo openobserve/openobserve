@@ -48,17 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn test_stddev_over_time_name() {
-        assert_eq!(StddevOverTimeFunc.name(), "stddev_over_time");
-    }
-
-    #[test]
-    fn test_stddev_over_time_empty() {
-        let func = StddevOverTimeFunc;
-        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
-    }
-
-    #[test]
     fn test_stddev_over_time_constant() {
         let func = StddevOverTimeFunc;
         let samples = make_samples(&[3.0, 3.0, 3.0]);

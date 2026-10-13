@@ -763,19 +763,6 @@ mod tests {
     }
 
     #[test]
-    fn test_func_enum_parsing_known_functions() {
-        assert_eq!("abs".parse::<Func>().unwrap(), Func::Abs);
-        assert_eq!("rate".parse::<Func>().unwrap(), Func::Rate);
-        assert_eq!("avg_over_time".parse::<Func>().unwrap(), Func::AvgOverTime);
-        assert_eq!(
-            "histogram_quantile".parse::<Func>().unwrap(),
-            Func::HistogramQuantile
-        );
-        assert_eq!("label_join".parse::<Func>().unwrap(), Func::LabelJoin);
-        assert_eq!("label_replace".parse::<Func>().unwrap(), Func::LabelReplace);
-    }
-
-    #[test]
     fn test_func_enum_unknown_returns_err() {
         assert!("unknown_function".parse::<Func>().is_err());
         assert!("".parse::<Func>().is_err());

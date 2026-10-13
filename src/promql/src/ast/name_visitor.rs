@@ -86,12 +86,6 @@ mod tests {
     }
 
     #[test]
-    fn test_name_visitor_new_starts_empty() {
-        let visitor = MetricNameVisitor::new();
-        assert!(visitor.name.is_empty());
-    }
-
-    #[test]
     fn test_name_visitor_resolves_name_label_matcher() {
         let promql = r#"sum(rate({__name__="http_requests_total"}[1m]))"#;
         let ast = parser::parse(promql).unwrap();

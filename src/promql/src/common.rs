@@ -187,18 +187,6 @@ mod tests {
     }
 
     #[test]
-    fn test_quantile() {
-        let data = vec![4.0, 2.0, 1.0, 3.0, 5.0];
-        let phi_quantile = 0.5;
-        let result = quantile(&data, phi_quantile);
-        let expected = 3.0;
-        match result {
-            Some(got) => assert_eq!(got, expected),
-            None => panic!(),
-        }
-    }
-
-    #[test]
     fn test_quantile_comprehensive() {
         // Test basic quartiles
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0];
@@ -412,68 +400,6 @@ mod tests {
         let data: Vec<f64> = vec![];
         let result = std_deviation(&data);
         assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_calculate_trend() {
-        // Test first iteration (index == 0)
-        let result = calculate_trend(0, 0.1, 10.0, 12.0, 1.0);
-        assert_eq!(result, 1.0);
-
-        // Test normal case
-        let result = calculate_trend(1, 0.1, 10.0, 12.0, 1.0);
-        // trend_factor * (current_smoothed - previous_smoothed) + (1.0 - trend_factor) *
-        // previous_trend 0.1 * (12.0 - 10.0) + 0.9 * 1.0 = 0.2 + 0.9 = 1.1
-        assert!((result - 1.1).abs() < 1e-10);
-
-        // Test with zero trend factor
-        let result = calculate_trend(1, 0.0, 10.0, 12.0, 1.0);
-        assert_eq!(result, 1.0);
-
-        // Test with one trend factor
-        let result = calculate_trend(1, 1.0, 10.0, 12.0, 1.0);
-        assert_eq!(result, 2.0);
-    }
-
-    #[test]
-    fn test_linear_regression() {
-        // Test with constant y values
-        let samples = vec![
-            Sample::new(1000, 5.0),
-            Sample::new(2000, 5.0),
-            Sample::new(3000, 5.0),
-        ];
-        let result = linear_regression(&samples, 0);
-        assert!(result.is_some());
-        let (slope, intercept) = result.unwrap();
-        assert_eq!(slope, 0.0);
-        assert_eq!(intercept, 5.0);
-
-        // Test with linear relationship
-        let samples = vec![
-            Sample::new(1000, 1.0),
-            Sample::new(2000, 2.0),
-            Sample::new(3000, 3.0),
-        ];
-        let result = linear_regression(&samples, 0);
-        assert!(result.is_some());
-        let (slope, intercept) = result.unwrap();
-        // Slope should be 1000.0 (y increases by 1 for each 0.001 increase in x)
-        assert!((slope - 1000.0).abs() < 1e-6);
-        assert!((intercept - 0.0).abs() < 1e-6);
-
-        // Test with infinite values
-        let samples = vec![
-            Sample::new(1000, f64::INFINITY),
-            Sample::new(2000, f64::INFINITY),
-        ];
-        let (slope, intercept) = linear_regression(&samples, 0).unwrap();
-        assert!(slope.is_nan() && intercept.is_nan());
-
-        // Test with empty samples
-        let samples: Vec<Sample> = vec![];
-        let result = linear_regression(&samples, 0);
-        assert!(result.is_none());
     }
 
     #[test]

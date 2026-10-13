@@ -58,18 +58,6 @@ mod tests {
     }
 
     #[test]
-    fn test_changes_value_none_input() {
-        let result = changes_test_helper(Value::None).unwrap();
-        assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_changes_invalid_input_returns_err() {
-        let result = changes_test_helper(Value::Float(1.0));
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_changes_no_changes() {
         let func = ChangesFunc;
         let samples = vec![

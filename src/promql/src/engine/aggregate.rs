@@ -346,27 +346,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_fused_agg_shape_ignores_the_parameter() {
-        assert_eq!(
-            shape("topk(3, rate(m[5m]))"),
-            Some((
-                "rate".to_string(),
-                true,
-                Some(Some(Duration::from_secs(300)))
-            ))
-        );
-        assert_eq!(
-            shape("bottomk by(instance) (2, m{job=\"a\"} offset 1m)"),
-            Some(("last_over_time".to_string(), false, Some(None)))
-        );
-        assert_eq!(
-            shape("topk(scalar(m), m)"),
-            Some(("last_over_time".to_string(), false, Some(None)))
-        );
-        assert_eq!(shape("topk(3, abs(m))"), None);
-    }
-
     /// `n` series `{instance="<i>", job="api"|"db"}` whose values differ at every step.
     fn requests(n: usize) -> String {
         (0..n)

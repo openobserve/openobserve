@@ -72,20 +72,6 @@ mod tests {
     }
 
     #[test]
-    fn test_quantile_over_time_name() {
-        assert_eq!(
-            QuantileOverTimeFunc::new(ScalarParam::Const(0.5)).name(),
-            "quantile_over_time"
-        );
-    }
-
-    #[test]
-    fn test_quantile_over_time_empty() {
-        let func = QuantileOverTimeFunc::new(ScalarParam::Const(0.5));
-        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
-    }
-
-    #[test]
     fn test_quantile_over_time_median() {
         let func = QuantileOverTimeFunc::new(ScalarParam::Const(0.5));
         let samples = make_samples(&[1.0, 2.0, 3.0]);

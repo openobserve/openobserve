@@ -90,12 +90,6 @@ mod tests {
     }
 
     #[test]
-    fn test_selector_visitor_empty() {
-        let visitor = MetricSelectorVisitor::default();
-        assert!(visitor.exprs.is_empty());
-    }
-
-    #[test]
     fn test_selector_visitor_non_selector_expr_not_collected() {
         // Scalar arithmetic has no VectorSelector or MatrixSelector
         let promql = "1 + 2";

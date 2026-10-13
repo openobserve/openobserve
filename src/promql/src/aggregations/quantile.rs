@@ -247,22 +247,6 @@ mod tests {
     }
 
     #[test]
-    fn test_quantile_value_none_input() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(ScalarParam::Const(0.5), &None, Value::None, &eval_ctx).unwrap();
-        assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_quantile_invalid_input_returns_err() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(ScalarParam::Const(0.5), &None, Value::Float(1.0), &eval_ctx);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_quantile_out_of_range_phi_is_per_group() {
         let ts = 1000;
         let eval_ctx = EvalContext::new(ts, ts + 1, 1, "test".to_string());

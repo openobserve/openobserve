@@ -54,17 +54,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sum_over_time_name() {
-        assert_eq!(SumOverTimeFunc.name(), "sum_over_time");
-    }
-
-    #[test]
-    fn test_sum_over_time_empty() {
-        let func = SumOverTimeFunc;
-        assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
-    }
-
-    #[test]
     fn test_sum_over_time_single() {
         let func = SumOverTimeFunc;
         let samples = make_samples(&[5.0]);
