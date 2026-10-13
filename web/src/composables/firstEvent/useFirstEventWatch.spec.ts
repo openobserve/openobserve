@@ -328,7 +328,7 @@ describe("useFirstEventWatch — an org with data", () => {
       anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
       countHits.mockReturnValue([{ zo_count: 312, zo_min: serverNowS * 1_000_000 + 5 }]);
       const w = watchOf("logs", { targetStream: "default" });
-      w.start("open");
+      w.start("check");
       await vi.advanceTimersByTimeAsync(5000);
       const req = countCalls()[0].query.query;
       expect(req.sql).toContain(`_timestamp >= ${serverNowS * 1_000_000}`);
@@ -368,7 +368,7 @@ describe("useFirstEventWatch — keyword sources", () => {
     ];
     anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
     const w = keywordWatch();
-    w.start("open");
+    w.start("check");
     await vi.advanceTimersByTimeAsync(1);
     expect(w.scope.value).toBe("since-watch-start");
     await vi.advanceTimersByTimeAsync(5000);
@@ -402,7 +402,7 @@ describe("useFirstEventWatch — keyword sources", () => {
       return { data: { hits: [{ _timestamp: serverNowS * 1_000_000 }] } };
     });
     const w = keywordWatch();
-    w.start("open");
+    w.start("check");
     await vi.advanceTimersByTimeAsync(1);
     for (let poll = 1; poll <= 3 && w.state.value === "waiting"; poll++) {
       await vi.advanceTimersByTimeAsync(5000);
@@ -424,7 +424,7 @@ describe("useFirstEventWatch — keyword sources", () => {
     }));
     anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
     const w = keywordWatch();
-    w.start("open");
+    w.start("check");
     await vi.advanceTimersByTimeAsync(1);
     rows.metrics[6].stats = { doc_num: 15, doc_time_min: 1, doc_time_max: 100 };
     await vi.advanceTimersByTimeAsync(5000);
@@ -457,7 +457,7 @@ describe("useFirstEventWatch — keyword sources", () => {
         return { data: { hits: [{ _timestamp: serverNowS * 1_000_000 }] } };
       });
       const w = keywordWatch();
-      w.start("open");
+      w.start("check");
       await vi.advanceTimersByTimeAsync(1);
       if (liveStatsMove) rows.metrics[3].stats = { doc_num: 13, doc_time_min: 1, doc_time_max: 7 };
       const others = rows.metrics.length - 1;
@@ -493,13 +493,133 @@ describe("useFirstEventWatch — keyword sources", () => {
     }));
     anchorHits.mockReturnValue([{ zo_count: 0, zo_now: Math.floor(NOW / 1000) }]);
     const w = keywordWatch();
-    w.start("open");
+    w.start("check");
     await vi.advanceTimersByTimeAsync(1);
     expect(keywordPageCalls("metrics", "system_")).toHaveLength(2);
     await vi.advanceTimersByTimeAsync(20_000);
     expect(keywordPageCalls("metrics", "system_")).toHaveLength(6);
     expect(unpagedCalls()).toHaveLength(0);
     expect(w.state.value).toBe("waiting");
+  });
+});
+
+describe("useFirstEventWatch — a target that already has data waits for the user", () => {
+  const serverNowS = Math.floor(NOW / 1000);
+
+  it("goes idle on open when the exact target exists, and never searches", async () => {
+    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+    countHits.mockReturnValue([{ zo_count: 312, zo_min: serverNowS * 1_000_000 }]);
+    const w = watchOf("logs", { targetStream: "default" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    const listCalls = nameList.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(w.state.value).toBe("idle");
+    expect(search).not.toHaveBeenCalled();
+    expect(nameList.mock.calls.length).toBe(listCalls);
+  });
+
+  it("goes idle on open when keyword matches exist, and never searches", async () => {
+    rows.metrics = [{ name: "system_cpu_time", stats: { doc_num: 9, doc_time_min: 1 } }];
+    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(w.state.value).toBe("idle");
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  it.each(["check", "copy"] as const)(
+    "counts from the server clock once %s starts it from idle",
+    async (reason) => {
+      rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+      anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+      countHits.mockReturnValue([{ zo_count: 312, zo_min: serverNowS * 1_000_000 + 5 }]);
+      const w = watchOf("logs", { targetStream: "default" });
+      w.start("open");
+      await vi.advanceTimersByTimeAsync(1);
+      expect(w.state.value).toBe("idle");
+      w.start(reason);
+      expect(w.state.value).toBe("waiting");
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(w.state.value).toBe("received");
+      expect(w.result.value).toMatchObject({ count: 312, sinceUs: serverNowS * 1_000_000 });
+    },
+  );
+
+  it("keeps checking on open when the exact target exists but holds no records", async () => {
+    rows.logs = [{ name: "default", stats: { doc_num: 0, doc_time_min: 0 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("logs", { targetStream: "default" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+    countHits.mockReturnValue([{ zo_count: 4, zo_min: serverNowS * 1_000_000 + 5 }]);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.state.value).toBe("received");
+  });
+
+  it("keeps checking on open when keyword matches exist but hold no records", async () => {
+    rows.metrics = [{ name: "system_cpu_time", stats: { doc_num: 0, doc_time_min: 0 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+  });
+
+  it("holds a populated target again after a target change, even after a copy", async () => {
+    rows.logs = [
+      { name: "a", stats: { doc_num: 9, doc_time_min: 1 } },
+      { name: "b", stats: { doc_num: 9, doc_time_min: 1 } },
+    ];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const target = ref<string | undefined>("a");
+    const w = watchOf("logs", { targetStream: target });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("check");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+    target.value = "b";
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+  });
+
+  it("starts the count when probeNow is called from idle", async () => {
+    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("logs", { targetStream: "default" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    await w.probeNow();
+    expect(w.state.value).toBe("waiting");
+  });
+
+  it("keeps checking on open while the target does not exist yet", async () => {
+    const w = watchOf("logs", { targetStream: "nginx_access" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(w.state.value).toBe("waiting");
+    rows.logs = [{ name: "nginx_access", stats: { doc_num: 4, doc_time_min: NOW * 1000 } }];
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.state.value).toBe("received");
+    expect(w.result.value?.sinceUs).toBeUndefined();
+  });
+
+  it("probes a changed target from idle and keeps checking when it does not exist", async () => {
+    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+    const target = ref<string | undefined>("default");
+    const w = watchOf("logs", { targetStream: target });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    target.value = "nginx_access";
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(w.state.value).toBe("waiting");
+    expect(keywordPageCalls("logs", "nginx_access").length).toBeGreaterThan(1);
+    expect(search).not.toHaveBeenCalled();
   });
 });
 
@@ -537,7 +657,7 @@ describe("useFirstEventWatch — handoff and configuration changes (F1, F5)", ()
         : realNameList(o, type, sch, offset, limit, keyword),
     );
     const w = watchOf("logs", { org, targetStream: "default" });
-    w.start("open");
+    w.start("check");
     await vi.advanceTimersByTimeAsync(1);
     rows.logs = [{ name: "default", stats: { doc_num: 3, doc_time_min: NOW * 1000 } }];
     await vi.advanceTimersByTimeAsync(5000);
@@ -548,7 +668,7 @@ describe("useFirstEventWatch — handoff and configuration changes (F1, F5)", ()
     await vi.advanceTimersByTimeAsync(1);
     expect(dispatch).not.toHaveBeenCalledWith("streams/setStreams", expect.anything());
     expect(dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
-    expect(w.state.value).toBe("waiting");
+    expect(w.state.value).toBe("idle");
     expect(w.result.value).toBeUndefined();
   });
 
@@ -558,7 +678,7 @@ describe("useFirstEventWatch — handoff and configuration changes (F1, F5)", ()
     anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
     const target = ref<string | undefined>("old");
     const w = watchOf("logs", { targetStream: target });
-    w.start("open");
+    w.start("check");
     await vi.advanceTimersByTimeAsync(1);
     expect(w.scope.value).toBe("since-watch-start");
     const pending = deferred<{ data: { hits: Record<string, unknown>[] } }>();
