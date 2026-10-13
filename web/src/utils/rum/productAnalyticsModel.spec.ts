@@ -122,6 +122,19 @@ describe("resolveIdentity (AC-28, AC-29, AC-50)", () => {
     expect(res.users).toBe(5);
   });
 
+  it("bot-free summary counts keep coverage at or below 100%", () => {
+    const res = resolveIdentity(
+      { sessions: 208, usr_email__values: 12, usr_email__sessions: 208 },
+      {},
+      { usr_email: true },
+      false,
+    );
+    expect(res.field).toBe("usr_email");
+    expect(res.coverage).toBe(1);
+    expect(res.coverage).toBeLessThanOrEqual(1);
+    expect(res.unidentifiedSessions).toBe(0);
+  });
+
   it("a 3-user app keeps every value because fewer than 3 would remain", () => {
     const res = resolveIdentity(
       { sessions: 30, usr_email__values: 3, usr_email__sessions: 30 },
