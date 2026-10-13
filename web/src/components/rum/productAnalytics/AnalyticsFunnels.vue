@@ -180,8 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OEmptyState>
       </OCard>
 
-      <component
-        :is="FunnelLayout"
+      <FunnelLayoutRail
         v-else
         :def="def"
         :result="result"
@@ -420,7 +419,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
         </template>
-      </component>
+      </FunnelLayoutRail>
       <AddToDashboard
         v-if="dashboardOpen"
         v-model:open="dashboardOpen"
@@ -447,7 +446,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   computed,
   defineAsyncComponent,
-  type Component,
   onActivated,
   onBeforeUnmount,
   onDeactivated,
@@ -488,11 +486,7 @@ import useFunnelDraft, {
 } from "@/composables/rum/useFunnelDraft";
 import useProductAnalytics from "@/composables/rum/useProductAnalytics";
 import useAppFilterCounts from "@/composables/rum/useAppFilterCounts";
-import {
-  FUNNEL_LAYOUTS,
-  funnelLayoutName,
-  type FunnelLayoutName,
-} from "@/components/rum/productAnalytics/funnelLayouts/registry";
+import FunnelLayoutRail from "@/components/rum/productAnalytics/funnelLayouts/rail/FunnelLayoutRail.vue";
 import type { FunnelLayoutSetting } from "@/components/rum/productAnalytics/funnelLayouts/types";
 import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import useAnalyticsSearch, { type PanelState } from "@/composables/rum/useAnalyticsSearch";
@@ -533,12 +527,6 @@ import { buildPrefillFromRumFunnel } from "@/utils/alerts/prefill/fromRumFunnel"
 defineOptions({ name: "AnalyticsFunnels" });
 
 const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
-const layoutComponents = new Map<FunnelLayoutName, Component>(
-  (Object.keys(FUNNEL_LAYOUTS) as FunnelLayoutName[]).map((name) => [
-    name,
-    defineAsyncComponent(FUNNEL_LAYOUTS[name]),
-  ]),
-);
 
 const DEBOUNCE_MS = 300;
 
@@ -568,9 +556,6 @@ const dropoffCohort = ref<FunnelCohort | null>(null);
 const valuesField = ref<string | null>(null);
 const whyOpen = ref(false);
 const dashboardOpen = ref(false);
-// The tab is kept alive, so the window choice is re-read on every activation, not only at setup.
-const layoutName = ref(funnelLayoutName(window._o2_paFunnelLayout));
-const FunnelLayout = computed(() => layoutComponents.get(layoutName.value));
 const linkProblem = pa.savedLinkProblem;
 let timer: ReturnType<typeof setTimeout> | null = null;
 let whyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1162,7 +1147,6 @@ onMounted(() => {
 
 onActivated(() => {
   active = true;
-  layoutName.value = funnelLayoutName(window._o2_paFunnelLayout);
   if (!activatedOnce) {
     activatedOnce = true;
     return;

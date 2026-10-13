@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { defineComponent, h, KeepAlive, ref, type Ref } from "vue";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createRouter, createWebHistory, type Router } from "vue-router";
@@ -82,7 +82,6 @@ import i18n from "@/locales";
 import { assertJoinFree } from "@/utils/rum/productAnalyticsQueries";
 import { decodeDef, encodeDef } from "@/utils/rum/productAnalyticsModel";
 import { alertCreationDialog } from "@/composables/alerts/useAlertCreation";
-import { FUNNEL_LAYOUTS } from "@/components/rum/productAnalytics/funnelLayouts/registry";
 
 type Hit = Record<string, unknown>;
 type Route = [RegExp, Hit[] | ((sql: string) => Hit[] | Promise<Hit[]>)];
@@ -187,11 +186,6 @@ const store = createStore({
 });
 
 describe("AnalyticsFunnels", () => {
-  // The layout loads lazily, and its first transform under a parallel run can outlast one settle().
-  beforeAll(async () => {
-    await Promise.all(Object.values(FUNNEL_LAYOUTS).map((load) => load()));
-  }, 60000);
-
   let router: Router;
   let wrapper: VueWrapper | null = null;
 
@@ -227,7 +221,12 @@ describe("AnalyticsFunnels", () => {
             props: ["open", "panels", "dashboardPanelData", "notice"],
             template: "<div data-test='add-to-dashboard-stub' />",
           },
-          VueDraggableNext: { template: "<div><slot /></div>" },
+          VueDraggableNext: {
+            name: "VueDraggableNext",
+            props: ["modelValue"],
+            emits: ["update:modelValue"],
+            template: "<div><slot /></div>",
+          },
           ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
           ODropdownItem: {
             emits: ["select"],
@@ -252,6 +251,22 @@ describe("AnalyticsFunnels", () => {
   };
 
   const text = (dt: string) => wrapper!.find(`[data-test="${dt}"]`).text();
+
+  // The rail shows suggestions and the step picker only once its Steps "+" has been clicked.
+  const openAddStep = async () => {
+    if (wrapper!.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()) return;
+    await wrapper!.find('[data-test="rum-analytics-funnel-rail-add-step-btn"]').trigger("click");
+    await settle();
+  };
+
+  const dragSteps = async (order: number[]) => {
+    const steps = useProductAnalytics().funnel.value.steps;
+    wrapper!.findComponent({ name: "VueDraggableNext" }).vm.$emit(
+      "update:modelValue",
+      order.map((i) => steps[i]),
+    );
+    await settle();
+  };
 
   beforeEach(() => {
     resetProductAnalytics();
@@ -283,6 +298,8 @@ describe("AnalyticsFunnels", () => {
     expect(text("rum-analytics-funnel-entry-start-0")).toContain("/web/login");
     await wrapper!.find('[data-test="rum-analytics-funnel-entry-start-0"]').trigger("click");
     await settle();
+    await openAddStep();
+    await settle();
     expect(useProductAnalytics().funnel.value.steps).toEqual([{ kind: "p", key: "/web/login" }]);
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(true);
   });
@@ -290,10 +307,12 @@ describe("AnalyticsFunnels", () => {
   it("Build funnel then two suggestions computes a 3-step funnel with no typing (AC-10)", async () => {
     await mountFunnels();
     await setSteps([["p", "/web/logs"]]);
+    await openAddStep();
     expect(text("rum-analytics-funnel-suggestion-0")).toContain("save-btn");
     expect(text("rum-analytics-funnel-suggestion-0")).toContain("41");
     await wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').trigger("click");
     await settle();
+    await openAddStep();
     await wrapper!.find('[data-test="rum-analytics-funnel-suggestion-1"]').trigger("click");
     await settle();
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual([
@@ -342,10 +361,9 @@ describe("AnalyticsFunnels", () => {
       ["p", "/c"],
     ]);
     const before = funnelSqls().length;
-    await wrapper!.find('[data-test="rum-analytics-funnel-step-2-move-up"]').trigger("click");
-    await settle();
+    await dragSteps([0, 2, 1]);
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual(["/a", "/c", "b"]);
-    await wrapper!.find('[data-test="rum-analytics-funnel-step-0-remove"]').trigger("click");
+    await wrapper!.find('[data-test="rum-analytics-funnel-rail-step-0-remove"]').trigger("click");
     await settle();
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual(["/c", "b"]);
     expect(funnelSqls().length).toBe(before + 2);
@@ -854,7 +872,7 @@ describe("AnalyticsFunnels", () => {
       ["c", "b"],
     ]);
     expect(text("rum-analytics-funnel-step1-empty")).toContain("/nowhere");
-    await wrapper!.find('[data-test="rum-analytics-funnel-step-0-remove"]').trigger("click");
+    await wrapper!.find('[data-test="rum-analytics-funnel-rail-step-0-remove"]').trigger("click");
     await settle();
     expect(useProductAnalytics().funnel.value.steps.map((s) => s.key)).toEqual(["b"]);
   });
@@ -862,6 +880,7 @@ describe("AnalyticsFunnels", () => {
   it("drops next-step suggestions as soon as the steps change, so one cannot be added twice", async () => {
     await mountFunnels();
     await setSteps([["p", "/web/logs"]]);
+    await openAddStep();
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(true);
     await wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').trigger("click");
     await flushPromises();
@@ -876,6 +895,7 @@ describe("AnalyticsFunnels", () => {
     respond();
     await mountFunnels();
     await setSteps([["p", "/web/logs"]]);
+    await openAddStep();
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(false);
     expect(text("rum-analytics-funnel-suggestions-error")).toContain("400");
     const funnelCallsBeforeRetry = funnelSqls().length;
@@ -921,6 +941,7 @@ describe("AnalyticsFunnels", () => {
     respond();
     shown.value = true;
     await settle();
+    await openAddStep();
     expect(wrapper!.find('[data-test="rum-analytics-funnel-suggestion-0"]').exists()).toBe(true);
   });
 
@@ -950,49 +971,6 @@ describe("AnalyticsFunnels", () => {
     expect(funnelSqls().length).toBe(before + 1);
   });
 
-  describe("layout switch through window._o2_paFunnelLayout", () => {
-    const hasRail = () => wrapper!.find('[data-test="rum-analytics-funnel-layout-rail"]').exists();
-    const hasInline = () => wrapper!.findComponent({ name: "FunnelLayoutInline" }).exists();
-
-    afterEach(() => {
-      delete window._o2_paFunnelLayout;
-    });
-
-    it("applies a new choice when the kept-alive tab is shown again, keeping the definition", async () => {
-      delete window._o2_paFunnelLayout;
-      const shown = ref(true);
-      await mountFunnels({}, shown);
-      await setSteps([
-        ["p", "/a"],
-        ["c", "b"],
-      ]);
-      expect(hasInline()).toBe(true);
-      expect(hasRail()).toBe(false);
-      const pa = useProductAnalytics();
-      const def = pa.funnel.value;
-      const queries = funnelSqls().length;
-
-      window._o2_paFunnelLayout = "rail";
-      shown.value = false;
-      await settle();
-      shown.value = true;
-      await settle();
-      expect(hasRail()).toBe(true);
-      expect(hasInline()).toBe(false);
-      expect(pa.funnel.value).toBe(def);
-      expect(funnelSqls().length).toBe(queries);
-
-      window._o2_paFunnelLayout = "nope";
-      shown.value = false;
-      await settle();
-      shown.value = true;
-      await settle();
-      expect(hasInline()).toBe(true);
-      expect(hasRail()).toBe(false);
-      expect(pa.funnel.value).toBe(def);
-    });
-  });
-
   it("names its icon-only buttons for screen readers", async () => {
     await mountFunnels();
     await setSteps([
@@ -1000,9 +978,9 @@ describe("AnalyticsFunnels", () => {
       ["c", "b"],
     ]);
     for (const dt of [
-      "rum-analytics-funnel-step-0-move-up",
-      "rum-analytics-funnel-step-0-move-down",
-      "rum-analytics-funnel-step-0-remove",
+      "rum-analytics-funnel-rail-add-step-btn",
+      "rum-analytics-funnel-rail-step-0-filters",
+      "rum-analytics-funnel-rail-step-0-remove",
     ]) {
       expect(wrapper!.find(`[data-test="${dt}"]`).attributes("aria-label"), dt).toBeTruthy();
     }
@@ -1038,8 +1016,9 @@ describe("AnalyticsFunnels", () => {
       ["p", long("e")],
     ]);
     const pa = useProductAnalytics();
-    const builder = wrapper!.findComponent({ name: "FunnelAddStep" });
     for (const c of ["f", "g", "h", "i"]) {
+      await openAddStep();
+      const builder = wrapper!.findComponent({ name: "FunnelAddStep" });
       (builder.vm as unknown as { add: (s: { kind: "p"; key: string }) => void }).add({
         kind: "p",
         key: long(c),
@@ -1699,7 +1678,7 @@ describe("AnalyticsFunnels", () => {
       await mountFunnels({ funnel: THREE("sessions", "session", [BETWEEN]) });
       await settle();
       toastSpy.mockClear();
-      await wrapper!.find('[data-test="rum-analytics-funnel-step-2-remove"]').trigger("click");
+      await wrapper!.find('[data-test="rum-analytics-funnel-rail-step-2-remove"]').trigger("click");
       await settle();
       const sent = decodeDef(router.currentRoute.value.query.funnel as string) as {
         s: unknown[];
@@ -1785,6 +1764,7 @@ describe("AnalyticsFunnels", () => {
       respond();
       await mountFunnels();
       await setSteps([["p", "/a"]]);
+      await openAddStep();
       const picker = wrapper!
         .findAllComponents(OSelect)
         .find((s) => s.attributes("data-test") === "rum-analytics-funnel-add-step-select")!;
@@ -1877,7 +1857,7 @@ describe("AnalyticsFunnels", () => {
       expect(at("rum-analytics-funnel-included-banner").exists()).toBe(false);
     });
 
-    it("the card line is hidden when the app filters removed nothing", async () => {
+    it("the rail section says nothing is hidden when the app filters removed nothing", async () => {
       routes = [
         [/va_rows/, [{ ...SUMMARY, total_sessions: 500, builtin_kept_sessions: 500 }]],
         ...baseRoutes(),
@@ -1888,7 +1868,8 @@ describe("AnalyticsFunnels", () => {
         ["p", "/a"],
         ["p", "/b"],
       ]);
-      expect(at("rum-analytics-funnel-app-filters").exists()).toBe(false);
+      expect(at("rum-analytics-funnel-app-filters-none").exists()).toBe(true);
+      expect(at("rum-analytics-funnel-app-filters-builtin").exists()).toBe(false);
     });
 
     it("Include hidden traffic sets includeExcluded and xall, and the banner names the count", async () => {
@@ -1898,7 +1879,7 @@ describe("AnalyticsFunnels", () => {
         ["p", "/a"],
         ["p", "/b"],
       ]);
-      await at("rum-analytics-funnel-app-filters-include").trigger("click");
+      wrapper!.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
       await settle();
       expect(useProductAnalytics().state.includeExcluded).toBe(true);
       expect(router.currentRoute.value.query.xall).toBe("1");
@@ -1999,7 +1980,7 @@ describe("AnalyticsFunnels", () => {
 
   describe("phase 2: Filter all steps, Why N?, stored SQL without page scope", () => {
     const at = (dt: string) => wrapper!.find(`[data-test="${dt}"]`);
-    const layout = () => wrapper!.findComponent({ name: "FunnelLayoutInline" });
+    const layout = () => wrapper!.findComponent({ name: "FunnelLayoutRail" });
     const twoSteps = async () => {
       await setSteps([
         ["p", "/a"],
