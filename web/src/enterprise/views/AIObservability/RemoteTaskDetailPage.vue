@@ -164,18 +164,24 @@
               </dd>
             </dl>
             <OButton
-              v-if="canReplaceCredentials"
+              v-if="hasAuthSecret"
               variant="outline"
               size="sm"
               icon-left="key"
               class="mt-3"
+              :disabled="!canEdit"
               data-test="ai-remote-task-detail-replace-credentials"
               @click="credentialsDialogOpen = true"
             >
               {{ t("aiObservability.remoteTasks.credentialsDialog.open") }}
+              <OTooltip
+                v-if="!canEdit"
+                side="bottom"
+                :content="t('aiObservability.remoteTasks.statusHint.retired')"
+              />
             </OButton>
             <RemoteTaskCredentialsDialog
-              v-if="canReplaceCredentials"
+              v-if="hasAuthSecret && canEdit"
               v-model:open="credentialsDialogOpen"
               :org-id="orgId"
               :entity-id="entityId"
@@ -461,9 +467,10 @@ const title = computed<I18nText>(() =>
 );
 const state = computed(() => (task.value ? remoteTaskState(task.value) : "draft"));
 const canEdit = computed(() => Boolean(task.value && canEditRemoteTask(task.value)));
-/** Only a stored auth secret can be replaced; a draft has none until it is registered. */
-const canReplaceCredentials = computed(
-  () => canEdit.value && task.value?.auth.type !== "none" && Boolean(task.value?.auth.usesSecret),
+/** Only a stored auth secret can be replaced. A registered draft holds one too. The
+ *  button follows Edit: shown but disabled, with the same hint, once the task is retired. */
+const hasAuthSecret = computed(
+  () => task.value?.auth.type !== "none" && Boolean(task.value?.auth.usesSecret),
 );
 const credentialsDialogOpen = ref(false);
 const hasDraft = computed(() => versions.value.some((version) => version.isDraft));

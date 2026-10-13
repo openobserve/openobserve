@@ -249,6 +249,15 @@ describe("RemoteTaskDetailPage", () => {
       expect(dialog.props("auth")).toEqual({ type: "basic", usesSecret: true });
     });
 
+    it("shows Replace Credentials disabled for a retired task, like Edit", async () => {
+      get.mockResolvedValue(task({ isActive: false, auth: { type: "bearer", usesSecret: true } }));
+      const wrapper = mountPage();
+      await flushPromises();
+
+      expect(wrapper.get(button).attributes("disabled")).toBeDefined();
+      expect(wrapper.findComponent({ name: "RemoteTaskCredentialsDialog" }).exists()).toBe(false);
+    });
+
     it("offers nothing when the task has no auth secret", async () => {
       const wrapper = mountPage();
       await flushPromises();
