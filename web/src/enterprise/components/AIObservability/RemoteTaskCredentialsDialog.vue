@@ -67,8 +67,9 @@ const form = useOForm<RemoteTaskCredentialsValues>({
 const isSubmitting = form.useStore((s) => s.isSubmitting);
 
 function close() {
-  // Nothing typed outlives the dialog.
+  // Nothing typed outlives the dialog: not the form, and not the mutation's variables.
   form.reset();
+  replaceAuth.reset();
   emit("update:open", false);
 }
 

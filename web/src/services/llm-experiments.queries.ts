@@ -122,6 +122,8 @@ export const replaceRemoteTaskAuthMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { entityId: string; material: RemoteTaskSecretMaterial }) =>
       remoteTasksService.replaceAuth(org, vars.entityId, vars.material),
+    // The variables carry the secret, so the cache drops them once nothing observes them.
+    gcTime: 0,
     meta: { invalidates: [remoteTaskKeys.all(org)], silentError: true },
   });
 

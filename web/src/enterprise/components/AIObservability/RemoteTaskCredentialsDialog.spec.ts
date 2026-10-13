@@ -3,6 +3,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
 import type { RemoteTaskAuthView } from "@/services/remote-tasks.service";
 
 const replaceAuth = vi.fn();
@@ -117,6 +118,19 @@ describe("RemoteTaskCredentialsDialog", () => {
     expect(replaceAuth).toHaveBeenCalledTimes(1);
     expect(toast).not.toHaveBeenCalled();
     expect(wrapper.emitted("update:open")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("keeps no typed password in the mutation cache after closing", async () => {
+    const wrapper = mountDialog({ type: "basic", usesSecret: true });
+    await fill(wrapper, { username: "svc", password: "s3cret-typed" });
+    expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+    await new Promise((resolve) => setTimeout(resolve, 0)); // a gcTime of 0 removes on the next tick
+    const leaked = queryClient
+      .getMutationCache()
+      .getAll()
+      .filter((m) => JSON.stringify(m.state.variables ?? null).includes("s3cret-typed"));
+    expect(leaked).toHaveLength(0);
     wrapper.unmount();
   });
 });
