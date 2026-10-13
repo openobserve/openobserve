@@ -22,7 +22,10 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use config::utils::json;
+use config::{
+    meta::stream::{StreamSettings, StreamType},
+    utils::{json, time::now_micros},
+};
 use flate2::read::ZlibDecoder;
 use ingestion_common::{IngestUser, IngestionRequest};
 use openobserve_api_common::extractors::Headers;
@@ -38,6 +41,8 @@ use crate::{
 pub const RUM_LOG_STREAM: &str = "_rumlog";
 pub const RUM_SESSION_REPLAY_STREAM: &str = "_sessionreplay";
 pub const RUM_DATA_STREAM: &str = "_rumdata";
+/// Columns the trace-to-RUM lookup filters on.
+const RUM_DATA_INDEX_FIELDS: [&str; 4] = ["_o2_trace_id", "_oo_trace_id", "view_id", "action_id"];
 
 /// Multipart form data being ingested in the form of session-replay
 #[derive(ToSchema)]
@@ -148,7 +153,10 @@ pub async fn data(
         // 202 Accepted: the RUM SDKs treat any non-202 intake response as an unexpected error
         // and drop the batch instead of retrying, so the status must be 202 even though the
         // body still carries `code: 200` from the shared ingestion response.
-        Ok(v) => (StatusCode::ACCEPTED, Json(v)).into_response(),
+        Ok(v) => {
+            seed_rum_data_index_fields(&org_id).await;
+            (StatusCode::ACCEPTED, Json(v)).into_response()
+        }
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
@@ -393,6 +401,58 @@ pub async fn sessionreplay(
     }
 }
 
+async fn seed_rum_data_index_fields(org_id: &str) {
+    let settings = match infra::schema::get_settings(org_id, RUM_DATA_STREAM, StreamType::Logs)
+        .await
+    {
+        Some(settings) => settings,
+        // No settings saved yet; saving for a stream that does not exist would create one.
+        None => match infra::schema::get_cache(org_id, RUM_DATA_STREAM, StreamType::Logs).await {
+            Ok(schema) if !schema.schema().metadata().is_empty() => Default::default(),
+            _ => return,
+        },
+    };
+    let Some(settings) = add_missing_index_fields(&settings) else {
+        return;
+    };
+    let org_id = org_id.to_string();
+    // save_stream_settings unwraps the DB write, and a panic must not cost the batch its 202.
+    tokio::spawn(async move {
+        match schema::save_stream_settings(&org_id, RUM_DATA_STREAM, StreamType::Logs, settings)
+            .await
+        {
+            Ok(_) => log::info!("[RUM] added index fields on {org_id}/{RUM_DATA_STREAM}"),
+            Err(e) => log::warn!("[RUM] add index fields on {org_id}/{RUM_DATA_STREAM}: {e}"),
+        }
+    });
+}
+
+/// Returns the settings with the missing lookup fields indexed, or `None` when none can be added.
+fn add_missing_index_fields(settings: &StreamSettings) -> Option<StreamSettings> {
+    // The store rejects a secondary index that is also an FTS key or a partition key.
+    let missing: Vec<&str> = RUM_DATA_INDEX_FIELDS
+        .into_iter()
+        .filter(|&field| {
+            !settings.index_fields.iter().any(|f| f == field)
+                && !settings.full_text_search_keys.iter().any(|f| f == field)
+                && !settings.partition_keys.iter().any(|p| p.field == field)
+        })
+        .collect();
+    if missing.is_empty() {
+        return None;
+    }
+    let mut settings = settings.clone();
+    let now = now_micros();
+    for field in missing {
+        settings.index_fields.push(field.to_string());
+        // Its own cutoff keeps older, unindexed files off the index path.
+        settings
+            .index_fields_updated_at
+            .insert(field.to_string(), now);
+    }
+    Some(settings)
+}
+
 #[cfg(test)]
 mod tests {
     use flate2::{Compression, write::ZlibEncoder};
@@ -404,6 +464,28 @@ mod tests {
         assert_eq!(RUM_LOG_STREAM, "_rumlog");
         assert_eq!(RUM_SESSION_REPLAY_STREAM, "_sessionreplay");
         assert_eq!(RUM_DATA_STREAM, "_rumdata");
+    }
+
+    #[test]
+    fn test_add_missing_index_fields() {
+        let settings = add_missing_index_fields(&StreamSettings::default()).unwrap();
+        assert_eq!(settings.index_fields, RUM_DATA_INDEX_FIELDS);
+        assert_eq!(settings.index_fields_updated_at.len(), 4);
+        assert!(add_missing_index_fields(&settings).is_none());
+
+        let mut settings = StreamSettings {
+            index_fields: vec!["user".to_string(), "view_id".to_string()],
+            full_text_search_keys: vec!["_oo_trace_id".to_string()],
+            partition_keys: vec![config::meta::stream::StreamPartition::new("action_id")],
+            ..Default::default()
+        };
+        settings
+            .index_fields_updated_at
+            .insert("view_id".to_string(), 1);
+        let settings = add_missing_index_fields(&settings).unwrap();
+        assert_eq!(settings.index_fields, ["user", "view_id", "_o2_trace_id"]);
+        assert_eq!(settings.index_fields_updated_at.get("view_id"), Some(&1));
+        assert_eq!(settings.index_fields_updated_at.len(), 2);
     }
 
     #[test]
