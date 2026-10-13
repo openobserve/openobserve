@@ -275,12 +275,32 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
+        timeout-minutes: 5
         working-directory: web
-        run: npm ci
+        shell: bash
+        env:
+          NPM_CONFIG_LOGS_DIR: ${{ runner.temp }}/ui-unit-test-diagnostics/npm
+        run: |
+          mkdir -p "$RUNNER_TEMP/ui-unit-test-diagnostics"
+          npm ci --timing --loglevel=verbose 2>&1 | tee "$RUNNER_TEMP/ui-unit-test-diagnostics/install.log"
 
       - name: Run frontend unit tests with coverage and check thresholds
+        timeout-minutes: 40
         working-directory: web
-        run: ./coverage.sh check
+        shell: bash
+        env:
+          NPM_CONFIG_LOGS_DIR: ${{ runner.temp }}/ui-unit-test-diagnostics/npm
+        run: ./coverage.sh check 2>&1 | tee "$RUNNER_TEMP/ui-unit-test-diagnostics/tests.log"
+
+      - name: Upload frontend unit test diagnostics
+        if: failure() || cancelled()
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-unit-test-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ui-unit-test-diagnostics/
+          retention-days: 7
+          if-no-files-found: warn
 
   ui_code_quality:
     needs: [check_changes]
