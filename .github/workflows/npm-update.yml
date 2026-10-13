@@ -106,7 +106,7 @@ jobs:
 
           # Regenerate package-lock.json only — node_modules is never needed
           # here, and skipping the install keeps this job to well under a minute.
-          npm install --package-lock-only
+          npm install --package-lock-only --ignore-scripts
 
           echo "Dependencies updated successfully"
 
