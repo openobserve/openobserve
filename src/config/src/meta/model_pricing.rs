@@ -102,8 +102,7 @@ pub struct ModelPricingDefinition {
     /// Whether this definition is active
     #[serde(default = "default_true")]
     pub enabled: bool,
-    /// Pricing tiers: first matching restricted tier wins, or the highest rank if `ranks_tiers()`;
-    /// the unrestricted tier is the fallback.
+    /// Pricing tiers; `ranks_tiers()` decides between first-match and highest-rank selection.
     pub tiers: Vec<PricingTierDefinition>,
     /// Optional Unix timestamp (microseconds) from which this definition is valid.
     /// When multiple definitions match the same model name, the one with the
