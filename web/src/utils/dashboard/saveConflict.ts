@@ -79,7 +79,7 @@ const NON_SETTING_FIELDS = new Set([
 
 const KNOWN_SETTINGS: DashboardSettingKey[] = ["title", "description", "defaultDatetimeDuration"];
 
-const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value ?? null));
+const clone = <T>(value: T): T => structuredClone(value ?? null) as T;
 
 const isBlank = (value: unknown) => value === null || value === undefined;
 
@@ -329,6 +329,7 @@ export const countChanges = (changes: ConflictChange[]): ConflictCounts => {
   return counts;
 };
 
+/** A panel they only added counts as untouched, which keeps Merge available. */
 export const isPanelTouched = (changes: ConflictChange[], panelId: string | undefined) =>
   !!panelId &&
   changes.some((c) => c.kind === "panel" && c.key === String(panelId) && c.change !== "added");

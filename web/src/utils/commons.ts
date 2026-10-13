@@ -570,7 +570,7 @@ const retrieveAndStoreDashboardData = async (
   loadedDashboardVersions.set(String(dashboardId), {
     hash,
     updatedAt: updatedAtOf(apiResponse.data),
-    snapshot: JSON.parse(JSON.stringify(convertedData ?? null)),
+    snapshot: structuredClone(toRaw(convertedData ?? null)),
   });
 
   store.dispatch("setAllDashboardListHash", {
@@ -627,6 +627,7 @@ export const updateDashboard = async (
 export const getLoadedDashboardVersion = (dashboardId: any): LoadedDashboardVersion | null =>
   loadedDashboardVersions.get(String(dashboardId)) ?? null;
 
+/** This object keeps saving with its old hash, so it conflicts again instead of overwriting. */
 export const markDashboardStale = (dashboardData: any, hash: string | undefined) => {
   if (!dashboardData || typeof dashboardData !== "object" || !hash) return;
   staleDashboardHashes.set(toRaw(dashboardData), hash);
@@ -635,6 +636,7 @@ export const markDashboardStale = (dashboardData: any, hash: string | undefined)
 export const getUnresolvedDashboardConflict = (dashboardId: any) =>
   unresolvedDashboardConflicts.get(String(dashboardId)) ?? null;
 
+/** Records the base an unresolved conflict saves against; null clears it. */
 export const setUnresolvedDashboardConflict = (
   dashboardId: any,
   base: LoadedDashboardVersion | null,
@@ -663,8 +665,15 @@ export const adoptDashboardWorkingCopy = (store: any, dashboardId: any, source: 
   const target = store.state.organizationData.allDashboardData?.[dashboardId];
   if (!target || !source || toRaw(target) === toRaw(source)) return;
   const next = JSON.parse(JSON.stringify(toRaw(source)));
-  for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
-  Object.assign(target, next);
+  // The source can be JSON-editor input, so keys that reach Object.prototype are never copied or deleted.
+  for (const key of Object.keys(target)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    if (!Object.prototype.hasOwnProperty.call(next, key)) delete target[key];
+  }
+  for (const key of Object.keys(next)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+    target[key] = next[key];
+  }
 };
 
 /** Re-fetches a dashboard into the store, replacing the cached copy and its hash. */

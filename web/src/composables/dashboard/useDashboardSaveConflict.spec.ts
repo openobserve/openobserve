@@ -368,6 +368,25 @@ describe("regression pass on 093855bec9", () => {
   });
 });
 
+describe("adoptDashboardWorkingCopy", () => {
+  it("never copies a __proto__ key from parsed JSON onto the cached dashboard", async () => {
+    service.get_Dashboard.mockResolvedValueOnce(response(BASE, "h1"));
+    const target = await getDashboard(store, DASH, FOLDER);
+    const prototypeBefore = Object.getPrototypeOf(target);
+
+    commons.adoptDashboardWorkingCopy(
+      store,
+      DASH,
+      JSON.parse('{"__proto__":{"polluted":1},"title":"x"}'),
+    );
+
+    expect(Object.getPrototypeOf(target)).toBe(prototypeBefore);
+    expect(({} as any).polluted).toBeUndefined();
+    expect((target as any).polluted).toBeUndefined();
+    expect(target.title).toBe("x");
+  });
+});
+
 describe("save helpers do nothing when the id is not found", () => {
   beforeEach(async () => {
     service.get_Dashboard.mockResolvedValueOnce(response(BASE, "h1"));
