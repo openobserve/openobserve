@@ -85,7 +85,7 @@ pub async fn delete_linked_domain(record: Model) -> Result<(), anyhow::Error> {
         .await?;
     // only sync cache for domain which is verified
     // non verified domain is not going to be in cache
-    if record.verification_state == OwnershipState::Verfied as i32 {
+    if record.verification_state == OwnershipState::Verified as i32 {
         let mut lock = CACHE.write().await;
         lock.remove(&record.domain);
         drop(lock);
@@ -128,26 +128,29 @@ pub async fn verify(mut record: Model) -> Result<Model, anyhow::Error> {
     Ok(record)
 }
 
-pub async fn verify_domain_now(org_id: &str, domain: &str) -> Result<(), anyhow::Error> {
+pub async fn verify_domain_now(org_id: &str, domain: &str) -> Result<Model, anyhow::Error> {
     let record = infra::table::org_domain_ownership::get_domain_org_record(org_id, domain).await?;
     let Some(record) = record else {
         return Err(anyhow::anyhow!(
             "no mapping for domain {domain} found for org {org_id}"
         ));
     };
+    if record.meta_mapped {
+        return Ok(record);
+    }
     let updated_record = verify(record).await?;
-    if updated_record.verification_state == OwnershipState::Verfied as i32 {
+    if updated_record.verification_state == OwnershipState::Verified as i32 {
         let mut lock = CACHE.write().await;
         lock.insert(domain.to_owned(), org_id.to_owned());
     }
     emit_sync_event(org_id, domain).await;
-    Ok(())
+    Ok(updated_record)
 }
 
 pub async fn update_state(org_id: &str, domain: &str, new_state: i32) -> Result<(), anyhow::Error> {
     let mut lock = CACHE.write().await;
     let existing = lock.get(domain);
-    if new_state == OwnershipState::Verfied as i32 {
+    if new_state == OwnershipState::Verified as i32 {
         lock.insert(domain.to_owned(), org_id.to_owned());
     } else if existing.is_some_and(|v| org_id == v) {
         lock.remove(domain);
@@ -174,7 +177,7 @@ pub async fn link_from_meta(org_id: &str, domain: &str) -> Result<(), anyhow::Er
         let record = OwnershipRecord {
             org_id: org_id.to_owned(),
             domain: domain.to_owned(),
-            state: OwnershipState::Verfied,
+            state: OwnershipState::Verified,
         };
         infra::table::org_domain_ownership::save_org_domain_mapping(record, true).await?;
     }
@@ -250,7 +253,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     lock.remove(domain);
                 }
                 Some(v) => {
-                    if v.verification_state == OwnershipState::Verfied as i32 {
+                    if v.verification_state == OwnershipState::Verified as i32 {
                         log::info!(
                             "added org {org} domain {domain} from memory cache as verified in db"
                         );

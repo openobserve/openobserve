@@ -26,7 +26,7 @@ use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
 pub enum OwnershipState {
     Pending = 0,
-    Verfied = 1,
+    Verified = 1,
     Failed = 2,
 }
 pub struct OwnershipRecord {
@@ -41,7 +41,7 @@ pub async fn list_active_domain_org_map() -> Result<HashMap<String, String>, any
         .select_only()
         .column(Column::Domain)
         .column(Column::OrgId)
-        .filter(Column::VerificationState.eq(OwnershipState::Verfied as i32))
+        .filter(Column::VerificationState.eq(OwnershipState::Verified as i32))
         .into_tuple::<(String, String)>()
         .all(client)
         .await?;
@@ -54,7 +54,7 @@ pub async fn get_verified_org_for_domain(domain: &str) -> Result<Option<String>,
         .select_only()
         .column(Column::OrgId)
         .filter(Column::Domain.eq(domain))
-        .filter(Column::VerificationState.eq(OwnershipState::Verfied as i32))
+        .filter(Column::VerificationState.eq(OwnershipState::Verified as i32))
         .into_tuple::<(String,)>()
         .one(client)
         .await?;
@@ -142,7 +142,7 @@ pub async fn mark_meta_mapped(org_id: &str, domain: &str) -> Result<(), anyhow::
         .col_expr(Column::LastCheckedAt, Expr::value(now))
         .col_expr(
             Column::VerificationState,
-            Expr::value(OwnershipState::Verfied as i32),
+            Expr::value(OwnershipState::Verified as i32),
         )
         .exec(client)
         .await?;

@@ -51,6 +51,13 @@ pub async fn get_req_by_id(id: &str) -> Result<Option<Model>, anyhow::Error> {
     Ok(org_domain_requests::get_by_id(id).await?)
 }
 
+pub async fn get_req_by_org_domain(
+    org_id: &str,
+    domain: &str,
+) -> Result<Option<Model>, anyhow::Error> {
+    Ok(org_domain_requests::get_by_org_domain(org_id, domain).await?)
+}
+
 pub async fn update_status(
     id: &str,
     user: &str,

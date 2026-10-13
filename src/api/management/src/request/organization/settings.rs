@@ -225,7 +225,7 @@ pub async fn create(
                 Ok(Some(v)) => {
                     use infra::table::org_domain_ownership::OwnershipState;
 
-                    if v.verification_state != OwnershipState::Verfied as i32 {
+                    if v.verification_state != OwnershipState::Verified as i32 {
                         return MetaHttpResponse::bad_request("This domain is not verified yet");
                     }
                 }

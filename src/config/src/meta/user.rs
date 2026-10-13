@@ -429,7 +429,10 @@ mod tests {
             assert_eq!(UserRole::from_str("invalid").unwrap(), UserRole::User);
             #[cfg(not(feature = "enterprise"))]
             assert_eq!(UserRole::from_str("invalid").unwrap(), UserRole::Admin);
+            #[cfg(feature = "enterprise")]
             assert_eq!(UserRole::from_str("").unwrap(), UserRole::User);
+            #[cfg(not(feature = "enterprise"))]
+            assert_eq!(UserRole::from_str("").unwrap(), UserRole::Admin);
             assert_eq!(UserRole::from_str("Admin").unwrap(), UserRole::Admin); // case sensitive
         }
     }

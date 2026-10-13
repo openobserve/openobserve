@@ -16,7 +16,6 @@
 use axum::{Json, extract::Path, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::{META_ORG_ID, meta::status_pages::CreateDomainRequest};
-use db::organization::get_org_setting;
 use infra::table::org_domain_requests::Status;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{org_domain_ownership, org_domain_requests};
@@ -43,22 +42,21 @@ pub async fn link_domain(
     Headers(user): Headers<UserEmail>,
     Json(body): Json<CreateDomainRequest>,
 ) -> Response {
-    let org_settings = match get_org_setting(&org_id).await {
-        Ok(v) => v,
-        Err(e) => {
-            return MetaHttpResponse::internal_error(format!("error getting org settings : {e}"));
-        }
-    };
     let domain = body.domain.trim().to_lowercase();
 
     match org_domain_ownership::get_verified_org_for_domain(&domain).await {
         Ok(Some(v)) => {
             log::info!(
-                "org {org_id} tried to link domain {domain} but it is already verfied by org {v}"
+                "org {org_id} tried to link domain {domain} but it is already verified by org {v}"
             );
-            return MetaHttpResponse::bad_request(
-                "this domain is already linked by some other org",
-            );
+            let org_info = if v == org_id {
+                "to this org"
+            } else {
+                "by some other org"
+            };
+            return MetaHttpResponse::bad_request(format!(
+                "this domain is already linked {org_info}"
+            ));
         }
         Err(e) => {
             return MetaHttpResponse::internal_error(format!(
@@ -68,14 +66,6 @@ pub async fn link_domain(
         _ => {}
     }
 
-    if org_settings
-        .domain_org_mappings
-        .iter()
-        .find(|v| v.domain.to_lowercase() == domain)
-        .is_some()
-    {
-        return MetaHttpResponse::bad_request("this domain is already mapped to this org");
-    }
     match org_domain_ownership::save_org_domain_mapping(&org_id, &domain).await {
         Ok(_) => {
             log::info!(
@@ -101,13 +91,27 @@ pub async fn raise_request(
     match org_domain_ownership::get_verified_org_for_domain(&domain).await {
         Ok(Some(v)) => {
             log::info!(
-                "org {org_id} tried to link domain {domain} but it is already verfied by org {v}"
+                "org {org_id} tried to link domain {domain} but it is already verified by org {v}"
             );
             return MetaHttpResponse::bad_request("this domain is already linked by some org");
         }
         Err(e) => {
             return MetaHttpResponse::internal_error(format!(
                 "error getting org domain linking : {e}"
+            ));
+        }
+        _ => {}
+    }
+
+    match org_domain_requests::get_req_by_org_domain(&org_id, &domain).await {
+        Err(e) => {
+            log::error!("error getting org domain request for {org_id} domain {domain} : {e}");
+            return MetaHttpResponse::internal_error(e);
+        }
+        Ok(Some(v)) => {
+            return MetaHttpResponse::bad_request(format!(
+                "org {org_id} already has a request for domain {domain} with status {:?}",
+                Status::from(v.status)
             ));
         }
         _ => {}
@@ -167,6 +171,10 @@ pub async fn approve_request(
         }
     };
 
+    if req.status != Status::Pending as i32 {
+        return MetaHttpResponse::bad_request("This request is not pending, cannot be approved");
+    }
+
     match org_domain_ownership::get_verified_org_for_domain(&req.domain).await {
         Ok(Some(v)) => {
             return MetaHttpResponse::bad_request(format!(
@@ -219,6 +227,10 @@ pub async fn reject_request(
             return MetaHttpResponse::internal_error(e);
         }
     };
+
+    if req.status != Status::Pending as i32 {
+        return MetaHttpResponse::bad_request("This request is not pending, cannot be rejected");
+    }
 
     if let Err(e) =
         org_domain_requests::update_status(&id, &user.user_id, Status::Rejected, reason).await
@@ -278,7 +290,7 @@ pub async fn verify_domain(
 ) -> Response {
     let domain = did.trim().to_lowercase();
     match org_domain_ownership::verify_domain_now(&org_id, &domain).await {
-        Ok(_) => MetaHttpResponse::ok("successfully verified mapping"),
+        Ok(record) => MetaHttpResponse::json(record),
         Err(e) => {
             log::error!(
                 "error verifying domain {domain} for org {org_id} by user {}: {e}",

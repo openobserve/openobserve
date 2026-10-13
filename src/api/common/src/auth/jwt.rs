@@ -1242,7 +1242,7 @@ async fn process_custom_claim_parsing(
     let openfga_cfg = get_openfga_config();
     let dex_cfg = get_dex_config();
 
-    // Check if custom claim parsing is enabled, for cloud, always allow it
+    // Check if custom claim parsing is enabled
     if !openfga_cfg.custom_claim_parsing_enabled {
         return None;
     }
