@@ -5516,6 +5516,7 @@
       "overwriteReplaces": "上書きすると相手の保存内容が置き換えられます",
       "impactRemoves": "他のユーザーが追加した{items}を削除: {names}",
       "impactReverts": "相手が編集した{items}を元に戻す: {names}",
+      "impactDeletesEdited": "相手が編集した{items}を削除: {names}",
       "impactRestores": "相手が削除した{items}を復元: {names}",
       "impactUnknown": "相手の変更を一覧表示できません。すべて置き換えられます。",
       "cannotUndo": "ここから元に戻すことはできません。",

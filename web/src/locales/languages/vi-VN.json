@@ -5516,6 +5516,7 @@
       "overwriteReplaces": "Ghi đè sẽ thay bản lưu của họ",
       "impactRemoves": "Xóa {items} do người khác thêm: {names}",
       "impactReverts": "Hoàn tác {items} họ đã sửa: {names}",
+      "impactDeletesEdited": "Xóa {items} họ đã sửa: {names}",
       "impactRestores": "Khôi phục {items} họ đã xóa: {names}",
       "impactUnknown": "Không thể liệt kê thay đổi của họ; tất cả sẽ bị thay thế.",
       "cannotUndo": "Không thể hoàn tác thao tác này tại đây.",

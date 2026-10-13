@@ -506,6 +506,9 @@ describe("AddTab", () => {
         expect.objectContaining({ dashboardId: wrapper.props("dashboardId") }),
       );
       expect(mockShowErrorNotification).not.toHaveBeenCalled();
+      // The tab is already pending on screen, so the dialog closes and Save cannot add it twice.
+      expect(wrapper.emitted("update:open")?.at(-1)).toEqual([false]);
+      expect(wrapper.emitted("refresh")?.at(-1)?.[0]).toMatchObject({ name: "Test Tab" });
     });
 
     it("should handle general errors", async () => {

@@ -17,6 +17,7 @@ import { reactive } from "vue";
 import type {
   ConflictChange,
   DashboardSettingKey,
+  OverwriteImpact,
   PanelComparison,
 } from "@/utils/dashboard/saveConflict";
 
@@ -48,7 +49,10 @@ export const dashboardSaveConflictState = reactive({
   changes: [] as ConflictChange[],
   changedSettings: [] as DashboardSettingKey[],
   panelComparison: null as PanelComparison | null,
+  /** My pending changes on this dashboard, joined for display. */
   myChange: "",
+  myChangeCount: 0,
+  impact: null as OverwriteImpact | null,
   mergedRows: [] as MergedPanelRow[],
   mergeUnavailable: false,
   /** The dashboard whose last save lost a conflict and is still not saved. */

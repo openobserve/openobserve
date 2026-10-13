@@ -32,6 +32,20 @@ export interface DashboardDiff {
   changedSettings: DashboardSettingKey[];
 }
 
+/** What saving my copy over theirs undoes of their save, each list naming their items. */
+export interface OverwriteImpact {
+  /** Items they added that my copy does not have. */
+  removes: ConflictChange[];
+  /** Items they edited that my copy deletes. */
+  deletesEdited: ConflictChange[];
+  /** Items they edited that my copy replaces with my version. */
+  reverts: ConflictChange[];
+  /** Items they removed that my copy brings back. */
+  restores: ConflictChange[];
+  /** Dashboard settings they changed that my copy replaces. */
+  settings: DashboardSettingKey[];
+}
+
 export interface PanelComparison {
   theirsRemoved: boolean;
   theirsTitle: string;
@@ -203,6 +217,88 @@ export const diffDashboards = (base: any, latest: any): DashboardDiff => {
     ...diffMaps("variable", variablesByName(base), variablesByName(latest), (v) => v?.name),
   ];
   return { changes, changedSettings: changedSettingsOf(base, latest) };
+};
+
+const impactFor = (
+  kind: ConflictItemKind,
+  base: Map<string, any> | null,
+  latest: Map<string, any>,
+  mine: Map<string, any>,
+  nameOf: (item: any) => string,
+  sameServer: (a: any, b: any) => boolean,
+  sameAsMine: (a: any, b: any) => boolean,
+  out: OverwriteImpact,
+) => {
+  const item = (key: string, value: any): ConflictChange => ({
+    kind,
+    change: "changed",
+    key,
+    name: nameOf(value) || key,
+  });
+  // Without the loaded version every difference has to be treated as theirs.
+  const theirsChanged = (key: string) =>
+    !base || !base.has(key) || !sameServer(base.get(key), latest.get(key));
+  for (const [key, theirs] of latest) {
+    if (!mine.has(key)) {
+      if (!base?.has(key)) out.removes.push(item(key, theirs));
+      else if (theirsChanged(key)) out.deletesEdited.push(item(key, theirs));
+    } else if (!sameAsMine(theirs, mine.get(key)) && theirsChanged(key)) {
+      out.reverts.push(item(key, theirs));
+    }
+  }
+  for (const [key, value] of mine) {
+    if (!latest.has(key) && base?.has(key)) out.restores.push(item(key, value));
+  }
+};
+
+/** What Overwrite undoes of their save when it stores `mine`, found by comparing all three versions. */
+export const overwriteImpact = (base: any | null, latest: any, mine: any): OverwriteImpact => {
+  const out: OverwriteImpact = {
+    removes: [],
+    deletesEdited: [],
+    reverts: [],
+    restores: [],
+    settings: [],
+  };
+  const panelShape = (loc: PanelLocation) => ({ tabId: loc.tabId, panel: loc.panel });
+  const strict = (shape: (v: any) => unknown) => (a: any, b: any) => same(shape(a), shape(b));
+  const lenientPanel = (a: PanelLocation, b: PanelLocation) =>
+    a.tabId === b.tabId && sameWhereBothSet(a.panel, b.panel);
+  impactFor(
+    "panel",
+    base ? panelsById(base) : null,
+    panelsById(latest),
+    panelsById(mine),
+    (loc) => loc.panel?.title,
+    strict(panelShape),
+    lenientPanel,
+    out,
+  );
+  impactFor(
+    "tab",
+    base ? tabsById(base) : null,
+    tabsById(latest),
+    tabsById(mine),
+    (tab) => tab?.name,
+    strict(tabShape),
+    strict(tabShape),
+    out,
+  );
+  impactFor(
+    "variable",
+    base ? variablesByName(base) : null,
+    variablesByName(latest),
+    variablesByName(mine),
+    (v) => v?.name,
+    strict((v) => v),
+    strict((v) => v),
+    out,
+  );
+  const theirSettings = base ? changedSettingsOf(base, latest) : null;
+  out.settings = changedSettingsOf(latest, mine).filter(
+    (key) => !theirSettings || theirSettings.includes(key),
+  );
+  return out;
 };
 
 /** Their version of my panel against mine, for the panel editor's same-panel conflict. */

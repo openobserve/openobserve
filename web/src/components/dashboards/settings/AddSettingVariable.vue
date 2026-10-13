@@ -1165,6 +1165,8 @@ export default defineComponent({
               change: t("dashboard.saveConflict.change.editedVariable", { name: payload.name }),
               onResolved: () => emit("save"),
             });
+            // The variable is already in the working copy; leaving the form open would let Save add it again.
+            emit("save");
           } else {
             showErrorNotification(
               error.message ?? t("dashboard.addSettingVariable.variableUpdateFailed"),
@@ -1187,6 +1189,8 @@ export default defineComponent({
               change: t("dashboard.saveConflict.change.addedVariable", { name: payload.name }),
               onResolved: () => emit("save"),
             });
+            // The variable is already in the working copy; leaving the form open would let Save add it again.
+            emit("save");
           } else {
             showErrorNotification(
               error.message ?? t("dashboard.addSettingVariable.variableCreationFailed"),

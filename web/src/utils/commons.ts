@@ -316,9 +316,24 @@ export const addPanel = async (
 
   // find tab from tabId
   const tab = getTabDataFromTabId(currentDashboard, tabId);
+  if (!tab) return;
 
   if (!tab.panels) {
     tab.panels = [];
+  }
+
+  // A save that lost a conflict left this panel in the working copy; saving it again replaces it instead of adding a twin.
+  const existingIndex = tab.panels.findIndex((panel: any) => panel.id === panelData.id);
+  if (existingIndex !== -1) {
+    panelData.layout = tab.panels[existingIndex].layout;
+    tab.panels[existingIndex] = panelData;
+    return await updateDashboard(
+      store,
+      store.state.selectedOrganization.identifier,
+      dashboardId,
+      currentDashboard,
+      folderId ?? "default",
+    );
   }
 
   const { maxI, maxY, lastPanel } = getMaxIAndMaxYFromTab(tab);
@@ -408,6 +423,7 @@ export const deleteVariable = async (
   const variableIndex = currentDashboard.variables.list.findIndex(
     (variable: any) => variable.name == variableName,
   );
+  if (variableIndex === -1) return;
   currentDashboard.variables.list.splice(variableIndex, 1);
 
   return await updateDashboard(
@@ -435,7 +451,9 @@ export const deletePanel = async (
   const tab = getTabDataFromTabId(currentDashboard, tabId);
 
   //remove panel from current dashboard
-  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelId);
+  const panelIndex = tab?.panels?.findIndex((panel: any) => panel.id == panelId) ?? -1;
+  // The panel may already be gone from this copy; splice(-1, 1) would drop the last panel instead.
+  if (panelIndex === -1) return;
   tab.panels.splice(panelIndex, 1);
   // currentDashboard.panels = currentDashboard.panels;
 
@@ -476,6 +494,7 @@ export const updateVariable = async (
   const variableIndex = currentDashboard.variables.list.findIndex(
     (variable: any) => variable.name == variableName,
   );
+  if (variableIndex === -1) return;
   //if name already exists
   const variableExists = currentDashboard.variables.list.filter(
     (it: any) => it.name == variableData.name,
@@ -512,7 +531,8 @@ export const updatePanel = async (
   // find tab from tabId
   const tab = getTabDataFromTabId(currentDashboard, tabId);
 
-  const panelIndex = tab.panels.findIndex((panel: any) => panel.id == panelData.id);
+  const panelIndex = tab?.panels?.findIndex((panel: any) => panel.id == panelData.id) ?? -1;
+  if (panelIndex === -1) return;
   tab.panels[panelIndex] = panelData;
   return await updateDashboard(
     store,
@@ -621,6 +641,30 @@ export const setUnresolvedDashboardConflict = (
 ) => {
   if (base) unresolvedDashboardConflicts.set(String(dashboardId), base);
   else clearUnresolvedDashboardConflict(dashboardId);
+};
+
+/** Reads the server's current version without touching the cache, which stays the user's working copy. */
+export const fetchServerDashboard = async (store: any, dashboardId: any, folderId: any) => {
+  const apiResponse = await dashboardService.get_Dashboard(
+    store.state.selectedOrganization.identifier,
+    dashboardId,
+    folderId,
+  );
+  const version = apiResponse.data.version;
+  return {
+    data: convertDashboardSchemaVersion(apiResponse.data[`v${version}`]),
+    hash: apiResponse.data.hash.toString() as string,
+    updatedAt: updatedAtOf(apiResponse.data),
+  };
+};
+
+/** Makes the cached dashboard equal to `source` in place, so views holding the cached object show it too. */
+export const adoptDashboardWorkingCopy = (store: any, dashboardId: any, source: any) => {
+  const target = store.state.organizationData.allDashboardData?.[dashboardId];
+  if (!target || !source || toRaw(target) === toRaw(source)) return;
+  const next = JSON.parse(JSON.stringify(toRaw(source)));
+  for (const key of Object.keys(target)) if (!(key in next)) delete target[key];
+  Object.assign(target, next);
 };
 
 /** Re-fetches a dashboard into the store, replacing the cached copy and its hash. */
@@ -928,22 +972,25 @@ export const deleteTab = async (
   moveToTabId?: any,
 ) => {
   const currentDashboard = await getDashboard(store, dashboardId, folderId);
+  const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
+  if (!deleteTabData) return;
 
   if (moveToTabId) {
-    const deleteTabData = getTabDataFromTabId(currentDashboard, deleteTabId);
     // move panels to other tab
     const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
+    if (!moveToTabData) return;
+    if (!moveToTabData.panels) moveToTabData.panels = [];
 
     let { maxI, maxY } = getMaxIAndMaxYFromTab(moveToTabData);
 
     // for each panel, need to recalculate layout object
-    deleteTabData.panels.forEach((panel: any) => {
+    (deleteTabData.panels ?? []).forEach((panel: any) => {
       maxY += 20;
       panel.layout.i = ++maxI;
       panel.layout.y = maxY;
     });
 
-    moveToTabData.panels.push(...deleteTabData.panels);
+    moveToTabData.panels.push(...(deleteTabData.panels ?? []));
   }
   // delete the tab
   currentDashboard.tabs = currentDashboard.tabs.filter((tab: any) => tab.tabId != deleteTabId);
@@ -966,6 +1013,7 @@ export const editTab = async (
 ) => {
   const currentDashboardData = await getDashboard(store, dashboardId, folderId);
   const tab = getTabDataFromTabId(currentDashboardData, tabId);
+  if (!tab) return;
 
   // only name will change
   tab.name = tabData.name;
@@ -1017,7 +1065,8 @@ export const movePanelToAnotherTab = async (
   const moveToTabData = getTabDataFromTabId(currentDashboard, moveToTabId);
 
   // panel data
-  const panelData = currentTabData.panels.find((it: any) => it.id == panelId);
+  const panelData = currentTabData?.panels?.find((it: any) => it.id == panelId);
+  if (!moveToTabData || !panelData) return;
 
   // delete panel in currentTab
   currentTabData.panels = currentTabData.panels.filter((panel: any) => panel.id != panelId);

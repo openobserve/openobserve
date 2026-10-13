@@ -254,6 +254,34 @@ describe("DashboardSaveConflictDialog", () => {
     expect(byTest(wrapper, "dashboard-save-conflict-loading").exists()).toBe(false);
   });
 
+  it("lists every pending change and stops offering Merge once more than one is pending", async () => {
+    const store = makeStore();
+    const ctx = { store, t: i18n.global.t as unknown as TranslateFn, locale: "en-US" };
+    service.get_Dashboard.mockResolvedValueOnce(response(BASE(), "h1"));
+    await getDashboard(store, "d1", "default");
+    service.get_Dashboard.mockResolvedValue(response(LATEST(), "h2"));
+    await openDashboardConflict(
+      { dashboardId: "d1", folderId: "default", change: raw('Deleted panel "Latency"') },
+      ctx,
+    );
+    state.open = false;
+    await openDashboardConflict(
+      {
+        dashboardId: "d1",
+        folderId: "default",
+        panelId: "p1",
+        change: raw('Edited panel "Error rate"'),
+      },
+      ctx,
+    );
+    await mountDialog();
+
+    expect(byTest(wrapper, "dashboard-save-conflict-my-change").text()).toBe(
+      'Your unsaved changes: Deleted panel "Latency" and Edited panel "Error rate"',
+    );
+    expect(byTest(wrapper, "dashboard-save-conflict-merge").exists()).toBe(false);
+  });
+
   it("renders the notice that a save after closing was not applied", async () => {
     await openConflict();
     state.notice = "stillUnresolved";

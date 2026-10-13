@@ -5516,6 +5516,7 @@
       "overwriteReplaces": "覆盖将替换他人的保存",
       "impactRemoves": "删除他人添加的{items}：{names}",
       "impactReverts": "还原他人编辑的{items}：{names}",
+      "impactDeletesEdited": "删除他人编辑过的{items}：{names}",
       "impactRestores": "恢复他人删除的{items}：{names}",
       "impactUnknown": "无法列出他人的更改；将全部替换。",
       "cannotUndo": "此操作无法在此撤销。",

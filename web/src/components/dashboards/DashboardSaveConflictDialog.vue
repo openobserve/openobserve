@@ -83,7 +83,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-save-conflict-my-change"
         >
           <OIcon name="edit-note" size="sm" class="text-text-secondary" />
-          <span>{{ t("dashboard.saveConflict.yourChange", { change: state.myChange }) }}</span>
+          <span>{{
+            t(
+              "dashboard.saveConflict.yourChange",
+              { change: state.myChange },
+              Math.max(state.myChangeCount, 1),
+            )
+          }}</span>
         </div>
 
         <div v-if="state.isPanelEditor">
@@ -581,7 +587,10 @@ const legend = computed(() => {
 });
 
 // Merge only when their save left my panel alone; otherwise it would silently drop their edit of it.
-const canMerge = computed(() => state.isPanelEditor && !state.panelTouched);
+// Merge carries only this panel onto their version, so it is not offered once other edits are pending too.
+const canMerge = computed(
+  () => state.isPanelEditor && !state.panelTouched && state.myChangeCount <= 1,
+);
 
 // Safe default: Merge when it is offered, Reload otherwise.
 const mainActions = computed<MainAction[]>(() => {
@@ -607,46 +616,57 @@ const mainActions = computed<MainAction[]>(() => {
   return actions.sort((a, b) => Number(a.primary) - Number(b.primary));
 });
 
+// Computed from the server's version against the exact copy Overwrite will save.
 const impact = computed(() => {
-  const theirs = (type: ConflictChangeType) => state.changes.filter((c) => c.change === type);
+  const i = state.impact;
   const names = (list: ConflictChange[]) => listFormat(list.map((c) => c.name));
+  const items = (list: ConflictChange[]) => itemsPhrase(list, "changed");
   const lines: I18nText[] = [];
-  const added = theirs("added");
-  const changed = theirs("changed");
-  const removed = theirs("removed");
-  if (added.length)
+  if (i?.removes.length)
     lines.push(
       t("dashboard.saveConflict.impactRemoves", {
-        items: itemsPhrase(added, "added"),
-        names: names(added),
+        items: items(i.removes),
+        names: names(i.removes),
       }),
     );
-  if (changed.length)
+  if (i?.deletesEdited.length)
+    lines.push(
+      t("dashboard.saveConflict.impactDeletesEdited", {
+        items: items(i.deletesEdited),
+        names: names(i.deletesEdited),
+      }),
+    );
+  if (i?.reverts.length)
     lines.push(
       t("dashboard.saveConflict.impactReverts", {
-        items: itemsPhrase(changed, "changed"),
-        names: names(changed),
+        items: items(i.reverts),
+        names: names(i.reverts),
       }),
     );
-  if (removed.length)
+  if (i?.restores.length)
     lines.push(
       t("dashboard.saveConflict.impactRestores", {
-        items: itemsPhrase(removed, "removed"),
-        names: names(removed),
+        items: items(i.restores),
+        names: names(i.restores),
       }),
     );
-  if (state.changedSettings.length)
-    lines.push(t("dashboard.saveConflict.impactSettings", { settings: settingsText.value }));
+  if (i?.settings.length)
+    lines.push(
+      t("dashboard.saveConflict.impactSettings", {
+        settings: listFormat(i.settings.map(settingLabel)),
+      }),
+    );
   if (!lines.length)
     lines.push(
       state.hasBase
         ? t("dashboard.saveConflict.impactNothing")
         : t("dashboard.saveConflict.impactUnknown"),
     );
+  const removed = [...(i?.removes ?? []), ...(i?.deletesEdited ?? [])];
   return {
-    removes: added.length > 0,
-    heading: added.length
-      ? t("dashboard.saveConflict.overwriteRemoves", { items: itemsPhrase(added, "added") })
+    removes: removed.length > 0,
+    heading: removed.length
+      ? t("dashboard.saveConflict.overwriteRemoves", { items: items(removed) })
       : t("dashboard.saveConflict.overwriteReplaces"),
     lines,
   };

@@ -397,6 +397,10 @@ export default defineComponent({
               await getDashboardData();
             },
           });
+          // The rename is already in the working copy, so show it as unsaved instead of keeping the editor open.
+          cancelEdit();
+          await getDashboardData();
+          emit("refresh");
           return;
         }
         showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));

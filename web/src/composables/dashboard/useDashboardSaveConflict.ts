@@ -18,7 +18,9 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText, type TranslateFn } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
+  adoptDashboardWorkingCopy,
   fetchLatestDashboard,
+  fetchServerDashboard,
   getLoadedDashboardVersion,
   getUnresolvedDashboardConflict,
   markDashboardStale,
@@ -32,6 +34,7 @@ import {
   formatClockTime,
   isPanelTouched,
   mergePanelOntoLatest,
+  overwriteImpact,
   toEpochMs,
 } from "@/utils/dashboard/saveConflict";
 import {
@@ -62,8 +65,12 @@ interface ConflictContext {
 interface ConflictSession {
   request: DashboardConflictRequest;
   ctx: ConflictContext;
+  /** Every change that lost a conflict since the dashboard was loaded, oldest first. */
+  changes: I18nText[];
+  onResolved: NonNullable<DashboardConflictRequest["onResolved"]>[];
   mine: any;
   base: LoadedDashboardVersion | null;
+  /** The server's version and hash; the cache keeps the user's working copy until Reload. */
   latest: { data: any; hash: string; updatedAt: number | null } | null;
   merged: any | null;
 }
@@ -80,6 +87,13 @@ const conflictMessage = (error: any) => raw(error?.response?.data?.message ?? er
 
 export const isDashboardConflictError = (error: any) => error?.response?.status === 409;
 
+// The cached dashboard is the working copy: my loaded version plus every pending edit, and what Overwrite saves.
+const workingCopy = (s: ConflictSession) =>
+  s.ctx.store.state.organizationData.allDashboardData?.[s.request.dashboardId] ?? s.mine;
+
+const changesText = (s: ConflictSession) =>
+  new Intl.ListFormat(localeOf(s.ctx), { style: "long", type: "conjunction" }).format(s.changes);
+
 const recompute = (s: ConflictSession) => {
   const latest = s.latest?.data;
   const diff = s.base ? diffDashboards(s.base.snapshot, latest) : null;
@@ -89,13 +103,13 @@ const recompute = (s: ConflictSession) => {
   state.latestUpdatedAt = toEpochMs(s.latest?.updatedAt);
   state.panelTouched = isPanelTouched(state.changes, s.request.panelId);
   state.panelComparison = state.panelTouched
-    ? comparePanel(latest, s.mine, s.request.panelId)
+    ? comparePanel(latest, workingCopy(s), s.request.panelId)
     : null;
 };
 
 const loadLatest = async (s: ConflictSession) => {
   try {
-    const latest = await fetchLatestDashboard(
+    const latest = await fetchServerDashboard(
       s.ctx.store,
       s.request.dashboardId,
       s.request.folderId,
@@ -119,7 +133,7 @@ const signalResolved = (dashboardId: string, outcome: ConflictOutcome) => {
 
 const finish = async (s: ConflictSession, outcome: ConflictOutcome) => {
   setUnresolvedDashboardConflict(s.request.dashboardId, null);
-  await s.request.onResolved?.(outcome);
+  for (const callback of s.onResolved) await callback(outcome);
   signalResolved(s.request.dashboardId, outcome);
   state.open = false;
   session = null;
@@ -142,23 +156,36 @@ export const openDashboardConflict = async (
   request: DashboardConflictRequest,
   ctx: ConflictContext,
 ) => {
-  const cached = ctx.store.state.organizationData.allDashboardData?.[request.dashboardId];
-  const mineSource = request.mine ?? cached;
-  const unresolved = getUnresolvedDashboardConflict(request.dashboardId);
-  const base = unresolved ?? getLoadedDashboardVersion(request.dashboardId);
-  setUnresolvedDashboardConflict(request.dashboardId, base);
-  state.unresolvedDashboardId = String(request.dashboardId);
-  markDashboardStale(mineSource, base?.hash);
+  const id = request.dashboardId;
+  // A save made from its own copy (settings forms, the JSON editor) becomes the working copy, so later edits stack on it.
+  if (request.mine) adoptDashboardWorkingCopy(ctx.store, id, request.mine);
+  const cached = ctx.store.state.organizationData.allDashboardData?.[id];
+  const mineSource = cached ?? request.mine;
+  const unresolved = getUnresolvedDashboardConflict(id);
+  const base = unresolved ?? getLoadedDashboardVersion(id);
+  setUnresolvedDashboardConflict(id, base);
+  state.unresolvedDashboardId = String(id);
+  markDashboardStale(request.mine, base?.hash);
   markDashboardStale(cached, base?.hash);
 
-  const s: ConflictSession = {
+  // A further conflict before the first is resolved adds to the same session instead of dropping its pending edits.
+  const extend = !!unresolved && session?.request.dashboardId === id ? session : null;
+  const s: ConflictSession = extend ?? {
     request,
     ctx,
-    mine: clone(mineSource),
+    changes: [],
+    onResolved: [],
+    mine: null,
     base,
     latest: null,
     merged: null,
   };
+  s.request = request;
+  s.ctx = ctx;
+  s.mine = clone(mineSource);
+  s.merged = null;
+  if (request.change && !s.changes.includes(request.change)) s.changes.push(request.change);
+  if (request.onResolved) s.onResolved.push(request.onResolved);
   session = s;
   Object.assign(state, {
     mounted: true,
@@ -167,8 +194,9 @@ export const openDashboardConflict = async (
     busy: null,
     notice: unresolved ? "stillUnresolved" : null,
     errorMessage: "",
-    myChange: request.change ?? "",
-    dashboardId: String(request.dashboardId),
+    myChange: changesText(s),
+    myChangeCount: s.changes.length,
+    dashboardId: String(id),
     isPanelEditor: !!request.panelId,
     panelTouched: false,
     hasBase: !!base,
@@ -177,6 +205,7 @@ export const openDashboardConflict = async (
     changes: [],
     changedSettings: [],
     panelComparison: null,
+    impact: null,
     mergedRows: [],
     mergeUnavailable: false,
   });
@@ -228,19 +257,29 @@ const reload = () =>
       state.notice = "saveFailed";
       return;
     }
+    const discarded = changesText(s);
     await finish(s, "reloaded");
     toast({
       variant: "success",
-      message: s.request.change
-        ? s.ctx.t("dashboard.saveConflict.toastReloadedChange", { change: s.request.change })
+      message: discarded
+        ? s.ctx.t("dashboard.saveConflict.toastReloadedChange", { change: discarded })
         : s.ctx.t("dashboard.saveConflict.toastReloaded"),
     });
   });
 
 const confirmOverwrite = () =>
   runAction("overwrite", async (s) => {
-    if (s.mine) await saveAgainstLatest(s, clone(s.mine), "overwritten");
+    const mine = workingCopy(s);
+    if (mine) await saveAgainstLatest(s, clone(mine), "overwritten");
   });
+
+// The confirm lists what saving the working copy undoes of the server's version, as it stands right now.
+const startOverwrite = () => {
+  const s = session;
+  setStep("confirm");
+  if (!s?.latest) return;
+  state.impact = overwriteImpact(s.base?.snapshot ?? null, s.latest.data, clone(workingCopy(s)));
+};
 
 const mergedRowsFor = (s: ConflictSession, merged: any): MergedPanelRow[] => {
   const added = new Set(
@@ -273,7 +312,7 @@ const merge = () => {
   if (!s?.latest || !s.request.panelId || state.panelTouched) return;
   const merged = mergePanelOntoLatest(
     s.latest.data,
-    s.mine,
+    clone(workingCopy(s)),
     s.request.panelId,
     s.base?.snapshot ?? s.latest.data,
   );
@@ -326,7 +365,7 @@ const reopen = () => {
 export const useDashboardSaveConflictDialog = () => ({
   state,
   reload,
-  startOverwrite: () => setStep("confirm"),
+  startOverwrite,
   confirmOverwrite,
   merge,
   saveMerged,

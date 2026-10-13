@@ -38,6 +38,8 @@ vi.mock("@/composables/dashboard/usePanelCache", () => ({
 }));
 
 import {
+  addTab,
+  deletePanel,
   getDashboard,
   setUnresolvedDashboardConflict,
   updateDashboard,
@@ -50,6 +52,7 @@ import {
   useDashboardSaveConflictDialog,
 } from "./useDashboardSaveConflict";
 import { dashboardSaveConflictState as state } from "./dashboardSaveConflictState";
+import * as commons from "@/utils/commons";
 
 const DASH = "d1";
 const FOLDER = "default";
@@ -142,14 +145,14 @@ beforeEach(() => {
 });
 
 describe("openDashboardConflict", () => {
-  it("re-fetches once, replaces the stale cache and lists what they changed", async () => {
+  it("re-fetches once, keeps my working copy in the cache and lists what they changed", async () => {
     await editPanelAndConflict();
 
     expect(service.get_Dashboard).toHaveBeenCalledTimes(2);
     const cached = store.state.organizationData.allDashboardData[DASH];
-    expect(cached.tabs[0].panels.map((p: any) => p.id)).toEqual(["p1", "p2", "p3"]);
-    expect(cached.tabs[0].panels[0].queries).toEqual([]);
-    expect(store.state.organizationData.allDashboardListHash[DASH]).toBe("h2");
+    expect(cached.tabs[0].panels.map((p: any) => p.id)).toEqual(["p1", "p2"]);
+    expect(cached.tabs[0].panels[0].queries).toEqual([{ q: "mine" }]);
+    expect(store.state.organizationData.allDashboardListHash[DASH]).toBe("h1");
     expect(state).toMatchObject({ open: true, step: "main", panelTouched: false, hasMine: true });
     expect(state.latestUpdatedAt).toBe(1_760_000_000_000);
     expect(state.changes).toEqual(
@@ -197,6 +200,189 @@ describe("openDashboardConflict", () => {
     service.get_Dashboard.mockResolvedValueOnce(response(LATEST, "h2"));
     await dialog.retry();
     expect(state.step).toBe("main");
+  });
+});
+
+describe("o2-enterprise#2875: closing the dialog and editing again", () => {
+  const ctx = () => ({ store, t, locale: "en-US" });
+  const open = (change: string) =>
+    openDashboardConflict({ dashboardId: DASH, folderId: FOLDER, change: raw(change) }, ctx());
+  const tabNames = (d: any) => d.tabs.map((tab: any) => tab.name);
+  const panelTitles = (d: any) => d.tabs[0].panels.map((p: any) => p.title);
+
+  it("deleting a second panel stacks on the first; Overwrite saves exactly {Disk} and claims no restore", async () => {
+    const start = doc([panel("e", "Errors"), panel("l", "Latency", 18), panel("d", "Disk", 36)]);
+    const afterB = doc([panel("e", "Errors"), panel("d", "Disk", 36)]);
+    service.get_Dashboard.mockResolvedValueOnce(response(start, "h1"));
+    await getDashboard(store, DASH, FOLDER);
+
+    service.save.mockRejectedValueOnce(conflict());
+    await expect(deletePanel(store, DASH, "e", FOLDER, "default")).rejects.toBeTruthy();
+    service.get_Dashboard.mockResolvedValueOnce(response(afterB, "h2"));
+    await open('Deleted panel "Errors"');
+
+    const cached = () => store.state.organizationData.allDashboardData[DASH];
+    expect(panelTitles(cached())).toEqual(["Latency", "Disk"]);
+    expect(state.changes).toEqual([
+      expect.objectContaining({ kind: "panel", change: "removed", name: "Latency" }),
+    ]);
+    dialog.close();
+
+    service.save.mockRejectedValueOnce(conflict());
+    await expect(deletePanel(store, DASH, "l", FOLDER, "default")).rejects.toBeTruthy();
+    expect(savedBodies().at(-1)!.hash).toBe("h1");
+    expect(panelTitles(cached())).toEqual(["Disk"]);
+    service.get_Dashboard.mockResolvedValueOnce(response(afterB, "h2"));
+    await open('Deleted panel "Latency"');
+
+    expect(state).toMatchObject({ notice: "stillUnresolved", myChangeCount: 2 });
+    expect(state.myChange).toBe('Deleted panel "Errors" and Deleted panel "Latency"');
+
+    dialog.startOverwrite();
+    expect(state.impact).toEqual({
+      removes: [],
+      deletesEdited: [],
+      reverts: [],
+      restores: [],
+      settings: [],
+    });
+
+    service.save.mockClear();
+    service.get_Dashboard.mockResolvedValue(response(doc([panel("d", "Disk", 36)]), "h3"));
+    await dialog.confirmOverwrite();
+    const [{ body, hash }] = savedBodies();
+    expect(hash).toBe("h2");
+    expect(panelTitles(body)).toEqual(["Disk"]);
+  });
+
+  it("adding a second tab stacks on the first; Overwrite saves both and says it replaces their description", async () => {
+    const start = { ...doc([panel("p1", "Errors")]), description: "original" };
+    start.tabs[0].name = "Overview";
+    const afterB = { ...start, description: "changed by B" };
+    service.get_Dashboard.mockResolvedValueOnce(response(start, "h1"));
+    await getDashboard(store, DASH, FOLDER);
+
+    service.save.mockRejectedValueOnce(conflict());
+    await expect(addTab(store, DASH, FOLDER, { name: "TabA", panels: [] })).rejects.toBeTruthy();
+    service.get_Dashboard.mockResolvedValueOnce(response(afterB, "h2"));
+    await open("Added tab 'TabA'");
+    expect(state.changedSettings).toEqual(["description"]);
+    dialog.close();
+
+    service.save.mockRejectedValueOnce(conflict());
+    await expect(addTab(store, DASH, FOLDER, { name: "TabB", panels: [] })).rejects.toBeTruthy();
+    service.get_Dashboard.mockResolvedValueOnce(response(afterB, "h2"));
+    await open("Added tab 'TabB'");
+
+    expect(state.myChange).toBe("Added tab 'TabA' and Added tab 'TabB'");
+
+    dialog.startOverwrite();
+    expect(state.impact).toMatchObject({ removes: [], restores: [], settings: ["description"] });
+
+    service.save.mockClear();
+    service.get_Dashboard.mockResolvedValue(response(afterB, "h3"));
+    await dialog.confirmOverwrite();
+    const [{ body, hash }] = savedBodies();
+    expect(hash).toBe("h2");
+    expect(tabNames(body)).toEqual(["Overview", "TabA", "TabB"]);
+    expect(body.description).toBe("original");
+  });
+
+  it("Reload replaces the working copy with the latest and clears every pending change", async () => {
+    await editPanelAndConflict();
+    dialog.close();
+    service.get_Dashboard.mockResolvedValueOnce(response(LATEST, "h2"));
+    await open("second change");
+    expect(state.myChangeCount).toBe(2);
+
+    service.get_Dashboard.mockResolvedValueOnce(response(LATEST, "h2"));
+    await dialog.reload();
+
+    const cached = store.state.organizationData.allDashboardData[DASH];
+    expect(cached.tabs[0].panels.map((p: any) => p.id)).toEqual(["p1", "p2", "p3"]);
+    expect(store.state.organizationData.allDashboardListHash[DASH]).toBe("h2");
+    expect(state.unresolvedDashboardId).toBe("");
+
+    service.save.mockRejectedValueOnce(conflict());
+    await expect(updateDashboard(store, "acme", DASH, cached, FOLDER)).rejects.toBeTruthy();
+    service.get_Dashboard.mockResolvedValueOnce(response(LATEST, "h3"));
+    await open("fresh change");
+    expect(state).toMatchObject({ notice: null, myChangeCount: 1, myChange: "fresh change" });
+  });
+
+  it("a save from its own copy (settings forms) becomes the working copy shown in place", async () => {
+    service.get_Dashboard.mockResolvedValueOnce(response(BASE, "h1"));
+    const cached = await getDashboard(store, DASH, FOLDER);
+    const form = JSON.parse(JSON.stringify(cached));
+    form.title = "Renamed by me";
+    service.get_Dashboard.mockResolvedValueOnce(response(LATEST, "h2"));
+
+    await openDashboardConflict({ dashboardId: DASH, folderId: FOLDER, mine: form }, ctx());
+
+    expect(store.state.organizationData.allDashboardData[DASH]).toBe(cached);
+    expect(cached.title).toBe("Renamed by me");
+  });
+});
+
+describe("save helpers do nothing when the id is not found", () => {
+  beforeEach(async () => {
+    service.get_Dashboard.mockResolvedValueOnce(response(BASE, "h1"));
+    await getDashboard(store, DASH, FOLDER);
+    service.save.mockClear();
+  });
+
+  const titles = () =>
+    store.state.organizationData.allDashboardData[DASH].tabs[0].panels.map((p: any) => p.id);
+
+  it.each([
+    ["deletePanel, unknown panel", () => deletePanel(store, DASH, "nope", FOLDER, "default")],
+    ["deletePanel, unknown tab", () => deletePanel(store, DASH, "p1", FOLDER, "nope")],
+    [
+      "updatePanel, unknown panel",
+      () => updatePanel(store, DASH, panel("nope", "x"), FOLDER, "default"),
+    ],
+    ["deleteTab, unknown tab", () => commons.deleteTab(store, DASH, FOLDER, "nope")],
+    [
+      "deleteTab, unknown target tab",
+      () => commons.deleteTab(store, DASH, FOLDER, "default", "nope"),
+    ],
+    ["editTab, unknown tab", () => commons.editTab(store, DASH, FOLDER, "nope", { name: "x" })],
+    [
+      "movePanelToAnotherTab, unknown panel",
+      () => commons.movePanelToAnotherTab(store, DASH, "nope", FOLDER, "default", "default"),
+    ],
+    [
+      "movePanelToAnotherTab, unknown target tab",
+      () => commons.movePanelToAnotherTab(store, DASH, "p1", FOLDER, "default", "nope"),
+    ],
+    ["deleteVariable, unknown name", () => commons.deleteVariable(store, DASH, "nope", FOLDER)],
+    [
+      "updateVariable, unknown name",
+      () => commons.updateVariable(t, store, DASH, "nope", { name: "nope" }, FOLDER),
+    ],
+    ["addPanel, unknown tab", () => commons.addPanel(store, DASH, panel("n", "N"), FOLDER, "nope")],
+  ])("%s", async (_label, call) => {
+    const before = JSON.stringify(store.state.organizationData.allDashboardData[DASH]);
+    await call();
+    expect(service.save).not.toHaveBeenCalled();
+    expect(JSON.stringify(store.state.organizationData.allDashboardData[DASH])).toBe(before);
+    expect(titles()).toEqual(["p1", "p2"]);
+  });
+
+  it("addPanel replaces a panel that is already pending instead of adding a twin", async () => {
+    await commons.addPanel(
+      store,
+      DASH,
+      { ...panel("p2", "Latency v2"), layout: undefined },
+      FOLDER,
+      "default",
+    );
+    const [{ body }] = savedBodies();
+    expect(body.tabs[0].panels.map((p: any) => [p.id, p.title])).toEqual([
+      ["p1", "Error rate"],
+      ["p2", "Latency v2"],
+    ]);
+    expect(body.tabs[0].panels[1].layout).toEqual(panel("p2", "Latency", 18).layout);
   });
 });
 

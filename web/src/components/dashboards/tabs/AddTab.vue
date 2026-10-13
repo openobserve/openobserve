@@ -140,6 +140,7 @@ export default defineComponent({
     const onSubmit = async (value: AddTabForm) => {
       // The @submit payload is the source of truth for `name`; the loaded
       // `editingTab` carries the rest (panels/tabId) in edit mode.
+      const newTabData: any = { name: value.name, panels: [] };
       try {
         //if edit mode
         if (props.editMode) {
@@ -164,7 +165,7 @@ export default defineComponent({
             store,
             props.dashboardId,
             props.folderId ?? route.query.folder ?? "default",
-            { name: value.name, panels: [] },
+            newTabData,
           );
 
           // emit refresh to rerender
@@ -186,6 +187,9 @@ export default defineComponent({
               : t("dashboard.saveConflict.change.addedTab", { name: value.name }),
             onResolved: () => emit("update:open", false),
           });
+          // The tab is already in the working copy and on screen as unsaved; Save here again would add it twice.
+          emit("refresh", props.editMode ? { ...editingTab.value, name: value.name } : newTabData);
+          emit("update:open", false);
         } else {
           showErrorNotification(
             error?.message ??
