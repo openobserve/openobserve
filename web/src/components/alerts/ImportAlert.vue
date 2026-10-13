@@ -168,6 +168,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="filteredDestinations"
                         :label="t('alerts.destinationsLabel')"
                         :placeholder="t('alerts.summary.noDestination')"
+                        :help-text="
+                          userSelectedDestinations[index]?.length
+                            ? undefined
+                            : t('alerts.alertSettings.noDestinationNote')
+                        "
                         multiple
                         searchable
                         @search="filterDestinations"
@@ -950,6 +955,15 @@ export default defineComponent({
 
       // Log all alert errors at the end
       if (alertErrors.length > 0) {
+        // Show in the picker what a retry will import: the names this org has, or none.
+        // Otherwise the picker reads empty while the JSON still holds the failing value.
+        if (alertErrors.some((e: any) => e?.field === "destination_name")) {
+          const known = Array.isArray(input.destinations)
+            ? input.destinations.filter((d: any) => checkDestinationInList(props.destinations, d))
+            : [];
+          userSelectedDestinations.value[alertErrorsToDisplay.value.length] = known;
+          updateUserSelectedDestinations(known, index - 1);
+        }
         alertErrorsToDisplay.value.push(alertErrors);
         return false;
       }
