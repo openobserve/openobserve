@@ -29,7 +29,6 @@ export class AlertSaveQueryModePage {
       nameInput: '[data-test="add-alert-name-input-input"]',
       streamTrigger: '[data-test="add-alert-stream-name-select-dropdown-trigger"]',
       destinationTrigger: '[data-test="alert-destinations-select-trigger"]',
-      selectedOption: '[role="option"][aria-selected="true"]',
       addCondition: '[data-test="alert-conditions-add-condition-btn"]',
       conditionColumn: '[data-test="alert-conditions-select-column-trigger"]',
       conditionValue: '[data-test="alert-conditions-value-input-field"]',
@@ -97,13 +96,6 @@ export class AlertSaveQueryModePage {
   /** Multi-select: the popover stays open after a pick, so it needs dismissing. */
   async selectDestination(destinationName) {
     await this.#pickFromDropdown(this.locators.destinationTrigger, destinationName);
-    await this.page.keyboard.press('Escape');
-  }
-
-  /** Clears the destination by re-picking the already-selected option. */
-  async clearDestination() {
-    await this.page.locator(this.locators.destinationTrigger).click();
-    await this.page.locator(this.locators.selectedOption).first().click();
     await this.page.keyboard.press('Escape');
   }
 

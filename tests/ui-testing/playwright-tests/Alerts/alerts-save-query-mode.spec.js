@@ -238,7 +238,8 @@ test.describe('Alerts — Choose Query Mode on save', {
     const id = await seed(page, builderEmptyWithSql(name));
 
     await pm.alertSaveQueryModePage.openEditor(id);
-    await pm.alertSaveQueryModePage.clearDestination();
+    // A blank threshold is restored on blur, so 0 is the value that stays invalid.
+    await pm.alertSaveQueryModePage.setThreshold('0');
 
     await pm.alertSaveQueryModePage.clickSave();
     // The form's own validation wins: no point asking which query to run when
@@ -246,7 +247,7 @@ test.describe('Alerts — Choose Query Mode on save', {
     await pm.alertSaveQueryModePage.expectDialogClosed();
     await pm.alertSaveQueryModePage.expectValidationToast();
 
-    await pm.alertSaveQueryModePage.selectDestination(DEST);
+    await pm.alertSaveQueryModePage.setThreshold('3');
     await pm.alertSaveQueryModePage.clickSave();
     await pm.alertSaveQueryModePage.expectDialogOpen();
   });
