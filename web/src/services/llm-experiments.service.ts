@@ -134,7 +134,9 @@ export interface ExperimentCostEstimate {
   incomplete: boolean;
   /** Some model in the run has no price, so the total is a lower bound. */
   hasUnpricedModel: boolean;
+  /** USD amount above which a create needs confirmation; 0 switches it off. */
   warningThreshold: number;
+  /** The estimate is above the threshold, so the create must send `confirmCostEstimate`. */
   confirmationRequired: boolean;
 }
 
