@@ -571,13 +571,16 @@ function isFrontendFile(filePath) {
   return /\.(vue|ts|js|css)$/.test(filePath);
 }
 
-// Playwright E2E tests + their page objects/utils, plus the suite's config. Anchored to
-// tests/ui-testing on purpose: web/src unit specs are the frontend agent's concern, and the
-// other suites under tests/ (mobile-testing, api-testing, …) are out of this agent's remit —
-// its POM/selector-cross-validation rules only apply to the ui-testing E2E suite.
+// Allowlist the Playwright E2E test-code locations under tests/ui-testing: spec files, the
+// playwright-tests tree, page objects, shared utils, and the suite config. Everything else there
+// — committed app fixtures (fixtures/ sample apps + sourcemaps), helper scripts, results/archives
+// — is NOT test code these POM/selector rules apply to, and the other suites under tests/
+// (mobile-testing, api-testing, …) are out of remit entirely.
 function isTestFile(filePath) {
   if (!filePath.startsWith("tests/ui-testing/")) return false;
-  return /\.(spec\.js|js)$/.test(filePath) || /playwright[^/]*\.config\.[jt]s$/.test(filePath);
+  if (/\.spec\.js$/.test(filePath)) return true;
+  if (/^tests\/ui-testing\/(playwright-tests|pages|utils)\/.*\.js$/.test(filePath)) return true;
+  return /^tests\/ui-testing\/playwright[^/]*\.config\.[jt]s$/.test(filePath);
 }
 
 function filterDiff(diff) {

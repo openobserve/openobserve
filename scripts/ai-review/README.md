@@ -41,8 +41,10 @@ out of scope — see the "What NOT to Flag" table in `agents/frontend.md`.
 ## The QA / Test Reviewer
 
 `qa` is a conditional agent on the same contract as `frontend`, appended whenever the diff touches
-the Playwright E2E suite — a `.js` file under `tests/ui-testing/` (specs/pages/utils) or a
-`tests/ui-testing/playwright*.config.{js,ts}`. It is
+the Playwright E2E test code under `tests/ui-testing/` — a `*.spec.js`, a page object/util (under
+`pages/`, `playwright-tests/` or `utils/`), or a `playwright*.config`. Committed app fixtures
+(`fixtures/**`) and the other suites under `tests/` are deliberately excluded, so the agent never
+applies POM/selector rules to sample application code. It is
 a **static** review of the *tests themselves* — it never runs them, so a green CI run clears none of
 its findings. It folds in the Council's Sentinel rules (POM compliance incl. selectors inside
 `expect(...)`, `testLogger` not `console.log`, real assertions — no `expect(true).toBe(true)`,
