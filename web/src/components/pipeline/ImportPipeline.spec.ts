@@ -1525,6 +1525,83 @@ describe("ImportPipeline.vue", () => {
       expect(line.warning).toBe(true);
       expect(line.success).toBe(true);
     });
+
+    it("reuses the function it wrote when the file's params only differ as blank space", async () => {
+      // The server stores `params` verbatim, blanks included, so an export can
+      // carry "   ". The create normalises that to "row", so comparing the raw
+      // values makes the stored function stop matching the file that produced it —
+      // and every later import of that same file adds another identical copy,
+      // until the suffix cap fails the import outright.
+      withExistingFunctions([{ name: "parse_nginx", function: BODY, params: "row", transType: 0 }]);
+      await mountReady();
+
+      const input = bundledPipeline({
+        functions: [{ name: "parse_nginx", function: BODY, params: "   ", transType: 0 }],
+      });
+      expect(await wrapper.vm.createPipeline(input, 1)).toBe(true);
+
+      expect(jstransform.create).not.toHaveBeenCalled();
+      expect(input.nodes[0].data.name).toBe("parse_nginx");
+    });
+
+    it("writes the params it compares, so a blank-params file is a fixed point", async () => {
+      await mountReady();
+
+      await wrapper.vm.createPipeline(
+        bundledPipeline({
+          functions: [{ name: "parse_nginx", function: BODY, params: "   ", transType: 0 }],
+        }),
+        1,
+      );
+
+      const written = vi.mocked(jstransform.create).mock.calls[0]?.[1] as any;
+      expect(written.params).toBe("row");
+      // What was written reads back as the same logic as the file it came from.
+      expect(wrapper.vm.sameFunctionLogic(written, { function: BODY, params: "   " })).toBe(true);
+    });
+
+    it("does not create a bundled function whose definition has no body", async () => {
+      // `String(undefined)` would otherwise be posted as the function body.
+      await mountReady();
+
+      const input = bundledPipeline({
+        functions: [{ name: "parse_nginx", params: "row", transType: 0 }],
+      });
+      await wrapper.vm.createPipeline(input, 1);
+
+      expect(jstransform.create).not.toHaveBeenCalled();
+    });
+
+    it("ignores a two-bodies clash under a name no node calls", async () => {
+      // The pipeline never reaches that name, so no choice of body affects it.
+      await mountReady();
+
+      const input = bundledPipeline({
+        functions: [
+          { name: "parse_nginx", function: BODY, params: "row", transType: 0 },
+          { name: "unused_fn", function: ".x = 1", params: "row", transType: 0 },
+          { name: "unused_fn", function: ".y = 2", params: "row", transType: 0 },
+        ],
+      });
+      expect(await wrapper.vm.createPipeline(input, 1)).toBe(true);
+
+      expect(
+        wrapper.vm.pipelineCreators.some((c: any) => c.message.includes("two different bodies")),
+      ).toBe(false);
+      // And the clashing name is still not created — nothing calls it.
+      expect(vi.mocked(jstransform.create).mock.calls.map((c: any) => c[1].name)).toEqual([
+        "parse_nginx",
+      ]);
+    });
+
+    it("does not post the export file's own functions key to the pipelines endpoint", async () => {
+      await mountReady();
+
+      await wrapper.vm.createPipeline(bundledPipeline(), 1);
+
+      expect(postedPipeline()).not.toHaveProperty("functions");
+      expect(postedPipeline().name).toBe("my-pipeline");
+    });
   });
 
   describe("Store integration", () => {

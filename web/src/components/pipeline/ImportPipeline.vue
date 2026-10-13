@@ -508,7 +508,6 @@ export default defineComponent({
       },
     });
 
-    // The endpoint paginates; every consumer here wants the whole list.
     // How far the copy search walks before giving up. A name that needs more than
     // this has a problem the import cannot name its way out of.
     const MAX_FUNCTION_COPY_SUFFIX = 50;
@@ -1231,11 +1230,41 @@ export default defineComponent({
         .trim();
 
     // `params` defaults to `row` on the server, so a file that omits it and one
-    // that spells it out describe the same function.
+    // that spells it out describe the same function. Anything that is not a
+    // non-blank string means the same as omitting it.
+    const normaliseFunctionParams = (params: any) =>
+      typeof params === "string" && params.trim() ? params : "row";
+
+    // 0 (VRL) for anything that is not a number the server would read as 1.
+    const normaliseTransType = (transType: any) => (Number(transType ?? 0) === 1 ? 1 : 0);
+
+    /**
+     * Compares what the two definitions would MEAN to the server, not what they
+     * spell. Both sides go through the same normalisation `bundledFunctionPayload`
+     * applies on the way out, so a function this import created always reads as
+     * identical to the file it came from.
+     *
+     * Comparing the raw values instead lets the two disagree: a file carrying
+     * `params: "   "` is written as `"row"`, so on the next import of that same
+     * file the stored `"row"` no longer matches the file's `"   "` and a
+     * byte-identical copy is created under `_1` — then `_2`, once per import,
+     * until the suffix cap fails the import outright.
+     */
     const sameFunctionLogic = (a: any, b: any) =>
       normaliseFunctionBody(a?.function) === normaliseFunctionBody(b?.function) &&
-      (a?.params || "row") === (b?.params || "row") &&
-      Number(a?.transType ?? 0) === Number(b?.transType ?? 0);
+      normaliseFunctionParams(a?.params) === normaliseFunctionParams(b?.params) &&
+      normaliseTransType(a?.transType) === normaliseTransType(b?.transType);
+
+    /** The names this pipeline's function nodes call. */
+    const calledFunctionNames = (input: any) => {
+      const names = new Set<string>();
+      (input?.nodes ?? []).forEach((node: any) => {
+        if (node?.data?.node_type !== "function") return;
+        const name = node?.data?.name;
+        if (typeof name === "string" && name !== "") names.add(name);
+      });
+      return names;
+    };
 
     /**
      * The functions a file bundles for one pipeline, keyed by name.
@@ -1243,20 +1272,29 @@ export default defineComponent({
      * `conflicting` names an unresolvable file: two entries under one name
      * describing different logic, where no choice of body can be the right one for
      * the node that calls it.
+     *
+     * An entry with no usable body does not count as bundled. Carrying it would
+     * post `String(undefined)` as the function body; leaving it out means the node
+     * that calls it is held to the ordinary rule — exist in this org, or be
+     * remapped — which is what an unusable definition deserves.
      */
     const bundledFunctionsByName = (input: any) => {
       const byName = new Map<string, any>();
       const conflicting: string[] = [];
       const bundle = Array.isArray(input?.functions) ? input.functions : [];
+      const called = calledFunctionNames(input);
 
       bundle.forEach((fn: any) => {
         if (!fn || typeof fn.name !== "string" || fn.name === "") return;
+        if (typeof fn.function !== "string" || !fn.function.trim()) return;
         const seen = byName.get(fn.name);
         if (!seen) {
           byName.set(fn.name, fn);
           return;
         }
-        if (!sameFunctionLogic(seen, fn) && !conflicting.includes(fn.name)) {
+        // Only a name a node calls can be unresolvable. A clash the pipeline never
+        // reaches decides nothing, and a file is not worth refusing over it.
+        if (called.has(fn.name) && !sameFunctionLogic(seen, fn) && !conflicting.includes(fn.name)) {
           conflicting.push(fn.name);
         }
       });
@@ -1293,12 +1331,17 @@ export default defineComponent({
       return missing;
     };
 
-    /** The four keys the server reads, spelled and typed the way it expects. */
+    /**
+     * The four keys the server reads, spelled and typed the way it expects.
+     *
+     * Normalises through the same helpers `sameFunctionLogic` compares with, so
+     * what is written always reads back as the same logic.
+     */
     const bundledFunctionPayload = (fn: any, name: string) => ({
       name,
       function: String(fn.function).trim(),
-      params: typeof fn.params === "string" && fn.params.trim() ? fn.params : "row",
-      transType: parseInt(String(fn.transType ?? 0)),
+      params: normaliseFunctionParams(fn.params),
+      transType: normaliseTransType(fn.transType),
     });
 
     /**
@@ -1480,8 +1523,14 @@ export default defineComponent({
       }
 
       try {
+        // `functions` is the export file's own key, already resolved into real
+        // functions above. `Pipeline` ignores what it does not declare, so sending
+        // it is merely useless today — but only until something there starts
+        // rejecting unknown fields.
+        const { functions: _bundled, ...pipelinePayload } = input;
+
         await pipelinesService.createPipeline({
-          data: input,
+          data: pipelinePayload,
           org_identifier: store.state.selectedOrganization.identifier,
         });
 
