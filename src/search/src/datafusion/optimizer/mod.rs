@@ -206,7 +206,8 @@ pub fn generate_physical_optimizer_rules(
     let mut index_fields: HashMap<TableReference, HashSet<String>> = HashMap::new();
     for (stream_name, schema) in sql.schemas.iter() {
         let stream_settings = infra::schema::unwrap_stream_settings(schema.schema());
-        let idx_fields = get_stream_setting_index_fields(&stream_settings);
+        let idx_fields =
+            get_stream_setting_index_fields(&stream_settings, sql.stream_type, stream_name.table());
         let idx_fields = idx_fields
             .into_iter()
             .filter_map(|index_field| {

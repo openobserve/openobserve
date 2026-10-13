@@ -18,6 +18,7 @@ use tokio::sync::OnceCell;
 static TIMESTAMP_UPDATED_AT: OnceCell<i64> = OnceCell::const_new();
 static SECONDARY_INDEX_UPDATED_AT: OnceCell<i64> = OnceCell::const_new();
 static DISTINCT_FIELDS_UPDATED_AT: OnceCell<i64> = OnceCell::const_new();
+static STREAM_DEFAULT_INDEX_UPDATED_AT: OnceCell<i64> = OnceCell::const_new();
 
 pub async fn get_ttv_timestamp_updated_at() -> i64 {
     *TIMESTAMP_UPDATED_AT
@@ -47,6 +48,18 @@ pub async fn get_ttv_distinct_fields_updated_at() -> i64 {
         .get_or_init(|| {
             get_or_create_updated_at(
                 "/tantivy/distinct_fields/updated_at",
+                config::utils::time::now_micros(),
+            )
+        })
+        .await
+}
+
+/// when the per-stream default index fields started being written into the tantivy index
+pub async fn get_ttv_stream_default_index_updated_at() -> i64 {
+    *STREAM_DEFAULT_INDEX_UPDATED_AT
+        .get_or_init(|| {
+            get_or_create_updated_at(
+                "/tantivy/stream_default_index/updated_at",
                 config::utils::time::now_micros(),
             )
         })

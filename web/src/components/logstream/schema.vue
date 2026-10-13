@@ -1753,6 +1753,14 @@ export default defineComponent({
         modelValue.stream_type !== "enrichment_tables",
     );
 
+    // Env-wide defaults plus the fields the backend always indexes for this stream.
+    const defaultSecondaryIndexFields = computed<string[]>(() => [
+      ...(store.state.zoConfig.default_secondary_index_fields || []),
+      ...(store.state.zoConfig.default_stream_index_fields?.[
+        `${indexData.value.stream_type}/${indexData.value.name}`
+      ] || []),
+    ]);
+
     const disableOptions = (schema: any, option: any) => {
       let selectedHashPartition = "";
 
@@ -1792,7 +1800,7 @@ export default defineComponent({
         return true;
       }
       if (
-        store.state.zoConfig.default_secondary_index_fields.includes(schema.name) &&
+        defaultSecondaryIndexFields.value.includes(schema.name) &&
         option.value.includes("secondaryIndexKey")
       ) {
         return true;
@@ -1997,7 +2005,7 @@ export default defineComponent({
       // Get default Secondary Index keys from BE config (only if they exist in schema)
       // iterate over all the be default secondary keys and check if they pressent in currentschemafieldnames if they are there
       // we should add them to secondarykeys from settings
-      const defaultSecondaryIndexKeys = store.state.zoConfig.default_secondary_index_fields || [];
+      const defaultSecondaryIndexKeys = defaultSecondaryIndexFields.value;
       defaultSecondaryIndexKeys.forEach((key: string) => {
         if (currentSchemaFieldNames.has(key)) {
           secondaryIndexFieldsFromSettings.add(key);
@@ -2386,7 +2394,7 @@ export default defineComponent({
         if (store.state.zoConfig.default_fts_keys.indexOf(props.row.name) > -1) {
           keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "fullTextSearchKey"])];
         }
-        if (store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1) {
+        if (defaultSecondaryIndexFields.value.indexOf(props.row.name) > -1) {
           keysToBeDisplayed = [...new Set([...keysToBeDisplayed, "secondaryIndexKey"])];
         }
         return keysToBeDisplayed || [];
@@ -2404,7 +2412,7 @@ export default defineComponent({
         return true;
       }
       if (
-        store.state.zoConfig.default_secondary_index_fields.indexOf(name) > -1 &&
+        defaultSecondaryIndexFields.value.indexOf(name) > -1 &&
         option.value == "secondaryIndexKey"
       ) {
         return true;
@@ -2449,7 +2457,7 @@ export default defineComponent({
         filteredValue = value.filter((item) => item !== "fullTextSearchKey");
       }
       if (
-        store.state.zoConfig.default_secondary_index_fields.indexOf(props.row.name) > -1 &&
+        defaultSecondaryIndexFields.value.indexOf(props.row.name) > -1 &&
         value.includes("secondaryIndexKey")
       ) {
         filteredValue = value.filter((item) => item !== "secondaryIndexKey");

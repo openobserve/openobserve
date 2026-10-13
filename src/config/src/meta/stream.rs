@@ -34,9 +34,12 @@ use crate::{
 
 /// The logs stream RUM data ingestion writes.
 pub const RUM_DATA_STREAM: &str = "_rumdata";
-/// `_rumdata` columns the trace-to-RUM lookup filters on, indexed by default.
+/// `_rumdata` columns the trace-to-RUM lookup filters on, always secondary-indexed.
 pub const RUM_DATA_INDEX_FIELDS: [&str; 4] =
     ["_o2_trace_id", "_oo_trace_id", "view_id", "action_id"];
+/// Secondary index fields a stream always has whatever its settings say, by stream type and name.
+pub const STREAM_DEFAULT_INDEX_FIELDS: [(StreamType, &str, &[&str]); 1] =
+    [(StreamType::Logs, RUM_DATA_STREAM, &RUM_DATA_INDEX_FIELDS)];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "PascalCase")]
@@ -1461,6 +1464,17 @@ impl From<&str> for FileListBookKeepMode {
             _ => FileListBookKeepMode::default(),
         }
     }
+}
+
+/// The [`STREAM_DEFAULT_INDEX_FIELDS`] entry of a stream, empty for most streams.
+pub fn stream_default_index_fields(
+    stream_type: StreamType,
+    stream_name: &str,
+) -> &'static [&'static str] {
+    STREAM_DEFAULT_INDEX_FIELDS
+        .iter()
+        .find(|(t, name, _)| *t == stream_type && *name == stream_name)
+        .map_or(&[], |(_, _, fields)| fields)
 }
 
 #[cfg(test)]
