@@ -121,6 +121,31 @@ describe("RemoteTaskCredentialsDialog", () => {
     wrapper.unmount();
   });
 
+  it("clears a token typed and then cancelled before the dialog reopens", async () => {
+    const wrapper = mountDialog({ type: "bearer", usesSecret: true });
+    await flushPromises();
+    const token = () =>
+      document.body.querySelector<HTMLInputElement>(
+        '[data-test="ai-remote-task-credentials-token-field"]',
+      )!;
+    token().value = "typed-then-cancelled";
+    token().dispatchEvent(new Event("input"));
+    await flushPromises();
+
+    document.body
+      .querySelector<HTMLButtonElement>(
+        '[data-test="ai-remote-task-credentials-dialog"] [data-test="o-dialog-secondary-btn"]',
+      )!
+      .click();
+    await flushPromises();
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true });
+    await flushPromises();
+
+    expect(token().value).toBe("");
+    wrapper.unmount();
+  });
+
   it("keeps no typed password in the mutation cache after closing", async () => {
     const wrapper = mountDialog({ type: "basic", usesSecret: true });
     await fill(wrapper, { username: "svc", password: "s3cret-typed" });

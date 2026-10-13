@@ -515,6 +515,31 @@ describe("RemoteTaskFormPage — test connection", () => {
       expect(panel.props("hint")).toContain("has not been published yet");
     });
 
+    it.each([
+      ["the signing key", { signing: { enabled: true, usesSecret: true, keyId: "k1" } }],
+      ["a custom header", { customHeaders: [{ key: "x-api-key", usesSecret: true }] }],
+    ])("takes the stored path when the only secret is %s", async (_label, secret) => {
+      const published = await get("acme", "head-1");
+      get.mockResolvedValue({ ...published, auth: { type: "none", usesSecret: false }, ...secret });
+      testRun.mockResolvedValue([
+        {
+          rowId: "sample-0",
+          status: "ok",
+          rawRequest: "{}",
+          rawResponse: "{}",
+          latencyMs: 5,
+          attempts: 1,
+        },
+      ]);
+      const wrapper = mountForm();
+      await flushPromises();
+
+      await runTest(wrapper);
+
+      expect(testCandidate).not.toHaveBeenCalled();
+      expect(testRun).toHaveBeenCalledWith("acme", "head-1", [expect.any(Object)]);
+    });
+
     it("counts an explicit skip from the endpoint as a pass", async () => {
       testRun.mockResolvedValue([
         {
