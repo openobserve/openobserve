@@ -184,6 +184,13 @@ pub async fn get_cache(
     }
 }
 
+/// Whether the stream is in the latest-schema cache; a miss never reaches the database.
+pub async fn is_cached(org_id: &str, stream_name: &str, stream_type: StreamType) -> bool {
+    let key = mk_key(org_id, stream_type, stream_name);
+    let cache_key = key.strip_prefix(SCHEMA_KEY).unwrap();
+    STREAM_SCHEMAS_LATEST.read().await.contains_key(cache_key)
+}
+
 /// Inserts into the `STREAM_SCHEMAS_LATEST` map behind its write guard, keeping `ORG_USER_STREAMS`.
 pub fn insert_latest(
     map: &mut hashbrown::HashMap<String, SchemaCache>,

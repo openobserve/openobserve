@@ -50,8 +50,8 @@ use promql_parser::parser::VectorSelector;
 
 use self::labels::load_series_labels;
 use super::utils::{
-    apply_label_selector, apply_matchers, apply_time_window, batch_run_len, exclude_exemplar_hosts,
-    exemplar_load_step, extend_samples,
+    apply_label_selector, apply_matchers, apply_time_window, batch_run_len, exemplar_load_step,
+    extend_samples,
 };
 
 const MAX_SERIES_FRAGMENT_HINT: usize = 24;
@@ -113,11 +113,6 @@ pub(super) async fn selector_load_data_from_datafusion(
     };
 
     df_group = apply_matchers(df_group, &selector.matchers)?;
-    // the label projection below drops `exemplars`, so host rows must go before it
-    if !query_ctx.query_exemplars {
-        let stale_markers = config::get_config().prom.staleness_markers_enabled;
-        df_group = exclude_exemplar_hosts(df_group, stale_markers)?;
-    }
 
     match apply_label_selector(df_group, &schema, &label_selector) {
         Some(dataframe) => df_group = dataframe,
@@ -623,82 +618,6 @@ mod tests {
         let samples = &metrics[&11].samples;
         assert_eq!(samples.len(), 2);
         assert_eq!(samples[0].value, 1.0);
-        assert!(config::meta::promql::is_stale_marker(samples[1].value));
-    }
-
-    #[tokio::test]
-    async fn test_selector_load_skips_an_exemplar_host_row_under_a_label_projection() {
-        use datafusion::datasource::MemTable;
-        use promql_parser::parser::{self, Expr};
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new(HASH_LABEL, DataType::UInt64, false),
-            Field::new(VALUE_LABEL, DataType::Float64, true),
-            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
-            Field::new("job", DataType::Utf8, true),
-        ]));
-        let batch = RecordBatch::try_new(
-            Arc::clone(&schema),
-            vec![
-                Arc::new(Int64Array::from(vec![100, 150, 200])),
-                Arc::new(UInt64Array::from(vec![11, 11, 11])),
-                Arc::new(Float64Array::from(vec![Some(1.0), None, None])),
-                Arc::new(StringArray::from(vec![
-                    None,
-                    Some(r#"[{"_timestamp":150,"value":1.0,"trace_id":"abc"}]"#),
-                    None,
-                ])),
-                Arc::new(StringArray::from(vec!["api", "api", "api"])),
-            ],
-        )
-        .unwrap();
-        let ctx = SessionContext::new();
-        let table = MemTable::try_new(Arc::clone(&schema), vec![vec![batch]]).unwrap();
-        ctx.register_table("up", Arc::new(table)).unwrap();
-        let Expr::VectorSelector(selector) = parser::parse("up").unwrap() else {
-            panic!("expected a vector selector");
-        };
-        let query_ctx = Arc::new(QueryContext {
-            trace_id: "t".to_string(),
-            org_id: "o".to_string(),
-            query_exemplars: false,
-            query_data: false,
-            need_wal: false,
-            use_cache: false,
-            timeout: 1,
-            search_event_type: None,
-            search_event_context: None,
-            regions: vec![],
-            clusters: vec![],
-            is_super_cluster: false,
-        });
-        // `sum by (job) (up)` projects the frame down to `job` before samples are read
-        let label_selector: HashSet<String> = ["job".to_string()].into_iter().collect();
-
-        let loaded = selector_load_data_from_datafusion(
-            query_ctx,
-            ctx,
-            schema,
-            selector,
-            label_selector,
-            300,
-            300,
-            0,
-            300,
-            true,
-        )
-        .await
-        .unwrap();
-        let LoadedMetrics::Partitioned(partitions) = loaded else {
-            panic!("expected partitioned metrics");
-        };
-        let metrics = merge_partitioned_metrics(partitions);
-
-        let samples = &metrics[&11].samples;
-        assert_eq!(samples.len(), 2);
-        assert_eq!((samples[0].timestamp, samples[0].value), (100, 1.0));
-        assert_eq!(samples[1].timestamp, 200);
         assert!(config::meta::promql::is_stale_marker(samples[1].value));
     }
 

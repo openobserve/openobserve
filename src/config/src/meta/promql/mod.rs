@@ -84,8 +84,10 @@ pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
 /// Prometheus' staleness-marker NaN; an ordinary NaN is not stale.
 pub const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
-/// A metrics index stores an exemplar host row's NULL `value` as these bits; it is never a sample.
-pub const EXEMPLAR_HOST_NAN_BITS: u64 = 0x7ff0_0000_0000_0003;
+/// Exemplars live in a stream of their own next to the metric, never in its sample rows.
+pub const EXEMPLARS_STREAM_SUFFIX: &str = "_exemplars";
+/// The classic streams a histogram family degrades into, whose exemplars sit under the family.
+pub const CLASSIC_HISTOGRAM_SUFFIXES: [&str; 3] = ["_bucket", "_count", "_sum"];
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///
@@ -106,6 +108,21 @@ pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
     crate::TIMESTAMP_COL_NAME,
     crate::INDEX_FIELD_NAME_FOR_ALL,
 ];
+
+/// The stream that holds `metric`'s exemplars.
+pub fn exemplars_stream_name(metric: &str) -> String {
+    format!("{metric}{EXEMPLARS_STREAM_SUFFIX}")
+}
+
+/// The exemplar stream a selector reads, and the family's when the name is a classic stream.
+pub fn exemplars_stream_candidates(selector_name: &str) -> (String, Option<String>) {
+    let family = CLASSIC_HISTOGRAM_SUFFIXES
+        .iter()
+        .find_map(|suffix| selector_name.strip_suffix(suffix))
+        .filter(|base| !base.is_empty())
+        .map(exemplars_stream_name);
+    (exemplars_stream_name(selector_name), family)
+}
 
 #[inline]
 pub fn is_metrics_hash_excluded_label(name: &str) -> bool {
@@ -505,6 +522,22 @@ pub enum ApiErrorType {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_exemplars_stream_candidates() {
+        assert_eq!(
+            exemplars_stream_candidates("http_requests_total"),
+            ("http_requests_total_exemplars".to_string(), None)
+        );
+        assert_eq!(
+            exemplars_stream_candidates("rpc_latency_bucket"),
+            (
+                "rpc_latency_bucket_exemplars".to_string(),
+                Some("rpc_latency_exemplars".to_string())
+            )
+        );
+        assert_eq!(exemplars_stream_candidates("_sum").1, None);
+    }
+
     use expect_test::expect;
 
     use super::*;

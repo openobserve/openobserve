@@ -78,14 +78,6 @@ struct RecordSink<'a> {
     json_data_by_stream: &'a mut JsonDataByStream,
 }
 
-impl RecordSink<'_> {
-    /// Whether this request already buffered a record for the stream.
-    fn has_records(&self, metric_name: &str) -> bool {
-        self.json_data_by_stream.contains_key(metric_name)
-            || self.pipeline_inputs.contains_key(metric_name)
-    }
-}
-
 /// HA replica election, run once per request at the first record that will actually be written.
 struct HaGate<'a> {
     first_line: &'a mut bool,
@@ -195,13 +187,10 @@ pub async fn remote_write(
     let mut event_count = 0;
     let mut sample_count = 0;
     let mut exemplar_count = 0;
-    let mut dropped_exemplars = 0;
 
     // Pre-load all configurations for unique metrics to avoid repeated queries
     let preload_start = std::time::Instant::now();
     let mut unique_metrics = HashSet::new();
-    // Prometheus sends an exemplar as an entry of its own; for a native histogram that is all
-    let mut exemplar_only_metrics: HashSet<String> = HashSet::new();
     // a request carries far more series than distinct metric names, so each is formatted once
     let mut formatted_names: HashMap<String, String> = HashMap::new();
     for event in &request.timeseries {
@@ -220,8 +209,9 @@ pub async fn remote_write(
                 for suffix in CLASSIC_HISTOGRAM_SUFFIXES {
                     unique_metrics.insert(format!("{metric_name}{suffix}"));
                 }
-            } else if event.samples.is_empty() && !event.exemplars.is_empty() {
-                exemplar_only_metrics.insert(metric_name);
+            }
+            if !event.exemplars.is_empty() {
+                unique_metrics.insert(exemplars_stream_name(&metric_name));
             }
         }
     }
@@ -233,32 +223,14 @@ pub async fn remote_write(
     let mut created_streams: HashSet<String> = HashSet::new();
 
     if !unique_metrics.is_empty() {
-        let stream_params = |name: &String| StreamParams {
-            org_id: org_id.to_owned().into(),
-            stream_name: name.to_owned().into(),
-            stream_type: StreamType::Metrics,
-        };
-        let mut streams: Vec<StreamParams> = unique_metrics.iter().map(stream_params).collect();
-
-        // Preload schemas
-        let t = std::time::Instant::now();
-        preload_schemas(&streams, &mut metric_schema_map, &mut created_streams).await;
-        // an exemplar-only entry of a native histogram lands in the bucket stream, so that
-        // stream's configuration is needed too, with the schema that decides the host stream
-        let bucket_streams = exemplar_bucket_streams(&exemplar_only_metrics, &metric_schema_map);
-        let bucket_streams: Vec<StreamParams> = bucket_streams
+        let streams: Vec<StreamParams> = unique_metrics
             .iter()
-            .filter(|name| unique_metrics.insert((*name).clone()))
-            .map(stream_params)
+            .map(|name| StreamParams {
+                org_id: org_id.to_owned().into(),
+                stream_name: name.to_owned().into(),
+                stream_type: StreamType::Metrics,
+            })
             .collect();
-        preload_schemas(
-            &bucket_streams,
-            &mut metric_schema_map,
-            &mut created_streams,
-        )
-        .await;
-        streams.extend(bucket_streams);
-        preload_schema_time = t.elapsed().as_micros();
 
         // Preload pipelines
         let t = std::time::Instant::now();
@@ -282,6 +254,25 @@ pub async fn remote_write(
         )
         .await;
         preload_uds_time = t.elapsed().as_micros();
+
+        // Preload schemas
+        let t = std::time::Instant::now();
+        for stream in &streams {
+            let stream_name_str: &str = stream.stream_name.as_ref();
+            if !metric_schema_map.contains_key(stream_name_str) {
+                let schema_exists = stream_schema_exists(
+                    &stream.org_id,
+                    &stream.stream_name,
+                    stream.stream_type,
+                    &mut metric_schema_map,
+                )
+                .await;
+                if !schema_exists.has_fields {
+                    created_streams.insert(stream.stream_name.to_string());
+                }
+            }
+        }
+        preload_schema_time = t.elapsed().as_micros();
 
         // Preload partition keys
         for stream in &streams {
@@ -425,7 +416,7 @@ pub async fn remote_write(
             if event.exemplars.is_empty() {
                 continue;
             }
-            // only the exemplar host rows are left for the JSON path
+            // only the exemplar rows are left for the JSON path
             event.samples.clear();
         }
 
@@ -493,37 +484,23 @@ pub async fn remote_write(
             }
         }
 
+        // Prometheus sends an exemplar as a series entry of its own, usually without a sample
         if event.exemplars.is_empty() {
             continue;
         }
         exemplar_count += event.exemplars.len();
-        let Some(host_stream) =
-            exemplar_host_stream(&metric_name, schema, &sink, &metric_schema_map)
-        else {
-            dropped_exemplars += event.exemplars.len();
-            continue;
-        };
-        // a bucket stream names its rows after itself, and their hash is computed on write
-        let host_hash = if host_stream == metric_name {
-            known_hash
-        } else {
-            labels.insert(
-                NAME_LABEL.to_string(),
-                json::Value::String(host_stream.clone()),
-            );
-            None
-        };
-        let hosts = exemplar_host_records(std::mem::take(&mut labels), &event.exemplars);
-        if !hosts.is_empty() && !gate.admit().await {
+        let rows = exemplar_records(std::mem::take(&mut labels), &event.exemplars);
+        if !rows.is_empty() && !gate.admit().await {
             ingest::observe_request(WRITE_ENDPOINT, org_id, &start);
             return Ok(());
         }
-        for (record, timestamp) in hosts {
+        let exemplars_stream = exemplars_stream_name(&metric_name);
+        for (record, timestamp) in rows {
             buffer_metric_record(
-                &host_stream,
+                &exemplars_stream,
                 json::Value::Object(record),
                 timestamp,
-                host_hash,
+                None,
                 &mut sink,
             );
         }
@@ -544,7 +521,7 @@ pub async fn remote_write(
         let other_time = parse_timeseries_us.saturating_sub(total_preload_time);
 
         log::info!(
-            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}, exemplars: {exemplar_count}, dropped_exemplars: {dropped_exemplars}) | \
+            "[remote_write] org: {org_id}, parse timeseries took: {parse_timeseries_ms} ms, streams: {} (events: {event_count}, samples: {sample_count}, exemplars: {exemplar_count}) | \
             preload_total={:.1}ms (pipeline={:.1}ms, uds={:.1}ms, schema={:.1}ms, alerts={:.1}ms), other={:.1}ms",
             unique_metrics.len(),
             total_preload_time as f64 / 1000.0,
@@ -761,7 +738,7 @@ const DEFAULT_SERIES_LOOKBACK_MICROS: i64 = 24 * 3600 * 1_000_000;
 
 const WRITE_ENDPOINT: &str = "/prometheus/api/v1/write";
 
-// fallback hash exclusions; METRICS_HASH_EXCLUDED_LABELS would drop real Prometheus labels
+// fallback hash exclusions: an exemplar row hashes as its series, whatever its `exemplars` holds
 const PENDING_HASH_EXCLUDED: &[&str] = &[VALUE_LABEL, EXEMPLARS_LABEL];
 
 fn normalize_series_time_range(start: i64, end: i64) -> (i64, i64) {
@@ -1190,101 +1167,36 @@ fn build_metric_record(
     record
 }
 
-/// Loads the schema of each stream not yet in the map, noting the ones this request creates.
-async fn preload_schemas(
-    streams: &[StreamParams],
-    metric_schema_map: &mut HashMap<String, SchemaCache>,
-    created_streams: &mut HashSet<String>,
-) {
-    for stream in streams {
-        let stream_name_str: &str = stream.stream_name.as_ref();
-        if metric_schema_map.contains_key(stream_name_str) {
-            continue;
-        }
-        let schema_exists = stream_schema_exists(
-            &stream.org_id,
-            &stream.stream_name,
-            stream.stream_type,
-            metric_schema_map,
-        )
-        .await;
-        if !schema_exists.has_fields {
-            created_streams.insert(stream.stream_name.to_string());
-        }
-    }
-}
-
-/// The bucket stream of each exemplar-only metric whose own stream cannot host a row.
-fn exemplar_bucket_streams(
-    exemplar_only_metrics: &HashSet<String>,
-    metric_schema_map: &HashMap<String, SchemaCache>,
-) -> Vec<String> {
-    exemplar_only_metrics
-        .iter()
-        .filter(|name| !ingest::has_value_column(metric_schema_map.get(*name)))
-        .map(|name| exemplar_bucket_stream(name))
-        .collect()
-}
-
-/// A native histogram writes only its classic streams, so its exemplars sit by the buckets.
-fn exemplar_bucket_stream(metric_name: &str) -> String {
-    format!("{metric_name}{}", CLASSIC_HISTOGRAM_SUFFIXES[0])
-}
-
-/// The stream a host row lands in: the series' own, else a native histogram's bucket stream.
-fn exemplar_host_stream(
-    metric_name: &str,
-    schema: Option<&SchemaCache>,
-    sink: &RecordSink<'_>,
-    metric_schema_map: &HashMap<String, SchemaCache>,
-) -> Option<String> {
-    // a host row needs the `value` column samples create, like a stale marker does
-    if ingest::has_value_column(schema) || sink.has_records(metric_name) {
-        return Some(metric_name.to_string());
-    }
-    let bucket = exemplar_bucket_stream(metric_name);
-    (sink.has_records(&bucket) || ingest::has_value_column(metric_schema_map.get(&bucket)))
-        .then_some(bucket)
-}
-
-/// One host row per exemplar timestamp: a NULL `value` plus the `exemplars` string OTLP writes.
-fn exemplar_host_records(
+/// One row per exemplar for the metric's exemplar stream: the series labels, the exemplar's
+/// own value and time, and the `exemplars` string the exemplar loader parses.
+fn exemplar_records(
     mut labels: json::Map<String, json::Value>,
     exemplars: &[prom_decode::Exemplar<'_>],
 ) -> Vec<(json::Map<String, json::Value>, i64)> {
-    let mut groups: Vec<(i64, Vec<json::Value>)> = Vec::with_capacity(exemplars.len());
-    for exemplar in exemplars {
-        let Some(value) = super::sanitize_metric_value(exemplar.value).value() else {
-            continue;
-        };
-        let timestamp = parse_i64_to_timestamp_micros(exemplar.timestamp);
-        let mut rec = json::Map::with_capacity(exemplar.labels.len() + 2);
-        for (name, val) in &exemplar.labels {
-            rec.insert((*name).to_string(), json::Value::String((*val).to_string()));
-        }
-        let rec = json::Value::Object(build_metric_record(rec, Some(value), timestamp));
-        match groups.iter_mut().find(|(ts, _)| *ts == timestamp) {
-            Some((_, group)) => group.push(rec),
-            None => groups.push((timestamp, vec![rec])),
-        }
-    }
-    let last = groups.len().saturating_sub(1);
-    groups
-        .into_iter()
+    let last = exemplars.len().saturating_sub(1);
+    exemplars
+        .iter()
         .enumerate()
-        .map(|(idx, (timestamp, group))| {
-            // the last host row owns the label set; nothing reads it afterwards
+        .filter_map(|(idx, exemplar)| {
+            let value = super::sanitize_metric_value(exemplar.value).value()?;
+            let timestamp = parse_i64_to_timestamp_micros(exemplar.timestamp);
+            let mut entry = json::Map::with_capacity(exemplar.labels.len() + 2);
+            for (name, val) in &exemplar.labels {
+                entry.insert((*name).to_string(), json::Value::String((*val).to_string()));
+            }
+            let entry = json::Value::Object(build_metric_record(entry, Some(value), timestamp));
+            // the last row owns the label set; nothing reads it afterwards
             let labels = if idx == last {
                 std::mem::take(&mut labels)
             } else {
                 labels.clone()
             };
-            let mut record = build_metric_record(labels, None, timestamp);
+            let mut record = build_metric_record(labels, Some(value), timestamp);
             record.insert(
                 EXEMPLARS_LABEL.to_string(),
-                json::Value::String(json::Value::Array(group).to_string()),
+                json::Value::String(json::Value::Array(vec![entry]).to_string()),
             );
-            (record, timestamp)
+            Some((record, timestamp))
         })
         .collect()
 }
@@ -2023,7 +1935,7 @@ mod tests {
     }
 
     #[test]
-    fn test_exemplar_host_records_group_by_timestamp_and_feed_the_exemplar_loader() {
+    fn test_exemplar_records_carry_the_series_labels_and_feed_the_exemplar_loader() {
         use config::meta::promql::value::{Exemplar, LabelsExt};
 
         let mut labels = json::Map::new();
@@ -2041,116 +1953,40 @@ mod tests {
                 timestamp: 1_700_000_000_006,
             },
             prom_decode::Exemplar {
-                labels: vec![("trace_id", "jkl")],
-                value: f64::INFINITY,
-                timestamp: 1_700_000_000_005,
-            },
-            prom_decode::Exemplar {
                 labels: vec![],
-                value: 1.0,
+                value: f64::INFINITY,
                 timestamp: 1_700_000_000_007,
             },
         ];
 
-        let hosts = exemplar_host_records(labels.clone(), &exemplars);
+        let rows = exemplar_records(labels.clone(), &exemplars);
 
-        let timestamps: Vec<i64> = hosts.iter().map(|(_, ts)| *ts).collect();
-        assert_eq!(
-            timestamps,
-            vec![
-                parse_i64_to_timestamp_micros(1_700_000_000_005),
-                parse_i64_to_timestamp_micros(1_700_000_000_007)
-            ]
-        );
-        let (first, first_ts) = &hosts[0];
-        assert_eq!(first.get(VALUE_LABEL), Some(&json::Value::Null));
+        assert_eq!(rows.len(), 2);
+        let (first, first_ts) = &rows[0];
+        assert_eq!(*first_ts, parse_i64_to_timestamp_micros(1_700_000_000_005));
+        assert_eq!(first.get(VALUE_LABEL), Some(&json::json!(2.5)));
         assert_eq!(first.get(TIMESTAMP_COL_NAME), Some(&json::json!(first_ts)));
         assert_eq!(first.get("job"), Some(&json::json!("api")));
+        assert_eq!(
+            first.get(NAME_LABEL),
+            Some(&json::json!("http_requests_total"))
+        );
         let stored: Vec<json::Value> =
             json::from_str(first[EXEMPLARS_LABEL].as_str().unwrap()).unwrap();
-        assert_eq!(stored.len(), 2);
+        assert_eq!(stored.len(), 1);
         let exemplar = Exemplar::from(stored[0].as_object().unwrap());
         assert_eq!(exemplar.value, 2.5);
         assert_eq!(exemplar.timestamp, *first_ts);
         assert_eq!(exemplar.labels.get_value("trace_id"), "abc");
         assert_eq!(exemplar.labels.get_value("span_id"), "def");
-        assert_eq!(
-            Exemplar::from(stored[1].as_object().unwrap()).value,
-            f64::MAX
-        );
-        let (second, _) = &hosts[1];
-        let stored: Vec<json::Value> =
-            json::from_str(second[EXEMPLARS_LABEL].as_str().unwrap()).unwrap();
-        assert_eq!(
-            stored,
-            vec![json::json!({"value": 1.0, "_timestamp": hosts[1].1})]
-        );
+        // infinities clamp like samples, NaN writes no row
+        assert_eq!(rows[1].0.get(VALUE_LABEL), Some(&json::json!(f64::MAX)));
 
-        assert!(exemplar_host_records(labels, &exemplars[1..2]).is_empty());
+        assert!(exemplar_records(labels, &exemplars[1..2]).is_empty());
     }
 
     #[test]
-    fn test_exemplar_host_stream_falls_back_to_a_native_histogram_bucket_stream() {
-        use datafusion::arrow::datatypes::{DataType, Field};
-
-        let pipelines = HashMap::new();
-        let uds = HashMap::new();
-        let mut pipeline_inputs = HashMap::new();
-        let mut json_data_by_stream: JsonDataByStream = HashMap::new();
-        json_data_by_stream.insert("rpc_latency_bucket".to_string(), vec![]);
-        let sink = RecordSink {
-            pipelines: &pipelines,
-            user_defined_schema: &uds,
-            pipeline_inputs: &mut pipeline_inputs,
-            json_data_by_stream: &mut json_data_by_stream,
-        };
-        let with_value = || {
-            SchemaCache::new(Schema::new(vec![Field::new(
-                VALUE_LABEL,
-                DataType::Float64,
-                true,
-            )]))
-        };
-        let mut schemas = HashMap::new();
-        schemas.insert("up".to_string(), with_value());
-        schemas.insert("db_latency_bucket".to_string(), with_value());
-        schemas.insert(
-            "http_latency_bucket".to_string(),
-            SchemaCache::new(Schema::empty()),
-        );
-
-        // the series' own stream wins whenever it has or gets a value column
-        assert_eq!(
-            exemplar_host_stream("up", schemas.get("up"), &sink, &schemas),
-            Some("up".to_string())
-        );
-        // buckets buffered by this request host a native histogram's exemplars
-        assert_eq!(
-            exemplar_host_stream("rpc_latency", None, &sink, &schemas),
-            Some("rpc_latency_bucket".to_string())
-        );
-        // so does a bucket stream an earlier request created
-        assert_eq!(
-            exemplar_host_stream("db_latency", None, &sink, &schemas),
-            Some("db_latency_bucket".to_string())
-        );
-        assert_eq!(
-            exemplar_host_stream("http_latency", None, &sink, &schemas),
-            None
-        );
-
-        // only metrics whose own stream cannot host a row get their bucket stream preloaded
-        let exemplar_only: HashSet<String> = ["up", "db_latency", "new_metric"]
-            .into_iter()
-            .map(String::from)
-            .collect();
-        let mut buckets = exemplar_bucket_streams(&exemplar_only, &schemas);
-        buckets.sort();
-        assert_eq!(buckets, vec!["db_latency_bucket", "new_metric_bucket"]);
-    }
-
-    #[test]
-    fn test_exemplar_host_row_hashes_with_its_series_on_both_hash_paths() {
+    fn test_exemplar_row_hashes_as_its_series_on_the_fallback_path() {
         let label_pairs = vec![
             (Cow::Borrowed(NAME_LABEL), Cow::Borrowed("up")),
             (Cow::Borrowed("instance"), Cow::Borrowed("a")),
@@ -2164,17 +2000,11 @@ mod tests {
             value: 1.0,
             timestamp: 7,
         };
-        let (host, _) = exemplar_host_records(labels.clone(), &[exemplar]).remove(0);
-        let sample = build_metric_record(labels, Some(1.0), 5);
+        let (row, _) = exemplar_records(labels, &[exemplar]).remove(0);
 
-        let series = crate::metrics::signature_of_series_labels(&label_pairs);
         assert_eq!(
-            crate::metrics::signature_without_labels(&sample, PENDING_HASH_EXCLUDED),
-            series
-        );
-        assert_eq!(
-            crate::metrics::signature_without_labels(&host, PENDING_HASH_EXCLUDED),
-            series
+            crate::metrics::signature_without_labels(&row, PENDING_HASH_EXCLUDED),
+            crate::metrics::signature_of_series_labels(&label_pairs)
         );
     }
 

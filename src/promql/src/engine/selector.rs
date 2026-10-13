@@ -35,7 +35,7 @@ use crate::{
     ast::rewrite::remove_filter_all,
     functions, micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
-    utils::{metric_name, offset_micros},
+    utils::{exemplars_stream_for, metric_name, offset_micros},
 };
 
 pub(super) type SelectorContexts = Vec<ScanContext>;
@@ -369,6 +369,18 @@ impl Engine {
         }
 
         let label_selector = self.selector_labels();
+
+        // an exemplar query reads the exemplar stream; mapped after the super-cluster forward
+        // above, so a peer maps the metric name once itself
+        let exemplar_selector;
+        let selector = if self.ctx.query_ctx.query_exemplars {
+            let mut mapped = selector.clone();
+            mapped.name = Some(exemplars_stream_for(&self.ctx.query_ctx.org_id, table_name).await);
+            exemplar_selector = mapped;
+            &exemplar_selector
+        } else {
+            selector
+        };
 
         let ctxs = match ctxs {
             Some(ctxs) => ctxs,
