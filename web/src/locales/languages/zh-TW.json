@@ -1405,6 +1405,7 @@
     "freeTextBuildNotice": "此篩選條件包含文字搜尋；請在 SQL 中編輯。"
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "升級至 PRO 方案",
     "home": "首頁",
     "about": "關於",
@@ -22448,5 +22449,1079 @@
     "modeExhausted": "已用盡",
     "modeFree": "免費",
     "modeUnknown": "未知"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "傳送您的資料。OpenObserve 會找出問題並通知您，同時提供對原因的最佳判讀。當一切平靜時，它會顯示檢查過的項目，以及它看不見的部分。",
+    "phase2": "階段 2",
+    "tabs": {
+      "issues": "問題",
+      "coverage": "涵蓋範圍",
+      "activity": "活動",
+      "policy": "政策"
+    },
+    "loops": {
+      "coverage": "涵蓋範圍",
+      "calibration": "校準",
+      "investigation": "調查",
+      "action": "動作"
+    },
+    "signals": {
+      "requests": "請求",
+      "errors": "錯誤",
+      "latency": "延遲",
+      "saturation": "飽和度",
+      "logPatterns": "日誌模式",
+      "dependencies": "相依性"
+    },
+    "ledgerStatus": {
+      "autoApplied": "自動套用",
+      "awaiting": "待核准",
+      "approved": "已核准",
+      "rejected": "已拒絕",
+      "rolledBack": "已回復",
+      "kept": "保留 — 檢查通過"
+    },
+    "issues": {
+      "subtitle": "由 SRE 代理分組並調查的事件。每個問題僅一則通知；原因會一併附上，若分診逾時或失敗，則會在同一討論串中後續送出。",
+      "open": "未解決",
+      "recent": "已解決",
+      "all": "全部",
+      "heldForDigest": "保留至週五摘要",
+      "colId": "事件",
+      "colTitle": "問題",
+      "colSeverity": "嚴重性",
+      "colServices": "受影響的服務",
+      "colStarted": "開始時間",
+      "colStatus": "狀態",
+      "colCause": "原因",
+      "emptyTitle": "這裡沒有內容",
+      "emptyDescription": "沒有符合此篩選條件的問題。",
+      "subsetNote": "顯示 {shown}。此示範顯示本週 {total} 個事件中的部分內容。",
+      "searchLabel": "搜尋問題",
+      "searchPlaceholder": "搜尋問題、服務、原因或 INC-…",
+      "noMatch": "沒有符合「{query}」的問題",
+      "clearSearch": "清除搜尋",
+      "matchCount": "沒有符合的問題 | 1 個符合的問題 | {count} 個符合的問題",
+      "colSignal": "訊號",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → 現在",
+      "minutes": "{count} 分鐘",
+      "grouped": "{count} 個警示 → 1 個事件 | {count} 個警示 → 1 個事件",
+      "confidence": "{level} 信心度",
+      "proposed": "建議",
+      "reversible": "可復原",
+      "proposalFor": "為 {title} 建議的修正"
+    },
+    "drawer": {
+      "rca": "根本原因",
+      "rcaSummary": "摘要",
+      "likelyCause": "可能原因",
+      "confidence": "信心度",
+      "confidenceValue": "信心度：{value}（尚無校正分數）",
+      "nextStep": "建議的下一步",
+      "evidence": "證據",
+      "blastRadius": "影響範圍",
+      "upstream": "上游呼叫方",
+      "affected": "受影響",
+      "downstream": "下游相依項目",
+      "none": "無",
+      "timeline": "時間軸",
+      "notification": "已傳送通知",
+      "notSent": "未發送通知：這個低嚴重性問題被保留到週五摘要。已記錄在產品內收件匣。",
+      "sender": "AutoObserve",
+      "threadReply": "已在討論串中回覆",
+      "p1Note": "P1 會立即發送通知，在調查完成之前。原因會在同一討論串中隨後說明。",
+      "gateNote": "P2 和 P3 通知會等待調查最多 2 分鐘，因此第一則訊息通常會附上原因。若分類逾時或失敗，訊息會顯示調查仍在進行或已失敗，而原因會在同一討論串中隨後說明。P4 問題不會通知任何人；它們會被納入週五摘要。",
+      "caughtEarlier": "原本什麼能更早發現這個問題",
+      "analyzedAt": "調查已於 {time} 完成。",
+      "triggersSample": "顯示 {total} 次觸發中的 {shown} 次",
+      "waitingForOk": "等待您的確認",
+      "proposedFix": "建議修正",
+      "unfoldTab": "事件發展過程",
+      "seeEvidence": "查看證據（{count}）→"
+    },
+    "unfold": {
+      "hint": "由左至右閱讀：什麼發生了變化、它引發的訊號，然後是什麼傳達到您的團隊。選取卡片以查看其觸發記錄。",
+      "legend": "卡片類型",
+      "team": "您的團隊",
+      "kind": {
+        "metric": "指標",
+        "log": "日誌",
+        "trace": "追蹤",
+        "change": "變更"
+      },
+      "likelyCause": "可能原因",
+      "linesUpWith": "與其吻合",
+      "times": "×{count}",
+      "sameMinute": "同一分鐘",
+      "plusMinutes": "+{count} 分鐘",
+      "plusHours": "+{hours} 小時 {minutes} 分鐘",
+      "firstFired": "首次觸發",
+      "lastFired": "最後觸發",
+      "firings": "觸發次數",
+      "peak": "峰值",
+      "normal": "相比基準",
+      "detector": "偵測器",
+      "firedAt": "觸發於",
+      "when": "時間",
+      "chartNote": "問題的主要圖表，如 Evidence 所示",
+      "outcome": {
+        "paged": "已呼叫值班",
+        "asked": "已請求確認",
+        "notified": "已傳送訊息，未呼叫",
+        "held": "保留至週五摘要",
+        "fixFailed": "修復無效",
+        "fixed": "已修復",
+        "resolved": "已解決",
+        "open": "仍未解決"
+      }
+    },
+    "coverage": {
+      "showing": "顯示 {total} 個服務中的 {shown} 個",
+      "watched": "已監控",
+      "learning": "學習中",
+      "gap": "缺口",
+      "na": "不適用",
+      "anomaly": "異常",
+      "threshold": "閾值",
+      "service": "服務",
+      "lastScanned": "上次掃描",
+      "detector": "偵測器",
+      "methodAnomaly": "異常偵測器，學習基準",
+      "methodThreshold": "來自程式庫的靜態閾值",
+      "libraryEntry": "程式庫項目",
+      "predicate": "適用性",
+      "predicateMatched": "{predicate} — 在串流 {stream} 中符合",
+      "predicateUnmatched": "{predicate} — 未符合",
+      "reason": "原因",
+      "history": "{total} 天歷史中的 {days} 天",
+      "notScanned": "首次掃描進行中 — 未知，完成前不予涵蓋",
+      "guardrails": "學習期間防護機制已啟用：錯誤率上限 · 新鮮度檢查（串流停止時觸發）",
+      "alsoWatchedBy": "也由以下監控",
+      "searchLabel": "搜尋服務",
+      "searchPlaceholder": "搜尋服務或串流",
+      "matchCount": "沒有符合的服務 | 1 個服務符合 | {count} 個服務符合",
+      "noMatch": "沒有服務或串流符合「{query}」",
+      "clearSearch": "清除搜尋",
+      "filterLabel": "依涵蓋範圍篩選服務",
+      "all": "全部",
+      "gaps": "缺口",
+      "cantWatch": "無法監控",
+      "detectorCount": "1 個偵測器 | {count} 個偵測器",
+      "stream": "串流",
+      "coverage": "涵蓋範圍",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "已監控 {total} 個適用訊號中的 {watched} 個",
+      "legendLabel": "圖例",
+      "gapChip": "缺口",
+      "daysShort": "{days}/{total}天",
+      "tipAnomaly": "{signal}：異常偵測器，學習基準",
+      "tipThreshold": "{signal}：來自程式庫的靜態閾值",
+      "tipLearning": "{signal}：學習中，{total} 天歷史中的 {days} 天",
+      "tipGap": "{signal}：缺口，尚無法監控",
+      "tipNa": "{signal}：不適用",
+      "config": "偵測器設定",
+      "lastFired": "上次觸發",
+      "never": "從未",
+      "hoursAgo": "1 小時前 | {count} 小時前",
+      "daysAgo": "1 天前 | {count} 天前",
+      "fixNoLink": "新增 service.name 標籤",
+      "fixStopped": "檢查收集器",
+      "fixQueued": "僅模擬：「{action}」針對 {service} 未傳送至任何位置",
+      "viewLabel": "涵蓋範圍檢視",
+      "viewMap": "地圖",
+      "viewTable": "表格",
+      "fillBy": "填色依據",
+      "fillState": "涵蓋狀態",
+      "fillLearning": "學習進度",
+      "fillDetectors": "偵測器數量",
+      "fillScanned": "上次掃描距今時間",
+      "summaryWatched": "{watched}／{total} 已完整監控 · {pct}%",
+      "addedThisWeek": "本週 1 個新服務 | 本週 {count} 個新服務",
+      "splitLabel": "{watched} 已完整監控，{learning} 學習中，{gaps} 尚無法監控",
+      "stateWatched": "完整監控",
+      "stateLearning": "學習中 · {days}／{total} 天",
+      "stateGap": "尚無法監控",
+      "hexName": "{service}，{state}，{stream}，{detectors}",
+      "legendOf": "{fill} 的圖例，選取以醒目顯示",
+      "mapLabel": "涵蓋範圍地圖，1 個服務依 {fill} 填色 | 涵蓋範圍地圖，{count} 個服務依 {fill} 填色",
+      "bucketLearned": "已學習",
+      "bucketDays67": "6–7 天",
+      "bucketDays35": "3–5 天",
+      "bucketDays02": "0–2 天",
+      "bucketNoData": "無數據",
+      "bucketSix": "6 個偵測器",
+      "bucketFive": "5 個偵測器",
+      "bucketFewer": "1–4 個偵測器",
+      "bucketNone": "無",
+      "bucketFresh": "5 分鐘內",
+      "bucketRecent": "5–15 分鐘",
+      "bucketHour": "15–60 分鐘",
+      "bucketStale": "超過 1 小時",
+      "bucketNotScanned": "未掃描",
+      "signals": "訊號",
+      "details": "詳細資料",
+      "detailsFor": "顯示 {metric} 的詳細資料",
+      "readyCaption": "正常範圍將於 {day} 就緒 · {days}／{total} 天",
+      "chartLearning": "{metric}，目前 {value}，學習中，尚無正常範圍",
+      "chartOverThreshold": "{metric}，目前 {value}，超過其 {threshold} 閾值",
+      "chartUnderThreshold": "{metric}，目前 {value}，低於其 {threshold} 閾值",
+      "chartAbove": "{metric}，目前 {value}，高於正常範圍",
+      "chartBelow": "{metric}，目前 {value}，低於正常範圍",
+      "chartWithin": "{metric}，目前 {value}，在正常範圍內",
+      "tipNormal": "正常 {low} – {high}",
+      "openTraces": "追蹤",
+      "openCatalog": "服務目錄",
+      "rangeLabel": "時間範圍",
+      "logPatternsValue": "{known} 已知 · 今日新增 {fresh}",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "未監看",
+      "signalsWatched": "已監看的訊號",
+      "chipAria": "{signal}：{state}",
+      "deltaUp": "自範圍開始以來上升 {change}",
+      "deltaDown": "自範圍開始以來下降 {change}",
+      "deltaFlat": "自範圍開始以來無變化",
+      "badgeLearning": "學習中 {days}/{total} 天",
+      "badgeAnomaly": "異常 · 已學習",
+      "badgeThreshold": "閾值 > {threshold}",
+      "now": "現在",
+      "bandLearning": "正在學習基準 · {total} 天中的第 {days} 天 · 正常範圍將於 {day} 就緒",
+      "metric": {
+        "requests": "請求",
+        "errors": "錯誤",
+        "latencyP95": "延遲 p95",
+        "cpu": "CPU",
+        "pool": "使用中的集區",
+        "memory": "記憶體",
+        "queries": "查詢",
+        "queryLatency": "查詢延遲 p95",
+        "connections": "使用中的連線",
+        "ops": "操作",
+        "rejections": "遭拒的連線",
+        "latency": "延遲",
+        "messages": "訊息",
+        "failed": "失敗（死信）",
+        "lag": "消費者落後量",
+        "depth": "佇列深度"
+      }
+    },
+    "activity": {
+      "allLoops": "所有迴圈",
+      "allStatuses": "所有狀態",
+      "ledgerHint": "AutoObserve 提出的或所做的每一項變更都會記錄在此。",
+      "userBuilt": "使用者建立的警示",
+      "confidence": "信心度：{value}",
+      "evidence": "證據：",
+      "before": "之前",
+      "after": "之後",
+      "neverAutoRetire": "停用警示永遠不會自動進行。",
+      "neverSilent": "使用者建立的警示永遠不會被默默變更。",
+      "undo": "復原",
+      "approve": "核准",
+      "edit": "編輯",
+      "reject": "拒絕",
+      "saveApprove": "儲存並核准",
+      "undoneNote": "已由您復原 — 先前的狀態已從快照還原",
+      "undoneToast": "已復原。已在此示範的帳本中標記為已回復。",
+      "approvedToast": "已核准。已在此示範的帳本中標記為已核准。",
+      "rejectedNote": "您已拒絕",
+      "rejectedToast": "已拒絕。已記錄至此動作類別。",
+      "emptyTitle": "沒有項目",
+      "emptyDescription": "帳本中沒有符合這些篩選條件的項目。",
+      "reviewWindow": "審查期為 {window} — 若檢查通過則自動保留，失敗則回復。先前的設定會持續在背景評估，因此這項變更原本會隱藏的任何內容仍會顯示。復原會立即還原先前的狀態。",
+      "approvedNote": "您已於 {time} 核准。",
+      "applyingNote": "您已於 {time} 核准；正在套用。",
+      "appliedNote": "您已於 {time} 核准並套用。",
+      "declinedNote": "您已拒絕。",
+      "needsApproval": "需要您的核准",
+      "awaiting": "等待中",
+      "auto": "自動",
+      "outcomeFilter": "依結果篩選",
+      "loopFilter": "依迴圈篩選",
+      "columns": {
+        "time": "時間",
+        "loop": "迴圈",
+        "action": "動作",
+        "target": "目標",
+        "change": "變更",
+        "confidence": "信心度",
+        "decision": "決策",
+        "outcome": "結果",
+        "actions": "動作"
+      },
+      "showDetails": "顯示 {target} 上 {action} 的詳細資料",
+      "hideDetails": "隱藏 {target} 上 {action} 的詳細資料",
+      "approveFor": "核准 {target} 上的 {action}",
+      "rejectFor": "拒絕 {target} 上的 {action}",
+      "editFor": "編輯 {target} 上的 {action}",
+      "undoFor": "復原 {target} 上的 {action}",
+      "openIncident": "開啟事件 {id}",
+      "confidenceHint": "{value} — 尚無校正分數",
+      "diff": "提議的變更，包含移除與新增的行",
+      "daysLeft": "{count} 天 | {count} 天",
+      "reviewProgress": "審查期已過時間",
+      "entryId": "項目",
+      "logged": "已記錄"
+    },
+    "policy": {
+      "gateHint": "在對現有警示的變更中，只有去重複會自行套用，並附帶先前狀態的快照與審查期：檢查通過則保留，失敗則回復。其他所有變更都需等待一鍵核准。",
+      "off": "關閉",
+      "suggest": "建議",
+      "auto": "自動",
+      "phase2Title": "動作 — 補救",
+      "phase2Hint": "正式環境的修正。每個類別依其可量測的歷史記錄取得對應層級，且絕不會執行超出該層級的動作。",
+      "investigation": "調查",
+      "outcomesTitle": "結果",
+      "outcomesBody": "AutoObserve 會衡量每個動作的成效：錯誤率是否回復正常、值班通報是否停止、是否被復原。持續表現良好的類別會逐步獲得更多自主權，一次一個類別；一次失誤會對其不利，而反覆需要進行的修正則會被回報為錯誤，而非自動化。",
+      "outcomesExample": "ScaleQueueWorkers 在 7 次已核准的擴充成功後升為「自動」。它在 10 月 2 日的一次失誤新增了前置檢查，若再失誤一次就會退回「建議」。AbortRollout 會等待您的確認；RollbackDeploy 在累積歷史記錄前維持「關閉」。",
+      "triage": {
+        "parallel": "平行",
+        "gate": "閘門",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "立即發送通知並同步展開調查；原因會在同一討論串中接續說明。P1 不允許使用 Gate。",
+        "gateDesc": "暫緩發送通知，直到調查完成，最多等待 2 分鐘。失敗時採開放策略：若分診逾時或失敗，仍會發送通知，並說明調查仍在進行或已失敗，原因則於討論串中接續說明。"
+      },
+      "classes": {
+        "EnableDeduplication": "為數分鐘內重複出現的警示開啟去重功能。",
+        "CreateDetector": "針對服務的請求、錯誤或延遲建立異常偵測器。",
+        "RaiseThreshold": "提高在健康狀況良好時仍觸發的閾值。",
+        "LengthenEvaluationWindow": "延長反覆震盪之警示的時間範圍。",
+        "FixAlertQuery": "修正測量錯誤項目或永遠無法匹配的警示查詢。",
+        "AttachDestination": "為觸發後無處可送的偵測器附加目標。",
+        "AddLibraryAlert": "在述詞相符之處，從警示庫新增排程警示。",
+        "MoveToIncidentDelivery": "讓使用者自建的警示透過其所屬事件遞送，而非走自己的路由。",
+        "ReviewForDeletion": "建議淘汰無人處理的警示。",
+        "RollbackDeploy": "回復造成問題的部署。",
+        "ScaleService": "橫向擴充已飽和的服務。",
+        "RestartPod": "在其複本健康時，重新啟動停止服務的 Pod；若再次發生則改為開立錯誤單。",
+        "ToggleFeatureFlag": "關閉問題背後的功能旗標。",
+        "RunRunbookStep": "執行服務 Runbook 中的步驟。",
+        "LowerThreshold": "調降未能及時在事件前預警的閾值。",
+        "RevertConfigChange": "當未套用該設定的複本健康時，還原問題發生時所做的近期設定變更。",
+        "EvictLeakedConnections": "關閉服務取出後從未歸還的連線（由洩漏偵測找出），但不動仍在進行中的查詢。每個連線都會連結到該洩漏的錯誤單。",
+        "AbortRollout": "當只有新版本的 Pod 在推出過程中失敗時，將流量送回前一版本。可一鍵繼續。",
+        "ScaleQueueWorkers": "為堆積的佇列增加工作執行緒，直到上限為止；若消化速率未改善，會自動縮回。"
+      },
+      "triageHint": "依嚴重性進行 L0 分診。第一階段為固定設定。",
+      "channels": "管道",
+      "channelInbox": "產品內收件匣",
+      "channelEmailAdmins": "以電子郵件寄送給組織管理員",
+      "channelDefault": "所有組織的預設值。永遠開啟。",
+      "alwaysOn": "永遠開啟",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "已連線。為選用項目；沒有它，收件匣與電子郵件仍可運作。",
+      "connected": "已連線",
+      "defaultsNote": "第一階段提供固定的產品預設值。各組織的覆寫設定將於日後推出。",
+      "groupCoverage": "涵蓋範圍 — 自動建立偵測器",
+      "groupCoverageHint": "每個新服務一出現，就會取得異常偵測器與相符的警示庫警示，並在學習期間進行基本安全檢查。每次建立都會被記錄、可以復原，並經過一段審查期間。",
+      "groupCalibration": "校準 — 對現有警示的變更",
+      "channelEmail": "電子郵件 {address}",
+      "paging": "通知發送",
+      "pagingHint": "嚴重性決定問題如何傳達給人員。",
+      "routing": {
+        "p1p2": "P1 與 P2",
+        "p1p2Desc": "影響客戶。任何時段都會通知值班人員。",
+        "page": "通知值班",
+        "p3": "P3",
+        "p3Desc": "準備好時立即發送 Slack 訊息。絕不通知任何人值班。",
+        "message": "訊息",
+        "p4": "P4",
+        "p4Desc": "納入週五摘要。",
+        "summary": "週五摘要"
+      },
+      "nav": {
+        "coverage": "涵蓋範圍",
+        "alerts": "警示變更",
+        "fixes": "修復",
+        "investigation": "調查與呼叫值班",
+        "channels": "頻道"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "已連線 {count} 個"
+      }
+    },
+    "notInDemo": "此示範中無法使用",
+    "confidence": {
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "uncalibrated": "尚無校準分數"
+    },
+    "analysis": {
+      "verdict": "判定",
+      "unconfirmed": "尚未確認",
+      "lasted": "持續 {count} 分鐘",
+      "soFar": "目前 {count} 分鐘",
+      "checked": "我檢查了什麼",
+      "verdicts": {
+        "confirmed": "已確認",
+        "ruled_out": "已排除",
+        "open": "仍未解決"
+      },
+      "comparison": "健康 vs 受影響",
+      "kinds": {
+        "affected": "受影響",
+        "healthy": "健康",
+        "limit": "限制"
+      },
+      "trail": "證據軌跡",
+      "seeInUnfold": "在「事件如何發展」中查看",
+      "nextStep": "下一步",
+      "fullReport": "完整報表",
+      "fullReportHint": "將上述所有內容整合為單一文件，可直接複製或下載"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "示範",
+    "scenarioLabel": "示範情境",
+    "scenarios": {
+      "demo": "示範週",
+      "allClear": "一切正常",
+      "incident": "進行中的事件",
+      "cantSee": "看不到",
+      "noBaseline": "無基準"
+    },
+    "nav": {
+      "history": "歷史記錄",
+      "settings": "管理",
+      "howItWorks": "運作方式",
+      "searchLabel": "搜尋問題",
+      "searchPlaceholder": "搜尋問題"
+    },
+    "recent": {
+      "ranges": {
+        "day": "過去 24 小時",
+        "week": "過去 7 天",
+        "month": "過去 30 天"
+      },
+      "within": {
+        "day": "在過去 24 小時內",
+        "week": "在過去 7 天內",
+        "month": "在過去 30 天內"
+      },
+      "groups": {
+        "thisWeek": "本週",
+        "lastWeek": "上週",
+        "weeksAgo": "{count} 週前"
+      },
+      "all": "全部",
+      "none": "{within}沒有 {priority} 問題。",
+      "allIssues": "所有問題",
+      "priorityLabel": "優先級",
+      "showing": "顯示 {count} 個問題 | 顯示 {count} 個問題"
+    },
+    "noProblems": "{within}沒有問題。我全天候檢查了 {count} 個服務。 | {within}沒有問題。我全天候檢查了 {count} 個服務。",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "再顯示 {count} 個",
+    "showFewer": "顯示較少",
+    "days": {
+      "today": "今天",
+      "monday": "星期一",
+      "tuesday": "星期二",
+      "wednesday": "星期三",
+      "thursday": "星期四",
+      "friday": "星期五",
+      "jul18": "7月18日",
+      "jul30": "7月30日",
+      "aug13": "8月13日",
+      "aug26": "8月26日",
+      "sep4": "9月4日",
+      "sep12": "9月12日",
+      "sep24": "9月24日",
+      "sep30": "9月30日",
+      "oct1": "10月1日",
+      "oct2": "10月2日",
+      "sep23": "9月23日"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db 的磁碟將在約 3 天內用盡",
+        "summary": "自週四的 orders 發佈開啟稽核日誌以來，其磁碟每天約增加 18 GB，因此預計在週三上午左右會滿。屆時，結帳、訂單和退款將開始失敗。目前尚未故障，因此我向您的團隊發送了預警，而非呼叫值班。",
+        "notify1": "orders-db 的磁碟將在約 3 天內用盡，時間約在週三 11:00。",
+        "notify2": "原因：自 orders 3.8.0 於週四上線後，稽核日誌每天寫入約 18 GB。在此之前，磁碟每天約成長 6 GB。",
+        "notify3": "請在週三前調降稽核日誌量或增加磁碟空間。當磁碟滿了，結帳、訂單和退款將會失敗。目前尚未故障，因此這是預警，而非呼叫值班。",
+        "chartCaption": "磁碟 · 約週三 11:00 滿",
+        "chartLabel": "磁碟使用量在 14 天內從 334 GB 增至 445 GB（總容量 500 GB），自週四起增速加快，預計約在週三 11:00 滿。"
+      },
+      "search": {
+        "title": "搜尋速度緩慢，且 search-2 持續當機",
+        "titleFixed": "在 search-2 持續當機期間，搜尋速度緩慢",
+        "summary": "自 10:27 起，約每 5 次搜尋就有 1 次超過 3 秒。search-2 在 10:16 變更的一項設定使其記憶體耗盡。我已呼叫值班，問題仍在發生。",
+        "notify1": "搜尋速度緩慢：自 10:27 起，約每 5 次搜尋就有 1 次超過 3 秒。",
+        "notify2": "原因：search-2 在 10:16 變更的一項設定使其記憶體被佔滿。自 10:20 起它已當機約 10 次。其他 4 個節點沒有這項變更，運作正常。",
+        "notify3": "還原舊設定應該能修復問題，我可以進行還原。回覆 \"revert\"，我就會執行。進行變更的人應該檢查原因。",
+        "summaryFixed": "問題始於 10:27，因為 search-2 上的一項設定變更使其記憶體被佔滿。您已核准還原舊設定，因此我已執行，搜尋現已恢復正常。",
+        "summaryFixing": "問題始於 10:27，因為 search-2 上的一項設定變更使其記憶體被佔滿。您已核准還原舊設定，我現在正在執行。",
+        "chartCaption": "p95 延遲 · 峰值 3.4 秒",
+        "chartLabel": "p95 延遲在 10:27 從 0.38 秒上升至 3.4 秒，且仍偏高",
+        "chartLabelFixed": "p95 延遲在 10:27 從 0.38 秒上升至 3.4 秒，並在還原設定後恢復正常"
+      },
+      "checkout": {
+        "title": "部署後每 12 筆付款有 1 筆失敗",
+        "summary": "payments-api 2.3.1 向付款資料庫要求的連線數超過其允許值。回滾在失敗開始後 18 分鐘修復了問題。",
+        "notify1": "自 14:02 起，結帳約每 12 筆付款有 1 筆失敗。",
+        "notify2": "可能原因：payments-api 2.3.1 在 14:01 上線，並將其每台伺服器的連線池從 20 提高到 50。6 台伺服器 × 50 超過付款資料庫允許的 200。",
+        "notify3": "回滾到 2.3.0 是最快的修復方式。",
+        "chartCaption": "失敗付款 · 峰值 1/12",
+        "chartLabel": "失敗付款在 14:02 從 0.1% 躍升至每 12 筆有 1 筆，並在回滾後 18 分鐘恢復正常"
+      },
+      "pool": {
+        "title": "結帳服務的資料庫連線用盡",
+        "summary": "洩漏的連線用光了所有空閒連線，付款開始逾時。您核准清除它們，所以我照做了。付款在 2 分鐘後恢復。",
+        "notify1": "結帳服務的資料庫連線已用盡，自 11:18 起約每 9 筆付款有 1 筆逾時。",
+        "notify2": "原因：50 個連線中有 48 個被退款匯出占用且從未歸還。這是 CHK-482 洩漏，兩週內第三次。",
+        "notify3": "只關閉洩漏的連線應該就能解決；進行中的付款不會受到影響。回覆 \"yes\"，我就執行。",
+        "chartCaption": "逾時 · 尖峰每 9 筆有 1 筆",
+        "chartLabel": "付款逾時在 11:18 升至約每 9 筆有 1 筆，並在 11:21 修復後 2 分鐘恢復"
+      },
+      "email": {
+        "title": "訂單電子郵件延遲最多達 9 分鐘",
+        "summary": "所有郵件工作者在夜間同時被替換，佇列在大約 20 分鐘內自行趕上。這問題輕微，所以留到週五的摘要。",
+        "chartCaption": "電子郵件延遲 · 尖峰 9 分鐘",
+        "chartLabel": "電子郵件延遲從 03:15 起升至 9 分鐘，並在 03:36 自行恢復"
+      },
+      "recs": {
+        "title": "推薦服務變慢 15 分鐘",
+        "summary": "它們從四分之一秒變慢到將近一秒。夜間快取重建在下午被手動啟動，並自行完成。我將其保留到週五的摘要。",
+        "chartCaption": "p95 延遲 · 尖峰 0.94 秒",
+        "chartLabel": "p95 延遲在 16:40 從 0.26 秒升至 0.94 秒，並在 15 分鐘後自行恢復"
+      },
+      "login": {
+        "title": "登入緩慢約 25 分鐘",
+        "summary": "每 8 人有 1 人等候超過 5 秒。工作階段快取在流量尖峰後空間不足，並讓一些人被登出。您的團隊增加了空間，隨後恢復。",
+        "notify1": "登入緩慢：自 10:12 起，約每 8 人有 1 人等候超過 5 秒。",
+        "notify2": "原因：工作階段快取在 10:05 流量倍增後已滿。",
+        "notify3": "增加快取空間應該就能解決。",
+        "chartCaption": "p95 登入 · 尖峰 5.8 秒",
+        "chartLabel": "p95 登入時間在 10:12 從 0.6 秒升至 5.8 秒，並在 10:31 增加快取空間後恢復"
+      },
+      "queue": {
+        "title": "訂單在佇列中積壓",
+        "summary": "最嚴重時約有 4,000 筆等候。我依照您的授權增加了工作者，但沒有幫助，所以我把它們還原並呼叫值班人員。真正的原因是遷移讓一個資料庫索引損壞；您的團隊在問題開始 40 分鐘後修復了它。",
+        "notify1": "訂單正在積壓：自 21:30 起約有 4,000 筆等候。",
+        "notify2": "我依照您的授權在 21:33 增加了工作者，但沒有幫助，所以我已將它們還原。",
+        "notify3": "自 21:20 資料庫遷移後，訂單查詢約慢 40 倍。請先檢查 orders_by_status 索引。",
+        "chartCaption": "積壓 · 尖峰 4,120",
+        "chartLabel": "等候訂單從 21:30 起攀升至 4,120，在增加工作者後持續攀升，並在 21:52 重建索引後消化完畢"
+      },
+      "uploads": {
+        "title": "每 40 人有 1 人圖片上傳失敗",
+        "summary": "持續了 10 分鐘，因為某台伺服器尚未載入替換憑證，憑證就已過期。問題自行解決，所以我將其保留到週五的摘要。",
+        "chartCaption": "上傳失敗 · 尖峰每 40 人有 1 人",
+        "chartLabel": "上傳失敗在 07:05 升至約每 40 人有 1 人，並在 10 分鐘後自行恢復"
+      },
+      "push": {
+        "title": "推播通知延遲 2 分鐘送達",
+        "summary": "持續了半小時，因為遞送它們的供應商速度緩慢。問題輕微，所以留到週五的摘要。",
+        "chartCaption": "遞送延遲 · 尖峰 2 分鐘",
+        "chartLabel": "遞送延遲在 13:50 從 4 秒升至約 2 分鐘，並在 30 分鐘後自行恢復"
+      },
+      "checkoutNow": {
+        "title": "結帳服務每 6 筆付款有 1 筆失敗",
+        "titleFixed": "結帳服務曾每 6 筆付款有 1 筆失敗",
+        "summary": "問題從 10:43 開始，我仍在調查原因。目前顯示與 10:41 推出的 2.4.0 版相符，我已呼叫值班人員。",
+        "notify1": "自 10:43 起，結帳服務約每 6 筆付款有 1 筆失敗。",
+        "notify2": "我仍在調查原因。目前顯示與 10:41 推出的結帳服務 2.4.0 版相符。",
+        "notify3": "只有執行 2.4.0 的伺服器失敗。回覆 \"stop\"，我就會將流量導回舊版；舊伺服器還有餘裕。我無法直接查看 payments-db，所以尚未排除這個可能。",
+        "summaryFixing": "問題從 10:43 開始，就在 2.4.0 版推出後。您核准停止部署，所以我現在正將流量導回舊版。",
+        "summaryFixed": "問題從 10:43 開始，在 2.4.0 版推出後。您核准停止部署，流量導回舊版後失敗便停止。2.4.0 為何失敗仍待您的團隊查明。",
+        "chartCaption": "付款失敗 · 尖峰每 6 筆有 1 筆",
+        "chartLabel": "失敗付款在 10:43 從 0.1% 躍升至約每 6 筆有 1 筆，且仍在失敗",
+        "chartLabelFixed": "失敗付款在 10:43 從 0.1% 躍升至約每 6 筆有 1 筆，並在停止部署後恢復正常"
+      },
+      "gateway": {
+        "title": "API 每 30 個請求有 1 個遭拒",
+        "summary": "它在一次設定變更後開始。您的團隊將其還原，並在開始後 13 分鐘恢復正常。",
+        "notify1": "自 15:22 起，API 拒絕約每 30 個請求中的 1 個。",
+        "notify2": "可能原因：15:20 的設定變更縮短了登入權杖的有效時間。",
+        "notify3": "還原該變更應可修正此問題。",
+        "chartCaption": "拒絕 · 峰值 1/30",
+        "chartLabel": "拒絕的請求在 15:22 升至每 30 個有 1 個，並在 15:34 設定變更還原後恢復正常。"
+      },
+      "poolSep": {
+        "title": "結帳服務用盡資料庫連線",
+        "summary": "洩漏的連線用盡了所有可用連線，付款開始逾時。我將洩漏來源追溯到退款匯出，而您核准清除洩漏的連線。付款在 2 分鐘後恢復。",
+        "notify1": "結帳服務的資料庫連線已用盡，且自 15:42 起約每 9 筆付款有 1 筆逾時。",
+        "notify2": "原因：50 個連線中有 47 個被從未歸還的退款匯出占用。這看起來像是退款匯出程式碼中的洩漏。",
+        "notify3": "僅關閉洩漏的連線應可解決；進行中的付款不會受到影響。回覆「yes」我就會執行。",
+        "chartCaption": "逾時 · 峰值 1/9",
+        "chartLabel": "付款逾時在 15:42 升至約每 9 筆有 1 筆，並在 15:45 修正後 2 分鐘恢復。"
+      },
+      "poolOct": {
+        "title": "結帳服務再次用盡資料庫連線",
+        "summary": "這是相同的退款匯出洩漏 (CHK-482)。您核准清除洩漏的連線，付款在 2 分鐘後恢復。",
+        "notify1": "結帳服務的資料庫連線已用盡，且自 10:05 起約每 9 筆付款有 1 筆逾時。",
+        "notify2": "原因：50 個連線中有 46 個被退款匯出占用。又是 CHK-482 洩漏，8 天內第二次。",
+        "notify3": "僅關閉洩漏的連線應可解決；進行中的付款不會受到影響。回覆「yes」我就會執行。",
+        "chartCaption": "逾時 · 峰值 1/9",
+        "chartLabel": "付款逾時在 10:05 升至約每 9 筆有 1 筆，並在 10:08 修正後 2 分鐘恢復。"
+      },
+      "lagSep": {
+        "title": "新產品最多需 40 分鐘才會出現在搜尋中",
+        "summary": "search-indexer 在版本 1.12.0 縮短每批次可花費的時間後，處理目錄更新進度落後。您的團隊將其復原，並在開始後 40 分鐘追上進度。",
+        "notify1": "新增和變更的產品從搜尋中遺漏：自 14:06 起，search-indexer 落後約 48,000 筆目錄更新。",
+        "notify2": "原因：search-indexer 1.12.0 在 13:58 上線，並將 Kafka 輪詢間隔縮短至 30 秒。大型批次約需 45 秒，因此消費者不斷被移出其群組。",
+        "notify3": "復原至 1.11.4 應可讓它追上進度。搜尋本身仍可運作；只是顯示較舊的產品。",
+        "chartCaption": "消費者落後 · 峰值 48,000",
+        "chartLabel": "消費者落後自 14:06 起從約 200 則訊息升至 48,000 則，並在 14:39 復原後下降。"
+      },
+      "poolAug": {
+        "title": "退款匯出期間，結帳服務用盡資料庫連線",
+        "summary": "夜間退款匯出占用了結帳服務幾乎所有資料庫連線，約每 12 筆付款有 1 筆逾時。它在開始後 13 分鐘、匯出完成時解除。",
+        "notify1": "結帳服務的資料庫連線已用盡，且自 02:04 起約每 12 筆付款有 1 筆逾時。",
+        "notify2": "原因：50 個連線中有 44 個被夜間退款匯出占用，該匯出在月末促銷後約為平常大小的 3 倍。",
+        "notify3": "它應該會在匯出完成時解除。如果沒有，停止匯出將會釋放連線。",
+        "chartCaption": "逾時 · 峰值 1/12",
+        "chartLabel": "付款逾時在 02:04 升至約每 12 筆有 1 筆，並在 02:17 匯出完成時自行恢復。"
+      },
+      "throttleAug": {
+        "title": "詐欺檢查變慢持續 35 分鐘",
+        "summary": "某批次工作在相同伺服器上執行並占用了它們的備用 CPU，因此詐欺檢查最多需 1.4 秒。結帳仍可運作，只是較慢，並在工作完成時恢復，因此我將其保留到週五摘要。",
+        "chartCaption": "p95 詐欺檢查 · 峰值 1.4 秒",
+        "chartLabel": "p95 詐欺檢查時間在 11:20 從 0.18 秒升至 1.4 秒，並在 11:55 批次工作完成時自行恢復。"
+      },
+      "tlsJul": {
+        "title": "發票停止寄送 43 分鐘",
+        "summary": "invoice-service 用於 billing-api 的憑證過期，因此每張發票都寄送失敗。您的團隊將其更新，佇列中的發票全都寄出。",
+        "notify1": "沒有發票寄出：自 09:01 起，來自 invoice-service 的每次寄送都失敗。",
+        "notify2": "原因：invoice-service 用於 billing-api 的用戶端憑證在 09:00 過期，而 billing-api 拒絕來自它的每個連線。",
+        "notify3": "更新憑證應可修正此問題。發票正在排隊，並未遺失。",
+        "chartCaption": "寄送失敗 · 全部",
+        "chartLabel": "發票寄送失敗率在 09:01 從 0.2% 躍升至 100%，並在 09:41 憑證更新後回落至正常。"
+      },
+      "dnsJul": {
+        "title": "每 4 人中有 1 人的購物車價格消失",
+        "summary": "某項 DNS 變更讓叢集中半數 DNS 伺服器停止回應內部名稱，因此 cart 無法連線到 currency。您的團隊在開始後 31 分鐘將其還原。",
+        "notify1": "自 16:22 起，約每 4 次購物車載入有 1 次未顯示價格。",
+        "notify2": "原因：16:20 的 DNS 設定變更從 4 部叢集 DNS 伺服器中的 2 部移除了內部區域，因此 cart 在那些查詢中找不到 currency.internal。",
+        "notify3": "還原 DNS 變更應可修正此問題。訂單在結帳時仍可完成。",
+        "chartCaption": "缺少價格 · 高峰為 1/4",
+        "chartLabel": "未顯示價格的購物車載入比例從 0.1% 上升到 16:22 的約每 4 次有 1 次，並在 16:51 還原 DNS 變更後降回正常。"
+      }
+    },
+    "drawer": {
+      "worked": "有效",
+      "didntHelp": "沒幫助",
+      "now": "現在"
+    },
+    "needs": {
+      "more": "更多",
+      "less": "更少",
+      "canUndo": "你可以復原它",
+      "undo": "復原",
+      "undone": "已復原。這會再次等待你的回覆。",
+      "shiftTo": "至",
+      "retune": {
+        "body": "{host} 上的「{alert}」警示這個月觸發了 {fired} 次，但沒有人需要採取行動。磁碟在夜間清理期間會攀升到約 85%，到了早上又回到接近 70%。即使在其最繁忙的一天，從 90% 填滿也需要超過 3 天。我想把它提高到 {to}%。如果磁碟有可能在一天內填滿，我仍會警告你。",
+        "yes": "是，變更它",
+        "no": "保持不變",
+        "doneYes": "完成。我已將它提高到 {to}%。填滿警告會保持開啟。",
+        "doneNo": "好的，我會將它保持在 {from}%。",
+        "headline": "要將 ingest-3 上的「磁碟 80%」警示提高到 90% 嗎？",
+        "why": "它這個月觸發了 41 次，但沒有人需要採取行動。",
+        "cost": "填滿警告保持開啟"
+      },
+      "fixNow": {
+        "search": {
+          "body": "搜尋很慢，因為節點 search-2 在 10:16 變更的設定會填滿其記憶體，所以它不斷當機。其他 4 個節點仍使用舊設定，運作正常。我可以把它改回去嗎？我可以復原這項操作。",
+          "yes": "把它改回去",
+          "no": "我來處理",
+          "doneYes": "完成。現在將它改回去。",
+          "doneNo": "好的，交給你了。我會持續觀察。",
+          "doneSettled": "完成。search-2 已恢復，搜尋也恢復正常。",
+          "headline": "要將 search-2 的快取設定改回 10% 嗎？",
+          "why": "10:16 的變更會填滿其記憶體，所以它不斷當機。",
+          "cost": "重啟 search-2 一次"
+        },
+        "checkoutNow": {
+          "body": "結帳約每 6 筆付款就有 1 筆失敗，而且只有 2.4.0 版伺服器會失敗。6 台舊版伺服器有足夠容量承載所有流量。我可以停止推出並將流量送回它們嗎？2.4.0 會保持部署，供你的團隊查看。",
+          "yes": "停止推出",
+          "no": "我來處理",
+          "doneYes": "完成。現在停止推出。",
+          "doneNo": "好的，交給你了。我會持續觀察。",
+          "doneSettled": "完成。付款已恢復正常。",
+          "headline": "要停止結帳的 2.4.0 推出嗎？",
+          "why": "約每 6 筆付款就有 1 筆失敗，全都發生在 2.4.0。舊版可以承載所有流量。",
+          "cost": "2.4.0 保持部署"
+        }
+      },
+      "fromNowOn": {
+        "body": "到目前為止已有 {done} 次，新版本在推出期間只讓自己的伺服器失敗。每次我都要求將流量送回舊版本，而失敗都在 2 分鐘內停止。從現在起，我可以在推出期間自行這樣做嗎？我會保留新版本供你的團隊檢查，並立刻通知他們。",
+        "yes": "是，可自行處理",
+        "no": "繼續問我",
+        "doneYes": "完成。我會自行停止不良推出，並每次通知你。",
+        "doneNo": "好的，我會繼續先詢問你。",
+        "headline": "從現在起，我可以自行停止不良推出嗎？",
+        "why": "6 次你都同意，失敗都在 2 分鐘內停止。",
+        "cost": "僅在推出期間"
+      },
+      "labels": {
+        "fixNow": "立即修復",
+        "fromNowOn": "讓我來處理",
+        "retune": "較安靜的警示"
+      },
+      "needsOk": "需要你的同意"
+    },
+    "footer": {
+      "text": "我也會自我檢查：如果我停止運作，你會收到通知。",
+      "seeAll": "查看我監控的一切",
+      "seeChanges": "查看我變更的一切"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1 分鐘前 | {count} 分鐘前",
+        "stale": "已有 1 分鐘沒有新資料（自 {since}）| 已有 {count} 分鐘沒有新資料（自 {since}）"
+      },
+      "summaryWatching": "我正在監控您 {total} 個服務中的 {watched} 個。",
+      "summaryAll": "我正在監控您全部 {total} 個服務。",
+      "summaryWithClauses": "{head} {clauses}。",
+      "clauseLearning": "{count} 個仍在學習 | {count} 個仍在學習",
+      "clauseUnseen": "有 1 個我看不到 | 有 {count} 個我看不到",
+      "legend": {
+        "watching": "完整監控",
+        "learning": "學習中",
+        "unseen": "看不到"
+      },
+      "legendAria": "{label}：{count}",
+      "summaryAllLearning": "我正在監控您全部 {total} 個服務，而且仍在學習每個服務的正常樣貌。"
+    },
+    "coveragePage": {
+      "title": "我監控的一切",
+      "back": "返回"
+    },
+    "issuesPage": {
+      "title": "所有問題",
+      "sentence": "我在{within}開啟的每個問題。選擇一個來查看發生了什麼事，以及我做了什麼處理。",
+      "back": "返回",
+      "ranges": {
+        "week": "最近 7 天",
+        "month": "最近 30 天",
+        "quarter": "最近 90 天"
+      },
+      "within": {
+        "week": "在最近 7 天內",
+        "month": "在最近 30 天內",
+        "quarter": "在最近 90 天內"
+      }
+    },
+    "activityPage": {
+      "title": "我變更的內容",
+      "stats": {
+        "window": "最近 7 天",
+        "made": "變更 | 變更",
+        "worked": "已生效",
+        "review": "審核中",
+        "undone": "已復原"
+      },
+      "filters": {
+        "all": "全部",
+        "fixes": "修正",
+        "watching": "監控中",
+        "tuning": "警示調校"
+      },
+      "status": {
+        "applying": "正在套用",
+        "worked": "已生效",
+        "done": "完成",
+        "review": "審核中",
+        "reviewDays": "審核中 · 剩 {count} 天 | 審核中 · 剩 {count} 天",
+        "didntHelp": "沒有幫助",
+        "undone": "已復原"
+      },
+      "actions": {
+        "undo": "復原",
+        "showDetails": "顯示詳細資料",
+        "hideDetails": "隱藏詳細資料"
+      },
+      "details": {
+        "name": "變更",
+        "target": "作用於",
+        "confidence": "信心度",
+        "saw": "我觀察到的",
+        "recurring": "這個修正一直需要處理同一個洩漏 ({bug})，因此在修復之前，我每次都會先詢問。",
+        "undoDecided": "復原會撤回此操作，我會再詢問您。"
+      },
+      "toast": {
+        "undone": "已復原。已回到原本的狀態。",
+        "undoDecided": "已復原。我會再詢問您。"
+      },
+      "empty": {
+        "filter": "目前這裡沒有任何內容。",
+        "scenario": "我還沒有做任何變更。當我進行變更時，您會在這裡看到。"
+      },
+      "entries": {
+        "L-313": {
+          "done": "停止了 checkout 的 2.4.0 推出",
+          "why": "只有 2.4.0 上的 6 台伺服器發生故障；舊版本的 6 台可以承擔所有流量。",
+          "from": "12 個 Pod 中有 6 個",
+          "to": "無流量",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "將 search-2 的快取設定改回 10%",
+          "why": "它在 10:16 升到 60%，之後 search-2 就一直記憶體不足。",
+          "from": "60%",
+          "to": "10%",
+          "on": "快取大小 · search-2"
+        },
+        "L-309": {
+          "done": "將 ingest-3 上的「磁碟 80%」警示提高到 90%",
+          "why": "這個月它觸發了 41 次，而且沒有人需要採取行動。填滿警告保持開啟。",
+          "from": "80%",
+          "to": "90%",
+          "on": "磁碟警示 · ingest-3"
+        },
+        "L-310": {
+          "done": "開始監控 returns、exchanges 與 gift-cards",
+          "why": "今天早上發現了它們。正在用 7 天的時間學習它們的正常狀態。",
+          "from": "未監控",
+          "to": "已監控",
+          "on": "3 個服務"
+        },
+        "L-314": {
+          "done": "開始監控我今早發現的 6 個服務",
+          "why": "它們今天出現在您的追蹤中。正在用 7 天的時間學習它們的正常狀態。",
+          "from": "未監控",
+          "to": "已監控",
+          "on": "6 個服務"
+        },
+        "L-311": {
+          "done": "獲得您的同意，可以自行停止不良的推出",
+          "why": "在 60 天內，我經您批准停止了 6 次；每次錯誤都在 2 分鐘內恢復正常。",
+          "from": "先詢問",
+          "to": "自行決定",
+          "on": "停止推出"
+        },
+        "L-304": {
+          "done": "清除了 checkout 的 48 個洩漏的資料庫連線",
+          "why": "付款發生逾時。2 分鐘後它們恢復正常。",
+          "from": "50 個中有 50 個使用中",
+          "to": "2 個使用中",
+          "on": "checkout 集區"
+        },
+        "L-299": {
+          "done": "清除了 checkout 的 46 個洩漏的資料庫連線",
+          "why": "與 9 月 23 日相同的洩漏。付款在 2 分鐘後恢復正常。",
+          "from": "50 個中有 50 個使用中",
+          "to": "4 個使用中",
+          "on": "checkout 集區"
+        },
+        "L-296": {
+          "done": "清除了 checkout 的 47 個洩漏的資料庫連線",
+          "why": "一個新的洩漏，所以我之後以 CHK-482 向 checkout 團隊提交了。",
+          "from": "50 個中有 50 個使用中",
+          "to": "3 個使用中",
+          "on": "checkout 集區"
+        },
+        "L-301": {
+          "done": "開始監控 billing-api、billing-worker 和 invoice-service",
+          "why": "在您的追蹤中找到它們。仍在學習它們的正常行為模式。",
+          "from": "未監控",
+          "to": "已監控",
+          "on": "3 個服務"
+        },
+        "L-307": {
+          "done": "修正 payments-api 連線警示，使其計入所有伺服器",
+          "why": "它會個別檢查每台伺服器，因此週二發生中斷時它從未觸發。",
+          "from": "每個 pod 超過 95%",
+          "to": "所有 pod 超過 85%",
+          "on": "連線警示"
+        },
+        "L-302": {
+          "done": "將 3 個 checkout 延遲警示合併為一個",
+          "why": "它們有 94% 的時間會同時觸發，因此一次變慢就通知您 3 次。",
+          "from": "3 個警示",
+          "to": "1",
+          "on": "checkout 延遲"
+        },
+        "L-303": {
+          "done": "將 ingest-1 上的「磁碟 80%」警示提高至 90%",
+          "why": "它在 30 天內觸發了 29 次，卻沒有人需要採取行動。磁碟填滿警告維持開啟。",
+          "from": "80%",
+          "to": "90%",
+          "on": "磁碟警示 · ingest-1"
+        },
+        "L-305": {
+          "done": "新增 4 個 orders-consumer 工作程序以清除待處理佇列",
+          "why": "沒有幫助，因此我縮減回 4 個，並在 3 分鐘後通知值班人員。",
+          "from": "4 個工作程序",
+          "to": "8 個工作程序",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "獲得您的同意，可自行新增佇列工作程序",
+          "why": "您在流量尖峰期間核准了 7 次，且每次待處理佇列都清空了。",
+          "from": "先詢問",
+          "to": "自行決定",
+          "on": "新增佇列工作程序"
+        },
+        "L-312": {
+          "done": "開始監控您連線時我找到的 18 個服務",
+          "why": "正在學習每一個的正常行為模式。學習完成後，它們的警示就會開始運作。",
+          "from": "未監控",
+          "to": "已監控",
+          "on": "18 個服務"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "歷程",
+      "seeChange": "查看變更",
+      "filters": {
+        "all": "全部",
+        "problems": "問題",
+        "changes": "變更",
+        "fixes": "修正",
+        "decisions": "您的決策"
+      },
+      "empty": "這裡還沒有任何內容。",
+      "entries": {
+        "checkoutNowPaged": "我針對 checkout 付款失敗通知了值班人員。",
+        "searchPaged": "我針對搜尋緩慢通知了值班人員。",
+        "searchAsked": "我詢問是否可以將 search-2 的快取設定還原。",
+        "euStopped": "自這個時間點起，{cluster} 叢集就沒有收到任何資料。我已在此處和 Slack 中告訴您。",
+        "fridaySummary": "我寄出了週五摘要，內含 {count} 個小問題。 | 我寄出了週五摘要，內含 {count} 個小問題。",
+        "emailHeld": "我保留了一個關於訂單電子郵件的小問題，留待週五摘要處理。",
+        "poolFixed": "我關閉了 checkout 洩漏的資料庫連線。付款在 2 分鐘後恢復。",
+        "poolApproved": "您核准關閉 checkout 洩漏的資料庫連線。",
+        "billingWatch": "我開始監控 billing-api、billing-worker 和 invoice-service。",
+        "checkoutPaged": "我因 checkout 付款失敗呼叫了值班。",
+        "recsHeld": "我把 recommendations 的一個小問題留到週五摘要。",
+        "diskApproved": "您核准將 ingest-1 的磁碟警示提高到 {to}%。",
+        "latencyGrouped": "我將三個 checkout 變慢警示合併成一個，這樣單一變慢只會呼叫值班一次。",
+        "queueFixed": "我新增了 orders 佇列工作者，但佇列持續增長，所以我把它們還原並呼叫值班。",
+        "loginPaged": "我因登入緩慢呼叫了值班。",
+        "queuePermission": "您允許我自行新增佇列工作者，最多 8 個。",
+        "gatewayPaged": "我因 API 拒絕請求呼叫了值班。",
+        "found18": "我找到了 {count} 個服務，並開始了解它們的正常狀態。",
+        "connected": "您已將我連接到您的資料。",
+        "thresholdApproved": "您核准讓 payments-api 連線警示將所有伺服器計入資料庫的 200 上限。",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "您核准還原 search-2 的設定。",
+              "no": "您說 search-2 由您自己處理。",
+              "undoYes": "您撤銷了還原 search-2 設定的動作。我重新套用了 60%，因此 search-2 將再次開始記憶體不足；我已通知值班。",
+              "cancel": "在我套用之前，您取消了還原 search-2 設定。search-2 仍持續記憶體不足；我已通知值班。",
+              "undoNo": "您收回自己處理 search-2 的說法。"
+            },
+            "checkoutNow": {
+              "yes": "您核准停止 checkout 2.4.0 的推出。",
+              "no": "您說 checkout 推出由您自己處理。",
+              "undoYes": "您撤銷了停止 2.4.0 推出的動作。流量又會導向 2.4.0，因此付款可能再次失敗；我已通知值班，並持續監控。",
+              "cancel": "在我執行之前，您取消了停止 2.4.0 推出。付款仍持續失敗；我已通知值班。",
+              "undoNo": "您收回自己處理 checkout 推出的說法。"
+            }
+          },
+          "retune": {
+            "yes": "您核准將 ingest-3 的磁碟警示提高到 90%。",
+            "no": "您說現在不提高 ingest-3 的磁碟警示。",
+            "undoYes": "您撤銷了提高 ingest-3 磁碟警示的動作。它回到 80%，因此在正常夜晚又會開始觸發。",
+            "undoNo": "您收回了對 ingest-3 磁碟警示的「現在不要」決定。"
+          },
+          "fromNowOn": {
+            "yes": "您核准讓我自行停止不良推出。",
+            "no": "您說現在不讓我自行停止不良推出。",
+            "undoYes": "您收回讓我自行停止不良推出的授權。",
+            "undoNo": "您收回了不讓我自行停止不良推出的「現在不要」決定。"
+          }
+        },
+        "fixedNow": {
+          "search": "我還原了 search-2 的設定。搜尋已恢復正常。",
+          "checkoutNow": "我將流量導回舊版本，失敗已停止。2.4.0 為何失敗仍待您的團隊查明；我已為他們保留部署。"
+        },
+        "checkoutNowAsked": "我詢問是否可以停止 checkout 2.4.0 的推出。",
+        "newWatch": "我今天早上找到 {count} 個新服務（returns、exchanges 和 gift-cards），並立即開始監控它們。",
+        "foundWatch": "我今天早上找到 {count} 個新服務，並立即開始監控它們。"
+      }
+    },
+    "settingsDrawer": {
+      "title": "管理",
+      "reach": "我該如何聯絡您？",
+      "destSlack": "Slack：{channel}",
+      "destEmail": "電子郵件：{address}",
+      "autonomy": "我應該自行處理到什麼程度？",
+      "tell": "告訴我",
+      "ask": "先問我",
+      "fix": "修復後告訴我",
+      "tellHint": "我會告訴您我會怎麼做，並把實際執行留給您。",
+      "askHint": "我會在每次修復前先詢問，並在您同意後執行。",
+      "fixHint": "對於有良好紀錄的修復類型，我會在您設定的限制內直接進行，並在之後立即告訴您。",
+      "advanced": "進階",
+      "perKind": "每種修復類型",
+      "digestDay": "摘要日",
+      "excluded": "我應忽略的服務",
+      "excludedNone": "無",
+      "kinds": {
+        "pool": "關閉洩漏的資料庫連線",
+        "queueWorker": "積壓時新增佇列工作者",
+        "retune": "調高吵雜警示的閾值",
+        "rollback": "復原部署",
+        "record": "已執行 {done} 次，成功 {worked} 次。",
+        "keptRecord": "已執行 {done} 次，保留 {worked} 次。",
+        "noRecord": "尚未執行過，因此在有實際紀錄之前，我不會自行執行。",
+        "revertConfig": "復原最近的設定變更",
+        "abortRollout": "停止有問題的推出",
+        "recurringRecord": "已執行 {done} 次，全都是同一個洩漏 ({bug})。在修復之前，我會持續詢問。"
+      },
+      "weekdays": {
+        "monday": "星期一",
+        "tuesday": "星期二",
+        "wednesday": "星期三",
+        "thursday": "星期四",
+        "friday": "星期五"
+      },
+      "saved": "已儲存",
+      "noDestination": "我將無法聯絡任何人。",
+      "routing": "當我呼叫你時",
+      "routingNote": "任何會影響客戶的問題，我都會呼叫你。較小的事情會收到不會吵醒任何人的訊息，而最小的事情則會納入星期五摘要。"
+    },
+    "howItWorks": {
+      "title": "運作方式",
+      "intro": "以下是我做的事，共五個步驟。",
+      "gotIt": "知道了",
+      "s1Title": "我找出你的服務",
+      "s1": "我會查看你已傳送的數據，並找出其中所有服務。當有新服務出現時，我會在同一天開始監控；你不需要特別要求。",
+      "s2Title": "我監控它們",
+      "s2": "我會學習每個服務的正常樣貌：一天中每個小時的錯誤、緩慢與流量，並隨著時間讓每週模式越來越精準。在我了解之前，我會使用基本的安全檢查。",
+      "s3Title": "除非問題是真的，否則我會保持安靜",
+      "s3": "大多數異常時刻並不是問題。當有事情影響客戶時，我會呼叫你的團隊；較小的問題會發送不會吵醒任何人的訊息；更微小的事情則留到星期五摘要。",
+      "s4Title": "我會解釋每一次呼叫",
+      "s4": "每則訊息都會說明什麼故障、從何時開始、我對原因的最佳判斷，以及我有多確定。",
+      "s5Title": "我只修復你允許的項目",
+      "s5": "我只修復你允許我修復的事項。有效的修復會為我贏得一點信任，而沒有幫助的修復則會讓我扣分。如果我持續需要相同的修復，那是我向你的團隊回報的錯誤，而不是我會自動化的習慣。"
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "已於 1 分鐘前檢查 | 已於 {count} 分鐘前檢查"
+    },
+    "outcome": {
+      "active": "正在發生",
+      "fixed": "已由 AutoObserve 修復",
+      "resolved": "已於 {minutes} 分鐘內解決",
+      "held": "在星期五摘要中",
+      "fixing": "正在修復",
+      "contained": "已由 AutoObserve 控制",
+      "predicted": "已預測"
+    },
+    "view": {
+      "standard": "標準",
+      "nerd": "進階",
+      "standardTooltip": "標準檢視提供簡短摘要：哪些事情需要你，以及過去 7 天發生了什麼",
+      "nerdTooltip": "進階檢視會完整顯示每個偵測器、迴圈與設定",
+      "label": "檢視"
+    },
+    "rail": {
+      "more": "下方更多"
+    },
+    "suggestions": {
+      "title": "建議",
+      "subtitle": "當您有空時——這些能減少雜訊或節省您的時間。"
+    }
   }
 }
