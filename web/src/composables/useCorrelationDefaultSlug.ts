@@ -14,8 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { loadIdentityConfig } from "@/utils/identityConfig";
-import serviceStreamsApi from "@/services/service_streams";
-import type { FieldAlias } from "@/services/service_streams";
+import { loadSemanticGroups } from "@/utils/semanticGroupsCache";
 import config from "@/aws-exports";
 
 function isCorrelationAvailable(): boolean {
@@ -25,46 +24,25 @@ function isCorrelationAvailable(): boolean {
 // ── Cache ────────────────────────────────────────────────────────────────────
 
 const fieldNamesCache = new Map<string, string[]>();
-const semanticGroupsCache = new Map<string, FieldAlias[]>();
+const pendingFieldNames = new Map<string, Promise<string[]>>();
 let lastSeenOrgId: string | null = null;
 
 function evictOrgCacheIfSwitched(orgId: string): void {
   if (lastSeenOrgId !== null && lastSeenOrgId !== orgId) {
-    // Org switched — remove all cached entries for the previous org so stale
-    // identity config and semantic groups are not reused.
     for (const key of fieldNamesCache.keys()) {
       if (key.startsWith(`${lastSeenOrgId}/`)) fieldNamesCache.delete(key);
     }
-    semanticGroupsCache.delete(lastSeenOrgId);
   }
   lastSeenOrgId = orgId;
 }
 
-async function loadSemanticGroups(orgId: string): Promise<FieldAlias[]> {
-  if (!isCorrelationAvailable()) return [];
-  if (semanticGroupsCache.has(orgId)) return semanticGroupsCache.get(orgId)!;
-  try {
-    const response = await serviceStreamsApi.getSemanticGroups(orgId);
-    const groups: FieldAlias[] = response.data ?? [];
-    semanticGroupsCache.set(orgId, groups);
-    return groups;
-  } catch {
-    return [];
-  }
-}
-
 // ── Field resolution ─────────────────────────────────────────────────────────
 
-export async function getCorrelationFieldNames(
+async function resolveCorrelationFieldNames(
   orgId: string,
-  streamName: string,
+  key: string,
   streamSchemaFields: { name: string }[],
 ): Promise<string[]> {
-  if (!isCorrelationAvailable()) return [];
-  evictOrgCacheIfSwitched(orgId);
-  const key = `${orgId}/${streamName}`;
-  if (fieldNamesCache.has(key)) return fieldNamesCache.get(key)!;
-
   let identityConfig: any;
   try {
     identityConfig = await loadIdentityConfig(orgId);
@@ -94,6 +72,32 @@ export async function getCorrelationFieldNames(
 
   fieldNamesCache.set(key, matched);
   return matched;
+}
+
+export async function getCorrelationFieldNames(
+  orgId: string,
+  streamName: string,
+  streamSchemaFields: { name: string }[],
+): Promise<string[]> {
+  if (!isCorrelationAvailable()) return [];
+  evictOrgCacheIfSwitched(orgId);
+  const key = `${orgId}/${streamName}`;
+  if (fieldNamesCache.has(key)) return fieldNamesCache.get(key)!;
+  // Query watchers sync before the schema loads; caching that empty match would block every later save for the stream.
+  if (!streamSchemaFields.length) return [];
+
+  // Every query watcher and streaming chunk lands here at once on a cold load, so they share one lookup.
+  const pending = pendingFieldNames.get(key);
+  if (pending) return pending;
+  const lookup: Promise<string[]> = resolveCorrelationFieldNames(
+    orgId,
+    key,
+    streamSchemaFields,
+  ).finally(() => {
+    if (pendingFieldNames.get(key) === lookup) pendingFieldNames.delete(key);
+  });
+  pendingFieldNames.set(key, lookup);
+  return lookup;
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -184,7 +188,7 @@ export function clearCorrelationFilters(
 
 export function clearCorrelationCache(): void {
   fieldNamesCache.clear();
-  semanticGroupsCache.clear();
+  pendingFieldNames.clear();
   lastSeenOrgId = null;
 }
 

@@ -41,6 +41,7 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 import { loadIdentityConfig } from "@/utils/identityConfig";
+import { clearSemanticGroupsCache } from "@/utils/semanticGroupsCache";
 import serviceStreamsApi from "@/services/service_streams";
 
 // ── localStorage helpers ──────────────────────────────────────────────────────
@@ -66,7 +67,10 @@ Object.defineProperty(globalThis, "localStorage", { value: localStorageMock });
 beforeEach(() => {
   localStorageMock.clear();
   vi.clearAllMocks();
+  vi.mocked(loadIdentityConfig).mockReset();
+  vi.mocked(serviceStreamsApi.getSemanticGroups).mockReset();
   clearCorrelationCache();
+  clearSemanticGroupsCache();
 });
 
 // ── extractCorrelationFilters ─────────────────────────────────────────────────
@@ -234,6 +238,88 @@ describe("getCorrelationFieldNames", () => {
     await getCorrelationFieldNames("org1", "cached-stream", [{ name: "host" }]);
     expect(loadIdentityConfig).toHaveBeenCalledTimes(1);
   });
+
+  it("does not cache an empty match from a call made before the schema loaded", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["alias1"] });
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({
+      data: [{ id: "alias1", fields: ["host"] }],
+    });
+
+    expect(await getCorrelationFieldNames("org1", "late-schema", [])).toEqual([]);
+    expect(await getCorrelationFieldNames("org1", "late-schema", [{ name: "host" }])).toEqual([
+      "host",
+    ]);
+  });
+
+  it("sends no request while the stream schema is still empty", async () => {
+    expect(await getCorrelationFieldNames("org1", "no-schema", [])).toEqual([]);
+    expect(loadIdentityConfig).not.toHaveBeenCalled();
+    expect(serviceStreamsApi.getSemanticGroups).not.toHaveBeenCalled();
+  });
+
+  it("still returns resolved field names while the schema is briefly empty", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: [] });
+    await getCorrelationFieldNames("org1", "reloading", [{ name: "host" }]);
+    expect(await getCorrelationFieldNames("org1", "reloading", [])).toEqual(["host"]);
+  });
+
+  it("resolves concurrent cold-cache callers with one identity and one groups lookup", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: [] });
+    await Promise.all(
+      Array.from({ length: 6 }, () =>
+        getCorrelationFieldNames("org1", "one-lookup", [{ name: "host" }]),
+      ),
+    );
+    expect(loadIdentityConfig).toHaveBeenCalledTimes(1);
+    expect(serviceStreamsApi.getSemanticGroups).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs a failed groups load once for a burst of concurrent callers", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockRejectedValue({ response: { status: 500 } });
+    const results = await Promise.all(
+      Array.from({ length: 6 }, () =>
+        getCorrelationFieldNames("org1", "failing", [{ name: "host" }]),
+      ),
+    );
+    expect(results.every((r) => r.length === 1 && r[0] === "host")).toBe(true);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    errorSpy.mockRestore();
+  });
+
+  it("treats a groups response with no data as no groups", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["alias1"] });
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: undefined } as never);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(await getCorrelationFieldNames("org1", "no-data", [{ name: "alias1" }])).toEqual([
+      "alias1",
+    ]);
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it("shares one semantic-groups request across concurrent cold-cache callers", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["alias1"] });
+    let release!: (v: { data: unknown }) => void;
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }) as never,
+    );
+
+    const calls = Array.from({ length: 8 }, () =>
+      getCorrelationFieldNames("org1", "burst-stream", [{ name: "host" }]),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    release({ data: [{ id: "alias1", fields: ["host"] }] });
+
+    const results = await Promise.all(calls);
+    expect(serviceStreamsApi.getSemanticGroups).toHaveBeenCalledTimes(1);
+    expect(results.every((r) => r.length === 1 && r[0] === "host")).toBe(true);
+  });
 });
 
 // ── useCorrelationFilters composable ─────────────────────────────────────────
@@ -287,6 +373,20 @@ describe("useCorrelationFilters", () => {
       const { save } = useCorrelationFilters(opts);
       await save();
       expect(loadCorrelationFilters("org1", "logs", "mystream")).toEqual([]);
+    });
+
+    it("fires one semantic-groups request for a burst of per-chunk saves", async () => {
+      vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
+      vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: [] });
+
+      const opts = makeOpts({ getQuery: () => `SELECT * FROM "default" WHERE host = 'web-01'` });
+      const { save } = useCorrelationFilters(opts);
+      await Promise.all(Array.from({ length: 10 }, () => save()));
+
+      expect(serviceStreamsApi.getSemanticGroups).toHaveBeenCalledTimes(1);
+      expect(loadCorrelationFilters("org1", "logs", "mystream")).toEqual([
+        { field: "host", value: "web-01" },
+      ]);
     });
 
     it("does nothing when orgId is missing", async () => {
