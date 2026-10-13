@@ -533,7 +533,8 @@ async fn search_window(
         query: Query {
             sql,
             from: 0,
-            size: -1,
+            // Parts and duplicate rows can push a window past the default row limit.
+            size: config::QUERY_WITH_NO_LIMIT,
             start_time: first_at,
             // Inclusive of the last committed batch's timestamp.
             end_time: last_at + 1,

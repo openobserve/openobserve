@@ -628,16 +628,23 @@ impl Locker {
             }
         };
         drop(local_mutex);
-        let _lock_guard = locker.lock().await;
+        let expiration = now + second_micros(timeout);
+        let Ok(_lock_guard) = tokio::time::timeout(remaining(expiration), locker.lock()).await
+        else {
+            return Err(Error::Message(format!(
+                "nats lock for key: {}, acquire timeout in {timeout}s",
+                self.key
+            )));
+        };
 
         // removes locks that are expired or acquired by nodes that are no longer alive
         _ = check_exist_lock(&bucket, &key, &self.key).await?;
 
-        let mut last_err = None;
+        let mut last_err: Option<String>;
         let mut revision = 0;
 
-        let expiration = now + second_micros(timeout);
-        while expiration > now_micros() {
+        // Always try once, so a deadline spent queueing locally is never reported as acquired.
+        loop {
             match bucket.create(&key, value.clone()).await {
                 Ok(created) => {
                     self.state.store(LOCKER_STATE_LOCKING, Ordering::SeqCst);
@@ -648,7 +655,12 @@ impl Locker {
                 Err(err) => {
                     // created error, means the key locked by other thread, wait and retry
                     last_err = Some(err.to_string());
-                    if let Err(e) = wait_for_delete(&bucket, &key, &self.key).await {
+                    if expiration <= now_micros() {
+                        break;
+                    }
+                    // The holder may keep the key far past our timeout, so never wait beyond it.
+                    let wait = wait_for_delete(&bucket, &key, &self.key);
+                    if let Ok(Err(e)) = tokio::time::timeout(remaining(expiration), wait).await {
                         log::error!("nats wait_for_delete key: {key}, error: {e}");
                     }
                 }
@@ -896,6 +908,10 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
     keys.sort();
     keys.dedup();
     Ok(keys)
+}
+
+fn remaining(expiration_micros: i64) -> Duration {
+    Duration::from_micros((expiration_micros - now_micros()).max(0) as u64)
 }
 
 async fn wait_for_delete(bucket: &jetstream::kv::Store, key: &str, orig_key: &str) -> Result<()> {
