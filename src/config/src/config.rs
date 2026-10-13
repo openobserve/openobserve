@@ -101,11 +101,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 101: create downtimes; muted_by_downtime_id, last_downtime_id, slo_backfill_jobs kind/attempts.
 // 102: create downtime_notifications.
 // 103: create alert_calibration_configs.
-pub const DB_SCHEMA_VERSION: u64 = 107;
 // 104: create ai_chat_sessions (server-side AI chat persistence).
 // 105: create ai_chat_shares and add fork columns to ai_chat_sessions.
 // 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
 // 107: add redact_tools to ai_chat_shares.
+pub const DB_SCHEMA_VERSION: u64 = 107;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

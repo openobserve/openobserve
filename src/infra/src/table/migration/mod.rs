@@ -209,7 +209,10 @@ mod m20260928_000001_add_alert_recovery_destinations;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
+mod m20261006_000001_create_ai_chat_shares;
+mod m20261007_000001_create_ai_chat_turns;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
+mod m20261007_000002_add_redact_tools_to_ai_chat_shares;
 mod m20261008_000001_add_name_to_rum_pa_tombstones;
 mod m20261009_000001_add_promql_rule_mode;
 mod m20261009_000001_create_downtimes;
@@ -218,9 +221,6 @@ mod m20261009_000003_add_last_downtime_id_to_alert_states;
 mod m20261009_000004_add_kind_to_slo_backfill_jobs;
 mod m20261009_000005_create_downtime_notifications;
 mod m20261012_000001_create_alert_calibration_configs;
-mod m20261006_000001_create_ai_chat_shares;
-mod m20261007_000001_create_ai_chat_turns;
-mod m20261007_000002_add_redact_tools_to_ai_chat_shares;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -639,6 +639,24 @@ mod tests {
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
     ];
 
+    // Two branches that each claim the next version merge cleanly, so a reused number must fail
+    // here.
+    #[test]
+    fn version_coverage_claims_each_version_once_up_to_db_schema_version() {
+        let mut seen = std::collections::HashSet::new();
+        for (version, name) in VERSION_COVERAGE {
+            assert!(
+                seen.insert(*version),
+                "version {version} is claimed twice (again by `{name}`)"
+            );
+        }
+        assert_eq!(
+            VERSION_COVERAGE.iter().map(|(v, _)| *v).max(),
+            Some(config::DB_SCHEMA_VERSION),
+            "the highest VERSION_COVERAGE entry must equal DB_SCHEMA_VERSION"
+        );
+    }
+
     #[test]
     fn db_schema_version_covers_every_registered_migration() {
         let newest = Migrator::migrations()
@@ -740,6 +758,8 @@ mod tests {
             (
                 "m20261009_000001_create_downtimes",
                 "m20261009_000005_create_downtime_notifications",
+            ),
+            (
                 "m20260923_000001_create_ai_chat_sessions",
                 "m20261006_000001_create_ai_chat_shares",
             ),
