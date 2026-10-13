@@ -102,8 +102,8 @@ pub struct ModelPricingDefinition {
     /// Whether this definition is active
     #[serde(default = "default_true")]
     pub enabled: bool,
-    /// Pricing tiers: the matching tier with the highest (priority, restriction count) wins,
-    /// ties go to list order, and the unrestricted tier is the fallback.
+    /// Pricing tiers: first matching restricted tier wins, or the highest rank if `ranks_tiers()`;
+    /// the unrestricted tier is the fallback.
     pub tiers: Vec<PricingTierDefinition>,
     /// Optional Unix timestamp (microseconds) from which this definition is valid.
     /// When multiple definitions match the same model name, the one with the
@@ -143,6 +143,13 @@ impl ModelPricingDefinition {
     /// Whether any tier reads span attributes, i.e. whether a [`PricingContext`] is needed.
     pub fn has_rules(&self) -> bool {
         self.tiers.iter().any(|t| !t.rules.is_empty())
+    }
+
+    /// Whether tiers are chosen by rank; definitions without rules or priority keep first-match.
+    pub fn ranks_tiers(&self) -> bool {
+        self.tiers
+            .iter()
+            .any(|t| !t.rules.is_empty() || t.priority != 0)
     }
 
     /// Normalizes every rule key once; call when the definition enters the cache.
@@ -650,6 +657,7 @@ impl PricingContext {
         }
     }
 
+    /// A known context holding `attrs` as raw span attributes.
     pub fn from_strings(attrs: &HashMap<String, String>) -> Self {
         let mut ctx = Self::known();
         for (k, v) in attrs {
@@ -678,7 +686,22 @@ impl PricingContext {
         attrs: &HashMap<String, json::Value>,
         wanted: Option<&[&str]>,
     ) {
+        self.extend_json_mapped(prefix, attrs, wanted, |k| k);
+    }
+
+    /// Like [`Self::extend_json`], with each attribute read under `map(key)`.
+    pub fn extend_json_mapped(
+        &mut self,
+        prefix: &str,
+        attrs: &HashMap<String, json::Value>,
+        wanted: Option<&[&str]>,
+        map: impl Fn(&str) -> &str,
+    ) {
+        if !prefix_wanted(prefix, wanted) {
+            return;
+        }
         for (k, v) in attrs {
+            let k = map(k);
             match v {
                 json::Value::String(s) => self.insert(prefix, k, s, wanted),
                 json::Value::Number(n) => self.insert(prefix, k, &n.to_string(), wanted),
@@ -697,6 +720,9 @@ impl PricingContext {
         attrs: &HashMap<String, String>,
         wanted: Option<&[&str]>,
     ) {
+        if !prefix_wanted(prefix, wanted) {
+            return;
+        }
         for (k, v) in attrs {
             self.insert(prefix, k, v, wanted);
         }
@@ -739,6 +765,12 @@ pub fn normalize_attribute_key(key: &str) -> String {
         .filter(|c| !matches!(c, '_' | '-' | '.'))
         .flat_map(char::to_lowercase)
         .collect()
+}
+
+/// Whether any wanted key can sit under `prefix`, so whole attribute maps are skipped otherwise.
+fn prefix_wanted(prefix: &str, wanted: Option<&[&str]>) -> bool {
+    let prefix = normalize_attribute_key(prefix);
+    wanted.is_none_or(|w| w.iter().any(|k| k.starts_with(&prefix)))
 }
 
 /// The usage type named by a `usage.`-prefixed rule key, matched case-insensitively.
@@ -1425,6 +1457,20 @@ mod tests {
             serde_json::from_str(r#"{"keys":["n"],"op":"gt","value":"lots"}"#).unwrap();
         assert_eq!(r.value, None);
         assert!(r.validate().is_err());
+    }
+
+    #[test]
+    fn test_context_skips_prefixes_no_rule_reads_and_maps_keys() {
+        let attrs = HashMap::from([("service_cloud.region".to_string(), json::json!("eu"))]);
+        let mut c = PricingContext::known();
+        c.extend_json_mapped("resource.", &attrs, Some(&["servicetier"]), |k| {
+            k.trim_start_matches("service_")
+        });
+        assert!(c.is_empty());
+        c.extend_json_mapped("resource.", &attrs, Some(&["resourcecloudregion"]), |k| {
+            k.trim_start_matches("service_")
+        });
+        assert_eq!(c.get("resource.cloud.region"), Some("eu"));
     }
 
     #[test]

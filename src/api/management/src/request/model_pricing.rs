@@ -21,7 +21,9 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use config::meta::model_pricing::{BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource};
+use config::meta::model_pricing::{
+    BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource, PricingTierDefinition,
+};
 use db::model_pricing;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
@@ -762,7 +764,21 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     {
         return Err(format!("Invalid regex pattern: {e}"));
     }
-    item.validate_tiers(false)
+    item.validate_tiers(false)?;
+    // Builds without rules read a rule tier as unrestricted and would price with it.
+    let first_default = item
+        .tiers
+        .iter()
+        .position(PricingTierDefinition::is_default);
+    if item
+        .tiers
+        .iter()
+        .take(first_default.unwrap_or(0))
+        .any(|t| !t.rules.is_empty())
+    {
+        return Err("The default tier must come before any tier with rules".to_string());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1040,6 +1056,32 @@ mod tests {
         );
 
         def.tiers[1].rules[0].values = vec!["flex".to_string()];
+        assert!(validate_definition(&def).is_ok());
+    }
+
+    #[test]
+    fn test_validate_definition_rule_tier_before_default_fails() {
+        use config::meta::model_pricing::{RuleOp, TierRule};
+        let mut def = valid_definition();
+        def.tiers.insert(
+            0,
+            PricingTierDefinition {
+                name: "flex".to_string(),
+                rules: vec![TierRule::new(
+                    &["service_tier"],
+                    RuleOp::In,
+                    &["flex"],
+                    None,
+                )],
+                ..default_tier()
+            },
+        );
+        assert!(
+            validate_definition(&def)
+                .unwrap_err()
+                .contains("default tier")
+        );
+        def.tiers.swap(0, 1);
         assert!(validate_definition(&def).is_ok());
     }
 
