@@ -33,7 +33,7 @@ pub async fn save_org_domain_request(
         updated_at: now,
         requested_by: req_by.to_string(),
         answered_by: None,
-        status: Status::Pending as i64,
+        status: Status::Pending as i32,
         reason: None,
     };
     org_domain_requests::save_org_domain_request(req).await?;

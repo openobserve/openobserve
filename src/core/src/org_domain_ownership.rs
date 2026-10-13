@@ -40,7 +40,7 @@ pub async fn init() {
         }
     };
     let mut lock = CACHE.write().await;
-    for (org, domain) in items {
+    for (domain, org) in items {
         lock.insert(domain, org);
     }
 }
@@ -132,7 +132,7 @@ pub async fn verify_domain_now(org_id: &str, domain: &str) -> Result<(), anyhow:
     let record = infra::table::org_domain_ownership::get_domain_org_record(org_id, domain).await?;
     let Some(record) = record else {
         return Err(anyhow::anyhow!(
-            "no mapping for domain {domain} foung for org {org_id}"
+            "no mapping for domain {domain} found for org {org_id}"
         ));
     };
     let updated_record = verify(record).await?;
@@ -146,9 +146,10 @@ pub async fn verify_domain_now(org_id: &str, domain: &str) -> Result<(), anyhow:
 
 pub async fn update_state(org_id: &str, domain: &str, new_state: i32) -> Result<(), anyhow::Error> {
     let mut lock = CACHE.write().await;
+    let existing = lock.get(domain);
     if new_state == OwnershipState::Verfied as i32 {
         lock.insert(domain.to_owned(), org_id.to_owned());
-    } else {
+    } else if existing.is_some_and(|v| org_id == v) {
         lock.remove(domain);
     }
     emit_sync_event(org_id, domain).await;
@@ -177,6 +178,7 @@ pub async fn link_from_meta(org_id: &str, domain: &str) -> Result<(), anyhow::Er
         };
         infra::table::org_domain_ownership::save_org_domain_mapping(record, true).await?;
     }
+    emit_sync_event(org_id, domain).await;
     Ok(())
 }
 
@@ -238,6 +240,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     continue;
                 }
             };
+            let cached = get_cached_org_for_domain(domain).await;
             let mut lock = CACHE.write().await;
             match record {
                 None => {
@@ -252,7 +255,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                             "added org {org} domain {domain} from memory cache as verified in db"
                         );
                         lock.insert(domain.to_owned(), org.to_owned());
-                    } else {
+                    } else if cached.is_some_and(|v| v == org) {
                         log::info!(
                             "removed org {org} domain {domain} from memory cache as not verified in db"
                         );

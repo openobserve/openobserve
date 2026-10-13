@@ -425,7 +425,10 @@ mod tests {
 
         #[test]
         fn test_invalid_string_defaults_to_admin() {
+            #[cfg(feature = "enterprise")]
             assert_eq!(UserRole::from_str("invalid").unwrap(), UserRole::User);
+            #[cfg(not(feature = "enterprise"))]
+            assert_eq!(UserRole::from_str("invalid").unwrap(), UserRole::Admin);
             assert_eq!(UserRole::from_str("").unwrap(), UserRole::User);
             assert_eq!(UserRole::from_str("Admin").unwrap(), UserRole::Admin); // case sensitive
         }

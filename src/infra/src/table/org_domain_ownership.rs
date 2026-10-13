@@ -39,8 +39,8 @@ pub async fn list_active_domain_org_map() -> Result<HashMap<String, String>, any
     let client = get_orm_client_ro().await;
     let records = OrgDomainOwnership::find()
         .select_only()
-        .column(Column::OrgId)
         .column(Column::Domain)
+        .column(Column::OrgId)
         .filter(Column::VerificationState.eq(OwnershipState::Verfied as i32))
         .into_tuple::<(String, String)>()
         .all(client)
@@ -83,7 +83,7 @@ pub async fn save_org_domain_mapping(
         org_id: Set(record.org_id),
         domain: Set(record.domain),
         verification_token: Set(token),
-        verification_state: Set(0),
+        verification_state: Set(record.state as i32),
         verification_failure_reason: Set(None),
         verified_at: Set(None),
         released_at: Set(None),

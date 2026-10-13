@@ -190,7 +190,7 @@ pub async fn approve_request(
         ));
     }
 
-    match org_domain_ownership::link_from_meta(&org_id, &req.domain).await {
+    match org_domain_ownership::link_from_meta(&req.org_id, &req.domain).await {
         Ok(_) => MetaHttpResponse::ok("request approved successfully"),
         Err(e) => {
             log::error!("error linking the domain to org after request approval : {e}");

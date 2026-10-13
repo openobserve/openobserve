@@ -1237,15 +1237,12 @@ async fn process_custom_claim_parsing(
     claims: &HashMap<String, Value>,
     org_id: &str,
 ) -> Option<(Vec<UserOrg>, Vec<String>)> {
-    #[cfg(not(feature = "cloud"))]
     use o2_openfga::config::get_config as get_openfga_config;
 
-    #[cfg(not(feature = "cloud"))]
     let openfga_cfg = get_openfga_config();
     let dex_cfg = get_dex_config();
 
     // Check if custom claim parsing is enabled, for cloud, always allow it
-    #[cfg(not(feature = "cloud"))]
     if !openfga_cfg.custom_claim_parsing_enabled {
         return None;
     }

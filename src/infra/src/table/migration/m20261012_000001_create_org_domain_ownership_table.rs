@@ -13,11 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Custom (vanity) domains for status pages — DNS ownership verification and
-//! Host→page routing only. TLS termination is deliberately out of scope: an
-//! operator's own reverse proxy / CDN handles HTTPS for the vanity host and
-//! forwards plain requests here with the original `Host` header intact.
-
 use sea_orm_migration::prelude::*;
 
 #[derive(DeriveMigrationName)]

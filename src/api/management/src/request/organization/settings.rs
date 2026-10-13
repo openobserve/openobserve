@@ -222,7 +222,13 @@ pub async fn create(
                         "error getting domain mappings : {e}"
                     ));
                 }
-                _ => {}
+                Ok(Some(v)) => {
+                    use infra::table::org_domain_ownership::OwnershipState;
+
+                    if v.verification_state != OwnershipState::Verfied as i32 {
+                        return MetaHttpResponse::bad_request("This domain is not verified yet");
+                    }
+                }
             }
 
             mapping.domain = domain;

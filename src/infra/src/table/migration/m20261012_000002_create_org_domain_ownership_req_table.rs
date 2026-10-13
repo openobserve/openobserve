@@ -71,12 +71,12 @@ fn create_domaim_req_stmt() -> TableCreateStatement {
         .col(
             ColumnDef::new(OrgDomainRequests::AnsweredBy)
                 .string_len(100)
-                .not_null(),
+                .null(),
         )
         .col(ColumnDef::new(OrgDomainRequests::Reason).string().null())
         .col(
             ColumnDef::new(OrgDomainRequests::Status)
-                .small_integer()
+                .integer()
                 .not_null()
                 .default(0),
         )

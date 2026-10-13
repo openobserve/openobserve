@@ -13,7 +13,7 @@ pub struct Model {
     pub updated_at: i64,
     pub requested_by: String,
     pub answered_by: Option<String>,
-    pub status: i64,
+    pub status: i32,
     pub reason: Option<String>,
 }
 
