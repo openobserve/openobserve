@@ -13,9 +13,7 @@ permissions:
 jobs:
   update-dependencies:
     name: Update NPM Dependencies
-    # This job only bumps the manifest and opens the PR. Type check, unit tests
-    # and build all run as normal PR checks on the resulting pull request, so
-    # nothing here needs to install node_modules or compile anything.
+    # Bumps the manifest, gates on the OSS license check, and opens the PR; type check, tests and build run as PR checks.
     runs-on: ubuntu-latest
 
     env:
@@ -111,6 +109,14 @@ jobs:
           npm install --package-lock-only --ignore-scripts
 
           echo "Dependencies updated successfully"
+
+      - name: Check licenses
+        if: steps.check_updates.outputs.has_updates == 'true'
+        run: |
+          cd web
+          # Keep the allow-list identical to .github/workflows/js-license-checker.yml.
+          npm ci --ignore-scripts
+          npx --yes license-checker --production --json --onlyAllow="MIT;ISC;Apache-2.0;BSD;MPL-2.0;Unlicense;CC0-1.0;CC-BY-4.0;Artistic-2.0;UNLICENSED;Python-2.0;BlueOak-1.0.0" > /dev/null
 
       - name: Generate update summary
         if: steps.check_updates.outputs.has_updates == 'true'
