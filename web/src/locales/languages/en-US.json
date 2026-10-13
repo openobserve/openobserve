@@ -560,6 +560,18 @@
       "description": "A remote task is an HTTP service your experiments call to produce outputs. Publish it once, prove the connection works, and every experiment can pin the exact version it ran against.",
       "action": "New Task",
       "actionDesc": "Point OpenObserve at your endpoint and test the connection."
+    },
+    "noDowntimes": {
+      "title": "No downtimes yet",
+      "description": "A downtime keeps alerts, anomaly detections and synthetics checks running and stops their notifications for a window that you schedule.",
+      "action": "Schedule a downtime",
+      "actionDesc": "One-time, daily or weekly. For a quick mute, use Mute in the alert list."
+    },
+    "searchCancelled": {
+      "title": "Search cancelled",
+      "description": "No results were loaded. Run the query to load events.",
+      "action": "Run query",
+      "actionDesc": "Run the same query again"
     }
   },
   "common": {
@@ -1271,9 +1283,129 @@
     "aliasNotAllowed": "Alias '{alias}' is not allowed.",
     "commonGroupFields": "Common Group Fields",
     "queryRangeHours": "{count} hour | {count} hours",
-    "menuGroupAlerts": "Alerts"
+    "menuGroupAlerts": "Alerts",
+    "runQueryPendingLabel": "Run query, changes not applied yet",
+    "queryActions": {
+      "runEditedFirst": "Run your edited query first",
+      "runFirst": "Run your query first",
+      "usesEditedQuery": "Uses your edited query (not run yet)",
+      "usesUnrunQuery": "Uses your query (not run yet)",
+      "downloadsShownResults": "Downloads the shown results, not your edit",
+      "downloadsLastRun": "Uses the query that last ran, not your edit"
+    },
+    "noFtsRecovery": {
+      "title": "Full-text search fields are not configured for {stream}",
+      "description": "Search field values, or clear the whole query to see logs in this time range.",
+      "searchField": "Search a specific field",
+      "searchFieldHint": "Choose a field for the search, keeping excluded words.",
+      "clearRun": "Show logs without this search",
+      "clearRunHint": "Clear the whole query and run in the same time range.",
+      "editPermission": "You need permission to edit stream settings.",
+      "scope": "Search {stream} in the current time range.",
+      "singleStreamScope": "Search {stream} only; {otherStreams} will be deselected.",
+      "stream": "Stream",
+      "field": "Field",
+      "match": "Match",
+      "value": "Value",
+      "contains": "Contains text",
+      "equals": "Equals",
+      "preview": "Filter preview",
+      "replacement": "This replaces the whole query with a field filter and keeps excluded words. No full-text field is required.",
+      "run": "Run field search",
+      "close": "Close field search",
+      "skipped": "{stream} was skipped because it has no full-text search fields configured.",
+      "resultsScope": "These results are from {streams} only.",
+      "noFields": "This stream has no fields available for a field search.",
+      "valueRequired": "Enter a value to search.",
+      "fieldRequired": "Choose a field to search.",
+      "invalidValue": "Enter a valid value for this field.",
+      "configureHint": "Makes full-text search fast for this stream."
+    },
+    "autoRunPersistNeedsRun": "Run the query first: this action saves or shares what you ran",
+    "autoRunSearchAroundActive": "Showing records around a line: run the query to return to results",
+    "autoRunStaleTooltip": "Run the query to update results",
+    "searchCancelledNotice": "Search cancelled.",
+    "linePermalink": {
+      "disabledFunction": "Turn off the function to link a single line",
+      "disabledTimestampRewrite": "This query rewrites the timestamp",
+      "disabledNotSingleLines": "Rows from this query are not single log lines",
+      "disabledNoTimestamp": "This row has no timestamp",
+      "disabledEnrichmentTable": "Enrichment table rows can't be linked",
+      "toastNotUnique": "Copied a link to the timestamp; this line could not be uniquely identified.",
+      "toastWideStream": "This stream is too wide to link one line exactly; copied a link to the timestamp",
+      "bannerInvalid": "This link is malformed; showing the shared search only",
+      "bannerDenied": "You don't have access to stream {stream}.",
+      "bannerStreamMissing": "Stream {stream} no longer exists",
+      "bannerError": "Could not load the shared log line.",
+      "bannerIncomplete": "Could not search every line at this timestamp",
+      "bannerGone": "This log line is no longer available. It may be past the stream's retention or deleted.",
+      "bannerGoneRetention": "This log line is no longer available. It may be past the stream's retention ({days} day) or deleted. | This log line is no longer available. It may be past the stream's retention ({days} days) or deleted.",
+      "bannerFound": "Showing a shared log line",
+      "bannerAmbiguous": "{count} line at this timestamp; the exact line could not be identified | {count} lines at this timestamp; the exact line could not be identified",
+      "bannerChanged": "The line may have changed since the link was made",
+      "actionShowLines": "Show these lines",
+      "actionShowInContext": "Show in context",
+      "bannerAmbiguousTieHeavy": "{count} line shares this timestamp and the stream has no _o2_id, so the exact line could not be identified. Lines at that timestamp are highlighted. | {count} lines share this timestamp and the stream has no _o2_id, so the exact line could not be identified. Lines at that timestamp are highlighted.",
+      "bannerDismiss": "Dismiss",
+      "copyLink": "Copy link",
+      "copyLinkTooltip": "Copy a link to this log line",
+      "copyLinkMenu": "Copy link to this log line",
+      "toastCopied": "Link to log line copied",
+      "toastCopiedValid": "Link to log line copied · valid for {days} day | Link to log line copied · valid for {days} days",
+      "toastLookupFailed": "Could not look up this line; copied a link to the timestamp",
+      "toastShortFailed": "Could not shorten the link; copied the full link instead",
+      "toastFailed": "Could not create a link to this log line",
+      "toastScopeChanged": "The organization or stream changed while the link was being made; nothing was copied",
+      "popoverTitle": "Link to this log line",
+      "popoverDesc": "Your browser blocked automatic copying. Select the link and copy it, or use the button.",
+      "pageNotice": "This link was on page {page}.",
+      "pageGo": "Go to page {page}",
+      "pageGoLast": "Go to last page ({page})"
+    },
+    "autoRunPendingDot": "Run query to apply latest changes",
+    "autoRunAppliesTo": "Applies to Logs and Traces",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "This search would scan about {size}",
+    "autoRunGuardLinkTitle": "This link would scan about {size}",
+    "autoRunGuardDescAutoRun": "{scope}. Auto Run paused so you can narrow it first.",
+    "autoRunGuardDescPaused": "{scope}. Paused so you can narrow it first.",
+    "autoRunGuardDescLink": "Opened from a link · {scope}. Review the scope, then run it.",
+    "autoRunGuardHint": "Turn off Auto Run to apply filter and time changes manually.",
+    "autoRunGuardUnknownTitle": "Size unknown for this window",
+    "autoRunGuardUnknownDesc": "{streams} has no size statistics yet, so Auto Run only runs windows of 1 hour or less on it.",
+    "autoRunGuardUnknownManyDesc": "{count} stream has no size statistics yet, so Auto Run waits for you. {scope}. | {count} streams have no size statistics yet, so Auto Run waits for you. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Ready to run across regions",
+    "autoRunGuardSuperClusterDesc": "Search size can't be estimated on a multi-region cluster yet, so Auto Run waits for you. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Stream not available",
+    "autoRunGuardUnresolvedDesc": "Stream {streams} does not exist or you don't have access to it.",
+    "autoRunGuardBanner": "This change would scan about {size} ({scope}), so Auto Run paused. The results below are from the previous query.",
+    "autoRunGuardBannerPaused": "This change would scan about {size} ({scope}), so it is paused. The results below are from the previous query.",
+    "autoRunGuardBannerUnknown": "Size unknown for this window ({scope}), so it is paused. The results below are from the previous query.",
+    "autoRunGuardBannerRefresh": "Auto-refresh would scan about {size} per refresh ({scope}), so it is paused until you run this once. The results below are from the previous query.",
+    "autoRunGuardRunAnyway": "Run anyway",
+    "autoRunGuardRunQuery": "Run query",
+    "autoRunGuardNarrow": "Narrow to {period}",
+    "autoRunGuardNarrowWithSize": "Narrow to {period} (~{size})",
+    "autoRunGuardSearchJob": "Run as search job",
+    "autoRunGuardSelectStream": "Select a stream",
+    "searchJobNoPermission": "You do not have permission to create search jobs",
+    "missingStreamAndNoFts": "One or more filter fields do not exist in \"{missingStreams}\", hence no search is performed in the mentioned stream.\n Not searched: {noFtsStreams} (no full-text fields).",
+    "freeTextChooseFirst": "Choose how to search text first",
+    "freeTextScanLogsOnly": "Scan mode works in the logs view only; set a full-text field to use text search here",
+    "freeTextSearchedFields": "Full-text search in: {fields} (all words, any order)",
+    "freeTextPreview": "Full-text search in: {fields} (all words, any order)\n\nRuns as {sql}",
+    "freeTextRunsAs": "Runs as {sql}",
+    "freeTextNotSearched": "Not searched: {streams} (no full-text fields).",
+    "freeTextSetField": "Configure full-text search fields",
+    "freeTextNoFtsTitle": "\"{stream}\" has no full-text fields",
+    "freeTextNoFtsTitleMulti": "The selected streams have no full-text fields",
+    "freeTextNoTextFields": "This stream has no text fields to search.",
+    "freeTextNoTextFieldsNamed": "Not searched: {streams} (no text fields).",
+    "freeTextBuildNotice": "This filter has text search; edit it in SQL."
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Upgrade to PRO Plan",
     "home": "Home",
     "about": "About",
@@ -1320,6 +1452,7 @@
     "topQueries": "Top Queries",
     "profiles": "Profiles",
     "productAnalytics": "Product Analytics",
+    "downtimes": "Downtimes",
     "trialEndedTitle": "Your trial has ended",
     "trialPageNeedsPlan": "{page} needs a plan",
     "trialPageNeedsPlanToast": "{page} needs a plan. Choose one on this page to keep using it.",
@@ -2491,6 +2624,7 @@
   "login": {
     "lockedOut": "Too many failed sign-in attempts. Try again in {duration}, or contact your administrator.",
     "redirectingToSsoMessage": "Redirecting to SSO login page. If you are not redirected, please",
+    "signingIn": "Signing you in...",
     "clickHere": "click here",
     "loginWithSso": "Login with SSO",
     "loginAsInternalUser": "Login as internal user",
@@ -2852,6 +2986,7 @@
       "scopeCoveredByParent": "Locked actions come from {scope}, set in {module}",
       "scopeAllOf": "All {module}",
       "scopeIncludesFuture": "Includes resources created later",
+      "scopeDowntimeHint": "A downtime folder limits who manages a downtime, not what it silences. To silence All folders of a module, a user needs the right to list every folder of that module. Muted chips and banners may name a downtime a user cannot list.",
       "grantedByWiderScope": "Granted By A Wider Scope",
       "grantedHereAndByWiderScope": "Granted Here And By A Wider Scope",
       "stillGrantedByWiderScope": "Removed Here, Still Granted By A Wider Scope",
@@ -4248,7 +4383,7 @@
       "transTypeLabel": "Language",
       "transTypePlaceholder": "Choose a language",
       "paramsLabel": "Parameters",
-      "paramsHint": "Comma-separated argument names. Defaults to \u201crow\u201d.",
+      "paramsHint": "Comma-separated argument names. Defaults to “row”.",
       "overrideExisting": "Replace the existing function instead",
       "nameInputRequired": "Enter a function name",
       "nameInputInvalid": "Use letters, numbers and underscores, starting with a letter or underscore",
@@ -4259,7 +4394,7 @@
       "overridden": "Function - {index}: \"{name}\" overridden",
       "createFailed": "Function - {index}: \"{name}\" failed - {reason}",
       "rejectedBody": "Correct the definition and import again.",
-      "rejectedLanguage": "Function - {index}: \"{name}\" was rejected. If it is a JavaScript function, set the language \u2014 a definition with no language is read as VRL.",
+      "rejectedLanguage": "Function - {index}: \"{name}\" was rejected. If it is a JavaScript function, set the language — a definition with no language is read as VRL.",
       "jsonStringEmpty": "JSON string is empty",
       "invalidJsonFormat": "Invalid JSON format",
       "importSuccess": "Imported {count} function | Imported {count} functions",
@@ -7510,6 +7645,11 @@
     "SearchSQLCancelled": "Error: Search SQL was cancelled."
   },
   "alerts": {
+    "promRuleMode": "Rule mode",
+    "promRulePreview": "{count} returned series match now. Each series must complete the pending period before firing.",
+    "promRuleModeDescription": "Matches when the expression returns any series. Choose Single or Multi alert when the pending period is zero; a pending period enables Multi alert automatically. Leave the stream empty to infer a referenced metrics stream.",
+    "promRuleModePendingMulti": "A pending period requires an independent timer for each series, so Multi alert cannot be disabled.",
+    "promRuleModeConflict": "Rule mode cannot use Critical or Warning value thresholds; a pending period requires Multi alert.",
     "allAlerts": "All Alerts",
     "compositeAlert": "Composite",
     "import": {
@@ -9053,7 +9193,9 @@
         "dbmLockSampling": "Lock activity is sampled on an interval, so contention that started and cleared between two samples was never recorded. A quiet alert is not proof there was no blocking.",
         "dbmNoInstance": "No single database instance was identified, so this alert watches every instance of this engine.",
         "rumFunnelSnapshot": "This alert keeps a copy of the funnel's SQL. Later edits to the funnel or its named events do not change it.",
-        "rumFunnelSteps": "A funnel needs at least two steps before it can alert on conversion."
+        "rumFunnelSteps": "A funnel needs at least two steps before it can alert on conversion.",
+        "textFilterDropped": "Your search filter was not carried over because this stream has no full-text search (FTS) fields. Add it to the alert query if you need it.",
+        "heldFilterDropped": "Your search filter was not carried over because it needs a Run as choice on the logs page first. Add it to the alert query if you need it."
       }
     },
     "saveFailed": "Could not save the alert.",
@@ -9065,7 +9207,501 @@
     "sloLongWindow": "Long window",
     "sloShortWindow": "Short window",
     "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
-    "seconds": "Seconds"
+    "seconds": "Seconds",
+    "downtimes": {
+      "newTitle": "New downtime",
+      "editTitle": "Edit downtime",
+      "detailTitle": "Downtime",
+      "modules": {
+        "alerts": "Alerts",
+        "anomaly_detections": "Anomaly detections",
+        "synthetics": "Synthetics checks",
+        "slos": "SLOs"
+      },
+      "modulesShort": {
+        "alerts": "Alerts",
+        "anomaly_detections": "Anomaly",
+        "synthetics": "Synthetics",
+        "slos": "SLOs"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "During the window, incidents are",
+          "muted": "Created and muted (default)",
+          "mutedHelp": "Incidents open as usual but notify nobody until the window ends.",
+          "none": "Not created",
+          "noneHelp": "No incident opens during the window; the first firing after it opens one and notifies.",
+          "summary": "no incidents"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}s",
+        "condition": "condition",
+        "allFolders": "all folders",
+        "oneFolder": "{name} folder",
+        "nFolders": "{count} folder | {count} folders",
+        "tags": "tag {tags}",
+        "nItems": "{count} item | {count} items",
+        "asGood": "as good",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}",
+        "noIncidents": "No incidents open during the window."
+      },
+      "duration": {
+        "days": "{count} d",
+        "hours": "{count} h",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "{start} to {end} {zone}",
+        "onceSentence": "Once · {start} to {end} · {zone}",
+        "dailySentence": "Daily · {time} for {duration} · {zone}",
+        "weeklySentence": "Weekly on {days} · {time} for {duration} · {zone}",
+        "fromNoEnd": "{schedule}, from {start} with no end date",
+        "fromUntil": "{schedule}, from {start} until {until}"
+      },
+      "validation": {
+        "conditionRequired": "Add a condition, or remove the condition block.",
+        "pairKey": "Choose a dimension for every row.",
+        "pairOperator": "Use = or != in a downtime condition.",
+        "pairValue": "Enter a value for every row.",
+        "loneStar": "A value cannot be a lone *.",
+        "innerStar": "A * is allowed only at the end of a value.",
+        "emptyGroup": "A condition group cannot be empty.",
+        "tooDeep": "A condition can nest groups at most 3 levels deep.",
+        "tooManyPairs": "A condition can hold at most 32 pairs.",
+        "needsEq": "Add at least one = condition. A condition made only of != rows would silence everything else.",
+        "modulesRequired": "Choose at least one module.",
+        "foldersRequired": "Choose All folders or at least one folder.",
+        "tagsRequired": "Add a tag, or remove the tags block.",
+        "idsRequired": "Pick an item, or remove the specific items block.",
+        "idOutsideFolders": "Some chosen items are not in the chosen folders.",
+        "tooManyFolders": "Choose at most {max} folders, or All folders.",
+        "tooManyTags": "Add at most {max} tags.",
+        "tooManyIds": "Pick at most {max} items.",
+        "nameTooLong": "A name can be at most 256 characters.",
+        "timezoneRequired": "Choose a timezone.",
+        "startRequired": "Enter a start date and time.",
+        "endRequired": "Enter an end date and time.",
+        "endAfterStart": "The end must be after the start.",
+        "windowTooLong": "A window can last at most 7 days.",
+        "windowTooShort": "A window must last at least 1 minute.",
+        "startTimeRequired": "Enter a start time as HH:MM.",
+        "durationInvalid": "Enter a duration such as 90m or 1h 30m.",
+        "weekdaysRequired": "Choose at least one day.",
+        "untilAfterStart": "Repeat until must be on or after the first day.",
+        "reasonTooLong": "A reason can be at most {max} characters.",
+        "windowOutlastsRepeat": "The window cannot be longer than the time between repeats.",
+        "startDateRequired": "Choose the first day."
+      },
+      "title": "Downtimes",
+      "subtitle": "Scheduled windows that keep alerts, anomaly detections and synthetics checks running but stop their notifications",
+      "newDowntime": "New downtime",
+      "filterAll": "All",
+      "filterOnce": "One-time",
+      "filterRecurring": "Recurring",
+      "search": "Search by name, dimension or creator",
+      "searchAcross": "Search all folders",
+      "thisFolder": "This folder",
+      "allFolders": "All folders",
+      "thisFolderTooltip": "Search in the selected folder",
+      "allFoldersTooltip": "Search in every folder",
+      "noFolder": "No folder you can file a downtime in",
+      "truncated": "Showing the first {shown} of {total} downtimes",
+      "stats": {
+        "active": "Active",
+        "scheduled": "Scheduled",
+        "recurring": "Recurring",
+        "ended": "Ended",
+        "cancelled": "Cancelled",
+        "endedEarly": "Ended early",
+        "total": "Total"
+      },
+      "columns": {
+        "name": "Name",
+        "status": "Status",
+        "targets": "Targets",
+        "schedule": "Schedule",
+        "when": "Ends / next",
+        "matched": "Matched",
+        "createdBy": "Created by",
+        "folder": "Folder"
+      },
+      "oneTime": "One-time",
+      "recurring": "Recurring",
+      "bannerOn": "A banner shows to everyone in the org while this downtime is active",
+      "endsLabel": "ends",
+      "confirmEndNow": {
+        "title": "End this downtime now?",
+        "message": "Notifications resume at once. The downtime stays in the list as ended early.",
+        "ok": "End now",
+        "keep": "Keep running"
+      },
+      "extend": {
+        "menu": "Extend by",
+        "notActive": "Only an active downtime can be extended",
+        "dialogTitle": "Extend {name}",
+        "newEnd": "New end",
+        "confirmUntil": "Extend until {time}",
+        "followUp": "This downtime repeats, so its schedule stays as it is. A one-time downtime named {name} is created from the end of the current window.",
+        "endAfterCurrent": "The new end must be later than the current end."
+      },
+      "nextLabel": "next",
+      "matched": {
+        "alerts": "{count} alert | {count} alerts",
+        "anomalies": "{count} anomaly | {count} anomalies",
+        "synthetics": "{count} check | {count} checks",
+        "slos": "{count} SLO | {count} SLOs"
+      },
+      "actions": {
+        "endNow": "End now",
+        "edit": "Edit",
+        "duplicate": "Duplicate",
+        "moveToFolder": "Move to folder",
+        "cancel": "Cancel downtime",
+        "delete": "Delete",
+        "more": "More actions",
+        "muteForHour": "Mute now for 1 h",
+        "extend": "Extend"
+      },
+      "confirmCancel": {
+        "title": "Cancel downtime",
+        "message": "Notifications resume at once. The downtime stays in the list for history.",
+        "bulkMessage": "Cancel {count} downtime? Notifications resume at once. | Cancel {count} downtimes? Notifications resume at once.",
+        "confirm": "Cancel downtime | Cancel downtimes",
+        "keep": "Keep downtime | Keep downtimes"
+      },
+      "confirmDelete": {
+        "title": "Delete downtime",
+        "message": "The downtime and its history are removed. This cannot be undone."
+      },
+      "copyOf": "Copy of {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} alert matches | {count} alerts match",
+          "anomaly_detections": "{count} detection matches | {count} detections match",
+          "synthetics": "{count} check matches | {count} checks match",
+          "slos": "{count} SLO matches | {count} SLOs match"
+        },
+        "alertFolders": "Alert folders",
+        "syntheticsFolders": "Synthetics folders",
+        "noAlertFolderAccess": "You don't have access to alert folders.",
+        "noSyntheticsFolderAccess": "You don't have access to synthetics folders.",
+        "tags": "Tags",
+        "tagPlaceholder": "key:value",
+        "tagsHint": "Every tag must be on the check.",
+        "removeBlock": "Remove this block",
+        "specificItems": "Specific items",
+        "itemsHint": "Only items in the chosen folders are offered.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Add tags",
+        "addItems": "Add specific items",
+        "sloMode": "SLO score inside the window",
+        "sloExclude": "Exclude the window",
+        "sloCountAsGood": "Count the window as good",
+        "sloExcludeCaption": "Time inside the window counts neither as good nor as bad. Burn-rate alerts on these SLOs do not fire for it.",
+        "sloCountAsGoodCaption": "Time in the window counts as fully good. Use this only when your SLO contract says planned maintenance is uptime.",
+        "cardCaption": "Folders first, then the optional blocks narrow further. The dimension condition above applies to this module too.",
+        "noConditionForChecks": "The dimension condition above does not apply to checks.",
+        "appliesTo": "Applies to",
+        "tabTargets": "Targets",
+        "tabSchedule": "Schedule",
+        "tabAdvanced": "Advanced",
+        "modeInFolder": "{mode} in",
+        "newMode": "New downtime",
+        "editMode": "Edit downtime",
+        "namePlaceholder": "Downtime name",
+        "nameLabel": "Downtime name",
+        "renameHint": "Click to rename",
+        "reason": "Reason",
+        "reasonHelp": "Optional. Shown in the list, on the detail page and in the Muted tooltip.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "activeBanner": "This downtime is active. An edit takes effect at the next evaluation, and a change to the SLO mode re-measures the windows that already started.",
+        "changedMeanwhile": "Someone changed this downtime since you loaded it. Reload and try again.",
+        "reload": "Reload",
+        "noModule": "Choose a module in Applies to.",
+        "checkSchedule": "Check the schedule, then save again."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "alerts",
+          "anomaly_detections": "anomaly detections",
+          "synthetics": "synthetics checks",
+          "slos": "SLOs"
+        },
+        "whenOnce": "Once, from {start} to {end} {zone}",
+        "whenDaily": "Every day at {time} {zone}, for {duration}",
+        "whenWeekly": "Every {days} at {time} {zone}, for {duration}",
+        "inFolders": "in the folder {names} | in the folders {names}",
+        "withCondition": "with {condition}",
+        "tagged": "tagged {tags}",
+        "named": "limited to {count} named item | limited to {count} named items",
+        "stopNotifying": "{when}: {targets} stop notifying.",
+        "nothingMuted": "{when}: no alert or check is muted.",
+        "sloUnchanged": "SLO scores are not changed.",
+        "sloExcluded": "{slos} exclude the window from their score.",
+        "sloAsGood": "{slos} count the window as good time."
+      },
+      "autoName": {
+        "once": "once",
+        "onceOn": "once {date}",
+        "daily": "daily",
+        "weekly": "weekly",
+        "all": {
+          "alerts": "All alerts",
+          "anomaly_detections": "All anomaly detections",
+          "synthetics": "All synthetics checks",
+          "slos": "All SLOs"
+        }
+      },
+      "condition": {
+        "none": "No dimension condition",
+        "add": "Add",
+        "title": "Dimension condition",
+        "onePer": "One per downtime",
+        "remove": "Remove the dimension condition",
+        "caption": "Applies to alerts, anomaly detections and SLOs. Synthetics checks have no dimensions and use tags. All pairs must match. Use an OR group for alternatives. A value can end in *."
+      },
+      "resources": {
+        "refineBy": "Refine by resource",
+        "load": "Load resources",
+        "needsEq": "Add at least one = condition before refining by resource.",
+        "tooMany": "{count} values co-occur with this condition. Narrow the condition to pick resources.",
+        "lastSeen": "Last seen",
+        "streams": "Streams",
+        "footer": "{selected} of {total} selected · {source}",
+        "fromRegistry": "from the service registry",
+        "fromSearch": "from the last 24 hours of data",
+        "apply": "Apply",
+        "loadFailed": "Could not load the resources",
+        "notSeen": "Not seen in the last hour.",
+        "partial": "Some sources did not answer.",
+        "items": "Items",
+        "fromValues": "from alerts, the service registry and the last hour of data",
+        "noValues": "No values seen for this dimension yet."
+      },
+      "scheduleForm": {
+        "once": "Once",
+        "daily": "Daily",
+        "weekly": "Weekly",
+        "startDate": "Start date",
+        "startTime": "Start time",
+        "endDate": "End date",
+        "endTime": "End time",
+        "days": "Days",
+        "startsAt": "Starts at",
+        "duration": "Duration",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Up to 7 days, for example 90m or 1h 30m.",
+        "until": "Repeat until",
+        "untilPlaceholder": "No end date",
+        "timezone": "Timezone",
+        "noWindow": "No window starts in the next 8 days.",
+        "nextWindow": "Next window: {window}. A window can cross midnight.",
+        "nextWindowWithUtc": "Next window: {window} ({utc}). A window can cross midnight.",
+        "startsOn": "Starts on"
+      },
+      "preview": {
+        "title": "Preview",
+        "failed": "The preview could not be loaded.",
+        "andMore": "and {count} more",
+        "noMatch": "Nothing matches now",
+        "fireTime": "{count} alert resolves its identity at fire time | {count} alerts resolve their identity at fire time",
+        "undecidable": "Cannot be told apart by {key}",
+        "showAll": "Show the full list",
+        "showLess": "Show less",
+        "finishCondition": "Finish the condition to see a preview."
+      },
+      "muteAllDialog": {
+        "title": "Mute whole modules?",
+        "intro": "No folder, item, tag or condition narrows these modules, so this downtime mutes:",
+        "every": {
+          "alerts": "Every alert in this organization",
+          "anomaly_detections": "Every anomaly detection in this organization",
+          "synthetics": "Every synthetics check in this organization",
+          "slos": "Every SLO in this organization"
+        },
+        "matchedNow": "{matched} today",
+        "outro": "Notifications, on-call pages and workflows stop for all of them inside the window.",
+        "cancel": "Cancel",
+        "confirm": "Mute all",
+        "titleOne": {
+          "alerts": "Mute every alert in this org?",
+          "anomaly_detections": "Mute every anomaly detection in this org?",
+          "synthetics": "Mute every synthetics check in this org?",
+          "slos": "Mute every SLO in this org?"
+        },
+        "window": "Window: {window}"
+      },
+      "summaryPane": {
+        "title": "Summary",
+        "filedIn": "Filed in",
+        "window": "Window",
+        "nextWindow": "Next window",
+        "inUtc": "In UTC",
+        "largeMatch": "{modules}: the downtime matches more than half of the items. Most of this org will not notify inside the window.",
+        "whatHappens": "What happens",
+        "keepRunning": "Evaluations and checks keep running and keep their history.",
+        "noNotifications": "Notifications, on-call pages and workflows stop.",
+        "mutedIncidents": "Incidents open muted and notify after the window."
+      },
+      "band": {
+        "now": "now",
+        "none": "No window has run yet and none is planned.",
+        "active": "Active",
+        "next": "Next",
+        "past": "Ran",
+        "track": "Windows",
+        "aria": "{kind}: {start} to {end}"
+      },
+      "detail": {
+        "overview": "Overview",
+        "affected": "Affected · {count}",
+        "suppressed": "Suppressed · {count}",
+        "details": "Details",
+        "condition": "Condition",
+        "noTarget": "No target",
+        "banner": "Banner",
+        "bannerOn": "Shown to the org while active",
+        "bannerOff": "No banner",
+        "occurrences": "Occurrences",
+        "nextWindow": "Next window: {window}. Your time: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Matched by",
+        "matchedBy": {
+          "query": "Query",
+          "source_alert": "Source alert",
+          "tag": "Tag",
+          "id": "Named",
+          "folder": "Folder",
+          "org": "Whole org"
+        },
+        "source": "Source",
+        "wouldHaveNotified": "Would have notified",
+        "noSuppressed": "Nothing has been suppressed yet",
+        "muteHourName": "{name} · mute 1 h",
+        "notFoundTitle": "Downtime not found",
+        "notFoundDescription": "It may have been deleted, or the link points to another organization.",
+        "backToList": "Back to downtimes"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Mute {count} alert | Mute {count} alerts",
+          "anomaly_detections": "Mute {count} anomaly detection | Mute {count} anomaly detections",
+          "synthetics": "Mute {count} check | Mute {count} checks",
+          "slos": "Mute {count} SLO | Mute {count} SLOs",
+          "items": "Mute {count} item | Mute {count} items"
+        },
+        "subtitle": "They keep running and keep their history. Notifications, pages and workflows stop until the window ends.",
+        "muteFor": "Mute for",
+        "fileIn": "File in",
+        "presets": {
+          "30m": "30 min",
+          "1h": "1 h",
+          "2h": "2 h",
+          "4h": "4 h",
+          "custom": "Custom"
+        },
+        "endsAt": "Ends on",
+        "endsIn": "In {duration}.",
+        "confirm": "Mute",
+        "confirmUntil": "Mute until {time}",
+        "menu": "Mute notifications",
+        "until": "Until…",
+        "bulk": "Mute",
+        "muted": "Muted · ends in {duration}",
+        "mutedTooltip": "Muted by {name} until {end}",
+        "exclude": "Exclude a window…",
+        "firingMuted": "Firing · muted",
+        "firingMutedTooltip": "Still firing. Notifications are muted by {name}."
+      },
+      "corrected": "Corrected",
+      "correctedBy": "Score corrected by {names}",
+      "incident": {
+        "mutedBy": "Muted · {name}",
+        "notLoaded": "Downtime not loaded",
+        "notLoadedTooltip": "Muted by downtime {id}, which is not among the downtimes loaded.",
+        "banner": "Muted by {name}. Nobody was paged. The first firing after the window sends the delayed opened notification.",
+        "bannerUntil": "Muted by {name} until {end}. Nobody was paged. The first firing after the window sends the delayed opened notification."
+      },
+      "banner": {
+        "ended": "ended",
+        "endsInUnderMinute": "ends in less than a minute",
+        "endsInMinutes": "ends in {count} minute | ends in {count} minutes",
+        "endsIn": "ends in {duration}",
+        "firstEndsInUnderMinute": "first ends in less than a minute",
+        "firstEndsInMinutes": "first ends in {count} minute | first ends in {count} minutes",
+        "firstEndsIn": "first ends in {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Show a banner to everyone in the org while this downtime is active",
+        "showBannerCaption": "The banner shows the name, the affected counts and the time left. It never names an alert.",
+        "preview": "Preview",
+        "previewMessage": "{name} is active.",
+        "tooLong": "A banner is only available for windows of up to 7 days."
+      },
+      "sloCorrections": {
+        "title": "Status corrections:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "shorter than the SLO's slice, no minutes corrected"
+      },
+      "notify": {
+        "title": "Notify",
+        "caption": "Tell destinations about the downtime itself: when it starts, before it ends and when it ends.",
+        "destinations": "Destinations",
+        "lead": "Remind before the end",
+        "leadHelp": "For example 10m or 1h, between 1 minute and the window length.",
+        "regionNote": "In a super cluster, the region where the downtime was created sends these. A downtime created before this setting existed sends from every region.",
+        "tab": "Notifications",
+        "events": {
+          "started": "When it starts",
+          "startedHelp": "One message as each window begins.",
+          "ending_soon": "Before it ends",
+          "ending_soonHelp": "A reminder ahead of the end, so nobody is surprised when alerts notify again.",
+          "ended": "When it ends",
+          "endedHelp": "One message as each window closes.",
+          "cancelled": "When it is cancelled",
+          "cancelledHelp": "Sent at once when someone ends or calls off the downtime.",
+          "extended": "When it is extended",
+          "extendedHelp": "Sent at once with the new end."
+        },
+        "validation": {
+          "tooMany": "At most {max} destinations can be notified.",
+          "eventRequired": "Choose at least one event, or remove the destinations.",
+          "leadInvalid": "The reminder must come between 1 minute and the window length before the end."
+        },
+        "summary": {
+          "none": "Sends no notifications of its own.",
+          "sentence": "Notifies {destinations}: {events}.",
+          "started": "when it starts",
+          "endingSoon": "{lead} before it ends",
+          "ended": "when it ends",
+          "cancelled": "when it is cancelled",
+          "extended": "when it is extended"
+        },
+        "log": {
+          "time": "Time",
+          "event": "Event",
+          "destinations": "Destinations",
+          "result": "Result",
+          "ok": "Sent",
+          "pending": "Sending",
+          "empty": "No notifications sent yet",
+          "events": {
+            "started": "Started",
+            "ending_soon": "Ending soon",
+            "ended": "Ended",
+            "cancelled": "Cancelled",
+            "extended": "Extended"
+          }
+        },
+        "test": {
+          "send": "Send test",
+          "sent": "Test sent to {count} destination | Test sent to {count} destinations",
+          "failed": "The test did not reach {names}."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -9102,7 +9738,8 @@
     "countWorkflow": "{count} workflow | {count} workflows",
     "countAnomalyDetection": "{count} anomaly detector | {count} anomaly detectors",
     "countIncidentIntegration": "{count} incident integration | {count} incident integrations",
-    "sectionOtherConsumers": "Also used by"
+    "sectionOtherConsumers": "Also used by",
+    "countDowntime": "{count} downtime | {count} downtimes"
   },
   "alert_library": {
     "header": "Alert Library",
@@ -11646,7 +12283,21 @@
     "eventClusterAriaLabelPlural": "{count} events, {errors} errors",
     "eventMarkerTooltip": "Event: {name}",
     "exceptionMarkerTooltip": "Exception: {type}",
-    "spanEventFallback": "span event"
+    "spanEventFallback": "span event",
+    "spanNav": {
+      "firstSpan": "First span",
+      "lastSpan": "Last span",
+      "position": "Span {index} of {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "Trace {row} of {count}, page {page}",
+      "spanPosition": "Span {row} of {count}, page {page}",
+      "firstResult": "First result",
+      "lastResult": "Last result",
+      "loadingPage": "Loading page {page}",
+      "pageFailed": "Couldn't load page {page}",
+      "pageEmpty": "Page {page} has no results"
+    }
   },
   "aiToolset": {
     "header": "AI Toolsets",
@@ -14883,7 +15534,8 @@
       "selectStreamDesc": "Browse logs, traces, metrics & RUM streams",
       "queryGuide": "Read the query guide",
       "queryGuideDesc": "Filters, SQL mode, VRL & saved views",
-      "recent": "Recent:"
+      "recent": "Last used:",
+      "descriptionAutoRun": "Choose a stream to see its latest logs. You can refine with filters, a VRL function, and a custom time range once results come in."
     },
     "noEvents": {
       "title": "No events found",
@@ -14937,7 +15589,8 @@
       "fixErrorsAndRetry": "There are some errors, please fix them and try again"
     },
     "buildQueryPage": {
-      "validationErrors": "There are some errors, please fix them and try again"
+      "validationErrors": "There are some errors, please fix them and try again",
+      "parserLoadFailed": "Couldn't load the query parser, so the search filter can't be added to the chart. Runs are paused until it loads."
     },
     "searchHistory": {
       "sqlQueryLabel": "SQL Query :",
@@ -15139,6 +15792,45 @@
     },
     "logsNoEventsState": {
       "lastData": "Last data: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "Severity {level}",
+      "srTextInferred": "Severity {level}, inferred",
+      "inferredLabel": "{level} · inferred",
+      "popoverTitle": "Severity: {level}",
+      "popoverAriaLabel": "Severity evidence",
+      "evidence": "Evidence",
+      "fromField": "From field {field}",
+      "inferredFrom": "Inferred from the {field} text.",
+      "notSearchable": "Not searchable; the histogram does not use it.",
+      "noLevelField": "No level field on this row, and no text field to scan.",
+      "noLevelWordInField": "No level field on this row, and no level word in {field}.",
+      "notInSelectedColumns": "Level field not in the selected columns",
+      "levels": {
+        "emergency": "emergency",
+        "alert": "alert",
+        "critical": "critical",
+        "error": "error",
+        "warning": "warning",
+        "notice": "notice",
+        "info": "info",
+        "debug": "debug",
+        "trace": "trace",
+        "ok": "ok",
+        "unknown": "unknown"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "Auto-refresh is on; turn it off to change pages",
+      "position": "Log {row} of {count}, page {page}",
+      "positionLabel": "Log {row} of {count} · Page {page}",
+      "loadingPage": "Loading page {page}…",
+      "loadingPageAnnouncement": "Loading page {page}",
+      "resultsChanged": "Results changed",
+      "notInPage": "Not in the current page",
+      "loadingResults": "Loading results…",
+      "previousLog": "Previous log",
+      "nextLog": "Next log"
     }
   },
   "queryError": {
@@ -15173,7 +15865,10 @@
     "traceId": "Trace ID:",
     "askAi": "Ask AI to fix my query",
     "showDetail": "Show details",
-    "hideDetail": "Hide details"
+    "hideDetail": "Hide details",
+    "runAs": "Run as",
+    "searchTextFor": "Search text for \"{text}\"",
+    "searchTextDesc": "Search the whole input as one phrase"
   },
   "refreshButton": {
     "justNow": "just now",
@@ -16959,7 +17654,8 @@
       "sourceMaps": "RUM — Source Maps",
       "oncall": "On-Call",
       "oncallDetail": "On-Call Page",
-      "syntheticsJourney": "Synthetics journey"
+      "syntheticsJourney": "Synthetics journey",
+      "downtimes": "Downtimes"
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
@@ -17071,7 +17767,19 @@
       "oncallEscalate": "Escalate",
       "oncallSnooze": "Snooze",
       "oncallResolve": "Resolve",
-      "functionsImport": "Import function"
+      "downtimesCreate": "New downtime",
+      "downtimesRefresh": "Refresh downtimes",
+      "functionsImport": "Import function",
+      "logsNextRow": "Next log (opens details)",
+      "logsPrevRow": "Previous log (opens details)",
+      "logsRowFocusMove": "Move focus between rows",
+      "logsRowOpen": "Open the focused row",
+      "logsDetailClose": "Close details and return to the row",
+      "tracesNextRow": "Select next trace",
+      "tracesPrevRow": "Select previous trace",
+      "tracesRowOpen": "Open the selected trace",
+      "traceNextVisibleSpan": "Next visible span",
+      "tracePrevVisibleSpan": "Previous visible span"
     }
   },
   "components": {
@@ -17444,7 +18152,13 @@
         "debug": "Debug",
         "info": "Info",
         "warn": "WARN",
-        "fatal": "Fatal"
+        "fatal": "Fatal",
+        "emergency": "Emergency",
+        "alert": "Alert",
+        "critical": "Critical",
+        "notice": "Notice",
+        "ok": "OK",
+        "unknown": "Unknown"
       },
       "pipelineRunOutcome": {
         "firing": "Firing",
@@ -17509,6 +18223,13 @@
         "belowTopN": "below top-N",
         "truncated": "truncated",
         "gap": "gap"
+      },
+      "downtimeStatus": {
+        "scheduled": "Scheduled",
+        "active": "Active",
+        "ended": "Ended",
+        "cancelled": "Cancelled",
+        "endedEarly": "Ended early"
       }
     }
   },
@@ -17905,6 +18626,24 @@
     },
     "iam": {
       "userSaveFailed": "Could not save the user"
+    },
+    "downtimes": {
+      "cancelled": "Downtime cancelled",
+      "cancelledMany": "{count} downtime cancelled | {count} downtimes cancelled",
+      "cancelFailed": "Could not cancel the downtime",
+      "extended": "Extended until {time}",
+      "extendedFollowUp": "Created {name}, running until {time}",
+      "extendFailed": "Could not extend the downtime",
+      "reload": "Reload",
+      "deleted": "Downtime deleted",
+      "deleteFailed": "Could not delete the downtime",
+      "created": "Downtime created",
+      "updated": "Downtime saved",
+      "saveFailed": "Could not save the downtime",
+      "muted": "Muted {count} item until {time}. Filed in {folder}. | Muted {count} items until {time}. Filed in {folder}.",
+      "muteFailed": "Could not create the mute",
+      "viewDowntime": "View downtime",
+      "itemsDropped": "{count} chosen item is outside the chosen folders and was removed. | {count} chosen items are outside the chosen folders and were removed."
     }
   },
   "cipherKeys": {
@@ -18195,7 +18934,9 @@
       "budgetNote": "The last point equals the Budget remaining tile above. The dashed line at 0% is exhaustion; below it the SLO has spent more errors than the target allows. Gaps are buckets with nothing measured, which is not the same as zero.",
       "burnExplain": "How fast the budget is burning in each bucket on its own, as a multiple of the budget-neutral rate.",
       "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis (the same line read as SLI):\nSLI = 100% − burn rate × (100% − target)",
-      "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI."
+      "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI.",
+      "corrected": "Corrected by a downtime",
+      "correctedTooltip": "Corrected by a downtime: excluded, so the budget line is flat"
     },
     "alerts": {
       "title": "Alerts",
@@ -21719,5 +22460,1079 @@
     "modeExhausted": "Exhausted",
     "modeFree": "Free",
     "modeUnknown": "Unknown"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "Send your data. OpenObserve finds the problems and tells you, with its best read on the cause. When it's quiet, it shows you what it checked and what it can't see.",
+    "phase2": "Phase 2",
+    "tabs": {
+      "issues": "Issues",
+      "coverage": "Coverage",
+      "activity": "Activity",
+      "policy": "Policy"
+    },
+    "loops": {
+      "coverage": "Coverage",
+      "calibration": "Calibration",
+      "investigation": "Investigation",
+      "action": "Action"
+    },
+    "signals": {
+      "requests": "Requests",
+      "errors": "Errors",
+      "latency": "Latency",
+      "saturation": "Saturation",
+      "logPatterns": "Log patterns",
+      "dependencies": "Dependencies"
+    },
+    "ledgerStatus": {
+      "autoApplied": "Auto-applied",
+      "awaiting": "Awaiting approval",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "rolledBack": "Rolled back",
+      "kept": "Kept — checks passed"
+    },
+    "issues": {
+      "subtitle": "Incidents grouped and investigated by the SRE agent. One notification per problem; the cause is attached, or follows in the same thread if triage times out or fails.",
+      "open": "Open",
+      "recent": "Resolved",
+      "all": "All",
+      "heldForDigest": "Held for Friday's summary",
+      "colId": "Incident",
+      "colTitle": "Problem",
+      "colSeverity": "Severity",
+      "colServices": "Affected services",
+      "colStarted": "Started",
+      "colStatus": "Status",
+      "colCause": "Cause",
+      "emptyTitle": "Nothing here",
+      "emptyDescription": "No problems match this filter.",
+      "subsetNote": "{shown} shown. This demo shows a selection of this week's {total} incidents.",
+      "searchLabel": "Search issues",
+      "searchPlaceholder": "Search issues, services, causes or INC-…",
+      "noMatch": "No issues match “{query}”",
+      "clearSearch": "Clear search",
+      "matchCount": "No issues match | 1 issue matches | {count} issues match",
+      "colSignal": "Signal",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → now",
+      "minutes": "{count} min",
+      "grouped": "{count} alert → 1 incident | {count} alerts → 1 incident",
+      "confidence": "{level} confidence",
+      "proposed": "Proposed",
+      "reversible": "reversible",
+      "proposalFor": "Proposed fix for {title}"
+    },
+    "drawer": {
+      "rca": "Root cause",
+      "rcaSummary": "Summary",
+      "likelyCause": "Likely cause",
+      "confidence": "Confidence",
+      "confidenceValue": "Confidence: {value} (no calibrated score yet)",
+      "nextStep": "Suggested next step",
+      "evidence": "Evidence",
+      "blastRadius": "Blast radius",
+      "upstream": "Upstream callers",
+      "affected": "Affected",
+      "downstream": "Downstream dependencies",
+      "none": "None",
+      "timeline": "Timeline",
+      "notification": "Notification sent",
+      "notSent": "No page: this low-severity problem was held for the Friday summary. Recorded in the in-product inbox.",
+      "sender": "AutoObserve",
+      "threadReply": "replied in thread",
+      "p1Note": "P1 pages immediately, before the investigation lands. The cause follows in the same thread.",
+      "gateNote": "P2 and P3 notifications wait up to 2 minutes for the investigation, so the first message usually carries the cause. If triage times out or fails, the message says the investigation is still running or failed, and the cause follows in the same thread. P4 problems don't notify anyone; they go into the Friday summary.",
+      "caughtEarlier": "What would have caught this earlier",
+      "analyzedAt": "Investigation landed at {time}.",
+      "triggersSample": "Showing {shown} of {total} firings",
+      "waitingForOk": "Waiting for your OK",
+      "proposedFix": "Proposed fix",
+      "unfoldTab": "How it unfolded",
+      "seeEvidence": "See the evidence ({count}) →"
+    },
+    "unfold": {
+      "hint": "Read left to right: what changed, the signals it set off, then what reached your team. Select a card for its firings.",
+      "legend": "Card types",
+      "team": "Your team",
+      "kind": {
+        "metric": "Metric",
+        "log": "Log",
+        "trace": "Trace",
+        "change": "Change"
+      },
+      "likelyCause": "Likely cause",
+      "linesUpWith": "Lines up with",
+      "times": "×{count}",
+      "sameMinute": "same minute",
+      "plusMinutes": "+{count} min",
+      "plusHours": "+{hours} h {minutes} min",
+      "firstFired": "First fired",
+      "lastFired": "Last fired",
+      "firings": "Firings",
+      "peak": "Peak",
+      "normal": "Compared with",
+      "detector": "Detector",
+      "firedAt": "Fired at",
+      "when": "When",
+      "chartNote": "The problem's main chart, as in Evidence",
+      "outcome": {
+        "paged": "Paged on-call",
+        "asked": "Asked for an OK",
+        "notified": "Message sent, no page",
+        "held": "Held for Friday's summary",
+        "fixFailed": "Fix didn't help",
+        "fixed": "Fixed",
+        "resolved": "Resolved",
+        "open": "Still open"
+      }
+    },
+    "coverage": {
+      "showing": "Showing {shown} of {total} services",
+      "watched": "Watched",
+      "learning": "Learning",
+      "gap": "Gap",
+      "na": "Not applicable",
+      "anomaly": "Anomaly",
+      "threshold": "Threshold",
+      "service": "Service",
+      "lastScanned": "Last scanned",
+      "detector": "Detector",
+      "methodAnomaly": "Anomaly detector, learned baseline",
+      "methodThreshold": "Static threshold from the library",
+      "libraryEntry": "Library entry",
+      "predicate": "Applicability",
+      "predicateMatched": "{predicate} — matched in stream {stream}",
+      "predicateUnmatched": "{predicate} — not matched",
+      "reason": "Why",
+      "history": "{days} of {total} days of history",
+      "notScanned": "First scan in progress — unknown, not covered until it finishes",
+      "guardrails": "Guardrails active while learning: error-ratio ceiling · freshness check (fires if the stream stops)",
+      "alsoWatchedBy": "Also watched by",
+      "searchLabel": "Search services",
+      "searchPlaceholder": "Search service or stream",
+      "matchCount": "No services match | 1 service matches | {count} services match",
+      "noMatch": "No service or stream matches “{query}”",
+      "clearSearch": "Clear search",
+      "filterLabel": "Filter services by coverage",
+      "all": "All",
+      "gaps": "Gaps",
+      "cantWatch": "Can't watch",
+      "detectorCount": "1 detector | {count} detectors",
+      "stream": "Stream",
+      "coverage": "Coverage",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "{watched} of {total} applicable signals watched",
+      "legendLabel": "Legend",
+      "gapChip": "GAP",
+      "daysShort": "{days}/{total}d",
+      "tipAnomaly": "{signal}: anomaly detector, learned baseline",
+      "tipThreshold": "{signal}: static threshold from the library",
+      "tipLearning": "{signal}: learning, {days} of {total} days of history",
+      "tipGap": "{signal}: gap, can't be watched yet",
+      "tipNa": "{signal}: not applicable",
+      "config": "Detector config",
+      "lastFired": "Last fired",
+      "never": "Never",
+      "hoursAgo": "1 hour ago | {count} hours ago",
+      "daysAgo": "1 day ago | {count} days ago",
+      "fixNoLink": "Add service.name label",
+      "fixStopped": "Check the collector",
+      "fixQueued": "Mock only: “{action}” for {service} was not sent anywhere",
+      "viewLabel": "Coverage view",
+      "viewMap": "Map",
+      "viewTable": "Table",
+      "fillBy": "Fill by",
+      "fillState": "Coverage state",
+      "fillLearning": "Learning progress",
+      "fillDetectors": "Detector count",
+      "fillScanned": "Last scanned age",
+      "summaryWatched": "{watched} of {total} fully watched · {pct}%",
+      "addedThisWeek": "1 new service this week | {count} new services this week",
+      "splitLabel": "{watched} fully watched, {learning} learning, {gaps} can't be watched yet",
+      "stateWatched": "Fully watched",
+      "stateLearning": "Learning · {days} of {total} days",
+      "stateGap": "Can't be watched yet",
+      "hexName": "{service}, {state}, {stream}, {detectors}",
+      "legendOf": "Legend for {fill}, select to highlight",
+      "mapLabel": "Coverage map, 1 service filled by {fill} | Coverage map, {count} services filled by {fill}",
+      "bucketLearned": "Learned",
+      "bucketDays67": "6–7 days",
+      "bucketDays35": "3–5 days",
+      "bucketDays02": "0–2 days",
+      "bucketNoData": "No data",
+      "bucketSix": "6 detectors",
+      "bucketFive": "5 detectors",
+      "bucketFewer": "1–4 detectors",
+      "bucketNone": "None",
+      "bucketFresh": "Under 5 min",
+      "bucketRecent": "5–15 min",
+      "bucketHour": "15–60 min",
+      "bucketStale": "Over 1 hour",
+      "bucketNotScanned": "Not scanned",
+      "signals": "Signals",
+      "details": "Details",
+      "detailsFor": "Show details for {metric}",
+      "readyCaption": "Normal range ready {day} · {days} of {total} days",
+      "chartLearning": "{metric}, {value} now, learning, no normal range yet",
+      "chartOverThreshold": "{metric}, {value} now, over its {threshold} threshold",
+      "chartUnderThreshold": "{metric}, {value} now, under its {threshold} threshold",
+      "chartAbove": "{metric}, {value} now, above normal range",
+      "chartBelow": "{metric}, {value} now, below normal range",
+      "chartWithin": "{metric}, {value} now, within normal range",
+      "tipNormal": "Normal {low} – {high}",
+      "openTraces": "Traces",
+      "openCatalog": "Service Catalog",
+      "rangeLabel": "Time range",
+      "logPatternsValue": "{known} known · {fresh} new today",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "Not watched",
+      "signalsWatched": "Signals watched",
+      "chipAria": "{signal}: {state}",
+      "deltaUp": "Up {change} since the start of the range",
+      "deltaDown": "Down {change} since the start of the range",
+      "deltaFlat": "No change since the start of the range",
+      "badgeLearning": "Learning {days}/{total}d",
+      "badgeAnomaly": "Anomaly · learned",
+      "badgeThreshold": "Threshold > {threshold}",
+      "now": "Now",
+      "bandLearning": "Learning the baseline · {days} of {total} days · normal range ready {day}",
+      "metric": {
+        "requests": "Requests",
+        "errors": "Errors",
+        "latencyP95": "Latency p95",
+        "cpu": "CPU",
+        "pool": "Pool in use",
+        "memory": "Memory",
+        "queries": "Queries",
+        "queryLatency": "Query latency p95",
+        "connections": "Connections in use",
+        "ops": "Operations",
+        "rejections": "Rejected connections",
+        "latency": "Latency",
+        "messages": "Messages",
+        "failed": "Failed (dead letters)",
+        "lag": "Consumer lag",
+        "depth": "Queue depth"
+      }
+    },
+    "activity": {
+      "allLoops": "All loops",
+      "allStatuses": "All statuses",
+      "ledgerHint": "Every change AutoObserve proposes or makes is recorded here.",
+      "userBuilt": "User-built alert",
+      "confidence": "Confidence: {value}",
+      "evidence": "Evidence:",
+      "before": "Before",
+      "after": "After",
+      "neverAutoRetire": "Retiring an alert is never automatic.",
+      "neverSilent": "User-built alerts are never changed silently.",
+      "undo": "Undo",
+      "approve": "Approve",
+      "edit": "Edit",
+      "reject": "Reject",
+      "saveApprove": "Save and approve",
+      "undoneNote": "Undone by you — prior state restored from snapshot",
+      "undoneToast": "Undone. Marked rolled back in this demo's ledger.",
+      "approvedToast": "Approved. Marked approved in this demo's ledger.",
+      "rejectedNote": "Rejected by you",
+      "rejectedToast": "Rejected. Recorded against this action class.",
+      "emptyTitle": "No entries",
+      "emptyDescription": "Nothing in the ledger matches these filters.",
+      "reviewWindow": "In review for {window} — kept automatically if its checks pass, rolled back if they fail. The prior configuration keeps being evaluated silently, so anything this change would have hidden still shows up. Undo restores the prior state now.",
+      "approvedNote": "Approved by you at {time}.",
+      "applyingNote": "Approved by you at {time}; applying it now.",
+      "appliedNote": "Approved by you at {time} and applied.",
+      "declinedNote": "Declined by you.",
+      "needsApproval": "Needs your approval",
+      "awaiting": "Awaiting",
+      "auto": "Auto",
+      "outcomeFilter": "Filter by outcome",
+      "loopFilter": "Filter by loop",
+      "columns": {
+        "time": "When",
+        "loop": "Loop",
+        "action": "Action",
+        "target": "Target",
+        "change": "Change",
+        "confidence": "Confidence",
+        "decision": "Decision",
+        "outcome": "Outcome",
+        "actions": "Actions"
+      },
+      "showDetails": "Show details for {action} on {target}",
+      "hideDetails": "Hide details for {action} on {target}",
+      "approveFor": "Approve {action} on {target}",
+      "rejectFor": "Reject {action} on {target}",
+      "editFor": "Edit {action} on {target}",
+      "undoFor": "Undo {action} on {target}",
+      "openIncident": "Open incident {id}",
+      "confidenceHint": "{value} — no calibrated score yet",
+      "diff": "Proposed change, removed and added lines",
+      "daysLeft": "{count} day left | {count} days left",
+      "reviewProgress": "Review window elapsed",
+      "entryId": "Entry",
+      "logged": "Logged"
+    },
+    "policy": {
+      "gateHint": "Among changes to existing alerts, only deduplication applies on its own, with a prior-state snapshot and a review window: kept if its checks pass, rolled back if they fail. Everything else waits for one-click approval.",
+      "off": "Off",
+      "suggest": "Suggest",
+      "auto": "Auto",
+      "phase2Title": "Action — remediation",
+      "phase2Hint": "Production fixes. Each class earns its level from its measured track record and never acts above it.",
+      "investigation": "Investigation",
+      "outcomesTitle": "Outcomes",
+      "outcomesBody": "AutoObserve measures what each action did: did the error rate recover, did the page stop, was it undone. A class that keeps landing well earns more autonomy, one class at a time; a miss counts against it, and a fix that keeps being needed is reported as a bug instead of automated.",
+      "outcomesExample": "ScaleQueueWorkers moved to Auto after 7 approved scale-outs worked. Its one miss, on 2 October, added a pre-check, and a second miss moves it back to Suggest. AbortRollout waits for your OK; RollbackDeploy stays Off until it has a track record.",
+      "triage": {
+        "parallel": "Parallel",
+        "gate": "Gate",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "Pages at once and investigates alongside; the cause follows in the same thread. Gate is not allowed for P1.",
+        "gateDesc": "Hold the page until the investigation lands, for up to 2 minutes. Fails open: if triage times out or fails, it pages anyway, says the investigation is still running or failed, and the cause follows in the thread."
+      },
+      "classes": {
+        "EnableDeduplication": "Turn on deduplication for an alert that repeats within minutes.",
+        "CreateDetector": "Create an anomaly detector on a service's requests, errors or latency.",
+        "RaiseThreshold": "Raise a threshold that fires on healthy days.",
+        "LengthenEvaluationWindow": "Lengthen the window of an alert that flaps.",
+        "FixAlertQuery": "Correct an alert query that measures the wrong thing or can never match.",
+        "AttachDestination": "Attach a destination to a detector that fires into nowhere.",
+        "AddLibraryAlert": "Add a scheduled alert from the library where its predicate matches.",
+        "MoveToIncidentDelivery": "Deliver a user-built alert through its incident instead of its own route.",
+        "ReviewForDeletion": "Propose retiring an alert nobody acts on.",
+        "RollbackDeploy": "Roll back the deploy that caused a problem.",
+        "ScaleService": "Scale a saturated service out.",
+        "RestartPod": "Restart a pod that stopped serving while its replicas are healthy; a repeat opens a bug instead.",
+        "ToggleFeatureFlag": "Turn off the feature flag behind a problem.",
+        "RunRunbookStep": "Run a step from the service's runbook.",
+        "LowerThreshold": "Lower a threshold that fired too late to warn before an incident.",
+        "RevertConfigChange": "Put back a recent setting change a problem started with, when the replicas without it are healthy.",
+        "EvictLeakedConnections": "Close connections a service checked out and never returned (found by leak detection), leaving queries in flight alone. Each one is linked to the leak's bug.",
+        "AbortRollout": "Send traffic back to the previous version when only the new version's pods fail mid-rollout. Resumable in one click.",
+        "ScaleQueueWorkers": "Add workers to a backed-up queue, up to a cap; scale back on its own if the drain rate doesn't improve."
+      },
+      "triageHint": "L0 triage per severity. Fixed in phase 1.",
+      "channels": "Channels",
+      "channelInbox": "In-product inbox",
+      "channelEmailAdmins": "Email to org admins",
+      "channelDefault": "Default for every org. Always on.",
+      "alwaysOn": "Always on",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "Connected. Optional; the inbox and email work without it.",
+      "connected": "Connected",
+      "defaultsNote": "Phase 1 ships fixed product defaults. Per-org overrides come later.",
+      "groupCoverage": "Coverage — creates detectors automatically",
+      "groupCoverageHint": "Every new service gets anomaly detectors and the matching library alerts as soon as it appears, with basic safety checks while it learns. Each creation is recorded, can be undone, and goes through a review window.",
+      "groupCalibration": "Calibration — changes to existing alerts",
+      "channelEmail": "Email {address}",
+      "paging": "Paging",
+      "pagingHint": "Severity decides how a problem reaches people.",
+      "routing": {
+        "p1p2": "P1 and P2",
+        "p1p2Desc": "Hurts customers. Pages on-call at any hour.",
+        "page": "Page",
+        "p3": "P3",
+        "p3Desc": "A Slack message sent as soon as it's ready. Never pages anyone.",
+        "message": "Message",
+        "p4": "P4",
+        "p4Desc": "Goes into the Friday summary.",
+        "summary": "Friday summary"
+      },
+      "nav": {
+        "coverage": "Coverage",
+        "alerts": "Alert changes",
+        "fixes": "Fixes",
+        "investigation": "Investigation & paging",
+        "channels": "Channels"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} connected"
+      }
+    },
+    "notInDemo": "Not available in this demo",
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "uncalibrated": "no calibrated score yet"
+    },
+    "analysis": {
+      "verdict": "Verdict",
+      "unconfirmed": "Not confirmed yet",
+      "lasted": "Lasted {count} min",
+      "soFar": "{count} min so far",
+      "checked": "What I checked",
+      "verdicts": {
+        "confirmed": "Confirmed",
+        "ruled_out": "Ruled out",
+        "open": "Still open"
+      },
+      "comparison": "Healthy vs affected",
+      "kinds": {
+        "affected": "Affected",
+        "healthy": "Healthy",
+        "limit": "Limit"
+      },
+      "trail": "Evidence trail",
+      "seeInUnfold": "See in How it unfolded",
+      "nextStep": "Next step",
+      "fullReport": "Full report",
+      "fullReportHint": "Everything above as one document, ready to copy or download"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "Demo",
+    "scenarioLabel": "Demo scenario",
+    "scenarios": {
+      "demo": "Demo week",
+      "allClear": "All clear",
+      "incident": "Active incident",
+      "cantSee": "Can't see",
+      "noBaseline": "No baseline"
+    },
+    "nav": {
+      "history": "History",
+      "settings": "Settings",
+      "howItWorks": "How it works",
+      "searchLabel": "Search issues",
+      "searchPlaceholder": "Search issues"
+    },
+    "recent": {
+      "ranges": {
+        "day": "Last 24 hours",
+        "week": "Last 7 days",
+        "month": "Last 30 days"
+      },
+      "within": {
+        "day": "in the last 24 hours",
+        "week": "in the last 7 days",
+        "month": "in the last 30 days"
+      },
+      "groups": {
+        "thisWeek": "This week",
+        "lastWeek": "Last week",
+        "weeksAgo": "{count} weeks ago"
+      },
+      "all": "All",
+      "none": "No {priority} problems {within}.",
+      "allIssues": "All issues",
+      "priorityLabel": "Priority",
+      "showing": "{count} problem shown | {count} problems shown"
+    },
+    "noProblems": "No problems {within}. I checked {count} service around the clock. | No problems {within}. I checked {count} services around the clock.",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "Show {count} more",
+    "showFewer": "Show fewer",
+    "days": {
+      "today": "Today",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "jul18": "18 July",
+      "jul30": "30 July",
+      "aug13": "13 August",
+      "aug26": "26 August",
+      "sep4": "4 September",
+      "sep12": "12 September",
+      "sep24": "24 September",
+      "sep30": "30 September",
+      "oct1": "1 October",
+      "oct2": "2 October",
+      "sep23": "23 September"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db will run out of disk in about 3 days",
+        "summary": "Its disk is filling about 18 GB a day since Thursday's orders release turned up audit logging, so it fills around Wednesday morning. When it does, checkout, orders and refunds will start failing. Nothing is broken yet, so I sent your team a heads-up instead of paging.",
+        "notify1": "orders-db will run out of disk in about 3 days, around Wednesday 11:00.",
+        "notify2": "Cause: since orders 3.8.0 went out on Thursday, audit logging writes about 18 GB a day. Before that the disk grew about 6 GB a day.",
+        "notify3": "Turn audit logging back down or add disk space before Wednesday. When it fills, checkout, orders and refunds will fail. Nothing is broken yet, so this is a heads-up, not a page.",
+        "chartCaption": "disk · full ~Wed 11:00",
+        "chartLabel": "Disk use grew from 334 to 445 GB of 500 over 14 days, faster since Thursday, and is forecast to be full around Wednesday 11:00"
+      },
+      "search": {
+        "title": "Search is slow and search-2 keeps crashing",
+        "titleFixed": "Search was slow while search-2 kept crashing",
+        "summary": "About 1 in 5 searches take over 3 seconds, since 10:27. A setting changed on search-2 at 10:16 makes it run out of memory. I've paged on-call, and it's still happening.",
+        "notify1": "Search is slow: about 1 in 5 searches take over 3 seconds, since 10:27.",
+        "notify2": "Cause: a setting changed on search-2 at 10:16 fills its memory. It has crashed about 10 times since 10:20. The other 4 nodes don't have the change and are fine.",
+        "notify3": "Putting the old setting back should fix it, and I can undo it. Reply \"revert\" and I'll do it. Whoever made the change should check why.",
+        "summaryFixed": "It started at 10:27, because a setting changed on search-2 filled its memory. You approved putting the old setting back, so I did, and searches are back to normal.",
+        "summaryFixing": "It started at 10:27, because a setting changed on search-2 fills its memory. You approved putting the old setting back, so I'm doing that now.",
+        "chartCaption": "p95 latency · 3.4 s peak",
+        "chartLabel": "p95 latency rose from 0.38 s to 3.4 s at 10:27 and is still high",
+        "chartLabelFixed": "p95 latency rose from 0.38 s to 3.4 s at 10:27 and fell back to normal once the setting was put back"
+      },
+      "checkout": {
+        "title": "1 in 12 payments failed after a deploy",
+        "summary": "payments-api 2.3.1 asked the payments database for more connections than it allows. Rolling back fixed it 18 minutes after the failures began.",
+        "notify1": "Checkout is failing about 1 in 12 payments, since 14:02.",
+        "notify2": "Likely cause: payments-api 2.3.1 went out at 14:01 and raised its connection pool from 20 to 50 per server. 6 servers × 50 is more than the 200 the payments database allows.",
+        "notify3": "Rolling back to 2.3.0 is the quickest fix.",
+        "chartCaption": "failed payments · 1 in 12 peak",
+        "chartLabel": "Failed payments jumped from 0.1% to 1 in 12 at 14:02 and were back to normal 18 minutes later, after the rollback"
+      },
+      "pool": {
+        "title": "Checkout ran out of database connections",
+        "summary": "Leaked connections used up all the free ones, and payments started timing out. You approved clearing them, so I did. Payments recovered 2 minutes later.",
+        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 11:18.",
+        "notify2": "Cause: 48 of 50 connections are held by refund exports that never returned them. It's the CHK-482 leak, third time in two weeks.",
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
+        "chartCaption": "timeouts · 1 in 9 peak",
+        "chartLabel": "Payment timeouts rose to about 1 in 9 at 11:18 and recovered 2 minutes after the fix at 11:21"
+      },
+      "email": {
+        "title": "Order emails ran up to 9 minutes late",
+        "summary": "All the mail workers were replaced at once overnight, and the queue caught up by itself within about 20 minutes. This was minor, so it went into Friday's summary.",
+        "chartCaption": "email delay · 9 min peak",
+        "chartLabel": "Email delay rose to 9 minutes from 03:15 and recovered by itself by 03:36"
+      },
+      "recs": {
+        "title": "Recommendations got slower for 15 minutes",
+        "summary": "They went from a quarter of a second to almost a second. The nightly cache rebuild had been started by hand during the afternoon, and it finished by itself. I held it for Friday's summary.",
+        "chartCaption": "p95 latency · 0.94 s peak",
+        "chartLabel": "p95 latency rose from 0.26 s to 0.94 s at 16:40 and recovered by itself 15 minutes later"
+      },
+      "login": {
+        "title": "Sign-in was slow for about 25 minutes",
+        "summary": "1 in 8 people waited more than 5 seconds. The session cache ran out of space after a traffic spike and signed some people out. Your team added space and it recovered.",
+        "notify1": "Sign-in is slow: about 1 in 8 people wait over 5 seconds, since 10:12.",
+        "notify2": "Cause: the session cache is full after traffic doubled at 10:05.",
+        "notify3": "Adding space to the cache should fix it.",
+        "chartCaption": "p95 sign-in · 5.8 s peak",
+        "chartLabel": "p95 sign-in time rose from 0.6 s to 5.8 s at 10:12 and recovered after cache space was added at 10:31"
+      },
+      "queue": {
+        "title": "Orders backed up in the queue",
+        "summary": "About 4,000 were waiting at the worst. I added workers as you've allowed, but it didn't help, so I put them back and paged on-call. The real cause was a database index that a migration left broken; your team fixed it 40 minutes after it began.",
+        "notify1": "Orders are backing up: about 4,000 waiting, since 21:30.",
+        "notify2": "I added workers at 21:33, as you've allowed, but it didn't help, so I've put them back.",
+        "notify3": "Order lookups are about 40 times slower since the 21:20 database migration. Check the orders_by_status index first.",
+        "chartCaption": "backlog · 4,120 peak",
+        "chartLabel": "Orders waiting climbed to 4,120 from 21:30, kept climbing after workers were added, and drained once the index was rebuilt at 21:52"
+      },
+      "uploads": {
+        "title": "Image uploads failed for 1 in 40 people",
+        "summary": "It lasted 10 minutes, because a certificate expired before one server had loaded its replacement. It sorted itself out, so I held it for Friday's summary.",
+        "chartCaption": "failed uploads · 1 in 40 peak",
+        "chartLabel": "Failed uploads rose to about 1 in 40 at 07:05 and recovered by itself 10 minutes later"
+      },
+      "push": {
+        "title": "Push notifications arrived 2 minutes late",
+        "summary": "It lasted half an hour, while the provider that delivers them was slow. Minor, so it waited for Friday's summary.",
+        "chartCaption": "delivery delay · 2 min peak",
+        "chartLabel": "Delivery delay rose from 4 s to about 2 minutes at 13:50 and recovered by itself 30 minutes later"
+      },
+      "checkoutNow": {
+        "title": "Checkout is failing 1 in 6 payments",
+        "titleFixed": "Checkout failed 1 in 6 payments",
+        "summary": "It started at 10:43, and I'm still looking into why. So far it lines up with version 2.4.0 going out at 10:41, and I've paged on-call.",
+        "notify1": "Checkout is failing about 1 in 6 payments, since 10:43.",
+        "notify2": "I'm still looking into why. So far it lines up with checkout 2.4.0 going out at 10:41.",
+        "notify3": "Only the servers on 2.4.0 are failing. Reply \"stop\" and I'll send traffic back to the old version; the old servers have room for it. I can't see payments-db directly, so I haven't ruled it out.",
+        "summaryFixing": "It started at 10:43, right after version 2.4.0 went out. You approved stopping the rollout, so I'm sending traffic back to the old version now.",
+        "summaryFixed": "It started at 10:43, after version 2.4.0 went out. You approved stopping the rollout, and failures stopped once traffic went back to the old version. Why 2.4.0 fails is still for your team to find.",
+        "chartCaption": "failed payments · 1 in 6 peak",
+        "chartLabel": "Failed payments jumped from 0.1% to about 1 in 6 at 10:43 and are still failing",
+        "chartLabelFixed": "Failed payments jumped from 0.1% to about 1 in 6 at 10:43 and fell back to normal once the rollout was stopped"
+      },
+      "gateway": {
+        "title": "The API rejected 1 in 30 requests",
+        "summary": "It started after a config change. Your team reverted it, and it was back to normal 13 minutes after it began.",
+        "notify1": "The API is rejecting about 1 in 30 requests, since 15:22.",
+        "notify2": "Likely cause: a config change at 15:20 shortened how long sign-in tokens last.",
+        "notify3": "Reverting that change should fix it.",
+        "chartCaption": "rejected · 1 in 30 peak",
+        "chartLabel": "Rejected requests rose to 1 in 30 at 15:22 and fell back to normal when the config change was reverted at 15:34"
+      },
+      "poolSep": {
+        "title": "Checkout ran out of database connections",
+        "summary": "Leaked connections used up all the free ones, and payments started timing out. I traced the leak to refund exports, and you approved clearing the leaked connections. Payments recovered 2 minutes later.",
+        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 15:42.",
+        "notify2": "Cause: 47 of 50 connections are held by refund exports that never returned them. It looks like a leak in the refund export code.",
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
+        "chartCaption": "timeouts · 1 in 9 peak",
+        "chartLabel": "Payment timeouts rose to about 1 in 9 at 15:42 and recovered 2 minutes after the fix at 15:45"
+      },
+      "poolOct": {
+        "title": "Checkout ran out of database connections again",
+        "summary": "It was the same refund-export leak (CHK-482). You approved clearing the leaked connections, and payments recovered 2 minutes later.",
+        "notify1": "Checkout has run out of database connections, and about 1 in 9 payments are timing out, since 10:05.",
+        "notify2": "Cause: 46 of 50 connections are held by refund exports. It's the CHK-482 leak again, second time in 8 days.",
+        "notify3": "Closing only the leaked connections should clear it; payments in progress aren't touched. Reply \"yes\" and I'll do it.",
+        "chartCaption": "timeouts · 1 in 9 peak",
+        "chartLabel": "Payment timeouts rose to about 1 in 9 at 10:05 and recovered 2 minutes after the fix at 10:08"
+      },
+      "lagSep": {
+        "title": "New products took up to 40 minutes to show up in search",
+        "summary": "search-indexer fell behind on catalog updates after version 1.12.0 shortened how long it may take per batch. Your team rolled it back and it caught up 40 minutes after it began.",
+        "notify1": "New and changed products are missing from search: search-indexer is about 48,000 catalog updates behind, since 14:06.",
+        "notify2": "Cause: search-indexer 1.12.0 went out at 13:58 and cut the Kafka poll interval to 30 s. Large batches take about 45 s, so the consumer keeps getting removed from its group.",
+        "notify3": "Rolling back to 1.11.4 should let it catch up. Search itself still works; it just shows older products.",
+        "chartCaption": "consumer lag · 48,000 peak",
+        "chartLabel": "Consumer lag rose from about 200 to 48,000 messages from 14:06 and drained after the rollback at 14:39"
+      },
+      "poolAug": {
+        "title": "Checkout ran out of database connections during the refund export",
+        "summary": "The nightly refund export held almost all of checkout's database connections, and about 1 in 12 payments timed out. It cleared when the export finished, 13 minutes after it began.",
+        "notify1": "Checkout has run out of database connections, and about 1 in 12 payments are timing out, since 02:04.",
+        "notify2": "Cause: 44 of 50 connections are held by the nightly refund export, which is about 3 times its usual size after the end-of-month sale.",
+        "notify3": "It should clear when the export finishes. If it doesn't, stopping the export will free the connections.",
+        "chartCaption": "timeouts · 1 in 12 peak",
+        "chartLabel": "Payment timeouts rose to about 1 in 12 at 02:04 and recovered by themselves when the export finished at 02:17"
+      },
+      "throttleAug": {
+        "title": "Fraud checks were slow for 35 minutes",
+        "summary": "A batch job landed on the same servers and took their spare CPU, so fraud checks took up to 1.4 seconds. Checkout still worked, just slower, and it recovered when the job finished, so I held it for Friday's summary.",
+        "chartCaption": "p95 fraud check · 1.4 s peak",
+        "chartLabel": "p95 fraud check time rose from 0.18 s to 1.4 s at 11:20 and recovered by itself when the batch job finished at 11:55"
+      },
+      "tlsJul": {
+        "title": "Invoices stopped sending for 43 minutes",
+        "summary": "invoice-service's certificate for billing-api expired, so every invoice failed to send. Your team renewed it, and the queued invoices all went out.",
+        "notify1": "No invoices are going out: every send from invoice-service is failing, since 09:01.",
+        "notify2": "Cause: invoice-service's client certificate for billing-api expired at 09:00, and billing-api rejects every connection from it.",
+        "notify3": "Renewing the certificate should fix it. Invoices are queuing, not lost.",
+        "chartCaption": "failed sends · all of them",
+        "chartLabel": "Failed invoice sends jumped from 0.2% to 100% at 09:01 and fell back to normal after the certificate was renewed at 09:41"
+      },
+      "dnsJul": {
+        "title": "Cart prices went missing for 1 in 4 people",
+        "summary": "A DNS change stopped half the cluster's DNS servers answering for internal names, so cart couldn't reach currency. Your team reverted it 31 minutes after it began.",
+        "notify1": "About 1 in 4 cart loads show no prices, since 16:22.",
+        "notify2": "Cause: a DNS config change at 16:20 dropped the internal zone from 2 of the 4 cluster DNS servers, so cart can't find currency.internal on those lookups.",
+        "notify3": "Reverting the DNS change should fix it. Orders still go through at checkout.",
+        "chartCaption": "missing prices · 1 in 4 peak",
+        "chartLabel": "Cart loads without prices rose from 0.1% to about 1 in 4 at 16:22 and fell back to normal when the DNS change was reverted at 16:51"
+      }
+    },
+    "drawer": {
+      "worked": "Worked",
+      "didntHelp": "Didn't help",
+      "now": "Now"
+    },
+    "needs": {
+      "more": "More",
+      "less": "Less",
+      "canUndo": "You can undo it",
+      "undo": "Undo",
+      "undone": "Undone. This is waiting for your answer again.",
+      "shiftTo": "to",
+      "retune": {
+        "body": "The \"{alert}\" alert on {host} went off {fired} times this month, and nobody needed to act. The disk climbs to about 85% during nightly cleanup and is back near 70% by morning. Even on its busiest day, it would take more than 3 days to fill from 90%. I'd like to raise it to {to}%. I'll still warn you if the disk is ever on track to fill within a day.",
+        "yes": "Yes, change it",
+        "no": "Leave it",
+        "doneYes": "Done. I raised it to {to}%. The fill warning stays on.",
+        "doneNo": "Okay, I'll leave it at {from}%.",
+        "headline": "Raise the 'disk 80%' alert on ingest-3 to 90%?",
+        "why": "It went off 41 times this month and nobody needed to act.",
+        "cost": "Fill warning stays on"
+      },
+      "fixNow": {
+        "search": {
+          "body": "Search is slow because a setting changed on node search-2 at 10:16 fills its memory, so it keeps crashing. The other 4 nodes still have the old setting and are fine. May I put it back? I can undo this.",
+          "yes": "Put it back",
+          "no": "I'll handle it",
+          "doneYes": "Done. Putting it back now.",
+          "doneNo": "Okay, it's yours. I'll keep watching.",
+          "doneSettled": "Done. search-2 is back and searches are normal.",
+          "headline": "Put search-2's cache setting back to 10%?",
+          "why": "A 10:16 change fills its memory, so it keeps crashing.",
+          "cost": "One restart of search-2"
+        },
+        "checkoutNow": {
+          "body": "Checkout is failing about 1 in 6 payments, and only the servers on 2.4.0 are failing. The 6 servers on the old version have room for all the traffic. May I stop the rollout and send traffic back to them? 2.4.0 stays deployed for your team to look at.",
+          "yes": "Stop the rollout",
+          "no": "I'll handle it",
+          "doneYes": "Done. Stopping the rollout now.",
+          "doneNo": "Okay, it's yours. I'll keep watching.",
+          "doneSettled": "Done. Payments are back to normal.",
+          "headline": "Stop checkout's 2.4.0 rollout?",
+          "why": "About 1 in 6 payments fail, all on 2.4.0. The old version can take all the traffic.",
+          "cost": "2.4.0 stays deployed"
+        }
+      },
+      "fromNowOn": {
+        "body": "{done} times now, a new version made only its own servers fail while it was rolling out. Each time I asked to send traffic back to the old version, and the failures stopped within 2 minutes. May I do that on my own during a rollout from now on? I'll leave the new version in place for your team, and tell them straight away.",
+        "yes": "Yes, on its own",
+        "no": "Keep asking me",
+        "doneYes": "Done. I'll stop bad rollouts on my own and tell you each time.",
+        "doneNo": "Okay, I'll keep asking you first.",
+        "headline": "Stop bad rollouts on my own from now on?",
+        "why": "All 6 times you said yes, the failures stopped within 2 minutes.",
+        "cost": "Only during a rollout"
+      },
+      "labels": {
+        "fixNow": "Fix now",
+        "fromNowOn": "Let me handle this",
+        "retune": "Quieter alert"
+      },
+      "needsOk": "Needs your OK"
+    },
+    "footer": {
+      "text": "I check myself too: if I stop working, you'll hear about it.",
+      "seeAll": "See everything I watch",
+      "seeChanges": "See everything I've changed"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1 minute ago | {count} minutes ago",
+        "stale": "No new data for 1 minute (since {since}) | No new data for {count} minutes (since {since})"
+      },
+      "summaryWatching": "I'm watching {watched} of your {total} services.",
+      "summaryAll": "I'm watching all {total} of your services.",
+      "summaryWithClauses": "{head} {clauses}.",
+      "clauseLearning": "{count} is still learning | {count} are still learning",
+      "clauseUnseen": "there's one I can't see | there are {count} I can't see",
+      "legend": {
+        "watching": "Fully watched",
+        "learning": "Learning",
+        "unseen": "Can't see"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "I'm watching all {total} of your services, and I'm still learning what normal looks like for each of them."
+    },
+    "coveragePage": {
+      "title": "Everything I watch",
+      "back": "Back"
+    },
+    "issuesPage": {
+      "title": "All issues",
+      "sentence": "Every problem I opened {within}. Pick one to see what happened and what I did about it.",
+      "back": "Back",
+      "ranges": {
+        "week": "Last 7 days",
+        "month": "Last 30 days",
+        "quarter": "Last 90 days"
+      },
+      "within": {
+        "week": "in the last 7 days",
+        "month": "in the last 30 days",
+        "quarter": "in the last 90 days"
+      }
+    },
+    "activityPage": {
+      "title": "What I've changed",
+      "stats": {
+        "window": "Last 7 days",
+        "made": "Change | Changes",
+        "worked": "Worked",
+        "review": "In review",
+        "undone": "Undone"
+      },
+      "filters": {
+        "all": "All",
+        "fixes": "Fixes",
+        "watching": "Watching",
+        "tuning": "Alert tuning"
+      },
+      "status": {
+        "applying": "Applying now",
+        "worked": "Worked",
+        "done": "Done",
+        "review": "In review",
+        "reviewDays": "In review · {count} day left | In review · {count} days left",
+        "didntHelp": "Didn't help",
+        "undone": "Undone"
+      },
+      "actions": {
+        "undo": "Undo",
+        "showDetails": "Show details",
+        "hideDetails": "Hide details"
+      },
+      "details": {
+        "name": "Change",
+        "target": "On",
+        "confidence": "Confidence",
+        "saw": "What I saw",
+        "recurring": "This fix keeps being needed for the same leak ({bug}), so I'll always ask first until it's fixed.",
+        "undoDecided": "Undo takes this back, and I'll ask you again."
+      },
+      "toast": {
+        "undone": "Undone. It's back the way it was.",
+        "undoDecided": "Undone. I'll ask you again."
+      },
+      "empty": {
+        "filter": "Nothing here right now.",
+        "scenario": "I haven't changed anything yet. When I make a change, you'll see it here."
+      },
+      "entries": {
+        "L-313": {
+          "done": "Stopped checkout's 2.4.0 rollout",
+          "why": "Only the 6 servers on 2.4.0 are failing; the 6 on the old version can take all the traffic.",
+          "from": "6 of 12 pods",
+          "to": "no traffic",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "Put search-2's cache setting back to 10%",
+          "why": "It went up to 60% at 10:16, and search-2 has been running out of memory since.",
+          "from": "60%",
+          "to": "10%",
+          "on": "cache size · search-2"
+        },
+        "L-309": {
+          "done": "Raised the 'disk 80%' alert on ingest-3 to 90%",
+          "why": "It went off 41 times this month and nobody needed to act. The fill warning stays on.",
+          "from": "80%",
+          "to": "90%",
+          "on": "disk alert · ingest-3"
+        },
+        "L-310": {
+          "done": "Started watching returns, exchanges and gift-cards",
+          "why": "Found them this morning. Learning what's normal for them over 7 days.",
+          "from": "not watched",
+          "to": "watched",
+          "on": "3 services"
+        },
+        "L-314": {
+          "done": "Started watching 6 services I found this morning",
+          "why": "They showed up in your traces today. Learning what's normal for them over 7 days.",
+          "from": "not watched",
+          "to": "watched",
+          "on": "6 services"
+        },
+        "L-311": {
+          "done": "Got your OK to stop bad rollouts on my own",
+          "why": "I stopped 6 with your approval in 60 days; errors were back to normal within 2 minutes each time.",
+          "from": "ask first",
+          "to": "on my own",
+          "on": "stopping rollouts"
+        },
+        "L-304": {
+          "done": "Cleared checkout's 48 leaked database connections",
+          "why": "Payments were timing out. They were back to normal 2 minutes later.",
+          "from": "50 of 50 in use",
+          "to": "2 in use",
+          "on": "checkout pool"
+        },
+        "L-299": {
+          "done": "Cleared checkout's 46 leaked database connections",
+          "why": "The same leak as 23 September. Payments were back to normal 2 minutes later.",
+          "from": "50 of 50 in use",
+          "to": "4 in use",
+          "on": "checkout pool"
+        },
+        "L-296": {
+          "done": "Cleared checkout's 47 leaked database connections",
+          "why": "A new leak, so I filed it with the checkout team as CHK-482 afterwards.",
+          "from": "50 of 50 in use",
+          "to": "3 in use",
+          "on": "checkout pool"
+        },
+        "L-301": {
+          "done": "Started watching billing-api, billing-worker and invoice-service",
+          "why": "Found them in your traces. Still learning what's normal for them.",
+          "from": "not watched",
+          "to": "watched",
+          "on": "3 services"
+        },
+        "L-307": {
+          "done": "Fixed the payments-api connection alert so it counts all servers",
+          "why": "It checked each server on its own, so it never went off during Tuesday's outage.",
+          "from": "each pod over 95%",
+          "to": "all pods over 85%",
+          "on": "connection alert"
+        },
+        "L-302": {
+          "done": "Grouped the 3 checkout latency alerts into one",
+          "why": "They went off together 94% of the time, so one slowdown paged you 3 times.",
+          "from": "3 alerts",
+          "to": "1",
+          "on": "checkout latency"
+        },
+        "L-303": {
+          "done": "Raised the 'disk 80%' alert on ingest-1 to 90%",
+          "why": "It went off 29 times in 30 days and nobody needed to act. The fill warning stays on.",
+          "from": "80%",
+          "to": "90%",
+          "on": "disk alert · ingest-1"
+        },
+        "L-305": {
+          "done": "Added 4 orders-consumer workers to clear a backlog",
+          "why": "It didn't help, so I scaled back to 4 and paged on-call 3 minutes later.",
+          "from": "4 workers",
+          "to": "8 workers",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "Got your OK to add queue workers on my own",
+          "why": "You approved it 7 times during traffic bursts, and the backlog cleared every time.",
+          "from": "ask first",
+          "to": "on my own",
+          "on": "adding queue workers"
+        },
+        "L-312": {
+          "done": "Started watching the 18 services I found when you connected",
+          "why": "Learning what's normal for each one. Their alerts start once that's ready.",
+          "from": "not watched",
+          "to": "watched",
+          "on": "18 services"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "History",
+      "seeChange": "See the change",
+      "filters": {
+        "all": "All",
+        "problems": "Problems",
+        "changes": "Changes",
+        "fixes": "Fixes",
+        "decisions": "Your decisions"
+      },
+      "empty": "Nothing here yet.",
+      "entries": {
+        "checkoutNowPaged": "I paged on-call about checkout failing payments.",
+        "searchPaged": "I paged on-call about search being slow.",
+        "searchAsked": "I asked whether I may put search-2's cache setting back.",
+        "euStopped": "Nothing has arrived from the {cluster} cluster since this time. I told you here and in Slack.",
+        "fridaySummary": "I sent Friday's summary with {count} minor problem. | I sent Friday's summary with {count} minor problems.",
+        "emailHeld": "I held a minor problem with order emails for Friday's summary.",
+        "poolFixed": "I closed checkout's leaked database connections. Payments recovered 2 minutes later.",
+        "poolApproved": "You approved closing checkout's leaked database connections.",
+        "billingWatch": "I started watching billing-api, billing-worker and invoice-service.",
+        "checkoutPaged": "I paged on-call about checkout failing payments.",
+        "recsHeld": "I held a minor problem with recommendations for Friday's summary.",
+        "diskApproved": "You approved raising the disk alert on ingest-1 to {to}%.",
+        "latencyGrouped": "I grouped the three checkout slowness alerts into one, so a single slowdown pages once.",
+        "queueFixed": "I added orders queue workers, but the queue kept growing, so I put them back and paged on-call.",
+        "loginPaged": "I paged on-call about slow sign-in.",
+        "queuePermission": "You allowed me to add queue workers on my own, up to 8.",
+        "gatewayPaged": "I paged on-call about the API rejecting requests.",
+        "found18": "I found {count} services and started learning what normal looks like for them.",
+        "connected": "You connected me to your data.",
+        "thresholdApproved": "You approved making the payments-api connection alert count all servers against the database's limit of 200.",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "You approved putting search-2's setting back.",
+              "no": "You said you'd handle search-2 yourself.",
+              "undoYes": "You undid putting search-2's setting back. I re-applied 60%, so search-2 will start running out of memory again; I've told on-call.",
+              "cancel": "You cancelled putting search-2's setting back before I applied it. search-2 is still running out of memory; I've told on-call.",
+              "undoNo": "You took back saying you'd handle search-2 yourself."
+            },
+            "checkoutNow": {
+              "yes": "You approved stopping the checkout 2.4.0 rollout.",
+              "no": "You said you'd handle the checkout rollout yourself.",
+              "undoYes": "You undid stopping the 2.4.0 rollout. Traffic is going to 2.4.0 again, so payments may start failing again; I've told on-call and I'm watching.",
+              "cancel": "You cancelled stopping the 2.4.0 rollout before I did it. Payments are still failing; I've told on-call.",
+              "undoNo": "You took back saying you'd handle the checkout rollout yourself."
+            }
+          },
+          "retune": {
+            "yes": "You approved raising the disk alert on ingest-3 to 90%.",
+            "no": "You said not now to raising the disk alert on ingest-3.",
+            "undoYes": "You undid raising the disk alert on ingest-3. It's back at 80%, so it will start going off on healthy nights again.",
+            "undoNo": "You took back your not-now on the disk alert on ingest-3."
+          },
+          "fromNowOn": {
+            "yes": "You approved letting me stop bad rollouts on my own.",
+            "no": "You said not now to letting me stop bad rollouts on my own.",
+            "undoYes": "You took back letting me stop bad rollouts on my own.",
+            "undoNo": "You took back your not-now on letting me stop bad rollouts on my own."
+          }
+        },
+        "fixedNow": {
+          "search": "I put search-2's setting back. Searches are back to normal.",
+          "checkoutNow": "I sent traffic back to the old version, and failures stopped. Why 2.4.0 fails is still for your team to find; I've kept it deployed for them."
+        },
+        "checkoutNowAsked": "I asked whether I may stop the checkout 2.4.0 rollout.",
+        "newWatch": "I found {count} new services this morning (returns, exchanges and gift-cards) and started watching them right away.",
+        "foundWatch": "I found {count} new services this morning and started watching them right away."
+      }
+    },
+    "settingsDrawer": {
+      "title": "Settings",
+      "reach": "Where should I reach you?",
+      "destSlack": "Slack: {channel}",
+      "destEmail": "Email: {address}",
+      "autonomy": "How much should I do on my own?",
+      "tell": "Tell me",
+      "ask": "Ask me first",
+      "fix": "Fix it, then tell me",
+      "tellHint": "I'll tell you what I would do, and leave the doing to you.",
+      "askHint": "I'll ask before each fix, and do it when you say yes.",
+      "fixHint": "For kinds of fix with a solid track record, I'll go ahead within the limits you set, and tell you straight after.",
+      "advanced": "Advanced",
+      "perKind": "Each kind of fix",
+      "digestDay": "Summary day",
+      "excluded": "Services I should ignore",
+      "excludedNone": "None",
+      "kinds": {
+        "pool": "Close leaked database connections",
+        "queueWorker": "Add queue workers during a backlog",
+        "retune": "Raise a noisy alert's threshold",
+        "rollback": "Roll back a deploy",
+        "record": "Done {done} times, worked {worked} times.",
+        "keptRecord": "Done {done} times, kept {worked} times.",
+        "noRecord": "Never done yet, so I won't do it on my own until it has a track record.",
+        "revertConfig": "Undo a recent setting change",
+        "abortRollout": "Stop a bad rollout",
+        "recurringRecord": "Done {done} times, all for the same leak ({bug}). I'll keep asking until it's fixed."
+      },
+      "weekdays": {
+        "monday": "Monday",
+        "tuesday": "Tuesday",
+        "wednesday": "Wednesday",
+        "thursday": "Thursday",
+        "friday": "Friday"
+      },
+      "saved": "Saved",
+      "noDestination": "I won't be able to reach anyone.",
+      "routing": "When I page you",
+      "routingNote": "I page for anything that hurts customers. Smaller things get a message that won't wake anyone, and the smallest go into Friday's summary."
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "intro": "Here's what I do, in five steps.",
+      "gotIt": "Got it",
+      "s1Title": "I find your services",
+      "s1": "I look through the data you already send and find every service in it. When a new one appears, I start watching it the same day; you don't need to ask.",
+      "s2Title": "I watch them",
+      "s2": "I learn what normal looks like for each service: its errors, slowness and traffic for each hour of the day, with weekly patterns sharpening over time. Until I know, I use basic safety checks.",
+      "s3Title": "I stay quiet unless it's real",
+      "s3": "Most odd moments aren't problems. I page your team when something hurts customers, send a message that won't wake anyone for smaller issues, and keep minor things for the Friday summary.",
+      "s4Title": "I explain every page",
+      "s4": "Every message says what broke, since when, and my best read on why, with how sure I am.",
+      "s5Title": "I fix what you've allowed",
+      "s5": "I only fix things you've said I may. A fix that works earns a little trust, and one that doesn't help counts against me. If I keep needing the same fix, that's a bug I report to your team, not a habit I automate."
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "Checked 1 minute ago | Checked {count} minutes ago"
+    },
+    "outcome": {
+      "active": "Happening now",
+      "fixed": "Fixed by AutoObserve",
+      "resolved": "Resolved in {minutes} min",
+      "held": "In Friday's summary",
+      "fixing": "Fixing it now",
+      "contained": "Contained by AutoObserve",
+      "predicted": "Predicted"
+    },
+    "view": {
+      "standard": "Standard",
+      "nerd": "Nerd",
+      "standardTooltip": "Standard view gives the short read: what needs you and what happened in the last 7 days",
+      "nerdTooltip": "Nerd view shows every detector, loop and setting in full",
+      "label": "View"
+    },
+    "rail": {
+      "more": "More below"
+    },
+    "suggestions": {
+      "title": "Suggestions",
+      "subtitle": "When you have a minute — these cut noise or save you time."
+    }
   }
 }

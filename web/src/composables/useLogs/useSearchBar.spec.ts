@@ -20,6 +20,7 @@ import { createI18n } from "vue-i18n";
 import store from "@/test/unit/helpers/store";
 import useSearchBar from "./useSearchBar";
 import searchState from "./searchState";
+import { resetLogsAutoRunForTests, useLogsAutoRun } from "./logsAutoRun";
 import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
 
@@ -145,6 +146,7 @@ describe("useSearchBar Composable", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetLogsAutoRunForTests();
     mockDeleteRunningQueries.mockResolvedValue({
       data: [{ is_success: true }],
     });
@@ -196,6 +198,52 @@ describe("useSearchBar Composable", () => {
     });
   });
 
+  describe("getQueryData — drawer-close rule and selection reset (4a §3.2.5, §3.2.7)", () => {
+    const prime = (pending: boolean) => {
+      const { searchObj } = searchState();
+      searchObj.data.stream.streamLists = [{ label: "app", value: "app" }];
+      searchObj.data.stream.selectedStream = ["app"];
+      searchObj.meta.showDetailTab = true;
+      searchObj.meta.resultGrid.navigation = {
+        currentRowIndex: 49,
+        selectionActive: true,
+        pendingPageSelection: pending ? { page: 2, position: "first", requestId: null } : null,
+      };
+      return searchObj;
+    };
+
+    it("a new query closes the drawer and drops the open row", async () => {
+      const searchObj = prime(true);
+      await (wrapper.vm as any).getQueryData(false);
+      expect(searchObj.meta.showDetailTab).toBe(false);
+      expect(searchObj.meta.resultGrid.navigation).toEqual({
+        currentRowIndex: null,
+        selectionActive: false,
+        pendingPageSelection: null,
+      });
+      expect(mockGetDataThroughStream).toHaveBeenCalledWith(false, undefined, {
+        reuseSchema: false,
+      });
+    });
+
+    it("a J/K crossing's page query keeps the drawer and the selection", async () => {
+      const searchObj = prime(true);
+      await (wrapper.vm as any).getQueryData(true);
+      expect(searchObj.meta.showDetailTab).toBe(true);
+      expect(searchObj.meta.resultGrid.navigation.currentRowIndex).toBe(49);
+      expect(searchObj.meta.resultGrid.navigation.pendingPageSelection?.page).toBe(2);
+      expect(mockGetDataThroughStream).toHaveBeenCalledWith(true, undefined, {
+        reuseSchema: false,
+      });
+    });
+
+    it("a mouse page query still closes the drawer", async () => {
+      const searchObj = prime(false);
+      await (wrapper.vm as any).getQueryData(true);
+      expect(searchObj.meta.showDetailTab).toBe(false);
+    });
+  });
+
   describe("onStreamChange", () => {
     it("clears carried-over selectedFields so FTS re-selects for the new stream", async () => {
       // Carried over from a previously selected stream. "field1" even exists
@@ -238,29 +286,53 @@ describe("useSearchBar Composable", () => {
         expect(searchObj.loading).toBe(false);
       });
 
-      it("turns true when Auto Run Query is on", async () => {
+      it("requests one guarded 'stream' run after the fields load when Auto Run is on", async () => {
         store.state.zoConfig.query_on_stream_selection = true;
         store.state.zoConfig.auto_query_enabled = true;
         const { searchObj } = searchState();
         searchObj.data.stream.selectedStream = ["new_stream"];
+        searchObj.data.stream.streamLists = [{ label: "new_stream", value: "new_stream" }];
         searchObj.meta.liveMode = true;
+        searchObj.meta.editorDirty = false;
         searchObj.loading = false;
+        const logs = vi.fn();
+        useLogsAutoRun().setExecutors({ logs });
 
-        const pending = wrapper.vm.onStreamChange("");
-        expect(searchObj.loading).toBe(true);
-        await pending;
+        await wrapper.vm.onStreamChange("", { origin: "selector" });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(logs).toHaveBeenCalledTimes(1);
+        expect(logs.mock.calls[0][0]).toMatchObject({ reason: "stream", kind: "refinement" });
       });
 
-      it("turns true when the deployment auto-queries on stream selection", async () => {
+      it("never runs for an editor-origin stream change (D3)", async () => {
+        store.state.zoConfig.query_on_stream_selection = true;
+        store.state.zoConfig.auto_query_enabled = true;
+        const { searchObj } = searchState();
+        searchObj.data.stream.selectedStream = ["typed_stream"];
+        searchObj.meta.liveMode = true;
+        const logs = vi.fn();
+        useLogsAutoRun().setExecutors({ logs });
+
+        await wrapper.vm.onStreamChange("", { origin: "editor" });
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(logs).not.toHaveBeenCalled();
+      });
+
+      it("keeps the legacy run when the deployment auto-queries on stream selection", async () => {
         store.state.zoConfig.query_on_stream_selection = false;
         const { searchObj } = searchState();
         searchObj.data.stream.selectedStream = ["new_stream"];
         searchObj.meta.liveMode = false;
         searchObj.loading = false;
+        const logs = vi.fn();
+        useLogsAutoRun().setExecutors({ logs });
 
-        const pending = wrapper.vm.onStreamChange("");
-        expect(searchObj.loading).toBe(true);
-        await pending;
+        await wrapper.vm.onStreamChange("");
+
+        expect(logs).toHaveBeenCalledTimes(1);
+        expect(logs.mock.calls[0][0]).toMatchObject({ reason: "explicit", kind: "explicit" });
       });
     });
   });

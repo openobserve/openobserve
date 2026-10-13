@@ -560,6 +560,18 @@
       "description": "Una tarea remota es un servicio HTTP al que tus experimentos llaman para generar resultados. Publícala una vez, comprueba que la conexión funciona y cada experimento podrá fijar la versión exacta contra la que se ejecutó.",
       "action": "Nueva tarea",
       "actionDesc": "Apunta OpenObserve a tu endpoint y prueba la conexión."
+    },
+    "noDowntimes": {
+      "title": "Aún no hay inactividades",
+      "description": "Una inactividad mantiene en ejecución las alertas, las detecciones de anomalías y las comprobaciones sintéticas, y detiene sus notificaciones durante una ventana que tú programes.",
+      "action": "Programar una inactividad",
+      "actionDesc": "Una sola vez, diaria o semanal. Para silenciar rápidamente, usa Silenciar en la lista de alertas."
+    },
+    "searchCancelled": {
+      "title": "Búsqueda cancelada",
+      "description": "No se cargaron resultados. Ejecuta la consulta para cargar eventos.",
+      "action": "Ejecutar consulta",
+      "actionDesc": "Ejecutar la misma consulta de nuevo"
     }
   },
   "common": {
@@ -1271,9 +1283,129 @@
     "aliasNotAllowed": "El alias '{alias}' no está permitido.",
     "commonGroupFields": "Campos de grupo comunes",
     "queryRangeHours": "{count} hora | {count} horas",
-    "menuGroupAlerts": "Alertas"
+    "menuGroupAlerts": "Alertas",
+    "runQueryPendingLabel": "Ejecutar consulta; los cambios aún no se han aplicado",
+    "queryActions": {
+      "runEditedFirst": "Ejecuta primero tu consulta editada",
+      "runFirst": "Ejecuta primero tu consulta",
+      "usesEditedQuery": "Usa tu consulta editada (aún no ejecutada)",
+      "usesUnrunQuery": "Usa tu consulta (aún no ejecutada)",
+      "downloadsShownResults": "Descarga los resultados mostrados, no tu edición",
+      "downloadsLastRun": "Usa la consulta que se ejecutó por última vez, no tu edición"
+    },
+    "noFtsRecovery": {
+      "title": "Los campos de búsqueda de texto completo no están configurados para {stream}",
+      "description": "Busca valores de campos o borra toda la consulta para ver los logs en este rango de tiempo.",
+      "searchField": "Buscar un campo específico",
+      "searchFieldHint": "Elige un campo para la búsqueda, manteniendo las palabras excluidas.",
+      "clearRun": "Mostrar logs sin esta búsqueda",
+      "clearRunHint": "Borra toda la consulta y ejecútala en el mismo rango de tiempo.",
+      "editPermission": "Necesitas permiso para editar la configuración del stream.",
+      "scope": "Busca en {stream} en el rango de tiempo actual.",
+      "singleStreamScope": "Busca solo en {stream}; {otherStreams} se deseleccionará.",
+      "stream": "Stream",
+      "field": "Campo",
+      "match": "Coincidencia",
+      "value": "Valor",
+      "contains": "Contiene texto",
+      "equals": "Igual a",
+      "preview": "Vista previa del filtro",
+      "replacement": "Esto reemplaza toda la consulta por un filtro de campo y mantiene las palabras excluidas. No se requiere ningún campo de texto completo.",
+      "run": "Ejecutar búsqueda por campo",
+      "close": "Cerrar búsqueda por campo",
+      "skipped": "Se omitió {stream} porque no tiene campos de búsqueda de texto completo configurados.",
+      "resultsScope": "Estos resultados son solo de {streams}.",
+      "noFields": "Este stream no tiene campos disponibles para una búsqueda por campo.",
+      "valueRequired": "Introduce un valor para buscar.",
+      "fieldRequired": "Elige un campo para buscar.",
+      "invalidValue": "Introduce un valor válido para este campo.",
+      "configureHint": "Hace que la búsqueda de texto completo sea rápida para este stream."
+    },
+    "autoRunPersistNeedsRun": "Ejecuta primero la consulta: esta acción guarda o comparte lo que ejecutaste",
+    "autoRunSearchAroundActive": "Mostrando registros alrededor de una línea: ejecuta la consulta para volver a los resultados",
+    "autoRunStaleTooltip": "Ejecuta la consulta para actualizar los resultados",
+    "searchCancelledNotice": "Búsqueda cancelada.",
+    "linePermalink": {
+      "disabledFunction": "Desactiva la función para enlazar una sola línea",
+      "disabledTimestampRewrite": "Esta consulta reescribe la marca de tiempo",
+      "disabledNotSingleLines": "Las filas de esta consulta no son líneas de log individuales",
+      "disabledNoTimestamp": "Esta fila no tiene marca de tiempo",
+      "disabledEnrichmentTable": "Las filas de la tabla de enriquecimiento no se pueden enlazar",
+      "toastNotUnique": "Se copió un enlace a la marca de tiempo; esta línea no se pudo identificar de forma única.",
+      "toastWideStream": "Este stream es demasiado amplio para enlazar una línea con exactitud; se copió un enlace a la marca de tiempo",
+      "bannerInvalid": "Este enlace está mal formado; solo se muestra la búsqueda compartida",
+      "bannerDenied": "No tienes acceso al stream {stream}.",
+      "bannerStreamMissing": "El stream {stream} ya no existe",
+      "bannerError": "No se pudo cargar la línea de log compartida.",
+      "bannerIncomplete": "No se pudieron buscar todas las líneas en esta marca de tiempo",
+      "bannerGone": "Esta línea de log ya no está disponible. Es posible que haya superado la retención del stream o que se haya eliminado.",
+      "bannerGoneRetention": "Esta línea de log ya no está disponible. Es posible que haya superado la retención del stream ({days} día) o que se haya eliminado. | Esta línea de log ya no está disponible. Es posible que haya superado la retención del stream ({days} días) o que se haya eliminado.",
+      "bannerFound": "Mostrando una línea de log compartida",
+      "bannerAmbiguous": "{count} línea en esta marca de tiempo; no se pudo identificar la línea exacta | {count} líneas en esta marca de tiempo; no se pudo identificar la línea exacta",
+      "bannerChanged": "Es posible que la línea haya cambiado desde que se creó el enlace",
+      "actionShowLines": "Mostrar estas líneas",
+      "actionShowInContext": "Mostrar en contexto",
+      "bannerAmbiguousTieHeavy": "{count} línea comparte esta marca de tiempo y el stream no tiene _o2_id, por lo que no se pudo identificar la línea exacta. Las líneas en esa marca de tiempo están resaltadas. | {count} líneas comparten esta marca de tiempo y el stream no tiene _o2_id, por lo que no se pudo identificar la línea exacta. Las líneas en esa marca de tiempo están resaltadas.",
+      "bannerDismiss": "Descartar",
+      "copyLink": "Copiar enlace",
+      "copyLinkTooltip": "Copiar un enlace a esta línea de log",
+      "copyLinkMenu": "Copiar enlace a esta línea de log",
+      "toastCopied": "Enlace a la línea de log copiado",
+      "toastCopiedValid": "Enlace a la línea de log copiado · válido durante {days} día | Enlace a la línea de log copiado · válido durante {days} días",
+      "toastLookupFailed": "No se pudo buscar esta línea; se copió un enlace a la marca de tiempo",
+      "toastShortFailed": "No se pudo acortar el enlace; se copió el enlace completo en su lugar",
+      "toastFailed": "No se pudo crear un enlace a esta línea de log",
+      "toastScopeChanged": "La organización o el stream cambiaron mientras se creaba el enlace; no se copió nada",
+      "popoverTitle": "Enlace a esta línea de log",
+      "popoverDesc": "Tu navegador bloqueó la copia automática. Selecciona el enlace y cópialo, o usa el botón.",
+      "pageNotice": "Este enlace estaba en la página {page}.",
+      "pageGo": "Ir a la página {page}",
+      "pageGoLast": "Ir a la última página ({page})"
+    },
+    "autoRunPendingDot": "Ejecutar consulta para aplicar los últimos cambios",
+    "autoRunAppliesTo": "Se aplica a Logs y Trazas",
+    "autoRunGuardScope": "{streams} · {window}",
+    "autoRunGuardMoreStreams": "{streams} +{count}",
+    "autoRunGuardTitle": "Esta búsqueda escanearía aproximadamente {size}",
+    "autoRunGuardLinkTitle": "Este enlace escanearía aproximadamente {size}",
+    "autoRunGuardDescAutoRun": "{scope}. La ejecución automática se pausó para que puedas acotarla primero.",
+    "autoRunGuardDescPaused": "{scope}. Pausada para que puedas acotarla primero.",
+    "autoRunGuardDescLink": "Abierto desde un enlace · {scope}. Revisa el alcance y luego ejecútala.",
+    "autoRunGuardHint": "Desactiva la ejecución automática para aplicar los cambios de filtro y tiempo manualmente.",
+    "autoRunGuardUnknownTitle": "Tamaño desconocido para esta ventana",
+    "autoRunGuardUnknownDesc": "{streams} aún no tiene estadísticas de tamaño, por lo que la ejecución automática solo ejecuta ventanas de 1 hora o menos en él.",
+    "autoRunGuardUnknownManyDesc": "{count} stream aún no tiene estadísticas de tamaño, por lo que la ejecución automática te espera. {scope}. | {count} streams aún no tienen estadísticas de tamaño, por lo que la ejecución automática te espera. {scope}.",
+    "autoRunGuardSuperClusterTitle": "Listo para ejecutarse en varias regiones",
+    "autoRunGuardSuperClusterDesc": "El tamaño de la búsqueda aún no se puede estimar en un clúster multirregión, por lo que la ejecución automática te espera. {scope}.",
+    "autoRunGuardUnresolvedTitle": "Stream no disponible",
+    "autoRunGuardUnresolvedDesc": "El stream {streams} no existe o no tienes acceso a él.",
+    "autoRunGuardBanner": "Este cambio escanearía aproximadamente {size} ({scope}), por lo que la ejecución automática se pausó. Los resultados a continuación son de la consulta anterior.",
+    "autoRunGuardBannerPaused": "Este cambio escanearía aproximadamente {size} ({scope}), por lo que está pausado. Los resultados a continuación son de la consulta anterior.",
+    "autoRunGuardBannerUnknown": "Tamaño desconocido para esta ventana ({scope}), por lo que está pausado. Los resultados a continuación son de la consulta anterior.",
+    "autoRunGuardBannerRefresh": "La actualización automática escanearía aproximadamente {size} por actualización ({scope}), por lo que está pausada hasta que la ejecutes una vez. Los resultados a continuación son de la consulta anterior.",
+    "autoRunGuardRunAnyway": "Ejecutar de todos modos",
+    "autoRunGuardRunQuery": "Ejecutar consulta",
+    "autoRunGuardNarrow": "Acotar a {period}",
+    "autoRunGuardNarrowWithSize": "Acotar a {period} (~{size})",
+    "autoRunGuardSearchJob": "Ejecutar como trabajo de búsqueda",
+    "autoRunGuardSelectStream": "Selecciona un stream",
+    "searchJobNoPermission": "No tienes permiso para crear trabajos de búsqueda",
+    "missingStreamAndNoFts": "Uno o más campos de filtro no existen en \"{missingStreams}\", por lo que no se realiza ninguna búsqueda en el stream mencionado.\n No se buscó en: {noFtsStreams} (sin campos de texto completo).",
+    "freeTextChooseFirst": "Elige primero cómo buscar texto",
+    "freeTextScanLogsOnly": "El modo de escaneo solo funciona en la vista de logs; configura un campo de texto completo para usar la búsqueda de texto aquí",
+    "freeTextSearchedFields": "Búsqueda de texto completo en: {fields} (todas las palabras, en cualquier orden)",
+    "freeTextPreview": "Búsqueda de texto completo en: {fields} (todas las palabras, en cualquier orden)\n\nSe ejecuta como {sql}",
+    "freeTextRunsAs": "Se ejecuta como {sql}",
+    "freeTextNotSearched": "No se buscó en: {streams} (sin campos de texto completo).",
+    "freeTextSetField": "Configurar campos de búsqueda de texto completo",
+    "freeTextNoFtsTitle": "\"{stream}\" no tiene campos de texto completo",
+    "freeTextNoFtsTitleMulti": "Los streams seleccionados no tienen campos de texto completo",
+    "freeTextNoTextFields": "Este stream no tiene campos de texto que buscar.",
+    "freeTextNoTextFieldsNamed": "No se buscó en: {streams} (sin campos de texto).",
+    "freeTextBuildNotice": "Este filtro tiene búsqueda de texto; edítalo en SQL."
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Actualizar al Plan PRO",
     "home": "Inicio",
     "about": "Acerca de",
@@ -1320,6 +1452,7 @@
     "topQueries": "Consultas principales",
     "profiles": "Perfiles",
     "productAnalytics": "Analítica de producto",
+    "downtimes": "Inactividad",
     "trialEndedTitle": "Tu período de prueba ha finalizado",
     "trialPageNeedsPlan": "{page} necesita un plan",
     "trialPageNeedsPlanToast": "{page} necesita un plan. Elige uno en esta página para seguir usándolo.",
@@ -2491,6 +2624,7 @@
   "login": {
     "lockedOut": "Demasiados intentos fallidos de inicio de sesión. Vuelva a intentarlo en {duration} o póngase en contacto con su administrador.",
     "redirectingToSsoMessage": "Redirigiendo a la página de inicio de sesión SSO. Si no eres redirigido, por favor",
+    "signingIn": "Iniciando sesión...",
     "clickHere": "haz clic aquí",
     "loginWithSso": "Iniciar sesión con SSO",
     "loginAsInternalUser": "Iniciar sesión como usuario interno",
@@ -2852,6 +2986,7 @@
       "scopeCoveredByParent": "Las acciones bloqueadas provienen de {scope}, definidas en {module}",
       "scopeAllOf": "Todo {module}",
       "scopeIncludesFuture": "Incluye recursos creados después",
+      "scopeDowntimeHint": "Una carpeta de inactividad limita quién gestiona una inactividad, no lo que silencia. Para silenciar Todas las carpetas de un módulo, un usuario necesita el derecho de listar todas las carpetas de ese módulo. Los chips y banners silenciados pueden nombrar una inactividad que un usuario no puede listar.",
       "grantedByWiderScope": "Otorgado por un alcance más amplio",
       "grantedHereAndByWiderScope": "Otorgado aquí y por un alcance más amplio",
       "stillGrantedByWiderScope": "Eliminado aquí, aún otorgado por un alcance más amplio",
@@ -7510,6 +7645,11 @@
     "SearchSQLCancelled": "Error: se canceló Search SQL."
   },
   "alerts": {
+    "promRuleMode": "Modo de regla",
+    "promRulePreview": "{count} series devueltas coinciden ahora. Cada serie debe completar el período pendiente antes de dispararse.",
+    "promRuleModeDescription": "Coincide cuando la expresión devuelve alguna serie. Elige alerta Única o Múltiple cuando el período pendiente sea cero; un período pendiente habilita la alerta Múltiple automáticamente. Deja el stream vacío para inferir un stream de métricas referenciado.",
+    "promRuleModePendingMulti": "Un período pendiente requiere un temporizador independiente para cada serie, por lo que la alerta Múltiple no se puede desactivar.",
+    "promRuleModeConflict": "El modo de regla no puede usar umbrales de valor Crítico o Advertencia; un período pendiente requiere la alerta Múltiple.",
     "allAlerts": "Todas las alertas",
     "compositeAlert": "Compuesta",
     "import": {
@@ -8446,7 +8586,7 @@
         "alertStartTime": "Hora de inicio de la ventana (ISO 8601)",
         "alertEndTime": "Hora de finalización de la ventana (ISO 8601)",
         "alertStartTimeMillis": "Hora de inicio de la ventana en milisegundos epoch",
-        "alertEndTimeMillis": "Hora de fin de la ventana en milisegundos epoch",
+        "alertEndTimeMillis": "Hora de finalización de la ventana en milisegundos epoch",
         "alertUrl": "Enlace de vuelta a OpenObserve para investigar",
         "alertTriggerTime": "Cuándo se disparó la alerta (ISO 8601)",
         "alertTriggerTimeMillis": "Hora de activación en milisegundos epoch",
@@ -9053,7 +9193,9 @@
         "dbmLockSampling": "La actividad de bloqueo se muestrea a intervalos, por lo que la contención que comenzó y se resolvió entre dos muestras nunca se registró. Una alerta silenciosa no es prueba de que no hubo bloqueo.",
         "dbmNoInstance": "No se identificó una única instancia de base de datos, por lo que esta alerta vigila cada instancia de este motor.",
         "rumFunnelSnapshot": "Esta alerta conserva una copia del SQL del embudo. Las ediciones posteriores del embudo o de sus eventos con nombre no la modifican.",
-        "rumFunnelSteps": "Un embudo necesita al menos dos pasos para poder alertar sobre la conversión."
+        "rumFunnelSteps": "Un embudo necesita al menos dos pasos para poder alertar sobre la conversión.",
+        "textFilterDropped": "Tu filtro de búsqueda no se conservó porque este stream no tiene campos de búsqueda de texto completo (FTS). Añádelo a la consulta de la alerta si lo necesitas.",
+        "heldFilterDropped": "Tu filtro de búsqueda no se conservó porque primero necesita una opción Ejecutar como en la página de Logs. Añádelo a la consulta de la alerta si lo necesitas."
       }
     },
     "saveFailed": "No se pudo guardar la alerta.",
@@ -9065,7 +9207,501 @@
     "sloLongWindow": "Ventana larga",
     "sloShortWindow": "Ventana corta",
     "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
-    "seconds": "Segundos"
+    "seconds": "Segundos",
+    "downtimes": {
+      "newTitle": "Nueva inactividad",
+      "editTitle": "Editar inactividad",
+      "detailTitle": "Inactividad",
+      "modules": {
+        "alerts": "Alertas",
+        "anomaly_detections": "Detecciones de anomalías",
+        "synthetics": "Comprobaciones sintéticas",
+        "slos": "SLOs"
+      },
+      "modulesShort": {
+        "alerts": "Alertas",
+        "anomaly_detections": "Anomalía",
+        "synthetics": "Sintéticos",
+        "slos": "SLOs"
+      },
+      "target": {
+        "incidentMode": {
+          "label": "Durante la ventana, los incidentes se",
+          "muted": "Crean y silencian (predeterminado)",
+          "mutedHelp": "Los incidentes se abren como siempre, pero no notifican a nadie hasta que termina la ventana.",
+          "none": "No se crean",
+          "noneHelp": "No se abre ningún incidente durante la ventana; el primer disparo posterior abre uno y notifica.",
+          "summary": "sin incidentes"
+        }
+      },
+      "summary": {
+        "valuesOfKey": "{count} {key} | {count} {key}s",
+        "condition": "condición",
+        "allFolders": "todas las carpetas",
+        "oneFolder": "carpeta {name}",
+        "nFolders": "{count} carpeta | {count} carpetas",
+        "tags": "etiqueta {tags}",
+        "nItems": "{count} elemento | {count} elementos",
+        "asGood": "como bueno",
+        "chip": "{module} · {text}",
+        "moreTargets": "+{count}",
+        "noIncidents": "No se abren incidentes durante la ventana."
+      },
+      "duration": {
+        "days": "{count} d",
+        "hours": "{count} h",
+        "minutes": "{count} min"
+      },
+      "schedule": {
+        "windowRange": "{start} a {end} {zone}",
+        "onceSentence": "Una vez · {start} a {end} · {zone}",
+        "dailySentence": "Diario · {time} durante {duration} · {zone}",
+        "weeklySentence": "Semanal los {days} · {time} durante {duration} · {zone}",
+        "fromNoEnd": "{schedule}, desde el {start} sin fecha de fin",
+        "fromUntil": "{schedule}, desde el {start} hasta el {until}"
+      },
+      "validation": {
+        "conditionRequired": "Añade una condición o elimina el bloque de condiciones.",
+        "pairKey": "Elige una dimensión para cada fila.",
+        "pairOperator": "Usa = o != en una condición de inactividad.",
+        "pairValue": "Introduce un valor para cada fila.",
+        "loneStar": "Un valor no puede ser un * por sí solo.",
+        "innerStar": "Un * solo se permite al final de un valor.",
+        "emptyGroup": "Un grupo de condiciones no puede estar vacío.",
+        "tooDeep": "Una condición puede anidar grupos como máximo 3 niveles.",
+        "tooManyPairs": "Una condición puede contener como máximo 32 pares.",
+        "needsEq": "Añade al menos una condición =. Una condición formada solo por filas != silenciaría todo lo demás.",
+        "modulesRequired": "Elige al menos un módulo.",
+        "foldersRequired": "Elige Todas las carpetas o al menos una carpeta.",
+        "tagsRequired": "Añade una etiqueta o elimina el bloque de etiquetas.",
+        "idsRequired": "Selecciona un elemento o elimina el bloque de elementos específicos.",
+        "idOutsideFolders": "Algunos elementos seleccionados no están en las carpetas seleccionadas.",
+        "tooManyFolders": "Elija como máximo {max} carpetas, o Todas las carpetas.",
+        "tooManyTags": "Añada como máximo {max} etiquetas.",
+        "tooManyIds": "Seleccione como máximo {max} elementos.",
+        "nameTooLong": "Un nombre puede tener como máximo 256 caracteres.",
+        "timezoneRequired": "Elige una zona horaria.",
+        "startRequired": "Introduce una fecha y hora de inicio.",
+        "endRequired": "Introduce una fecha y hora de finalización.",
+        "endAfterStart": "El final debe ser posterior al inicio.",
+        "windowTooLong": "Una ventana puede durar como máximo 7 días.",
+        "windowTooShort": "Una ventana debe durar al menos 1 minuto.",
+        "startTimeRequired": "Introduce una hora de inicio como HH:MM.",
+        "durationInvalid": "Introduce una duración como 90m o 1h 30m.",
+        "weekdaysRequired": "Elige al menos un día.",
+        "untilAfterStart": "Repetir hasta debe ser el primer día o posterior.",
+        "reasonTooLong": "Un motivo puede tener como máximo {max} caracteres.",
+        "windowOutlastsRepeat": "La ventana no puede ser más larga que el tiempo entre repeticiones.",
+        "startDateRequired": "Elija el primer día."
+      },
+      "title": "Tiempos de inactividad",
+      "subtitle": "Ventanas programadas que mantienen en ejecución las alertas, las detecciones de anomalías y las comprobaciones de sintéticos, pero detienen sus notificaciones",
+      "newDowntime": "Nuevo tiempo de inactividad",
+      "filterAll": "Todos",
+      "filterOnce": "Puntual",
+      "filterRecurring": "Recurrente",
+      "search": "Buscar por nombre, dimensión o creador",
+      "searchAcross": "Buscar en todas las carpetas",
+      "thisFolder": "Esta carpeta",
+      "allFolders": "Todas las carpetas",
+      "thisFolderTooltip": "Buscar en la carpeta seleccionada",
+      "allFoldersTooltip": "Buscar en todas las carpetas",
+      "noFolder": "No hay ninguna carpeta en la que pueda guardar un tiempo de inactividad",
+      "truncated": "Se muestran los primeros {shown} de {total} tiempos de inactividad",
+      "stats": {
+        "active": "Activo",
+        "scheduled": "Programado",
+        "recurring": "Recurrente",
+        "ended": "Finalizado",
+        "cancelled": "Cancelado",
+        "endedEarly": "Finalizado antes",
+        "total": "Total"
+      },
+      "columns": {
+        "name": "Nombre",
+        "status": "Estado",
+        "targets": "Objetivos",
+        "schedule": "Programación",
+        "when": "Finaliza / próxima",
+        "matched": "Coincidencias",
+        "createdBy": "Creado por",
+        "folder": "Carpeta"
+      },
+      "oneTime": "Puntual",
+      "recurring": "Recurrente",
+      "bannerOn": "Se muestra un banner a todos los miembros de la organización mientras este tiempo de inactividad esté activo",
+      "endsLabel": "finaliza",
+      "confirmEndNow": {
+        "title": "¿Finalizar este tiempo de inactividad ahora?",
+        "message": "Las notificaciones se reanudan de inmediato. El tiempo de inactividad queda en la lista como finalizado antes.",
+        "ok": "Finalizar ahora",
+        "keep": "Seguir activo"
+      },
+      "extend": {
+        "menu": "Ampliar en",
+        "notActive": "Solo se puede ampliar un tiempo de inactividad activo",
+        "dialogTitle": "Ampliar {name}",
+        "newEnd": "Nuevo fin",
+        "confirmUntil": "Ampliar hasta {time}",
+        "followUp": "Este tiempo de inactividad se repite, así que su programación no cambia. Se crea un tiempo de inactividad único llamado {name} desde el fin de la ventana actual.",
+        "endAfterCurrent": "El nuevo fin debe ser posterior al fin actual."
+      },
+      "nextLabel": "próxima",
+      "matched": {
+        "alerts": "{count} alerta | {count} alertas",
+        "anomalies": "{count} anomalía | {count} anomalías",
+        "synthetics": "{count} comprobación | {count} comprobaciones",
+        "slos": "{count} SLO | {count} SLOs"
+      },
+      "actions": {
+        "endNow": "Finalizar ahora",
+        "edit": "Editar",
+        "duplicate": "Duplicar",
+        "moveToFolder": "Mover a carpeta",
+        "cancel": "Cancelar el tiempo de inactividad",
+        "delete": "Eliminar",
+        "more": "Más acciones",
+        "muteForHour": "Silenciar ahora durante 1 h",
+        "extend": "Ampliar"
+      },
+      "confirmCancel": {
+        "title": "Cancelar periodo de inactividad",
+        "message": "Las notificaciones se reanudan de inmediato. El periodo de inactividad permanece en la lista como historial.",
+        "bulkMessage": "¿Cancelar {count} periodo de inactividad? Las notificaciones se reanudan de inmediato. | ¿Cancelar {count} periodos de inactividad? Las notificaciones se reanudan de inmediato.",
+        "confirm": "Cancelar periodo de inactividad | Cancelar periodos de inactividad",
+        "keep": "Mantener periodo de inactividad | Mantener periodos de inactividad"
+      },
+      "confirmDelete": {
+        "title": "Eliminar periodo de inactividad",
+        "message": "Se eliminan el periodo de inactividad y su historial. Esta acción no se puede deshacer."
+      },
+      "copyOf": "Copia de {name}",
+      "form": {
+        "matches": {
+          "alerts": "{count} alerta coincide | {count} alertas coinciden",
+          "anomaly_detections": "{count} detección coincide | {count} detecciones coinciden",
+          "synthetics": "{count} comprobación coincide | {count} comprobaciones coinciden",
+          "slos": "{count} SLO coincide | {count} SLO coinciden"
+        },
+        "alertFolders": "Carpetas de alertas",
+        "syntheticsFolders": "Carpetas de Sintéticos",
+        "noAlertFolderAccess": "No tienes acceso a las carpetas de alertas.",
+        "noSyntheticsFolderAccess": "No tienes acceso a las carpetas de Sintéticos.",
+        "tags": "Etiquetas",
+        "tagPlaceholder": "clave:valor",
+        "tagsHint": "Cada etiqueta debe estar en la comprobación.",
+        "removeBlock": "Eliminar este bloque",
+        "specificItems": "Elementos específicos",
+        "itemsHint": "Solo se ofrecen los elementos de las carpetas seleccionadas.",
+        "itemOption": "{name} · {folder}",
+        "addTags": "Añadir etiquetas",
+        "addItems": "Añadir elementos específicos",
+        "sloMode": "Puntuación de SLO dentro de la ventana",
+        "sloExclude": "Excluir la ventana",
+        "sloCountAsGood": "Contar la ventana como buena",
+        "sloExcludeCaption": "El tiempo dentro de la ventana no cuenta ni como bueno ni como malo. Las alertas de burn rate de estos SLO no se activan por él.",
+        "sloCountAsGoodCaption": "El tiempo en la ventana cuenta como totalmente bueno. Usa esto solo cuando tu contrato de SLO indique que el mantenimiento planificado cuenta como tiempo de actividad.",
+        "cardCaption": "Primero las carpetas; después, los bloques opcionales acotan más. La condición de dimensión anterior también se aplica a este módulo.",
+        "noConditionForChecks": "La condición de dimensión anterior no se aplica a las comprobaciones.",
+        "appliesTo": "Se aplica a",
+        "tabTargets": "Objetivos",
+        "tabSchedule": "Programación",
+        "tabAdvanced": "Avanzado",
+        "modeInFolder": "{mode} en",
+        "newMode": "Nuevo periodo de inactividad",
+        "editMode": "Editar periodo de inactividad",
+        "namePlaceholder": "Nombre del periodo de inactividad",
+        "nameLabel": "Nombre del periodo de inactividad",
+        "renameHint": "Haz clic para cambiar el nombre",
+        "reason": "Motivo",
+        "reasonHelp": "Opcional. Se muestra en la lista, en la página de detalles y en la información emergente de Silenciado.",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "activeBanner": "Este periodo de inactividad está activo. Una edición surte efecto en la próxima evaluación, y un cambio en el modo de SLO vuelve a medir las ventanas que ya comenzaron.",
+        "changedMeanwhile": "Alguien cambió este periodo de inactividad desde que lo cargó. Recárguelo e inténtelo de nuevo.",
+        "reload": "Recargar",
+        "noModule": "Elige un módulo en «Se aplica a».",
+        "checkSchedule": "Revise la programación y vuelva a guardar."
+      },
+      "sentence": {
+        "nouns": {
+          "alerts": "alertas",
+          "anomaly_detections": "detecciones de anomalías",
+          "synthetics": "comprobaciones de Sintéticos",
+          "slos": "SLOs"
+        },
+        "whenOnce": "Una vez, desde {start} hasta {end} {zone}",
+        "whenDaily": "Todos los días a las {time} {zone}, durante {duration}",
+        "whenWeekly": "Cada {days} a las {time} {zone}, durante {duration}",
+        "inFolders": "en la carpeta {names} | en las carpetas {names}",
+        "withCondition": "con {condition}",
+        "tagged": "etiquetado {tags}",
+        "named": "limitado a {count} elemento con nombre | limitado a {count} elementos con nombre",
+        "stopNotifying": "{when}: {targets} dejan de notificar.",
+        "nothingMuted": "{when}: no se silencia ninguna alerta ni comprobación.",
+        "sloUnchanged": "Las puntuaciones de SLO no cambian.",
+        "sloExcluded": "{slos} excluyen la ventana de su puntuación.",
+        "sloAsGood": "{slos} cuentan la ventana como tiempo bueno."
+      },
+      "autoName": {
+        "once": "una vez",
+        "onceOn": "una vez el {date}",
+        "daily": "diario",
+        "weekly": "semanal",
+        "all": {
+          "alerts": "Todas las alertas",
+          "anomaly_detections": "Todas las detecciones de anomalías",
+          "synthetics": "Todas las comprobaciones de Sintéticos",
+          "slos": "Todos los SLO"
+        }
+      },
+      "condition": {
+        "none": "Sin condición de dimensión",
+        "add": "Añadir",
+        "title": "Condición de dimensión",
+        "onePer": "Una por inactividad",
+        "remove": "Eliminar la condición de dimensión",
+        "caption": "Se aplica a alertas, detecciones de anomalías y SLOs. Las comprobaciones de Sintéticos no tienen dimensiones y usan etiquetas. Todos los pares deben coincidir. Use un grupo OR para alternativas. Un valor puede terminar en *."
+      },
+      "resources": {
+        "refineBy": "Refinar por recurso",
+        "load": "Cargar recursos",
+        "needsEq": "Añada al menos una condición = antes de refinar por recurso.",
+        "tooMany": "{count} valores coocurren con esta condición. Acote la condición para elegir recursos.",
+        "lastSeen": "Visto por última vez",
+        "streams": "Streams",
+        "footer": "{selected} de {total} seleccionados · {source}",
+        "fromRegistry": "desde el registro de servicios",
+        "fromSearch": "de las últimas 24 horas de datos",
+        "apply": "Aplicar",
+        "loadFailed": "No se pudieron cargar los recursos",
+        "notSeen": "No visto en la última hora.",
+        "partial": "Algunas fuentes no respondieron.",
+        "items": "Elementos",
+        "fromValues": "de alertas, el registro de servicios y los datos de la última hora",
+        "noValues": "Aún no se han visto valores para esta dimensión."
+      },
+      "scheduleForm": {
+        "once": "Una vez",
+        "daily": "Diario",
+        "weekly": "Semanal",
+        "startDate": "Fecha de inicio",
+        "startTime": "Hora de inicio",
+        "endDate": "Fecha de fin",
+        "endTime": "Hora de fin",
+        "days": "Días",
+        "startsAt": "Comienza a las",
+        "duration": "Duración",
+        "durationPlaceholder": "1h 30m",
+        "durationHelp": "Hasta 7 días, por ejemplo 90m o 1h 30m.",
+        "until": "Repetir hasta",
+        "untilPlaceholder": "Sin fecha de fin",
+        "timezone": "Zona horaria",
+        "noWindow": "Ninguna ventana comienza en los próximos 8 días.",
+        "nextWindow": "Próxima ventana: {window}. Una ventana puede cruzar la medianoche.",
+        "nextWindowWithUtc": "Próxima ventana: {window} ({utc}). Una ventana puede cruzar la medianoche.",
+        "startsOn": "Comienza el"
+      },
+      "preview": {
+        "title": "Vista previa",
+        "failed": "No se pudo cargar la vista previa.",
+        "andMore": "y {count} más",
+        "noMatch": "Nada coincide ahora",
+        "fireTime": "{count} alerta resuelve su identidad al dispararse | {count} alertas resuelven su identidad al dispararse",
+        "undecidable": "No se pueden distinguir por {key}",
+        "showAll": "Mostrar la lista completa",
+        "showLess": "Mostrar menos",
+        "finishCondition": "Complete la condición para ver una vista previa."
+      },
+      "muteAllDialog": {
+        "title": "¿Silenciar módulos completos?",
+        "intro": "Ninguna carpeta, elemento, etiqueta o condición limita estos módulos, por lo que este periodo de inactividad silencia:",
+        "every": {
+          "alerts": "Todas las alertas de esta organización",
+          "anomaly_detections": "Todas las detecciones de anomalías de esta organización",
+          "synthetics": "Todas las comprobaciones de Sintéticos de esta organización",
+          "slos": "Todos los SLO de esta organización"
+        },
+        "matchedNow": "{matched} hoy",
+        "outro": "Las notificaciones, los avisos de guardia y los flujos de trabajo se detienen para todos ellos dentro de la ventana.",
+        "cancel": "Cancelar",
+        "confirm": "Silenciar todo",
+        "titleOne": {
+          "alerts": "¿Silenciar todas las alertas de esta organización?",
+          "anomaly_detections": "¿Silenciar todas las detecciones de anomalías de esta organización?",
+          "synthetics": "¿Silenciar todas las comprobaciones de Sintéticos de esta organización?",
+          "slos": "¿Silenciar todos los SLO de esta organización?"
+        },
+        "window": "Ventana: {window}"
+      },
+      "summaryPane": {
+        "title": "Resumen",
+        "filedIn": "Archivado en",
+        "window": "Ventana",
+        "nextWindow": "Próxima ventana",
+        "inUtc": "En UTC",
+        "largeMatch": "{modules}: el periodo de inactividad coincide con más de la mitad de los elementos. La mayor parte de esta organización no notificará dentro de la ventana.",
+        "whatHappens": "Qué ocurre",
+        "keepRunning": "Las evaluaciones y comprobaciones siguen ejecutándose y conservan su historial.",
+        "noNotifications": "Las notificaciones, los avisos de guardia y los flujos de trabajo se detienen.",
+        "mutedIncidents": "Los incidentes se abren silenciados y notifican después de la ventana."
+      },
+      "band": {
+        "now": "ahora",
+        "none": "Aún no se ha ejecutado ninguna ventana ni hay ninguna planificada.",
+        "active": "Activa",
+        "next": "Próxima",
+        "past": "Ejecutada",
+        "track": "Ventanas",
+        "aria": "{kind}: {start} a {end}"
+      },
+      "detail": {
+        "overview": "Resumen",
+        "affected": "Afectados · {count}",
+        "suppressed": "Suprimidos · {count}",
+        "details": "Detalles",
+        "condition": "Condición",
+        "noTarget": "Sin objetivo",
+        "banner": "Banner",
+        "bannerOn": "Se muestra a la organización mientras está activo",
+        "bannerOff": "Sin banner",
+        "occurrences": "Ocurrencias",
+        "nextWindow": "Próxima ventana: {window}. Tu hora: {local}.",
+        "sectionCount": "{name} · {count}",
+        "matchedByHeader": "Coincide por",
+        "matchedBy": {
+          "query": "Consulta",
+          "source_alert": "Alerta de origen",
+          "tag": "Etiqueta",
+          "id": "Con nombre",
+          "folder": "Carpeta",
+          "org": "Toda la organización"
+        },
+        "source": "Origen",
+        "wouldHaveNotified": "Habría notificado",
+        "noSuppressed": "Aún no se ha suprimido nada",
+        "muteHourName": "{name} · silenciar 1 h",
+        "notFoundTitle": "No se encontró el periodo de inactividad",
+        "notFoundDescription": "Puede que se haya eliminado o que el enlace apunte a otra organización.",
+        "backToList": "Volver a los periodos de inactividad"
+      },
+      "mute": {
+        "title": {
+          "alerts": "Silenciar {count} alerta | Silenciar {count} alertas",
+          "anomaly_detections": "Silenciar {count} detección de anomalías | Silenciar {count} detecciones de anomalías",
+          "synthetics": "Silenciar {count} comprobación | Silenciar {count} comprobaciones",
+          "slos": "Silenciar {count} SLO | Silenciar {count} SLOs",
+          "items": "Silenciar {count} elemento | Silenciar {count} elementos"
+        },
+        "subtitle": "Siguen ejecutándose y conservan su historial. Las notificaciones, los avisos y los flujos de trabajo se detienen hasta que finalice la ventana.",
+        "muteFor": "Silenciar durante",
+        "fileIn": "Archivar en",
+        "presets": {
+          "30m": "30 min",
+          "1h": "1 h",
+          "2h": "2 h",
+          "4h": "4 h",
+          "custom": "Personalizado"
+        },
+        "endsAt": "Finaliza el",
+        "endsIn": "En {duration}.",
+        "confirm": "Silenciar",
+        "confirmUntil": "Silenciar hasta {time}",
+        "menu": "Silenciar notificaciones",
+        "until": "Hasta…",
+        "bulk": "Silenciar",
+        "muted": "Silenciado · finaliza en {duration}",
+        "mutedTooltip": "Silenciado por {name} hasta {end}",
+        "exclude": "Excluir una ventana…",
+        "firingMuted": "Disparando · silenciada",
+        "firingMutedTooltip": "Sigue disparándose. {name} silencia las notificaciones."
+      },
+      "corrected": "Corregido",
+      "correctedBy": "Puntuación corregida por {names}",
+      "incident": {
+        "mutedBy": "Silenciado · {name}",
+        "notLoaded": "Tiempo de inactividad no cargado",
+        "notLoadedTooltip": "Silenciado por el tiempo de inactividad {id}, que no está entre los cargados.",
+        "banner": "Silenciado por {name}. No se avisó a nadie. El primer disparo después de la ventana envía la notificación de apertura retrasada.",
+        "bannerUntil": "Silenciado por {name} hasta {end}. No se avisó a nadie. El primer disparo después de la ventana envía la notificación de apertura retrasada."
+      },
+      "banner": {
+        "ended": "finalizó",
+        "endsInUnderMinute": "finaliza en menos de un minuto",
+        "endsInMinutes": "finaliza en {count} minuto | finaliza en {count} minutos",
+        "endsIn": "finaliza en {duration}",
+        "firstEndsInUnderMinute": "el primero finaliza en menos de un minuto",
+        "firstEndsInMinutes": "el primero finaliza en {count} minuto | el primero finaliza en {count} minutos",
+        "firstEndsIn": "el primero finaliza en {duration}",
+        "count": "{module} {count}",
+        "showBanner": "Mostrar un banner a todos los miembros de la organización mientras este periodo de inactividad esté activo",
+        "showBannerCaption": "El banner muestra el nombre, los recuentos afectados y el tiempo restante. Nunca menciona una alerta concreta.",
+        "preview": "Vista previa",
+        "previewMessage": "{name} está activo.",
+        "tooLong": "El banner solo está disponible para ventanas de hasta 7 días."
+      },
+      "sloCorrections": {
+        "title": "Correcciones de estado:",
+        "item": "{name} ({status})",
+        "shorterThanSlice": "más corto que el intervalo del SLO, no se corrigió ningún minuto"
+      },
+      "notify": {
+        "title": "Notificar",
+        "caption": "Informa a los destinos sobre el propio periodo de inactividad: cuando empieza, antes de que termine y cuando termina.",
+        "destinations": "Destinos",
+        "lead": "Recordar antes del final",
+        "leadHelp": "Por ejemplo 10m o 1h, entre 1 minuto y la duración de la ventana.",
+        "regionNote": "En un superclúster, envía la región donde se creó el periodo de inactividad. Uno creado antes de existir este ajuste envía desde todas las regiones.",
+        "tab": "Notificaciones",
+        "events": {
+          "started": "Cuando empieza",
+          "startedHelp": "Un mensaje al comenzar cada ventana.",
+          "ending_soon": "Antes de que termine",
+          "ending_soonHelp": "Un recordatorio antes del final, para que nadie se sorprenda cuando las alertas vuelvan a notificar.",
+          "ended": "Cuando termina",
+          "endedHelp": "Un mensaje al cerrarse cada ventana.",
+          "cancelled": "Cuando se cancela",
+          "cancelledHelp": "Se envía en el acto cuando alguien termina o anula el periodo de inactividad.",
+          "extended": "Cuando se amplía",
+          "extendedHelp": "Se envía en el acto con el nuevo final."
+        },
+        "validation": {
+          "tooMany": "Se pueden notificar como máximo {max} destinos.",
+          "eventRequired": "Elige al menos un evento o quita los destinos.",
+          "leadInvalid": "El recordatorio debe llegar entre 1 minuto y la duración de la ventana antes del final."
+        },
+        "summary": {
+          "none": "No envía notificaciones propias.",
+          "sentence": "Notifica a {destinations}: {events}.",
+          "started": "cuando empieza",
+          "endingSoon": "{lead} antes de que termine",
+          "ended": "cuando termina",
+          "cancelled": "cuando se cancela",
+          "extended": "cuando se amplía"
+        },
+        "log": {
+          "time": "Hora",
+          "event": "Evento",
+          "destinations": "Destinos",
+          "result": "Resultado",
+          "ok": "Enviado",
+          "pending": "Enviando",
+          "empty": "Aún no se ha enviado ninguna notificación",
+          "events": {
+            "started": "Iniciado",
+            "ending_soon": "Termina pronto",
+            "ended": "Terminado",
+            "cancelled": "Cancelado",
+            "extended": "Ampliado"
+          }
+        },
+        "test": {
+          "send": "Enviar prueba",
+          "sent": "Prueba enviada a {count} destino | Prueba enviada a {count} destinos",
+          "failed": "La prueba no llegó a {names}."
+        }
+      }
+    }
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -9102,7 +9738,8 @@
     "countWorkflow": "{count} flujo de trabajo | {count} flujos de trabajo",
     "countAnomalyDetection": "{count} detector de anomalías | {count} detectores de anomalías",
     "countIncidentIntegration": "{count} integración de incidentes | {count} integraciones de incidentes",
-    "sectionOtherConsumers": "También usado por"
+    "sectionOtherConsumers": "También usado por",
+    "countDowntime": "{count} periodo de inactividad | {count} periodos de inactividad"
   },
   "alert_library": {
     "header": "Biblioteca de alertas",
@@ -11646,7 +12283,21 @@
     "eventClusterAriaLabelPlural": "{count} eventos, {errors} errores",
     "eventMarkerTooltip": "Evento: {name}",
     "exceptionMarkerTooltip": "Excepción: {type}",
-    "spanEventFallback": "evento de span"
+    "spanEventFallback": "evento de span",
+    "spanNav": {
+      "firstSpan": "Primer span",
+      "lastSpan": "Último span",
+      "position": "Span {index} de {count}: {name}"
+    },
+    "rowNav": {
+      "tracePosition": "Traza {row} de {count}, página {page}",
+      "spanPosition": "Span {row} de {count}, página {page}",
+      "firstResult": "Primer resultado",
+      "lastResult": "Último resultado",
+      "loadingPage": "Cargando página {page}",
+      "pageFailed": "No se pudo cargar la página {page}",
+      "pageEmpty": "La página {page} no tiene resultados"
+    }
   },
   "aiToolset": {
     "header": "Conjuntos de herramientas de IA",
@@ -14883,7 +15534,8 @@
       "selectStreamDesc": "Explora streams de logs, traces, métricas y RUM",
       "queryGuide": "Lea la guía de consultas",
       "queryGuideDesc": "Filtros, modo SQL, VRL y vistas guardadas",
-      "recent": "Reciente:"
+      "recent": "Último usado:",
+      "descriptionAutoRun": "Elige un stream para ver sus logs más recientes. Puedes refinar con filtros, una función VRL y un rango de tiempo personalizado una vez que lleguen los resultados."
     },
     "noEvents": {
       "title": "No se encontraron eventos",
@@ -14937,7 +15589,8 @@
       "fixErrorsAndRetry": "Hay algunos errores, corrígelos e inténtalo de nuevo"
     },
     "buildQueryPage": {
-      "validationErrors": "Hay algunos errores, corrígelos e inténtalo de nuevo"
+      "validationErrors": "Hay algunos errores, corrígelos e inténtalo de nuevo",
+      "parserLoadFailed": "No se pudo cargar el analizador de consultas, por lo que el filtro de búsqueda no se puede añadir al gráfico. Las ejecuciones están en pausa hasta que se cargue."
     },
     "searchHistory": {
       "sqlQueryLabel": "Consulta SQL :",
@@ -15139,6 +15792,45 @@
     },
     "logsNoEventsState": {
       "lastData": "Últimos datos: {formatted} ({zone})"
+    },
+    "severity": {
+      "srText": "Severidad {level}",
+      "srTextInferred": "Severidad {level}, inferida",
+      "inferredLabel": "{level} · inferida",
+      "popoverTitle": "Severidad: {level}",
+      "popoverAriaLabel": "Evidencia de severidad",
+      "evidence": "Evidencia",
+      "fromField": "Del campo {field}",
+      "inferredFrom": "Inferida del texto de {field}.",
+      "notSearchable": "No es buscable; el histograma no lo usa.",
+      "noLevelField": "No hay campo de nivel en esta fila y no hay campo de texto que escanear.",
+      "noLevelWordInField": "No hay campo de nivel en esta fila ni una palabra de nivel en {field}.",
+      "notInSelectedColumns": "El campo de nivel no está en las columnas seleccionadas",
+      "levels": {
+        "emergency": "emergencia",
+        "alert": "alerta",
+        "critical": "crítico",
+        "error": "error",
+        "warning": "advertencia",
+        "notice": "aviso",
+        "info": "info",
+        "debug": "debug",
+        "trace": "traza",
+        "ok": "ok",
+        "unknown": "desconocido"
+      }
+    },
+    "rowNav": {
+      "autoRefreshEdge": "La actualización automática está activada; desactívala para cambiar de página",
+      "position": "Log {row} de {count}, página {page}",
+      "positionLabel": "Log {row} de {count} · Página {page}",
+      "loadingPage": "Cargando página {page}…",
+      "loadingPageAnnouncement": "Cargando página {page}",
+      "resultsChanged": "Los resultados cambiaron",
+      "notInPage": "No está en la página actual",
+      "loadingResults": "Cargando resultados…",
+      "previousLog": "Log anterior",
+      "nextLog": "Log siguiente"
     }
   },
   "queryError": {
@@ -15173,7 +15865,10 @@
     "traceId": "ID de trace:",
     "askAi": "Pedir a la IA que corrija mi consulta",
     "showDetail": "Mostrar detalles",
-    "hideDetail": "Ocultar detalles"
+    "hideDetail": "Ocultar detalles",
+    "runAs": "Ejecutar como",
+    "searchTextFor": "Buscar el texto \"{text}\"",
+    "searchTextDesc": "Buscar toda la entrada como una sola frase"
   },
   "refreshButton": {
     "justNow": "justo ahora",
@@ -16959,7 +17654,8 @@
       "sourceMaps": "RUM — Mapas de origen",
       "oncall": "Guardia",
       "oncallDetail": "Página de guardia",
-      "syntheticsJourney": "Recorrido de Sintéticos"
+      "syntheticsJourney": "Recorrido de Sintéticos",
+      "downtimes": "Tiempos de inactividad"
     },
     "actions": {
       "openCheatsheet": "Abrir hoja de referencia de atajos de teclado",
@@ -17071,7 +17767,19 @@
       "oncallEscalate": "Escalar",
       "oncallSnooze": "Posponer",
       "oncallResolve": "Resolver",
-      "functionsImport": "Importar función"
+      "downtimesCreate": "Nuevo tiempo de inactividad",
+      "downtimesRefresh": "Actualizar tiempos de inactividad",
+      "functionsImport": "Importar función",
+      "logsNextRow": "Log siguiente (abre los detalles)",
+      "logsPrevRow": "Log anterior (abre los detalles)",
+      "logsRowFocusMove": "Mover el foco entre filas",
+      "logsRowOpen": "Abrir la fila enfocada",
+      "logsDetailClose": "Cerrar los detalles y volver a la fila",
+      "tracesNextRow": "Seleccionar la traza siguiente",
+      "tracesPrevRow": "Seleccionar la traza anterior",
+      "tracesRowOpen": "Abrir la traza seleccionada",
+      "traceNextVisibleSpan": "Span visible siguiente",
+      "tracePrevVisibleSpan": "Span visible anterior"
     }
   },
   "components": {
@@ -17444,7 +18152,13 @@
         "debug": "Depuración",
         "info": "Información",
         "warn": "ADVERTENCIA",
-        "fatal": "Fatal"
+        "fatal": "Fatal",
+        "emergency": "Emergencia",
+        "alert": "Alerta",
+        "critical": "Crítico",
+        "notice": "Aviso",
+        "ok": "OK",
+        "unknown": "Desconocido"
       },
       "pipelineRunOutcome": {
         "firing": "En disparo",
@@ -17509,6 +18223,13 @@
         "belowTopN": "por debajo del top-N",
         "truncated": "truncado",
         "gap": "brecha"
+      },
+      "downtimeStatus": {
+        "scheduled": "Programado",
+        "active": "Activo",
+        "ended": "Finalizado",
+        "cancelled": "Cancelado",
+        "endedEarly": "Finalizado antes"
       }
     }
   },
@@ -17905,6 +18626,24 @@
     },
     "iam": {
       "userSaveFailed": "No se pudo guardar el usuario"
+    },
+    "downtimes": {
+      "cancelled": "Tiempo de inactividad cancelado",
+      "cancelledMany": "{count} tiempo de inactividad cancelado | {count} tiempos de inactividad cancelados",
+      "cancelFailed": "No se pudo cancelar el tiempo de inactividad",
+      "extended": "Ampliado hasta {time}",
+      "extendedFollowUp": "Se creó {name}, activo hasta {time}",
+      "extendFailed": "No se pudo ampliar el tiempo de inactividad",
+      "reload": "Recargar",
+      "deleted": "Tiempo de inactividad eliminado",
+      "deleteFailed": "No se pudo eliminar el tiempo de inactividad",
+      "created": "Tiempo de inactividad creado",
+      "updated": "Tiempo de inactividad guardado",
+      "saveFailed": "No se pudo guardar el tiempo de inactividad",
+      "muted": "Se silenció {count} elemento hasta {time}. Archivado en {folder}. | Se silenciaron {count} elementos hasta {time}. Archivados en {folder}.",
+      "muteFailed": "No se pudo crear el silencio",
+      "viewDowntime": "Ver tiempo de inactividad",
+      "itemsDropped": "{count} elemento seleccionado está fuera de las carpetas seleccionadas y se eliminó. | {count} elementos seleccionados están fuera de las carpetas seleccionadas y se eliminaron."
     }
   },
   "cipherKeys": {
@@ -18195,7 +18934,9 @@
       "budgetNote": "El último punto equivale al mosaico de presupuesto restante de arriba. La línea discontinua en 0% es el agotamiento; por debajo de ella, el SLO ha gastado más errores de los que el objetivo permite. Los vacíos son cubos sin nada medido, que no es lo mismo que cero.",
       "burnExplain": "La rapidez con la que se consume el presupuesto en cada intervalo por sí solo, como múltiplo de la tasa neutral del presupuesto.",
       "burnFormula": "tasa de consumo = (100% − SLI) ÷ (100% − objetivo)\nSLI = 100 × bueno ÷ total, solo para ese cubo\n\neje derecho (la misma línea leída como SLI):\nSLI = 100% − tasa de consumo × (100% − objetivo)",
-      "burnNote": "×1 gasta el presupuesto exactamente al final de la ventana, ×2 en la mitad; por debajo de ×1 el presupuesto se acumula. Como es por intervalo y no acumulativo, un pico aquí permanece visible en lugar de diluirse. El eje derecho cuenta hacia abajo: subir en el gráfico significa más consumo, lo que implica un SLI más bajo."
+      "burnNote": "×1 gasta el presupuesto exactamente al final de la ventana, ×2 en la mitad; por debajo de ×1 el presupuesto se acumula. Como es por intervalo y no acumulativo, un pico aquí permanece visible en lugar de diluirse. El eje derecho cuenta hacia abajo: subir en el gráfico significa más consumo, lo que implica un SLI más bajo.",
+      "corrected": "Corregido por un tiempo de inactividad",
+      "correctedTooltip": "Corregido por un tiempo de inactividad: excluido, así que la línea de presupuesto se mantiene plana"
     },
     "alerts": {
       "title": "Alertas",
@@ -21719,5 +22460,1079 @@
     "modeExhausted": "Agotado",
     "modeFree": "Gratis",
     "modeUnknown": "Desconocido"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "Envía tus datos. OpenObserve encuentra los problemas y te los comunica, con su mejor lectura de la causa. Cuando está en silencio, te muestra qué ha revisado y qué no puede ver.",
+    "phase2": "Fase 2",
+    "tabs": {
+      "issues": "Incidencias",
+      "coverage": "Cobertura",
+      "activity": "Actividad",
+      "policy": "Política"
+    },
+    "loops": {
+      "coverage": "Cobertura",
+      "calibration": "Calibración",
+      "investigation": "Investigación",
+      "action": "Acción"
+    },
+    "signals": {
+      "requests": "Solicitudes",
+      "errors": "Errores",
+      "latency": "Latencia",
+      "saturation": "Saturación",
+      "logPatterns": "Patrones de logs",
+      "dependencies": "Dependencias"
+    },
+    "ledgerStatus": {
+      "autoApplied": "Aplicado automáticamente",
+      "awaiting": "Pendiente de aprobación",
+      "approved": "Aprobado",
+      "rejected": "Rechazado",
+      "rolledBack": "Revertido",
+      "kept": "Conservado — comprobaciones superadas"
+    },
+    "issues": {
+      "subtitle": "Incidentes agrupados e investigados por el agente SRE. Una notificación por problema; la causa se adjunta, o llega a continuación en el mismo hilo si el triaje agota el tiempo o falla.",
+      "open": "Abiertos",
+      "recent": "Resueltos",
+      "all": "Todos",
+      "heldForDigest": "Retenido para el resumen del viernes",
+      "colId": "Incidente",
+      "colTitle": "Problema",
+      "colSeverity": "Severidad",
+      "colServices": "Servicios afectados",
+      "colStarted": "Inicio",
+      "colStatus": "Estado",
+      "colCause": "Causa",
+      "emptyTitle": "No hay nada aquí",
+      "emptyDescription": "Ningún problema coincide con este filtro.",
+      "subsetNote": "{shown} mostrados. Esta demo muestra una selección de los {total} incidentes de esta semana.",
+      "searchLabel": "Buscar incidencias",
+      "searchPlaceholder": "Buscar incidencias, servicios, causas o INC-…",
+      "noMatch": "Ninguna incidencia coincide con “{query}”",
+      "clearSearch": "Borrar búsqueda",
+      "matchCount": "Ninguna incidencia coincide | 1 incidencia coincide | {count} incidencias coinciden",
+      "colSignal": "Señal",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → ahora",
+      "minutes": "{count} min",
+      "grouped": "{count} alerta → 1 incidente | {count} alertas → 1 incidente",
+      "confidence": "Confianza {level}",
+      "proposed": "Propuesto",
+      "reversible": "reversible",
+      "proposalFor": "Corrección propuesta para {title}"
+    },
+    "drawer": {
+      "rca": "Causa raíz",
+      "rcaSummary": "Resumen",
+      "likelyCause": "Causa probable",
+      "confidence": "Confianza",
+      "confidenceValue": "Confianza: {value} (aún no hay puntuación calibrada)",
+      "nextStep": "Siguiente paso sugerido",
+      "evidence": "Evidencia",
+      "blastRadius": "Radio de impacto",
+      "upstream": "Llamadores ascendentes",
+      "affected": "Afectados",
+      "downstream": "Dependencias descendentes",
+      "none": "Ninguno",
+      "timeline": "Cronología",
+      "notification": "Notificación enviada",
+      "notSent": "Sin aviso: este problema de baja severidad se reservó para el resumen del viernes. Registrado en la bandeja de entrada del producto.",
+      "sender": "AutoObserve",
+      "threadReply": "respondió en el hilo",
+      "p1Note": "Los P1 avisan de inmediato, antes de que llegue la investigación. La causa llega en el mismo hilo.",
+      "gateNote": "Las notificaciones de P2 y P3 esperan hasta 2 minutos a la investigación, por lo que el primer mensaje suele incluir la causa. Si la clasificación se agota o falla, el mensaje indica que la investigación sigue en curso o ha fallado, y la causa llega en el mismo hilo. Los problemas P4 no notifican a nadie; se incluyen en el resumen del viernes.",
+      "caughtEarlier": "Qué lo habría detectado antes",
+      "analyzedAt": "La investigación finalizó a las {time}.",
+      "triggersSample": "Mostrando {shown} de {total} activaciones",
+      "waitingForOk": "Esperando tu confirmación",
+      "proposedFix": "Corrección propuesta",
+      "unfoldTab": "Cómo se desarrolló",
+      "seeEvidence": "Ver la evidencia ({count}) →"
+    },
+    "unfold": {
+      "hint": "Lee de izquierda a derecha: qué cambió, las señales que desencadenó y, después, lo que llegó a tu equipo. Selecciona una tarjeta para ver sus activaciones.",
+      "legend": "Tipos de tarjeta",
+      "team": "Tu equipo",
+      "kind": {
+        "metric": "Métrica",
+        "log": "Log",
+        "trace": "Traza",
+        "change": "Cambio"
+      },
+      "likelyCause": "Causa probable",
+      "linesUpWith": "Coincide con",
+      "times": "×{count}",
+      "sameMinute": "mismo minuto",
+      "plusMinutes": "+{count} min",
+      "plusHours": "+{hours} h {minutes} min",
+      "firstFired": "Primera activación",
+      "lastFired": "Última activación",
+      "firings": "Activaciones",
+      "peak": "Pico",
+      "normal": "Comparado con",
+      "detector": "Detector",
+      "firedAt": "Activado a las",
+      "when": "Cuándo",
+      "chartNote": "El gráfico principal del problema, como en Evidence",
+      "outcome": {
+        "paged": "Se avisó a la guardia",
+        "asked": "Se pidió un OK",
+        "notified": "Mensaje enviado, sin aviso",
+        "held": "Retenido para el resumen del viernes",
+        "fixFailed": "La corrección no ayudó",
+        "fixed": "Corregido",
+        "resolved": "Resuelto",
+        "open": "Sigue abierto"
+      }
+    },
+    "coverage": {
+      "showing": "Mostrando {shown} de {total} servicios",
+      "watched": "Vigilado",
+      "learning": "Aprendiendo",
+      "gap": "Brecha",
+      "na": "No aplicable",
+      "anomaly": "Anomalía",
+      "threshold": "Umbral",
+      "service": "Servicio",
+      "lastScanned": "Último escaneo",
+      "detector": "Detector",
+      "methodAnomaly": "Detector de anomalías, línea base aprendida",
+      "methodThreshold": "Umbral estático de la biblioteca",
+      "libraryEntry": "Entrada de la biblioteca",
+      "predicate": "Aplicabilidad",
+      "predicateMatched": "{predicate} — coincidencia en el stream {stream}",
+      "predicateUnmatched": "{predicate} — sin coincidencia",
+      "reason": "Por qué",
+      "history": "{days} de {total} días de historial",
+      "notScanned": "Primer escaneo en curso — desconocido, sin cobertura hasta que finalice",
+      "guardrails": "Salvaguardas activas durante el aprendizaje: límite de tasa de errores · verificación de frescura (se activa si el stream se detiene)",
+      "alsoWatchedBy": "También vigilado por",
+      "searchLabel": "Buscar servicios",
+      "searchPlaceholder": "Buscar servicio o stream",
+      "matchCount": "Ningún servicio coincide | 1 servicio coincide | {count} servicios coinciden",
+      "noMatch": "Ningún servicio o stream coincide con “{query}”",
+      "clearSearch": "Borrar búsqueda",
+      "filterLabel": "Filtrar servicios por cobertura",
+      "all": "Todos",
+      "gaps": "Brechas",
+      "cantWatch": "No se puede vigilar",
+      "detectorCount": "1 detector | {count} detectores",
+      "stream": "Stream",
+      "coverage": "Cobertura",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "{watched} de {total} señales aplicables vigiladas",
+      "legendLabel": "Leyenda",
+      "gapChip": "BRECHA",
+      "daysShort": "{days}/{total}d",
+      "tipAnomaly": "{signal}: detector de anomalías, línea base aprendida",
+      "tipThreshold": "{signal}: umbral estático de la biblioteca",
+      "tipLearning": "{signal}: aprendiendo, {days} de {total} días de historial",
+      "tipGap": "{signal}: brecha, aún no se puede monitorizar",
+      "tipNa": "{signal}: no aplicable",
+      "config": "Configuración del detector",
+      "lastFired": "Última activación",
+      "never": "Nunca",
+      "hoursAgo": "hace 1 hora | hace {count} horas",
+      "daysAgo": "hace 1 día | hace {count} días",
+      "fixNoLink": "Añadir la etiqueta service.name",
+      "fixStopped": "Revisar el colector",
+      "fixQueued": "Solo simulación: “{action}” para {service} no se envió a ningún sitio",
+      "viewLabel": "Vista de cobertura",
+      "viewMap": "Mapa",
+      "viewTable": "Tabla",
+      "fillBy": "Rellenar por",
+      "fillState": "Estado de cobertura",
+      "fillLearning": "Progreso de aprendizaje",
+      "fillDetectors": "Número de detectores",
+      "fillScanned": "Antigüedad del último escaneo",
+      "summaryWatched": "{watched} de {total} totalmente monitorizados · {pct}%",
+      "addedThisWeek": "1 servicio nuevo esta semana | {count} servicios nuevos esta semana",
+      "splitLabel": "{watched} totalmente monitorizados, {learning} en aprendizaje, {gaps} aún sin poder monitorizar",
+      "stateWatched": "Totalmente monitorizado",
+      "stateLearning": "Aprendizaje · {days} de {total} días",
+      "stateGap": "Aún no se puede monitorizar",
+      "hexName": "{service}, {state}, {stream}, {detectors}",
+      "legendOf": "Leyenda de {fill}, selecciona para resaltar",
+      "mapLabel": "Mapa de cobertura, 1 servicio rellenado por {fill} | Mapa de cobertura, {count} servicios rellenados por {fill}",
+      "bucketLearned": "Aprendido",
+      "bucketDays67": "6–7 días",
+      "bucketDays35": "3–5 días",
+      "bucketDays02": "0–2 días",
+      "bucketNoData": "Sin datos",
+      "bucketSix": "6 detectores",
+      "bucketFive": "5 detectores",
+      "bucketFewer": "1–4 detectores",
+      "bucketNone": "Ninguno",
+      "bucketFresh": "Menos de 5 min",
+      "bucketRecent": "5–15 min",
+      "bucketHour": "15–60 min",
+      "bucketStale": "Más de 1 hora",
+      "bucketNotScanned": "Sin escanear",
+      "signals": "Señales",
+      "details": "Detalles",
+      "detailsFor": "Mostrar detalles de {metric}",
+      "readyCaption": "Rango normal listo {day} · {days} de {total} días",
+      "chartLearning": "{metric}, {value} ahora, en aprendizaje, aún sin rango normal",
+      "chartOverThreshold": "{metric}, {value} ahora, por encima de su umbral {threshold}",
+      "chartUnderThreshold": "{metric}, {value} ahora, por debajo de su umbral {threshold}",
+      "chartAbove": "{metric}, {value} ahora, por encima del rango normal",
+      "chartBelow": "{metric}, {value} ahora, por debajo del rango normal",
+      "chartWithin": "{metric}, {value} ahora, dentro del rango normal",
+      "tipNormal": "Normal {low} – {high}",
+      "openTraces": "Trazas",
+      "openCatalog": "Catálogo de servicios",
+      "rangeLabel": "Rango temporal",
+      "logPatternsValue": "{known} conocidos · {fresh} nuevos hoy",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "Sin monitorizar",
+      "signalsWatched": "Señales monitorizadas",
+      "chipAria": "{signal}: {state}",
+      "deltaUp": "Aumento de {change} desde el inicio del rango",
+      "deltaDown": "Descenso de {change} desde el inicio del rango",
+      "deltaFlat": "Sin cambios desde el inicio del rango",
+      "badgeLearning": "Aprendiendo {days}/{total}d",
+      "badgeAnomaly": "Anomalía · aprendida",
+      "badgeThreshold": "Umbral > {threshold}",
+      "now": "Ahora",
+      "bandLearning": "Aprendiendo la línea base · {days} de {total} días · rango normal listo {day}",
+      "metric": {
+        "requests": "Solicitudes",
+        "errors": "Errores",
+        "latencyP95": "Latencia p95",
+        "cpu": "CPU",
+        "pool": "Pool en uso",
+        "memory": "Memoria",
+        "queries": "Consultas",
+        "queryLatency": "Latencia de consultas p95",
+        "connections": "Conexiones en uso",
+        "ops": "Operaciones",
+        "rejections": "Conexiones rechazadas",
+        "latency": "Latencia",
+        "messages": "Mensajes",
+        "failed": "Fallidos (mensajes muertos)",
+        "lag": "Retraso del consumidor",
+        "depth": "Profundidad de la cola"
+      }
+    },
+    "activity": {
+      "allLoops": "Todos los bucles",
+      "allStatuses": "Todos los estados",
+      "ledgerHint": "Cada cambio que AutoObserve propone o realiza queda registrado aquí.",
+      "userBuilt": "Alerta creada por el usuario",
+      "confidence": "Confianza: {value}",
+      "evidence": "Evidencia:",
+      "before": "Antes",
+      "after": "Después",
+      "neverAutoRetire": "Retirar una alerta nunca es automático.",
+      "neverSilent": "Las alertas creadas por el usuario nunca se modifican de forma silenciosa.",
+      "undo": "Deshacer",
+      "approve": "Aprobar",
+      "edit": "Editar",
+      "reject": "Rechazar",
+      "saveApprove": "Guardar y aprobar",
+      "undoneNote": "Deshecho por ti — estado anterior restaurado desde la instantánea",
+      "undoneToast": "Deshecho. Marcado como revertido en el registro de esta demostración.",
+      "approvedToast": "Aprobado. Marcado como aprobado en el registro de esta demostración.",
+      "rejectedNote": "Rechazado por ti",
+      "rejectedToast": "Rechazado. Registrado contra esta clase de acción.",
+      "emptyTitle": "Sin entradas",
+      "emptyDescription": "Nada en el registro coincide con estos filtros.",
+      "reviewWindow": "En revisión durante {window} — se conserva automáticamente si sus comprobaciones pasan y se revierte si fallan. La configuración anterior sigue evaluándose en silencio, así que todo lo que este cambio habría ocultado sigue apareciendo. Deshacer restaura el estado anterior ahora mismo.",
+      "approvedNote": "Aprobado por ti el {time}.",
+      "applyingNote": "Aprobado por ti el {time}; aplicándolo ahora.",
+      "appliedNote": "Aprobado por ti el {time} y aplicado.",
+      "declinedNote": "Rechazado por ti.",
+      "needsApproval": "Necesita tu aprobación",
+      "awaiting": "En espera",
+      "auto": "Auto",
+      "outcomeFilter": "Filtrar por resultado",
+      "loopFilter": "Filtrar por bucle",
+      "columns": {
+        "time": "Cuándo",
+        "loop": "Bucle",
+        "action": "Acción",
+        "target": "Objetivo",
+        "change": "Cambio",
+        "confidence": "Confianza",
+        "decision": "Decisión",
+        "outcome": "Resultado",
+        "actions": "Acciones"
+      },
+      "showDetails": "Mostrar detalles de {action} en {target}",
+      "hideDetails": "Ocultar detalles de {action} en {target}",
+      "approveFor": "Aprobar {action} en {target}",
+      "rejectFor": "Rechazar {action} en {target}",
+      "editFor": "Editar {action} en {target}",
+      "undoFor": "Deshacer {action} en {target}",
+      "openIncident": "Abrir incidente {id}",
+      "confidenceHint": "{value} — aún sin puntuación calibrada",
+      "diff": "Cambio propuesto, líneas eliminadas y añadidas",
+      "daysLeft": "{count} día restante | {count} días restantes",
+      "reviewProgress": "Ventana de revisión transcurrida",
+      "entryId": "Entrada",
+      "logged": "Registrado"
+    },
+    "policy": {
+      "gateHint": "Entre los cambios a alertas existentes, solo la deduplicación se aplica por sí sola, con una instantánea del estado anterior y una ventana de revisión: se conserva si sus comprobaciones pasan y se revierte si fallan. Todo lo demás espera una aprobación con un solo clic.",
+      "off": "Desactivado",
+      "suggest": "Sugerir",
+      "auto": "Auto",
+      "phase2Title": "Acción — remediación",
+      "phase2Hint": "Correcciones en producción. Cada clase se gana su nivel según su historial medido y nunca actúa por encima de él.",
+      "investigation": "Investigación",
+      "outcomesTitle": "Resultados",
+      "outcomesBody": "AutoObserve mide lo que hizo cada acción: si la tasa de errores se recuperó, si cesaron los avisos de guardia, si se deshizo. Una clase que sigue funcionando bien gana más autonomía, de a una clase por vez; un fallo cuenta en su contra, y una corrección que se sigue necesitando se reporta como un bug en lugar de automatizarse.",
+      "outcomesExample": "ScaleQueueWorkers pasó a Auto tras 7 escalados aprobados que funcionaron. Su único fallo, el 2 de octubre, añadió una comprobación previa, y un segundo fallo lo devuelve a Sugerir. AbortRollout espera tu OK; RollbackDeploy permanece Desactivado hasta tener un historial.",
+      "triage": {
+        "parallel": "Paralelo",
+        "gate": "Puerta",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "Avisa al guardia de inmediato e investiga en paralelo; la causa llega en el mismo hilo. Gate no está permitido para P1.",
+        "gateDesc": "Retiene el aviso hasta que llegue la investigación, durante un máximo de 2 minutos. Falla de forma abierta: si el triaje agota el tiempo o falla, avisa igualmente al guardia, indica que la investigación sigue en curso o ha fallado, y la causa llega en el mismo hilo."
+      },
+      "classes": {
+        "EnableDeduplication": "Activa la deduplicación para una alerta que se repite en cuestión de minutos.",
+        "CreateDetector": "Crea un detector de anomalías sobre las solicitudes, los errores o la latencia de un servicio.",
+        "RaiseThreshold": "Eleva un umbral que se dispara en días sin problemas.",
+        "LengthenEvaluationWindow": "Alarga la ventana de una alerta que fluctúa.",
+        "FixAlertQuery": "Corrige una consulta de alerta que mide lo que no debe o que nunca puede coincidir.",
+        "AttachDestination": "Adjunta un destino a un detector que se dispara hacia la nada.",
+        "AddLibraryAlert": "Añade una alerta programada de la biblioteca donde coincida su predicado.",
+        "MoveToIncidentDelivery": "Envía una alerta creada por el usuario a través de su incidente en lugar de su propia ruta.",
+        "ReviewForDeletion": "Propón retirar una alerta que nadie atiende.",
+        "RollbackDeploy": "Revierte el despliegue que causó un problema.",
+        "ScaleService": "Escala horizontalmente un servicio saturado.",
+        "RestartPod": "Reinicia un pod que dejó de servir mientras sus réplicas están sanas; si se repite, se abre un bug en su lugar.",
+        "ToggleFeatureFlag": "Desactiva el flag de funcionalidad que hay detrás de un problema.",
+        "RunRunbookStep": "Ejecuta un paso del runbook del servicio.",
+        "LowerThreshold": "Baja un umbral que se disparó demasiado tarde para avisar antes de un incidente.",
+        "RevertConfigChange": "Revierte un cambio de configuración reciente con el que empezó un problema, cuando las réplicas sin él están sanas.",
+        "EvictLeakedConnections": "Cierra las conexiones que un servicio tomó y nunca devolvió (detectadas por la detección de fugas), sin tocar las consultas en curso. Cada una está vinculada al bug de la fuga.",
+        "AbortRollout": "Devuelve el tráfico a la versión anterior cuando solo fallan los pods de la versión nueva a mitad del despliegue. Se puede reanudar con un clic.",
+        "ScaleQueueWorkers": "Añade workers a una cola atascada, hasta un máximo; se reduce por sí sola si la tasa de drenaje no mejora."
+      },
+      "triageHint": "Triaje L0 por severidad. Fijo en la fase 1.",
+      "channels": "Canales",
+      "channelInbox": "Bandeja de entrada del producto",
+      "channelEmailAdmins": "Correo a los administradores de la organización",
+      "channelDefault": "Predeterminado para todas las organizaciones. Siempre activo.",
+      "alwaysOn": "Siempre activo",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "Conectado. Opcional; la bandeja de entrada y el correo funcionan sin ello.",
+      "connected": "Conectado",
+      "defaultsNote": "La fase 1 incluye valores predeterminados fijos del producto. Las anulaciones por organización llegan más adelante.",
+      "groupCoverage": "Cobertura — crea detectores automáticamente",
+      "groupCoverageHint": "Cada servicio nuevo recibe detectores de anomalías y las alertas coincidentes de la biblioteca en cuanto aparece, con comprobaciones básicas de seguridad mientras aprende. Cada creación queda registrada, se puede deshacer y pasa por una ventana de revisión.",
+      "groupCalibration": "Calibración — cambios en alertas existentes",
+      "channelEmail": "Correo {address}",
+      "paging": "Avisos al guardia",
+      "pagingHint": "La severidad decide cómo llega un problema a las personas.",
+      "routing": {
+        "p1p2": "P1 y P2",
+        "p1p2Desc": "Afecta a los clientes. Avisa al guardia a cualquier hora.",
+        "page": "Aviso al guardia",
+        "p3": "P3",
+        "p3Desc": "Un mensaje de Slack que se envía en cuanto está listo. Nunca avisa al guardia.",
+        "message": "Mensaje",
+        "p4": "P4",
+        "p4Desc": "Se incluye en el resumen del viernes.",
+        "summary": "Resumen del viernes"
+      },
+      "nav": {
+        "coverage": "Cobertura",
+        "alerts": "Cambios de alertas",
+        "fixes": "Correcciones",
+        "investigation": "Investigación y avisos",
+        "channels": "Canales"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} conectados"
+      }
+    },
+    "notInDemo": "No disponible en esta demo",
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "uncalibrated": "aún no hay una puntuación calibrada"
+    },
+    "analysis": {
+      "verdict": "Veredicto",
+      "unconfirmed": "Aún no confirmado",
+      "lasted": "Duró {count} min",
+      "soFar": "{count} min hasta ahora",
+      "checked": "Lo que revisé",
+      "verdicts": {
+        "confirmed": "Confirmado",
+        "ruled_out": "Descartado",
+        "open": "Aún abierto"
+      },
+      "comparison": "Saludable vs afectado",
+      "kinds": {
+        "affected": "Afectado",
+        "healthy": "Saludable",
+        "limit": "Límite"
+      },
+      "trail": "Rastro de evidencia",
+      "seeInUnfold": "Ver en Cómo se desarrolló",
+      "nextStep": "Siguiente paso",
+      "fullReport": "Informe completo",
+      "fullReportHint": "Todo lo anterior en un solo documento, listo para copiar o descargar"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "Demo",
+    "scenarioLabel": "Escenario de demo",
+    "scenarios": {
+      "demo": "Semana de demo",
+      "allClear": "Todo en orden",
+      "incident": "Incidente activo",
+      "cantSee": "Sin visibilidad",
+      "noBaseline": "Sin línea base"
+    },
+    "nav": {
+      "history": "Historial",
+      "settings": "Ajustes",
+      "howItWorks": "Cómo funciona",
+      "searchLabel": "Buscar incidencias",
+      "searchPlaceholder": "Buscar incidencias"
+    },
+    "recent": {
+      "ranges": {
+        "day": "Últimas 24 horas",
+        "week": "Últimos 7 días",
+        "month": "Últimos 30 días"
+      },
+      "within": {
+        "day": "en las últimas 24 horas",
+        "week": "en los últimos 7 días",
+        "month": "en los últimos 30 días"
+      },
+      "groups": {
+        "thisWeek": "Esta semana",
+        "lastWeek": "La semana pasada",
+        "weeksAgo": "hace {count} semanas"
+      },
+      "all": "Todos",
+      "none": "No hay problemas {priority} {within}.",
+      "allIssues": "Todos los problemas",
+      "priorityLabel": "Prioridad",
+      "showing": "{count} problema mostrado | {count} problemas mostrados"
+    },
+    "noProblems": "No hay problemas {within}. Revisé {count} servicio las 24 horas. | No hay problemas {within}. Revisé {count} servicios las 24 horas.",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "Mostrar {count} más",
+    "showFewer": "Mostrar menos",
+    "days": {
+      "today": "Hoy",
+      "monday": "Lunes",
+      "tuesday": "Martes",
+      "wednesday": "Miércoles",
+      "thursday": "Jueves",
+      "friday": "Viernes",
+      "jul18": "18 de julio",
+      "jul30": "30 de julio",
+      "aug13": "13 de agosto",
+      "aug26": "26 de agosto",
+      "sep4": "4 de septiembre",
+      "sep12": "12 de septiembre",
+      "sep24": "24 de septiembre",
+      "sep30": "30 de septiembre",
+      "oct1": "1 de octubre",
+      "oct2": "2 de octubre",
+      "sep23": "23 de septiembre"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db se quedará sin disco en unos 3 días",
+        "summary": "Su disco se llena unos 18 GB al día desde que la versión de orders del jueves activó el registro de auditoría, así que se llenará el miércoles por la mañana. Cuando lo haga, el pago, los pedidos y los reembolsos empezarán a fallar. Nada está roto aún, así que avisé a tu equipo en lugar de enviar una alerta.",
+        "notify1": "orders-db se quedará sin disco en unos 3 días, alrededor del miércoles a las 11:00.",
+        "notify2": "Causa: desde que se publicó orders 3.8.0 el jueves, el registro de auditoría escribe unos 18 GB al día. Antes de eso, el disco crecía unos 6 GB al día.",
+        "notify3": "Reduce el registro de auditoría o añade espacio en disco antes del miércoles. Cuando se llene, el pago, los pedidos y los reembolsos fallarán. Nada está roto aún, así que esto es un aviso, no una alerta.",
+        "chartCaption": "disco · lleno ~mié 11:00",
+        "chartLabel": "El uso de disco creció de 334 a 445 GB de 500 en 14 días, más rápido desde el jueves, y se prevé que esté lleno alrededor del miércoles a las 11:00"
+      },
+      "search": {
+        "title": "La búsqueda es lenta y search-2 no deja de caerse",
+        "titleFixed": "La búsqueda era lenta mientras search-2 no dejaba de caerse",
+        "summary": "Aproximadamente 1 de cada 5 búsquedas tarda más de 3 segundos, desde las 10:27. Un ajuste cambiado en search-2 a las 10:16 hace que se quede sin memoria. He avisado al guardia, y sigue ocurriendo.",
+        "notify1": "La búsqueda es lenta: aproximadamente 1 de cada 5 búsquedas tarda más de 3 segundos, desde las 10:27.",
+        "notify2": "Causa: un ajuste cambiado en search-2 a las 10:16 le llena la memoria. Se ha caído unas 10 veces desde las 10:20. Los otros 4 nodos no tienen el cambio y están bien.",
+        "notify3": "Restaurar el ajuste anterior debería solucionarlo, y puedo deshacerlo. Responde \"revert\" y lo haré. Quien haya hecho el cambio debería comprobar por qué.",
+        "summaryFixed": "Empezó a las 10:27, porque un ajuste cambiado en search-2 llenó su memoria. Aprobaste restaurar el ajuste anterior, así que lo hice, y las búsquedas han vuelto a la normalidad.",
+        "summaryFixing": "Empezó a las 10:27, porque un ajuste cambiado en search-2 llena su memoria. Aprobaste restaurar el ajuste anterior, así que lo estoy haciendo ahora.",
+        "chartCaption": "latencia p95 · pico de 3,4 s",
+        "chartLabel": "La latencia p95 subió de 0,38 s a 3,4 s a las 10:27 y sigue alta",
+        "chartLabelFixed": "La latencia p95 subió de 0,38 s a 3,4 s a las 10:27 y volvió a la normalidad una vez restaurado el ajuste"
+      },
+      "checkout": {
+        "title": "1 de cada 12 pagos falló tras un despliegue",
+        "summary": "payments-api 2.3.1 pidió a la base de datos de pagos más conexiones de las que permite. La reversión lo solucionó 18 minutos después de que empezaran los fallos.",
+        "notify1": "El pago falla en aproximadamente 1 de cada 12 pagos, desde las 14:02.",
+        "notify2": "Causa probable: payments-api 2.3.1 se publicó a las 14:01 y elevó su grupo de conexiones de 20 a 50 por servidor. 6 servidores × 50 es más de las 200 que permite la base de datos de pagos.",
+        "notify3": "Revertir a 2.3.0 es la solución más rápida.",
+        "chartCaption": "pagos fallidos · pico de 1 de cada 12",
+        "chartLabel": "Los pagos fallidos pasaron de 0,1 % a 1 de cada 12 a las 14:02 y volvieron a la normalidad 18 minutos después, tras la reversión"
+      },
+      "pool": {
+        "title": "Checkout se quedó sin conexiones a la base de datos",
+        "summary": "Las conexiones filtradas agotaron todas las libres y los pagos empezaron a agotar el tiempo de espera. Aprobaste liberarlas, así que lo hice. Los pagos se recuperaron 2 minutos después.",
+        "notify1": "Checkout se ha quedado sin conexiones a la base de datos y aproximadamente 1 de cada 9 pagos están agotando el tiempo de espera desde las 11:18.",
+        "notify2": "Causa: las exportaciones de reembolsos que nunca las devolvieron retienen 48 de las 50 conexiones. Es la fuga CHK-482, la tercera vez en dos semanas.",
+        "notify3": "Cerrar solo las conexiones filtradas debería resolverlo; los pagos en curso no se ven afectados. Responde \"yes\" y lo haré.",
+        "chartCaption": "tiempos de espera · máximo de 1 de cada 9",
+        "chartLabel": "Los tiempos de espera de pagos subieron a aproximadamente 1 de cada 9 a las 11:18 y se recuperaron 2 minutos después de la corrección a las 11:21"
+      },
+      "email": {
+        "title": "Los correos de pedidos llegaron con hasta 9 minutos de retraso",
+        "summary": "Todos los workers de correo se reemplazaron a la vez durante la noche y la cola se puso al día por sí sola en unos 20 minutos. Fue menor, así que entró en el resumen del viernes.",
+        "chartCaption": "retraso de correo · máximo de 9 min",
+        "chartLabel": "El retraso de correo subió a 9 minutos a partir de las 03:15 y se recuperó por sí solo a las 03:36"
+      },
+      "recs": {
+        "title": "Las recomendaciones se ralentizaron durante 15 minutos",
+        "summary": "Pasaron de un cuarto de segundo a casi un segundo. La reconstrucción nocturna de la caché se había iniciado a mano durante la tarde y terminó por sí sola. Lo reservé para el resumen del viernes.",
+        "chartCaption": "latencia p95 · máximo de 0,94 s",
+        "chartLabel": "La latencia p95 subió de 0,26 s a 0,94 s a las 16:40 y se recuperó por sí sola 15 minutos después"
+      },
+      "login": {
+        "title": "El inicio de sesión fue lento durante unos 25 minutos",
+        "summary": "1 de cada 8 personas esperó más de 5 segundos. La caché de sesiones se quedó sin espacio tras un pico de tráfico y cerró la sesión a algunas personas. Tu equipo añadió espacio y se recuperó.",
+        "notify1": "El inicio de sesión es lento: aproximadamente 1 de cada 8 personas espera más de 5 segundos desde las 10:12.",
+        "notify2": "Causa: la caché de sesiones está llena tras duplicarse el tráfico a las 10:05.",
+        "notify3": "Añadir espacio a la caché debería solucionarlo.",
+        "chartCaption": "inicio de sesión p95 · máximo de 5,8 s",
+        "chartLabel": "El tiempo de inicio de sesión p95 subió de 0,6 s a 5,8 s a las 10:12 y se recuperó tras añadirse espacio a la caché a las 10:31"
+      },
+      "queue": {
+        "title": "Los pedidos se acumularon en la cola",
+        "summary": "Unos 4.000 esperaban en el peor momento. Añadí workers como has permitido, pero no ayudó, así que los devolví y avisé a guardia. La causa real era un índice de base de datos que una migración dejó roto; tu equipo lo arregló 40 minutos después de que empezara.",
+        "notify1": "Los pedidos se están acumulando: unos 4.000 en espera desde las 21:30.",
+        "notify2": "Añadí workers a las 21:33, como has permitido, pero no ayudó, así que los he devuelto.",
+        "notify3": "Las consultas de pedidos son unas 40 veces más lentas desde la migración de base de datos de las 21:20. Revisa primero el índice orders_by_status.",
+        "chartCaption": "acumulación · máximo de 4.120",
+        "chartLabel": "Los pedidos en espera subieron a 4.120 a partir de las 21:30, siguieron subiendo tras añadir workers y se vaciaron cuando el índice se reconstruyó a las 21:52"
+      },
+      "uploads": {
+        "title": "Las subidas de imágenes fallaron para 1 de cada 40 personas",
+        "summary": "Duró 10 minutos, porque un certificado expiró antes de que un servidor hubiera cargado su reemplazo. Se resolvió solo, así que lo reservé para el resumen del viernes.",
+        "chartCaption": "subidas fallidas · máximo de 1 de cada 40",
+        "chartLabel": "Las subidas fallidas subieron a aproximadamente 1 de cada 40 a las 07:05 y se recuperaron por sí solas 10 minutos después"
+      },
+      "push": {
+        "title": "Las notificaciones push llegaron con 2 minutos de retraso",
+        "summary": "Duró media hora, mientras el proveedor que las entrega iba lento. Menor, así que esperó al resumen del viernes.",
+        "chartCaption": "retraso de entrega · máximo de 2 min",
+        "chartLabel": "El retraso de entrega subió de 4 s a aproximadamente 2 minutos a las 13:50 y se recuperó por sí solo 30 minutos después"
+      },
+      "checkoutNow": {
+        "title": "Checkout está fallando en 1 de cada 6 pagos",
+        "titleFixed": "Checkout falló en 1 de cada 6 pagos",
+        "summary": "Empezó a las 10:43 y todavía estoy investigando por qué. Hasta ahora coincide con el despliegue de la versión 2.4.0 a las 10:41, y he avisado a guardia.",
+        "notify1": "Checkout está fallando en aproximadamente 1 de cada 6 pagos desde las 10:43.",
+        "notify2": "Todavía estoy investigando por qué. Hasta ahora coincide con el despliegue de checkout 2.4.0 a las 10:41.",
+        "notify3": "Solo están fallando los servidores con la 2.4.0. Responde \"stop\" y devolveré el tráfico a la versión anterior; los servidores antiguos tienen capacidad para ello. No puedo ver payments-db directamente, así que no lo he descartado.",
+        "summaryFixing": "Empezó a las 10:43, justo después del despliegue de la versión 2.4.0. Aprobaste detener el despliegue, así que ahora estoy devolviendo el tráfico a la versión anterior.",
+        "summaryFixed": "Empezó a las 10:43, después del despliegue de la versión 2.4.0. Aprobaste detener el despliegue y los fallos cesaron cuando el tráfico volvió a la versión anterior. Por qué falla la 2.4.0 sigue siendo algo que tu equipo debe averiguar.",
+        "chartCaption": "pagos fallidos · máximo de 1 de cada 6",
+        "chartLabel": "Los pagos fallidos pasaron de 0,1 % a aproximadamente 1 de cada 6 a las 10:43 y siguen fallando",
+        "chartLabelFixed": "Los pagos fallidos pasaron de 0,1 % a aproximadamente 1 de cada 6 a las 10:43 y volvieron a la normalidad cuando se detuvo el despliegue"
+      },
+      "gateway": {
+        "title": "La API rechazó 1 de cada 30 solicitudes",
+        "summary": "Comenzó tras un cambio de configuración. Tu equipo lo revirtió y todo volvió a la normalidad 13 minutos después de empezar.",
+        "notify1": "La API está rechazando aproximadamente 1 de cada 30 solicitudes, desde las 15:22.",
+        "notify2": "Causa probable: un cambio de configuración a las 15:20 acortó la duración de los tokens de inicio de sesión.",
+        "notify3": "Revertir ese cambio debería solucionarlo.",
+        "chartCaption": "rechazadas · 1 de cada 30 en el pico",
+        "chartLabel": "Las solicitudes rechazadas subieron a 1 de cada 30 a las 15:22 y volvieron a la normalidad cuando se revirtió el cambio de configuración a las 15:34"
+      },
+      "poolSep": {
+        "title": "Checkout se quedó sin conexiones a la base de datos",
+        "summary": "Las conexiones filtradas agotaron todas las libres y los pagos empezaron a fallar por tiempo de espera. Rastreé la fuga hasta las exportaciones de reembolsos y aprobaste liberar las conexiones filtradas. Los pagos se recuperaron 2 minutos después.",
+        "notify1": "Checkout se ha quedado sin conexiones a la base de datos y aproximadamente 1 de cada 9 pagos están fallando por tiempo de espera, desde las 15:42.",
+        "notify2": "Causa: 47 de 50 conexiones están retenidas por exportaciones de reembolsos que nunca las devolvieron. Parece una fuga en el código de exportación de reembolsos.",
+        "notify3": "Cerrar solo las conexiones filtradas debería resolverlo; los pagos en curso no se ven afectados. Responde \"sí\" y lo haré.",
+        "chartCaption": "tiempos de espera · 1 de cada 9 en el pico",
+        "chartLabel": "Los tiempos de espera de los pagos subieron a aproximadamente 1 de cada 9 a las 15:42 y se recuperaron 2 minutos después de la corrección a las 15:45"
+      },
+      "poolOct": {
+        "title": "Checkout se quedó sin conexiones a la base de datos de nuevo",
+        "summary": "Fue la misma fuga de exportación de reembolsos (CHK-482). Aprobaste liberar las conexiones filtradas y los pagos se recuperaron 2 minutos después.",
+        "notify1": "Checkout se ha quedado sin conexiones a la base de datos y aproximadamente 1 de cada 9 pagos están fallando por tiempo de espera, desde las 10:05.",
+        "notify2": "Causa: 46 de 50 conexiones están retenidas por exportaciones de reembolsos. Es la fuga CHK-482 otra vez, la segunda vez en 8 días.",
+        "notify3": "Cerrar solo las conexiones filtradas debería resolverlo; los pagos en curso no se ven afectados. Responde \"sí\" y lo haré.",
+        "chartCaption": "tiempos de espera · 1 de cada 9 en el pico",
+        "chartLabel": "Los tiempos de espera de los pagos subieron a aproximadamente 1 de cada 9 a las 10:05 y se recuperaron 2 minutos después de la corrección a las 10:08"
+      },
+      "lagSep": {
+        "title": "Los productos nuevos tardaron hasta 40 minutos en aparecer en la búsqueda",
+        "summary": "search-indexer se quedó atrás en las actualizaciones del catálogo después de que la versión 1.12.0 acortara el tiempo permitido por lote. Tu equipo lo revirtió y se puso al día 40 minutos después de empezar.",
+        "notify1": "Los productos nuevos y modificados faltan en la búsqueda: search-indexer está unas 48.000 actualizaciones del catálogo por detrás, desde las 14:06.",
+        "notify2": "Causa: search-indexer 1.12.0 se desplegó a las 13:58 y redujo el intervalo de sondeo de Kafka a 30 s. Los lotes grandes tardan unos 45 s, por lo que el consumidor sigue siendo expulsado de su grupo.",
+        "notify3": "Revertir a 1.11.4 debería permitirle ponerse al día. La búsqueda en sí sigue funcionando; solo muestra productos más antiguos.",
+        "chartCaption": "retraso del consumidor · 48.000 en el pico",
+        "chartLabel": "El retraso del consumidor subió de unos 200 a 48.000 mensajes desde las 14:06 y se drenó tras la reversión a las 14:39"
+      },
+      "poolAug": {
+        "title": "Checkout se quedó sin conexiones a la base de datos durante la exportación de reembolsos",
+        "summary": "La exportación nocturna de reembolsos retuvo casi todas las conexiones a la base de datos de checkout, y aproximadamente 1 de cada 12 pagos fallaron por tiempo de espera. Se resolvió cuando terminó la exportación, 13 minutos después de empezar.",
+        "notify1": "Checkout se ha quedado sin conexiones a la base de datos y aproximadamente 1 de cada 12 pagos están fallando por tiempo de espera, desde las 02:04.",
+        "notify2": "Causa: 44 de 50 conexiones están retenidas por la exportación nocturna de reembolsos, que es unas 3 veces su tamaño habitual tras la venta de fin de mes.",
+        "notify3": "Debería resolverse cuando termine la exportación. Si no, detener la exportación liberará las conexiones.",
+        "chartCaption": "tiempos de espera · 1 de cada 12 en el pico",
+        "chartLabel": "Los tiempos de espera de los pagos subieron a aproximadamente 1 de cada 12 a las 02:04 y se recuperaron solos cuando terminó la exportación a las 02:17"
+      },
+      "throttleAug": {
+        "title": "Las verificaciones de fraude fueron lentas durante 35 minutos",
+        "summary": "Un trabajo por lotes llegó a los mismos servidores y consumió su CPU libre, así que las verificaciones de fraude tardaron hasta 1,4 segundos. Checkout siguió funcionando, solo más lento, y se recuperó cuando terminó el trabajo, así que lo reservé para el resumen del viernes.",
+        "chartCaption": "p95 de verificación de fraude · 1,4 s en el pico",
+        "chartLabel": "El tiempo p95 de verificación de fraude subió de 0,18 s a 1,4 s a las 11:20 y se recuperó solo cuando terminó el trabajo por lotes a las 11:55"
+      },
+      "tlsJul": {
+        "title": "Las facturas dejaron de enviarse durante 43 minutos",
+        "summary": "El certificado de invoice-service para billing-api expiró, así que todas las facturas fallaron al enviarse. Tu equipo lo renovó y todas las facturas en cola se enviaron.",
+        "notify1": "No se están enviando facturas: todos los envíos desde invoice-service están fallando, desde las 09:01.",
+        "notify2": "Causa: el certificado de cliente de invoice-service para billing-api expiró a las 09:00 y billing-api rechaza todas las conexiones desde él.",
+        "notify3": "Renovar el certificado debería solucionarlo. Las facturas se están encolando, no se pierden.",
+        "chartCaption": "envíos fallidos · todos",
+        "chartLabel": "Los envíos fallidos de facturas saltaron del 0,2 % al 100 % a las 09:01 y volvieron a la normalidad tras renovarse el certificado a las 09:41"
+      },
+      "dnsJul": {
+        "title": "Los precios del carrito desaparecieron para 1 de cada 4 personas",
+        "summary": "Un cambio de DNS hizo que la mitad de los servidores DNS del clúster dejaran de responder a los nombres internos, así que el carrito no podía alcanzar currency. Tu equipo lo revirtió 31 minutos después de empezar.",
+        "notify1": "Alrededor de 1 de cada 4 cargas del carrito no muestran precios, desde las 16:22.",
+        "notify2": "Causa: un cambio de configuración de DNS a las 16:20 eliminó la zona interna de 2 de los 4 servidores DNS del clúster, así que el carrito no puede encontrar currency.internal en esas consultas.",
+        "notify3": "Revertir el cambio de DNS debería solucionarlo. Los pedidos todavía se completan en checkout.",
+        "chartCaption": "precios faltantes · 1 de cada 4 en el pico",
+        "chartLabel": "Las cargas del carrito sin precios subieron del 0,1% a aproximadamente 1 de cada 4 a las 16:22 y volvieron a la normalidad cuando se revirtió el cambio de DNS a las 16:51"
+      }
+    },
+    "drawer": {
+      "worked": "Funcionó",
+      "didntHelp": "No ayudó",
+      "now": "Ahora"
+    },
+    "needs": {
+      "more": "Más",
+      "less": "Menos",
+      "canUndo": "Puedes deshacerlo",
+      "undo": "Deshacer",
+      "undone": "Deshecho. Esto vuelve a esperar tu respuesta.",
+      "shiftTo": "a",
+      "retune": {
+        "body": "La alerta \"{alert}\" en {host} se activó {fired} veces este mes y nadie tuvo que actuar. El disco sube hasta cerca del 85% durante la limpieza nocturna y vuelve a estar cerca del 70% por la mañana. Incluso en su día más ajetreado, tardaría más de 3 días en llenarse desde el 90%. Me gustaría subirla a {to}%. Seguiré avisándote si el disco va camino de llenarse en menos de un día.",
+        "yes": "Sí, cámbiala",
+        "no": "Déjala",
+        "doneYes": "Hecho. La subí a {to}%. El aviso de llenado sigue activo.",
+        "doneNo": "Vale, la dejo en {from}%.",
+        "headline": "¿Subir la alerta 'disco 80%' de ingest-3 al 90%?",
+        "why": "Se activó 41 veces este mes y nadie tuvo que actuar.",
+        "cost": "El aviso de llenado sigue activo"
+      },
+      "fixNow": {
+        "search": {
+          "body": "La búsqueda va lenta porque un ajuste modificado en el nodo search-2 a las 10:16 le llena la memoria, así que no deja de caerse. Los otros 4 nodos aún tienen el ajuste antiguo y funcionan bien. ¿Puedo revertirlo? Puedo deshacerlo.",
+          "yes": "Vuelve a ponerlo",
+          "no": "Yo me encargo",
+          "doneYes": "Hecho. Revirtiéndolo ahora mismo.",
+          "doneNo": "Vale, es tuyo. Seguiré vigilando.",
+          "doneSettled": "Hecho. search-2 ha vuelto y las búsquedas son normales.",
+          "headline": "¿Devolver el ajuste de caché de search-2 al 10%?",
+          "why": "Un cambio de las 10:16 le llena la memoria, así que no deja de caerse.",
+          "cost": "Un reinicio de search-2"
+        },
+        "checkoutNow": {
+          "body": "Checkout falla en aproximadamente 1 de cada 6 pagos, y solo fallan los servidores con la versión 2.4.0. Los 6 servidores con la versión antigua tienen capacidad para todo el tráfico. ¿Puedo detener el despliegue y devolverles el tráfico? La 2.4.0 permanece desplegada para que tu equipo la revise.",
+          "yes": "Detén el despliegue",
+          "no": "Yo me encargo",
+          "doneYes": "Hecho. Deteniendo el despliegue ahora mismo.",
+          "doneNo": "Vale, es tuyo. Seguiré vigilando.",
+          "doneSettled": "Hecho. Los pagos han vuelto a la normalidad.",
+          "headline": "¿Detener el despliegue de la 2.4.0 de checkout?",
+          "why": "Falla aproximadamente 1 de cada 6 pagos, todos en la 2.4.0. La versión antigua puede con todo el tráfico.",
+          "cost": "La 2.4.0 permanece desplegada"
+        }
+      },
+      "fromNowOn": {
+        "body": "{done} veces ya, una versión nueva hizo que solo fallaran sus propios servidores mientras se desplegaba. Cada vez pedí devolver el tráfico a la versión antigua, y los fallos se detuvieron en menos de 2 minutos. ¿Puedo hacerlo por mi cuenta durante un despliegue a partir de ahora? Dejaré la versión nueva en su sitio para tu equipo y se lo diré de inmediato.",
+        "yes": "Sí, por tu cuenta",
+        "no": "Sigue preguntándome",
+        "doneYes": "Hecho. Detendré los despliegues defectuosos por mi cuenta y te lo diré cada vez.",
+        "doneNo": "Vale, seguiré preguntándote primero.",
+        "headline": "¿Detener los despliegues defectuosos por mi cuenta a partir de ahora?",
+        "why": "Las 6 veces que dijiste que sí, los fallos se detuvieron en menos de 2 minutos.",
+        "cost": "Solo durante un despliegue"
+      },
+      "labels": {
+        "fixNow": "Arreglar ahora",
+        "fromNowOn": "Dejar que me encargue",
+        "retune": "Alerta más silenciosa"
+      },
+      "needsOk": "Necesita tu aprobación"
+    },
+    "footer": {
+      "text": "También me vigilo a mí mismo: si dejo de funcionar, te enterarás.",
+      "seeAll": "Ver todo lo que vigilo",
+      "seeChanges": "Ver todo lo que he cambiado"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "hace 1 minuto | hace {count} minutos",
+        "stale": "Sin datos nuevos durante 1 minuto (desde {since}) | Sin datos nuevos durante {count} minutos (desde {since})"
+      },
+      "summaryWatching": "Estoy vigilando {watched} de tus {total} servicios.",
+      "summaryAll": "Estoy vigilando los {total} servicios.",
+      "summaryWithClauses": "{head} {clauses}.",
+      "clauseLearning": "{count} aún está aprendiendo | {count} aún están aprendiendo",
+      "clauseUnseen": "hay uno que no puedo ver | hay {count} que no puedo ver",
+      "legend": {
+        "watching": "Vigilado por completo",
+        "learning": "Aprendiendo",
+        "unseen": "No puedo ver"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "Estoy vigilando los {total} servicios, y aún estoy aprendiendo cómo es lo normal en cada uno de ellos."
+    },
+    "coveragePage": {
+      "title": "Todo lo que vigilo",
+      "back": "Atrás"
+    },
+    "issuesPage": {
+      "title": "Todos los problemas",
+      "sentence": "Todos los problemas que abrí {within}. Elige uno para ver qué ocurrió y qué hice al respecto.",
+      "back": "Atrás",
+      "ranges": {
+        "week": "Últimos 7 días",
+        "month": "Últimos 30 días",
+        "quarter": "Últimos 90 días"
+      },
+      "within": {
+        "week": "en los últimos 7 días",
+        "month": "en los últimos 30 días",
+        "quarter": "en los últimos 90 días"
+      }
+    },
+    "activityPage": {
+      "title": "Lo que he cambiado",
+      "stats": {
+        "window": "Últimos 7 días",
+        "made": "Cambio | Cambios",
+        "worked": "Funcionó",
+        "review": "En revisión",
+        "undone": "Deshecho"
+      },
+      "filters": {
+        "all": "Todos",
+        "fixes": "Correcciones",
+        "watching": "Vigilando",
+        "tuning": "Ajuste de alertas"
+      },
+      "status": {
+        "applying": "Aplicando ahora",
+        "worked": "Funcionó",
+        "done": "Completado",
+        "review": "En revisión",
+        "reviewDays": "En revisión · queda {count} día | En revisión · quedan {count} días",
+        "didntHelp": "No ayudó",
+        "undone": "Deshecho"
+      },
+      "actions": {
+        "undo": "Deshacer",
+        "showDetails": "Mostrar detalles",
+        "hideDetails": "Ocultar detalles"
+      },
+      "details": {
+        "name": "Cambio",
+        "target": "En",
+        "confidence": "Confianza",
+        "saw": "Lo que vi",
+        "recurring": "Esta corrección se sigue necesitando para la misma fuga ({bug}), así que siempre preguntaré primero hasta que se corrija.",
+        "undoDecided": "Deshacer revierte esto y te preguntaré de nuevo."
+      },
+      "toast": {
+        "undone": "Deshecho. Volvió a como estaba.",
+        "undoDecided": "Deshecho. Te preguntaré de nuevo."
+      },
+      "empty": {
+        "filter": "No hay nada aquí en este momento.",
+        "scenario": "Todavía no he cambiado nada. Cuando haga un cambio, lo verás aquí."
+      },
+      "entries": {
+        "L-313": {
+          "done": "Detuve el despliegue de checkout 2.4.0",
+          "why": "Solo los 6 servidores en 2.4.0 están fallando; los 6 en la versión anterior pueden soportar todo el tráfico.",
+          "from": "6 de 12 pods",
+          "to": "sin tráfico",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "Volví a poner el ajuste de caché de search-2 en 10%",
+          "why": "Subió a 60% a las 10:16, y search-2 se ha estado quedando sin memoria desde entonces.",
+          "from": "60%",
+          "to": "10%",
+          "on": "tamaño de caché · search-2"
+        },
+        "L-309": {
+          "done": "Subí la alerta 'disk 80%' de ingest-3 a 90%",
+          "why": "Se disparó 41 veces este mes y nadie necesitó actuar. La advertencia de llenado sigue activada.",
+          "from": "80%",
+          "to": "90%",
+          "on": "alerta de disco · ingest-3"
+        },
+        "L-310": {
+          "done": "Empecé a vigilar returns, exchanges y gift-cards",
+          "why": "Los encontré esta mañana. Estoy aprendiendo qué es normal para ellos durante 7 días.",
+          "from": "sin vigilar",
+          "to": "vigilado",
+          "on": "3 servicios"
+        },
+        "L-314": {
+          "done": "Empecé a vigilar 6 servicios que encontré esta mañana",
+          "why": "Aparecieron en tus trazas hoy. Estoy aprendiendo qué es normal para ellos durante 7 días.",
+          "from": "sin vigilar",
+          "to": "vigilado",
+          "on": "6 servicios"
+        },
+        "L-311": {
+          "done": "Obtuve tu aprobación para detener despliegues defectuosos por mi cuenta",
+          "why": "Detuve 6 con tu aprobación en 60 días; los errores volvieron a la normalidad en 2 minutos cada vez.",
+          "from": "preguntar primero",
+          "to": "por mi cuenta",
+          "on": "detener despliegues"
+        },
+        "L-304": {
+          "done": "Liberé las 48 conexiones de base de datos con fuga de checkout",
+          "why": "Los pagos estaban agotando el tiempo de espera. Volvieron a la normalidad 2 minutos después.",
+          "from": "50 de 50 en uso",
+          "to": "2 en uso",
+          "on": "pool de checkout"
+        },
+        "L-299": {
+          "done": "Liberé las 46 conexiones de base de datos con fuga de checkout",
+          "why": "La misma fuga que el 23 de septiembre. Los pagos volvieron a la normalidad 2 minutos después.",
+          "from": "50 de 50 en uso",
+          "to": "4 en uso",
+          "on": "pool de checkout"
+        },
+        "L-296": {
+          "done": "Liberé las 47 conexiones de base de datos con fuga de checkout",
+          "why": "Una fuga nueva, así que después la registré con el equipo de checkout como CHK-482.",
+          "from": "50 de 50 en uso",
+          "to": "3 en uso",
+          "on": "pool de checkout"
+        },
+        "L-301": {
+          "done": "Comencé a monitorear billing-api, billing-worker e invoice-service",
+          "why": "Los encontré en tus trazas. Sigo aprendiendo qué es normal para ellos.",
+          "from": "no monitoreado",
+          "to": "monitoreado",
+          "on": "3 servicios"
+        },
+        "L-307": {
+          "done": "Corregí la alerta de conexión de payments-api para que cuente todos los servidores",
+          "why": "Comprobaba cada servidor por su cuenta, así que nunca se activó durante la caída del martes.",
+          "from": "cada pod por encima del 95%",
+          "to": "todos los pods por encima del 85%",
+          "on": "alerta de conexión"
+        },
+        "L-302": {
+          "done": "Agrupé las 3 alertas de latencia de checkout en una",
+          "why": "Se activaban juntas el 94% del tiempo, así que una ralentización te avisó 3 veces.",
+          "from": "3 alertas",
+          "to": "1",
+          "on": "latencia de checkout"
+        },
+        "L-303": {
+          "done": "Subí la alerta 'disco 80%' de ingest-1 al 90%",
+          "why": "Se activó 29 veces en 30 días y nadie necesitó actuar. La advertencia de llenado permanece activada.",
+          "from": "80%",
+          "to": "90%",
+          "on": "alerta de disco · ingest-1"
+        },
+        "L-305": {
+          "done": "Añadí 4 workers de orders-consumer para despejar un backlog",
+          "why": "No ayudó, así que reduje a 4 y avisé a la guardia 3 minutos después.",
+          "from": "4 workers",
+          "to": "8 workers",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "Recibí tu OK para añadir workers de cola por mi cuenta",
+          "why": "Lo aprobaste 7 veces durante picos de tráfico, y el backlog se despejó cada vez.",
+          "from": "preguntar primero",
+          "to": "por mi cuenta",
+          "on": "añadir workers de cola"
+        },
+        "L-312": {
+          "done": "Comencé a monitorear los 18 servicios que encontré cuando te conectaste",
+          "why": "Aprendiendo qué es normal para cada uno. Sus alertas comenzarán cuando eso esté listo.",
+          "from": "no monitoreado",
+          "to": "monitoreado",
+          "on": "18 servicios"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "Historial",
+      "seeChange": "Ver el cambio",
+      "filters": {
+        "all": "Todos",
+        "problems": "Problemas",
+        "changes": "Cambios",
+        "fixes": "Correcciones",
+        "decisions": "Tus decisiones"
+      },
+      "empty": "Aún no hay nada aquí.",
+      "entries": {
+        "checkoutNowPaged": "Avisé a la guardia de que checkout estaba fallando en los pagos.",
+        "searchPaged": "Avisé a la guardia de que la búsqueda estaba lenta.",
+        "searchAsked": "Pregunté si podía restaurar la configuración de caché de search-2.",
+        "euStopped": "No ha llegado nada del clúster {cluster} desde este momento. Te lo dije aquí y en Slack.",
+        "fridaySummary": "Envié el resumen del viernes con {count} problema menor. | Envié el resumen del viernes con {count} problemas menores.",
+        "emailHeld": "Retuve un problema menor con los correos de pedidos para el resumen del viernes.",
+        "poolFixed": "Cerré las conexiones de base de datos filtradas de checkout. Los pagos se recuperaron 2 minutos después.",
+        "poolApproved": "Aprobaste cerrar las conexiones de base de datos filtradas de checkout.",
+        "billingWatch": "Empecé a monitorizar billing-api, billing-worker e invoice-service.",
+        "checkoutPaged": "Avisé a la guardia sobre los pagos fallidos de checkout.",
+        "recsHeld": "Dejé en espera un problema menor con recommendations para el resumen del viernes.",
+        "diskApproved": "Aprobaste elevar la alerta de disco en ingest-1 a {to}%.",
+        "latencyGrouped": "Agrupé las tres alertas de lentitud de checkout en una sola, así una única ralentización genera un solo aviso.",
+        "queueFixed": "Añadí workers de la cola de orders, pero la cola siguió creciendo, así que los revertí y avisé a la guardia.",
+        "loginPaged": "Avisé a la guardia sobre el inicio de sesión lento.",
+        "queuePermission": "Me permitiste añadir workers de cola por mi cuenta, hasta 8.",
+        "gatewayPaged": "Avisé a la guardia sobre la API que rechaza solicitudes.",
+        "found18": "Encontré {count} servicios y empecé a aprender cómo es lo normal para ellos.",
+        "connected": "Me conectaste a tus datos.",
+        "thresholdApproved": "Aprobaste hacer que la alerta de conexiones de payments-api cuente todos los servidores frente al límite de 200 de la base de datos.",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "Aprobaste restaurar la configuración de search-2.",
+              "no": "Dijiste que te encargarías tú mismo de search-2.",
+              "undoYes": "Deshiciste la restauración de la configuración de search-2. Volví a aplicar 60%, así que search-2 empezará a quedarse sin memoria de nuevo; ya avisé a la guardia.",
+              "cancel": "Cancelaste la restauración de la configuración de search-2 antes de que la aplicara. search-2 sigue quedándose sin memoria; ya avisé a la guardia.",
+              "undoNo": "Retiraste tu decisión de encargarte tú mismo de search-2."
+            },
+            "checkoutNow": {
+              "yes": "Aprobaste detener el despliegue gradual de checkout 2.4.0.",
+              "no": "Dijiste que te encargarías tú mismo del despliegue de checkout.",
+              "undoYes": "Deshiciste la detención del despliegue de 2.4.0. El tráfico vuelve a ir a 2.4.0, así que los pagos pueden empezar a fallar de nuevo; ya avisé a la guardia y estoy vigilando.",
+              "cancel": "Cancelaste detener el despliegue de 2.4.0 antes de que lo hiciera. Los pagos siguen fallando; ya avisé a la guardia.",
+              "undoNo": "Retiraste tu decisión de encargarte tú mismo del despliegue de checkout."
+            }
+          },
+          "retune": {
+            "yes": "Aprobaste elevar la alerta de disco en ingest-3 a 90%.",
+            "no": "Dijiste que ahora no a elevar la alerta de disco en ingest-3.",
+            "undoYes": "Deshiciste la elevación de la alerta de disco en ingest-3. Volvió a 80%, así que empezará a dispararse en noches saludables de nuevo.",
+            "undoNo": "Retiraste tu «ahora no» sobre la alerta de disco en ingest-3."
+          },
+          "fromNowOn": {
+            "yes": "Aprobaste permitirme detener despliegues defectuosos por mi cuenta.",
+            "no": "Dijiste que ahora no a permitirme detener despliegues defectuosos por mi cuenta.",
+            "undoYes": "Retiraste el permitirme detener despliegues defectuosos por mi cuenta.",
+            "undoNo": "Retiraste tu «ahora no» sobre permitirme detener despliegues defectuosos por mi cuenta."
+          }
+        },
+        "fixedNow": {
+          "search": "Restauré la configuración de search-2. Las búsquedas volvieron a la normalidad.",
+          "checkoutNow": "Devolví el tráfico a la versión anterior y los fallos se detuvieron. Por qué falla 2.4.0 sigue siendo algo que tu equipo debe averiguar; lo he mantenido desplegado para ellos."
+        },
+        "checkoutNowAsked": "Pregunté si puedo detener el despliegue de checkout 2.4.0.",
+        "newWatch": "Encontré {count} servicios nuevos esta mañana (returns, exchanges y gift-cards) y empecé a monitorizarlos de inmediato.",
+        "foundWatch": "Encontré {count} servicios nuevos esta mañana y empecé a monitorizarlos de inmediato."
+      }
+    },
+    "settingsDrawer": {
+      "title": "Ajustes",
+      "reach": "¿Dónde debo contactarte?",
+      "destSlack": "Slack: {channel}",
+      "destEmail": "Correo electrónico: {address}",
+      "autonomy": "¿Cuánto debo hacer por mi cuenta?",
+      "tell": "Avísame",
+      "ask": "Pregúntame primero",
+      "fix": "Corrígelo y luego avísame",
+      "tellHint": "Te diré lo que haría y te dejaré a ti hacerlo.",
+      "askHint": "Preguntaré antes de cada corrección y la haré cuando digas que sí.",
+      "fixHint": "Para tipos de corrección con un historial sólido, procederé dentro de los límites que establezcas y te avisaré justo después.",
+      "advanced": "Avanzado",
+      "perKind": "Cada tipo de corrección",
+      "digestDay": "Día del resumen",
+      "excluded": "Servicios que debo ignorar",
+      "excludedNone": "Ninguno",
+      "kinds": {
+        "pool": "Cerrar conexiones de base de datos con fugas",
+        "queueWorker": "Añadir trabajadores de cola durante una acumulación",
+        "retune": "Subir el umbral de una alerta ruidosa",
+        "rollback": "Revertir un despliegue",
+        "record": "Hecho {done} veces, funcionó {worked} veces.",
+        "keptRecord": "Hecho {done} veces, mantenido {worked} veces.",
+        "noRecord": "Aún no se ha hecho nunca, así que no lo haré por mi cuenta hasta que tenga un historial.",
+        "revertConfig": "Deshacer un cambio reciente de ajustes",
+        "abortRollout": "Detener un despliegue problemático",
+        "recurringRecord": "Hecho {done} veces, todas por la misma fuga ({bug}). Seguiré preguntando hasta que se solucione."
+      },
+      "weekdays": {
+        "monday": "Lunes",
+        "tuesday": "Martes",
+        "wednesday": "Miércoles",
+        "thursday": "Jueves",
+        "friday": "Viernes"
+      },
+      "saved": "Guardado",
+      "noDestination": "No podré contactar con nadie.",
+      "routing": "Cuándo te aviso",
+      "routingNote": "Aviso por cualquier cosa que perjudique a los clientes. Las cosas más pequeñas reciben un mensaje que no despertará a nadie, y las más pequeñas van al resumen del viernes."
+    },
+    "howItWorks": {
+      "title": "Cómo funciona",
+      "intro": "Esto es lo que hago, en cinco pasos.",
+      "gotIt": "Entendido",
+      "s1Title": "Encuentro tus servicios",
+      "s1": "Reviso los datos que ya envías y encuentro cada servicio que hay en ellos. Cuando aparece uno nuevo, empiezo a vigilarlo ese mismo día; no hace falta que me lo pidas.",
+      "s2Title": "Los vigilo",
+      "s2": "Aprendo cómo es lo normal para cada servicio: sus errores, su lentitud y su tráfico para cada hora del día, y los patrones semanales se afinan con el tiempo. Hasta que lo sepa, uso comprobaciones de seguridad básicas.",
+      "s3Title": "Me mantengo en silencio a menos que sea real",
+      "s3": "La mayoría de los momentos extraños no son problemas. Aviso a tu equipo cuando algo perjudica a los clientes, envío un mensaje que no despertará a nadie para los problemas menores y guardo las cosas triviales para el resumen del viernes.",
+      "s4Title": "Explico cada aviso",
+      "s4": "Cada mensaje indica qué se rompió, desde cuándo y mi mejor interpretación del porqué, junto con mi nivel de certeza.",
+      "s5Title": "Arreglo lo que me hayas permitido",
+      "s5": "Solo arreglo las cosas que me hayas dicho que puedo. Una solución que funciona me gana un poco de confianza, y una que no ayuda cuenta en mi contra. Si sigo necesitando la misma solución, es un error que reporto a tu equipo, no un hábito que automatizo."
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "Comprobado hace 1 minuto | Comprobado hace {count} minutos"
+    },
+    "outcome": {
+      "active": "Ocurriendo ahora",
+      "fixed": "Arreglado por AutoObserve",
+      "resolved": "Resuelto en {minutes} min",
+      "held": "En el resumen del viernes",
+      "fixing": "Arreglándolo ahora",
+      "contained": "Contenido por AutoObserve",
+      "predicted": "Previsto"
+    },
+    "view": {
+      "standard": "Estándar",
+      "nerd": "Nerd",
+      "standardTooltip": "La vista Estándar ofrece la lectura breve: qué te necesita y qué ocurrió en los últimos 7 días",
+      "nerdTooltip": "La vista Nerd muestra cada detector, bucle y ajuste en su totalidad",
+      "label": "Vista"
+    },
+    "rail": {
+      "more": "Más abajo"
+    },
+    "suggestions": {
+      "title": "Sugerencias",
+      "subtitle": "Cuando tengas un minuto: esto reduce el ruido o te ahorra tiempo."
+    }
   }
 }

@@ -480,6 +480,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { ActiveDowntime } from "@/services/downtimes";
 import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useQuery } from "@tanstack/vue-query";
@@ -586,6 +587,7 @@ interface ApiMonitor {
   referenced_by: number;
   /** Absent for a check with no subtest reference. */
   reference_state?: "ok" | "missing" | "nested";
+  active_downtime?: ActiveDowntime | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -639,6 +641,7 @@ function mapMonitor(m: ApiMonitor) {
     steps: m.steps,
     referencedBy: m.referenced_by,
     referenceState: m.reference_state,
+    active_downtime: m.active_downtime ?? null,
   };
 }
 

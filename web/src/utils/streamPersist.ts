@@ -14,24 +14,39 @@ const DASHBOARD_KEYS = {
   stream: (orgId: string, streamType: string) => `oo_dashboard_panel_stream_${streamType}_${orgId}`,
 };
 
-export function saveLogsStream(orgId: string, streams: string[]): void {
-  if (!orgId) return;
-  if (streams.length) {
-    localStorage.setItem(STORAGE_KEYS.logs(orgId), JSON.stringify(streams));
-  } else {
-    localStorage.removeItem(STORAGE_KEYS.logs(orgId));
-  }
-}
+// Namespaced to the Logs page: the plain per-type name would collide with the Traces and Metrics string keys.
+const logsSelectionKey = (orgId: string, streamType: string) =>
+  `oo_logs_selected_stream_${streamType || "logs"}_${orgId}`;
 
-export function restoreLogsStream(orgId: string): string[] {
+function readStreamArray(key: string): string[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.logs(orgId));
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : [];
   } catch {
     return [];
   }
+}
+
+function restoreLogsStream(orgId: string): string[] {
+  return readStreamArray(STORAGE_KEYS.logs(orgId));
+}
+
+export function saveLogsSelectedStreams(
+  orgId: string,
+  streamType: string,
+  streams: string[],
+): void {
+  if (!orgId || !streams.length) return;
+  localStorage.setItem(logsSelectionKey(orgId, streamType), JSON.stringify(streams));
+}
+
+export function restoreLogsSelectedStreams(orgId: string, streamType: string): string[] {
+  if (!orgId) return [];
+  const saved = readStreamArray(logsSelectionKey(orgId, streamType));
+  if (saved.length || (streamType || "logs") !== "logs") return saved;
+  return restoreLogsStream(orgId);
 }
 
 export function saveTracesStream(orgId: string, stream: string): void {
@@ -89,7 +104,7 @@ const lastStreamsOfType = (orgId: string, streamType: string): string[] => {
   const dashboardStream = readStorage(DASHBOARD_KEYS.stream(orgId, streamType));
   let explored: string[] = [];
   try {
-    if (streamType === "logs") explored = restoreLogsStream(orgId);
+    if (streamType === "logs") explored = restoreLogsSelectedStreams(orgId, "logs");
     if (streamType === "traces") explored = [restoreTracesStream(orgId)];
     if (streamType === "metrics") explored = [restoreMetricsStream(orgId)];
   } catch {

@@ -228,6 +228,8 @@ export interface PanelEditorProps {
    */
   showAddToDashboardButton?: boolean;
 
+  addToDashboardDisabledReason?: I18nText | null;
+
   /**
    * While true, chart-type and config re-renders keep the queries the chart last ran.
    * @default false

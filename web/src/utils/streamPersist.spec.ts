@@ -5,7 +5,7 @@ import {
   pickDashboardPanelStream,
   restoreDashboardPanelStreamType,
   saveDashboardPanelStream,
-  saveLogsStream,
+  saveLogsSelectedStreams,
   saveMetricsStream,
   saveTracesStream,
 } from "./streamPersist";
@@ -31,7 +31,7 @@ describe("dashboard panel stream memory", () => {
   });
 
   it("falls back to the last explored stream of that type, then the first stream", () => {
-    saveLogsStream("org1", ["missing", "app"]);
+    saveLogsSelectedStreams("org1", "logs", ["missing", "app"]);
     saveTracesStream("org1", "otel");
     saveMetricsStream("org1", "mem");
 

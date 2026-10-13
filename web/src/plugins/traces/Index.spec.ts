@@ -26,6 +26,10 @@ import router from "@/test/unit/helpers/router";
 import * as useDurationPercentilesModule from "@/composables/useDurationPercentiles";
 import { buildViewTracesFilter } from "@/plugins/traces/viewTracesHandoff";
 import analytics from "@/services/product_analytics";
+import {
+  announceTracesRowNav,
+  tracesRowNavAnnouncement,
+} from "@/plugins/traces/composables/tracesRowNav";
 
 // Create DOM node for mounting
 const node = document.createElement("div");
@@ -162,6 +166,12 @@ const mockSearchObj = {
       rowsPerPage: 25,
       sortBy: "start_time" as string,
       sortOrder: "desc" as "asc" | "desc",
+      navigation: {
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as any,
+        lastOpenedId: null as string | null,
+      },
     },
     liveMode: false,
     serviceColors: {},
@@ -191,6 +201,8 @@ const mockSearchObj = {
     resultGrid: {
       currentPage: 0,
       columns: [],
+      pageRequest: null as any,
+      pageLoad: null as any,
     },
     datetime: {
       startTime: new Date().getTime() * 1000 - 900000000,
@@ -780,6 +792,75 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
+  describe("Auto Run off (#14760)", () => {
+    const mountTraces = () =>
+      mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+
+    beforeEach(() => localStorage.setItem("oo_toggle_auto_run", "false"));
+
+    afterEach(() => {
+      delete store.state.zoConfig.auto_query_enabled;
+      localStorage.removeItem("oo_toggle_auto_run");
+    });
+
+    it("restores the last stream on page load without running a search", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      mockRestoreTracesStream.mockReturnValue("default");
+      wrapper = mountTraces();
+      await vi.waitFor(() =>
+        expect(mockSearchObj.data.stream.selectedStream.value).toBe("default"),
+      );
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("does not run when the stream changes, and runs once Auto Run is on", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      wrapper = mountTraces();
+      await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
+      await flushPromises();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+
+      mockSearchObj.meta.liveMode = true;
+      localStorage.setItem("oo_toggle_auto_run", "true");
+      await wrapper.vm.onChangeStream();
+      await flushPromises();
+      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled();
+    });
+
+    it("still loads a shared link's stream with Auto Run off", async () => {
+      store.state.zoConfig.auto_query_enabled = true;
+      mockSearchObj.meta.liveMode = false;
+      routerCurrentRouteSpy.mockReturnValue({
+        value: { query: { stream: "default" }, name: "traces", path: "/traces" },
+      } as any);
+      wrapper = mountTraces();
+      await vi.waitFor(() => expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalled(), {
+        timeout: 3000,
+      });
+    });
+  });
+
   describe("Stream Selection", () => {
     it("should select the default stream automatically", async () => {
       wrapper = mount(Index, {
@@ -1319,6 +1400,18 @@ describe("Index.vue (Main Traces Page)", () => {
       );
     });
 
+    it("keeps the J/K live region outside the results the error state replaces", async () => {
+      await mountForErrors();
+
+      await failSearch({ content: { message: "boom", code: 500 } });
+      announceTracesRowNav("Couldn't load page 2");
+      await flushPromises();
+
+      expect(errorState().exists()).toBe(true);
+      expect(wrapper.find('[data-test="traces-row-nav-live"]').text()).toBe("Couldn't load page 2");
+      tracesRowNavAnnouncement.value = "";
+    });
+
     it("keeps an application error code for the shared error state", async () => {
       await mountForErrors();
 
@@ -1499,6 +1592,97 @@ describe("Index.vue (Main Traces Page)", () => {
       const calls = mockFetchQueryDataWithHttpStream.mock.calls;
       return calls[calls.length - 1][1];
     };
+
+    describe("J/K page crossing signals (4a §3.4)", () => {
+      const navigation = () => mockSearchObj.meta.resultGrid.navigation;
+      const pend = () => {
+        navigation().pendingPageSelection = { page: 2, position: "first", requestId: null };
+      };
+      const sentTraceId = () => {
+        const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+        return calls[calls.length - 1][0].traceId;
+      };
+
+      afterEach(() => {
+        navigation().pendingPageSelection = null;
+        navigation().selectionActive = false;
+        navigation().currentRowIndex = 0;
+        mockSearchObj.data.resultGrid.pageRequest = null;
+        mockSearchObj.data.resultGrid.pageLoad = null;
+      });
+
+      it("binds the crossing to the page request it sends and records its completion", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        const traceId = sentTraceId();
+        expect(navigation().pendingPageSelection?.requestId).toBe(traceId);
+        expect(mockSearchObj.data.resultGrid.pageRequest).toEqual({ requestId: traceId });
+
+        lastCallbacks().complete(null);
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: traceId,
+          ok: true,
+          reason: "done",
+        });
+      });
+
+      it("records `error` from the page request's error callback", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        lastCallbacks().error(null, { content: { message: "boom", code: 500 } });
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: sentTraceId(),
+          ok: false,
+          reason: "error",
+        });
+      });
+
+      it("records `error` when the request throws after it was bound (outer catch)", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockImplementationOnce(() => {
+          throw new Error("init");
+        });
+        pend();
+        await wrapper.vm.getQueryData(true);
+        const bound = navigation().pendingPageSelection?.requestId;
+        expect(bound).toBeTruthy();
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: bound,
+          ok: false,
+          reason: "error",
+        });
+      });
+
+      it("records `cancelled` when the user cancels the bound page request", async () => {
+        await mountPage();
+        mockFetchQueryDataWithHttpStream.mockClear();
+        pend();
+        await wrapper.vm.getQueryData(true);
+        wrapper.vm.cancelSearch();
+        expect(mockSearchObj.data.resultGrid.pageLoad).toEqual({
+          requestId: sentTraceId(),
+          ok: false,
+          reason: "cancelled",
+        });
+      });
+
+      it("a new search drops the selection and any crossing", async () => {
+        await mountPage();
+        pend();
+        navigation().selectionActive = true;
+        navigation().currentRowIndex = 7;
+        await wrapper.vm.getQueryData(false);
+        expect(navigation()).toMatchObject({
+          selectionActive: false,
+          currentRowIndex: null,
+          pendingPageSelection: null,
+        });
+      });
+    });
 
     it("replaces the previous page when the stream opens with an empty batch", async () => {
       await mountPage();
