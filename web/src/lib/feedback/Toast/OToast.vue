@@ -118,10 +118,10 @@ const actionSucceeded = ref(false);
 let actionResetTimer: ReturnType<typeof setTimeout> | undefined;
 
 const actionClasses = computed(() => [
-  'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
+  "rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none",
   actionSucceeded.value
-    ? 'bg-toast-success-icon focus-visible:ring-toast-success-icon text-white'
-    : 'bg-toast-action-text hover:bg-toast-action-hover focus-visible:ring-toast-action-text text-white',
+    ? "bg-toast-success-icon focus-visible:ring-toast-success-icon text-white"
+    : "bg-toast-action-text hover:bg-toast-action-hover focus-visible:ring-toast-action-text text-white",
 ]);
 
 function handleActionClick() {

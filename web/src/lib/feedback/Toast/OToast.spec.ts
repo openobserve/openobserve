@@ -145,4 +145,24 @@ describe("OToast", () => {
     await vueNextTick();
     expect(document.body.querySelector('[role="status"]')).not.toBeNull();
   });
+
+  it("collapses grouped details until the toggle is clicked", async () => {
+    mountToast({
+      id: "1",
+      open: true,
+      message: "No access",
+      title: "Access required",
+      titleCount: 2,
+      details: [{ label: "Logs", url: "/api/logs" }],
+    });
+    await vueNextTick();
+    expect(document.body.querySelector('[data-test="o-toast-grouped"]')).not.toBeNull();
+    expect(document.body.querySelector('[data-test="o-toast-details"]')).toBeNull();
+
+    document.body.querySelector<HTMLElement>('[data-test="o-toast-details-toggle"]')!.click();
+    await vueNextTick();
+    expect(
+      document.body.querySelector('[data-test="o-toast-details-list"]')?.textContent,
+    ).toContain("/api/logs");
+  });
 });

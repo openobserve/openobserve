@@ -42,4 +42,43 @@ describe("OToastProvider", () => {
 
     expect(toastRecords).toHaveLength(0);
   });
+
+  it("renders a bottom-right toast in its own viewport", async () => {
+    toast({ variant: "error", message: "Denied", position: "bottom-right", timeout: 0 });
+
+    const wrapper = mount(OToastProvider, { attachTo: document.body });
+    await nextTick();
+
+    expect(wrapper.findAllComponents({ name: "OToast" })).toHaveLength(1);
+    const viewport = document.body.querySelector("ol.end-4");
+    expect(viewport?.textContent).toContain("Denied");
+  });
+
+  it("dismisses an open grouped toast on Escape", async () => {
+    toast({
+      variant: "error",
+      message: "Denied",
+      position: "bottom-right",
+      timeout: 0,
+      details: [{ label: "Logs", url: "/api/logs" }],
+    });
+    mount(OToastProvider, { attachTo: document.body });
+    await nextTick();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await nextTick();
+
+    expect(toastRecords.every((r) => !r.open)).toBe(true);
+  });
+
+  it("leaves plain toasts alone on Escape", async () => {
+    toast({ variant: "error", message: "Boom", timeout: 0 });
+    mount(OToastProvider, { attachTo: document.body });
+    await nextTick();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await nextTick();
+
+    expect(toastRecords.every((r) => r.open)).toBe(true);
+  });
 });
