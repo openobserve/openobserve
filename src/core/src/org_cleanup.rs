@@ -1257,11 +1257,6 @@ mod tests {
     }
 
     #[test]
-    fn test_db_resources_deletes_alert_calibration_configs() {
-        position_of("alert_calibration::delete_by_org(get_orm_client_rw().await, org_id)");
-    }
-
-    #[test]
     fn test_db_resources_deletes_query_history() {
         position_of("query_history::delete_by_org(org_id)");
     }

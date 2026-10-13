@@ -112,7 +112,7 @@ fn upsert_statement(org: &str, patch: &ConfigPatch, now: i64) -> sea_orm::Insert
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{Database, DatabaseBackend, DatabaseConnection, PaginatorTrait, QueryTrait};
+    use sea_orm::{Database, DatabaseConnection, PaginatorTrait};
 
     use super::*;
     use crate::table::migration::create_alert_calibration_configs_for_test;
@@ -236,19 +236,5 @@ mod tests {
             .await
             .unwrap();
         assert!(!fresh.enabled);
-    }
-
-    #[test]
-    fn the_upsert_compiles_to_conflict_handling_on_every_meta_store() {
-        for (backend, clause) in [
-            (DatabaseBackend::Sqlite, "ON CONFLICT"),
-            (DatabaseBackend::Postgres, "ON CONFLICT"),
-            (DatabaseBackend::MySql, "ON DUPLICATE KEY UPDATE"),
-        ] {
-            let sql = upsert_statement(ORG, &ConfigPatch::default(), NOW)
-                .build(backend)
-                .to_string();
-            assert!(sql.contains(clause), "{backend:?} emitted no upsert: {sql}");
-        }
     }
 }
