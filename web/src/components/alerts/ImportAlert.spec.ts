@@ -505,6 +505,80 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
         }
       });
 
+      describe("destinations", () => {
+        // Other fields are invalid on purpose: only the destination errors are read.
+        const destinationErrors = async (destinations: unknown) => {
+          wrapper.vm.alertErrorsToDisplay = [];
+          await wrapper.vm.validateAlertInputs(
+            {
+              name: "a1",
+              stream_type: "invalid",
+              query_condition: { type: "custom" },
+              trigger_condition: {},
+              ...(destinations === undefined ? {} : { destinations }),
+            },
+            1,
+          );
+          return wrapper.vm.alertErrorsToDisplay
+            .flat()
+            .filter((error: any) => error?.field === "destination_name");
+        };
+
+        it.each([
+          ["absent", undefined],
+          ["empty", []],
+        ])("imports an alert whose destinations are %s", async (_case, destinations) => {
+          expect(await destinationErrors(destinations)).toEqual([]);
+        });
+
+        it.each([
+          ["null", null],
+          ["not a list", "ops-slack"],
+        ])("rejects destinations that are %s", async (_case, destinations) => {
+          expect(await destinationErrors(destinations)).toHaveLength(1);
+        });
+
+        it("still rejects a destination this org does not have", async () => {
+          expect(await destinationErrors(["no-such-destination"])).toHaveLength(1);
+        });
+
+        // Leaving the fix-up picker as it is must import what it shows, so the
+        // picker and the JSON have to hold the same value.
+        it.each([
+          ["an unknown name", ["no-such-destination"], []],
+          ["a known and an unknown name", ["email-dest", "no-such-destination"], ["email-dest"]],
+          ["null", null, []],
+        ])(
+          "puts what a retry imports into the picker and the JSON for %s",
+          async (_case, destinations, expected) => {
+            const baseImport = wrapper.vm.$refs.baseImportRef;
+            baseImport.updateJsonArray([{ name: "a1", destinations }]);
+
+            await destinationErrors(destinations);
+
+            expect(wrapper.vm.userSelectedDestinations[0]).toEqual(expected);
+            expect(JSON.parse(baseImport.jsonStr)[0].destinations).toEqual(expected);
+          },
+        );
+
+        // Same wording as the alert form's Destination field: empty is a valid choice.
+        it("tells the user the picker is optional only while it is empty", async () => {
+          const helpText = () =>
+            wrapper
+              .findAllComponents({ name: "OSelect" })
+              .find((c: any) => c.attributes("data-test") === "alert-import-destination-name-input")
+              ?.props("helpText");
+          wrapper.vm.alertErrorsToDisplay = [[{ message: "bad", field: "destination_name" }]];
+          wrapper.vm.userSelectedDestinations = [[]];
+          await wrapper.vm.$nextTick();
+          expect(helpText()).toBe(wrapper.vm.t("alerts.alertSettings.noDestinationNote"));
+
+          wrapper.vm.userSelectedDestinations = [["email-dest"]];
+          await wrapper.vm.$nextTick();
+          expect(helpText()).toBeUndefined();
+        });
+      });
+
       it("should validate inputs and return boolean result using component function", async () => {
         // Test that the validation function exists and can be called
         const input = {
@@ -937,6 +1011,26 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
       const payload = await submitAnomaly(exportedAnomaly({ seasonality: "daily" }));
 
       expect(payload.anomaly_config.seasonality).toBeUndefined();
+    });
+  });
+
+  describe("error list rendering", () => {
+    it("colours a plain-string error like the ones with an inline fix-up", async () => {
+      // Asserting the pushed value cannot catch a missing colour class; only the render can.
+      wrapper.vm.alertErrorsToDisplay = [
+        [
+          { field: "alert_name", message: "Alert - 1: Name is mandatory" },
+          "Alert - 1: Cron expression should be a valid cron expression.",
+        ],
+      ];
+      await wrapper.vm.$nextTick();
+
+      const classesOf = (errorIndex: number) =>
+        wrapper.find(`[data-test="alert-import-error-0-${errorIndex}"]`).find("span").classes();
+
+      expect(classesOf(1)).toContain("text-status-negative");
+      // Same colour as the branch that does have an inline control.
+      expect(classesOf(1)).toEqual(classesOf(0));
     });
   });
 });
