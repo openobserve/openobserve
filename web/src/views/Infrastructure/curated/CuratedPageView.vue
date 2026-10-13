@@ -554,7 +554,10 @@ const onVariablesManagerReady = (manager: VariablesManager) => {
   stopCommitWatch?.();
   // Values ONLY: options and loading flags churn per fetch and would re-run panels for an untouched picker.
   stopCommitWatch = watch(
-    () => manager.variablesData.global.map((variable) => variable.value),
+    () =>
+      Object.values(manager.variablesData.tabs).flatMap((variables) =>
+        variables.map((variable) => variable.value),
+      ),
     () => {
       manager.commitAll();
       syncPickerUrl(manager);
@@ -599,12 +602,16 @@ watch(
     const manager = variablesManager.value;
     if (!manager) return;
     // loadFromUrl only APPLIES the keys it finds, so a Back that drops var-cluster would strand the drilled-in value.
-    const cluster = manager.getVariable("cluster", "global");
-    if (cluster && query["var-cluster"] === undefined) {
+    for (const [tabId, variables] of Object.entries(manager.variablesData.tabs)) {
+      const cluster = variables.find((variable) => variable.name === "cluster");
+      if (!cluster) continue;
+      if (query["var-cluster"] !== undefined || query[`var-cluster.t.${tabId}`] !== undefined) {
+        continue;
+      }
       manager.updateVariableValue(
         "cluster",
-        "global",
-        undefined,
+        "tabs",
+        tabId,
         undefined,
         cluster.multiSelect ? [] : (cluster.options?.[0]?.value ?? null),
       );
@@ -643,15 +650,17 @@ const showEditAsDashboard = computed(() => props.workload === "kubernetes" && !!
 const editingAsDashboard = ref(false);
 const kubernetesSource = getReadyMadeSource("kubernetes");
 
-/** The page's cluster/namespace picks, in the dashboard's own `var-` URL shape. */
+/** The open tab's cluster/namespace picks, as the unsuffixed `var-` keys a dashboard applies to every scope. */
 const scopeParams = (): Record<string, string | string[]> => {
   const params: Record<string, any> = variablesManager.value?.getUrlParams({ useLive: false }) ?? {
     ...route.query,
   };
+  const tabId = selectedTabId.value;
   const picked: Record<string, string | string[]> = {};
-  for (const key of ["var-cluster", "var-namespace"]) {
-    const value = params[key];
-    if (value !== undefined && value !== null && value !== "") picked[key] = value;
+  for (const name of ["cluster", "namespace"]) {
+    // Pickers are tab-scoped, so a pick is keyed by its tab; a drilldown or hand-typed URL carries the bare key.
+    const value = (tabId ? params[`var-${name}.t.${tabId}`] : undefined) ?? params[`var-${name}`];
+    if (value !== undefined && value !== null && value !== "") picked[`var-${name}`] = value;
   }
   return picked;
 };

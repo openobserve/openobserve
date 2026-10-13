@@ -167,6 +167,16 @@ pub struct OrgDetails {
     pub user_obj: OrgUser,
     #[serde(default)]
     pub plan: i32,
+    /// The org admin/owner's email — used by the frontend to disambiguate
+    /// two orgs that share a display name (e.g. two orgs both named
+    /// "default"). Empty when no admin could be resolved (e.g. root-user
+    /// view of a stale org).
+    #[serde(default)]
+    pub owner_email: String,
+    /// The org admin/owner's first name, when set; the frontend falls back
+    /// to the local part of `owner_email` when this is empty.
+    #[serde(default)]
+    pub owner_first_name: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -324,7 +334,8 @@ impl TriggerStatus {
                     usage::RunOutcome::Firing
                     | usage::RunOutcome::Normal
                     | usage::RunOutcome::Succeeded
-                    | usage::RunOutcome::Pending => status.healthy += 1,
+                    | usage::RunOutcome::Pending
+                    | usage::RunOutcome::Suppressed => status.healthy += 1,
                     usage::RunOutcome::Error | usage::RunOutcome::NotifyFailed => {
                         status.failed += 1
                     }
@@ -467,10 +478,6 @@ fn default_usage_stream_enabled() -> bool {
     false
 }
 
-fn default_red_insights_enabled() -> bool {
-    true
-}
-
 #[cfg(feature = "enterprise")]
 fn default_claim_parser_function() -> String {
     "".to_string()
@@ -554,7 +561,7 @@ pub struct OrganizationSetting {
     pub max_series_per_query: Option<usize>,
     #[serde(default = "default_usage_stream_enabled")]
     pub usage_stream_enabled: bool,
-    #[serde(default = "default_red_insights_enabled")]
+    #[serde(default)]
     pub red_insights_enabled: bool,
     #[cfg(feature = "enterprise")]
     #[serde(default = "default_claim_parser_function")]
@@ -595,7 +602,7 @@ impl Default for OrganizationSetting {
             dark_mode_theme_color,
             max_series_per_query: None,
             usage_stream_enabled: default_usage_stream_enabled(),
-            red_insights_enabled: default_red_insights_enabled(),
+            red_insights_enabled: false,
             #[cfg(feature = "enterprise")]
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
@@ -915,6 +922,8 @@ mod tests {
             org_type: "basic".to_string(),
             user_obj: user,
             plan: 0,
+            owner_email: "admin1@example.com".to_string(),
+            owner_first_name: "Admin".to_string(),
         };
 
         let response = OrganizationResponse {
@@ -1656,15 +1665,11 @@ mod tests {
     }
 
     #[test]
-    fn test_red_insights_enabled_defaults_on_and_round_trips() {
-        assert!(OrganizationSetting::default().red_insights_enabled);
+    fn test_red_insights_enabled_defaults_off_and_round_trips() {
+        assert!(!OrganizationSetting::default().red_insights_enabled);
         let legacy: OrganizationSetting =
             serde_json::from_str(r#"{"scrape_interval": 15}"#).unwrap();
-        assert!(legacy.red_insights_enabled);
-        let off: OrganizationSetting =
-            serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": false}"#)
-                .unwrap();
-        assert!(!off.red_insights_enabled);
+        assert!(!legacy.red_insights_enabled);
         let on: OrganizationSetting =
             serde_json::from_str(r#"{"scrape_interval": 15, "red_insights_enabled": true}"#)
                 .unwrap();

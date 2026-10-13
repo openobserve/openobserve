@@ -46,7 +46,9 @@
           auto-apply
           menu-align="end"
           :hide-range-shift="isMobile"
-          :default-type="searchObj.data.datetime.type"
+          :default-type="restoredDate.valueType || searchObj.data.datetime.type"
+          :default-relative-time="restoredDate.relativeTimePeriod || '15m'"
+          :default-absolute-time="restoredDate.absolute"
           @on:date-change="updateDateTime"
         />
       </div>
@@ -79,6 +81,7 @@
     </div>
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
+        ref="oTableRef"
         :frame="false"
         :data="dataToBeLoaded"
         :columns="columnsToBeRendered"
@@ -88,7 +91,14 @@
         pagination="client"
         :page-size="pageSize"
         :page-size-options="pageSizeOptions"
+        :current-page="currentPage"
+        @update:current-page="currentPage = $event"
+        @update:page-size="pageSize = $event"
         sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         expansion="single"
         :expand-on-row-click="true"
         v-model:expanded-ids="expandedIds"
@@ -295,7 +305,16 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, onMounted, computed, onUnmounted, defineAsyncComponent, defineComponent } from "vue";
+import {
+  ref,
+  onMounted,
+  computed,
+  onUnmounted,
+  defineAsyncComponent,
+  defineComponent,
+  watch,
+} from "vue";
+import { useListViewState } from "@/composables/useListViewState";
 import { timestampToTimezoneDate, b64EncodeUnicode, getUUID } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -319,7 +338,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -368,12 +387,35 @@ export default defineComponent({
     const wrapText = ref(true);
     const { searchObj } = searchState();
     const dataToBeLoaded: any = ref([]);
-    const dateTimeToBeSent = ref({
-      valueType: "relative",
-      relativeTimePeriod: "15m",
+    const viewState = useListViewState("searchHistory", {
+      valueType: "",
+      relativeTimePeriod: "",
       startTime: 0,
       endTime: 0,
+      pageSize: 100,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
     });
+    const restoredDate = {
+      valueType: viewState.valueType,
+      relativeTimePeriod: viewState.relativeTimePeriod,
+      absolute:
+        viewState.valueType === "absolute"
+          ? { startTime: viewState.startTime, endTime: viewState.endTime }
+          : null,
+    };
+    const dateTimeToBeSent = ref({
+      valueType: viewState.valueType || "relative",
+      relativeTimePeriod: viewState.relativeTimePeriod || "15m",
+      startTime: viewState.startTime,
+      endTime: viewState.endTime,
+    });
+    const oTableRef: any = ref(null);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+    let pendingPageRestore = true;
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
@@ -417,7 +459,7 @@ export default defineComponent({
 
     onUnmounted(() => {});
 
-    const pageSize = ref(100);
+    const pageSize = ref(viewState.pageSize);
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
     // Columns are a fixed schema (not derived from the response), so they can be
@@ -531,6 +573,11 @@ export default defineComponent({
         });
         dataToBeLoaded.value = filteredHits;
         isLoading.value = false;
+        if (pendingPageRestore) {
+          pendingPageRestore = false;
+          // Macrotask so the restored page wins over the table's own reset on data change.
+          setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+        }
       } catch (error: any) {
         forbidden.value = error?.response?.status === 403;
         // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -559,6 +606,10 @@ export default defineComponent({
 
     const updateDateTime = async (value: any) => {
       dateTimeToBeSent.value = value;
+      viewState.valueType = value.valueType;
+      viewState.relativeTimePeriod = value.relativeTimePeriod ?? "";
+      viewState.startTime = value.startTime;
+      viewState.endTime = value.endTime;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
       // Auto-run on a genuine user time change (consistent with the rest of the
       // app). Skip programmatic emits — the setAbsoluteTime() call above re-emits
@@ -730,6 +781,14 @@ export default defineComponent({
         return filtered;
       }, {});
     }
+    watch([pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     useShortcuts([
       {
         id: "searchHistoryRefresh",
@@ -738,15 +797,10 @@ export default defineComponent({
         },
       },
     ]);
-    // Own page: claim the keyboard scope and load history on mount, then hand the
-    // scope back to the logs page on leave.
     onMounted(() => {
-      getManager()?.setScope("search-history");
       fetchSearchHistory();
     });
-    onUnmounted(() => {
-      getManager()?.setScope("logs");
-    });
+
     return {
       isMobile,
       searchObj,
@@ -775,6 +829,11 @@ export default defineComponent({
       delayMessage,
       pageSize,
       pageSizeOptions,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
+      restoredDate,
       activeTab,
       tabs,
       moreDetailsToDisplay,

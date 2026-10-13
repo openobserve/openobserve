@@ -1,224 +1,141 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createRouter, createWebHistory } from "vue-router";
+import { createMemoryHistory, createRouter } from "vue-router";
 import Apache from "./Apache.vue";
-import CopyContent from "@/components/CopyContent.vue";
+import FirstEventStatus from "@/components/ingestion/FirstEventStatus.vue";
+import { WEB_SERVER_GUIDES } from "@/composables/useIngestion";
 
-vi.mock("../../../aws-exports", () => ({
-  default: { API_ENDPOINT: "http://localhost:5080", region: "us-east-1" },
+const copyMock = vi.fn();
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: (...args: unknown[]) => copyMock(...args),
 }));
+vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
-vi.mock("../../../utils/zincutils", () => ({
-  getImageURL: vi.fn((path) => `mock-image-url-${path}`),
-  getEndPoint: vi.fn(() => ({
-    url: "http://localhost:5080",
-    host: "localhost",
-    port: "5080",
-    protocol: "http",
-    tls: false,
-  })),
-  getIngestionURL: vi.fn(() => "http://localhost:5080"),
-}));
+const SERVER = "apache";
+const PASSCODE = "o2tokenSECRETvalue0123456789";
+const EMAIL = "you@acme.io";
 
-vi.mock("@/composables/useIngestion", () => ({
-  default: vi.fn(() => ({
-    endpoint: {
-      url: "http://localhost:5080",
-      host: "localhost",
-      port: "5080",
-      protocol: "http",
-      tls: false,
+const makeStore = () =>
+  createStore({
+    state: {
+      API_ENDPOINT: "http://localhost:5080",
+      selectedOrganization: { identifier: "acme-prod", name: "acme-prod", id: 1 },
+      userInfo: { email: EMAIL },
+      zoConfig: { ingestion_url: "https://api.openobserve.ai", timestamp_column: "_timestamp" },
+      theme: "light",
+      organizationData: {
+        organizationPasscode: PASSCODE,
+        organizationPasscodeForbidden: false,
+        orgTokens: [{ name: "default", token: PASSCODE, enabled: true }],
+      },
     },
-    serverContent: `HTTP Endpoint: http://localhost:5080/api/test-org/[STREAM_NAME]/_json\nAccess Key: [BASIC_PASSCODE]`,
-    serverDocURLs: {
-      nginx: "https://short.openobserve.ai/server/nginx",
-      apache: "https://short.openobserve.ai/server/apache",
-      iis: "https://short.openobserve.ai/server/iis",
-    },
-  })),
-}));
-
-vi.mock("@/components/CopyContent.vue", () => ({
-  default: {
-    name: "CopyContent",
-    template: '<div data-test="copy-content">{{ content }}</div>',
-    props: ["content"],
-  },
-}));
-
-const mockStore = createStore({
-  state: {
-    selectedOrganization: { identifier: "test-org", name: "Test Organization" },
-    userInfo: { email: "test@example.com" },
-  },
-});
-
-const mockRouter = createRouter({
-  history: createWebHistory(),
-  routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
-});
-
-describe("Apache.vue Comprehensive Coverage", () => {
-  let wrapper: VueWrapper;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
   });
+
+const mountPage = async () => {
+  const store = makeStore();
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: "/:any(.*)*", name: SERVER, component: { template: "<div />" } }],
+  });
+  await router.push("/");
+  const wrapper = mount(Apache, {
+    props: { currOrgIdentifier: "acme-prod", currUserEmail: EMAIL },
+    global: {
+      plugins: [store, router],
+      provide: { store },
+      stubs: { FirstEventStatus: true },
+    },
+  });
+  await flushPromises();
+  return wrapper;
+};
+
+describe("Apache.vue web server guide", () => {
+  let wrapper: VueWrapper | undefined;
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
-    vi.clearAllMocks();
+    wrapper?.unmount();
+    wrapper = undefined;
+    copyMock.mockClear();
   });
 
-  const createWrapper = (props = {}) => {
-    const defaultProps = { currOrgIdentifier: "test-org", currUserEmail: "test@example.com" };
-    return mount(Apache, {
-      props: { ...defaultProps, ...props },
-      global: {
-        plugins: [mockRouter],
-        provide: { store: mockStore },
-        components: { CopyContent },
-      },
-    });
-  };
-
-  describe("Component Rendering Tests", () => {
-    it("should render CopyContent component", () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.exists()).toBe(true);
-    });
-
-    it("should render documentation link", () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find("a");
-      expect(docLink.exists()).toBe(true);
-      expect(docLink.attributes("target")).toBe("_blank");
-    });
-
-    it("should apply correct styling to documentation link", () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find("a");
-      expect(docLink.classes()).toContain("text-text-link");
-    });
-
-    it("should render documentation text correctly", () => {
-      wrapper = createWrapper();
-      const text = wrapper.text();
-      expect(text).toContain("Click");
-      expect(text).toContain("here");
-      expect(text).toContain("to check further documentation");
-    });
+  it("shows a runnable Fluent Bit config with the org endpoint and the token masked", async () => {
+    wrapper = await mountPage();
+    const config = wrapper.find(`[data-test="ingestion-${SERVER}-config-code-block"]`);
+    expect(config.exists()).toBe(true);
+    const text = config.text();
+    expect(text).toContain("[INPUT]");
+    expect(text).toContain(WEB_SERVER_GUIDES[SERVER].logPaths);
+    expect(text).toContain("Host              api.openobserve.ai");
+    expect(text).toContain("Port              443");
+    expect(text).toContain("tls               On");
+    expect(text).toContain(`URI               /api/acme-prod/${SERVER}/_json`);
+    expect(text).toContain(`HTTP_User         ${EMAIL}`);
+    expect(text).not.toContain(PASSCODE);
+    expect(text).not.toContain("Access Key");
+    expect(wrapper.html()).not.toContain(PASSCODE);
   });
 
-  describe("Props Validation Tests", () => {
-    it("should accept currOrgIdentifier string prop", () => {
-      wrapper = createWrapper({ currOrgIdentifier: "custom-org" });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should accept currUserEmail string prop", () => {
-      wrapper = createWrapper({ currUserEmail: "custom@example.com" });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle undefined currOrgIdentifier", () => {
-      wrapper = createWrapper({ currOrgIdentifier: undefined });
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should handle undefined currUserEmail", () => {
-      wrapper = createWrapper({ currUserEmail: undefined });
-      expect(wrapper.exists()).toBe(true);
-    });
+  it("copies the real config, token included, on the first click on the block", async () => {
+    wrapper = await mountPage();
+    await wrapper.find(`[data-test="ingestion-${SERVER}-config-code-block-pre"]`).trigger("click");
+    expect(copyMock).toHaveBeenCalledTimes(1);
+    const copied = String(copyMock.mock.calls[0][0]);
+    expect(copied).toContain(`HTTP_Passwd       ${PASSCODE}`);
+    expect(copied).toContain(`URI               /api/acme-prod/${SERVER}/_json`);
   });
 
-  describe("Setup Function Tests", () => {
-    it("should initialize content as a string", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(typeof vm.content).toBe("string");
-    });
-
-    it("should not contain [STREAM_NAME] in content", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.content).not.toContain("[STREAM_NAME]");
-    });
-
-    it("should expose docURL as a defined string", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.docURL).toBeDefined();
-      expect(typeof vm.docURL).toBe("string");
-    });
-
-    it("should expose content", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.content).toBeDefined();
-    });
+  it("names the token in the block toolbar", async () => {
+    wrapper = await mountPage();
+    expect(
+      wrapper.find(`[data-test="ingestion-${SERVER}-config-code-block-token-link"]`).text(),
+    ).toContain("default");
   });
 
-  describe("Content Processing Tests", () => {
-    it("should replace [STREAM_NAME] with apache in content", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.content).toContain("apache");
-      expect(vm.content).not.toContain("[STREAM_NAME]");
+  it("mounts one status bar watching logs in the server's stream, with Copy config", async () => {
+    wrapper = await mountPage();
+    const bars = wrapper.findAllComponents(FirstEventStatus);
+    expect(bars).toHaveLength(1);
+    expect(bars[0].props()).toMatchObject({
+      org: "acme-prod",
+      signal: "logs",
+      targetStream: SERVER,
+      kind: "standard",
+      guideName: WEB_SERVER_GUIDES[SERVER].label,
+      snippetKind: "config",
     });
-
-    it("should generate content with HTTP Endpoint structure", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.content).toContain("HTTP Endpoint:");
-    });
-
-    it("should produce content with Access Key field", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      expect(vm.content).toContain("Access Key:");
-    });
+    expect(bars[0].props("docUrl")).toMatch(/^https:\/\/short\.openobserve\.ai\/server\//);
   });
 
-  describe("Component Props Passing Tests", () => {
-    it("should pass content prop to CopyContent that is defined", () => {
-      wrapper = createWrapper();
-      const copyContent = wrapper.findComponent(CopyContent);
-      expect(copyContent.props("content")).toBeDefined();
-    });
-
-    it("should pass href to documentation link that is defined", () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find("a");
-      expect(docLink.attributes("href")).toBeDefined();
-    });
-
-    it("should pass the correct apache doc URL as href", () => {
-      wrapper = createWrapper();
-      const docLink = wrapper.find("a");
-      expect(docLink.attributes("href")).toBe("https://short.openobserve.ai/server/apache");
-    });
+  it("puts the bar after the config and the restart hint, above the docs link", async () => {
+    wrapper = await mountPage();
+    const html = wrapper.html();
+    const restart = html.indexOf(`ingestion-${SERVER}-restart-hint`);
+    const bar = html.indexOf("first-event-status-stub");
+    expect(restart).toBeGreaterThan(-1);
+    expect(bar).toBeGreaterThan(restart);
+    expect(wrapper.text()).toContain(WEB_SERVER_GUIDES[SERVER].restartCommand);
   });
 
-  describe("Component Lifecycle Tests", () => {
-    it("should mount without errors", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should unmount without errors", () => {
-      wrapper = createWrapper();
-      expect(() => wrapper.unmount()).not.toThrow();
-    });
-
-    it("should handle props updates", async () => {
-      wrapper = createWrapper({ currOrgIdentifier: "initial-org" });
-      await wrapper.setProps({ currOrgIdentifier: "updated-org" });
-      expect(wrapper.exists()).toBe(true);
-    });
+  it("gives the install step a terminal command", async () => {
+    wrapper = await mountPage();
+    const install = wrapper.find(`[data-test="ingestion-${SERVER}-install-code-block"]`);
+    expect(install.text()).toContain(String(WEB_SERVER_GUIDES[SERVER].installCommand));
   });
 });

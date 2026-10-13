@@ -1426,21 +1426,23 @@ async fn search(
     )
     .await
     {
-        Ok(data) if !req.query_exemplars => (
+        Ok(resp) if !req.query_exemplars => (
             StatusCode::OK,
-            axum::Json(config::meta::promql::ApiFuncResponse::ok(
+            axum::Json(config::meta::promql::ApiFuncResponse::ok_with_warnings(
                 config::meta::promql::QueryResult {
-                    result_type: data.get_type().to_string(),
-                    result: data,
+                    result_type: resp.value.get_type().to_string(),
+                    result: resp.value,
                 },
+                resp.warnings,
                 Some(trace_id.to_string()),
             )),
         )
             .into_response(),
-        Ok(data) => (
+        Ok(resp) => (
             StatusCode::OK,
-            axum::Json(config::meta::promql::ApiFuncResponse::ok(
-                data,
+            axum::Json(config::meta::promql::ApiFuncResponse::ok_with_warnings(
+                resp.value,
+                resp.warnings,
                 Some(trace_id.to_string()),
             )),
         )
@@ -1527,12 +1529,13 @@ async fn search_streaming(
             )
             .await
             {
-                Ok(data) => {
+                Ok(resp) => {
                     let res = StreamResponses::PromqlResponse {
                         data: config::meta::promql::QueryResult {
-                            result_type: data.get_type().to_string(),
-                            result: data,
+                            result_type: resp.value.get_type().to_string(),
+                            result: resp.value,
                         },
+                        warnings: resp.warnings,
                         trace_id: Some(req_trace_id.clone()),
                     };
                     if tx.send(Ok(res)).await.is_err() {

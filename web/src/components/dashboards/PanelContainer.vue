@@ -36,9 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-panel-bar"
       >
         <OIcon
-          v-if="!viewOnly && !simplifiedPanelView"
+          v-if="!viewOnly && !simplifiedPanelView && layoutMode !== 'view'"
           name="drag-indicator"
           size="sm"
+          class="shrink-0"
           data-test="dashboard-panel-drag"
         />
         <!-- me-5 is a truncation MARGIN, not decoration. The spacer after this
@@ -170,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <ExemplarToggle
           v-if="exemplarsEligible && !viewOnly"
-          :class="exemplarToggleAtRest ? '' : hoverRevealClass"
+          :class="exemplarToggleAtRest && !isLayoutEditing ? '' : hoverRevealClass"
           :on="exemplarsOn"
           :loading="PanleSchemaRendererRef?.exemplarsStatus === 'loading'"
           :count="PanleSchemaRendererRef?.exemplarsCount ?? 0"
@@ -232,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @retry-exemplars="PanleSchemaRendererRef?.retryExemplars()"
         />
         <OButton
-          v-if="!viewOnly && !simplifiedPanelView"
+          v-if="!viewOnly && !simplifiedPanelView && !isLayoutEditing"
           :variant="variablesDataUpdated ? 'ghost-warning' : 'ghost'"
           size="icon"
           @click="() => onRefreshPanel(false)"
@@ -271,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            v-if="!simplifiedPanelView"
+            v-if="!simplifiedPanelView && !isLayoutEditing"
             data-test="dashboard-edit-panel"
             @select="onPanelModifyClick('EditPanel')"
             shortcut-id="panelEdit"
@@ -280,93 +281,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.editPanel") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView"
+            v-if="!simplifiedPanelView && layoutMode !== 'view'"
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
           >
             <template #icon-left><OIcon name="dashboard-customize" size="sm" /></template>
             {{ t("panel.editLayout") }}
           </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-duplicate-panel"
-            @select="onPanelModifyClick('DuplicatePanel')"
-            shortcut-id="panelDuplicate"
-          >
-            <template #icon-left><OIcon name="content-copy" size="sm" /></template>
-            {{ t("panel.duplicate") }}
-          </ODropdownItem>
-          <ODropdownItem
-            data-test="dashboard-delete-panel"
-            @select="onPanelModifyClick('DeletePanel')"
-            shortcut-id="panelDelete"
-          >
-            <template #icon-left
-              ><OIcon name="delete-outline" size="sm" class="text-current!"
-            /></template>
-            {{ t("panel.deletePanel") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-query-inspector-panel"
-            @select="showViewPanel = true"
-            shortcut-id="panelQueryInspector"
-          >
-            <template #icon-left><OIcon name="manage-search" size="sm" /></template>
-            {{ t("panel.queryInspector") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-panel-download-as-csv-btn"
-            @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
-          >
-            <template #icon-left><OIcon name="file-download" size="sm" /></template>
-            {{ t("panel.downloadAsCSV") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            data-test="dashboard-panel-download-as-json-btn"
-            @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
-          >
-            <template #icon-left><OIcon name="data-object" size="sm" /></template>
-            {{ t("panel.downloadAsJSON") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            :disabled="props.data.queryType != 'sql'"
-            data-test="dashboard-move-to-logs-module"
-            @select="onLogPanel"
-            icon-left="search"
-          >
-            {{ t("panel.goToLogs") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-refresh-without-cache"
-            @select="onPanelModifyClick('Refresh')"
-            icon-left="cached"
-          >
-            {{ t("dashboard.panelContainer.refreshCacheReload") }}
-          </ODropdownItem>
-          <ODropdownItem
-            v-if="!simplifiedPanelView"
-            data-test="dashboard-move-to-another-panel"
-            @select="onPanelModifyClick('MovePanel')"
-          >
-            <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
-            {{ t("panel.moveToAnotherTab") }}
-          </ODropdownItem>
-          <!-- Alert creation is shared platform machinery: this contributes the
-               panel's state through a pure adapter and the action owns the rest
-               (label, confirm dialog, transport). See CreateAlertAction.vue. -->
-          <CreateAlertAction
-            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-            variant="menu-item"
-            source="panel"
-            :build="buildPanelAlertPrefill"
-            :disabled-reason="alertDisabledReason"
-            data-test="dashboard-create-alert-from-panel"
-          />
+          <!-- Only the layout dialog belongs to layout edit mode; every other action saves on its own. -->
+          <template v-if="!isLayoutEditing">
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-duplicate-panel"
+              @select="onPanelModifyClick('DuplicatePanel')"
+              shortcut-id="panelDuplicate"
+            >
+              <template #icon-left><OIcon name="content-copy" size="sm" /></template>
+              {{ t("panel.duplicate") }}
+            </ODropdownItem>
+            <ODropdownItem
+              data-test="dashboard-delete-panel"
+              @select="onPanelModifyClick('DeletePanel')"
+              shortcut-id="panelDelete"
+            >
+              <template #icon-left
+                ><OIcon name="delete-outline" size="sm" class="text-current!"
+              /></template>
+              {{ t("panel.deletePanel") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-query-inspector-panel"
+              @select="showViewPanel = true"
+              shortcut-id="panelQueryInspector"
+            >
+              <template #icon-left><OIcon name="manage-search" size="sm" /></template>
+              {{ t("panel.queryInspector") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-panel-download-as-csv-btn"
+              @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+            >
+              <template #icon-left><OIcon name="file-download" size="sm" /></template>
+              {{ t("panel.downloadAsCSV") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              data-test="dashboard-panel-download-as-json-btn"
+              @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+            >
+              <template #icon-left><OIcon name="data-object" size="sm" /></template>
+              {{ t("panel.downloadAsJSON") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              :disabled="props.data.queryType != 'sql'"
+              data-test="dashboard-move-to-logs-module"
+              @select="onLogPanel"
+              icon-left="search"
+            >
+              {{ t("panel.goToLogs") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-refresh-without-cache"
+              @select="onPanelModifyClick('Refresh')"
+              icon-left="cached"
+            >
+              {{ t("dashboard.panelContainer.refreshCacheReload") }}
+            </ODropdownItem>
+            <ODropdownItem
+              v-if="!simplifiedPanelView"
+              data-test="dashboard-move-to-another-panel"
+              @select="onPanelModifyClick('MovePanel')"
+            >
+              <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
+              {{ t("panel.moveToAnotherTab") }}
+            </ODropdownItem>
+            <!-- Alert creation is shared platform machinery: this contributes the
+                 panel's state through a pure adapter and the action owns the rest
+                 (label, confirm dialog, transport). See CreateAlertAction.vue. -->
+            <CreateAlertAction
+              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+              variant="menu-item"
+              source="panel"
+              :build="buildPanelAlertPrefill"
+              :disabled-reason="alertDisabledReason"
+              data-test="dashboard-create-alert-from-panel"
+            />
+          </template>
         </ODropdown>
       </PanelBar>
     </div>
@@ -577,6 +581,7 @@ export default defineComponent({
     "simplifiedPanelView",
     "shouldRefreshWithoutCache",
     "showLegendsButton",
+    "layoutMode",
   ],
   components: {
     OTag,
@@ -777,6 +782,7 @@ export default defineComponent({
 
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
+    const isLayoutEditing = computed(() => props.layoutMode === "edit");
 
     // Applied to every hover-revealed control in the panel bar. They stay in the
     // layout while hidden so the title's truncation point never moves when the
@@ -784,9 +790,11 @@ export default defineComponent({
     // out of the tab order and the a11y tree, so nothing hidden is reachable.
     // Touch has no hover, so < md the controls are simply always shown.
     const { isMobile } = useBreakpoint();
-    const hoverRevealClass = computed(() =>
-      isCurrentlyHoveredPanel.value || isMobile.value ? "" : "invisible pointer-events-none",
-    );
+    // Layout editing drops them so the grip does not squeeze a narrow panel's title.
+    const hoverRevealClass = computed(() => {
+      if (isLayoutEditing.value) return "hidden";
+      return isCurrentlyHoveredPanel.value || isMobile.value ? "" : "invisible pointer-events-none";
+    });
 
     //for edit panel
     const onEditPanel = (data: any) => {
@@ -1108,6 +1116,7 @@ export default defineComponent({
     const handlePanelKeydown = (e: KeyboardEvent) => {
       if (!isCurrentlyHoveredPanel.value) return;
       if (isInputFocused()) return;
+      if (isLayoutEditing.value && !["v", "V", "i", "I"].includes(e.key)) return;
       // These are single-letter shortcuts — never fire while a modifier is held.
       // Otherwise combos like Alt+Left (panel-editor "Discard & go back") leaking
       // a still-held Alt into the next keystroke would wrongly trigger edit/view.
@@ -1170,6 +1179,7 @@ export default defineComponent({
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,
+      isLayoutEditing,
       hoverRevealClass,
       showViewPanel,
       dependentAdHocVariable,

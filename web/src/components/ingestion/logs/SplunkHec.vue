@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- The collector path is fixed at the root with no org and no base_uri, so unlike every other ingestion page these snippets must not interpolate the org. -->
 <template>
-  <IngestionContent>
+  <IngestionContent ref="content" :target-stream="targetStream">
     <OText variant="body" as="p" data-test="ingestion-logs-splunkhec-intro">
       {{
         t("ingestion.splunkHec.intro", { brand: raw("OpenObserve"), product: raw("Splunk HEC") })
@@ -33,7 +33,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           })
         }}
       </OText>
-      <CopyContent class="copy-content-container-cls" :content="raw(endpointUrl)" />
+      <OCodeBlock
+        :code="endpointUrl"
+        data-test="ingestion-splunkhec-endpoint-code-block"
+        wrap
+        inset
+        copy-on-click
+        class="my-0"
+        @copy="onSnippetCopy"
+      />
       <OText variant="meta" as="p" class="leading-snug">
         {{ t("ingestion.splunkHec.endpointNote", { setting: raw("ZO_BASE_URI") }) }}
       </OText>
@@ -59,12 +67,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <section class="flex flex-col gap-2" data-test="ingestion-logs-splunkhec-example">
       <OText variant="body-strong" as="h3">{{ t("ingestion.splunkHec.exampleTitle") }}</OText>
-      <CopyContent class="copy-content-container-cls" :content="raw(curlContent)" />
+      <OCodeBlock
+        :code="curlContent"
+        lang="bash"
+        data-test="ingestion-splunkhec-example-code-block"
+        wrap
+        inset
+        copy-on-click
+        class="my-0"
+        @copy="onSnippetCopy"
+      />
     </section>
 
     <section class="flex flex-col gap-2" data-test="ingestion-logs-splunkhec-payload">
       <OText variant="body-strong" as="h3">{{ t("ingestion.splunkHec.payloadTitle") }}</OText>
-      <CopyContent class="copy-content-container-cls" :content="raw(payloadContent)" />
+      <OCodeBlock
+        :code="payloadContent"
+        lang="json"
+        data-test="ingestion-splunkhec-payload-code-block"
+        wrap
+        inset
+        copy-on-click
+        class="my-0"
+        @copy="onSnippetCopy"
+      />
       <OText variant="body" as="p">
         {{
           t("ingestion.splunkHec.payloadIndex", {
@@ -107,7 +133,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           })
         }}
       </OText>
-      <CopyContent class="copy-content-container-cls" :content="raw(healthContent)" />
+      <OCodeBlock
+        :code="healthContent"
+        lang="bash"
+        data-test="ingestion-splunkhec-health-code-block"
+        wrap
+        inset
+        copy-on-click
+        class="my-0"
+        @copy="onSnippetCopy"
+      />
     </section>
 
     <OBanner
@@ -154,7 +189,11 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
+import { useRouter } from "vue-router";
+import config from "@/aws-exports";
+import analytics from "@/services/product_analytics";
+import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import type { CodeBlockCopyPayload } from "@/lib/core/Code/OCodeBlock.types";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -169,10 +208,13 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent, IngestionContent, OBanner, OText },
+  components: { OCodeBlock, IngestionContent, OBanner, OText },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
+    const router = useRouter();
+    // Cloud endpoints carry valid certificates, so -k there only teaches users to skip TLS checks.
+    const insecureFlag = config.isCloud === "true" ? "" : " -k";
     // The collector is registered like every other route, so a ZO_BASE_URI
     // deployment serves it under that prefix too — resolve the configured
     // ingest host rather than the browser origin serving the UI.
@@ -185,9 +227,10 @@ export default defineComponent({
 
     // No literal `time`: a hardcoded epoch ages past ZO_INGEST_ALLOWED_UPTO and is
     // then discarded, which the collector still answers with code 0.
-    const curlContent = `curl -k ${endpointUrl} \\
+    const targetStream = "default";
+    const curlContent = `curl${insecureFlag} ${endpointUrl} \\
   -H "Authorization: Splunk [SPLUNK_HEC_TOKEN]" \\
-  -d '{"event":{"level":"info","log":"test message for openobserve"},"index":"default"}'`;
+  -d '{"event":{"level":"info","log":"test message for openobserve"},"index":"${targetStream}"}'`;
 
     // `time` is documented by example here, so it stays — but read through a clock
     // that ticks, since a page held open past ZO_INGEST_ALLOWED_UPTO would otherwise
@@ -207,7 +250,7 @@ export default defineComponent({
     const payloadContent = computed(
       () => `{
   "event": { "level": "info", "log": "test message for openobserve" },
-  "index": "application",
+  "index": "${targetStream}",
   "time": ${nowSeconds.value},
   "host": "web-01",
   "source": "/var/log/app.log",
@@ -215,7 +258,7 @@ export default defineComponent({
 }`,
     );
 
-    const healthContent = `curl -k ${collectorBase}/services/collector/health`;
+    const healthContent = `curl${insecureFlag} ${collectorBase}/services/collector/health`;
 
     // The tokens page is org-scoped, unlike the collector endpoint itself.
     const ingestionTokensRoute = computed(() => ({
@@ -223,9 +266,18 @@ export default defineComponent({
       query: { org_identifier: store.state.selectedOrganization?.identifier },
     }));
 
+    const content = ref<InstanceType<typeof IngestionContent> | null>(null);
+    const onSnippetCopy = ({ partial }: CodeBlockCopyPayload) => {
+      analytics.track("snippet_copied", { route: router?.currentRoute.value.name, partial });
+      content.value?.snippetCopied();
+    };
+
     return {
       t,
+      targetStream,
+      content,
       raw,
+      onSnippetCopy,
       store,
       endpointUrl,
       authHeader,

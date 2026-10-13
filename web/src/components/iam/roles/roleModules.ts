@@ -49,6 +49,11 @@ export type RoleModule = {
   countedKeys: string[];
 };
 
+/** Rail key of the view that lists every module's own grant row; no resource key starts with `__`. */
+export const ALL_MODULES_KEY = "__all__";
+
+export const ALL_MODULES_ICON: IconName = "checklist";
+
 /** Stream types are type-level children of `stream`, opened from the Streams module like folders. */
 export const STREAM_PARENT_KEY = "stream";
 
@@ -111,6 +116,8 @@ const GROUP_OF: Record<string, ModuleGroupId> = {
   workflows: "pipelines",
   synthetic_folder: "monitoring",
   synthetics: "monitoring",
+  downtime_folder: "alerting",
+  downtime: "alerting",
   synthetic_environment: "monitoring",
   status_page: "monitoring",
   db_monitoring: "monitoring",
@@ -174,6 +181,8 @@ const ICON_OF: Record<string, IconName> = {
   workflows: "schema",
   synthetic_folder: "radar",
   synthetics: "radar",
+  downtime_folder: "notifications-paused",
+  downtime: "notifications-paused",
   synthetic_environment: "layers",
   status_page: "monitor-heart",
   db_monitoring: "database",

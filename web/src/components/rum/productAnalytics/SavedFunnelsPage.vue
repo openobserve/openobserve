@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="min-h-0 flex-1 overflow-hidden">
       <OTable
+        ref="oTableRef"
         v-model:selected-ids="selectedIds"
         :data="rows"
         :columns="columns"
@@ -53,9 +54,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :error="listStatus === 'failed' ? t('rum.analytics.saved.loadFailed') : null"
         :selection="canWrite ? 'multiple' : 'none'"
         pagination="client"
-        :page-size="20"
+        :page-size="pageSize"
         :page-size-options="[20, 50, 100]"
+        :current-page="currentPage"
+        @update:current-page="currentPage = $event"
+        @update:page-size="pageSize = $event"
         sorting="client"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         :default-columns="false"
         :show-global-filter="false"
         :frame="false"
@@ -251,6 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onActivated, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useListViewState } from "@/composables/useListViewState";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -295,7 +304,29 @@ const draft = useFunnelDraft();
 const { permission, invalidCount } = sf;
 
 const dialogs = ref<InstanceType<typeof SavedFunnelDialogs> | null>(null);
-const filter = ref("");
+const viewState = useListViewState("rumSavedFunnels", {
+  filter: "",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const filter = ref(viewState.filter);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref<"asc" | "desc">(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+watch([filter, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    filter: filter.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
+watch(filter, () => (currentPage.value = 1));
 const selectedIds = ref<string[]>([]);
 const refreshing = ref(false);
 let activatedOnce = false;
@@ -307,6 +338,17 @@ const { entries, entriesLoading, entriesFailed, recent, loadEntries, refreshRece
 
 const org = () => pa.toQuery().org_identifier as string;
 const listStatus = computed(() => sf.status(org(), pa.state.app));
+let pageRestored = false;
+watch(
+  () => listStatus.value === "ready",
+  (ready) => {
+    if (!ready || pageRestored) return;
+    pageRestored = true;
+    // Macrotask so the restored page wins over the table's own reset on data change.
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { immediate: true },
+);
 // Another app's read time must not stand for this list while it loads.
 const lastUpdatedAt = computed(() =>
   listStatus.value === "loading" ? undefined : (sf.loadedAt.value ?? undefined),

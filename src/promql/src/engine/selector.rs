@@ -333,7 +333,11 @@ impl Engine {
         let trace_id = self.ctx.query_ctx.trace_id.clone();
         #[cfg(feature = "enterprise")]
         let (super_tx, mut super_rx) = tokio::sync::mpsc::channel::<
-            Result<(HashMap<u64, RangeValue>, config::meta::search::ScanStats)>,
+            Result<(
+                HashMap<u64, RangeValue>,
+                config::meta::search::ScanStats,
+                Vec<String>,
+            )>,
         >(1);
         #[cfg(feature = "enterprise")]
         if self.ctx.query_ctx.is_super_cluster {
@@ -402,6 +406,7 @@ impl Engine {
             schema,
             scan_stats,
             keep_filters,
+            warnings,
             ..
         } in ctxs
         {
@@ -434,6 +439,9 @@ impl Engine {
             // update stats
             let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
             ctx_scan_stats.add(&scan_stats);
+            if !warnings.is_empty() {
+                self.ctx.warnings.write().await.extend(warnings);
+            }
         }
 
         let mut abort_receiver = self
@@ -505,7 +513,7 @@ impl Engine {
         #[cfg(feature = "enterprise")]
         let metrics = if self.ctx.query_ctx.is_super_cluster {
             let mut metrics = merge_loaded_metrics(task_results);
-            let (metric, stats) = match super_rx.recv().await {
+            let (metric, stats, warnings) = match super_rx.recv().await {
                 Some(Ok(ret)) => ret,
                 Some(Err(e)) => {
                     log::error!(
@@ -533,6 +541,9 @@ impl Engine {
             }
             let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
             ctx_scan_stats.add(&stats);
+            if !warnings.is_empty() {
+                self.ctx.warnings.write().await.extend(warnings);
+            }
 
             metrics.into_values().collect()
         } else {

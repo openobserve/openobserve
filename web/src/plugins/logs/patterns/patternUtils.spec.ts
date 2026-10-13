@@ -23,6 +23,8 @@ import {
   buildPatternAlertData,
   compactCount,
   formatBucketDuration,
+  patternSeverityKey,
+  patternSeverityKeyForPattern,
 } from "./patternUtils";
 
 describe("extractConstantsFromPattern", () => {
@@ -345,6 +347,26 @@ describe("buildPatternSetSqlQuery", () => {
     expect(buildPatternSetSqlQuery({ streamName: "k8s_logs" })).toBe("SELECT * FROM 'k8s_logs'");
   });
 
+  it.each(["status=500 --404", "status=500 -- note", "status=500\n-- note"])(
+    "strips a comment from the base filter so it cannot swallow the pattern terms: %j",
+    (baseFilter) => {
+      expect(
+        buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter, excludes: [ERROR_PATTERN] }),
+      ).toBe(
+        "SELECT * FROM 'k8s_logs' WHERE (status=500) AND NOT (match_all('Connection refused to upstream'))",
+      );
+    },
+  );
+
+  it("keeps -- inside a string literal of the base filter, and drops a comment-only base", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "msg = 'a -- b'" })).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (msg = 'a -- b')",
+    );
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "-- note" })).toBe(
+      "SELECT * FROM 'k8s_logs'",
+    );
+  });
+
   it("ignores a whitespace-only base filter", () => {
     expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "   " })).toBe(
       "SELECT * FROM 'k8s_logs'",
@@ -363,5 +385,29 @@ describe("buildPatternSetSqlQuery", () => {
     expect(buildPatternSetSqlQuery({ streamName: "s", includes: [ERROR_PATTERN] })).toBe(
       buildPatternSqlQuery(ERROR_PATTERN, "s"),
     );
+  });
+});
+
+describe("pattern severity buckets", () => {
+  it.each([
+    ["trace", "debug"],
+    ["0", "info"],
+    [0, "info"],
+    ["3", "error"],
+    ["WARN2", "info"],
+    ["failure", "info"],
+    ["error", "error"],
+    ["notice", "warning"],
+    ["ok", "info"],
+  ])("backend level %s → %s", (level, bucket) => {
+    expect(patternSeverityKeyForPattern({ level, template: "x" })).toBe(bucket);
+  });
+
+  it.each([
+    ["GET /api ERROR <*>", "error"],
+    ["trace span <*>", "debug"],
+    ["user logged in <*>", "uncategorized"],
+  ])("template %s → %s", (template, bucket) => {
+    expect(patternSeverityKey(template)).toBe(bucket);
   });
 });

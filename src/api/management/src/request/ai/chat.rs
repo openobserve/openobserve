@@ -181,6 +181,21 @@ fn is_valid_session_id(val: &str) -> bool {
     val.len() == 36 && uuid::Uuid::try_parse(val).is_ok()
 }
 
+/// The confirm body with `org_id` set to the path org, which the auth middleware
+/// has checked the caller belongs to; `None` unless the body is a JSON object.
+///
+/// Any client-sent `org_id` is overwritten: o2-ai refuses a confirmation whose
+/// recorded org differs, so it must only ever see the org the caller was
+/// authorized for.
+#[cfg(any(feature = "enterprise", test))]
+fn bind_confirm_body_to_org(body: &[u8], org_id: &str) -> Option<Vec<u8>> {
+    let mut value: serde_json::Value = serde_json::from_slice(body).ok()?;
+    value
+        .as_object_mut()?
+        .insert("org_id".to_string(), serde_json::Value::from(org_id));
+    serde_json::to_vec(&value).ok()
+}
+
 #[cfg(feature = "cloud")]
 pub(crate) fn ai_authorization_error_response(
     error: openobserve_core::trial_quota::AiUsageAuthorizationError,
@@ -1229,7 +1244,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
     )
 )]
 pub async fn confirm_action(
-    Path((_org_id, session_id)): Path<(String, String)>,
+    Path((org_id, session_id)): Path<(String, String)>,
     in_req: axum::extract::Request,
 ) -> Response {
     let (parts, body) = in_req.into_parts();
@@ -1265,13 +1280,16 @@ pub async fn confirm_action(
         // Extract user auth from headers to pass to the agent
         let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
 
-        // Agent uses Authorization header directly - no need to inject user_token into body
-        let forward_bytes = body_bytes;
+        // The session id alone names no org, so pass the authorized one along:
+        // o2-ai refuses to answer a confirmation recorded for a different org.
+        let Some(forward_bytes) = bind_confirm_body_to_org(&body_bytes, &org_id) else {
+            return MetaHttpResponse::bad_request("Confirmation body must be a JSON object");
+        };
 
         // The client builds and routes the confirm URL itself: it must reach the
         // replica holding the paused turn, not whichever one the LB picks.
         match client
-            .confirm_action(&session_id, forward_bytes.to_vec(), &auth_str)
+            .confirm_action(&session_id, forward_bytes, &auth_str)
             .await
         {
             Ok(resp) => {
@@ -1308,6 +1326,7 @@ pub async fn confirm_action(
 
     #[cfg(not(feature = "enterprise"))]
     {
+        drop(org_id);
         drop(session_id);
         drop(parts);
         drop(body_bytes);
@@ -1420,6 +1439,31 @@ mod tests {
         assert!(!is_valid_session_id(
             "01234567-89ab-cdef-0123-456789abcdeff"
         ));
+    }
+
+    #[test]
+    fn test_confirm_body_carries_the_path_org() {
+        let bound = bind_confirm_body_to_org(br#"{"approved":true}"#, "acme").unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bound).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({"approved": true, "org_id": "acme"})
+        );
+    }
+
+    #[test]
+    fn test_confirm_body_org_cannot_be_chosen_by_the_client() {
+        let bound =
+            bind_confirm_body_to_org(br#"{"approved":true,"org_id":"victim"}"#, "acme").unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bound).unwrap();
+        assert_eq!(value["org_id"], "acme");
+    }
+
+    #[test]
+    fn test_confirm_body_must_be_a_json_object() {
+        assert!(bind_confirm_body_to_org(b"", "acme").is_none());
+        assert!(bind_confirm_body_to_org(b"not json", "acme").is_none());
+        assert!(bind_confirm_body_to_org(b"[true]", "acme").is_none());
     }
 
     #[test]

@@ -159,6 +159,7 @@ export const defaultAlertValue: any = () => {
       // aggregation.multi_alert — a PromQL alert has no aggregation, so the
       // flag cannot live there.
       promql_multi_alert: false,
+      promql_rule_mode: false,
       // Feature 5 (§6b.6). `null` until the SLO query mode is chosen: the
       // backend enforces `query_type == slo` IFF this is present, so an empty
       // object here would make every ordinary alert fail validation.
@@ -2581,7 +2582,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // frequency field's display unit). Falls back to 0 for any alert type
       // where the field is absent from the GET response (older cached
       // response shape, etc.) rather than showing NaN.
-      data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
+      const pendingMinutes = (Number(data.pending_period_sec) || 0) / 60;
+      data.pending_period_sec =
+        data.query_condition?.type === "promql" && data.query_condition.promql_rule_mode
+          ? pendingMinutes
+          : Math.round(pendingMinutes);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
       // The saved type is the user's earlier answer; ask again only on a switch.
       confirmedSaveMode.value = data.query_condition?.type ?? null;
@@ -2818,7 +2823,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           ? formData.value.query_condition.promql.trim()
           : "";
         isUsingBackendSql.value = false;
-        if (!formData.value.query_condition.promql_condition) {
+        if (
+          !formData.value.query_condition.promql_condition &&
+          !formData.value.query_condition.promql_rule_mode
+        ) {
           setF("query_condition.promql_condition", {
             column: "value",
             operator: ">=",

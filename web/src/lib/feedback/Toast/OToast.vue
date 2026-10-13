@@ -224,6 +224,7 @@ onUnmounted(() => {
           <button
             v-if="action"
             type="button"
+            data-test="o-toast-action-btn"
             :class="[
               'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
               actionSucceeded

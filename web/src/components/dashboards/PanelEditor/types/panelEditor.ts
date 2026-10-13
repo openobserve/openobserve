@@ -228,6 +228,8 @@ export interface PanelEditorProps {
    */
   showAddToDashboardButton?: boolean;
 
+  addToDashboardDisabledReason?: I18nText | null;
+
   // ---- Chart Configuration ----
   /**
    * Array of allowed chart types. If not specified, all chart types are allowed.

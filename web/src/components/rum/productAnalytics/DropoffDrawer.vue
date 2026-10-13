@@ -238,8 +238,9 @@ const props = withDefaults(
     sampled: SampleRatio;
     expectedDropped?: number | null;
     events?: NamedEvent[];
+    deletedNames?: Readonly<Record<string, string>>;
   }>(),
-  { expectedDropped: null, events: () => [] },
+  { expectedDropped: null, events: () => [], deletedNames: () => ({}) },
 );
 const emit = defineEmits<{ "update:open": [boolean]; paths: [FunnelCohort] }>();
 const { t } = useI18nTyped();
@@ -274,10 +275,12 @@ const unitNoun = computed(() =>
   users.value ? pa.usersUnit.value.noun : t("rum.analytics.funnel.sessionNoun"),
 );
 const step = computed(() => props.cohort.funnel.steps[props.cohort.stepIndex - 1]);
-const stepKey = computed(() => (step.value ? stepLabel(step.value, props.events) : ""));
+const stepKey = computed(() =>
+  step.value ? stepLabel(step.value, props.events, props.deletedNames) : "",
+);
 const nextKey = computed(() => {
   const s = props.cohort.funnel.steps[props.cohort.stepIndex];
-  return s ? stepLabel(s, props.events) : "";
+  return s ? stepLabel(s, props.events, props.deletedNames) : "";
 });
 
 const dropped = computed(() => healthPanel.value.rows.find((r) => r.side === "dropped"));

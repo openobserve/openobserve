@@ -85,8 +85,9 @@ const props = withDefaults(
     dimLabel: I18nText;
     events: NamedEvent[];
     sampled?: SampleRatio;
+    deletedNames?: Readonly<Record<string, string>>;
   }>(),
-  { sampled: 1 },
+  { sampled: 1, deletedNames: () => ({}) },
 );
 const { t } = useI18nTyped();
 
@@ -125,7 +126,7 @@ const columns = computed<OTableColumnDef<TableRow>[]>(() => [
   },
   ...props.steps.map((s, i) => ({
     id: `s${i}`,
-    header: raw(`${i + 1}. ${stepLabel(s, props.events)}`),
+    header: raw(`${i + 1}. ${stepLabel(s, props.events, props.deletedNames)}`),
     accessorFn: (r: TableRow) => r.counts[i],
     size: 130,
     meta: { align: "right" as const },

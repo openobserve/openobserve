@@ -47,9 +47,18 @@ describe("useOSRoutes", () => {
     expect(homeChildRoutes.slice(0, mockIngestionRoutes.length)).toEqual(mockIngestionRoutes);
   });
 
-  it("homeChildRoutes has one extra route (the AI Monitor shell) beyond the mocked ingestion routes", () => {
+  it("homeChildRoutes has three extra routes (the AI Monitor shell + its two siblings) beyond the mocked ingestion routes", () => {
     const { homeChildRoutes } = useOSRoutes();
-    expect(homeChildRoutes).toHaveLength(mockIngestionRoutes.length + 1);
+    expect(homeChildRoutes).toHaveLength(mockIngestionRoutes.length + 3);
+  });
+
+  it("registers aiSessionDetails and the online-evals redirect alongside the AI Monitor shell", () => {
+    const { homeChildRoutes } = useOSRoutes();
+    const names = homeChildRoutes.map((r: any) => r.name ?? r.path);
+    expect(names).toContain("aiSessionDetails");
+    expect(homeChildRoutes.find((r: any) => r.path === "online-evals")).toMatchObject({
+      redirect: { name: "aiEvaluations" },
+    });
   });
 
   it("homeChildRoutes items match the mocked route objects", () => {
@@ -58,15 +67,53 @@ describe("useOSRoutes", () => {
     expect(homeChildRoutes[1]).toEqual({ path: "ingestion/logs", name: "ingestLogs" });
   });
 
-  it("registers the AI Monitor shell with only LLM Insights + Sessions as children", () => {
+  it("registers every AI Observability route in OSS too, not just LLM Insights + Sessions", () => {
+    // OSS used to register only these two — the rest were enterprise-only,
+    // which silently broke any nav item that pointed at them once the rail
+    // started showing them locked-but-visible instead of hidden. All of
+    // them must resolve to SOME route now, even if `withFeatureGate` then
+    // redirects away in a true OSS build.
     const { homeChildRoutes } = useOSRoutes();
     const aiRoute = homeChildRoutes.find((r: any) => r.path === "ai");
     expect(aiRoute).toBeDefined();
-    expect(aiRoute.children.map((c: any) => c.name)).toEqual([
-      "aiObservability",
-      "aiLLMInsights",
-      "aiSessions",
-    ]);
+    const names = aiRoute.children.map((c: any) => c.name);
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "aiLLMInsights",
+        "aiSessions",
+        "aiAgentGraph",
+        "aiAgentBehavior",
+        "aiDiscovery",
+        "aiQueues",
+        "aiQueueDetail",
+        "aiQueueWorkbench",
+        "aiDatasets",
+        "aiDatasetDetail",
+        "aiPrompts",
+        "aiPromptCreate",
+        "aiPromptVersionCreate",
+        "aiPlayground",
+        "aiExperiments",
+        "aiExperimentCreate",
+        "aiExperimentCompare",
+        "aiExperimentDetail",
+        "aiRemoteTasks",
+        "aiRemoteTaskCreate",
+        "aiRemoteTaskEdit",
+        "aiRemoteTaskDetail",
+        "aiEvaluations",
+      ]),
+    );
+  });
+
+  it("gates every AI Observability route except LLM Insights/Sessions with a beforeEnter guard", () => {
+    const { homeChildRoutes } = useOSRoutes();
+    const aiRoute = homeChildRoutes.find((r: any) => r.path === "ai");
+    const ungated = new Set(["aiObservability", "aiLLMInsights", "aiSessions"]);
+    for (const child of aiRoute.children) {
+      if (ungated.has(child.name)) continue;
+      expect(typeof child.beforeEnter).toBe("function");
+    }
   });
 
   describe("the AI Monitor shell route", () => {

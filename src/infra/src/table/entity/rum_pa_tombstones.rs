@@ -27,6 +27,8 @@ pub struct Model {
     pub org_id: String,
     pub version: i32,
     pub deleted_at: i64,
+    /// The row's name when it was deleted, when the delete captured one; absent otherwise.
+    pub name: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

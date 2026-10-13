@@ -437,8 +437,17 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
       await click("dashboards-ready-made-banner-choose");
       await toggleRow("mysql");
       await primary().trigger("click");
+      // Two installs queue behind the dismissal's write, so a fixed tick count runs out under a loaded run.
+      await vi.waitFor(
+        () =>
+          expect(savedStates()).toEqual({
+            postgresql: "added",
+            redis: "added",
+            mysql: "dismissed",
+          }),
+        { timeout: 4000 },
+      );
       await settle();
-      expect(savedStates()).toEqual({ postgresql: "added", redis: "added", mysql: "dismissed" });
       expect(router.push).not.toHaveBeenCalled();
       expect(toastMock.mock.calls.at(-1)![0].variant).toBe("success");
     });

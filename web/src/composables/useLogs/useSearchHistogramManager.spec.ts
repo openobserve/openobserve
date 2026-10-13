@@ -190,6 +190,32 @@ describe("useSearchHistogramManager", () => {
   });
 
   describe("handleHistogramResponse", () => {
+    it("skips the fill instead of throwing when the run built no request", () => {
+      (mockState.searchObj.data as any).customDownloadQueryObj = {};
+      mockState.searchObj.data.queryResults = {
+        aggs: [],
+        scan_size: 0,
+        took: 0,
+        result_cache_ratio: 0,
+        hits: [],
+        histogram_interval: 0,
+      } as any;
+      const response = {
+        content: {
+          results: {
+            hits: [{ zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 1 }],
+            scan_size: 0,
+            took: 0,
+            result_cache_ratio: 0,
+          },
+        },
+      };
+      expect(() =>
+        histogramManager.handleHistogramResponse({} as any, "trace-1", response, {}, vi.fn()),
+      ).not.toThrow();
+      expect(mockState.searchObj.data.queryResults.aggs).toHaveLength(1);
+    });
+
     it("should process histogram response correctly", () => {
       // Use mockState directly
       mockState.searchObj.data.queryResults = {

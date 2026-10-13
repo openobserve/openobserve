@@ -22,6 +22,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     searchable
     search-data-test="server-list-search-input"
   >
+    <template v-if="pickTab" #tabs="{ tabs, filter }">
+      <FirstSourcePickGroup
+        v-if="pickMatches(filter)"
+        rail="servers"
+        :tab="pickTab"
+        :rest-label="t('ingestion.serverLabel')"
+      />
+      <ORouteTab
+        v-for="tab in tabs.filter((tab) => tab.name !== pickTab?.name)"
+        :key="tab.name"
+        :title="tab.name"
+        :name="tab.name"
+        :to="tab.to"
+        :icon="tab.icon"
+        :label="tab.label"
+      />
+    </template>
     <div class="h-full w-full">
       <div class="bg-card-glass-bg h-full">
         <div class="h-full overflow-auto pt-0.5">
@@ -35,6 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
+import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -43,10 +62,11 @@ import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
+import { firstSourcePickRoute } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "ServerPage",
-  components: { DataSourceSidebarLayout },
+  components: { DataSourceSidebarLayout, FirstSourcePickGroup, ORouteTab },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -127,6 +147,11 @@ export default defineComponent({
       },
     ];
 
+    const pickRoute = firstSourcePickRoute(store.state.selectedOrganization.identifier);
+    const pickTab = serverTabs.find((tab) => tab.name === pickRoute);
+    const pickMatches = (filter: string) =>
+      !filter || (pickTab?.label ?? "").toLowerCase().includes(filter.toLowerCase());
+
     return {
       t,
       store,
@@ -139,6 +164,8 @@ export default defineComponent({
       tabs,
       ingestTabType,
       serverTabs,
+      pickTab,
+      pickMatches,
     };
   },
 });

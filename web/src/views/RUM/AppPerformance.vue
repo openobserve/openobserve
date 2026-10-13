@@ -41,21 +41,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="app-performance-auto-refresh-interval"
         @trigger="refreshData"
       />
-      <OButton
-        icon-left="refresh"
-        :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
-        size="icon-toolbar"
-        data-test="rum-performance-refresh"
-        @click="refreshData"
-      >
-        <OTooltip
-          :content="
-            isVariablesChanged
-              ? t('dashboard.refreshToApplyVariableChanges')
-              : t('dashboard.refresh')
-          "
-        />
-      </OButton>
+      <OButtonGroup>
+        <OButton
+          :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
+          :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
+          size="icon-toolbar"
+          data-test="rum-performance-refresh"
+          @click="refreshData"
+        >
+          <OTooltip
+            :content="
+              isAutoRunOn
+                ? t('search.autoRunEnabled')
+                : isVariablesChanged
+                  ? t('dashboard.refreshToApplyVariableChanges')
+                  : t('dashboard.refresh')
+            "
+          />
+        </OButton>
+        <ODropdown v-if="isAutoRunAvailable" align="end" side="bottom">
+          <template #trigger>
+            <OButton
+              :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
+              size="icon-toolbar"
+              class="w-5"
+              :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
+              data-test="rum-performance-refresh-options-btn"
+              icon-left="arrow-drop-down"
+            />
+          </template>
+          <ODropdownItem
+            data-test="rum-performance-refresh-item"
+            icon-left="refresh"
+            @select="refreshData"
+          >
+            {{ t("dashboard.refresh") }}
+          </ODropdownItem>
+          <ODropdownSeparator />
+          <ODropdownItem data-test="rum-performance-auto-run-toggle-btn" @select="toggleAutoRun">
+            <template #icon-left>
+              <OIcon
+                :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                size="sm"
+                :class="isAutoRunOn ? 'text-accent' : ''"
+              />
+            </template>
+            <span>
+              <div class="font-medium">
+                {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+              </div>
+              <div class="text-text-secondary text-xs">
+                {{ t("search.liveModeTooltip") }}
+              </div>
+            </span>
+          </ODropdownItem>
+        </ODropdown>
+      </OButtonGroup>
       <ShareButton
         data-test="rum-performance-share-link-btn"
         :url="shareUrl"
@@ -93,7 +134,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, nextTick, computed, onActivated } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  onMounted,
+  nextTick,
+  computed,
+  onActivated,
+  provide,
+} from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -109,6 +159,12 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -122,6 +178,11 @@ export default defineComponent({
     OTab,
     DateTimePickerDashboard,
     OButton,
+    OButtonGroup,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
+    OIcon,
     OTooltip,
     OPageLayout,
     ShareButton,
@@ -138,11 +199,16 @@ export default defineComponent({
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);
 
+    const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
+    provide("dashboardAutoRun", isAutoRunOn);
+
     // Track if there are uncommitted variable changes
     const isVariablesChanged = computed(() => {
       // If using variables manager, access hasUncommittedChanges directly from the manager
       // Explicitly dereference to ensure Vue tracks the dependency
       const manager = variablesManager.value;
+
+      if (isAutoRunOn.value) return false;
 
       if (manager && "hasUncommittedChanges" in manager) {
         // Access the value (Vue auto-unwraps computed refs in composable returns)
@@ -417,6 +483,9 @@ export default defineComponent({
       activePerformanceTab,
       activePerformanceComponent,
       isVariablesChanged,
+      isAutoRunAvailable,
+      isAutoRunOn,
+      toggleAutoRun,
       shareUrl,
       isMobile,
     };

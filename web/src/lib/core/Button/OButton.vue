@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ButtonProps, ButtonEmits, ButtonSlots } from "./OButton.types";
 import { Primitive } from "reka-ui";
-import { computed } from "vue";
+import { computed, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -12,12 +12,17 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   size: "md",
   type: "button",
   disabled: false,
+  focusableUnavailable: false,
   loading: false,
   active: false,
   block: false,
 });
 
 const emit = defineEmits<ButtonEmits>();
+const attrs = useAttrs();
+const id = useId();
+const unavailable = computed(() => props.disabled && props.focusableUnavailable);
+const reasonId = computed(() => props.descriptionId ?? `${id}-reason`);
 
 defineSlots<ButtonSlots>();
 
@@ -269,6 +274,58 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
 };
 
+const disabledVariantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
+  primary: "bg-button-primary-disabled text-button-primary-foreground",
+  secondary: "bg-button-secondary-disabled text-text-disabled",
+  outline: "opacity-50",
+  ghost: "text-text-disabled",
+  "ghost-primary": "text-text-disabled",
+  "ghost-muted": "text-text-disabled",
+  "ghost-subtle": "text-text-disabled opacity-30",
+  "ghost-destructive": "opacity-60",
+  "ghost-success": "opacity-60",
+  destructive: "opacity-60",
+  "filter-exclude": "opacity-60",
+  "ghost-warning": "opacity-60",
+  warning: "opacity-60",
+  "ghost-neutral": "opacity-50",
+  "outline-destructive": "opacity-50",
+  "cancel-query": "opacity-60",
+  "panel-collapse": "opacity-50",
+  "sidebar-button": "bg-button-primary-disabled text-button-primary-foreground",
+  "sidebar-toggle": "opacity-50",
+  "ai-gradient": "opacity-40",
+  "on-dark-primary": "opacity-50",
+  "on-dark-ghost": "opacity-50",
+  "preview-slack": "opacity-60",
+  "preview-teams": "opacity-60",
+  "preview-email": "opacity-60",
+  "preview-opsgenie": "opacity-60",
+  "preview-action": "opacity-60",
+  "webinar-dismiss": "opacity-60",
+  "banner-dismiss": "opacity-60",
+  "outline-primary": "opacity-50",
+  dashed: "opacity-50",
+  "pricing-chip": "opacity-60",
+};
+
+const unavailableClasses = computed(() => {
+  const disabledClasses = disabledVariantClasses[props.variant].split(" ");
+  const overriddenGroups = disabledClasses.map((value) => value.split("-")[0]);
+  return [
+    ...variantClasses[props.variant]
+      .split(" ")
+      .filter(
+        (value) =>
+          !value.startsWith("enabled:") &&
+          !value.startsWith("disabled:") &&
+          !overriddenGroups.includes(value.split("-")[0]),
+      ),
+    ...disabledClasses,
+    "cursor-not-allowed!",
+  ].join(" ");
+});
+
 const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   xs: "h-7 ps-2.5 pe-2.5 text-xs gap-1.5 rounded-default",
   // 34px control height — the workhorse compact button that pairs with 34px
@@ -336,14 +393,31 @@ const classes = computed<string[]>(() => [
      1.38:1 in light and 1.50:1 in dark, against the 3:1 SC 1.4.11 floor. Solid, it is
      4.80:1 / 6.82:1. This override is why the per-variant ring classes never paint. */
   "focus-visible:ring-[0.125rem]! focus-visible:ring-focus-ring-accent!",
-  "disabled:cursor-not-allowed enabled:cursor-pointer",
+  unavailable.value ? "cursor-not-allowed!" : "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
-  props.active ? activeClasses : variantClasses[props.variant],
+  unavailable.value
+    ? unavailableClasses.value
+    : props.active
+      ? activeClasses
+      : variantClasses[props.variant],
   sizeClasses[props.size],
 ]);
 
+function handleKeydown(event: KeyboardEvent): void {
+  if (unavailable.value && (event.key === "Enter" || event.key === " ")) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}
+
 function handleClick(event: MouseEvent): void {
-  if (props.disabled || props.loading) return;
+  if (props.disabled || props.loading) {
+    if (unavailable.value) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+    return;
+  }
   emit("click", event);
 }
 </script>
@@ -354,12 +428,16 @@ function handleClick(event: MouseEvent): void {
     :as-child="asChild"
     :class="classes"
     :type="as === 'button' ? type : undefined"
-    :disabled="as === 'button' ? disabled || loading : undefined"
+    :disabled="
+      as === 'button' ? (disabled && !focusableUnavailable) || (loading && !unavailable) : undefined
+    "
     :aria-disabled="disabled || loading || undefined"
     :aria-busy="loading || undefined"
     data-o2-btn
     :data-o2-variant="variant"
     v-bind="$attrs"
+    :aria-describedby="unavailable ? reasonId : (attrs['aria-describedby'] as string | undefined)"
+    @keydown.capture="handleKeydown"
     @click="handleClick"
   >
     <!-- Loading spinner overlay — centered, absolute, shown only when loading -->
@@ -372,11 +450,14 @@ function handleClick(event: MouseEvent): void {
     </span>
 
     <!-- Keep display:contents while loading: a wrapper that later loses its box strands a child-mode OTooltip anchored to it at (0,0) -->
-    <span :class="loading ? 'invisible contents' : 'contents'">
+    <span :class="loading ? 'contents text-transparent [&>*]:opacity-0' : 'contents'">
       <slot name="icon-left">
         <OIcon v-if="iconLeft" :name="iconLeft" size="sm" />
       </slot>
       <slot />
+      <span v-if="unavailable && !descriptionId" :id="reasonId" class="sr-only" aria-hidden="true"
+        ><slot name="unavailable-reason"
+      /></span>
       <slot name="icon-right">
         <OIcon v-if="iconRight" :name="iconRight" size="sm" />
       </slot>

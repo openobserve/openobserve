@@ -44,6 +44,9 @@ const PAGE_ONLY_VARIABLE_KEYS = new Set([
   "labelKey",
 ]);
 
+/** The page scopes each picker to its tabs; a stored copy re-declares its own scope below. */
+const PAGE_SCOPE_VARIABLE_KEYS = new Set(["scope", "tabs"]);
+
 const GROUP_IDS = new Set<string>(Object.values(GROUP));
 
 /** A picker label that fell back to the bare group id reads better as the plain noun. */
@@ -179,12 +182,19 @@ function dashboardLink(link: KubernetesDashboardLink): Doc {
 
 function storedVariable(variable: Doc): Doc {
   const kept = Object.fromEntries(
-    Object.entries(withoutPageKeys(variable)).filter(([key]) => !PAGE_ONLY_VARIABLE_KEYS.has(key)),
+    Object.entries(withoutPageKeys(variable)).filter(
+      ([key]) => !PAGE_ONLY_VARIABLE_KEYS.has(key) && !PAGE_SCOPE_VARIABLE_KEYS.has(key),
+    ),
   );
   const fallback = VARIABLE_LABEL_KEYS[kept.name];
   // The dictionary's display when the org has one; its raw group id otherwise.
   const unlabelled = !kept.label || GROUP_IDS.has(kept.label);
-  return { ...kept, label: unlabelled && fallback ? gt(fallback) : kept.label };
+  return {
+    ...kept,
+    label: unlabelled && fallback ? gt(fallback) : kept.label,
+    // A link passes picks as URL keys; a tab-scoped key names the source dashboard's tab, which the target lacks.
+    scope: "global",
+  };
 }
 
 function notePanel(id: string, text: string): Doc {

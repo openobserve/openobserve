@@ -58,16 +58,28 @@ export interface CodeBlockProps {
   lineNumbers?: boolean;
   /** Inset the code from the block's edge, for a block with no toolbar above it. */
   padded?: boolean;
+  inset?: boolean;
   /**
    * data-test prefix for the toolbar buttons, e.g. "ai-code" yields
    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
    */
   dataTest?: string;
+  /** First click on an unfocused block copies `code` and focuses it; Enter copies again. */
+  copyOnClick?: boolean;
+  /** Name of the credential inside `code`, shown as a toolbar link and in the copy toast. */
+  tokenName?: string;
+}
+
+/** `partial` is true for a copy of a text selection, false for a whole-block copy. */
+export interface CodeBlockCopyPayload {
+  partial: boolean;
 }
 
 export interface CodeBlockEmits {
-  /** Fired only after the raw code was copied to the clipboard successfully. */
-  (e: "copy"): void;
+  /** Fired only after the code was copied to the clipboard successfully. */
+  (e: "copy", payload: CodeBlockCopyPayload): void;
+  /** The toolbar token link was clicked (only rendered when `tokenName` is set). */
+  (e: "token-click"): void;
 }
 
 export interface CodeBlockSlots {

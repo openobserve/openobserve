@@ -1561,6 +1561,11 @@ describe("CuratedPageView", () => {
       (variables[0] as any).options = [{ label: "common-dev", value: "common-dev" }];
       (variables[0] as any).value = ["common-dev"];
       (variables[1] as any).value = ["argocd"];
+      // Tab-scoped, as buildVariable emits them.
+      for (const variable of variables as any[]) {
+        variable.scope = "tabs";
+        variable.tabs = ["workloads"];
+      }
       // The REAL chain edge buildVariable emits — the graph is built from this
       // `$cluster` reference, so a fixture without it resets no children.
       (variables[1] as any).query_data = {
@@ -1582,13 +1587,16 @@ describe("CuratedPageView", () => {
         .vm.$emit("variablesManagerReady", manager);
       await flushPromises();
 
-      manager.updateVariableValue("cluster", "global", undefined, undefined, []);
+      manager.updateVariableValue("cluster", "tabs", "workloads", undefined, []);
       manager.commitAll();
       await flushPromises();
 
-      expect(router.currentRoute.value.query["var-cluster"]).toBeUndefined();
+      const query = router.currentRoute.value.query;
+      expect(query["var-cluster"]).toBeUndefined();
+      expect(query["var-cluster.t.workloads"]).toBeUndefined();
       // The chain: a namespace picked under the cleared cluster must not keep filtering.
-      expect(router.currentRoute.value.query["var-namespace"]).toBeUndefined();
+      expect(query["var-namespace"]).toBeUndefined();
+      expect(query["var-namespace.t.workloads"]).toBeUndefined();
     });
 
     it("finding 23b: an omitted cluster picker with ONE resolvable value renders the name as static text", async () => {
@@ -1753,7 +1761,8 @@ describe("CuratedPageView", () => {
             label: "K8s Namespace",
             type: "query_values",
             multiSelect: true,
-            scope: "global",
+            scope: "tabs",
+            tabs: ["workloads"],
             value: [],
             options: [
               { label: "argocd", value: "argocd" },
@@ -1812,11 +1821,11 @@ describe("CuratedPageView", () => {
         .vm.$emit("variablesManagerReady", manager);
       await flushPromises();
 
-      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      manager.updateVariableValue("namespace", "tabs", "workloads", undefined, ["argocd"]);
       await flushPromises();
       const afterFirst = committedValue(manager, "namespace");
 
-      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      manager.updateVariableValue("namespace", "tabs", "workloads", undefined, ["argocd"]);
       await flushPromises();
 
       expect(committedValue(manager, "namespace")).toEqual(afterFirst);
@@ -1836,11 +1845,11 @@ describe("CuratedPageView", () => {
       expect(committedValue(manager, "namespace")).toEqual([]);
 
       // Exactly what VariablesValueSelector does on a user pick.
-      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      manager.updateVariableValue("namespace", "tabs", "workloads", undefined, ["argocd"]);
       await flushPromises();
 
       // Live state moved...
-      expect(manager.getVariable("namespace", "global")?.value).toEqual(["argocd"]);
+      expect(manager.getVariable("namespace", "tabs", "workloads")?.value).toEqual(["argocd"]);
       // ...and the page must have pushed it through to what panels read.
       expect(committedValue(manager, "namespace")).toEqual(["argocd"]);
     });
@@ -1860,7 +1869,8 @@ describe("CuratedPageView", () => {
               label: "Cluster",
               type: "query_values",
               multiSelect: false,
-              scope: "global",
+              scope: "tabs",
+              tabs: ["workloads"],
               value: "prod-eu",
               options: [
                 { label: "prod-eu", value: "prod-eu" },
@@ -1885,7 +1895,7 @@ describe("CuratedPageView", () => {
         .vm.$emit("variablesManagerReady", manager);
       await flushPromises();
 
-      manager.updateVariableValue("cluster", "global", undefined, undefined, "prod-us");
+      manager.updateVariableValue("cluster", "tabs", "workloads", undefined, "prod-us");
       await flushPromises();
 
       const render = wrapper.findComponent({ name: "RenderDashboardCharts" });
@@ -1894,7 +1904,7 @@ describe("CuratedPageView", () => {
       await flushPromises();
 
       expect(router.currentRoute.value.query.tab).toBe(dashboardData.tabs[1].tabId);
-      expect(manager.getVariable("cluster", "global")?.value).toBe("prod-us");
+      expect(manager.getVariable("cluster", "tabs", "workloads")?.value).toBe("prod-us");
     });
 
     it("a picker change does NOT re-resolve — only the selection moved", async () => {
@@ -1912,7 +1922,7 @@ describe("CuratedPageView", () => {
       refreshSpy.mockClear();
       const identityBefore = captured.dashboardData;
 
-      manager.updateVariableValue("namespace", "global", undefined, undefined, ["ziox"]);
+      manager.updateVariableValue("namespace", "tabs", "workloads", undefined, ["ziox"]);
       await flushPromises();
 
       expect(refreshSpy).not.toHaveBeenCalled();
@@ -2230,7 +2240,11 @@ describe("CuratedPageView — Edit as dashboard", () => {
     })),
   });
 
-  const mountPage = async (workload = "kubernetes", over: Record<string, any> = {}) => {
+  const mountPage = async (
+    workload = "kubernetes",
+    over: Record<string, any> = {},
+    query: Record<string, string> = { "var-cluster": "from-url" },
+  ) => {
     useCuratedPageMock.mockReturnValue(makeState(over));
     const store = createStore({
       state: { selectedOrganization: { identifier: "test-org" }, timezone: "UTC", theme: "light" },
@@ -2243,7 +2257,7 @@ describe("CuratedPageView — Edit as dashboard", () => {
         { path: "/dashboards/view", component: { template: "<div />" } },
       ],
     });
-    await router.push({ path: "/infra/kubernetes", query: { "var-cluster": "from-url" } });
+    await router.push({ path: "/infra/kubernetes", query });
     await router.isReady();
     vi.spyOn(router, "push");
     const w = mount(CuratedPageView, {
@@ -2284,26 +2298,54 @@ describe("CuratedPageView — Edit as dashboard", () => {
     expect(button().exists()).toBe(false);
   });
 
-  it("installs if needed and opens Kubernetes / Cluster with the page's cluster and namespace picks", async () => {
-    wrapper = await mountPage();
-    const manager = {
-      variablesData: { global: [] },
-      commitAll: vi.fn(),
-      getUrlParams: () => ({
-        "var-cluster": "prod-eu-1",
-        "var-namespace": ["payments", "checkout"],
-        "var-pod": "ignored",
-      }),
-    };
+  // The REAL manager over tab-scoped pickers, as buildVariable emits them: a stub cannot prove the URL shape it writes.
+  const pickedManager = async () => {
+    const picker = (name: string, tabs: string[], multiSelect: boolean) => ({
+      name,
+      label: name,
+      type: "query_values",
+      multiSelect,
+      scope: "tabs",
+      tabs,
+      options: [],
+      query_data: { stream: "kube_pod_status_phase", field: name, filter: [] },
+    });
+    const manager = useVariablesManager((key: string) => key);
+    await manager.initialize(
+      [
+        picker("cluster", ["overview", "nodes"], false),
+        picker("namespace", ["overview"], true),
+        picker("pod", ["overview"], true),
+      ] as any[],
+      {},
+    );
+    manager.updateVariableValue("cluster", "tabs", "overview", undefined, "prod-eu-1");
+    manager.updateVariableValue("namespace", "tabs", "overview", undefined, [
+      "payments",
+      "checkout",
+    ]);
+    manager.updateVariableValue("pod", "tabs", "overview", undefined, ["ignored"]);
+    manager.updateVariableValue("cluster", "tabs", "nodes", undefined, "prod-us-2");
+    manager.commitAll();
+    return manager;
+  };
+
+  const clickWithPicks = async () => {
     wrapper
       .findComponent({ name: "RenderDashboardCharts" })
-      .vm.$emit("variablesManagerReady", manager);
+      .vm.$emit("variablesManagerReady", await pickedManager());
     await flushPromises();
     await button().trigger("click");
     await flushPromises();
+  };
+
+  it("installs if needed and opens Kubernetes / Cluster with the open tab's cluster and namespace picks", async () => {
+    wrapper = await mountPage("kubernetes", {}, {});
+    await clickWithPicks();
     expect(installReadyMadeMock).toHaveBeenCalledWith("test-org", "kubernetes", {
       userId: undefined,
     });
+    // Bare `var-` keys: the dashboard has no tab of this page's name to match a suffixed one.
     expect(router.push).toHaveBeenCalledWith({
       path: "/dashboards/view",
       query: {
@@ -2317,6 +2359,15 @@ describe("CuratedPageView — Edit as dashboard", () => {
     expect(toastMock.mock.calls[0][0].variant).toBe("success");
   });
 
+  it("carries the picks of the tab that is open, never another tab's", async () => {
+    wrapper = await mountPage("kubernetes", {}, { tab: "nodes" });
+    await clickWithPicks();
+    const query = router.push.mock.calls.at(-1)[0].query;
+    expect(query["var-cluster"]).toBe("prod-us-2");
+    expect(query["var-namespace"]).toBeUndefined();
+    expect(Object.keys(query).filter((key) => key.includes(".t."))).toEqual([]);
+  });
+
   it("falls back to the URL picks before the pickers are ready, and stays quiet when the copies exist", async () => {
     installReadyMadeMock.mockResolvedValue(k8sCopies("exists"));
     wrapper = await mountPage();
@@ -2324,6 +2375,19 @@ describe("CuratedPageView — Edit as dashboard", () => {
     await flushPromises();
     expect(router.push.mock.calls.at(-1)[0].query["var-cluster"]).toBe("from-url");
     expect(toastMock).not.toHaveBeenCalled();
+  });
+
+  it("the URL fallback reads the open tab's own key, the shape the page itself writes", async () => {
+    wrapper = await mountPage(
+      "kubernetes",
+      {},
+      { "var-cluster.t.overview": "tab-url", "var-cluster.t.nodes": "other-tab" },
+    );
+    await button().trigger("click");
+    await flushPromises();
+    const query = router.push.mock.calls.at(-1)[0].query;
+    expect(query["var-cluster"]).toBe("tab-url");
+    expect(query["var-cluster.t.overview"]).toBeUndefined();
   });
 
   it.each([

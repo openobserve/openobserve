@@ -77,6 +77,25 @@ const reqAs = async (page, method, path, data) => {
     return { status: resp.status(), body: await resp.json().catch(() => ({})) };
 };
 
+/**
+ * The v2 twin of reqAs(): same session-cookie identity, but the v2 route shape
+ * `/api/v2/<org><path>` rather than `/api/<org><path>`.
+ *
+ * Needed because the v1 routes for alerts and reports are deprecated AND resolve to a
+ * different OpenFGA object than their v2 replacements — v1 /reports checks the report
+ * item, v2 checks the folder. Probing v1 therefore measures a dead route rather than
+ * the grant under test, so any enforcement assertion about those modules must come
+ * through here.
+ */
+const reqAsV2 = async (page, method, path, data) => {
+    const resp = await page.request.fetch(`${api()}/v2/${org()}${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        ...(data ? { data } : {}),
+    });
+    return { status: resp.status(), body: await resp.json().catch(() => ({})) };
+};
+
 /** Did this request succeed? Anything >= 400 counts as denied. */
 const allowed = (res) => res.status < 400;
 
@@ -415,7 +434,7 @@ const rbacEnabled = async (page) => {
 
 module.exports = {
     loginAs, MEMBER_PASSWORD, createMember, sweepUsers, rbacEnabled,
-    PREFIX, ns, uniq, org, api, req, reqAs, allowed,
+    PREFIX, ns, uniq, org, api, req, reqAs, reqAsV2, allowed,
     listRoles, listGroups, getGroup, listUsers, getPerms,
     createRole, setRolePerms, clearRolePerms, setGroup, createGroupApi, sweepRoles, makeTracker,
     createDashboardFolder, createDashboardIn, listDashboardFolders, sweepDashboardFolders,

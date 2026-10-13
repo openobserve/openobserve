@@ -168,18 +168,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('onlineEvals.manualEvaluation.titles.trace')" />
             </OButton>
 
-            <TraceAnnotateMenu
-              v-if="canAnnotate"
-              ref-type="trace"
-              :ref-id="effectiveTraceId"
-              :ref-trace-start-time="traceEvaluationRange.startTime"
-              :source-stream="effectiveStreamName"
-              compact
-              data-test="trace-details-annotate-trace-btn"
-            />
+            <template v-if="canAnnotateContext">
+              <TraceAnnotateMenu
+                v-if="queuesAccess.allowed"
+                ref-type="trace"
+                :ref-id="effectiveTraceId"
+                :ref-trace-start-time="traceEvaluationRange.startTime"
+                :source-stream="effectiveStreamName"
+                compact
+                data-test="trace-details-annotate-trace-btn"
+              />
+              <!-- TraceAnnotateMenu has no disabled affordance of its own, so a
+                   locked edition gets a stand-in button that opens the
+                   upgrade dialog instead. -->
+              <OButton
+                v-else
+                variant="outline"
+                size="icon-xs"
+                :aria-label="t('aiObservability.traceActions.annotate.button')"
+                data-test="trace-details-annotate-trace-btn"
+                @click="openUpgradeDialog"
+              >
+                <OIcon name="fact-check" size="sm" />
+                <template #icon-right
+                  ><OIcon name="lock" size="xs" class="text-warning-600"
+                /></template>
+              </OButton>
+            </template>
 
             <OButton
-              v-if="canAnnotate"
+              v-if="canAnnotateContext"
               data-test="trace-details-dataset-trace-btn"
               variant="outline"
               size="icon-xs"
@@ -187,7 +205,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="openTraceDataset"
             >
               <OIcon name="table-chart" size="sm" />
-              <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
+              <template v-if="!queuesAccess.allowed" #icon-right>
+                <OIcon name="lock" size="xs" class="text-warning-600" />
+              </template>
+              <OTooltip
+                v-if="queuesAccess.allowed"
+                side="bottom"
+                :content="t('aiObservability.traceActions.dataset.button')"
+              />
             </OButton>
 
             <!-- Share button -->
@@ -947,10 +972,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :session-id="manualEvaluationTarget.sessionId"
       @update:open="updateManualEvaluationOpen"
     />
+
+    <div
+      class="sr-only"
+      aria-live="polite"
+      aria-atomic="true"
+      data-test="trace-details-span-nav-live"
+    >
+      {{ spanNavAnnouncement }}
+    </div>
   </div>
 </template>
 
 <script lang="ts">
+import { announceInto } from "@/utils/announceInto";
 import {
   defineComponent,
   ref,
@@ -964,6 +999,7 @@ import {
   nextTick,
   computed,
   provide,
+  toRef,
 } from "vue";
 import { cloneDeep } from "lodash-es";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -1022,6 +1058,8 @@ import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import analytics from "@/services/product_analytics";
 import config from "@/aws-exports";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
@@ -1048,6 +1086,7 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { ancestorChain, nextVisibleSpan } from "@/utils/rowNavigation";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
@@ -1254,6 +1293,10 @@ export default defineComponent({
     enableCorrelationLinks: {
       type: Boolean,
       default: false,
+    },
+    shortcutsActive: {
+      type: Boolean,
+      default: true,
     },
   },
   components: {
@@ -1821,13 +1864,14 @@ export default defineComponent({
     };
 
     // ── Annotate / Dataset (Phase 2.5 Annotate) ──
-    // Same enterprise gate as manual evaluation minus the online-eval flag:
-    // queuing a trace for human review does not require the eval engine.
-    const canAnnotate = computed(() => {
+    // The non-edition half of the old combined gate — same conditions minus
+    // the online-eval flag, since queuing a trace for human review doesn't
+    // require the eval engine. Drives the header buttons' VISIBILITY so a
+    // locked edition still shows them, just disabled.
+    const canAnnotateContext = computed(() => {
       const range = traceEvaluationRange.value;
       return (
         props.mode === "standalone" &&
-        (config.isEnterprise === "true" || config.isCloud === "true") &&
         Boolean(effectiveOrgIdentifier.value) &&
         Boolean(effectiveStreamName.value) &&
         Boolean(effectiveTraceId.value) &&
@@ -1835,6 +1879,14 @@ export default defineComponent({
         range.startTime > 0
       );
     });
+    // Annotating a trace is the same capability as queuing it into AI
+    // Observability's review Queues, so it shares that gate.
+    const queuesAccess = useLockedAffordance("queues");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+    // Fully resolved — used wherever the OLD hide-entirely boolean fed a
+    // downstream prop (e.g. the sidebar's own annotate buttons), which must
+    // stay hidden rather than render unlocked-looking controls it can't lock itself.
+    const canAnnotate = computed(() => canAnnotateContext.value && queuesAccess.value.allowed);
 
     const datasetOpen = ref(false);
     const datasetTarget = ref<DatasetTarget | null>(null);
@@ -1890,6 +1942,10 @@ export default defineComponent({
     };
 
     const openTraceDataset = () => {
+      if (!queuesAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
       datasetTarget.value = traceTarget();
       datasetOpen.value = true;
     };
@@ -3307,27 +3363,49 @@ export default defineComponent({
     };
 
     // ── Keyboard shortcuts — span navigation ─────────────────────────────
-    const nextSpanHandler = () => {
+    const spanNavAnnouncement = ref("");
+    const announceSpanNav = (message: string) => announceInto(spanNavAnnouncement, message);
+    const spanAncestors = (spanId: string): string[] =>
+      ancestorChain(
+        spanId,
+        (id) => spanMap.value[id]?.reference_parent_span_id,
+        spanList.value?.length ?? 0,
+      );
+    const stepSpan = (direction: 1 | -1) => {
       if (isInputFocused()) return;
-      const list = spanList.value;
-      if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
-      if (idx < list.length - 1) updateSelectedSpan(list[idx + 1].span_id);
-    };
-    const prevSpanHandler = () => {
-      if (isInputFocused()) return;
-      const list = spanList.value;
-      if (!list?.length) return;
-      const idx = list.findIndex((s: any) => s.span_id === selectedSpanId.value);
-      if (idx > 0) updateSelectedSpan(list[idx - 1].span_id);
+      const visible: string[] = spanPositionList.value.map((s: any) => s.spanId);
+      const current = selectedSpanId.value || null;
+      const next = nextVisibleSpan(visible, current, spanAncestors, direction);
+      if (next) {
+        updateSelectedSpan(next);
+        const row = spanPositionList.value.find((s: any) => s.spanId === next);
+        announceSpanNav(
+          t("traces.spanNav.position", {
+            index: visible.indexOf(next) + 1,
+            count: visible.length,
+            name: row?.operationName ?? "",
+          }),
+        );
+        return;
+      }
+      const hasAnchor =
+        current !== null &&
+        (visible.includes(current) || spanAncestors(current).some((id) => visible.includes(id)));
+      if (hasAnchor) {
+        announceSpanNav(
+          t(direction === 1 ? "traces.spanNav.lastSpan" : "traces.spanNav.firstSpan"),
+        );
+      }
     };
 
-    useShortcuts([
-      // `traceNextSpan` registers j + ↓, `tracePrevSpan` registers k + ↑
-      // (both bindings live in the registry under `keys`).
-      { id: "traceNextSpan", handler: nextSpanHandler },
-      { id: "tracePrevSpan", handler: prevSpanHandler },
-    ]);
+    useShortcuts(
+      [
+        { id: "traceNextSpan", handler: () => stepSpan(1) },
+        { id: "tracePrevSpan", handler: () => stepSpan(-1) },
+      ],
+      undefined,
+      { active: toRef(props, "shortcutsActive") },
+    );
     return {
       router,
       t,
@@ -3363,6 +3441,8 @@ export default defineComponent({
       closeSidebar,
       toggleSpanCollapse,
       spanPositionList,
+      spanNavAnnouncement,
+      stepSpan,
       spanDimensions,
       splitterModel,
       ChartData,
@@ -3469,6 +3549,9 @@ export default defineComponent({
       manualEvaluationOpen,
       manualEvaluationTarget,
       canAnnotate,
+      canAnnotateContext,
+      queuesAccess,
+      openUpgradeDialog,
       traceEvaluationRange,
       datasetOpen,
       datasetTarget,

@@ -29,6 +29,7 @@ vi.mock("@/utils/semanticGroupsCache", () => ({
 
 import stream from "@/services/stream";
 import { queryClient } from "@/composables/query/queryClient";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import type { FieldAlias } from "@/services/service_streams";
 import defaultSemanticGroups from "@/views/Infrastructure/curated/packs/__fixtures__/semanticGroups.default.json";
 import { buildKubernetesDashboards } from "./kubernetesDashboards";
@@ -253,6 +254,34 @@ describe("buildKubernetesDashboards — variables", () => {
     expect(names(docs.node)).toEqual(["cluster", "node"]);
     expect(names(docs.pod)).toEqual(["cluster", "namespace", "pod"]);
     expect(names(docs.workload)).toEqual(["cluster", "namespace"]);
+  });
+
+  it("keeps every variable dashboard-wide, never the page's per-tab scope", async () => {
+    const docs = await build();
+    for (const doc of Object.values(docs)) {
+      for (const entry of doc.variables.list) {
+        expect(entry.scope).toBe("global");
+        expect(entry.tabs).toBeUndefined();
+      }
+    }
+  });
+
+  it("a pick made on one dashboard reaches the next through the URL a link passes", async () => {
+    const { cluster, pod } = await build();
+    // The REAL manager on both ends: a `passAllVariables` link hands the target the source's own `var-` keys.
+    const source = useVariablesManager((key: string) => key);
+    await source.initialize(cluster.variables.list, cluster);
+    source.updateVariableValue("cluster", "global", undefined, undefined, ["prod-eu-1"]);
+    source.updateVariableValue("namespace", "global", undefined, undefined, ["payments"]);
+    source.commitAll();
+    const query = source.getUrlParams({ useLive: false });
+    expect(query).toEqual({ "var-cluster": ["prod-eu-1"], "var-namespace": ["payments"] });
+
+    const target = useVariablesManager((key: string) => key);
+    await target.initialize(pod.variables.list, pod);
+    target.loadFromUrl({ query });
+    expect(target.getVariable("cluster", "global")?.value).toEqual(["prod-eu-1"]);
+    expect(target.getVariable("namespace", "global")?.value).toEqual(["payments"]);
   });
 
   it("node values come from kube-state's `node`, chained on the cluster", async () => {

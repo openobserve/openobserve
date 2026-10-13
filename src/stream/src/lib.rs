@@ -890,7 +890,7 @@ pub async fn stream_delete_inner(
     w.remove(&key);
     drop(w);
     let mut w = STREAM_SCHEMAS_LATEST.write().await;
-    w.remove(&key);
+    infra::schema::remove_latest(&mut w, &key);
     drop(w);
 
     // delete stream settings cache

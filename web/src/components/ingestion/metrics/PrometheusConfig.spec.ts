@@ -28,9 +28,9 @@ vi.mock("../../../utils/zincutils", () => ({
   getIngestionURL: vi.fn(() => "https://test.example.com:5080"),
 }));
 
-vi.mock("@/components/CopyContent.vue", () => ({
+vi.mock("@/components/ingestion/CredentialCodeBlock.vue", () => ({
   default: {
-    name: "CopyContent",
+    name: "CredentialCodeBlock",
     template: "<div class='copy-content'><slot /></div>",
     props: ["content"],
   },
@@ -65,7 +65,7 @@ describe("PrometheusConfig.vue", () => {
       global: {
         plugins: [store],
         stubs: {
-          CopyContent: {
+          CredentialCodeBlock: {
             template: "<div class='copy-content-stub'>{{ content }}</div>",
             props: ["content"],
           },
@@ -100,8 +100,8 @@ describe("PrometheusConfig.vue", () => {
       expect(PrometheusConfig.props.currUserEmail.type).toBe(String);
     });
 
-    it("should have CopyContent in components", () => {
-      expect(PrometheusConfig.components).toHaveProperty("CopyContent");
+    it("should have CredentialCodeBlock in components", () => {
+      expect(PrometheusConfig.components).toHaveProperty("CredentialCodeBlock");
     });
   });
 
@@ -189,18 +189,18 @@ describe("PrometheusConfig.vue", () => {
       expect(container.exists()).toBe(true);
     });
 
-    it("should render CopyContent component", () => {
+    it("should render CredentialCodeBlock component", () => {
       const copyContent = wrapper.find(".copy-content-stub");
       expect(copyContent.exists()).toBe(true);
     });
 
-    it("should pass content to CopyContent component", () => {
+    it("should pass content to CredentialCodeBlock component", () => {
       const copyContent = wrapper.find(".copy-content-stub");
       expect(copyContent.exists()).toBe(true);
       expect(copyContent.text()).toContain("remote_write:");
     });
 
-    it("should apply correct class to CopyContent", () => {
+    it("should apply correct class to CredentialCodeBlock", () => {
       const copyContent = wrapper.find(".copy-content-stub");
       expect(copyContent.exists()).toBe(true);
     });
@@ -219,7 +219,7 @@ describe("PrometheusConfig.vue", () => {
       const wrapperWithoutProp = mount(PrometheusConfig, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
         props: {
           currUserEmail: "test@example.com",
@@ -232,7 +232,7 @@ describe("PrometheusConfig.vue", () => {
       const wrapperWithoutProp = mount(PrometheusConfig, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
         props: {
           currOrgIdentifier: "test-org",
@@ -259,7 +259,7 @@ describe("PrometheusConfig.vue", () => {
       const newWrapper = mount(PrometheusConfig, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
       });
       expect(newWrapper.vm.content).toContain("/api/different-org/");
@@ -334,7 +334,7 @@ describe("PrometheusConfig.vue", () => {
       const newWrapper = mount(PrometheusConfig, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
       });
       expect(newWrapper.vm.content).toContain("/api//");
@@ -360,7 +360,7 @@ describe("PrometheusConfig.vue", () => {
       const newWrapper = mount(PrometheusConfig, {
         global: {
           plugins: [storeWithNullOrg],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
       });
       expect(newWrapper.exists()).toBe(true);
@@ -371,7 +371,7 @@ describe("PrometheusConfig.vue", () => {
       const wrapperWithoutProps = mount(PrometheusConfig, {
         global: {
           plugins: [store],
-          stubs: { CopyContent: true },
+          stubs: { CredentialCodeBlock: true },
         },
       });
       expect(wrapperWithoutProps.exists()).toBe(true);

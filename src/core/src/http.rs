@@ -85,6 +85,7 @@ impl From<AlertError> for Response {
             | AlertError::InvalidSloAlert(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
+            | AlertError::PromRuleStreamMissing(_)
             | AlertError::PromqlMissingQuery
             | AlertError::SqlUnsupportedQueryType { .. }
             | AlertError::PeriodExceedsMaxQueryRange { .. }
@@ -255,6 +256,7 @@ impl From<PipelineError> for Response {
             PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
             PipelineError::Modified(_) => MetaHttpResponse::conflict(value),
+            PipelineError::Refused(refusal) => refusal.into_response(),
             error => MetaHttpResponse::bad_request(error),
         }
     }

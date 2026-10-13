@@ -64,8 +64,7 @@ watch(
 );
 const showSkeleton = computed(() => props.loading && !settled.value);
 
-// Callers spell "no filter" as null, as "all", or as a key they never render;
-// all three mean the default tile.
+// Callers spell "no filter" as null, "all", or a key they never render — all three mean the default tile.
 const activeKey = computed(() => {
   if (!props.selectable) return null;
   const named = props.items.some((item) => item.key === props.selectedKey);

@@ -13,7 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
+
+use crate::utils::str::redact_dsn;
+
+const SUPPORTED: [(&str, MetaStore); 4] = [
+    ("sqlite", MetaStore::Sqlite),
+    ("nats", MetaStore::Nats),
+    ("postgres", MetaStore::PostgreSQL),
+    ("postgresql", MetaStore::PostgreSQL),
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
@@ -23,14 +34,33 @@ pub enum MetaStore {
     PostgreSQL,
 }
 
+/// Strict and case-insensitive; an unknown value is an error, unlike the lenient `From<&str>`.
+impl FromStr for MetaStore {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let lowered = s.to_lowercase();
+        if let Some((_, store)) = SUPPORTED.iter().find(|(name, _)| *name == lowered) {
+            return Ok(*store);
+        }
+        let valid = SUPPORTED.map(|(name, _)| name).join(", ");
+        // backends this enum shipped and dropped: their operators need migration advice
+        let removed = if lowered.starts_with("mysql") || lowered.starts_with("etcd") {
+            " this backend is no longer supported;"
+        } else {
+            ""
+        };
+        Err(format!(
+            "invalid value: {},{removed} valid values are: {valid}",
+            redact_dsn(s)
+        ))
+    }
+}
+
+/// Lenient: an unknown value is `Sqlite`, since callers also probe e.g. ZO_QUEUE_STORE=memory.
 impl From<&str> for MetaStore {
     fn from(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "sqlite" => Self::Sqlite,
-            "nats" => Self::Nats,
-            "postgres" | "postgresql" => Self::PostgreSQL,
-            _ => Self::Sqlite,
-        }
+        s.parse().unwrap_or(Self::Sqlite)
     }
 }
 
@@ -104,5 +134,38 @@ mod tests {
         assert_eq!(MetaStore::from("POSTGRES"), MetaStore::PostgreSQL);
         assert_eq!(MetaStore::from("POSTGRESQL"), MetaStore::PostgreSQL);
         assert_eq!(MetaStore::from("NATS"), MetaStore::Nats);
+    }
+
+    #[test]
+    fn test_metastore_parse_accepts_supported_values_in_any_case() {
+        assert_eq!("sqlite".parse::<MetaStore>(), Ok(MetaStore::Sqlite));
+        assert_eq!("NATS".parse::<MetaStore>(), Ok(MetaStore::Nats));
+        assert_eq!("postgres".parse::<MetaStore>(), Ok(MetaStore::PostgreSQL));
+        assert_eq!("PostgreSQL".parse::<MetaStore>(), Ok(MetaStore::PostgreSQL));
+    }
+
+    #[test]
+    fn test_metastore_parse_rejects_removed_backends_with_a_removal_notice() {
+        for value in ["mysql", "MySQL", "etcd", "mysql://root:secret@db:3306/o2"] {
+            let err = value.parse::<MetaStore>().unwrap_err();
+            assert!(err.contains("no longer supported"), "{err}");
+            assert!(
+                !err.contains("secret"),
+                "a DSN password reached the error: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_metastore_parse_rejects_unknown_values_as_typed() {
+        for value in ["", "mongodb", "SqlLite", "postgre"] {
+            let err = value.parse::<MetaStore>().unwrap_err();
+            assert!(err.contains(&format!("invalid value: {value},")), "{err}");
+            assert!(!err.contains("no longer supported"), "{err}");
+        }
+        let err = "postgres://o2:secret@db:5432/o2"
+            .parse::<MetaStore>()
+            .unwrap_err();
+        assert!(err.contains("invalid value: postgres://...,"), "{err}");
     }
 }

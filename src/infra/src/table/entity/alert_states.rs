@@ -55,6 +55,8 @@ pub struct Model {
     /// When the condition first cleared, while `keep_firing_for` holds the
     /// episode open. NULL = not in the hold.
     pub recovering_since: Option<i64>,
+    /// Rollup row only: the downtime that suppressed the latest firing run.
+    pub last_downtime_id: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

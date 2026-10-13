@@ -89,7 +89,7 @@ const authSettled = computed(() => authMode.value === "oauth" || !!credential.va
 const TOKEN_PLACEHOLDER = "Basic <base64 of service-account-email:token>";
 const MASKED_AUTH = "Basic ••••••••••••••••";
 
-const SKILLS_REPO_URL = "https://github.com/openobserve/skills";
+const SKILLS_REPO_URL = "https://www.npmjs.com/package/@openobserve/skills";
 // No -a flag: the CLI then asks which agents to install to, so one command serves every client.
 const SKILLS_INSTALL_CMD = "npx skills add openobserve/skills --skill openobserve";
 
@@ -645,7 +645,7 @@ const openSkillsRepo = () => {
         data-test="ai-integrations-mcp-skills-repo-btn"
         @click="openSkillsRepo"
       >
-        {{ t("ingestion.mcp.skillsRepo", { host: raw("GitHub") }) }}
+        {{ t("ingestion.mcp.skillsRepo", { host: raw("npm") }) }}
       </OButton>
     </template>
   </SetupCardRenderer>
