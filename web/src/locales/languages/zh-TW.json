@@ -2624,6 +2624,7 @@
   "login": {
     "lockedOut": "登入嘗試失敗次數過多。請在 {duration} 後再試，或聯絡您的管理員。",
     "redirectingToSsoMessage": "正在重新導向至 SSO 登入頁面。如果您未被重新導向，請",
+    "signingIn": "正在為您登入...",
     "clickHere": "按一下這裡",
     "loginWithSso": "使用 SSO 登入",
     "loginAsInternalUser": "以內部使用者身分登入",

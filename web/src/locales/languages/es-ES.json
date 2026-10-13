@@ -2624,6 +2624,7 @@
   "login": {
     "lockedOut": "Demasiados intentos fallidos de inicio de sesión. Vuelva a intentarlo en {duration} o póngase en contacto con su administrador.",
     "redirectingToSsoMessage": "Redirigiendo a la página de inicio de sesión SSO. Si no eres redirigido, por favor",
+    "signingIn": "Iniciando sesión...",
     "clickHere": "haz clic aquí",
     "loginWithSso": "Iniciar sesión con SSO",
     "loginAsInternalUser": "Iniciar sesión como usuario interno",

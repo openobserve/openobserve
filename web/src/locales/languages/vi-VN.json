@@ -2624,6 +2624,7 @@
   "login": {
     "lockedOut": "Quá nhiều lần đăng nhập thất bại. Thử lại sau {duration}, hoặc liên hệ quản trị viên.",
     "redirectingToSsoMessage": "Đang chuyển hướng đến trang đăng nhập SSO. Nếu bạn không được chuyển hướng, vui lòng",
+    "signingIn": "Đang đăng nhập...",
     "clickHere": "bấm vào đây",
     "loginWithSso": "Đăng nhập bằng SSO",
     "loginAsInternalUser": "Đăng nhập với tư cách người dùng nội bộ",
