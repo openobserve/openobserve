@@ -19,6 +19,7 @@ import { DOMWrapper, flushPromises, mount, type VueWrapper } from "@vue/test-uti
 import { createMemoryHistory, createRouter, RouterView, type Router } from "vue-router";
 import { createStore } from "vuex";
 import i18n from "@/locales";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 const { confirmMock, toastMock } = vi.hoisted(() => ({
   confirmMock: vi.fn(async (_o: Record<string, unknown>) => true),
@@ -204,6 +205,7 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
     resetSavedFunnels();
     resetNamedEvents();
     resetProductAnalytics();
+    resetListViewState();
     confirmMock.mockReset().mockResolvedValue(true);
     toastMock.mockReset();
     window.localStorage.clear();
@@ -684,5 +686,17 @@ describe("SavedFunnelsPage (AC-67, AC-68, AC-69)", () => {
     await q("rum-analytics-saved-funnels-retry-btn").trigger("click");
     await settle();
     expect(names()).toEqual(["Alpha"]);
+  });
+
+  it("restores the saved search and saves search changes", async () => {
+    api.seedFunnel("web", "Alpha", PARAM);
+    api.seedFunnel("web", "Beta", PARAM);
+    useListViewState("rumSavedFunnels", { filter: "Alpha" });
+    await mountPage();
+    expect(names()).toEqual([expect.stringContaining("Alpha")]);
+    wrapper!.findComponent(SavedFunnelsPage).vm.$.setupState.filter = "Beta";
+    await flushPromises();
+    const saved: any = useListViewState("rumSavedFunnels", {});
+    expect(saved.filter).toBe("Beta");
   });
 });

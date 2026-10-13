@@ -47,6 +47,8 @@ pub struct PromqlContext {
     /// Default look back from sample search.
     pub lookback_delta: i64,
     pub scan_stats: Arc<RwLock<ScanStats>>,
+    /// Non-empty when some nodes failed and the result may be incomplete.
+    pub warnings: Arc<RwLock<Vec<String>>>,
 }
 
 impl PromqlContext {
@@ -65,6 +67,7 @@ impl PromqlContext {
             interval: five_min,
             lookback_delta: five_min,
             scan_stats: Arc::new(RwLock::new(ScanStats::default())),
+            warnings: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -77,7 +80,7 @@ impl PromqlContext {
         &mut self,
         trace_id: &str,
         stmt: EvalStmt,
-    ) -> Result<(Value, Option<String>, ScanStats)> {
+    ) -> Result<(Value, Option<String>, ScanStats, Vec<String>)> {
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
         if stmt.interval > Duration::ZERO {
@@ -127,6 +130,7 @@ impl PromqlContext {
             sorted_value,
             final_result_type,
             *self.scan_stats.read().await,
+            self.warnings.read().await.clone(),
         ))
     }
 
@@ -139,7 +143,7 @@ impl PromqlContext {
         &mut self,
         trace_id: &str,
         stmt: EvalStmt,
-    ) -> Result<(Value, Option<String>, ScanStats)> {
+    ) -> Result<(Value, Option<String>, ScanStats, Vec<String>)> {
         let cfg = config::get_config();
         self.start = micros_since_epoch(stmt.start);
         self.end = micros_since_epoch(stmt.end);
@@ -202,7 +206,12 @@ impl PromqlContext {
 
         // empty result quick return
         if instant_vectors.is_empty() {
-            return Ok((Value::None, result_type, *self.scan_stats.read().await));
+            return Ok((
+                Value::None,
+                result_type,
+                *self.scan_stats.read().await,
+                self.warnings.read().await.clone(),
+            ));
         }
 
         // merge data
@@ -230,7 +239,12 @@ impl PromqlContext {
         // sort data
         let mut value = Value::Matrix(merged_data);
         value.sort();
-        Ok((value, result_type, *self.scan_stats.read().await))
+        Ok((
+            value,
+            result_type,
+            *self.scan_stats.read().await,
+            self.warnings.read().await.clone(),
+        ))
     }
 }
 
@@ -416,7 +430,7 @@ mod tests {
             interval: Duration::from_secs(15),
             lookback_delta: DEFAULT_LOOKBACK,
         };
-        let (value, result_type, _) = ctx.query_exemplars(trace_id, stmt).await.unwrap();
+        let (value, result_type, ..) = ctx.query_exemplars(trace_id, stmt).await.unwrap();
         assert_eq!(result_type.as_deref(), Some("exemplars"));
         match value {
             Value::Matrix(series) => series

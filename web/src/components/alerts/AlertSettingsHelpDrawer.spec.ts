@@ -141,6 +141,14 @@ describe("AlertSettingsHelpDrawer", () => {
     expect(chips.some((c) => c.text() === "{alert_description}")).toBe(true);
   });
 
+  it("advertises {alert_start_time_millis} and {alert_end_time_millis} (both are substituted by the server)", async () => {
+    w = mountDrawer({ topic: "variables" });
+    await w.find('[data-test="help-builtin-toggle"]').trigger("click");
+    const chips = w.findAll('[data-test="help-builtin-var"]');
+    expect(chips.some((c) => c.text() === "{alert_start_time_millis}")).toBe(true);
+    expect(chips.some((c) => c.text() === "{alert_end_time_millis}")).toBe(true);
+  });
+
   it("teaches the WHY with a before/after comparison", () => {
     w = mountDrawer({ topic: "variables" });
     const why = w.find('[data-test="help-why"]');

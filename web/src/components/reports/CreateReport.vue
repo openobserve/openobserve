@@ -632,6 +632,7 @@ import { ref, computed, watch, nextTick, onBeforeMount } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useLocalTimezone } from "@/utils/zincutils";
+import { useTimezoneOptions } from "@/composables/useTimezoneOptions";
 import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
 import dashboardService from "@/services/dashboards";
@@ -641,6 +642,7 @@ import reports from "@/services/reports";
 import { saveReportMutation } from "@/services/reports.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { convertDateToTimestamp } from "@/utils/date";
@@ -1144,30 +1146,11 @@ const customFrequencyOptions = computed(() => [
 const currentTimezone = useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
 const timezone = ref(currentTimezone);
 
-// @ts-ignore
-let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
-  return tz;
+// The report's stored zone is an option under its own name, so a legacy `Asia/Calcutta` saves back unchanged.
+const { timezoneOptions: timezoneSelectOptions } = useTimezoneOptions({
+  browserEntry: true,
+  current: form.useStore((s: any) => s.values?.timezone),
 });
-
-// Not translated on purpose: utils/timezone.ts resolveBrowserTimezone() parses
-// this exact "Browser Time (<zone>)" shape back to an IANA zone before saving, and
-// existing records hold it verbatim. The LABEL is translated in timezoneSelectOptions.
-const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const browserTime = raw("Browser Time (" + browserTz + ")");
-
-// Add the UTC option
-timezoneOptions.unshift("UTC");
-timezoneOptions.unshift(browserTime);
-
-// The browser-time entry keeps its English VALUE (resolveBrowserTimezone parses that
-// exact shape and stored reports hold it) but renders translated copy.
-const timezoneSelectOptions = computed(() =>
-  timezoneOptions.map((tz: string) =>
-    tz === browserTime
-      ? { label: t("common.browserTimeWithZone", { zone: browserTz }), value: tz }
-      : { label: raw(tz), value: tz },
-  ),
-);
 
 const getDashboaordFolders = () => {
   return new Promise((resolve, reject) => {
@@ -1303,7 +1286,6 @@ const saveReport = async (value: CreateReportForm) => {
 
   if (value.isCachedReport) reportPayload.destinations = [];
 
-  const org = store.state.selectedOrganization.identifier;
   const routeQuery = router.currentRoute.value.query;
   const reportId = routeQuery?.report_id as string | undefined;
   const folderId = selectedReportFolderId.value || "default";
@@ -1364,6 +1346,20 @@ const saveReport = async (value: CreateReportForm) => {
     });
 };
 
+const reportsListRoute = () => ({
+  name: "reports",
+  query: {
+    org_identifier: store.state.selectedOrganization.identifier,
+    folder: selectedReportFolderId.value || "default",
+  },
+});
+
+const goBackToOrigin = useListBackNavigation({
+  // The dashboard view hosts the scheduled-reports drawer that also opens this form.
+  isListPath: (path) => path.endsWith("/reports") || path.endsWith("/dashboards/view"),
+  fallback: reportsListRoute,
+});
+
 const goToReports = () => {
   const returnTo = router.currentRoute.value.query.returnTo;
   // Only an in-app path: a full URL here would make the form an open redirect.
@@ -1371,13 +1367,13 @@ const goToReports = () => {
     router.replace(returnTo);
     return;
   }
-  router.replace({
-    name: "reports",
-    query: {
-      org_identifier: store.state.selectedOrganization.identifier,
-      folder: selectedReportFolderId.value || "default",
-    },
-  });
+  const entryFolder = router.currentRoute.value.query.folder;
+  // Saving into another folder must land on that folder, not the one the form was opened from.
+  if (entryFolder && selectedReportFolderId.value && entryFolder !== selectedReportFolderId.value) {
+    router.replace(reportsListRoute());
+    return;
+  }
+  goBackToOrigin();
 };
 
 const setupEditingReport = async (report: any) => {

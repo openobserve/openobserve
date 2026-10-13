@@ -60,16 +60,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OTable
       v-if="rows.length || loading"
+      ref="oTableRef"
       :data="rows"
       :columns="columns"
       row-key="event_id"
       :frame="false"
       :loading="loading"
       pagination="client"
+      :page-size="pageSize"
+      :current-page="currentPage"
       :show-global-filter="false"
       table-id="oncall-my-deliveries"
       data-test="oncall-my-deliveries-table"
       @row-click="openPage"
+      @update:current-page="currentPage = $event"
+      @update:page-size="pageSize = $event"
     >
       <template #cell-page="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5 max-lg:py-1.5">
@@ -143,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -159,6 +164,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
+import { useListViewState } from "@/composables/useListViewState";
 import { markDeliveriesReadMutation, myDeliveriesQuery } from "@/services/oncall.queries";
 import type { MyDeliveries, MyDelivery } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -183,7 +189,33 @@ const rows = ref<MyDelivery[]>([]);
 const unread = ref(0);
 const loading = ref(false);
 const marking = ref(false);
-const unreadOnly = ref(false);
+const savedView = useListViewState("oncall-my-deliveries", {
+  unreadOnly: false,
+  currentPage: 1,
+  pageSize: 20,
+});
+const unreadOnly = ref(savedView.unreadOnly);
+const currentPage = ref(savedView.currentPage);
+const pageSize = ref(savedView.pageSize);
+const oTableRef = ref<any>(null);
+
+watch(unreadOnly, () => {
+  currentPage.value = 1;
+});
+watch([unreadOnly, currentPage, pageSize], () => {
+  Object.assign(savedView, {
+    unreadOnly: unreadOnly.value,
+    currentPage: currentPage.value,
+    pageSize: pageSize.value,
+  });
+});
+// The inbox loads after mount and TanStack resets to page 0 on its own deferred queue; setTimeout(0) runs after it so the restored page wins.
+let pageRestored = false;
+watch(loading, (isLoading) => {
+  if (isLoading || pageRestored) return;
+  pageRestored = true;
+  setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+});
 
 /// This is the reader's own inbox, so it is rendered in the reader's own clock
 /// — unlike a schedule, which belongs to its team's zone.

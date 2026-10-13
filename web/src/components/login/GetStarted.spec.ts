@@ -1,442 +1,554 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
+import { createMemoryHistory, createRouter, type Router } from "vue-router";
 import enLocale from "@/locales/languages/en-US.json";
 import GetStarted from "./GetStarted.vue";
 import { makeGetStartedSchema } from "./GetStarted.schema";
+import { FIRST_SOURCE_PREFILL_KEY } from "./firstSourceOptions";
 import { gt } from "@/types/i18n";
 
-// The schema is a t-threaded factory; build it once with the shared translator.
-const getStartedSchema = makeGetStartedSchema(gt);
-
-// Mock billings service
+const submitNewUserInfo = vi.fn();
 vi.mock("@/services/billings", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
-    default: {
-      submit_new_user_info: vi.fn(),
-    },
+    default: { submit_new_user_info: (...args: unknown[]) => submitNewUserInfo(...args) },
   });
 });
 
-// Mock toast function
-vi.mock("@/lib/feedback/Toast/useToast", () => {
-  return {
-    toast: vi.fn(),
-  };
-});
+const httpCalls = vi.fn();
+vi.mock("@/services/http", () => ({
+  default: () =>
+    new Proxy(
+      {},
+      {
+        get:
+          (_target, method) =>
+          (...args: unknown[]) => {
+            httpCalls(method, ...args);
+            return Promise.resolve({ status: 200, data: {} });
+          },
+      },
+    ),
+}));
 
-const mockStore = createStore({
-  state: {
-    selectedOrganization: {
-      identifier: "test-org",
-      name: "Test Organization",
-    },
-    theme: "light",
-    userInfo: {
-      email: "test@example.com",
-    },
-  },
-});
+const toastMock = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: unknown[]) => toastMock(...args),
+}));
 
-const mockI18n = createI18n({
-  locale: "en",
-  messages: { en: enLocale },
-});
+const track = vi.fn();
+vi.mock("@/services/product_analytics", () => ({
+  default: { track: (...args: unknown[]) => track(...args) },
+}));
+
+const ORG = "test-org";
+const EMAIL = "test@example.com";
+const OPTION_IDS = [
+  "kubernetes",
+  "linux",
+  "windows",
+  "webserver",
+  "otel",
+  "http",
+  "cloud",
+  "rum",
+  "llm",
+  "agent",
+  "unsure",
+];
+
+const makeStore = () =>
+  createStore({
+    state: {
+      selectedOrganization: { identifier: ORG, name: "Test Organization" },
+      theme: "light",
+      userInfo: { email: EMAIL },
+    },
+  });
+
+const i18n = createI18n({ legacy: false, locale: "en", messages: { en: enLocale } });
+
+const makeRouter = () =>
+  createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: "/", name: "home", component: { template: "<div />" } },
+      { path: "/logs", name: "logs", component: { template: "<div />" } },
+      { path: "/guide/:name", name: "guide", component: { template: "<div />" } },
+      ...[
+        "ingestFromKubernetes",
+        "ingestFromLinux",
+        "ingestFromWindows",
+        "nginx",
+        "otelCollector",
+        "curl",
+        "AWSConfig",
+        "frontendMonitoring",
+        "ai-integrations",
+        "recommendedMcp",
+      ].map((name) => ({ path: `/ingestion/${name}`, name, component: { template: "<div />" } })),
+    ],
+  });
+
+const flush = async () => {
+  await flushPromises();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushPromises();
+};
 
 describe("GetStarted.vue", () => {
-  let wrapper: VueWrapper;
-  let mockToast: ReturnType<typeof vi.fn>;
+  let wrapper: VueWrapper | undefined;
+  let router: Router;
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    const toastModule = await import("@/lib/feedback/Toast/useToast");
-    mockToast = vi.mocked(toastModule.toast);
-    mockToast.mockClear();
+  const mountAt = async (path = "/") => {
+    router = makeRouter();
+    await router.push(path);
+    await router.isReady();
+    wrapper = mount(GetStarted, { global: { plugins: [i18n, makeStore(), router] } });
+    await flush();
+    return wrapper;
+  };
+
+  const byTest = (id: string) => wrapper!.find(`[data-test="${id}"]`);
+
+  const fillInputs = async () => {
+    const inputs = wrapper!.findAllComponents({ name: "OInput" });
+    await inputs[0].vm.$emit("update:modelValue", "From a friend");
+    await inputs[1].vm.$emit("update:modelValue", "Company Inc");
+  };
+
+  const tickTerms = async () => {
+    await wrapper!.findComponent({ name: "OCheckbox" }).vm.$emit("update:modelValue", true);
+    await flush();
+  };
+
+  const pick = async (id: string) => {
+    await wrapper!.findComponent({ name: "ORadioGroup" }).vm.$emit("update:modelValue", id);
+    await flush();
+  };
+
+  const pickedValue = () =>
+    wrapper!.findComponent({ name: "ORadioGroup" }).props("modelValue") as string | undefined;
+
+  const pushSpy = () => vi.spyOn(router, "push");
+
+  beforeEach(() => {
+    submitNewUserInfo.mockReset();
+    submitNewUserInfo.mockResolvedValue({ status: 200 });
+    httpCalls.mockClear();
+    toastMock.mockClear();
+    track.mockClear();
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("isFirstTimeLogin", "true");
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+    wrapper?.unmount();
+    wrapper = undefined;
+    vi.restoreAllMocks();
   });
 
-  const createWrapper = (storeOverride?: any) => {
-    return mount(GetStarted, {
-      global: {
-        plugins: [mockI18n, storeOverride || mockStore],
-      },
-    });
-  };
+  describe("schema", () => {
+    const schema = makeGetStartedSchema(gt);
+    const valid = { hearAboutUs: "A friend", whereDoYouWork: "Acme", isAgree: true };
 
-  describe("Component Mounting", () => {
-    it("should mount without errors", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
+    it("requires both text answers, trimmed", () => {
+      expect(schema.safeParse({ ...valid, hearAboutUs: "  " }).success).toBe(false);
+      expect(schema.safeParse({ ...valid, whereDoYouWork: "" }).success).toBe(false);
+      expect(schema.safeParse(valid).success).toBe(true);
     });
 
-    it("should unmount without errors", () => {
-      wrapper = createWrapper();
-      expect(() => wrapper.unmount()).not.toThrow();
+    it("requires Terms", () => {
+      expect(schema.safeParse({ ...valid, isAgree: false }).success).toBe(false);
     });
 
-    it("should be a Vue component", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm).toBeDefined();
-      expect(typeof wrapper.vm).toBe("object");
+    it("keeps the first source optional", () => {
+      expect(schema.safeParse({ ...valid, firstSource: undefined }).success).toBe(true);
+      expect(schema.safeParse({ ...valid, firstSource: "kubernetes" }).success).toBe(true);
     });
   });
 
-  // Validation lives in the Zod schema (GetStarted.schema.ts), not in local refs.
-  // Assert the schema directly so the source of truth is what's tested.
-  describe("schema validation", () => {
-    it("should fail when hearAboutUs is empty", () => {
-      expect(
-        getStartedSchema.safeParse({ hearAboutUs: "", whereDoYouWork: "Company", isAgree: true })
-          .success,
-      ).toBe(false);
-    });
-
-    it("should fail when whereDoYouWork is empty", () => {
-      expect(
-        getStartedSchema.safeParse({
-          hearAboutUs: "From a friend",
-          whereDoYouWork: "",
-          isAgree: true,
-        }).success,
-      ).toBe(false);
-    });
-
-    it("should fail when both fields are empty", () => {
-      expect(
-        getStartedSchema.safeParse({ hearAboutUs: "", whereDoYouWork: "", isAgree: true }).success,
-      ).toBe(false);
-    });
-
-    it("should pass when both fields are filled and terms accepted", () => {
-      expect(
-        getStartedSchema.safeParse({
-          hearAboutUs: "From a friend",
-          whereDoYouWork: "Company Inc",
-          isAgree: true,
-        }).success,
-      ).toBe(true);
-    });
-
-    it("should fail when hearAboutUs is only whitespace", () => {
-      expect(
-        getStartedSchema.safeParse({ hearAboutUs: "   ", whereDoYouWork: "Company", isAgree: true })
-          .success,
-      ).toBe(false);
-    });
-
-    it("should fail when whereDoYouWork is only whitespace", () => {
-      expect(
-        getStartedSchema.safeParse({
-          hearAboutUs: "From a friend",
-          whereDoYouWork: "   ",
-          isAgree: true,
-        }).success,
-      ).toBe(false);
-    });
-
-    it("should handle fields with special characters", () => {
-      expect(
-        getStartedSchema.safeParse({
-          hearAboutUs: "LinkedIn & Twitter",
-          whereDoYouWork: "Acme Corp (2024)",
-          isAgree: true,
-        }).success,
-      ).toBe(true);
-    });
-
-    it("should fail when isAgree is false (terms not accepted)", () => {
-      const result = getStartedSchema.safeParse({
-        hearAboutUs: "From a friend",
-        whereDoYouWork: "Company Inc",
-        isAgree: false,
-      });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        const agreeIssue = result.error.issues.find((i) => i.path[0] === "isAgree");
-        expect(agreeIssue?.message).toBe("You must accept the terms to continue");
-      }
-    });
-
-    it("should fail when isAgree is missing", () => {
-      expect(
-        getStartedSchema.safeParse({ hearAboutUs: "From a friend", whereDoYouWork: "Company Inc" })
-          .success,
-      ).toBe(false);
-    });
-  });
-
-  describe("onSubmit - submit payload", () => {
-    it("should map the submit payload to the billings service args", async () => {
-      const billings = await import("@/services/billings");
-      vi.mocked(billings.default.submit_new_user_info).mockResolvedValue({ status: 200 });
-
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      await vm.doSubmit({
-        hearAboutUs: "Search",
-        company: undefined,
-        whereDoYouWork: "Company",
-        isAgree: true,
-      });
-
-      expect(billings.default.submit_new_user_info).toHaveBeenCalledWith("test-org", {
-        from: "Search",
-        company: "Company",
-      });
-    });
-  });
-
-  describe("onSubmit - Valid Form (Success)", () => {
-    beforeEach(async () => {
-      const billings = await import("@/services/billings");
-      (billings.default.submit_new_user_info as any).mockResolvedValue({ status: 200 });
-    });
-
-    it("should call billings.submit_new_user_info with correct args", async () => {
-      const billings = await import("@/services/billings");
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      await vm.doSubmit({
-        hearAboutUs: "From a friend",
-        whereDoYouWork: "Company Inc",
-        isAgree: true,
-      });
-
-      expect(billings.default.submit_new_user_info).toHaveBeenCalledWith("test-org", {
-        from: "From a friend",
-        company: "Company Inc",
-      });
-    });
-
-    it("should emit removeFirstTimeLogin event on success", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      await vm.doSubmit({
-        hearAboutUs: "From a friend",
-        whereDoYouWork: "Company Inc",
-        isAgree: true,
-      });
-
-      const emittedEvents = wrapper.emitted();
-      expect(emittedEvents["removeFirstTimeLogin"]).toBeTruthy();
-      expect(emittedEvents["removeFirstTimeLogin"][0]).toEqual([false]);
-    });
-
-    it("should show success notification on success", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      await vm.doSubmit({
-        hearAboutUs: "From a friend",
-        whereDoYouWork: "Company Inc",
-        isAgree: true,
-      });
-
-      expect(mockToast).toHaveBeenCalledWith({
-        message: "Thank you for your feedback",
-        variant: "success",
-      });
-    });
-
-    it("should remove isFirstTimeLogin from localStorage on success", async () => {
-      // vi.spyOn cannot intercept jsdom Storage prototype methods reliably;
-      // verify the effect instead: set the item first, then confirm it is gone after submit.
-      localStorage.setItem("isFirstTimeLogin", "true");
-
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      await vm.doSubmit({
-        hearAboutUs: "From a friend",
-        whereDoYouWork: "Company Inc",
-        isAgree: true,
-      });
-      await flushPromises();
-
-      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
-    });
-  });
-
-  describe("onSubmit - Valid Form (Failure)", () => {
-    beforeEach(async () => {
-      const billings = await import("@/services/billings");
-      (billings.default.submit_new_user_info as any).mockResolvedValue({ status: 500 });
-    });
-
-    it("should show error notification on non-200 response", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      await vm.doSubmit({
-        hearAboutUs: "From a friend",
-        whereDoYouWork: "Company Inc",
-        isAgree: true,
-      });
-
-      expect(mockToast).toHaveBeenCalledWith({
-        message: "Something went wrong",
-        variant: "error",
-      });
-    });
-
-    it("should not emit removeFirstTimeLogin on failure", async () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-
-      await vm.doSubmit({
-        hearAboutUs: "From a friend",
-        whereDoYouWork: "Company Inc",
-        isAgree: true,
-      });
-
-      const emittedEvents = wrapper.emitted();
-      expect(emittedEvents["removeFirstTimeLogin"]).toBeFalsy();
-    });
-  });
-
-  describe("Template Tests", () => {
-    it("should render a form with inputs", () => {
-      wrapper = createWrapper();
-      expect(wrapper.find(".flex").exists()).toBe(true);
-    });
-
-    it("should show copyright year", () => {
-      wrapper = createWrapper();
-      const yearEl = wrapper.find("#year");
-      expect(yearEl.exists()).toBe(true);
-      expect(yearEl.text()).toBe(new Date().getFullYear().toString());
-    });
-
-    it("should render at least one button", () => {
-      wrapper = createWrapper();
-      const buttons = wrapper.findAll("button");
-      expect(buttons.length).toBeGreaterThan(0);
-    });
-
-    it("should link the terms and privacy documents in a new tab", () => {
-      wrapper = createWrapper();
-      const terms = wrapper.find('[data-test="onboarding-get-started-terms-link"]');
-      const privacy = wrapper.find('[data-test="onboarding-get-started-privacy-link"]');
-
-      expect(terms.attributes("href")).toBe("https://openobserve.ai/legal/terms-of-service/");
-      expect(privacy.attributes("href")).toBe("https://openobserve.ai/legal/privacy-policy/");
-      for (const link of [terms, privacy]) {
-        expect(link.attributes("target")).toBe("_blank");
-        expect(link.attributes("rel")).toBe("noopener");
-      }
-    });
-  });
-
-  describe("Theme Tests", () => {
-    it("should render without errors in dark theme", () => {
-      const darkStore = createStore({
-        state: {
-          selectedOrganization: { identifier: "test-org" },
-          theme: "dark",
-          userInfo: { email: "test@example.com" },
-        },
-      });
-      wrapper = createWrapper(darkStore);
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should render without errors in light theme", () => {
-      const lightStore = createStore({
-        state: {
-          selectedOrganization: { identifier: "test-org" },
-          theme: "light",
-          userInfo: { email: "test@example.com" },
-        },
-      });
-      wrapper = createWrapper(lightStore);
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Store Integration", () => {
-    it("should use organization identifier from store", async () => {
-      const billings = await import("@/services/billings");
-      (billings.default.submit_new_user_info as any).mockResolvedValue({ status: 200 });
-
-      const customStore = createStore({
-        state: {
-          selectedOrganization: { identifier: "custom-org" },
-          theme: "light",
-          userInfo: { email: "test@example.com" },
-        },
-      });
-
-      wrapper = createWrapper(customStore);
-      const vm = wrapper.vm as any;
-
-      await vm.doSubmit({ hearAboutUs: "Search", whereDoYouWork: "My Company", isAgree: true });
-
-      expect(billings.default.submit_new_user_info).toHaveBeenCalledWith(
-        "custom-org",
-        expect.any(Object),
+  describe("content", () => {
+    it("shows the welcome title and the trial subtitle", async () => {
+      await mountAt();
+      expect(byTest("onboarding-get-started-title").text()).toBe("Welcome to OpenObserve");
+      expect(byTest("onboarding-get-started-subtitle").text()).toContain(
+        "Your 14-day trial has started",
       );
     });
-  });
 
-  // End-to-end gating through the real OForm/TanStack pipeline: the Save button
-  // is always enabled (R3), so submit is gated by the schema. An unchecked
-  // terms box must block submission; checking it must let it through.
-  // Pattern: set values via each field component's `update:modelValue`, then
-  // AWAIT the form's own handleSubmit (runs schema → @submit) — deterministic.
-  describe("terms gate (real OForm submit)", () => {
-    const fillInputs = async () => {
-      const inputs = wrapper.findAllComponents({ name: "OInput" });
-      // Two OFormInputs: hearAboutUs, whereDoYouWork (in template order).
-      await inputs[0].vm.$emit("update:modelValue", "From a friend");
-      await inputs[1].vm.$emit("update:modelValue", "Company Inc");
-    };
-
-    const submitForm = async () => {
-      await flushPromises();
-      await (wrapper.findComponent({ name: "OForm" }).vm as any).form.handleSubmit();
-      await flushPromises();
-    };
-
-    it("should NOT call billings when terms checkbox is unchecked", async () => {
-      const billings = await import("@/services/billings");
-      (billings.default.submit_new_user_info as any).mockResolvedValue({ status: 200 });
-
-      wrapper = createWrapper();
-      await fillInputs();
-
-      // Box left unchecked (default false) → schema gate fails on submit.
-      await submitForm();
-
-      expect(billings.default.submit_new_user_info).not.toHaveBeenCalled();
+    it("matches a2: placeholders, the Terms wording and the hint under Terms", async () => {
+      await mountAt();
+      const inputs = wrapper!.findAllComponents({ name: "OInput" });
+      expect(inputs.map((i) => i.find("input").attributes("placeholder"))).toEqual([
+        "For example, a colleague or a blog post",
+        "Company or team",
+      ]);
+      expect(byTest("onboarding-get-started-terms-link").text()).toBe("Terms of service");
+      expect(byTest("onboarding-get-started-privacy-link").text()).toBe("Privacy policy");
+      expect(byTest("onboarding-get-started-agree-hint").text()).toBe(
+        "Needed to continue, even if you skip the questions.",
+      );
     });
 
-    it("should call billings when terms checkbox is checked and fields are filled", async () => {
-      const billings = await import("@/services/billings");
-      (billings.default.submit_new_user_info as any).mockResolvedValue({ status: 200 });
+    it("offers exactly 11 sources in the approved order with their labels", async () => {
+      await mountAt();
+      const grid = byTest("onboarding-get-started-source-grid");
+      expect(grid.exists()).toBe(true);
+      const ids = grid
+        .findAll('[data-test^="onboarding-get-started-source-"]')
+        .map((el) => el.attributes("data-test")!.replace("onboarding-get-started-source-", ""));
+      expect(ids).toEqual(OPTION_IDS);
+      expect(grid.text()).toContain("Kubernetes");
+      expect(grid.text()).toContain("Linux or VM host");
+      expect(grid.text()).toContain("Logs over HTTP");
+      expect(grid.text()).toContain("Let an AI agent set it up");
+      expect(grid.text()).toContain("Not sure yet");
+    });
 
-      wrapper = createWrapper();
+    it("uses the data sources page's logos and a glyph where none exists", async () => {
+      await mountAt();
+      const srcs = wrapper!.findAll("img").map((img) => img.attributes("src") ?? "");
+      for (const logo of [
+        "kubernetes.svg",
+        "linux.svg",
+        "windows.svg",
+        "nginx.svg",
+        "otlp.svg",
+        "aws.svg",
+        "ai_icon.svg",
+      ]) {
+        expect(srcs.some((src) => src.includes(logo))).toBe(true);
+      }
+      expect(wrapper!.findAllComponents({ name: "OIcon" }).length).toBeGreaterThanOrEqual(4);
+    });
+
+    it("renders the grid as card radios", async () => {
+      await mountAt();
+      const radios = wrapper!.findAllComponents({ name: "ORadio" });
+      expect(radios).toHaveLength(11);
+      for (const radio of radios) expect(radio.props("variant")).toBe("card");
+    });
+  });
+
+  describe("Terms gate, Skip and the pick", () => {
+    it("disables Continue and Skip until Terms is ticked", async () => {
+      await mountAt();
+      expect(byTest("onboarding-get-started-submit-btn").attributes("disabled")).toBeDefined();
+      expect(byTest("onboarding-get-started-skip-btn").attributes("disabled")).toBeDefined();
+      await tickTerms();
+      expect(byTest("onboarding-get-started-submit-btn").attributes("disabled")).toBeUndefined();
+      expect(byTest("onboarding-get-started-skip-btn").attributes("disabled")).toBeUndefined();
+    });
+
+    it("never calls the API when Skip is forced while Terms is unticked", async () => {
+      await mountAt();
+      await (wrapper!.vm as unknown as { skip: () => Promise<void> }).skip();
+      expect(submitNewUserInfo).not.toHaveBeenCalled();
+    });
+
+    it("skips with empty profiling answers, the pick and skipped true, and fires onboarding_questions_skipped", async () => {
+      await mountAt();
       await fillInputs();
+      await pick("linux");
+      await tickTerms();
+      await byTest("onboarding-get-started-skip-btn").trigger("click");
+      await flush();
+      expect(submitNewUserInfo).toHaveBeenCalledTimes(1);
+      expect(submitNewUserInfo).toHaveBeenCalledWith(ORG, {
+        from: "",
+        company: "",
+        first_source: "linux",
+        skipped: true,
+      });
+      expect(track).toHaveBeenCalledWith("onboarding_questions_skipped", { first_source: "linux" });
+      expect(track).toHaveBeenCalledWith("onboarding_get_started_submitted", {
+        first_source: "linux",
+        skipped: true,
+      });
+    });
 
-      // Check the terms box → isAgree=true satisfies the schema gate.
-      const checkbox = wrapper.findComponent({ name: "OCheckbox" });
-      await checkbox.vm.$emit("update:modelValue", true);
+    it("skips without the two text answers filled", async () => {
+      await mountAt();
+      await tickTerms();
+      await byTest("onboarding-get-started-skip-btn").trigger("click");
+      await flush();
+      expect(submitNewUserInfo).toHaveBeenCalledWith(ORG, {
+        from: "",
+        company: "",
+        first_source: undefined,
+        skipped: true,
+      });
+      expect(track).toHaveBeenCalledWith("onboarding_questions_skipped", { first_source: null });
+    });
 
-      await submitForm();
-
-      expect(billings.default.submit_new_user_info).toHaveBeenCalledWith("test-org", {
+    it("continues with the answers, the pick and skipped false", async () => {
+      await mountAt();
+      await fillInputs();
+      await pick("kubernetes");
+      await tickTerms();
+      await byTest("onboarding-get-started-submit-btn").trigger("submit");
+      await flush();
+      expect(submitNewUserInfo).toHaveBeenCalledWith(ORG, {
         from: "From a friend",
         company: "Company Inc",
+        first_source: "kubernetes",
+        skipped: false,
       });
+      expect(track).toHaveBeenCalledWith("onboarding_get_started_submitted", {
+        first_source: "kubernetes",
+        skipped: false,
+      });
+      expect(track).not.toHaveBeenCalledWith("onboarding_questions_skipped", expect.anything());
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("does not submit Continue with Terms unticked", async () => {
+      await mountAt();
+      await fillInputs();
+      await (
+        wrapper!.findComponent({ name: "OForm" }).vm as unknown as {
+          submit: () => void;
+        }
+      ).submit();
+      await flush();
+      expect(submitNewUserInfo).not.toHaveBeenCalled();
+    });
+
+    it("writes the pick only to localStorage o2.onboarding.firstSource.<org> and makes no other API call", async () => {
+      await mountAt();
+      const before = new Set(Object.keys(localStorage));
+      await pick("otel");
+      await tickTerms();
+      await byTest("onboarding-get-started-skip-btn").trigger("click");
+      await flush();
+      expect(localStorage.getItem(`o2.onboarding.firstSource.${ORG}`)).toBe("otel");
+      const added = Object.keys(localStorage).filter((key) => !before.has(key));
+      expect(added).toEqual([`o2.onboarding.firstSource.${ORG}`]);
+      expect(httpCalls).not.toHaveBeenCalled();
+      expect(submitNewUserInfo).toHaveBeenCalledTimes(1);
+    });
+
+    it("stores no pick when none was chosen", async () => {
+      await mountAt();
+      await tickTerms();
+      await byTest("onboarding-get-started-skip-btn").trigger("click");
+      await flush();
+      expect(localStorage.getItem(`o2.onboarding.firstSource.${ORG}`)).toBeNull();
+    });
+
+    it("clears the first-login flag and closes on success", async () => {
+      await mountAt();
+      await tickTerms();
+      await byTest("onboarding-get-started-skip-btn").trigger("click");
+      await flush();
+      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+      expect(wrapper!.emitted("removeFirstTimeLogin")).toEqual([[false]]);
+    });
+  });
+
+  describe("a3/a4: in flight and failure", () => {
+    it("locks every control while the call is in flight", async () => {
+      let resolve: (value: { status: number }) => void = () => {};
+      submitNewUserInfo.mockReturnValue(new Promise((r) => (resolve = r)));
+      await mountAt();
+      await tickTerms();
+      await byTest("onboarding-get-started-skip-btn").trigger("click");
+      await flushPromises();
+      expect(byTest("onboarding-get-started-submit-btn").attributes("disabled")).toBeDefined();
+      expect(byTest("onboarding-get-started-skip-btn").attributes("disabled")).toBeDefined();
+      for (const input of wrapper!.findAllComponents({ name: "OInput" })) {
+        expect(input.props("disabled")).toBe(true);
+      }
+      expect(wrapper!.findComponent({ name: "ORadioGroup" }).props("disabled")).toBe(true);
+      resolve({ status: 200 });
+      await flush();
+    });
+
+    it("shows today's error toast on a non-200 answer and keeps every answer", async () => {
+      submitNewUserInfo.mockResolvedValue({ status: 500 });
+      await mountAt();
+      await fillInputs();
+      await pick("webserver");
+      await tickTerms();
+      await byTest("onboarding-get-started-submit-btn").trigger("submit");
+      await flush();
+      expect(toastMock).toHaveBeenCalledWith({ message: "Something went wrong", variant: "error" });
+      expect(wrapper!.emitted("removeFirstTimeLogin")).toBeUndefined();
+      expect(localStorage.getItem("isFirstTimeLogin")).toBe("true");
+      expect(pickedValue()).toBe("webserver");
+      const inputs = wrapper!.findAllComponents({ name: "OInput" });
+      expect(inputs[0].props("modelValue")).toBe("From a friend");
+      expect(byTest("onboarding-get-started-submit-btn").attributes("disabled")).toBeUndefined();
+    });
+
+    it("shows the same toast when the call rejects, and Continue retries", async () => {
+      submitNewUserInfo.mockRejectedValueOnce(new Error("network"));
+      await mountAt();
+      await fillInputs();
+      await tickTerms();
+      await byTest("onboarding-get-started-submit-btn").trigger("submit");
+      await flush();
+      expect(toastMock).toHaveBeenCalledWith({ message: "Something went wrong", variant: "error" });
+      await byTest("onboarding-get-started-submit-btn").trigger("submit");
+      await flush();
+      expect(submitNewUserInfo).toHaveBeenCalledTimes(2);
+      expect(wrapper!.emitted("removeFirstTimeLogin")).toEqual([[false]]);
+    });
+  });
+
+  describe("routing after submit", () => {
+    const skipWith = async (id?: string) => {
+      if (id) await pick(id);
+      await tickTerms();
+      await byTest("onboarding-get-started-skip-btn").trigger("click");
+      await flush();
+    };
+
+    it("opens the picked guide with the org and suppresses the connect-data-source popup", async () => {
+      localStorage.setItem("connectDataSourcePromptPending", "true");
+      await mountAt();
+      const push = pushSpy();
+      await skipWith("webserver");
+      expect(push).toHaveBeenCalledWith({ name: "nginx", query: { org_identifier: ORG } });
+      expect(sessionStorage.getItem(`connectDataSourcePromptShown:${EMAIL}`)).toBe("true");
+      expect(localStorage.getItem("connectDataSourcePromptPending")).toBeNull();
+    });
+
+    it.each([
+      ["kubernetes", "ingestFromKubernetes"],
+      ["linux", "ingestFromLinux"],
+      ["windows", "ingestFromWindows"],
+      ["otel", "otelCollector"],
+      ["http", "curl"],
+      ["cloud", "AWSConfig"],
+      ["rum", "frontendMonitoring"],
+      ["llm", "ai-integrations"],
+      ["agent", "recommendedMcp"],
+    ])("routes %s to %s", async (id, route) => {
+      await mountAt();
+      const push = pushSpy();
+      await skipWith(id);
+      expect(push).toHaveBeenCalledWith({ name: route, query: { org_identifier: ORG } });
+    });
+
+    it("stays on today's landing for Not sure yet or no pick, and leaves the popup alone", async () => {
+      for (const id of ["unsure", undefined]) {
+        sessionStorage.clear();
+        await mountAt();
+        const push = pushSpy();
+        await skipWith(id);
+        expect(push).not.toHaveBeenCalled();
+        expect(sessionStorage.getItem(`connectDataSourcePromptShown:${EMAIL}`)).toBeNull();
+        wrapper!.unmount();
+        wrapper = undefined;
+      }
+    });
+
+    it("lets a followed redirectURI win: no guide route when the dialog is not on Home", async () => {
+      await mountAt("/logs");
+      const push = pushSpy();
+      await skipWith("kubernetes");
+      expect(push).not.toHaveBeenCalled();
+      expect(localStorage.getItem(`o2.onboarding.firstSource.${ORG}`)).toBe("kubernetes");
+    });
+
+    it("lets a pending redirectURI or marketplace flow win", async () => {
+      for (const [key, value] of [
+        ["redirectURI", "/web/dashboards?x=1"],
+        ["azure_marketplace_token", "tok"],
+      ]) {
+        sessionStorage.clear();
+        sessionStorage.setItem(key, value);
+        await mountAt();
+        const push = pushSpy();
+        await skipWith("kubernetes");
+        expect(push).not.toHaveBeenCalled();
+        wrapper!.unmount();
+        wrapper = undefined;
+      }
+    });
+
+    it("dispatches o2:onboarding-complete after the suppression is in place", async () => {
+      await mountAt();
+      let suppressedAtEvent: string | null = "unset";
+      const listener = () => {
+        suppressedAtEvent = sessionStorage.getItem(`connectDataSourcePromptShown:${EMAIL}`);
+      };
+      window.addEventListener("o2:onboarding-complete", listener);
+      await skipWith("kubernetes");
+      window.removeEventListener("o2:onboarding-complete", listener);
+      expect(suppressedAtEvent).toBe("true");
+    });
+  });
+
+  describe("prefill", () => {
+    it("preselects the option named by utm_content", async () => {
+      sessionStorage.setItem(FIRST_SOURCE_PREFILL_KEY, JSON.stringify({ utm_content: "rum" }));
+      await mountAt();
+      expect(pickedValue()).toBe("rum");
+    });
+
+    it("preselects from a mapped docs referrer", async () => {
+      sessionStorage.setItem(
+        FIRST_SOURCE_PREFILL_KEY,
+        JSON.stringify({ referrer: "https://openobserve.ai/docs/ingestion/logs/kubernetes/" }),
+      );
+      await mountAt();
+      expect(pickedValue()).toBe("kubernetes");
+    });
+
+    it("leaves no pick for an unknown value", async () => {
+      sessionStorage.setItem(FIRST_SOURCE_PREFILL_KEY, JSON.stringify({ utm_content: "banner" }));
+      await mountAt();
+      expect(pickedValue()).toBeUndefined();
+    });
+
+    it("lets the user change a prefilled pick before Continue, and clears the prefill after", async () => {
+      sessionStorage.setItem(
+        FIRST_SOURCE_PREFILL_KEY,
+        JSON.stringify({ utm_content: "kubernetes" }),
+      );
+      await mountAt();
+      await fillInputs();
+      await pick("windows");
+      await tickTerms();
+      await byTest("onboarding-get-started-submit-btn").trigger("submit");
+      await flush();
+      expect(submitNewUserInfo).toHaveBeenCalledWith(
+        ORG,
+        expect.objectContaining({ first_source: "windows" }),
+      );
+      expect(sessionStorage.getItem(FIRST_SOURCE_PREFILL_KEY)).toBeNull();
+    });
+  });
+
+  describe("Terms and privacy links", () => {
+    it("open the legal documents in a new tab", async () => {
+      await mountAt();
+      const terms = byTest("onboarding-get-started-terms-link");
+      const privacy = byTest("onboarding-get-started-privacy-link");
+      expect(terms.attributes("href")).toBe("https://openobserve.ai/legal/terms-of-service/");
+      expect(privacy.attributes("href")).toBe("https://openobserve.ai/legal/privacy-policy/");
+      expect(terms.attributes("target")).toBe("_blank");
     });
   });
 });

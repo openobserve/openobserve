@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import ScheduledDashboards from "./ScheduledDashboards.vue";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 // Mock Vuex store
 const mockStore = {
@@ -21,6 +22,10 @@ const mockRouter = {
 // Mock composables
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => mockStore),
+}));
+
+vi.mock("@/stores", () => ({
+  default: { state: { selectedOrganization: { identifier: "test-org" } } },
 }));
 
 vi.mock("vue-router", () => ({
@@ -115,6 +120,8 @@ const i18n = createI18n({
 });
 
 describe("ScheduledDashboards", () => {
+  beforeEach(() => resetListViewState());
+
   const defaultProps = {
     open: true,
     reports: [],
@@ -641,6 +648,52 @@ describe("ScheduledDashboards", () => {
     it("should render action buttons", () => {
       const wrapper = createWrapper();
       expect(wrapper.findAll('[data-test="alert-list-add-alert-btn"]').length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("view state persistence", () => {
+    const defaults = {
+      activeTab: "cached",
+      filterQuery: "",
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      pageSize: 20,
+      currentPage: 1,
+    };
+
+    it("seeds tab, search, sort and paging from the saved view", () => {
+      Object.assign(useListViewState("scheduled-dashboards", defaults), {
+        activeTab: "shared",
+        filterQuery: "daily",
+        sortBy: "name",
+        sortOrder: "desc",
+        pageSize: 50,
+        currentPage: 2,
+      });
+      const vm = createWrapper().vm as any;
+
+      expect(vm.scheduledActiveTab).toBe("shared");
+      expect(vm.scheduledFilterQuery).toBe("daily");
+      expect(vm.sortBy).toBe("name");
+      expect(vm.sortOrder).toBe("desc");
+      expect(vm.selectedPerPage).toBe(50);
+      expect(vm.currentPage).toBe(2);
+    });
+
+    it("saves changes into the view state and resets the page on a tab switch", async () => {
+      Object.assign(useListViewState("scheduled-dashboards", defaults), { currentPage: 3 });
+      const vm = createWrapper().vm as any;
+
+      vm.scheduledFilterQuery = "weekly";
+      vm.scheduledActiveTab = "shared";
+      await flushPromises();
+
+      expect(vm.currentPage).toBe(1);
+      expect(useListViewState("scheduled-dashboards", defaults)).toMatchObject({
+        filterQuery: "weekly",
+        activeTab: "shared",
+        currentPage: 1,
+      });
     });
   });
 });

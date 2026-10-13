@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Unified View Toggle: Service Graph / Traces / Spans -->
           <OToggleGroup
             :model-value="searchObj.meta.searchMode"
-            @update:model-value="$emit('update:searchMode', $event)"
+            @update:model-value="onSearchModeChange"
           >
             <OToggleGroupItem
               data-test="traces-search-mode-spans-btn"
@@ -53,11 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
             </OToggleGroupItem>
             <OToggleGroupItem
-              v-if="config.isEnterprise == 'true'"
+              v-if="serviceGraphAccess.visible"
               data-test="traces-service-graph-toggle"
               value="service-graph"
               size="sm"
-              :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
+              :icon-right="!serviceGraphAccess.allowed ? 'lock' : undefined"
+              :tooltip="
+                serviceGraphAccess.allowed && shouldHideToggleText
+                  ? t('traces.serviceGraphTab')
+                  : undefined
+              "
             >
               <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
               <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
@@ -392,6 +397,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="text-2xs text-muted-foreground">
                       {{ t("search.liveModeTooltip") }}
                     </div>
+                    <div class="text-2xs text-muted-foreground">
+                      {{ t("search.autoRunAppliesTo") }}
+                    </div>
                   </span>
                 </ODropdownItem>
               </ODropdown>
@@ -585,6 +593,8 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
+import { useLockedAffordance } from "@/composables/useLockedAffordance";
 import useTraces from "@/composables/useTraces";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import SyntaxGuide from "./SyntaxGuide.vue";
@@ -1268,10 +1278,21 @@ export default defineComponent({
         !searchObj.data.errorMsg?.trim()?.length &&
         !!searchObj.searchApplied,
     );
+    const serviceGraphAccess = useLockedAffordance("enterprise");
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
+
+    // OToggleGroup is controlled, so refusing to emit here keeps a locked Service Graph from switching.
+    const onSearchModeChange = (value: unknown) => {
+      if (value === "service-graph" && !serviceGraphAccess.value.allowed) {
+        openUpgradeDialog();
+        return;
+      }
+      emit("update:searchMode", value);
+    };
 
     const leftBaseWidth = computed(() => {
       const textKey = shouldHideToggleText.value ? "icon" : "text";
-      const toggle = config.isEnterprise == "true" ? TOGGLE_WIDTH.enterprise : TOGGLE_WIDTH.oss;
+      const toggle = serviceGraphAccess.value.visible ? TOGGLE_WIDTH.enterprise : TOGGLE_WIDTH.oss;
       const widths = [toggle[textKey], MORE_WIDTH];
       if (showDrillDown.value) widths.push(DRILL_DOWN_WIDTH[textKey]);
       if (isSearchMode.value) widths.push(RESET_WIDTH[shouldHideResetText.value ? "icon" : "text"]);
@@ -1349,6 +1370,8 @@ export default defineComponent({
       savedViewsDropdownOpen,
       quickUpdateSavedView,
       confirmUpdateSavedView,
+      serviceGraphAccess,
+      onSearchModeChange,
     };
   },
   computed: {

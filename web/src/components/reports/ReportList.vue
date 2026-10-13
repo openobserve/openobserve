@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
           <div class="bg-card-glass-bg h-full">
             <OTable
+              ref="oTableRef"
               data-test="report-list-table"
               :data="visibleRows"
               :columns="columns"
@@ -94,6 +95,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :enable-column-resize="true"
               :persist-columns="true"
               :default-columns="false"
+              :page-size="pageSize"
+              :current-page="currentPage"
+              :sort-by="sortBy"
+              :sort-order="sortOrder"
+              @update:page-size="pageSize = $event"
+              @update:current-page="currentPage = $event"
+              @update:sort-by="sortBy = $event"
+              @update:sort-order="sortOrder = $event"
               show-index
               table-id="reports-report-list"
               :column-visibility="{ next_run_at: false }"
@@ -434,6 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { useOrgId } from "@/composables/query/useOrgId";
+import { useListViewState } from "@/composables/useListViewState";
 import type { ReportListFilters } from "@/services/reports";
 import { useQuery } from "@tanstack/vue-query";
 import { reportsQuery } from "@/services/reports.queries";
@@ -490,7 +500,16 @@ const store = useStore();
 
 // ── Folder state ──────────────────────────────────────────────────────────────
 const activeFolderId = ref<string>((router.currentRoute.value.query.folder as string) ?? "default");
-const searchAcrossFolders = ref(false);
+const savedView = useListViewState("reports", {
+  filterQuery: "",
+  searchQuery: "",
+  searchAcrossFolders: false,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+  pageSize: 20,
+  currentPage: 1,
+});
+const searchAcrossFolders = ref(savedView.searchAcrossFolders);
 
 const showMoveDialog = ref(false);
 const activeFolderToMove = ref("default");
@@ -535,9 +554,56 @@ const activeTab = computed<ListTab>(() => {
   const tab = router.currentRoute.value.query.tab;
   return tab === "cached" || tab === "history" ? tab : "shared";
 });
-const filterQuery = ref(""); // client-side filter within current folder
-const searchQuery = ref(""); // API search across all folders
+const filterQuery = ref(savedView.filterQuery); // client-side filter within current folder
+const searchQuery = ref(savedView.searchQuery); // API search across all folders
+const sortBy = ref<string>(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const pageSize = ref<number>(savedView.pageSize);
+const currentPage = ref<number>(savedView.currentPage);
+const oTableRef = ref<any>(null);
+
+watch(
+  [
+    activeTab,
+    filterQuery,
+    searchQuery,
+    searchAcrossFolders,
+    sortBy,
+    sortOrder,
+    pageSize,
+    currentPage,
+  ],
+  () => {
+    Object.assign(savedView, {
+      filterQuery: filterQuery.value,
+      searchQuery: searchQuery.value,
+      searchAcrossFolders: searchAcrossFolders.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+      pageSize: pageSize.value,
+      currentPage: currentPage.value,
+    });
+  },
+);
+
+// A tab switch starts a new dataset; the stored page must not carry over.
+watch(activeTab, () => {
+  currentPage.value = 1;
+});
+
+// setTimeout(0) runs after TanStack's deferred auto-reset on the first data load, so the restored page wins.
+watch(
+  isLoadingReports,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => {
+      (oTableRef.value as any)?.restorePage?.(currentPage.value);
+    }, 0);
+  },
+  { once: true },
+);
 const cachedFolderReports = ref<any[]>([]); // current folder's reports before cross-folder search
+let folderRowsCached = false;
 
 const dynamicQueryModel = computed({
   get() {
@@ -716,7 +782,10 @@ const shapeReports = (rows: any[]) =>
 
 const renderReports = (rows: any[]) => {
   const mapped = shapeReports(rows);
-  if (!readNameQuery.value) cachedFolderReports.value = mapped;
+  if (!readNameQuery.value) {
+    cachedFolderReports.value = mapped;
+    folderRowsCached = true;
+  }
   staticReportsList.value = mapped;
   filterReports();
 };
@@ -801,7 +870,10 @@ const filterReports = () => {
 onBeforeMount(async () => {
   // A folder-list 403 must not abort the load below, or the skeleton never clears.
   await getFoldersListByType(store, "reports").catch(() => null);
-  await loadReports(activeFolderId.value);
+  await loadReports(
+    activeFolderId.value,
+    searchAcrossFolders.value && searchQuery.value ? searchQuery.value : undefined,
+  );
 });
 
 // ── Folder watchers (mirrors AlertList pattern) ───────────────────────────────
@@ -822,6 +894,7 @@ watch(
   async (newVal) => {
     selectedReports.value = [];
     if (newVal === router.currentRoute.value.query.folder) return;
+    currentPage.value = 1;
 
     if (searchAcrossFolders.value) {
       searchAcrossFolders.value = false;
@@ -854,10 +927,19 @@ watch(searchAcrossFolders, (enabled) => {
     // Restore the cached folder data without an API call
     searchQuery.value = "";
     filterQuery.value = "";
-    staticReportsList.value = cachedFolderReports.value;
-    filterReports();
+    restoreFolderRows();
   }
 });
+
+// A view restored straight into a cross-folder search never cached the folder's own rows, so those must be read again.
+const restoreFolderRows = () => {
+  if (!folderRowsCached) {
+    loadReports(activeFolderId.value);
+    return;
+  }
+  staticReportsList.value = cachedFolderReports.value;
+  filterReports();
+};
 
 // Named handler: a refresh keeps whatever the user is searching for. Passing
 // `undefined` here reset the name query, so the rows came back unfiltered while
@@ -875,8 +957,7 @@ watch(searchQuery, async (newVal) => {
   if (!searchAcrossFolders.value) return;
   if (!newVal) {
     // User cleared the search — restore cached folder data
-    staticReportsList.value = cachedFolderReports.value;
-    filterReports();
+    restoreFolderRows();
   } else {
     await debouncedSearch(newVal);
   }

@@ -23,6 +23,7 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
+import { setSeverityInferenceEnabled } from "@/utils/logs/statusParser";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -163,13 +164,6 @@ export default createStore({
     // Share URL state for Safari-compatible clipboard copy
     // Polling mechanism checks this value and copies when available
     pendingShortURL: null,
-    // Alert list filter state — persisted across navigation so returning
-    // from add/edit alert screens restores the previous search & toggle state
-    alertListFilters: {
-      searchQuery: "",
-      filterQuery: "",
-      searchAcrossFolders: false,
-    },
   },
   mutations: {
     login(state, payload) {
@@ -281,6 +275,7 @@ export default createStore({
     // },
     setConfig(state, payload) {
       state.zoConfig = payload;
+      setSeverityInferenceEnabled(payload?.ui_logs_severity_inference !== false);
     },
     setFolders(state, payload) {
       state.organizationData.folders = payload;
@@ -381,9 +376,6 @@ export default createStore({
      */
     clearPendingShortURL(state) {
       state.pendingShortURL = null;
-    },
-    setAlertListFilters(state, payload) {
-      state.alertListFilters = { ...state.alertListFilters, ...payload };
     },
     /**
      * Cache the alert library manifest, stamping the time the TTL is measured

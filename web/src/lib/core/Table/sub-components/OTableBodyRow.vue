@@ -33,6 +33,7 @@ const props = defineProps<{
   bordered?: boolean;
   striped?: boolean;
   rowClassFn?: string | ((row: any) => string);
+  isActive?: boolean;
   rowStyleFn?: (row: any) => Record<string, any>;
   /** Virtual scroll: callback for measuring row DOM element height */
   measureEl?: (el: HTMLElement | null) => void;
@@ -177,6 +178,8 @@ function onRowMouseleave() {
     :ref="setRowRef"
     :data-test="`o2-table-row-${row.index}`"
     :data-index="dynamicRowHeight ? virtualIndex : undefined"
+    :data-active-row="isActive ? 'true' : undefined"
+    :aria-current="isActive ? 'true' : undefined"
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
@@ -184,8 +187,9 @@ function onRowMouseleave() {
       clickable ? 'cursor-pointer' : '',
       'hover:bg-table-row-hover-bg',
       clickable ? 'focus-visible:bg-table-row-hover-bg focus:outline-none' : '',
-      isRowSelected ? 'bg-table-row-selected-bg' : '',
-      !isRowSelected && isStriped ? 'bg-table-row-striped-bg' : '',
+      isRowSelected || isActive ? 'bg-table-row-selected-bg' : '',
+      isActive ? 'ring-focus-ring-accent ring-2 ring-inset' : '',
+      !isRowSelected && !isActive && isStriped ? 'bg-table-row-striped-bg' : '',
       statusBarColor ? 'o2-table-row-with-status' : '',
       rowClass,
     ]"

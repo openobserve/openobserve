@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
           <OTable
+            ref="oTableRef"
             :frame="false"
             data-test="synthetics-locations-list-table"
             :data="visibleRows"
@@ -57,8 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :selected-ids="selectedLocationIds"
             selection="multiple"
             pagination="client"
-            :page-size="20"
+            :page-size="pageSize"
             :page-size-options="[10, 20, 50, 100]"
+            :current-page="currentPage"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:page-size="pageSize = $event"
+            @update:current-page="currentPage = $event"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             sorting="client"
             filter-mode="client"
             :default-columns="false"
@@ -259,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, onMounted, defineComponent, computed } from "vue";
+import { ref, onMounted, defineComponent, computed, watch } from "vue";
 import type { Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -280,6 +288,7 @@ import syntheticsService from "@/services/synthetics";
 import SyntheticsLocationForm from "./SyntheticsLocationForm.vue";
 import ImportSyntheticsLocations from "./ImportSyntheticsLocations.vue";
 import type { SyntheticsLocationRecord } from "@/types/synthetics";
+import { useListViewState } from "@/composables/useListViewState";
 
 export default defineComponent({
   name: "SyntheticsLocationsList",
@@ -297,7 +306,29 @@ export default defineComponent({
     ImportSyntheticsLocations,
   },
   setup() {
-    const filterQuery = ref("");
+    const viewState = useListViewState("synthetics-locations", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
     const { t } = useI18nTyped();
     const store = useStore();
     const { confirm } = useConfirmDialog();
@@ -360,6 +391,14 @@ export default defineComponent({
     ];
 
     const locations = ref<SyntheticsLocationRecord[]>([]);
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      locations,
+      () => {
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true },
+    );
     const selectedLocations: Ref<SyntheticsLocationRecord[]> = ref([]);
     const listLoading = ref(false);
     const bulkActionLoading = ref(false);
@@ -644,6 +683,11 @@ export default defineComponent({
       t,
       store,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       columns,
       locations,
       listLoading,

@@ -153,6 +153,24 @@ describe("buildPrefillFromLogs", () => {
       expect(keys(buildPrefillFromLogs(logs()))).not.toContain("broadMatch");
     });
 
+    it("opens a held filter with the filter-dropped warning, the same as patterns", () => {
+      const p = normalizePrefill(
+        buildPrefillFromLogs(
+          logs({
+            rawQuery: "status=500 -404 AND is_error",
+            resolvedSql: 'select * from "k8s_logs"',
+            heldFilterDropped: true,
+          }),
+        ),
+      );
+      expect(keys(p)).toContain("heldFilterDropped");
+      expect(keys(p)).not.toContain("textFilterDropped");
+      expect(keys(p)).toContain("broadMatch");
+      expect(keys(p)).not.toContain("convertedToSql");
+      expect(isPrefillBlocked(p)).toBe(false);
+      expect(p.sql).toBe('select * from "k8s_logs"');
+    });
+
     it("notes an empty result set without blocking", () => {
       const p = buildPrefillFromLogs(logs({ hasResults: false }));
       expect(keys(p)).toContain("noResults");
@@ -228,6 +246,13 @@ describe("logsAlertSnapshot", () => {
     expect(snapshot.streamType).toBe("logs");
     expect(snapshot.datetime).toBeNull();
     expect(snapshot.hasResults).toBe(false);
+  });
+
+  it("carries the dropped-filter flag through to the adapter", () => {
+    expect(logsAlertSnapshot(searchObj(), "SELECT 1", undefined, true).heldFilterDropped).toBe(
+      true,
+    );
+    expect(logsAlertSnapshot(searchObj(), "SELECT 1").heldFilterDropped).toBeFalsy();
   });
 
   it("feeds the adapter end to end", () => {

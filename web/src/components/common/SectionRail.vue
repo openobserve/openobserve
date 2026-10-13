@@ -98,18 +98,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- `justify-center!`: the vertical tab hardcodes `justify-start`, and
                two utilities for one property resolve by stylesheet order, not
                class order — without the marker the icon stays left-aligned. -->
-          <OTab
-            v-for="item in group.items"
-            :key="item.key"
-            :name="item.key"
-            :label="collapsed ? undefined : item.label"
-            :tooltip="collapsed ? item.label : undefined"
-            :icon="item.icon"
-            :data-test="item.dataTest"
-            class="w-full"
-            :class="collapsed ? 'justify-center!' : undefined"
-            @click="navigate(item.to)"
-          />
+          <template v-for="item in group.items" :key="item.key">
+            <OTab
+              :name="item.key"
+              :label="collapsed ? undefined : item.label"
+              :tooltip="collapsed ? item.label : undefined"
+              :icon="item.icon"
+              :suffix-icon="item.locked && !collapsed ? 'lock' : undefined"
+              :data-test="item.locked ? `${item.dataTest}-locked` : item.dataTest"
+              class="w-full"
+              :class="collapsed ? 'justify-center!' : undefined"
+              @click="navigate(item.locked ? { name: 'enterpriseFeatures' } : item.to)"
+            />
+          </template>
         </template>
       </OTabs>
     </div>

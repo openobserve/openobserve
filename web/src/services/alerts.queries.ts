@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { quantizeRange } from "@/composables/query/queryClient";
 import alerts from "./alerts";
+import search from "./search";
 import type { AlertHistoryQuery } from "./alerts";
 import { alertKeys } from "./alerts.querykeys";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
@@ -98,6 +99,29 @@ export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
     staleTime: LIVE_STALE_TIME,
   });
 };
+
+export const promRulePreviewQuery = (org: string, expression: string, at: number) =>
+  queryOptions({
+    queryKey: ["alerts", org, "prom-rule-preview", expression, at],
+    queryFn: async (): Promise<number> => {
+      const response = await search.metrics_query({
+        org_identifier: org,
+        query: encodeURIComponent(expression),
+        end_time: at,
+      });
+      const body = response.data;
+      if (
+        body?.status !== "success" ||
+        body?.data?.resultType !== "vector" ||
+        !Array.isArray(body.data.result) ||
+        body.warnings?.length
+      ) {
+        throw new Error("Incomplete PromQL rule preview");
+      }
+      return body.data.result.length;
+    },
+    staleTime: LIVE_STALE_TIME,
+  });
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 

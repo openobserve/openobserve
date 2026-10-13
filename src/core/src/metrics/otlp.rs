@@ -370,6 +370,13 @@ pub async fn handle_otlp_request(
                 {
                     continue;
                 }
+                if !schema_exists.has_fields {
+                    crate::onboarding::on_user_stream_created(
+                        org_id,
+                        StreamType::Metrics,
+                        &metric_name,
+                    );
+                }
 
                 // get partition keys
                 if !stream_partitioning_map.contains_key(&metric_name) {

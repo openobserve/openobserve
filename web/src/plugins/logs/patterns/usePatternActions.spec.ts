@@ -331,6 +331,168 @@ describe("usePatternActions", () => {
       expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain("(code = 500)");
     });
 
+    it("renders a bare word as match_all for the patterns' stream, never dropping it (AC6.2)", () => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [{ name: "test-stream", schema: [{ name: "body", type: "Utf8" }], settings: {} }],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [{ name: "body" }];
+      (mockStore.state as any).zoConfig = { default_fts_keys: ["body"] };
+      mockSearchObj.data.query = "timeout";
+      try {
+        const sql = usePatternActions().buildPatternsAlertPrefill().sql;
+        expect(sql).toContain("(match_all('timeout'))");
+        expect(sql).not.toMatch(/\(timeout\)/);
+        mockSearchObj.data.query = "error AND body='x'";
+        expect(usePatternActions().buildPatternsAlertPrefill().sql).toContain(
+          "(match_all('error') AND body='x')",
+        );
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+        delete (mockStore.state as any).zoConfig;
+      }
+    });
+
+    it("carries a -term after a predicate into the alert as an exclusion, never subtraction", () => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [
+          {
+            name: "test-stream",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [
+        { name: "body" },
+        { name: "status" },
+      ];
+      mockSearchObj.data.query = "status=500 -404";
+      try {
+        const sql = usePatternActions().buildPatternsAlertPrefill().sql;
+        expect(sql).toContain("(status=500 AND NOT match_all('404'))");
+        expect(sql).not.toContain("500 -404");
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+      }
+    });
+
+    const PATTERN_TERMS =
+      "(match_all('Connection refused to upstream')) OR (match_all('Health probe succeeded for endpoint'))";
+
+    const withStatusStream = (query: string, run: () => void) => {
+      (mockSearchObj.data as any).streamResults = {
+        list: [
+          {
+            name: "test-stream",
+            schema: [
+              { name: "body", type: "Utf8" },
+              { name: "status", type: "Int64" },
+              { name: "is_error", type: "Boolean" },
+            ],
+            settings: { full_text_search_keys: ["body"] },
+          },
+        ],
+      };
+      (mockSearchObj.data.stream as any).selectedStreamFields = [
+        { name: "body" },
+        { name: "status" },
+        { name: "is_error" },
+      ];
+      mockSearchObj.data.query = query;
+      try {
+        run();
+      } finally {
+        delete (mockSearchObj.data as any).streamResults;
+      }
+    };
+
+    it.each(["status=500 -404 AND is_error", "status=500 -debug AND is_error"])(
+      "carries no base filter for a held filter, never subtraction: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          expect(usePatternActions().buildPatternsAlertPrefill().sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE NOT (${PATTERN_TERMS})`,
+          );
+        });
+      },
+    );
+
+    const keysOf = (prefill: any) => prefill.warnings.map((w: any) => w.key);
+
+    it.each(["status=500 -404 AND is_error", "status=500 AND is_error -404"])(
+      "warns that a held filter was dropped, in include mode too: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          for (const patternMode of ["include", "exclude"] as const) {
+            const prefill = usePatternActions().buildPatternsAlertPrefill({ patternMode });
+            expect(keysOf(prefill)).toContain("heldFilterDropped");
+            expect(keysOf(prefill)).not.toContain("textFilterDropped");
+            expect(prefill.sql).not.toContain("404");
+            expect(prefill.sql).not.toContain("is_error");
+          }
+        });
+      },
+    );
+
+    it.each(["status=500 -404", "timeout"])(
+      "carries no base filter and warns when the text cannot run on a no-FTS stream: %s",
+      (query) => {
+        (mockSearchObj.data as any).streamResults = {
+          list: [
+            {
+              name: "test-stream",
+              schema: [
+                { name: "msg_text", type: "Utf8" },
+                { name: "status", type: "Int64" },
+              ],
+              settings: {},
+            },
+          ],
+        };
+        (mockSearchObj.data.stream as any).selectedStreamFields = [
+          { name: "msg_text" },
+          { name: "status" },
+        ];
+        mockSearchObj.data.query = query;
+        try {
+          const prefill = usePatternActions().buildPatternsAlertPrefill();
+          expect(prefill.sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE NOT (${PATTERN_TERMS})`,
+          );
+          expect(keysOf(prefill)).toContain("textFilterDropped");
+          expect(keysOf(prefill)).not.toContain("heldFilterDropped");
+          const include = usePatternActions().buildPatternsAlertPrefill({ patternMode: "include" });
+          expect(include.sql).not.toContain(query);
+          expect(keysOf(include)).toContain("textFilterDropped");
+        } finally {
+          delete (mockSearchObj.data as any).streamResults;
+        }
+      },
+    );
+
+    it("does not warn about a dropped filter when the filter is carried", () => {
+      withStatusStream("status=500 -404", () => {
+        const prefill = usePatternActions().buildPatternsAlertPrefill();
+        expect(prefill.sql).toContain("(status=500 AND NOT match_all('404'))");
+        expect(keysOf(prefill)).not.toContain("textFilterDropped");
+        expect(keysOf(prefill)).not.toContain("heldFilterDropped");
+      });
+    });
+
+    it.each(["status=500 --404", "status=500 -- note"])(
+      "keeps the pattern terms when the filter ends in a comment: %s",
+      (query) => {
+        withStatusStream(query, () => {
+          expect(usePatternActions().buildPatternsAlertPrefill().sql).toBe(
+            `SELECT count(*) AS cnt FROM 'test-stream' WHERE (status=500) AND NOT (${PATTERN_TERMS})`,
+          );
+        });
+      },
+    );
+
     it("says so when a SQL-mode query cannot be spliced in", () => {
       mockSearchObj.meta.sqlMode = true;
       mockSearchObj.data.query = 'SELECT * FROM "test-stream"';

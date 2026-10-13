@@ -169,6 +169,7 @@ mod tests {
         // reflection sample or orgs created after the change get a triggers
         // stream schema without them.
         assert!(field_names.contains(&"actual_value".to_string()));
+        assert!(field_names.contains(&"rule_value".to_string()));
         assert!(field_names.contains(&"threshold_value".to_string()));
         assert!(field_names.contains(&"threshold_operator".to_string()));
         assert!(field_names.contains(&"level".to_string()));
@@ -192,8 +193,13 @@ mod tests {
             assert!(field_names.contains(&f.to_string()), "missing {f}");
         }
 
-        // 21 original + 5 dedup/grouping + 6 value-context + 2 synthetics + 1 delivery + 6 report
-        assert_eq!(field_names.len(), 41);
+        // The history filter and the Suppressed tab of a downtime read this column.
+        assert!(field_names.contains(&"downtime_id".to_string()));
+
+        // Verify count matches struct fields
+        // 43: 21 original + 5 dedup + 6 value + 2 synthetics + downtime + delivery + rule_value + 6
+        // report
+        assert_eq!(field_names.len(), 43);
 
         // Verify no duplicate fields
         let unique_count = field_names

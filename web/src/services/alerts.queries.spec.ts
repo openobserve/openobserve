@@ -14,8 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { alertHistoryQuery } from "./alerts.queries";
+import { promRulePreviewQuery, alertHistoryQuery } from "./alerts.queries";
 import alerts from "./alerts";
+import search from "./search";
+
+vi.mock("./search", () => ({ default: { metrics_query: vi.fn() } }));
 
 vi.mock("./alerts", () => ({
   default: { getHistory: vi.fn().mockResolvedValue({ data: { hits: [], total: 0 } }) },
@@ -59,5 +62,42 @@ describe("alertHistoryQuery", () => {
       ORG,
       expect.objectContaining({ start_time: START_US, end_time: END_US }),
     );
+  });
+});
+
+describe("promRulePreviewQuery", () => {
+  it("counts returned series including special-value strings from an instant query", async () => {
+    vi.mocked(search.metrics_query).mockResolvedValue({
+      data: {
+        status: "success",
+        data: {
+          resultType: "vector",
+          result: [
+            { metric: { host: "a" }, value: [600, "NaN"] },
+            { metric: { host: "b" }, value: [600, "+Inf"] },
+          ],
+        },
+      },
+    } as any);
+    const options = promRulePreviewQuery("org", "foo > 0", 600);
+    expect(await (options.queryFn as () => Promise<number>)()).toBe(2);
+    expect(search.metrics_query).toHaveBeenCalledWith({
+      org_identifier: "org",
+      query: "foo%20%3E%200",
+      end_time: 600,
+    });
+  });
+
+  it("rejects incomplete replies rather than reporting a recovery", async () => {
+    vi.mocked(search.metrics_query).mockResolvedValue({
+      data: {
+        status: "success",
+        warnings: ["partial"],
+        data: { resultType: "vector", result: [] },
+      },
+    } as any);
+    await expect(
+      (promRulePreviewQuery("org", "foo", 600).queryFn as () => Promise<number>)(),
+    ).rejects.toThrow("Incomplete");
   });
 });

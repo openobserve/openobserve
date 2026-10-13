@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div data-test="scheduled-dashboards-container" class="scheduled-dashboards h-full min-h-0">
       <OTable
+        ref="oTableRef"
         class="w-full"
         data-test="scheduled-dashboard-table"
         :data="displayReports"
@@ -59,6 +60,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         pagination="client"
         :page-size="selectedPerPage"
         :page-size-options="perPageOptionsList"
+        :current-page="currentPage"
+        :sort-by="sortBy"
+        :sort-order="sortOrder"
+        @update:page-size="selectedPerPage = $event"
+        @update:current-page="currentPage = $event"
+        @update:sort-by="sortBy = $event"
+        @update:sort-order="sortOrder = $event"
         :show-global-filter="false"
         :default-columns="false"
         show-index
@@ -133,6 +141,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import { isCachedReport, lastRunChip } from "@/utils/reports/reportRun";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useListViewState } from "@/composables/useListViewState";
 
 const props = defineProps({
   open: {
@@ -173,8 +182,20 @@ const { t } = useI18nTyped();
 
 const router = useRouter();
 
-const scheduledFilterQuery = ref("");
-const scheduledActiveTab = ref("cached");
+const savedView = useListViewState("scheduled-dashboards", {
+  activeTab: "cached",
+  filterQuery: "",
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+  pageSize: 20,
+  currentPage: 1,
+});
+const scheduledFilterQuery = ref(savedView.filterQuery);
+const scheduledActiveTab = ref(savedView.activeTab);
+const sortBy = ref<string>(savedView.sortBy);
+const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+const currentPage = ref<number>(savedView.currentPage);
+const oTableRef = ref<any>(null);
 const scheduledReportTypeTabs = reactive([
   { label: t("reports.cached"), value: "cached", icon: "database" },
   { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
@@ -217,8 +238,10 @@ watch(
 );
 
 watch(scheduledActiveTab, () => {
+  currentPage.value = 1;
   filterReports();
 });
+
 //this makes sure that reports are formatted when the component is mounted
 //because sometimes watcher might not be triggered if the props are already set
 onMounted(() => {
@@ -309,7 +332,31 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-const selectedPerPage = ref(20);
+const selectedPerPage = ref<number>(savedView.pageSize);
+
+watch(
+  [scheduledActiveTab, scheduledFilterQuery, sortBy, sortOrder, selectedPerPage, currentPage],
+  () => {
+    Object.assign(savedView, {
+      activeTab: scheduledActiveTab.value,
+      filterQuery: scheduledFilterQuery.value,
+      sortBy: sortBy.value,
+      sortOrder: sortOrder.value,
+      pageSize: selectedPerPage.value,
+      currentPage: currentPage.value,
+    });
+  },
+);
+
+// setTimeout(0) runs after TanStack's deferred auto-reset on the first data load, so the restored page wins.
+let pageRestored = false;
+watch(formattedReports, (rows) => {
+  if (pageRestored || !rows.length) return;
+  pageRestored = true;
+  setTimeout(() => {
+    (oTableRef.value as any)?.restorePage?.(currentPage.value);
+  }, 0);
+});
 
 const perPageOptionsList = [5, 10, 20, 50, 100];
 

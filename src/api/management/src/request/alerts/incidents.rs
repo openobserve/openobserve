@@ -1223,6 +1223,7 @@ mod tests {
             updated_at: 2000,
             group_values: serde_json::Value::Object(Default::default()),
             key_type: config::meta::alerts::incidents::KeyType::default(),
+            muted_by_downtime_id: None,
         };
 
         let response = ListIncidentsResponse {

@@ -34,6 +34,7 @@ pub mod db_monitoring;
 pub mod discovery;
 #[cfg(feature = "enterprise")]
 pub mod domain_management;
+pub mod downtimes;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
 #[cfg(feature = "enterprise")]
@@ -41,6 +42,7 @@ pub mod experiments;
 #[allow(deprecated)]
 pub mod folders;
 pub mod gen_ai;
+pub mod ingest_rejections;
 pub mod keys;
 pub mod kv;
 #[cfg(feature = "enterprise")]
