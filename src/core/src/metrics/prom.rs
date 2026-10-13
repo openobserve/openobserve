@@ -196,11 +196,12 @@ pub async fn remote_write(
     let mut sample_count = 0;
     let mut exemplar_count = 0;
     let mut dropped_exemplars = 0;
-    let mut bucket_value_columns: HashMap<String, bool> = HashMap::new();
 
     // Pre-load all configurations for unique metrics to avoid repeated queries
     let preload_start = std::time::Instant::now();
     let mut unique_metrics = HashSet::new();
+    // Prometheus sends an exemplar as an entry of its own; for a native histogram that is all
+    let mut exemplar_only_metrics: HashSet<String> = HashSet::new();
     // a request carries far more series than distinct metric names, so each is formatted once
     let mut formatted_names: HashMap<String, String> = HashMap::new();
     for event in &request.timeseries {
@@ -219,6 +220,8 @@ pub async fn remote_write(
                 for suffix in CLASSIC_HISTOGRAM_SUFFIXES {
                     unique_metrics.insert(format!("{metric_name}{suffix}"));
                 }
+            } else if event.samples.is_empty() && !event.exemplars.is_empty() {
+                exemplar_only_metrics.insert(metric_name);
             }
         }
     }
@@ -230,14 +233,32 @@ pub async fn remote_write(
     let mut created_streams: HashSet<String> = HashSet::new();
 
     if !unique_metrics.is_empty() {
-        let streams: Vec<StreamParams> = unique_metrics
+        let stream_params = |name: &String| StreamParams {
+            org_id: org_id.to_owned().into(),
+            stream_name: name.to_owned().into(),
+            stream_type: StreamType::Metrics,
+        };
+        let mut streams: Vec<StreamParams> = unique_metrics.iter().map(stream_params).collect();
+
+        // Preload schemas
+        let t = std::time::Instant::now();
+        preload_schemas(&streams, &mut metric_schema_map, &mut created_streams).await;
+        // an exemplar-only entry of a native histogram lands in the bucket stream, so that
+        // stream's configuration is needed too, with the schema that decides the host stream
+        let bucket_streams = exemplar_bucket_streams(&exemplar_only_metrics, &metric_schema_map);
+        let bucket_streams: Vec<StreamParams> = bucket_streams
             .iter()
-            .map(|name| StreamParams {
-                org_id: org_id.to_owned().into(),
-                stream_name: name.to_owned().into(),
-                stream_type: StreamType::Metrics,
-            })
+            .filter(|name| unique_metrics.insert((*name).clone()))
+            .map(stream_params)
             .collect();
+        preload_schemas(
+            &bucket_streams,
+            &mut metric_schema_map,
+            &mut created_streams,
+        )
+        .await;
+        streams.extend(bucket_streams);
+        preload_schema_time = t.elapsed().as_micros();
 
         // Preload pipelines
         let t = std::time::Instant::now();
@@ -261,25 +282,6 @@ pub async fn remote_write(
         )
         .await;
         preload_uds_time = t.elapsed().as_micros();
-
-        // Preload schemas
-        let t = std::time::Instant::now();
-        for stream in &streams {
-            let stream_name_str: &str = stream.stream_name.as_ref();
-            if !metric_schema_map.contains_key(stream_name_str) {
-                let schema_exists = stream_schema_exists(
-                    &stream.org_id,
-                    &stream.stream_name,
-                    stream.stream_type,
-                    &mut metric_schema_map,
-                )
-                .await;
-                if !schema_exists.has_fields {
-                    created_streams.insert(stream.stream_name.to_string());
-                }
-            }
-        }
-        preload_schema_time = t.elapsed().as_micros();
 
         // Preload partition keys
         for stream in &streams {
@@ -495,14 +497,8 @@ pub async fn remote_write(
             continue;
         }
         exemplar_count += event.exemplars.len();
-        let Some(host_stream) = exemplar_host_stream(
-            org_id,
-            &metric_name,
-            schema,
-            &sink,
-            &mut bucket_value_columns,
-        )
-        .await
+        let Some(host_stream) =
+            exemplar_host_stream(&metric_name, schema, &sink, &metric_schema_map)
         else {
             dropped_exemplars += event.exemplars.len();
             continue;
@@ -1194,34 +1190,61 @@ fn build_metric_record(
     record
 }
 
+/// Loads the schema of each stream not yet in the map, noting the ones this request creates.
+async fn preload_schemas(
+    streams: &[StreamParams],
+    metric_schema_map: &mut HashMap<String, SchemaCache>,
+    created_streams: &mut HashSet<String>,
+) {
+    for stream in streams {
+        let stream_name_str: &str = stream.stream_name.as_ref();
+        if metric_schema_map.contains_key(stream_name_str) {
+            continue;
+        }
+        let schema_exists = stream_schema_exists(
+            &stream.org_id,
+            &stream.stream_name,
+            stream.stream_type,
+            metric_schema_map,
+        )
+        .await;
+        if !schema_exists.has_fields {
+            created_streams.insert(stream.stream_name.to_string());
+        }
+    }
+}
+
+/// The bucket stream of each exemplar-only metric whose own stream cannot host a row.
+fn exemplar_bucket_streams(
+    exemplar_only_metrics: &HashSet<String>,
+    metric_schema_map: &HashMap<String, SchemaCache>,
+) -> Vec<String> {
+    exemplar_only_metrics
+        .iter()
+        .filter(|name| !ingest::has_value_column(metric_schema_map.get(*name)))
+        .map(|name| exemplar_bucket_stream(name))
+        .collect()
+}
+
+/// A native histogram writes only its classic streams, so its exemplars sit by the buckets.
+fn exemplar_bucket_stream(metric_name: &str) -> String {
+    format!("{metric_name}{}", CLASSIC_HISTOGRAM_SUFFIXES[0])
+}
+
 /// The stream a host row lands in: the series' own, else a native histogram's bucket stream.
-async fn exemplar_host_stream(
-    org_id: &str,
+fn exemplar_host_stream(
     metric_name: &str,
     schema: Option<&SchemaCache>,
     sink: &RecordSink<'_>,
-    bucket_value_columns: &mut HashMap<String, bool>,
+    metric_schema_map: &HashMap<String, SchemaCache>,
 ) -> Option<String> {
     // a host row needs the `value` column samples create, like a stale marker does
     if ingest::has_value_column(schema) || sink.has_records(metric_name) {
         return Some(metric_name.to_string());
     }
-    // a native histogram writes only its classic streams, so its exemplars sit by the buckets
-    let bucket = format!("{metric_name}{}", CLASSIC_HISTOGRAM_SUFFIXES[0]);
-    if sink.has_records(&bucket) {
-        return Some(bucket);
-    }
-    let has_value = match bucket_value_columns.get(&bucket) {
-        Some(known) => *known,
-        None => {
-            let has_value = infra::schema::get_cache(org_id, &bucket, StreamType::Metrics)
-                .await
-                .is_ok_and(|cache| ingest::has_value_column(Some(&cache)));
-            bucket_value_columns.insert(bucket.clone(), has_value);
-            has_value
-        }
-    };
-    has_value.then_some(bucket)
+    let bucket = exemplar_bucket_stream(metric_name);
+    (sink.has_records(&bucket) || ingest::has_value_column(metric_schema_map.get(&bucket)))
+        .then_some(bucket)
 }
 
 /// One host row per exemplar timestamp: a NULL `value` plus the `exemplars` string OTLP writes.
@@ -2066,8 +2089,8 @@ mod tests {
         assert!(exemplar_host_records(labels, &exemplars[1..2]).is_empty());
     }
 
-    #[tokio::test]
-    async fn test_exemplar_host_stream_falls_back_to_a_native_histogram_bucket_stream() {
+    #[test]
+    fn test_exemplar_host_stream_falls_back_to_a_native_histogram_bucket_stream() {
         use datafusion::arrow::datatypes::{DataType, Field};
 
         let pipelines = HashMap::new();
@@ -2081,34 +2104,49 @@ mod tests {
             pipeline_inputs: &mut pipeline_inputs,
             json_data_by_stream: &mut json_data_by_stream,
         };
-        let with_value = SchemaCache::new(Schema::new(vec![Field::new(
-            VALUE_LABEL,
-            DataType::Float64,
-            true,
-        )]));
-        let mut known = HashMap::new();
+        let with_value = || {
+            SchemaCache::new(Schema::new(vec![Field::new(
+                VALUE_LABEL,
+                DataType::Float64,
+                true,
+            )]))
+        };
+        let mut schemas = HashMap::new();
+        schemas.insert("up".to_string(), with_value());
+        schemas.insert("db_latency_bucket".to_string(), with_value());
+        schemas.insert(
+            "http_latency_bucket".to_string(),
+            SchemaCache::new(Schema::empty()),
+        );
 
         // the series' own stream wins whenever it has or gets a value column
         assert_eq!(
-            exemplar_host_stream("o", "up", Some(&with_value), &sink, &mut known).await,
+            exemplar_host_stream("up", schemas.get("up"), &sink, &schemas),
             Some("up".to_string())
         );
         // buckets buffered by this request host a native histogram's exemplars
         assert_eq!(
-            exemplar_host_stream("o", "rpc_latency", None, &sink, &mut known).await,
+            exemplar_host_stream("rpc_latency", None, &sink, &schemas),
             Some("rpc_latency_bucket".to_string())
         );
-        // a bucket stream already known to lack a value column drops them
-        known.insert("http_latency_bucket".to_string(), false);
+        // so does a bucket stream an earlier request created
         assert_eq!(
-            exemplar_host_stream("o", "http_latency", None, &sink, &mut known).await,
-            None
-        );
-        known.insert("db_latency_bucket".to_string(), true);
-        assert_eq!(
-            exemplar_host_stream("o", "db_latency", None, &sink, &mut known).await,
+            exemplar_host_stream("db_latency", None, &sink, &schemas),
             Some("db_latency_bucket".to_string())
         );
+        assert_eq!(
+            exemplar_host_stream("http_latency", None, &sink, &schemas),
+            None
+        );
+
+        // only metrics whose own stream cannot host a row get their bucket stream preloaded
+        let exemplar_only: HashSet<String> = ["up", "db_latency", "new_metric"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let mut buckets = exemplar_bucket_streams(&exemplar_only, &schemas);
+        buckets.sort();
+        assert_eq!(buckets, vec!["db_latency_bucket", "new_metric_bucket"]);
     }
 
     #[test]
