@@ -760,6 +760,9 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::OncallSlackSync => {
+            handle_oncall_slack_sync_triggers(trigger).await
+        }
     }
 }
 
@@ -820,6 +823,32 @@ async fn handle_oncall_escalation_triggers(
         &trigger.org,
         db::scheduler::TriggerModule::OncallEscalation,
         &trigger.module_key,
+    )
+    .await?;
+    Ok(())
+}
+
+/// Runs one Slack sync pass of a page; the pass ends its own row.
+#[cfg(feature = "enterprise")]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    o2_enterprise::enterprise::oncall::chat::sync::run(&trigger).await
+}
+
+/// Completes the row with no Slack call: this build has no sync job.
+#[cfg(not(feature = "enterprise"))]
+async fn handle_oncall_slack_sync_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    // Region-local (FL-4): infra, never the publishing db::scheduler.
+    infra::scheduler::update_status(
+        &trigger.org,
+        db::scheduler::TriggerModule::OncallSlackSync,
+        &trigger.module_key,
+        db::scheduler::TriggerStatus::Completed,
+        0,
+        None,
     )
     .await?;
     Ok(())

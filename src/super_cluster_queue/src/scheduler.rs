@@ -64,6 +64,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
 async fn push(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    if region_local(&trigger.module, &trigger.module_key) {
+        return Ok(());
+    }
     if trigger.module == TriggerModule::Alert {
         trigger_modify_module_key(&mut trigger).await?;
     }
@@ -82,6 +85,9 @@ async fn push(msg: Message) -> Result<()> {
 
 async fn update(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    if region_local(&trigger.module, &trigger.module_key) {
+        return Ok(());
+    }
     if trigger.module == TriggerModule::Alert {
         trigger_modify_module_key(&mut trigger).await?;
     }
@@ -233,6 +239,8 @@ async fn update(msg: Message) -> Result<()> {
                 );
             }
         }
+        // FL-4: region-local, dropped by every receiver before it gets here.
+        TriggerModule::OncallSlackSync => {}
         // Both SLO modules key on the SLO, so they share one existence check.
         // Pushing a trigger whose SLO has not synced yet would create a job
         // that fires against nothing; the handler reschedules in that case,
@@ -312,6 +320,9 @@ async fn update(msg: Message) -> Result<()> {
 
 async fn update_status(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    if region_local(&trigger.module, &trigger.module_key) {
+        return Ok(());
+    }
     if trigger.module == TriggerModule::Alert {
         trigger_modify_module_key(&mut trigger).await?;
     }
@@ -344,6 +355,10 @@ async fn update_status(msg: Message) -> Result<()> {
 
 async fn bulk_update(msg: Message) -> Result<()> {
     let triggers: Vec<Trigger> = json::from_slice(&msg.value.unwrap())?;
+    let triggers = triggers
+        .into_iter()
+        .filter(|t| !region_local(&t.module, &t.module_key))
+        .collect();
     if let Err(e) = scheduler::bulk_update_triggers(triggers).await {
         log::error!("[SUPER_CLUSTER:sync] Failed to bulk update triggers error: {e}");
         return Err(e);
@@ -353,6 +368,10 @@ async fn bulk_update(msg: Message) -> Result<()> {
 
 async fn bulk_update_status(msg: Message) -> Result<()> {
     let updates: Vec<StatusUpdateTuple> = json::from_slice(&msg.value.unwrap())?;
+    let updates = updates
+        .into_iter()
+        .filter(|(_, module, key, ..)| !region_local(module, key))
+        .collect();
     if let Err(e) = scheduler::bulk_update_status(updates).await {
         log::error!("[SUPER_CLUSTER:sync] Failed to bulk update triggers error: {e}");
         return Err(e);
@@ -362,6 +381,9 @@ async fn bulk_update_status(msg: Message) -> Result<()> {
 
 async fn delete(msg: Message) -> Result<()> {
     let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    if region_local(&trigger.module, &trigger.module_key) {
+        return Ok(());
+    }
     if trigger.module == TriggerModule::Alert {
         trigger_modify_module_key(&mut trigger).await?;
     }
@@ -378,6 +400,15 @@ async fn delete(msg: Message) -> Result<()> {
         return Err(e);
     }
     Ok(())
+}
+
+/// FL-4: a page's Slack sync runs only in its home region, so its trigger is never applied here.
+fn region_local(module: &TriggerModule, key: &str) -> bool {
+    let local = *module == TriggerModule::OncallSlackSync;
+    if local {
+        log::warn!("[SUPER_CLUSTER:sync] dropped a replicated {module} trigger for {key}");
+    }
+    local
 }
 
 async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
@@ -405,4 +436,81 @@ async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
         trigger.module_key = alert.get_unique_key();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+    use config::meta::triggers::TriggerStatus;
+
+    use super::*;
+
+    // A message of `message_type` carrying `value` as JSON.
+    fn message(message_type: MessageType, value: &impl serde::Serialize) -> Message {
+        let value = Bytes::from(json::to_vec(value).unwrap());
+        Message::new(
+            "/scheduler/".to_string(),
+            Some(value),
+            None,
+            false,
+            message_type,
+        )
+    }
+
+    #[tokio::test]
+    async fn every_receiver_drops_a_slack_sync_trigger() {
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).unwrap();
+        infra::db_init().await.unwrap();
+        let org = format!("s10b_{}", config::ider::uuid());
+        scheduler::arm_slack_sync(&org, "local", 5).await.unwrap();
+        let before = scheduler::get(&org, TriggerModule::OncallSlackSync, "local")
+            .await
+            .unwrap();
+        let foreign = |key: &str| Trigger {
+            org: org.clone(),
+            module: TriggerModule::OncallSlackSync,
+            module_key: key.to_string(),
+            next_run_at: 1,
+            status: TriggerStatus::Completed,
+            retries: 2,
+            data: "{}".to_string(),
+            ..Default::default()
+        };
+        let tuple: StatusUpdateTuple = (
+            org.clone(),
+            TriggerModule::OncallSlackSync,
+            "local".to_string(),
+            TriggerStatus::Completed,
+            2,
+            Some("{}".to_string()),
+        );
+        let messages = [
+            message(MessageType::SchedulerPush, &foreign("remote")),
+            message(MessageType::SchedulerUpdate, &foreign("local")),
+            message(MessageType::SchedulerUpdate, &foreign("remote")),
+            message(MessageType::SchedulerUpdateStatus, &foreign("local")),
+            message(MessageType::BulkSchedulerUpdate, &vec![foreign("local")]),
+            message(MessageType::BulkSchedulerStatusUpdate, &vec![tuple]),
+            message(MessageType::SchedulerDelete, &foreign("local")),
+        ];
+        for msg in messages {
+            let kind = format!("{:?}", msg.message_type);
+            process(msg).await.unwrap();
+            let after = scheduler::get(&org, TriggerModule::OncallSlackSync, "local")
+                .await
+                .unwrap_or_else(|_| panic!("{kind} removed the local row"));
+            assert_eq!(
+                (after.status, after.next_run_at, after.retries, after.data),
+                (
+                    before.status.clone(),
+                    before.next_run_at,
+                    before.retries,
+                    before.data.clone()
+                ),
+                "{kind}"
+            );
+        }
+        let pushed = scheduler::get(&org, TriggerModule::OncallSlackSync, "remote").await;
+        assert!(pushed.is_err(), "a replicated sync trigger was stored");
+    }
 }

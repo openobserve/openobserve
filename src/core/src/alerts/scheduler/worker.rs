@@ -681,7 +681,6 @@ fn resolve_module_configs(
             poll_interval_secs: pick_interval(cfg.limit.scheduler_slo_backfill_interval),
             lease_timeout_secs: None,
         },
-        oncall_module_config(cfg, base),
         ModuleSchedulerConfig {
             module: TriggerModule::QueryRecommendations,
             concurrency: pick_concurrency(cfg.limit.scheduler_query_reco_concurrency),
@@ -689,6 +688,9 @@ fn resolve_module_configs(
             lease_timeout_secs: None,
         },
     ]
+    .into_iter()
+    .chain(oncall_module_configs(cfg, base))
+    .collect()
 }
 
 /// The lanes that exist even when `ZO_SCHEDULER_PER_MODULE_PULLERS` is off.
@@ -706,7 +708,7 @@ fn always_on_module_configs(
     base: &SchedulerConfig,
 ) -> Vec<ModuleSchedulerConfig> {
     if oncall_lane_wanted() {
-        vec![oncall_module_config(cfg, base)]
+        oncall_module_configs(cfg, base).to_vec()
     } else {
         // Nothing pushes an escalation trigger when the feature is off, so a puller for it would
         // be a query per interval per node against rows that cannot exist.
@@ -757,6 +759,19 @@ fn oncall_module_config(cfg: &config::Config, base: &SchedulerConfig) -> ModuleS
             _ => None,
         },
     }
+}
+
+/// The escalation lane and the Slack sync lane (SY-8), which shares its budget, cadence and lease.
+fn oncall_module_configs(
+    cfg: &config::Config,
+    base: &SchedulerConfig,
+) -> [ModuleSchedulerConfig; 2] {
+    let escalation = oncall_module_config(cfg, base);
+    let sync = ModuleSchedulerConfig {
+        module: TriggerModule::OncallSlackSync,
+        ..escalation.clone()
+    };
+    [escalation, sync]
 }
 
 /// First value greater than zero, treating zero as "inherit the next one down". The last entry is
@@ -933,7 +948,7 @@ mod tests {
         // modules when `CompositeAlert` and `OncallEscalation` arrived from
         // different branches, so it is asserted against the same number the
         // loop walks rather than a literal somebody has to remember to bump.
-        let expected = 10;
+        let expected = 11;
         assert_eq!(configs.len(), expected);
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
@@ -953,6 +968,7 @@ mod tests {
             TriggerModule::Slo,
             TriggerModule::SloBackfill,
             TriggerModule::OncallEscalation,
+            TriggerModule::OncallSlackSync,
         ] {
             assert!(modules.contains(&m), "missing module {m:?}");
         }
@@ -1229,8 +1245,47 @@ mod tests {
             assert!(always_on_module_configs(&cfg, &base).is_empty());
         } else {
             let lanes = always_on_module_configs(&cfg, &base);
-            assert_eq!(lanes.len(), 1, "on-call gets a lane, and only on-call");
-            assert_eq!(lanes[0].module, TriggerModule::OncallEscalation);
+            let modules: Vec<_> = lanes.iter().map(|l| l.module.clone()).collect();
+            assert_eq!(
+                modules,
+                [
+                    TriggerModule::OncallEscalation,
+                    TriggerModule::OncallSlackSync
+                ],
+                "on-call gets its lanes, and only on-call"
+            );
+        }
+    }
+
+    /// SY-8: the Slack sync lane runs wherever the escalation lane does, at its cadence.
+    #[test]
+    fn test_slack_sync_lane_follows_the_escalation_lane_in_both_puller_modes() {
+        let base = make_config(); // interval 10
+        for (oncall_interval, expected) in [(7, 7), (0, 10)] {
+            let mut cfg = config::Config::default();
+            cfg.limit.scheduler_oncall_interval = oncall_interval;
+            // (ZO_SCHEDULER_PER_MODULE_PULLERS, the lanes that mode builds)
+            let modes = [
+                (true, resolve_module_configs(&cfg, &base)),
+                (false, always_on_module_configs(&cfg, &base)),
+            ];
+            for (per_module, configs) in modes {
+                let lane = |m: TriggerModule| {
+                    configs
+                        .iter()
+                        .find(|c| c.module == m)
+                        .map(|c| (c.concurrency, c.poll_interval_secs, c.lease_timeout_secs))
+                };
+                let escalation = lane(TriggerModule::OncallEscalation);
+                assert_eq!(
+                    lane(TriggerModule::OncallSlackSync),
+                    escalation,
+                    "per-module {per_module}"
+                );
+                if let Some((_, interval, _)) = escalation {
+                    assert_eq!(interval, expected, "per-module {per_module}");
+                }
+            }
         }
     }
 

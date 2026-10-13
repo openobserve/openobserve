@@ -54,6 +54,8 @@ pub enum TriggerModule {
     /// next rung's delay. Its own lane so a paging timer is never queued
     /// behind an alert evaluation backlog.
     OncallEscalation,
+    /// Slack sync of one page, keyed by its response id; region-local, never replicated.
+    OncallSlackSync,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -69,6 +71,7 @@ impl std::fmt::Display for TriggerModule {
             Self::SloBackfill => write!(f, "slo_backfill"),
             Self::CompositeAlert => write!(f, "composite_alert"),
             Self::OncallEscalation => write!(f, "oncall_escalation"),
+            Self::OncallSlackSync => write!(f, "oncall_slack_sync"),
         }
     }
 }
@@ -215,6 +218,32 @@ impl ScheduledTriggerData {
     }
 }
 
+/// The `data` of an `OncallSlackSync` row: its retry state and the arms made during a pass.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OncallSlackSyncData {
+    /// Consecutive passes that failed with a passing Slack error.
+    #[serde(default)]
+    pub attempt: u32,
+    /// No pass before this time, in microseconds; 0 for none.
+    #[serde(default)]
+    pub not_before: i64,
+    /// Arms made while a pass held the row; the pass's own finish applies only if it did not move.
+    #[serde(default)]
+    pub armed_during_pass: i64,
+    /// The job stopped retrying and wrote the timeline line.
+    #[serde(default)]
+    pub gave_up: bool,
+}
+
+/// How a sync pass ends its row when no arm came in during the pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SlackSyncFinish {
+    /// Completed: nothing left to retry.
+    Done,
+    /// Waiting until the data's `not_before`.
+    Retry,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -253,6 +282,7 @@ mod tests {
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
         assert_eq!(TriggerModule::OncallEscalation as i32, 9);
+        assert_eq!(TriggerModule::OncallSlackSync as i32, 10);
     }
 
     #[test]

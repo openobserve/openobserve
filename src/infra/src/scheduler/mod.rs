@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use config::{
     meta::{
         meta_store::MetaStore,
-        triggers::{Trigger, TriggerModule, TriggerStatus},
+        triggers::{OncallSlackSyncData, SlackSyncFinish, Trigger, TriggerModule, TriggerStatus},
     },
     utils::json,
 };
@@ -28,6 +28,8 @@ use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use crate::errors::Result;
 
 pub mod postgres;
+#[cfg(test)]
+mod slack_sync_tests;
 pub mod sqlite;
 
 static CLIENT: Lazy<Box<dyn Scheduler>> = Lazy::new(connect);
@@ -78,6 +80,17 @@ pub trait Scheduler: Sync + Send + 'static {
     ) -> Result<bool>;
     /// Persist completion/reschedule fields only for the captured claim epoch.
     async fn complete_claim(&self, trigger: Trigger) -> Result<bool>;
+    /// Arms a page's `OncallSlackSync` row at `at` in one statement (SY-2).
+    async fn arm_slack_sync(&self, org: &str, response_id: &str, at: i64) -> Result<()>;
+    /// Ends a claimed sync pass in one statement (SY-2); false when the claim was lost.
+    async fn finish_slack_sync(
+        &self,
+        claim: &Trigger,
+        read_armed: i64,
+        finish: SlackSyncFinish,
+        data: &OncallSlackSyncData,
+        now: i64,
+    ) -> Result<bool>;
     async fn pull(
         &self,
         concurrency: i64,
@@ -182,6 +195,28 @@ pub async fn keep_alive_claim(
 #[inline]
 pub async fn complete_claim(trigger: Trigger) -> Result<bool> {
     CLIENT.complete_claim(trigger).await
+}
+
+/// Asks for a sync pass of the page at `at`: never later than a pending arm, never before its
+/// backoff, and only counted while a pass holds the row (SY-2). [strong]
+#[inline]
+pub async fn arm_slack_sync(org: &str, response_id: &str, at: i64) -> Result<()> {
+    CLIENT.arm_slack_sync(org, response_id, at).await
+}
+
+/// Ends a pass with `finish` and `data`, or waits again at `max(now, data.not_before)` if an arm
+/// came in since it read `read_armed`; false when the claim was lost (SY-2). [strong]
+#[inline]
+pub async fn finish_slack_sync(
+    claim: &Trigger,
+    read_armed: i64,
+    finish: SlackSyncFinish,
+    data: &OncallSlackSyncData,
+    now: i64,
+) -> Result<bool> {
+    CLIENT
+        .finish_slack_sync(claim, read_armed, finish, data, now)
+        .await
 }
 
 /// Acquire the scheduler row's write lock, verify the physical claim, and
