@@ -6,7 +6,7 @@ Use category `QA` for every finding.
 
 ## Scope — what counts as a test change
 
-Only review files under `tests/ui-testing/` — specs (`*.spec.js`), page objects (`pages/**`), utils (`playwright-tests/utils/**`), and the suite's Playwright config (`playwright*.config.{js,ts}`). You may still `grep`/`read` other files (Vue components, the `playwright.yml` workflow) to verify a selector or a registration, but do not raise findings on application, backend, or other-suite code — the other reviewers own that.
+Only review Playwright test code under `tests/ui-testing/` — specs and helpers anywhere in the `playwright-tests/**` tree (including nested `**/utils/` helpers), page objects (`pages/**`), shared utils (`utils/**`), and the suite's Playwright config (`playwright*.config.{js,ts}`). You may still `grep`/`read` other files (Vue components, the `playwright.yml` workflow) to verify a selector or a registration, but do not raise findings on application, backend, fixture, or other-suite code — the other reviewers own that.
 
 ## What to Flag — Coverage-integrity failures (critical)
 

@@ -571,14 +571,15 @@ function isFrontendFile(filePath) {
   return /\.(vue|ts|js|css)$/.test(filePath);
 }
 
-// Allowlist the Playwright E2E test-code locations under tests/ui-testing: spec files, the
-// playwright-tests tree, page objects, shared utils, and the suite config. Everything else there
-// — committed app fixtures (fixtures/ sample apps + sourcemaps), helper scripts, results/archives
-// — is NOT test code these POM/selector rules apply to, and the other suites under tests/
-// (mobile-testing, api-testing, …) are out of remit entirely.
+// Allowlist the Playwright E2E test-code locations under tests/ui-testing: the playwright-tests
+// tree (specs + helpers), page objects, shared utils, and the suite config. Everything else there
+// — committed app fixtures (fixtures/ sample apps + sourcemaps), archived specs (test-archives/),
+// docs, results — is NOT test code these POM/selector rules apply to, and the other suites under
+// tests/ (mobile-testing, api-testing, …) are out of remit entirely. Every real spec lives under
+// playwright-tests/**, so the tree branch already covers *.spec.js — no separate spec rule (an
+// un-anchored one would drag in test-archives/ and the trivial top-level seed-mcp.spec.js).
 function isTestFile(filePath) {
   if (!filePath.startsWith("tests/ui-testing/")) return false;
-  if (/\.spec\.js$/.test(filePath)) return true;
   if (/^tests\/ui-testing\/(playwright-tests|pages|utils)\/.*\.js$/.test(filePath)) return true;
   return /^tests\/ui-testing\/playwright[^/]*\.config\.[jt]s$/.test(filePath);
 }
