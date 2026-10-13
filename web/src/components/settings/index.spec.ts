@@ -506,6 +506,28 @@ describe("SettingsIndex", () => {
       });
     });
 
+    it.each(["announcementBanners", "announcementBannerEditor"])(
+      "should redirect %s to general outside the meta org",
+      async (name) => {
+        mockStore.state.zoConfig = { meta_org: "_meta", service_streams_enabled: true };
+        mockIsMetaOrg.value = false;
+
+        const awsConfig = await import("@/aws-exports");
+        vi.mocked(awsConfig.default).isEnterprise = "true";
+
+        const originalRoute = router.currentRoute.value;
+        router.currentRoute.value = { ...originalRoute, name } as any;
+        try {
+          createWrapper();
+          expect(mockRouterPush).toHaveBeenCalledWith(
+            expect.objectContaining({ path: "/settings/general" }),
+          );
+        } finally {
+          router.currentRoute.value = originalRoute;
+        }
+      },
+    );
+
     it("should NOT redirect syntheticsLocations on an OSS build with synthetics on", async () => {
       mockStore.state.zoConfig = {
         meta_org: "some-meta-org",

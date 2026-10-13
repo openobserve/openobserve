@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { applyThemeColors, cssToken } from "./theme";
+import { applyThemeColors, cssToken, pickReadableForeground } from "./theme";
 import type { SemanticColors } from "./theme";
 
 describe("cssToken", () => {
@@ -118,5 +118,30 @@ describe("applyThemeColors button-primary-foreground contrast", () => {
     expect(
       document.documentElement.style.getPropertyValue("--color-button-primary-foreground"),
     ).toBe("");
+  });
+});
+
+describe("pickReadableForeground", () => {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const contrast = (a: string, b: string) => {
+    const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+    return (hi + 0.05) / (lo + 0.05);
+  };
+
+  it("keeps AA contrast on every grey, including the mid-tones", () => {
+    for (let v = 0; v < 256; v += 1) {
+      const hex = `#${v.toString(16).padStart(2, "0").repeat(3)}`;
+      expect(contrast(pickReadableForeground(hex), hex)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("uses black where neither white nor grey-900 reaches AA", () => {
+    expect(pickReadableForeground("#7B7B7B")).toBe("#000000");
   });
 });

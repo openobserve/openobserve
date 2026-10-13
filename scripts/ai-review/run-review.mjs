@@ -81,6 +81,7 @@ const CATEGORY_GLYPH = {
   documentation: "📝", docs: "📝",
   release: "📦",
   frontend: "🎨", ui: "🎨",
+  qa: "🧪", test: "🧪",
 };
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -146,6 +147,17 @@ const AGENTS = {
     fileFocus: isFrontendFile,
     requiresFocus: true,
   },
+  // Reviews only Playwright E2E tests + page objects (static QA: framework compliance,
+  // test anti-patterns, and data-test↔component selector cross-validation). `requiresFocus`
+  // keeps it off backend/app code — it only ever sees the test-file slice of the diff. Added
+  // via CONDITIONAL_AGENTS so a one-line spec tweak (which is "trivial" by size) still gets it.
+  qa: {
+    name: "QA / Test Reviewer",
+    promptFile: "agents/qa.md",
+    opencodeAgent: "ai-review-qa",
+    fileFocus: isTestFile,
+    requiresFocus: true,
+  },
 };
 
 // ─── Risk tiers ────────────────────────────────────────────────────────────
@@ -174,6 +186,7 @@ const RISK_TIERS = {
 // product name in the locale catalogue, so tier alone must not decide whether it gets reviewed.
 const CONDITIONAL_AGENTS = [
   { agent: "frontend", matches: isFrontendFile },
+  { agent: "qa", matches: isTestFile },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -558,6 +571,22 @@ function isFrontendFile(filePath) {
   return /\.(vue|ts|js|css)$/.test(filePath);
 }
 
+// Allowlist the Playwright E2E test-code locations under tests/ui-testing: the playwright-tests
+// tree (specs + helpers), page objects, shared utils, and the suite config. The committed app
+// fixtures (fixtures/ sample apps + sourcemaps — all git-tracked, so they DO reach a diff) and the
+// other suites under tests/ (mobile-testing, api-testing, …) are deliberately out of remit — these
+// POM/selector rules must not touch app code. No separate *.spec.js rule: every real spec lives
+// under playwright-tests/**, already covered by the tree branch, and an un-anchored one would also
+// pull in committed fixtures/** specs. (Archived specs under test-archives/ are gitignored, so they
+// never reach a diff either way.) The tree branch takes .js or .ts: the suite is all .js today, but
+// matching .ts keeps it consistent with the config branch and qa.md and future-proofs a TS
+// migration — otherwise a future .ts spec would silently go unreviewed.
+function isTestFile(filePath) {
+  if (!filePath.startsWith("tests/ui-testing/")) return false;
+  if (/^tests\/ui-testing\/(playwright-tests|pages|utils)\/.*\.(js|ts)$/.test(filePath)) return true;
+  return /^tests\/ui-testing\/playwright[^/]*\.config\.[jt]s$/.test(filePath);
+}
+
 function filterDiff(diff) {
   const files = parseDiffFiles(diff);
   const filteredFiles = [];
@@ -873,7 +902,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     } else if (agentDef.requiresFocus) {
       console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — no files in focus`);
       TRACE.endSpan(reviewerSpan, { "review.skipped": true, "review.skip_reason": "no_focus_files" });
-      return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: null, genAIResponseId: "" };
+      return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: null, genAIResponseId: "", skipped: true };
     }
   }
 
@@ -977,7 +1006,7 @@ function sanitizeReviewBody(body) {
     "changed_files", "existing_inline_findings", "previous_review",
     "custom_review_instructions", "review_task", "pr_context", "diff",
     "all_findings", "coordinator_task", "overall_pr_context", "risk_tier",
-    "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
+    "reviewers_ran", "failed_reviewers", "reviewer", "findings", "finding", "no-issues",
     "category", "severity", "file", "line", "description", "suggestion"];
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
@@ -1031,10 +1060,16 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     ? `\n<failed_reviewers>${failedAgents.map(r => r.agentName).join(", ")}</failed_reviewers>`
     : "";
 
+  // Authoritative list of reviewers that actually ran (not skipped, not failed). The coordinator
+  // must render the "Reviewers" row from THIS, not infer it — a reviewer with no findings sends no
+  // <reviewer> block, so without this the LLM guesses and can invent an agent that never ran.
+  const ranReviewers = agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName);
+
   const userPrompt = [
     `<coordinator_task>`,
     `<overall_pr_context>${prContext}</overall_pr_context>`,
     `<risk_tier>${tier}</risk_tier>`,
+    `<reviewers_ran>${ranReviewers.join(", ")}</reviewers_ran>`,
     `<all_findings>${findingsSections}</all_findings>`,
     failedNote,
     existingReview ? `<previous_review>${existingReview}</previous_review>` : "",
@@ -1192,7 +1227,7 @@ ${sections.join("\n")}
 ---
 
 - Risk tier: ${tier}
-- Reviewers completed: ${agentResults.filter(r => !r.error).map(r => r.agentName).join(", ") || "none"}
+- Reviewers completed: ${agentResults.filter(r => !r.error && !r.skipped).map(r => r.agentName).join(", ") || "none"}
 ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agentName).join(", ")}` : ""}
 
 </details>`;
@@ -1410,14 +1445,17 @@ async function main() {
 
     const results = agentResults.map(r => r.status === "fulfilled" ? r.value : { agentKey: "unknown", agentName: "unknown", findings: [], error: r.reason?.message || "Unknown error", genAIResponseId: "" });
     const totalFindings = results.reduce((sum, r) => sum + r.findings.length, 0);
-    const failedAgents = results.filter(r => r.error);
-    const completedAgents = results.filter(r => !r.error);
+    // A requiresFocus agent that saw no files in its domain opted out — it is neither expected
+    // nor completed, so it must not count toward coverage.
+    const ranResults = results.filter(r => !r.skipped);
+    const failedAgents = ranResults.filter(r => r.error);
+    const completedAgents = ranResults.filter(r => !r.error);
     const failedAgentNames = failedAgents.map(r => r.agentName);
     const failureReasons = Object.fromEntries(
       failedAgents.map(r => [r.agentName, r.error]),
     );
-    const coverageRatio = results.length > 0 ? completedAgents.length / results.length : 0;
-    if (failedAgents.length > 0 && failedAgents.length < results.length) {
+    const coverageRatio = ranResults.length > 0 ? completedAgents.length / ranResults.length : 0;
+    if (failedAgents.length > 0 && failedAgents.length < ranResults.length) {
       outcome = "partial_success";
     }
     const reviewerResponseIds = results.map(r => r.genAIResponseId).filter(Boolean);
@@ -1428,7 +1466,7 @@ async function main() {
       "review.failure_reasons": failureReasons,
       "review.completed_agents": completedAgents.map(r => r.agentName),
       "review.completed_agent_count": completedAgents.length,
-      "review.expected_agent_count": results.length,
+      "review.expected_agent_count": ranResults.length,
       "review.coverage_ratio": coverageRatio,
       "review.degraded": failedAgents.length > 0,
     });
@@ -1442,7 +1480,7 @@ async function main() {
     // manufactured from a total outage. Report the failure instead, skip the coordinator
     // (saving another AGENT_TIMEOUT_MS of waiting on a provider that is already failing),
     // and exit non-zero so the check surfaces as red.
-    const allAgentsFailed = results.length > 0 && failedAgents.length === results.length;
+    const allAgentsFailed = ranResults.length > 0 && failedAgents.length === ranResults.length;
     let finalReview;
     let responseIds = reviewerResponseIds;
 
@@ -1452,7 +1490,7 @@ async function main() {
       const detail = failedAgents
         .map(r => `- ${r.agentName}: ${r.error}`)
         .join("\n");
-      console.error(`[${isoNow()}] All ${results.length} reviewers failed — skipping coordinator and reporting failure.`);
+      console.error(`[${isoNow()}] All ${ranResults.length} reviewers failed — skipping coordinator and reporting failure.`);
       TRACE.setSpanAttributes(rootSpan, {
         "review.all_agents_failed": true,
         "review.coordinator_skipped": true,
@@ -1462,7 +1500,7 @@ async function main() {
         ``,
         `> [!CAUTION]`,
         `> ### ⛔ Not reviewed`,
-        `> All ${results.length} reviewers failed, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        `> All ${ranResults.length} reviewers failed, so there are no findings to report — this is an infrastructure failure, not an approval.`,
         ``,
         `<details>`,
         `<summary>🧾 Reviewer failures (${failedAgents.length})</summary>`,
@@ -1524,7 +1562,7 @@ async function main() {
     // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands
     // (not at detection time) to guarantee both happen.
     if (allAgentsFailed) {
-      const err = new Error(`All ${results.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
+      const err = new Error(`All ${ranResults.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
       err.suppressFatalLog = true;
       throw err;
     }
