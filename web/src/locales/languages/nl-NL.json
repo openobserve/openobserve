@@ -1399,6 +1399,7 @@
     "freeTextBuildNotice": "Dit filter heeft tekstzoekopdracht; bewerk het in SQL."
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Upgrade naar PRO Plan",
     "home": "Home",
     "about": "Over",
@@ -21920,5 +21921,1079 @@
     "modeExhausted": "Uitgeput",
     "modeFree": "Gratis",
     "modeUnknown": "Onbekend"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "Stuur je gegevens. OpenObserve vindt de problemen en vertelt het je, met zijn beste inschatting van de oorzaak. Als het rustig is, laat het zien wat het heeft gecontroleerd en wat het niet kan zien.",
+    "phase2": "Fase 2",
+    "tabs": {
+      "issues": "Problemen",
+      "coverage": "Dekking",
+      "activity": "Activiteit",
+      "policy": "Beleid"
+    },
+    "loops": {
+      "coverage": "Dekking",
+      "calibration": "Kalibratie",
+      "investigation": "Onderzoek",
+      "action": "Actie"
+    },
+    "signals": {
+      "requests": "Aanvragen",
+      "errors": "Fouten",
+      "latency": "Latentie",
+      "saturation": "Verzadiging",
+      "logPatterns": "Logpatronen",
+      "dependencies": "Afhankelijkheden"
+    },
+    "ledgerStatus": {
+      "autoApplied": "Automatisch toegepast",
+      "awaiting": "Wacht op goedkeuring",
+      "approved": "Goedgekeurd",
+      "rejected": "Afgewezen",
+      "rolledBack": "Teruggedraaid",
+      "kept": "Behouden — controles geslaagd"
+    },
+    "issues": {
+      "subtitle": "Incidenten gegroepeerd en onderzocht door de SRE-agent. Eén melding per probleem; de oorzaak wordt bijgevoegd, of volgt in dezelfde thread als de triage te lang duurt of mislukt.",
+      "open": "Open",
+      "recent": "Opgelost",
+      "all": "Alle",
+      "heldForDigest": "Vastgehouden voor de samenvatting van vrijdag",
+      "colId": "Incident",
+      "colTitle": "Probleem",
+      "colSeverity": "Ernst",
+      "colServices": "Getroffen services",
+      "colStarted": "Gestart",
+      "colStatus": "Status",
+      "colCause": "Oorzaak",
+      "emptyTitle": "Niets hier",
+      "emptyDescription": "Geen problemen gevonden voor dit filter.",
+      "subsetNote": "{shown} weergegeven. Deze demo toont een selectie van de {total} incidenten van deze week.",
+      "searchLabel": "Problemen zoeken",
+      "searchPlaceholder": "Zoek in problemen, services, oorzaken of INC-…",
+      "noMatch": "Geen problemen gevonden voor “{query}”",
+      "clearSearch": "Zoekopdracht wissen",
+      "matchCount": "Geen problemen gevonden | 1 probleem gevonden | {count} problemen gevonden",
+      "colSignal": "Signaal",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → nu",
+      "minutes": "{count} min",
+      "grouped": "{count} alarm → 1 incident | {count} alarmen → 1 incident",
+      "confidence": "{level} zekerheid",
+      "proposed": "Voorgesteld",
+      "reversible": "omkeerbaar",
+      "proposalFor": "Voorgestelde oplossing voor {title}"
+    },
+    "drawer": {
+      "rca": "Grondoorzaak",
+      "rcaSummary": "Samenvatting",
+      "likelyCause": "Waarschijnlijke oorzaak",
+      "confidence": "Zekerheid",
+      "confidenceValue": "Zekerheid: {value} (nog geen gekalibreerde score)",
+      "nextStep": "Voorgestelde volgende stap",
+      "evidence": "Bewijs",
+      "blastRadius": "Impactradius",
+      "upstream": "Upstream-aanroepers",
+      "affected": "Getroffen",
+      "downstream": "Downstream-afhankelijkheden",
+      "none": "Geen",
+      "timeline": "Tijdlijn",
+      "notification": "Melding verzonden",
+      "notSent": "Geen piketmelding: dit probleem met lage ernst is achtergehouden voor de vrijdagsamenvatting. Vastgelegd in de in-product inbox.",
+      "sender": "AutoObserve",
+      "threadReply": "antwoordde in thread",
+      "p1Note": "P1 geeft onmiddellijk een piketmelding, voordat het onderzoek binnen is. De oorzaak volgt in dezelfde thread.",
+      "gateNote": "P2- en P3-meldingen wachten maximaal 2 minuten op het onderzoek, zodat het eerste bericht meestal de oorzaak bevat. Als de triage een time-out krijgt of mislukt, vermeldt het bericht dat het onderzoek nog loopt of is mislukt, en de oorzaak volgt in dezelfde thread. P4-problemen leveren geen melding op; ze gaan naar de vrijdagsamenvatting.",
+      "caughtEarlier": "Wat dit eerder zou hebben gedetecteerd",
+      "analyzedAt": "Het onderzoek is afgerond om {time}.",
+      "triggersSample": "Toont {shown} van {total} activeringen",
+      "waitingForOk": "Wacht op jouw goedkeuring",
+      "proposedFix": "Voorgestelde oplossing",
+      "unfoldTab": "Hoe het verliep",
+      "seeEvidence": "Bekijk het bewijs ({count}) →"
+    },
+    "unfold": {
+      "hint": "Lees van links naar rechts: wat er veranderde, de signalen die het in gang zette, en dan wat je team bereikte. Selecteer een kaart voor de bijbehorende activeringen.",
+      "legend": "Kaarttypen",
+      "team": "Je team",
+      "kind": {
+        "metric": "Metriek",
+        "log": "Logboek",
+        "trace": "Trace",
+        "change": "Wijziging"
+      },
+      "likelyCause": "Waarschijnlijke oorzaak",
+      "linesUpWith": "Komt overeen met",
+      "times": "×{count}",
+      "sameMinute": "zelfde minuut",
+      "plusMinutes": "+{count} min",
+      "plusHours": "+{hours} u {minutes} min",
+      "firstFired": "Eerste activering",
+      "lastFired": "Laatste activering",
+      "firings": "Activeringen",
+      "peak": "Piek",
+      "normal": "Vergeleken met",
+      "detector": "Detector",
+      "firedAt": "Geactiveerd om",
+      "when": "Wanneer",
+      "chartNote": "De belangrijkste grafiek van het probleem, zoals in Evidence",
+      "outcome": {
+        "paged": "Piket opgeroepen",
+        "asked": "Goedkeuring gevraagd",
+        "notified": "Bericht verzonden, geen piketoproep",
+        "held": "Achtergehouden voor vrijdagse samenvatting",
+        "fixFailed": "Oplossing hielp niet",
+        "fixed": "Opgelost",
+        "resolved": "Afgehandeld",
+        "open": "Nog open"
+      }
+    },
+    "coverage": {
+      "showing": "Toont {shown} van {total} services",
+      "watched": "Bewaakt",
+      "learning": "Leren",
+      "gap": "Hiaat",
+      "na": "Niet van toepassing",
+      "anomaly": "Anomalie",
+      "threshold": "Drempelwaarde",
+      "service": "Service",
+      "lastScanned": "Laatst gescand",
+      "detector": "Detector",
+      "methodAnomaly": "Anomaliedetector, aangeleerde basislijn",
+      "methodThreshold": "Statische drempelwaarde uit de bibliotheek",
+      "libraryEntry": "Bibliotheekvermelding",
+      "predicate": "Toepasbaarheid",
+      "predicateMatched": "{predicate} — gematcht in stream {stream}",
+      "predicateUnmatched": "{predicate} — niet gematcht",
+      "reason": "Waarom",
+      "history": "{days} van {total} dagen geschiedenis",
+      "notScanned": "Eerste scan wordt uitgevoerd — onbekend, niet gedekt totdat deze is voltooid",
+      "guardrails": "Vangrails actief tijdens het leren: foutratio-plafond · versheidscontrole (gaat af als de stream stopt)",
+      "alsoWatchedBy": "Ook bewaakt door",
+      "searchLabel": "Services zoeken",
+      "searchPlaceholder": "Service of stream zoeken",
+      "matchCount": "Geen services komen overeen | 1 service komt overeen | {count} services komen overeen",
+      "noMatch": "Geen service of stream komt overeen met “{query}”",
+      "clearSearch": "Zoekopdracht wissen",
+      "filterLabel": "Services filteren op dekking",
+      "all": "Alle",
+      "gaps": "Hiaten",
+      "cantWatch": "Niet te bewaken",
+      "detectorCount": "1 detector | {count} detectoren",
+      "stream": "Stream",
+      "coverage": "Dekking",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "{watched} van {total} toepasbare signalen bewaakt",
+      "legendLabel": "Legenda",
+      "gapChip": "HIAAT",
+      "daysShort": "{days}/{total}d",
+      "tipAnomaly": "{signal}: anomaliedetector, aangeleerde basislijn",
+      "tipThreshold": "{signal}: statische drempelwaarde uit de bibliotheek",
+      "tipLearning": "{signal}: leren, {days} van {total} dagen geschiedenis",
+      "tipGap": "{signal}: hiaat, kan nog niet worden bewaakt",
+      "tipNa": "{signal}: niet van toepassing",
+      "config": "Detectorconfiguratie",
+      "lastFired": "Laatst geactiveerd",
+      "never": "Nooit",
+      "hoursAgo": "1 uur geleden | {count} uur geleden",
+      "daysAgo": "1 dag geleden | {count} dagen geleden",
+      "fixNoLink": "Label service.name toevoegen",
+      "fixStopped": "Controleer de collector",
+      "fixQueued": "Alleen mock: “{action}” voor {service} is nergens naartoe verzonden",
+      "viewLabel": "Dekkingsweergave",
+      "viewMap": "Kaart",
+      "viewTable": "Tabel",
+      "fillBy": "Vullen op basis van",
+      "fillState": "Dekkingsstatus",
+      "fillLearning": "Leervoortgang",
+      "fillDetectors": "Aantal detectors",
+      "fillScanned": "Tijd sinds laatste scan",
+      "summaryWatched": "{watched} van {total} volledig bewaakt · {pct}%",
+      "addedThisWeek": "1 nieuwe service deze week | {count} nieuwe services deze week",
+      "splitLabel": "{watched} volledig bewaakt, {learning} lerend, {gaps} nog niet te bewaken",
+      "stateWatched": "Volledig bewaakt",
+      "stateLearning": "Lerend · {days} van {total} dagen",
+      "stateGap": "Kan nog niet worden bewaakt",
+      "hexName": "{service}, {state}, {stream}, {detectors}",
+      "legendOf": "Legenda voor {fill}, selecteer om te markeren",
+      "mapLabel": "Dekkingskaart, 1 service gevuld op basis van {fill} | Dekkingskaart, {count} services gevuld op basis van {fill}",
+      "bucketLearned": "Geleerd",
+      "bucketDays67": "6–7 dagen",
+      "bucketDays35": "3–5 dagen",
+      "bucketDays02": "0–2 dagen",
+      "bucketNoData": "Geen gegevens",
+      "bucketSix": "6 detectors",
+      "bucketFive": "5 detectors",
+      "bucketFewer": "1–4 detectors",
+      "bucketNone": "Geen",
+      "bucketFresh": "Minder dan 5 min",
+      "bucketRecent": "5–15 min",
+      "bucketHour": "15–60 min",
+      "bucketStale": "Meer dan 1 uur",
+      "bucketNotScanned": "Niet gescand",
+      "signals": "Signalen",
+      "details": "Details",
+      "detailsFor": "Details weergeven voor {metric}",
+      "readyCaption": "Normaalbereik gereed {day} · {days} van {total} dagen",
+      "chartLearning": "{metric}, nu {value}, lerend, nog geen normaalbereik",
+      "chartOverThreshold": "{metric}, nu {value}, boven zijn drempel van {threshold}",
+      "chartUnderThreshold": "{metric}, nu {value}, onder zijn drempel van {threshold}",
+      "chartAbove": "{metric}, nu {value}, boven normaalbereik",
+      "chartBelow": "{metric}, nu {value}, onder normaalbereik",
+      "chartWithin": "{metric}, {value} nu, binnen normaal bereik",
+      "tipNormal": "Normaal {low} – {high}",
+      "openTraces": "Traces",
+      "openCatalog": "Servicecatalogus",
+      "rangeLabel": "Tijdsbereik",
+      "logPatternsValue": "{known} bekend · {fresh} nieuw vandaag",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "Niet bewaakt",
+      "signalsWatched": "Signalen bewaakt",
+      "chipAria": "{signal}: {state}",
+      "deltaUp": "Omhoog {change} sinds het begin van het bereik",
+      "deltaDown": "Omlaag {change} sinds het begin van het bereik",
+      "deltaFlat": "Geen verandering sinds het begin van het bereik",
+      "badgeLearning": "Leren {days}/{total}d",
+      "badgeAnomaly": "Afwijking · geleerd",
+      "badgeThreshold": "Drempelwaarde > {threshold}",
+      "now": "Nu",
+      "bandLearning": "Basislijn aan het leren · {days} van {total} dagen · normaal bereik gereed {day}",
+      "metric": {
+        "requests": "Verzoeken",
+        "errors": "Fouten",
+        "latencyP95": "Latentie p95",
+        "cpu": "CPU",
+        "pool": "Pool in gebruik",
+        "memory": "Geheugen",
+        "queries": "Query's",
+        "queryLatency": "Query-latentie p95",
+        "connections": "Verbindingen in gebruik",
+        "ops": "Operaties",
+        "rejections": "Geweigerde verbindingen",
+        "latency": "Latentie",
+        "messages": "Berichten",
+        "failed": "Mislukt (dead letters)",
+        "lag": "Consumer-lag",
+        "depth": "Wachtrijdiepte"
+      }
+    },
+    "activity": {
+      "allLoops": "Alle loops",
+      "allStatuses": "Alle statussen",
+      "ledgerHint": "Elke wijziging die AutoObserve voorstelt of doorvoert, wordt hier vastgelegd.",
+      "userBuilt": "Door gebruiker gebouwd alarm",
+      "confidence": "Vertrouwen: {value}",
+      "evidence": "Bewijs:",
+      "before": "Voor",
+      "after": "Na",
+      "neverAutoRetire": "Het buiten gebruik stellen van een alarm is nooit automatisch.",
+      "neverSilent": "Door gebruikers gebouwde alarmen worden nooit stilzwijgend gewijzigd.",
+      "undo": "Ongedaan maken",
+      "approve": "Goedkeuren",
+      "edit": "Bewerken",
+      "reject": "Afwijzen",
+      "saveApprove": "Opslaan en goedkeuren",
+      "undoneNote": "Door jou ongedaan gemaakt — vorige status hersteld uit snapshot",
+      "undoneToast": "Ongedaan gemaakt. Gemarkeerd als teruggedraaid in het grootboek van deze demo.",
+      "approvedToast": "Goedgekeurd. Gemarkeerd als goedgekeurd in het grootboek van deze demo.",
+      "rejectedNote": "Door jou afgewezen",
+      "rejectedToast": "Afgewezen. Geregistreerd tegen deze actieklasse.",
+      "emptyTitle": "Geen vermeldingen",
+      "emptyDescription": "Niets in het grootboek komt overeen met deze filters.",
+      "reviewWindow": "In beoordeling gedurende {window} — automatisch behouden als de controles slagen, teruggedraaid als ze falen. De eerdere configuratie wordt stil doorlopend geëvalueerd, dus alles wat deze wijziging zou hebben verborgen, verschijnt nog steeds. Ongedaan maken herstelt nu de eerdere status.",
+      "approvedNote": "Door jou goedgekeurd om {time}.",
+      "applyingNote": "Door jou goedgekeurd om {time}; wordt nu toegepast.",
+      "appliedNote": "Door jou goedgekeurd om {time} en toegepast.",
+      "declinedNote": "Door jou geweigerd.",
+      "needsApproval": "Vereist jouw goedkeuring",
+      "awaiting": "In afwachting",
+      "auto": "Auto",
+      "outcomeFilter": "Filteren op uitkomst",
+      "loopFilter": "Filteren op loop",
+      "columns": {
+        "time": "Wanneer",
+        "loop": "Loop",
+        "action": "Actie",
+        "target": "Doelwit",
+        "change": "Wijziging",
+        "confidence": "Vertrouwen",
+        "decision": "Beslissing",
+        "outcome": "Uitkomst",
+        "actions": "Acties"
+      },
+      "showDetails": "Details tonen voor {action} op {target}",
+      "hideDetails": "Details verbergen voor {action} op {target}",
+      "approveFor": "Keur {action} goed op {target}",
+      "rejectFor": "Wijs {action} af op {target}",
+      "editFor": "Bewerk {action} op {target}",
+      "undoFor": "Maak {action} ongedaan op {target}",
+      "openIncident": "Incident {id} openen",
+      "confidenceHint": "{value} — nog geen gekalibreerde score",
+      "diff": "Voorgestelde wijziging, verwijderde en toegevoegde regels",
+      "daysLeft": "{count} dag over | {count} dagen over",
+      "reviewProgress": "Beoordelingsperiode verstreken",
+      "entryId": "Vermelding",
+      "logged": "Geregistreerd"
+    },
+    "policy": {
+      "gateHint": "Van wijzigingen aan bestaande alarmen wordt alleen deduplicatie zelfstandig toegepast, met een snapshot van de vorige status en een beoordelingsperiode: behouden als de controles slagen, teruggedraaid als ze falen. Al het overige wacht op goedkeuring met één klik.",
+      "off": "Uit",
+      "suggest": "Suggereren",
+      "auto": "Auto",
+      "phase2Title": "Actie — herstel",
+      "phase2Hint": "Herstelacties in productie. Elke klasse verdient zijn niveau op basis van zijn gemeten staat van dienst en handelt nooit boven dat niveau.",
+      "investigation": "Onderzoek",
+      "outcomesTitle": "Uitkomsten",
+      "outcomesBody": "AutoObserve meet wat elke actie deed: herstelde het foutpercentage, stopte de pagina, werd het ongedaan gemaakt. Een klasse die het goed blijft doen, verdient meer autonomie, één klasse tegelijk; een misser telt in het nadeel, en een oplossing die steeds opnieuw nodig blijft, wordt als bug gerapporteerd in plaats van geautomatiseerd.",
+      "outcomesExample": "ScaleQueueWorkers ging naar Auto nadat 7 goedgekeurde scale-outs werkten. De ene misser, op 2 oktober, voegde een pre-check toe, en een tweede misser zet hem terug naar Suggereren. AbortRollout wacht op jouw OK; RollbackDeploy blijft uit tot het een staat van dienst heeft.",
+      "triage": {
+        "parallel": "Parallel",
+        "gate": "Poort",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "Roept direct op en onderzoekt parallel; de oorzaak volgt in dezelfde thread. Gate is niet toegestaan voor P1.",
+        "gateDesc": "Houd de oproep tegen totdat het onderzoek is afgerond, maximaal 2 minuten. Open faalgedrag: als triage een timeout krijgt of mislukt, wordt er alsnog een oproep gedaan, wordt gemeld dat het onderzoek nog loopt of is mislukt, en de oorzaak volgt in de thread."
+      },
+      "classes": {
+        "EnableDeduplication": "Deduplicatie inschakelen voor een alarm dat zich binnen enkele minuten herhaalt.",
+        "CreateDetector": "Maak een anomaliedetector voor de verzoeken, fouten of latentie van een service.",
+        "RaiseThreshold": "Verhoog een drempel die op gezonde dagen afgaat.",
+        "LengthenEvaluationWindow": "Verleng het venster van een alarm dat flappert.",
+        "FixAlertQuery": "Corrigeer een alarmquery die het verkeerde meet of nooit kan overeenkomen.",
+        "AttachDestination": "Koppel een bestemming aan een detector die in het niets afgaat.",
+        "AddLibraryAlert": "Voeg een gepland alarm uit de bibliotheek toe waarvan het predicaat overeenkomt.",
+        "MoveToIncidentDelivery": "Bezorg een door de gebruiker gebouwd alarm via het bijbehorende incident in plaats van via de eigen route.",
+        "ReviewForDeletion": "Stel voor om een alarm buiten gebruik te stellen waar niemand op reageert.",
+        "RollbackDeploy": "Draai de uitrol terug die een probleem veroorzaakte.",
+        "ScaleService": "Schaal een verzadigde service horizontaal op.",
+        "RestartPod": "Herstart een pod die stopte met verwerken van verkeer terwijl de replica's gezond zijn; een herhaling opent in plaats daarvan een bug.",
+        "ToggleFeatureFlag": "Schakel de feature flag uit die achter een probleem zit.",
+        "RunRunbookStep": "Voer een stap uit het runbook van de service uit.",
+        "LowerThreshold": "Verlaag een drempel die te laat afging om te waarschuwen vóór een incident.",
+        "RevertConfigChange": "Zet een recente instellingswijziging waarmee een probleem begon terug, wanneer de replica's zonder die wijziging gezond zijn.",
+        "EvictLeakedConnections": "Sluit verbindingen die een service heeft geleend en nooit heeft teruggegeven (gevonden door lekdetectie), en laat lopende queries met rust. Elk daarvan is gekoppeld aan de bug van het lek.",
+        "AbortRollout": "Stuur verkeer terug naar de vorige versie wanneer alleen de pods van de nieuwe versie midden in de uitrol falen. Hervatbaar met één klik.",
+        "ScaleQueueWorkers": "Voeg workers toe aan een achterstallige wachtrij, tot een maximum; schaalt zelf terug als de afvoersnelheid niet verbetert."
+      },
+      "triageHint": "L0-triage per ernstniveau. Vastgelegd in fase 1.",
+      "channels": "Kanalen",
+      "channelInbox": "Inbox in het product",
+      "channelEmailAdmins": "E-mail naar organisatiebeheerders",
+      "channelDefault": "Standaard voor elke organisatie. Altijd aan.",
+      "alwaysOn": "Altijd aan",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "Verbonden. Optioneel; de inbox en e-mail werken zonder.",
+      "connected": "Verbonden",
+      "defaultsNote": "Fase 1 levert vaste productstandaarden. Overschrijvingen per organisatie komen later.",
+      "groupCoverage": "Dekking — maakt automatisch detectoren aan",
+      "groupCoverageHint": "Elke nieuwe service krijgt anomaliedetectoren en de bijpassende bibliotheekalarmen zodra die verschijnt, met basale veiligheidscontroles terwijl deze leert. Elke creatie wordt geregistreerd, kan ongedaan worden gemaakt en doorloopt een beoordelingsvenster.",
+      "groupCalibration": "Kalibratie — wijzigingen aan bestaande alarmen",
+      "channelEmail": "E-mail {address}",
+      "paging": "Oproepen",
+      "pagingHint": "Ernst bepaalt hoe een probleem mensen bereikt.",
+      "routing": {
+        "p1p2": "P1 en P2",
+        "p1p2Desc": "Treft klanten. Roept piket op elk moment op.",
+        "page": "Oproep",
+        "p3": "P3",
+        "p3Desc": "Een Slack-bericht dat wordt verzonden zodra het klaar is. Roept nooit iemand op.",
+        "message": "Bericht",
+        "p4": "P4",
+        "p4Desc": "Komt in de vrijdagsamenvatting.",
+        "summary": "Vrijdagsamenvatting"
+      },
+      "nav": {
+        "coverage": "Dekking",
+        "alerts": "Alarmwijzigingen",
+        "fixes": "Oplossingen",
+        "investigation": "Onderzoek en alarmering",
+        "channels": "Kanalen"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} verbonden"
+      }
+    },
+    "notInDemo": "Niet beschikbaar in deze demo",
+    "confidence": {
+      "high": "Hoog",
+      "medium": "Gemiddeld",
+      "low": "Laag",
+      "uncalibrated": "nog geen gekalibreerde score"
+    },
+    "analysis": {
+      "verdict": "Oordeel",
+      "unconfirmed": "Nog niet bevestigd",
+      "lasted": "Duurde {count} min",
+      "soFar": "{count} min tot nu toe",
+      "checked": "Wat ik heb gecontroleerd",
+      "verdicts": {
+        "confirmed": "Bevestigd",
+        "ruled_out": "Uitgesloten",
+        "open": "Nog open"
+      },
+      "comparison": "Gezond versus getroffen",
+      "kinds": {
+        "affected": "Getroffen",
+        "healthy": "Gezond",
+        "limit": "Limiet"
+      },
+      "trail": "Bewijsspoor",
+      "seeInUnfold": "Bekijk in Hoe het verliep",
+      "nextStep": "Volgende stap",
+      "fullReport": "Volledig rapport",
+      "fullReportHint": "Alles hierboven als één document, klaar om te kopiëren of te downloaden"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "Demo",
+    "scenarioLabel": "Demoscenario",
+    "scenarios": {
+      "demo": "Demoweek",
+      "allClear": "Alles in orde",
+      "incident": "Actief incident",
+      "cantSee": "Niet zichtbaar",
+      "noBaseline": "Geen basislijn"
+    },
+    "nav": {
+      "history": "Geschiedenis",
+      "settings": "Instellingen",
+      "howItWorks": "Hoe het werkt",
+      "searchLabel": "Problemen zoeken",
+      "searchPlaceholder": "Problemen zoeken"
+    },
+    "recent": {
+      "ranges": {
+        "day": "Afgelopen 24 uur",
+        "week": "Afgelopen 7 dagen",
+        "month": "Afgelopen 30 dagen"
+      },
+      "within": {
+        "day": "in de afgelopen 24 uur",
+        "week": "in de afgelopen 7 dagen",
+        "month": "in de afgelopen 30 dagen"
+      },
+      "groups": {
+        "thisWeek": "Deze week",
+        "lastWeek": "Vorige week",
+        "weeksAgo": "{count} weken geleden"
+      },
+      "all": "Alle",
+      "none": "Geen {priority}-problemen {within}.",
+      "allIssues": "Alle problemen",
+      "priorityLabel": "Prioriteit",
+      "showing": "{count} probleem weergegeven | {count} problemen weergegeven"
+    },
+    "noProblems": "Geen problemen {within}. Ik heb {count} service dag en nacht gecontroleerd. | Geen problemen {within}. Ik heb {count} services dag en nacht gecontroleerd.",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "Nog {count} weergeven",
+    "showFewer": "Minder weergeven",
+    "days": {
+      "today": "Vandaag",
+      "monday": "maandag",
+      "tuesday": "dinsdag",
+      "wednesday": "woensdag",
+      "thursday": "donderdag",
+      "friday": "vrijdag",
+      "jul18": "18 juli",
+      "jul30": "30 juli",
+      "aug13": "13 augustus",
+      "aug26": "26 augustus",
+      "sep4": "4 september",
+      "sep12": "12 september",
+      "sep24": "24 september",
+      "sep30": "30 september",
+      "oct1": "1 oktober",
+      "oct2": "2 oktober",
+      "sep23": "23 september"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "De schijf van orders-db raakt over ongeveer 3 dagen vol",
+        "summary": "De schijf loopt sinds de orders-release van donderdag, die auditlogging aanzette, met ongeveer 18 GB per dag vol, dus hij raakt rond woensdagochtend vol. Zodra dat gebeurt, gaan checkout, orders en refunds falen. Er is nog niets stuk, dus ik heb je team een waarschuwing vooraf gestuurd in plaats van de piketdienst op te roepen.",
+        "notify1": "De schijf van orders-db raakt over ongeveer 3 dagen vol, rond woensdag 11:00.",
+        "notify2": "Oorzaak: sinds orders 3.8.0 donderdag is uitgerold, schrijft auditlogging ongeveer 18 GB per dag. Daarvoor groeide de schijf met ongeveer 6 GB per dag.",
+        "notify3": "Zet auditlogging weer terug of voeg schijfruimte toe vóór woensdag. Als de schijf vol raakt, gaan checkout, orders en refunds falen. Er is nog niets stuk, dus dit is een waarschuwing vooraf, geen piketmelding.",
+        "chartCaption": "schijf · vol ~wo 11:00",
+        "chartLabel": "Schijfgebruik groeide in 14 dagen van 334 naar 445 GB van 500, sneller sinds donderdag, en raakt naar verwachting vol rond woensdag 11:00"
+      },
+      "search": {
+        "title": "Zoeken is traag en search-2 blijft crashen",
+        "titleFixed": "Zoeken was traag terwijl search-2 bleef crashen",
+        "summary": "Ongeveer 1 op de 5 zoekopdrachten duurt langer dan 3 seconden, sinds 10:27. Een instelling die om 10:16 op search-2 is gewijzigd, zorgt dat het geheugen vol raakt. Ik heb de piketdienst opgeroepen, en het gebeurt nog steeds.",
+        "notify1": "Zoeken is traag: ongeveer 1 op de 5 zoekopdrachten duurt langer dan 3 seconden, sinds 10:27.",
+        "notify2": "Oorzaak: een instelling die om 10:16 op search-2 is gewijzigd, vult het geheugen. Het is sinds 10:20 ongeveer 10 keer gecrasht. De andere 4 nodes hebben de wijziging niet en doen het prima.",
+        "notify3": "De oude instelling terugzetten zou het moeten oplossen, en ik kan het terugdraaien. Antwoord met \"revert\" en ik doe het. Wie de wijziging heeft gedaan, moet uitzoeken waarom.",
+        "summaryFixed": "Het begon om 10:27, doordat een gewijzigde instelling op search-2 het geheugen vulde. Je hebt goedgekeurd om de oude instelling terug te zetten, dus dat heb ik gedaan, en zoekopdrachten zijn weer normaal.",
+        "summaryFixing": "Het begon om 10:27, doordat een gewijzigde instelling op search-2 het geheugen vult. Je hebt goedgekeurd om de oude instelling terug te zetten, dus dat doe ik nu.",
+        "chartCaption": "p95-latentie · piek 3,4 s",
+        "chartLabel": "p95-latentie steeg om 10:27 van 0,38 s naar 3,4 s en is nog steeds hoog",
+        "chartLabelFixed": "p95-latentie steeg om 10:27 van 0,38 s naar 3,4 s en viel terug naar normaal toen de instelling was teruggezet"
+      },
+      "checkout": {
+        "title": "1 op de 12 betalingen mislukte na een deploy",
+        "summary": "payments-api 2.3.1 vroeg de payments-database om meer verbindingen dan toegestaan. Terugdraaien loste het op, 18 minuten nadat de fouten begonnen.",
+        "notify1": "Checkout laat ongeveer 1 op de 12 betalingen mislukken, sinds 14:02.",
+        "notify2": "Waarschijnlijke oorzaak: payments-api 2.3.1 is om 14:01 uitgerold en verhoogde zijn connection pool van 20 naar 50 per server. 6 servers × 50 is meer dan de 200 die de payments-database toestaat.",
+        "notify3": "Terugdraaien naar 2.3.0 is de snelste oplossing.",
+        "chartCaption": "mislukte betalingen · piek 1 op 12",
+        "chartLabel": "Mislukte betalingen sprongen van 0,1% naar 1 op 12 om 14:02 en waren 18 minuten later weer normaal, na de rollback"
+      },
+      "pool": {
+        "title": "Checkout had geen databaseverbindingen meer",
+        "summary": "Gelekte verbindingen gebruikten alle vrije verbindingen op, en betalingen kregen time-outs. Je hebt goedgekeurd dat ik ze opruimde, dus dat deed ik. Betalingen herstelden 2 minuten later.",
+        "notify1": "Checkout heeft geen databaseverbindingen meer, en ongeveer 1 op 9 betalingen krijgt time-outs, sinds 11:18.",
+        "notify2": "Oorzaak: 48 van de 50 verbindingen worden vastgehouden door exports van terugbetalingen die ze nooit hebben teruggegeven. Het is het CHK-482-lek, de derde keer in twee weken.",
+        "notify3": "Alleen de gelekte verbindingen sluiten zou het moeten oplossen; lopende betalingen worden niet geraakt. Antwoord met \"ja\" en ik doe het.",
+        "chartCaption": "time-outs · piek 1 op 9",
+        "chartLabel": "Time-outs bij betalingen stegen naar ongeveer 1 op 9 om 11:18 en herstelden 2 minuten na de oplossing om 11:21"
+      },
+      "email": {
+        "title": "E-mails over bestellingen liepen tot 9 minuten vertraging op",
+        "summary": "Alle mailworkers werden 's nachts in één keer vervangen, en de wachtrij haalde zich binnen ongeveer 20 minuten vanzelf in. Dit was klein, dus het ging naar de samenvatting van vrijdag.",
+        "chartCaption": "e-mailvertraging · piek 9 min",
+        "chartLabel": "E-mailvertraging steeg naar 9 minuten vanaf 03:15 en herstelde vanzelf tegen 03:36"
+      },
+      "recs": {
+        "title": "Aanbevelingen werden 15 minuten trager",
+        "summary": "Ze gingen van een kwart seconde naar bijna een seconde. De nachtelijke cache-herbouw was 's middags handmatig gestart, en die was vanzelf klaar. Ik hield het voor de samenvatting van vrijdag.",
+        "chartCaption": "p95-latentie · piek 0,94 s",
+        "chartLabel": "p95-latentie steeg van 0,26 s naar 0,94 s om 16:40 en herstelde 15 minuten later vanzelf"
+      },
+      "login": {
+        "title": "Inloggen was ongeveer 25 minuten traag",
+        "summary": "1 op 8 mensen wachtte meer dan 5 seconden. De sessiecache raakte vol na een piek in het verkeer en logde sommige mensen uit. Je team voegde ruimte toe en het herstelde.",
+        "notify1": "Inloggen is traag: ongeveer 1 op 8 mensen wacht meer dan 5 seconden, sinds 10:12.",
+        "notify2": "Oorzaak: de sessiecache zit vol nadat het verkeer om 10:05 verdubbelde.",
+        "notify3": "Ruimte toevoegen aan de cache zou het moeten oplossen.",
+        "chartCaption": "p95 inloggen · piek 5,8 s",
+        "chartLabel": "p95-inlogtijd steeg van 0,6 s naar 5,8 s om 10:12 en herstelde nadat er om 10:31 cacheruimte was toegevoegd"
+      },
+      "queue": {
+        "title": "Bestellingen stapelden zich op in de wachtrij",
+        "summary": "Op het dieptepunt wachtten er ongeveer 4.000. Ik voegde workers toe zoals je hebt toegestaan, maar het hielp niet, dus ik heb ze teruggezet en piket opgeroepen. De echte oorzaak was een database-index die een migratie kapot had achtergelaten; je team repareerde die 40 minuten nadat het begon.",
+        "notify1": "Bestellingen stapelen zich op: ongeveer 4.000 wachtend, sinds 21:30.",
+        "notify2": "Ik voegde om 21:33 workers toe, zoals je hebt toegestaan, maar het hielp niet, dus ik heb ze teruggezet.",
+        "notify3": "Het opzoeken van bestellingen is ongeveer 40 keer trager sinds de databasemigratie van 21:20. Controleer eerst de index orders_by_status.",
+        "chartCaption": "achterstand · piek 4.120",
+        "chartLabel": "Wachtende bestellingen klommen naar 4.120 vanaf 21:30, bleven stijgen nadat workers waren toegevoegd, en liepen leeg zodra de index om 21:52 opnieuw was opgebouwd"
+      },
+      "uploads": {
+        "title": "Afbeelding-uploads mislukten voor 1 op 40 mensen",
+        "summary": "Het duurde 10 minuten, omdat een certificaat verliep voordat één server de vervanger had geladen. Het loste zichzelf op, dus ik hield het voor de samenvatting van vrijdag.",
+        "chartCaption": "mislukte uploads · piek 1 op 40",
+        "chartLabel": "Mislukte uploads stegen naar ongeveer 1 op 40 om 07:05 en herstelden 10 minuten later vanzelf"
+      },
+      "push": {
+        "title": "Pushmeldingen kwamen 2 minuten te laat",
+        "summary": "Het duurde een half uur, terwijl de provider die ze bezorgt traag was. Klein, dus het wachtte op de samenvatting van vrijdag.",
+        "chartCaption": "bezorgvertraging · piek 2 min",
+        "chartLabel": "Bezorgvertraging steeg van 4 s naar ongeveer 2 minuten om 13:50 en herstelde 30 minuten later vanzelf"
+      },
+      "checkoutNow": {
+        "title": "Checkout laat 1 op 6 betalingen mislukken",
+        "titleFixed": "Checkout liet 1 op 6 betalingen mislukken",
+        "summary": "Het begon om 10:43, en ik zoek nog uit waarom. Tot nu toe valt het samen met versie 2.4.0 die om 10:41 uitging, en ik heb piket opgeroepen.",
+        "notify1": "Checkout laat ongeveer 1 op 6 betalingen mislukken, sinds 10:43.",
+        "notify2": "Ik zoek nog uit waarom. Tot nu toe valt het samen met checkout 2.4.0 die om 10:41 uitging.",
+        "notify3": "Alleen de servers op 2.4.0 falen. Antwoord met \"stop\" en ik stuur het verkeer terug naar de oude versie; de oude servers hebben er ruimte voor. Ik kan payments-db niet direct zien, dus ik heb het niet uitgesloten.",
+        "summaryFixing": "Het begon om 10:43, direct nadat versie 2.4.0 uitging. Je hebt goedgekeurd dat de uitrol werd gestopt, dus ik stuur het verkeer nu terug naar de oude versie.",
+        "summaryFixed": "Het begon om 10:43, nadat versie 2.4.0 uitging. Je hebt goedgekeurd dat de uitrol werd gestopt, en de fouten stopten zodra het verkeer terugging naar de oude versie. Waarom 2.4.0 faalt, moet je team nog uitzoeken.",
+        "chartCaption": "mislukte betalingen · piek 1 op 6",
+        "chartLabel": "Mislukte betalingen sprongen van 0,1% naar ongeveer 1 op 6 om 10:43 en mislukken nog steeds",
+        "chartLabelFixed": "Mislukte betalingen sprongen van 0,1% naar ongeveer 1 op 6 om 10:43 en vielen terug naar normaal zodra de uitrol was gestopt"
+      },
+      "gateway": {
+        "title": "De API weigerde 1 op 30 verzoeken",
+        "summary": "Het begon na een configuratiewijziging. Je team heeft die teruggedraaid, en 13 minuten nadat het begon was het weer normaal.",
+        "notify1": "De API weigert ongeveer 1 op de 30 requests, sinds 15:22.",
+        "notify2": "Waarschijnlijke oorzaak: een configuratiewijziging om 15:20 verkortte de levensduur van inlogtokens.",
+        "notify3": "Het terugdraaien van die wijziging zou het moeten oplossen.",
+        "chartCaption": "afgewezen · piek 1 op de 30",
+        "chartLabel": "Afgewezen requests stegen naar 1 op de 30 om 15:22 en vielen terug naar normaal toen de configuratiewijziging om 15:34 werd teruggedraaid."
+      },
+      "poolSep": {
+        "title": "Checkout had geen databaseverbindingen meer",
+        "summary": "Gelekte verbindingen gebruikten alle vrije verbindingen op en betalingen kregen time-outs. Ik heb het lek herleid naar terugbetalingsexports, en je hebt goedgekeurd dat de gelekte verbindingen werden vrijgegeven. Betalingen herstelden zich 2 minuten later.",
+        "notify1": "Checkout heeft geen databaseverbindingen meer, en ongeveer 1 op de 9 betalingen krijgt een time-out, sinds 15:42.",
+        "notify2": "Oorzaak: 47 van de 50 verbindingen worden vastgehouden door terugbetalingsexports die ze nooit hebben teruggegeven. Het lijkt op een lek in de code voor terugbetalingsexports.",
+        "notify3": "Alleen de gelekte verbindingen sluiten zou het moeten oplossen; betalingen die in behandeling zijn, worden niet geraakt. Antwoord met \"ja\" en ik doe het.",
+        "chartCaption": "time-outs · piek 1 op de 9",
+        "chartLabel": "Time-outs bij betalingen stegen naar ongeveer 1 op de 9 om 15:42 en herstelden zich 2 minuten na de oplossing om 15:45"
+      },
+      "poolOct": {
+        "title": "Checkout had opnieuw geen databaseverbindingen meer",
+        "summary": "Het was hetzelfde lek in de terugbetalingsexport (CHK-482). Je hebt goedgekeurd dat de gelekte verbindingen werden vrijgegeven, en betalingen herstelden zich 2 minuten later.",
+        "notify1": "Checkout heeft geen databaseverbindingen meer, en ongeveer 1 op de 9 betalingen krijgt een time-out, sinds 10:05.",
+        "notify2": "Oorzaak: 46 van de 50 verbindingen worden vastgehouden door terugbetalingsexports. Het is weer het CHK-482-lek, de tweede keer in 8 dagen.",
+        "notify3": "Alleen de gelekte verbindingen sluiten zou het moeten oplossen; betalingen die in behandeling zijn, worden niet geraakt. Antwoord met \"ja\" en ik doe het.",
+        "chartCaption": "time-outs · piek 1 op de 9",
+        "chartLabel": "Time-outs bij betalingen stegen naar ongeveer 1 op de 9 om 10:05 en herstelden zich 2 minuten na de oplossing om 10:08"
+      },
+      "lagSep": {
+        "title": "Nieuwe producten deden er tot 40 minuten over om in zoekresultaten te verschijnen",
+        "summary": "search-indexer raakte achter op catalogusupdates nadat versie 1.12.0 de toegestane duur per batch had verkort. Je team heeft die teruggedraaid en 40 minuten na het begin was de achterstand ingehaald.",
+        "notify1": "Nieuwe en gewijzigde producten ontbreken in de zoekresultaten: search-indexer loopt ongeveer 48.000 catalogusupdates achter, sinds 14:06.",
+        "notify2": "Oorzaak: search-indexer 1.12.0 is om 13:58 uitgerold en verlaagde het Kafka-pollinterval naar 30 s. Grote batches duren ongeveer 45 s, waardoor de consumer steeds uit zijn groep wordt verwijderd.",
+        "notify3": "Terugdraaien naar 1.11.4 zou moeten zorgen dat het de achterstand inhaalt. Zoeken zelf werkt nog; het toont alleen oudere producten.",
+        "chartCaption": "consumer lag · piek 48.000",
+        "chartLabel": "Consumer lag steeg van ongeveer 200 naar 48.000 berichten vanaf 14:06 en liep leeg na de terugdraaiing om 14:39"
+      },
+      "poolAug": {
+        "title": "Checkout had geen databaseverbindingen meer tijdens de terugbetalingsexport",
+        "summary": "De nachtelijke terugbetalingsexport hield bijna alle databaseverbindingen van checkout vast, en ongeveer 1 op 12 betalingen liep een time-out op. Het verdween toen de export klaar was, 13 minuten nadat het begon.",
+        "notify1": "Checkout heeft geen databaseverbindingen meer, en ongeveer 1 op 12 betalingen krijgt een time-out, sinds 02:04.",
+        "notify2": "Oorzaak: 44 van de 50 verbindingen worden vastgehouden door de nachtelijke terugbetalingsexport, die ongeveer 3 keer zo groot is als normaal na de uitverkoop aan het einde van de maand.",
+        "notify3": "Het zou moeten verdwijnen wanneer de export klaar is. Als dat niet gebeurt, maakt het stoppen van de export de verbindingen vrij.",
+        "chartCaption": "time-outs · piek 1 op de 12",
+        "chartLabel": "Time-outs bij betalingen stegen naar ongeveer 1 op de 12 om 02:04 en herstelden zich vanzelf toen de export om 02:17 klaar was"
+      },
+      "throttleAug": {
+        "title": "Fraudecontroles waren 35 minuten lang traag",
+        "summary": "Een batchjob kwam op dezelfde servers terecht en nam hun reserve-CPU in beslag, waardoor fraudecontroles tot 1,4 seconden duurden. Checkout werkte nog, alleen langzamer, en herstelde zich toen de job klaar was, dus ik heb het bewaard voor de samenvatting van vrijdag.",
+        "chartCaption": "p95 fraudecontrole · piek 1,4 s",
+        "chartLabel": "p95-tijd voor fraudecontrole steeg van 0,18 s naar 1,4 s om 11:20 en herstelde zich vanzelf toen de batchjob om 11:55 klaar was"
+      },
+      "tlsJul": {
+        "title": "Facturen werden 43 minuten lang niet verzonden",
+        "summary": "Het certificaat van invoice-service voor billing-api was verlopen, waardoor elke factuur niet kon worden verzonden. Je team heeft het vernieuwd, en de wachtende facturen werden allemaal verzonden.",
+        "notify1": "Er gaan geen facturen uit: elke verzending van invoice-service mislukt, sinds 09:01.",
+        "notify2": "Oorzaak: het clientcertificaat van invoice-service voor billing-api is om 09:00 verlopen, en billing-api weigert elke verbinding ervan.",
+        "notify3": "Het vernieuwen van het certificaat zou het moeten oplossen. Facturen staan in de wachtrij, ze zijn niet verloren.",
+        "chartCaption": "mislukte verzendingen · allemaal",
+        "chartLabel": "Mislukte factuurverzendingen sprongen van 0,2% naar 100% om 09:01 en vielen terug naar normaal nadat het certificaat om 09:41 was vernieuwd"
+      },
+      "dnsJul": {
+        "title": "Prijzen in de winkelwagen ontbraken bij 1 op de 4 mensen",
+        "summary": "Een DNS-wijziging zorgde ervoor dat de helft van de DNS-servers van het cluster niet meer antwoordde op interne namen, waardoor cart currency niet kon bereiken. Je team heeft die 31 minuten na het begin teruggedraaid.",
+        "notify1": "Bij ongeveer 1 op de 4 winkelwagenweergaven ontbreken de prijzen, sinds 16:22.",
+        "notify2": "Oorzaak: een DNS-configuratiewijziging om 16:20 verwijderde de interne zone van 2 van de 4 DNS-servers van het cluster, waardoor cart currency.internal niet kan vinden bij die opzoekingen.",
+        "notify3": "Het terugdraaien van de DNS-wijziging zou het moeten oplossen. Bestellingen gaan nog steeds door bij checkout.",
+        "chartCaption": "ontbrekende prijzen · piek 1 op 4",
+        "chartLabel": "Winkelwagenladingen zonder prijzen stegen om 16:22 van 0,1% naar ongeveer 1 op 4 en daalden weer naar normaal toen de DNS-wijziging om 16:51 werd teruggedraaid."
+      }
+    },
+    "drawer": {
+      "worked": "Hielp",
+      "didntHelp": "Hielp niet",
+      "now": "Nu"
+    },
+    "needs": {
+      "more": "Meer",
+      "less": "Minder",
+      "canUndo": "Je kunt het ongedaan maken",
+      "undo": "Ongedaan maken",
+      "undone": "Ongedaan gemaakt. Dit wacht weer op je antwoord.",
+      "shiftTo": "naar",
+      "retune": {
+        "body": "Het \"{alert}\"-alarm op {host} is deze maand {fired} keer afgegaan, en niemand hoefde iets te doen. De schijf loopt tijdens de nachtelijke opschoning op tot ongeveer 85% en is 's ochtends weer rond 70%. Zelfs op de drukste dag zou het vanaf 90% meer dan 3 dagen duren voordat hij vol zit. Ik wil het verhogen naar {to}%. Ik waarschuw je nog steeds als de schijf op weg is om binnen een dag vol te raken.",
+        "yes": "Ja, wijzig het",
+        "no": "Laat het zo",
+        "doneYes": "Klaar. Ik heb het verhoogd naar {to}%. De waarschuwing bij vollopen blijft aan.",
+        "doneNo": "Oké, ik laat het op {from}%.",
+        "headline": "Het 'schijf 80%'-alarm op ingest-3 verhogen naar 90%?",
+        "why": "Het is deze maand 41 keer afgegaan en niemand hoefde iets te doen.",
+        "cost": "Waarschuwing bij vollopen blijft aan"
+      },
+      "fixNow": {
+        "search": {
+          "body": "Zoeken is traag omdat een instelling die om 10:16 op node search-2 is gewijzigd, het geheugen laat vollopen, waardoor hij blijft crashen. De andere 4 nodes hebben nog de oude instelling en doen het prima. Mag ik het terugzetten? Ik kan dit ongedaan maken.",
+          "yes": "Zet het terug",
+          "no": "Ik regel het zelf",
+          "doneYes": "Klaar. Ik zet het nu terug.",
+          "doneNo": "Oké, het is aan jou. Ik blijf opletten.",
+          "doneSettled": "Klaar. search-2 is hersteld en het zoeken is weer normaal.",
+          "headline": "De cache-instelling van search-2 terugzetten naar 10%?",
+          "why": "Een wijziging om 10:16 vult het geheugen, waardoor hij blijft crashen.",
+          "cost": "Eén herstart van search-2"
+        },
+        "checkoutNow": {
+          "body": "Bij checkout mislukt ongeveer 1 op 6 betalingen, en alleen de servers op 2.4.0 falen. De 6 servers op de oude versie kunnen al het verkeer aan. Mag ik de uitrol stoppen en het verkeer terug naar hen sturen? 2.4.0 blijft uitgerold zodat je team ernaar kan kijken.",
+          "yes": "Stop de uitrol",
+          "no": "Ik regel het zelf",
+          "doneYes": "Klaar. Ik stop de uitrol nu.",
+          "doneNo": "Oké, het is aan jou. Ik blijf opletten.",
+          "doneSettled": "Klaar. Betalingen zijn weer normaal.",
+          "headline": "De 2.4.0-uitrol van checkout stoppen?",
+          "why": "Ongeveer 1 op 6 betalingen mislukt, allemaal op 2.4.0. De oude versie kan al het verkeer aan.",
+          "cost": "2.4.0 blijft uitgerold"
+        }
+      },
+      "fromNowOn": {
+        "body": "Inmiddels {done} keer heeft een nieuwe versie tijdens de uitrol alleen zijn eigen servers laten falen. Elke keer vroeg ik om het verkeer terug naar de oude versie te sturen, en de storingen stopten binnen 2 minuten. Mag ik dat voortaan tijdens een uitrol zelf doen? Ik laat de nieuwe versie voor je team staan en licht ze meteen in.",
+        "yes": "Ja, zelfstandig",
+        "no": "Blijf het mij vragen",
+        "doneYes": "Klaar. Ik stop slechte uitrollen zelf en vertel het je elke keer.",
+        "doneNo": "Oké, ik blijf het eerst aan je vragen.",
+        "headline": "Voortaan zelf slechte uitrollen stoppen?",
+        "why": "Alle 6 keer dat je ja zei, stopten de storingen binnen 2 minuten.",
+        "cost": "Alleen tijdens een uitrol"
+      },
+      "labels": {
+        "fixNow": "Nu oplossen",
+        "fromNowOn": "Laat mij dit regelen",
+        "retune": "Stiller alarm"
+      },
+      "needsOk": "Wacht op je goedkeuring"
+    },
+    "footer": {
+      "text": "Ik houd mezelf ook in de gaten: als ik ermee stop, hoor je het.",
+      "seeAll": "Bekijk alles wat ik volg",
+      "seeChanges": "Bekijk alles wat ik heb gewijzigd"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1 minuut geleden | {count} minuten geleden",
+        "stale": "Geen nieuwe gegevens gedurende 1 minuut (sinds {since}) | Geen nieuwe gegevens gedurende {count} minuten (sinds {since})"
+      },
+      "summaryWatching": "Ik volg {watched} van je {total} services.",
+      "summaryAll": "Ik volg al je {total} services.",
+      "summaryWithClauses": "{head} {clauses}.",
+      "clauseLearning": "{count} is nog aan het leren | {count} zijn nog aan het leren",
+      "clauseUnseen": "er is er één die ik niet kan zien | er zijn {count} die ik niet kan zien",
+      "legend": {
+        "watching": "Volledig gevolgd",
+        "learning": "Aan het leren",
+        "unseen": "Niet zichtbaar"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "Ik volg al je {total} services en ik ben nog aan het leren hoe normaal er voor elk van hen uitziet."
+    },
+    "coveragePage": {
+      "title": "Alles wat ik volg",
+      "back": "Terug"
+    },
+    "issuesPage": {
+      "title": "Alle problemen",
+      "sentence": "Elk probleem dat ik {within} heb geopend. Kies er een om te zien wat er is gebeurd en wat ik eraan heb gedaan.",
+      "back": "Terug",
+      "ranges": {
+        "week": "Afgelopen 7 dagen",
+        "month": "Afgelopen 30 dagen",
+        "quarter": "Afgelopen 90 dagen"
+      },
+      "within": {
+        "week": "in de afgelopen 7 dagen",
+        "month": "in de afgelopen 30 dagen",
+        "quarter": "in de afgelopen 90 dagen"
+      }
+    },
+    "activityPage": {
+      "title": "Wat ik heb gewijzigd",
+      "stats": {
+        "window": "Afgelopen 7 dagen",
+        "made": "Wijziging | Wijzigingen",
+        "worked": "Gewerkt",
+        "review": "In beoordeling",
+        "undone": "Ongedaan gemaakt"
+      },
+      "filters": {
+        "all": "Alle",
+        "fixes": "Oplossingen",
+        "watching": "Volgen",
+        "tuning": "Alarmen afstemmen"
+      },
+      "status": {
+        "applying": "Wordt nu toegepast",
+        "worked": "Gewerkt",
+        "done": "Klaar",
+        "review": "In beoordeling",
+        "reviewDays": "In beoordeling · {count} dag resterend | In beoordeling · {count} dagen resterend",
+        "didntHelp": "Hielp niet",
+        "undone": "Ongedaan gemaakt"
+      },
+      "actions": {
+        "undo": "Ongedaan maken",
+        "showDetails": "Details tonen",
+        "hideDetails": "Details verbergen"
+      },
+      "details": {
+        "name": "Wijziging",
+        "target": "Op",
+        "confidence": "Zekerheid",
+        "saw": "Wat ik zag",
+        "recurring": "Deze oplossing blijft nodig voor hetzelfde lek ({bug}), dus ik zal altijd eerst vragen totdat het is opgelost.",
+        "undoDecided": "Ongedaan maken draait dit terug, en dan vraag ik het je opnieuw."
+      },
+      "toast": {
+        "undone": "Ongedaan gemaakt. Het is weer zoals het was.",
+        "undoDecided": "Ongedaan gemaakt. Ik vraag het je opnieuw."
+      },
+      "empty": {
+        "filter": "Hier is nu niets.",
+        "scenario": "Ik heb nog niets gewijzigd. Wanneer ik iets wijzig, zie je het hier."
+      },
+      "entries": {
+        "L-313": {
+          "done": "2.4.0-uitrol van checkout gestopt",
+          "why": "Alleen de 6 servers op 2.4.0 falen; de 6 op de oude versie kunnen al het verkeer aan.",
+          "from": "6 van 12 pods",
+          "to": "geen verkeer",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "Cache-instelling van search-2 teruggezet naar 10%",
+          "why": "Die ging om 10:16 naar 60%, en sindsdien raakt search-2 door zijn geheugen heen.",
+          "from": "60%",
+          "to": "10%",
+          "on": "cachegrootte · search-2"
+        },
+        "L-309": {
+          "done": "Het alarm 'disk 80%' op ingest-3 verhoogd naar 90%",
+          "why": "Het ging deze maand 41 keer af en niemand hoefde iets te doen. De vulwaarschuwing blijft aan.",
+          "from": "80%",
+          "to": "90%",
+          "on": "schijfalarm · ingest-3"
+        },
+        "L-310": {
+          "done": "Ben returns, exchanges en gift-cards gaan volgen",
+          "why": "Heb ze vanmorgen gevonden. Ik leer in 7 dagen wat normaal voor ze is.",
+          "from": "niet gevolgd",
+          "to": "gevolgd",
+          "on": "3 services"
+        },
+        "L-314": {
+          "done": "Ben 6 services gaan volgen die ik vanmorgen heb gevonden",
+          "why": "Ze verschenen vandaag in je traces. Ik leer in 7 dagen wat normaal voor ze is.",
+          "from": "niet gevolgd",
+          "to": "gevolgd",
+          "on": "6 services"
+        },
+        "L-311": {
+          "done": "Je goedkeuring gekregen om zelf slechte uitrollen te stoppen",
+          "why": "Ik heb er in 60 dagen 6 gestopt met jouw goedkeuring; de fouten waren elke keer binnen 2 minuten weer normaal.",
+          "from": "eerst vragen",
+          "to": "zelfstandig",
+          "on": "uitrollen stoppen"
+        },
+        "L-304": {
+          "done": "48 gelekte databaseverbindingen van checkout opgeruimd",
+          "why": "Betalingen liepen vast. Twee minuten later waren ze weer normaal.",
+          "from": "50 van 50 in gebruik",
+          "to": "2 in gebruik",
+          "on": "checkout-pool"
+        },
+        "L-299": {
+          "done": "46 gelekte databaseverbindingen van checkout opgeruimd",
+          "why": "Dezelfde lek als op 23 september. Betalingen waren 2 minuten later weer normaal.",
+          "from": "50 van 50 in gebruik",
+          "to": "4 in gebruik",
+          "on": "checkout-pool"
+        },
+        "L-296": {
+          "done": "47 gelekte databaseverbindingen van checkout opgeruimd",
+          "why": "Een nieuw lek, dus ik heb het daarna als CHK-482 bij het checkout-team gemeld.",
+          "from": "50 van 50 in gebruik",
+          "to": "3 in gebruik",
+          "on": "checkout-pool"
+        },
+        "L-301": {
+          "done": "Ben begonnen met het volgen van billing-api, billing-worker en invoice-service",
+          "why": "Gevonden in je traces. Ik leer nog wat normaal voor ze is.",
+          "from": "niet gevolgd",
+          "to": "gevolgd",
+          "on": "3 diensten"
+        },
+        "L-307": {
+          "done": "Het verbindingsalarm van payments-api gerepareerd, zodat het alle servers meetelt",
+          "why": "Het controleerde elke server apart, dus het ging nooit af tijdens de storing van dinsdag.",
+          "from": "elke pod boven 95%",
+          "to": "alle pods boven 85%",
+          "on": "verbindingsalarm"
+        },
+        "L-302": {
+          "done": "De 3 checkout-latentiealarmen samengevoegd tot één",
+          "why": "Ze gingen 94% van de tijd samen af, dus één vertraging gaf je 3 keer een piketmelding.",
+          "from": "3 alarmen",
+          "to": "1",
+          "on": "checkout-latentie"
+        },
+        "L-303": {
+          "done": "Het alarm 'disk 80%' op ingest-1 verhoogd naar 90%",
+          "why": "Het ging 29 keer af in 30 dagen en niemand hoefde iets te doen. De vulwaarschuwing blijft aan.",
+          "from": "80%",
+          "to": "90%",
+          "on": "schijfalarm · ingest-1"
+        },
+        "L-305": {
+          "done": "4 orders-consumer-werkers toegevoegd om een achterstand weg te werken",
+          "why": "Het hielp niet, dus ik schaalde terug naar 4 en stuurde 3 minuten later een piketmelding.",
+          "from": "4 werkers",
+          "to": "8 werkers",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "Je goedkeuring gekregen om zelf wachtrij-werkers toe te voegen",
+          "why": "Je keurde het 7 keer goed tijdens verkeerspieken, en de achterstand werd elke keer weggewerkt.",
+          "from": "eerst vragen",
+          "to": "op eigen initiatief",
+          "on": "wachtrij-werkers toevoegen"
+        },
+        "L-312": {
+          "done": "Begonnen met het volgen van de 18 diensten die ik vond toen je verbinding maakte",
+          "why": "Ik leer wat normaal is voor elk van hen. Hun alarmen starten zodra dat klaar is.",
+          "from": "niet gevolgd",
+          "to": "gevolgd",
+          "on": "18 diensten"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "Geschiedenis",
+      "seeChange": "Bekijk de wijziging",
+      "filters": {
+        "all": "Alle",
+        "problems": "Problemen",
+        "changes": "Wijzigingen",
+        "fixes": "Oplossingen",
+        "decisions": "Jouw beslissingen"
+      },
+      "empty": "Hier staat nog niets.",
+      "entries": {
+        "checkoutNowPaged": "Ik heb piket opgeroepen omdat checkout betalingen liet mislukken.",
+        "searchPaged": "Ik heb piket opgeroepen omdat zoeken traag was.",
+        "searchAsked": "Ik heb gevraagd of ik de cache-instelling van search-2 mag terugzetten.",
+        "euStopped": "Er is sinds dit moment niets binnengekomen van het {cluster}-cluster. Ik heb het je hier en in Slack gemeld.",
+        "fridaySummary": "Ik heb de samenvatting van vrijdag gestuurd met {count} klein probleem. | Ik heb de samenvatting van vrijdag gestuurd met {count} kleine problemen.",
+        "emailHeld": "Ik heb een klein probleem met order-e-mails achtergehouden voor de samenvatting van vrijdag.",
+        "poolFixed": "Ik heb de gelekte databaseverbindingen van checkout gesloten. Betalingen herstelden 2 minuten later.",
+        "poolApproved": "Je hebt goedgekeurd dat de weggelekte databaseverbindingen van checkout worden gesloten.",
+        "billingWatch": "Ik ben billing-api, billing-worker en invoice-service gaan volgen.",
+        "checkoutPaged": "Ik heb piket opgeroepen omdat bij checkout betalingen mislukken.",
+        "recsHeld": "Ik heb een klein probleem met recommendations achtergehouden voor de samenvatting van vrijdag.",
+        "diskApproved": "Je hebt goedgekeurd dat het schijfalarm op ingest-1 naar {to}% wordt verhoogd.",
+        "latencyGrouped": "Ik heb de drie traagheidsalarmen van checkout samengevoegd tot één, zodat één enkele vertraging maar één keer piket oproept.",
+        "queueFixed": "Ik heb workers voor de orders-wachtrij toegevoegd, maar de wachtrij bleef groeien, dus ik heb ze teruggedraaid en piket opgeroepen.",
+        "loginPaged": "Ik heb piket opgeroepen vanwege traag inloggen.",
+        "queuePermission": "Je hebt me toegestaan zelf wachtrij-workers toe te voegen, tot 8.",
+        "gatewayPaged": "Ik heb piket opgeroepen omdat de API verzoeken weigert.",
+        "found18": "Ik heb {count} services gevonden en ben gaan leren hoe normaal er voor hen uitziet.",
+        "connected": "Je hebt me met je gegevens verbonden.",
+        "thresholdApproved": "Je hebt goedgekeurd dat het verbindingsalarm van payments-api alle servers meetelt tegen de databaselimiet van 200.",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "Je hebt goedgekeurd dat de instelling van search-2 wordt teruggezet.",
+              "no": "Je zei dat je search-2 zelf zou aanpakken.",
+              "undoYes": "Je hebt het terugzetten van de instelling van search-2 ongedaan gemaakt. Ik heb 60% opnieuw toegepast, dus search-2 zal weer geheugen tekortkomen; ik heb piket ingelicht.",
+              "cancel": "Je hebt het terugzetten van de instelling van search-2 geannuleerd voordat ik het toepaste. search-2 kampt nog steeds met geheugentekort; ik heb piket ingelicht.",
+              "undoNo": "Je hebt teruggenomen dat je search-2 zelf zou aanpakken."
+            },
+            "checkoutNow": {
+              "yes": "Je hebt goedgekeurd dat de uitrol van checkout 2.4.0 wordt gestopt.",
+              "no": "Je zei dat je de uitrol van checkout zelf zou aanpakken.",
+              "undoYes": "Je hebt het stoppen van de 2.4.0-uitrol ongedaan gemaakt. Het verkeer gaat weer naar 2.4.0, dus betalingen kunnen weer gaan mislukken; ik heb piket ingelicht en ik houd het in de gaten.",
+              "cancel": "Je hebt het stoppen van de 2.4.0-uitrol geannuleerd voordat ik het deed. Betalingen mislukken nog steeds; ik heb piket ingelicht.",
+              "undoNo": "Je hebt teruggenomen dat je de uitrol van checkout zelf zou aanpakken."
+            }
+          },
+          "retune": {
+            "yes": "Je hebt goedgekeurd dat het schijfalarm op ingest-3 naar 90% wordt verhoogd.",
+            "no": "Je zei 'nu niet' over het verhogen van het schijfalarm op ingest-3.",
+            "undoYes": "Je hebt het verhogen van het schijfalarm op ingest-3 ongedaan gemaakt. Het staat weer op 80%, dus het zal weer afgaan op gezonde nachten.",
+            "undoNo": "Je hebt je 'nu niet' over het schijfalarm op ingest-3 teruggenomen."
+          },
+          "fromNowOn": {
+            "yes": "Je hebt goedgekeurd dat ik zelf slechte uitrollen mag stoppen.",
+            "no": "Je zei 'nu niet' over dat ik zelf slechte uitrollen mag stoppen.",
+            "undoYes": "Je hebt teruggenomen dat ik zelf slechte uitrollen mag stoppen.",
+            "undoNo": "Je hebt je 'nu niet' teruggenomen over dat ik zelf slechte uitrollen mag stoppen."
+          }
+        },
+        "fixedNow": {
+          "search": "Ik heb de instelling van search-2 teruggezet. Zoekopdrachten zijn weer normaal.",
+          "checkoutNow": "Ik heb het verkeer terug naar de oude versie gestuurd, en de fouten stopten. Waarom 2.4.0 faalt, moeten je team nog uitzoeken; ik heb het voor hen uitgerold gelaten."
+        },
+        "checkoutNowAsked": "Ik heb gevraagd of ik de uitrol van checkout 2.4.0 mag stoppen.",
+        "newWatch": "Ik heb vanochtend {count} nieuwe services gevonden (returns, exchanges en gift-cards) en ben ze meteen gaan volgen.",
+        "foundWatch": "Ik heb vanochtend {count} nieuwe services gevonden en ben ze meteen gaan volgen."
+      }
+    },
+    "settingsDrawer": {
+      "title": "Instellingen",
+      "reach": "Waar kan ik je bereiken?",
+      "destSlack": "Slack: {channel}",
+      "destEmail": "E-mail: {address}",
+      "autonomy": "Hoeveel mag ik zelf doen?",
+      "tell": "Vertel het me",
+      "ask": "Vraag het me eerst",
+      "fix": "Los het op, vertel het me daarna",
+      "tellHint": "Ik vertel je wat ik zou doen, en laat het doen aan jou over.",
+      "askHint": "Ik vraag het vóór elke oplossing, en voer het uit als je ja zegt.",
+      "fixHint": "Bij soorten oplossingen met een solide staat van dienst ga ik binnen de grenzen die je stelt meteen aan de slag, en vertel ik het je direct daarna.",
+      "advanced": "Geavanceerd",
+      "perKind": "Elke soort oplossing",
+      "digestDay": "Samenvattingsdag",
+      "excluded": "Services die ik moet negeren",
+      "excludedNone": "Geen",
+      "kinds": {
+        "pool": "Gelekte databaseverbindingen sluiten",
+        "queueWorker": "Wachtrijwerkers toevoegen bij een achterstand",
+        "retune": "De drempel van een lawaaiig alarm verhogen",
+        "rollback": "Een deploy terugdraaien",
+        "record": "{done} keer gedaan, {worked} keer gewerkt.",
+        "keptRecord": "{done} keer gedaan, {worked} keer behouden.",
+        "noRecord": "Nog nooit gedaan, dus ik doe het niet op eigen houtje totdat het een staat van dienst heeft.",
+        "revertConfig": "Een recente instellingswijziging ongedaan maken",
+        "abortRollout": "Een slechte uitrol stoppen",
+        "recurringRecord": "{done} keer gedaan, allemaal voor hetzelfde lek ({bug}). Ik blijf erom vragen tot het is opgelost."
+      },
+      "weekdays": {
+        "monday": "Maandag",
+        "tuesday": "Dinsdag",
+        "wednesday": "Woensdag",
+        "thursday": "Donderdag",
+        "friday": "Vrijdag"
+      },
+      "saved": "Opgeslagen",
+      "noDestination": "Ik kan niemand bereiken.",
+      "routing": "Wanneer ik je oproep",
+      "routingNote": "Ik roep op voor alles wat klanten pijn doet. Kleinere dingen krijgen een bericht dat niemand wakker maakt, en de kleinste gaan naar de samenvatting van vrijdag."
+    },
+    "howItWorks": {
+      "title": "Hoe het werkt",
+      "intro": "Dit is wat ik doe, in vijf stappen.",
+      "gotIt": "Begrepen",
+      "s1Title": "Ik vind je services",
+      "s1": "Ik kijk door de gegevens die je al verstuurt en vind elke service daarin. Wanneer er een nieuwe verschijnt, begin ik die dezelfde dag in de gaten te houden; je hoeft het niet te vragen.",
+      "s2Title": "Ik houd ze in de gaten",
+      "s2": "Ik leer hoe normaal eruitziet voor elke service: de fouten, traagheid en het verkeer voor elk uur van de dag, waarbij wekelijkse patronen na verloop van tijd scherper worden. Tot ik het weet, gebruik ik basale veiligheidscontroles.",
+      "s3Title": "Ik blijf stil tenzij het echt is",
+      "s3": "De meeste rare momenten zijn geen problemen. Ik roep je team op wanneer iets klanten pijn doet, stuur een bericht dat niemand wakker maakt voor kleinere kwesties, en bewaar kleine dingen voor de samenvatting van vrijdag.",
+      "s4Title": "Ik leg elke oproep uit",
+      "s4": "Elk bericht zegt wat er kapotging, sinds wanneer, en mijn beste inschatting waarom, met hoe zeker ik ervan ben.",
+      "s5Title": "Ik repareer wat je hebt toegestaan",
+      "s5": "Ik repareer alleen dingen waarvan je hebt gezegd dat het mag. Een oplossing die werkt levert een beetje vertrouwen op, en een die niet helpt telt tegen me. Als ik steeds dezelfde oplossing nodig heb, is dat een bug die ik aan je team meld, geen gewoonte die ik automatiseer."
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "1 minuut geleden gecontroleerd | {count} minuten geleden gecontroleerd"
+    },
+    "outcome": {
+      "active": "Gebeurt nu",
+      "fixed": "Opgelost door AutoObserve",
+      "resolved": "Opgelost in {minutes} min",
+      "held": "In de samenvatting van vrijdag",
+      "fixing": "Nu aan het oplossen",
+      "contained": "Ingedamd door AutoObserve",
+      "predicted": "Voorspeld"
+    },
+    "view": {
+      "standard": "Standaard",
+      "nerd": "Nerd",
+      "standardTooltip": "Standaardweergave geeft de korte versie: wat jou nodig heeft en wat er de afgelopen 7 dagen is gebeurd",
+      "nerdTooltip": "Nerdweergave toont elke detector, lus en instelling volledig",
+      "label": "Weergave"
+    },
+    "rail": {
+      "more": "Meer hieronder"
+    },
+    "suggestions": {
+      "title": "Suggesties",
+      "subtitle": "Als je even tijd hebt — deze verminderen ruis of besparen je tijd."
+    }
   }
 }

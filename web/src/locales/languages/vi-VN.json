@@ -1399,6 +1399,7 @@
     "freeTextBuildNotice": "Bộ lọc này có tìm kiếm văn bản; hãy chỉnh sửa trong SQL."
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Nâng cấp lên gói PRO",
     "home": "Trang chủ",
     "about": "Giới thiệu",
@@ -21920,5 +21921,1079 @@
     "modeExhausted": "Đã hết",
     "modeFree": "Miễn phí",
     "modeUnknown": "Không xác định"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "Gửi dữ liệu của bạn. OpenObserve tìm ra vấn đề và thông báo cho bạn, kèm theo đánh giá tốt nhất về nguyên nhân. Khi mọi thứ yên ắng, hệ thống cho bạn biết nó đã kiểm tra những gì và những gì nó không thể thấy.",
+    "phase2": "Giai đoạn 2",
+    "tabs": {
+      "issues": "Vấn đề",
+      "coverage": "Phạm vi bao phủ",
+      "activity": "Hoạt động",
+      "policy": "Chính sách"
+    },
+    "loops": {
+      "coverage": "Phạm vi bao phủ",
+      "calibration": "Hiệu chuẩn",
+      "investigation": "Điều tra",
+      "action": "Hành động"
+    },
+    "signals": {
+      "requests": "Yêu cầu",
+      "errors": "Lỗi",
+      "latency": "Độ trễ",
+      "saturation": "Độ bão hòa",
+      "logPatterns": "Mẫu nhật ký",
+      "dependencies": "Phụ thuộc"
+    },
+    "ledgerStatus": {
+      "autoApplied": "Tự động áp dụng",
+      "awaiting": "Chờ phê duyệt",
+      "approved": "Đã phê duyệt",
+      "rejected": "Đã từ chối",
+      "rolledBack": "Đã hoàn tác",
+      "kept": "Đã giữ — kiểm tra đạt"
+    },
+    "issues": {
+      "subtitle": "Các sự cố được nhóm lại và điều tra bởi tác nhân SRE. Một thông báo cho mỗi vấn đề; nguyên nhân được đính kèm, hoặc theo sau trong cùng luồng nếu quá trình phân loại hết thời gian hoặc thất bại.",
+      "open": "Đang mở",
+      "recent": "Đã giải quyết",
+      "all": "Tất cả",
+      "heldForDigest": "Giữ lại cho bản tóm tắt thứ Sáu",
+      "colId": "Sự cố",
+      "colTitle": "Vấn đề",
+      "colSeverity": "Mức độ nghiêm trọng",
+      "colServices": "Dịch vụ bị ảnh hưởng",
+      "colStarted": "Bắt đầu",
+      "colStatus": "Trạng thái",
+      "colCause": "Nguyên nhân",
+      "emptyTitle": "Không có gì ở đây",
+      "emptyDescription": "Không có vấn đề nào khớp với bộ lọc này.",
+      "subsetNote": "{shown} được hiển thị. Bản demo này hiển thị một tuyển chọn trong {total} sự cố của tuần này.",
+      "searchLabel": "Tìm kiếm vấn đề",
+      "searchPlaceholder": "Tìm kiếm vấn đề, dịch vụ, nguyên nhân hoặc INC-…",
+      "noMatch": "Không có vấn đề nào khớp với “{query}”",
+      "clearSearch": "Xóa tìm kiếm",
+      "matchCount": "Không có vấn đề nào khớp | 1 vấn đề khớp | {count} vấn đề khớp",
+      "colSignal": "Tín hiệu",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → hiện tại",
+      "minutes": "{count} phút",
+      "grouped": "{count} cảnh báo → 1 sự cố | {count} cảnh báo → 1 sự cố",
+      "confidence": "Độ tin cậy {level}",
+      "proposed": "Đề xuất",
+      "reversible": "có thể hoàn tác",
+      "proposalFor": "Bản sửa đề xuất cho {title}"
+    },
+    "drawer": {
+      "rca": "Nguyên nhân gốc",
+      "rcaSummary": "Tóm tắt",
+      "likelyCause": "Nguyên nhân có thể",
+      "confidence": "Độ tin cậy",
+      "confidenceValue": "Độ tin cậy: {value} (chưa có điểm hiệu chỉnh)",
+      "nextStep": "Bước tiếp theo được đề xuất",
+      "evidence": "Bằng chứng",
+      "blastRadius": "Phạm vi ảnh hưởng",
+      "upstream": "Các bên gọi thượng nguồn",
+      "affected": "Bị ảnh hưởng",
+      "downstream": "Các phụ thuộc hạ nguồn",
+      "none": "Không có",
+      "timeline": "Dòng thời gian",
+      "notification": "Đã gửi thông báo",
+      "notSent": "Không gửi thông báo: sự cố mức độ thấp này được giữ lại cho bản tóm tắt thứ Sáu. Đã ghi vào hộp thư trong sản phẩm.",
+      "sender": "AutoObserve",
+      "threadReply": "đã trả lời trong luồng",
+      "p1Note": "P1 gửi thông báo ngay lập tức, trước khi quá trình điều tra kết thúc. Nguyên nhân sẽ được gửi tiếp trong cùng luồng.",
+      "gateNote": "Thông báo P2 và P3 chờ tối đa 2 phút cho quá trình điều tra, nên tin nhắn đầu tiên thường chứa nguyên nhân. Nếu quá trình phân loại hết thời gian hoặc thất bại, tin nhắn sẽ cho biết quá trình điều tra vẫn đang chạy hoặc đã thất bại, và nguyên nhân sẽ được gửi tiếp trong cùng luồng. Sự cố P4 không thông báo cho ai; chúng sẽ được đưa vào bản tóm tắt thứ Sáu.",
+      "caughtEarlier": "Điều gì có thể phát hiện điều này sớm hơn",
+      "analyzedAt": "Quá trình điều tra kết thúc lúc {time}.",
+      "triggersSample": "Đang hiển thị {shown} trong tổng số {total} lần kích hoạt",
+      "waitingForOk": "Đang chờ bạn xác nhận",
+      "proposedFix": "Bản sửa đề xuất",
+      "unfoldTab": "Diễn biến sự việc",
+      "seeEvidence": "Xem bằng chứng ({count}) →"
+    },
+    "unfold": {
+      "hint": "Đọc từ trái sang phải: những gì đã thay đổi, các tín hiệu mà nó kích hoạt, rồi những gì đã đến với nhóm của bạn. Chọn một thẻ để xem các lần kích hoạt của thẻ đó.",
+      "legend": "Các loại thẻ",
+      "team": "Nhóm của bạn",
+      "kind": {
+        "metric": "Chỉ số",
+        "log": "Nhật ký",
+        "trace": "Trace",
+        "change": "Thay đổi"
+      },
+      "likelyCause": "Nguyên nhân có thể",
+      "linesUpWith": "Khớp với",
+      "times": "×{count}",
+      "sameMinute": "cùng phút",
+      "plusMinutes": "+{count} phút",
+      "plusHours": "+{hours} giờ {minutes} phút",
+      "firstFired": "Kích hoạt lần đầu",
+      "lastFired": "Kích hoạt lần cuối",
+      "firings": "Số lần kích hoạt",
+      "peak": "Đỉnh điểm",
+      "normal": "So với",
+      "detector": "Bộ phát hiện",
+      "firedAt": "Kích hoạt lúc",
+      "when": "Khi nào",
+      "chartNote": "Biểu đồ chính của vấn đề, như trong phần Bằng chứng",
+      "outcome": {
+        "paged": "Đã gọi trực",
+        "asked": "Đã hỏi xin xác nhận",
+        "notified": "Đã gửi tin nhắn, không gọi trực",
+        "held": "Giữ lại cho bản tổng kết thứ Sáu",
+        "fixFailed": "Bản sửa lỗi không hiệu quả",
+        "fixed": "Đã sửa",
+        "resolved": "Đã giải quyết",
+        "open": "Vẫn đang mở"
+      }
+    },
+    "coverage": {
+      "showing": "Đang hiển thị {shown} trong {total} dịch vụ",
+      "watched": "Đang theo dõi",
+      "learning": "Đang học",
+      "gap": "Khoảng trống",
+      "na": "Không áp dụng",
+      "anomaly": "Bất thường",
+      "threshold": "Ngưỡng",
+      "service": "Dịch vụ",
+      "lastScanned": "Lần quét gần nhất",
+      "detector": "Bộ phát hiện",
+      "methodAnomaly": "Bộ phát hiện bất thường, đường cơ sở đã học",
+      "methodThreshold": "Ngưỡng tĩnh từ thư viện",
+      "libraryEntry": "Mục trong thư viện",
+      "predicate": "Khả năng áp dụng",
+      "predicateMatched": "{predicate} — khớp trong stream {stream}",
+      "predicateUnmatched": "{predicate} — không khớp",
+      "reason": "Lý do",
+      "history": "{days} trong {total} ngày lịch sử",
+      "notScanned": "Lần quét đầu tiên đang diễn ra — chưa xác định, chưa được bao phủ cho đến khi hoàn tất",
+      "guardrails": "Rào chắn hoạt động trong quá trình học: giới hạn tỷ lệ lỗi · kiểm tra độ mới (kích hoạt nếu stream dừng)",
+      "alsoWatchedBy": "Cũng được theo dõi bởi",
+      "searchLabel": "Tìm kiếm dịch vụ",
+      "searchPlaceholder": "Tìm kiếm dịch vụ hoặc stream",
+      "matchCount": "Không có dịch vụ nào khớp | 1 dịch vụ khớp | {count} dịch vụ khớp",
+      "noMatch": "Không có dịch vụ hoặc stream nào khớp “{query}”",
+      "clearSearch": "Xóa tìm kiếm",
+      "filterLabel": "Lọc dịch vụ theo độ bao phủ",
+      "all": "Tất cả",
+      "gaps": "Khoảng trống",
+      "cantWatch": "Không thể theo dõi",
+      "detectorCount": "1 bộ phát hiện | {count} bộ phát hiện",
+      "stream": "Stream",
+      "coverage": "Độ bao phủ",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "{watched} trong {total} tín hiệu áp dụng được theo dõi",
+      "legendLabel": "Chú giải",
+      "gapChip": "GAP",
+      "daysShort": "{days}/{total} ngày",
+      "tipAnomaly": "{signal}: bộ phát hiện bất thường, đường cơ sở đã học",
+      "tipThreshold": "{signal}: ngưỡng tĩnh từ thư viện",
+      "tipLearning": "{signal}: đang học, {days} trong {total} ngày lịch sử",
+      "tipGap": "{signal}: khoảng trống, chưa thể theo dõi",
+      "tipNa": "{signal}: không áp dụng",
+      "config": "Cấu hình bộ phát hiện",
+      "lastFired": "Kích hoạt gần nhất",
+      "never": "Chưa bao giờ",
+      "hoursAgo": "1 giờ trước | {count} giờ trước",
+      "daysAgo": "1 ngày trước | {count} ngày trước",
+      "fixNoLink": "Thêm nhãn service.name",
+      "fixStopped": "Kiểm tra collector",
+      "fixQueued": "Chỉ mô phỏng: “{action}” cho {service} chưa được gửi đi đâu cả",
+      "viewLabel": "Chế độ xem độ phủ",
+      "viewMap": "Bản đồ",
+      "viewTable": "Bảng",
+      "fillBy": "Tô màu theo",
+      "fillState": "Trạng thái độ phủ",
+      "fillLearning": "Tiến độ học",
+      "fillDetectors": "Số lượng bộ phát hiện",
+      "fillScanned": "Thời gian từ lần quét gần nhất",
+      "summaryWatched": "{watched} trên {total} được theo dõi đầy đủ · {pct}%",
+      "addedThisWeek": "1 dịch vụ mới trong tuần này | {count} dịch vụ mới trong tuần này",
+      "splitLabel": "{watched} theo dõi đầy đủ, {learning} đang học, {gaps} chưa thể theo dõi",
+      "stateWatched": "Theo dõi đầy đủ",
+      "stateLearning": "Đang học · {days} trên {total} ngày",
+      "stateGap": "Chưa thể theo dõi",
+      "hexName": "{service}, {state}, {stream}, {detectors}",
+      "legendOf": "Chú giải cho {fill}, chọn để làm nổi bật",
+      "mapLabel": "Bản đồ độ phủ, 1 dịch vụ được tô theo {fill} | Bản đồ độ phủ, {count} dịch vụ được tô theo {fill}",
+      "bucketLearned": "Đã học",
+      "bucketDays67": "6–7 ngày",
+      "bucketDays35": "3–5 ngày",
+      "bucketDays02": "0–2 ngày",
+      "bucketNoData": "Không có dữ liệu",
+      "bucketSix": "6 bộ phát hiện",
+      "bucketFive": "5 bộ phát hiện",
+      "bucketFewer": "1–4 bộ phát hiện",
+      "bucketNone": "Không có",
+      "bucketFresh": "Dưới 5 phút",
+      "bucketRecent": "5–15 phút",
+      "bucketHour": "15–60 phút",
+      "bucketStale": "Trên 1 giờ",
+      "bucketNotScanned": "Chưa quét",
+      "signals": "Tín hiệu",
+      "details": "Chi tiết",
+      "detailsFor": "Hiển thị chi tiết cho {metric}",
+      "readyCaption": "Dải bình thường sẵn sàng {day} · {days} trên {total} ngày",
+      "chartLearning": "{metric}, hiện tại {value}, đang học, chưa có dải bình thường",
+      "chartOverThreshold": "{metric}, hiện tại {value}, vượt ngưỡng {threshold}",
+      "chartUnderThreshold": "{metric}, hiện tại {value}, dưới ngưỡng {threshold}",
+      "chartAbove": "{metric}, hiện tại {value}, cao hơn dải bình thường",
+      "chartBelow": "{metric}, hiện tại {value}, thấp hơn dải bình thường",
+      "chartWithin": "{metric}, hiện tại {value}, trong phạm vi bình thường",
+      "tipNormal": "Bình thường {low} – {high}",
+      "openTraces": "Trace",
+      "openCatalog": "Danh mục dịch vụ",
+      "rangeLabel": "Khoảng thời gian",
+      "logPatternsValue": "{known} đã biết · {fresh} mới hôm nay",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "Chưa theo dõi",
+      "signalsWatched": "Tín hiệu đang theo dõi",
+      "chipAria": "{signal}: {state}",
+      "deltaUp": "Tăng {change} kể từ đầu khoảng thời gian",
+      "deltaDown": "Giảm {change} kể từ đầu khoảng thời gian",
+      "deltaFlat": "Không thay đổi kể từ đầu khoảng thời gian",
+      "badgeLearning": "Đang học {days}/{total} ngày",
+      "badgeAnomaly": "Bất thường · đã học",
+      "badgeThreshold": "Ngưỡng > {threshold}",
+      "now": "Bây giờ",
+      "bandLearning": "Đang học đường cơ sở · {days} trên {total} ngày · phạm vi bình thường sẵn sàng {day}",
+      "metric": {
+        "requests": "Yêu cầu",
+        "errors": "Lỗi",
+        "latencyP95": "Độ trễ p95",
+        "cpu": "CPU",
+        "pool": "Pool đang dùng",
+        "memory": "Bộ nhớ",
+        "queries": "Truy vấn",
+        "queryLatency": "Độ trễ truy vấn p95",
+        "connections": "Kết nối đang dùng",
+        "ops": "Thao tác",
+        "rejections": "Kết nối bị từ chối",
+        "latency": "Độ trễ",
+        "messages": "Tin nhắn",
+        "failed": "Thất bại (thư chết)",
+        "lag": "Độ trễ consumer",
+        "depth": "Độ sâu hàng đợi"
+      }
+    },
+    "activity": {
+      "allLoops": "Tất cả vòng lặp",
+      "allStatuses": "Tất cả trạng thái",
+      "ledgerHint": "Mọi thay đổi AutoObserve đề xuất hoặc thực hiện đều được ghi lại ở đây.",
+      "userBuilt": "Cảnh báo do người dùng tạo",
+      "confidence": "Độ tin cậy: {value}",
+      "evidence": "Bằng chứng:",
+      "before": "Trước",
+      "after": "Sau",
+      "neverAutoRetire": "Việc gỡ bỏ cảnh báo không bao giờ diễn ra tự động.",
+      "neverSilent": "Cảnh báo do người dùng tạo không bao giờ bị thay đổi âm thầm.",
+      "undo": "Hoàn tác",
+      "approve": "Phê duyệt",
+      "edit": "Chỉnh sửa",
+      "reject": "Từ chối",
+      "saveApprove": "Lưu và phê duyệt",
+      "undoneNote": "Bạn đã hoàn tác — trạng thái trước đó được khôi phục từ ảnh chụp nhanh",
+      "undoneToast": "Đã hoàn tác. Đã đánh dấu hoàn nguyên trong sổ cái của bản demo này.",
+      "approvedToast": "Đã phê duyệt. Đã đánh dấu phê duyệt trong sổ cái của bản demo này.",
+      "rejectedNote": "Bị bạn từ chối",
+      "rejectedToast": "Đã từ chối. Đã ghi nhận vào lớp hành động này.",
+      "emptyTitle": "Không có mục nào",
+      "emptyDescription": "Không có gì trong sổ cái khớp với các bộ lọc này.",
+      "reviewWindow": "Đang xem xét trong {window} — tự động giữ lại nếu các kiểm tra đạt, hoàn nguyên nếu không đạt. Cấu hình trước đó vẫn được đánh giá âm thầm, nên bất cứ thứ gì thay đổi này lẽ ra sẽ ẩn vẫn hiển thị. Hoàn tác sẽ khôi phục trạng thái trước đó ngay bây giờ.",
+      "approvedNote": "Được bạn phê duyệt lúc {time}.",
+      "applyingNote": "Được bạn phê duyệt lúc {time}; đang áp dụng ngay bây giờ.",
+      "appliedNote": "Được bạn phê duyệt lúc {time} và đã áp dụng.",
+      "declinedNote": "Bị bạn từ chối.",
+      "needsApproval": "Cần bạn phê duyệt",
+      "awaiting": "Đang chờ",
+      "auto": "Tự động",
+      "outcomeFilter": "Lọc theo kết quả",
+      "loopFilter": "Lọc theo vòng lặp",
+      "columns": {
+        "time": "Thời điểm",
+        "loop": "Vòng lặp",
+        "action": "Hành động",
+        "target": "Mục tiêu",
+        "change": "Thay đổi",
+        "confidence": "Độ tin cậy",
+        "decision": "Quyết định",
+        "outcome": "Kết quả",
+        "actions": "Hành động"
+      },
+      "showDetails": "Hiện chi tiết cho {action} trên {target}",
+      "hideDetails": "Ẩn chi tiết cho {action} trên {target}",
+      "approveFor": "Phê duyệt {action} trên {target}",
+      "rejectFor": "Từ chối {action} trên {target}",
+      "editFor": "Chỉnh sửa {action} trên {target}",
+      "undoFor": "Hoàn tác {action} trên {target}",
+      "openIncident": "Mở sự cố {id}",
+      "confidenceHint": "{value} — chưa có điểm đã hiệu chuẩn",
+      "diff": "Thay đổi đề xuất, các dòng bị xóa và thêm",
+      "daysLeft": "{count} ngày còn lại | {count} ngày còn lại",
+      "reviewProgress": "Đã hết thời hạn xem xét",
+      "entryId": "Mục",
+      "logged": "Đã ghi nhận"
+    },
+    "policy": {
+      "gateHint": "Trong số các thay đổi đối với cảnh báo hiện có, chỉ khử trùng lặp tự áp dụng, kèm ảnh chụp trạng thái trước và thời hạn xem xét: giữ lại nếu các kiểm tra đạt, hoàn nguyên nếu không đạt. Mọi thứ khác đều chờ phê duyệt bằng một cú nhấp.",
+      "off": "Tắt",
+      "suggest": "Đề xuất",
+      "auto": "Tự động",
+      "phase2Title": "Hành động — khắc phục",
+      "phase2Hint": "Các bản sửa lỗi trên môi trường production. Mỗi lớp đạt được cấp độ của mình từ thành tích đo lường được và không bao giờ hành động vượt quá cấp đó.",
+      "investigation": "Điều tra",
+      "outcomesTitle": "Kết quả",
+      "outcomesBody": "AutoObserve đo lường kết quả của từng hành động: tỷ lệ lỗi có phục hồi không, thông báo trực có dừng không, hành động có bị hoàn tác không. Một lớp liên tục thành công sẽ được trao quyền tự chủ nhiều hơn, từng lớp một; một lần thất bại sẽ bị trừ điểm, và một bản sửa lỗi liên tục phải dùng đến sẽ được báo cáo như một lỗi thay vì tự động hóa.",
+      "outcomesExample": "ScaleQueueWorkers chuyển sang Tự động sau khi 7 lần mở rộng quy mô được phê duyệt đã thành công. Một lần thất bại của nó, vào ngày 2 tháng 10, đã thêm một bước kiểm tra trước, và lần thất bại thứ hai sẽ đưa nó trở lại Đề xuất. AbortRollout chờ bạn xác nhận; RollbackDeploy vẫn Tắt cho đến khi có thành tích.",
+      "triage": {
+        "parallel": "Song song",
+        "gate": "Cổng",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "Gọi trực ngay lập tức và điều tra song song; nguyên nhân được gửi tiếp trong cùng luồng. Không cho phép dùng Gate với P1.",
+        "gateDesc": "Giữ thông báo gọi trực cho đến khi có kết quả điều tra, tối đa 2 phút. Mở khi lỗi: nếu triage hết thời gian hoặc thất bại, hệ thống vẫn gọi trực, báo rằng quá trình điều tra vẫn đang chạy hoặc đã thất bại, và nguyên nhân được gửi tiếp trong luồng."
+      },
+      "classes": {
+        "EnableDeduplication": "Bật khử trùng lặp cho cảnh báo lặp lại trong vài phút.",
+        "CreateDetector": "Tạo bộ phát hiện bất thường trên yêu cầu, lỗi hoặc độ trễ của một dịch vụ.",
+        "RaiseThreshold": "Nâng ngưỡng đang kích hoạt cả vào những ngày bình thường.",
+        "LengthenEvaluationWindow": "Kéo dài cửa sổ của một cảnh báo hay dao động.",
+        "FixAlertQuery": "Sửa truy vấn cảnh báo đo sai thứ cần đo hoặc không bao giờ khớp.",
+        "AttachDestination": "Gắn đích đến cho bộ phát hiện kích hoạt mà không gửi đi đâu cả.",
+        "AddLibraryAlert": "Thêm cảnh báo theo lịch từ thư viện khi vị từ của nó khớp.",
+        "MoveToIncidentDelivery": "Gửi cảnh báo do người dùng tạo thông qua sự cố của nó thay vì tuyến riêng.",
+        "ReviewForDeletion": "Đề xuất ngừng một cảnh báo không ai xử lý.",
+        "RollbackDeploy": "Khôi phục bản triển khai đã gây ra sự cố.",
+        "ScaleService": "Mở rộng một dịch vụ đang quá tải.",
+        "RestartPod": "Khởi động lại pod đã ngừng phục vụ trong khi các bản sao của nó vẫn khỏe mạnh; nếu lặp lại sẽ mở một bug thay vì làm vậy.",
+        "ToggleFeatureFlag": "Tắt feature flag đứng sau sự cố.",
+        "RunRunbookStep": "Chạy một bước từ runbook của dịch vụ.",
+        "LowerThreshold": "Hạ ngưỡng đã kích hoạt quá muộn để cảnh báo trước sự cố.",
+        "RevertConfigChange": "Khôi phục thay đổi cấu hình gần đây khiến sự cố bắt đầu, khi các bản sao không có thay đổi đó vẫn khỏe mạnh.",
+        "EvictLeakedConnections": "Đóng các kết nối mà dịch vụ đã lấy ra và không bao giờ trả lại (do phát hiện rò rỉ tìm thấy), không đụng đến các truy vấn đang chạy. Mỗi kết nối được liên kết với bug rò rỉ tương ứng.",
+        "AbortRollout": "Chuyển lưu lượng trở lại phiên bản trước khi chỉ các pod của phiên bản mới gặp lỗi giữa quá trình triển khai. Có thể tiếp tục chỉ với một cú nhấp.",
+        "ScaleQueueWorkers": "Thêm worker vào hàng đợi bị tồn đọng, tối đa đến một giới hạn; tự động thu hẹp lại nếu tốc độ xử lý không cải thiện."
+      },
+      "triageHint": "Phân loại L0 theo mức độ nghiêm trọng. Cố định trong giai đoạn 1.",
+      "channels": "Kênh",
+      "channelInbox": "Hộp thư trong sản phẩm",
+      "channelEmailAdmins": "Email đến quản trị viên tổ chức",
+      "channelDefault": "Mặc định cho mọi tổ chức. Luôn bật.",
+      "alwaysOn": "Luôn bật",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "Đã kết nối. Không bắt buộc; hộp thư và email vẫn hoạt động nếu không có.",
+      "connected": "Đã kết nối",
+      "defaultsNote": "Giai đoạn 1 cung cấp các mặc định cố định của sản phẩm. Ghi đè theo từng tổ chức sẽ có sau.",
+      "groupCoverage": "Phạm vi bao phủ — tự động tạo bộ phát hiện",
+      "groupCoverageHint": "Mọi dịch vụ mới đều nhận bộ phát hiện bất thường và các cảnh báo thư viện phù hợp ngay khi xuất hiện, kèm các kiểm tra an toàn cơ bản trong lúc học. Mỗi lần tạo đều được ghi lại, có thể hoàn tác và trải qua một khoảng thời gian xem xét.",
+      "groupCalibration": "Hiệu chỉnh — thay đổi đối với các cảnh báo hiện có",
+      "channelEmail": "Email {address}",
+      "paging": "Gọi trực",
+      "pagingHint": "Mức độ nghiêm trọng quyết định cách sự cố tiếp cận mọi người.",
+      "routing": {
+        "p1p2": "P1 và P2",
+        "p1p2Desc": "Ảnh hưởng đến khách hàng. Gọi trực vào bất kỳ giờ nào.",
+        "page": "Gọi trực",
+        "p3": "P3",
+        "p3Desc": "Tin nhắn Slack được gửi ngay khi sẵn sàng. Không bao giờ gọi trực cho ai.",
+        "message": "Tin nhắn",
+        "p4": "P4",
+        "p4Desc": "Được đưa vào bản tóm tắt thứ Sáu.",
+        "summary": "Tóm tắt thứ Sáu"
+      },
+      "nav": {
+        "coverage": "Phạm vi bao phủ",
+        "alerts": "Thay đổi cảnh báo",
+        "fixes": "Khắc phục",
+        "investigation": "Điều tra & gọi trực",
+        "channels": "Kênh"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} đã kết nối"
+      }
+    },
+    "notInDemo": "Không khả dụng trong bản demo này",
+    "confidence": {
+      "high": "Cao",
+      "medium": "Trung bình",
+      "low": "Thấp",
+      "uncalibrated": "chưa có điểm đã hiệu chỉnh"
+    },
+    "analysis": {
+      "verdict": "Kết luận",
+      "unconfirmed": "Chưa được xác nhận",
+      "lasted": "Kéo dài {count} phút",
+      "soFar": "{count} phút cho đến nay",
+      "checked": "Những gì tôi đã kiểm tra",
+      "verdicts": {
+        "confirmed": "Đã xác nhận",
+        "ruled_out": "Đã loại trừ",
+        "open": "Vẫn chưa giải quyết"
+      },
+      "comparison": "Lành mạnh vs bị ảnh hưởng",
+      "kinds": {
+        "affected": "Bị ảnh hưởng",
+        "healthy": "Lành mạnh",
+        "limit": "Giới hạn"
+      },
+      "trail": "Dấu vết bằng chứng",
+      "seeInUnfold": "Xem trong Cách sự việc diễn ra",
+      "nextStep": "Bước tiếp theo",
+      "fullReport": "Báo cáo đầy đủ",
+      "fullReportHint": "Toàn bộ nội dung trên trong một tài liệu, sẵn sàng để sao chép hoặc tải xuống"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "Demo",
+    "scenarioLabel": "Kịch bản demo",
+    "scenarios": {
+      "demo": "Tuần demo",
+      "allClear": "Không có sự cố",
+      "incident": "Sự cố đang diễn ra",
+      "cantSee": "Không thấy được",
+      "noBaseline": "Không có baseline"
+    },
+    "nav": {
+      "history": "Lịch sử",
+      "settings": "Cài đặt",
+      "howItWorks": "Cách hoạt động",
+      "searchLabel": "Tìm kiếm sự cố",
+      "searchPlaceholder": "Tìm kiếm sự cố"
+    },
+    "recent": {
+      "ranges": {
+        "day": "24 giờ qua",
+        "week": "7 ngày qua",
+        "month": "30 ngày qua"
+      },
+      "within": {
+        "day": "trong 24 giờ qua",
+        "week": "trong 7 ngày qua",
+        "month": "trong 30 ngày qua"
+      },
+      "groups": {
+        "thisWeek": "Tuần này",
+        "lastWeek": "Tuần trước",
+        "weeksAgo": "{count} tuần trước"
+      },
+      "all": "Tất cả",
+      "none": "Không có vấn đề {priority} {within}.",
+      "allIssues": "Tất cả vấn đề",
+      "priorityLabel": "Mức độ ưu tiên",
+      "showing": "{count} vấn đề được hiển thị | {count} vấn đề được hiển thị"
+    },
+    "noProblems": "Không có vấn đề {within}. Tôi đã kiểm tra {count} dịch vụ suốt ngày đêm. | Không có vấn đề {within}. Tôi đã kiểm tra {count} dịch vụ suốt ngày đêm.",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "Hiển thị thêm {count}",
+    "showFewer": "Hiển thị ít hơn",
+    "days": {
+      "today": "Hôm nay",
+      "monday": "Thứ Hai",
+      "tuesday": "Thứ Ba",
+      "wednesday": "Thứ Tư",
+      "thursday": "Thứ Năm",
+      "friday": "Thứ Sáu",
+      "jul18": "18 tháng 7",
+      "jul30": "30 tháng 7",
+      "aug13": "13 tháng 8",
+      "aug26": "26 tháng 8",
+      "sep4": "4 tháng 9",
+      "sep12": "12 tháng 9",
+      "sep24": "24 tháng 9",
+      "sep30": "30 tháng 9",
+      "oct1": "1 tháng 10",
+      "oct2": "2 tháng 10",
+      "sep23": "23 tháng 9"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db sẽ hết dung lượng đĩa trong khoảng 3 ngày",
+        "summary": "Đĩa của nó đang tăng khoảng 18 GB mỗi ngày kể từ khi bản phát hành orders hôm Thứ Năm tăng mức ghi nhật ký kiểm toán, nên đĩa sẽ đầy vào khoảng sáng Thứ Tư. Khi đó, checkout, đơn hàng và hoàn tiền sẽ bắt đầu lỗi. Hiện chưa có gì hỏng, nên tôi đã gửi thông báo trước cho nhóm của bạn thay vì gọi trực.",
+        "notify1": "orders-db sẽ hết dung lượng đĩa trong khoảng 3 ngày, vào khoảng 11:00 Thứ Tư.",
+        "notify2": "Nguyên nhân: kể từ khi orders 3.8.0 phát hành hôm Thứ Năm, ghi nhật ký kiểm toán ghi khoảng 18 GB mỗi ngày. Trước đó đĩa chỉ tăng khoảng 6 GB mỗi ngày.",
+        "notify3": "Hãy giảm mức ghi nhật ký kiểm toán trở lại hoặc thêm dung lượng đĩa trước Thứ Tư. Khi đĩa đầy, checkout, đơn hàng và hoàn tiền sẽ lỗi. Hiện chưa có gì hỏng, nên đây là thông báo trước, không phải cuộc gọi trực.",
+        "chartCaption": "đĩa · đầy ~11:00 Thứ Tư",
+        "chartLabel": "Dung lượng đĩa đã tăng từ 334 lên 445 GB trong tổng 500 GB trong 14 ngày, nhanh hơn kể từ Thứ Năm, và dự báo sẽ đầy vào khoảng 11:00 Thứ Tư"
+      },
+      "search": {
+        "title": "Tìm kiếm chậm và search-2 liên tục bị sập",
+        "titleFixed": "Tìm kiếm đã chậm trong khi search-2 liên tục bị sập",
+        "summary": "Khoảng 1 trong 5 lượt tìm kiếm mất hơn 3 giây, kể từ 10:27. Một thay đổi cấu hình trên search-2 lúc 10:16 khiến nó hết bộ nhớ. Tôi đã gọi trực, và vấn đề vẫn đang tiếp diễn.",
+        "notify1": "Tìm kiếm đang chậm: khoảng 1 trong 5 lượt tìm kiếm mất hơn 3 giây, kể từ 10:27.",
+        "notify2": "Nguyên nhân: một thay đổi cấu hình trên search-2 lúc 10:16 làm đầy bộ nhớ của nó. Nó đã sập khoảng 10 lần kể từ 10:20. 4 nút còn lại không có thay đổi đó và vẫn hoạt động bình thường.",
+        "notify3": "Khôi phục cấu hình cũ sẽ khắc phục được, và tôi có thể hoàn tác. Trả lời \"revert\" và tôi sẽ thực hiện. Người đã thay đổi nên kiểm tra lý do.",
+        "summaryFixed": "Vấn đề bắt đầu lúc 10:27, do một thay đổi cấu hình trên search-2 làm đầy bộ nhớ của nó. Bạn đã phê duyệt khôi phục cấu hình cũ, nên tôi đã làm và tìm kiếm đã trở lại bình thường.",
+        "summaryFixing": "Vấn đề bắt đầu lúc 10:27, do một thay đổi cấu hình trên search-2 làm đầy bộ nhớ của nó. Bạn đã phê duyệt khôi phục cấu hình cũ, nên tôi đang thực hiện ngay bây giờ.",
+        "chartCaption": "độ trễ p95 · đỉnh 3,4 s",
+        "chartLabel": "Độ trễ p95 tăng từ 0,38 s lên 3,4 s lúc 10:27 và vẫn còn cao",
+        "chartLabelFixed": "Độ trễ p95 tăng từ 0,38 s lên 3,4 s lúc 10:27 và trở lại bình thường sau khi khôi phục cấu hình cũ"
+      },
+      "checkout": {
+        "title": "1 trong 12 giao dịch thanh toán thất bại sau một lần triển khai",
+        "summary": "payments-api 2.3.1 yêu cầu cơ sở dữ liệu payments nhiều kết nối hơn mức cho phép. Việc khôi phục phiên bản cũ đã khắc phục được 18 phút sau khi lỗi bắt đầu.",
+        "notify1": "Checkout đang lỗi khoảng 1 trong 12 giao dịch thanh toán, kể từ 14:02.",
+        "notify2": "Nguyên nhân có khả năng: payments-api 2.3.1 phát hành lúc 14:01 và tăng pool kết nối từ 20 lên 50 mỗi máy chủ. 6 máy chủ × 50 vượt quá 200 kết nối mà cơ sở dữ liệu payments cho phép.",
+        "notify3": "Khôi phục về 2.3.0 là cách khắc phục nhanh nhất.",
+        "chartCaption": "giao dịch thất bại · đỉnh 1 trong 12",
+        "chartLabel": "Giao dịch thanh toán thất bại tăng vọt từ 0,1% lên 1 trong 12 lúc 14:02 và trở lại bình thường 18 phút sau, sau khi rollback"
+      },
+      "pool": {
+        "title": "Checkout đã hết kết nối cơ sở dữ liệu",
+        "summary": "Các kết nối bị rò rỉ đã dùng hết số kết nối trống, và các giao dịch thanh toán bắt đầu bị timeout. Bạn đã phê duyệt giải phóng chúng, nên tôi đã làm. Các giao dịch thanh toán đã phục hồi 2 phút sau đó.",
+        "notify1": "Checkout đã hết kết nối cơ sở dữ liệu, và khoảng 1 trong 9 giao dịch thanh toán đang bị timeout, từ 11:18.",
+        "notify2": "Nguyên nhân: 48 trong 50 kết nối đang bị giữ bởi các tác vụ xuất hoàn tiền chưa bao giờ trả lại chúng. Đây là rò rỉ CHK-482, lần thứ ba trong hai tuần.",
+        "notify3": "Chỉ đóng các kết nối bị rò rỉ là có thể xử lý; các giao dịch thanh toán đang xử lý sẽ không bị ảnh hưởng. Trả lời \"có\" và tôi sẽ làm.",
+        "chartCaption": "timeout · đỉnh 1 trong 9",
+        "chartLabel": "Timeout thanh toán tăng lên khoảng 1 trong 9 lúc 11:18 và phục hồi 2 phút sau khi sửa lúc 11:21."
+      },
+      "email": {
+        "title": "Email đơn hàng chậm tới 9 phút",
+        "summary": "Tất cả worker gửi thư bị thay thế cùng lúc qua đêm, và hàng đợi tự đuổi kịp trong khoảng 20 phút. Việc này nhỏ, nên nó được đưa vào bản tổng hợp thứ Sáu.",
+        "chartCaption": "độ trễ email · đỉnh 9 phút",
+        "chartLabel": "Độ trễ email tăng lên 9 phút từ 03:15 và tự phục hồi trước 03:36."
+      },
+      "recs": {
+        "title": "Gợi ý chậm hơn trong 15 phút",
+        "summary": "Chúng tăng từ một phần tư giây lên gần một giây. Việc xây dựng lại cache hằng đêm đã được bắt đầu thủ công vào buổi chiều, và nó tự hoàn tất. Tôi giữ nó cho bản tổng hợp thứ Sáu.",
+        "chartCaption": "độ trễ p95 · đỉnh 0,94 giây",
+        "chartLabel": "Độ trễ p95 tăng từ 0,26 giây lên 0,94 giây lúc 16:40 và tự phục hồi 15 phút sau."
+      },
+      "login": {
+        "title": "Đăng nhập chậm trong khoảng 25 phút",
+        "summary": "1 trong 8 người phải chờ hơn 5 giây. Cache phiên hết dung lượng sau khi lưu lượng tăng đột biến và khiến một số người bị đăng xuất. Nhóm của bạn đã thêm dung lượng và hệ thống phục hồi.",
+        "notify1": "Đăng nhập đang chậm: khoảng 1 trong 8 người phải chờ hơn 5 giây, từ 10:12.",
+        "notify2": "Nguyên nhân: cache phiên đầy sau khi lưu lượng tăng gấp đôi lúc 10:05.",
+        "notify3": "Thêm dung lượng cho cache sẽ khắc phục được.",
+        "chartCaption": "p95 đăng nhập · đỉnh 5,8 giây",
+        "chartLabel": "Thời gian đăng nhập p95 tăng từ 0,6 giây lên 5,8 giây lúc 10:12 và phục hồi sau khi thêm dung lượng cache lúc 10:31."
+      },
+      "queue": {
+        "title": "Đơn hàng ùn ứ trong hàng đợi",
+        "summary": "Khoảng 4.000 đơn đang chờ lúc cao điểm nhất. Tôi đã thêm worker như bạn cho phép, nhưng không giúp ích, nên tôi đã đưa chúng trở lại và gọi trực. Nguyên nhân thực sự là một chỉ mục cơ sở dữ liệu bị hỏng do migration; nhóm của bạn đã sửa nó 40 phút sau khi bắt đầu.",
+        "notify1": "Đơn hàng đang ùn ứ: khoảng 4.000 đơn đang chờ, từ 21:30.",
+        "notify2": "Tôi đã thêm worker lúc 21:33, như bạn cho phép, nhưng không giúp ích, nên tôi đã đưa chúng trở lại.",
+        "notify3": "Tra cứu đơn hàng chậm hơn khoảng 40 lần kể từ migration cơ sở dữ liệu lúc 21:20. Kiểm tra chỉ mục orders_by_status trước tiên.",
+        "chartCaption": "tồn đọng · đỉnh 4.120",
+        "chartLabel": "Số đơn đang chờ tăng lên 4.120 từ 21:30, tiếp tục tăng sau khi thêm worker, và giảm hết khi chỉ mục được xây dựng lại lúc 21:52."
+      },
+      "uploads": {
+        "title": "Tải ảnh lên thất bại với 1 trong 40 người",
+        "summary": "Kéo dài 10 phút, vì một chứng chỉ hết hạn trước khi một máy chủ tải xong bản thay thế. Nó tự khắc phục, nên tôi giữ lại cho bản tổng hợp thứ Sáu.",
+        "chartCaption": "tải lên thất bại · đỉnh 1 trong 40",
+        "chartLabel": "Tải lên thất bại tăng lên khoảng 1 trong 40 lúc 07:05 và tự phục hồi 10 phút sau."
+      },
+      "push": {
+        "title": "Thông báo đẩy đến trễ 2 phút",
+        "summary": "Kéo dài nửa giờ, trong khi nhà cung cấp dịch vụ gửi chúng bị chậm. Mức độ nhỏ, nên nó chờ bản tổng hợp thứ Sáu.",
+        "chartCaption": "độ trễ gửi · đỉnh 2 phút",
+        "chartLabel": "Độ trễ gửi tăng từ 4 giây lên khoảng 2 phút lúc 13:50 và tự phục hồi 30 phút sau."
+      },
+      "checkoutNow": {
+        "title": "Checkout đang khiến 1 trong 6 giao dịch thanh toán bị lỗi",
+        "titleFixed": "Checkout đã khiến 1 trong 6 giao dịch thanh toán bị lỗi",
+        "summary": "Nó bắt đầu lúc 10:43, và tôi vẫn đang tìm hiểu nguyên nhân. Đến giờ nó trùng với việc phiên bản 2.4.0 được phát hành lúc 10:41, và tôi đã gọi trực.",
+        "notify1": "Checkout đang khiến khoảng 1 trong 6 giao dịch thanh toán bị lỗi, từ 10:43.",
+        "notify2": "Tôi vẫn đang tìm hiểu nguyên nhân. Đến giờ nó trùng với việc checkout 2.4.0 được phát hành lúc 10:41.",
+        "notify3": "Chỉ các máy chủ chạy 2.4.0 đang lỗi. Trả lời \"dừng\" và tôi sẽ đưa lưu lượng trở lại phiên bản cũ; các máy chủ cũ còn đủ chỗ. Tôi không xem được payments-db trực tiếp, nên chưa loại trừ nó.",
+        "summaryFixing": "Nó bắt đầu lúc 10:43, ngay sau khi phiên bản 2.4.0 được phát hành. Bạn đã phê duyệt dừng triển khai, nên tôi đang đưa lưu lượng trở lại phiên bản cũ ngay bây giờ.",
+        "summaryFixed": "Nó bắt đầu lúc 10:43, sau khi phiên bản 2.4.0 được phát hành. Bạn đã phê duyệt dừng triển khai, và lỗi đã dừng khi lưu lượng quay trở lại phiên bản cũ. Lý do 2.4.0 lỗi vẫn cần nhóm của bạn tìm hiểu.",
+        "chartCaption": "giao dịch thanh toán thất bại · đỉnh 1 trong 6",
+        "chartLabel": "Giao dịch thanh toán thất bại tăng vọt từ 0,1% lên khoảng 1 trong 6 lúc 10:43 và vẫn đang lỗi.",
+        "chartLabelFixed": "Giao dịch thanh toán thất bại tăng vọt từ 0,1% lên khoảng 1 trong 6 lúc 10:43 và trở lại bình thường khi dừng triển khai."
+      },
+      "gateway": {
+        "title": "API đã từ chối 1 trong 30 yêu cầu",
+        "summary": "Sự việc bắt đầu sau một thay đổi cấu hình. Nhóm của bạn đã hoàn tác thay đổi đó, và mọi thứ trở lại bình thường 13 phút sau khi bắt đầu.",
+        "notify1": "API đang từ chối khoảng 1 trong 30 yêu cầu, kể từ 15:22.",
+        "notify2": "Nguyên nhân có thể: một thay đổi cấu hình lúc 15:20 đã rút ngắn thời gian hiệu lực của token đăng nhập.",
+        "notify3": "Hoàn tác thay đổi đó sẽ khắc phục được sự việc.",
+        "chartCaption": "bị từ chối · đỉnh 1 trong 30",
+        "chartLabel": "Yêu cầu bị từ chối tăng lên 1 trong 30 lúc 15:22 và trở lại bình thường khi thay đổi cấu hình được hoàn tác lúc 15:34"
+      },
+      "poolSep": {
+        "title": "Checkout hết kết nối cơ sở dữ liệu",
+        "summary": "Các kết nối bị rò rỉ đã dùng hết số kết nối trống, và các giao dịch thanh toán bắt đầu hết thời gian chờ. Tôi đã truy vết rò rỉ đến các lần xuất hoàn tiền, và bạn đã phê duyệt việc giải phóng các kết nối bị rò rỉ. Thanh toán đã phục hồi 2 phút sau đó.",
+        "notify1": "Checkout đã hết kết nối cơ sở dữ liệu, và khoảng 1 trong 9 giao dịch thanh toán bị hết thời gian chờ, kể từ 15:42.",
+        "notify2": "Nguyên nhân: 47 trong 50 kết nối đang bị giữ bởi các lần xuất hoàn tiền không bao giờ trả lại chúng. Có vẻ như là rò rỉ trong mã xuất hoàn tiền.",
+        "notify3": "Chỉ đóng các kết nối bị rò rỉ sẽ giải quyết được; các giao dịch thanh toán đang xử lý không bị ảnh hưởng. Trả lời \"yes\" và tôi sẽ thực hiện.",
+        "chartCaption": "hết thời gian chờ · đỉnh 1 trong 9",
+        "chartLabel": "Số lần hết thời gian chờ thanh toán tăng lên khoảng 1 trong 9 lúc 15:42 và phục hồi 2 phút sau khi khắc phục lúc 15:45"
+      },
+      "poolOct": {
+        "title": "Checkout lại hết kết nối cơ sở dữ liệu",
+        "summary": "Đó vẫn là cùng một rò rỉ xuất hoàn tiền (CHK-482). Bạn đã phê duyệt việc giải phóng các kết nối bị rò rỉ, và thanh toán đã phục hồi 2 phút sau đó.",
+        "notify1": "Checkout đã hết kết nối cơ sở dữ liệu, và khoảng 1 trong 9 giao dịch thanh toán bị hết thời gian chờ, kể từ 10:05.",
+        "notify2": "Nguyên nhân: 46 trong 50 kết nối đang bị giữ bởi các lần xuất hoàn tiền. Lại là rò rỉ CHK-482, lần thứ hai trong 8 ngày.",
+        "notify3": "Chỉ đóng các kết nối bị rò rỉ sẽ giải quyết được; các giao dịch thanh toán đang xử lý không bị ảnh hưởng. Trả lời \"yes\" và tôi sẽ thực hiện.",
+        "chartCaption": "hết thời gian chờ · đỉnh 1 trong 9",
+        "chartLabel": "Số lần hết thời gian chờ thanh toán tăng lên khoảng 1 trong 9 lúc 10:05 và phục hồi 2 phút sau khi khắc phục lúc 10:08"
+      },
+      "lagSep": {
+        "title": "Sản phẩm mới mất tới 40 phút để xuất hiện trong tìm kiếm",
+        "summary": "search-indexer bị tụt lại trong việc cập nhật danh mục sau khi phiên bản 1.12.0 rút ngắn thời gian tối đa cho mỗi lô. Nhóm của bạn đã khôi phục về phiên bản cũ và nó đã bắt kịp 40 phút sau khi bắt đầu.",
+        "notify1": "Các sản phẩm mới và đã thay đổi bị thiếu trong tìm kiếm: search-indexer đang tụt lại khoảng 48.000 cập nhật danh mục, kể từ 14:06.",
+        "notify2": "Nguyên nhân: search-indexer 1.12.0 được triển khai lúc 13:58 và giảm khoảng thời gian poll Kafka xuống 30 giây. Các lô lớn mất khoảng 45 giây, nên consumer liên tục bị loại khỏi nhóm của nó.",
+        "notify3": "Khôi phục về 1.11.4 sẽ giúp nó bắt kịp. Bản thân tìm kiếm vẫn hoạt động; chỉ là nó hiển thị các sản phẩm cũ hơn.",
+        "chartCaption": "độ trễ consumer · đỉnh 48.000",
+        "chartLabel": "Độ trễ consumer tăng từ khoảng 200 lên 48.000 thông điệp kể từ 14:06 và giảm hết sau khi khôi phục lúc 14:39"
+      },
+      "poolAug": {
+        "title": "Checkout hết kết nối cơ sở dữ liệu trong lúc xuất hoàn tiền",
+        "summary": "Lần xuất hoàn tiền hằng đêm đã giữ gần hết kết nối cơ sở dữ liệu của checkout, và khoảng 1 trong 12 giao dịch thanh toán bị hết thời gian chờ. Sự việc được giải quyết khi lần xuất kết thúc, 13 phút sau khi bắt đầu.",
+        "notify1": "Checkout đã hết kết nối cơ sở dữ liệu, và khoảng 1 trong 12 giao dịch thanh toán bị hết thời gian chờ, kể từ 02:04.",
+        "notify2": "Nguyên nhân: 44 trong 50 kết nối đang bị giữ bởi lần xuất hoàn tiền hằng đêm, vốn có kích thước gấp khoảng 3 lần bình thường sau đợt giảm giá cuối tháng.",
+        "notify3": "Sự việc sẽ được giải quyết khi lần xuất kết thúc. Nếu không, việc dừng lần xuất sẽ giải phóng các kết nối.",
+        "chartCaption": "hết thời gian chờ · đỉnh 1 trong 12",
+        "chartLabel": "Số lần hết thời gian chờ thanh toán tăng lên khoảng 1 trong 12 lúc 02:04 và tự phục hồi khi lần xuất kết thúc lúc 02:17"
+      },
+      "throttleAug": {
+        "title": "Kiểm tra gian lận bị chậm trong 35 phút",
+        "summary": "Một tác vụ theo lô chạy trên cùng các máy chủ và chiếm phần CPU dự phòng của chúng, nên kiểm tra gian lận mất tới 1,4 giây. Checkout vẫn hoạt động, chỉ chậm hơn, và nó đã phục hồi khi tác vụ kết thúc, nên tôi đã giữ lại cho bản tổng kết thứ Sáu.",
+        "chartCaption": "p95 kiểm tra gian lận · đỉnh 1,4 giây",
+        "chartLabel": "Thời gian p95 kiểm tra gian lận tăng từ 0,18 giây lên 1,4 giây lúc 11:20 và tự phục hồi khi tác vụ theo lô kết thúc lúc 11:55"
+      },
+      "tlsJul": {
+        "title": "Hóa đơn ngừng gửi trong 43 phút",
+        "summary": "Chứng chỉ của invoice-service dành cho billing-api đã hết hạn, nên mọi hóa đơn đều gửi thất bại. Nhóm của bạn đã gia hạn nó, và tất cả hóa đơn trong hàng đợi đều được gửi đi.",
+        "notify1": "Không có hóa đơn nào được gửi đi: mọi lần gửi từ invoice-service đều thất bại, kể từ 09:01.",
+        "notify2": "Nguyên nhân: chứng chỉ client của invoice-service dành cho billing-api hết hạn lúc 09:00, và billing-api từ chối mọi kết nối từ nó.",
+        "notify3": "Gia hạn chứng chỉ sẽ khắc phục được. Hóa đơn đang xếp hàng đợi, không bị mất.",
+        "chartCaption": "gửi thất bại · tất cả",
+        "chartLabel": "Số lần gửi hóa đơn thất bại tăng vọt từ 0,2% lên 100% lúc 09:01 và trở lại bình thường sau khi chứng chỉ được gia hạn lúc 09:41"
+      },
+      "dnsJul": {
+        "title": "Giá trong giỏ hàng bị mất với 1 trong 4 người",
+        "summary": "Một thay đổi DNS khiến một nửa số máy chủ DNS của cluster ngừng phản hồi cho các tên nội bộ, nên cart không thể kết nối tới currency. Nhóm của bạn đã hoàn tác nó 31 phút sau khi bắt đầu.",
+        "notify1": "Khoảng 1 trong 4 lần tải giỏ hàng không hiển thị giá, kể từ 16:22.",
+        "notify2": "Nguyên nhân: một thay đổi cấu hình DNS lúc 16:20 đã loại bỏ zone nội bộ khỏi 2 trong 4 máy chủ DNS của cluster, nên cart không thể tìm thấy currency.internal trong các truy vấn đó.",
+        "notify3": "Hoàn tác thay đổi DNS sẽ khắc phục được. Các đơn hàng vẫn được xử lý khi thanh toán.",
+        "chartCaption": "thiếu giá · đỉnh 1/4",
+        "chartLabel": "Lượt tải giỏ hàng không có giá tăng từ 0,1% lên khoảng 1/4 lúc 16:22 và trở lại bình thường khi thay đổi DNS được hoàn tác lúc 16:51"
+      }
+    },
+    "drawer": {
+      "worked": "Hiệu quả",
+      "didntHelp": "Không hiệu quả",
+      "now": "Bây giờ"
+    },
+    "needs": {
+      "more": "Nhiều hơn",
+      "less": "Ít hơn",
+      "canUndo": "Bạn có thể hoàn tác",
+      "undo": "Hoàn tác",
+      "undone": "Đã hoàn tác. Mục này đang chờ câu trả lời của bạn lần nữa.",
+      "shiftTo": "đến",
+      "retune": {
+        "body": "Cảnh báo \"{alert}\" trên {host} đã kích hoạt {fired} lần trong tháng này và không ai cần xử lý. Dung lượng đĩa tăng lên khoảng 85% trong quá trình dọn dẹp ban đêm và trở lại gần 70% vào buổi sáng. Ngay cả trong ngày bận rộn nhất, cũng phải mất hơn 3 ngày để đầy từ 90%. Tôi muốn nâng lên {to}%. Tôi vẫn sẽ cảnh báo bạn nếu đĩa có nguy cơ đầy trong vòng một ngày.",
+        "yes": "Có, hãy đổi",
+        "no": "Giữ nguyên",
+        "doneYes": "Xong. Tôi đã nâng lên {to}%. Cảnh báo đầy đĩa vẫn bật.",
+        "doneNo": "Được, tôi sẽ giữ nguyên ở {from}%.",
+        "headline": "Nâng cảnh báo 'disk 80%' trên ingest-3 lên 90%?",
+        "why": "Nó đã kích hoạt 41 lần trong tháng này và không ai cần xử lý.",
+        "cost": "Cảnh báo đầy đĩa vẫn bật"
+      },
+      "fixNow": {
+        "search": {
+          "body": "Tìm kiếm chậm vì một cài đặt thay đổi trên node search-2 lúc 10:16 làm đầy bộ nhớ của nó, nên nó liên tục bị sập. 4 node còn lại vẫn giữ cài đặt cũ và hoạt động bình thường. Tôi khôi phục lại được không? Tôi có thể hoàn tác việc này.",
+          "yes": "Khôi phục lại",
+          "no": "Tôi sẽ tự xử lý",
+          "doneYes": "Xong. Đang khôi phục lại ngay.",
+          "doneNo": "Được, để bạn xử lý. Tôi sẽ tiếp tục theo dõi.",
+          "doneSettled": "Xong. search-2 đã trở lại và tìm kiếm đã bình thường.",
+          "headline": "Khôi phục cài đặt cache của search-2 về 10%?",
+          "why": "Một thay đổi lúc 10:16 làm đầy bộ nhớ của nó, nên nó liên tục bị sập.",
+          "cost": "Một lần khởi động lại search-2"
+        },
+        "checkoutNow": {
+          "body": "Thanh toán đang thất bại ở khoảng 1 trong 6 giao dịch, và chỉ các máy chủ chạy phiên bản 2.4.0 bị lỗi. 6 máy chủ ở phiên bản cũ có đủ dung lượng cho toàn bộ lưu lượng. Tôi có thể dừng triển khai và đưa lưu lượng trở lại chúng không? 2.4.0 vẫn được triển khai để nhóm của bạn xem xét.",
+          "yes": "Dừng triển khai",
+          "no": "Tôi sẽ tự xử lý",
+          "doneYes": "Xong. Đang dừng triển khai ngay.",
+          "doneNo": "Được, để bạn xử lý. Tôi sẽ tiếp tục theo dõi.",
+          "doneSettled": "Xong. Thanh toán đã trở lại bình thường.",
+          "headline": "Dừng triển khai 2.4.0 của checkout?",
+          "why": "Khoảng 1 trong 6 giao dịch thanh toán thất bại, tất cả đều trên 2.4.0. Phiên bản cũ có thể chịu toàn bộ lưu lượng.",
+          "cost": "2.4.0 vẫn được triển khai"
+        }
+      },
+      "fromNowOn": {
+        "body": "Đã {done} lần, một phiên bản mới chỉ khiến các máy chủ của nó bị lỗi trong khi triển khai. Mỗi lần tôi đều đề nghị đưa lưu lượng trở lại phiên bản cũ, và các lỗi dừng trong vòng 2 phút. Từ giờ tôi có thể tự làm điều đó trong một lần triển khai không? Tôi sẽ giữ nguyên phiên bản mới cho nhóm của bạn và thông báo ngay cho họ.",
+        "yes": "Có, tự làm",
+        "no": "Cứ hỏi tôi",
+        "doneYes": "Xong. Tôi sẽ tự dừng các lần triển khai lỗi và thông báo cho bạn mỗi lần.",
+        "doneNo": "Được, tôi sẽ tiếp tục hỏi bạn trước.",
+        "headline": "Từ giờ tự dừng các lần triển khai lỗi?",
+        "why": "Cả 6 lần bạn đều đồng ý, các lỗi đều dừng trong vòng 2 phút.",
+        "cost": "Chỉ trong khi triển khai"
+      },
+      "labels": {
+        "fixNow": "Sửa ngay",
+        "fromNowOn": "Để tôi xử lý việc này",
+        "retune": "Cảnh báo bớt ồn"
+      },
+      "needsOk": "Cần bạn phê duyệt"
+    },
+    "footer": {
+      "text": "Tôi cũng tự kiểm tra chính mình: nếu tôi ngừng hoạt động, bạn sẽ được thông báo.",
+      "seeAll": "Xem mọi thứ tôi theo dõi",
+      "seeChanges": "Xem mọi thứ tôi đã thay đổi"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1 phút trước | {count} phút trước",
+        "stale": "Không có dữ liệu mới trong 1 phút (từ {since}) | Không có dữ liệu mới trong {count} phút (từ {since})"
+      },
+      "summaryWatching": "Tôi đang theo dõi {watched} trong số {total} dịch vụ của bạn.",
+      "summaryAll": "Tôi đang theo dõi tất cả {total} dịch vụ của bạn.",
+      "summaryWithClauses": "{head} {clauses}.",
+      "clauseLearning": "{count} vẫn đang học | {count} vẫn đang học",
+      "clauseUnseen": "có một cái tôi không thấy | có {count} cái tôi không thấy",
+      "legend": {
+        "watching": "Theo dõi đầy đủ",
+        "learning": "Đang học",
+        "unseen": "Không thấy"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "Tôi đang theo dõi tất cả {total} dịch vụ của bạn, và tôi vẫn đang học xem trạng thái bình thường của từng dịch vụ trông như thế nào."
+    },
+    "coveragePage": {
+      "title": "Mọi thứ tôi theo dõi",
+      "back": "Quay lại"
+    },
+    "issuesPage": {
+      "title": "Tất cả vấn đề",
+      "sentence": "Mọi vấn đề tôi đã mở {within}. Chọn một vấn đề để xem chuyện gì đã xảy ra và tôi đã làm gì với nó.",
+      "back": "Quay lại",
+      "ranges": {
+        "week": "7 ngày qua",
+        "month": "30 ngày qua",
+        "quarter": "90 ngày qua"
+      },
+      "within": {
+        "week": "trong 7 ngày qua",
+        "month": "trong 30 ngày qua",
+        "quarter": "trong 90 ngày qua"
+      }
+    },
+    "activityPage": {
+      "title": "Những gì tôi đã thay đổi",
+      "stats": {
+        "window": "7 ngày qua",
+        "made": "Thay đổi | Thay đổi",
+        "worked": "Hiệu quả",
+        "review": "Đang xem xét",
+        "undone": "Đã hoàn tác"
+      },
+      "filters": {
+        "all": "Tất cả",
+        "fixes": "Bản sửa lỗi",
+        "watching": "Đang theo dõi",
+        "tuning": "Tinh chỉnh cảnh báo"
+      },
+      "status": {
+        "applying": "Đang áp dụng",
+        "worked": "Hiệu quả",
+        "done": "Hoàn thành",
+        "review": "Đang xem xét",
+        "reviewDays": "Đang xem xét · còn {count} ngày | Đang xem xét · còn {count} ngày",
+        "didntHelp": "Không hiệu quả",
+        "undone": "Đã hoàn tác"
+      },
+      "actions": {
+        "undo": "Hoàn tác",
+        "showDetails": "Hiện chi tiết",
+        "hideDetails": "Ẩn chi tiết"
+      },
+      "details": {
+        "name": "Thay đổi",
+        "target": "Trên",
+        "confidence": "Độ tin cậy",
+        "saw": "Những gì tôi đã thấy",
+        "recurring": "Bản sửa lỗi này liên tục cần thiết cho cùng một rò rỉ ({bug}), nên tôi sẽ luôn hỏi trước cho đến khi nó được khắc phục.",
+        "undoDecided": "Hoàn tác sẽ lấy lại thay đổi này, và tôi sẽ hỏi bạn lại."
+      },
+      "toast": {
+        "undone": "Đã hoàn tác. Mọi thứ đã trở lại như cũ.",
+        "undoDecided": "Đã hoàn tác. Tôi sẽ hỏi bạn lại."
+      },
+      "empty": {
+        "filter": "Hiện tại chưa có gì ở đây.",
+        "scenario": "Tôi chưa thay đổi gì cả. Khi tôi thực hiện thay đổi, bạn sẽ thấy ở đây."
+      },
+      "entries": {
+        "L-313": {
+          "done": "Đã dừng triển khai checkout 2.4.0",
+          "why": "Chỉ 6 máy chủ chạy 2.4.0 bị lỗi; 6 máy chủ ở phiên bản cũ có thể gánh toàn bộ lưu lượng.",
+          "from": "6 trong 12 pod",
+          "to": "không có lưu lượng",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "Đã đưa cài đặt bộ nhớ đệm của search-2 về 10%",
+          "why": "Nó đã tăng lên 60% lúc 10:16, và search-2 đã hết bộ nhớ kể từ đó.",
+          "from": "60%",
+          "to": "10%",
+          "on": "kích thước bộ nhớ đệm · search-2"
+        },
+        "L-309": {
+          "done": "Đã nâng cảnh báo 'disk 80%' trên ingest-3 lên 90%",
+          "why": "Nó đã kích hoạt 41 lần trong tháng này và không ai cần xử lý. Cảnh báo dung lượng vẫn được bật.",
+          "from": "80%",
+          "to": "90%",
+          "on": "cảnh báo disk · ingest-3"
+        },
+        "L-310": {
+          "done": "Đã bắt đầu theo dõi returns, exchanges và gift-cards",
+          "why": "Phát hiện chúng sáng nay. Đang tìm hiểu mức bình thường của chúng trong 7 ngày.",
+          "from": "chưa theo dõi",
+          "to": "đang theo dõi",
+          "on": "3 dịch vụ"
+        },
+        "L-314": {
+          "done": "Đã bắt đầu theo dõi 6 dịch vụ tôi phát hiện sáng nay",
+          "why": "Chúng xuất hiện trong trace của bạn hôm nay. Đang tìm hiểu mức bình thường của chúng trong 7 ngày.",
+          "from": "chưa theo dõi",
+          "to": "đang theo dõi",
+          "on": "6 dịch vụ"
+        },
+        "L-311": {
+          "done": "Đã được bạn đồng ý cho tự dừng các đợt triển khai lỗi",
+          "why": "Tôi đã dừng 6 đợt với sự chấp thuận của bạn trong 60 ngày; mỗi lần lỗi trở lại bình thường trong vòng 2 phút.",
+          "from": "hỏi trước",
+          "to": "tự quyết",
+          "on": "dừng triển khai"
+        },
+        "L-304": {
+          "done": "Đã giải phóng 48 kết nối cơ sở dữ liệu bị rò rỉ của checkout",
+          "why": "Thanh toán bị quá thời gian chờ. Chúng trở lại bình thường 2 phút sau.",
+          "from": "50 trong 50 đang được dùng",
+          "to": "2 đang được dùng",
+          "on": "pool của checkout"
+        },
+        "L-299": {
+          "done": "Đã giải phóng 46 kết nối cơ sở dữ liệu bị rò rỉ của checkout",
+          "why": "Cùng một rò rỉ như ngày 23 tháng 9. Thanh toán trở lại bình thường 2 phút sau.",
+          "from": "50 trong 50 đang được dùng",
+          "to": "4 đang được dùng",
+          "on": "pool của checkout"
+        },
+        "L-296": {
+          "done": "Đã giải phóng 47 kết nối cơ sở dữ liệu bị rò rỉ của checkout",
+          "why": "Một rò rỉ mới, nên sau đó tôi đã báo cho nhóm checkout với mã CHK-482.",
+          "from": "50 trong 50 đang được dùng",
+          "to": "3 đang được dùng",
+          "on": "pool của checkout"
+        },
+        "L-301": {
+          "done": "Đã bắt đầu theo dõi billing-api, billing-worker và invoice-service",
+          "why": "Đã tìm thấy chúng trong trace của bạn. Vẫn đang tìm hiểu mức bình thường của chúng.",
+          "from": "chưa theo dõi",
+          "to": "đã theo dõi",
+          "on": "3 dịch vụ"
+        },
+        "L-307": {
+          "done": "Đã sửa cảnh báo kết nối payments-api để tính tất cả máy chủ",
+          "why": "Nó kiểm tra từng máy chủ riêng lẻ, nên đã không hề kích hoạt trong sự cố ngày thứ Ba.",
+          "from": "mỗi pod trên 95%",
+          "to": "tất cả pod trên 85%",
+          "on": "cảnh báo kết nối"
+        },
+        "L-302": {
+          "done": "Đã gộp 3 cảnh báo độ trễ checkout thành một",
+          "why": "Chúng cùng kích hoạt 94% thời gian, nên một lần chậm đã gọi bạn 3 lần.",
+          "from": "3 cảnh báo",
+          "to": "1",
+          "on": "độ trễ checkout"
+        },
+        "L-303": {
+          "done": "Đã nâng cảnh báo 'disk 80%' trên ingest-1 lên 90%",
+          "why": "Nó kích hoạt 29 lần trong 30 ngày và không ai cần xử lý. Cảnh báo dung lượng vẫn được bật.",
+          "from": "80%",
+          "to": "90%",
+          "on": "cảnh báo disk · ingest-1"
+        },
+        "L-305": {
+          "done": "Đã thêm 4 worker orders-consumer để xử lý tồn đọng",
+          "why": "Việc đó không giúp ích, nên tôi đã giảm lại về 4 và gọi trực 3 phút sau.",
+          "from": "4 worker",
+          "to": "8 worker",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "Đã được bạn đồng ý tự thêm worker hàng đợi",
+          "why": "Bạn đã phê duyệt 7 lần trong các đợt cao điểm lưu lượng, và lần nào tồn đọng cũng được xử lý.",
+          "from": "hỏi trước",
+          "to": "tự làm",
+          "on": "thêm worker hàng đợi"
+        },
+        "L-312": {
+          "done": "Đã bắt đầu theo dõi 18 dịch vụ tôi tìm thấy khi bạn kết nối",
+          "why": "Đang tìm hiểu mức bình thường của từng dịch vụ. Cảnh báo của chúng sẽ bắt đầu khi xong.",
+          "from": "chưa theo dõi",
+          "to": "đã theo dõi",
+          "on": "18 dịch vụ"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "Lịch sử",
+      "seeChange": "Xem thay đổi",
+      "filters": {
+        "all": "Tất cả",
+        "problems": "Vấn đề",
+        "changes": "Thay đổi",
+        "fixes": "Sửa lỗi",
+        "decisions": "Quyết định của bạn"
+      },
+      "empty": "Chưa có gì ở đây.",
+      "entries": {
+        "checkoutNowPaged": "Tôi đã gọi trực về việc checkout thanh toán thất bại.",
+        "searchPaged": "Tôi đã gọi trực về việc tìm kiếm chậm.",
+        "searchAsked": "Tôi đã hỏi liệu tôi có thể khôi phục cài đặt cache của search-2 không.",
+        "euStopped": "Không có gì đến từ cụm {cluster} kể từ thời điểm này. Tôi đã báo bạn ở đây và trên Slack.",
+        "fridaySummary": "Tôi đã gửi bản tóm tắt thứ Sáu với {count} vấn đề nhỏ. | Tôi đã gửi bản tóm tắt thứ Sáu với {count} vấn đề nhỏ.",
+        "emailHeld": "Tôi đã giữ lại một vấn đề nhỏ về email đơn hàng cho bản tóm tắt thứ Sáu.",
+        "poolFixed": "Tôi đã đóng các kết nối cơ sở dữ liệu bị rò rỉ của checkout. Thanh toán đã hồi phục 2 phút sau đó.",
+        "poolApproved": "Bạn đã phê duyệt việc đóng các kết nối cơ sở dữ liệu bị rò rỉ của checkout.",
+        "billingWatch": "Tôi đã bắt đầu theo dõi billing-api, billing-worker và invoice-service.",
+        "checkoutPaged": "Tôi đã gọi trực về việc checkout lỗi thanh toán.",
+        "recsHeld": "Tôi đã giữ lại một vấn đề nhỏ với recommendations cho bản tổng kết thứ Sáu.",
+        "diskApproved": "Bạn đã phê duyệt việc nâng cảnh báo dung lượng đĩa trên ingest-1 lên {to}%.",
+        "latencyGrouped": "Tôi đã gộp ba cảnh báo chậm của checkout thành một, để một lần chậm chỉ gọi trực một lần.",
+        "queueFixed": "Tôi đã thêm worker cho hàng đợi orders, nhưng hàng đợi vẫn tiếp tục tăng, nên tôi đã hoàn nguyên và gọi trực.",
+        "loginPaged": "Tôi đã gọi trực về việc đăng nhập chậm.",
+        "queuePermission": "Bạn đã cho phép tôi tự thêm worker cho hàng đợi, tối đa 8.",
+        "gatewayPaged": "Tôi đã gọi trực về việc API từ chối các yêu cầu.",
+        "found18": "Tôi đã tìm thấy {count} dịch vụ và bắt đầu tìm hiểu trạng thái bình thường của chúng.",
+        "connected": "Bạn đã kết nối tôi với dữ liệu của bạn.",
+        "thresholdApproved": "Bạn đã phê duyệt việc cho cảnh báo kết nối payments-api đếm tất cả máy chủ so với giới hạn 200 của cơ sở dữ liệu.",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "Bạn đã phê duyệt việc khôi phục cài đặt của search-2.",
+              "no": "Bạn nói rằng bạn sẽ tự xử lý search-2.",
+              "undoYes": "Bạn đã hoàn tác việc khôi phục cài đặt của search-2. Tôi đã áp dụng lại 60%, nên search-2 sẽ lại bắt đầu hết bộ nhớ; tôi đã báo cho trực.",
+              "cancel": "Bạn đã hủy việc khôi phục cài đặt của search-2 trước khi tôi áp dụng. search-2 vẫn đang hết bộ nhớ; tôi đã báo cho trực.",
+              "undoNo": "Bạn đã rút lại việc nói rằng bạn sẽ tự xử lý search-2."
+            },
+            "checkoutNow": {
+              "yes": "Bạn đã phê duyệt việc dừng triển khai checkout 2.4.0.",
+              "no": "Bạn nói rằng bạn sẽ tự xử lý việc triển khai checkout.",
+              "undoYes": "Bạn đã hoàn tác việc dừng triển khai 2.4.0. Lưu lượng lại được chuyển đến 2.4.0, nên thanh toán có thể lại bắt đầu lỗi; tôi đã báo cho trực và đang theo dõi.",
+              "cancel": "Bạn đã hủy việc dừng triển khai 2.4.0 trước khi tôi thực hiện. Thanh toán vẫn đang lỗi; tôi đã báo cho trực.",
+              "undoNo": "Bạn đã rút lại việc nói rằng bạn sẽ tự xử lý việc triển khai checkout."
+            }
+          },
+          "retune": {
+            "yes": "Bạn đã phê duyệt việc nâng cảnh báo dung lượng đĩa trên ingest-3 lên 90%.",
+            "no": "Bạn nói chưa phải lúc để nâng cảnh báo dung lượng đĩa trên ingest-3.",
+            "undoYes": "Bạn đã hoàn tác việc nâng cảnh báo dung lượng đĩa trên ingest-3. Nó trở về 80%, nên sẽ lại bắt đầu kêu vào những đêm bình thường.",
+            "undoNo": "Bạn đã rút lại ý 'chưa phải lúc' về cảnh báo dung lượng đĩa trên ingest-3."
+          },
+          "fromNowOn": {
+            "yes": "Bạn đã phê duyệt việc cho phép tôi tự dừng các đợt triển khai lỗi.",
+            "no": "Bạn nói chưa phải lúc để cho phép tôi tự dừng các đợt triển khai lỗi.",
+            "undoYes": "Bạn đã rút lại việc cho phép tôi tự dừng các đợt triển khai lỗi.",
+            "undoNo": "Bạn đã rút lại ý 'chưa phải lúc' về việc cho phép tôi tự dừng các đợt triển khai lỗi."
+          }
+        },
+        "fixedNow": {
+          "search": "Tôi đã khôi phục cài đặt của search-2. Tìm kiếm đã trở lại bình thường.",
+          "checkoutNow": "Tôi đã chuyển lưu lượng trở lại phiên bản cũ, và các lỗi đã dừng. Lý do 2.4.0 lỗi vẫn còn để nhóm của bạn tìm ra; tôi đã giữ nó được triển khai cho họ."
+        },
+        "checkoutNowAsked": "Tôi đã hỏi liệu tôi có thể dừng triển khai checkout 2.4.0 không.",
+        "newWatch": "Sáng nay tôi đã tìm thấy {count} dịch vụ mới (returns, exchanges và gift-cards) và bắt đầu theo dõi chúng ngay.",
+        "foundWatch": "Sáng nay tôi đã tìm thấy {count} dịch vụ mới và bắt đầu theo dõi chúng ngay."
+      }
+    },
+    "settingsDrawer": {
+      "title": "Cài đặt",
+      "reach": "Tôi nên liên hệ với bạn ở đâu?",
+      "destSlack": "Slack: {channel}",
+      "destEmail": "Email: {address}",
+      "autonomy": "Tôi nên tự làm bao nhiêu việc?",
+      "tell": "Báo cho tôi",
+      "ask": "Hỏi tôi trước",
+      "fix": "Sửa rồi báo cho tôi",
+      "tellHint": "Tôi sẽ cho bạn biết tôi sẽ làm gì, và để việc thực hiện cho bạn.",
+      "askHint": "Tôi sẽ hỏi trước mỗi lần sửa, và thực hiện khi bạn đồng ý.",
+      "fixHint": "Với những loại sửa đổi đã chứng minh hiệu quả, tôi sẽ tiến hành trong giới hạn bạn đặt ra, và báo cho bạn ngay sau đó.",
+      "advanced": "Nâng cao",
+      "perKind": "Từng loại sửa đổi",
+      "digestDay": "Ngày tổng kết",
+      "excluded": "Dịch vụ tôi nên bỏ qua",
+      "excludedNone": "Không có",
+      "kinds": {
+        "pool": "Đóng các kết nối cơ sở dữ liệu bị rò rỉ",
+        "queueWorker": "Thêm worker hàng đợi khi có tồn đọng",
+        "retune": "Nâng ngưỡng của một cảnh báo nhiễu",
+        "rollback": "Hoàn tác một triển khai",
+        "record": "Đã làm {done} lần, thành công {worked} lần.",
+        "keptRecord": "Đã làm {done} lần, giữ lại {worked} lần.",
+        "noRecord": "Chưa từng làm, nên tôi sẽ không tự làm cho đến khi nó có thành tích.",
+        "revertConfig": "Hoàn tác thay đổi cài đặt gần đây",
+        "abortRollout": "Dừng một đợt triển khai lỗi",
+        "recurringRecord": "Đã làm {done} lần, tất cả đều cho cùng một rò rỉ ({bug}). Tôi sẽ tiếp tục hỏi cho đến khi nó được sửa."
+      },
+      "weekdays": {
+        "monday": "Thứ Hai",
+        "tuesday": "Thứ Ba",
+        "wednesday": "Thứ Tư",
+        "thursday": "Thứ Năm",
+        "friday": "Thứ Sáu"
+      },
+      "saved": "Đã lưu",
+      "noDestination": "Tôi sẽ không thể liên lạc với ai cả.",
+      "routing": "Khi tôi thông báo cho bạn",
+      "routingNote": "Tôi thông báo cho bất cứ điều gì gây hại cho khách hàng. Những việc nhỏ hơn sẽ nhận được tin nhắn không đánh thức ai, và những việc nhỏ nhất sẽ vào bản tóm tắt thứ Sáu."
+    },
+    "howItWorks": {
+      "title": "Cách hoạt động",
+      "intro": "Đây là những gì tôi làm, trong năm bước.",
+      "gotIt": "Đã hiểu",
+      "s1Title": "Tôi tìm dịch vụ của bạn",
+      "s1": "Tôi xem xét dữ liệu bạn đã gửi và tìm thấy mọi dịch vụ trong đó. Khi một dịch vụ mới xuất hiện, tôi bắt đầu theo dõi nó ngay trong ngày; bạn không cần phải yêu cầu.",
+      "s2Title": "Tôi theo dõi chúng",
+      "s2": "Tôi học cách nhận biết trạng thái bình thường của từng dịch vụ: lỗi, độ chậm và lưu lượng truy cập theo từng giờ trong ngày, với các mẫu hàng tuần ngày càng rõ nét hơn theo thời gian. Cho đến khi tôi biết, tôi sử dụng các kiểm tra an toàn cơ bản.",
+      "s3Title": "Tôi giữ im lặng trừ khi đó là vấn đề thực sự",
+      "s3": "Hầu hết những khoảnh khắc kỳ lạ không phải là vấn đề. Tôi thông báo cho đội của bạn khi có điều gì đó gây hại cho khách hàng, gửi tin nhắn không đánh thức ai cho các vấn đề nhỏ hơn, và giữ những việc nhỏ nhặt cho bản tóm tắt thứ Sáu.",
+      "s4Title": "Tôi giải thích mọi thông báo",
+      "s4": "Mọi tin nhắn đều nói rõ cái gì đã hỏng, từ khi nào, và đánh giá tốt nhất của tôi về lý do, cùng với độ chắc chắn của tôi.",
+      "s5Title": "Tôi sửa những gì bạn cho phép",
+      "s5": "Tôi chỉ sửa những thứ bạn nói tôi có thể. Một sửa chữa hiệu quả sẽ tạo được chút tin tưởng, còn một sửa chữa không giúp ích gì sẽ bị tính là điểm trừ. Nếu tôi cứ cần cùng một sửa chữa, đó là lỗi tôi báo cáo cho đội của bạn, không phải thói quen tôi tự động hóa."
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "Đã kiểm tra 1 phút trước | Đã kiểm tra {count} phút trước"
+    },
+    "outcome": {
+      "active": "Đang diễn ra",
+      "fixed": "Đã sửa bởi AutoObserve",
+      "resolved": "Đã giải quyết trong {minutes} phút",
+      "held": "Trong bản tóm tắt thứ Sáu",
+      "fixing": "Đang sửa ngay bây giờ",
+      "contained": "Đã kiểm soát bởi AutoObserve",
+      "predicted": "Đã dự đoán"
+    },
+    "view": {
+      "standard": "Tiêu chuẩn",
+      "nerd": "Nerd",
+      "standardTooltip": "Chế độ xem Tiêu chuẩn cung cấp thông tin ngắn gọn: những gì cần bạn và những gì đã xảy ra trong 7 ngày qua",
+      "nerdTooltip": "Chế độ xem Nerd hiển thị đầy đủ mọi detector, vòng lặp và cài đặt",
+      "label": "Chế độ xem"
+    },
+    "rail": {
+      "more": "Xem thêm bên dưới"
+    },
+    "suggestions": {
+      "title": "Gợi ý",
+      "subtitle": "Khi bạn có chút thời gian — những mục này giúp giảm nhiễu hoặc tiết kiệm thời gian cho bạn."
+    }
   }
 }

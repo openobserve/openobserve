@@ -1399,6 +1399,7 @@
     "freeTextBuildNotice": "此过滤器包含文本搜索；请在 SQL 中编辑。"
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "升级到 PRO 计划",
     "home": "主页",
     "about": "关于",
@@ -21920,5 +21921,1079 @@
     "modeExhausted": "已用尽",
     "modeFree": "免费",
     "modeUnknown": "未知"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "发送您的数据。OpenObserve 会发现问题并告知您，同时给出对原因的最佳判断。当一切平静时，它会展示已检查的内容以及无法看到的内容。",
+    "phase2": "阶段 2",
+    "tabs": {
+      "issues": "问题",
+      "coverage": "覆盖范围",
+      "activity": "活动",
+      "policy": "策略"
+    },
+    "loops": {
+      "coverage": "覆盖范围",
+      "calibration": "校准",
+      "investigation": "调查",
+      "action": "操作"
+    },
+    "signals": {
+      "requests": "请求",
+      "errors": "错误",
+      "latency": "延迟",
+      "saturation": "饱和度",
+      "logPatterns": "日志模式",
+      "dependencies": "依赖项"
+    },
+    "ledgerStatus": {
+      "autoApplied": "已自动应用",
+      "awaiting": "等待批准",
+      "approved": "已批准",
+      "rejected": "已拒绝",
+      "rolledBack": "已回滚",
+      "kept": "已保留 — 检查通过"
+    },
+    "issues": {
+      "subtitle": "由 SRE 代理分组并调查的事件。每个问题只发送一条通知；原因会一并附上，若分诊超时或失败，则会在同一会话中跟进。",
+      "open": "未解决",
+      "recent": "已解决",
+      "all": "全部",
+      "heldForDigest": "保留至周五的汇总",
+      "colId": "事件",
+      "colTitle": "问题",
+      "colSeverity": "严重程度",
+      "colServices": "受影响的服务",
+      "colStarted": "开始时间",
+      "colStatus": "状态",
+      "colCause": "原因",
+      "emptyTitle": "这里空空如也",
+      "emptyDescription": "没有符合此过滤器的问题。",
+      "subsetNote": "已显示 {shown} 条。此演示展示了本周 {total} 个事件中的一部分。",
+      "searchLabel": "搜索问题",
+      "searchPlaceholder": "搜索问题、服务、原因或 INC-…",
+      "noMatch": "没有与“{query}”匹配的问题",
+      "clearSearch": "清除搜索",
+      "matchCount": "没有匹配的问题 | 1 个问题匹配 | {count} 个问题匹配",
+      "colSignal": "信号",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → 现在",
+      "minutes": "{count} 分钟",
+      "grouped": "{count} 条告警 → 1 个事件 | {count} 条告警 → 1 个事件",
+      "confidence": "{level} 置信度",
+      "proposed": "建议",
+      "reversible": "可撤销",
+      "proposalFor": "针对 {title} 的建议修复"
+    },
+    "drawer": {
+      "rca": "根本原因",
+      "rcaSummary": "摘要",
+      "likelyCause": "可能原因",
+      "confidence": "置信度",
+      "confidenceValue": "置信度：{value}（暂无校准评分）",
+      "nextStep": "建议的下一步",
+      "evidence": "证据",
+      "blastRadius": "影响范围",
+      "upstream": "上游调用方",
+      "affected": "受影响",
+      "downstream": "下游依赖",
+      "none": "无",
+      "timeline": "时间线",
+      "notification": "通知已发送",
+      "notSent": "未呼叫：该低严重度问题被暂缓，留待周五汇总。已记录到产品内收件箱。",
+      "sender": "AutoObserve",
+      "threadReply": "在会话中回复",
+      "p1Note": "P1 会立即呼叫，早于调查结果生成。原因会在同一会话中跟进。",
+      "gateNote": "P2 和 P3 通知最多等待 2 分钟以获取调查结果，因此首条消息通常已包含原因。如果分诊超时或失败，消息会说明调查仍在进行或已失败，原因会在同一会话中跟进。P4 问题不会通知任何人，只计入周五汇总。",
+      "caughtEarlier": "什么本可以更早发现此问题",
+      "analyzedAt": "调查结果生成于 {time}。",
+      "triggersSample": "显示 {shown} / {total} 次触发",
+      "waitingForOk": "等待您确认",
+      "proposedFix": "建议修复",
+      "unfoldTab": "如何演变",
+      "seeEvidence": "查看证据（{count}）→"
+    },
+    "unfold": {
+      "hint": "从左到右阅读：发生了什么变更、触发了哪些信号，以及最终到达您团队的内容。选择卡片可查看其触发记录。",
+      "legend": "卡片类型",
+      "team": "您的团队",
+      "kind": {
+        "metric": "指标",
+        "log": "日志",
+        "trace": "追踪",
+        "change": "变更"
+      },
+      "likelyCause": "可能原因",
+      "linesUpWith": "与…吻合",
+      "times": "×{count}",
+      "sameMinute": "同一分钟",
+      "plusMinutes": "+{count} 分钟",
+      "plusHours": "+{hours} 小时 {minutes} 分钟",
+      "firstFired": "首次触发",
+      "lastFired": "最近触发",
+      "firings": "触发次数",
+      "peak": "峰值",
+      "normal": "对比",
+      "detector": "检测器",
+      "firedAt": "触发时间",
+      "when": "时间",
+      "chartNote": "问题的主要图表，与 Evidence 中一致",
+      "outcome": {
+        "paged": "已呼叫值班",
+        "asked": "请求确认",
+        "notified": "已发送消息，未呼叫",
+        "held": "暂缓，留到周五汇总",
+        "fixFailed": "修复未奏效",
+        "fixed": "已修复",
+        "resolved": "已解决",
+        "open": "仍未解决"
+      }
+    },
+    "coverage": {
+      "showing": "显示 {shown}/{total} 个服务",
+      "watched": "已监控",
+      "learning": "学习中",
+      "gap": "缺口",
+      "na": "不适用",
+      "anomaly": "异常",
+      "threshold": "阈值",
+      "service": "服务",
+      "lastScanned": "上次扫描",
+      "detector": "检测器",
+      "methodAnomaly": "异常检测器，学习基线",
+      "methodThreshold": "来自库的静态阈值",
+      "libraryEntry": "库条目",
+      "predicate": "适用性",
+      "predicateMatched": "{predicate} — 在数据流 {stream} 中匹配",
+      "predicateUnmatched": "{predicate} — 未匹配",
+      "reason": "原因",
+      "history": "{days}/{total} 天历史",
+      "notScanned": "首次扫描进行中 — 未知，扫描完成前尚未覆盖",
+      "guardrails": "学习期间启用护栏：错误率上限 · 新鲜度检查（数据流停止时触发）",
+      "alsoWatchedBy": "同时由以下监控",
+      "searchLabel": "搜索服务",
+      "searchPlaceholder": "搜索服务或数据流",
+      "matchCount": "没有匹配的服务 | 1 个服务匹配 | {count} 个服务匹配",
+      "noMatch": "没有服务或数据流匹配“{query}”",
+      "clearSearch": "清除搜索",
+      "filterLabel": "按覆盖情况筛选服务",
+      "all": "全部",
+      "gaps": "缺口",
+      "cantWatch": "无法监控",
+      "detectorCount": "1 个检测器 | {count} 个检测器",
+      "stream": "数据流",
+      "coverage": "覆盖率",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "已监控 {watched}/{total} 个适用信号",
+      "legendLabel": "图例",
+      "gapChip": "GAP",
+      "daysShort": "{days}/{total}天",
+      "tipAnomaly": "{signal}：异常检测器，学习基线",
+      "tipThreshold": "{signal}：来自库的静态阈值",
+      "tipLearning": "{signal}：学习中，{days}/{total} 天历史",
+      "tipGap": "{signal}：存在缺口，尚无法监控",
+      "tipNa": "{signal}：不适用",
+      "config": "检测器配置",
+      "lastFired": "最近触发",
+      "never": "从未",
+      "hoursAgo": "1 小时前 | {count} 小时前",
+      "daysAgo": "1 天前 | {count} 天前",
+      "fixNoLink": "添加 service.name 标签",
+      "fixStopped": "检查采集器",
+      "fixQueued": "仅模拟：“{action}”（针对 {service}）未发送到任何位置",
+      "viewLabel": "覆盖率视图",
+      "viewMap": "地图",
+      "viewTable": "表格",
+      "fillBy": "填充依据",
+      "fillState": "覆盖率状态",
+      "fillLearning": "学习进度",
+      "fillDetectors": "检测器数量",
+      "fillScanned": "距上次扫描时间",
+      "summaryWatched": "{total} 个中有 {watched} 个已完全监控 · {pct}%",
+      "addedThisWeek": "本周新增 1 个服务 | 本周新增 {count} 个服务",
+      "splitLabel": "{watched} 个已完全监控，{learning} 个学习中，{gaps} 个尚无法监控",
+      "stateWatched": "已完全监控",
+      "stateLearning": "学习中 · {days}/{total} 天",
+      "stateGap": "尚无法监控",
+      "hexName": "{service}，{state}，{stream}，{detectors}",
+      "legendOf": "{fill} 的图例，选择以高亮",
+      "mapLabel": "覆盖率地图，1 个服务按 {fill} 填充 | 覆盖率地图，{count} 个服务按 {fill} 填充",
+      "bucketLearned": "已学习",
+      "bucketDays67": "6–7 天",
+      "bucketDays35": "3–5 天",
+      "bucketDays02": "0–2 天",
+      "bucketNoData": "无数据",
+      "bucketSix": "6 个检测器",
+      "bucketFive": "5 个检测器",
+      "bucketFewer": "1–4 个检测器",
+      "bucketNone": "无",
+      "bucketFresh": "5 分钟内",
+      "bucketRecent": "5–15 分钟",
+      "bucketHour": "15–60 分钟",
+      "bucketStale": "超过 1 小时",
+      "bucketNotScanned": "未扫描",
+      "signals": "信号",
+      "details": "详情",
+      "detailsFor": "显示 {metric} 的详情",
+      "readyCaption": "正常范围将于 {day} 就绪 · {days}/{total} 天",
+      "chartLearning": "{metric}，当前 {value}，学习中，尚无正常范围",
+      "chartOverThreshold": "{metric}，当前 {value}，超过其 {threshold} 阈值",
+      "chartUnderThreshold": "{metric}，当前 {value}，低于其 {threshold} 阈值",
+      "chartAbove": "{metric}，当前 {value}，高于正常范围",
+      "chartBelow": "{metric}，当前 {value}，低于正常范围",
+      "chartWithin": "{metric}，当前 {value}，处于正常范围",
+      "tipNormal": "正常 {low} – {high}",
+      "openTraces": "追踪",
+      "openCatalog": "服务目录",
+      "rangeLabel": "时间范围",
+      "logPatternsValue": "{known} 个已知 · {fresh} 个今日新增",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "未监控",
+      "signalsWatched": "已监控信号",
+      "chipAria": "{signal}：{state}",
+      "deltaUp": "较区间开始上升 {change}",
+      "deltaDown": "较区间开始下降 {change}",
+      "deltaFlat": "自区间开始以来无变化",
+      "badgeLearning": "学习中 {days}/{total} 天",
+      "badgeAnomaly": "异常 · 已学习",
+      "badgeThreshold": "阈值 > {threshold}",
+      "now": "现在",
+      "bandLearning": "正在学习基线 · {total} 天中的第 {days} 天 · 正常范围将于 {day} 就绪",
+      "metric": {
+        "requests": "请求",
+        "errors": "错误",
+        "latencyP95": "延迟 p95",
+        "cpu": "CPU",
+        "pool": "使用中的池",
+        "memory": "内存",
+        "queries": "查询",
+        "queryLatency": "查询延迟 p95",
+        "connections": "使用中的连接",
+        "ops": "操作",
+        "rejections": "被拒绝的连接",
+        "latency": "延迟",
+        "messages": "消息",
+        "failed": "失败（死信）",
+        "lag": "消费者滞后",
+        "depth": "队列深度"
+      }
+    },
+    "activity": {
+      "allLoops": "所有循环",
+      "allStatuses": "所有状态",
+      "ledgerHint": "AutoObserve 提出的或执行的每一项变更都会记录在此。",
+      "userBuilt": "用户创建的告警",
+      "confidence": "置信度：{value}",
+      "evidence": "证据：",
+      "before": "变更前",
+      "after": "变更后",
+      "neverAutoRetire": "停用告警绝不会自动执行。",
+      "neverSilent": "用户创建的告警绝不会被静默修改。",
+      "undo": "撤销",
+      "approve": "批准",
+      "edit": "编辑",
+      "reject": "拒绝",
+      "saveApprove": "保存并批准",
+      "undoneNote": "已由您撤销 — 已恢复之前的状态",
+      "undoneToast": "已撤销。已在演示账本中标记为回滚。",
+      "approvedToast": "已批准。已在演示账本中标记为批准。",
+      "rejectedNote": "由您拒绝",
+      "rejectedToast": "已拒绝。已记录到此操作类别。",
+      "emptyTitle": "无条目",
+      "emptyDescription": "账本中没有符合这些过滤器的内容。",
+      "reviewWindow": "审核中，为期 {window}——检查通过则自动保留，失败则回滚。先前配置会继续静默评估，因此此更改本会隐藏的内容仍会显示。撤销可立即恢复先前状态。",
+      "approvedNote": "您已于 {time} 批准。",
+      "applyingNote": "您已于 {time} 批准；正在应用。",
+      "appliedNote": "您已于 {time} 批准并已应用。",
+      "declinedNote": "由您拒绝。",
+      "needsApproval": "需要您的批准",
+      "awaiting": "等待中",
+      "auto": "自动",
+      "outcomeFilter": "按结果过滤",
+      "loopFilter": "按循环过滤",
+      "columns": {
+        "time": "时间",
+        "loop": "循环",
+        "action": "操作",
+        "target": "目标",
+        "change": "变更",
+        "confidence": "置信度",
+        "decision": "决策",
+        "outcome": "结果",
+        "actions": "操作"
+      },
+      "showDetails": "显示 {target} 上 {action} 的详情",
+      "hideDetails": "隐藏 {target} 上 {action} 的详情",
+      "approveFor": "批准 {target} 上的 {action}",
+      "rejectFor": "拒绝 {target} 上的 {action}",
+      "editFor": "编辑 {target} 上的 {action}",
+      "undoFor": "撤销 {target} 上的 {action}",
+      "openIncident": "打开事件 {id}",
+      "confidenceHint": "{value} — 尚无校准评分",
+      "diff": "建议的变更，删除和新增的行",
+      "daysLeft": "{count} 天剩余 | {count} 天剩余",
+      "reviewProgress": "审核窗口已结束",
+      "entryId": "条目",
+      "logged": "已记录"
+    },
+    "policy": {
+      "gateHint": "在对现有告警的更改中，只有去重可单独应用，并带有先前状态快照和审核窗口：检查通过则保留，失败则回滚。其他所有更改都需一键批准。",
+      "off": "关闭",
+      "suggest": "建议",
+      "auto": "自动",
+      "phase2Title": "操作 — 修复",
+      "phase2Hint": "生产环境修复。每个类别根据其已测量的历史记录获得相应等级，绝不会超出该等级行事。",
+      "investigation": "调查",
+      "outcomesTitle": "结果",
+      "outcomesBody": "AutoObserve 会衡量每个操作的效果：错误率是否恢复、呼叫告警是否停止、是否被撤销。表现持续良好的类别会一次一个地获得更多自主权；一次失误会对其不利，而反复需要人工修复的问题会被报告为缺陷，而不是自动化处理。",
+      "outcomesExample": "ScaleQueueWorkers 在 7 次已批准的扩容成功后转为自动。其唯一一次失误发生在 10 月 2 日，因此增加了一项预检查，而第二次失误会将其退回建议。AbortRollout 等待您的确认；RollbackDeploy 在有历史记录之前保持关闭。",
+      "triage": {
+        "parallel": "并行",
+        "gate": "门控",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "立即呼叫值班并同步调查；原因会在同一线程中跟进。P1 不允许使用门控。",
+        "gateDesc": "将告警暂缓到调查完成，最长 2 分钟。失败时放行：如果分诊超时或失败，仍会发出告警，并说明调查仍在进行或已失败，原因会在同一线程中跟进。"
+      },
+      "classes": {
+        "EnableDeduplication": "为在几分钟内重复出现的告警开启去重。",
+        "CreateDetector": "针对服务的请求、错误或延迟创建异常检测器。",
+        "RaiseThreshold": "提高在健康日也会触发的阈值。",
+        "LengthenEvaluationWindow": "延长反复抖动告警的评估窗口。",
+        "FixAlertQuery": "修正衡量对象错误或永远无法匹配的告警查询。",
+        "AttachDestination": "为触发后无处送达的检测器附加目标。",
+        "AddLibraryAlert": "在谓词匹配时，从库中添加定时告警。",
+        "MoveToIncidentDelivery": "通过事件投递用户构建的告警，而不是走其自身的路由。",
+        "ReviewForDeletion": "建议停用无人处理的告警。",
+        "RollbackDeploy": "回滚导致问题的部署。",
+        "ScaleService": "对已饱和的服务进行横向扩容。",
+        "RestartPod": "重启已停止提供服务但副本仍健康的 Pod；若再次发生，则改为创建缺陷。",
+        "ToggleFeatureFlag": "关闭问题背后的功能开关。",
+        "RunRunbookStep": "运行服务运行手册中的步骤。",
+        "LowerThreshold": "降低触发太晚、未能在事件前预警的阈值。",
+        "RevertConfigChange": "当未应用该变更的副本健康时，还原最近导致问题发生的设置变更。",
+        "EvictLeakedConnections": "关闭服务借出后从未归还的连接（由泄漏检测发现），不处理正在进行的查询。每个连接都会关联到该泄漏对应的缺陷。",
+        "AbortRollout": "当只有新版本的 Pod 在发布中途失败时，将流量切回上一版本。可一键恢复。",
+        "ScaleQueueWorkers": "为积压的队列增加工作进程，直至上限；如果消费速率没有改善，则自动缩减。"
+      },
+      "triageHint": "按严重级别进行 L0 分诊。第 1 阶段固定。",
+      "channels": "渠道",
+      "channelInbox": "产品内收件箱",
+      "channelEmailAdmins": "向组织管理员发送电子邮件",
+      "channelDefault": "每个组织的默认渠道。始终开启。",
+      "alwaysOn": "始终开启",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "已连接。可选；没有它，收件箱和电子邮件也能正常工作。",
+      "connected": "已连接",
+      "defaultsNote": "第 1 阶段提供固定的产品默认值。按组织覆盖的设置后续提供。",
+      "groupCoverage": "覆盖范围 — 自动创建检测器",
+      "groupCoverageHint": "每个新服务一经出现，就会获得异常检测器和匹配的库告警，并在学习期间进行基本安全检查。每次创建都会被记录、可撤销，并经过审核窗口。",
+      "groupCalibration": "校准 — 对现有告警的变更",
+      "channelEmail": "电子邮件 {address}",
+      "paging": "呼叫",
+      "pagingHint": "严重级别决定问题以何种方式通知人员。",
+      "routing": {
+        "p1p2": "P1 和 P2",
+        "p1p2Desc": "影响客户。全天候呼叫值班人员。",
+        "page": "呼叫",
+        "p3": "P3",
+        "p3Desc": "准备就绪后立即发送 Slack 消息。绝不呼叫任何人。",
+        "message": "消息",
+        "p4": "P4",
+        "p4Desc": "会纳入周五摘要。",
+        "summary": "周五摘要"
+      },
+      "nav": {
+        "coverage": "覆盖范围",
+        "alerts": "告警变更",
+        "fixes": "修复",
+        "investigation": "调查与寻呼",
+        "channels": "渠道"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} 个已连接"
+      }
+    },
+    "notInDemo": "此演示中不可用",
+    "confidence": {
+      "high": "高",
+      "medium": "中",
+      "low": "低",
+      "uncalibrated": "尚无校准评分"
+    },
+    "analysis": {
+      "verdict": "结论",
+      "unconfirmed": "尚未确认",
+      "lasted": "持续 {count} 分钟",
+      "soFar": "目前 {count} 分钟",
+      "checked": "我检查的内容",
+      "verdicts": {
+        "confirmed": "已确认",
+        "ruled_out": "已排除",
+        "open": "仍未解决"
+      },
+      "comparison": "健康与受影响",
+      "kinds": {
+        "affected": "受影响",
+        "healthy": "健康",
+        "limit": "限制"
+      },
+      "trail": "证据链",
+      "seeInUnfold": "在“事件经过”中查看",
+      "nextStep": "下一步",
+      "fullReport": "完整报表",
+      "fullReportHint": "将上述全部内容整理为一份文档，可随时复制或下载"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "演示",
+    "scenarioLabel": "演示场景",
+    "scenarios": {
+      "demo": "演示周",
+      "allClear": "一切正常",
+      "incident": "活跃事件",
+      "cantSee": "无法查看",
+      "noBaseline": "无基线"
+    },
+    "nav": {
+      "history": "历史",
+      "settings": "设置",
+      "howItWorks": "工作原理",
+      "searchLabel": "搜索问题",
+      "searchPlaceholder": "搜索问题"
+    },
+    "recent": {
+      "ranges": {
+        "day": "最近 24 小时",
+        "week": "最近 7 天",
+        "month": "最近 30 天"
+      },
+      "within": {
+        "day": "在过去 24 小时内",
+        "week": "在过去 7 天内",
+        "month": "在过去 30 天内"
+      },
+      "groups": {
+        "thisWeek": "本周",
+        "lastWeek": "上周",
+        "weeksAgo": "{count} 周前"
+      },
+      "all": "全部",
+      "none": "没有{priority}问题，{within}。",
+      "allIssues": "所有问题",
+      "priorityLabel": "优先级",
+      "showing": "{count} 个问题已显示 | {count} 个问题已显示"
+    },
+    "noProblems": "{within}没有问题。我全天候检查了 {count} 个服务。 | {within}没有问题。我全天候检查了 {count} 个服务。",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "再显示 {count} 个",
+    "showFewer": "显示更少",
+    "days": {
+      "today": "今天",
+      "monday": "星期一",
+      "tuesday": "星期二",
+      "wednesday": "星期三",
+      "thursday": "星期四",
+      "friday": "星期五",
+      "jul18": "7月18日",
+      "jul30": "7月30日",
+      "aug13": "8月13日",
+      "aug26": "8月26日",
+      "sep4": "9月4日",
+      "sep12": "9月12日",
+      "sep24": "9月24日",
+      "sep30": "9月30日",
+      "oct1": "10月1日",
+      "oct2": "10月2日",
+      "sep23": "9月23日"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db 将在大约 3 天后磁盘空间耗尽",
+        "summary": "自周四的 orders 版本启用审计日志以来，其磁盘每天增加约 18 GB，因此它将在周三上午左右填满。当它填满时，checkout、orders 和 refunds 将开始失败。目前还没有出问题，所以我向你的团队发送了提醒，而不是呼叫。",
+        "notify1": "orders-db 将在大约 3 天后磁盘空间耗尽，大约在周三 11:00。",
+        "notify2": "原因：自周四 orders 3.8.0 发布以来，审计日志每天写入约 18 GB。在此之前，磁盘每天增长约 6 GB。",
+        "notify3": "在周三之前降低审计日志级别或增加磁盘空间。当它填满时，checkout、orders 和 refunds 将失败。目前还没有出问题，所以这是提醒，不是呼叫。",
+        "chartCaption": "磁盘 · 已满 ~周三 11:00",
+        "chartLabel": "磁盘使用量在 14 天内从 334 GB 增长到 445 GB（共 500 GB），自周四起增长加快，预计将在周三 11:00 左右满。"
+      },
+      "search": {
+        "title": "搜索缓慢，search-2 不断崩溃",
+        "titleFixed": "搜索曾缓慢，而 search-2 不断崩溃",
+        "summary": "自 10:27 起，大约五分之一次的搜索耗时超过 3 秒。search-2 上在 10:16 更改了一项设置，导致其内存耗尽。我已呼叫值班人员，问题仍在发生。",
+        "notify1": "搜索缓慢：自 10:27 起，大约五分之一次的搜索耗时超过 3 秒。",
+        "notify2": "原因：search-2 上在 10:16 更改的一项设置使其内存填满。自 10:20 起它已崩溃约 10 次。其他 4 个节点没有此更改，运行正常。",
+        "notify3": "恢复旧设置应该可以修复它，我可以撤销。回复 \"revert\"，我就执行。做出更改的人应该检查原因。",
+        "summaryFixed": "问题始于 10:27，因为 search-2 上更改的一项设置填满了其内存。你批准恢复旧设置，所以我执行了，搜索已恢复正常。",
+        "summaryFixing": "问题始于 10:27，因为 search-2 上更改的一项设置填满了其内存。你批准恢复旧设置，所以我正在执行。",
+        "chartCaption": "p95 延迟 · 峰值 3.4 秒",
+        "chartLabel": "p95 延迟在 10:27 从 0.38 秒升至 3.4 秒，且仍然很高",
+        "chartLabelFixed": "p95 延迟在 10:27 从 0.38 秒升至 3.4 秒，在设置恢复后回落至正常"
+      },
+      "checkout": {
+        "title": "部署后每 12 笔支付中有 1 笔失败",
+        "summary": "payments-api 2.3.1 向支付数据库请求了超出其允许的连接数。在故障开始 18 分钟后，回滚修复了问题。",
+        "notify1": "自 14:02 起，结账大约每 12 笔支付中有 1 笔失败。",
+        "notify2": "可能的原因：payments-api 2.3.1 在 14:01 发布，将其每台服务器的连接池从 20 提高到 50。6 台服务器 × 50 超过了支付数据库允许的 200。",
+        "notify3": "回滚到 2.3.0 是最快的修复方法。",
+        "chartCaption": "支付失败 · 峰值十二分之一",
+        "chartLabel": "支付失败率在 14:02 从 0.1% 跃升至 1/12，回滚后 18 分钟恢复正常"
+      },
+      "pool": {
+        "title": "结账服务用尽了数据库连接",
+        "summary": "泄漏的连接占用了所有空闲连接，支付开始超时。您批准了清理这些连接，我便执行了。支付在 2 分钟后恢复。",
+        "notify1": "结账服务已用尽数据库连接，自 11:18 起约 1/9 的支付超时。",
+        "notify2": "原因：50 个连接中有 48 个被从未归还连接的退款导出占用。这是 CHK-482 泄漏，两周内第三次。",
+        "notify3": "只关闭泄漏的连接应该就能解决；进行中的支付不受影响。回复“yes”，我就执行。",
+        "chartCaption": "超时 · 峰值 1/9",
+        "chartLabel": "支付超时在 11:18 升至约 1/9，并在 11:21 修复后 2 分钟恢复"
+      },
+      "email": {
+        "title": "订单邮件最多延迟 9 分钟",
+        "summary": "所有邮件工作进程在夜间被一次性替换，队列在约 20 分钟内自行追平。这属于轻微问题，因此纳入了周五的汇总。",
+        "chartCaption": "邮件延迟 · 峰值 9 分钟",
+        "chartLabel": "邮件延迟自 03:15 起升至 9 分钟，并在 03:36 自行恢复"
+      },
+      "recs": {
+        "title": "推荐服务变慢了 15 分钟",
+        "summary": "响应时间从四分之一秒升至接近一秒。夜间缓存重建在下午被手动启动，并自行完成。我将其留到周五的汇总中。",
+        "chartCaption": "p95 延迟 · 峰值 0.94 秒",
+        "chartLabel": "p95 延迟在 16:40 从 0.26 秒升至 0.94 秒，并在 15 分钟后自行恢复"
+      },
+      "login": {
+        "title": "登录缓慢持续约 25 分钟",
+        "summary": "每 8 人中有 1 人等待超过 5 秒。会话缓存在流量激增后空间耗尽，导致部分用户被登出。您的团队增加了空间，随后恢复。",
+        "notify1": "登录缓慢：自 10:12 起，约每 8 人中有 1 人等待超过 5 秒。",
+        "notify2": "原因：10:05 流量翻倍后，会话缓存已满。",
+        "notify3": "为缓存增加空间应该可以解决。",
+        "chartCaption": "p95 登录 · 峰值 5.8 秒",
+        "chartLabel": "p95 登录时间在 10:12 从 0.6 秒升至 5.8 秒，并在 10:31 增加缓存空间后恢复"
+      },
+      "queue": {
+        "title": "订单在队列中积压",
+        "summary": "最严重时约有 4,000 个订单在等待。我按您的授权增加了工作进程，但没有帮助，因此我将它们回退并呼叫了值班人员。真正的原因是一次迁移遗留的数据库索引损坏；您的团队在开始后 40 分钟修复了它。",
+        "notify1": "订单正在积压：自 21:30 起约有 4,000 个在等待。",
+        "notify2": "我在 21:33 按您的授权增加了工作进程，但没有帮助，因此我已将它们回退。",
+        "notify3": "自 21:20 数据库迁移以来，订单查询慢了约 40 倍。请先检查 orders_by_status 索引。",
+        "chartCaption": "积压 · 峰值 4,120",
+        "chartLabel": "等待中的订单自 21:30 起攀升至 4,120，在增加工作进程后仍继续上升，并在 21:52 索引重建后清空"
+      },
+      "uploads": {
+        "title": "每 40 人中有 1 人图片上传失败",
+        "summary": "持续了 10 分钟，原因是某台服务器在加载替换证书之前旧证书已过期。它自行解决，因此我将其留到周五的汇总中。",
+        "chartCaption": "上传失败 · 峰值 1/40",
+        "chartLabel": "上传失败在 07:05 升至约 1/40，并在 10 分钟后自行恢复"
+      },
+      "push": {
+        "title": "推送通知延迟 2 分钟送达",
+        "summary": "持续了半小时，期间负责投递的提供商响应缓慢。属于轻微问题，因此留到周五的汇总中。",
+        "chartCaption": "投递延迟 · 峰值 2 分钟",
+        "chartLabel": "投递延迟在 13:50 从 4 秒升至约 2 分钟，并在 30 分钟后自行恢复"
+      },
+      "checkoutNow": {
+        "title": "结账服务每 6 笔支付中有 1 笔失败",
+        "titleFixed": "结账服务曾出现 1/6 的支付失败",
+        "summary": "问题始于 10:43，我仍在排查原因。目前看来与 10:41 发布的 2.4.0 版本吻合，我已呼叫值班人员。",
+        "notify1": "自 10:43 起，结账服务约每 6 笔支付中有 1 笔失败。",
+        "notify2": "我仍在排查原因。目前看来与 10:41 发布的结账服务 2.4.0 版本吻合。",
+        "notify3": "只有运行 2.4.0 的服务器在失败。回复“stop”，我就会将流量切回旧版本；旧服务器有足够的容量承接。我无法直接查看 payments-db，因此尚未排除它的可能。",
+        "summaryFixing": "问题始于 10:43，就在 2.4.0 版本发布之后。您批准了停止发布，因此我现在正将流量切回旧版本。",
+        "summaryFixed": "问题始于 10:43，在 2.4.0 版本发布之后。您批准了停止发布，流量切回旧版本后失败便停止了。2.4.0 为何失败仍需您的团队查明。",
+        "chartCaption": "支付失败 · 峰值 1/6",
+        "chartLabel": "支付失败率在 10:43 从 0.1% 跃升至约 1/6，目前仍在失败",
+        "chartLabelFixed": "支付失败率在 10:43 从 0.1% 跃升至约 1/6，并在停止发布后回落至正常水平"
+      },
+      "gateway": {
+        "title": "API 每 30 个请求中拒绝了 1 个",
+        "summary": "它始于一次配置变更。你们团队将其回滚，问题在开始 13 分钟后恢复正常。",
+        "notify1": "自 15:22 起，API 大约每 30 个请求就有 1 个被拒绝。",
+        "notify2": "可能原因：15:20 的一次配置变更缩短了登录令牌的有效期。",
+        "notify3": "回滚该变更应可修复此问题。",
+        "chartCaption": "被拒绝 · 峰值 1/30",
+        "chartLabel": "被拒绝的请求在 15:22 升至每 30 个请求中 1 个，并在 15:34 回滚配置变更后恢复正常"
+      },
+      "poolSep": {
+        "title": "Checkout 的数据库连接耗尽",
+        "summary": "泄漏的连接占用了全部空闲连接，支付开始超时。我将泄漏追踪到退款导出，你批准了清除泄漏的连接。支付在 2 分钟后恢复。",
+        "notify1": "Checkout 的数据库连接已耗尽，自 15:42 起，约每 9 笔支付就有 1 笔超时。",
+        "notify2": "原因：50 个连接中有 47 个被从未归还连接的退款导出占用。这看起来是退款导出代码中的泄漏。",
+        "notify3": "仅关闭泄漏的连接即可解决；进行中的支付不会受到影响。回复 \"yes\"，我就执行。",
+        "chartCaption": "超时 · 峰值 1/9",
+        "chartLabel": "支付超时在 15:42 升至约每 9 笔中 1 笔，并在 15:45 修复后 2 分钟恢复"
+      },
+      "poolOct": {
+        "title": "Checkout 再次耗尽数据库连接",
+        "summary": "还是同一个退款导出泄漏（CHK-482）。你批准了清除泄漏的连接，支付在 2 分钟后恢复。",
+        "notify1": "Checkout 的数据库连接已耗尽，自 10:05 起，约每 9 笔支付就有 1 笔超时。",
+        "notify2": "原因：50 个连接中有 46 个被退款导出占用。又是 CHK-482 泄漏，8 天内的第二次。",
+        "notify3": "仅关闭泄漏的连接即可解决；进行中的支付不会受到影响。回复 \"yes\"，我就执行。",
+        "chartCaption": "超时 · 峰值 1/9",
+        "chartLabel": "支付超时在 10:05 升至约每 9 笔中 1 笔，并在 10:08 修复后 2 分钟恢复"
+      },
+      "lagSep": {
+        "title": "新产品最多需要 40 分钟才出现在搜索中",
+        "summary": "在 1.12.0 版本缩短了每批允许的处理时长后，search-indexer 在目录更新上出现滞后。你们团队将其回滚，问题在开始 40 分钟后追平。",
+        "notify1": "新增和变更的产品未出现在搜索中：自 14:06 起，search-indexer 落后约 48,000 条目录更新。",
+        "notify2": "原因：search-indexer 1.12.0 于 13:58 发布，将 Kafka 轮询间隔缩短至 30 秒。大批次需要约 45 秒，因此消费者不断被移出其消费组。",
+        "notify3": "回滚到 1.11.4 应能让它追平。搜索本身仍可用，只是显示较旧的产品。",
+        "chartCaption": "消费者滞后 · 峰值 48,000",
+        "chartLabel": "消费者滞后从约 200 条消息在 14:06 升至 48,000 条，并在 14:39 回滚后清空"
+      },
+      "poolAug": {
+        "title": "Checkout 在退款导出期间耗尽数据库连接",
+        "summary": "夜间退款导出占用了 Checkout 几乎所有的数据库连接，约每 12 笔支付就有 1 笔超时。导出完成后问题即消除，距开始 13 分钟。",
+        "notify1": "Checkout 的数据库连接已耗尽，自 02:04 起，约每 12 笔支付就有 1 笔超时。",
+        "notify2": "原因：50 个连接中有 44 个被夜间退款导出占用，该导出在月末促销后约为平时的 3 倍规模。",
+        "notify3": "导出完成后问题应会消除。如果没有，停止导出将释放这些连接。",
+        "chartCaption": "超时 · 峰值 1/12",
+        "chartLabel": "支付超时在 02:04 升至约每 12 笔中 1 笔，并在 02:17 导出完成时自行恢复"
+      },
+      "throttleAug": {
+        "title": "欺诈检查变慢持续 35 分钟",
+        "summary": "一个批处理任务落在相同的服务器上并占用了其空闲 CPU，因此欺诈检查耗时最高达 1.4 秒。Checkout 仍能运行，只是变慢，并在任务完成后恢复，所以我将它留到周五的汇总中。",
+        "chartCaption": "p95 欺诈检查 · 峰值 1.4 秒",
+        "chartLabel": "p95 欺诈检查耗时在 11:20 从 0.18 秒升至 1.4 秒，并在 11:55 批处理任务完成时自行恢复"
+      },
+      "tlsJul": {
+        "title": "发票停止发送持续 43 分钟",
+        "summary": "invoice-service 用于 billing-api 的证书已过期，因此所有发票都发送失败。你们团队续期了证书，排队的发票全部发出。",
+        "notify1": "没有发票发出：自 09:01 起，来自 invoice-service 的每次发送都失败。",
+        "notify2": "原因：invoice-service 用于 billing-api 的客户端证书于 09:00 过期，billing-api 拒绝了来自它的所有连接。",
+        "notify3": "续期证书应可修复此问题。发票正在排队，并未丢失。",
+        "chartCaption": "失败的发送 · 全部",
+        "chartLabel": "发票发送失败率在 09:01 从 0.2% 跃升至 100%，并在 09:41 续期证书后恢复正常"
+      },
+      "dnsJul": {
+        "title": "每 4 个人中就有 1 个人的购物车价格缺失",
+        "summary": "一次 DNS 变更导致集群中一半的 DNS 服务器不再应答内部名称，因此 cart 无法访问 currency。你们团队在开始 31 分钟后将其回滚。",
+        "notify1": "自 16:22 起，约每 4 次购物车加载就有 1 次不显示价格。",
+        "notify2": "原因：16:20 的一次 DNS 配置变更从集群 4 台 DNS 服务器中的 2 台上移除了内部区域，因此 cart 在这些查询中找不到 currency.internal。",
+        "notify3": "回滚该 DNS 变更应可修复此问题。结账时订单仍可完成。",
+        "chartCaption": "缺少价格 · 峰值时 4 次中有 1 次",
+        "chartLabel": "缺少价格的购物车加载从 0.1% 上升到 16:22 时的约 1/4，并在 16:51 撤销 DNS 变更后回落至正常水平"
+      }
+    },
+    "drawer": {
+      "worked": "有帮助",
+      "didntHelp": "没帮助",
+      "now": "现在"
+    },
+    "needs": {
+      "more": "更多",
+      "less": "更少",
+      "canUndo": "你可以撤销",
+      "undo": "撤销",
+      "undone": "已撤销。这条再次等待你的回复。",
+      "shiftTo": "到",
+      "retune": {
+        "body": "{host} 上的“{alert}”告警本月触发了 {fired} 次，但没有人需要处理。磁盘在夜间清理期间会升至约 85%，到早上又回到接近 70%。即使在最繁忙的一天，从 90% 开始也需要 3 天以上才会写满。我想把它提高到 {to}%。如果磁盘有可能在一天内写满，我仍会提醒你。",
+        "yes": "是的，修改它",
+        "no": "保持不变",
+        "doneYes": "已完成。我已将其提高到 {to}%。写满警告保持开启。",
+        "doneNo": "好的，我将其保持在 {from}%。",
+        "headline": "将 ingest-3 上的“磁盘 80%”告警提高到 90%？",
+        "why": "它本月触发了 41 次，但没有人需要处理。",
+        "cost": "写满警告保持开启"
+      },
+      "fixNow": {
+        "search": {
+          "body": "搜索变慢是因为 search-2 节点在 10:16 变更的设置占满了它的内存，导致它不断崩溃。其他 4 个节点仍使用旧设置，运行正常。我可以把它改回去吗？此操作可以撤销。",
+          "yes": "改回去",
+          "no": "我来处理",
+          "doneYes": "已完成。正在改回去。",
+          "doneNo": "好的，交给你了。我会继续观察。",
+          "doneSettled": "已完成。search-2 已恢复，搜索正常。",
+          "headline": "将 search-2 的缓存设置改回 10%？",
+          "why": "10:16 的一次变更占满了它的内存，导致它不断崩溃。",
+          "cost": "重启 search-2 一次"
+        },
+        "checkoutNow": {
+          "body": "结账流程中约有 1/6 的支付失败，且只有运行 2.4.0 的服务器在失败。旧版本的 6 台服务器有足够的容量承载全部流量。我可以停止发布并将流量切回它们吗？2.4.0 会保持部署，供你的团队查看。",
+          "yes": "停止发布",
+          "no": "我来处理",
+          "doneYes": "已完成。正在停止发布。",
+          "doneNo": "好的，交给你了。我会继续观察。",
+          "doneSettled": "已完成。支付已恢复正常。",
+          "headline": "停止结账服务的 2.4.0 发布？",
+          "why": "约 1/6 的支付失败，全部发生在 2.4.0 上。旧版本可以承载全部流量。",
+          "cost": "2.4.0 保持部署"
+        }
+      },
+      "fromNowOn": {
+        "body": "到现在已经有 {done} 次，新版本在发布过程中只让自身的服务器失败。每次我请求将流量切回旧版本，故障都在 2 分钟内停止。从今往后，我可以在发布期间自行这样做吗？我会保留新版本供你的团队查看，并立即通知他们。",
+        "yes": "是的，可自行操作",
+        "no": "继续先问我",
+        "doneYes": "已完成。我会自行停止有问题的发布，并在每次操作后告知你。",
+        "doneNo": "好的，我会继续先征求你的意见。",
+        "headline": "从今往后自行停止有问题的发布？",
+        "why": "6 次你说“可以”之后，故障都在 2 分钟内停止。",
+        "cost": "仅在发布期间"
+      },
+      "labels": {
+        "fixNow": "立即修复",
+        "fromNowOn": "让我来处理",
+        "retune": "降低告警噪音"
+      },
+      "needsOk": "需要你确认"
+    },
+    "footer": {
+      "text": "我也会自查：如果我停止工作，你会收到通知。",
+      "seeAll": "查看我关注的所有内容",
+      "seeChanges": "查看我更改的所有内容"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "1 分钟前 | {count} 分钟前",
+        "stale": "1 分钟没有新数据（自 {since} 起） | {count} 分钟没有新数据（自 {since} 起）"
+      },
+      "summaryWatching": "我正在关注您的 {total} 项服务中的 {watched} 项。",
+      "summaryAll": "我正在关注您的全部 {total} 项服务。",
+      "summaryWithClauses": "{head} {clauses}。",
+      "clauseLearning": "{count} 项仍在学习 | {count} 项仍在学习",
+      "clauseUnseen": "有 1 个我看不到 | 有 {count} 个我看不到",
+      "legend": {
+        "watching": "完全关注",
+        "learning": "学习中",
+        "unseen": "看不到"
+      },
+      "legendAria": "{label}：{count}",
+      "summaryAllLearning": "我正在关注您的全部 {total} 项服务，并且仍在学习每项服务的正常状态是什么样的。"
+    },
+    "coveragePage": {
+      "title": "我关注的所有内容",
+      "back": "返回"
+    },
+    "issuesPage": {
+      "title": "所有问题",
+      "sentence": "我在{within}开启的每个问题。选择一个，查看发生了什么以及我做了哪些处理。",
+      "back": "返回",
+      "ranges": {
+        "week": "最近 7 天",
+        "month": "最近 30 天",
+        "quarter": "最近 90 天"
+      },
+      "within": {
+        "week": "在过去 7 天内",
+        "month": "在过去 30 天内",
+        "quarter": "在过去 90 天内"
+      }
+    },
+    "activityPage": {
+      "title": "我更改的内容",
+      "stats": {
+        "window": "最近 7 天",
+        "made": "更改 | 更改",
+        "worked": "已生效",
+        "review": "审核中",
+        "undone": "已撤销"
+      },
+      "filters": {
+        "all": "全部",
+        "fixes": "修复",
+        "watching": "关注中",
+        "tuning": "告警调优"
+      },
+      "status": {
+        "applying": "正在应用",
+        "worked": "已生效",
+        "done": "完成",
+        "review": "审核中",
+        "reviewDays": "审核中 · 剩余 {count} 天 | 审核中 · 剩余 {count} 天",
+        "didntHelp": "没起作用",
+        "undone": "已撤销"
+      },
+      "actions": {
+        "undo": "撤销",
+        "showDetails": "显示详情",
+        "hideDetails": "隐藏详情"
+      },
+      "details": {
+        "name": "更改",
+        "target": "作用于",
+        "confidence": "置信度",
+        "saw": "我观察到的情况",
+        "recurring": "同一个泄漏问题（{bug}）反复需要此修复，因此在它被修复之前，我会每次都先征询您的意见。",
+        "undoDecided": "撤销会将其恢复，我会再次询问你。"
+      },
+      "toast": {
+        "undone": "已撤销。已恢复原样。",
+        "undoDecided": "已撤销。我会再次询问你。"
+      },
+      "empty": {
+        "filter": "这里目前没有任何内容。",
+        "scenario": "我还没有做任何更改。当我做出更改时，你会在这里看到。"
+      },
+      "entries": {
+        "L-313": {
+          "done": "已停止 checkout 的 2.4.0 发布",
+          "why": "只有运行 2.4.0 的 6 台服务器在故障；旧版本的 6 台可以承担全部流量。",
+          "from": "12 个 Pod 中的 6 个",
+          "to": "无流量",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "将 search-2 的缓存设置改回 10%",
+          "why": "它在 10:16 升到了 60%，此后 search-2 一直内存不足。",
+          "from": "60%",
+          "to": "10%",
+          "on": "缓存大小 · search-2"
+        },
+        "L-309": {
+          "done": "将 ingest-3 上的“磁盘 80%”告警阈值提高到 90%",
+          "why": "本月它触发了 41 次，无人需要处理。填充警告保持开启。",
+          "from": "80%",
+          "to": "90%",
+          "on": "磁盘告警 · ingest-3"
+        },
+        "L-310": {
+          "done": "开始监控退货、换货和礼品卡",
+          "why": "今天早上发现了它们。将在 7 天内学习它们的正常状态。",
+          "from": "未监控",
+          "to": "监控中",
+          "on": "3 个服务"
+        },
+        "L-314": {
+          "done": "开始监控我今天早上发现的 6 个服务",
+          "why": "它们今天出现在你的追踪中。将在 7 天内学习它们的正常状态。",
+          "from": "未监控",
+          "to": "监控中",
+          "on": "6 个服务"
+        },
+        "L-311": {
+          "done": "获得你的许可，可自行停止不良发布",
+          "why": "在 60 天内，我经你批准停止了 6 次；每次错误都在 2 分钟内恢复正常。",
+          "from": "先询问",
+          "to": "自行处理",
+          "on": "停止发布"
+        },
+        "L-304": {
+          "done": "清理了 checkout 的 48 个泄漏的数据库连接",
+          "why": "支付出现超时。2 分钟后恢复正常。",
+          "from": "50 个中 50 个在使用",
+          "to": "2 个在使用",
+          "on": "checkout 连接池"
+        },
+        "L-299": {
+          "done": "清理了 checkout 的 46 个泄漏的数据库连接",
+          "why": "与 9 月 23 日相同的泄漏。2 分钟后支付恢复正常。",
+          "from": "50 个中 50 个在使用",
+          "to": "4 个在使用",
+          "on": "checkout 连接池"
+        },
+        "L-296": {
+          "done": "清理了 checkout 的 47 个泄漏的数据库连接",
+          "why": "这是一次新的泄漏，因此我随后以 CHK-482 提交给了 checkout 团队。",
+          "from": "50 个中 50 个在使用",
+          "to": "3 个在使用",
+          "on": "checkout 连接池"
+        },
+        "L-301": {
+          "done": "开始监控 billing-api、billing-worker 和 invoice-service",
+          "why": "在您的追踪中发现了它们。仍在学习它们的正常状态。",
+          "from": "未监控",
+          "to": "已监控",
+          "on": "3 个服务"
+        },
+        "L-307": {
+          "done": "修复了 payments-api 连接告警，使其统计所有服务器",
+          "why": "它单独检查每台服务器，因此在周二的故障期间从未触发。",
+          "from": "每个 pod 超过 95%",
+          "to": "所有 pod 超过 85%",
+          "on": "连接告警"
+        },
+        "L-302": {
+          "done": "将 3 个 checkout 延迟告警合并为一个",
+          "why": "它们有 94% 的时间同时触发，因此一次变慢就向您呼叫了 3 次。",
+          "from": "3 个告警",
+          "to": "1",
+          "on": "checkout 延迟"
+        },
+        "L-303": {
+          "done": "将 ingest-1 上的“磁盘 80%”告警提升到 90%",
+          "why": "它在 30 天内触发了 29 次，且无人需要处理。容量填充警告保持开启。",
+          "from": "80%",
+          "to": "90%",
+          "on": "磁盘告警 · ingest-1"
+        },
+        "L-305": {
+          "done": "新增 4 个 orders-consumer worker 以清理积压",
+          "why": "没有帮助，因此我缩减回 4 个，并在 3 分钟后呼叫了值班人员。",
+          "from": "4 个 worker",
+          "to": "8 个 worker",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "获得您的许可，可自行新增队列 worker",
+          "why": "您在流量高峰期间批准了 7 次，且每次积压都得以清理。",
+          "from": "先询问",
+          "to": "自行处理",
+          "on": "新增队列 worker"
+        },
+        "L-312": {
+          "done": "开始监控在您连接时发现的 18 个服务",
+          "why": "正在学习每个服务的正常状态。准备就绪后，它们的告警将开始。",
+          "from": "未监控",
+          "to": "已监控",
+          "on": "18 个服务"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "历史记录",
+      "seeChange": "查看变更",
+      "filters": {
+        "all": "全部",
+        "problems": "问题",
+        "changes": "变更",
+        "fixes": "修复",
+        "decisions": "您的决策"
+      },
+      "empty": "这里还没有内容。",
+      "entries": {
+        "checkoutNowPaged": "我就 checkout 支付失败呼叫了值班人员。",
+        "searchPaged": "我就搜索缓慢呼叫了值班人员。",
+        "searchAsked": "我询问是否可以恢复 search-2 的缓存设置。",
+        "euStopped": "自该时间起，{cluster} 集群没有任何数据到达。我在这里和 Slack 中都已告知您。",
+        "fridaySummary": "我发送了周五的总结，其中包含 {count} 个次要问题。 | 我发送了周五的总结，其中包含 {count} 个次要问题。",
+        "emailHeld": "我将订单邮件的一个次要问题保留到周五的总结中。",
+        "poolFixed": "我关闭了 checkout 泄漏的数据库连接。支付在 2 分钟后恢复。",
+        "poolApproved": "您批准关闭 checkout 泄漏的数据库连接。",
+        "billingWatch": "我开始监控 billing-api、billing-worker 和 invoice-service。",
+        "checkoutPaged": "我就 checkout 支付失败问题呼叫了值班。",
+        "recsHeld": "我把 recommendations 的一个小问题留到了周五的摘要。",
+        "diskApproved": "您批准将 ingest-1 上的磁盘告警阈值提高到 {to}%。",
+        "latencyGrouped": "我把 checkout 的三个变慢告警合并为一个，这样单个变慢只会呼叫一次。",
+        "queueFixed": "我为 orders 增加了队列 worker，但队列仍在增长，所以我把它们改了回来，并呼叫了值班。",
+        "loginPaged": "我就登录变慢问题呼叫了值班。",
+        "queuePermission": "您允许我自行增加队列 worker，最多 8 个。",
+        "gatewayPaged": "我就 API 拒绝请求问题呼叫了值班。",
+        "found18": "我发现了 {count} 个服务，并开始了解它们的正常状态是什么样的。",
+        "connected": "您将我接入了您的数据。",
+        "thresholdApproved": "您批准将 payments-api 连接告警改为对照数据库 200 的上限统计所有服务器。",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "您批准将 search-2 的设置改回。",
+              "no": "您说 search-2 由您自己处理。",
+              "undoYes": "您撤销了将 search-2 设置改回的操作。我重新应用了 60%，因此 search-2 将再次出现内存不足；我已通知值班。",
+              "cancel": "在我应用之前，您取消了将 search-2 设置改回的操作。search-2 仍处于内存不足状态；我已通知值班。",
+              "undoNo": "您收回了由您自己处理 search-2 的说法。"
+            },
+            "checkoutNow": {
+              "yes": "您批准停止 checkout 2.4.0 的发布。",
+              "no": "您说 checkout 的发布由您自己处理。",
+              "undoYes": "您撤销了停止 2.4.0 发布的操作。流量再次流向 2.4.0，因此支付可能再次失败；我已通知值班，并正在持续观察。",
+              "cancel": "在我执行之前，您取消了停止 2.4.0 发布的操作。支付仍在失败；我已通知值班。",
+              "undoNo": "您收回了由您自己处理 checkout 发布的说法。"
+            }
+          },
+          "retune": {
+            "yes": "您批准将 ingest-3 上的磁盘告警阈值提高到 90%。",
+            "no": "您表示现在暂不提高 ingest-3 上的磁盘告警阈值。",
+            "undoYes": "您撤销了提高 ingest-3 磁盘告警阈值的操作。它又回到 80%，因此在运行正常的夜晚也会再次告警。",
+            "undoNo": "您收回了对 ingest-3 磁盘告警暂不调整的决定。"
+          },
+          "fromNowOn": {
+            "yes": "您批准让我自行停止有问题的发布。",
+            "no": "您表示现在还不让我自行停止有问题的发布。",
+            "undoYes": "您收回了让我自行停止有问题的发布的授权。",
+            "undoNo": "您收回了关于暂不让我自行停止有问题发布的决定。"
+          }
+        },
+        "fixedNow": {
+          "search": "我改回了 search-2 的设置。搜索已恢复正常。",
+          "checkoutNow": "我将流量切回旧版本，故障随之停止。2.4.0 为何失败仍需您的团队排查；我为此保留了它的部署。"
+        },
+        "checkoutNowAsked": "我询问是否可以停止 checkout 2.4.0 的发布。",
+        "newWatch": "今天早上我发现了 {count} 个新服务（returns、exchanges 和 gift-cards），并立即开始监控它们。",
+        "foundWatch": "今天早上我发现了 {count} 个新服务，并立即开始监控它们。"
+      }
+    },
+    "settingsDrawer": {
+      "title": "设置",
+      "reach": "我该在哪里联系您？",
+      "destSlack": "Slack：{channel}",
+      "destEmail": "邮箱：{address}",
+      "autonomy": "我可以自行处理多少事情？",
+      "tell": "告诉我",
+      "ask": "先问我",
+      "fix": "修复后告诉我",
+      "tellHint": "我会告诉您我会怎么做，具体执行交由您决定。",
+      "askHint": "每次修复前我都会先询问，您同意后我再执行。",
+      "fixHint": "对于有可靠记录的修复类型，我会在您设定的范围内直接执行，并立即告知您。",
+      "advanced": "高级",
+      "perKind": "各类修复",
+      "digestDay": "摘要日期",
+      "excluded": "应忽略的服务",
+      "excludedNone": "无",
+      "kinds": {
+        "pool": "关闭泄漏的数据库连接",
+        "queueWorker": "在积压期间增加队列工作进程",
+        "retune": "提高噪音告警的阈值",
+        "rollback": "回滚部署",
+        "record": "已完成 {done} 次，成功 {worked} 次。",
+        "keptRecord": "已完成 {done} 次，保持有效 {worked} 次。",
+        "noRecord": "从未执行过，因此在没有成功记录之前，我不会自行执行。",
+        "revertConfig": "撤销最近的设置更改",
+        "abortRollout": "停止异常发布",
+        "recurringRecord": "已完成 {done} 次，均针对同一个泄漏（{bug}）。在修复之前，我会持续询问。"
+      },
+      "weekdays": {
+        "monday": "星期一",
+        "tuesday": "星期二",
+        "wednesday": "星期三",
+        "thursday": "星期四",
+        "friday": "星期五"
+      },
+      "saved": "已保存",
+      "noDestination": "我将无法联系到任何人。",
+      "routing": "当我呼叫您时",
+      "routingNote": "任何影响客户的问题我都会发起呼叫。较小的问题会发送一条不会吵醒任何人的消息，最小的问题则归入周五摘要。"
+    },
+    "howItWorks": {
+      "title": "工作原理",
+      "intro": "以下是我所做的工作，共五步。",
+      "gotIt": "知道了",
+      "s1Title": "我会发现您的服务",
+      "s1": "我会查看您已发送的数据，并找出其中的每项服务。当新服务出现时，我会当天开始监控它；您无需提出请求。",
+      "s2Title": "我会监控它们",
+      "s2": "我会学习每项服务的正常状态：每天各小时的错误、延迟和流量，并随着时间推移不断细化每周模式。在掌握之前，我会使用基本的安全检查。",
+      "s3Title": "除非确有问题，否则我保持安静",
+      "s3": "大多数异常时刻并不是问题。当某些情况影响客户时，我会呼叫您的团队；对于较小的问题，会发送不会吵醒任何人的消息；而次要事项则留到周五摘要中。",
+      "s4Title": "我会解释每一次呼叫",
+      "s4": "每条消息都会说明出了什么问题、从何时开始，以及我对原因的最佳判断和确信程度。",
+      "s5Title": "我只修复您允许我修复的内容",
+      "s5": "我只修复您已允许我修复的事项。有效的修复会赢得一点信任，而没有帮助的修复会对我产生不利。如果我反复需要同一种修复，那是我向您的团队报告的 bug，而不是我会自动化的习惯。"
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "1 分钟前检查过 | {count} 分钟前检查过"
+    },
+    "outcome": {
+      "active": "正在发生",
+      "fixed": "由 AutoObserve 修复",
+      "resolved": "在 {minutes} 分钟内解决",
+      "held": "在周五摘要中",
+      "fixing": "正在修复",
+      "contained": "已由 AutoObserve 遏制",
+      "predicted": "已预测"
+    },
+    "view": {
+      "standard": "标准",
+      "nerd": "极客",
+      "standardTooltip": "标准视图提供简要信息：需要您处理的事项以及过去 7 天发生的情况",
+      "nerdTooltip": "极客视图完整显示每个检测器、循环和设置",
+      "label": "视图"
+    },
+    "rail": {
+      "more": "下方更多"
+    },
+    "suggestions": {
+      "title": "建议",
+      "subtitle": "有空时看看——这些能减少噪音或节省您的时间。"
+    }
   }
 }

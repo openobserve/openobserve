@@ -1399,6 +1399,7 @@
     "freeTextBuildNotice": "Ce filtre comporte une recherche textuelle ; modifiez-le en SQL."
   },
   "menu": {
+    "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Passer au plan PRO",
     "home": "Accueil",
     "about": "À propos",
@@ -21920,5 +21921,1079 @@
     "modeExhausted": "Épuisé",
     "modeFree": "Gratuit",
     "modeUnknown": "Inconnu"
+  },
+  "autoobserve": {
+    "title": "AutoObserve",
+    "subtitle": "Envoyez vos données. OpenObserve détecte les problèmes et vous les signale, avec sa meilleure interprétation de la cause. Quand tout est calme, il vous montre ce qu'il a vérifié et ce qu'il ne peut pas voir.",
+    "phase2": "Phase 2",
+    "tabs": {
+      "issues": "Problèmes",
+      "coverage": "Couverture",
+      "activity": "Activité",
+      "policy": "Politique"
+    },
+    "loops": {
+      "coverage": "Couverture",
+      "calibration": "Calibration",
+      "investigation": "Investigation",
+      "action": "Action"
+    },
+    "signals": {
+      "requests": "Requêtes",
+      "errors": "Erreurs",
+      "latency": "Latence",
+      "saturation": "Saturation",
+      "logPatterns": "Motifs de logs",
+      "dependencies": "Dépendances"
+    },
+    "ledgerStatus": {
+      "autoApplied": "Appliqué automatiquement",
+      "awaiting": "En attente d'approbation",
+      "approved": "Approuvé",
+      "rejected": "Rejeté",
+      "rolledBack": "Annulé",
+      "kept": "Conservé — vérifications réussies"
+    },
+    "issues": {
+      "subtitle": "Incidents regroupés et analysés par l'agent SRE. Une notification par problème ; la cause y est jointe, ou suit dans le même fil si le triage expire ou échoue.",
+      "open": "Ouverts",
+      "recent": "Résolus",
+      "all": "Tous",
+      "heldForDigest": "Retenu pour le récapitulatif de vendredi",
+      "colId": "Incident",
+      "colTitle": "Problème",
+      "colSeverity": "Sévérité",
+      "colServices": "Services concernés",
+      "colStarted": "Début",
+      "colStatus": "Statut",
+      "colCause": "Cause",
+      "emptyTitle": "Rien ici",
+      "emptyDescription": "Aucun problème ne correspond à ce filtre.",
+      "subsetNote": "{shown} affichés. Cette démo présente une sélection des {total} incidents de cette semaine.",
+      "searchLabel": "Rechercher des problèmes",
+      "searchPlaceholder": "Rechercher des problèmes, services, causes ou INC-…",
+      "noMatch": "Aucun problème ne correspond à « {query} »",
+      "clearSearch": "Effacer la recherche",
+      "matchCount": "Aucun problème ne correspond | 1 problème correspond | {count} problèmes correspondent",
+      "colSignal": "Signal",
+      "span": "{start} → {end}",
+      "spanOpen": "{start} → maintenant",
+      "minutes": "{count} min",
+      "grouped": "{count} alerte → 1 incident | {count} alertes → 1 incident",
+      "confidence": "Confiance {level}",
+      "proposed": "Proposé",
+      "reversible": "réversible",
+      "proposalFor": "Correctif proposé pour {title}"
+    },
+    "drawer": {
+      "rca": "Cause racine",
+      "rcaSummary": "Résumé",
+      "likelyCause": "Cause probable",
+      "confidence": "Confiance",
+      "confidenceValue": "Confiance : {value} (aucun score calibré pour l'instant)",
+      "nextStep": "Prochaine étape suggérée",
+      "evidence": "Preuves",
+      "blastRadius": "Rayon d'impact",
+      "upstream": "Appelants en amont",
+      "affected": "Impactés",
+      "downstream": "Dépendances en aval",
+      "none": "Aucun",
+      "timeline": "Chronologie",
+      "notification": "Notification envoyée",
+      "notSent": "Aucune alerte : ce problème de faible gravité a été conservé pour le récapitulatif du vendredi. Enregistré dans la boîte de réception du produit.",
+      "sender": "AutoObserve",
+      "threadReply": "a répondu dans le fil",
+      "p1Note": "Les alertes P1 sont envoyées immédiatement, avant que l'investigation ne soit terminée. La cause suit dans le même fil.",
+      "gateNote": "Les notifications P2 et P3 attendent l'investigation jusqu'à 2 minutes, de sorte que le premier message porte généralement la cause. Si le triage expire ou échoue, le message indique que l'investigation est toujours en cours ou a échoué, et la cause suit dans le même fil. Les problèmes P4 ne notifient personne ; ils sont inclus dans le récapitulatif du vendredi.",
+      "caughtEarlier": "Ce qui aurait permis de détecter cela plus tôt",
+      "analyzedAt": "Investigation terminée à {time}.",
+      "triggersSample": "Affichage de {shown} sur {total} déclenchements",
+      "waitingForOk": "En attente de votre validation",
+      "proposedFix": "Correctif proposé",
+      "unfoldTab": "Comment cela s'est déroulé",
+      "seeEvidence": "Voir les preuves ({count}) →"
+    },
+    "unfold": {
+      "hint": "Lisez de gauche à droite : ce qui a changé, les signaux déclenchés, puis ce qui a atteint votre équipe. Sélectionnez une carte pour voir ses déclenchements.",
+      "legend": "Types de cartes",
+      "team": "Votre équipe",
+      "kind": {
+        "metric": "Métrique",
+        "log": "Log",
+        "trace": "Trace",
+        "change": "Changement"
+      },
+      "likelyCause": "Cause probable",
+      "linesUpWith": "Correspond à",
+      "times": "×{count}",
+      "sameMinute": "même minute",
+      "plusMinutes": "+{count} min",
+      "plusHours": "+{hours} h {minutes} min",
+      "firstFired": "Premier déclenchement",
+      "lastFired": "Dernier déclenchement",
+      "firings": "Déclenchements",
+      "peak": "Pic",
+      "normal": "Comparé à",
+      "detector": "Détecteur",
+      "firedAt": "Déclenché à",
+      "when": "Quand",
+      "chartNote": "Le graphique principal du problème, comme dans Evidence",
+      "outcome": {
+        "paged": "Astreinte contactée par pager",
+        "asked": "A demandé un OK",
+        "notified": "Message envoyé, pas de page",
+        "held": "Retenu pour le résumé du vendredi",
+        "fixFailed": "Le correctif n'a pas aidé",
+        "fixed": "Corrigé",
+        "resolved": "Résolu",
+        "open": "Toujours ouvert"
+      }
+    },
+    "coverage": {
+      "showing": "Affichage de {shown} sur {total} services",
+      "watched": "Surveillé",
+      "learning": "Apprentissage",
+      "gap": "Lacune",
+      "na": "Non applicable",
+      "anomaly": "Anomalie",
+      "threshold": "Seuil",
+      "service": "Service",
+      "lastScanned": "Dernière analyse",
+      "detector": "Détecteur",
+      "methodAnomaly": "Détecteur d'anomalies, référence apprise",
+      "methodThreshold": "Seuil statique issu de la bibliothèque",
+      "libraryEntry": "Entrée de bibliothèque",
+      "predicate": "Applicabilité",
+      "predicateMatched": "{predicate} — correspondance dans le flux {stream}",
+      "predicateUnmatched": "{predicate} — aucune correspondance",
+      "reason": "Pourquoi",
+      "history": "{days} sur {total} jours d'historique",
+      "notScanned": "Première analyse en cours — inconnu, non couvert tant qu'elle n'est pas terminée",
+      "guardrails": "Garde-fous actifs pendant l'apprentissage : plafond du taux d'erreur · contrôle de fraîcheur (se déclenche si le flux s'arrête)",
+      "alsoWatchedBy": "Également surveillé par",
+      "searchLabel": "Rechercher des services",
+      "searchPlaceholder": "Rechercher un service ou un flux",
+      "matchCount": "Aucun service ne correspond | 1 service correspond | {count} services correspondent",
+      "noMatch": "Aucun service ni flux ne correspond à « {query} »",
+      "clearSearch": "Effacer la recherche",
+      "filterLabel": "Filtrer les services par couverture",
+      "all": "Tous",
+      "gaps": "Lacunes",
+      "cantWatch": "Non surveillable",
+      "detectorCount": "1 détecteur | {count} détecteurs",
+      "stream": "Flux",
+      "coverage": "Couverture",
+      "coverageCount": "{watched}/{total}",
+      "coverageLabel": "{watched} sur {total} signaux applicables surveillés",
+      "legendLabel": "Légende",
+      "gapChip": "LACUNE",
+      "daysShort": "{days}/{total}j",
+      "tipAnomaly": "{signal} : détecteur d'anomalies, référence apprise",
+      "tipThreshold": "{signal} : seuil statique issu de la bibliothèque",
+      "tipLearning": "{signal} : apprentissage, {days} sur {total} jours d'historique",
+      "tipGap": "{signal} : lacune, pas encore surveillable",
+      "tipNa": "{signal} : non applicable",
+      "config": "Configuration du détecteur",
+      "lastFired": "Dernier déclenchement",
+      "never": "Jamais",
+      "hoursAgo": "il y a 1 heure | il y a {count} heures",
+      "daysAgo": "il y a 1 jour | il y a {count} jours",
+      "fixNoLink": "Ajouter le libellé service.name",
+      "fixStopped": "Vérifier le collecteur",
+      "fixQueued": "Simulation uniquement : “{action}” pour {service} n'a été envoyé nulle part",
+      "viewLabel": "Vue de la couverture",
+      "viewMap": "Carte",
+      "viewTable": "Tableau",
+      "fillBy": "Remplir par",
+      "fillState": "État de couverture",
+      "fillLearning": "Progression de l'apprentissage",
+      "fillDetectors": "Nombre de détecteurs",
+      "fillScanned": "Ancienneté du dernier scan",
+      "summaryWatched": "{watched} sur {total} entièrement surveillés · {pct}%",
+      "addedThisWeek": "1 nouveau service cette semaine | {count} nouveaux services cette semaine",
+      "splitLabel": "{watched} entièrement surveillés, {learning} en apprentissage, {gaps} pas encore surveillables",
+      "stateWatched": "Entièrement surveillé",
+      "stateLearning": "Apprentissage · {days} sur {total} jours",
+      "stateGap": "Pas encore surveillable",
+      "hexName": "{service}, {state}, {stream}, {detectors}",
+      "legendOf": "Légende pour {fill}, sélectionnez pour mettre en surbrillance",
+      "mapLabel": "Carte de couverture, 1 service rempli par {fill} | Carte de couverture, {count} services remplis par {fill}",
+      "bucketLearned": "Appris",
+      "bucketDays67": "6–7 jours",
+      "bucketDays35": "3–5 jours",
+      "bucketDays02": "0–2 jours",
+      "bucketNoData": "Aucune donnée",
+      "bucketSix": "6 détecteurs",
+      "bucketFive": "5 détecteurs",
+      "bucketFewer": "1–4 détecteurs",
+      "bucketNone": "Aucun",
+      "bucketFresh": "Moins de 5 min",
+      "bucketRecent": "5–15 min",
+      "bucketHour": "15–60 min",
+      "bucketStale": "Plus d'une heure",
+      "bucketNotScanned": "Non scanné",
+      "signals": "Signaux",
+      "details": "Détails",
+      "detailsFor": "Afficher les détails pour {metric}",
+      "readyCaption": "Plage normale prête {day} · {days} sur {total} jours",
+      "chartLearning": "{metric}, {value} actuellement, en apprentissage, pas encore de plage normale",
+      "chartOverThreshold": "{metric}, {value} actuellement, au-dessus de son seuil {threshold}",
+      "chartUnderThreshold": "{metric}, {value} actuellement, en dessous de son seuil {threshold}",
+      "chartAbove": "{metric}, {value} actuellement, au-dessus de la plage normale",
+      "chartBelow": "{metric}, {value} actuellement, en dessous de la plage normale",
+      "chartWithin": "{metric}, {value} maintenant, dans la plage normale",
+      "tipNormal": "Normal {low} – {high}",
+      "openTraces": "Traces",
+      "openCatalog": "Catalogue des services",
+      "rangeLabel": "Plage temporelle",
+      "logPatternsValue": "{known} connus · {fresh} nouveaux aujourd'hui",
+      "drawerSubtitle": "{stream} · {detectors} · {library}",
+      "badgeNotWatched": "Non surveillé",
+      "signalsWatched": "Signaux surveillés",
+      "chipAria": "{signal} : {state}",
+      "deltaUp": "En hausse de {change} depuis le début de la plage",
+      "deltaDown": "En baisse de {change} depuis le début de la plage",
+      "deltaFlat": "Aucun changement depuis le début de la plage",
+      "badgeLearning": "Apprentissage {days}/{total} j",
+      "badgeAnomaly": "Anomalie · apprise",
+      "badgeThreshold": "Seuil > {threshold}",
+      "now": "Maintenant",
+      "bandLearning": "Apprentissage de la référence · {days} sur {total} jours · plage normale prête {day}",
+      "metric": {
+        "requests": "Requêtes",
+        "errors": "Erreurs",
+        "latencyP95": "Latence p95",
+        "cpu": "CPU",
+        "pool": "Pool utilisé",
+        "memory": "Mémoire",
+        "queries": "Requêtes",
+        "queryLatency": "Latence des requêtes p95",
+        "connections": "Connexions utilisées",
+        "ops": "Opérations",
+        "rejections": "Connexions rejetées",
+        "latency": "Latence",
+        "messages": "Messages",
+        "failed": "Échecs (lettres mortes)",
+        "lag": "Retard du consommateur",
+        "depth": "Profondeur de la file"
+      }
+    },
+    "activity": {
+      "allLoops": "Toutes les boucles",
+      "allStatuses": "Tous les statuts",
+      "ledgerHint": "Chaque changement qu'AutoObserve propose ou effectue est enregistré ici.",
+      "userBuilt": "Alerte créée par l'utilisateur",
+      "confidence": "Confiance : {value}",
+      "evidence": "Preuves :",
+      "before": "Avant",
+      "after": "Après",
+      "neverAutoRetire": "La mise hors service d'une alerte n'est jamais automatique.",
+      "neverSilent": "Les alertes créées par l'utilisateur ne sont jamais modifiées en silence.",
+      "undo": "Annuler",
+      "approve": "Approuver",
+      "edit": "Modifier",
+      "reject": "Rejeter",
+      "saveApprove": "Enregistrer et approuver",
+      "undoneNote": "Annulé par vous — état précédent restauré depuis l'instantané",
+      "undoneToast": "Annulation effectuée. Marqué comme annulé dans le registre de cette démo.",
+      "approvedToast": "Approuvé. Marqué comme approuvé dans le registre de cette démo.",
+      "rejectedNote": "Rejeté par vous",
+      "rejectedToast": "Rejeté. Consigné pour cette classe d'action.",
+      "emptyTitle": "Aucune entrée",
+      "emptyDescription": "Aucun élément du registre ne correspond à ces filtres.",
+      "reviewWindow": "En cours de révision pendant {window} — conservé automatiquement si ses vérifications réussissent, annulé si elles échouent. La configuration précédente continue d'être évaluée en silence, donc tout ce que ce changement aurait masqué apparaît quand même. Annuler restaure immédiatement l'état précédent.",
+      "approvedNote": "Approuvé par vous à {time}.",
+      "applyingNote": "Approuvé par vous à {time} ; application en cours.",
+      "appliedNote": "Approuvé par vous à {time} et appliqué.",
+      "declinedNote": "Refusé par vous.",
+      "needsApproval": "Nécessite votre approbation",
+      "awaiting": "En attente",
+      "auto": "Auto",
+      "outcomeFilter": "Filtrer par résultat",
+      "loopFilter": "Filtrer par boucle",
+      "columns": {
+        "time": "Quand",
+        "loop": "Boucle",
+        "action": "Action",
+        "target": "Cible",
+        "change": "Changement",
+        "confidence": "Confiance",
+        "decision": "Décision",
+        "outcome": "Résultat",
+        "actions": "Actions"
+      },
+      "showDetails": "Afficher les détails de {action} sur {target}",
+      "hideDetails": "Masquer les détails de {action} sur {target}",
+      "approveFor": "Approuver {action} sur {target}",
+      "rejectFor": "Rejeter {action} sur {target}",
+      "editFor": "Modifier {action} sur {target}",
+      "undoFor": "Annuler {action} sur {target}",
+      "openIncident": "Ouvrir l'incident {id}",
+      "confidenceHint": "{value} — aucun score calibré pour l'instant",
+      "diff": "Changement proposé, lignes supprimées et ajoutées",
+      "daysLeft": "{count} jour restant | {count} jours restants",
+      "reviewProgress": "Fenêtre de révision écoulée",
+      "entryId": "Entrée",
+      "logged": "Enregistré"
+    },
+    "policy": {
+      "gateHint": "Parmi les modifications apportées aux alertes existantes, seule la déduplication s'applique d'elle-même, avec un instantané de l'état précédent et une fenêtre de révision : conservée si ses vérifications réussissent, annulée si elles échouent. Tout le reste attend une approbation en un clic.",
+      "off": "Désactivé",
+      "suggest": "Suggestion",
+      "auto": "Auto",
+      "phase2Title": "Action — remédiation",
+      "phase2Hint": "Correctifs en production. Chaque classe gagne son niveau à partir de ses antécédents mesurés et n'agit jamais au-delà.",
+      "investigation": "Investigation",
+      "outcomesTitle": "Résultats",
+      "outcomesBody": "AutoObserve mesure l'effet de chaque action : le taux d'erreur s'est-il rétabli, l'astreinte a-t-elle cessé, l'action a-t-elle été annulée. Une classe qui réussit régulièrement gagne plus d'autonomie, une classe à la fois ; un échec compte contre elle, et un correctif qui reste nécessaire est signalé comme un bug plutôt que d'être automatisé.",
+      "outcomesExample": "ScaleQueueWorkers est passé en Auto après 7 montées en charge approuvées réussies. Son unique échec, le 2 octobre, a ajouté une pré-vérification, et un second échec le renvoie en Suggestion. AbortRollout attend votre accord ; RollbackDeploy reste Désactivé tant qu'il n'a pas d'antécédents.",
+      "triage": {
+        "parallel": "Parallèle",
+        "gate": "Contrôle",
+        "p2p4": "P2–P3",
+        "p1Short": "P1",
+        "p1Desc": "Alerte immédiatement et enquête en parallèle ; la cause suit dans le même fil. Le mécanisme Gate n'est pas autorisé pour P1.",
+        "gateDesc": "Retient l'alerte jusqu'à ce que l'enquête aboutisse, pendant 2 minutes au maximum. Échoue en mode ouvert : si le triage expire ou échoue, l'alerte est envoyée quand même, indique que l'enquête est toujours en cours ou a échoué, et la cause suit dans le fil."
+      },
+      "classes": {
+        "EnableDeduplication": "Activer la déduplication pour une alerte qui se répète en quelques minutes.",
+        "CreateDetector": "Créer un détecteur d'anomalies sur les requêtes, les erreurs ou la latence d'un service.",
+        "RaiseThreshold": "Relever un seuil qui se déclenche les jours où tout va bien.",
+        "LengthenEvaluationWindow": "Allonger la fenêtre d'une alerte qui oscille.",
+        "FixAlertQuery": "Corriger une requête d'alerte qui mesure la mauvaise chose ou qui ne peut jamais correspondre.",
+        "AttachDestination": "Associer une destination à un détecteur qui se déclenche dans le vide.",
+        "AddLibraryAlert": "Ajouter une alerte planifiée issue de la bibliothèque là où son prédicat correspond.",
+        "MoveToIncidentDelivery": "Acheminer une alerte créée par l'utilisateur via son incident plutôt que par sa propre route.",
+        "ReviewForDeletion": "Proposer de retirer une alerte sur laquelle personne n'agit.",
+        "RollbackDeploy": "Annuler le déploiement à l'origine d'un problème.",
+        "ScaleService": "Passer à l'échelle horizontale un service saturé.",
+        "RestartPod": "Redémarrer un pod qui a cessé de servir alors que ses réplicas sont sains ; une récidive ouvre un bug à la place.",
+        "ToggleFeatureFlag": "Désactiver le feature flag à l'origine d'un problème.",
+        "RunRunbookStep": "Exécuter une étape du runbook du service.",
+        "LowerThreshold": "Abaisser un seuil qui s'est déclenché trop tard pour avertir avant un incident.",
+        "RevertConfigChange": "Rétablir une modification de réglage récente à l'origine d'un problème, lorsque les réplicas sans cette modification sont sains.",
+        "EvictLeakedConnections": "Fermer les connexions qu'un service a empruntées sans jamais les rendre (détectées par la détection de fuites), sans toucher aux requêtes en cours. Chacune est liée au bug à l'origine de la fuite.",
+        "AbortRollout": "Renvoyer le trafic vers la version précédente lorsque seuls les pods de la nouvelle version échouent en cours de déploiement. Reprenable en un clic.",
+        "ScaleQueueWorkers": "Ajouter des workers à une file d'attente en retard, jusqu'à un plafond ; revient automatiquement à l'état initial si le débit de traitement ne s'améliore pas."
+      },
+      "triageHint": "Triage L0 par sévérité. Fixé en phase 1.",
+      "channels": "Canaux",
+      "channelInbox": "Boîte de réception du produit",
+      "channelEmailAdmins": "E-mail aux administrateurs de l'organisation",
+      "channelDefault": "Par défaut pour chaque organisation. Toujours actif.",
+      "alwaysOn": "Toujours actif",
+      "channelSlack": "Slack {channel}",
+      "channelConnectedDesc": "Connecté. Facultatif ; la boîte de réception et l'e-mail fonctionnent sans.",
+      "connected": "Connecté",
+      "defaultsNote": "La phase 1 fournit des valeurs par défaut fixes du produit. Les remplacements par organisation viendront plus tard.",
+      "groupCoverage": "Couverture — crée automatiquement des détecteurs",
+      "groupCoverageHint": "Chaque nouveau service reçoit des détecteurs d'anomalies et les alertes de bibliothèque correspondantes dès son apparition, avec des contrôles de sécurité de base pendant son apprentissage. Chaque création est enregistrée, peut être annulée et passe par une fenêtre de révision.",
+      "groupCalibration": "Calibration — modifications des alertes existantes",
+      "channelEmail": "E-mail {address}",
+      "paging": "Alerte d'astreinte",
+      "pagingHint": "La sévérité détermine comment un problème atteint les personnes.",
+      "routing": {
+        "p1p2": "P1 et P2",
+        "p1p2Desc": "Impacte les clients. Alerte l'astreinte à toute heure.",
+        "page": "Alerte",
+        "p3": "P3",
+        "p3Desc": "Un message Slack envoyé dès qu'il est prêt. N'alerte jamais personne.",
+        "message": "Message",
+        "p4": "P4",
+        "p4Desc": "Figure dans le résumé du vendredi.",
+        "summary": "Résumé du vendredi"
+      },
+      "nav": {
+        "coverage": "Couverture",
+        "alerts": "Modifications des alertes",
+        "fixes": "Correctifs",
+        "investigation": "Investigation et astreinte",
+        "channels": "Canaux"
+      },
+      "summary": {
+        "count": "{count} {mode}",
+        "row": "{label} {mode}",
+        "channels": "{count} connectés"
+      }
+    },
+    "notInDemo": "Non disponible dans cette démo",
+    "confidence": {
+      "high": "Élevée",
+      "medium": "Moyenne",
+      "low": "Faible",
+      "uncalibrated": "pas encore de score calibré"
+    },
+    "analysis": {
+      "verdict": "Verdict",
+      "unconfirmed": "Pas encore confirmé",
+      "lasted": "A duré {count} min",
+      "soFar": "{count} min jusqu'à présent",
+      "checked": "Ce que j'ai vérifié",
+      "verdicts": {
+        "confirmed": "Confirmé",
+        "ruled_out": "Écarté",
+        "open": "Toujours ouvert"
+      },
+      "comparison": "Sain vs affecté",
+      "kinds": {
+        "affected": "Affecté",
+        "healthy": "Sain",
+        "limit": "Limite"
+      },
+      "trail": "Piste de preuves",
+      "seeInUnfold": "Voir dans Comment cela s'est déroulé",
+      "nextStep": "Étape suivante",
+      "fullReport": "Rapport complet",
+      "fullReportHint": "Tout ce qui précède en un seul document, prêt à être copié ou téléchargé"
+    }
+  },
+  "autoobserve2": {
+    "demoTag": "Démo",
+    "scenarioLabel": "Scénario de démo",
+    "scenarios": {
+      "demo": "Semaine de démo",
+      "allClear": "Tout est normal",
+      "incident": "Incident actif",
+      "cantSee": "Non visible",
+      "noBaseline": "Aucune référence"
+    },
+    "nav": {
+      "history": "Historique",
+      "settings": "Réglages",
+      "howItWorks": "Comment ça marche",
+      "searchLabel": "Rechercher des problèmes",
+      "searchPlaceholder": "Rechercher des problèmes"
+    },
+    "recent": {
+      "ranges": {
+        "day": "Dernières 24 heures",
+        "week": "7 derniers jours",
+        "month": "30 derniers jours"
+      },
+      "within": {
+        "day": "au cours des dernières 24 heures",
+        "week": "au cours des 7 derniers jours",
+        "month": "au cours des 30 derniers jours"
+      },
+      "groups": {
+        "thisWeek": "Cette semaine",
+        "lastWeek": "La semaine dernière",
+        "weeksAgo": "il y a {count} semaines"
+      },
+      "all": "Tous",
+      "none": "Aucun problème {priority} {within}.",
+      "allIssues": "Tous les problèmes",
+      "priorityLabel": "Priorité",
+      "showing": "{count} problème affiché | {count} problèmes affichés"
+    },
+    "noProblems": "Aucun problème {within}. J'ai surveillé {count} service 24 h sur 24. | Aucun problème {within}. J'ai surveillé {count} services 24 h sur 24.",
+    "entryLabel": "{when} · {service}",
+    "when": "{day}, {time}",
+    "showMore": "Afficher {count} de plus",
+    "showFewer": "Afficher moins",
+    "days": {
+      "today": "Aujourd'hui",
+      "monday": "lundi",
+      "tuesday": "mardi",
+      "wednesday": "mercredi",
+      "thursday": "jeudi",
+      "friday": "vendredi",
+      "jul18": "18 juillet",
+      "jul30": "30 juillet",
+      "aug13": "13 août",
+      "aug26": "26 août",
+      "sep4": "4 septembre",
+      "sep12": "12 septembre",
+      "sep24": "24 septembre",
+      "sep30": "30 septembre",
+      "oct1": "1er octobre",
+      "oct2": "2 octobre",
+      "sep23": "23 septembre"
+    },
+    "problems": {
+      "ordersDisk": {
+        "title": "orders-db manquera d'espace disque dans environ 3 jours",
+        "summary": "Son disque se remplit d'environ 18 Go par jour depuis la sortie de la version d'orders jeudi, qui a activé la journalisation d'audit ; il sera donc plein mercredi matin. Le moment venu, checkout, orders et refunds commenceront à échouer. Rien n'est encore cassé, alors j'ai prévenu votre équipe plutôt que de déclencher une astreinte.",
+        "notify1": "orders-db manquera d'espace disque dans environ 3 jours, vers mercredi 11:00.",
+        "notify2": "Cause : depuis la sortie d'orders 3.8.0 jeudi, la journalisation d'audit écrit environ 18 Go par jour. Avant cela, le disque croissait d'environ 6 Go par jour.",
+        "notify3": "Réduisez la journalisation d'audit ou ajoutez de l'espace disque avant mercredi. Quand il sera plein, checkout, orders et refunds échoueront. Rien n'est encore cassé : c'est un avertissement, pas une astreinte.",
+        "chartCaption": "disque · plein ~mer. 11:00",
+        "chartLabel": "L'utilisation du disque est passée de 334 à 445 Go sur 500 en 14 jours, plus rapidement depuis jeudi, et devrait être pleine vers mercredi 11:00"
+      },
+      "search": {
+        "title": "La recherche est lente et search-2 plante sans arrêt",
+        "titleFixed": "La recherche était lente et search-2 plantait sans arrêt",
+        "summary": "Environ 1 recherche sur 5 dépasse 3 secondes, depuis 10:27. Un paramètre modifié sur search-2 à 10:16 la fait manquer de mémoire. J'ai déclenché l'astreinte, et le problème persiste.",
+        "notify1": "La recherche est lente : environ 1 recherche sur 5 dépasse 3 secondes, depuis 10:27.",
+        "notify2": "Cause : un paramètre modifié sur search-2 à 10:16 sature sa mémoire. Il a planté environ 10 fois depuis 10:20. Les 4 autres nœuds n'ont pas la modification et fonctionnent bien.",
+        "notify3": "Rétablir l'ancien paramètre devrait corriger le problème, et je peux annuler la modification. Répondez « revert » et je le fais. La personne à l'origine du changement devrait vérifier pourquoi.",
+        "summaryFixed": "Le problème a commencé à 10:27, parce qu'un paramètre modifié sur search-2 saturait sa mémoire. Vous avez approuvé le rétablissement de l'ancien paramètre, je l'ai fait, et les recherches sont revenues à la normale.",
+        "summaryFixing": "Le problème a commencé à 10:27, parce qu'un paramètre modifié sur search-2 sature sa mémoire. Vous avez approuvé le rétablissement de l'ancien paramètre, je m'en occupe maintenant.",
+        "chartCaption": "latence p95 · pic à 3,4 s",
+        "chartLabel": "La latence p95 est passée de 0,38 s à 3,4 s à 10:27 et reste élevée",
+        "chartLabelFixed": "La latence p95 est passée de 0,38 s à 3,4 s à 10:27 puis est revenue à la normale une fois le paramètre rétabli"
+      },
+      "checkout": {
+        "title": "1 paiement sur 12 a échoué après un déploiement",
+        "summary": "payments-api 2.3.1 a demandé à la base de données de paiements plus de connexions qu'elle n'en autorise. Le retour arrière a corrigé le problème 18 minutes après le début des échecs.",
+        "notify1": "Environ 1 paiement sur 12 échoue au checkout, depuis 14:02.",
+        "notify2": "Cause probable : payments-api 2.3.1 a été déployée à 14:01 et a fait passer son pool de connexions de 20 à 50 par serveur. 6 serveurs × 50 dépassent les 200 autorisées par la base de données de paiements.",
+        "notify3": "Revenir à 2.3.0 est la correction la plus rapide.",
+        "chartCaption": "paiements échoués · pic de 1 sur 12",
+        "chartLabel": "Les paiements échoués sont passés de 0,1 % à 1 sur 12 à 14:02 et sont revenus à la normale 18 minutes plus tard, après le rollback"
+      },
+      "pool": {
+        "title": "Checkout a épuisé ses connexions à la base de données",
+        "summary": "Des connexions fuitées ont épuisé toutes les connexions libres, et les paiements ont commencé à expirer. Vous avez approuvé leur fermeture, alors je l'ai fait. Les paiements se sont rétablis 2 minutes plus tard.",
+        "notify1": "Checkout a épuisé ses connexions à la base de données, et environ 1 paiement sur 9 expire, depuis 11:18.",
+        "notify2": "Cause : 48 des 50 connexions sont retenues par des exports de remboursements qui ne les ont jamais rendues. C'est la fuite CHK-482, la troisième fois en deux semaines.",
+        "notify3": "Fermer uniquement les connexions fuitées devrait résoudre le problème ; les paiements en cours ne sont pas touchés. Répondez « oui » et je le ferai.",
+        "chartCaption": "expirations · pic à 1 sur 9",
+        "chartLabel": "Les expirations de paiement ont atteint environ 1 sur 9 à 11:18 et se sont rétablies 2 minutes après le correctif à 11:21"
+      },
+      "email": {
+        "title": "Les e-mails de commande ont eu jusqu'à 9 minutes de retard",
+        "summary": "Tous les workers d'e-mails ont été remplacés d'un coup pendant la nuit, et la file a rattrapé son retard toute seule en environ 20 minutes. C'était mineur, donc ça a été inclus dans le récapitulatif de vendredi.",
+        "chartCaption": "retard e-mail · pic à 9 min",
+        "chartLabel": "Le retard des e-mails est monté à 9 minutes à partir de 03:15 et s'est rétabli tout seul à 03:36"
+      },
+      "recs": {
+        "title": "Les recommandations ont ralenti pendant 15 minutes",
+        "summary": "Elles sont passées d'un quart de seconde à presque une seconde. La reconstruction nocturne du cache avait été lancée à la main dans l'après-midi, et elle s'est terminée toute seule. Je l'ai gardée pour le récapitulatif de vendredi.",
+        "chartCaption": "latence p95 · pic à 0,94 s",
+        "chartLabel": "La latence p95 est passée de 0,26 s à 0,94 s à 16:40 et s'est rétablie toute seule 15 minutes plus tard"
+      },
+      "login": {
+        "title": "La connexion a été lente pendant environ 25 minutes",
+        "summary": "1 personne sur 8 a attendu plus de 5 secondes. Le cache de session a manqué d'espace après un pic de trafic et a déconnecté certaines personnes. Votre équipe a ajouté de l'espace et tout est revenu à la normale.",
+        "notify1": "La connexion est lente : environ 1 personne sur 8 attend plus de 5 secondes, depuis 10:12.",
+        "notify2": "Cause : le cache de session est plein après le doublement du trafic à 10:05.",
+        "notify3": "Ajouter de l'espace au cache devrait résoudre le problème.",
+        "chartCaption": "connexion p95 · pic à 5,8 s",
+        "chartLabel": "Le temps de connexion p95 est passé de 0,6 s à 5,8 s à 10:12 et s'est rétabli après l'ajout d'espace de cache à 10:31"
+      },
+      "queue": {
+        "title": "Les commandes se sont accumulées dans la file",
+        "summary": "Environ 4 000 attendaient au pire. J'ai ajouté des workers comme vous l'avez autorisé, mais ça n'a pas aidé, alors je les ai remis et j'ai alerté l'astreinte. La vraie cause était un index de base de données laissé cassé par une migration ; votre équipe l'a corrigé 40 minutes après le début.",
+        "notify1": "Les commandes s'accumulent : environ 4 000 en attente, depuis 21:30.",
+        "notify2": "J'ai ajouté des workers à 21:33, comme vous l'avez autorisé, mais ça n'a pas aidé, alors je les ai remis.",
+        "notify3": "Les recherches de commandes sont environ 40 fois plus lentes depuis la migration de base de données de 21:20. Vérifiez d'abord l'index orders_by_status.",
+        "chartCaption": "accumulation · pic à 4 120",
+        "chartLabel": "Le nombre de commandes en attente est monté à 4 120 à partir de 21:30, a continué d'augmenter après l'ajout de workers, et s'est résorbé une fois l'index reconstruit à 21:52"
+      },
+      "uploads": {
+        "title": "Les téléversements d'images ont échoué pour 1 personne sur 40",
+        "summary": "Ça a duré 10 minutes, parce qu'un certificat a expiré avant qu'un serveur ait chargé son remplacement. Ça s'est réglé tout seul, alors je l'ai gardé pour le récapitulatif de vendredi.",
+        "chartCaption": "téléversements échoués · pic à 1 sur 40",
+        "chartLabel": "Les téléversements échoués ont atteint environ 1 sur 40 à 07:05 et se sont rétablis tout seuls 10 minutes plus tard"
+      },
+      "push": {
+        "title": "Les notifications push sont arrivées avec 2 minutes de retard",
+        "summary": "Ça a duré une demi-heure, pendant que le fournisseur qui les délivre était lent. Mineur, donc ça a attendu le récapitulatif de vendredi.",
+        "chartCaption": "retard de livraison · pic à 2 min",
+        "chartLabel": "Le retard de livraison est passé de 4 s à environ 2 minutes à 13:50 et s'est rétabli tout seul 30 minutes plus tard"
+      },
+      "checkoutNow": {
+        "title": "Checkout fait échouer 1 paiement sur 6",
+        "titleFixed": "Checkout a fait échouer 1 paiement sur 6",
+        "summary": "Ça a commencé à 10:43, et je cherche encore pourquoi. Jusqu'ici, ça coïncide avec le déploiement de la version 2.4.0 à 10:41, et j'ai alerté l'astreinte.",
+        "notify1": "Checkout fait échouer environ 1 paiement sur 6, depuis 10:43.",
+        "notify2": "Je cherche encore pourquoi. Jusqu'ici, ça coïncide avec le déploiement de checkout 2.4.0 à 10:41.",
+        "notify3": "Seuls les serveurs en 2.4.0 échouent. Répondez « stop » et je renverrai le trafic vers l'ancienne version ; les anciens serveurs ont la capacité de l'absorber. Je ne vois pas payments-db directement, donc je ne l'ai pas écarté.",
+        "summaryFixing": "Ça a commencé à 10:43, juste après le déploiement de la version 2.4.0. Vous avez approuvé l'arrêt du déploiement, donc je renvoie le trafic vers l'ancienne version maintenant.",
+        "summaryFixed": "Ça a commencé à 10:43, après le déploiement de la version 2.4.0. Vous avez approuvé l'arrêt du déploiement, et les échecs ont cessé une fois le trafic renvoyé vers l'ancienne version. Reste à votre équipe de trouver pourquoi 2.4.0 échoue.",
+        "chartCaption": "paiements échoués · pic à 1 sur 6",
+        "chartLabel": "Les paiements échoués sont passés de 0,1 % à environ 1 sur 6 à 10:43 et échouent encore",
+        "chartLabelFixed": "Les paiements échoués sont passés de 0,1 % à environ 1 sur 6 à 10:43 et sont revenus à la normale une fois le déploiement arrêté"
+      },
+      "gateway": {
+        "title": "L'API a rejeté 1 requête sur 30",
+        "summary": "Cela a commencé après un changement de configuration. Votre équipe l'a annulé, et tout est revenu à la normale 13 minutes après le début.",
+        "notify1": "L'API rejette environ 1 requête sur 30, depuis 15:22.",
+        "notify2": "Cause probable : un changement de configuration à 15:20 a réduit la durée de validité des jetons de connexion.",
+        "notify3": "Annuler ce changement devrait corriger le problème.",
+        "chartCaption": "rejetées · pic de 1 sur 30",
+        "chartLabel": "Les requêtes rejetées ont atteint 1 sur 30 à 15:22 et sont revenues à la normale lorsque le changement de configuration a été annulé à 15:34"
+      },
+      "poolSep": {
+        "title": "Checkout a épuisé ses connexions à la base de données",
+        "summary": "Des connexions fuyantes ont épuisé toutes les connexions libres, et les paiements ont commencé à expirer. J'ai retracé la fuite jusqu'aux exports de remboursements, et vous avez approuvé la fermeture des connexions fuyantes. Les paiements se sont rétablis 2 minutes plus tard.",
+        "notify1": "Checkout a épuisé ses connexions à la base de données, et environ 1 paiement sur 9 expire, depuis 15:42.",
+        "notify2": "Cause : 47 connexions sur 50 sont retenues par des exports de remboursements qui ne les ont jamais rendues. Cela ressemble à une fuite dans le code d'export des remboursements.",
+        "notify3": "Fermer uniquement les connexions fuyantes devrait résoudre le problème ; les paiements en cours ne sont pas touchés. Répondez « oui » et je le ferai.",
+        "chartCaption": "expirations · pic de 1 sur 9",
+        "chartLabel": "Les expirations de paiement ont atteint environ 1 sur 9 à 15:42 et se sont rétablies 2 minutes après la correction à 15:45"
+      },
+      "poolOct": {
+        "title": "Checkout a de nouveau épuisé ses connexions à la base de données",
+        "summary": "C'était la même fuite d'export de remboursements (CHK-482). Vous avez approuvé la fermeture des connexions fuyantes, et les paiements se sont rétablis 2 minutes plus tard.",
+        "notify1": "Checkout a épuisé ses connexions à la base de données, et environ 1 paiement sur 9 expire, depuis 10:05.",
+        "notify2": "Cause : 46 connexions sur 50 sont retenues par des exports de remboursements. C'est encore la fuite CHK-482, la deuxième fois en 8 jours.",
+        "notify3": "Fermer uniquement les connexions fuyantes devrait résoudre le problème ; les paiements en cours ne sont pas touchés. Répondez « oui » et je le ferai.",
+        "chartCaption": "expirations · pic de 1 sur 9",
+        "chartLabel": "Les expirations de paiement ont atteint environ 1 sur 9 à 10:05 et se sont rétablies 2 minutes après la correction à 10:08"
+      },
+      "lagSep": {
+        "title": "Les nouveaux produits ont mis jusqu'à 40 minutes à apparaître dans la recherche",
+        "summary": "search-indexer a pris du retard sur les mises à jour du catalogue après que la version 1.12.0 a réduit le temps autorisé par lot. Votre équipe a fait un retour arrière et il a rattrapé son retard 40 minutes après le début.",
+        "notify1": "Les produits nouveaux et modifiés sont absents de la recherche : search-indexer a environ 48 000 mises à jour de catalogue de retard, depuis 14:06.",
+        "notify2": "Cause : search-indexer 1.12.0 a été déployé à 13:58 et a réduit l'intervalle d'interrogation Kafka à 30 s. Les gros lots prennent environ 45 s, donc le consommateur est sans cesse retiré de son groupe.",
+        "notify3": "Un retour à la 1.11.4 devrait lui permettre de rattraper son retard. La recherche elle-même fonctionne toujours ; elle affiche simplement des produits plus anciens.",
+        "chartCaption": "retard du consommateur · pic de 48 000",
+        "chartLabel": "Le retard du consommateur est passé d'environ 200 à 48 000 messages à partir de 14:06 et s'est résorbé après le retour arrière à 14:39"
+      },
+      "poolAug": {
+        "title": "Checkout a épuisé ses connexions à la base de données pendant l'export des remboursements",
+        "summary": "L'export nocturne des remboursements retenait presque toutes les connexions à la base de données de checkout, et environ 1 paiement sur 12 a expiré. Le problème a disparu lorsque l'export s'est terminé, 13 minutes après son début.",
+        "notify1": "Checkout a épuisé ses connexions à la base de données, et environ 1 paiement sur 12 expire, depuis 02:04.",
+        "notify2": "Cause : 44 connexions sur 50 sont retenues par l'export nocturne des remboursements, qui est environ 3 fois plus volumineux que d'habitude après la vente de fin de mois.",
+        "notify3": "Le problème devrait disparaître lorsque l'export se terminera. Sinon, arrêter l'export libérera les connexions.",
+        "chartCaption": "expirations · pic de 1 sur 12",
+        "chartLabel": "Les expirations de paiement ont atteint environ 1 sur 12 à 02:04 et se sont rétablies d'elles-mêmes lorsque l'export s'est terminé à 02:17"
+      },
+      "throttleAug": {
+        "title": "Les contrôles de fraude ont été lents pendant 35 minutes",
+        "summary": "Un traitement par lots s'est exécuté sur les mêmes serveurs et a pris leur CPU disponible, si bien que les contrôles de fraude ont pris jusqu'à 1,4 seconde. Checkout fonctionnait toujours, simplement plus lentement, et tout est revenu à la normale à la fin du traitement, donc je l'ai mis de côté pour le récapitulatif de vendredi.",
+        "chartCaption": "contrôle de fraude p95 · pic de 1,4 s",
+        "chartLabel": "Le temps de contrôle de fraude p95 est passé de 0,18 s à 1,4 s à 11:20 et est revenu à la normale de lui-même lorsque le traitement par lots s'est terminé à 11:55"
+      },
+      "tlsJul": {
+        "title": "L'envoi des factures s'est arrêté pendant 43 minutes",
+        "summary": "Le certificat d'invoice-service pour billing-api a expiré, donc aucune facture n'a pu être envoyée. Votre équipe l'a renouvelé, et toutes les factures en file d'attente ont été envoyées.",
+        "notify1": "Aucune facture n'est envoyée : chaque envoi depuis invoice-service échoue, depuis 09:01.",
+        "notify2": "Cause : le certificat client d'invoice-service pour billing-api a expiré à 09:00, et billing-api rejette toutes les connexions venant de lui.",
+        "notify3": "Renouveler le certificat devrait corriger le problème. Les factures sont mises en file d'attente, pas perdues.",
+        "chartCaption": "envois échoués · la totalité",
+        "chartLabel": "Les envois de factures échoués sont passés de 0,2 % à 100 % à 09:01 et sont revenus à la normale après le renouvellement du certificat à 09:41"
+      },
+      "dnsJul": {
+        "title": "Les prix du panier ont disparu pour 1 personne sur 4",
+        "summary": "Un changement DNS a empêché la moitié des serveurs DNS du cluster de répondre pour les noms internes, donc cart ne pouvait pas joindre currency. Votre équipe l'a annulé 31 minutes après le début.",
+        "notify1": "Environ 1 chargement de panier sur 4 n'affiche aucun prix, depuis 16:22.",
+        "notify2": "Cause : un changement de configuration DNS à 16:20 a retiré la zone interne de 2 des 4 serveurs DNS du cluster, donc cart ne trouve pas currency.internal lors de ces résolutions.",
+        "notify3": "Annuler le changement DNS devrait corriger le problème. Les commandes passent toujours au paiement.",
+        "chartCaption": "prix manquants · pic à 1 sur 4",
+        "chartLabel": "Les chargements de panier sans prix sont passés de 0,1 % à environ 1 sur 4 à 16:22, puis sont revenus à la normale lorsque la modification DNS a été annulée à 16:51"
+      }
+    },
+    "drawer": {
+      "worked": "A fonctionné",
+      "didntHelp": "N'a pas aidé",
+      "now": "Maintenant"
+    },
+    "needs": {
+      "more": "Plus",
+      "less": "Moins",
+      "canUndo": "Vous pouvez annuler",
+      "undo": "Annuler",
+      "undone": "Annulé. Cette demande attend à nouveau votre réponse.",
+      "shiftTo": "à",
+      "retune": {
+        "body": "L'alerte « {alert} » sur {host} s'est déclenchée {fired} fois ce mois-ci, et personne n'a eu besoin d'agir. Le disque monte à environ 85 % pendant le nettoyage nocturne et redescend près de 70 % au matin. Même lors de sa journée la plus chargée, il faudrait plus de 3 jours pour le remplir à partir de 90 %. J'aimerais la relever à {to} %. Je vous préviendrai toujours si le disque risque de se remplir en moins d'un jour.",
+        "yes": "Oui, modifiez-la",
+        "no": "Laissez tel quel",
+        "doneYes": "C'est fait. Je l'ai relevée à {to} %. L'avertissement de remplissage reste actif.",
+        "doneNo": "D'accord, je la laisse à {from} %.",
+        "headline": "Relever l'alerte « disque 80 % » sur ingest-3 à 90 % ?",
+        "why": "Elle s'est déclenchée 41 fois ce mois-ci et personne n'a eu besoin d'agir.",
+        "cost": "L'avertissement de remplissage reste actif"
+      },
+      "fixNow": {
+        "search": {
+          "body": "La recherche est lente parce qu'un paramètre modifié sur le nœud search-2 à 10:16 remplit sa mémoire, ce qui le fait planter sans cesse. Les 4 autres nœuds ont encore l'ancien paramètre et fonctionnent bien. Puis-je le rétablir ? Je peux annuler cette action.",
+          "yes": "Rétablissez-le",
+          "no": "Je m'en occupe",
+          "doneYes": "C'est fait. Je le rétablis maintenant.",
+          "doneNo": "D'accord, c'est à vous. Je continue à surveiller.",
+          "doneSettled": "C'est fait. search-2 est de retour et les recherches sont normales.",
+          "headline": "Rétablir le paramètre de cache de search-2 à 10 % ?",
+          "why": "Une modification à 10:16 remplit sa mémoire, ce qui le fait planter sans cesse.",
+          "cost": "Un redémarrage de search-2"
+        },
+        "checkoutNow": {
+          "body": "Checkout échoue sur environ 1 paiement sur 6, et seuls les serveurs en 2.4.0 échouent. Les 6 serveurs sur l'ancienne version ont la capacité d'absorber tout le trafic. Puis-je arrêter le déploiement progressif et leur renvoyer le trafic ? 2.4.0 reste déployé pour que votre équipe puisse l'examiner.",
+          "yes": "Arrêtez le déploiement",
+          "no": "Je m'en occupe",
+          "doneYes": "C'est fait. J'arrête le déploiement maintenant.",
+          "doneNo": "D'accord, c'est à vous. Je continue à surveiller.",
+          "doneSettled": "C'est fait. Les paiements sont revenus à la normale.",
+          "headline": "Arrêter le déploiement de checkout 2.4.0 ?",
+          "why": "Environ 1 paiement sur 6 échoue, tous en 2.4.0. L'ancienne version peut absorber tout le trafic.",
+          "cost": "2.4.0 reste déployé"
+        }
+      },
+      "fromNowOn": {
+        "body": "{done} fois maintenant, une nouvelle version a fait échouer uniquement ses propres serveurs pendant son déploiement. À chaque fois, j'ai demandé à renvoyer le trafic vers l'ancienne version, et les échecs ont cessé en moins de 2 minutes. Puis-je le faire de moi-même pendant un déploiement à partir de maintenant ? Je laisserai la nouvelle version en place pour votre équipe et je les préviendrai immédiatement.",
+        "yes": "Oui, de façon autonome",
+        "no": "Continuez à me demander",
+        "doneYes": "C'est fait. J'arrêterai les mauvais déploiements de façon autonome et je vous préviendrai à chaque fois.",
+        "doneNo": "D'accord, je continuerai à vous demander d'abord.",
+        "headline": "Arrêter les mauvais déploiements de façon autonome à partir de maintenant ?",
+        "why": "Les 6 fois, vous avez dit oui et les échecs ont cessé en moins de 2 minutes.",
+        "cost": "Uniquement pendant un déploiement"
+      },
+      "labels": {
+        "fixNow": "Corriger maintenant",
+        "fromNowOn": "Laissez-moi gérer",
+        "retune": "Alerte plus discrète"
+      },
+      "needsOk": "Nécessite votre accord"
+    },
+    "footer": {
+      "text": "Je me surveille aussi : si j'arrête de fonctionner, vous serez prévenu.",
+      "seeAll": "Voir tout ce que je surveille",
+      "seeChanges": "Voir tout ce que j'ai modifié"
+    },
+    "coverageDrawer": {
+      "ago": {
+        "minutes": "Il y a 1 minute | Il y a {count} minutes",
+        "stale": "Aucune nouvelle donnée depuis 1 minute (depuis {since}) | Aucune nouvelle donnée depuis {count} minutes (depuis {since})"
+      },
+      "summaryWatching": "Je surveille {watched} de vos {total} services.",
+      "summaryAll": "Je surveille l'ensemble de vos {total} services.",
+      "summaryWithClauses": "{head} {clauses}.",
+      "clauseLearning": "{count} apprend encore | {count} apprennent encore",
+      "clauseUnseen": "il y en a un que je ne vois pas | il y en a {count} que je ne vois pas",
+      "legend": {
+        "watching": "Entièrement surveillé",
+        "learning": "Apprentissage",
+        "unseen": "Non visible"
+      },
+      "legendAria": "{label}: {count}",
+      "summaryAllLearning": "Je surveille l'ensemble de vos {total} services, et j'apprends encore à quoi ressemble la normale pour chacun d'eux."
+    },
+    "coveragePage": {
+      "title": "Tout ce que je surveille",
+      "back": "Retour"
+    },
+    "issuesPage": {
+      "title": "Tous les problèmes",
+      "sentence": "Chaque problème que j'ai ouvert {within}. Choisissez-en un pour voir ce qui s'est passé et ce que j'ai fait.",
+      "back": "Retour",
+      "ranges": {
+        "week": "7 derniers jours",
+        "month": "30 derniers jours",
+        "quarter": "90 derniers jours"
+      },
+      "within": {
+        "week": "au cours des 7 derniers jours",
+        "month": "au cours des 30 derniers jours",
+        "quarter": "au cours des 90 derniers jours"
+      }
+    },
+    "activityPage": {
+      "title": "Ce que j'ai modifié",
+      "stats": {
+        "window": "7 derniers jours",
+        "made": "Modification | Modifications",
+        "worked": "A fonctionné",
+        "review": "En revue",
+        "undone": "Annulé"
+      },
+      "filters": {
+        "all": "Tous",
+        "fixes": "Correctifs",
+        "watching": "Surveillance",
+        "tuning": "Réglage des alertes"
+      },
+      "status": {
+        "applying": "Application en cours",
+        "worked": "A fonctionné",
+        "done": "Terminé",
+        "review": "En revue",
+        "reviewDays": "En revue · {count} jour restant | En revue · {count} jours restants",
+        "didntHelp": "N'a pas aidé",
+        "undone": "Annulé"
+      },
+      "actions": {
+        "undo": "Annuler",
+        "showDetails": "Afficher les détails",
+        "hideDetails": "Masquer les détails"
+      },
+      "details": {
+        "name": "Modification",
+        "target": "Sur",
+        "confidence": "Confiance",
+        "saw": "Ce que j'ai vu",
+        "recurring": "Ce correctif est toujours nécessaire pour la même fuite ({bug}), je demanderai donc toujours avant d'agir tant qu'elle n'est pas corrigée.",
+        "undoDecided": "Annuler revient en arrière, et je vous demanderai à nouveau."
+      },
+      "toast": {
+        "undone": "Annulé. Tout est revenu comme avant.",
+        "undoDecided": "Annulé. Je vous demanderai à nouveau."
+      },
+      "empty": {
+        "filter": "Rien ici pour le moment.",
+        "scenario": "Je n'ai encore rien changé. Quand je ferai un changement, vous le verrez ici."
+      },
+      "entries": {
+        "L-313": {
+          "done": "Arrêt du déploiement 2.4.0 de checkout",
+          "why": "Seuls les 6 serveurs en 2.4.0 échouent ; les 6 sur l'ancienne version peuvent absorber tout le trafic.",
+          "from": "6 pods sur 12",
+          "to": "aucun trafic",
+          "on": "checkout 2.4.0"
+        },
+        "L-308": {
+          "done": "Paramètre de cache de search-2 rétabli à 10 %",
+          "why": "Il est passé à 60 % à 10:16, et search-2 manque de mémoire depuis.",
+          "from": "60 %",
+          "to": "10 %",
+          "on": "taille du cache · search-2"
+        },
+        "L-309": {
+          "done": "Alerte « disque 80 % » sur ingest-3 relevée à 90 %",
+          "why": "Elle s'est déclenchée 41 fois ce mois-ci sans que personne n'ait à agir. L'avertissement de remplissage reste activé.",
+          "from": "80 %",
+          "to": "90 %",
+          "on": "alerte disque · ingest-3"
+        },
+        "L-310": {
+          "done": "Surveillance démarrée pour returns, exchanges et gift-cards",
+          "why": "Je les ai trouvés ce matin. J'apprends ce qui est normal pour eux sur 7 jours.",
+          "from": "non surveillé",
+          "to": "surveillé",
+          "on": "3 services"
+        },
+        "L-314": {
+          "done": "Surveillance démarrée pour les 6 services que j'ai trouvés ce matin",
+          "why": "Ils sont apparus dans vos traces aujourd'hui. J'apprends ce qui est normal pour eux sur 7 jours.",
+          "from": "non surveillé",
+          "to": "surveillé",
+          "on": "6 services"
+        },
+        "L-311": {
+          "done": "Accord obtenu pour arrêter les mauvais déploiements de ma propre initiative",
+          "why": "J'en ai arrêté 6 avec votre approbation en 60 jours ; à chaque fois, les erreurs sont revenues à la normale en moins de 2 minutes.",
+          "from": "demander d'abord",
+          "to": "de ma propre initiative",
+          "on": "arrêt des déploiements"
+        },
+        "L-304": {
+          "done": "48 connexions de base de données fuyantes de checkout libérées",
+          "why": "Les paiements expiraient. Ils sont revenus à la normale 2 minutes plus tard.",
+          "from": "50 sur 50 utilisées",
+          "to": "2 utilisées",
+          "on": "pool de checkout"
+        },
+        "L-299": {
+          "done": "46 connexions de base de données fuyantes de checkout libérées",
+          "why": "La même fuite que le 23 septembre. Les paiements sont revenus à la normale 2 minutes plus tard.",
+          "from": "50 sur 50 utilisées",
+          "to": "4 utilisées",
+          "on": "pool de checkout"
+        },
+        "L-296": {
+          "done": "47 connexions de base de données fuyantes de checkout libérées",
+          "why": "Une nouvelle fuite ; je l'ai donc ensuite signalée à l'équipe checkout sous la référence CHK-482.",
+          "from": "50 sur 50 utilisées",
+          "to": "3 utilisées",
+          "on": "pool de checkout"
+        },
+        "L-301": {
+          "done": "J'ai commencé à surveiller billing-api, billing-worker et invoice-service",
+          "why": "Je les ai trouvés dans vos traces. J'apprends encore ce qui est normal pour eux.",
+          "from": "non surveillé",
+          "to": "surveillé",
+          "on": "3 services"
+        },
+        "L-307": {
+          "done": "J'ai corrigé l'alerte de connexion de payments-api pour qu'elle compte tous les serveurs",
+          "why": "Elle vérifiait chaque serveur individuellement, donc elle ne s'est jamais déclenchée pendant la panne de mardi.",
+          "from": "chaque pod au-dessus de 95 %",
+          "to": "tous les pods au-dessus de 85 %",
+          "on": "alerte de connexion"
+        },
+        "L-302": {
+          "done": "J'ai regroupé les 3 alertes de latence checkout en une seule",
+          "why": "Elles se déclenchaient ensemble 94 % du temps, donc un seul ralentissement vous a alerté 3 fois.",
+          "from": "3 alertes",
+          "to": "1",
+          "on": "latence checkout"
+        },
+        "L-303": {
+          "done": "J'ai relevé l'alerte « disk 80 % » sur ingest-1 à 90 %",
+          "why": "Elle s'est déclenchée 29 fois en 30 jours et personne n'a eu besoin d'agir. L'avertissement de remplissage reste actif.",
+          "from": "80 %",
+          "to": "90 %",
+          "on": "alerte disque · ingest-1"
+        },
+        "L-305": {
+          "done": "J'ai ajouté 4 workers orders-consumer pour résorber un backlog",
+          "why": "Cela n'a pas aidé, donc je suis revenu à 4 et j'ai alerté l'astreinte 3 minutes plus tard.",
+          "from": "4 workers",
+          "to": "8 workers",
+          "on": "orders-consumer"
+        },
+        "L-306": {
+          "done": "J'ai obtenu votre accord pour ajouter des workers de file d'attente de façon autonome",
+          "why": "Vous l'avez approuvé 7 fois pendant des pics de trafic, et le backlog s'est résorbé à chaque fois.",
+          "from": "demander d'abord",
+          "to": "de façon autonome",
+          "on": "ajout de workers de file d'attente"
+        },
+        "L-312": {
+          "done": "J'ai commencé à surveiller les 18 services que j'ai trouvés lors de votre connexion",
+          "why": "J'apprends ce qui est normal pour chacun. Leurs alertes démarreront une fois que ce sera prêt.",
+          "from": "non surveillé",
+          "to": "surveillé",
+          "on": "18 services"
+        }
+      }
+    },
+    "historyDrawer": {
+      "title": "Historique",
+      "seeChange": "Voir le changement",
+      "filters": {
+        "all": "Tout",
+        "problems": "Problèmes",
+        "changes": "Changements",
+        "fixes": "Corrections",
+        "decisions": "Vos décisions"
+      },
+      "empty": "Rien ici pour l'instant.",
+      "entries": {
+        "checkoutNowPaged": "J'ai alerté l'astreinte au sujet de checkout qui fait échouer les paiements.",
+        "searchPaged": "J'ai alerté l'astreinte au sujet de la lenteur de search.",
+        "searchAsked": "J'ai demandé si je pouvais rétablir le réglage de cache de search-2.",
+        "euStopped": "Rien n'est arrivé du cluster {cluster} depuis cette heure-ci. Je vous l'ai signalé ici et dans Slack.",
+        "fridaySummary": "J'ai envoyé le résumé de vendredi avec {count} problème mineur. | J'ai envoyé le résumé de vendredi avec {count} problèmes mineurs.",
+        "emailHeld": "J'ai gardé un problème mineur concernant les e-mails de commande pour le résumé de vendredi.",
+        "poolFixed": "J'ai fermé les connexions de base de données fuitées de checkout. Les paiements se sont rétablis 2 minutes plus tard.",
+        "poolApproved": "Vous avez approuvé la fermeture des connexions de base de données qui fuient sur checkout.",
+        "billingWatch": "J'ai commencé à surveiller billing-api, billing-worker et invoice-service.",
+        "checkoutPaged": "J'ai alerté l'astreinte au sujet des paiements en échec sur checkout.",
+        "recsHeld": "J'ai gardé de côté un problème mineur avec recommendations pour le résumé de vendredi.",
+        "diskApproved": "Vous avez approuvé de relever l'alerte disque sur ingest-1 à {to} %.",
+        "latencyGrouped": "J'ai regroupé les trois alertes de lenteur de checkout en une seule, pour qu'un seul ralentissement ne déclenche qu'une seule alerte.",
+        "queueFixed": "J'ai ajouté des workers à la file orders, mais la file continuait de grandir, alors je les ai retirés et j'ai alerté l'astreinte.",
+        "loginPaged": "J'ai alerté l'astreinte au sujet de la lenteur de connexion.",
+        "queuePermission": "Vous m'avez autorisé à ajouter moi-même des workers de file d'attente, jusqu'à 8.",
+        "gatewayPaged": "J'ai alerté l'astreinte au sujet de l'API qui rejette des requêtes.",
+        "found18": "J'ai découvert {count} services et j'ai commencé à apprendre à quoi ressemble leur état normal.",
+        "connected": "Vous m'avez connecté à vos données.",
+        "thresholdApproved": "Vous avez approuvé que l'alerte de connexion de payments-api compte tous les serveurs par rapport à la limite de 200 de la base de données.",
+        "decision": {
+          "fixNow": {
+            "search": {
+              "yes": "Vous avez approuvé le rétablissement du réglage de search-2.",
+              "no": "Vous avez dit que vous vous occuperiez de search-2 vous-même.",
+              "undoYes": "Vous avez annulé le rétablissement du réglage de search-2. J'ai réappliqué 60 %, donc search-2 va de nouveau manquer de mémoire ; j'ai prévenu l'astreinte.",
+              "cancel": "Vous avez annulé le rétablissement du réglage de search-2 avant que je l'applique. search-2 manque toujours de mémoire ; j'ai prévenu l'astreinte.",
+              "undoNo": "Vous êtes revenu sur votre décision de vous occuper de search-2 vous-même."
+            },
+            "checkoutNow": {
+              "yes": "Vous avez approuvé l'arrêt du déploiement de checkout 2.4.0.",
+              "no": "Vous avez dit que vous vous occuperiez vous-même du déploiement de checkout.",
+              "undoYes": "Vous avez annulé l'arrêt du déploiement 2.4.0. Le trafic est de nouveau dirigé vers 2.4.0, donc les paiements pourraient recommencer à échouer ; j'ai prévenu l'astreinte et je surveille.",
+              "cancel": "Vous avez annulé l'arrêt du déploiement 2.4.0 avant que je ne le fasse. Les paiements échouent toujours ; j'ai prévenu l'astreinte.",
+              "undoNo": "Vous êtes revenu sur votre décision de vous occuper vous-même du déploiement de checkout."
+            }
+          },
+          "retune": {
+            "yes": "Vous avez approuvé de relever l'alerte disque sur ingest-3 à 90 %.",
+            "no": "Vous avez dit « pas maintenant » à l'idée de relever l'alerte disque sur ingest-3.",
+            "undoYes": "Vous avez annulé le relèvement de l'alerte disque sur ingest-3. Elle est revenue à 80 %, donc elle recommencera à se déclencher les nuits sans problème.",
+            "undoNo": "Vous êtes revenu sur votre « pas maintenant » concernant l'alerte disque sur ingest-3."
+          },
+          "fromNowOn": {
+            "yes": "Vous avez approuvé que j'arrête moi-même les mauvais déploiements.",
+            "no": "Vous avez dit « pas maintenant » à l'idée de me laisser arrêter moi-même les mauvais déploiements.",
+            "undoYes": "Vous êtes revenu sur le fait de me laisser arrêter moi-même les mauvais déploiements.",
+            "undoNo": "Vous êtes revenu sur votre « pas maintenant » concernant le fait de me laisser arrêter moi-même les mauvais déploiements."
+          }
+        },
+        "fixedNow": {
+          "search": "J'ai rétabli le réglage de search-2. Les recherches sont revenues à la normale.",
+          "checkoutNow": "J'ai redirigé le trafic vers l'ancienne version, et les échecs ont cessé. La raison pour laquelle 2.4.0 échoue reste à trouver par votre équipe ; je l'ai laissée déployée pour elle."
+        },
+        "checkoutNowAsked": "J'ai demandé si je pouvais arrêter le déploiement de checkout 2.4.0.",
+        "newWatch": "J'ai découvert {count} nouveaux services ce matin (returns, exchanges et gift-cards) et j'ai commencé à les surveiller immédiatement.",
+        "foundWatch": "J'ai découvert {count} nouveaux services ce matin et j'ai commencé à les surveiller immédiatement."
+      }
+    },
+    "settingsDrawer": {
+      "title": "Réglages",
+      "reach": "Où dois-je vous joindre ?",
+      "destSlack": "Slack : {channel}",
+      "destEmail": "E-mail : {address}",
+      "autonomy": "Jusqu'où dois-je agir de moi-même ?",
+      "tell": "Dites-moi",
+      "ask": "Demandez-moi d'abord",
+      "fix": "Corrigez, puis dites-moi",
+      "tellHint": "Je vous dirai ce que je ferais et vous laisserai agir.",
+      "askHint": "Je demanderai avant chaque correction et je l'appliquerai quand vous direz oui.",
+      "fixHint": "Pour les types de correction ayant fait leurs preuves, j'agirai dans les limites que vous avez fixées et je vous préviendrai juste après.",
+      "advanced": "Avancé",
+      "perKind": "Chaque type de correction",
+      "digestDay": "Jour du résumé",
+      "excluded": "Services que je dois ignorer",
+      "excludedNone": "Aucun",
+      "kinds": {
+        "pool": "Fermer les connexions de base de données en fuite",
+        "queueWorker": "Ajouter des workers de file d'attente pendant un arriéré",
+        "retune": "Relever le seuil d'une alerte bruyante",
+        "rollback": "Annuler un déploiement",
+        "record": "Fait {done} fois, a fonctionné {worked} fois.",
+        "keptRecord": "Fait {done} fois, maintenu {worked} fois.",
+        "noRecord": "Jamais fait jusqu'ici, donc je ne le ferai pas de moi-même tant qu'il n'a pas fait ses preuves.",
+        "revertConfig": "Annuler une modification récente de réglage",
+        "abortRollout": "Arrêter un déploiement progressif défaillant",
+        "recurringRecord": "Fait {done} fois, toujours pour la même fuite ({bug}). Je continuerai de demander jusqu'à ce qu'elle soit corrigée."
+      },
+      "weekdays": {
+        "monday": "Lundi",
+        "tuesday": "Mardi",
+        "wednesday": "Mercredi",
+        "thursday": "Jeudi",
+        "friday": "Vendredi"
+      },
+      "saved": "Enregistré",
+      "noDestination": "Je ne pourrai joindre personne.",
+      "routing": "Quand je vous alerte",
+      "routingNote": "J'alerte pour tout ce qui nuit aux clients. Les choses plus petites reçoivent un message qui ne réveillera personne, et les plus petites vont dans le résumé du vendredi."
+    },
+    "howItWorks": {
+      "title": "Comment ça marche",
+      "intro": "Voici ce que je fais, en cinq étapes.",
+      "gotIt": "Compris",
+      "s1Title": "Je trouve vos services",
+      "s1": "Je parcours les données que vous envoyez déjà et j'y trouve chaque service. Quand un nouveau apparaît, je commence à le surveiller le jour même ; vous n'avez rien à demander.",
+      "s2Title": "Je les surveille",
+      "s2": "J'apprends à quoi ressemble la normale pour chaque service : ses erreurs, sa lenteur et son trafic pour chaque heure de la journée, les motifs hebdomadaires s'affinant avec le temps. Tant que je ne sais pas, j'utilise des contrôles de sécurité de base.",
+      "s3Title": "Je reste silencieux sauf si c'est réel",
+      "s3": "La plupart des moments étranges ne sont pas des problèmes. J'alerte votre équipe quand quelque chose nuit aux clients, j'envoie un message qui ne réveillera personne pour les problèmes plus petits, et je garde les choses mineures pour le résumé du vendredi.",
+      "s4Title": "J'explique chaque alerte",
+      "s4": "Chaque message indique ce qui a cassé, depuis quand, et ma meilleure interprétation du pourquoi, avec mon degré de certitude.",
+      "s5Title": "Je corrige ce que vous avez autorisé",
+      "s5": "Je ne corrige que ce que vous m'avez autorisé. Une correction qui fonctionne me rapporte un peu de confiance, et une qui n'aide pas compte contre moi. Si j'ai toujours besoin de la même correction, c'est un bug que je signale à votre équipe, pas une habitude que j'automatise."
+    },
+    "topbar": {
+      "brand": "AutoObserve",
+      "checked": "Vérifié il y a 1 minute | Vérifié il y a {count} minutes"
+    },
+    "outcome": {
+      "active": "En cours",
+      "fixed": "Corrigé par AutoObserve",
+      "resolved": "Résolu en {minutes} min",
+      "held": "Dans le résumé du vendredi",
+      "fixing": "Correction en cours",
+      "contained": "Circonscrit par AutoObserve",
+      "predicted": "Prédit"
+    },
+    "view": {
+      "standard": "Standard",
+      "nerd": "Nerd",
+      "standardTooltip": "La vue Standard donne la lecture rapide : ce qui vous concerne et ce qui s'est passé ces 7 derniers jours",
+      "nerdTooltip": "La vue Nerd montre en intégralité chaque détecteur, boucle et réglage",
+      "label": "Vue"
+    },
+    "rail": {
+      "more": "Plus bas"
+    },
+    "suggestions": {
+      "title": "Suggestions",
+      "subtitle": "Quand vous avez une minute — ceux-ci réduisent le bruit ou vous font gagner du temps."
+    }
   }
 }
