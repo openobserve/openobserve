@@ -338,6 +338,19 @@ export interface QualityDistributionBucket {
   unhealthy: number | null;
 }
 
+/** Latest scores written in one slice of the time range; times in microseconds. */
+export interface QualityTimelineBucket {
+  start: number;
+  end: number;
+  count: number;
+  unhealthy: number | null;
+  /** Boolean configs only. */
+  trueCount: number | null;
+  /** Numeric configs only, like `p95`. */
+  average: number | null;
+  p95: number | null;
+}
+
 export interface QualityScore {
   id: string;
   timestamp: number;
@@ -362,6 +375,7 @@ export interface QualityScore {
 export interface QualityScorePage {
   average: number | null;
   distribution: QualityDistributionBucket[];
+  timeline: QualityTimelineBucket[];
   list: QualityScore[];
   total: number;
   from: number;

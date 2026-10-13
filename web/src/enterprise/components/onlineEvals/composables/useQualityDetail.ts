@@ -94,6 +94,7 @@ export function useQualityDetail(opts: {
 
   const data = computed(() => scoresQuery.data.value);
   const distribution = computed(() => data.value?.distribution ?? []);
+  const timeline = computed(() => data.value?.timeline ?? []);
   const summary = computed(() => summarizeDistribution(distribution.value));
   const list = computed(() => data.value?.list ?? []);
   const total = computed(() => data.value?.total ?? 0);
@@ -147,6 +148,7 @@ export function useQualityDetail(opts: {
     filter,
     page,
     distribution,
+    timeline,
     summary,
     list,
     total,

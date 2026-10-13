@@ -25,6 +25,7 @@ import type {
   QualityScore,
   QualityScoresParams,
   QualityStatus,
+  QualityTimelineBucket,
   ScoreDataType,
 } from "@/services/online-evals.service";
 import { ALL_AGENTS_VALUE } from "@/plugins/traces/llmAgentFilter";
@@ -267,6 +268,42 @@ export function distributionDataType(distribution: QualityDistributionBucket[]):
   if (distribution.some((bucket) => bucket.lower != null)) return "numeric";
   if (distribution.some((bucket) => typeof bucket.key === "boolean")) return "boolean";
   return "categorical";
+}
+
+/** The trend, as the earlier Quality page drew it: average and p95 for numeric configs, the healthy rate with a threshold, else the true rate for boolean configs, else the score count. */
+export type QualityTrendKind = "score" | "healthyRate" | "trueRate" | "count";
+export type QualityTrendMetric = "average" | "p95" | "healthyRate" | "trueRate" | "count";
+
+export function trendKind(
+  timeline: QualityTimelineBucket[],
+  dataType: ScoreDataType,
+): QualityTrendKind {
+  if (dataType === "numeric") return "score";
+  if (timeline.some((bucket) => bucket.unhealthy != null)) return "healthyRate";
+  return dataType === "boolean" ? "trueRate" : "count";
+}
+
+/** Buckets that got scores; the trend skips the others and joins its points across them. */
+export const trendBuckets = (timeline: QualityTimelineBucket[]) =>
+  timeline.filter((bucket) => bucket.count > 0);
+
+function trendValue(bucket: QualityTimelineBucket, metric: QualityTrendMetric): number | null {
+  if (metric === "average") return bucket.average;
+  if (metric === "p95") return bucket.p95;
+  if (metric === "count") return bucket.count;
+  const part = metric === "healthyRate" ? bucket.count - (bucket.unhealthy ?? 0) : bucket.trueCount;
+  return part == null ? null : (part / bucket.count) * 100;
+}
+
+/** One point per bucket with scores, at the bucket's midpoint in milliseconds. */
+export function trendPoints(
+  timeline: QualityTimelineBucket[],
+  metric: QualityTrendMetric,
+): [number, number | null][] {
+  return trendBuckets(timeline).map((bucket) => [
+    (bucket.start + bucket.end) / 2000,
+    trendValue(bucket, metric),
+  ]);
 }
 
 /** Quality's own default range; LLM Insights and Sessions keep the shared AI range and its default. */
