@@ -20,29 +20,42 @@ export interface HexLabel {
 
 export type MeasureText = (text: string, font: number) => number;
 
-const MAX_FONT = 13;
+export const LINE_HEIGHT = 1.15;
 const MIN_FONT = 9;
-const MIN_VISIBLE = 6;
-const LINE_HEIGHT = 1.15;
+const FONT_STEP = 1.5;
 const ELLIPSIS = "…";
 
-// Every way to cut the name into two lines; separators stay at the end of line one.
-const splits = (name: string): [string, string][] => {
-  const at = [...name].flatMap((c, i) => (c === "-" || c === "_" ? [i + 1] : []));
-  const cuts = at.filter((i) => i > 0 && i < name.length);
-  if (cuts.length) return cuts.map((i): [string, string] => [name.slice(0, i), name.slice(i)]);
-  return Array.from({ length: name.length - 3 }, (_, k): [string, string] => [
-    `${name.slice(0, k + 2)}-`,
-    name.slice(k + 2),
-  ]);
+// Hyphen- or underscore-separated parts, each keeping its trailing separator.
+const segments = (name: string) => name.match(/[^-_]+[-_]*|[-_]+/g) ?? [name];
+
+// Every way to group the parts into at most `max` consecutive lines.
+const groupings = (parts: string[], max: number): string[][] => {
+  const out: string[][] = [];
+  const cuts = parts.length - 1;
+  for (let mask = 0; mask < 1 << cuts; mask++) {
+    const lines = [parts[0]];
+    for (let i = 1; i < parts.length; i++) {
+      if (mask & (1 << (i - 1))) lines.push(parts[i]);
+      else lines[lines.length - 1] += parts[i];
+    }
+    if (lines.length <= max) out.push(lines);
+  }
+  return out;
 };
 
-const balanced = (name: string, font: number, measure: MeasureText) =>
-  splits(name)
-    .map((pair) => ({ pair, wide: Math.max(...pair.map((l) => measure(l, font))) }))
-    .sort((a, b) => a.wide - b.wide)[0];
+// Fewest lines that fit, most balanced among those; otherwise the narrowest grouping.
+const best = (name: string, font: number, max: number, room: number, measure: MeasureText) => {
+  const all = groupings(segments(name), max).map((lines) => ({
+    lines,
+    wide: Math.max(...lines.map((l) => measure(l, font))),
+  }));
+  const fits = all.filter((g) => g.wide <= room);
+  if (!fits.length) return all.sort((a, b) => a.wide - b.wide)[0];
+  return fits.sort((a, b) => a.lines.length - b.lines.length || a.wide - b.wide)[0];
+};
 
 const shorten = (text: string, font: number, room: number, measure: MeasureText) => {
+  if (measure(text, font) <= room) return text;
   for (let n = text.length - 1; n > 0; n--) {
     const cut = `${text.slice(0, n)}${ELLIPSIS}`;
     if (measure(cut, font) <= room) return cut;
@@ -50,28 +63,26 @@ const shorten = (text: string, font: number, room: number, measure: MeasureText)
   return "";
 };
 
-// Largest font from 13 to 9 at which the name fits whole on one or two balanced lines; otherwise a 9px cut.
+// Wraps only at the name's own separators; one font step down, then an ellipsis.
 export const fitLabel = (
   name: string,
   room: number,
   height: number,
+  font: number,
   measure: MeasureText,
-  allowCut: boolean,
 ): HexLabel | null => {
-  for (let font = MAX_FONT; font >= MIN_FONT; font--) {
-    if (measure(name, font) <= room && font * LINE_HEIGHT <= height) return { lines: [name], font };
-    const two = name.length > 3 ? balanced(name, font, measure) : undefined;
-    if (two && two.wide <= room && 2 * font * LINE_HEIGHT <= height)
-      return { lines: two.pair, font };
+  for (const size of [font, Math.max(MIN_FONT, font - FONT_STEP)]) {
+    const max = Math.floor(height / (size * LINE_HEIGHT));
+    if (max < 1) return null;
+    const fit = best(name, size, max, room, measure);
+    if (fit.wide <= room) return { lines: fit.lines, font: size };
   }
-  if (!allowCut || 2 * MIN_FONT * LINE_HEIGHT > height) return null;
-  const two = balanced(name, MIN_FONT, measure);
-  const [first, second] = two?.pair ?? [name, ""];
-  const lines = [first, second]
-    .map((l) => (measure(l, MIN_FONT) <= room ? l : shorten(l, MIN_FONT, room, measure)))
+  const size = Math.max(MIN_FONT, font - FONT_STEP);
+  const max = Math.max(1, Math.floor(height / (size * LINE_HEIGHT)));
+  const lines = best(name, size, max, room, measure)
+    .lines.map((l) => shorten(l, size, room, measure))
     .filter(Boolean);
-  const visible = lines.join("").replace(ELLIPSIS, "").length;
-  return visible >= MIN_VISIBLE ? { lines, font: MIN_FONT } : null;
+  return lines.length ? { lines, font: size } : null;
 };
 
 // Smallest hex worth labelling: about six average characters at the minimum font.

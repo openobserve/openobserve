@@ -117,6 +117,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="autoobserve-coverage-fill"
             @update:model-value="(v) => (fill = v as CoverageFill)"
           />
+          <OToggleGroup
+            v-model="highlight"
+            type="multiple"
+            class="max-w-full overflow-x-auto"
+            :aria-label="t('autoobserve.coverage.legendOf', { fill: t(FILL_LABEL[fill]) })"
+            data-test="autoobserve-coverage-legend-chips"
+          >
+            <OToggleGroupItem
+              v-for="item in legend"
+              :key="item.cls"
+              :value="item.cls"
+              size="sm"
+              :data-test="`autoobserve-coverage-legend-${item.cls}`"
+            >
+              <span class="rounded-default size-3 shrink-0" :class="SWATCH[item.cls]" />
+              <span>{{ item.label }}</span>
+              <span class="text-text-secondary tabular-nums">{{ item.count }}</span>
+            </OToggleGroupItem>
+          </OToggleGroup>
         </template>
         <OToggleGroup
           v-else
@@ -161,31 +180,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :matches="matches"
             @select="selectService"
           />
-        </div>
-        <div
-          class="px-page-edge border-table-row-divider text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1 border-t py-2 text-xs"
-          data-test="autoobserve-coverage-map-legend"
-        >
-          <span>{{ t(FILL_LABEL[fill]) }}</span>
-          <OToggleGroup
-            v-model="highlight"
-            type="multiple"
-            class="max-w-full overflow-x-auto"
-            :aria-label="t('autoobserve.coverage.legendOf', { fill: t(FILL_LABEL[fill]) })"
-            data-test="autoobserve-coverage-legend-chips"
-          >
-            <OToggleGroupItem
-              v-for="item in legend"
-              :key="item.cls"
-              :value="item.cls"
-              size="sm"
-              :data-test="`autoobserve-coverage-legend-${item.cls}`"
-            >
-              <span class="rounded-default h-3 w-4 shrink-0" :class="SWATCH[item.cls]" />
-              <span>{{ item.label }}</span>
-              <span class="text-text-secondary tabular-nums">{{ item.count }}</span>
-            </OToggleGroupItem>
-          </OToggleGroup>
         </div>
       </template>
 
@@ -252,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else-if="row.cells[signal].state === 'learning'">
                 <span class="bg-progress-bar-track relative h-1 w-6 overflow-hidden rounded-full">
                   <span
-                    class="bg-icon-chip-info-text absolute inset-y-0 start-0 rounded-full"
+                    class="bg-status-neutral-text absolute inset-y-0 start-0 rounded-full"
                     :style="{ width: `${progressPct(row.cells[signal])}%` }"
                   />
                 </span>
@@ -305,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <li class="flex items-center gap-1.5">
               <span class="bg-progress-bar-track relative h-1 w-6 overflow-hidden rounded-full">
                 <span
-                  class="bg-icon-chip-info-text absolute inset-y-0 start-0 w-1/2 rounded-full"
+                  class="bg-status-neutral-text absolute inset-y-0 start-0 w-1/2 rounded-full"
                 />
               </span>
               {{ t("autoobserve.coverage.learning") }}
@@ -401,13 +395,13 @@ const FILL_LABEL: Record<CoverageFill, I18nKey> = {
 };
 const SEGMENT_CLASS: Record<CellState, string> = {
   watched: "bg-icon-chip-success-text",
-  learning: "bg-icon-chip-info-text",
+  learning: "bg-status-neutral-text",
   gap: "bg-icon-chip-warning-text",
   na: "",
 };
 const SWATCH: Record<HexClass, string> = {
-  watched: "bg-badge-success-soft-text dark:bg-status-positive",
-  learning: "bg-status-info-text",
+  watched: "bg-badge-success-soft-text/15 border border-badge-success-soft-text/60",
+  learning: "bg-badge-default-soft-bg border border-dashed border-status-neutral-text",
   gap: "bg-status-warning-text",
   none: "bg-status-neutral-text",
   s1: "bg-map-seq-1",
@@ -418,9 +412,9 @@ const SWATCH: Record<HexClass, string> = {
 };
 const LEGEND: Record<CoverageFill, { cls: HexClass; key: I18nKey }[]> = {
   state: [
-    { cls: "watched", key: "autoobserve.coverage.watched" },
-    { cls: "learning", key: "autoobserve.coverage.learning" },
     { cls: "gap", key: "autoobserve.coverage.gap" },
+    { cls: "learning", key: "autoobserve.coverage.learning" },
+    { cls: "watched", key: "autoobserve.coverage.watched" },
   ],
   learning: [
     { cls: "s1", key: "autoobserve.coverage.bucketLearned" },
@@ -485,8 +479,8 @@ const watchedPct = computed(() =>
 );
 
 const split = computed(() => [
-  { cls: "bg-badge-success-soft-text dark:bg-status-positive", count: totals.value.fullyWatched },
-  { cls: "bg-status-info-text", count: totals.value.learning },
+  { cls: "bg-badge-success-soft-text/50", count: totals.value.fullyWatched },
+  { cls: "bg-status-neutral-text/60", count: totals.value.learning },
   { cls: "bg-status-warning-text", count: totals.value.gaps },
 ]);
 
@@ -661,7 +655,7 @@ const isSelected = (service: string, signal: Signal) =>
   selected.value?.service === service && selected.value.signal === signal;
 
 const railTone = (row: CoverageRow): RowRailTone | null =>
-  (["warning", "info", null] as const)[rank(row)];
+  (["warning", "neutral", null] as const)[rank(row)];
 
 const rowClass = (row: CoverageRow) =>
   row.service === selected.value?.service ? "bg-table-row-selected-bg" : "";
