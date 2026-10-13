@@ -20,7 +20,7 @@ use config::{
     meta::{
         search::{Query, Request, Response as SearchResponse, SearchEventType, default_use_cache},
         stream::StreamType,
-        traces::session::{key_in_predicate, quote_identifier, quote_sql_string},
+        traces::session::{key_in_predicate, quote_identifier},
     },
     utils::json,
 };
@@ -63,13 +63,10 @@ impl RumQuery {
         let ids_in = |column: &str| key_in_predicate(column, ids.iter().map(String::as_str));
         let (filter, order) = match self {
             Self::TracedResources => {
-                // OR of equalities rather than COALESCE so each column can use its own index.
+                // One IN per column rather than COALESCE so each column can use its own index.
                 let any_id = trace_columns
                     .iter()
-                    .flat_map(|column| {
-                        ids.iter()
-                            .map(move |id| format!("{column} = {}", quote_sql_string(id)))
-                    })
+                    .map(|column| ids_in(column))
                     .collect::<Vec<_>>()
                     .join(" OR ");
                 (format!("({any_id})"), "ASC")
@@ -328,11 +325,11 @@ mod tests {
                 &["_o2_trace_id", "_oo_trace_id"],
                 &["0abc".to_string(), "abc".to_string()]
             ),
-            "SELECT * FROM \"_rumdata\" WHERE (_o2_trace_id = '0abc' OR _o2_trace_id = 'abc' OR _oo_trace_id = '0abc' OR _oo_trace_id = 'abc') ORDER BY _timestamp ASC"
+            "SELECT * FROM \"_rumdata\" WHERE (\"_o2_trace_id\" IN ('0abc', 'abc') OR \"_oo_trace_id\" IN ('0abc', 'abc')) ORDER BY _timestamp ASC"
         );
         assert_eq!(
             RumQuery::TracedResources.sql(&["_oo_trace_id"], &["it's".to_string()]),
-            "SELECT * FROM \"_rumdata\" WHERE (_oo_trace_id = 'it''s') ORDER BY _timestamp ASC"
+            "SELECT * FROM \"_rumdata\" WHERE (\"_oo_trace_id\" IN ('it''s')) ORDER BY _timestamp ASC"
         );
     }
 

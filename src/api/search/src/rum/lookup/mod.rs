@@ -119,7 +119,7 @@ impl RumLookupResponse {
     tag = "Search",
     operation_id = "RumLookup",
     summary = "Find the RUM events linked to a trace",
-    description = "Finds the browser requests that carry the trace id, then fetches their page views, actions and other page events in parallel. Each result set keeps its own order and limit; `truncated`, `errors` and `status` report what is missing.",
+    description = "Finds the browser requests that carry the trace id, then fetches their page views, actions and other page events in parallel. Each result set keeps its own order and limit; its `truncated` and `error`, and the top-level `status`, report what is missing.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = RumLookupRequest, description = "Trace id and backend span time range", content_type = "application/json"),
