@@ -1119,6 +1119,8 @@ export default defineComponent({
 
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
+      // A manually opened dialog consumes the ?email= latch so the post-save repaint cannot reopen it.
+      deepLinkOpened = true;
       selectedUser.value.organization = store.state.selectedOrganization.identifier;
 
       if (props.row != undefined) {
