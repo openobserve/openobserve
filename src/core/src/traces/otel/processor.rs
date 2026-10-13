@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use config::{
     meta::{
         gen_ai::GenAiAgentMappingConfig,
-        model_pricing::{ModelPricingDefinition, PricingContext},
+        model_pricing::{ModelPricingDefinition, PricingContext, normalize_attribute_key},
     },
     utils::{json, time::parse_timestamp_micro_from_value},
 };
@@ -715,7 +715,16 @@ pub fn pricing_context(
     let wanted: Vec<&str> = keys.iter().map(|k| k.as_ref()).collect();
     if !wanted.is_empty() {
         ctx.extend_json("", span_attributes, Some(&wanted));
-        ctx.extend_json("resource.", resource_attributes, Some(&wanted));
+        let resource: HashMap<String, json::Value> = resource_attributes
+            .iter()
+            .map(|(k, v)| (original_resource_key(k), v))
+            .filter(|(k, _)| {
+                let key = normalize_attribute_key(&format!("resource.{k}"));
+                wanted.contains(&key.as_str())
+            })
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        ctx.extend_json("resource.", &resource, Some(&wanted));
         ctx.extend_strings("param.", model_params, Some(&wanted));
     }
     ctx
@@ -728,6 +737,13 @@ pub fn test_pricing_context(
 ) -> PricingContext {
     let model_params = ParametersExtractor.extract(attributes, "");
     pricing_context(definition, attributes, &HashMap::new(), &model_params)
+}
+
+// Ingestion stores resource attributes as `service_<key>`; rules name the OTel key.
+fn original_resource_key(key: &str) -> &str {
+    key.strip_prefix("service_attr_")
+        .or_else(|| key.strip_prefix("service_"))
+        .unwrap_or(key)
 }
 
 fn build_pricing_usage(
@@ -2132,9 +2148,9 @@ mod tests {
             ),
             0.002
         ));
-        // Resource attributes are readable under the `resource.` prefix.
+        // Ingestion keys resource attributes `service_<key>`; rules read `resource.<key>`.
         assert!(close(
-            service_tier_input_cost(&[], &[("cloud.region", "eu-west-1")]),
+            service_tier_input_cost(&[], &[("service_cloud.region", "eu-west-1")]),
             0.003
         ));
     }

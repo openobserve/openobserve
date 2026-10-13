@@ -164,6 +164,26 @@ impl ModelPricingDefinition {
         keys.dedup();
         keys
     }
+
+    /// Checks the tiers; the sync allows unknown operators since such a tier never matches.
+    pub fn validate_tiers(&self, allow_unknown_ops: bool) -> Result<(), String> {
+        if self.tiers.is_empty() {
+            return Err("At least one pricing tier is required".to_string());
+        }
+        if self.tiers.len() > MAX_TIERS {
+            return Err(format!("At most {MAX_TIERS} pricing tiers are allowed"));
+        }
+        // Otherwise a span outside every window and rule would have no tier to price with.
+        if !self.tiers.iter().any(PricingTierDefinition::is_default) {
+            return Err(
+                "At least one tier must have no condition, no time window and no rule (default fallback)"
+                    .to_string(),
+            );
+        }
+        self.tiers
+            .iter()
+            .try_for_each(|t| t.validate(allow_unknown_ops))
+    }
 }
 
 /// A pricing tier within a model definition.
@@ -221,6 +241,70 @@ impl PricingTierDefinition {
     /// The unrestricted fallback tier.
     pub fn is_default(&self) -> bool {
         self.restriction_count() == 0
+    }
+
+    pub fn validate(&self, allow_unknown_ops: bool) -> Result<(), String> {
+        if let Some(ref cond) = self.condition {
+            if cond.usage_key.trim().is_empty() {
+                return Err(format!(
+                    "Tier '{}' has a condition with an empty usage_key",
+                    self.name
+                ));
+            }
+            if !cond.value.is_finite() {
+                return Err(format!(
+                    "Tier '{}' condition value must be a finite number, got {}",
+                    self.name, cond.value
+                ));
+            }
+        }
+        for window in &self.utc_windows {
+            if window.start_minute > MINUTES_PER_DAY || window.end_minute > MINUTES_PER_DAY {
+                return Err(format!(
+                    "Tier '{}' time window must be within 0-{} minutes past UTC midnight, got {}-{}",
+                    self.name, MINUTES_PER_DAY, window.start_minute, window.end_minute
+                ));
+            }
+            if window.start_minute % MINUTES_PER_DAY == window.end_minute % MINUTES_PER_DAY {
+                return Err(format!(
+                    "Tier '{}' time window start and end are the same ({}); leave the window list empty for an always-on tier",
+                    self.name, window.start_minute
+                ));
+            }
+        }
+        self.validate_rules(allow_unknown_ops)?;
+        for (key, &price) in &self.prices {
+            if !price.is_finite() || price < 0.0 {
+                return Err(format!(
+                    "Price for '{}' in tier '{}' must be a finite number >= 0, got {}",
+                    key, self.name, price
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_rules(&self, allow_unknown_ops: bool) -> Result<(), String> {
+        if self.rules.len() > MAX_RULES_PER_TIER {
+            return Err(format!(
+                "Tier '{}' may have at most {MAX_RULES_PER_TIER} rules",
+                self.name
+            ));
+        }
+        if !(-MAX_TIER_PRIORITY..=MAX_TIER_PRIORITY).contains(&self.priority) {
+            return Err(format!(
+                "Tier '{}' priority must be between -{MAX_TIER_PRIORITY} and {MAX_TIER_PRIORITY}",
+                self.name
+            ));
+        }
+        for rule in &self.rules {
+            if allow_unknown_ops && rule.op == RuleOp::Unknown {
+                continue;
+            }
+            rule.validate()
+                .map_err(|e| format!("Tier '{}': {e}", self.name))?;
+        }
+        Ok(())
     }
 }
 
@@ -399,8 +483,8 @@ impl TierRule {
         if self.op == RuleOp::Unknown {
             return Err("rule has an unknown operator".to_string());
         }
-        if self.keys.iter().all(|k| k.trim().is_empty()) {
-            return Err("rule must list at least one attribute key".to_string());
+        if self.keys.is_empty() || self.keys.iter().any(|k| k.trim().is_empty()) {
+            return Err("rule keys must be non-empty attribute keys".to_string());
         }
         if self.keys.len() > MAX_RULE_KEYS || self.values.len() > MAX_RULE_VALUES {
             return Err(format!(
@@ -665,21 +749,27 @@ fn usage_key(key: &str) -> Option<&str> {
         .map(|_| &key[USAGE_KEY_PREFIX.len()..])
 }
 
-/// Accepts strings, numbers and bools so a hand-edited catalogue entry cannot fail the whole sync.
+/// Accepts a list of scalars or one scalar; anything else errors rather than being dropped.
 fn lenient_strings<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let raw = Vec::<json::Value>::deserialize(deserializer).unwrap_or_default();
-    Ok(raw
-        .into_iter()
-        .filter_map(|v| match v {
+    fn scalar(v: json::Value) -> Option<String> {
+        match v {
             json::Value::String(s) => Some(s),
             json::Value::Number(n) => Some(n.to_string()),
             json::Value::Bool(b) => Some(b.to_string()),
             _ => None,
-        })
-        .collect())
+        }
+    }
+    let invalid = || serde::de::Error::custom("expected a list of strings");
+    match json::Value::deserialize(deserializer)? {
+        json::Value::Array(items) => items
+            .into_iter()
+            .map(|v| scalar(v).ok_or_else(invalid))
+            .collect(),
+        v => scalar(v).map(|s| vec![s]).ok_or_else(invalid),
+    }
 }
 
 /// Accepts a number or a numeric string; anything else becomes `None` and fails validation.
@@ -1320,13 +1410,56 @@ mod tests {
                 .unwrap();
         assert_eq!(r.value, Some(272000.0));
         let r: TierRule =
-            serde_json::from_str(r#"{"keys":["n"],"op":"in","values":[1, true, "x", {"a":1}]}"#)
-                .unwrap();
+            serde_json::from_str(r#"{"keys":["n"],"op":"in","values":[1, true, "x"]}"#).unwrap();
         assert_eq!(r.values, vec!["1", "true", "x"]);
+        // A scalar is one value; dropping it would turn `not_in` into match-everything.
+        let r: TierRule =
+            serde_json::from_str(r#"{"keys":"n","op":"not_in","values":"flex"}"#).unwrap();
+        assert_eq!((r.keys, r.values), (vec!["n".into()], vec!["flex".into()]));
+        assert!(
+            serde_json::from_str::<TierRule>(r#"{"keys":["n"],"op":"in","values":[{"a":1}]}"#)
+                .is_err()
+        );
+        assert!(serde_json::from_str::<TierRule>(r#"{"keys":{"a":1},"op":"exists"}"#).is_err());
         let r: TierRule =
             serde_json::from_str(r#"{"keys":["n"],"op":"gt","value":"lots"}"#).unwrap();
         assert_eq!(r.value, None);
         assert!(r.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_tiers_rejects_entries_that_misprice() {
+        let parse = |tiers: &str| -> ModelPricingDefinition {
+            serde_json::from_str(&format!(
+                r#"{{"name":"m","match_pattern":"m","tiers":{tiers}}}"#
+            ))
+            .unwrap()
+        };
+        let default = r#"{"name":"Default","prices":{"input":1e-6}}"#;
+        assert!(parse(&format!("[{default}]")).validate_tiers(false).is_ok());
+        // No default tier would price unmatched spans at zero.
+        let only_rule = r#"{"name":"Flex","rules":[{"keys":["k"],"op":"in","values":["v"]}]}"#;
+        assert!(
+            parse(&format!("[{only_rule}]"))
+                .validate_tiers(true)
+                .is_err()
+        );
+        let blank_not_in = r#"{"name":"X","rules":[{"keys":["k"],"op":"not_in","values":[" "]}]}"#;
+        assert!(
+            parse(&format!("[{default},{blank_not_in}]"))
+                .validate_tiers(true)
+                .is_err()
+        );
+        let blank_key = r#"{"name":"X","rules":[{"keys":["k",""],"op":"exists"}]}"#;
+        assert!(
+            parse(&format!("[{default},{blank_key}]"))
+                .validate_tiers(true)
+                .is_err()
+        );
+        let future_op = r#"{"name":"X","rules":[{"keys":["k"],"op":"regex","values":["v"]}]}"#;
+        let def = parse(&format!("[{default},{future_op}]"));
+        assert!(def.validate_tiers(true).is_ok());
+        assert!(def.validate_tiers(false).is_err());
     }
 
     #[test]

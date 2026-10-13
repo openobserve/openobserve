@@ -21,10 +21,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use config::meta::model_pricing::{
-    BUILT_IN_ORG, MAX_RULES_PER_TIER, MAX_TIER_PRIORITY, MAX_TIERS, META_ORG, MINUTES_PER_DAY,
-    ModelPricingDefinition, PricingSource, PricingTierDefinition,
-};
+use config::meta::model_pricing::{BUILT_IN_ORG, META_ORG, ModelPricingDefinition, PricingSource};
 use db::model_pricing;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "enterprise")]
@@ -765,85 +762,7 @@ fn validate_definition(item: &ModelPricingDefinition) -> Result<(), String> {
     {
         return Err(format!("Invalid regex pattern: {e}"));
     }
-    if item.tiers.is_empty() {
-        return Err("At least one pricing tier is required".to_string());
-    }
-    if item.tiers.len() > MAX_TIERS {
-        return Err(format!("At most {MAX_TIERS} pricing tiers are allowed"));
-    }
-    // Otherwise a span outside every window and rule would have no tier to price with.
-    if !item.tiers.iter().any(PricingTierDefinition::is_default) {
-        return Err(
-            "At least one tier must have no condition, no time window and no rule (default fallback)"
-                .to_string(),
-        );
-    }
-    for tier in &item.tiers {
-        if let Some(ref cond) = tier.condition {
-            if cond.usage_key.trim().is_empty() {
-                return Err(format!(
-                    "Tier '{}' has a condition with an empty usage_key",
-                    tier.name
-                ));
-            }
-            if cond.value.is_nan() || cond.value.is_infinite() {
-                return Err(format!(
-                    "Tier '{}' condition value must be a finite number, got {}",
-                    tier.name, cond.value
-                ));
-            }
-        }
-        for window in &tier.utc_windows {
-            if window.start_minute > MINUTES_PER_DAY || window.end_minute > MINUTES_PER_DAY {
-                return Err(format!(
-                    "Tier '{}' time window must be within 0-{} minutes past UTC midnight, got {}-{}",
-                    tier.name, MINUTES_PER_DAY, window.start_minute, window.end_minute
-                ));
-            }
-            if window.start_minute % MINUTES_PER_DAY == window.end_minute % MINUTES_PER_DAY {
-                return Err(format!(
-                    "Tier '{}' time window start and end are the same ({}); leave the window list empty for an always-on tier",
-                    tier.name, window.start_minute
-                ));
-            }
-        }
-        validate_tier_rules(tier)?;
-        for (key, &price) in &tier.prices {
-            if price.is_nan() || price.is_infinite() {
-                return Err(format!(
-                    "Price for '{}' in tier '{}' must be a finite number, got {}",
-                    key, tier.name, price
-                ));
-            }
-            if price < 0.0 {
-                return Err(format!(
-                    "Price for '{}' in tier '{}' must be >= 0, got {}",
-                    key, tier.name, price
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-fn validate_tier_rules(tier: &PricingTierDefinition) -> Result<(), String> {
-    if tier.rules.len() > MAX_RULES_PER_TIER {
-        return Err(format!(
-            "Tier '{}' may have at most {MAX_RULES_PER_TIER} rules",
-            tier.name
-        ));
-    }
-    if !(-MAX_TIER_PRIORITY..=MAX_TIER_PRIORITY).contains(&tier.priority) {
-        return Err(format!(
-            "Tier '{}' priority must be between -{MAX_TIER_PRIORITY} and {MAX_TIER_PRIORITY}",
-            tier.name
-        ));
-    }
-    for rule in &tier.rules {
-        rule.validate()
-            .map_err(|e| format!("Tier '{}': {e}", tier.name))?;
-    }
-    Ok(())
+    item.validate_tiers(false)
 }
 
 #[cfg(test)]
