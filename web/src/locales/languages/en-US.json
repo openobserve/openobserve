@@ -17800,7 +17800,8 @@
       "tokenLink": "org token · {name}",
       "tokenLinkTooltip": "Choose which ingestion token the snippets use",
       "copiedWithToken": "Copied with org token {name}",
-      "tokenIncludedHint": "The org's ingestion token is included; it stays hidden here."
+      "tokenIncludedHint": "Copy includes the org's ingestion token, which stays hidden here.",
+      "maskedSelectionWarning": "The hidden token was copied as dots. Use Copy, or Reveal it first."
     },
     "spinner": {
       "loading": "Loading"

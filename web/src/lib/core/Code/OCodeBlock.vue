@@ -17,8 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   OCodeBlock — a syntax-highlighted block of code with a copy button, optional
   secret masking (Reveal/Hide), optional window chrome (terminal / editor), and
-  a slot for extra toolbar actions. Copy always copies the raw `code` prop, never
-  the highlighted markup or the masked variant.
+  a slot for extra toolbar actions. The Copy button copies the raw `code` prop;
+  a text selection copies only what is shown, so a masked token stays masked.
 
   For inline / simple code chips without highlighting, use OCode.
 -->
@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, ref, type CSSProperties } from "vue";
 import hljs from "highlight.js";
 import { copyToClipboard } from "@/utils/clipboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -47,6 +48,8 @@ const { t } = useI18nTyped();
 const CODE_LINE_HEIGHT = 1.55;
 
 const CODE_INSET = "0.75rem";
+
+const MASK_CHAR = "\u2022";
 
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   wrap: false,
@@ -156,6 +159,11 @@ const onNativeCopy = () => {
   const range = selection.getRangeAt(0);
   const inside = root.contains(range.startContainer) && root.contains(range.endContainer);
   if (!inside) return;
+  // a selection over the hidden token pastes as dots, so it is not a usable copy of the command
+  if (props.codeMasked && !revealed.value && selection.toString().includes(MASK_CHAR)) {
+    toast({ variant: "warning", message: t("components.codeBlock.maskedSelectionWarning") });
+    return;
+  }
   emit("copy", { partial: true });
 };
 </script>

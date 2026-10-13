@@ -547,6 +547,56 @@ describe("useFirstEventWatch — a target that already has data waits for the us
     },
   );
 
+  it("keeps checking on open when the exact target exists but holds no records", async () => {
+    rows.logs = [{ name: "default", stats: { doc_num: 0, doc_time_min: 0 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("logs", { targetStream: "default" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+    countHits.mockReturnValue([{ zo_count: 4, zo_min: serverNowS * 1_000_000 + 5 }]);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(w.state.value).toBe("received");
+  });
+
+  it("keeps checking on open when keyword matches exist but hold no records", async () => {
+    rows.metrics = [{ name: "system_cpu_time", stats: { doc_num: 0, doc_time_min: 0 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("metrics", { targetStream: "system_", match: "keyword" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+  });
+
+  it("holds a populated target again after a target change, even after a copy", async () => {
+    rows.logs = [
+      { name: "a", stats: { doc_num: 9, doc_time_min: 1 } },
+      { name: "b", stats: { doc_num: 9, doc_time_min: 1 } },
+    ];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const target = ref<string | undefined>("a");
+    const w = watchOf("logs", { targetStream: target });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    w.start("check");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("waiting");
+    target.value = "b";
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+  });
+
+  it("starts the count when probeNow is called from idle", async () => {
+    rows.logs = [{ name: "default", stats: { doc_num: 99, doc_time_min: 1 } }];
+    anchorHits.mockReturnValue([{ zo_count: 0, zo_now: serverNowS }]);
+    const w = watchOf("logs", { targetStream: "default" });
+    w.start("open");
+    await vi.advanceTimersByTimeAsync(1);
+    expect(w.state.value).toBe("idle");
+    await w.probeNow();
+    expect(w.state.value).toBe("waiting");
+  });
+
   it("keeps checking on open while the target does not exist yet", async () => {
     const w = watchOf("logs", { targetStream: "nginx_access" });
     w.start("open");
@@ -618,7 +668,7 @@ describe("useFirstEventWatch — handoff and configuration changes (F1, F5)", ()
     await vi.advanceTimersByTimeAsync(1);
     expect(dispatch).not.toHaveBeenCalledWith("streams/setStreams", expect.anything());
     expect(dispatch).not.toHaveBeenCalledWith("setIsDataIngested", expect.anything());
-    expect(w.state.value).toBe("waiting");
+    expect(w.state.value).toBe("idle");
     expect(w.result.value).toBeUndefined();
   });
 

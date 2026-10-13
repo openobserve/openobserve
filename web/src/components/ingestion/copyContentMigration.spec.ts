@@ -202,7 +202,7 @@ describe("CredentialCodeBlock", () => {
   it("says the hidden token is included, with no click-to-copy hint", () => {
     const wrapper = mountBlock();
     expect(wrapper.find('[data-test="ingestion-curl-code-block-hint"]').text()).toBe(
-      "The org's ingestion token is included; it stays hidden here.",
+      "Copy includes the org's ingestion token, which stays hidden here.",
     );
     wrapper.unmount();
   });

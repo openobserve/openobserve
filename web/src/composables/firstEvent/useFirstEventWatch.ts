@@ -132,6 +132,8 @@ const fetchOrNull = async <T>(fn: () => Promise<T>): Promise<T | null> => {
 const newestFirst = (rows: StreamRow[]): StreamRow[] =>
   [...rows].sort((a, b) => Number(b.stats?.doc_time_max ?? 0) - Number(a.stats?.doc_time_max ?? 0));
 
+const hasRecords = (row: StreamRow): boolean => Number(row.stats?.doc_num ?? 0) > 0;
+
 const statsKey = (row: StreamRow): string =>
   `${Number(row.stats?.doc_num ?? 0)}/${Number(row.stats?.doc_time_max ?? 0)}`;
 
@@ -383,7 +385,7 @@ export function useFirstEventWatch(
       const row = await findTarget(ctx, name);
       if (row === undefined || stale(ctx)) return;
       target.value = { existed: !!row };
-      if (row && !engaged) holdForUser();
+      if (row && !engaged && hasRecords(row)) holdForUser();
       else if (row) await anchor(ctx, name);
       return;
     }
@@ -463,7 +465,7 @@ export function useFirstEventWatch(
         baselineTotal: found.total,
         matches: matches.map((s) => s.name),
       };
-      if (matches.length && !engaged) holdForUser();
+      if (!engaged && matches.some(hasRecords)) holdForUser();
       else if (matches.length) await anchor(ctx, matches[0].name);
       return;
     }
@@ -672,6 +674,8 @@ export function useFirstEventWatch(
     diagnosisTrigger = undefined;
     lastRejectionsReadMs = undefined;
     untracked = false;
+    // a new target is a new watch, so a copy for the previous one does not count its traffic
+    engaged = false;
     troubleshooting.value = false;
     state.value = "waiting";
   };
@@ -708,6 +712,10 @@ export function useFirstEventWatch(
   const stop = () => halt();
 
   const probeNow = async () => {
+    if (state.value === "idle") {
+      start("check");
+      return;
+    }
     if (!running) return;
     await poll();
   };

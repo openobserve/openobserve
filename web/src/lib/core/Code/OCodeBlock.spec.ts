@@ -286,13 +286,28 @@ describe("OCodeBlock", () => {
       wrapper.unmount();
     });
 
-    it("keeps the mask in a selection that crosses the token", () => {
+    it("keeps the mask in a selection that crosses the token, warns, and reports no copy", () => {
       const wrapper = mountAttached({ tokenName: "prod-ingest" });
       const codeEl = wrapper.find("code").element;
       select(codeEl, masked.indexOf("me@"), masked.indexOf(" https"));
       const { setData, event } = fireCopy(codeEl);
       expect(setData).not.toHaveBeenCalled();
       expect(event.defaultPrevented).toBe(false);
+      expect(toastMock).toHaveBeenCalledTimes(1);
+      expect(toastMock.mock.calls[0][0]).toMatchObject({
+        variant: "warning",
+        message: "The hidden token was copied as dots. Use Copy, or Reveal it first.",
+      });
+      expect(wrapper.emitted("copy")).toBeUndefined();
+      wrapper.unmount();
+    });
+
+    it("reports a revealed selection across the token as a partial copy, with no warning", async () => {
+      const wrapper = mountAttached({});
+      await wrapper.find('[data-test="code-block-reveal-btn"]').trigger("click");
+      const codeEl = wrapper.find("code").element;
+      select(codeEl, 0, code.length);
+      fireCopy(codeEl);
       expect(toastMock).not.toHaveBeenCalled();
       expect(wrapper.emitted("copy")).toEqual([[{ partial: true }]]);
       wrapper.unmount();
