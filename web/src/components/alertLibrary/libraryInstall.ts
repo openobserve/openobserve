@@ -23,8 +23,8 @@
 //   1. The same normalization ImportAlert does (`createAlert`, ImportAlert.vue)
 //      — that is the only place in the app that has ever turned a stored alert
 //      document back into a create, and divergence here is a bug by definition.
-//   2. Three things only the library needs: the org's destination replaces the
-//      author's, provenance is stamped so Phase 5 can recognise the alert
+//   2. Three things only the library needs: the org's destination (or none)
+//      replaces the author's, provenance is stamped so Phase 5 can recognise the alert
 //      later, and the library's severity becomes the product's priority.
 //
 // Pure and file-in/payload-out, so the wizard stays markup and this stays
@@ -52,7 +52,7 @@ export interface InstallPayloadInput {
   /** The tuned file, straight from the drawer, or freshly fetched. */
   file: AlertLibraryFile;
   folderId: string;
-  /** A destination NAME that exists in this org. */
+  /** A destination NAME that exists in this org, or "" to install with none. */
   destination: string;
   /** Installing user's email — becomes owner and last editor. */
   owner: string;
@@ -176,7 +176,7 @@ export function buildInstallPayload(input: InstallPayloadInput): Record<string, 
   // ── library-specific ─────────────────────────────────────────────────────
   // Overwrite, never merge: the packs hardcode "k8s_alert"/"o2_to_slack",
   // which no customer org has, and the alert API rejects an unknown name.
-  payload.destinations = [destination];
+  payload.destinations = destination ? [destination] : [];
 
   // Phase 5 input, recorded here because this is where the promise is made:
   // `context_attributes` is USER-EDITABLE — the alert form renders it as
