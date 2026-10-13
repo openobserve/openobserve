@@ -645,6 +645,37 @@ describe("FirstEventStatus — pill display for empty pages", () => {
     expect(q("first-event-status-restart-btn").exists()).toBe(false);
   });
 
+  it("waits for the user on a target that already has data, and Check now starts the count", async () => {
+    mountBar({ targetStream: "default", signal: "logs" });
+    fake.start.mockClear();
+    fake.state.value = "idle";
+    await nextTick();
+    expect(q("first-event-status").attributes("data-state")).toBe("idle");
+    expect(q("first-event-status").text()).toContain("Not checking yet");
+    expect(q("first-event-status-meta").text()).toBe(
+      "default already receives data. Checks start when you copy the command.",
+    );
+    expect(q("first-event-status-troubleshoot-btn").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("turns green by itself");
+    await q("first-event-status-check-now-btn").trigger("click");
+    expect(fake.start).toHaveBeenCalledWith("check");
+  });
+
+  it.each([
+    [{ targetStream: "system_", match: "keyword" }, "Matching streams already receive data."],
+    [{ targetStream: "default", snippetKind: "config" }, "Checks start when you copy the config."],
+  ])("names what the idle bar waits on (%o)", async (props, text) => {
+    mountBar(props);
+    fake.state.value = "idle";
+    await nextTick();
+    expect(q("first-event-status-meta").text()).toContain(text);
+  });
+
+  it("offers no Check now outside the idle state", () => {
+    mountBar({ targetStream: "default" });
+    expect(q("first-event-status-check-now-btn").exists()).toBe(false);
+  });
+
   it("offers no Check again while the watch runs", () => {
     mountBar({ display: "pill" });
     expect(q("first-event-status-restart-btn").exists()).toBe(false);

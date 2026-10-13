@@ -253,6 +253,7 @@ struct ConfigResponse<'a> {
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
     profiling_enabled: bool,
+    experimental: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
@@ -634,6 +635,7 @@ pub async fn zo_config(
         search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
         profiling_enabled: cfg.common.profiling_enabled,
+        experimental: cfg.common.experimental,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
         #[cfg(feature = "enterprise")]

@@ -512,6 +512,10 @@ export default defineComponent({
       return Boolean(store.state.zoConfig?.profiling_enabled);
     });
 
+    const isExperimentalEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.experimental);
+    });
+
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
       { label: Number, value: String },
@@ -850,6 +854,24 @@ export default defineComponent({
       );
     };
 
+    const updateAutoObserveMenu = () => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === "autoobserve");
+      if (config.isEnterprise != "true" || !isExperimentalEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+      const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+      linksList.value.splice(alertIndex === -1 ? linksList.value.length : alertIndex, 0, {
+        title: t("menu.autoobserve"),
+        icon: "navigation",
+        link: "/autoobserve",
+        name: "autoobserve",
+      });
+    };
+
+    watch(isExperimentalEnabled, () => updateAutoObserveMenu(), { immediate: false });
+
     // Absorbed into the Reliability flyout (navGroups.ts), which places it after Incidents.
     const isDowntimesEnabled = computed(
       () =>
@@ -977,6 +999,7 @@ export default defineComponent({
     // A separate top-level rail item here would be a second gate to keep in
     // sync.
     const filterMenus = () => {
+      updateAutoObserveMenu();
       updateIncidentsMenu();
       updateDowntimesMenu();
       updateWorkflowsMenu();
