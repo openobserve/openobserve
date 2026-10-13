@@ -355,8 +355,8 @@ pub trait RangeFunc: Send + Sync {
     ///
     /// # Parameters
     ///
-    /// * `samples` - Samples within the time window, sorted by timestamp in ascending order. May be
-    ///   empty if no samples exist in the window.
+    /// * `samples` - Samples within the time window, sorted by timestamp in ascending order. Never
+    ///   empty: windows without samples are skipped before `exec` is called.
     /// * `eval_ts` - The evaluation timestamp (in microseconds) for which to compute the result.
     ///   This is the right endpoint of the time window.
     /// * `range` - The duration of the lookback window. The window spans from `eval_ts - range`,

@@ -56,34 +56,14 @@ pub fn count_values(
         }
     };
 
-    if matrix.is_empty() {
-        return Ok(Value::None);
-    }
-
     // Use the eval timestamps from the context to ensure consistent alignment
     let eval_timestamps = eval_ctx.timestamps();
     let eval_timestamps: hashbrown::HashSet<i64> = eval_timestamps.iter().cloned().collect();
-
-    if eval_timestamps.is_empty() {
-        return Ok(Value::None);
-    }
 
     log::info!(
         "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) processing {} time points",
         eval_ctx.trace_id,
         eval_timestamps.len()
-    );
-
-    // For each eval timestamp, aggregate across all series
-    // Parallelize processing using query_thread_num
-    let cfg = config::get_config();
-    let thread_num = cfg.limit.query_thread_num;
-    let chunk_size = (eval_timestamps.len() / thread_num).max(1);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] eval_aggregate({func_name}) using {} threads with chunk_size {}",
-        eval_ctx.trace_id,
-        thread_num,
-        chunk_size
     );
 
     // Step 1: Compute label hash for each series once based on param
@@ -164,14 +144,12 @@ pub fn count_values(
                 // Sort by timestamp to maintain order
                 samples.sort_by_key(|s| s.timestamp);
 
-                if !samples.is_empty() {
-                    value_series.push(RangeValue {
-                        labels,
-                        samples,
-                        exemplars: None,
-                        time_window: None,
-                    });
-                }
+                value_series.push(RangeValue {
+                    labels,
+                    samples,
+                    exemplars: None,
+                    time_window: None,
+                });
             }
 
             value_series

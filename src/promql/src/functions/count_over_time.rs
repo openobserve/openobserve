@@ -27,9 +27,6 @@ impl RangeFunc for CountOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
         Some(samples.len() as f64)
     }
 }

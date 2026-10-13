@@ -99,11 +99,11 @@ impl PromqlContext {
         let eval_ctx = EvalContext::new(self.start, self.end, self.interval, trace_id.to_string());
         let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx.clone());
 
-        let (value, result_type_exec) = engine.exec(&expr).await?;
+        let value = engine.exec(&expr).await?;
 
         // Convert result format based on query type (instant vs range) only at the end
         let (final_value, final_result_type) = if is_instant {
-            shape_instant_result(value, &expr, self.end, result_type_exec)
+            shape_instant_result(value, &expr, self.end)
         } else {
             // For range queries, ensure result is in matrix format
             match value {
@@ -117,7 +117,7 @@ impl PromqlContext {
                 }
                 Value::None => (Value::None, Some("matrix".to_string())),
                 other @ Value::Matrix(_) => (other, Some("matrix".to_string())),
-                other => (other, result_type_exec),
+                other => (other, None),
             }
         };
 
@@ -176,18 +176,17 @@ impl PromqlContext {
             // Exemplars are wanted over the whole range, not only the lookback at `start`.
             let eval_ctx = EvalContext::new(window_start, window_end, step, trace_id.to_string());
             let mut engine = Engine::new(trace_id, ctx.clone(), eval_ctx);
-            let task: tokio::task::JoinHandle<Result<(Value, Option<String>)>> =
-                tokio::task::spawn(async move {
-                    let ret = engine.exec(&expr).await;
-                    drop(permit);
-                    ret
-                });
+            let task: tokio::task::JoinHandle<Result<Value>> = tokio::task::spawn(async move {
+                let ret = engine.exec(&expr).await;
+                drop(permit);
+                ret
+            });
             tasks.push(task);
         }
 
         for ret in tasks {
-            let (result, _result_type_exec) = match ret.await {
-                Ok(Ok((value, result_type))) => (value, result_type),
+            let result = match ret.await {
+                Ok(Ok(value)) => value,
                 Ok(Err(e)) => {
                     log::error!("Error executing query engine: {e}");
                     return Err(e);
@@ -272,12 +271,7 @@ fn exemplars_in_window(
 }
 
 /// The shape an instant query answers with, given what evaluation produced.
-fn shape_instant_result(
-    value: Value,
-    expr: &PromExpr,
-    eval_ts: i64,
-    result_type_exec: Option<String>,
-) -> (Value, Option<String>) {
+fn shape_instant_result(value: Value, expr: &PromExpr, eval_ts: i64) -> (Value, Option<String>) {
     // A range-vector-typed expression - a range selector or a subquery - asked for the samples
     // in its window, so the matrix evaluation produced is already the answer. Collapsing it
     // would keep an arbitrary one of those samples and drop the rest.
@@ -304,7 +298,7 @@ fn shape_instant_result(
             Some("scalar".to_string()),
         ),
         Value::None => (Value::None, Some("vector".to_string())),
-        other => (other, result_type_exec),
+        other => (other, None),
     }
 }
 
@@ -445,7 +439,7 @@ mod tests {
 
     fn shaped(query: &str, value: Value) -> (Value, Option<String>) {
         let expr = parser::parse(query).unwrap();
-        shape_instant_result(value, &expr, 3000, None)
+        shape_instant_result(value, &expr, 3000)
     }
 
     fn window_of_two() -> Value {

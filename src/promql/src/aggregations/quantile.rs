@@ -29,26 +29,7 @@ pub(crate) fn quantile(
     data: Value,
     eval_ctx: &EvalContext,
 ) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] quantile_range({qtile:?}) started",
-        eval_ctx.trace_id,
-    );
-
-    let result = super::eval_aggregate(
-        modifier,
-        data,
-        Quantile {
-            qtile: qtile.clone(),
-        },
-        eval_ctx,
-    );
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] quantile_range({qtile:?}) execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
+    super::eval_aggregate(modifier, data, Quantile { qtile }, eval_ctx)
 }
 
 pub(crate) struct Quantile {

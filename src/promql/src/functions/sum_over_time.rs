@@ -27,9 +27,6 @@ impl RangeFunc for SumOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
         let mut sum = SumState::default();
         for sample in samples {
             sum.push(sample.value);

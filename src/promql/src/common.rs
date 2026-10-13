@@ -40,13 +40,6 @@ pub(crate) fn variance(values: impl ExactSizeIterator<Item = f64> + Clone) -> Op
     )
 }
 
-pub fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
-    if data.is_empty() || !(0.0..=1.0).contains(&quantile) {
-        return quantile_in_place(&mut [], quantile);
-    }
-    quantile_in_place(&mut data.to_vec(), quantile)
-}
-
 pub(crate) fn quantile_in_place(data: &mut [f64], quantile: f64) -> Option<f64> {
     if !(0.0..=1.0).contains(&quantile) {
         let value = match quantile.signum() as i32 {
@@ -149,6 +142,10 @@ pub fn kahan_sum_increment(increment: f64, sum: f64, c: f64) -> (f64, f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn quantile(data: &[f64], quantile: f64) -> Option<f64> {
+        quantile_in_place(&mut data.to_vec(), quantile)
+    }
 
     #[test]
     fn test_variance_over_sample_values_preserves_edge_cases() {
