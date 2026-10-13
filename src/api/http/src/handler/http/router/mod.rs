@@ -2136,6 +2136,22 @@ fn oncall_routes(router: Router) -> Router {
                 .put(oncall::put_telephony)
                 .delete(oncall::delete_telephony),
         )
+        .route(
+            "/{org_id}/oncall/chat/slack/install/start",
+            post(oncall::chat::start_slack_install),
+        )
+        .route(
+            "/{org_id}/oncall/chat/slack/install/exchange",
+            post(oncall::chat::exchange_slack_install),
+        )
+        .route(
+            "/{org_id}/oncall/chat/installs",
+            get(oncall::chat::list_chat_installs),
+        )
+        .route(
+            "/{org_id}/oncall/chat/installs/{workspace_id}",
+            delete(oncall::chat::delete_chat_install),
+        )
 }
 
 /// Create other service routes (AWS, GCP, RUM)

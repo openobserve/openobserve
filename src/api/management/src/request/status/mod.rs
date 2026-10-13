@@ -225,6 +225,7 @@ struct ConfigResponse<'a> {
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     oncall_enabled: bool,
+    oncall_slack: config::meta::oncall::SlackAvailability,
     /// Whether private locations — pools served by long-running agents deployed
     /// inside the customer's network — are available. Enterprise only, so the
     /// UI hides the private-locations views, the agent-setup drawer and the
@@ -507,6 +508,14 @@ pub async fn zo_config(
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
     let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let oncall_slack = enterprise_value!(
+        config::meta::oncall::SlackAvailability::Off,
+        config::meta::oncall::SlackAvailability::of(
+            o2cfg.oncall.enabled,
+            o2cfg.oncall.slack_is_set(),
+            infra::table::cipher::is_encrypting(),
+        )
+    );
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -625,6 +634,7 @@ pub async fn zo_config(
         composite_alerts_available,
         synthetics_enabled,
         oncall_enabled,
+        oncall_slack,
         synthetics_private_locations_enabled,
         synthetics_subtests_enabled,
         synthetics_browser_max_steps,

@@ -211,6 +211,27 @@ pub struct NativeRoom {
     pub channel_name: Option<String>,
 }
 
+/// Whether this deployment offers Slack to orgs, as `/config` reports it (IN-2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlackAvailability {
+    Off,
+    /// Set up, but bot tokens cannot be stored until the operator sets the master key.
+    NeedsKey,
+    On,
+}
+
+impl SlackAvailability {
+    /// Off unless on-call is on and the Slack app is set; then on only while encrypting. [pure]
+    pub fn of(oncall_enabled: bool, slack_set: bool, encrypting: bool) -> Self {
+        match (oncall_enabled && slack_set, encrypting) {
+            (false, _) => Self::Off,
+            (true, false) => Self::NeedsKey,
+            (true, true) => Self::On,
+        }
+    }
+}
+
 /// Decides the team's native room, stage webhooks and fallback from its stored Slack fields. [pure]
 pub fn room_plan(
     team_workspace_id: Option<&str>,
@@ -353,5 +374,22 @@ mod tests {
         assert_eq!(InstallStatus::from_i32(0), None);
         assert_eq!(ChatMessageKind::from_i32(0), None);
         assert_eq!(ChatMessageStatus::from_i32(0), None);
+    }
+
+    #[test]
+    fn test_slack_availability_needs_oncall_the_app_and_the_master_key() {
+        use SlackAvailability as A;
+        let cases = [
+            (false, false, false, A::Off, "off"),
+            (false, true, true, A::Off, "off"),
+            (true, false, true, A::Off, "off"),
+            (true, true, false, A::NeedsKey, "needs_key"),
+            (true, true, true, A::On, "on"),
+        ];
+        for (oncall, slack, encrypting, want, wire) in cases {
+            let got = SlackAvailability::of(oncall, slack, encrypting);
+            assert_eq!(got, want, "{oncall} {slack} {encrypting}");
+            assert_eq!(serde_json::to_value(got).unwrap(), wire);
+        }
     }
 }

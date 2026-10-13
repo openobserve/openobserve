@@ -15,6 +15,8 @@
 
 //! On-call teams, schedules and escalation policies.
 
+pub mod chat;
+
 use axum::{
     extract::{Path, Query},
     response::Response,

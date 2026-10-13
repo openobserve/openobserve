@@ -37,7 +37,7 @@ pub use agent::{
 };
 pub use chat::{
     ChatIdentity, ChatInstall, ChatMessage, ChatMessageKind, ChatMessageStatus, ChatPlatform,
-    InstallStatus,
+    InstallStatus, SlackAvailability,
 };
 pub use contact::{
     CODE_MAX_ATTEMPTS, CODE_TTL_MICROS, CodeCheck, CodeRow, Contact, ContactError, DAY_MICROS,
