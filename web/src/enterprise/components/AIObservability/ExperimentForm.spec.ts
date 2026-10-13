@@ -434,8 +434,22 @@ describe("ExperimentForm", () => {
       const text = wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text();
       expect(text).toContain("$42.50");
       expect(text).toContain("order of magnitude");
-      expect(text).toContain("lower bound");
+      // A Remote/SDK task is incomplete by design; that is "scoring cost only",
+      // not a missing price.
+      expect(text).not.toContain("lower bound");
       expect(text).toContain("scoring cost only");
+    });
+
+    it("calls the estimate a lower bound only when a model has no price", async () => {
+      (llmExperimentsService.preview as any).mockResolvedValue({
+        ...previewResult,
+        costEstimate: { ...costEstimate, incomplete: true, hasUnpricedModel: true },
+      });
+      wrapper = await createWrapper();
+      fillValid(wrapper);
+      await flushPromises();
+      const text = wrapper.find('[data-test="ai-experiment-form-cost-estimate"]').text();
+      expect(text).toContain("lower bound, some models have no price");
     });
 
     it("says when the cost could not be estimated", async () => {

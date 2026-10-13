@@ -65,7 +65,7 @@
                   cost: formatEstimatedCost(costEstimate.estimatedCost),
                 })
           }}
-          <template v-if="costEstimate.estimatedCost !== null && costEstimate.incomplete">
+          <template v-if="costEstimate.estimatedCost !== null && costEstimate.hasUnpricedModel">
             · {{ t("aiObservability.experiments.form.costLowerBound") }}
           </template>
           <template v-if="!costEstimate.taskCostEstimated">

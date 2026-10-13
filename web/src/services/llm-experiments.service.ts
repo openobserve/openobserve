@@ -130,8 +130,10 @@ export interface ExperimentCostEstimate {
   estimatedCost: number | null;
   /** false for Remote/SDK tasks: the total is scoring cost only. */
   taskCostEstimated: boolean;
-  /** Some dimension had no price, so the total is a lower bound. */
+  /** Some dimension had no price, or the task side was left out (Remote/SDK). */
   incomplete: boolean;
+  /** Some model in the run has no price, so the total is a lower bound. */
+  hasUnpricedModel: boolean;
   warningThreshold: number;
   confirmationRequired: boolean;
 }
@@ -539,10 +541,18 @@ function value<T>(input: any, camel: string, snake: string, fallback: T): T {
 function normalizeCostEstimate(input: any): ExperimentCostEstimate | null {
   if (!input) return null;
   const cost = value<number | null>(input, "estimatedCost", "estimated_cost", null);
+  const taskCostEstimated = Boolean(
+    value(input, "taskCostEstimated", "task_cost_estimated", false),
+  );
+  // One entry per priced call site; a null cost means that model has no price.
+  const dimensions = value<any[] | null>(input, "dimensions", "dimensions", null);
   return {
     estimatedCost: cost === null ? null : Number(cost),
-    taskCostEstimated: Boolean(value(input, "taskCostEstimated", "task_cost_estimated", false)),
+    taskCostEstimated,
     incomplete: Boolean(input.incomplete),
+    hasUnpricedModel: Array.isArray(dimensions)
+      ? dimensions.some((d) => value(d, "estimatedCost", "estimated_cost", null) === null)
+      : Boolean(input.incomplete) && taskCostEstimated,
     warningThreshold: Number(value(input, "warningThreshold", "warning_threshold", 0)),
     confirmationRequired: Boolean(
       value(input, "confirmationRequired", "confirmation_required", false),
