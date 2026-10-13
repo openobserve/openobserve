@@ -4534,6 +4534,12 @@
       "stoppedMeta": "In 60 Minuten sind keine Daten eingetroffen",
       "stoppedHint": "Wenn Daten später eintreffen, informiert Sie die Startseite beim nächsten Besuch.",
       "checkAgain": "Erneut prüfen",
+      "idlePill": "Noch keine Prüfung",
+      "idleIn": "{stream} empfängt bereits Daten. Die Prüfung startet, wenn Sie den Befehl kopieren.",
+      "idleInConfig": "{stream} empfängt bereits Daten. Die Prüfung startet, wenn Sie die Konfiguration kopieren.",
+      "idleMatches": "Passende Streams empfangen bereits Daten. Die Prüfung startet, wenn Sie den Befehl kopieren.",
+      "idleMatchesConfig": "Passende Streams empfangen bereits Daten. Die Prüfung startet, wenn Sie die Konfiguration kopieren.",
+      "checkNow": "Jetzt prüfen",
       "receivedPill": "Erstes Ereignis empfangen",
       "receivedNewPill": "Neue Daten empfangen",
       "testPill": "Testereignis empfangen",
@@ -4613,7 +4619,6 @@
       "changeSource": "Andere Quelle wählen",
       "copyCommand": "Befehl kopieren",
       "copied": "Befehl kopiert",
-      "clickToCopy": "Klicken Sie auf den Block, um den Befehl zu kopieren",
       "waitingLogs": "Warte auf Ihre ersten Logs",
       "waitingMetrics": "Warte auf Ihre ersten Metriken",
       "waitingTraces": "Warte auf Ihre ersten Traces",
@@ -17795,8 +17800,8 @@
       "tokenLink": "Organisations-Token · {name}",
       "tokenLinkTooltip": "Wählen Sie, welches Datenerfassungs-Token die Snippets verwenden",
       "copiedWithToken": "Mit Organisations-Token {name} kopiert",
-      "clickToCopy": "Klicken Sie auf den Block, um zu kopieren.",
-      "clickToCopyWithToken": "Klicken Sie auf den Block, um zu kopieren. Das Datenerfassungs-Token der Organisation ist enthalten; es bleibt hier ausgeblendet."
+      "tokenIncludedHint": "Kopieren enthält das Datenerfassungs-Token der Organisation, das hier ausgeblendet bleibt.",
+      "maskedSelectionWarning": "Das ausgeblendete Token wurde als Punkte kopiert. Verwenden Sie Kopieren oder zeigen Sie es zuerst an."
     },
     "spinner": {
       "loading": "Wird geladen"

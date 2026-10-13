@@ -4534,6 +4534,12 @@
       "stoppedMeta": "No data arrived in 60 minutes",
       "stoppedHint": "If data lands later, Home tells you on your next visit.",
       "checkAgain": "Check again",
+      "idlePill": "Not checking yet",
+      "idleIn": "{stream} already receives data. Checks start when you copy the command.",
+      "idleInConfig": "{stream} already receives data. Checks start when you copy the config.",
+      "idleMatches": "Matching streams already receive data. Checks start when you copy the command.",
+      "idleMatchesConfig": "Matching streams already receive data. Checks start when you copy the config.",
+      "checkNow": "Check now",
       "receivedPill": "First event received",
       "receivedNewPill": "New data received",
       "testPill": "Test event received",
@@ -4613,7 +4619,6 @@
       "changeSource": "Choose a different source",
       "copyCommand": "Copy command",
       "copied": "Command copied",
-      "clickToCopy": "Click the block to copy the command",
       "waitingLogs": "Waiting for your first logs",
       "waitingMetrics": "Waiting for your first metrics",
       "waitingTraces": "Waiting for your first traces",
@@ -17795,8 +17800,8 @@
       "tokenLink": "org token · {name}",
       "tokenLinkTooltip": "Choose which ingestion token the snippets use",
       "copiedWithToken": "Copied with org token {name}",
-      "clickToCopy": "Click the block to copy.",
-      "clickToCopyWithToken": "Click the block to copy. The org's ingestion token is included; it stays hidden here."
+      "tokenIncludedHint": "Copy includes the org's ingestion token, which stays hidden here.",
+      "maskedSelectionWarning": "The hidden token was copied as dots. Use Copy, or Reveal it first."
     },
     "spinner": {
       "loading": "Loading"

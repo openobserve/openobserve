@@ -38,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="ingestion-splunkhec-endpoint-code-block"
         wrap
         inset
-        copy-on-click
         class="my-0"
         @copy="onSnippetCopy"
       />
@@ -73,7 +72,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="ingestion-splunkhec-example-code-block"
         wrap
         inset
-        copy-on-click
         class="my-0"
         @copy="onSnippetCopy"
       />
@@ -87,7 +85,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="ingestion-splunkhec-payload-code-block"
         wrap
         inset
-        copy-on-click
         class="my-0"
         @copy="onSnippetCopy"
       />
@@ -139,7 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="ingestion-splunkhec-health-code-block"
         wrap
         inset
-        copy-on-click
         class="my-0"
         @copy="onSnippetCopy"
       />

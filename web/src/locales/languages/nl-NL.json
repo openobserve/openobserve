@@ -4534,6 +4534,12 @@
       "stoppedMeta": "Er zijn geen gegevens aangekomen in 60 minuten",
       "stoppedHint": "Als gegevens later binnenkomen, meldt Home dit bij je volgende bezoek.",
       "checkAgain": "Opnieuw controleren",
+      "idlePill": "Nog niet aan het controleren",
+      "idleIn": "{stream} ontvangt al gegevens. Controles starten zodra je het commando kopieert.",
+      "idleInConfig": "{stream} ontvangt al gegevens. Controles starten zodra je de configuratie kopieert.",
+      "idleMatches": "Overeenkomende streams ontvangen al gegevens. Controles starten zodra je het commando kopieert.",
+      "idleMatchesConfig": "Overeenkomende streams ontvangen al gegevens. Controles starten zodra je de configuratie kopieert.",
+      "checkNow": "Nu controleren",
       "receivedPill": "Eerste event ontvangen",
       "receivedNewPill": "Nieuwe gegevens ontvangen",
       "testPill": "Testevent ontvangen",
@@ -4613,7 +4619,6 @@
       "changeSource": "Kies een andere bron",
       "copyCommand": "Commando kopiëren",
       "copied": "Commando gekopieerd",
-      "clickToCopy": "Klik op het blok om het commando te kopiëren",
       "waitingLogs": "Wachten op je eerste logboeken",
       "waitingMetrics": "Wachten op je eerste metrieken",
       "waitingTraces": "Wachten op je eerste traces",
@@ -17795,8 +17800,8 @@
       "tokenLink": "org-token · {name}",
       "tokenLinkTooltip": "Kies welk ingestietoken de snippets gebruiken",
       "copiedWithToken": "Gekopieerd met org-token {name}",
-      "clickToCopy": "Klik op het blok om te kopiëren.",
-      "clickToCopyWithToken": "Klik op het blok om te kopiëren. Het ingestietoken van de organisatie is inbegrepen; het blijft hier verborgen."
+      "tokenIncludedHint": "Kopiëren bevat het ingestietoken van de organisatie, dat hier verborgen blijft.",
+      "maskedSelectionWarning": "Het verborgen token is als punten gekopieerd. Gebruik Kopiëren of maak het eerst zichtbaar."
     },
     "spinner": {
       "loading": "Laden"

@@ -4534,6 +4534,12 @@
       "stoppedMeta": "60분 동안 데이터가 도착하지 않았습니다",
       "stoppedHint": "데이터가 나중에 도착하면 다음 방문 시 홈에서 알려드립니다.",
       "checkAgain": "다시 확인",
+      "idlePill": "아직 확인하지 않음",
+      "idleIn": "{stream}은(는) 이미 데이터를 수신하고 있습니다. 명령을 복사하면 확인이 시작됩니다.",
+      "idleInConfig": "{stream}은(는) 이미 데이터를 수신하고 있습니다. 구성을 복사하면 확인이 시작됩니다.",
+      "idleMatches": "일치하는 스트림은 이미 데이터를 수신하고 있습니다. 명령을 복사하면 확인이 시작됩니다.",
+      "idleMatchesConfig": "일치하는 스트림은 이미 데이터를 수신하고 있습니다. 구성을 복사하면 확인이 시작됩니다.",
+      "checkNow": "지금 확인",
       "receivedPill": "첫 이벤트 수신됨",
       "receivedNewPill": "새 데이터 수신됨",
       "testPill": "테스트 이벤트 수신됨",
@@ -4613,7 +4619,6 @@
       "changeSource": "다른 소스 선택",
       "copyCommand": "명령 복사",
       "copied": "명령이 복사되었습니다",
-      "clickToCopy": "명령을 복사하려면 블록을 클릭하세요",
       "waitingLogs": "첫 로그를 기다리는 중",
       "waitingMetrics": "첫 메트릭을 기다리는 중",
       "waitingTraces": "첫 트레이스를 기다리는 중",
@@ -17795,8 +17800,8 @@
       "tokenLink": "조직 토큰 · {name}",
       "tokenLinkTooltip": "코드 조각에서 사용할 수집 토큰 선택",
       "copiedWithToken": "조직 토큰 {name}(으)로 복사됨",
-      "clickToCopy": "블록을 클릭하여 복사하세요.",
-      "clickToCopyWithToken": "블록을 클릭하여 복사하세요. 조직의 수집 토큰이 포함되며, 여기서는 숨겨진 상태로 유지됩니다."
+      "tokenIncludedHint": "복사 내용에는 조직의 수집 토큰이 포함되며, 이 토큰은 여기에서 숨김 상태로 유지됩니다.",
+      "maskedSelectionWarning": "숨겨진 토큰이 점으로 복사되었습니다. 복사를 사용하거나 먼저 표시하세요."
     },
     "spinner": {
       "loading": "로딩 중"

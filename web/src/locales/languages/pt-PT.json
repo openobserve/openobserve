@@ -4534,6 +4534,12 @@
       "stoppedMeta": "Nenhum dado chegou em 60 minutos",
       "stoppedHint": "Se os dados chegarem depois, o Início avisa você na próxima visita.",
       "checkAgain": "Verificar novamente",
+      "idlePill": "Ainda não verificando",
+      "idleIn": "{stream} já recebe dados. As verificações começam quando você copia o comando.",
+      "idleInConfig": "{stream} já recebe dados. As verificações começam quando você copia a configuração.",
+      "idleMatches": "Os streams correspondentes já recebem dados. As verificações começam quando você copia o comando.",
+      "idleMatchesConfig": "Os streams correspondentes já recebem dados. As verificações começam quando você copia a configuração.",
+      "checkNow": "Verificar agora",
       "receivedPill": "Primeiro evento recebido",
       "receivedNewPill": "Novos dados recebidos",
       "testPill": "Evento de teste recebido",
@@ -4613,7 +4619,6 @@
       "changeSource": "Escolher outra fonte",
       "copyCommand": "Copiar comando",
       "copied": "Comando copiado",
-      "clickToCopy": "Clique no bloco para copiar o comando",
       "waitingLogs": "Aguardando seus primeiros registros",
       "waitingMetrics": "Aguardando suas primeiras métricas",
       "waitingTraces": "Aguardando seus primeiros rastros",
@@ -17795,8 +17800,8 @@
       "tokenLink": "token da organização · {name}",
       "tokenLinkTooltip": "Escolha qual token de ingestão os trechos de código usam",
       "copiedWithToken": "Copiado com o token da organização {name}",
-      "clickToCopy": "Clique no bloco para copiar.",
-      "clickToCopyWithToken": "Clique no bloco para copiar. O token de ingestão da organização está incluído; ele permanece oculto aqui."
+      "tokenIncludedHint": "Copiar inclui o token de ingestão da organização, que permanece oculto aqui.",
+      "maskedSelectionWarning": "O token oculto foi copiado como pontos. Use Copiar ou revele-o primeiro."
     },
     "spinner": {
       "loading": "Carregando"

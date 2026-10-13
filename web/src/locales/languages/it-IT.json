@@ -4534,6 +4534,12 @@
       "stoppedMeta": "Nessun dato arrivato in 60 minuti",
       "stoppedHint": "Se i dati arrivano più tardi, Home te lo segnala alla prossima visita.",
       "checkAgain": "Controlla di nuovo",
+      "idlePill": "Non ancora in verifica",
+      "idleIn": "{stream} riceve già dati. I controlli iniziano quando copi il comando.",
+      "idleInConfig": "{stream} riceve già dati. I controlli iniziano quando copi la configurazione.",
+      "idleMatches": "Gli stream corrispondenti ricevono già dati. I controlli iniziano quando copi il comando.",
+      "idleMatchesConfig": "Gli stream corrispondenti ricevono già dati. I controlli iniziano quando copi la configurazione.",
+      "checkNow": "Verifica ora",
       "receivedPill": "Primo evento ricevuto",
       "receivedNewPill": "Nuovi dati ricevuti",
       "testPill": "Evento di test ricevuto",
@@ -4613,7 +4619,6 @@
       "changeSource": "Scegli un'altra origine",
       "copyCommand": "Copia comando",
       "copied": "Comando copiato",
-      "clickToCopy": "Fai clic sul blocco per copiare il comando",
       "waitingLogs": "In attesa dei tuoi primi log",
       "waitingMetrics": "In attesa delle tue prime metriche",
       "waitingTraces": "In attesa delle tue prime tracce",
@@ -17795,8 +17800,8 @@
       "tokenLink": "token org · {name}",
       "tokenLinkTooltip": "Scegli quale token di ingestione usano gli snippet",
       "copiedWithToken": "Copiato con il token org {name}",
-      "clickToCopy": "Fai clic sul blocco per copiare.",
-      "clickToCopyWithToken": "Fai clic sul blocco per copiare. Il token di ingestione dell'organizzazione è incluso; qui resta nascosto."
+      "tokenIncludedHint": "La copia include il token di ingestione dell'organizzazione, che resta nascosto qui.",
+      "maskedSelectionWarning": "Il token nascosto è stato copiato come punti. Usa Copia oppure rivelalo prima."
     },
     "spinner": {
       "loading": "Caricamento"
