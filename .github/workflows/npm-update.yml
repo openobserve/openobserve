@@ -34,7 +34,7 @@ jobs:
       # monaco-editor (restricted import paths), @tanstack/vue-table (v9 drops useVueTable),
       # eslint (v10 drops @eslint/js, plugins need eslint 9), js-yaml (v5 drops the default export),
       # vite (v8 swaps esbuild for rolldown), jsdom (v30 needs a newer Node).
-      NCU_ARGS: --target latest --peer --reject typescript,monaco-editor,@tanstack/vue-table,eslint,js-yaml,vite,jsdom,@types/jsdom,@eslint/css,eslint-plugin-cypress,vite-plugin-istanbul,unplugin-icons
+      NCU_ARGS: --target latest --peer --reject typescript,monaco-editor,@tanstack/vue-table,eslint,js-yaml,vite,jsdom,@types/jsdom,@eslint/css,eslint-plugin-cypress,vite-plugin-istanbul,unplugin-icons,msw,vue-tsc
 
     steps:
       - name: Clone the current repo
