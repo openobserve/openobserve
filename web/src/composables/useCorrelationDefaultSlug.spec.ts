@@ -374,7 +374,21 @@ describe("getCorrelationFieldNames", () => {
     ]);
   });
 
-  it("does not reuse an in-flight lookup from an org that was switched away from", async () => {
+  it("does not cache a lookup that finishes after switching to another org", async () => {
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
+    const release = deferGroups();
+    const schema = [{ name: "host" }, { name: "service_name" }];
+    const abandoned = getCorrelationFieldNames("org1", "logs", "s", schema);
+    await tick();
+    vi.mocked(serviceStreamsApi.getSemanticGroups).mockResolvedValue({ data: [] });
+    await getCorrelationFieldNames("org2", "logs", "s", schema);
+    release([]);
+    expect(await abandoned).toEqual(["host"]);
+    vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["service_name"] });
+    expect(await getCorrelationFieldNames("org1", "logs", "s", schema)).toEqual(["service_name"]);
+  });
+
+  it("recomputes with the current identity config when returning to an org mid-lookup", async () => {
     vi.mocked(loadIdentityConfig).mockResolvedValue({ tracked_alias_ids: ["host"] });
     const release = deferGroups();
     const schema = [{ name: "host" }, { name: "service_name" }];
