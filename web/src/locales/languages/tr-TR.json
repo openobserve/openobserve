@@ -8315,6 +8315,7 @@
     "summaryActive": "Aktif",
     "summaryPaused": "Duraklatıldı",
     "summaryFailed": "Başarısız",
+    "summaryFiring": "Alarmda",
     "summaryRecent": "Tetiklenen < 15 dk",
     "summaryTotal": "Toplam",
     "webhook": "Web Kancası",

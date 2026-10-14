@@ -8315,6 +8315,7 @@
     "summaryActive": "アクティブ",
     "summaryPaused": "一時停止中",
     "summaryFailed": "失敗",
+    "summaryFiring": "発火中",
     "summaryRecent": "トリガー < 15m",
     "summaryTotal": "合計",
     "webhook": "Webhook",
