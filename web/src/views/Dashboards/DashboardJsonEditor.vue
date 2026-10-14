@@ -5,9 +5,9 @@
     :open="open"
     :width="70"
     persistent
-    :title="t('dashboard.editJson')"
-    :secondary-button-label="t('common.cancel')"
-    :primary-button-label="t('common.save')"
+    :title="readOnly ? t('authz.viewDashboardJson') : t('dashboard.editJson')"
+    :secondary-button-label="readOnly ? t('common.close') : t('common.cancel')"
+    :primary-button-label="readOnly ? undefined : t('common.save')"
     :primary-button-loading="saveJsonLoading"
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
@@ -29,6 +29,7 @@
           :debounceTime="300"
           v-model:query="jsonContent"
           language="json"
+          :read-only="readOnly"
           @update:query="handleEditorChange"
         />
       </div>
@@ -77,6 +78,10 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    readOnly: {
+      type: Boolean,
+      default: false,
+    },
   },
   emits: ["close", "update:open"],
   setup(props) {
@@ -121,7 +126,7 @@ export default defineComponent({
     };
 
     const saveChanges = async () => {
-      if (!isValidJson.value || saveJsonLoading.value) return;
+      if (props.readOnly || !isValidJson.value || saveJsonLoading.value) return;
 
       try {
         const updatedJson = JSON.parse(jsonContent.value);

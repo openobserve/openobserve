@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <ODropdownItem
-            v-if="!simplifiedPanelView && !isLayoutEditing"
+            v-if="!simplifiedPanelView && !isLayoutEditing && canEditDashboard"
             data-test="dashboard-edit-panel"
             @select="onPanelModifyClick('EditPanel')"
             shortcut-id="panelEdit"
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.editPanel") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView && layoutMode !== 'view'"
+            v-if="!simplifiedPanelView && layoutMode !== 'view' && canEditDashboard"
             data-test="dashboard-edit-layout"
             @select="onPanelModifyClick('EditLayout')"
           >
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Only the layout dialog belongs to layout edit mode; every other action saves on its own. -->
           <template v-if="!isLayoutEditing">
             <ODropdownItem
-              v-if="!simplifiedPanelView"
+              v-if="!simplifiedPanelView && canEditDashboard"
               data-test="dashboard-duplicate-panel"
               @select="onPanelModifyClick('DuplicatePanel')"
               shortcut-id="panelDuplicate"
@@ -300,6 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("panel.duplicate") }}
             </ODropdownItem>
             <ODropdownItem
+              v-if="canEditDashboard"
               data-test="dashboard-delete-panel"
               @select="onPanelModifyClick('DeletePanel')"
               shortcut-id="panelDelete"
@@ -352,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dashboard.panelContainer.refreshCacheReload") }}
             </ODropdownItem>
             <ODropdownItem
-              v-if="!simplifiedPanelView"
+              v-if="!simplifiedPanelView && canEditDashboard"
               data-test="dashboard-move-to-another-panel"
               @select="onPanelModifyClick('MovePanel')"
             >
@@ -535,6 +536,7 @@ import {
   useExemplarOverride,
 } from "@/composables/dashboard/useExemplarOverride";
 import { isExemplarEligible } from "@/utils/dashboard/exemplars/exemplarEligibility";
+import { useCan } from "@/composables/useCan";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -608,6 +610,13 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { t } = useI18nTyped();
+    const { can } = useCan();
+    // Panel edits, duplicates, moves and deletes are all saves of the parent dashboard.
+    const canEditDashboard = computed(
+      () =>
+        !props.dashboardId ||
+        can("dashboard", String(props.dashboardId), "edit", String(props.folderId || "default")),
+    );
     // Curated pages stamp this; stored dashboards never carry it, so the badge
     // and the body dimming are both invisible outside them (§6.3).
     const curatedBadge = computed(
@@ -1127,6 +1136,8 @@ export default defineComponent({
       } else if (e.key === "i" || e.key === "I") {
         e.preventDefault();
         showViewPanel.value = true;
+      } else if (!canEditDashboard.value) {
+        return;
       } else if (e.key === "e" || e.key === "E") {
         e.preventDefault();
         onEditPanel(props.data);
@@ -1158,6 +1169,7 @@ export default defineComponent({
 
     return {
       props,
+      canEditDashboard,
       exemplarsEligible,
       exemplarOverride,
       exemplarsOn,

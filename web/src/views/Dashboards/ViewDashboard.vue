@@ -61,6 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-edit-badge"
             >{{ t("dashboard.layoutEdit.editing") }}</OBadge
           >
+          <ViewOnlyBadge
+            v-if="dashboardEditStatus === 'denied'"
+            class="ms-2 align-middle"
+            data-test="dashboard-view-only-badge"
+          />
         </template>
         <template #actions>
           <!-- Add panel is the most-used action, so it leads the toolbar. -->
@@ -187,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </ODropdown>
           </OButtonGroup>
           <OButton
-            v-if="!isFullscreen && !isEditingLayout"
+            v-if="!isFullscreen && !isEditingLayout && dashboardEditStatus === 'allowed'"
             v-show="store.state.printMode !== true"
             variant="outline"
             :size="isMobile ? 'icon-toolbar' : 'sm-toolbar'"
@@ -350,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip :content="t('dashboard.scheduledDashboards')" />
             </OButton>
             <OButton
-              v-if="!isFullscreen"
+              v-if="!isFullscreen && dashboardEditStatus === 'allowed'"
               v-show="store.state.printMode !== true"
               variant="outline"
               size="icon-toolbar"
@@ -359,6 +364,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="code"
             >
               <OTooltip :content="t('dashboard.editJson')" />
+            </OButton>
+            <OButton
+              v-if="!isFullscreen && dashboardEditStatus === 'denied'"
+              v-show="store.state.printMode !== true"
+              variant="outline"
+              size="icon-toolbar"
+              data-test="dashboard-json-view-btn"
+              @click="openJsonEditor"
+              icon-left="visibility"
+            >
+              <OTooltip :content="t('authz.viewJsonReadOnly')" />
             </OButton>
             <!-- Pin as org-wide home dashboard: a low-frequency, set-once
                    action, so it sits at the far right, icon-only. Filled pin +
@@ -482,6 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:open="showJsonEditorDialog"
           :dashboard-data="currentDashboardData.data"
           :save-json-dashboard="saveJsonDashboard"
+          :read-only="dashboardEditStatus !== 'allowed'"
         />
 
         <ODialog
@@ -596,6 +613,8 @@ import {
 } from "@/lib/vue-shortcut-manager";
 import { isInputFocused, isMacOS } from "@/utils/keyboardShortcuts";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { useCan } from "@/composables/useCan";
+import ViewOnlyBadge from "@/components/common/ViewOnlyBadge.vue";
 import { queryClient } from "@/composables/query/queryClient";
 import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
 
@@ -616,6 +635,7 @@ export default defineComponent({
   emits: ["onDeletePanel", "sendToAiChat"],
   components: {
     OPageLayout,
+    ViewOnlyBadge,
     DateTimePickerDashboard,
     ShareButton,
     AutoRefreshInterval,
@@ -680,6 +700,18 @@ export default defineComponent({
     const dashboardId = computed(() => route.query.dashboard);
 
     const folderId = computed(() => route.query.folder);
+
+    const { status: canStatus } = useCan();
+    const dashboardEditStatus = computed(() =>
+      dashboardId.value
+        ? canStatus(
+            "dashboard",
+            String(dashboardId.value),
+            "edit",
+            String(folderId.value || "default"),
+          )
+        : "allowed",
+    );
 
     // Set/remove this dashboard as the single org-wide home dashboard, shared
     // reactive state with the dashboard list and HomeView via the composable.
@@ -1095,7 +1127,7 @@ export default defineComponent({
     const isSavingLayout = ref(false);
 
     const enterLayoutEdit = () => {
-      if (store.state.printMode) return;
+      if (store.state.printMode || dashboardEditStatus.value !== "allowed") return;
       layoutDraft.start();
     };
 
@@ -2228,6 +2260,7 @@ export default defineComponent({
 
     return {
       isMobile,
+      dashboardEditStatus,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,

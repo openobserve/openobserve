@@ -220,6 +220,18 @@ describe("DashboardJsonEditor", () => {
     expect(drawer.props("primaryButtonLoading")).toBe(false);
   });
 
+  it("opens read-only with no Save when the user cannot edit the dashboard", async () => {
+    wrapper = createWrapper({ readOnly: true });
+    const drawer = wrapper.findComponent({ name: "ODrawer" });
+    expect(drawer.props("title")).toBe("authz.viewDashboardJson");
+    expect(drawer.props("primaryButtonLabel")).toBeUndefined();
+    expect(drawer.props("secondaryButtonLabel")).toBe("common.close");
+    expect(wrapper.findComponent({ name: "QueryEditor" }).attributes("read-only")).toBe("true");
+
+    await wrapper.vm.saveChanges();
+    expect(mockSaveJsonDashboard.execute).not.toHaveBeenCalled();
+  });
+
   // Test 3: Initial JSON content loading
   it("should initialize with dashboard data as JSON", async () => {
     wrapper = createWrapper();

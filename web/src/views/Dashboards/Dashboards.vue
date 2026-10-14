@@ -308,7 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
                 />
                 <OButton
-                  v-if="row.actions == 'true'"
+                  v-if="row.actions == 'true' && canDeleteDashboard(row)"
                   icon-left="delete"
                   :title="t('dashboard.delete')"
                   variant="ghost-destructive"
@@ -349,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("dashboard.duplicate") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
+                    v-if="canDeleteDashboard(row)"
                     icon-left="delete"
                     variant="destructive"
                     class="md:hidden"
@@ -430,6 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("common.export") }}
               </OButton>
               <OButton
+                v-if="!bulkDeleteSplit.skipped.length || bulkDeleteSplit.allowed.length > 0"
                 variant="outline-destructive"
                 size="sm"
                 icon-left="delete"
@@ -519,7 +521,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('dashboard.deleteDashboardsConfirmTitle')"
       data-test="dashboard-confirm-bulk-delete-dialog"
-      :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
+      :message="
+        bulkDeleteSplit.skipped.length
+          ? t('authz.bulkDeletePartial', {
+              count: bulkDeleteSplit.allowed.length,
+              total: selectedIds.length,
+              skipped: bulkDeleteSplit.skipped.length,
+            })
+          : t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })
+      "
+      :detail="bulkDeleteSkippedNames"
       @update:ok="bulkDeleteDashboards"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -597,6 +608,7 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import analytics from "@/services/product_analytics";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { skippedNamesText, splitByPermission, useCan } from "@/composables/useCan";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -1463,6 +1475,7 @@ export default defineComponent({
             if (org) useHomeDashboard(t).load(org, true);
           }
         } catch (err) {
+          noteWriteDenied(err, "dashboard", deletedId, "delete", rowFolderId(selectedDelete.value));
           showErrorNotification(
             raw(asCaughtError(err).message ?? t("dashboard.dashboards.deletionFailed")),
             {},
@@ -1659,6 +1672,27 @@ export default defineComponent({
     const confirmBulkDelete = ref<boolean>(false);
     const bulkDeleteLoading = ref(false);
 
+    const { can, noteWriteDenied } = useCan();
+    const rowFolderId = (row: any): string =>
+      row?.folder_id || (showFavoritesOnly.value ? "default" : activeFolderId.value) || "default";
+    const canDeleteDashboard = (row: any): boolean =>
+      can("dashboard", row.id, "delete", rowFolderId(row));
+    const bulkDeleteSplit = computed(() => {
+      const byId = new Map<string, any>(dashboards.value.map((row: any) => [row.id, row]));
+      return splitByPermission(selectedDashboardIds.value, (id: string) =>
+        canDeleteDashboard(byId.get(id) ?? { id }),
+      );
+    });
+    const bulkDeleteSkippedNames = computed(() => {
+      const names = new Map<string, string>(
+        dashboards.value.map((row: any) => [row.id, row.name || row.id]),
+      );
+      return skippedNamesText(
+        t,
+        bulkDeleteSplit.value.skipped.map((id: string) => names.get(id) ?? id),
+      );
+    });
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -1683,7 +1717,7 @@ export default defineComponent({
 
         // Snapshot the selection first: reading `dashboards` below can re-run
         // that computed, which resets selectedIds as a side effect.
-        const idsToDelete = [...selectedDashboardIds.value];
+        const idsToDelete = [...bulkDeleteSplit.value.allowed];
 
         // Did this batch include the Home-pinned dashboard? Captured before the
         // delete so we can refresh the pin state afterwards (the backend clears
@@ -1848,6 +1882,9 @@ export default defineComponent({
       },
     ]);
     return {
+      canDeleteDashboard,
+      bulkDeleteSplit,
+      bulkDeleteSkippedNames,
       t,
       oTableRef,
       store,
