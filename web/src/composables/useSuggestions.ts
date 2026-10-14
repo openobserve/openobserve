@@ -150,6 +150,9 @@ const useSqlSuggestions = () => {
     return org && streamType && streamName ? { org, streamType, streamName } : null;
   };
 
+  const sameStreamContext = (a: StreamContext, b: StreamContext | null): boolean =>
+    !!b && a.org === b.org && a.streamType === b.streamType && a.streamName === b.streamName;
+
   /**
    * Field values for one column, for the completion provider to await directly.
    *
@@ -179,10 +182,13 @@ const useSqlSuggestions = () => {
       stored = [];
     }
 
+    // The stream can change while a lookup is awaited, and the menu must show the current stream's values.
+    if (!sameStreamContext(ctx, readStreamContext())) return resolveFieldValues(fieldName, options);
     const merged = [...new Set([...inSession, ...stored])];
     if (merged.length) return merged;
 
     const fetched = await requestFieldValues(ctx, fieldName, options);
+    if (!sameStreamContext(ctx, readStreamContext())) return resolveFieldValues(fieldName, options);
     if (!fetched.length && fieldValuesUnavailable(ctx, fieldName)) {
       throw new Error("field values unavailable");
     }

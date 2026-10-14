@@ -1273,6 +1273,7 @@ export default defineComponent({
         // Kind first: a numeric field ranked first inside avg( also starts with the operator lane's prefix.
         if (entry?.kind === "Field") return "field";
         if (entry?.kind === "Value") return "value";
+        if (entry?.lane !== undefined) return entry.lane;
         const sort = String(entry?.sortText ?? "");
         if (sort.startsWith(SORT_LANE.operator)) return "operator";
         if (sort.startsWith(SORT_LANE.predicate) || sort.startsWith(SORT_LANE.clause)) {
@@ -1334,6 +1335,8 @@ export default defineComponent({
           token?.isCancellationRequested ||
           isValueAnswerStale(snapshot, config.editor(), config.escapeCount());
         if (stale) return null;
+        // A retry at the same caret keeps the old hint, since only a caret move clears it; withStatus sets it again if still due.
+        config.showHint(null);
         if (outcome === "loading") config.tracker.budgetHit();
         return outcome;
       };
@@ -1508,6 +1511,11 @@ export default defineComponent({
           return !entry || !inLane.has(String(entry.name ?? entry.label).toLowerCase());
         });
         if (!groupsMenus(config)) return [...lane, ...catalog];
+        // Grouping rewrites sortText, which laneOf reads, so each row carries its lane through it.
+        const withLane = (raw: any) => {
+          const entry = objectEntry(raw);
+          return entry && { ...entry, lane: laneOf(entry) };
+        };
         return groupEntries(
           [
             {
@@ -1516,6 +1524,7 @@ export default defineComponent({
               // Under its header a word operator such as IN or IS NULL reads as an operator, not a keyword.
               entries: lane
                 .filter((entry) => !isWrapRow(entry))
+                .map(withLane)
                 .map((entry) =>
                   entry.kind === "Keyword" ? { ...entry, kind: "Operator" } : entry,
                 ),
@@ -1525,10 +1534,10 @@ export default defineComponent({
               name: t("sqlEditor.completion.groupFunctionsAndFields"),
               entries: [
                 ...lane.filter(isWrapRow).map((entry) => ({
-                  ...entry,
+                  ...withLane(entry),
                   description: t(WRAP_DESCRIPTIONS[String(entry.name)] ?? ""),
                 })),
-                ...catalog.map(objectEntry),
+                ...catalog.map(withLane),
               ],
             },
           ],
