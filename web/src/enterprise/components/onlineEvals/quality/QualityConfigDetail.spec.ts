@@ -341,6 +341,14 @@ describe("QualityConfigDetail", () => {
     expect(missing.text()).toContain("Back to all configs");
   });
 
+  it("shows the load error, not the empty state, when the request fails without a response", async () => {
+    scores.mockRejectedValue(Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" }));
+    const wrapper = mountDetail();
+    await flushPromises();
+    expect(wrapper.find('[data-test="quality-detail-empty"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="quality-detail-error"]').exists()).toBe(true);
+  });
+
   it("takes the type and the threshold from the Score Config when the list has no row", async () => {
     const config: ScoreConfig = {
       id: "row-1",
