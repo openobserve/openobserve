@@ -1649,6 +1649,32 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
     },
   );
 
+  it(
+    "Esc or a blur before the queued reopen runs leaves the menu closed",
+    { timeout: 30000 },
+    async () => {
+      const { model, editor } = await mountWith(
+        "v-quote-dismissed",
+        vi.fn(async () => ["error"]),
+      );
+      const text = "SELECT * FROM logs WHERE level = '";
+      model.getValueInRange.mockReturnValue(text);
+      editor.getPosition.mockReturnValue({ lineNumber: 1, column: text.length + 1 });
+      const typeThen = async (dismiss: () => void) => {
+        editor.trigger.mockClear();
+        editor.onDidChangeModelContent.mock.calls.at(-1)![0]({ changes: [{ text: "''" }] });
+        dismiss();
+        await new Promise((r) => setTimeout(r, 20));
+        return editor.trigger.mock.calls.map((c: any[]) => c[1]);
+      };
+      const escape = () => editor.onKeyDown.mock.calls.at(-1)![0]({ keyCode: 9 });
+      expect(await typeThen(escape)).not.toContain("editor.action.triggerSuggest");
+      editor.hasTextFocus.mockReturnValue(false);
+      expect(await typeThen(() => {})).not.toContain("editor.action.triggerSuggest");
+      editor.hasTextFocus.mockReturnValue(true);
+    },
+  );
+
   it("a quote outside a value position reopens nothing", { timeout: 30000 }, async () => {
     const { model, editor } = await mountWith(
       "v-quote-none",
@@ -1773,6 +1799,48 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
 describe("P0-4 — PromQL label values come from the provider", () => {
   let spy: ReturnType<typeof vi.spyOn>;
   afterAll(() => spy?.mockRestore());
+
+  it(
+    "drops label values when the organization changes while they load",
+    { timeout: 30000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const { resolvePromqlLabelValues } = await import("@/composables/usePromqlSuggestions");
+      const createFn = vi.mocked(api.editor.create);
+      const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+      const before = createFn.mock.calls.length;
+      spy = vi
+        .spyOn(document, "getElementById")
+        .mockImplementation(() => document.createElement("div"));
+      const store = createStore({
+        state: { theme: "light", selectedOrganization: { identifier: "old-org" } },
+      });
+      mount(CodeQueryEditor, {
+        props: { editorId: "promql-org-switch", language: "promql", query: "", keywords: [] },
+        global: { plugins: [store] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+      const model = createdEditors.at(-1)!.getModel();
+      const provide = registerFn.mock.calls.filter((c) => c[0] === "promql").at(-1)![1]
+        .provideCompletionItems;
+      let finish!: (values: string[]) => void;
+      vi.mocked(resolvePromqlLabelValues).mockImplementationOnce(
+        () => new Promise<string[]>((resolve) => (finish = resolve)),
+      );
+      const text = 'up{job="';
+      model.getValueInRange.mockReturnValue(text);
+      model.getLineContent.mockReturnValue(`${text}"}`);
+      model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
+      const pending = provide(model, { lineNumber: 1, column: text.length + 1 }, {}, {});
+      await vi.waitFor(() => expect(finish).toBeDefined());
+      store.state.selectedOrganization = { identifier: "new-org" };
+      finish(["old-org-only-service"]);
+      expect((await pending).suggestions.map(nameOf)).not.toContain('"old-org-only-service"');
+    },
+  );
 
   it(
     "awaits label values in a value position and closes the quote",

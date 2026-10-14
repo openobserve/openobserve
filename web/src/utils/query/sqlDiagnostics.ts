@@ -1094,13 +1094,14 @@ export function locateNotACondition(
 ): { field: string; hit: TokenHit; message: I18nText } | null {
   const types = text.match(/logical boolean operation\s+(\w+)\s+(AND|OR)\s+(\w+)/i);
   if (!types) return null;
-  const [, lhsType, , rhsType] = types;
+  const [, lhsType, opName, rhsType] = types;
   const tokens = tokenizeOperands(query);
   const betweenAnds = betweenAndIndexes(tokens);
   const candidates: { field: string; type: string; start: number; end: number }[] = [];
   for (let k = 0; k < tokens.length; k++) {
     const op = tokens[k].text.toUpperCase();
-    if (tokens[k].kind !== "word" || (op !== "AND" && op !== "OR") || betweenAnds.has(k)) continue;
+    // The types belong to the operator the error names; the other kind's operands say nothing about them.
+    if (tokens[k].kind !== "word" || op !== opName.toUpperCase() || betweenAnds.has(k)) continue;
     const sides: [string, number, number][] = [
       [lhsType, k - 1, -1],
       [rhsType, k + 1, 1],
@@ -1117,9 +1118,11 @@ export function locateNotACondition(
     }
   }
   // With the stream's column types known, a bare Boolean column elsewhere in the query is not the culprit.
-  const sameType = (c: (typeof candidates)[number]) =>
-    sameColumnType(typeOf?.(c.field.split(".").pop() ?? c.field), c.type);
-  const pick = candidates.find(sameType) ?? candidates[0];
+  const columnType = (c: (typeof candidates)[number]) =>
+    typeOf?.(c.field.split(".").pop() ?? c.field);
+  const sameType = (c: (typeof candidates)[number]) => sameColumnType(columnType(c), c.type);
+  const possible = candidates.filter((c) => !/^boolean$/i.test(columnType(c) ?? ""));
+  const pick = possible.find(sameType) ?? possible[0];
   if (!pick) return null;
   return {
     field: pick.field,

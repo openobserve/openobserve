@@ -695,8 +695,10 @@ export default defineComponent({
     };
 
     // A typed quote opens its menu unhighlighted; reopened as an auto Invoke it highlights the preselected first value, so Enter takes it.
-    const reopenInQuote = (version: number | undefined) => {
+    const reopenInQuote = (version: number | undefined, escapes: number) => {
       if (!editorObj || suggestMode.value === "off") return;
+      // Esc or a blur since the quote dismissed the menu, and triggerSuggest would also steal focus back.
+      if (escapes !== escapeCount || !editorObj.hasTextFocus?.()) return;
       const model = editorObj.getModel();
       // A key typed after the quote owns the menu now; reopening would highlight a menu it opened.
       if (model?.getVersionId?.() !== version) return;
@@ -930,7 +932,8 @@ export default defineComponent({
         const quote = props.language === "promql" ? '"' : "'";
         if (e?.changes?.some((c: any) => c.text === quote || c.text === quote + quote)) {
           const version = editorObj.getModel()?.getVersionId?.();
-          setTimeout(() => reopenInQuote(version), 0);
+          const escapes = escapeCount;
+          setTimeout(() => reopenInQuote(version, escapes), 0);
         }
         commitModelChange(e);
       });
@@ -1459,7 +1462,8 @@ export default defineComponent({
         const outcome = await awaitValues(config, token, (options) =>
           resolvePromqlLabelValues(org, context.metric, context.label, options),
         );
-        if (outcome === null) return null;
+        // Another organization's label values must never appear in this one's menu.
+        if (outcome === null || store.state.selectedOrganization?.identifier !== org) return null;
         if (outcome === "nolookup") return [];
         if (outcome === "loading" || outcome === "failed" || !outcome.length) {
           const status = Array.isArray(outcome) ? "empty" : outcome;
