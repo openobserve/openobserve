@@ -480,6 +480,20 @@ describe("Phase 3 — resolveFieldValues is exposed for the editor to await", ()
     expect(values).toContain("stored_only");
   });
 
+  it("answers for the stream selected when the lookup returns, not the one it started on", async () => {
+    const c = makeComposable();
+    let finishOld!: (values: string[]) => void;
+    vi.mocked(getFieldValuesForSuggestion).mockImplementation((ctx: any) =>
+      ctx.streamName === "http_logs"
+        ? new Promise<string[]>((resolve) => (finishOld = resolve))
+        : Promise.resolve(["new-stream-value"]),
+    );
+    const pending = (c as any).resolveFieldValues("level");
+    c.autoCompleteData.value.streamName = "other_logs";
+    finishOld(["old-stream-value"]);
+    await expect(pending).resolves.toEqual(["new-stream-value"]);
+  });
+
   it("resolves to an empty list rather than throwing when the lookup fails", async () => {
     const c = makeComposable({ storedValues: [] });
     vi.mocked(getFieldValuesForSuggestion).mockRejectedValueOnce(new Error("idb down"));
