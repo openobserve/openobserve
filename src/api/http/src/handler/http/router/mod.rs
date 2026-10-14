@@ -30,8 +30,9 @@ use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
-    kv, metrics_usage, model_pricing, organization, public_dashboards, query_history, rum_analytics,
-    service_accounts, short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
+    kv, metrics_usage, model_pricing, organization, public_dashboards, query_history,
+    rum_analytics, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
+    synthetics, users,
 };
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::{cloud, organization::billing_group};
@@ -707,8 +708,8 @@ fn public_dashboard_admin_routes(router: Router) -> Router {
             post(public_dashboards::admin::resume),
         )
         .route(
-            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/rebuild",
-            post(public_dashboards::admin::rebuild),
+            "/{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh",
+            post(public_dashboards::admin::refresh),
         )
 }
 
@@ -866,20 +867,16 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
-    // Public dashboards: same unauthenticated point-read plane (basic_routes),
-    // gated by its own master switch. The SPA viewer route (/public/dashboards)
-    // is served by the frontend catch-all, so only the data APIs live here.
-    if get_config().public_dashboards.enabled {
-        router = router
-            .route(
-                "/api/public_dashboards/{slug}",
-                get(public_dashboards::public::config),
-            )
-            .route(
-                "/api/public_dashboards/{slug}/data",
-                get(public_dashboards::public::data),
-            );
-    }
+    // Always registered: the handlers answer 404 while the env flag or the org switch is off.
+    router = router
+        .route(
+            "/api/public_dashboards/{slug}",
+            get(public_dashboards::public::config),
+        )
+        .route(
+            "/api/public_dashboards/{slug}/data",
+            get(public_dashboards::public::data),
+        );
 
     // Unauthenticated like status pages: the share token is checked in the handler.
     #[cfg(feature = "enterprise")]

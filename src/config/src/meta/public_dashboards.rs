@@ -13,16 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! DTOs for public dashboards. `PublicDashboardConfig` is the admin request
-//! body; `SanitizedDashboard` is the projection the anonymous plane serves
-//! (no ids/SQL/stream internals); `SnapshotData` is what the rebuilder stores
-//! and the viewer point-reads.
+//! DTOs for public dashboards. `PublicDashboardConfig` is the admin request body;
+//! `SanitizedDashboard` (GET /config) and `DataResponse` (GET /data) are what the anonymous
+//! plane serves, with no ids, SQL or stream internals.
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::meta::dashboards::Dashboard;
+
+/// The refresh interval a new link gets when the request names none.
+pub const DEFAULT_REFRESH_SECS: i32 = 300;
+/// The longest refresh interval a link can select.
+pub const MAX_REFRESH_SECS: i32 = 30 * 86_400;
+/// The shortest refresh interval a link can select.
+pub const MIN_REFRESH_SECS: i32 = 60;
 
 /// Draft configures the share without exposing it; Public serves it and is the default.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -49,7 +55,7 @@ impl Visibility {
     }
 }
 
-/// One window a link offers: rolling and rebuilt every refresh, or fixed and built once.
+/// One window a link offers: rolling and refreshed on read, or fixed and built once.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TimeRange {
@@ -64,7 +70,7 @@ pub enum TimeRange {
 }
 
 impl TimeRange {
-    /// The id its snapshot is stored under and the viewer asks for.
+    /// The id its result is stored under and the viewer asks for.
     pub fn key(&self) -> String {
         match self {
             Self::Relative { secs } => format!("r{secs}"),
@@ -89,6 +95,15 @@ impl TimeRange {
             Self::Relative { secs } => (now - secs * 1_000_000, now),
             Self::Absolute { start, end } => (*start, *end),
         }
+    }
+
+    /// `ceil_to_minute(max(selected, window / 288, min_refresh))`, from the current settings.
+    pub fn effective_refresh_secs(&self, selected: i64, min_refresh: i64) -> i64 {
+        let secs = selected
+            .max(self.length_secs() / 288)
+            .max(min_refresh)
+            .max(1);
+        (secs + 59) / 60 * 60
     }
 }
 
@@ -117,25 +132,26 @@ pub struct PublicDashboardConfig {
     pub time_range: TimeRangePolicy,
     #[serde(default)]
     pub frozen_variables: BTreeMap<String, serde_json::Value>,
-    pub rebuild_secs: i32,
+    #[serde(default = "default_refresh_secs")]
+    pub refresh_secs: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<i64>,
 }
 
-/// A link's state as the admin UI shows it, derived from the stored row.
+/// A link's state as the admin UI shows it; `NeedsAttention` comes from the batch status call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PublicLinkStatus {
     Live,
     Paused,
-    Preparing,
+    NotViewed,
     NeedsAttention,
     Expired,
     DashboardDeleted,
 }
 
 impl PublicLinkStatus {
-    /// Precedence: deleted dashboard, expired, paused, never built, failed or stale, live.
+    /// The lifecycle state from the row. Precedence: deleted dashboard, expired, paused, unviewed.
     pub fn derive(link: &PublicLinkState, now: i64) -> Self {
         if !link.dashboard_exists {
             return Self::DashboardDeleted;
@@ -146,14 +162,8 @@ impl PublicLinkStatus {
         if !link.enabled {
             return Self::Paused;
         }
-        let Some(built) = link.last_rebuilt_at else {
-            return Self::Preparing;
-        };
-        // Three missed rebuilds means the viewer is looking at data the author didn't promise.
-        let stale_after = 3 * i64::from(link.rebuild_secs.max(1)) * 1_000_000;
-        let stale = link.has_relative && now - built > stale_after;
-        if link.rebuild_failed || stale {
-            return Self::NeedsAttention;
+        if link.access_count == 0 {
+            return Self::NotViewed;
         }
         Self::Live
     }
@@ -165,30 +175,74 @@ pub struct PublicLinkState {
     pub dashboard_exists: bool,
     pub enabled: bool,
     pub expires_at: Option<i64>,
-    pub last_rebuilt_at: Option<i64>,
-    pub rebuild_failed: bool,
-    pub rebuild_secs: i32,
-    /// Absolute ranges are built once, so only a relative range can go stale.
-    pub has_relative: bool,
+    pub access_count: i64,
 }
 
-/// Whether a panel rendered, or was withheld (unreadable stream / unsupported).
-/// `reason` is deliberately generic — it never names a stream on the public plane.
+/// Why a panel is withheld; deliberately generic, it never names a stream on the public plane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NotAvailableReason {
+    Unauthorized,
+    Unsupported,
+    NoQuery,
+    TooLarge,
+    TooManyPanels,
+    Truncated,
+    BuildError,
+    TooOld,
+    Changed,
+}
+
+/// A panel's outcome: served (possibly retained, partial or truncated) or withheld.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum PanelState {
-    Ok,
-    NotAvailable { reason: String },
+    Ok {
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        retained: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_since: Option<i64>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        partial: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        truncated: bool,
+    },
+    NotAvailable {
+        reason: NotAvailableReason,
+    },
 }
 
-/// One panel's materialized output, shaped for the client renderer: `data` and
-/// `result_meta_data` are per-query (index-aligned to the panel's queries), and
-/// `metadata.queries[i]` carries that query's time window. The viewer feeds these
-/// straight into the same `convertPanelData` the live dashboard uses — no query
-/// runs on the anonymous plane. Serialized camelCase to match the frontend.
+impl PanelState {
+    /// A fresh, complete panel.
+    pub fn ok() -> Self {
+        Self::Ok {
+            retained: false,
+            error_since: None,
+            partial: false,
+            truncated: false,
+        }
+    }
+}
+
+/// A window in UTC micros.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Window {
+    pub start: i64,
+    pub end: i64,
+}
+
+/// One panel's output, shaped for the client renderer: `data` and `result_meta_data` are
+/// per-query (index-aligned to the panel's queries) and `metadata.queries[i]` carries that query's
+/// window. The viewer feeds these into the same `convertPanelData` the live dashboard uses.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PanelSnapshot {
+pub struct PanelResult {
     pub state: PanelState,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub intent: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub built_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window: Option<Window>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub data: Vec<serde_json::Value>,
     #[serde(
@@ -201,44 +255,106 @@ pub struct PanelSnapshot {
     pub metadata: serde_json::Value,
 }
 
-/// Stored per `(public_dashboard, range key)`; serialized into the snapshot row's
-/// `data` column and point-read by the anonymous plane. Keyed by panel id so the
-/// viewer can look up each panel's slice directly.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct SnapshotData {
-    pub panels: BTreeMap<String, PanelSnapshot>,
-    pub built_at: i64,
-    /// The values this snapshot was built with, defaults included, as the viewer shows them.
+impl PanelResult {
+    /// A withheld panel: its state and nothing else.
+    pub fn not_available(reason: NotAvailableReason) -> Self {
+        Self {
+            state: PanelState::NotAvailable { reason },
+            intent: String::new(),
+            built_at: None,
+            window: None,
+            data: Vec::new(),
+            result_meta_data: Vec::new(),
+            metadata: serde_json::Value::Null,
+        }
+    }
+}
+
+/// One range's panels and the variable values they were built with.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ResultBody {
+    pub panels: BTreeMap<String, PanelResult>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub variables: Vec<PublicVariable>,
 }
 
-/// The sanitized config the anonymous plane returns — layout + viz specs and
-/// the offered ranges only. No ids, no SQL, no stream internals.
+/// Why a served result is due again.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StaleReason {
+    Interval,
+    Dashboard,
+    Link,
+    Settings,
+    Retry,
+}
+
+/// GET /api/public_dashboards/{slug}/data, 200: one range's result and its freshness.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DataResponse {
+    /// Hex hash over the visible state; also the ETag.
+    pub rev: String,
+    pub built_at: i64,
+    pub window: Window,
+    /// The effective interval of this range.
+    pub refresh_secs: i64,
+    /// Null for an absolute range.
+    pub fresh_until: Option<i64>,
+    pub stale: bool,
+    pub stale_reason: Option<StaleReason>,
+    pub refreshing: bool,
+    pub next_retry_at: Option<i64>,
+    pub last_error_at: Option<i64>,
+    pub dashboard_updated_at: i64,
+    pub link_rev: i64,
+    pub settings_rev: i64,
+    pub variables: Vec<PublicVariable>,
+    pub panels: BTreeMap<String, PanelResult>,
+}
+
+/// GET /data when there is no result to serve yet: 202 building or 503 cooldown.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum NotReadyResponse {
+    Building {
+        started_at: i64,
+        estimated_secs: u64,
+        progress: f64,
+    },
+    Cooldown {
+        last_error_at: Option<i64>,
+        next_retry_at: i64,
+    },
+}
+
+/// GET /api/public_dashboards/{slug}: layout, viz specs and the offered ranges only. No ids, no
+/// SQL, no stream internals.
 #[derive(Clone, Debug, Serialize)]
 pub struct SanitizedDashboard {
     pub title: String,
     pub layout: serde_json::Value,
     pub ranges: Vec<KeyedRange>,
     pub default_key: String,
-    /// Keys of the ranges that have a snapshot to show.
-    pub available_keys: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub built_at: Option<i64>,
     /// The renderer keys time-series axes off this; anonymous viewers get no `/config`.
     pub timestamp_column: String,
-    /// Viewer re-read interval — the author's "Refresh every" rebuild cadence.
+    /// The default range's effective refresh interval.
     pub refresh_secs: i64,
     /// Frozen variable values, shown read-only; no variable is ever viewer-editable.
     pub variables: Vec<PublicVariable>,
+    pub dashboard_updated_at: i64,
+    pub link_rev: i64,
+    pub settings_rev: i64,
+    /// Panel id to the intent fingerprint a served panel must match.
+    pub intents: BTreeMap<String, String>,
 }
 
-/// A range with the key the viewer requests its snapshot by.
+/// A range with the key the viewer requests its data by and its effective refresh interval.
 #[derive(Clone, Debug, Serialize)]
 pub struct KeyedRange {
     pub key: String,
     #[serde(flatten)]
     pub range: TimeRange,
+    pub refresh_secs: i64,
 }
 
 /// A dashboard variable as the public viewer sees it: display label and frozen value only.
@@ -299,6 +415,15 @@ impl PublicVariable {
     }
 }
 
+/// The virtual user public dashboard searches run as; it has no users row and no permissions.
+pub fn public_dashboard_identity(org_id: &str) -> String {
+    format!("public-dashboard.org-{org_id}@openobserve.internal")
+}
+
+fn default_refresh_secs() -> i32 {
+    DEFAULT_REFRESH_SECS
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314,41 +439,124 @@ mod tests {
 
     #[test]
     fn not_available_panel_omits_data_and_names_no_stream() {
-        let p = PanelSnapshot {
-            state: PanelState::NotAvailable {
-                reason: "unauthorized".to_string(),
-            },
-            data: vec![],
-            result_meta_data: vec![],
-            metadata: serde_json::Value::Null,
-        };
-        let s = serde_json::to_string(&p).unwrap();
-        assert!(!s.contains("\"data\""), "{s}");
-        assert!(!s.contains("\"metadata\""), "{s}");
-        assert!(s.contains("not_available"), "{s}");
+        let p = PanelResult::not_available(NotAvailableReason::TooLarge);
+        assert_eq!(
+            serde_json::to_value(&p).unwrap(),
+            serde_json::json!({ "state": { "state": "not_available", "reason": "too_large" } })
+        );
     }
 
     #[test]
-    fn snapshot_serializes_result_meta_data_camelcase() {
+    fn panel_state_flags_are_omitted_unless_set() {
+        assert_eq!(
+            serde_json::to_value(PanelState::ok()).unwrap(),
+            serde_json::json!({ "state": "ok" })
+        );
+        let retained = PanelState::Ok {
+            retained: true,
+            error_since: Some(5),
+            partial: false,
+            truncated: false,
+        };
+        let json = serde_json::to_value(&retained).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({ "state": "ok", "retained": true, "error_since": 5 })
+        );
+        assert_eq!(
+            serde_json::from_value::<PanelState>(json).unwrap(),
+            retained
+        );
+    }
+
+    #[test]
+    fn data_response_uses_the_contract_field_names() {
         let mut panels = BTreeMap::new();
         panels.insert(
-            "panel-1".to_string(),
-            PanelSnapshot {
-                state: PanelState::Ok,
+            "p1".to_string(),
+            PanelResult {
+                state: PanelState::ok(),
+                intent: "9c1e".into(),
+                built_at: Some(10),
+                window: Some(Window { start: 1, end: 10 }),
                 data: vec![serde_json::json!({ "hits": [] })],
                 result_meta_data: vec![serde_json::json!({ "histogram_interval": 60 })],
                 metadata: serde_json::json!({ "queries": [] }),
             },
         );
-        let s = serde_json::to_string(&SnapshotData {
-            panels,
-            built_at: 1,
+        let resp = DataResponse {
+            rev: "a1f3".into(),
+            built_at: 10,
+            window: Window { start: 1, end: 10 },
+            refresh_secs: 300,
+            fresh_until: None,
+            stale: true,
+            stale_reason: Some(StaleReason::Interval),
+            refreshing: true,
+            next_retry_at: None,
+            last_error_at: None,
+            dashboard_updated_at: 7,
+            link_rev: 8,
+            settings_rev: 0,
             variables: vec![],
-        })
-        .unwrap();
-        assert!(s.contains("resultMetaData"), "{s}");
-        assert!(s.contains("\"panel-1\""), "{s}");
-        assert!(!s.contains("variables"), "{s}");
+            panels,
+        };
+        let json = serde_json::to_value(&resp).unwrap();
+        let mut keys: Vec<&str> = json
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            [
+                "built_at",
+                "dashboard_updated_at",
+                "fresh_until",
+                "last_error_at",
+                "link_rev",
+                "next_retry_at",
+                "panels",
+                "refresh_secs",
+                "refreshing",
+                "rev",
+                "settings_rev",
+                "stale",
+                "stale_reason",
+                "variables",
+                "window"
+            ]
+        );
+        assert!(json["fresh_until"].is_null());
+        assert_eq!(json["stale_reason"], "interval");
+        assert_eq!(json["rev"], "a1f3");
+        let p1 = &json["panels"]["p1"];
+        assert_eq!(p1["intent"], "9c1e");
+        assert_eq!(p1["window"], serde_json::json!({ "start": 1, "end": 10 }));
+        assert!(p1.get("resultMetaData").is_some());
+    }
+
+    #[test]
+    fn not_ready_bodies_carry_their_state() {
+        let building = NotReadyResponse::Building {
+            started_at: 1,
+            estimated_secs: 12,
+            progress: 0.4,
+        };
+        assert_eq!(
+            serde_json::to_value(&building).unwrap(),
+            serde_json::json!({ "state": "building", "started_at": 1, "estimated_secs": 12, "progress": 0.4 })
+        );
+        let cooldown = NotReadyResponse::Cooldown {
+            last_error_at: Some(2),
+            next_retry_at: 3,
+        };
+        assert_eq!(
+            serde_json::to_value(&cooldown).unwrap(),
+            serde_json::json!({ "state": "cooldown", "last_error_at": 2, "next_retry_at": 3 })
+        );
     }
 
     fn state() -> PublicLinkState {
@@ -356,16 +564,13 @@ mod tests {
             dashboard_exists: true,
             enabled: true,
             expires_at: None,
-            last_rebuilt_at: Some(1_000_000_000),
-            rebuild_failed: false,
-            rebuild_secs: 60,
-            has_relative: true,
+            access_count: 3,
         }
     }
 
     #[test]
     fn link_status_follows_its_precedence() {
-        let now = 1_000_000_000 + 30_000_000;
+        let now = 1_000_000_000;
         assert_eq!(
             PublicLinkStatus::derive(&state(), now),
             PublicLinkStatus::Live
@@ -387,45 +592,59 @@ mod tests {
         assert_eq!(PublicLinkStatus::derive(&s, now), PublicLinkStatus::Expired);
         let s = PublicLinkState {
             enabled: false,
+            access_count: 0,
             ..state()
         };
         assert_eq!(PublicLinkStatus::derive(&s, now), PublicLinkStatus::Paused);
         let s = PublicLinkState {
-            last_rebuilt_at: None,
+            access_count: 0,
             ..state()
         };
         assert_eq!(
             PublicLinkStatus::derive(&s, now),
-            PublicLinkStatus::Preparing
+            PublicLinkStatus::NotViewed
         );
-        let s = PublicLinkState {
-            rebuild_failed: true,
-            ..state()
-        };
         assert_eq!(
-            PublicLinkStatus::derive(&s, now),
-            PublicLinkStatus::NeedsAttention
+            serde_json::to_value(PublicLinkStatus::NeedsAttention).unwrap(),
+            "needs_attention"
+        );
+        assert_eq!(
+            serde_json::to_value(PublicLinkStatus::NotViewed).unwrap(),
+            "not_viewed"
         );
     }
 
     #[test]
-    fn link_goes_stale_after_three_missed_rebuilds() {
-        let built = 1_000_000_000;
-        assert_eq!(
-            PublicLinkStatus::derive(&state(), built + 180_000_000),
-            PublicLinkStatus::Live
-        );
-        assert_eq!(
-            PublicLinkStatus::derive(&state(), built + 180_000_001),
-            PublicLinkStatus::NeedsAttention
-        );
-        let absolute_only = PublicLinkState {
-            has_relative: false,
-            ..state()
+    fn effective_refresh_is_the_largest_floor_rounded_up_to_a_minute() {
+        let rel = |secs| TimeRange::Relative { secs };
+        assert_eq!(rel(3600).effective_refresh_secs(300, 60), 300);
+        assert_eq!(rel(86_400).effective_refresh_secs(60, 60), 300);
+        assert_eq!(rel(30 * 86_400).effective_refresh_secs(300, 60), 9000);
+        assert_eq!(rel(3600).effective_refresh_secs(60, 120), 120);
+        assert_eq!(rel(3600).effective_refresh_secs(61, 60), 120);
+        assert_eq!(rel(90_000).effective_refresh_secs(60, 60), 360);
+        let abs = TimeRange::Absolute {
+            start: 0,
+            end: 7 * 86_400 * 1_000_000,
         };
+        assert_eq!(abs.effective_refresh_secs(300, 60), 2100);
+    }
+
+    #[test]
+    fn config_defaults_to_a_five_minute_refresh() {
+        let cfg: PublicDashboardConfig = serde_json::from_value(serde_json::json!({
+            "time_range": { "ranges": [{ "type": "relative", "secs": 3600 }],
+                            "default": { "type": "relative", "secs": 3600 } }
+        }))
+        .unwrap();
+        assert_eq!(cfg.refresh_secs, 300);
+    }
+
+    #[test]
+    fn identity_names_the_org() {
         assert_eq!(
-            PublicLinkStatus::derive(&absolute_only, built + 86_400_000_000),
-            PublicLinkStatus::Live
+            public_dashboard_identity("acme"),
+            "public-dashboard.org-acme@openobserve.internal"
         );
     }
 

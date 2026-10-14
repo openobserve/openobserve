@@ -979,12 +979,18 @@ pub async fn promote_expired() -> Result<usize, anyhow::Error> {
     Ok(promoted)
 }
 
-/// Background job: hourly, promote expired pending_deletion orgs to `deleting`.
+/// Background job: hourly, promote expired pending_deletion orgs to `deleting` and hard-delete
+/// public links whose soft-delete retention has run out.
 pub async fn run_promotion_scheduler() -> Result<(), anyhow::Error> {
     spawn_pausable_job!("org_deletion_promotion", POLL_INTERVAL_SECS, {
         match promote_expired().await {
             Ok(n) if n > 0 => log::info!("[org_cleanup] promoted {n} orgs to deleting"),
             Err(e) => log::error!("[org_cleanup] promotion error: {e}"),
+            _ => {}
+        }
+        match crate::public_dashboards::purge_deleted().await {
+            Ok(n) if n > 0 => log::info!("[org_cleanup] purged {n} revoked public links"),
+            Err(e) => log::error!("[org_cleanup] public link purge error: {e}"),
             _ => {}
         }
     });

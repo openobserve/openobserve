@@ -25,18 +25,19 @@ use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::public_dashboards::PublicDashboardConfig;
 use infra::table::entity::public_dashboards::Model as PublicDashboard;
 use openobserve_api_common::extractors::Headers;
+use openobserve_core::public_dashboards::{Invalid, LINK_NOT_FOUND};
 
 use crate::service::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use crate::service::auth::check_permissions;
 
 fn map_err(ctx: &str, e: anyhow::Error) -> Response {
-    let msg = e.to_string();
-    if msg == "dashboard not found" {
-        return MetaHttpResponse::not_found(msg);
+    if let Some(invalid) = e.downcast_ref::<Invalid>() {
+        return MetaHttpResponse::bad_request(&invalid.0);
     }
-    if msg == openobserve_core::public_dashboards::OLDER_FORMAT_ERROR {
-        return MetaHttpResponse::bad_request(msg);
+    let msg = e.to_string();
+    if msg == "dashboard not found" || msg == LINK_NOT_FOUND {
+        return MetaHttpResponse::not_found(msg);
     }
     if msg.contains("permission") {
         return MetaHttpResponse::forbidden(msg);
@@ -112,7 +113,7 @@ async fn load_link(
 ) -> Result<PublicDashboard, Response> {
     match openobserve_core::public_dashboards::get_link(org_id, dashboard_id, link_id).await {
         Ok(Some(link)) => Ok(link),
-        Ok(None) => Err(MetaHttpResponse::not_found("public link not found")),
+        Ok(None) => Err(MetaHttpResponse::not_found(LINK_NOT_FOUND)),
         Err(e) => Err(map_err("load_link", e)),
     }
 }
@@ -121,7 +122,7 @@ async fn view_response(ctx: &str, org_id: &str, link: PublicDashboard) -> Respon
     match openobserve_core::public_dashboards::views(org_id, vec![link]).await {
         Ok(mut v) => match v.pop() {
             Some(view) => MetaHttpResponse::json(view),
-            None => MetaHttpResponse::not_found("public link not found"),
+            None => MetaHttpResponse::not_found(LINK_NOT_FOUND),
         },
         Err(e) => map_err(ctx, e),
     }
@@ -265,13 +266,13 @@ pub async fn resume(
     };
     match openobserve_core::public_dashboards::resume_link(link, &user.user_id).await {
         Ok(link) => view_response("resume", &org_id, link).await,
-        Err(e) if e.to_string().contains("expired") => MetaHttpResponse::bad_request(e),
         Err(e) => map_err("resume", e),
     }
 }
 
-/// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/rebuild — build every range now.
-pub async fn rebuild(
+/// POST /{org_id}/dashboards/{dashboard_id}/public_links/{link_id}/refresh — every range is due
+/// on its next view; no query runs here.
+pub async fn refresh(
     Path((org_id, dashboard_id, link_id)): Path<(String, String, String)>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
@@ -285,12 +286,9 @@ pub async fn rebuild(
         Ok(link) => link,
         Err(r) => return r,
     };
-    match openobserve_core::public_dashboards::rebuild_now(link, &user.user_id).await {
-        Ok(link) => view_response("rebuild", &org_id, link).await,
-        Err(e) if e.to_string().contains("expired") || e.to_string().contains("resume") => {
-            MetaHttpResponse::bad_request(e)
-        }
-        Err(e) => map_err("rebuild", e),
+    match openobserve_core::public_dashboards::refresh_now(link).await {
+        Ok(link) => view_response("refresh", &org_id, link).await,
+        Err(e) => map_err("refresh", e),
     }
 }
 
@@ -321,10 +319,12 @@ mod tests {
 
     #[test]
     fn public_link_errors_map_to_their_status() {
-        let older = anyhow::anyhow!(openobserve_core::public_dashboards::OLDER_FORMAT_ERROR);
-        assert_eq!(map_err("create", older).status(), StatusCode::BAD_REQUEST);
+        let invalid = anyhow::Error::new(Invalid("This dashboard has 14 panels".into()));
+        assert_eq!(map_err("create", invalid).status(), StatusCode::BAD_REQUEST);
         let missing = anyhow::anyhow!("dashboard not found");
         assert_eq!(map_err("create", missing).status(), StatusCode::NOT_FOUND);
+        let gone = anyhow::anyhow!(LINK_NOT_FOUND);
+        assert_eq!(map_err("pause", gone).status(), StatusCode::NOT_FOUND);
         let other = anyhow::anyhow!("connection refused");
         assert_eq!(
             map_err("create", other).status(),
