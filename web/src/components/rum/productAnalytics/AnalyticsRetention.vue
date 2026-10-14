@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :model-value="def.per"
           :options="perOptions"
           size="sm"
-          class="w-48"
+          width="sm"
           data-test="rum-analytics-retention-granularity"
           @update:model-value="(v) => update({ per: v as Granularity })"
         />

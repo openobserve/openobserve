@@ -1086,16 +1086,28 @@ export function parseSavedFunnelDraft(draft: {
 
 const parseCohort = (raw: unknown): FunnelCohort | null => {
   if (!isRecord(raw)) return null;
-  const { k, ...def } = raw;
+  const { k, n, i, ...def } = raw;
   const funnel = parseFunnelDef(def);
   if (!funnel) return null;
   if (typeof k !== "number" || !Number.isInteger(k) || k < 1 || k >= funnel.steps.length)
     return null;
-  return { funnel: { ...funnel, breakdown: null }, stepIndex: k, side: "dropped" };
+  const name = typeof n === "string" && n.trim() ? n.trim().slice(0, MAX_NAME_LENGTH) : null;
+  return {
+    funnel: { ...funnel, breakdown: null },
+    stepIndex: k,
+    side: "dropped",
+    ...(name ? { name } : {}),
+    ...(isEntityId(i) ? { funnelId: i } : {}),
+  };
 };
 
 export function cohortParam(cohort: FunnelCohort): string {
-  return encodeDef({ ...funnelParam({ ...cohort.funnel, breakdown: null }), k: cohort.stepIndex });
+  return encodeDef({
+    ...funnelParam({ ...cohort.funnel, breakdown: null }),
+    k: cohort.stepIndex,
+    ...(cohort.name ? { n: cohort.name } : {}),
+    ...(cohort.funnelId ? { i: cohort.funnelId } : {}),
+  });
 }
 
 export function parsePathsDef(raw: unknown): PathsDef | null {

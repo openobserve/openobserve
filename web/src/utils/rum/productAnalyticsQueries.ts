@@ -86,6 +86,10 @@ export interface FunnelCohort {
   funnel: FunnelDef;
   stepIndex: number;
   side: "dropped";
+  /** The saved funnel's name at hand-off; absent for an unsaved funnel. */
+  name?: string;
+  /** The saved funnel's id at hand-off, so "Back to funnel" reopens this one and not whichever is open. */
+  funnelId?: string;
 }
 export type PathsInclude = "all" | "pages" | "clicks";
 export interface PathsDef {
