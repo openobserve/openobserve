@@ -623,8 +623,8 @@ impl GroupCounts {
 }
 
 pub struct MultiHistogramSegmentCollector {
-    /// None when either column is missing from this segment (legacy index file)
-    cols: Option<(Column<i64>, StrColumn)>,
+    // Schema-present fields with no column contain only NULL values.
+    cols: Option<(Column<i64>, Option<StrColumn>)>,
     /// Some on a time-sorted segment: buckets come from doc-id runs instead
     /// of fetching the timestamp column
     sorted: Option<SortedBucketCursor>,
@@ -637,7 +637,7 @@ pub struct MultiHistogramSegmentCollector {
 
 impl Collector for MultiHistogramCollector {
     /// `(bucket key in local wall-clock µs, breakdown value, count)` rows
-    type Fruit = Vec<(i64, String, u64)>;
+    type Fruit = Vec<(i64, Option<String>, u64)>;
     type Child = MultiHistogramSegmentCollector;
 
     fn for_segment(
@@ -648,10 +648,12 @@ impl Collector for MultiHistogramCollector {
         let fast_fields = segment.fast_fields();
         let ts_col = fast_fields.column_opt::<i64>(&self.ts_field)?;
         let str_col = fast_fields.str(&self.breakdown_field)?;
-        let cols = ts_col.zip(str_col);
+        let cols = ts_col
+            .map(|ts| (ts, str_col))
+            .filter(|_| segment.schema().get_field(&self.breakdown_field).is_ok());
         let counts = match &cols {
             Some((_, str_col)) => {
-                let num_terms = str_col.num_terms();
+                let num_terms = str_col.as_ref().map_or(0, |col| col.num_terms()) + 1;
                 match num_terms.checked_mul(self.num_buckets) {
                     Some(space) if num_terms > 0 && space <= self.dense_limit => {
                         GroupCounts::Dense {
@@ -693,7 +695,7 @@ impl Collector for MultiHistogramCollector {
 
     fn merge_fruits(
         &self,
-        mut segment_fruits: Vec<Vec<(i64, String, u64)>>,
+        mut segment_fruits: Vec<Vec<(i64, Option<String>, u64)>>,
     ) -> tantivy::Result<Self::Fruit> {
         debug_assert!(
             segment_fruits.len() <= 1,
@@ -704,7 +706,7 @@ impl Collector for MultiHistogramCollector {
 }
 
 impl SegmentCollector for MultiHistogramSegmentCollector {
-    type Fruit = Vec<(i64, String, u64)>;
+    type Fruit = Vec<(i64, Option<String>, u64)>;
 
     fn collect(&mut self, doc: DocId, _score: Score) {
         let Self {
@@ -717,15 +719,16 @@ impl SegmentCollector for MultiHistogramSegmentCollector {
         let Some((ts_col, str_col)) = cols else {
             return;
         };
-        // a doc missing the breakdown value forms no group (terms agg `missing: None`)
+        // Zero represents NULL; dictionary ordinals are shifted to keep empty strings distinct.
+        let ord = str_col
+            .as_ref()
+            .and_then(|col| col.ords().first(doc))
+            .map_or(0, |ord| ord + 1);
         if let Some(cursor) = sorted {
-            if let Some(bucket) = cursor.bucket(doc)
-                && let Some(ord) = str_col.ords().first(doc)
-            {
+            if let Some(bucket) = cursor.bucket(doc) {
                 counts.add(bucket, ord);
             }
         } else if let Some(ts) = ts_col.first(doc)
-            && let Some(ord) = str_col.ords().first(doc)
             && let Some(bucket) = computer.bucket(ts)
         {
             counts.add(bucket, ord);
@@ -748,25 +751,26 @@ impl SegmentCollector for MultiHistogramSegmentCollector {
         let Some((ts_col, str_col)) = cols else {
             return;
         };
-        fetch_first_vals(str_col.ords(), docs, ord_buf);
+        if let Some(str_col) = str_col {
+            fetch_first_vals(str_col.ords(), docs, ord_buf);
+        } else {
+            ord_buf.clear();
+            ord_buf.resize(docs.len(), None);
+        }
         if let Some(cursor) = sorted {
             for (&doc, ord) in docs.iter().zip(ord_buf.iter()) {
-                let Some(ord) = ord else {
-                    continue;
-                };
                 if let Some(bucket) = cursor.bucket(doc) {
-                    counts.add(bucket, *ord);
+                    counts.add(bucket, ord.map_or(0, |ord| ord + 1));
                 }
             }
             return;
         }
         fetch_first_vals(ts_col, docs, ts_buf);
         for (ts, ord) in ts_buf.iter().zip(ord_buf.iter()) {
-            let (Some(ts), Some(ord)) = (ts, ord) else {
-                continue;
-            };
-            if let Some(bucket) = computer.bucket(*ts) {
-                counts.add(bucket, *ord);
+            if let Some(ts) = ts
+                && let Some(bucket) = computer.bucket(*ts)
+            {
+                counts.add(bucket, ord.map_or(0, |ord| ord + 1));
             }
         }
     }
@@ -831,13 +835,29 @@ impl SegmentCollector for MultiHistogramSegmentCollector {
         }
 
         // resolve the distinct surviving ordinals in one sorted dictionary pass
-        let ord_map = resolve_ords(&str_col, groups.iter().map(|(_, ord, _)| *ord).collect());
+        let ord_map = str_col
+            .as_ref()
+            .map(|col| {
+                resolve_ords(
+                    col,
+                    groups
+                        .iter()
+                        .filter_map(|(_, ord, _)| ord.checked_sub(1))
+                        .collect(),
+                )
+            })
+            .unwrap_or_default();
         let mut out = Vec::with_capacity(groups.len());
         for (bucket, ord, count) in groups {
-            if let Some(s) = ord_map.get(&ord) {
-                let key = computer.min_value + bucket as i64 * computer.bucket_width as i64;
-                out.push((key, s.clone(), count as u64));
-            }
+            let value = if ord == 0 {
+                None
+            } else if let Some(s) = ord_map.get(&(ord - 1)) {
+                Some(s.clone())
+            } else {
+                continue;
+            };
+            let key = computer.min_value + bucket as i64 * computer.bucket_width as i64;
+            out.push((key, value, count as u64));
         }
         out
     }
@@ -895,13 +915,67 @@ mod tests {
             (25, Some("a")),
             (25, Some("b")),
             (15, Some("a")),
-            // missing level: counted by the simple histogram, no group in the multi
             (7, None),
             (6, Some("b")),
             (5, Some("b")),
             (0, Some("a")),
             (-10, Some("a")),
         ])
+    }
+
+    #[test]
+    fn test_multi_histogram_null_and_empty_collection_paths() {
+        let rows = [(1, None), (2, Some("")), (3, Some("0")), (4, None)];
+        for rows in [
+            rows,
+            [rows[3], rows[2], rows[1], rows[0]],
+            [rows[2], rows[0], rows[3], rows[1]],
+        ] {
+            let searcher = build_index_from(&rows);
+            for dense_limit in [0, usize::MAX] {
+                let collector =
+                    MultiHistogramCollector::new("_timestamp".into(), "level".into(), 0, 10, 10, 0)
+                        .with_dense_limit(dense_limit);
+                let expected = vec![
+                    (0, None, 2),
+                    (0, Some("".into()), 1),
+                    (0, Some("0".into()), 1),
+                ];
+                let mut result = searcher.search(&AllQuery, &collector).unwrap();
+                result.sort_unstable();
+                assert_eq!(result, expected);
+                for block in [false, true] {
+                    let mut segment = collector
+                        .for_segment(0, searcher.segment_reader(0))
+                        .unwrap();
+                    if block {
+                        segment.collect_block(&[0, 1]);
+                        segment.collect_block(&[2, 3]);
+                    } else {
+                        for doc in 0..4 {
+                            segment.collect(doc, 0.0);
+                        }
+                    }
+                    let mut result = segment.harvest();
+                    result.sort_unstable();
+                    assert_eq!(result, expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_multi_histogram_all_null() {
+        let searcher = build_index_from(&[(1, None), (2, None)]);
+        for dense_limit in [0, usize::MAX] {
+            let collector =
+                MultiHistogramCollector::new("_timestamp".into(), "level".into(), 0, 10, 10, 0)
+                    .with_dense_limit(dense_limit);
+            assert_eq!(
+                searcher.search(&AllQuery, &collector).unwrap(),
+                vec![(0, None, 2)]
+            );
+        }
     }
 
     #[test]
@@ -932,7 +1006,7 @@ mod tests {
     #[test]
     fn test_multi_histogram_collector() {
         let searcher = build_index();
-        let row = |ts: i64, s: &str, count: u64| (ts, s.to_string(), count);
+        let row = |ts: i64, s: &str, count: u64| (ts, Some(s.to_string()), count);
 
         // dense_limit usize::MAX forces the dense counting array, 0 forces the
         // hash map; both must produce identical results
@@ -951,6 +1025,7 @@ mod tests {
             assert_eq!(
                 res,
                 vec![
+                    (0, None, 1),
                     row(0, "a", 1),
                     row(0, "b", 2),
                     row(10, "a", 1),
@@ -983,10 +1058,10 @@ mod tests {
             assert_eq!(
                 res,
                 vec![
-                    (0, "b".to_string(), 2),
-                    (10, "a".to_string(), 1),
-                    (20, "a".to_string(), 1),
-                    (40, "c".to_string(), 1),
+                    (0, Some("b".to_string()), 2),
+                    (10, Some("a".to_string()), 1),
+                    (20, Some("a".to_string()), 1),
+                    (40, Some("c".to_string()), 1),
                 ],
                 "dense_limit={dense_limit}"
             );
@@ -1010,12 +1085,13 @@ mod tests {
         assert_eq!(
             res,
             vec![
-                (0, "a".to_string(), 1),
-                (10, "a".to_string(), 1),
-                (10, "b".to_string(), 2),
-                (20, "a".to_string(), 1),
-                (30, "a".to_string(), 1),
-                (30, "b".to_string(), 1),
+                (0, Some("a".to_string()), 1),
+                (10, None, 1),
+                (10, Some("a".to_string()), 1),
+                (10, Some("b".to_string()), 2),
+                (20, Some("a".to_string()), 1),
+                (30, Some("a".to_string()), 1),
+                (30, Some("b".to_string()), 1),
             ]
         );
     }

@@ -33,11 +33,11 @@ pub enum CacheEntry {
     RowIds(Arc<BooleanBuffer>, Option<u32>),
     /// ((_timestamp, doc_id), row_group_size_from_index_file)
     SelectCandidates(Arc<Vec<(i64, u32)>>, Option<u32>),
-    Count(usize),                            // simple count optimization
-    Histogram(Vec<u64>),                     // simple histogram optimization
-    MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization
-    TopN(Vec<(Vec<String>, u64)>),           // group by top n optimization (1..=4 fields)
-    Distinct(HashSet<String>),               // simple distinct optimization
+    Count(usize),                                    // simple count optimization
+    Histogram(Vec<u64>),                             // simple histogram optimization
+    MultiHistogram(Vec<(i64, Option<String>, u64)>), // multi histogram optimization
+    TopN(Vec<(Vec<Option<String>>, u64)>),           // group by top n optimization (1..=4 fields)
+    Distinct(HashSet<String>),                       // simple distinct optimization
 }
 
 impl From<CacheEntry> for TantivyResult {
@@ -82,21 +82,27 @@ impl CacheEntry {
                 multi_histogram
                     .iter()
                     .map(|(_, s, _)| {
-                        s.capacity() + std::mem::size_of::<i64>() + std::mem::size_of::<u64>()
+                        s.as_ref().map_or(0, String::capacity)
+                            + std::mem::size_of::<(i64, Option<String>, u64)>()
                     })
                     .sum::<usize>()
-                    + std::mem::size_of::<Vec<(i64, String, u64)>>()
+                    + std::mem::size_of::<Vec<(i64, Option<String>, u64)>>()
             }
             CacheEntry::TopN(top_n) => {
                 top_n
                     .iter()
                     .map(|(keys, _)| {
-                        keys.iter().map(|s| s.capacity()).sum::<usize>()
-                            + std::mem::size_of::<Vec<String>>()
+                        keys.iter()
+                            .map(|s| {
+                                std::mem::size_of::<Option<String>>()
+                                    + s.as_ref().map_or(0, String::capacity)
+                            })
+                            .sum::<usize>()
+                            + std::mem::size_of::<Vec<Option<String>>>()
                             + std::mem::size_of::<u64>()
                     })
                     .sum::<usize>()
-                    + std::mem::size_of::<Vec<(Vec<String>, u64)>>()
+                    + std::mem::size_of::<Vec<(Vec<Option<String>>, u64)>>()
             }
             CacheEntry::Distinct(distinct) => {
                 distinct.iter().map(|s| s.capacity()).sum::<usize>()
@@ -210,9 +216,12 @@ mod tests {
 
     fn create_test_top_n_result() -> CacheEntry {
         CacheEntry::TopN(vec![
-            (vec!["key1".to_string()], 100),
-            (vec!["key2".to_string()], 200),
-            (vec!["key3".to_string(), "sub1".to_string()], 300),
+            (vec![Some("key1".to_string())], 100),
+            (vec![Some("key2".to_string())], 200),
+            (
+                vec![Some("key3".to_string()), Some("sub1".to_string())],
+                300,
+            ),
         ])
     }
 
@@ -444,7 +453,7 @@ mod tests {
 
         if let Some(TantivyResult::TopN(top_n)) = cache.get("topn_key") {
             assert_eq!(top_n.len(), 3);
-            assert_eq!(top_n[0].0, vec!["key1".to_string()]);
+            assert_eq!(top_n[0].0, vec![Some("key1".to_string())]);
             assert_eq!(top_n[0].1, 100);
         } else {
             panic!("Expected TopN result");

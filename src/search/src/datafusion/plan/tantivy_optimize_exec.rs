@@ -336,7 +336,7 @@ fn create_histogram_arrow_array(
 /// - multi_histogram: Vector of (timestamp, breakdown_value, count) tuples
 fn create_multi_histogram_arrow_array(
     schema: &SchemaRef,
-    multi_histogram: &[(i64, String, u64)],
+    multi_histogram: &[(i64, Option<String>, u64)],
 ) -> Result<Vec<Arc<dyn arrow::array::Array>>, DataFusionError> {
     // Validate schema has 3 fields
     if schema.fields().len() != 3 {
@@ -410,7 +410,7 @@ fn create_multi_histogram_arrow_array(
 
 fn create_top_n_arrow_array(
     schema: &SchemaRef,
-    top_n: Vec<(Vec<String>, u64)>,
+    top_n: Vec<(Vec<Option<String>>, u64)>,
 ) -> Result<Vec<Vec<Arc<dyn arrow::array::Array>>>, DataFusionError> {
     // schema is the group fields plus a trailing count field
     let schema_fields = schema.fields().len();
@@ -424,7 +424,7 @@ fn create_top_n_arrow_array(
     let count_field = &schema.fields()[num_group_fields];
 
     // unzip the composite keys and counts, dropping any malformed row
-    let mut group_values: Vec<Vec<String>> =
+    let mut group_values: Vec<Vec<Option<String>>> =
         vec![Vec::with_capacity(top_n.len()); num_group_fields];
     let mut count_values = Vec::with_capacity(top_n.len());
     for (keys, count) in top_n {
@@ -477,15 +477,15 @@ fn create_distinct_arrow_array(
     let field_field = &schema.fields()[0];
 
     // Create field value array with proper type based on schema
-    let field_array = create_field_array(field_field, distinct_values.into_iter().collect())?;
+    let field_array =
+        create_field_array(field_field, distinct_values.into_iter().map(Some).collect())?;
 
     Ok(vec![field_array])
 }
 
-/// Helper function to create field arrays with proper type conversion
 fn create_field_array(
     field: &arrow_schema::Field,
-    field_values: Vec<String>,
+    field_values: Vec<Option<String>>,
 ) -> Result<Arc<dyn Array>, DataFusionError> {
     match field.data_type() {
         arrow_schema::DataType::Utf8 => {
@@ -538,16 +538,14 @@ fn create_count_array(
     }
 }
 
-/// Parse string values into i64 array
-fn parse_i64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusionError> {
+fn parse_i64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, DataFusionError> {
     let parsed_values = field_values
         .iter()
-        .map(|v| {
-            if v.is_empty() {
-                Ok(0i64)
-            } else {
-                v.parse::<i64>()
-            }
+        // Indexes built before NULL preservation store NULL as an empty string.
+        .map(|v| match v.as_deref() {
+            None => Ok(None),
+            Some("") => Ok(Some(0i64)),
+            Some(v) => v.parse::<i64>().map(Some),
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse i64 in topn: {e}")))?;
@@ -555,16 +553,13 @@ fn parse_i64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
     Ok(Arc::new(arrow::array::Int64Array::from(parsed_values)) as Arc<dyn Array>)
 }
 
-/// Parse string values into u64 array
-fn parse_u64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusionError> {
+fn parse_u64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, DataFusionError> {
     let parsed_values = field_values
         .iter()
-        .map(|v| {
-            if v.is_empty() {
-                Ok(0u64)
-            } else {
-                v.parse::<u64>()
-            }
+        .map(|v| match v.as_deref() {
+            None => Ok(None),
+            Some("") => Ok(Some(0u64)),
+            Some(v) => v.parse::<u64>().map(Some),
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse u64 in topn: {e}")))?;
@@ -572,16 +567,13 @@ fn parse_u64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
     Ok(Arc::new(arrow::array::UInt64Array::from(parsed_values)) as Arc<dyn Array>)
 }
 
-/// Parse string values into f64 array
-fn parse_f64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusionError> {
+fn parse_f64_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, DataFusionError> {
     let parsed_values = field_values
         .iter()
-        .map(|v| {
-            if v.is_empty() {
-                Ok(0.0f64)
-            } else {
-                v.parse::<f64>()
-            }
+        .map(|v| match v.as_deref() {
+            None => Ok(None),
+            Some("") => Ok(Some(0.0f64)),
+            Some(v) => v.parse::<f64>().map(Some),
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse f64 in topn: {e}")))?;
@@ -589,16 +581,13 @@ fn parse_f64_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusion
     Ok(Arc::new(arrow::array::Float64Array::from(parsed_values)) as Arc<dyn Array>)
 }
 
-/// Parse string values into bool array
-fn parse_bool_array(field_values: &[String]) -> Result<Arc<dyn Array>, DataFusionError> {
+fn parse_bool_array(field_values: &[Option<String>]) -> Result<Arc<dyn Array>, DataFusionError> {
     let parsed_values = field_values
         .iter()
-        .map(|v| {
-            if v.is_empty() {
-                Ok(false)
-            } else {
-                v.parse::<bool>()
-            }
+        .map(|v| match v.as_deref() {
+            None => Ok(None),
+            Some("") => Ok(Some(false)),
+            Some(v) => v.parse::<bool>().map(Some),
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| DataFusionError::Internal(format!("Failed to parse bool in topn: {e}")))?;
@@ -617,10 +606,200 @@ mod tests {
 
     use super::*;
 
+    #[tokio::test]
+    async fn test_index_groups_match_datafusion_for_nullable_fields() {
+        use config::tantivy::query::{
+            histogram_collector::MultiHistogramCollector, topn_collector::TopNCollector,
+        };
+        use datafusion::execution::context::SessionContext;
+        use tantivy::{
+            Index, doc,
+            query::AllQuery,
+            schema::{FAST, STRING},
+        };
+
+        for (data_type, default, other) in [
+            (DataType::Utf8, "", "x"),
+            (DataType::Int64, "0", "1"),
+            (DataType::UInt64, "0", "1"),
+            (DataType::Float64, "0", "1"),
+            (DataType::Boolean, "false", "true"),
+        ] {
+            let field = Field::new("severity", data_type, true);
+            let raw_schema = Arc::new(Schema::new(vec![
+                Field::new("_timestamp", DataType::Int64, false),
+                field.clone(),
+            ]));
+            let tokens = vec![None, Some(default.into()), Some(other.into()), None];
+            let raw = RecordBatch::try_new(
+                raw_schema,
+                vec![
+                    Arc::new(Int64Array::from(vec![1, 2, 3, 4])),
+                    create_field_array(&field, tokens.clone()).unwrap(),
+                ],
+            )
+            .unwrap();
+            let mut schema = tantivy::schema::Schema::builder();
+            let ts = schema.add_i64_field("_timestamp", FAST);
+            let severity = schema.add_text_field("severity", STRING | FAST);
+            let index = Index::create_in_ram(schema.build());
+            let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
+            for (row, token) in tokens.iter().enumerate() {
+                let mut document = doc!(ts => row as i64 + 1);
+                if let Some(value) = token {
+                    document.add_text(severity, value);
+                }
+                writer.add_document(document).unwrap();
+            }
+            writer.commit().unwrap();
+            let searcher = index.reader().unwrap().searcher();
+            let context = SessionContext::new();
+            context.register_batch("raw", raw).unwrap();
+            let expected = context.sql("SELECT severity, count(*) AS cnt FROM raw GROUP BY severity ORDER BY severity NULLS FIRST").await.unwrap().collect().await.unwrap();
+            let group_schema = Arc::new(Schema::new(vec![
+                field.clone(),
+                Field::new("cnt", DataType::Int64, false),
+            ]));
+            let topn = searcher
+                .search(
+                    &AllQuery,
+                    &TopNCollector::<u32>::new(vec!["severity".into()], 10, false),
+                )
+                .unwrap();
+            let topn = create_top_n_arrow_array(&group_schema, topn)
+                .unwrap()
+                .remove(0);
+            let histogram = searcher
+                .search(
+                    &AllQuery,
+                    &MultiHistogramCollector::new(
+                        "_timestamp".into(),
+                        "severity".into(),
+                        0,
+                        10,
+                        10,
+                        0,
+                    ),
+                )
+                .unwrap();
+            let histogram_schema = Arc::new(Schema::new(vec![
+                Field::new(
+                    "ts",
+                    DataType::Timestamp(TimeUnit::Microsecond, None),
+                    false,
+                ),
+                field.clone(),
+                Field::new("cnt", DataType::Int64, false),
+            ]));
+            let mut histogram =
+                create_multi_histogram_arrow_array(&histogram_schema, &histogram).unwrap();
+            histogram.remove(0);
+            for arrays in [topn, histogram] {
+                let batch = RecordBatch::try_new(group_schema.clone(), arrays).unwrap();
+                context.register_batch("indexed", batch).unwrap();
+                let actual = context
+                    .sql("SELECT severity, cnt FROM indexed ORDER BY severity NULLS FIRST")
+                    .await
+                    .unwrap()
+                    .collect()
+                    .await
+                    .unwrap();
+                assert_eq!(actual, expected, "{:?}", field.data_type());
+                context.deregister_table("indexed").unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn test_field_arrays_preserve_null_and_default_values() {
+        for (data_type, value) in [
+            (DataType::Utf8, ""),
+            (DataType::Utf8View, ""),
+            (DataType::LargeUtf8, ""),
+            (DataType::Int64, "0"),
+            (DataType::UInt64, "0"),
+            (DataType::Float64, "0"),
+            (DataType::Boolean, "false"),
+        ] {
+            let field = Field::new("breakdown", data_type, true);
+            let array = create_field_array(&field, vec![None, Some(value.into())]).unwrap();
+            assert_eq!(array.len(), 2);
+            assert!(array.is_null(0));
+            assert!(!array.is_null(1));
+            assert_eq!(array.null_count(), 1);
+        }
+        for (data_type, expected) in [
+            (
+                DataType::Int64,
+                Arc::new(Int64Array::from(vec![0])) as Arc<dyn Array>,
+            ),
+            (DataType::UInt64, Arc::new(UInt64Array::from(vec![0]))),
+            (DataType::Float64, Arc::new(Float64Array::from(vec![0.0]))),
+            (DataType::Boolean, Arc::new(BooleanArray::from(vec![false]))),
+        ] {
+            let field = Field::new("breakdown", data_type, true);
+            let array = create_field_array(&field, vec![Some("".into())]).unwrap();
+            assert_eq!(&array, &expected);
+        }
+    }
+
+    #[test]
+    fn test_histogram_and_topn_arrays_preserve_null() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(
+                "ts",
+                DataType::Timestamp(TimeUnit::Microsecond, None),
+                false,
+            ),
+            Field::new("breakdown", DataType::Int64, true),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let histogram =
+            create_multi_histogram_arrow_array(&schema, &[(0, None, 2), (0, Some("0".into()), 1)])
+                .unwrap();
+        let values = histogram[1].as_any().downcast_ref::<Int64Array>().unwrap();
+        assert!(values.is_null(0));
+        assert!(!values.is_null(1));
+        assert_eq!(values.value(1), 0);
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("s", DataType::Utf8, true),
+            Field::new("b", DataType::Boolean, true),
+            Field::new("count", DataType::Int64, false),
+        ]));
+        let topn = create_top_n_arrow_array(
+            &schema,
+            vec![
+                (vec![None, None], 2),
+                (vec![Some("".into()), Some("false".into())], 1),
+            ],
+        )
+        .unwrap();
+        assert!(topn[0][0].is_null(0));
+        assert!(topn[0][1].is_null(0));
+        assert_eq!(
+            topn[0][0]
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .value(1),
+            ""
+        );
+        assert!(
+            !topn[0][1]
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .unwrap()
+                .value(1)
+        );
+    }
+
     #[test]
     fn test_parse_f64_array() {
         let f64_values = [1.0, 0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY];
-        let field_values = f64_values.iter().map(|v| v.to_string()).collect::<Vec<_>>();
+        let field_values = f64_values
+            .iter()
+            .map(|v| Some(v.to_string()))
+            .collect::<Vec<_>>();
         let array = parse_f64_array(&field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<Float64Array>().unwrap();
         assert_eq!(array_values.len(), 5);
@@ -634,10 +813,10 @@ mod tests {
     #[test]
     fn test_parse_i64_array() {
         let field_values = vec![
-            "123".to_string(),
-            "-456".to_string(),
-            "0".to_string(),
-            "".to_string(),
+            Some("123".to_string()),
+            Some("-456".to_string()),
+            Some("0".to_string()),
+            None,
         ];
         let array = parse_i64_array(&field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<Int64Array>().unwrap();
@@ -645,16 +824,16 @@ mod tests {
         assert_eq!(array_values.value(0), 123);
         assert_eq!(array_values.value(1), -456);
         assert_eq!(array_values.value(2), 0);
-        assert_eq!(array_values.value(3), 0); // empty string defaults to 0
+        assert!(array_values.is_null(3));
     }
 
     #[test]
     fn test_parse_u64_array() {
         let field_values = vec![
-            "123".to_string(),
-            "456".to_string(),
-            "0".to_string(),
-            "".to_string(),
+            Some("123".to_string()),
+            Some("456".to_string()),
+            Some("0".to_string()),
+            None,
         ];
         let array = parse_u64_array(&field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<UInt64Array>().unwrap();
@@ -662,44 +841,44 @@ mod tests {
         assert_eq!(array_values.value(0), 123);
         assert_eq!(array_values.value(1), 456);
         assert_eq!(array_values.value(2), 0);
-        assert_eq!(array_values.value(3), 0); // empty string defaults to 0
+        assert!(array_values.is_null(3));
     }
 
     #[test]
     fn test_parse_bool_array() {
-        let field_values = vec!["true".to_string(), "false".to_string(), "".to_string()];
+        let field_values = vec![Some("true".to_string()), Some("false".to_string()), None];
         let array = parse_bool_array(&field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<BooleanArray>().unwrap();
         assert_eq!(array_values.len(), 3);
         assert!(array_values.value(0));
         assert!(!array_values.value(1));
-        assert!(!array_values.value(2)); // empty string defaults to false
+        assert!(array_values.is_null(2));
     }
 
     #[test]
     fn test_parse_i64_array_invalid_input() {
-        let field_values = vec!["123".to_string(), "invalid".to_string()];
+        let field_values = vec![Some("123".to_string()), Some("invalid".to_string())];
         let result = parse_i64_array(&field_values);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_parse_u64_array_invalid_input() {
-        let field_values = vec!["123".to_string(), "invalid".to_string()];
+        let field_values = vec![Some("123".to_string()), Some("invalid".to_string())];
         let result = parse_u64_array(&field_values);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_parse_f64_array_invalid_input() {
-        let field_values = vec!["123.45".to_string(), "invalid".to_string()];
+        let field_values = vec![Some("123.45".to_string()), Some("invalid".to_string())];
         let result = parse_f64_array(&field_values);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_parse_bool_array_invalid_input() {
-        let field_values = vec!["true".to_string(), "invalid".to_string()];
+        let field_values = vec![Some("true".to_string()), Some("invalid".to_string())];
         let result = parse_bool_array(&field_values);
         assert!(result.is_err());
     }
@@ -707,7 +886,7 @@ mod tests {
     #[test]
     fn test_create_field_array_string() {
         let field = Field::new("test", DataType::Utf8, false);
-        let field_values = vec!["hello".to_string(), "world".to_string()];
+        let field_values = vec![Some("hello".to_string()), Some("world".to_string())];
         let array = create_field_array(&field, field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<StringArray>().unwrap();
         assert_eq!(array_values.len(), 2);
@@ -718,7 +897,7 @@ mod tests {
     #[test]
     fn test_create_field_array_int64() {
         let field = Field::new("test", DataType::Int64, false);
-        let field_values = vec!["123".to_string(), "456".to_string()];
+        let field_values = vec![Some("123".to_string()), Some("456".to_string())];
         let array = create_field_array(&field, field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<Int64Array>().unwrap();
         assert_eq!(array_values.len(), 2);
@@ -729,7 +908,7 @@ mod tests {
     #[test]
     fn test_create_field_array_uint64() {
         let field = Field::new("test", DataType::UInt64, false);
-        let field_values = vec!["123".to_string(), "456".to_string()];
+        let field_values = vec![Some("123".to_string()), Some("456".to_string())];
         let array = create_field_array(&field, field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<UInt64Array>().unwrap();
         assert_eq!(array_values.len(), 2);
@@ -740,7 +919,7 @@ mod tests {
     #[test]
     fn test_create_field_array_float64() {
         let field = Field::new("test", DataType::Float64, false);
-        let field_values = vec!["123.45".to_string(), "456.78".to_string()];
+        let field_values = vec![Some("123.45".to_string()), Some("456.78".to_string())];
         let array = create_field_array(&field, field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<Float64Array>().unwrap();
         assert_eq!(array_values.len(), 2);
@@ -751,7 +930,7 @@ mod tests {
     #[test]
     fn test_create_field_array_boolean() {
         let field = Field::new("test", DataType::Boolean, false);
-        let field_values = vec!["true".to_string(), "false".to_string()];
+        let field_values = vec![Some("true".to_string()), Some("false".to_string())];
         let array = create_field_array(&field, field_values).unwrap();
         let array_values = array.as_any().downcast_ref::<BooleanArray>().unwrap();
         assert_eq!(array_values.len(), 2);
@@ -762,7 +941,7 @@ mod tests {
     #[test]
     fn test_create_field_array_unsupported_type() {
         let field = Field::new("test", DataType::Int32, false);
-        let field_values = vec!["123".to_string()];
+        let field_values = vec![Some("123".to_string())];
         let result = create_field_array(&field, field_values);
         assert!(result.is_err());
     }
@@ -945,7 +1124,10 @@ mod tests {
             Field::new("field", DataType::Utf8, false),
             Field::new("count", DataType::Int64, false),
         ]));
-        let top_n = vec![(vec!["a".to_string()], 10), (vec!["b".to_string()], 20)];
+        let top_n = vec![
+            (vec![Some("a".to_string())], 10),
+            (vec![Some("b".to_string())], 20),
+        ];
         let result = create_top_n_arrow_array(&schema, top_n).unwrap();
 
         assert_eq!(result.len(), 1); // One batch
@@ -969,8 +1151,8 @@ mod tests {
             Field::new("count", DataType::Int64, false),
         ]));
         let top_n = vec![
-            (vec!["a".to_string(), "x".to_string()], 10),
-            (vec!["b".to_string(), "y".to_string()], 20),
+            (vec![Some("a".to_string()), Some("x".to_string())], 10),
+            (vec![Some("b".to_string()), Some("y".to_string())], 20),
         ];
         let result = create_top_n_arrow_array(&schema, top_n).unwrap();
 
@@ -1002,7 +1184,7 @@ mod tests {
             DataType::Utf8,
             false,
         )]));
-        let top_n = vec![(vec!["a".to_string()], 10)];
+        let top_n = vec![(vec![Some("a".to_string())], 10)];
         let result = create_top_n_arrow_array(&schema, top_n);
         assert!(result.is_err());
     }

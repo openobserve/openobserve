@@ -51,11 +51,11 @@ pub enum TantivyResult {
     Skipped {
         percent: usize, // skipped tantivy search, with the percentage
     },
-    Count(usize),                            // simple count optimization
-    Histogram(Vec<u64>),                     // simple histogram optimization
-    MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
-    TopN(Vec<(Vec<String>, u64)>),           // group by top n optimization (1..=4 fields)
-    Distinct(HashSet<String>),               // simple distinct optimization
+    Count(usize),        // simple count optimization
+    Histogram(Vec<u64>), // simple histogram optimization
+    MultiHistogram(Vec<(i64, Option<String>, u64)>),
+    TopN(Vec<(Vec<Option<String>>, u64)>), // group by top n optimization (1..=4 fields)
+    Distinct(HashSet<String>),             // simple distinct optimization
 }
 
 impl TantivyResult {
@@ -89,21 +89,27 @@ impl TantivyResult {
                 multi_histogram
                     .iter()
                     .map(|(_, s, _)| {
-                        s.capacity() + std::mem::size_of::<i64>() + std::mem::size_of::<u64>()
+                        s.as_ref().map_or(0, String::capacity)
+                            + std::mem::size_of::<(i64, Option<String>, u64)>()
                     })
                     .sum::<usize>()
-                    + std::mem::size_of::<Vec<(i64, String, u64)>>()
+                    + std::mem::size_of::<Vec<(i64, Option<String>, u64)>>()
             }
             Self::TopN(top_n) => {
                 top_n
                     .iter()
                     .map(|(keys, _)| {
-                        keys.iter().map(|s| s.capacity()).sum::<usize>()
-                            + std::mem::size_of::<Vec<String>>()
+                        keys.iter()
+                            .map(|s| {
+                                std::mem::size_of::<Option<String>>()
+                                    + s.as_ref().map_or(0, String::capacity)
+                            })
+                            .sum::<usize>()
+                            + std::mem::size_of::<Vec<Option<String>>>()
                             + std::mem::size_of::<u64>()
                     })
                     .sum::<usize>()
-                    + std::mem::size_of::<Vec<(Vec<String>, u64)>>()
+                    + std::mem::size_of::<Vec<(Vec<Option<String>>, u64)>>()
             }
             Self::Distinct(distinct) => {
                 distinct.iter().map(|s| s.capacity()).sum::<usize>()
@@ -308,7 +314,7 @@ impl TantivyResult {
                     if ascend && distinct_values.len() >= limit {
                         break;
                     }
-                    // null values are indexed as empty strings, skip them
+                    // Legacy indexes encode NULL as an empty string.
                     if term.is_empty() {
                         continue;
                     }
@@ -323,7 +329,7 @@ impl TantivyResult {
                     if ascend && distinct_values.len() >= limit {
                         break;
                     }
-                    // null values are indexed as empty strings, skip them
+                    // Legacy indexes encode NULL as an empty string.
                     if term.is_empty() {
                         continue;
                     }
@@ -404,19 +410,19 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_simple_distinct_skips_null_terms() {
+    fn test_handle_simple_distinct_skips_null_and_empty() {
         use crate::index::{Condition, IndexCondition};
 
         let mut schema_builder = tantivy::schema::SchemaBuilder::new();
         let svc_field = schema_builder.add_text_field("svc", tantivy::schema::STRING);
         let index = tantivy::index::Index::create_in_ram(schema_builder.build());
         let mut writer = index.writer_with_num_threads(1, 15_000_000).unwrap();
-        // null values are indexed as empty strings (see tantivy_utils index_builder)
         for svc in ["", "ziox", "", "ingress-nginx"] {
             writer
                 .add_document(tantivy::doc!(svc_field => svc))
                 .unwrap();
         }
+        writer.add_document(tantivy::doc!()).unwrap();
         writer.commit().unwrap();
         let searcher = index.reader().unwrap().searcher();
 
@@ -502,16 +508,22 @@ mod tests {
     #[test]
     fn test_tantivy_result_get_memory_size_top_n() {
         let top_n = vec![
-            (vec!["term1".to_string()], 100u64),
-            (vec!["term2".to_string(), "sub1".to_string()], 200u64),
-            (vec!["term3".to_string(), "sub2".to_string()], 150u64),
+            (vec![Some("term1".to_string())], 100u64),
+            (
+                vec![Some("term2".to_string()), Some("sub1".to_string())],
+                200u64,
+            ),
+            (
+                vec![Some("term3".to_string()), Some("sub2".to_string())],
+                150u64,
+            ),
         ];
         let result = TantivyResult::TopN(top_n);
         let memory_size = result.get_memory_size();
 
         // Should include Vec overhead + string capacities + u64 sizes
         assert!(memory_size > 0);
-        assert!(memory_size >= std::mem::size_of::<Vec<(Vec<String>, u64)>>());
+        assert!(memory_size >= std::mem::size_of::<Vec<(Vec<Option<String>>, u64)>>());
     }
 
     #[test]
