@@ -80,6 +80,20 @@ pub async fn ensure_triggers_stream_initialized(org_id: &str) -> Result<()> {
     }
 }
 
+/// The stream's full schema, inferred from a `TriggerData` with every field populated.
+pub(crate) fn expected_schema() -> Result<arrow_schema::Schema> {
+    let sample = config::meta::self_reporting::usage::TriggerData::init_for_reflection();
+    let json_value = config::utils::json::to_value(&sample)?;
+    let json_map = json_value
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert TriggerData to JSON object"))?;
+    Ok(config::utils::schema::infer_json_schema_from_map(
+        usage::TRIGGERS_STREAM,
+        StreamType::Logs,
+        std::iter::once(json_map),
+    )?)
+}
+
 /// Internal function that performs the actual schema initialization.
 /// This should only be called by ensure_triggers_stream_initialized.
 ///
@@ -95,22 +109,7 @@ async fn initialize_triggers_stream_schema(org_id: &str) -> Result<()> {
         "[SELF-REPORTING] Creating triggers stream schema for {org_id}/{stream_name} via reflection"
     );
 
-    // Create a sample TriggerData with all fields populated (for schema inference)
-    let sample_trigger = config::meta::self_reporting::usage::TriggerData::init_for_reflection();
-
-    // Convert to JSON value to infer Arrow schema
-    let json_value = config::utils::json::to_value(&sample_trigger)?;
-    let json_map = json_value
-        .as_object()
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert TriggerData to JSON object"))?;
-
-    // Infer Arrow schema from the JSON (uses OpenObserve's schema inference)
-    // Pass as iterator of a single map
-    let expected_schema = config::utils::schema::infer_json_schema_from_map(
-        stream_name,
-        stream_type,
-        std::iter::once(json_map),
-    )?;
+    let expected_schema = expected_schema()?;
 
     if infra::schema::get(org_id, stream_name, stream_type)
         .await
