@@ -52,9 +52,10 @@ use {
     axum::body::{Body, to_bytes},
     config::utils::time::now_micros,
     o2_enterprise::enterprise::common::{
-        auditor::{AuditMessage, Protocol, ResponseMeta},
+        auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
         config::get_config as get_o2_config,
     },
+    openobserve_api_common::auth::delegation::DelegatedCaller,
     openobserve_api_management::request::{
         ai, alert_calibration, annotation_queues, annotations, anomaly_detection, datasets,
         discovery, domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall,
@@ -293,6 +294,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                     header::CONTENT_TYPE,
                     header::HeaderValue::from_static("application/x-www-form-urlencoded"),
                 );
+            }
+
+            if let Some(caller) = result.delegation {
+                parts.extensions.insert(caller);
             }
 
             let mut response = next.run(Request::from_parts(parts, body)).await;
@@ -559,6 +564,15 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .and_then(|v| v.to_str().ok())
             .map(str::to_string);
 
+        let delegated =
+            request
+                .extensions()
+                .get::<DelegatedCaller>()
+                .map(|caller| DelegatedAudit {
+                    link_id: caller.link_id.clone(),
+                    jti: caller.jti.clone(),
+                });
+
         // Extract body
         let (parts, body) = request.into_parts();
         let bytes = match to_bytes(body, usize::MAX).await {
@@ -601,6 +615,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                     error_msg,
                     trace_id: None,
                 },
+                delegated,
             })
             .await;
         }
@@ -3935,5 +3950,211 @@ mod tests {
         );
         let response = node_routes().oneshot(node_request(root)).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    /// Every (method, template) the `/api` tree serves, parsed from this file's production code.
+    fn api_routes() -> std::collections::BTreeMap<String, std::collections::BTreeSet<String>> {
+        let src = include_str!("mod.rs");
+        let (production, _) = src.split_once("\n#[cfg(test)]\nmod tests {").unwrap();
+        let section = |from: &str, to: &str| {
+            let start = production.find(from).unwrap();
+            let end = start + production[start..].find(to).unwrap();
+            &production[start..end]
+        };
+        let api_tree = [
+            section("fn ai_chat_routes(", "pub fn other_service_routes("),
+            section("fn es_compat_routes(", "\n}\n"),
+        ];
+        let methods =
+            regex::Regex::new(r"(?:^|[\s(.,])(get|post|put|delete|patch|head)\(").unwrap();
+        let mut routes =
+            std::collections::BTreeMap::<String, std::collections::BTreeSet<String>>::new();
+        for text in api_tree {
+            for (at, _) in text.match_indices(".route(") {
+                let args = &text[at + ".route(".len()..];
+                let mut depth = 1;
+                let end = args
+                    .char_indices()
+                    .find(|(_, c)| {
+                        depth += match c {
+                            '(' => 1,
+                            ')' => -1,
+                            _ => 0,
+                        };
+                        depth == 0
+                    })
+                    .unwrap()
+                    .0;
+                let args = &args[..end];
+                let template = args.split('"').nth(1).unwrap().to_string();
+                let found: Vec<String> = methods
+                    .captures_iter(args)
+                    .map(|c| c[1].to_uppercase())
+                    .collect();
+                assert!(!found.is_empty(), "no method parsed for {template}");
+                routes.entry(template).or_default().extend(found);
+            }
+        }
+        routes
+    }
+
+    fn template_segments(template: &str) -> Vec<&str> {
+        template.trim_start_matches('/').split('/').collect()
+    }
+
+    fn is_param(segment: &str) -> bool {
+        segment.starts_with('{')
+    }
+
+    fn neutral_path(template: &str) -> String {
+        template_segments(template)
+            .iter()
+            .map(|s| if is_param(s) { "zz" } else { s })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    /// The route axum dispatches to: at the first differing segment a literal beats a parameter.
+    fn owner<'a>(templates: &[&'a str], path: &[&str]) -> Option<&'a str> {
+        let matches = |t: &&str| {
+            let segs = template_segments(t);
+            segs.len() == path.len() && segs.iter().zip(path).all(|(s, p)| is_param(s) || s == p)
+        };
+        templates.iter().copied().filter(matches).max_by(|a, b| {
+            let rank = |t: &str| -> Vec<bool> {
+                template_segments(t).iter().map(|s| !is_param(s)).collect()
+            };
+            rank(a).cmp(&rank(b))
+        })
+    }
+
+    #[test]
+    fn assistant_scope_is_exactly_these_router_routes() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
+        let mut allowed = Vec::new();
+        for (template, methods) in api_routes() {
+            for method in methods {
+                let m = Method::from_bytes(method.as_bytes()).unwrap();
+                if in_assistant_scope(&m, &neutral_path(&template)) {
+                    allowed.push(format!("{method} {template}"));
+                }
+            }
+        }
+        let expected = [
+            "GET /v2/{org_id}/alerts",
+            "GET /v2/{org_id}/alerts/history",
+            "GET /v2/{org_id}/alerts/incidents",
+            "GET /v2/{org_id}/alerts/incidents/stats",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/events",
+            "GET /v2/{org_id}/alerts/incidents/{incident_id}/rca/history",
+            "GET /v2/{org_id}/alerts/tags",
+            "GET /v2/{org_id}/alerts/{alert_id}",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups",
+            "GET /v2/{org_id}/alerts/{alert_id}/groups/transitions",
+            "GET /v2/{org_id}/folders/{folder_type}",
+            "GET /v2/{org_id}/folders/{folder_type}/name/{folder_name}",
+            "GET /v2/{org_id}/folders/{folder_type}/{folder_id}",
+            "GET /{org_id}/dashboards",
+            "GET /{org_id}/dashboards/{dashboard_id}",
+            "GET /{org_id}/functions",
+            "GET /{org_id}/mcp",
+            "GET /{org_id}/oncall/incidents/{incident_id}/responses",
+            "GET /{org_id}/oncall/responses",
+            "GET /{org_id}/oncall/responses/{response_id}",
+            "GET /{org_id}/oncall/responses/{response_id}/escalation",
+            "GET /{org_id}/oncall/responses/{response_id}/history",
+            "GET /{org_id}/oncall/teams",
+            "GET /{org_id}/oncall/teams/{team_id}",
+            "GET /{org_id}/oncall/teams/{team_id}/members",
+            "GET /{org_id}/oncall/teams/{team_id}/on-call",
+            "GET /{org_id}/oncall/teams/{team_id}/overrides",
+            "GET /{org_id}/oncall/teams/{team_id}/overview",
+            "GET /{org_id}/oncall/teams/{team_id}/resolved-schedule",
+            "GET /{org_id}/oncall/teams/{team_id}/schedule",
+            "GET /{org_id}/prometheus/api/v1/query",
+            "GET /{org_id}/prometheus/api/v1/query_range",
+            "GET /{org_id}/streams",
+            "GET /{org_id}/streams/{stream_name}/schema",
+            "GET /{org_id}/{stream_name}/_around",
+            "GET /{org_id}/{stream_name}/_values",
+            "GET /{org_id}/{stream_name}/traces/latest",
+            "GET /{org_id}/{stream_name}/traces/latest_stream",
+            "GET /{org_id}/{stream_name}/traces/session",
+            "GET /{org_id}/{stream_name}/traces/session/details",
+            "GET /{org_id}/{stream_name}/traces/time_range",
+            "GET /{org_id}/{stream_name}/traces/user",
+            "GET /{org_id}/{stream_name}/traces/{trace_id}/dag",
+            "GET /{org_id}/{stream_name}/traces/{trace_id}/details",
+            "PATCH /v2/{org_id}/alerts/incidents/{incident_id}/update",
+            "POST /v2/{org_id}/alerts/incidents/{incident_id}/events/comment",
+            "POST /v2/{org_id}/downtimes",
+            "POST /v2/{org_id}/downtimes/{downtime_id}/cancel",
+            "POST /{org_id}/_search",
+            "POST /{org_id}/ai/chat",
+            "POST /{org_id}/ai/chat_stream",
+            "POST /{org_id}/ai/chats/{session_id}/cancel",
+            "POST /{org_id}/ai/confirm/{session_id}",
+            "POST /{org_id}/ai/feedback",
+            "POST /{org_id}/mcp",
+            "POST /{org_id}/oncall/responses/{response_id}/acknowledge",
+            "POST /{org_id}/oncall/responses/{response_id}/resolve",
+            "POST /{org_id}/oncall/responses/{response_id}/snooze",
+            "POST /{org_id}/prometheus/api/v1/query",
+            "POST /{org_id}/prometheus/api/v1/query_range",
+            "POST /{org_id}/{stream_name}/_around",
+        ];
+        allowed.sort();
+        let mut expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
+        expected.sort();
+        assert_eq!(allowed, expected);
+    }
+
+    /// A pattern parameter must not admit a path that axum hands to a more specific route.
+    #[test]
+    fn assistant_scope_agrees_with_axum_dispatch() {
+        use openobserve_api_common::auth::delegation::in_assistant_scope;
+
+        let routes = api_routes();
+        let templates: Vec<&str> = routes.keys().map(String::as_str).collect();
+        let mut wrong = Vec::new();
+        for r in &templates {
+            for a in &templates {
+                let (rs, as_) = (template_segments(r), template_segments(a));
+                if rs.len() != as_.len() {
+                    continue;
+                }
+                let merged: Option<Vec<&str>> = rs
+                    .iter()
+                    .zip(&as_)
+                    .map(|(x, y)| match (is_param(x), is_param(y)) {
+                        (false, false) => (x == y).then_some(*x),
+                        (false, true) => Some(*x),
+                        (true, false) => Some(*y),
+                        (true, true) => Some("zz"),
+                    })
+                    .collect();
+                let Some(path) = merged else { continue };
+                let Some(owner) = owner(&templates, &path) else {
+                    continue;
+                };
+                for method in &routes[owner] {
+                    let m = Method::from_bytes(method.as_bytes()).unwrap();
+                    let joined = path.join("/");
+                    if in_assistant_scope(&m, &joined)
+                        != in_assistant_scope(&m, &neutral_path(owner))
+                    {
+                        wrong.push(format!("{method} {joined} dispatches to {owner}"));
+                    }
+                }
+            }
+        }
+        wrong.sort();
+        wrong.dedup();
+        assert!(
+            wrong.is_empty(),
+            "add the literal to RESERVED_STREAM_SLOTS in api/common auth/delegation.rs: {wrong:#?}"
+        );
     }
 }

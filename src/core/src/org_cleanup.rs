@@ -771,6 +771,7 @@ async fn emit_status_audit(org_id: &str, actor: &str, from: &str, to: &str) {
                 error_msg: None,
                 trace_id: None,
             },
+            delegated: None,
         })
         .await;
     }
