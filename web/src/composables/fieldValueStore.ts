@@ -292,9 +292,15 @@ export const fieldValuesUnavailable = (ctx: StreamContext, fieldName: string): b
  *
  * Never throws; the editor races it against a wait budget and a late answer still fills the cache.
  */
+export interface ValueLookupOptions {
+  /** Called only when this call went to the server, so cache hits never skew the fetch-time median. */
+  onFetched?: (ms: number) => void;
+}
+
 export const requestFieldValues = async (
   ctx: StreamContext,
   fieldName: string,
+  options: ValueLookupOptions = {},
 ): Promise<string[]> => {
   if (!fieldName || !ctx.org || !ctx.streamType || !ctx.streamName) return [];
 
@@ -307,6 +313,7 @@ export const requestFieldValues = async (
   if (existing) return existing;
 
   const endMicros = Date.now() * 1000;
+  const started = Date.now();
 
   // The timeout races the request, and the cleanup hangs off the RACE rather
   // than off the request: a promise that never settles would never run its own
@@ -340,6 +347,7 @@ export const requestFieldValues = async (
         .filter((value: string) => value.length > 0);
 
       failedKeys.delete(key);
+      options.onFetched?.(Date.now() - started);
       if (values.length) {
         // The read cache is filled HERE, synchronously, so the next keystroke
         // is local. captureFromValuesApi persists to IndexedDB on

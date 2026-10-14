@@ -208,7 +208,7 @@ describe("catalog wiring — suggestions come from the shared sqlCompletion modu
     c.updateFieldKeywords([{ name: "host" }, { name: "level" }]);
     await run(c, "SELECT * FROM stream WHERE ");
     const host = c.effectiveKeywords.value.find((k: any) => k.label === "host");
-    const and = c.effectiveKeywords.value.find((k: any) => k.label === "and");
+    const and = c.effectiveKeywords.value.find((k: any) => k.label === "AND");
     expect(host.sortText < and.sortText).toBe(true);
   });
 });
@@ -291,7 +291,7 @@ describe("Phase 2 — SQL clause keywords are offered (B1)", () => {
     const c = makeComposable({ storedValues: [] });
     await run(c, "SELECT * FROM stream WHERE ");
     const labels = c.effectiveKeywords.value.map((k: any) => k.label);
-    expect(labels).toContain("and");
+    expect(labels).toContain("AND");
     expect(labels).toContain("=");
   });
 
@@ -537,6 +537,7 @@ describe("resolveFieldValues — asking the server when the cache is cold", () =
     expect(requestFieldValues).toHaveBeenCalledWith(
       { org: "myorg", streamType: "logs", streamName: "http_logs" },
       "level",
+      expect.anything(),
     );
   });
 

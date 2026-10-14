@@ -19,10 +19,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="query-editor"
       class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
-      :class="{ 'promql-mode': language === 'promql' }"
+      :class="{
+        'promql-mode': language === 'promql',
+        [queryEditorClass]: language === 'sql' || language === 'promql',
+      }"
       ref="editorRef"
       :id="editorId"
     />
+    <div
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-test="query-editor-suggest-status"
+    >
+      {{ suggestAnnouncement }}
+    </div>
     <!-- AI Icon Button -->
     <OButton
       v-if="showAiIcon && !disableAi"
@@ -57,6 +69,7 @@ import {
   onActivated,
   watch,
   computed,
+  getCurrentInstance,
   type PropType,
 } from "vue";
 
@@ -94,23 +107,165 @@ interface EditorConfig {
   enabled: () => boolean;
   keywords: () => any[];
   suggestions: () => any[];
-  resolveFieldValues: () => ((field: string) => Promise<string[]>) | null;
+  resolveFieldValues: () => FieldValueResolver | null;
   editor: () => any;
   /** Esc presses so far, so a value answer that lands after one is dropped. */
   escapeCount: () => number;
   mode: () => EditorSuggestMode;
+  /** The Logs filter is a bare WHERE fragment, so a field with nothing before it starts a predicate. */
+  filterMode: () => boolean;
+  tracker: SuggestTracker;
+  /** When the chain last typed its space, so the menu that space opens is known to be chained. */
+  chain: ChainState;
+  announce: (rows: number) => void;
   /** Text after the caret that is never a menu row; null clears it. */
   showHint: (text: string | null) => void;
-  /** Highlight row 1 of the menu that just opened, so Enter takes it; any edit since `versionId` voids the request. */
-  highlightFirstRow: (versionId: number | undefined) => void;
 }
+
+interface ChainState {
+  pendingSince: number;
+  /** Set between the accept and the space the chain types, so that space can be told from a typed one. */
+  typingSpace: boolean;
+  /** Where the chain's space ended, while the next key could still be a space typed out of habit. */
+  spaceEnd: { lineNumber: number; column: number } | null;
+}
+
+// Monaco's theme API takes hex only; a 1px canvas resolves any token value (oklch, color-mix) to it.
+const tokenHex = (name: string): string | undefined => {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  if (!value || !context) return undefined;
+  context.fillStyle = value;
+  context.fillRect(0, 0, 1, 1);
+  const pixel = context.getImageData(0, 0, 1, 1)?.data;
+  if (!pixel) return undefined;
+  const [r, g, b, a] = pixel;
+  const hex = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${hex(r)}${hex(g)}${hex(b)}${a < 255 ? hex(a) : ""}`;
+};
+
+const SYMBOL_ICON_KEYS = (
+  "array boolean class color constant constructor enumerator enumeratorMember event field file folder " +
+  "function interface key keyword method module namespace null number object operator package property " +
+  "reference snippet string struct text typeParameter unit variable"
+).split(" ");
+
+/** Suggest-widget colours from the app tokens: only the autocomplete takes the app's menu style. */
+const suggestThemeColors = (dark: boolean): Record<string, string> => {
+  const entries: [string, string][] = [
+    ...SYMBOL_ICON_KEYS.map((key): [string, string] => [
+      `symbolIcon.${key}Foreground`,
+      "--color-text-secondary",
+    ]),
+    ["editorSuggestWidget.background", "--color-select-content-bg"],
+    ["editorSuggestWidget.border", "--color-dropdown-border"],
+    ["editorSuggestWidget.foreground", "--color-select-item-text"],
+    ["editorSuggestWidget.selectedBackground", "--color-select-item-selected-bg"],
+    ["editorSuggestWidget.selectedForeground", "--color-select-item-text"],
+    ["editorSuggestWidget.selectedIconForeground", "--color-select-item-selected-text"],
+    ["editorSuggestWidget.highlightForeground", "--color-accent"],
+    ["editorSuggestWidget.focusHighlightForeground", "--color-select-item-selected-text"],
+    ["editorSuggestWidgetStatus.foreground", "--color-text-secondary"],
+    [
+      "list.hoverBackground",
+      dark ? "--color-select-item-hover-bg" : "--color-select-item-selected-bg",
+    ],
+    ["symbolIcon.fieldForeground", "--color-accent"],
+    ["symbolIcon.enumeratorForeground", "--color-status-warning-text"],
+    ["symbolIcon.enumeratorMemberForeground", "--color-status-warning-text"],
+    ["symbolIcon.functionForeground", "--color-sql-accent"],
+    ["symbolIcon.methodForeground", "--color-sql-accent"],
+  ];
+  const colors: Record<string, string> = { "list.focusOutline": "#00000000" };
+  for (const [key, token] of entries) {
+    const hex = tokenHex(token);
+    if (hex) colors[key] = hex;
+  }
+  return colors;
+};
+
+// The theme is global and its colours come from the page's dark class, so it is applied once per change of that class.
+let appliedTheme: boolean | null = null;
+let themeClassObserver: MutationObserver | null = null;
+
+/** Redefine before setTheme: the token values differ between the light and dark sheets. */
+const applyEditorTheme = (monaco: any): void => {
+  const dark = document.documentElement.classList.contains("dark");
+  if (appliedTheme === dark) return;
+  appliedTheme = dark;
+  defineEditorThemes(monaco);
+  monaco.editor.setTheme(dark ? "myCustomDarkTheme" : "myCustomTheme");
+};
+
+// A dark class that flips after the store's theme changes would otherwise leave the previous colours in place.
+const followThemeClass = (monaco: any): void => {
+  if (themeClassObserver || typeof MutationObserver === "undefined") return;
+  themeClassObserver = new MutationObserver(() => applyEditorTheme(monaco));
+  themeClassObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+};
+
+const defineEditorThemes = (monaco: any): void => {
+  const dark = document.documentElement.classList.contains("dark");
+  const suggest = suggestThemeColors(dark);
+  monaco.editor.defineTheme("myCustomTheme", {
+    base: "vs",
+    inherit: true,
+    rules: [
+      { token: "comment", background: "FFFFFF" },
+      // PromQL: no rules on purpose — built-in "vs" colours via inherit.
+    ],
+    colors: {
+      "editor.foreground": "#000000",
+      "editor.background": "#fafafa",
+      "editorCursor.foreground": "#000000",
+      "editor.lineHighlightBackground": "#FFFFFF",
+      "editorLineNumber.foreground": "#000000",
+      "editor.border": "#000000",
+      ...(dark ? {} : suggest),
+    },
+  });
+  monaco.editor.defineTheme("myCustomDarkTheme", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "string", foreground: "CE9178" },
+      { token: "string.sql", foreground: "CE9178" },
+      { token: "string.vrl", foreground: "CE9178" },
+      // PromQL: no rules on purpose — built-in "vs-dark" colours via inherit.
+    ],
+    colors: dark ? suggest : {},
+  });
+};
+
+const WRAP_DESCRIPTIONS: Record<string, string> = {
+  str_match: "sqlEditor.completion.wrapStrMatch",
+  re_match: "sqlEditor.completion.wrapReMatch",
+  re_not_match: "sqlEditor.completion.wrapReNotMatch",
+};
+
+type FieldValueResolver = (field: string, options?: ValueLookupOptions) => Promise<string[]>;
 const editorConfigs = new Map<string, EditorConfig>();
 const registeredLanguages = new Set<string>();
 const modelKey = (model: any): string => model?.uri?.toString?.() ?? "";
+
+// Global commands report here; the model says which editor accepted.
+const onSuggestAccepted = (editor: any, lane: SuggestLane | "", chained: boolean) => {
+  const config = editorConfigs.get(modelKey(editor?.getModel?.()));
+  if (!config) return;
+  config.tracker.accepted(lane);
+  forgetMenu();
+  if (!chained) return;
+  config.chain.pendingSince = Date.now();
+  config.chain.typingSpace = true;
+};
 import {
   resolveKeywords,
   resolveSuggestions,
   buildCompletionItems,
+  SORT_LANE,
 } from "@/utils/query/sqlCompletion";
 import {
   parseCallContext,
@@ -123,11 +278,21 @@ import {
   type ValueStatus,
   buildSignatureHelp,
   buildHoverContents,
+  buildOperatorLane,
   fieldEntriesOf,
   findCatalogEntry,
   findFunctionEntry,
+  isCaretInComment,
+  isPredicatePosition,
+  groupEntries,
+  parseLogicalLeadContext,
+  logicalLeadNames,
+  buildLogicalLead,
+  CHAINING_KEYWORDS,
+  chainedKeyword,
   isValueAnswerStale,
   literalStateAtEnd,
+  parseOperatorContext,
   takeValueGuardSnapshot,
   wantsNumericColumn,
   rankNumericFieldsFirst,
@@ -140,13 +305,35 @@ import {
   resolvePromqlLabelValues,
   type PromqlValueContext,
 } from "@/composables/usePromqlSuggestions";
-import { FIELD_VALUES_LOOKBACK_MINUTES, isNoValueLookup } from "@/composables/fieldValueStore";
+import {
+  FIELD_VALUES_LOOKBACK_MINUTES,
+  isNoValueLookup,
+  type ValueLookupOptions,
+} from "@/composables/fieldValueStore";
 import { findDoubleQuoteIssues } from "@/utils/query/doubleQuoteWarnings";
 import {
+  acceptCommand,
+  CHAINED_MENU_WINDOW_MS,
+  chainsInMode,
   isQueryLanguage,
+  NAV_SKIP_CONTEXT_KEY,
+  QUERY_EDITOR_CLASS,
+  WRAP_FIELD_COMMAND,
+  forgetMenu,
+  noteMenuItems,
+  noteResolvedItem,
+  registerAcceptCommands,
   setTabPicksFirst,
+  SQL_VALUE_TRIGGERS,
   suggestKeyOptions,
+  triggerCharactersFor,
+  type SuggestLane,
 } from "@/utils/query/editorKeyContract";
+import {
+  createSuggestTracker,
+  flushEditorSuggestSummary,
+  type SuggestTracker,
+} from "@/utils/query/editorSuggestStats";
 import { useEditorSuggestMode, type EditorSuggestMode } from "@/composables/useEditorSuggestMode";
 import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
@@ -246,8 +433,12 @@ export default defineComponent({
      * declared default applies.
      */
     fieldValueResolver: {
-      type: Function as PropType<(field: string) => Promise<string[]>>,
+      type: Function as PropType<FieldValueResolver>,
       default: null,
+    },
+    filterMode: {
+      type: Boolean,
+      default: false,
     },
     freeTextDecorations: {
       type: Object as PropType<{
@@ -276,6 +467,28 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
     const { mode: suggestMode } = useEditorSuggestMode();
+    // Read once here: at unmount the route is already the destination. The editor id can carry trace ids and SQL.
+    const surface = String((getCurrentInstance()?.proxy as any)?.$route?.name ?? "unknown");
+    const suggestTracker = createSuggestTracker(
+      surface,
+      () => props.language,
+      () => suggestMode.value,
+    );
+    const chainState: ChainState = { pendingSince: 0, typingSpace: false, spaceEnd: null };
+    let navSkipKey: { set: (value: boolean) => void } | null = null;
+    const groupsHeaders = (mode: EditorSuggestMode) => props.language === "sql" && mode !== "off";
+    const suggestAnnouncement = ref("");
+    const announceMenu = (rows: number) => {
+      // Cleared first so the same sentence twice in a row is still announced.
+      suggestAnnouncement.value = "";
+      nextTick(() => {
+        suggestAnnouncement.value = t(
+          "sqlEditor.completion.chainedMenuAnnouncement",
+          { count: rows },
+          rows,
+        );
+      });
+    };
     const editorRef: any = ref();
     let editorObj: any = null;
     let escapeCount = 0;
@@ -306,9 +519,11 @@ export default defineComponent({
 
     watch(
       () => isDark.value,
-      () => {
+      async () => {
         if (!monaco) return;
-        monaco.editor.setTheme(isDark.value ? "myCustomDarkTheme" : "myCustomTheme");
+        // The suggest colours are read from the app's tokens, which follow the theme class.
+        await nextTick();
+        applyEditorTheme(monaco);
       },
     );
 
@@ -455,14 +670,22 @@ export default defineComponent({
     const showHint = (text: string | null) => {
       if (!editorObj || !monaco) return;
       hintDecorations ??= editorObj.createDecorationsCollection();
-      const at = editorObj.getPosition();
-      if (!text || !at) {
+      const caret = editorObj.getPosition();
+      if (!text || !caret) {
         hintDecorations.clear();
         return;
       }
+      // After an auto-closed quote, so the hint does not read as part of the string.
+      const closer = /^['"]/.test(
+        editorObj
+          .getModel()
+          ?.getLineContent(caret.lineNumber)
+          .slice(caret.column - 1) ?? "",
+      );
+      const column = caret.column + (closer ? 1 : 0);
       hintDecorations.set([
         {
-          range: new monaco.Range(at.lineNumber, at.column, at.lineNumber, at.column),
+          range: new monaco.Range(caret.lineNumber, column, caret.lineNumber, column),
           options: {
             after: { content: text, inlineClassName: "o2-suggest-inline-hint" },
             showIfCollapsed: true,
@@ -471,15 +694,27 @@ export default defineComponent({
       ]);
     };
 
-    // A menu opened by a typed quote starts unhighlighted; inside the quote Enter should take the value.
-    const highlightFirstRow = (versionId: number | undefined) => {
-      for (const delay of [0, 120]) {
-        setTimeout(() => {
-          // A late answer or timer from an earlier keystroke must not highlight the menu opened since.
-          if (editorObj?.getModel()?.getVersionId?.() !== versionId) return;
-          editorObj.trigger("o2", "focusSuggestion", {});
-        }, delay);
-      }
+    // A typed quote opens its menu unhighlighted; reopened as an auto Invoke it highlights the preselected first value, so Enter takes it.
+    const reopenInQuote = (version: number | undefined) => {
+      if (!editorObj || suggestMode.value === "off") return;
+      const model = editorObj.getModel();
+      // A key typed after the quote owns the menu now; reopening would highlight a menu it opened.
+      if (model?.getVersionId?.() !== version) return;
+      const caret = editorObj.getPosition();
+      if (!model || !caret) return;
+      const before = model.getValueInRange({
+        startLineNumber: 1,
+        startColumn: 1,
+        endLineNumber: caret.lineNumber,
+        endColumn: caret.column,
+      });
+      const inQuote =
+        props.language === "sql"
+          ? parseValueContext(before)?.hasOpenQuote
+          : props.language === "promql" && parsePromqlValueContext(before)?.hasOpenQuote;
+      if (!inQuote) return;
+      editorObj.trigger("o2", "hideSuggestWidget", {});
+      editorObj.trigger("o2", "editor.action.triggerSuggest", { auto: true });
     };
 
     /** Point this editor's model at its live configuration. */
@@ -498,8 +733,11 @@ export default defineComponent({
         editor: () => editorObj,
         escapeCount: () => escapeCount,
         mode: () => suggestMode.value,
+        filterMode: () => props.filterMode,
+        tracker: suggestTracker,
+        chain: chainState,
+        announce: announceMenu,
         showHint,
-        highlightFirstRow,
       });
     };
 
@@ -531,38 +769,15 @@ export default defineComponent({
         monaco.languages.setMonarchTokensProvider("vrl", vrlLanguageDefinition as any);
       }
 
-      monaco.editor.defineTheme("myCustomTheme", {
-        base: "vs", // can also be vs-dark or hc-black
-        inherit: true, // can also be false to completely replace the builtin rules
-        rules: [
-          { token: "comment", background: "FFFFFF" },
-          // PromQL: no rules on purpose — built-in "vs" colours via inherit.
-        ],
-        colors: {
-          "editor.foreground": "#000000",
-          "editor.background": "#fafafa",
-          "editorCursor.foreground": "#000000",
-          "editor.lineHighlightBackground": "#FFFFFF",
-          "editorLineNumber.foreground": "#000000",
-          "editor.border": "#000000",
-        },
-      });
-
-      monaco.editor.defineTheme("myCustomDarkTheme", {
-        base: "vs-dark",
-        inherit: true,
-        rules: [
-          { token: "string", foreground: "CE9178" },
-          { token: "string.sql", foreground: "CE9178" },
-          { token: "string.vrl", foreground: "CE9178" },
-          // PromQL: no rules on purpose — built-in "vs-dark" colours via inherit.
-        ],
-        colors: {},
-      });
+      applyEditorTheme(monaco);
+      followThemeClass(monaco);
 
       // One provider set per language, shared by every editor of that language.
       registerLanguageProviders(props.language);
-      if (isQueryLanguage(props.language)) setTabPicksFirst(monaco, suggestMode.value !== "off");
+      if (isQueryLanguage(props.language)) {
+        setTabPicksFirst(monaco, suggestMode.value !== "off");
+        registerAcceptCommands(monaco, onSuggestAccepted);
+      }
 
       // Faces load lazily on first use, so without this the first measurement can hit the fallback font.
       await document.fonts?.load?.(`1rem ${getFontMono()}`).catch(() => {});
@@ -617,6 +832,9 @@ export default defineComponent({
         // falls back to its built-in Menlo/Monaco/Courier New stack, which differs
         // per OS and from the rest of the app.
         fontFamily: getFontMono(),
+        // Pinned so the suggest rows do not change size between operating systems; the editor text keeps its default.
+        suggestFontSize: 12,
+        suggestLineHeight: 24,
         theme: isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
         showFoldingControls: enableCodeFolding.value ? "always" : "never",
         folding: enableCodeFolding.value,
@@ -675,6 +893,10 @@ export default defineComponent({
       });
 
       publishEditorConfig();
+      navSkipKey = editorObj.createContextKey(
+        NAV_SKIP_CONTEXT_KEY,
+        groupsHeaders(suggestMode.value),
+      );
 
       // The editor's content only reaches the parent after `debounceTime`. Held
       // as a named handle so it can be flushed on the paths that consume the
@@ -697,22 +919,62 @@ export default defineComponent({
 
       editorObj.onDidChangeCursorPosition(() => hintDecorations?.clear());
       editorObj.onDidChangeModelContent((e: any) => {
+        const [change] = e?.changes ?? [];
+        const chainSpace =
+          chainState.typingSpace && e?.changes?.length === 1 && change.text === " ";
+        chainState.typingSpace = false;
+        chainState.spaceEnd = chainSpace
+          ? { lineNumber: change.range.startLineNumber, column: change.range.startColumn + 1 }
+          : null;
         if (!e?.isFlush && !programmatic) emit("user-edit");
+        const quote = props.language === "promql" ? '"' : "'";
+        if (e?.changes?.some((c: any) => c.text === quote || c.text === quote + quote)) {
+          const version = editorObj.getModel()?.getVersionId?.();
+          setTimeout(() => reopenInQuote(version), 0);
+        }
         commitModelChange(e);
       });
 
       // Fires on the text area's own blur. onDidBlurEditorWidget waits a timer tick, so a fast click on Run reads the previous query.
-      editorObj.onDidBlurEditorText(() => commitModelChange.flush());
+      editorObj.onDidBlurEditorText(() => {
+        forgetMenu();
+        commitModelChange.flush();
+        suggestTracker.closed();
+      });
 
       const runQuery = () => {
         commitModelChange.flush();
         emit("run-query");
       };
 
+      // The chain already typed the space a user types after a field out of habit; IME composition is never touched.
+      const swallowsHabitSpace = (e: any) => {
+        const end = chainState.spaceEnd;
+        chainState.spaceEnd = null;
+        if (!end || e.keyCode !== monaco.KeyCode.Space || e.browserEvent?.isComposing) return false;
+        if (e.ctrlKey || e.metaKey || e.altKey) return false;
+        const caret = editorObj.getPosition();
+        return caret?.lineNumber === end.lineNumber && caret?.column === end.column;
+      };
+
       // Handled here rather than via addCommand: monaco's addCommand discards the
       // disposable it gets back, so its CommandsRegistry entry outlives the editor.
       editorObj.onKeyDown((e: any) => {
-        if (e.keyCode === monaco.KeyCode.Escape) escapeCount += 1;
+        if (e.keyCode === monaco.KeyCode.Escape) {
+          escapeCount += 1;
+          forgetMenu();
+        }
+        if (swallowsHabitSpace(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        if (isQueryLanguage(props.language)) {
+          suggestTracker.keyDown({
+            key: e.browserEvent?.key ?? "",
+            ctrlOrMeta: !!(e.ctrlKey || e.metaKey),
+          });
+        }
         if (e.keyCode === monaco.KeyCode.Enter && (e.ctrlKey || e.metaKey)) {
           e.preventDefault();
           e.stopPropagation();
@@ -860,9 +1122,7 @@ export default defineComponent({
       freeTextDecorationIds = editorObj.deltaDecorations(freeTextDecorationIds, next);
     };
 
-    watch(() => props.freeTextDecorations, applyFreeTextDecorations, {
-      deep: true,
-    });
+    watch(() => props.freeTextDecorations, applyFreeTextDecorations, { deep: true });
 
     onMounted(async () => {
       await loadLanguageContribution(props.language);
@@ -892,6 +1152,9 @@ export default defineComponent({
           window.removeEventListener("resize", editorObj._windowResizeHandler);
         }
 
+        // Surfaces without a query run report on the way out.
+        flushEditorSuggestSummary(surface);
+
         // Drop this editor's entry so the shared provider stops answering for
         // a model that no longer exists.
         if (publishedKey) editorConfigs.delete(publishedKey);
@@ -910,6 +1173,7 @@ export default defineComponent({
     // The editor can mount before the config that carries the mode, so a late mode is applied live.
     watch(suggestMode, (mode) => {
       if (!monaco || !isQueryLanguage(props.language)) return;
+      navSkipKey?.set(groupsHeaders(mode));
       setTabPicksFirst(monaco, mode !== "off");
       editorObj?.updateOptions(suggestKeyOptions(mode, props.language));
     });
@@ -929,14 +1193,6 @@ export default defineComponent({
         editorObj?.updateOptions({
           lineNumbers: props.showLineNumbers ? "on" : "off",
         });
-      },
-    );
-
-    watch(
-      () => isDark.value,
-      () => {
-        if (!monaco) return;
-        monaco.editor.setTheme(isDark.value ? "myCustomDarkTheme" : "myCustomTheme");
       },
     );
 
@@ -1008,26 +1264,78 @@ export default defineComponent({
           tags: monaco.languages.CompletionItemTag,
         });
 
+      const objectEntry = (entry: any) =>
+        typeof entry === "string"
+          ? { name: entry, label: entry, kind: "Field", insertText: entry }
+          : entry;
+
+      const laneOf = (entry: any): SuggestLane | "" => {
+        // Kind first: a numeric field ranked first inside avg( also starts with the operator lane's prefix.
+        if (entry?.kind === "Field") return "field";
+        if (entry?.kind === "Value") return "value";
+        const sort = String(entry?.sortText ?? "");
+        if (sort.startsWith(SORT_LANE.operator)) return "operator";
+        if (sort.startsWith(SORT_LANE.predicate) || sort.startsWith(SORT_LANE.clause)) {
+          return "clause";
+        }
+        return "";
+      };
+
+      // Every item counts its accept; a status row inserts nothing and counts nothing.
+      const withAcceptCommands = (entries: any[]) =>
+        entries.map((raw) => {
+          const entry = objectEntry(raw);
+          if (!entry || entry.command || entry.insertText === "" || entry.skipRow) return entry;
+          return { ...entry, command: acceptCommand(laneOf(entry), false) };
+        });
+
+      const respond = (
+        config: EditorConfig,
+        context: any,
+        chained: boolean,
+        entries: any[] | null,
+        word: string,
+        itemRange: any,
+      ) => {
+        if (entries === null || !isQueryLanguage(language)) {
+          return { suggestions: itemsFrom(entries ?? [], word, itemRange), incomplete: true };
+        }
+        const decorated = withAcceptCommands(entries);
+        const suggestions = itemsFrom(decorated, word, itemRange);
+        noteMenuItems(suggestions, config.editor());
+        config.tracker.offered({
+          triggerKind: context?.triggerKind ?? 0,
+          chained,
+          lanes: decorated.map(laneOf).filter((lane): lane is SuggestLane => !!lane),
+          rows: suggestions.length,
+        });
+        if (chained && suggestions.length) config.announce(suggestions.length);
+        // ALWAYS incomplete: `severity = ` turns the same catalog into a value list, and Monaco only asks again when told to.
+        return { suggestions, incomplete: true };
+      };
+
       // Null means the answer went stale while it was awaited and must not be shown.
       const awaitValues = async (
         config: EditorConfig,
         token: any,
-        lookup: () => Promise<string[]>,
+        lookup: (options: ValueLookupOptions) => Promise<string[]>,
       ): Promise<string[] | "loading" | "failed" | "nolookup" | null> => {
         const snapshot = takeValueGuardSnapshot(config.editor(), config.escapeCount());
         let timer: ReturnType<typeof setTimeout> | undefined;
         const budget = new Promise<"loading">((resolve) => {
           timer = setTimeout(() => resolve("loading"), VALUE_WAIT_BUDGET_MS);
         });
-        const fetched = lookup().catch((error) =>
-          isNoValueLookup(error) ? ("nolookup" as const) : ("failed" as const),
+        const fetched = lookup({ onFetched: (ms) => config.tracker.valueFetched(ms) }).catch(
+          (error) => (isNoValueLookup(error) ? ("nolookup" as const) : ("failed" as const)),
         );
         const outcome = await Promise.race([fetched, budget]);
         clearTimeout(timer);
         const stale =
           token?.isCancellationRequested ||
           isValueAnswerStale(snapshot, config.editor(), config.escapeCount());
-        return stale ? null : outcome;
+        if (stale) return null;
+        if (outcome === "loading") config.tracker.budgetHit();
+        return outcome;
       };
 
       const caretRange = (position: MonacoEditor.Position, typedLength: number) => ({
@@ -1049,16 +1357,12 @@ export default defineComponent({
         const asHint = (inQuote && status !== "loading") || (highlighted && !others.length);
         if (asHint) {
           config.showHint(
-            valueStatusText(t, status, field, {
-              minutes: FIELD_VALUES_LOOKBACK_MINUTES,
-            }),
+            valueStatusText(t, status, field, { minutes: FIELD_VALUES_LOOKBACK_MINUTES }),
           );
           return others;
         }
         const row = {
-          ...buildValueStatusEntry(t, status, field, {
-            minutes: FIELD_VALUES_LOOKBACK_MINUTES,
-          }),
+          ...buildValueStatusEntry(t, status, field, { minutes: FIELD_VALUES_LOOKBACK_MINUTES }),
           range: caretRange(position, 0),
         };
         return highlighted ? [...others, { ...row, sortText: "\uffff" }] : [row, ...others];
@@ -1074,13 +1378,13 @@ export default defineComponent({
             ]
           : [];
 
-      const charAtCaret = (
-        model: MonacoEditor.editor.ITextModel,
-        position: MonacoEditor.Position,
-      ) => (model.getLineContent?.(position.lineNumber) ?? "").charAt(position.column - 1);
-
       // `b.trace_id` in `ON a.trace_id = b.trace_id` is a column; `2.39.1` is a value.
       const isQualified = (typed: string) => /^[A-Za-z_][\w$]*\.[\w$]*$/.test(typed);
+
+      const lineAfterCaret = (
+        model: MonacoEditor.editor.ITextModel,
+        position: MonacoEditor.Position,
+      ) => (model.getLineContent?.(position.lineNumber) ?? "").slice(position.column - 1);
 
       const sqlValueEntries = async (
         model: MonacoEditor.editor.ITextModel,
@@ -1090,7 +1394,6 @@ export default defineComponent({
         context: ValueContext,
         highlighted: boolean,
       ): Promise<any[] | null> => {
-        const version = model.getVersionId?.();
         const allFields = fieldEntriesOf(config.keywords(), config.suggestions());
         // `x IN (sel` may start a subquery, so SELECT stays offered after the values and fields.
         const startsSubquery =
@@ -1111,7 +1414,9 @@ export default defineComponent({
         const unknownField = allFields.length > 0 && !named(context.field);
         if (!resolver || typedIsColumn || unknownField) return fields;
 
-        const outcome = await awaitValues(config, token, () => resolver(context.field));
+        const outcome = await awaitValues(config, token, (options) =>
+          resolver(context.field, options),
+        );
         if (outcome === null) return null;
         if (outcome === "nolookup") return fields;
         const shape = { highlighted, inQuote: context.hasOpenQuote };
@@ -1127,11 +1432,10 @@ export default defineComponent({
         const offered = orderValues(outcome, fieldType).filter((value) => !chosen.has(value));
         // Every value is already in the IN list, so the column is the only help left.
         if (!offered.length) return fields;
-        if (context.hasOpenQuote && !highlighted) config.highlightFirstRow(version);
         const values = buildValueEntries(offered, {
           hasOpenQuote: context.hasOpenQuote,
           // Monaco auto-closes a typed quote, so the closer already sits after the caret.
-          closingQuoteAhead: charAtCaret(model, position) === "'",
+          closingQuoteAhead: lineAfterCaret(model, position).startsWith("'"),
           range: caretRange(position, context.typed.length),
           fieldType,
           pattern: context.operator === "like",
@@ -1147,11 +1451,10 @@ export default defineComponent({
         context: PromqlValueContext,
         highlighted: boolean,
       ): Promise<any[] | null> => {
-        const version = model.getVersionId?.();
         const org = store.state.selectedOrganization?.identifier;
         if (!org) return [];
-        const outcome = await awaitValues(config, token, () =>
-          resolvePromqlLabelValues(org, context.metric, context.label),
+        const outcome = await awaitValues(config, token, (options) =>
+          resolvePromqlLabelValues(org, context.metric, context.label, options),
         );
         if (outcome === null) return null;
         if (outcome === "nolookup") return [];
@@ -1162,22 +1465,164 @@ export default defineComponent({
             inQuote: context.hasOpenQuote,
           });
         }
-        if (context.hasOpenQuote && !highlighted) config.highlightFirstRow(version);
         const values = buildPromqlValueEntries(orderValues(outcome), {
           hasOpenQuote: context.hasOpenQuote,
-          closingQuoteAhead: charAtCaret(model, position) === '"',
+          closingQuoteAhead: lineAfterCaret(model, position).startsWith('"'),
           range: caretRange(position, context.typed.length),
         });
         return [...values, ...capRow(context.label, outcome.length, position)];
       };
 
+      const operatorEntries = (
+        config: EditorConfig,
+        model: MonacoEditor.editor.ITextModel,
+        position: MonacoEditor.Position,
+        textUntilPosition: string,
+        preselect: boolean,
+      ): any[] | null => {
+        const fields = fieldEntriesOf(config.keywords(), config.suggestions());
+        const context = parseOperatorContext(
+          textUntilPosition,
+          fields.map((f) => f.name ?? f.label),
+          config.filterMode(),
+        );
+        if (!context) return null;
+        const field = fields.find(
+          (f) => (f.name ?? f.label).toLowerCase() === context.field.toLowerCase(),
+        );
+        const lane = buildOperatorLane({
+          context,
+          fieldType: field?.detail,
+          lineNumber: position.lineNumber,
+          column: position.column,
+          chainCommand: chainsHere(config, model, position)
+            ? acceptCommand("operator", true)
+            : undefined,
+        });
+        const inLane = new Set(lane.map((entry) => String(entry.name).toLowerCase()));
+        // A partial with a space (`IS N`) can only finish an operator, so the catalog stays out of it.
+        const multiWord = /\s/.test(context.partial);
+        const catalog = [...config.keywords(), ...config.suggestions()].filter((raw) => {
+          if (multiWord) return false;
+          const entry = objectEntry(raw);
+          return !entry || !inLane.has(String(entry.name ?? entry.label).toLowerCase());
+        });
+        if (!groupsMenus(config)) return [...lane, ...catalog];
+        return groupEntries(
+          [
+            {
+              header: t("sqlEditor.completion.groupOperators"),
+              name: t("sqlEditor.completion.groupOperators"),
+              // Under its header a word operator such as IN or IS NULL reads as an operator, not a keyword.
+              entries: lane
+                .filter((entry) => !isWrapRow(entry))
+                .map((entry) =>
+                  entry.kind === "Keyword" ? { ...entry, kind: "Operator" } : entry,
+                ),
+            },
+            {
+              header: t("sqlEditor.completion.groupFunctionsAndFields"),
+              name: t("sqlEditor.completion.groupFunctionsAndFields"),
+              entries: [
+                ...lane.filter(isWrapRow).map((entry) => ({
+                  ...entry,
+                  description: t(WRAP_DESCRIPTIONS[String(entry.name)] ?? ""),
+                })),
+                ...catalog.map(objectEntry),
+              ],
+            },
+          ],
+          {
+            typed: context.partial,
+            range: caretRange(position, context.partial.length),
+            preselect,
+          },
+        );
+      };
+
+      const isWrapRow = (entry: any) => entry?.command?.id === WRAP_FIELD_COMMAND;
+
+      // Grouped menus lean on the full key contract, so `off` keeps today's flat menus.
+      const groupsMenus = (config: EditorConfig) => language === "sql" && config.mode() !== "off";
+
+      const groupValueMenu = (entries: any[], typed: string, range: any, preselect: boolean) => {
+        const inValues = (raw: any) => {
+          const entry = objectEntry(raw);
+          return entry?.kind === "Value" || String(entry?.name ?? "").startsWith("\u0000");
+        };
+        return groupEntries(
+          [
+            {
+              header: t("sqlEditor.completion.groupValues", {
+                minutes: FIELD_VALUES_LOOKBACK_MINUTES,
+              }),
+              name: t("sqlEditor.completion.groupValuesName"),
+              entries: entries.filter(inValues).map(objectEntry),
+            },
+            {
+              header: t("sqlEditor.completion.groupFields"),
+              name: t("sqlEditor.completion.groupFields"),
+              entries: entries.filter((raw) => !inValues(raw)).map(objectEntry),
+            },
+          ],
+          { typed, range, preselect },
+        );
+      };
+
+      // Mid-line the typed space would double one that is already there and open a menu over existing text.
+      const chainsHere = (
+        config: EditorConfig,
+        model: MonacoEditor.editor.ITextModel,
+        position: MonacoEditor.Position,
+      ) => {
+        if (language !== "sql" || !chainsInMode(config.mode())) return false;
+        const after = lineAfterCaret(model, position);
+        return after.trim() === "" || after.startsWith(")");
+      };
+
+      const catalogEntries = (
+        config: EditorConfig,
+        model: MonacoEditor.editor.ITextModel,
+        position: MonacoEditor.Position,
+        textUntilPosition: string,
+        word: string,
+      ) => {
+        // Inside avg( or approx_percentile_cont(, numeric columns lead; on a metrics stream every label would sort above `value`.
+        const numericFirst = wantsNumericColumn(parseCallContext(textUntilPosition));
+        const rank = (list: any[]) => (numericFirst ? rankNumericFieldsFirst(list) : list);
+        const entries = [...rank(config.keywords()), ...rank(config.suggestions())];
+        const textBeforeWord = textUntilPosition.slice(0, textUntilPosition.length - word.length);
+        const canChain = chainsHere(config, model, position);
+        const lead =
+          language === "sql" ? parseLogicalLeadContext(textBeforeWord, config.filterMode()) : null;
+        const ranked = lead
+          ? buildLogicalLead(
+              entries,
+              logicalLeadNames(lead, config.filterMode()),
+              canChain ? acceptCommand("operator", true) : undefined,
+            )
+          : entries;
+        if (!canChain) return ranked;
+        const fieldChain = isPredicatePosition(textBeforeWord, config.filterMode())
+          ? acceptCommand("field", true)
+          : null;
+        return ranked.map((raw) => {
+          const entry = objectEntry(raw);
+          if (fieldChain && entry?.kind === "Field") return { ...entry, command: fieldChain };
+          const name = String(entry?.name ?? "").toLowerCase();
+          const keyword =
+            entry?.kind === "Keyword" && !entry.command && CHAINING_KEYWORDS.has(name);
+          return keyword ? chainedKeyword(entry, acceptCommand(laneOf(entry), true)) : raw;
+        });
+      };
+
       monaco.languages.registerCompletionItemProvider(language, {
-        // Without these nothing opens after a paren, a comma or an opening
-        // quote — the positions where help is most wanted.
-        triggerCharacters:
-          language === "promql"
-            ? [".", "(", ",", "'", '"', " ", "="]
-            : [".", "(", ",", "'", '"', " "],
+        triggerCharacters: triggerCharactersFor(language),
+        // A never-settling resolve for header and status rows is cancelled when focus leaves, so the next visit reports again.
+        resolveCompletionItem: (item: any) => {
+          noteResolvedItem(item);
+          return item?.o2skip ? new Promise(() => {}) : item;
+        },
         provideCompletionItems: async (
           model: MonacoEditor.editor.ITextModel,
           position: MonacoEditor.Position,
@@ -1193,6 +1638,24 @@ export default defineComponent({
             endLineNumber: position.lineNumber,
             endColumn: position.column,
           });
+          // Monaco loads the SQL tokenizer lazily (sql.contribution.js), so until it lands the tokens know no comments.
+          const inComment =
+            isCaretInComment(model, position, textUntilPosition) ||
+            (language === "sql" && literalStateAtEnd(textUntilPosition) === "comment");
+          if (inComment) return { suggestions: [] };
+          const offTrigger =
+            language === "sql" &&
+            config.mode() === "off" &&
+            context?.triggerKind === 1 &&
+            SQL_VALUE_TRIGGERS.includes(context.triggerCharacter);
+          if (offTrigger) return { suggestions: [] };
+
+          const chained =
+            context?.triggerKind === 1 &&
+            context?.triggerCharacter === " " &&
+            Date.now() - config.chain.pendingSince <= CHAINED_MENU_WINDOW_MS;
+          if (chained) config.chain.pendingSince = 0;
+
           const word = model.getWordUntilPosition(position);
           const range = {
             startLineNumber: position.lineNumber,
@@ -1200,6 +1663,8 @@ export default defineComponent({
             startColumn: word.startColumn,
             endColumn: word.endColumn,
           };
+          const reply = (entries: any[] | null, itemRange: any = range) =>
+            respond(config, context, chained, entries, word.word, itemRange);
 
           // Only a menu opened by a trigger character opens unhighlighted.
           const highlighted = config.mode() === "off" || context?.triggerKind !== 1;
@@ -1218,12 +1683,21 @@ export default defineComponent({
               const typedRange = isQualified(valueContext.typed)
                 ? range
                 : caretRange(position, valueContext.typed.length);
-              return {
-                suggestions: entries ? itemsFrom(entries, word.word, typedRange) : [],
-                incomplete: true,
-              };
+              if (!entries || !groupsMenus(config)) return reply(entries, typedRange);
+              return reply(
+                groupValueMenu(entries, valueContext.typed, typedRange, highlighted),
+                typedRange,
+              );
             }
-            if (literalStateAtEnd(textUntilPosition) === "string") return { suggestions: [] };
+            if (literalStateAtEnd(textUntilPosition) === "string") return reply([]);
+            const operators = operatorEntries(
+              config,
+              model,
+              position,
+              textUntilPosition,
+              highlighted,
+            );
+            if (operators) return reply(operators);
           }
 
           const promqlValue =
@@ -1237,47 +1711,13 @@ export default defineComponent({
               promqlValue,
               highlighted,
             );
-            const typedRange = caretRange(position, promqlValue.typed.length);
-            return {
-              suggestions: entries ? itemsFrom(entries, word.word, typedRange) : [],
-              incomplete: true,
-            };
+            return reply(entries, caretRange(position, promqlValue.typed.length));
           }
           // `=` is a PromQL trigger only for label values; a comparison like `== 1` gets no menu.
           if (language === "promql" && context?.triggerCharacter === "=")
             return { suggestions: [] };
 
-          // Inside avg( or approx_percentile_cont(, lift the numeric columns to
-          // the top. On a metrics stream every label sorts above `value` — the
-          // one column the function can take — which is a correct list and a
-          // useless one. Applied to both lists so it does not depend on which
-          // one a given host puts its fields in.
-          const numericFirst = wantsNumericColumn(parseCallContext(textUntilPosition));
-          const keywordList = numericFirst
-            ? rankNumericFieldsFirst(config.keywords())
-            : config.keywords();
-          const suggestionList = numericFirst
-            ? rankNumericFieldsFirst(config.suggestions())
-            : config.suggestions();
-          return {
-            suggestions: buildCompletionItems({
-              keywords: keywordList,
-              suggestions: suggestionList,
-              word: word.word,
-              range,
-              kinds: kinds(),
-              insertTextRules: rules(),
-              tags: monaco.languages.CompletionItemTag,
-            }),
-            // ALWAYS incomplete, which is not about the content: `severity = `
-            // turns this same static catalog into a value list, and monaco
-            // re-filters what it has unless the previous answer said otherwise
-            // (suggestModel.js). So the values waited for a trigger character,
-            // and a value fetched from the server after this call could never
-            // arrive at all. Costs one provider call per keystroke over a local
-            // catalog and a cached lookup.
-            incomplete: true,
-          };
+          return reply(catalogEntries(config, model, position, textUntilPosition, word.word));
         },
       });
 
@@ -1558,6 +1998,8 @@ export default defineComponent({
       t,
       aiIcon,
       toggleNlpMode,
+      suggestAnnouncement,
+      queryEditorClass: QUERY_EDITOR_CLASS,
     };
   },
 });
@@ -1614,37 +2056,161 @@ export default defineComponent({
   text-decoration-color: var(--color-status-negative);
 }
 
-/* Status rows (Event = loading, Issue = empty, failed, cap) insert nothing, so they never take a click or a highlight. */
-.logs-query-editor
+/* Only query editors' suggest widgets take the app's menu style (Monaco internals: .details-label, .signature-label, .qualifier-label, .monaco-icon-label, .frozen). */
+.logs-query-editor.o2-query-editor :deep(.suggest-widget) {
+  border-radius: var(--radius-default);
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+.logs-query-editor.o2-query-editor :deep(.suggest-widget .monaco-list .monaco-list-row) {
+  padding-inline-start: 0.5rem;
+}
+.logs-query-editor.o2-query-editor :deep(.suggest-widget .monaco-list .monaco-list-row.focused) {
+  background-image: linear-gradient(var(--color-accent), var(--color-accent));
+  background-size: 0.125rem 100%;
+  background-position: 0 0;
+  background-repeat: no-repeat;
+}
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget:not(.frozen) .monaco-highlighted-label .highlight) {
+  font-weight: var(--font-medium);
+}
+.logs-query-editor.o2-query-editor
+  :deep(
+    .suggest-widget .monaco-list .monaco-list-row > .contents > .main > .right > .details-label
+  ) {
+  opacity: 1;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+}
+.logs-query-editor.o2-query-editor
+  :deep(
+    .suggest-widget
+      .monaco-list
+      .monaco-list-row.focused
+      > .contents
+      > .main
+      > .right
+      > .details-label
+  ) {
+  color: var(--color-text-body);
+}
+.logs-query-editor.o2-query-editor
+  :deep(
+    .suggest-widget .monaco-list .monaco-list-row > .contents > .main > .left > .signature-label
+  ) {
+  opacity: 1;
+  color: var(--color-text-secondary);
+}
+
+/* Tailwind's .contents utility (display: contents) collides with Monaco's row wrapper of the same name. */
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list .monaco-list-row > .contents) {
+  display: block;
+}
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list .monaco-list-row > .contents > .main > .left) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Status rows insert nothing, so they never take a click or a highlight (Monaco internals: codicon-symbol-* classes, glyphs \eb19 / \ea74, codicon-spin). */
+.logs-query-editor.o2-query-editor
   :deep(.suggest-widget .monaco-list-row:is(:has(.codicon-symbol-event), :has(.codicon-issues))) {
   pointer-events: none;
 }
-.logs-query-editor
+.logs-query-editor.o2-query-editor
   :deep(
     .suggest-widget .monaco-list-row.focused:is(:has(.codicon-symbol-event), :has(.codicon-issues))
   ) {
   background-color: transparent;
+  background-image: none;
 }
-.logs-query-editor
+.logs-query-editor.o2-query-editor
   :deep(
     .suggest-widget
       .monaco-list-row:is(:has(.codicon-symbol-event), :has(.codicon-issues))
       .monaco-icon-label
   ) {
-  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  color: var(--color-text-secondary) !important;
+}
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list-row .suggest-icon.codicon-symbol-event::before) {
+  content: "\eb19";
+}
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list-row .suggest-icon.codicon-symbol-event) {
+  color: var(--color-text-secondary) !important;
+  animation: codicon-spin 1.5s steps(30) infinite;
+}
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list-row .suggest-icon.codicon-issues::before) {
+  content: "\ea74";
+}
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list-row .suggest-icon.codicon-issues) {
+  color: var(--color-text-secondary) !important;
 }
 
-/* Tailwind's .contents utility (display: contents) collides with Monaco's row wrapper of the same name. */
-.logs-query-editor :deep(.suggest-widget .monaco-list .monaco-list-row > .contents) {
-  display: block;
+/* Group headers are Folder rows (a kind nothing else uses); clicks pass through and the editor swallows them. */
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list .monaco-list-row:has(.codicon-symbol-folder)) {
+  pointer-events: none;
+  cursor: default;
+  background: transparent !important;
+}
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list .monaco-list-row:has(.codicon-symbol-folder) .suggest-icon) {
+  display: none;
+}
+.logs-query-editor.o2-query-editor
+  :deep(
+    .suggest-widget .monaco-list .monaco-list-row:has(.codicon-symbol-folder) .monaco-icon-label
+  ) {
+  font-family: var(--font-sans) !important;
+  font-size: var(--text-2xs);
+  font-weight: var(--font-medium);
+  color: var(--color-text-secondary) !important;
+}
+.logs-query-editor.o2-query-editor
+  :deep(
+    .suggest-widget
+      .monaco-list
+      .monaco-list-row:has(.codicon-symbol-folder)
+      :is(.qualifier-label, .details-label, .signature-label)
+  ) {
+  display: none !important;
+}
+.logs-query-editor.o2-query-editor
+  :deep(.suggest-widget .monaco-list .monaco-list-row:has(.codicon-symbol-folder) .highlight) {
+  color: inherit !important;
+  font-weight: inherit !important;
+}
+.logs-query-editor.o2-query-editor
+  :deep(
+    .suggest-widget .monaco-list .monaco-list-row:has(.codicon-symbol-folder):not([data-index="0"])
+  ) {
+  border-top: 0.0625rem solid var(--color-border-subtle);
+}
+/* In a grouped menu a value or operator row's description is the group name, for screen readers only. */
+.logs-query-editor.o2-query-editor
+  :deep(
+    .suggest-widget:has(.codicon-symbol-folder)
+      .monaco-list-row:is(:has(.codicon-symbol-value), :has(.codicon-symbol-operator))
+      .details-label
+  ) {
+  visibility: hidden;
 }
 
-/* A one-row menu is sized to its content rather than the full default width; a lone status row needs room for its hint. */
-.logs-query-editor
+/* A one-row menu is sized to its content and a lone status row gets room for its hint (Monaco internals: data-index, data-last-element). */
+.logs-query-editor.o2-query-editor
   :deep(.suggest-widget:has(.monaco-list-row[data-index="0"][data-last-element="true"])) {
   width: 16.25rem !important;
 }
-.logs-query-editor
+.logs-query-editor.o2-query-editor
   :deep(
     .suggest-widget:is(
       :has(.monaco-list-row[data-index="0"][data-last-element="true"] .codicon-symbol-event),
@@ -1655,7 +2221,9 @@ export default defineComponent({
 }
 
 .logs-query-editor :deep(.o2-suggest-inline-hint) {
-  color: var(--color-text-secondary);
+  color: var(--color-text-secondary) !important;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
   font-style: italic;
   padding-inline-start: 0.75rem;
 }
