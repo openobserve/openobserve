@@ -25,7 +25,9 @@ import {
   latestRun,
   runsWithAlertSql,
   type DigestRecord,
+  type RuleId,
   type RunRow,
+  type Severity,
 } from "./digests";
 import { formatEvidence, formatMinutes } from "./format";
 
@@ -83,6 +85,25 @@ describe("a run pulled again", () => {
     ]);
     expect(newest?.emitted_at).toBe(500);
     expect(findings.map((f) => f.title)).toEqual(["new"]);
+  });
+
+  it("lists findings most severe first, whatever order the search returned them in", () => {
+    const finding = (rule_id: RuleId, severity: Severity, alert_name: string) =>
+      record({
+        _timestamp: 500,
+        finding_count: 3,
+        rule_id,
+        severity,
+        alert_name,
+        title: alert_name,
+      });
+    const { findings } = latestEmission([
+      finding("no_destination", "Medium", "billing"),
+      finding("notify_failed", "High", "orders"),
+      finding("failure", "High", "payments"),
+      finding("no_destination", "High", "disk"),
+    ]);
+    expect(findings.map((f) => f.alert_name)).toEqual(["payments", "disk", "orders", "billing"]);
   });
 
   it("has no detail when the stream holds no record for it", () => {

@@ -90,6 +90,8 @@ const COVERAGE_COLUMNS: (keyof Coverage)[] = [
   "coverage_meta_fallback_used",
 ];
 
+const SEVERITY_RANK: Record<Severity, number> = { High: 3, Medium: 2, Low: 1, Info: 0 };
+
 const RUN_COLUMNS = [
   "window_start",
   "window_end",
@@ -173,9 +175,15 @@ export function latestEmission(records: DigestRecord[]): {
   const emission = records.filter((r) => r._timestamp === newest);
   return {
     run: runIdentity(emission[0]),
-    findings: emission.filter((r): r is FindingRecord => !!r.rule_id),
+    findings: emission.filter((r): r is FindingRecord => !!r.rule_id).sort(findingOrder),
   };
 }
+
+/** One emission's records share a `_timestamp`, so the search returns them in no stable order. */
+const findingOrder = (a: FindingRecord, b: FindingRecord) =>
+  SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] ||
+  a.rule_id.localeCompare(b.rule_id) ||
+  (a.alert_name ?? "").localeCompare(b.alert_name ?? "");
 
 export const latestRun = (rows: RunRow[]): RunRow | null =>
   rows.reduce<RunRow | null>((a, b) => (!a || b.window_end > a.window_end ? b : a), null);
