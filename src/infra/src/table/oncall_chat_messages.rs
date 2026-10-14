@@ -18,7 +18,7 @@
 use config::meta::oncall::{ChatMessage, ChatMessageKind, ChatMessageStatus, ChatPlatform};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
-    QueryFilter, QueryOrder, TransactionTrait,
+    QueryFilter, QueryOrder, QuerySelect, TransactionTrait,
 };
 
 use super::entity::oncall_chat_messages::{Column, Entity, Model};
@@ -32,6 +32,18 @@ pub async fn put(message: &ChatMessage) -> Result<(), errors::Error> {
 /// A page's message rows, oldest first. [strong]
 pub async fn list_for_response(response_id: &str) -> Result<Vec<ChatMessage>, errors::Error> {
     list_for_response_in(get_orm_client_rw().await, response_id).await
+}
+
+/// One person's DM rows in an org's workspace, newest first, at most `limit`. [strong]
+pub async fn recent_dms(
+    org_id: &str,
+    platform: ChatPlatform,
+    workspace_id: &str,
+    recipient: &str,
+    limit: u64,
+) -> Result<Vec<ChatMessage>, errors::Error> {
+    let conn = get_orm_client_rw().await;
+    recent_dms_in(conn, org_id, platform, workspace_id, recipient, limit).await
 }
 
 /// Removes a page's message rows in one statement and returns how many went. [strong]
@@ -138,6 +150,31 @@ async fn list_for_response_in<C: ConnectionTrait>(
         .filter(Column::ResponseId.eq(response_id))
         .order_by_asc(Column::CreatedAt)
         .order_by_asc(Column::Id)
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(to_message)
+        .collect()
+}
+
+/// [`recent_dms`] against a caller-supplied connection.
+async fn recent_dms_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    platform: ChatPlatform,
+    workspace_id: &str,
+    recipient: &str,
+    limit: u64,
+) -> Result<Vec<ChatMessage>, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Platform.eq(platform.to_i32()))
+        .filter(Column::WorkspaceId.eq(workspace_id))
+        .filter(Column::Kind.eq(ChatMessageKind::Dm.to_i32()))
+        .filter(Column::Recipient.eq(recipient))
+        .order_by_desc(Column::CreatedAt)
+        .order_by_desc(Column::Id)
+        .limit(limit)
         .all(conn)
         .await?
         .into_iter()
@@ -260,6 +297,38 @@ mod tests {
         assert_eq!(delete_for_response_in(&db, "r1").await.unwrap(), 2);
         assert!(list_for_response_in(&db, "r1").await.unwrap().is_empty());
         assert_eq!(list_for_response_in(&db, "r2").await.unwrap().len(), 1);
+    }
+
+    /// DM-8: a person's newest DM rows in one org's workspace first, at most `limit`.
+    #[tokio::test]
+    async fn test_recent_dms_lists_one_persons_newest_dm_rows_first() {
+        let db = db().await;
+        let dm = |id: &str, created_at: i64, recipient: &str| ChatMessage {
+            kind: ChatMessageKind::Dm,
+            channel_id: recipient.into(),
+            recipient: Some(recipient.into()),
+            ..message(id, "r1", created_at)
+        };
+        let other_workspace = ChatMessage {
+            workspace_id: "T2".into(),
+            ..dm("m5", 500, "U1")
+        };
+        let rows = [
+            dm("m1", 100, "U1"),
+            dm("m2", 200, "U1"),
+            dm("m3", 300, "U1"),
+            dm("m4", 400, "U2"),
+            other_workspace,
+            message("m6", "r1", 600),
+        ];
+        for row in &rows {
+            put_in(&db, row).await.unwrap();
+        }
+        let ids = |found: Vec<ChatMessage>| found.into_iter().map(|m| m.id).collect::<Vec<_>>();
+        let found = recent_dms_in(&db, "acme", ChatPlatform::Slack, "T1", "U1", 2)
+            .await
+            .unwrap();
+        assert_eq!(ids(found), vec!["m3", "m2"]);
     }
 
     /// FL-3: in either arrival order, two regions keep the newer of two clashing rows.

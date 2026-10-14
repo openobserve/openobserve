@@ -171,6 +171,20 @@ pub struct ChatIdentity {
     pub changed_at: i64,
 }
 
+impl ChatIdentity {
+    /// Whether the link counts: not unlinked, and its org's install of its workspace is active.
+    /// [pure]
+    pub fn is_active(&self, install: Option<&ChatInstall>) -> bool {
+        self.unlinked_at.is_none()
+            && install.is_some_and(|i| {
+                i.status == InstallStatus::Active
+                    && i.org_id == self.org_id
+                    && i.platform == self.platform
+                    && i.workspace_id == self.workspace_id
+            })
+    }
+}
+
 /// One chat message about a page: a room post, a DM, or a fallback marker.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChatMessage {
@@ -580,6 +594,50 @@ mod tests {
             let got = SlackAvailability::of(oncall, slack, encrypting);
             assert_eq!(got, want, "{oncall} {slack} {encrypting}");
             assert_eq!(serde_json::to_value(got).unwrap(), wire);
+        }
+    }
+
+    /// DM-1: a link counts only while linked and while its workspace's install is active.
+    #[test]
+    fn test_a_link_is_active_only_unlinked_never_under_an_active_install_of_its_workspace() {
+        let link = ChatIdentity {
+            id: "l1".to_string(),
+            org_id: "default".to_string(),
+            platform: ChatPlatform::Slack,
+            workspace_id: "T1".to_string(),
+            platform_user_id: "U1".to_string(),
+            enterprise_user_id: None,
+            user_email: "ann@o2.ai".to_string(),
+            linked_at: 1,
+            unlinked_at: None,
+            changed_at: 1,
+        };
+        let unlinked = ChatIdentity {
+            unlinked_at: Some(2),
+            ..link.clone()
+        };
+        let active = install(InstallStatus::Active);
+        let revoked = install(InstallStatus::Revoked);
+        let other_workspace = ChatInstall {
+            workspace_id: "T2".to_string(),
+            ..active.clone()
+        };
+        // (case, link, install, expected)
+        let cases = [
+            ("linked, active", &link, Some(&active), true),
+            ("linked, revoked", &link, Some(&revoked), false),
+            ("linked, no install", &link, None, false),
+            (
+                "linked, other workspace",
+                &link,
+                Some(&other_workspace),
+                false,
+            ),
+            ("unlinked, active", &unlinked, Some(&active), false),
+            ("unlinked, revoked", &unlinked, Some(&revoked), false),
+        ];
+        for (case, link, install, want) in cases {
+            assert_eq!(link.is_active(install), want, "{case}");
         }
     }
 }

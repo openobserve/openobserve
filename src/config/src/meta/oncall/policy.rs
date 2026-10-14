@@ -45,6 +45,8 @@ pub enum Channel {
     Webhook,
     Sms,
     Voice,
+    /// A DM from the org's Slack app to the person's linked Slack account.
+    Slack,
 }
 
 impl Channel {
@@ -52,6 +54,7 @@ impl Channel {
     pub fn to_i32(&self) -> i32 {
         match self {
             Self::Email => 1,
+            Self::Slack => 2,
             Self::Sms => 3,
             Self::Voice => 4,
             Self::Webhook => 7,
@@ -61,6 +64,7 @@ impl Channel {
     pub fn from_i32(v: i32) -> Option<Self> {
         match v {
             1 => Some(Self::Email),
+            2 => Some(Self::Slack),
             3 => Some(Self::Sms),
             4 => Some(Self::Voice),
             7 => Some(Self::Webhook),
@@ -73,21 +77,29 @@ impl Channel {
             Self::Email => "email",
             Self::Sms => "sms",
             Self::Voice => "voice",
+            Self::Slack => "slack",
             Self::Webhook => "webhook",
         }
     }
 
     /// Every channel a page can reach a person on.
     pub fn deliverable() -> Vec<Self> {
-        vec![Self::Email, Self::Sms, Self::Voice, Self::Webhook]
+        vec![
+            Self::Email,
+            Self::Sms,
+            Self::Voice,
+            Self::Slack,
+            Self::Webhook,
+        ]
     }
 }
 
 /// The order a plan lists channels in; it orders and de-duplicates, and decides nothing else.
-pub const CHANNEL_ORDER: [Channel; 4] = [
+pub const CHANNEL_ORDER: [Channel; 5] = [
     Channel::Email,
     Channel::Sms,
     Channel::Voice,
+    Channel::Slack,
     Channel::Webhook,
 ];
 
@@ -95,7 +107,7 @@ pub const CHANNEL_ORDER: [Channel; 4] = [
 pub fn is_broadcast(channel: Channel) -> bool {
     match channel {
         Channel::Webhook => true,
-        Channel::Email | Channel::Sms | Channel::Voice => false,
+        Channel::Email | Channel::Sms | Channel::Voice | Channel::Slack => false,
     }
 }
 
@@ -127,15 +139,21 @@ pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
     }
 }
 
-/// One person's channels: Email always, Sms and Voice only with a pageable phone and an account.
-/// [pure]
-pub fn personal_channels(channels: &[Channel], pageable: bool, account: bool) -> Vec<Channel> {
+/// One person's channels: Email always, Sms and Voice with a pageable phone and an account, Slack
+/// with an account (the org's active install) and the person's active link. [pure]
+pub fn personal_channels(
+    channels: &[Channel],
+    pageable: bool,
+    account: bool,
+    slack_linked: bool,
+) -> Vec<Channel> {
     channels
         .iter()
         .copied()
         .filter(|c| match c {
             Channel::Email => true,
             Channel::Sms | Channel::Voice => pageable && account,
+            Channel::Slack => account && slack_linked,
             Channel::Webhook => false,
         })
         .collect()
@@ -610,11 +628,11 @@ impl EscalationPolicy {
             if !rung.steps.is_empty() && rung.channels.is_empty() {
                 return Err(PolicyError::NoChannels(rung.priority));
             }
-            let phone = rung
+            let needs_email = rung
                 .channels
                 .iter()
-                .any(|c| matches!(c, Channel::Sms | Channel::Voice));
-            if !rung.steps.is_empty() && phone && !rung.channels.contains(&Channel::Email) {
+                .any(|c| matches!(c, Channel::Sms | Channel::Voice | Channel::Slack));
+            if !rung.steps.is_empty() && needs_email && !rung.channels.contains(&Channel::Email) {
                 return Err(PolicyError::PersonalWithoutEmail(rung.priority));
             }
             let mut seen_delay = std::collections::HashSet::new();
@@ -783,7 +801,7 @@ impl std::fmt::Display for PolicyError {
             Self::PersonalWithoutEmail(p) => {
                 write!(
                     f,
-                    "priority `{p}` pages by SMS or voice, so it must also page by email"
+                    "priority `{p}` pages by SMS, voice or Slack, so it must also page by email"
                 )
             }
         }
@@ -816,6 +834,7 @@ mod tests {
     fn test_channel_storage_ids_are_pinned() {
         let all = [
             (Channel::Email, 1, "email"),
+            (Channel::Slack, 2, "slack"),
             (Channel::Sms, 3, "sms"),
             (Channel::Voice, 4, "voice"),
             (Channel::Webhook, 7, "webhook"),
@@ -826,7 +845,7 @@ mod tests {
             assert_eq!(c.as_str(), name);
             assert_eq!(serde_json::to_string(&c).unwrap(), format!("\"{name}\""));
         }
-        for unused in [0, 2, 5, 6, 8] {
+        for unused in [0, 5, 6, 8] {
             assert_eq!(Channel::from_i32(unused), None, "{unused} is not a channel");
         }
     }
@@ -1293,6 +1312,7 @@ mod tests {
                 Channel::Email,
                 Channel::Sms,
                 Channel::Voice,
+                Channel::Slack,
                 Channel::Webhook
             ]
         );
@@ -1324,6 +1344,7 @@ mod tests {
     fn test_the_plan_is_ordered_and_deduplicated() {
         let plan = channel_plan(&[
             Channel::Webhook,
+            Channel::Slack,
             Channel::Voice,
             Channel::Email,
             Channel::Sms,
@@ -1331,7 +1352,7 @@ mod tests {
         ]);
         assert_eq!(
             plan.personal,
-            vec![Channel::Email, Channel::Sms, Channel::Voice]
+            vec![Channel::Email, Channel::Sms, Channel::Voice, Channel::Slack]
         );
         assert_eq!(plan.broadcast, vec![Channel::Webhook]);
     }
@@ -1366,9 +1387,31 @@ mod tests {
         ];
         for (ticked, pageable, account, want) in cases {
             assert_eq!(
-                &personal_channels(ticked, *pageable, *account),
+                &personal_channels(ticked, *pageable, *account, true),
                 want,
                 "ticked {ticked:?}, pageable {pageable}, account {account}"
+            );
+        }
+    }
+
+    /// DM-2: Slack stays only with an active install (the notifier's account) and an active link.
+    #[test]
+    fn test_personal_channels_keep_slack_only_with_an_active_install_and_link() {
+        let ticked = [Channel::Email, Channel::Slack];
+        let with_slack = vec![Channel::Email, Channel::Slack];
+        let email = vec![Channel::Email];
+        // (install active, link active, expected)
+        let cases = [
+            (true, true, with_slack),
+            (true, false, email.clone()),
+            (false, true, email.clone()),
+            (false, false, email),
+        ];
+        for (install, link, want) in cases {
+            assert_eq!(
+                personal_channels(&ticked, false, install, link),
+                want,
+                "install {install}, link {link}"
             );
         }
     }
@@ -1385,6 +1428,11 @@ mod tests {
                 Err(PolicyError::PersonalWithoutEmail(AlertPriority::P1)),
             ),
             (&[Channel::Email, Channel::Sms], Ok(())),
+            (
+                &[Channel::Slack],
+                Err(PolicyError::PersonalWithoutEmail(AlertPriority::P1)),
+            ),
+            (&[Channel::Email, Channel::Slack], Ok(())),
         ];
         for (channels, want) in cases {
             let mut p = policy();
@@ -1753,7 +1801,7 @@ mod tests {
     #[test]
     fn test_only_the_room_channels_are_broadcasts() {
         assert!(is_broadcast(Channel::Webhook));
-        for personal in [Channel::Email, Channel::Sms, Channel::Voice] {
+        for personal in [Channel::Email, Channel::Sms, Channel::Voice, Channel::Slack] {
             assert!(!is_broadcast(personal), "{personal} reaches one person");
         }
     }

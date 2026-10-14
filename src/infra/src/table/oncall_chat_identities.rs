@@ -63,6 +63,15 @@ pub async fn get_for_email(
     .await
 }
 
+/// The linked (never unlinked) rows of an org's workspace. [strong]
+pub async fn list_linked(
+    org_id: &str,
+    platform: ChatPlatform,
+    workspace_id: &str,
+) -> Result<Vec<ChatIdentity>, errors::Error> {
+    list_linked_in(get_orm_client_rw().await, org_id, platform, workspace_id).await
+}
+
 /// Removes the link; false means there was none. [strong]
 pub async fn delete(id: &str) -> Result<bool, errors::Error> {
     delete_in(get_orm_client_rw().await, id).await
@@ -187,6 +196,22 @@ async fn get_for_email_in<C: ConnectionTrait>(
     found.map(to_identity).transpose()
 }
 
+/// [`list_linked`] against a caller-supplied connection.
+async fn list_linked_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    platform: ChatPlatform,
+    workspace_id: &str,
+) -> Result<Vec<ChatIdentity>, errors::Error> {
+    scoped(org_id, platform, workspace_id)
+        .filter(Column::UnlinkedAt.is_null())
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(to_identity)
+        .collect()
+}
+
 /// [`delete`] against a caller-supplied connection.
 async fn delete_in<C: ConnectionTrait>(conn: &C, id: &str) -> Result<bool, errors::Error> {
     let deleted = Entity::delete_by_id(id).exec(conn).await?.rows_affected;
@@ -246,6 +271,28 @@ mod tests {
             unlinked_at: None,
             changed_at: 100,
         }
+    }
+
+    /// DM-1: the linked rows of one org's workspace, never an unlinked one or another workspace's.
+    #[tokio::test]
+    async fn test_list_linked_keeps_only_linked_rows_of_the_workspace() {
+        let db = db().await;
+        let ana = identity("l1", "U1", "ana@o2.ai");
+        let bo = ChatIdentity {
+            unlinked_at: Some(200),
+            ..identity("l2", "U2", "bo@o2.ai")
+        };
+        let elsewhere = ChatIdentity {
+            workspace_id: "T2".into(),
+            ..identity("l3", "U3", "cy@o2.ai")
+        };
+        for row in [&ana, &bo, &elsewhere] {
+            put_in(&db, row).await.unwrap();
+        }
+        let linked = list_linked_in(&db, "acme", ChatPlatform::Slack, "T1")
+            .await
+            .unwrap();
+        assert_eq!(linked, vec![ana]);
     }
 
     #[tokio::test]
