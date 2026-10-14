@@ -87,6 +87,10 @@ pub mod openapi;
 
 use common::meta::http::ERROR_HEADER;
 
+// Largest Slack request body read; a press or command is a few KiB (CL-1).
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+const SLACK_MAX_BODY_BYTES: usize = 64 * 1024;
+
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
     CorsLayer::new()
@@ -811,6 +815,12 @@ pub fn basic_routes() -> Router {
         .route_layer(DefaultBodyLimit::max(
             alerts::external_events::MAX_BODY_BYTES,
         ));
+
+    // Unauthenticated: Slack's signature is the credential; mounted only while Slack is set (IN-1).
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled && get_o2_config().oncall.slack_is_set() {
+        router = router.merge(slack_inbound_routes());
+    }
 
     // Public status pages — unauthenticated by design, like chart_render
     // above: existence and visibility are checked inside the handler, and the
@@ -2162,6 +2172,17 @@ fn oncall_routes(router: Router) -> Router {
         )
 }
 
+/// Slack's signed inbound requests, with their own body cap so no other route's limit applies.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn slack_inbound_routes() -> Router {
+    Router::new()
+        .route(
+            "/api/v2/oncall/chat/slack/interact",
+            post(openobserve_api_management::request::oncall::chat::slack_interact),
+        )
+        .layer(DefaultBodyLimit::max(SLACK_MAX_BODY_BYTES))
+}
+
 /// Create other service routes (AWS, GCP, RUM)
 pub fn other_service_routes() -> Router {
     let aws_routes = Router::new()
@@ -2561,6 +2582,28 @@ mod tests {
             audited(Method::POST, "api/org/settings/logo", "png"),
             "cG5n"
         );
+    }
+
+    /// CL-1: a Slack request over 64 KiB is refused before the handler; one at the cap is read.
+    #[tokio::test]
+    async fn test_slack_inbound_routes_cap_the_body_at_64_kib() {
+        let post_of = |len: usize| {
+            Request::builder()
+                .method(Method::POST)
+                .uri("/api/v2/oncall/chat/slack/interact")
+                .body(Body::from(vec![b'a'; len]))
+                .unwrap()
+        };
+        let over = slack_inbound_routes()
+            .oneshot(post_of(65 * 1024))
+            .await
+            .unwrap();
+        assert_eq!(over.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let at_cap = slack_inbound_routes()
+            .oneshot(post_of(64 * 1024))
+            .await
+            .unwrap();
+        assert_ne!(at_cap.status(), StatusCode::PAYLOAD_TOO_LARGE);
     }
 
     #[tokio::test]

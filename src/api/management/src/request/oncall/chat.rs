@@ -13,20 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Native Slack for on-call: connecting, showing and disconnecting the org's workspace, and the
-//! deployment's app manifest URLs.
+//! Native Slack for on-call: connecting, showing and disconnecting the org's workspace, the
+//! deployment's app manifest URLs, and button presses.
 
-use axum::{extract::Path, response::Response};
+use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::{
+    common::config::get_config as get_o2_config,
+    oncall::chat::{
+        payload::{Click, ParsedClick},
+        press,
+    },
+};
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 use openobserve_api_common::extractors::ValidatedJson;
 use serde::Deserialize;
 
 #[cfg(feature = "enterprise")]
-use super::{CONFIG, SETTINGS, allowed};
+use super::{CONFIG, RESPONSES, SETTINGS, allowed};
 #[cfg(feature = "enterprise")]
 use crate::service::auth::UserEmail;
+
+// Header carrying Slack's request signature (https://docs.slack.dev/authentication/verifying-requests-from-slack).
+#[cfg(feature = "enterprise")]
+const SLACK_SIGNATURE_HEADER: &str = "x-slack-signature";
+// Header carrying the timestamp Slack signed with the body (same page).
+#[cfg(feature = "enterprise")]
+const SLACK_TIMESTAMP_HEADER: &str = "x-slack-request-timestamp";
 
 /// Slack's one-time code and the state `install/start` issued, as the callback page relays them.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -275,6 +290,64 @@ pub async fn test_team_slack_channel(
     }
 }
 
+/// Slack's button presses: verified, answered at once with an empty 200, then worked (CL-1, CL-3).
+#[utoipa::path(
+    post,
+    path = "/v2/oncall/chat/slack/interact",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "OnCallSlackInteract",
+    summary = "Receive a Slack button press",
+    request_body(content = String, content_type = "application/x-www-form-urlencoded", description = "Slack's signed block_actions form"),
+    responses(
+        (status = 200, description = "Accepted; any reply goes to Slack's response_url"),
+        (status = 401, description = "Not signed by Slack, or too old", content_type = "application/json", body = Object),
+        (status = 403, description = "Not Supported", content_type = "application/json", body = Object),
+        (status = 413, description = "Body over 64 KiB"),
+    ),
+)]
+pub async fn slack_interact(headers: HeaderMap, body: Bytes) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use axum::{http::StatusCode, response::IntoResponse};
+
+        let header = |name: &str| {
+            headers
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_default()
+        };
+        let secret = get_o2_config().oncall.slack_signing_secret.clone();
+        let now_secs = config::utils::time::now_micros() / 1_000_000;
+        // Verified before any parse or I/O, so an unsigned request costs one HMAC (CL-8).
+        let parsed = press::accept_press(
+            secret.as_bytes(),
+            header(SLACK_TIMESTAMP_HEADER),
+            &body,
+            header(SLACK_SIGNATURE_HEADER),
+            now_secs,
+        );
+        match parsed {
+            Err(_) => MetaHttpResponse::error(
+                StatusCode::UNAUTHORIZED.as_u16(),
+                "Unauthorized".to_string(),
+            )
+            .into_response(),
+            Ok(ParsedClick::Ignore) => StatusCode::OK.into_response(),
+            Ok(ParsedClick::Click(click)) => {
+                // Slack wants the 200 within 3 s; the work and any reply follow on their own.
+                tokio::spawn(press_worker(click));
+                StatusCode::OK.into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (headers, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 /// A storage failure is logged and answered as a bare 500; every other refusal is worded for the
 /// caller.
 #[cfg(feature = "enterprise")]
@@ -286,6 +359,23 @@ fn refusal(e: o2_enterprise::enterprise::oncall::chat::install_flow::InstallFlow
         return super::internal_error("slack install", cause);
     }
     MetaHttpResponse::error(e.http_status(), e.to_string()).into_response()
+}
+
+/// Answers one press as the linked person, then posts any private reply (CL-5 to CL-7).
+#[cfg(feature = "enterprise")]
+async fn press_worker(click: Click) {
+    // The on-call client secret keys link tokens; their own domain keeps them apart (C7).
+    let link_key = get_o2_config().oncall.slack_client_secret.clone();
+    let may_work_pages =
+        async |org_id: &str, email: &str| allowed(org_id, email, RESPONSES, "POST").await;
+    let reply = press::answer_click(
+        &click,
+        link_key.as_bytes(),
+        may_work_pages,
+        config::utils::time::now_micros(),
+    )
+    .await;
+    press::send_reply(&click.response_url, &reply).await;
 }
 
 #[cfg(test)]
@@ -329,6 +419,10 @@ mod tests {
                     "acme".to_string(),
                     "t1".to_string(),
                 )))),
+            ),
+            (
+                "slack interact",
+                Box::pin(slack_interact(HeaderMap::new(), Bytes::new())),
             ),
         ];
         for (name, handler) in cases {
