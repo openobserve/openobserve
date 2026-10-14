@@ -24,6 +24,20 @@ vi.mock("@/services/alerts", async (importOriginal) => {
   });
 });
 
+// Per-test permission answer for the edit check.
+const { canState } = vi.hoisted(() => ({ canState: { status: "allowed" } }));
+vi.mock("@/composables/useCan", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useCan: () => ({
+      status: () => canState.status,
+      can: () => canState.status === "allowed",
+      noteWriteDenied: () => {},
+    }),
+  };
+});
+
 describe("AddAlertView.vue", () => {
   let store: any;
   let router: any;
@@ -303,6 +317,25 @@ describe("AddAlertView.vue", () => {
       expect(seeded.name).toBe("my-alert");
       expect(seeded.stream_name).toBe("k8s_logs");
       expect(seeded.stream_type).toBe("logs");
+    });
+
+    it("sends a user who cannot edit to the read-only detail page instead of the form", async () => {
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+      vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: { name: "a" } } as any);
+      router.addRoute({
+        path: "/alerts/detail/:alert_id",
+        name: "alertDetail",
+        component: { template: "<div>Detail</div>" },
+      });
+      canState.status = "denied";
+      try {
+        const wrapper = await mountEditing();
+        expect(wrapper.findComponent(AddAlertStub).exists()).toBe(false);
+        expect(router.currentRoute.value.name).toBe("alertDetail");
+        expect(router.currentRoute.value.params.alert_id).toBe("alert-1");
+      } finally {
+        canState.status = "allowed";
+      }
     });
 
     it("does not fetch an alert when creating one", async () => {

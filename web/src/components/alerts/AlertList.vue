@@ -536,7 +536,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OSpinner size="xs" />
                   </div>
                   <OButton
-                    v-else
+                    v-else-if="canAlert(row, 'edit')"
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
                     class="ms-1 max-md:hidden"
@@ -552,6 +552,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </OButton>
                   <OButton
+                    v-if="canAlert(row, 'edit')"
                     data-row-action="edit"
                     :data-test="`alert-list-${row.name}-update-alert`"
                     variant="ghost"
@@ -607,6 +608,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.stop="exportAlert(row)"
                   />
                   <button
+                    v-if="canAlert(row, 'delete')"
                     type="button"
                     data-row-action="delete"
                     class="hidden"
@@ -625,6 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </template>
                     <ODropdownItem
+                      v-if="canAlert(row, 'edit')"
                       class="md:hidden"
                       :disabled="!!alertStateLoadingMap[row.uuid]"
                       :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
@@ -636,6 +639,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
                     </ODropdownItem>
                     <ODropdownItem
+                      v-if="canAlert(row, 'edit')"
                       class="md:hidden"
                       :data-test="`alert-list-${row.name}-update-alert-menu`"
                       @select="editAlert(row)"
@@ -666,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                       {{ t("common.move") }}
                     </ODropdownItem>
-                    <template v-if="downtimesEnabled">
+                    <template v-if="downtimesEnabled && canAlert(row, 'edit')">
                       <ODropdownSeparator />
                       <MuteMenuItems
                         :data-test-prefix="`alert-list-${row.name}-mute`"
@@ -674,8 +678,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @until="openMuteDialog([row])"
                       />
                     </template>
-                    <ODropdownSeparator />
+                    <ODropdownSeparator v-if="canAlert(row, 'delete')" />
                     <ODropdownItem
+                      v-if="canAlert(row, 'delete')"
                       :data-test="`alert-list-${row.name}-delete-alert`"
                       variant="destructive"
                       shortcut-id="alertsRowDelete"
@@ -775,6 +780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ t("common.export") }}</OButton
                 >
                 <OButton
+                  v-if="showBulkEdit"
                   data-test="alert-list-pause-alerts-btn"
                   variant="outline"
                   size="sm"
@@ -783,6 +789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ t("alerts.pause") }}</OButton
                 >
                 <OButton
+                  v-if="showBulkEdit"
                   data-test="alert-list-unpause-alerts-btn"
                   variant="outline"
                   size="sm"
@@ -790,7 +797,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="bulkToggleAlerts('resume')"
                   >{{ t("alerts.resume") }}</OButton
                 >
-                <ODropdown v-if="downtimesEnabled" side="top">
+                <ODropdown v-if="downtimesEnabled && showBulkEdit" side="top">
                   <template #trigger>
                     <OButton
                       variant="outline"
@@ -803,11 +810,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <MuteMenuItems
                     data-test-prefix="alert-list-bulk-mute"
-                    @preset="(secs) => muteAndRefresh(selectedAlerts, secs)"
-                    @until="openMuteDialog(selectedAlerts)"
+                    @preset="(secs) => muteAndRefresh(bulkEditSplit.allowed, secs)"
+                    @until="openMuteDialog(bulkEditSplit.allowed)"
                   />
                 </ODropdown>
                 <OButton
+                  v-if="!bulkDeleteSplit.skipped.length || bulkDeleteSplit.allowed.length > 0"
                   data-test="alert-list-delete-alerts-btn"
                   variant="outline-destructive"
                   size="sm"
@@ -857,7 +865,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('alerts.deleteAlertsTitle')"
-      :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
+      :message="
+        bulkDeleteSplit.skipped.length
+          ? t('authz.bulkDeletePartial', {
+              count: bulkDeleteSplit.allowed.length,
+              total: selectedAlerts.length,
+              skipped: bulkDeleteSplit.skipped.length,
+            })
+          : t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })
+      "
+      :detail="bulkDeleteSkippedNames"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -1052,6 +1069,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { skippedNamesText, splitByPermission, useCan } from "@/composables/useCan";
+import type { AuthzAction } from "@/composables/useCan";
 
 // import alertList from "./alerts";
 
@@ -2982,6 +3001,13 @@ export default defineComponent({
         })
         .catch((err) => {
           if (err.response?.status == 403) {
+            noteWriteDenied(
+              err,
+              "alert",
+              selectedDelete.value.alert_id,
+              "delete",
+              alertFolderId(selectedDelete.value),
+            );
             return;
           }
           if (err.response?.status === 409 && err.response?.data?.code === "child_referenced") {
@@ -3619,8 +3645,7 @@ export default defineComponent({
       try {
         const isResuming = action === "resume";
 
-        // Filter alerts based on action
-        const alertsToToggle = selectedAlerts.value.filter((alert: any) =>
+        const alertsToToggle = bulkEditSplit.value.allowed.filter((alert: any) =>
           isResuming ? !alert.enabled : alert.enabled,
         );
 
@@ -3685,6 +3710,27 @@ export default defineComponent({
       confirmBulkDelete.value = true;
     };
 
+    const { can, noteWriteDenied } = useCan();
+    const alertFolderId = (row: any): string =>
+      row?.folder_name?.id || activeFolderId.value || "default";
+    const canAlert = (row: any, action: AuthzAction): boolean =>
+      can("alert", row.alert_id, action, alertFolderId(row));
+    const bulkDeleteSplit = computed(() =>
+      splitByPermission(selectedAlerts.value, (row: any) => canAlert(row, "delete")),
+    );
+    const bulkDeleteSkippedNames = computed(() =>
+      skippedNamesText(
+        t,
+        bulkDeleteSplit.value.skipped.map((row: any) => row.name),
+      ),
+    );
+    const bulkEditSplit = computed(() =>
+      splitByPermission(selectedAlerts.value, (row: any) => canAlert(row, "edit")),
+    );
+    const showBulkEdit = computed(
+      () => !bulkEditSplit.value.skipped.length || bulkEditSplit.value.allowed.length > 0,
+    );
+
     const bulkDeleteAlerts = async () => {
       bulkDeleteLoading.value = true;
       const dismiss = toast({
@@ -3703,9 +3749,8 @@ export default defineComponent({
           return;
         }
 
-        // Extract alert ids
         const payload = {
-          ids: selectedAlerts.value.map((a: any) => a.alert_id),
+          ids: bulkDeleteSplit.value.allowed.map((a: any) => a.alert_id),
         };
 
         const response = await alertsService.bulkDelete(
@@ -3842,6 +3887,11 @@ export default defineComponent({
     ]);
 
     return {
+      canAlert,
+      bulkDeleteSplit,
+      bulkEditSplit,
+      showBulkEdit,
+      bulkDeleteSkippedNames,
       downtimesEnabled,
       muteDialogOpen,
       muteSelection,

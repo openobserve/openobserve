@@ -17,6 +17,26 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { http, HttpResponse } from "msw";
+// Per-test permission answers keyed "<action>:<alert_id>"; anything not listed is allowed.
+const perm = vi.hoisted(() => ({ denied: new Set<string>() }));
+vi.mock("@/composables/useCan", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  // Reactive so a denial added after mount re-renders the rows.
+  const { reactive } = await import("vue");
+  perm.denied = reactive(new Set<string>());
+  const denied = perm.denied;
+  const status = (_r: string, id: string, action: string) =>
+    denied.has(`${action}:${id}`) ? "denied" : "allowed";
+  return {
+    ...actual,
+    useCan: () => ({
+      status,
+      can: (r: string, id: string, action: string) => status(r, id, action) === "allowed",
+      noteWriteDenied: () => {},
+    }),
+  };
+});
+
 // Mock aws-exports so isEnterprise / isCloud can be controlled per-test
 vi.mock("@/aws-exports", () => ({
   default: {
@@ -726,6 +746,63 @@ describe("AlertList - filtering behaviors", () => {
     await flushPromises();
     expect(wrapper.vm.filteredResults.every((r: any) => r.name.includes("Scheduled"))).toBe(true);
   }, 10000);
+});
+
+describe("AlertList - permissions", () => {
+  afterEach(() => perm.denied.clear());
+
+  it("hides pause/resume and edit on a row the user cannot edit", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const sel = (name: string, action: string) => `[data-test="alert-list-${name}-${action}"]`;
+    const shown = await vi.waitFor(async () => {
+      await flushPromises();
+      const row = wrapper.vm.filteredResults.find((r: any) =>
+        wrapper.find(sel(r.name, "pause-start-alert")).exists(),
+      );
+      expect(row).toBeTruthy();
+      return row;
+    });
+    expect(wrapper.find(sel(shown.name, "update-alert")).exists()).toBe(true);
+
+    perm.denied.add(`edit:${shown.alert_id}`);
+    await flushPromises();
+
+    expect(wrapper.find(sel(shown.name, "pause-start-alert")).exists()).toBe(false);
+    expect(wrapper.find(sel(shown.name, "update-alert")).exists()).toBe(false);
+    expect(wrapper.find(sel(shown.name, "clone-alert")).exists()).toBe(true);
+  });
+
+  it("bulk pause sends only the alerts the user may edit", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const enabled = wrapper.vm.filteredResults.filter((r: any) => r.enabled).slice(0, 2);
+    expect(enabled).toHaveLength(2);
+    perm.denied.add(`edit:${enabled[1].alert_id}`);
+    wrapper.vm.selectedAlertIds = enabled.map((r: any) => r.alert_id);
+    await flushPromises();
+
+    await wrapper.vm.bulkToggleAlerts("pause");
+    await flushPromises();
+    expect(alertsSvc.bulkToggleState).toHaveBeenCalledWith(expect.anything(), false, {
+      ids: [enabled[0].alert_id],
+      names: [enabled[0].name],
+    });
+  });
+
+  it("names the skipped alerts under a partial bulk-delete confirm", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const rows = wrapper.vm.filteredResults.slice(0, 2);
+    perm.denied.add(`delete:${rows[1].alert_id}`);
+    wrapper.vm.selectedAlertIds = rows.map((r: any) => r.alert_id);
+    await flushPromises();
+
+    expect(wrapper.vm.bulkDeleteSplit.allowed.map((r: any) => r.alert_id)).toEqual([
+      rows[0].alert_id,
+    ]);
+    expect(wrapper.vm.bulkDeleteSkippedNames).toBe(`Skipped: ${rows[1].name}`);
+  });
 });
 
 // 4. Actions: toggle, delete, clone, edit, export
