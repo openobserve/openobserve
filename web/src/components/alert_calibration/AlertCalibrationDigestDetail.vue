@@ -200,6 +200,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { b64EncodeUnicode } from "@/utils/formatters";
+import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import AlertCalibrationFindingCard from "./AlertCalibrationFindingCard.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
@@ -221,6 +222,7 @@ import { RULE_META } from "./rules";
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
 
 const { t } = useI18nTyped();
+useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
 const { search, orgId } = useDigestSearch();
 

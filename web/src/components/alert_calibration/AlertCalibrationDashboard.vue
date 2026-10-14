@@ -143,6 +143,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
+import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
 import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import AlertCalibrationPanel from "./AlertCalibrationPanel.vue";
@@ -169,6 +170,7 @@ interface RuleTally {
 }
 
 const { t } = useI18nTyped();
+useLeaveIfAlertCalibrationOff("alertList");
 const { search, orgId } = useDigestSearch();
 
 const configQuery = useQuery(() => alertCalibrationConfigQuery(orgId.value));

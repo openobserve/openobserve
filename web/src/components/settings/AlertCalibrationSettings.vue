@@ -106,10 +106,12 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { errorMessage } from "@/services/alert_calibration";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
 import { useRequestAlertCalibrationRun } from "@/composables/alertCalibration/useRequestAlertCalibrationRun";
+import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import { DIGEST_STREAM } from "@/components/alert_calibration/digests";
 import AlertCalibrationSettingsForm from "./AlertCalibrationSettingsForm.vue";
 
 const { t } = useI18nTyped();
+useLeaveIfAlertCalibrationOff("general");
 const router = useRouter();
 const orgId = useOrgId();
 

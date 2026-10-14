@@ -221,6 +221,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { alertCalibrationConfigQuery } from "@/services/alert_calibration.queries";
+import { useLeaveIfAlertCalibrationOff } from "@/composables/alertCalibration/useAlertCalibrationEnabled";
 import AlertCalibrationTabs from "./AlertCalibrationTabs.vue";
 import AlertCalibrationActions from "./AlertCalibrationActions.vue";
 import { useDigestSearch, useLatestRead } from "./useDigestSearch";
@@ -242,6 +243,7 @@ import { COVERAGE_BADGE, formatMinutes } from "./format";
 type Scope = "all" | "findings" | "gaps";
 
 const { t } = useI18nTyped();
+useLeaveIfAlertCalibrationOff("alertList");
 const router = useRouter();
 const { search: searchDigests, orgId } = useDigestSearch();
 

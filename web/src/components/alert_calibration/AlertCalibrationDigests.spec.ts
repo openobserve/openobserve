@@ -22,6 +22,11 @@ import alertCalibration from "@/services/alert_calibration";
 import AlertCalibrationDigests from "./AlertCalibrationDigests.vue";
 import type { RunRow } from "./digests";
 
+vi.mock("@/aws-exports", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/aws-exports")>();
+  return { default: { ...actual.default, isEnterprise: "true" } };
+});
+
 vi.mock("@/services/alert_calibration", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/services/alert_calibration")>();
   return {
@@ -74,6 +79,7 @@ const mountPage = async () => {
         name: "alertCalibrationSettings",
         component: { template: "<div />" },
       },
+      { path: "/alerts", name: "alertList", component: { template: "<div />" } },
     ],
   });
   await router.push({ name: "alertCalibration", query: { org_identifier: "default" } });
@@ -92,6 +98,11 @@ const mountPage = async () => {
 describe("AlertCalibrationDigests", () => {
   beforeEach(() => {
     queryClient.clear();
+    store.state.zoConfig = {
+      ...store.state.zoConfig,
+      version: "v1",
+      alert_calibration_enabled: true,
+    };
     vi.mocked(alertCalibration.getConfig).mockResolvedValue({
       data: {
         id: "c1",
@@ -141,5 +152,13 @@ describe("AlertCalibrationDigests", () => {
       windowEnd: String(latest.window_end),
     });
     wrapper.unmount();
+  });
+
+  it("leaves for the alert list once /config says the deployment has it off", async () => {
+    vi.mocked(alertCalibration.searchDigests).mockResolvedValue([]);
+    store.state.zoConfig = { ...store.state.zoConfig, alert_calibration_enabled: false };
+    const page = await mountPage();
+    expect(page.router.currentRoute.value.name).toBe("alertList");
+    page.unmount();
   });
 });
