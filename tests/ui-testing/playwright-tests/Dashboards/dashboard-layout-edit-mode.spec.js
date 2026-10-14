@@ -11,7 +11,6 @@ const {
   PANEL_B,
   createLayoutDashboard,
   getSavedLayouts,
-  deleteLayoutDashboard,
   trackDashboardPuts,
 } = require("./utils/layoutEditFixtures.js");
 
@@ -39,10 +38,6 @@ test.describe("Dashboard layout edit mode testcases", () => {
     await pm.dashboardZoomDrag.waitForPanelTile(panelIds[0]);
     await pm.dashboardZoomDrag.waitForPanelTile(panelIds[1]);
     testLogger.info("Layout dashboard opened", { dashboardId, panelIds });
-  });
-
-  test.afterEach(async () => {
-    await deleteLayoutDashboard(dashboardId);
   });
 
   const onScreenBox = async (panelId) => toBox(await pm.dashboardZoomDrag.readPanelLayout(panelId));

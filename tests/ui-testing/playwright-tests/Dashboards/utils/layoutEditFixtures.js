@@ -95,14 +95,6 @@ async function getSavedLayouts(dashboardId) {
   return layouts;
 }
 
-async function deleteLayoutDashboard(dashboardId) {
-  if (!dashboardId) return;
-  await fetch(`${BASE}/api/${ORG()}/dashboards/${dashboardId}?folder=default`, {
-    method: "DELETE",
-    headers: getAuthHeaders(),
-  }).catch(() => {});
-}
-
 function trackDashboardPuts(page) {
   const state = { count: 0 };
   page.on("request", (req) => {
@@ -117,6 +109,5 @@ module.exports = {
   SECOND_TAB_ID,
   createLayoutDashboard,
   getSavedLayouts,
-  deleteLayoutDashboard,
   trackDashboardPuts,
 };
