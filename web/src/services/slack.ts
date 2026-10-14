@@ -63,6 +63,9 @@ export interface SlackRequestOptions {
   silentForbidden?: boolean;
 }
 
+// The link pages and the connect proof render every refusal themselves.
+const RENDERS_FORBIDDEN: SlackRequestOptions = { silentForbidden: true };
+
 const base = (org: string) => `/api/${encodeURIComponent(org)}/slack`;
 
 const installation = (org: string, id: string) =>
@@ -122,7 +125,11 @@ const slack = {
     http().post<SlackConnectionStartResponse>(`${installation(org, id)}/connection/start`, body),
 
   confirmConnection: (org: string, body: SlackOidcCallbackRequest) =>
-    http().post<SlackConnectionConfirmResponse>(`${base(org)}/connection/confirm`, body),
+    http().post<SlackConnectionConfirmResponse>(
+      `${base(org)}/connection/confirm`,
+      body,
+      RENDERS_FORBIDDEN,
+    ),
 
   connectInstallation: (org: string, id: string, body: SlackConnectRequest) =>
     http().post<SlackConnectResponse>(`${installation(org, id)}/connection`, body),
@@ -172,13 +179,22 @@ const slack = {
     http().post<SlackLinkRequestStartResponse>(
       `${base(org)}/link-requests/${encodeURIComponent(requestId)}/start`,
       body,
+      RENDERS_FORBIDDEN,
     ),
 
   confirmLinkRequest: (org: string, body: SlackOidcCallbackRequest) =>
-    http().post<SlackLinkRequestConfirmResponse>(`${base(org)}/link-requests/confirm`, body),
+    http().post<SlackLinkRequestConfirmResponse>(
+      `${base(org)}/link-requests/confirm`,
+      body,
+      RENDERS_FORBIDDEN,
+    ),
 
   resendLinkRequest: (org: string, requestId: string, body: SlackSignedRequest) =>
-    http().post<void>(`${base(org)}/link-requests/${encodeURIComponent(requestId)}/resend`, body),
+    http().post<void>(
+      `${base(org)}/link-requests/${encodeURIComponent(requestId)}/resend`,
+      body,
+      RENDERS_FORBIDDEN,
+    ),
 
   getMyLinks: (org: string) => http().get<SlackMyLinksResponse>(`${base(org)}/links/me`),
 

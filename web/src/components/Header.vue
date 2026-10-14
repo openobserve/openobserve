@@ -452,6 +452,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdownItem>
               <ODropdownSeparator />
 
+              <template v-if="linkedAccountsVisible">
+                <ODropdownItem
+                  data-test="menu-link-linked-accounts-item"
+                  @select="showLinkedAccounts = true"
+                >
+                  <template #icon-left>
+                    <OIcon size="xs" name="link" class="padding-none" />
+                  </template>
+                  {{ t("menu.linkedAccounts") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+              </template>
+
               <!-- Logout -->
               <ODropdownItem
                 data-test="menu-link-logout-item"
@@ -472,6 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Enterprise Upgrade Dialog -->
     <EnterpriseUpgradeDialog v-model="showEnterpriseDialog" />
+    <LinkedAccountsDialog v-if="linkedAccountsVisible" v-model:open="showLinkedAccounts" />
   </div>
 </template>
 
@@ -485,10 +499,12 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
+import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
+import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
@@ -504,6 +520,7 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
+    LinkedAccountsDialog,
     OButton,
     OIcon,
     OTooltip,
@@ -704,6 +721,17 @@ export default defineComponent({
       () => !aiAccess.value.allowed || Boolean(props.store.state.zoConfig.ai_enabled),
     );
 
+    // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
+    const linkedAccountsVisible = computed(
+      () =>
+        checkFeatureAccess("slack", {
+          isEnterprise: props.config.isEnterprise === "true",
+          isCloud: props.config.isCloud === "true",
+          rbac: props.store.state.zoConfig?.rbac_enabled !== false,
+        }).allowed && readSlackOrgConfig(props.store.state.zoConfig).enabled,
+    );
+    const showLinkedAccounts = ref(false);
+
     // Computed property for enterprise button text based on deployment type
     const enterpriseButtonText = computed(() => {
       const isEnterprise = props.config.isEnterprise === "true";
@@ -829,6 +857,8 @@ export default defineComponent({
       toggleAIChat,
       aiAccess,
       aiButtonVisible,
+      linkedAccountsVisible,
+      showLinkedAccounts,
       openSlack,
       navigateToOpenAPI,
       navigateToDocs,

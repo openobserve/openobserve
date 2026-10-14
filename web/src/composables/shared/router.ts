@@ -272,6 +272,31 @@ const useRoutes = () => {
         titleKey: "routeTitles.slackOAuthCallback",
       },
     },
+    // The three Slack pages below need a session: signed out, the guard saves the URL and returns after login.
+    {
+      path: "/slack/link",
+      name: "slackLink",
+      component: () => import("@/views/SlackLink.vue"),
+      meta: {
+        titleKey: "routeTitles.slackLink",
+      },
+    },
+    {
+      path: "/slack/link/callback",
+      name: "slackLinkCallback",
+      component: () => import("@/views/SlackLinkCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackLinkCallback",
+      },
+    },
+    {
+      path: "/slack/connect/callback",
+      name: "slackConnectCallback",
+      component: () => import("@/views/SlackConnectCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackConnectCallback",
+      },
+    },
   ];
 
   const homeChildRoutes = [
