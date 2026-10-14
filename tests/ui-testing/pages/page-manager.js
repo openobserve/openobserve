@@ -34,6 +34,7 @@ import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { AlertSaveQueryModePage } from "./alertsPages/alertSaveQueryModePage.js";
+import { AlertNoDestinationPage } from "./alertsPages/alertNoDestinationPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
 import { IncidentsPage } from "./alertsPages/incidentsPage.js";
 import { SloListPage } from "./sloPages/sloListPage.js";
@@ -201,6 +202,7 @@ class PageManager {
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.alertSaveQueryModePage = new AlertSaveQueryModePage(page);
+    this.alertNoDestinationPage = new AlertNoDestinationPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
     this.incidentsPage = new IncidentsPage(page);
 
