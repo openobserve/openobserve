@@ -13,19 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, describe, expect, it } from "vitest";
-import { mount, type VueWrapper } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mount, type DOMWrapper, type VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import FunnelLayoutRail from "./FunnelLayoutRail.vue";
 import type { FunnelResult } from "@/utils/rum/productAnalyticsModel";
 import type { FunnelDef, StepRef } from "@/utils/rum/productAnalyticsQueries";
+
+vi.mock("@/composables/rum/useStepOptions", async (importOriginal) => {
+  const { useStepOptionsMock } = await import("@/utils/rum/__fixtures__/stepOptionsMock");
+  return {
+    ...(await importOriginal<object>()),
+    default: useStepOptionsMock,
+    useStepOptions: useStepOptionsMock,
+  };
+});
+
+import { resetStepOptions } from "@/utils/rum/__fixtures__/stepOptionsMock";
+import FunnelLayoutRail from "./FunnelLayoutRail.vue";
 
 const store = createStore({
   state: { selectedOrganization: { identifier: "org1" }, timezone: "UTC", zoConfig: {} },
 });
 // Follows `open` like the real popover, so a controlled popover can be driven from its trigger.
 const popoverStub = {
-  props: ["open"],
+  props: ["open", "side"],
   emits: ["update:open"],
   data: () => ({ inner: false }),
   computed: {
@@ -48,6 +59,7 @@ const draggableStub = {
   template: "<div><slot /></div>",
 };
 const IDLE = { status: "idle", rows: [], error: null } as never;
+const COLLAPSED_KEY = "o2.rum.analytics.funnelRailCollapsed";
 const DEF = {
   steps: [
     { kind: "p", key: "/web", f: { errored: true } },
@@ -58,6 +70,8 @@ const DEF = {
   breakdown: null,
   x: [{ step: { kind: "p", key: "/x" }, a: 1, b: 2 }],
 } as FunnelDef;
+const popoverAround = (w: VueWrapper, testId: string) =>
+  w.findAllComponents(popoverStub).find((c) => c.find(`[data-test="${testId}"]`).exists());
 
 describe("FunnelLayoutRail", () => {
   let wrapper: VueWrapper | null = null;
@@ -247,6 +261,132 @@ describe("FunnelLayoutRail", () => {
       mountRail({ def }).find('[data-test="rum-analytics-funnel-rail-step-0"]').text(),
     ).toContain("from google.com");
   });
+
+  describe("collapsible side panel", () => {
+    const RAIL = '[data-test="rum-analytics-funnel-layout-rail"]';
+    const SECTIONS = '[data-test="rum-analytics-funnel-rail-sections"]';
+    const STRIP = '[data-test="rum-analytics-funnel-rail-collapsed"]';
+    const TOGGLE = '[data-test="rum-analytics-funnel-rail-collapse-btn"]';
+    const EXPANDED_GRID = "lg:grid-cols-[22rem_minmax(0,1fr)]";
+    const COLLAPSED_GRID = "lg:grid-cols-[auto_minmax(0,1fr)]";
+    const toggleIn = (w: VueWrapper | DOMWrapper<Element>) => {
+      const toggle = w.find(TOGGLE);
+      expect(toggle.exists()).toBe(true);
+      return toggle;
+    };
+
+    beforeEach(() => {
+      localStorage.removeItem(COLLAPSED_KEY);
+    });
+
+    afterEach(() => {
+      localStorage.removeItem(COLLAPSED_KEY);
+    });
+
+    it("mounts expanded by default", () => {
+      const w = mountRail();
+      expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
+      expect(toggleIn(w).attributes("aria-label")).toBe("Collapse side panel");
+      expect(toggleIn(w).element.closest('[class~="max-lg:hidden"]')).not.toBeNull();
+      expect(w.find(STRIP).exists()).toBe(false);
+      const sections = w.find(SECTIONS);
+      expect(sections.exists()).toBe(true);
+      expect(sections.classes()).not.toContain("lg:hidden");
+    });
+
+    it("clicking the toggle collapses the panel to a strip and remembers it", async () => {
+      const w = mountRail();
+      await toggleIn(w).trigger("click");
+      expect(w.find(SECTIONS).classes()).toContain("lg:hidden");
+      const strip = w.find(STRIP);
+      expect(strip.exists()).toBe(true);
+      expect(toggleIn(strip).attributes("aria-expanded")).toBe("false");
+      expect(localStorage.getItem(COLLAPSED_KEY)).toBe("1");
+      const grid = w.find(RAIL).classes();
+      expect(grid).toContain(COLLAPSED_GRID);
+      expect(grid).not.toContain(EXPANDED_GRID);
+    });
+
+    it("clicking the toggle again expands the panel and remembers that too", async () => {
+      const w = mountRail();
+      await toggleIn(w).trigger("click");
+      await toggleIn(w.find(STRIP)).trigger("click");
+      expect(w.find(STRIP).exists()).toBe(false);
+      expect(w.find(SECTIONS).classes()).not.toContain("lg:hidden");
+      expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
+      expect(localStorage.getItem(COLLAPSED_KEY)).toBe("0");
+      const grid = w.find(RAIL).classes();
+      expect(grid).toContain(EXPANDED_GRID);
+      expect(grid).not.toContain(COLLAPSED_GRID);
+    });
+
+    it("mounts collapsed when the panel was collapsed last time", () => {
+      localStorage.setItem(COLLAPSED_KEY, "1");
+      const w = mountRail();
+      expect(w.find(STRIP).exists()).toBe(true);
+      expect(toggleIn(w.find(STRIP)).attributes("aria-expanded")).toBe("false");
+      expect(toggleIn(w.find(STRIP)).attributes("aria-label")).toBe("Expand side panel");
+      expect(w.find(STRIP).classes()).toContain("max-lg:hidden");
+      expect(w.find(SECTIONS).classes()).toContain("lg:hidden");
+    });
+
+    it("keeps keyboard focus on the toggle across a collapse and an expand", async () => {
+      const w = mountRail();
+      await toggleIn(w).trigger("click");
+      expect(document.activeElement).toBe(toggleIn(w.find(STRIP)).element);
+      await toggleIn(w.find(STRIP)).trigger("click");
+      expect(document.activeElement).toBe(toggleIn(w).element);
+    });
+
+    it("keeps the steps table card while collapsed", () => {
+      localStorage.setItem(COLLAPSED_KEY, "1");
+      const w = mountRail();
+      expect(w.find(STRIP).exists()).toBe(true);
+      expect(w.find('[data-test="rum-analytics-funnel-card"]').exists()).toBe(true);
+      expect(w.find('[data-test="rum-analytics-funnel-steps-table"]').exists()).toBe(true);
+    });
+
+    it("keeps the add-step box and an open step editor across a collapse", async () => {
+      const w = mountRail();
+      await w.find('[data-test="rum-analytics-funnel-rail-add-step-btn"]').trigger("click");
+      await w.find('[data-test="rum-analytics-funnel-rail-step-0-filters"]').trigger("click");
+      const filters = '[data-test="rum-analytics-funnel-rail-step-0-filters"]';
+      expect(w.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()).toBe(true);
+      expect(w.find(filters).attributes("aria-expanded")).toBe("true");
+      await toggleIn(w).trigger("click");
+      expect(w.find(SECTIONS).classes()).toContain("lg:hidden");
+      expect(w.find('[data-test="rum-analytics-funnel-rail-add-step"]').exists()).toBe(true);
+      expect(w.find(filters).attributes("aria-expanded")).toBe("true");
+    });
+
+    it("mounts expanded when localStorage throws", () => {
+      const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+        throw new Error("blocked");
+      });
+      try {
+        const w = mountRail();
+        expect(toggleIn(w).attributes("aria-expanded")).toBe("true");
+        expect(w.find(STRIP).exists()).toBe(false);
+        expect(w.find(SECTIONS).classes()).not.toContain("lg:hidden");
+      } finally {
+        getItem.mockRestore();
+      }
+    });
+
+    it("still collapses when localStorage cannot be written", async () => {
+      const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+        throw new Error("blocked");
+      });
+      try {
+        const w = mountRail();
+        await toggleIn(w).trigger("click");
+        expect(w.find(STRIP).exists()).toBe(true);
+        expect(w.find(SECTIONS).classes()).toContain("lg:hidden");
+      } finally {
+        setItem.mockRestore();
+      }
+    });
+  });
 });
 
 // Ported from the removed inline layout: the exclusion and step-option parts are shared, the rail is now their only host.
@@ -312,15 +452,23 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     return wrapper;
   };
 
-  const exclusionPicker = (w: VueWrapper) =>
-    w
-      .findAllComponents({ name: "StepPicker" })
-      .find((c) => c.props("dataTest") === "rum-analytics-funnel-exclusion-select");
-
-  const pickExclusion = async (w: VueWrapper, step: StepRef) => {
-    await w.find('[data-test="rum-analytics-funnel-add-exclusion-btn"]').trigger("click");
-    exclusionPicker(w)!.vm.$emit("update:modelValue", step);
-    await w.vm.$nextTick();
+  const ADD = "rum-analytics-funnel-add-exclusion-btn";
+  const PICKER = "rum-analytics-funnel-exclusion-picker";
+  const picker = (w: VueWrapper) => w.find(`[data-test="${PICKER}"]`);
+  const chip = (w: VueWrapper, j: number) =>
+    w.find(`[data-test="rum-analytics-funnel-exclusion-${j}"]`);
+  const inPicker = (w: VueWrapper, id: string) => {
+    const el = w.find(`[data-test="${PICKER}-${id}"]`);
+    expect(el.exists()).toBe(true);
+    return el;
+  };
+  const pickRow = async (w: VueWrapper, key: string) =>
+    inPicker(w, `step-p:${key}`).trigger("click");
+  const applyPicker = async (w: VueWrapper) => inPicker(w, "apply").trigger("click");
+  const addExclusion = async (w: VueWrapper, key: string) => {
+    await w.find(`[data-test="${ADD}"]`).trigger("click");
+    await pickRow(w, key);
+    await applyPicker(w);
   };
 
   const lastDef = (w: VueWrapper) => w.emitted("update:def")?.at(-1)?.[0] as FunnelDef | undefined;
@@ -329,6 +477,17 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     w.findComponent(draggableStub).vm.$emit("update:modelValue", order);
     await w.vm.$nextTick();
   };
+
+  beforeEach(() =>
+    resetStepOptions([
+      { label: "Pages", header: true, value: "header:p" },
+      ...["/web", "/web/logs", "/web/billings", "/web/ingestion", "/x"].map((key) => ({
+        label: key,
+        value: `p:${key}`,
+        icon: "article",
+      })),
+    ]),
+  );
 
   afterEach(() => {
     wrapper?.unmount();
@@ -346,104 +505,23 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     expect(w.find('[data-test="rum-analytics-funnel-suggestions"]').exists()).toBe(false);
   });
 
-  it("the picker asks for a page or click", async () => {
-    const w = mountLayout(defWith([]));
-    await w.find('[data-test="rum-analytics-funnel-add-exclusion-btn"]').trigger("click");
-    expect(exclusionPicker(w)!.props("placeholder")).toBe("Pick a page or click");
-  });
-
   it("a new exclusion spans step 1 to the last step", async () => {
     const w = mountLayout(defWith([]));
-    await pickExclusion(w, { kind: "p", key: "/web/ingestion" });
+    await addExclusion(w, "/web/ingestion");
     expect(lastDef(w)!.x).toEqual([{ step: { kind: "p", key: "/web/ingestion" }, a: 1, b: 3 }]);
   });
 
-  it("a row over the whole funnel says so, a narrower one does not", () => {
+  it("a chip over the whole funnel says so, a narrower one names its steps", () => {
     const w = mountLayout(
       defWith([
         { step: { kind: "p", key: "/x" }, a: 1, b: 3 },
         { step: { kind: "p", key: "/y" }, a: 2, b: 3 },
       ]),
     );
-    expect(w.find('[data-test="rum-analytics-funnel-exclusion-0-whole"]').exists()).toBe(true);
-    expect(w.find('[data-test="rum-analytics-funnel-exclusion-1-whole"]').exists()).toBe(false);
-    expect(w.find('[data-test="rum-analytics-funnel-exclusion-0"]').text()).toMatch(
-      /Did not see.*\/x.*between step 1 and step 3/,
-    );
-  });
-
-  it("no validation shows before a pick", async () => {
-    const w = mountLayout(defWith([]));
-    await w.find('[data-test="rum-analytics-funnel-add-exclusion-btn"]').trigger("click");
-    expect(w.find('[role="alert"]').exists()).toBe(false);
-  });
-
-  it("a page strictly inside the span shows why right after the pick and is not applied", async () => {
-    const w = mountLayout(defWith([]));
-    await pickExclusion(w, { kind: "p", key: "/web/logs" });
-    expect(w.emitted("update:def")).toBeUndefined();
-    const invalid = w.find('[data-test="rum-analytics-funnel-exclusion-pending-invalid"]');
-    expect(invalid.text()).toContain("step 3 already did this at step 2");
-  });
-
-  it("narrowing a held row's range to a valid span applies it", async () => {
-    const w = mountLayout(defWith([]));
-    await pickExclusion(w, { kind: "p", key: "/web/logs" });
-    await w.find('[data-test="rum-analytics-funnel-exclusion-pending-edit"]').trigger("click");
-    w.findAllComponents({ name: "OSelect" })
-      .find((c) => c.attributes("data-test") === "rum-analytics-funnel-exclusion-pending-to")!
-      .vm.$emit("update:modelValue", 2);
-    await w.vm.$nextTick();
-    expect(lastDef(w)!.x).toEqual([{ step: { kind: "p", key: "/web/logs" }, a: 1, b: 2 }]);
-    expect(w.find('[data-test="rum-analytics-funnel-exclusion-pending"]').exists()).toBe(false);
-  });
-
-  it("step a's and step b's own pages are valid for a between row", async () => {
-    const w = mountLayout(defWith([]));
-    await pickExclusion(w, { kind: "p", key: "/web" });
-    await pickExclusion(w, { kind: "p", key: "/web/billings" });
-    const emitted = w.emitted("update:def")!.map((e) => (e[0] as FunnelDef).x);
-    expect(emitted).toHaveLength(2);
-    expect(w.find('[role="alert"]').exists()).toBe(false);
-  });
-
-  it("switching a row to within N s on step a's own page is refused with a reason", async () => {
-    const w = mountLayout(defWith([{ step: { kind: "p", key: "/web" }, a: 1, b: 3 }]));
-    await w.find('[data-test="rum-analytics-funnel-exclusion-0-edit"]').trigger("click");
-    w.find('[data-test="rum-analytics-funnel-exclusion-0"]')
-      .findComponent({ name: "OToggleGroup" })
-      .vm.$emit("update:modelValue", "within");
-    await w.vm.$nextTick();
-    expect(w.emitted("update:def")).toBeUndefined();
-    expect(w.find('[data-test="rum-analytics-funnel-exclusion-0-invalid"]').text()).toContain(
-      "page of step 1",
-    );
-  });
-
-  it("switching a within row on the last step of a 2-step funnel to between stays in range", async () => {
-    const w = mountLayout(
-      defWith([{ step: { kind: "p", key: "/x" }, a: 2, withinMs: 5000 }], steps.slice(0, 2)),
-    );
-    await w.find('[data-test="rum-analytics-funnel-exclusion-0-edit"]').trigger("click");
-    w.find('[data-test="rum-analytics-funnel-exclusion-0"]')
-      .findComponent({ name: "OToggleGroup" })
-      .vm.$emit("update:modelValue", "between");
-    await w.vm.$nextTick();
-    expect(lastDef(w)!.x).toEqual([{ step: { kind: "p", key: "/x" }, a: 1, b: 2 }]);
-  });
-
-  it("a seconds value that rounds to 0 ms is not applied", async () => {
-    const w = mountLayout(defWith([{ step: { kind: "p", key: "/x" }, a: 2, withinMs: 5000 }]));
-    await w.find('[data-test="rum-analytics-funnel-exclusion-0-edit"]').trigger("click");
-    const seconds = w
-      .find('[data-test="rum-analytics-funnel-exclusion-0"]')
-      .findComponent({ name: "OInput" });
-    seconds.vm.$emit("update:modelValue", "0.0003");
-    await w.vm.$nextTick();
-    expect(w.emitted("update:def")).toBeUndefined();
-    seconds.vm.$emit("update:modelValue", "2");
-    await w.vm.$nextTick();
-    expect(lastDef(w)!.x).toEqual([{ step: { kind: "p", key: "/x" }, a: 2, withinMs: 2000 }]);
+    expect(chip(w, 0).text()).toMatch(/\/x over the whole funnel/);
+    expect(chip(w, 0).text()).not.toContain("between step");
+    expect(chip(w, 1).text()).toMatch(/\/y between step 2 and step 3/);
+    expect(chip(w, 1).text()).not.toContain("whole funnel");
   });
 
   it("removed counts show as a chip on the row and a hatched segment on step b's bar", () => {
@@ -533,5 +611,206 @@ describe("FunnelLayoutRail: exclusion steps and step options", () => {
     expect(field.exists()).toBe(true);
     await field.trigger("click");
     expect(w.emitted("filter-values")).toEqual([["usr_email"]]);
+  });
+
+  describe("exclusion steps add through a popover", () => {
+    const SPAN_1_2 = { step: { kind: "p", key: "/x" }, a: 1, b: 2 };
+
+    it("the exclusion + opens a popover like Filter all steps, on the picker's list", async () => {
+      const w = mountLayout(defWith([]));
+      expect(picker(w).exists()).toBe(false);
+      await w.find(`[data-test="${ADD}"]`).trigger("click");
+      const popover = popoverAround(w, ADD);
+      expect(popover).toBeDefined();
+      expect(popover!.find(`[data-test="${PICKER}"]`).exists()).toBe(true);
+      expect(w.findAll(`[data-test="${PICKER}"]`)).toHaveLength(1);
+      expect(w.findComponent(`[data-test="${ADD}"]`).props("active")).toBe(true);
+      expect(picker(w).find(`[data-test="${PICKER}-step-p:/web/ingestion"]`).exists()).toBe(true);
+      expect(picker(w).find(`[data-test="${PICKER}-apply"]`).exists()).toBe(false);
+    });
+
+    it("the exclusion popover opens to the right of the rail, like the filter popover", () => {
+      const w = mountLayout(defWith([]));
+      const filter = popoverAround(w, "rum-analytics-funnel-add-filter-btn");
+      const exclusion = popoverAround(w, ADD);
+      expect(filter?.props("side")).toBe("right");
+      expect(exclusion?.props("side")).toBe("right");
+      expect(exclusion?.attributes("content-class")).toBe(filter?.attributes("content-class"));
+    });
+
+    it("applying from the picker appends the exclusion and closes the popover", async () => {
+      const w = mountLayout(defWith([SPAN_1_2]));
+      await addExclusion(w, "/web/ingestion");
+      expect(w.emitted("update:def")).toHaveLength(1);
+      expect(lastDef(w)!.x).toEqual([
+        SPAN_1_2,
+        { step: { kind: "p", key: "/web/ingestion" }, a: 1, b: 3 },
+      ]);
+      expect(popoverAround(w, ADD)?.props("open")).toBe(false);
+      expect(picker(w).exists()).toBe(false);
+      expect(w.findComponent(`[data-test="${ADD}"]`).props("active")).toBe(false);
+    });
+
+    it("Cancel and closing the popover drop a staged edit", async () => {
+      const w = mountLayout(defWith([SPAN_1_2]));
+      const drops = [
+        async () => inPicker(w, "cancel").trigger("click"),
+        async () => {
+          popoverAround(w, ADD)!.vm.$emit("update:open", false);
+          await w.vm.$nextTick();
+        },
+      ];
+      for (const drop of drops) {
+        await chip(w, 0).trigger("click");
+        expect(inPicker(w, "step").text()).toContain("/x");
+        w.findAllComponents({ name: "OSelect" })
+          .find((c) => c.attributes("data-test") === `${PICKER}-to`)!
+          .vm.$emit("update:modelValue", 3);
+        await w.vm.$nextTick();
+        await drop();
+        expect(picker(w).exists()).toBe(false);
+        expect(popoverAround(w, ADD)?.props("open")).toBe(false);
+        expect(w.emitted("update:def")).toBeUndefined();
+        expect(chip(w, 0).text()).toContain("between step 1 and step 2");
+      }
+    });
+
+    it("the popover reopens for a second add after the first closed it", async () => {
+      const w = mountLayout(defWith([]));
+      await addExclusion(w, "/web");
+      expect(popoverAround(w, ADD)?.props("open")).toBe(false);
+      await addExclusion(w, "/web/billings");
+      expect(popoverAround(w, ADD)?.props("open")).toBe(false);
+      expect(w.emitted("update:def")).toHaveLength(2);
+      expect(lastDef(w)!.x).toEqual([{ step: { kind: "p", key: "/web/billings" }, a: 1, b: 3 }]);
+    });
+
+    it("reads as Did not see / and chips, one per exclusion", () => {
+      const w = mountLayout(defWith([SPAN_1_2, { step: { kind: "p", key: "/y" }, a: 2, b: 3 }]));
+      const text = w.find('[data-test="rum-analytics-funnel-exclusions"]').text();
+      expect(text).toMatch(
+        /Did not see\s*Page\s*\/x between step 1 and step 2\s*and\s*Page\s*\/y between step 2 and step 3/,
+      );
+      expect(text.match(/Did not see/g)).toHaveLength(1);
+      expect(chip(w, 0).findComponent({ name: "OTooltip" }).props("content")).toBe(
+        "/x between step 1 and step 2",
+      );
+      w.unmount();
+      wrapper = mountLayout(defWith([SPAN_1_2, SPAN_1_2]));
+      expect(chip(wrapper, 1).exists()).toBe(true);
+    });
+
+    it("clicking a chip edits it in the picker; another step replaces it and keeps the range", async () => {
+      const w = mountLayout(defWith([SPAN_1_2, { step: { kind: "p", key: "/y" }, a: 2, b: 3 }]));
+      await chip(w, 0).trigger("click");
+      expect(popoverAround(w, ADD)?.props("open")).toBe(true);
+      expect(inPicker(w, "step").text()).toContain("/x");
+      const to = w
+        .findAllComponents({ name: "OSelect" })
+        .find((c) => c.attributes("data-test") === `${PICKER}-to`)!;
+      expect(to.props("modelValue")).toBe(2);
+      await inPicker(w, "back").trigger("click");
+      await pickRow(w, "/web/ingestion");
+      await applyPicker(w);
+      expect(w.emitted("update:def")).toHaveLength(1);
+      expect(lastDef(w)!.x).toEqual([
+        { step: { kind: "p", key: "/web/ingestion" }, a: 1, b: 2 },
+        { step: { kind: "p", key: "/y" }, a: 2, b: 3 },
+      ]);
+      expect(picker(w).exists()).toBe(false);
+    });
+
+    it("an edit starts from the chip even right after an add was cancelled", async () => {
+      const w = mountLayout(defWith([{ step: { kind: "p", key: "/y" }, a: 2, b: 3 }]));
+      await w.find(`[data-test="${ADD}"]`).trigger("click");
+      await pickRow(w, "/web/ingestion");
+      await inPicker(w, "cancel").trigger("click");
+      await chip(w, 0).trigger("click");
+      expect(inPicker(w, "step").text()).toContain("/y");
+      await applyPicker(w);
+      expect(lastDef(w)!.x).toEqual([{ step: { kind: "p", key: "/y" }, a: 2, b: 3 }]);
+    });
+
+    it("the + after a dropped edit starts a fresh add that appends", async () => {
+      const w = mountLayout(defWith([SPAN_1_2]));
+      const dropEdit = [
+        async () => inPicker(w, "cancel").trigger("click"),
+        async () => {
+          popoverAround(w, ADD)!.vm.$emit("update:open", false);
+          await w.vm.$nextTick();
+        },
+      ];
+      for (const [k, drop] of dropEdit.entries()) {
+        await chip(w, 0).trigger("click");
+        expect(inPicker(w, "step").text()).toContain("/x");
+        await drop();
+        expect(picker(w).exists()).toBe(false);
+        await w.find(`[data-test="${ADD}"]`).trigger("click");
+        expect(picker(w).find(`[data-test="${PICKER}-apply"]`).exists()).toBe(false);
+        await pickRow(w, "/web/ingestion");
+        await applyPicker(w);
+        expect(w.emitted("update:def")).toHaveLength(k + 1);
+        expect(lastDef(w)!.x).toEqual([
+          SPAN_1_2,
+          { step: { kind: "p", key: "/web/ingestion" }, a: 1, b: 3 },
+        ]);
+      }
+    });
+
+    it("the chip's remove control removes it and the removed count still renders", async () => {
+      const w = mountLayout(defWith([SPAN_1_2, { step: { kind: "p", key: "/y" }, a: 2, b: 3 }]), {
+        result: resultOf([100, 60, 30]),
+        state: OK,
+        removed: [12, null],
+      });
+      expect(w.find('[data-test="rum-analytics-funnel-exclusion-0-removed"]').text()).toBe(
+        "12 removed at step 2",
+      );
+      expect(w.find('[data-test="rum-analytics-funnel-exclusion-1-removed"]').exists()).toBe(false);
+      await chip(w, 0).find("button").trigger("click");
+      expect(w.emitted("update:def")).toHaveLength(1);
+      expect(lastDef(w)!.x).toEqual([{ step: { kind: "p", key: "/y" }, a: 2, b: 3 }]);
+      expect(picker(w).exists()).toBe(false);
+    });
+
+    it("a blocked + stays disabled and never opens the popover", async () => {
+      const w = mountLayout(defWith([], steps.slice(0, 1)));
+      const add = w.find(`[data-test="${ADD}"]`);
+      expect(add.attributes("disabled")).toBeDefined();
+      await add.trigger("click");
+      expect(picker(w).exists()).toBe(false);
+      expect(popoverAround(w, ADD)).toBeDefined();
+      expect(popoverAround(w, ADD)!.props("open")).toBe(false);
+    });
+
+    it("a chip still edits at the exclusion limit, where the + is blocked", async () => {
+      const five = Array.from({ length: 5 }, (_, k) => ({
+        step: { kind: "p", key: `/p${k}` },
+        a: 1,
+        b: 3,
+      }));
+      const w = mountLayout(defWith(five));
+      expect(w.find(`[data-test="${ADD}"]`).attributes("disabled")).toBeDefined();
+      await chip(w, 4).trigger("click");
+      expect(inPicker(w, "step").text()).toContain("/p4");
+      await inPicker(w, "back").trigger("click");
+      await pickRow(w, "/web/ingestion");
+      await applyPicker(w);
+      expect(w.emitted("update:def")).toHaveLength(1);
+      expect(lastDef(w)!.x).toEqual([
+        ...five.slice(0, 4),
+        { step: { kind: "p", key: "/web/ingestion" }, a: 1, b: 3 },
+      ]);
+      expect(picker(w).exists()).toBe(false);
+    });
+
+    it("a step list change while the popover is open closes it", async () => {
+      const w = mountLayout(defWith([SPAN_1_2]));
+      await chip(w, 0).trigger("click");
+      expect(picker(w).exists()).toBe(true);
+      await w.setProps({ def: defWith([SPAN_1_2], steps.slice(0, 2)) });
+      expect(picker(w).exists()).toBe(false);
+      expect(popoverAround(w, ADD)?.props("open")).toBe(false);
+    });
   });
 });

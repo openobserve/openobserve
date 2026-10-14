@@ -199,6 +199,20 @@ describe("FunnelFilterBar", () => {
     return wrapper;
   };
 
+  it("marks the add button active while its popover is open, and opens the rail's beside it", async () => {
+    const w = mountBar();
+    const btn = () => w.findComponent({ name: "OButton" });
+    expect(btn().props("active")).toBe(false);
+    expect(w.findComponent(popoverStub).attributes("side")).toBe("bottom");
+    await w.find(dt("rum-analytics-funnel-add-filter-btn")).trigger("click");
+    expect(btn().props("active")).toBe(true);
+    w.findComponent(popoverStub).vm.$emit("update:open", false);
+    await w.vm.$nextTick();
+    expect(btn().props("active")).toBe(false);
+    await w.setProps({ stacked: true });
+    expect(w.findComponent(popoverStub).attributes("side")).toBe("right");
+  });
+
   it("adds a filter through the picker", async () => {
     const w = mountBar();
     expect(w.text()).toContain("Filter all steps");
