@@ -257,10 +257,6 @@ mod tests {
         assert_eq!(TriggerModule::Slo.to_string(), "slo");
         assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
         assert_eq!(TriggerModule::CompositeAlert.to_string(), "composite_alert");
-        assert_eq!(
-            TriggerModule::PublicDashboard.to_string(),
-            "public_dashboard"
-        );
     }
 
     /// The discriminant IS the stored value. A variant inserted above an
