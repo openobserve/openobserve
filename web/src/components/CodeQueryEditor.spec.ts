@@ -71,6 +71,10 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     setModelMarkers: vi.fn(),
     setModelLanguage: vi.fn(),
     TrackedRangeStickiness: { NeverGrowsWhenTypingAtEdges: 1 },
+    addCommand: vi.fn(() => ({ dispose: vi.fn() })),
+    addKeybindingRule: vi.fn(() => ({ dispose: vi.fn() })),
+    registerCommand: vi.fn(() => ({ dispose: vi.fn() })),
+    getEditors: vi.fn(() => []),
   },
   languages: {
     // Real values, mirroring monaco-editor/esm/vs/editor/common/languages.js
@@ -103,7 +107,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
   KeyMod: { CtrlCmd: 1 },
-  KeyCode: { Enter: 13 },
+  KeyCode: { Backspace: 1, Tab: 2, Enter: 13, Escape: 9, KeyZ: 56 },
   Range: class {
     constructor(...args: number[]) {
       Object.assign(this, { args });

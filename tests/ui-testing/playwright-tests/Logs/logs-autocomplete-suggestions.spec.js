@@ -1245,3 +1245,198 @@ test.describe("Autocomplete Value Suggestions - Cold Start & TTL", () => {
         testLogger.info('Cold start test completed');
     });
 });
+
+// ============================================================================
+// KEY CONTRACT MATRIX (Phase 1, ZO_EDITOR_SUGGEST_MODE)
+// ============================================================================
+
+// Each row reads the flag from the page, so this file runs once per flag value.
+const QUERY_EDITOR_HOST = '[data-test="logs-search-bar-query-editor"]';
+
+/** The effective ZO_EDITOR_SUGGEST_MODE the browser received in zoConfig. */
+async function getSuggestMode(page) {
+    return await page.evaluate(() => {
+        const app = document.querySelector('#app')?.__vue_app__;
+        const raw = app?.config?.globalProperties?.$store?.state?.zoConfig?.editor_suggest_mode;
+        const value = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+        return ['automatic', 'typing', 'off'].includes(value) ? value : 'automatic';
+    });
+}
+
+/** Put text in the Logs editor without typing it, caret at the end, editor focused. */
+async function seedEditor(page, text) {
+    await page.waitForFunction((host) => {
+        const el = document.querySelector(host);
+        return !!el && (window.monaco?.editor?.getEditors?.() || []).some((e) => el.contains(e.getDomNode()));
+    }, QUERY_EDITOR_HOST, { timeout: 15000 });
+    await page.evaluate(({ host, value }) => {
+        const el = document.querySelector(host);
+        const ed = window.monaco.editor.getEditors().find((e) => el.contains(e.getDomNode()));
+        ed.focus();
+        ed.setValue(value);
+        const model = ed.getModel();
+        const line = model.getLineCount();
+        ed.setPosition({ lineNumber: line, column: model.getLineMaxColumn(line) });
+        ed.trigger('e2e', 'hideSuggestWidget', {});
+    }, { host: QUERY_EDITOR_HOST, value: text });
+}
+
+/** The query editor's model text (not the rendered view). */
+async function editorText(page) {
+    return await page.evaluate((host) => {
+        const el = document.querySelector(host);
+        const ed = (window.monaco?.editor?.getEditors?.() || []).find((e) => el?.contains(e.getDomNode()));
+        return ed?.getValue?.() ?? '';
+    }, QUERY_EDITOR_HOST).then((text) => text.replace(/\r\n/g, '\n'));
+}
+
+/** Visible suggest rows and which one, if any, is highlighted. */
+async function menuState(page) {
+    const widget = page.locator('.monaco-editor .suggest-widget.visible');
+    if (!(await widget.isVisible().catch(() => false))) return { visible: false, rows: [], focused: null };
+    const rows = await widget.locator('.monaco-list-row').evaluateAll((nodes) =>
+        nodes.map((n) => ({
+            label: (n.getAttribute('aria-label') || n.textContent || '').split(',')[0].trim(),
+            focused: n.classList.contains('focused'),
+        })),
+    );
+    return { visible: true, rows: rows.map((r) => r.label), focused: rows.find((r) => r.focused)?.label ?? null };
+}
+
+/** Wait until a suggest menu is on screen; returns its state. */
+async function waitForMenu(page, timeout = 8000) {
+    await page.locator('.monaco-editor .suggest-widget.visible').waitFor({ state: 'visible', timeout });
+    // Monaco paints rows one frame after the widget becomes visible.
+    await expect.poll(async () => (await menuState(page)).rows.length, { timeout: 3000 }).toBeGreaterThan(0);
+    return await menuState(page);
+}
+
+test.describe("Autocomplete key contract — Enter never inserts from a menu it did not ask for", () => {
+    test.describe.configure({ mode: 'serial' });
+
+    let pm;
+    let mode;
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+
+    test.beforeEach(async ({ page }, testInfo) => {
+        testLogger.testStart(testInfo.title, testInfo.file);
+        await navigateToBase(page);
+        pm = new PageManager(page);
+        await page.waitForLoadState('domcontentloaded');
+        await ingestTestData(page);
+        await waitForStreamData(page, streamName, 1).catch(() => {});
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await page.waitForLoadState('domcontentloaded');
+        await pm.logsPage.selectStream(streamName);
+        mode = await getSuggestMode(page);
+        testLogger.info(`ZO_EDITOR_SUGGEST_MODE in the browser: ${mode}`);
+    });
+
+    // 07a: a comma opened the catalog with row 1 highlighted, and Enter inserted it.
+    test("Enter after a comma is a newline (07a)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `SELECT level`);
+        await page.keyboard.type(',');
+        const menu = await waitForMenu(page);
+        expect(menu.focused, 'a comma menu must open with nothing highlighted').toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`SELECT level,\n`);
+    });
+
+    // 07b: typing the closing quote by hand opened a highlighted catalog.
+    test("Enter after a hand-typed closing quote is a newline (07b)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level = 'error`);
+        await page.keyboard.type("'");
+        const text = await editorText(page);
+        const menu = await menuState(page);
+        if (menu.visible) expect(menu.focused).toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`${text}\n`);
+    });
+
+    // 07c: an auto menu whose row equals the typed word swallowed Enter.
+    test("Enter after a whole word in GROUP BY is a newline (07c)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `SELECT level, count(*) FROM "${streamName}" GROUP BY lev`);
+        await page.keyboard.type('el');
+        await waitForMenu(page).catch(() => null);
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`SELECT level, count(*) FROM "${streamName}" GROUP BY level\n`);
+    });
+
+    // 07d: a space after a value opened the catalog with row 1 highlighted.
+    test("Enter after a typed space is a newline (07d)", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        test.skip(mode === 'off', 'off is the editor before the fix');
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE level = 'error'`);
+        await page.keyboard.type(' ');
+        const menu = await waitForMenu(page);
+        expect(menu.focused, 'a typed-space menu must open with nothing highlighted').toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toBe(`SELECT * FROM "${streamName}" WHERE level = 'error' \n`);
+    });
+
+    test("Tab indents when no menu is open", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT *`);
+        await page.keyboard.press('Escape');
+        await page.keyboard.press('Tab');
+        expect(await editorText(page)).toMatch(/^SELECT \*[ \t]+$/);
+    });
+
+    test("typed letters still highlight row 1 and Enter accepts it", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE `);
+        await page.keyboard.type('lev');
+        const menu = await waitForMenu(page);
+        expect(menu.focused, 'a menu opened by typing letters keeps row 1 highlighted').not.toBeNull();
+        await page.keyboard.press('Enter');
+        expect(await editorText(page)).toContain('WHERE level');
+    });
+});
+
+// The off switch must hold even when the editor mounts before the authenticated config arrives.
+test.describe("Autocomplete key contract — the mode is known before the full config", () => {
+    const streamName = 'e2e_automate';
+    const orgName = process.env["ORGNAME"] || 'default';
+
+    test("with /api/*/config held back 2 s, off still gives today's editor", {
+        tag: ['@all', '@autosuggestions', '@logs', '@keycontract']
+    }, async ({ page }) => {
+        await navigateToBase(page);
+        await page.route('**/api/*/config', async (route) => {
+            await new Promise((r) => setTimeout(r, 2000));
+            await route.continue();
+        });
+        await page.goto(`${logData.logsUrl}?org_identifier=${orgName}`);
+        await seedEditor(page, `SELECT * FROM "${streamName}" WHERE `);
+        const mode = await getSuggestMode(page);
+        test.skip(mode !== 'off', 'this row is for ZO_EDITOR_SUGGEST_MODE=off');
+        const options = await page.evaluate((host) => {
+            const el = document.querySelector(host);
+            const ed = window.monaco.editor.getEditors().find((e) => el.contains(e.getDomNode()));
+            const raw = ed.getRawOptions();
+            return { selectionMode: raw.suggest?.selectionMode, enter: raw.acceptSuggestionOnEnter };
+        }, QUERY_EDITOR_HOST);
+        expect(options).toEqual({ selectionMode: 'always', enter: 'on' });
+        await seedEditor(page, `SELECT level`);
+        await page.keyboard.type(',');
+        const menu = await waitForMenu(page);
+        expect(menu.focused, 'off keeps row 1 highlighted, as today').not.toBeNull();
+        await page.keyboard.press('Tab');
+        const text = await editorText(page);
+        expect(text.startsWith('SELECT level,') && text.length > 'SELECT level,'.length, `Tab accepted row 1: ${text}`).toBe(true);
+        expect(text).toContain(menu.focused);
+    });
+});

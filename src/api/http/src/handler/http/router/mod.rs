@@ -2980,12 +2980,19 @@ mod tests {
                 "custom_logo_dark_img",
                 "custom_logo_img",
                 "custom_logo_text",
+                "editor_suggest_mode",
                 "native_login_enabled",
                 "rum",
                 "sso_enabled",
                 "telemetry_enabled",
             ],
             "unauthenticated /config must expose exactly the login-page bootstrap fields"
+        );
+
+        assert_eq!(
+            payload.get("editor_suggest_mode").and_then(Value::as_str),
+            Some("automatic"),
+            "the editors need the suggest mode before the authenticated config arrives"
         );
 
         // build_type (enterprise/cloud/opensource) is not sensitive and the o2

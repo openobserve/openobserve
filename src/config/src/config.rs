@@ -3055,6 +3055,12 @@ pub struct Limit {
     )]
     pub timechart_enabled: bool,
     #[env_config(
+        name = "ZO_EDITOR_SUGGEST_MODE",
+        help = "Query editor suggestions for every user: automatic (field, operator and value menus follow each other), typing (no follow-on menus) or off (the editor as it was before this setting)",
+        default = "automatic"
+    )]
+    pub editor_suggest_mode: String,
+    #[env_config(
         name = "ZO_HISTOGRAM_BREAKDOWN_FIELDS",
         help = "Comma-separated ordered list of stream fields used for stacked histogram breakdown. First match wins. Default: severity,log_level,level,status",
         default = "severity,log_level,level,status"
@@ -4025,7 +4031,20 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.workflow_error_retention_secs = 3600;
     }
 
+    cfg.limit.editor_suggest_mode = normalize_editor_suggest_mode(&cfg.limit.editor_suggest_mode)?;
+
     Ok(())
+}
+
+fn normalize_editor_suggest_mode(raw: &str) -> Result<String, anyhow::Error> {
+    let mode = raw.trim().to_lowercase();
+    match mode.as_str() {
+        "" => Ok("automatic".to_string()),
+        "automatic" | "typing" | "off" => Ok(mode),
+        _ => Err(anyhow::anyhow!(
+            "ZO_EDITOR_SUGGEST_MODE must be one of: automatic (default), typing or off; got {raw}"
+        )),
+    }
 }
 
 fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
@@ -6065,6 +6084,27 @@ mod tests {
             assert!(
                 check_queue_store_config(&mut cfg).is_err(),
                 "queue store {value} must be rejected instead of falling back"
+            );
+        }
+    }
+
+    #[test]
+    fn test_editor_suggest_mode_defaults_to_automatic() {
+        let mut cfg = Config::init().unwrap();
+        assert_eq!(cfg.limit.editor_suggest_mode, "automatic");
+        check_limit_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.editor_suggest_mode, "automatic");
+    }
+
+    #[test]
+    fn test_editor_suggest_mode_normalizes_and_rejects_unknown_values() {
+        assert_eq!(normalize_editor_suggest_mode(" Typing ").unwrap(), "typing");
+        assert_eq!(normalize_editor_suggest_mode("OFF").unwrap(), "off");
+        assert_eq!(normalize_editor_suggest_mode("").unwrap(), "automatic");
+        for value in ["auto", "on", "invoke", "manual"] {
+            assert!(
+                normalize_editor_suggest_mode(value).is_err(),
+                "editor suggest mode {value} must be rejected instead of falling back"
             );
         }
     }
