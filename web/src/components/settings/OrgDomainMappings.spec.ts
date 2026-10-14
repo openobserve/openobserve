@@ -17,9 +17,9 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent } from "vue";
 import i18n from "@/locales";
-import { queryClient } from "@/composables/query/queryClient";
+import { withQueryClient } from "@/test/unit/helpers/queryClient";
+import type { OrgDomainMapping } from "@/services/organizations";
 import OrgDomainMappings from "./OrgDomainMappings.vue";
-import type { OrgDomainMapping } from "./OrgDomainMapping.schema";
 
 const { mockToast, mockConfirm } = vi.hoisted(() => ({
   mockToast: vi.fn(),
@@ -34,16 +34,17 @@ vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme", label: "Acme" } } }),
 }));
 vi.mock("@/services/billings", () => ({
-  default: { list_billing_group_members: vi.fn().mockResolvedValue({ data: [] }) },
+  default: {
+    list_billing_group_members: vi
+      .fn()
+      .mockResolvedValue({ data: [{ member_org_id: "child", member_org_name: "Child" }] }),
+  },
 }));
 vi.mock("@/services/organizations", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
     default: {
       list_org_domains: vi.fn(),
-      link_org_domain: vi.fn(),
-      unlink_org_domain: vi.fn(),
-      verify_org_domain: vi.fn(),
       post_organization_settings: vi.fn(),
     },
   });
@@ -54,11 +55,20 @@ const api = organizations as unknown as Record<string, ReturnType<typeof vi.fn>>
 
 const DialogStub = defineComponent({
   name: "OrgDomainMappingDialog",
-  props: ["open", "mode", "mapping", "orgOptions", "defaultOrgId", "takenDomains", "submit"],
+  props: [
+    "open",
+    "mode",
+    "mapping",
+    "domainOptions",
+    "orgOptions",
+    "defaultOrgId",
+    "takenKeys",
+    "submit",
+  ],
   template: "<div />",
 });
 
-const link = (domain: string, state = 0) => ({
+const link = (domain: string, state = 1) => ({
   id: domain,
   org_id: "acme",
   domain,
@@ -69,122 +79,133 @@ const link = (domain: string, state = 0) => ({
   last_checked_at: null,
   created_at: 0,
   updated_at: 0,
+  meta_mapped: false,
 });
 
-const mountList = async (mappings: OrgDomainMapping[]) => {
+const existing: OrgDomainMapping = {
+  domain: "acme.com",
+  org_id: "acme",
+  base_role: "allowed_user",
+  role_claim_name: null,
+  create_missing_roles: false,
+};
+const childMapping: OrgDomainMapping = {
+  domain: "acme.com",
+  org_id: "child",
+  base_role: "viewer",
+  role_claim_name: "groups",
+  create_missing_roles: true,
+};
+
+// Covers OTable's 50ms skeleton hold, which otherwise hides rows that already landed.
+const settle = async () => {
+  for (let i = 0; i < 8; i++) {
+    await new Promise((r) => setTimeout(r, 10));
+    await flushPromises();
+  }
+};
+
+const mountList = async (mappings: OrgDomainMapping[], enforce = false) => {
   const wrapper = mount(OrgDomainMappings, {
-    props: { orgId: "acme", mappings },
+    props: { orgId: "acme", mappings, enforceAllowedOrgsOnly: enforce },
     global: {
-      plugins: [i18n],
-      stubs: { OrgDomainMappingDialog: DialogStub, OTooltip: true, OrgDomainVerification: true },
+      plugins: [i18n, withQueryClient()],
+      stubs: { OrgDomainMappingDialog: DialogStub, OTooltip: true },
     },
   });
-  await flushPromises();
+  await settle();
   return wrapper;
 };
 
-const submitFrom = (wrapper: Awaited<ReturnType<typeof mountList>>) =>
-  wrapper.findComponent(DialogStub).props("submit") as (_m: OrgDomainMapping) => Promise<boolean>;
+type ListWrapper = Awaited<ReturnType<typeof mountList>>;
 
-const newMapping: OrgDomainMapping = { domain: "new.com", org_id: "acme", role_name: "viewer" };
-const existing: OrgDomainMapping = { domain: "old.com", org_id: "acme", role_name: "user" };
+const dialog = (wrapper: ListWrapper) => wrapper.findComponent(DialogStub);
+const submitFrom = (wrapper: ListWrapper) =>
+  dialog(wrapper).props("submit") as (_m: OrgDomainMapping) => Promise<boolean>;
 
 describe("OrgDomainMappings", () => {
   beforeEach(() => {
-    queryClient.clear();
     vi.clearAllMocks();
-    api.list_org_domains.mockResolvedValue({ data: [link("old.com", 1)] });
-    api.link_org_domain.mockResolvedValue({ data: {} });
-    api.unlink_org_domain.mockResolvedValue({ data: {} });
+    api.list_org_domains.mockResolvedValue({
+      data: [link("acme.com"), link("pending.com", 0)],
+    });
     api.post_organization_settings.mockResolvedValue({ data: {} });
     mockConfirm.mockResolvedValue(true);
   });
 
-  it("links a new domain before saving the mapping", async () => {
+  it("offers only verified domains and this org plus its billing group", async () => {
     const wrapper = await mountList([existing]);
 
-    await expect(submitFrom(wrapper)(newMapping)).resolves.toBe(true);
+    expect(
+      dialog(wrapper)
+        .props("domainOptions")
+        .map((o: any) => o.value),
+    ).toEqual(["acme.com"]);
+    expect(
+      dialog(wrapper)
+        .props("orgOptions")
+        .map((o: any) => o.value),
+    ).toEqual(["acme", "child"]);
+  });
 
-    expect(api.link_org_domain).toHaveBeenCalledWith("acme", "new.com");
+  it("appends a new mapping", async () => {
+    const wrapper = await mountList([existing]);
+    (wrapper.vm as any).openAdd();
+
+    await expect(submitFrom(wrapper)(childMapping)).resolves.toBe(true);
+
     expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
-      domain_org_mappings: [existing, newMapping],
+      domain_org_mappings: [existing, childMapping],
     });
-    expect(api.link_org_domain.mock.invocationCallOrder[0]).toBeLessThan(
-      api.post_organization_settings.mock.invocationCallOrder[0],
-    );
   });
 
-  it("does not save the mapping when linking fails", async () => {
-    api.link_org_domain.mockRejectedValue({ response: { data: { message: "claimed" } } });
-    const wrapper = await mountList([existing]);
+  it("allows one domain to map to several organizations", async () => {
+    const wrapper = await mountList([existing, childMapping]);
+    (wrapper.vm as any).openAdd();
+    await flushPromises();
 
-    await expect(submitFrom(wrapper)(newMapping)).resolves.toBe(false);
-
-    expect(api.post_organization_settings).not.toHaveBeenCalled();
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error", message: "claimed" }),
-    );
+    expect(dialog(wrapper).props("takenKeys")).toEqual(["acme.com|acme", "acme.com|child"]);
   });
 
-  it("releases the new link when saving the mapping fails", async () => {
-    api.post_organization_settings.mockRejectedValue(new Error("boom"));
-    const wrapper = await mountList([existing]);
+  it("saves an edited mapping in place and frees its own key", async () => {
+    const wrapper = await mountList([existing, childMapping]);
+    await wrapper
+      .find('[data-test="settings-org-domain-mappings-edit-acme.com|child"]')
+      .trigger("click");
+    await flushPromises();
+    expect(dialog(wrapper).props("takenKeys")).toEqual(["acme.com|acme"]);
 
-    await expect(submitFrom(wrapper)(newMapping)).resolves.toBe(false);
-
-    expect(api.unlink_org_domain).toHaveBeenCalledWith("acme", "new.com");
-  });
-
-  it("skips linking a domain this org already holds", async () => {
-    api.list_org_domains.mockResolvedValue({ data: [link("old.com", 1), link("new.com")] });
-    const wrapper = await mountList([existing]);
-
-    await expect(submitFrom(wrapper)(newMapping)).resolves.toBe(true);
-
-    expect(api.link_org_domain).not.toHaveBeenCalled();
-    expect(api.post_organization_settings).toHaveBeenCalled();
-  });
-
-  it("saves an edited mapping in place without linking", async () => {
-    const wrapper = await mountList([existing]);
-    await wrapper.find('[data-test="settings-org-domain-mappings-edit-old.com"]').trigger("click");
-    const edited = { ...existing, role_name: "admin" };
-
+    const edited = { ...childMapping, base_role: "admin" };
     await expect(submitFrom(wrapper)(edited)).resolves.toBe(true);
 
-    expect(api.link_org_domain).not.toHaveBeenCalled();
     expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
-      domain_org_mappings: [edited],
+      domain_org_mappings: [existing, edited],
     });
   });
 
-  it("unlinks the domain before removing its mapping", async () => {
+  it("keeps the dialog open when saving fails", async () => {
+    api.post_organization_settings.mockRejectedValue({
+      response: { data: { message: "not verified" } },
+    });
     const wrapper = await mountList([existing]);
 
-    await wrapper
-      .find('[data-test="settings-org-domain-mappings-delete-old.com"]')
-      .trigger("click");
-    await flushPromises();
-
-    expect(api.unlink_org_domain).toHaveBeenCalledWith("acme", "old.com");
-    expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
-      domain_org_mappings: [],
-    });
-    expect(api.unlink_org_domain.mock.invocationCallOrder[0]).toBeLessThan(
-      api.post_organization_settings.mock.invocationCallOrder[0],
+    await expect(submitFrom(wrapper)(childMapping)).resolves.toBe(false);
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: "error", message: "not verified" }),
     );
   });
 
-  it("keeps the mapping when unlinking fails", async () => {
-    api.unlink_org_domain.mockRejectedValue(new Error("nope"));
-    const wrapper = await mountList([existing]);
+  it("removes only the confirmed mapping", async () => {
+    const wrapper = await mountList([existing, childMapping]);
 
     await wrapper
-      .find('[data-test="settings-org-domain-mappings-delete-old.com"]')
+      .find('[data-test="settings-org-domain-mappings-delete-acme.com|acme"]')
       .trigger("click");
     await flushPromises();
 
-    expect(api.post_organization_settings).not.toHaveBeenCalled();
+    expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
+      domain_org_mappings: [childMapping],
+    });
   });
 
   it("does nothing when the removal is not confirmed", async () => {
@@ -192,23 +213,56 @@ describe("OrgDomainMappings", () => {
     const wrapper = await mountList([existing]);
 
     await wrapper
-      .find('[data-test="settings-org-domain-mappings-delete-old.com"]')
+      .find('[data-test="settings-org-domain-mappings-delete-acme.com|acme"]')
       .trigger("click");
     await flushPromises();
 
-    expect(api.unlink_org_domain).not.toHaveBeenCalled();
     expect(api.post_organization_settings).not.toHaveBeenCalled();
   });
 
-  it("lists a linked domain that has no mapping", async () => {
-    api.list_org_domains.mockResolvedValue({ data: [link("old.com", 1), link("orphan.com")] });
+  it("flags a mapping whose domain is no longer verified", async () => {
+    const stale = { ...existing, domain: "pending.com" };
+    const wrapper = await mountList([existing, stale]);
+
+    expect(
+      wrapper.find('[data-test="settings-org-domain-mappings-unverified-pending.com"]').exists(),
+    ).toBe(true);
+    expect(
+      wrapper.find('[data-test="settings-org-domain-mappings-unverified-acme.com"]').exists(),
+    ).toBe(false);
+  });
+
+  it("asks before turning on removal from other organizations", async () => {
     const wrapper = await mountList([existing]);
 
-    expect(wrapper.find('[data-test="settings-org-domain-mappings-row-orphan.com"]').exists()).toBe(
-      true,
-    );
-    expect(wrapper.find('[data-test="settings-org-domain-mappings-map-orphan.com"]').exists()).toBe(
-      true,
-    );
+    await wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(mockConfirm).toHaveBeenCalled();
+    expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
+      enforce_allowed_orgs_only: true,
+    });
+  });
+
+  it("leaves the setting off when the confirmation is declined", async () => {
+    mockConfirm.mockResolvedValue(false);
+    const wrapper = await mountList([existing]);
+
+    await wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(api.post_organization_settings).not.toHaveBeenCalled();
+  });
+
+  it("turns the setting off without asking", async () => {
+    const wrapper = await mountList([existing], true);
+
+    await wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", false);
+    await flushPromises();
+
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(api.post_organization_settings).toHaveBeenCalledWith("acme", {
+      enforce_allowed_orgs_only: false,
+    });
   });
 });

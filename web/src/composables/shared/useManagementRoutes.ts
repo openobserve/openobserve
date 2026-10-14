@@ -292,7 +292,7 @@ const useManagementRoutes = () => {
         {
           path: "org_domain_mapping",
           name: "orgDomainMapping",
-          component: () => import("@/components/settings/OrgDomainMapping.vue"),
+          component: () => import("@/components/settings/OrgDomainManagement.vue"),
           meta: {
             titleKey: "routeTitles.orgDomainMapping",
           },

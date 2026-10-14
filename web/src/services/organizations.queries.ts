@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
-import organizations, { type BillingGroupMember, type OrgDomainOwnership } from "./organizations";
+import organizations, {
+  type BillingGroupMember,
+  type OrgDomainOwnership,
+  type OrgDomainRequest,
+} from "./organizations";
 import billings from "./billings";
 import { organizationKeys } from "./organizations.querykeys";
 import { MEDIUM_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
@@ -68,6 +72,15 @@ export const orgDomainsQuery = (org: string) =>
     queryKey: organizationKeys.domains(org),
     queryFn: async (): Promise<OrgDomainOwnership[]> =>
       (await organizations.list_org_domains(org)).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+// On the meta org this lists every org's requests.
+export const orgDomainRequestsQuery = (org: string) =>
+  queryOptions({
+    queryKey: organizationKeys.domainRequests(org),
+    queryFn: async (): Promise<OrgDomainRequest[]> =>
+      (await organizations.list_org_domain_requests(org)).data ?? [],
     staleTime: NORMAL_STALE_TIME,
   });
 
@@ -133,4 +146,22 @@ export const verifyOrgDomainMutation = (org: string) =>
   mutationOptions({
     mutationFn: (domain: string) => organizations.verify_org_domain(org, domain),
     meta: { invalidates: [organizationKeys.domains(org)], silentError: true },
+  });
+
+export const raiseOrgDomainRequestMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (domain: string) => organizations.raise_org_domain_request(org, domain),
+    meta: { invalidates: [organizationKeys.domainRequests(org)], silentError: true },
+  });
+
+export const decideOrgDomainRequestMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { id: string; approve: boolean; reason: string }) =>
+      vars.approve
+        ? organizations.approve_org_domain_request(org, vars.id, vars.reason)
+        : organizations.reject_org_domain_request(org, vars.id, vars.reason),
+    meta: {
+      invalidates: [organizationKeys.domainRequests(org), organizationKeys.domains(org)],
+      silentError: true,
+    },
   });

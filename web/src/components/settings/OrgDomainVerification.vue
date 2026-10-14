@@ -64,7 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <span class="text-text-secondary text-xs">
-      {{ t("settings.orgDomainMapping.verifyHint", { minutes: VERIFY_INTERVAL_MINUTES }) }}
+      {{
+        domain.verification_state === 1
+          ? t("settings.orgDomainMapping.keepRecordHint", {
+              minutes: VERIFY_INTERVAL_MINUTES,
+              grace: FAILURE_GRACE_MINUTES,
+            })
+          : t("settings.orgDomainMapping.verifyHint", { minutes: VERIFY_INTERVAL_MINUTES })
+      }}
     </span>
   </div>
 </template>
@@ -85,6 +92,8 @@ const { t } = useI18nTyped();
 
 // Mirrors ORG_DOMAIN_OWNERSHIP_CHECK_INTERVAL in the cloud jobs; no endpoint exposes it.
 const VERIFY_INTERVAL_MINUTES = 5;
+// Mirrors DOMAIN_EXPIRY_BUFFER_SEC in core/org_domain_ownership.rs.
+const FAILURE_GRACE_MINUTES = 30;
 
 const FAILURE_REASON_KEYS = {
   0: "settings.orgDomainMapping.failureReason.recordMissing",

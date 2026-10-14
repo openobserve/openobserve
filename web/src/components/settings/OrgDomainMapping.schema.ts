@@ -16,39 +16,58 @@
 import { z } from "zod";
 import { isValidDomain } from "./DomainManagement.schema";
 
-export const BUILT_IN_ROLES = ["admin", "editor", "viewer", "user"] as const;
+// The backend accepts only these; `allowed_user` is the OpenFGA name of the User role.
+export const BASE_ROLES = ["admin", "editor", "viewer", "allowed_user"] as const;
+export type BaseRole = (typeof BASE_ROLES)[number];
 
-export interface OrgDomainMapping {
-  domain: string;
-  org_id: string;
-  role_name?: string;
-}
+export const LINK_METHODS = ["dns", "request"] as const;
+export type LinkMethod = (typeof LINK_METHODS)[number];
 
-export const makeOrgDomainMappingSchema = (t: (_key: string) => string) =>
+type Translate = (_key: string) => string;
+
+export const makeOrgDomainMappingSchema = (t: Translate) =>
+  z.object({
+    domain: z.string().min(1, t("settings.orgDomainMapping.domainRequired")),
+    org_id: z.string().min(1, t("settings.orgDomainMapping.organizationRequired")),
+    base_role: z.enum(BASE_ROLES),
+    role_claim_name: z.string(),
+    create_missing_roles: z.boolean(),
+  });
+
+export type OrgDomainMappingForm = z.infer<ReturnType<typeof makeOrgDomainMappingSchema>>;
+
+export const orgDomainMappingDefaults = (orgId = "", domain = ""): OrgDomainMappingForm => ({
+  domain,
+  org_id: orgId,
+  base_role: "allowed_user",
+  role_claim_name: "",
+  create_missing_roles: false,
+});
+
+export const makeLinkDomainSchema = (t: Translate) =>
   z.object({
     // No .trim(): OForm saves the raw value, so the submit handler normalizes it.
     domain: z
       .string()
       .min(1, t("settings.domainRequired"))
       .refine((v) => isValidDomain(v), { message: t("settings.invalidDomain") }),
-    org_id: z.string().min(1, t("settings.orgDomainMapping.organizationRequired")),
-    role_name: z.string().min(1, t("settings.orgDomainMapping.roleRequired")),
+    method: z.enum(LINK_METHODS),
   });
 
-export type OrgDomainMappingForm = z.infer<ReturnType<typeof makeOrgDomainMappingSchema>>;
+export type LinkDomainForm = z.infer<ReturnType<typeof makeLinkDomainSchema>>;
 
-export const orgDomainMappingDefaults = (orgId = ""): OrgDomainMappingForm => ({
-  domain: "",
-  org_id: orgId,
-  role_name: "user",
-});
+export const linkDomainDefaults = (): LinkDomainForm => ({ domain: "", method: "dns" });
 
-export const makeOrgSsoSettingsSchema = () =>
-  z.object({
-    // Clearing the select yields null; an empty string turns the parser off.
-    claimParserFunction: z.string().nullable(),
-    roleNameClaim: z.string(),
-    createMissingRole: z.boolean(),
+// Read lazily: one form serves both approve (reason optional) and reject (reason required).
+export const makeRequestDecisionSchema = (t: Translate, isReasonRequired: () => boolean) =>
+  z.object({ reason: z.string() }).superRefine((value, ctx) => {
+    if (isReasonRequired() && value.reason.trim() === "") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["reason"],
+        message: t("settings.orgDomainMapping.reasonRequired"),
+      });
+    }
   });
 
-export type OrgSsoSettingsForm = z.infer<ReturnType<typeof makeOrgSsoSettingsSchema>>;
+export type RequestDecisionForm = z.infer<ReturnType<typeof makeRequestDecisionSchema>>;

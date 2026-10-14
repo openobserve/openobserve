@@ -16,11 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="settings-org-domain-restrictions">
-    <div class="mb-3">
-      <div class="text-xl font-semibold">{{ t("settings.domainRestrictionsSubsection") }}</div>
-      <div class="text-text-secondary text-sm">
-        {{ t("settings.orgDomainMapping.restrictionsSubtitle") }}
-      </div>
+    <div class="text-text-secondary mb-3 text-sm">
+      {{ t("settings.orgDomainMapping.restrictionsSubtitle") }}
     </div>
 
     <OForm
@@ -84,13 +81,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="card.policy === 'allow_all'"
             class="rounded-default bg-status-info-bg text-status-info-text p-2 text-sm"
           >
-            {{ t("settings.allUsersAllowedMessage", { domain: "@" + card.name }) }}
+            {{ t("settings.orgDomainMapping.accessAllowAllMessage", { domain: "@" + card.name }) }}
           </div>
           <div
             v-if="card.policy === 'block_all'"
             class="rounded-default bg-status-error-bg text-status-error-text p-2 text-sm"
           >
-            {{ t("settings.allUsersBlockedMessage", { domain: "@" + card.name }) }}
+            {{ t("settings.orgDomainMapping.accessBlockAllMessage", { domain: "@" + card.name }) }}
           </div>
 
           <div
@@ -135,7 +132,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`settings-org-domain-restrictions-no-allowed-${card.name}`"
               class="rounded-default bg-status-warning-bg text-status-warning-text mt-1 p-2 text-sm"
             >
-              {{ t("settings.noAllowedEmailsDenyAll", { domain: "@" + card.name }) }}
+              {{
+                t("settings.orgDomainMapping.accessNoAllowedEmails", { domain: "@" + card.name })
+              }}
             </div>
             <div
               v-for="(email, emailIndex) in emailList(card, kind)"
@@ -157,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!isAllowPolicy(card.policy) || card.blockedEmails.length > 0"
             class="text-text-secondary text-xs"
           >
-            {{ t("settings.blockedUsersHint") }}
+            {{ t("settings.orgDomainMapping.accessRulesHint") }}
           </div>
         </div>
       </div>

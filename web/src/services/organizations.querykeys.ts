@@ -31,5 +31,6 @@ export const organizationKeys = {
   ingestionTokens: (org: string) => orgKey(org, "organizations", "ingestionTokens"),
   passcode: (org: string) => orgKey(org, "organizations", "passcode"),
   domains: (org: string) => orgKey(org, "organizations", "domains"),
+  domainRequests: (org: string) => orgKey(org, "organizations", "domainRequests"),
   billingGroupMembers: (org: string) => orgKey(org, "organizations", "billingGroupMembers"),
 };

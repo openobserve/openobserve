@@ -149,14 +149,7 @@ const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
 const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cross_links || []);
 const formDirty = ref(false);
 
-// Domain mappings are read and written on the meta org only, and the backend
-// ignores the field outside cloud — so the section renders under both conditions.
-const { isMetaOrg } = useIsMetaOrg();
-const showDomainOrgMappings = computed(() => config.isCloud === "true" && isMetaOrg.value);
 const showRedInsights = config.isEnterprise == "true";
-const domainOrgMappings = ref<DomainOrgMapping[]>(
-  store.state?.organizationData?.organizationSettings?.domain_org_mappings || [],
-);
 
 // Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
 // span/toggle values are form-owned (OFormInput / OFormSwitch).
@@ -193,12 +186,7 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       usage_stream_enabled: value.usageStreamEnabled,
     };
 
-    // Only sent when the section rendered: an org that never showed it must not
-    // post an empty list and wipe mappings another admin saved.
-    if (showDomainOrgMappings.value) {
-      payload.domain_org_mappings = domainOrgMappings.value;
-    }
-    // Same rule for the enterprise-only switch: a hidden field must not overwrite the stored one.
+    // A hidden enterprise-only field must not overwrite the stored one.
     if (showRedInsights) {
       payload.red_insights_enabled = value.redInsightsEnabled;
     }
@@ -217,7 +205,6 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       toggle_ingestion_logs: value.toggleIngestionLogs,
       cross_links: crossLinks.value,
       usage_stream_enabled: value.usageStreamEnabled,
-      ...(showDomainOrgMappings.value ? { domain_org_mappings: domainOrgMappings.value } : {}),
       ...(showRedInsights ? { red_insights_enabled: value.redInsightsEnabled } : {}),
     };
 

@@ -31,14 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="dialogOpen = false"
   >
     <OForm :id="FORM_ID" :form="form" class="flex flex-col gap-5">
-      <OFormInput
-        data-test="settings-org-domain-mapping-domain-input"
+      <OFormSelect
+        data-test="settings-org-domain-mapping-domain-select"
         name="domain"
         :label="t('settings.orgDomainMapping.domain')"
+        :options="domainOptions"
         required
-        :disabled="!!mapping?.domain"
-        :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
-        :help-text="t('settings.orgDomainMapping.domainHelp', { at_sign: '@' })"
+        :help-text="t('settings.orgDomainMapping.mappingDomainHelp')"
       />
 
       <OFormSelect
@@ -52,12 +51,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OFormSelect
         data-test="settings-org-domain-mapping-role-select"
-        name="role_name"
-        :label="t('settings.orgDomainMapping.role')"
+        name="base_role"
+        :label="t('settings.orgDomainMapping.baseRole')"
         :options="roleOptions"
-        :loading="customRoles.isFetching.value"
         required
-        :help-text="t('settings.orgDomainMapping.roleHelp')"
+        :help-text="t('settings.orgDomainMapping.baseRoleHelp')"
+      />
+
+      <OFormInput
+        data-test="settings-org-domain-mapping-claim-input"
+        name="role_claim_name"
+        :label="t('settings.orgDomainMapping.roleClaimName')"
+        :placeholder="t('settings.orgDomainMapping.roleClaimNamePlaceholder')"
+        :help-text="t('settings.orgDomainMapping.roleClaimNameHelp')"
+      />
+
+      <OFormSwitch
+        data-test="settings-org-domain-mapping-create-roles-switch"
+        name="create_missing_roles"
+        :label="t('settings.orgDomainMapping.createMissingRoles')"
+        :disabled="!hasClaim"
       />
     </OForm>
   </ODialog>
@@ -65,21 +78,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, watch } from "vue";
-import { useQuery } from "@tanstack/vue-query";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { rolesQuery } from "@/services/iam.queries";
+import type { OrgDomainMapping } from "@/services/organizations";
 import {
-  BUILT_IN_ROLES,
+  BASE_ROLES,
   makeOrgDomainMappingSchema,
   orgDomainMappingDefaults,
-  type OrgDomainMapping,
+  type BaseRole,
   type OrgDomainMappingForm,
 } from "./OrgDomainMapping.schema";
 
@@ -89,16 +102,17 @@ const props = withDefaults(
   defineProps<{
     open: boolean;
     mode: "add" | "edit";
-    /** Prefill; a set domain is locked, since changing it would need a new domain link. */
     mapping?: OrgDomainMapping | null;
+    /** Verified domains only; the backend rejects a mapping for any other. */
+    domainOptions: SelectOption[];
     orgOptions: SelectOption[];
     defaultOrgId: string;
-    /** Domains already mapped, excluding the one being edited. */
-    takenDomains?: string[];
+    /** `domain|org_id` of the other mappings, so one pair is mapped once. */
+    takenKeys?: string[];
     /** Resolves true once the mapping is persisted; the dialog stays open on false. */
     submit: (_mapping: OrgDomainMapping) => Promise<boolean>;
   }>(),
-  { mapping: null, takenDomains: () => [] },
+  { mapping: null, takenKeys: () => [] },
 );
 
 const emit = defineEmits<{
@@ -111,8 +125,12 @@ const ROLE_LABEL_KEYS = {
   admin: "components.badge.userRole.admin",
   editor: "components.badge.userRole.editor",
   viewer: "components.badge.userRole.viewer",
-  user: "components.badge.userRole.user",
+  allowed_user: "components.badge.userRole.user",
 } as const;
+
+const roleOptions = computed<SelectOption[]>(() =>
+  BASE_ROLES.map((role) => ({ label: t(ROLE_LABEL_KEYS[role]), value: role })),
+);
 
 const dialogOpen = computed({
   get: () => props.open,
@@ -122,12 +140,16 @@ const dialogOpen = computed({
 const isEditing = computed(() => props.mode === "edit");
 
 const mappingDefaults = computed((): OrgDomainMappingForm => {
-  const base = orgDomainMappingDefaults(props.defaultOrgId);
+  const firstDomain = String(props.domainOptions[0]?.value ?? "");
+  const base = orgDomainMappingDefaults(props.defaultOrgId, firstDomain);
   if (!props.mapping) return base;
+  const role = props.mapping.base_role as BaseRole;
   return {
     domain: props.mapping.domain,
     org_id: props.mapping.org_id,
-    role_name: props.mapping.role_name || base.role_name,
+    base_role: BASE_ROLES.includes(role) ? role : base.base_role,
+    role_claim_name: props.mapping.role_claim_name ?? "",
+    create_missing_roles: props.mapping.create_missing_roles,
   };
 });
 
@@ -137,29 +159,7 @@ const form = useOForm<OrgDomainMappingForm>({
   onSubmit,
 });
 
-const selectedOrg = form.useStore((s) => s.values.org_id);
-const selectedRole = form.useStore((s) => s.values.role_name);
-
-// The caller may lack access to a child org's roles; that leaves only the built-in roles.
-const customRoles = useQuery(() =>
-  Object.assign(rolesQuery(selectedOrg.value), { enabled: props.open && !!selectedOrg.value }),
-);
-
-const roleOptions = computed<SelectOption[]>(() => {
-  const builtIn = BUILT_IN_ROLES.map((role) => ({ label: t(ROLE_LABEL_KEYS[role]), value: role }));
-  const custom = (Array.isArray(customRoles.data.value) ? customRoles.data.value : [])
-    .filter((name: string) => !(BUILT_IN_ROLES as readonly string[]).includes(name))
-    .map((name: string) => ({ label: raw(name), value: name }));
-  return [...builtIn, ...custom];
-});
-
-// A custom role belongs to one org, so switching the target org can orphan the selection.
-watch([selectedOrg, () => customRoles.isFetching.value], ([, fetching]) => {
-  if (fetching) return;
-  if (!roleOptions.value.some((o) => o.value === selectedRole.value)) {
-    form.setFieldValue("role_name", "user");
-  }
-});
+const hasClaim = form.useStore((s) => s.values.role_claim_name.trim() !== "");
 
 // The form outlives the dialog body, so it is re-seeded on every open.
 watch(
@@ -171,14 +171,17 @@ watch(
 
 async function onSubmit(value: OrgDomainMappingForm) {
   const domain = value.domain.trim().toLowerCase();
-  if (props.takenDomains.includes(domain)) {
-    toast({ variant: "error", message: t("settings.orgDomainMapping.duplicateDomain") });
+  if (props.takenKeys.includes(`${domain}|${value.org_id}`)) {
+    toast({ variant: "error", message: t("settings.orgDomainMapping.duplicateMapping") });
     return;
   }
+  const claim = value.role_claim_name.trim();
   const saved = await props.submit({
     domain,
     org_id: value.org_id,
-    role_name: value.role_name,
+    base_role: value.base_role,
+    role_claim_name: claim || null,
+    create_missing_roles: !!claim && value.create_missing_roles,
   });
   if (saved) emit("update:open", false);
 }
