@@ -93,6 +93,20 @@ const countFieldListBuilds = () => {
   return { builds, stop };
 };
 
+const groupsKey = () => serviceStreamKeys.semanticGroups(org());
+
+// Like fetchQuery: the cache keeps a structurally shared copy while the caller gets the raw response.
+const pendingGroupsLoad = () => {
+  const groups = deferred<FieldAlias[]>();
+  loadSemanticGroups.mockReturnValue(groups.promise);
+  return (data: FieldAlias[], { cache = true } = {}) => {
+    if (cache) queryClient.setQueryData(groupsKey(), structuredClone(data));
+    groups.resolve(structuredClone(data));
+  };
+};
+
+const edgeGroup = () => ({ id: "edge", group: "edge", fields: ["host"] }) as FieldAlias;
+
 const infraGroup = () => ({ id: "infra", group: "infra", fields: ["host"] }) as FieldAlias;
 
 const hostGroup = () =>
@@ -187,30 +201,29 @@ describe("extractFields and a slow semantic-groups load", () => {
 
   it("regroups the fields once the groups arrive, keeping the current error message", async () => {
     seedStream();
-    const groups = deferred<FieldAlias[]>();
-    loadSemanticGroups.mockReturnValue(groups.promise);
+    const land = pendingGroupsLoad();
     const wrapper = mountConsumer();
     await wrapper.vm.extractFields({ reuseLoadedSchema: true });
     expect(hostGroup()).not.toBe("infra");
 
     searchObj.data.errorMsg = "search failed";
     searchObj.loadingStream = false;
-    groups.resolve([infraGroup()]);
+    land([infraGroup()]);
     await vi.waitFor(() => expect(hostGroup()).toBe("infra"));
 
     expect(searchObj.data.errorMsg).toBe("search failed");
     expect(searchObj.loadingStream).toBe(false);
   });
 
-  it("uses cached groups straight away and does not regroup an unchanged refresh", async () => {
+  it("uses cached groups straight away and does not regroup a refresh that changed nothing", async () => {
     seedStream();
-    const cached = [infraGroup()];
-    queryClient.setQueryData(serviceStreamKeys.semanticGroups(org()), cached);
-    loadSemanticGroups.mockResolvedValue(cached);
+    queryClient.setQueryData(groupsKey(), [infraGroup()]);
+    const land = pendingGroupsLoad();
     const wrapper = mountConsumer();
     const { builds, stop } = countFieldListBuilds();
 
     await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    land([infraGroup()]);
     await flush();
     stop();
 
@@ -218,7 +231,7 @@ describe("extractFields and a slow semantic-groups load", () => {
     expect(builds.count).toBe(1);
   });
 
-  it("does not regroup when the groups load fails", async () => {
+  it("does not regroup when a cold groups load fails", async () => {
     seedStream();
     loadSemanticGroups.mockResolvedValue([]);
     const wrapper = mountConsumer();
@@ -231,49 +244,44 @@ describe("extractFields and a slow semantic-groups load", () => {
     expect(builds.count).toBe(1);
   });
 
-  it("ignores groups a settings save invalidated and regroups with the refreshed ones", async () => {
+  it("keeps the cached groups when their refresh fails", async () => {
     seedStream();
-    queryClient.setQueryData(serviceStreamKeys.semanticGroups(org()), [
-      { id: "infra", group: "infra", fields: ["message"] },
-    ]);
-    await queryClient.invalidateQueries({ queryKey: serviceStreamKeys.semanticGroups(org()) });
-    const groups = deferred<FieldAlias[]>();
-    loadSemanticGroups.mockReturnValue(groups.promise);
+    queryClient.setQueryData(groupsKey(), [edgeGroup()]);
+    loadSemanticGroups.mockResolvedValue([]);
     const wrapper = mountConsumer();
+    const { builds, stop } = countFieldListBuilds();
 
     await wrapper.vm.extractFields({ reuseLoadedSchema: true });
-    expect(hostGroup()).not.toBe("infra");
+    await flush();
+    stop();
 
-    groups.resolve([infraGroup()]);
-    await vi.waitFor(() => expect(hostGroup()).toBe("infra"));
+    expect(hostGroup()).toBe("edge");
+    expect(builds.count).toBe(1);
   });
 
-  it("regroups when a refresh of stale cached groups returns changed groups", async () => {
+  it("shows invalidated groups first and regroups when their refresh changed them", async () => {
     seedStream();
-    queryClient.setQueryData(serviceStreamKeys.semanticGroups(org()), [
-      { id: "edge", group: "edge", fields: ["host"] },
-    ]);
-    const groups = deferred<FieldAlias[]>();
-    loadSemanticGroups.mockReturnValue(groups.promise);
+    queryClient.setQueryData(groupsKey(), [edgeGroup()]);
+    await queryClient.invalidateQueries({ queryKey: groupsKey(), refetchType: "none" });
+    const land = pendingGroupsLoad();
     const wrapper = mountConsumer();
 
     await wrapper.vm.extractFields({ reuseLoadedSchema: true });
     expect(hostGroup()).toBe("edge");
 
-    groups.resolve([infraGroup()]);
+    land([infraGroup()]);
     await vi.waitFor(() => expect(hostGroup()).toBe("infra"));
   });
 
   it("leaves a stream change in flight to its own extract", async () => {
     seedStream();
-    const groups = deferred<FieldAlias[]>();
-    loadSemanticGroups.mockReturnValue(groups.promise);
+    const land = pendingGroupsLoad();
     const wrapper = mountConsumer();
     await wrapper.vm.extractFields({ reuseLoadedSchema: true });
     const { builds, stop } = countFieldListBuilds();
 
     searchObj.loadingStream = true;
-    groups.resolve([infraGroup()]);
+    land([infraGroup()]);
     await flush();
     stop();
 
@@ -282,18 +290,34 @@ describe("extractFields and a slow semantic-groups load", () => {
     searchObj.loadingStream = false;
   });
 
+  it("does not regroup while a selected stream's schema is not loaded", async () => {
+    seedStream();
+    const land = pendingGroupsLoad();
+    const wrapper = mountConsumer();
+    await wrapper.vm.extractFields({ reuseLoadedSchema: true });
+    const { builds, stop } = countFieldListBuilds();
+
+    (searchObj.data.streamResults.list[0] as any).schema = undefined;
+    land([infraGroup()]);
+    await flush();
+    stop();
+
+    expect(builds.count).toBe(0);
+  });
+
   it("does not regroup with the previous org's groups after an org switch", async () => {
     seedStream();
-    const groups = deferred<FieldAlias[]>();
-    loadSemanticGroups.mockReturnValue(groups.promise);
+    const land = pendingGroupsLoad();
     const wrapper = mountConsumer();
     await wrapper.vm.extractFields({ reuseLoadedSchema: true });
     const { builds, stop } = countFieldListBuilds();
     const previousOrg = store.state.selectedOrganization;
+    const key = groupsKey();
 
     store.state.selectedOrganization = { ...previousOrg, identifier: "other-org" };
     try {
-      groups.resolve([infraGroup()]);
+      queryClient.setQueryData(key, [infraGroup()]);
+      land([infraGroup()], { cache: false });
       await flush();
     } finally {
       store.state.selectedOrganization = previousOrg;

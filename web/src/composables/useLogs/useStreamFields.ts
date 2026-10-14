@@ -49,7 +49,7 @@ import {
 import { buildStreamNameColumn, shouldShowStreamNameColumn } from "@/utils/logs/streamNameColumn";
 import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServiceCorrelation";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import { getCurrentSemanticGroups } from "@/utils/semanticGroupsCache";
+import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 import type { FieldAlias } from "@/services/service_streams";
 import { isGuardActive } from "@/composables/useLogs/useAutoRun";
 import { pickLatestStream, type StreamStatsEntry } from "@/utils/logs/estimateScanMb";
@@ -80,7 +80,7 @@ export interface StreamListOptions {
 
 export interface ExtractFieldsOptions {
   reuseLoadedSchema?: boolean;
-  /** Re-runs over the loaded schema with late groups, without clearing search errors or touching the loading flag. */
+  /** Rebuilds the field list from already-loaded schemas with groups that changed after the first build; search errors and the loading flag are left alone. */
   regroupWith?: FieldAlias[];
 }
 
@@ -273,7 +273,7 @@ export const useStreamFields = () => {
         let semanticAliases: FieldAlias[] = options.regroupWith ?? [];
         if (isEnterprise && !regroupPass) {
           // The search waits on this function, so a slow groups request must not hold it; changed groups regroup when they land.
-          semanticAliases = getCurrentSemanticGroups(orgId) ?? [];
+          semanticAliases = getCachedSemanticGroups(orgId) ?? [];
           lateSemanticGroups = { load: loadSemanticGroups(), used: semanticAliases };
         }
         const [keyFieldsConfig, fieldGrouping] = await Promise.all([
@@ -938,15 +938,24 @@ export const useStreamFields = () => {
     token: number,
     orgId: string,
   ) => {
-    void late.load.then((aliases) => {
-      // A failed refresh resolves to []; keep the groups shown rather than strip them.
-      if (!aliases.length || aliases === late.used) return;
+    void late.load.then(() => {
+      // fetchQuery returns the raw response; the cached copy keeps its reference when nothing changed, and survives a failed refresh.
+      const aliases = getCachedSemanticGroups(orgId);
+      if (!aliases?.length || aliases === late.used) return;
       if (token !== schemaRequestToken.value) return;
       // A stream or org change in flight runs its own extract, which reads these groups from the cache.
       if (searchObj.loadingStream || orgId !== store.state.selectedOrganization.identifier) return;
+      if (!selectedSchemasLoaded()) return;
       void extractFields({ reuseLoadedSchema: true, regroupWith: aliases });
     });
   };
+
+  const selectedSchemasLoaded = () =>
+    searchObj.data.stream.selectedStream.every((name: string) =>
+      searchObj.data.streamResults.list.some(
+        (stream: any) => stream.name === name && Array.isArray(stream.schema),
+      ),
+    );
 
   const loadStreamFields = async (streamName: string) => {
     try {

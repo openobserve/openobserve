@@ -33,12 +33,6 @@ export function getCachedSemanticGroups(org: string): FieldAlias[] | null {
   return queryClient.getQueryData<FieldAlias[]>(serviceStreamKeys.semanticGroups(org)) ?? null;
 }
 
-/** Like `getCachedSemanticGroups`, but a save's invalidation makes the held groups count as absent. */
-export function getCurrentSemanticGroups(org: string): FieldAlias[] | null {
-  const state = queryClient.getQueryState<FieldAlias[]>(serviceStreamKeys.semanticGroups(org));
-  return state?.data !== undefined && !state.isInvalidated ? state.data : null;
-}
-
 /**
  * The org's semantic groups, from cache when fresh. Concurrent callers share
  * one request. `onError` lets a caller surface the failure; the groups

@@ -45,6 +45,8 @@ import {
   withQueryOrigin,
 } from "@/composables/useLogs/logsRowNav";
 import { noteGridQuery } from "@/composables/useLogs/useLogPermalink";
+import { getCachedSemanticGroups, loadSemanticGroups } from "@/utils/semanticGroupsCache";
+import config from "@/aws-exports";
 
 let selectionToken = 0;
 
@@ -430,7 +432,24 @@ export const useSearchBar = (t: TranslateFn) => {
 
   const getQueryData = (isPagination = false, options: QueryDataOptions = {}) => {
     noteGridQuery(options.origin, options.generationId);
-    return withQueryOrigin(options.origin, () => runQueryData(isPagination, options));
+    const run = () => withQueryOrigin(options.origin, () => runQueryData(isPagination, options));
+    const groupsLoad = isPagination ? null : pendingFilterSemanticGroups();
+    // The origin only covers runQueryData's synchronous part, so the wait happens before it, never inside it.
+    if (!groupsLoad) return run();
+    return groupsLoad.then(() => {
+      const superseded =
+        options.generationId !== undefined &&
+        !useLogsAutoRun().engine.isCurrent(options.generationId);
+      if (!superseded) return run();
+    });
+  };
+
+  // Filters are mapped across streams through semantic groups, and extractFields no longer waits for them.
+  const pendingFilterSemanticGroups = (): Promise<unknown> | null => {
+    if (config.isEnterprise !== "true" && config.isCloud !== "true") return null;
+    if (!searchObj.data.query?.trim()) return null;
+    const org = store.state.selectedOrganization.identifier;
+    return getCachedSemanticGroups(org) ? null : loadSemanticGroups(org);
   };
 
   const runQueryData = async (isPagination: boolean, options: QueryDataOptions) => {
