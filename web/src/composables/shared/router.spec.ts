@@ -2379,7 +2379,11 @@ describe("useRoutes (router.ts)", () => {
       config.isEnterprise = "true";
       config.isCloud = "true";
       previousZoConfig = store.state.zoConfig;
-      store.state.zoConfig = { ...(store.state.zoConfig ?? {}), database_monitoring_enabled: true };
+      store.state.zoConfig = {
+        ...(store.state.zoConfig ?? {}),
+        database_monitoring_enabled: true,
+        public_dashboards_enabled: true,
+      };
     });
 
     afterEach(() => {

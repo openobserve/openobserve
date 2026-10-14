@@ -105,7 +105,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 105: create ai_chat_shares and add fork columns to ai_chat_sessions.
 // 106: create ai_chat_turns and add replica_purged_at to ai_chat_sessions.
 // 107: add redact_tools to ai_chat_shares.
-pub const DB_SCHEMA_VERSION: u64 = 107;
+// 108: create public_dashboards and add their name column.
+// 109: add updated_by to public_dashboards.
+// 110: public_dashboards time ranges become a list; snapshots keyed by range.
+pub const DB_SCHEMA_VERSION: u64 = 110;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1054,6 +1057,7 @@ pub struct Config {
     pub enrichment_table: EnrichmentTable,
     pub slo: Slo,
     pub synthetics: Synthetics,
+    pub public_dashboards: PublicDashboards,
     pub alert_composite: AlertComposite,
     pub db_monitoring: DatabaseMonitoring,
     pub self_profiles: SelfProfiles,
@@ -1167,6 +1171,23 @@ pub struct DatabaseMonitoring {
         help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
     )]
     pub rollup_interval_secs: u64,
+}
+
+/// Public (unauthenticated) dashboards: the master switch and the per-IP rate limit.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct PublicDashboards {
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_ENABLED",
+        default = false,
+        help = "Master switch for public dashboards. Off by default; the public HTTP routes and the snapshot rebuilder only exist when this is true."
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_PUBLIC_DASHBOARD_RPM",
+        default = 240,
+        help = "Per-IP requests-per-minute limit on the unauthenticated public-dashboard routes (0 disables)."
+    )]
+    pub rpm: u64,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -2856,6 +2877,12 @@ pub struct Limit {
         help = "Max query-recommendation jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
     )]
     pub scheduler_query_reco_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_PUBLIC_DASHBOARD_CONCURRENCY",
+        default = 0,
+        help = "Max public-dashboard rebuild jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_public_dashboard_concurrency: i64,
     // Per-module poll cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL (the alert pull
     // frequency). Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. One var per module so each
     // puller can poll at its own rate (e.g. backfill slower, synthetics faster). The alert lane
@@ -2908,6 +2935,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_query_reco_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_PUBLIC_DASHBOARD_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the public-dashboard rebuild puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_public_dashboard_interval: i64,
     #[env_config(
         name = "ZO_SCHEDULER_ALERT_CALIBRATION_INTERVAL",
         default = 0, // seconds

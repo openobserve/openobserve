@@ -186,6 +186,7 @@ mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 mod m20260901_000001_reset_anomaly_detection_retries;
 mod m20260903_000001_add_anomaly_last_failed_at;
 mod m20260906_000001_add_anomaly_last_alert_fired_at;
+mod m20260907_000001_create_public_dashboards_tables;
 mod m20260908_000001_create_synthetics_refs;
 mod m20260910_000001_add_folder_id_to_workflows;
 mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
@@ -205,10 +206,13 @@ mod m20260922_000003_create_user_auth_state_table;
 mod m20260923_000001_create_ai_chat_sessions;
 mod m20260923_000001_create_llm_prompts;
 mod m20260924_000001_add_recovery_episode_columns;
+mod m20260925_000001_add_name_to_public_dashboards;
 mod m20260928_000001_add_alert_recovery_destinations;
+mod m20260930_000001_add_updated_by_to_public_dashboards;
 mod m20261001_000001_add_anomaly_band_settings;
 mod m20261003_000001_create_rum_pa_tables;
 mod m20261004_000001_create_query_history;
+mod m20261005_000001_public_dashboards_time_ranges;
 mod m20261006_000001_create_ai_chat_shares;
 mod m20261007_000001_create_ai_chat_turns;
 mod m20261007_000001_scope_alert_dedup_state_by_org;
@@ -571,6 +575,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20261006_000001_create_ai_chat_shares::Migration),
             Box::new(m20261007_000001_create_ai_chat_turns::Migration),
             Box::new(m20261007_000002_add_redact_tools_to_ai_chat_shares::Migration),
+            Box::new(m20260907_000001_create_public_dashboards_tables::Migration),
+            Box::new(m20260925_000001_add_name_to_public_dashboards::Migration),
+            Box::new(m20260930_000001_add_updated_by_to_public_dashboards::Migration),
+            Box::new(m20261005_000001_public_dashboards_time_ranges::Migration),
         ]
     }
 }
@@ -637,6 +645,10 @@ mod tests {
         (105, "m20261006_000001_create_ai_chat_shares"),
         (106, "m20261007_000001_create_ai_chat_turns"),
         (107, "m20261007_000002_add_redact_tools_to_ai_chat_shares"),
+        // Also covers m20260907 (public dashboards tables), which no earlier bump did.
+        (108, "m20260925_000001_add_name_to_public_dashboards"),
+        (109, "m20260930_000001_add_updated_by_to_public_dashboards"),
+        (110, "m20261005_000001_public_dashboards_time_ranges"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

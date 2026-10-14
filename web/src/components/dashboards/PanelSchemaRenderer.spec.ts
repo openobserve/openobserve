@@ -1102,6 +1102,30 @@ describe("PanelSchemaRenderer", () => {
     });
   });
 
+  describe("Drilldowns", () => {
+    const withDrilldown = (allowDrilldown?: boolean) =>
+      createWrapper({
+        ...(allowDrilldown === undefined ? {} : { allowDrilldown }),
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          config: { drilldown: [{ name: "to logs", type: "logs", data: {} }] },
+        },
+      });
+    const click = { data: { name: "a", value: 1 }, event: { offsetX: 1, offsetY: 1 } };
+
+    it("opens the drilldown menu on a click by default", async () => {
+      wrapper = withDrilldown();
+      await wrapper.vm.onPanelClick(click);
+      expect(wrapper.vm.drilldownArray).toHaveLength(1);
+    });
+
+    it("ignores clicks when drilldowns are turned off", async () => {
+      wrapper = withDrilldown(false);
+      await wrapper.vm.onPanelClick(click);
+      expect(wrapper.vm.drilldownArray).toHaveLength(0);
+    });
+  });
+
   describe("Store Integration", () => {
     it("should access store correctly", () => {
       wrapper = createWrapper();

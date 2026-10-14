@@ -48,6 +48,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="truncate">{{ homeDashboard.label }}</span>
       </OButton>
       <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
+      <OButton
+        v-if="publicLinksEnabled"
+        variant="outline"
+        size="sm"
+        icon-left="public"
+        data-test="dashboard-public-links"
+        @click="openPublicLinks"
+      >
+        {{ t("dashboard.publicLinks.pageTitle") }}
+      </OButton>
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
@@ -499,7 +509,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('dashboard.deleteDashboardConfirmTitle')"
       data-test="dashboard-confirm-dialog"
-      :message="t('dashboard.deleteDashboardConfirmMsg')"
+      :message="
+        publicLinksEnabled
+          ? t('dashboard.deleteDashboardConfirmMsgPublicLinks')
+          : t('dashboard.deleteDashboardConfirmMsg')
+      "
       @update:ok="deleteDashboard"
       @update:cancel="confirmDeleteDialog = false"
       v-model="confirmDeleteDialog"
@@ -519,7 +533,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialog
       :title="t('dashboard.deleteDashboardsConfirmTitle')"
       data-test="dashboard-confirm-bulk-delete-dialog"
-      :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
+      :message="
+        t(
+          publicLinksEnabled
+            ? 'dashboard.deleteDashboardsConfirmMsgPublicLinks'
+            : 'dashboard.deleteDashboardsConfirmMsg',
+          { count: selectedIds.length },
+          selectedIds.length,
+        )
+      "
       @update:ok="bulkDeleteDashboards"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -755,6 +777,15 @@ export default defineComponent({
     // The favorites view is a rail location, not a toolbar filter: it is
     // active exactly when the Favorites pseudo-folder is selected.
     const showFavoritesOnly = computed(() => activeFolderId.value === FAVORITES_FOLDER_ID);
+    const publicLinksEnabled = computed(
+      () => store.state.zoConfig?.public_dashboards_enabled === true,
+    );
+    const openPublicLinks = () => {
+      router.push({
+        name: "publicDashboardLinks",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+    };
     const toggleFavorite = (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       const userId = store.state.userInfo?.email;
@@ -1926,6 +1957,8 @@ export default defineComponent({
       isFavorite,
       toggleFavorite,
       showFavoritesOnly,
+      publicLinksEnabled,
+      openPublicLinks,
     };
   },
   methods: {
