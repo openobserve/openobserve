@@ -136,6 +136,12 @@ describe("QualityScorePane", () => {
     );
   });
 
+  it("scrolls the body between the header and the actions, so the reasoning stays readable on a short window", () => {
+    expect(mountPane().find('[data-test="quality-score-pane-body"]').classes()).toEqual(
+      expect.arrayContaining(["min-h-0", "flex-1", "overflow-y-auto"]),
+    );
+  });
+
   it("folds and unfolds the reasoning, and keeps it folded across scores", async () => {
     const wrapper = mountPane();
     const toggle = () =>

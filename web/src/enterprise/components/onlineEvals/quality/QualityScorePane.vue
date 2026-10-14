@@ -78,7 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </header>
 
-      <div class="flex min-h-0 flex-1 flex-col gap-3 p-3">
+      <!-- Scrolls on a short window, so the reasoning never slides under the action bar. -->
+      <div
+        class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+        data-test="quality-score-pane-body"
+      >
         <!-- Input and Output side by side, filling the pane; fullscreen takes both, as on the queue workbench. -->
         <div
           ref="ioContainer"
