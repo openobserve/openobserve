@@ -230,7 +230,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="panel-editor-annotation-btn"
                     >
                       <OIcon
-                        :name="panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'"
+                        :name="
+                          panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'
+                        "
                         size="sm"
                       />
                       <OTooltip
