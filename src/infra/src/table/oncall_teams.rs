@@ -22,7 +22,7 @@ use std::{
 
 use config::{
     RwHashMap, ider,
-    meta::oncall::{Team, TeamMember},
+    meta::oncall::{SlackRoomEdit, Team, TeamMember},
     utils::time::now_micros,
 };
 use sea_orm::{
@@ -214,23 +214,49 @@ pub async fn set_channel(
     id: &str,
     destinations: Option<Vec<String>>,
 ) -> Result<bool, errors::Error> {
+    Ok(
+        update_channel(org_id, id, destinations, &SlackRoomEdit::Keep)
+            .await?
+            .is_some(),
+    )
+}
+
+/// Sets the team's channel like [`set_channel`] and applies `slack` to its Slack fields. [strong]
+pub async fn update_channel(
+    org_id: &str,
+    id: &str,
+    destinations: Option<Vec<String>>,
+    slack: &SlackRoomEdit,
+) -> Result<Option<Team>, errors::Error> {
     let client = get_orm_client_rw().await;
     let Some(existing) = oncall_teams::Entity::find_by_id(id)
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .one(client)
         .await?
     else {
-        return Ok(false);
+        return Ok(None);
     };
     let stored = destinations
         .as_ref()
         .map(|d| serde_json::to_string(d).unwrap_or_else(|_| "[]".to_string()));
     let mut model: oncall_teams::ActiveModel = existing.into();
     model.channel_destinations = Set(stored);
+    match slack {
+        SlackRoomEdit::Keep => {}
+        SlackRoomEdit::SameRoom(destination) => {
+            model.slack_same_room_destination = Set(destination.clone());
+        }
+        SlackRoomEdit::Clear => {
+            model.slack_workspace_id = Set(None);
+            model.slack_channel_id = Set(None);
+            model.slack_channel_name = Set(None);
+            model.slack_same_room_destination = Set(None);
+        }
+    }
     model.updated_at = Set(now_micros());
-    model.update(client).await?;
+    let team = to_team(model.update(client).await?);
     invalidate_and_publish_team(org_id, id).await;
-    Ok(true)
+    Ok(Some(team))
 }
 
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {

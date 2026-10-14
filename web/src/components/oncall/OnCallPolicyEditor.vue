@@ -541,6 +541,17 @@
                   {{ t("oncall.teamChannelSilent") }}
                 </span>
               </div>
+
+              <!-- Sits under the team channel because the old webhook it may replace is chosen there. -->
+              <OnCallTeamSlackChannel
+                v-if="slackOffered && teamChannel"
+                :org-id="orgId"
+                :team-id="props.teamId"
+                :team-name="props.teamName"
+                :channel="teamChannel"
+                :saving="savingChannel"
+                @save="saveTeamSlack"
+              />
             </div>
           </OTabPanel>
 
@@ -595,6 +606,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
+import OnCallTeamSlackChannel from "@/components/oncall/OnCallTeamSlackChannel.vue";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -624,6 +636,7 @@ import {
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
   Channel,
+  SetTeamChannelBody,
   TeamChannel,
   EscalationTarget,
   L0Policy,
@@ -662,8 +675,10 @@ const props = withDefaults(
      * stored id as the name somebody recognises.
      */
     rotations?: Rotation[];
+    /** For the `/oncall here {team}` guidance under the Slack channel. */
+    teamName?: string;
   }>(),
-  { rotations: () => [] },
+  { rotations: () => [], teamName: "" },
 );
 const emit = defineEmits<{
   saved: [];
@@ -775,14 +790,31 @@ async function fetchTeamChannel() {
 
 /// `null` clears the override; an array (even empty) is the team's own list.
 async function saveTeamChannel(destinations: string[] | null) {
+  // The PUT replaces the whole setting, so a ticked same-room webhook still in the new list rides along.
+  const same = teamChannel.value?.slack_same_room_destination;
+  const list = destinations ?? props.policy?.destinations ?? [];
+  const body: SetTeamChannelBody = { destinations };
+  if (same && list.includes(same)) body.slack_same_room_destination = same;
+  await writeTeamChannel(body);
+}
+
+/// The Slack row's change, sent with the team's own list unchanged.
+async function saveTeamSlack(slack: Omit<SetTeamChannelBody, "destinations">) {
+  const current = teamChannel.value;
+  const destinations = current?.source === "team" ? current.destinations : null;
+  await writeTeamChannel({ destinations, ...slack });
+}
+
+async function writeTeamChannel(body: SetTeamChannelBody) {
   savingChannel.value = true;
   try {
-    const res = await saveChannelWrite.mutateAsync(destinations);
+    const res = await saveChannelWrite.mutateAsync(body);
     // The drawer stays open on this answer, and an invalidation cannot repaint a ref.
     teamChannel.value = res.data ?? null;
     teamChannelDraft.value = [...(res.data?.destinations ?? [])];
     toast({ variant: "success", message: t("oncall.teamChannelSaved") });
   } catch (err: any) {
+    noteConfigurationDenied(err);
     toast({
       variant: "error",
       message: raw(err?.response?.data?.message) || t("oncall.teamChannelSaveFailed"),
@@ -791,6 +823,9 @@ async function saveTeamChannel(destinations: string[] | null) {
     savingChannel.value = false;
   }
 }
+
+// Hidden only when the deployment has Slack off, like its Settings entry.
+const slackOffered = computed(() => store.state.zoConfig?.oncall_slack !== "off");
 
 /// Only read to answer one question: does the final action's safety net
 /// exist. A failure leaves the warning off — a false "no default team" on a

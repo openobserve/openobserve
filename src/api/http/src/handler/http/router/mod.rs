@@ -2156,6 +2156,10 @@ fn oncall_routes(router: Router) -> Router {
             "/{org_id}/oncall/chat/slack/manifest",
             get(oncall::chat::get_slack_manifest),
         )
+        .route(
+            "/{org_id}/oncall/teams/{team_id}/slack/test",
+            post(oncall::chat::test_team_slack_channel),
+        )
 }
 
 /// Create other service routes (AWS, GCP, RUM)

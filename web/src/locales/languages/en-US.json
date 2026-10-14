@@ -23792,7 +23792,21 @@
     "disconnectMessage": "Also remove the app in Slack. Reconnecting needs the app invited to each team's Slack channel again.",
     "loadFailed": "The Slack connection could not be loaded.",
     "connectFailed": "Slack could not be connected. Try again.",
-    "disconnectFailed": "Slack could not be disconnected. Try again."
+    "disconnectFailed": "Slack could not be disconnected. Try again.",
+    "teamChannelTitle": "Slack channel",
+    "teamChannelNotSet": "Not set",
+    "teamChannelGuidance": "Set a Slack channel with /oncall here {team}",
+    "teamChannelLinkHint": "Type it in the Slack channel. It needs your Slack account linked on My on-call.",
+    "teamChannelNotConnected": "Slack is not connected. Ask an organisation admin to connect it in Settings → Slack.",
+    "teamChannelMismatch": "This Slack channel is in a workspace that is no longer connected.",
+    "teamChannelSendTest": "Send test message",
+    "teamChannelClear": "Clear",
+    "teamChannelStop": "Stop posting pages through {destination}",
+    "teamChannelStopPick": "Stop posting pages through",
+    "teamChannelStopHelp": "Tick it when that webhook posts into the same Slack channel: it stops every page appearing there twice.",
+    "teamChannelStopRisk": "If the bot ever cannot post in the Slack channel, nothing posts the page there as a fallback.",
+    "teamChannelTestSent": "Test message sent to {channel}",
+    "teamChannelTestFailed": "Slack could not be reached. Try again."
   },
   "oncallSlackApp": {
     "title": "Slack app",

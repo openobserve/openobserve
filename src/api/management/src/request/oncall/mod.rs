@@ -594,6 +594,36 @@ fn refusal_response(
     (status, axum::Json(body)).into_response()
 }
 
+/// The team's channel read: an empty list while pages go to the policy's room would be a lie.
+#[cfg(feature = "enterprise")]
+async fn team_channel_response(team: config::meta::oncall::Team) -> Response {
+    use config::meta::oncall::{ChatPlatform, TeamSlackView, policy::team_channel};
+
+    let policy = match infra::table::oncall_policies::get_or_create(&team.org_id, &team.id).await {
+        Ok(p) => p.destinations,
+        Err(e) => return internal_error("team channel policy", &e),
+    };
+    let install =
+        match infra::table::oncall_chat_installs::get_for_org(&team.org_id, ChatPlatform::Slack)
+            .await
+        {
+            Ok(install) => install,
+            Err(e) => return internal_error("team channel install", &e),
+        };
+    let destinations = team_channel(team.channel_destinations.as_deref(), &policy).to_vec();
+    let source = if team.channel_destinations.is_some() {
+        "team"
+    } else {
+        "policy"
+    };
+    MetaHttpResponse::json(TeamChannelResponse {
+        slack: TeamSlackView::of(&team, install.as_ref(), &destinations),
+        team_id: team.id,
+        destinations,
+        source,
+    })
+}
+
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/teams",
@@ -1394,6 +1424,12 @@ pub async fn set_policy(
 pub struct SetTeamChannelRequest {
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
+    /// Absent unticks it: the PUT replaces the whole setting, like `destinations`.
+    #[serde(default)]
+    pub slack_same_room_destination: Option<String>,
+    /// Empties the team's Slack channel; only `/oncall here` ever sets one.
+    #[serde(default)]
+    pub clear_slack: bool,
 }
 
 /// A team's channel and where the answer came from.
@@ -1403,6 +1439,8 @@ pub struct TeamChannelResponse {
     pub destinations: Vec<String>,
     /// `team` or `policy`, or "pages still go to the old room" is unanswerable from the API.
     pub source: &'static str,
+    #[serde(flatten)]
+    pub slack: config::meta::oncall::TeamSlackView,
 }
 
 #[utoipa::path(
@@ -1428,23 +1466,11 @@ pub async fn get_team_channel(
         if !allowed(&org_id, &user_email.user_id, CONFIG, "GET").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let team = match infra::table::oncall_teams::get_channel(&org_id, &team_id).await {
-            Ok(t) => t,
-            Err(e) => return internal_error("get_team_channel", &e),
-        };
-        // An empty list while pages go to the policy's room would be a lie of omission.
-        let policy =
-            match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
-                Ok(p) => p.destinations,
-                Err(e) => return to_response(e),
-            };
-        let source = if team.is_some() { "team" } else { "policy" };
-        MetaHttpResponse::json(TeamChannelResponse {
-            team_id,
-            destinations: config::meta::oncall::policy::team_channel(team.as_deref(), &policy)
-                .to_vec(),
-            source,
-        })
+        match infra::table::oncall_teams::get(&org_id, &team_id).await {
+            Ok(Some(team)) => team_channel_response(team).await,
+            Ok(None) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
+            Err(e) => internal_error("get_team_channel", &e),
+        }
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -1466,7 +1492,11 @@ pub async fn get_team_channel(
         ("team_id" = String, Path, description = "Team ID"),
     ),
     request_body(content = SetTeamChannelRequest, content_type = "application/json"),
-    responses((status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse)),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = TeamChannelResponse),
+        (status = 400, description = "Not one of the team's webhook destinations", content_type = "application/json", body = Object),
+        (status = 404, description = "Team not found", content_type = "application/json", body = Object),
+    ),
 )]
 pub async fn set_team_channel(
     Path((org_id, team_id)): Path<(String, String)>,
@@ -1484,32 +1514,17 @@ pub async fn set_team_channel(
                 .filter(|n| !n.is_empty())
                 .collect::<Vec<_>>()
         });
-        match infra::table::oncall_teams::set_channel(&org_id, &team_id, requested.clone()).await {
-            Ok(false) => MetaHttpResponse::not_found(format!("team `{team_id}` not found")),
-            Err(e) => internal_error("set_team_channel", &e),
-            Ok(true) => {
-                let policy =
-                    match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id)
-                        .await
-                    {
-                        Ok(p) => p.destinations,
-                        Err(e) => return to_response(e),
-                    };
-                let source = if requested.is_some() {
-                    "team"
-                } else {
-                    "policy"
-                };
-                MetaHttpResponse::json(TeamChannelResponse {
-                    team_id,
-                    destinations: config::meta::oncall::policy::team_channel(
-                        requested.as_deref(),
-                        &policy,
-                    )
-                    .to_vec(),
-                    source,
-                })
-            }
+        let saved = o2_enterprise::enterprise::oncall::chat::room::save_channel(
+            &org_id,
+            &team_id,
+            requested,
+            body.slack_same_room_destination,
+            body.clear_slack,
+        )
+        .await;
+        match saved {
+            Ok(team) => team_channel_response(team).await,
+            Err(e) => to_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]

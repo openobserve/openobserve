@@ -616,6 +616,67 @@ describe("OnCallPolicyEditor", () => {
       );
     });
 
+    /// The PUT replaces the whole setting, so a ticked same-room webhook still listed is resent.
+    it("keeps a ticked same-room webhook that is still in the new list", async () => {
+      service.getTeamChannel.mockResolvedValue({
+        data: {
+          team_id: "team_1",
+          destinations: ["slack-eng"],
+          source: "team",
+          slack_same_room_destination: "slack-eng",
+        },
+      } as any);
+      service.setTeamChannel.mockResolvedValue({
+        data: { team_id: "team_1", destinations: ["slack-eng"], source: "policy" },
+      } as any);
+      const wrapper = mount(OnCallPolicyEditor, {
+        props: {
+          teamId: "team_1",
+          policy: { ...policy, destinations: ["slack-eng"] },
+          open: true,
+          rotations: ROTATIONS,
+        },
+        global: { plugins: [i18n, store], stubs },
+      });
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-team-channel-clear"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setTeamChannel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { destinations: null, slack_same_room_destination: "slack-eng" },
+        }),
+      );
+    });
+
+    /// The Slack row's change goes out with the team's own list, not a reset to the policy.
+    it("sends the Slack row's clear with the team's own list", async () => {
+      service.getTeamChannel.mockResolvedValue({
+        data: {
+          team_id: "team_1",
+          destinations: ["slack-eng"],
+          source: "team",
+          slack_channel_set: true,
+          slack_channel_name: "pay",
+          slack_native: true,
+          slack_connected: true,
+        },
+      } as any);
+      service.setTeamChannel.mockResolvedValue({
+        data: { team_id: "team_1", destinations: ["slack-eng"], source: "team" },
+      } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      await wrapper.find('[data-test="oncall-team-slack-clear"]').trigger("click");
+      await flushPromises();
+
+      expect(service.setTeamChannel).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { destinations: ["slack-eng"], clear_slack: true } }),
+      );
+    });
+
     it("says so when the team's channel is empty on purpose", async () => {
       service.getTeamChannel.mockResolvedValue({
         data: { team_id: "team_1", destinations: [], source: "team" },

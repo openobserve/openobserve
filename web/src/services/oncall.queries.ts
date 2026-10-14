@@ -46,6 +46,7 @@ import type {
   Rotation,
   PutTelephonyBody,
   RoutingConfig,
+  SetTeamChannelBody,
   TeamLoad,
   TelephonyView,
   TeamOverview,
@@ -549,12 +550,8 @@ export const setTeamPolicyMutation = (org: string, teamId: string) =>
 
 export const setTeamChannelMutation = (org: string, teamId: string) =>
   mutationOptions({
-    mutationFn: (destinations: string[] | null) =>
-      oncallService.setTeamChannel({
-        org_identifier: org,
-        team_id: teamId,
-        data: { destinations },
-      }),
+    mutationFn: (data: SetTeamChannelBody) =>
+      oncallService.setTeamChannel({ org_identifier: org, team_id: teamId, data }),
     meta: { invalidates: [oncallKeys.team(org, teamId)], silentError: true },
   });
 

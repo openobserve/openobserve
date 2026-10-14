@@ -16,6 +16,9 @@
 //! Chat-platform rows: an org's install, a person's link, and one message per page post.
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+use super::team::Team;
 
 /// The chat platform a row belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -232,6 +235,95 @@ impl SlackAvailability {
     }
 }
 
+/// What a team-channel save does to the team's Slack fields (RO-1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SlackRoomEdit {
+    /// Leave every Slack field as it is.
+    Keep,
+    /// Store this same-room destination, or none.
+    SameRoom(Option<String>),
+    /// Empty the channel, its workspace and the same-room destination.
+    Clear,
+}
+
+impl SlackRoomEdit {
+    /// The edit a team-channel PUT asks for, refused unless its destination is the team's. [pure]
+    pub fn from_request(
+        same_room: Option<String>,
+        clear: bool,
+        team_channel: &[String],
+    ) -> Result<Self, SlackRoomEditError> {
+        let same_room = same_room
+            .map(|d| d.trim().to_string())
+            .filter(|d| !d.is_empty());
+        match (same_room, clear) {
+            (None, true) => Ok(Self::Clear),
+            (Some(_), true) => Err(SlackRoomEditError::ClearWithDestination),
+            (Some(d), false) if !team_channel.contains(&d) => {
+                Err(SlackRoomEditError::ForeignDestination(d))
+            }
+            (same_room, false) => Ok(Self::SameRoom(same_room)),
+        }
+    }
+}
+
+/// Why a team-channel save's Slack part is refused.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SlackRoomEditError {
+    /// The same-room destination is not one of the team's webhook destinations.
+    ForeignDestination(String),
+    /// The save both clears the Slack channel and names a same-room destination.
+    ClearWithDestination,
+}
+
+impl std::fmt::Display for SlackRoomEditError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ForeignDestination(d) => {
+                write!(f, "`{d}` is not one of this team's webhook destinations")
+            }
+            Self::ClearWithDestination => {
+                f.write_str("clearing the Slack channel also clears the same-room destination")
+            }
+        }
+    }
+}
+
+/// What the team-channel read shows of the team's Slack channel; never its workspace id.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct TeamSlackView {
+    pub slack_channel_set: bool,
+    /// Display only.
+    pub slack_channel_name: Option<String>,
+    /// Only while it is still one of the team's webhook destinations.
+    pub slack_same_room_destination: Option<String>,
+    /// RO-2: the channel is in the org's active workspace, so pages post there natively.
+    pub slack_native: bool,
+    /// The org has an active Slack install.
+    pub slack_connected: bool,
+}
+
+impl TeamSlackView {
+    /// The team's Slack channel as its read shows it, given the org's install and webhooks. [pure]
+    pub fn of(team: &Team, install: Option<&ChatInstall>, team_channel: &[String]) -> Self {
+        let plan = room_plan(
+            team.slack_workspace_id.as_deref(),
+            team.slack_channel_id.as_deref(),
+            team.slack_channel_name.as_deref(),
+            team.slack_same_room_destination.as_deref(),
+            install,
+            team_channel,
+        );
+        Self {
+            slack_channel_set: team.slack_channel_id.is_some(),
+            slack_channel_name: team.slack_channel_name.clone(),
+            slack_same_room_destination: plan.fallback_destination,
+            slack_native: plan.native.is_some(),
+            slack_connected: install.is_some_and(|i| i.status == InstallStatus::Active),
+        }
+    }
+}
+
 /// Decides the team's native room, stage webhooks and fallback from its stored Slack fields. [pure]
 pub fn room_plan(
     team_workspace_id: Option<&str>,
@@ -341,6 +433,104 @@ mod tests {
         }
         let unnamed = room_plan(Some("T1"), Some("C1"), None, None, Some(&active), &list);
         assert_eq!(unnamed.native.map(|n| n.channel_name), Some(None));
+    }
+
+    /// RO-1: a same-room destination must be one of the team's webhooks; clear empties it too.
+    #[test]
+    fn test_slack_room_edit_accepts_only_the_teams_own_destinations() {
+        use SlackRoomEdit as E;
+        use SlackRoomEditError as X;
+        let list = vec!["slack-old".to_string(), "pagerduty".to_string()];
+        let same = |d: &str| Ok(E::SameRoom(Some(d.to_string())));
+        // (case, requested destination, clear, outcome)
+        let cases = [
+            ("own", Some("slack-old"), false, same("slack-old")),
+            ("trimmed", Some(" pagerduty "), false, same("pagerduty")),
+            ("none unticks", None, false, Ok(E::SameRoom(None))),
+            ("blank unticks", Some("  "), false, Ok(E::SameRoom(None))),
+            (
+                "foreign",
+                Some("elsewhere"),
+                false,
+                Err(X::ForeignDestination("elsewhere".to_string())),
+            ),
+            ("clear", None, true, Ok(E::Clear)),
+            (
+                "clear with one",
+                Some("slack-old"),
+                true,
+                Err(X::ClearWithDestination),
+            ),
+        ];
+        for (case, requested, clear, want) in cases {
+            let got = SlackRoomEdit::from_request(requested.map(str::to_string), clear, &list);
+            assert_eq!(got, want, "{case}");
+        }
+    }
+
+    /// RO-1, RO-2: the read shows name, counted destination and whether the room is native.
+    #[test]
+    fn test_team_slack_view_shows_the_room_and_never_the_workspace() {
+        let active = install(InstallStatus::Active);
+        let list = vec!["slack-old".to_string()];
+        let team = |workspace: Option<&str>, channel: Option<&str>, same: Option<&str>| Team {
+            id: "t1".to_string(),
+            org_id: "default".to_string(),
+            name: "Payments".to_string(),
+            timezone: "UTC".to_string(),
+            description: None,
+            channel_destinations: None,
+            slack_workspace_id: workspace.map(str::to_string),
+            slack_channel_id: channel.map(str::to_string),
+            slack_channel_name: channel.map(|_| "pay".to_string()),
+            slack_same_room_destination: same.map(str::to_string),
+            created_at: 1,
+            updated_at: 1,
+        };
+        let view = |set, name: Option<&str>, same: Option<&str>, native, connected| TeamSlackView {
+            slack_channel_set: set,
+            slack_channel_name: name.map(str::to_string),
+            slack_same_room_destination: same.map(str::to_string),
+            slack_native: native,
+            slack_connected: connected,
+        };
+        let cases = [
+            (
+                "native",
+                team(Some("T1"), Some("C1"), Some("slack-old")),
+                Some(&active),
+                view(true, Some("pay"), Some("slack-old"), true, true),
+            ),
+            (
+                "mismatch",
+                team(Some("T2"), Some("C1"), None),
+                Some(&active),
+                view(true, Some("pay"), None, false, true),
+            ),
+            (
+                "no install",
+                team(Some("T1"), Some("C1"), None),
+                None,
+                view(true, Some("pay"), None, false, false),
+            ),
+            (
+                "not set, destination left the list",
+                team(None, None, Some("gone")),
+                Some(&active),
+                view(false, None, None, false, true),
+            ),
+        ];
+        for (case, team, install, want) in cases {
+            let got = TeamSlackView::of(&team, install, &list);
+            assert_eq!(got, want, "{case}");
+            assert!(
+                !serde_json::to_string(&got).unwrap().contains("T1"),
+                "{case}"
+            );
+        }
+        let revoked = install(InstallStatus::Revoked);
+        let got = TeamSlackView::of(&team(Some("T1"), Some("C1"), None), Some(&revoked), &list);
+        assert!(!got.slack_connected && !got.slack_native);
     }
 
     #[test]

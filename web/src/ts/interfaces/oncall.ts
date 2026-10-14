@@ -349,6 +349,28 @@ export interface TeamChannel {
   team_id: string;
   destinations: string[];
   source: "team" | "policy";
+  /** Only `/oncall here` sets a team's Slack channel; the read never carries its workspace id. */
+  slack_channel_set?: boolean;
+  slack_channel_name?: string | null;
+  /** Only while it is still one of the team's webhook destinations (RO-1). */
+  slack_same_room_destination?: string | null;
+  /** RO-2: the channel is in the org's connected workspace. */
+  slack_native?: boolean;
+  slack_connected?: boolean;
+}
+
+/** `PUT /oncall/teams/{id}/channel` body; an omitted same-room destination unticks it. */
+export interface SetTeamChannelBody {
+  destinations: string[] | null;
+  slack_same_room_destination?: string;
+  clear_slack?: boolean;
+}
+
+/** `POST /oncall/teams/{id}/slack/test` (RO-7): `advice` is the server's words for what to fix. */
+export interface TeamSlackTestResult {
+  ok: boolean;
+  class: "ok" | "channel_problem" | "not_connected" | "no_channel";
+  advice: string | null;
 }
 
 export interface Unavailability {

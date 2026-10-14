@@ -24,7 +24,7 @@ use openobserve_api_common::extractors::ValidatedJson;
 use serde::Deserialize;
 
 #[cfg(feature = "enterprise")]
-use super::{SETTINGS, allowed};
+use super::{CONFIG, SETTINGS, allowed};
 #[cfg(feature = "enterprise")]
 use crate::service::auth::UserEmail;
 
@@ -232,6 +232,49 @@ pub async fn get_slack_manifest(
     }
 }
 
+/// Posts one plain test message to the team's Slack channel and says what to fix (RO-7).
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/teams/{team_id}/slack/test",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "TestOnCallTeamSlackChannel",
+    summary = "Send a test message to a team's Slack channel",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = String, Path, description = "Team ID"),
+    ),
+    responses(
+        (status = 200, description = "Sent, or the reason it was not with advice", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
+        (status = 404, description = "Team not found", content_type = "application/json", body = Object),
+        (status = 502, description = "Slack could not be reached", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn test_team_slack_channel(
+    Path((org_id, team_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use axum::response::IntoResponse;
+        use o2_enterprise::enterprise::oncall::chat::room::{self, RoomTestError};
+
+        let permitted = allowed(&org_id, &user_email.user_id, CONFIG, "PUT").await;
+        match room::test(&org_id, &team_id, permitted).await {
+            Ok(result) => MetaHttpResponse::json(result),
+            Err(RoomTestError::Storage(cause)) => super::internal_error("slack test", &cause),
+            Err(e) => MetaHttpResponse::error(e.http_status(), e.to_string()).into_response(),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, team_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 /// A storage failure is logged and answered as a bare 500; every other refusal is worded for the
 /// caller.
 #[cfg(feature = "enterprise")]
@@ -280,6 +323,13 @@ mod tests {
                 )))),
             ),
             ("manifest", Box::pin(get_slack_manifest(org()))),
+            (
+                "team slack test",
+                Box::pin(test_team_slack_channel(Path((
+                    "acme".to_string(),
+                    "t1".to_string(),
+                )))),
+            ),
         ];
         for (name, handler) in cases {
             let resp = handler.await;

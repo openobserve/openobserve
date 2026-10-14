@@ -60,6 +60,8 @@ import type {
   OrgTelephonyView,
   ChatInstallView,
   SlackManifestUrls,
+  SetTeamChannelBody,
+  TeamSlackTestResult,
   TestPageResult,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
@@ -380,11 +382,23 @@ const oncall = {
   }: {
     org_identifier: string;
     team_id: string;
-    data: { destinations: string[] | null };
+    data: SetTeamChannelBody;
   }) =>
     http().put<TeamChannel>(
       `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/channel`,
       data,
+    ),
+
+  /// One plain bot message to the team's Slack channel; answers what to fix when it cannot post.
+  testTeamSlackChannel: ({
+    org_identifier,
+    team_id,
+  }: {
+    org_identifier: string;
+    team_id: string;
+  }) =>
+    http().post<TeamSlackTestResult>(
+      `/api/${org_identifier}/oncall/teams/${encodeURIComponent(team_id)}/slack/test`,
     ),
 
   /// Org-scoped, deliberately not per team. All three params optional; both
