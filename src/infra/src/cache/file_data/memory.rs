@@ -158,8 +158,10 @@ impl FileData {
             let (key, data_size) = item.unwrap();
             // move the file from memory to disk cache
             let idx = get_bucket_idx(&key);
+            // A public dashboard body is a decompressed copy; its disk file is the source.
             if let Some((key, data)) = DATA[idx].remove(&key)
                 && !is_local_disk_storage()
+                && !key.starts_with(super::disk::PUBLIC_DASHBOARDS_PREFIX)
             {
                 _ = super::disk::set(&key, data).await;
             }
@@ -352,6 +354,25 @@ pub async fn remove(file: &str) -> Result<(), anyhow::Error> {
     let idx = get_bucket_idx(file);
     let mut files = FILES[idx].write().await;
     files.remove(file).await
+}
+
+/// Removes every entry whose key starts with `prefix`; it scans the whole cache, so keep it rare.
+pub async fn remove_prefix(prefix: &str) -> Result<(), anyhow::Error> {
+    let keys: Vec<String> = DATA
+        .iter()
+        .flat_map(|bucket| {
+            bucket
+                .iter()
+                .filter(|e| e.key().starts_with(prefix))
+                .map(|e| e.key().clone())
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    for key in keys {
+        let idx = get_bucket_idx(&key);
+        FILES[idx].write().await.remove(&key).await?;
+    }
+    Ok(())
 }
 
 async fn gc() -> Result<(), anyhow::Error> {
@@ -687,5 +708,27 @@ mod tests {
         let fd = FileData::default();
         assert!(fd.is_empty());
         assert_eq!(fd.size(), 0);
+    }
+
+    #[tokio::test]
+    async fn remove_prefix_drops_every_version_of_one_public_dashboard_key() {
+        let key = format!("public_dashboards/o/{}/r3600", config::ider::uuid());
+        let other = format!("{key}0");
+        for k in [format!("{key}#1"), format!("{key}#2"), format!("{other}#1")] {
+            let idx = get_bucket_idx(&k);
+            FILES[idx]
+                .write()
+                .await
+                .set(&k, Bytes::from_static(b"body"))
+                .await
+                .unwrap();
+        }
+        remove_prefix(&format!("{key}#")).await.unwrap();
+        let left = |k: String| DATA[get_bucket_idx(&k)].contains_key(&k);
+        assert!(!left(format!("{key}#1")));
+        assert!(!left(format!("{key}#2")));
+        assert!(left(format!("{other}#1")));
+        let idx = get_bucket_idx(&format!("{key}#1"));
+        assert!(!FILES[idx].read().await.exist(&format!("{key}#1")).await);
     }
 }
