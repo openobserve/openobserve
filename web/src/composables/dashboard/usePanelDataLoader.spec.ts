@@ -1,7 +1,8 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { onMounted, ref } from "vue";
+import { createApp, onMounted, ref } from "vue";
 import { flushPromises } from "@vue/test-utils";
 import { usePanelDataLoader } from "./usePanelDataLoader";
+import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
 import queryService from "../../services/search";
 import config from "@/aws-exports";
 
@@ -1662,6 +1663,89 @@ describe("usePanelDataLoader", () => {
       await flushPromises();
 
       expect(streams).toHaveLength(1);
+    });
+  });
+
+  describe("a reload triggered by a variable change", () => {
+    const MINUTE = 60_000;
+    const queriedEndMs = (payload: any) => {
+      const end = Number(JSON.stringify(payload).match(/"end_time":(\d+)/)?.[1]);
+      return end > 1e14 ? end / 1000 : end;
+    };
+
+    const loadThenChangeVariable = async (provideResolver?: (app: any) => void) => {
+      global.AbortController = RealAbortController;
+      const streams: any[] = [];
+      streamOverride = (payload) => {
+        streams.push(payload);
+        return `stream-${streams.length}`;
+      };
+      const handedEnd = new Date(Date.now() - 45 * MINUTE);
+      const env = { name: "env", type: "custom", value: "prod", isVariablePartialLoaded: true };
+      const variablesData = createMockVariablesData({ values: [env] });
+      const app = createApp({});
+      provideResolver?.(app);
+      const loader = app.runWithContext(() =>
+        usePanelDataLoader(
+          createMockPanelSchema({ queryConfig: { query: "SELECT * FROM t WHERE e = '$env'" } }),
+          ref({ start_time: new Date(handedEnd.getTime() - 15 * MINUTE), end_time: handedEnd }),
+          variablesData,
+          ref(null),
+          ref(true),
+          ref("dashboards"),
+          ref("test-dashboard"),
+          ref("test-folder"),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(null),
+          ref(false),
+        ),
+      );
+
+      await loader.loadData();
+      await flushPromises();
+      variablesData.value = {
+        isVariablesLoading: false,
+        values: [{ ...env, value: "dev" }],
+      };
+      await flushPromises();
+      await flushPromises();
+      return { streams, handedEnd };
+    };
+
+    it("queries the window the dashboard resolves now, not the one handed at the last refresh", async () => {
+      const freshEnd = new Date();
+      const resolveFreshPanelTime = vi.fn(() => ({
+        start_time: new Date(freshEnd.getTime() - 15 * MINUTE),
+        end_time: freshEnd,
+      }));
+
+      const { streams, handedEnd } = await loadThenChangeVariable((app) =>
+        app.provide(DASHBOARD_FRESH_PANEL_TIME, resolveFreshPanelTime),
+      );
+
+      expect(streams).toHaveLength(2);
+      expect(queriedEndMs(streams[0])).toBe(handedEnd.getTime());
+      expect(resolveFreshPanelTime).toHaveBeenCalledWith("test-panel");
+      expect(queriedEndMs(streams[1])).toBe(freshEnd.getTime());
+    });
+
+    it("keeps the handed window when the dashboard resolves none", async () => {
+      const { streams, handedEnd } = await loadThenChangeVariable((app) =>
+        app.provide(DASHBOARD_FRESH_PANEL_TIME, () => undefined),
+      );
+
+      expect(streams).toHaveLength(2);
+      expect(queriedEndMs(streams[1])).toBe(handedEnd.getTime());
+    });
+
+    it("keeps the handed window outside a dashboard", async () => {
+      const { streams, handedEnd } = await loadThenChangeVariable();
+
+      expect(streams).toHaveLength(2);
+      expect(queriedEndMs(streams[1])).toBe(handedEnd.getTime());
     });
   });
 
