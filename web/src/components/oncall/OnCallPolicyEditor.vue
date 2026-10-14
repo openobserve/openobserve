@@ -407,17 +407,23 @@
               <div v-if="current" class="flex flex-col gap-2">
                 <div class="flex flex-wrap items-center gap-2">
                   <OText variant="label" class="w-32 shrink-0">{{ t("oncall.channels") }}</OText>
-                  <OCheckbox
-                    v-for="channel in CHANNELS"
-                    :key="channel"
-                    :model-value="current.channels.includes(channel)"
-                    :label="t(`oncall.channel_${channel}`)"
-                    :disabled="!canConfigure"
-                    :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
-                    @update:model-value="
-                      (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
-                    "
-                  />
+                  <span v-for="channel in channels" :key="channel" class="flex items-center gap-1">
+                    <OCheckbox
+                      :model-value="current.channels.includes(channel)"
+                      :label="t(`oncall.channel_${channel}`)"
+                      :disabled="!canConfigure || (channel === 'email' && emailLocked)"
+                      :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
+                      @update:model-value="
+                        (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
+                      "
+                    />
+                    <OIcon
+                      v-if="channel === 'email' && emailLocked"
+                      name="lock"
+                      size="xs"
+                      class="text-text-secondary"
+                    />
+                  </span>
                 </div>
                 <div class="flex flex-col items-start gap-2 ps-34 max-md:ps-0">
                   <OText variant="meta" data-test="oncall-policy-channels-hint">
@@ -426,6 +432,13 @@
                         priority: raw(priorityLabel(current.priority)),
                       })
                     }}
+                  </OText>
+                  <OText
+                    v-if="emailLocked && !slackNotConnected"
+                    variant="meta"
+                    data-test="oncall-policy-email-locked"
+                  >
+                    {{ t("oncallSlack.policyEmailLocked") }}
                   </OText>
                   <span
                     v-if="phoneWithoutEmail(current)"
@@ -444,6 +457,21 @@
                       @click="openTelephony"
                     >
                       {{ t("oncall.policyNoProviderLink") }}
+                    </OButton>
+                  </OBanner>
+                  <OBanner
+                    v-if="slackNotConnected"
+                    variant="info"
+                    data-test="oncall-policy-slack-not-connected"
+                  >
+                    {{ t("oncallSlack.policyNotConnected") }}
+                    <OButton
+                      variant="ghost-primary"
+                      size="xs"
+                      data-test="oncall-policy-slack-settings-link"
+                      @click="openSlackSettings"
+                    >
+                      {{ t("oncallSlack.policyNotConnectedLink") }}
                     </OButton>
                   </OBanner>
                 </div>
@@ -608,6 +636,7 @@ import { useStore } from "vuex";
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
 import OnCallTeamSlackChannel from "@/components/oncall/OnCallTeamSlackChannel.vue";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -690,10 +719,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
-
-// Only channels a Notifier can actually send. Rendering the rest would let
-// somebody tick SMS and receive nothing.
-const CHANNELS = DELIVERABLE_CHANNELS;
 
 /// Enough faces to read the row as "people", not enough to wrap it. The count
 /// beside them carries the real number.
@@ -826,6 +851,19 @@ async function writeTeamChannel(body: SetTeamChannelBody) {
 
 // Hidden only when the deployment has Slack off, like its Settings entry.
 const slackOffered = computed(() => store.state.zoConfig?.oncall_slack !== "off");
+
+// Only channels a Notifier can send; a stored Slack tick stays visible so it can be unticked.
+const channels = computed(() =>
+  DELIVERABLE_CHANNELS.filter(
+    (c) => c !== "slack" || slackOffered.value || current.value?.channels.includes("slack"),
+  ),
+);
+/// DM-3: a page never goes by Slack alone, so Email stays ticked and locked while Slack is.
+const emailLocked = computed(() => current.value?.channels.includes("slack") ?? false);
+/// DM-2: with no active install every Slack DM is skipped; an unread team channel says nothing.
+const slackNotConnected = computed(
+  () => emailLocked.value && teamChannel.value?.slack_connected === false,
+);
 
 /// Only read to answer one question: does the final action's safety net
 /// exist. A failure leaves the warning off — a false "no default team" on a
@@ -1197,6 +1235,7 @@ function addStep(rung: PriorityRung) {
 function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
   if (on) {
     if (!rung.channels.includes(channel)) rung.channels.push(channel);
+    if (channel === "slack" && !rung.channels.includes("email")) rung.channels.push("email");
   } else {
     rung.channels = rung.channels.filter((c) => c !== channel);
   }
@@ -1204,6 +1243,11 @@ function toggleChannel(rung: PriorityRung, channel: Channel, on: boolean) {
 
 function openTelephony() {
   router.push({ name: "telephonySettings", query: { org_identifier: orgId.value } });
+}
+
+/// Opens Settings → Slack, where an org admin connects the workspace.
+function openSlackSettings() {
+  router.push({ name: "slackSettings", query: { org_identifier: orgId.value } });
 }
 
 function onL0Update(value: L0Policy) {

@@ -21769,6 +21769,7 @@
     "eventKind_severity_promoted": "Severity raised",
     "eventKind_flapped": "Flapped — not re-paged",
     "channel_email": "Email",
+    "channel_slack": "Slack",
     "channel_sms": "SMS",
     "channel_voice": "Voice call",
     "channel_webhook": "Chat / webhook",
@@ -23806,7 +23807,11 @@
     "teamChannelStopHelp": "Tick it when that webhook posts into the same Slack channel: it stops every page appearing there twice.",
     "teamChannelStopRisk": "If the bot ever cannot post in the Slack channel, nothing posts the page there as a fallback.",
     "teamChannelTestSent": "Test message sent to {channel}",
-    "teamChannelTestFailed": "Slack could not be reached. Try again."
+    "teamChannelTestFailed": "Slack could not be reached. Try again.",
+    "chipLinkOwn": "{reason}. Link your Slack account on My on-call",
+    "policyEmailLocked": "Email stays on with Slack: people without a linked Slack account still get the email.",
+    "policyNotConnected": "Slack is not connected, so Slack DMs are skipped and these pages go by the other ticks.",
+    "policyNotConnectedLink": "Connect it in Settings → Slack"
   },
   "oncallSlackApp": {
     "title": "Slack app",

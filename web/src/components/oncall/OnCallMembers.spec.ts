@@ -464,7 +464,7 @@ describe("OnCallMembers", () => {
   /// U2, U5, S1: three person chips per row, the server's reason on each, and red only when nothing lands.
   describe("the reach chips", () => {
     const SELF = String(store.state.userInfo.email);
-    const blocked = (channel: "sms" | "voice", why: string): ChannelReadiness => ({
+    const blocked = (channel: "sms" | "voice" | "slack", why: string): ChannelReadiness => ({
       channel,
       deliverable: false,
       configured_but_unverified: false,
@@ -497,10 +497,11 @@ describe("OnCallMembers", () => {
       });
     }
 
-    it("orders the chips Email, SMS, Voice whatever order the server sent", async () => {
+    it("orders the chips Email, Slack, SMS, Voice whatever order the server sent", async () => {
       const wrapper = renderReach([
         reach("bob@o2.ai", true, [
           blocked("voice", "no phone on file"),
+          blocked("slack", "not linked"),
           ready("email"),
           blocked("sms", "no phone on file"),
         ]),
@@ -509,6 +510,8 @@ describe("OnCallMembers", () => {
 
       expect(chipsOf(wrapper, "bob@o2.ai")).toEqual([
         "oncall-channel-bob@o2.ai-email",
+        "tip",
+        "oncall-channel-bob@o2.ai-slack",
         "tip",
         "oncall-channel-bob@o2.ai-sms",
         "tip",
@@ -585,6 +588,62 @@ describe("OnCallMembers", () => {
       expect(wrapper.find('[data-test="oncall-channel-cara@o2.ai-sms"]').classes()).toContain(
         "bg-icon-chip-error-bg",
       );
+    });
+
+    /// DM-8: green when a DM would land, dashed with the server's reason when not; never red while email lands.
+    it.each([
+      [
+        "a DM would land",
+        ready("slack"),
+        "bg-icon-chip-success-bg",
+        "Slack — verified, a page lands here",
+      ],
+      ["not linked", blocked("slack", "not linked"), "border-dashed", "not linked"],
+      ["DMs failing", blocked("slack", "Slack DMs failing"), "border-dashed", "Slack DMs failing"],
+      [
+        "disconnected",
+        blocked("slack", "Slack disconnected"),
+        "border-dashed",
+        "Slack disconnected",
+      ],
+    ])("draws the Slack chip when %s", async (_, slack, tone, tip) => {
+      const wrapper = renderReach([reach("bob@o2.ai", true, [ready("email"), slack])]);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="oncall-channel-bob@o2.ai-slack"]').classes()).toContain(
+        tone,
+      );
+      expect(tipsOf(wrapper, "bob@o2.ai")[1]).toBe(tip);
+      expect(wrapper.text()).not.toContain("Unreachable");
+    });
+
+    /// U5: the server sends no Slack entry while the org has no Slack connected, so no chip shows.
+    it("draws no Slack chip when the server sent no Slack entry", async () => {
+      const wrapper = renderReach([reach("bob@o2.ai", true, noPhone)]);
+      await flushPromises();
+
+      expect(wrapper.find('[data-test^="oncall-channel-bob@o2.ai-slack"]').exists()).toBe(false);
+    });
+
+    it("links the caller's own dashed Slack chip to My on-call", async () => {
+      const own = SELF.toUpperCase();
+      const notLinked = [ready("email"), blocked("slack", "not linked")];
+      const wrapper = renderReach([
+        reach(own, true, notLinked),
+        reach("bob@o2.ai", true, notLinked),
+      ]);
+      await flushPromises();
+
+      expect(tipsOf(wrapper, own)[1]).toBe("not linked. Link your Slack account on My on-call");
+      expect(wrapper.find('[data-test="oncall-channel-bob@o2.ai-slack-link"]').exists()).toBe(
+        false,
+      );
+
+      await wrapper.find(`[data-test="oncall-channel-${own}-slack-link"]`).trigger("click");
+      expect(push).toHaveBeenCalledWith({
+        name: "onCallMine",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
     });
   });
 

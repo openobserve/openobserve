@@ -74,6 +74,8 @@ export type AlertPriorityValue = 1 | 2 | 3 | 4 | 5;
 
 export type Channel =
   | "email"
+  /** A DM from the org's Slack app to the person's linked Slack account. */
+  | "slack"
   | "sms"
   | "voice"
   /** An existing alert Destination — Slack, Teams, or any HTTP endpoint. */

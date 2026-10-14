@@ -80,13 +80,15 @@ const router = useRouter();
 const store = useStore();
 
 /// The person channels in the order the chips read; webhook is the team's room, not a person's.
-const PERSON_CHANNELS: Channel[] = ["email", "sms", "voice"];
-const PHONE_CHANNELS = new Set<Channel>(["sms", "voice"]);
+const PERSON_CHANNELS: Channel[] = ["email", "slack", "sms", "voice"];
+/// The channels the caller fixes on My on-call, so only these chips link there.
+const OWN_FIX_CHANNELS = new Set<Channel>(["slack", "sms", "voice"]);
 
 /// A closed map rather than a built key: an unknown channel must fail to
 /// compile, not render a missing glyph next to a person's name.
 const CHANNEL_ICON: Record<Channel, IconName> = {
   email: "mail",
+  slack: "slack",
   sms: "chat",
   voice: "smartphone",
   webhook: "webhook",
@@ -96,6 +98,8 @@ function channelLabel(channel: Channel): I18nText {
   switch (channel) {
     case "email":
       return t("oncall.channel_email");
+    case "slack":
+      return t("oncall.channel_slack");
     case "sms":
       return t("oncall.channel_sms");
     case "voice":
@@ -143,15 +147,22 @@ function chipOf(c: ChannelReadiness): Chip {
   const tone = props.wouldLand
     ? "border-border-subtle border-dashed text-text-muted"
     : "border-transparent bg-icon-chip-error-bg text-icon-chip-error-text";
-  // Only the caller can add their own phone, so only their row links (R4b).
-  const link = props.own && PHONE_CHANNELS.has(c.channel);
+  // Only the caller can add their own phone or link their own Slack, so only their row links (R4b).
+  const link = props.own && OWN_FIX_CHANNELS.has(c.channel);
   return {
     channel: c.channel,
     icon: CHANNEL_ICON[c.channel],
     tone,
-    tip: link ? t("oncall.channelAddPhone", { reason: tip }) : tip,
+    tip: link ? ownFixTip(c.channel, tip) : tip,
     link,
   };
+}
+
+/// The caller's own blocked chip names where on My on-call they fix it.
+function ownFixTip(channel: Channel, reason: I18nText): I18nText {
+  return channel === "slack"
+    ? t("oncallSlack.chipLinkOwn", { reason })
+    : t("oncall.channelAddPhone", { reason });
 }
 
 function openMine() {
