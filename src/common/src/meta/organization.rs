@@ -533,13 +533,10 @@ pub struct OrganizationSettingPayload {
     pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
     #[cfg(feature = "cloud")]
     #[serde(default)]
-    pub role_name_claim: Option<String>,
-    #[cfg(feature = "cloud")]
-    #[serde(default)]
-    pub create_missing_role: Option<bool>,
-    #[cfg(feature = "cloud")]
-    #[serde(default)]
     pub domain_management_config: Option<DomainManagementConfig>,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub enforce_allowed_orgs_only: Option<bool>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -586,10 +583,7 @@ pub struct OrganizationSetting {
     pub domain_org_mappings: Vec<DomainOrgMapping>,
     #[cfg(feature = "cloud")]
     #[serde(default)]
-    pub role_name_claim: Option<String>,
-    #[cfg(feature = "cloud")]
-    #[serde(default)]
-    pub create_missing_role: bool,
+    pub enforce_allowed_orgs_only: bool,
     #[cfg(feature = "cloud")]
     #[serde(default)]
     pub domain_management_config: DomainManagementConfig,
@@ -630,11 +624,9 @@ impl Default for OrganizationSetting {
             #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
             #[cfg(feature = "cloud")]
-            role_name_claim: None,
-            #[cfg(feature = "cloud")]
-            create_missing_role: false,
-            #[cfg(feature = "cloud")]
             domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
         }
     }
 }
@@ -1510,11 +1502,9 @@ mod tests {
             #[cfg(feature = "cloud")]
             domain_org_mappings: None,
             #[cfg(feature = "cloud")]
-            role_name_claim: None,
-            #[cfg(feature = "cloud")]
-            create_missing_role: None,
-            #[cfg(feature = "cloud")]
             domain_management_config: None,
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1596,11 +1586,9 @@ mod tests {
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
             #[cfg(feature = "cloud")]
-            role_name_claim: None,
-            #[cfg(feature = "cloud")]
-            create_missing_role: false,
-            #[cfg(feature = "cloud")]
             domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1633,11 +1621,9 @@ mod tests {
             #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
             #[cfg(feature = "cloud")]
-            role_name_claim: None,
-            #[cfg(feature = "cloud")]
-            create_missing_role: false,
-            #[cfg(feature = "cloud")]
             domain_management_config: Default::default(),
+            #[cfg(feature = "cloud")]
+            enforce_allowed_orgs_only: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

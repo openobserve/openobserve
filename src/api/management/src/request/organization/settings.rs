@@ -237,18 +237,8 @@ pub async fn create(
     }
 
     #[cfg(feature = "cloud")]
-    if let Some(name) = settings.role_name_claim {
-        if name.is_empty() {
-            data.role_name_claim = None;
-        } else {
-            data.role_name_claim = Some(name);
-        }
-        field_found = true;
-    }
-
-    #[cfg(feature = "cloud")]
-    if let Some(create) = settings.create_missing_role {
-        data.create_missing_role = create;
+    if let Some(enforce) = settings.enforce_allowed_orgs_only {
+        data.enforce_allowed_orgs_only = enforce;
         field_found = true;
     }
 

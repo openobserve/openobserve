@@ -189,19 +189,19 @@ pub async fn approve_request(
         _ => {}
     }
 
-    if let Err(e) =
-        org_domain_requests::update_status(&id, &user.user_id, Status::Approved, reason).await
-    {
-        log::error!("error approving domain ownership request {id} : {e}",);
+    if let Err(e) = org_domain_ownership::link_from_meta(&req.org_id, &req.domain).await {
+        log::error!("error linking the domain to org after request approval : {e}");
+
         return MetaHttpResponse::internal_error(format!(
-            "error approving org domain ownership request : {e}"
+            "error linking domain from req {} : {e}",
+            req.id
         ));
     }
 
-    match org_domain_ownership::link_from_meta(&req.org_id, &req.domain).await {
+    match org_domain_requests::update_status(&id, &user.user_id, Status::Approved, reason).await {
         Ok(_) => MetaHttpResponse::ok("request approved successfully"),
         Err(e) => {
-            log::error!("error linking the domain to org after request approval : {e}");
+            log::error!("error approving domain ownership request {id} : {e}",);
             MetaHttpResponse::internal_error(e)
         }
     }

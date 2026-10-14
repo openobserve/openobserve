@@ -31,17 +31,9 @@ use {
     std::collections::HashMap,
     std::sync::LazyLock as Lazy,
 };
-#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
-use {
-    config::meta::user::{UserOrg, UserRole},
-    o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, get_user_role_deletion_tuple},
-    o2_openfga::authorizer::roles::{
-        check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
-    },
-    std::str::FromStr,
-};
 #[cfg(feature = "cloud")]
 use {
+    config::get_config,
     config::{DEFAULT_ORG, meta::user::UserRole, utils::rand::generate_random_string},
     db::org_status,
     db::{org_users, organization::get_org_setting},
@@ -55,7 +47,17 @@ use {
     openobserve_core::org_domain_ownership::get_cached_org_for_domain,
     openobserve_core::organization::list_org_users_by_user,
     openobserve_core::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
+    openobserve_core::users,
     std::{collections::HashSet, str::FromStr as _},
+};
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+use {
+    config::meta::user::{UserOrg, UserRole},
+    o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, get_user_role_deletion_tuple},
+    o2_openfga::authorizer::roles::{
+        check_and_get_crole_tuple_for_new_user, get_roles_for_user, get_user_crole_removal_tuples,
+    },
+    std::str::FromStr,
 };
 
 #[cfg(feature = "cloud")]
@@ -868,6 +870,13 @@ pub async fn process_domain_org_mapping(
     let org_settings = get_org_setting(&org_id).await?;
     let mappings = org_settings.domain_org_mappings;
 
+    let mut allowed_orgs: HashSet<_> = billing_group::list_billing_group_members_of(&org_id)
+        .await?
+        .into_iter()
+        .map(|v| v.member_org_id)
+        .collect();
+    allowed_orgs.insert(org_id.clone());
+
     let decision = org_settings.domain_management_config.evaluate(user_email);
     if matches!(decision, AccessDecision::Deny) {
         if is_new_user {
@@ -875,25 +884,28 @@ pub async fn process_domain_org_mapping(
             // the normal flow can take place
             return Ok(false);
         }
-        // TODO YJDoc2: decision on what the mapping should be : additive or add+sub
-        // let orgs = list_orgs_by_user(user_email).await?;
-        // let mut orgs_to_remove = Vec::new();
-        // for org in orgs {
-        //     if allowed_orgs.contains(&org.org_id) {
-        //         orgs_to_remove.push(org.org_id);
-        //     }
-        // }
+        let orgs = org_users::list_orgs_by_user(user_email).await?;
+        let mut orgs_to_remove = Vec::new();
+        for org in orgs {
+            if allowed_orgs.contains(&org.org_id) {
+                orgs_to_remove.push(org.org_id);
+            }
+        }
+
+        for org in orgs_to_remove {
+            if let Err(e) =
+                users::remove_user_from_org(&org, &user_email, &get_config().auth.root_user_email)
+                    .await
+            {
+                log::error!(
+                    "error user {user_email} was blocked from org {org_id}, but failed to remove from org {org} : {e}"
+                );
+            }
+        }
 
         log::info!("user {user_email} blocked by domain management config of org {org_id}");
-        return Ok(false);
+        return Ok(true);
     }
-
-    let mut allowed_orgs: HashSet<_> = billing_group::list_billing_group_members_of(&org_id)
-        .await?
-        .into_iter()
-        .map(|v| v.member_org_id)
-        .collect();
-    allowed_orgs.insert(org_id.clone());
 
     let mapped_orgs: Vec<_> = mappings
         .into_iter()
@@ -908,8 +920,6 @@ pub async fn process_domain_org_mapping(
     }
 
     let mut added = 0;
-
-    // TODO: YJDoc2: decide how to handle non mapped orgs, additively or add-sub
 
     for mapped in mapped_orgs {
         if org_status::is_blocked(&mapped.org_id) {
@@ -1021,7 +1031,30 @@ pub async fn process_domain_org_mapping(
         added += 1;
     }
 
-    if added == 0 {
+    let mut removed = 0;
+    if org_settings.enforce_allowed_orgs_only && !is_new_user {
+        let orgs = org_users::list_orgs_by_user(user_email).await?;
+        let mut orgs_to_remove = Vec::new();
+        for org in orgs {
+            if !allowed_orgs.contains(&org.org_id) {
+                orgs_to_remove.push(org.org_id);
+            }
+        }
+
+        removed = orgs_to_remove.len();
+        for org in orgs_to_remove {
+            if let Err(e) =
+                users::remove_user_from_org(&org, &user_email, &get_config().auth.root_user_email)
+                    .await
+            {
+                log::error!(
+                    "error user {user_email} was domain mapped from org {org_id}, but failed to remove from extra org {org} : {e}"
+                );
+            }
+        }
+    }
+
+    if added == 0 && removed == 0 {
         log::info!(
             "no mapped orgs were viable, so skipped processing domain mapping for user {user_email} from org {org_id}"
         );
@@ -1095,6 +1128,13 @@ pub async fn check_and_add_to_org(
         Ok(processed) => {
             if processed {
                 // domain based adding is done, so do not treat as a new user
+                let orgs = org_users::list_orgs_by_user(user_email).await?;
+                if orgs.is_empty() {
+                    log::warn!(
+                        "user {user_email} was domain mapped and is now associated with 0 orgs, logging him out"
+                    );
+                    return Err(anyhow::anyhow!("Please log in again"));
+                }
                 return Ok((false, pending_invites));
             }
         }
