@@ -15,7 +15,9 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  buildScopedDependencyGraph,
   buildVariablesDependencyGraph,
+  detectCyclesInScopedGraph,
   extractVariableNames,
   isGraphHasCycle,
 } from "./variablesDependencyUtils";
@@ -872,6 +874,72 @@ describe("Variables Dependency Utils", () => {
 
       expect(graph.region.parentVariables).toContain("env");
       expect(graph.env.childVariables).toContain("region");
+    });
+  });
+
+  describe("query variables", () => {
+    const queryVar = (name: string, query: string) => ({
+      name,
+      type: "query",
+      scope: "global" as const,
+      query_data: { query_type: "sql", query },
+    });
+
+    it("finds parents referenced in the raw query", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "region", type: "custom", query_data: undefined },
+        { name: "cluster", type: "query_values", query_data: { stream: "s", field: "f" } },
+        queryVar(
+          "service",
+          "SELECT service FROM logs WHERE region IN ($region) AND cluster = '${cluster}'",
+        ),
+      ]);
+      expect(graph.service.parentVariables).toEqual(["region", "cluster"]);
+      expect(graph.region.childVariables).toEqual(["service"]);
+      expect(graph.cluster.childVariables).toEqual(["service"]);
+    });
+
+    it("finds parents inside a PromQL selector and ignores unknown names", () => {
+      const graph = buildVariablesDependencyGraph([
+        { name: "cluster", type: "custom", query_data: undefined },
+        queryVar(
+          "namespace",
+          'label_values(kube_pod_info{cluster="$cluster",x="$nope"}, namespace)',
+        ),
+      ]);
+      expect(graph.namespace.parentVariables).toEqual(["cluster"]);
+    });
+
+    it("detects a cycle between query variables", () => {
+      const graph = buildVariablesDependencyGraph([
+        queryVar("a", "SELECT a FROM t WHERE b = '$b'"),
+        queryVar("b", "SELECT b FROM t WHERE a = '$a'"),
+      ]);
+      expect(isGraphHasCycle(graph)).not.toBeNull();
+    });
+
+    it("links scoped query variables and detects their cycles", () => {
+      const scoped = buildScopedDependencyGraph(
+        [
+          { name: "cluster", type: "custom", scope: "global" },
+          {
+            name: "pod",
+            type: "query",
+            scope: "tabs",
+            tabId: "t1",
+            query_data: { query: 'label_values(up{cluster="$cluster"}, pod)' },
+          },
+        ],
+        {},
+      );
+      expect(scoped["pod@tab@t1"].parents).toEqual(["cluster@global"]);
+      expect(scoped["cluster@global"].children).toEqual(["pod@tab@t1"]);
+
+      const cyclic = buildScopedDependencyGraph(
+        [queryVar("a", "SELECT * FROM t WHERE x = '$b'"), queryVar("b", "SELECT '$a'")],
+        {},
+      );
+      expect(detectCyclesInScopedGraph(cyclic)).not.toBeNull();
     });
   });
 });

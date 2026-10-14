@@ -1,4 +1,5 @@
 import { gt } from "@/types/i18n";
+import { isQueryBackedVariable } from "./queryVariableUtils";
 
 /**
  * Extract variable names from a string
@@ -52,9 +53,15 @@ export const buildVariablesDependencyGraph = (
   // Populate the graph
   for (let item of variables) {
     let name = item.name;
-    if (item.type == "query_values") {
+    if (isQueryBackedVariable(item)) {
       // Use a Set to collect all unique dependencies from stream, field, and filters
       const allDependencies = new Set<string>();
+
+      if (item.query_data?.query) {
+        extractVariableNames(item.query_data.query, variablesNameList).forEach((dep: string) =>
+          allDependencies.add(dep),
+        );
+      }
 
       // 1. Check stream field for variable references
       if (item.query_data?.stream) {
@@ -82,7 +89,7 @@ export const buildVariablesDependencyGraph = (
       // 5. Set parent variables (convert Set to Array)
       graph[name].parentVariables = Array.from(allDependencies);
     } else {
-      // no dependencies for non query_values variables
+      // no dependencies for variables that are not loaded from a query
       graph[item.name] = {
         parentVariables: [],
         childVariables: [],
@@ -192,6 +199,7 @@ interface VariableRuntimeState {
   query_data?: {
     stream?: string;
     field?: string;
+    query?: string;
     filter?: Array<{
       filter?: string;
       value?: string;
@@ -340,9 +348,13 @@ export const buildScopedDependencyGraph = (
       variable.panelId,
     );
 
-    if (variable.type === "query_values") {
+    if (isQueryBackedVariable(variable)) {
       // Use a Set to collect all unique parent variable names
       const allParentNames = new Set<string>();
+
+      if (variable.query_data?.query) {
+        extractVariableNames(variable.query_data.query).forEach((name) => allParentNames.add(name));
+      }
 
       // 1. Check stream field for variable references
       if (variable.query_data?.stream) {
