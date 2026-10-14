@@ -42,7 +42,8 @@ export function useReadyMadeOffers() {
   // Null while unread or after a failed read — either way, no banner.
   const settings = ref<ReadyMadeSettingValue | null>(null);
   const copies = ref<CopiesBySource>({});
-  const folderNames = ref<Set<string>>(new Set());
+  // Null while unread or after a failed read: a row must not claim "new" for a folder it never looked for.
+  const folderNames = ref<Set<string> | null>(null);
   const loaded = ref(false);
   let generation = 0;
 
@@ -84,22 +85,43 @@ export function useReadyMadeOffers() {
     loaded.value = true;
   };
 
+  const fetchFolderNames = async (org: string, force: boolean): Promise<Set<string> | null> => {
+    const options = foldersQuery(org, "dashboards");
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const folders = await queryClient.fetchQuery(options).catch(() => null);
+    return folders ? new Set(folders.map((folder) => folder.name)) : null;
+  };
+
+  /** The org's folder names, so each checklist row can say whether its folder already exists. */
+  const loadFolders = async ({ force = false }: { force?: boolean } = {}) => {
+    const org = orgId.value;
+    if (!org) return;
+    const names = await fetchFolderNames(org, force);
+    if (org === orgId.value) folderNames.value = names;
+  };
+
   /** Every source's copies and the folder names, for the Import dialog. */
   const loadAll = async ({ force = false }: { force?: boolean } = {}) => {
     const org = orgId.value;
     if (!org) return;
-    const run = generation;
-    const [all, folders] = await Promise.all([
+    const [all, names] = await Promise.all([
       loadCopies(
         org,
         READY_MADE_SOURCES.map((source) => source.id),
         force,
       ),
-      queryClient.fetchQuery(foldersQuery(org, "dashboards")).catch(() => []),
+      fetchFolderNames(org, force),
     ]);
-    if (run !== generation) return;
+    // Only an org switch voids these: a banner refresh that overlaps reads fewer sources and must not drop them.
+    if (org !== orgId.value) return;
     copies.value = { ...copies.value, ...all };
-    folderNames.value = new Set(folders.map((folder) => folder.name));
+    folderNames.value = names;
   };
 
   const isDetected = (id: ReadyMadeSourceId) => !!detected.value?.includes(id);
@@ -141,6 +163,7 @@ export function useReadyMadeOffers() {
     isDetected,
     copiesOf,
     refresh,
+    loadFolders,
     loadAll,
     remember,
   };

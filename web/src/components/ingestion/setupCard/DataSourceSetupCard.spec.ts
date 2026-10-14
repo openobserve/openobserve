@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
-import { ref } from "vue";
+import { defineComponent, ref } from "vue";
 import DataSourceSetupCard from "./DataSourceSetupCard.vue";
 import i18n from "@/locales";
 import settings from "@/services/settings";
@@ -514,19 +514,24 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
   const answered = (sources: Record<string, "added" | "dismissed">) =>
     getSetting.mockResolvedValue(stored(sources));
 
-  const installed = (sourceId: string, count = 1, status = "created") => ({
-    status,
-    sourceId,
-    folderId: "f-1",
-    folderName: sourceId === "kubernetes" ? "Kubernetes" : "PostgreSQL",
-    dashboards: Array.from({ length: count }, (_, i) => ({
-      key: `k${i}`,
-      title: `t${i}`,
-      dashboardId: `dash-${i}`,
+  const installed = (sourceId: string, count = 1, status = "created", createdKeys?: string[]) => {
+    const folderName = sourceId === "kubernetes" ? "Kubernetes" : "PostgreSQL";
+    return {
+      status,
+      sourceId,
       folderId: "f-1",
-      folderName: "x",
-    })),
-  });
+      folderName,
+      dashboards: Array.from({ length: count }, (_, i) => ({
+        key: `k${i}`,
+        title: `t${i}`,
+        dashboardId: `dash-${i}`,
+        folderId: "f-1",
+        folderName,
+        created: createdKeys ? createdKeys.includes(`k${i}`) : status === "created",
+      })),
+    };
+  };
+  const notice = () => wrapper.find('[data-test="data-source-setup-card-ready-made-added"]');
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -659,6 +664,117 @@ describe("DataSourceSetupCard — ready-made dashboards wiring", () => {
     renderer().vm.$emit("detected", 2);
     await flushPromises();
     expect(toastMock).not.toHaveBeenCalled();
+    expect(notice().exists()).toBe(false);
+  });
+
+  it("after an automatic add, keeps a notice on the page naming what was added and where, with Open", async () => {
+    wrapper = mountCard("postgres");
+    expect(notice().exists()).toBe(false);
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(notice().text()).toContain(
+      (i18n.global as any).t("ingestion.setupCard.readyMadeAutoAdded", {
+        name: "PostgreSQL",
+        list: "t0",
+        folder: "PostgreSQL",
+      }),
+    );
+    await notice()
+      .find('[data-test="data-source-setup-card-ready-made-added-open"]')
+      .trigger("click");
+    expect(router.push).toHaveBeenCalledWith({
+      path: "/dashboards/view",
+      query: { org_identifier: "test-org", dashboard: "dash-0", folder: "f-1" },
+    });
+    await notice()
+      .find('[data-test="data-source-setup-card-ready-made-added-close"]')
+      .trigger("click");
+    expect(notice().exists()).toBe(false);
+  });
+
+  it("keeps the notice when a layout switch remounts the card, and drops it on the next visit", async () => {
+    // The page stays mounted while the card is swapped, as the data-sources page does when a phone rotation crosses md.
+    const host = defineComponent({
+      components: { DataSourceSetupCard },
+      setup: () => ({ shown: ref(true) }),
+      template: '<DataSourceSetupCard v-if="shown" slug="postgres" />',
+    });
+    const store = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        userInfo: { email: "t@e.com" },
+        organizationData: { organizationPasscode: "pc" },
+        theme: "light",
+      },
+    });
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: "/", component: { template: "<div />" } },
+        { path: "/setup", component: { template: "<div />" } },
+      ],
+    });
+    await router.push("/setup");
+    wrapper = mount(host, {
+      global: { plugins: [store, router, i18n], stubs: { SetupCardRenderer: rendererStub } },
+    });
+    const remount = async () => {
+      wrapper.vm.shown = false;
+      await flushPromises();
+      wrapper.vm.shown = true;
+      await flushPromises();
+    };
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(notice().exists()).toBe(true);
+
+    await remount();
+    expect(notice().exists()).toBe(true);
+    expect(installReadyMade).toHaveBeenCalledTimes(1);
+
+    await router.push("/");
+    await router.push("/setup");
+    await remount();
+    expect(notice().exists()).toBe(false);
+  });
+
+  it("shows no notice when the automatic path found the dashboards already there", async () => {
+    installReadyMade.mockResolvedValue(installed("postgresql", 1, "exists"));
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(toastMock).toHaveBeenCalledTimes(1);
+    expect(notice().exists()).toBe(false);
+  });
+
+  it("shows no notice after an earlier answer silenced the automatic path", async () => {
+    answered({ postgresql: "dismissed" });
+    wrapper = mountCard("postgres");
+    renderer().vm.$emit("detected", 2);
+    await flushPromises();
+    expect(notice().exists()).toBe(false);
+  });
+
+  it("the step button names a dashboard it had to put back into an existing set", async () => {
+    installReadyMade.mockResolvedValue(installed("kubernetes", 4, "created", ["k1"]));
+    wrapper = mountCard("kubernetes");
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    expect(toastMock).toHaveBeenCalledTimes(1);
+    expect(toastMock.mock.calls[0][0]).toMatchObject({
+      variant: "success",
+      message: tp("dashboard.readyMade.missingAdded", { list: "t1", folder: "Kubernetes" }, 1),
+    });
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("the step button opens a fresh install without a toast: the dashboard it opens is the news", async () => {
+    installReadyMade.mockResolvedValue(installed("kubernetes", 4));
+    wrapper = mountCard("kubernetes");
+    renderer().vm.$emit("step-action", "open-ready-made-dashboard");
+    await flushPromises();
+    expect(toastMock).not.toHaveBeenCalled();
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
 
   it("Kubernetes with no earlier answer installs only when its metrics rule passes", async () => {

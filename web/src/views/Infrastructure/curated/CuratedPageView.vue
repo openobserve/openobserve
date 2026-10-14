@@ -43,8 +43,10 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import analytics from "@/services/product_analytics";
 import { getReadyMadeSource } from "@/composables/readyMade/catalog";
 import { installReadyMade } from "@/composables/readyMade/installReadyMade";
+import { describeReadyMadeInstall } from "@/composables/readyMade/readyMadeMessages";
 import type { WorkloadId } from "@/composables/useWorkloadDetection";
 import { curatedPacks } from "./packs";
+import { kubernetesDashboardForPageTab } from "./packs/kubernetes.dashboardTargets";
 import { FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./packs/kubernetes.page";
 import { useCuratedPage } from "./useCuratedPage";
 import type { HiddenGroupInfo, StaleGroupInfo } from "./resolve";
@@ -55,7 +57,7 @@ const props = defineProps<{ workload: WorkloadId }>();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 
 // No fallback: a packless route rendering another workload's manifest is a lie, not a degradation.
 const pack = curatedPacks[props.workload];
@@ -650,14 +652,16 @@ const showEditAsDashboard = computed(() => props.workload === "kubernetes" && !!
 const editingAsDashboard = ref(false);
 const kubernetesSource = getReadyMadeSource("kubernetes");
 
-/** The open tab's cluster/namespace picks, as the unsuffixed `var-` keys a dashboard applies to every scope. */
-const scopeParams = (): Record<string, string | string[]> => {
+/** A tab's picks for the named variables, as the unsuffixed `var-` keys a dashboard applies to every scope. */
+const scopeParams = (
+  tabId: string | null,
+  names: readonly string[],
+): Record<string, string | string[]> => {
   const params: Record<string, any> = variablesManager.value?.getUrlParams({ useLive: false }) ?? {
     ...route.query,
   };
-  const tabId = selectedTabId.value;
   const picked: Record<string, string | string[]> = {};
-  for (const name of ["cluster", "namespace"]) {
+  for (const name of names) {
     // Pickers are tab-scoped, so a pick is keyed by its tab; a drilldown or hand-typed URL carries the bare key.
     const value = (tabId ? params[`var-${name}.t.${tabId}`] : undefined) ?? params[`var-${name}`];
     if (value !== undefined && value !== null && value !== "") picked[`var-${name}`] = value;
@@ -669,6 +673,9 @@ const editAsDashboard = async () => {
   if (editingAsDashboard.value) return;
   editingAsDashboard.value = true;
   const org = orgId.value;
+  // Read before the first await: the tab and picks at the click are the ones to mirror.
+  const target = kubernetesDashboardForPageTab(selectedTabId.value);
+  const picks = scopeParams(selectedTabId.value, target.variables);
   try {
     const result = await installReadyMade(org, "kubernetes", {
       userId: store.state.userInfo?.email,
@@ -686,24 +693,18 @@ const editAsDashboard = async () => {
     }
     if (result.status === "created") {
       analytics.track("dashboard_created");
-      const count = result.dashboards.length;
-      toast({
-        variant: "success",
-        message: t(
-          "dashboard.readyMade.addedOne",
-          { name: kubernetesSource.name, folder: result.folderName, count },
-          count,
-        ),
-      });
+      toast({ variant: "success", message: describeReadyMadeInstall(result, t, locale.value) });
     }
-    const cluster = result.dashboards[0];
+    const copy =
+      result.dashboards.find((entry) => entry.key === target.key) ?? result.dashboards[0];
     await router.push({
       path: "/dashboards/view",
       query: {
         org_identifier: org,
-        dashboard: cluster.dashboardId,
-        folder: cluster.folderId,
-        ...scopeParams(),
+        dashboard: copy.dashboardId,
+        folder: copy.folderId,
+        tab: target.tabId,
+        ...picks,
       },
     });
   } finally {

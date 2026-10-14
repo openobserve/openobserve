@@ -75,6 +75,7 @@ import FirstEventStatus from "../FirstEventStatus.vue";
 const ORG = "test-org";
 const USER = "t@e.com";
 const OPEN_BUTTON = '[data-test="ai-step-action-open-ready-made-dashboard"]';
+const NOTICE = '[data-test="data-source-setup-card-ready-made-added"]';
 const svc = dashboards as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const settingsSvc = settings as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
@@ -283,6 +284,32 @@ describe(
       expect(memory?.sources.postgresql.state).toBe("added");
     });
 
+    it("keeps a notice above the card after the automatic add, for a user who missed the toast", async () => {
+      openPage();
+      await dataArrives();
+      await eventually(() => expect(wrapper.find(NOTICE).exists()).toBe(true));
+
+      const notice = wrapper.find(NOTICE);
+      expect(notice.text()).toContain(
+        (i18n.global as any).t("ingestion.setupCard.readyMadeAutoAdded", {
+          name: "PostgreSQL",
+          list: "PostgreSQL / Overview",
+          folder: "PostgreSQL",
+        }),
+      );
+      // Above the card, not inside main's renderer.
+      expect(
+        notice.element.compareDocumentPosition(wrapper.findComponent(SetupCardRenderer).element),
+      ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      await notice
+        .find('[data-test="data-source-setup-card-ready-made-added-open"]')
+        .trigger("click");
+      expect(router.push).toHaveBeenCalledWith({
+        path: "/dashboards/view",
+        query: { org_identifier: ORG, dashboard: "d1", folder: "f-PostgreSQL" },
+      });
+    });
+
     it.each(["dismissed", "added"] as const)(
       "with a %s answer, makes no dashboard or folder call and shows no toast",
       async (state) => {
@@ -296,6 +323,7 @@ describe(
         expect(dashboardCalls()).toEqual([]);
         expect(settingsSvc.setUserSetting).not.toHaveBeenCalled();
         expect(toastMock).not.toHaveBeenCalled();
+        expect(wrapper.find(NOTICE).exists()).toBe(false);
         expect(memory?.sources.postgresql.state).toBe(state);
         // The deliberate way in stays on the page.
         expect(wrapper.find(OPEN_BUTTON).exists()).toBe(true);
@@ -339,6 +367,8 @@ describe(
       expect(dashboardCalls().length).toBe(callsAfterFirstOpen);
       expect(settingsSvc.setUserSetting).toHaveBeenCalledTimes(1);
       expect(rows).toHaveLength(1);
+      // A later visit created nothing, so it carries no notice.
+      expect(wrapper.find(NOTICE).exists()).toBe(false);
     });
 
     it("stays silent on a later open even after the user deleted the dashboard it added", async () => {
@@ -378,6 +408,8 @@ describe(
         tp("dashboard.readyMade.existsOne", { name: "PostgreSQL", folder: "DB team", count: 1 }, 1),
       );
       expect(memory?.sources.postgresql.state).toBe("added");
+      // Nothing was created by this visit, so nothing stays on the page.
+      expect(wrapper.find(NOTICE).exists()).toBe(false);
       const callsAfterFirstOpen = dashboardCalls().length;
 
       await openAgain();

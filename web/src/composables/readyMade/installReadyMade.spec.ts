@@ -151,6 +151,7 @@ describe("installReadyMade", () => {
           dashboardId: "d1",
           folderId: "f-PostgreSQL",
           folderName: "PostgreSQL",
+          created: true,
         },
       ],
     });
@@ -185,7 +186,7 @@ describe("installReadyMade", () => {
       status: "exists",
       folderId: "moved",
       folderName: "DB team",
-      dashboards: [{ dashboardId: "seed-0" }],
+      dashboards: [{ dashboardId: "seed-0", created: false }],
     });
     // Exists still means the user has it, so it stops being offered.
     expect(settingsSvc.setUserSetting.mock.calls[0][3].sources.postgresql.state).toBe("added");
@@ -217,7 +218,11 @@ describe("installReadyMade", () => {
     expect(svc.delete).toHaveBeenCalledWith(ORG, "ours", "f-PostgreSQL", {
       silentForbidden: true,
     });
-    expect(result).toMatchObject({ dashboards: [{ dashboardId: "teammate" }] });
+    // The survivor is the teammate's, so this call added nothing a toast could name.
+    expect(result).toMatchObject({
+      status: "exists",
+      dashboards: [{ dashboardId: "teammate", created: false }],
+    });
   });
 
   it("breaks a created-time tie on the id, and never deletes a copy it did not create", async () => {
@@ -236,6 +241,33 @@ describe("installReadyMade", () => {
     const result = await installReadyMade(ORG, "postgresql");
     expect(svc.delete).not.toHaveBeenCalled();
     expect(result).toMatchObject({ dashboards: [{ dashboardId: "aaa" }] });
+  });
+
+  it("marks which dashboards this call created, so a re-add of a deleted one can name it", async () => {
+    folders.set("Kubernetes", { folderId: "f-Kubernetes", name: "Kubernetes" });
+    for (const [key, title] of [
+      ["cluster", "Kubernetes / Cluster"],
+      ["pod", "Kubernetes / Pod"],
+      ["workload", "Kubernetes / Workload"],
+    ]) {
+      seedCopy({
+        dashboard_id: `k8s-${key}`,
+        folder_id: "f-Kubernetes",
+        folder_name: "Kubernetes",
+        title,
+        role: `ready-made:kubernetes/${key}:1`,
+      });
+    }
+    const result = await installReadyMade(ORG, "kubernetes");
+    expect(svc.create.mock.calls.map((call) => call[1].title)).toEqual(["Kubernetes / Node"]);
+    expect(result.status).toBe("created");
+    if (result.status === "error") return;
+    expect(result.dashboards.map((d) => [d.title, d.created])).toEqual([
+      ["Kubernetes / Cluster", false],
+      ["Kubernetes / Node", true],
+      ["Kubernetes / Pod", false],
+      ["Kubernetes / Workload", false],
+    ]);
   });
 
   it("reports a 403 on create as forbidden, sent with silentForbidden", async () => {

@@ -49,6 +49,15 @@ const PAGE_SCOPE_VARIABLE_KEYS = new Set(["scope", "tabs"]);
 
 const GROUP_IDS = new Set<string>(Object.values(GROUP));
 
+/** Panels the curated pack marks empty-means-healthy, on the panel or through its page section. */
+const EMPTY_MEANS_HEALTHY_PANEL_IDS = new Set<string>(
+  kubernetesPage.sections.flatMap((section) =>
+    section.panels
+      .filter((panel) => panel.emptyMeansHealthy ?? section.emptyMeansHealthy)
+      .map((panel) => panel.id),
+  ),
+);
+
 /** A picker label that fell back to the bare group id reads better as the plain noun. */
 const VARIABLE_LABEL_KEYS: Record<string, I18nKey> = {
   cluster: "infra.k8s2.groupCluster",
@@ -142,10 +151,19 @@ function storedTab(tab: Doc, layout: KubernetesDashboardLayout): Doc {
   };
 }
 
+/** The page stamps "all clear" only where an empty answer is trustworthy: a tile or an instant table. */
+const emptyMeansHealthy = (panel: Doc): boolean =>
+  EMPTY_MEANS_HEALTHY_PANEL_IDS.has(panel.id) &&
+  (panel.type === "metric" || panel.queries?.[0]?.config?.query_type === "instant");
+
 function storedPanel(panel: Doc, layout: KubernetesDashboardLayout): Doc {
   const link = layout.links[panel.id];
   return {
     ...panel,
+    // The page paints an empty one as "All clear"; a stored copy shows "No Data", so its description says what that means.
+    ...(emptyMeansHealthy(panel)
+      ? { description: gt("dashboard.readyMade.emptyMeansHealthy") }
+      : {}),
     config: {
       ...withoutPageKeys(panel.config),
       // The explorer link carried the query base64-encoded, so a variable inside it never resolved.

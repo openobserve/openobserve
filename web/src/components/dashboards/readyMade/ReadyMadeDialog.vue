@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -25,6 +26,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OGlyph from "@/lib/forms/EmojiPicker/OGlyph.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { ReadyMadeSourceId } from "@/composables/readyMade/catalog";
+import { joinReadyMadeNames } from "@/composables/readyMade/readyMadeMessages";
 import type { ReadyMadeDialogMode, ReadyMadeDialogRow } from "./readyMade.types";
 
 const props = withDefaults(
@@ -47,7 +49,7 @@ const emit = defineEmits<{
   (e: "set-up", id: ReadyMadeSourceId): void;
 }>();
 
-const { t } = useI18nTyped();
+const { t, locale } = useI18nTyped();
 
 // Only the user's overrides: rows can still change after opening (Import loads copies late), and their defaults must follow.
 const overrides = ref(new Map<ReadyMadeSourceId, boolean>());
@@ -71,6 +73,25 @@ const toggle = (row: ReadyMadeDialogRow, value: unknown) => {
 };
 
 const selectedCount = computed(() => props.rows.filter(isSelected).length);
+
+// Only the banner's checklist remembers an untick, so only it warns about one.
+const declined = computed(() =>
+  props.mode === "choose" ? props.rows.filter((row) => selectable(row) && !isSelected(row)) : [],
+);
+const declineNote = computed<I18nText>(() =>
+  declined.value.length === 0
+    ? t("dashboard.readyMade.declineRule")
+    : t(
+        "dashboard.readyMade.declineNamed",
+        {
+          list: joinReadyMadeNames(
+            declined.value.map((row) => row.name),
+            locale.value,
+          ),
+        },
+        declined.value.length,
+      ),
+);
 
 const title = computed(() =>
   props.mode === "choose"
@@ -203,6 +224,14 @@ const confirm = () => {
           </OButton>
         </li>
       </ul>
+      <OBanner
+        v-if="mode === 'choose' && !loading"
+        variant="info"
+        dense
+        icon="info"
+        data-test="dashboards-ready-made-dialog-decline-note"
+        :content="declineNote"
+      />
     </div>
   </ODialog>
 </template>

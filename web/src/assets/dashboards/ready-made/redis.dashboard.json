@@ -327,7 +327,7 @@
           "id": "redis_rejected_connections",
           "type": "line",
           "title": "Rejected connections/s",
-          "description": "Connections refused because maxclients was reached. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "description": "Connections refused because maxclients was reached. Flat at 0 is healthy: no client was turned away. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -372,7 +372,7 @@
           "id": "redis_evicted_keys",
           "type": "line",
           "title": "Evicted keys/s",
-          "description": "Keys removed because maxmemory was reached. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "description": "Keys removed because maxmemory was reached. Flat at 0 is healthy: memory has not run out. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -882,7 +882,7 @@
           "id": "redis_clients_over_time",
           "type": "line",
           "title": "Clients",
-          "description": "Connected clients, not counting replicas, and clients waiting on a blocking command such as BLPOP. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
+          "description": "Connected clients, not counting replicas, and clients waiting on a blocking command such as BLPOP. Blocked at 0 is normal. Several Redis servers share one series unless the receiver's server.address resource attribute is enabled; until then this mixes them.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",

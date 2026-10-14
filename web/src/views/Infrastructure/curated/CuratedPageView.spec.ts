@@ -2226,7 +2226,10 @@ describe("CuratedPageView — Edit as dashboard", () => {
   let wrapper: VueWrapper<any>;
   let router: any;
 
-  const k8sCopies = (status: string) => ({
+  const k8sCopies = (
+    status: string,
+    created = status === "created" ? ["cluster", "node", "pod", "workload"] : [],
+  ) => ({
     status,
     sourceId: "kubernetes",
     folderId: "f-k8s",
@@ -2237,7 +2240,17 @@ describe("CuratedPageView — Edit as dashboard", () => {
       dashboardId: `k8s-${key}`,
       folderId: "f-k8s",
       folderName: "Kubernetes",
+      created: created.includes(key),
     })),
+  });
+  const tr = (key: string, named: Record<string, unknown> = {}, count?: number) =>
+    count === undefined
+      ? (i18n.global as any).t(key, named)
+      : (i18n.global as any).t(key, named, count);
+  const fullPage = () => ({
+    dashboard: ref(
+      dashboardFixture(["overview", "inventory", "health", "utilization", "nodes", "workloads"]),
+    ),
   });
 
   const mountPage = async (
@@ -2352,20 +2365,84 @@ describe("CuratedPageView — Edit as dashboard", () => {
         org_identifier: "test-org",
         dashboard: "k8s-cluster",
         folder: "f-k8s",
+        tab: "inventory",
         "var-cluster": "prod-eu-1",
         "var-namespace": ["payments", "checkout"],
       },
     });
-    expect(toastMock.mock.calls[0][0].variant).toBe("success");
+    expect(toastMock.mock.calls[0][0]).toMatchObject({
+      variant: "success",
+      message: tr(
+        "dashboard.readyMade.addedOne",
+        { name: "Kubernetes", folder: "Kubernetes", count: 4 },
+        4,
+      ),
+    });
   });
 
-  it("carries the picks of the tab that is open, never another tab's", async () => {
+  it("from Nodes opens Kubernetes / Node on its Nodes tab, with that tab's cluster pick only", async () => {
     wrapper = await mountPage("kubernetes", {}, { tab: "nodes" });
     await clickWithPicks();
     const query = router.push.mock.calls.at(-1)[0].query;
-    expect(query["var-cluster"]).toBe("prod-us-2");
+    expect(query).toMatchObject({
+      dashboard: "k8s-node",
+      tab: "nodes",
+      "var-cluster": "prod-us-2",
+    });
     expect(query["var-namespace"]).toBeUndefined();
     expect(Object.keys(query).filter((key) => key.includes(".t."))).toEqual([]);
+  });
+
+  it.each([
+    ["inventory", "k8s-cluster", "inventory"],
+    ["health", "k8s-cluster", "health"],
+    ["utilization", "k8s-cluster", "utilization"],
+    ["nodes", "k8s-node", "nodes"],
+    ["workloads", "k8s-pod", "pods"],
+  ])("from the %s tab opens %s on its %s tab", async (pageTab, dashboard, tab) => {
+    wrapper = await mountPage("kubernetes", fullPage(), { tab: pageTab });
+    await button().trigger("click");
+    await flushPromises();
+    expect(router.push.mock.calls.at(-1)[0].query).toMatchObject({ dashboard, tab });
+  });
+
+  it("from Workloads carries the cluster, namespace and pod picks to Kubernetes / Pod", async () => {
+    wrapper = await mountPage("kubernetes", fullPage(), {
+      tab: "workloads",
+      "var-cluster.t.workloads": "prod-eu-1",
+      "var-namespace.t.workloads": "shop",
+      "var-pod.t.workloads": "web-1",
+      "var-namespace.t.health": "other",
+    });
+    await button().trigger("click");
+    await flushPromises();
+    expect(router.push.mock.calls.at(-1)[0].query).toMatchObject({
+      dashboard: "k8s-pod",
+      tab: "pods",
+      "var-cluster": "prod-eu-1",
+      "var-namespace": "shop",
+      "var-pod": "web-1",
+    });
+  });
+
+  it("names a deleted dashboard it puts back, and opens the one for this tab", async () => {
+    installReadyMadeMock.mockResolvedValue(k8sCopies("created", ["node"]));
+    wrapper = await mountPage("kubernetes", fullPage(), { tab: "health" });
+    await button().trigger("click");
+    await flushPromises();
+    expect(toastMock).toHaveBeenCalledTimes(1);
+    expect(toastMock.mock.calls[0][0]).toMatchObject({
+      variant: "success",
+      message: tr(
+        "dashboard.readyMade.missingAdded",
+        { list: "Kubernetes / node", folder: "Kubernetes" },
+        1,
+      ),
+    });
+    expect(router.push.mock.calls.at(-1)[0].query).toMatchObject({
+      dashboard: "k8s-cluster",
+      tab: "health",
+    });
   });
 
   it("falls back to the URL picks before the pickers are ready, and stays quiet when the copies exist", async () => {

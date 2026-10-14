@@ -32,6 +32,9 @@ import { queryClient } from "@/composables/query/queryClient";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import type { FieldAlias } from "@/services/service_streams";
 import defaultSemanticGroups from "@/views/Infrastructure/curated/packs/__fixtures__/semanticGroups.default.json";
+import i18n from "@/locales";
+import { kubernetesPage } from "@/views/Infrastructure/curated/packs/kubernetes.page";
+import { kubernetesDashboardForPageTab } from "@/views/Infrastructure/curated/packs/kubernetes.dashboardTargets";
 import { buildKubernetesDashboards } from "./kubernetesDashboards";
 import { getReadyMadeSource, readyMadeMarker } from "./catalog";
 import { READYMADE_K8S_STREAMS, k8sSchemaEntry, k8sStreamList } from "./__fixtures__/k8sStreams";
@@ -202,6 +205,71 @@ describe("buildKubernetesDashboards — what the curated page alone understands 
     expect(first.layout.y).toBeGreaterThanOrEqual(note.layout.h);
     const layoutIds = cluster.tabs[0].panels.map((p: any) => p.layout.i);
     expect(new Set(layoutIds).size).toBe(layoutIds.length);
+  });
+});
+
+describe("buildKubernetesDashboards — empty means healthy", () => {
+  const HEALTHY = i18n.global.t("dashboard.readyMade.emptyMeansHealthy");
+  // The same rule resolve.ts uses to paint "All clear" on the page: the pack's mark, on a tile or an instant table.
+  const pageMarks = new Set(
+    kubernetesPage.sections.flatMap((section) =>
+      section.panels
+        .filter((p) => p.emptyMeansHealthy ?? section.emptyMeansHealthy)
+        .filter((p) =>
+          p.type === "metric" ? true : p.variants.every((v) => v.queryMode === "instant"),
+        )
+        .map((p) => p.id),
+    ),
+  );
+
+  it("describes every panel the pack marks empty-means-healthy, and no other", async () => {
+    const docs = await build();
+    const said = new Set<string>();
+    for (const doc of Object.values(docs)) {
+      for (const p of panelsOf(doc)) {
+        if (p.type === "markdown") continue;
+        if (pageMarks.has(p.id)) {
+          expect(p.description, p.id).toBe(HEALTHY);
+          said.add(p.id);
+        } else {
+          expect(p.description, p.id).not.toBe(HEALTHY);
+        }
+      }
+    }
+    expect([...said]).toEqual(
+      expect.arrayContaining([
+        "k8s_ov_unhealthy_pods",
+        "k8s_wh_deploy_short",
+        "k8s_wh_waiting_top",
+      ]),
+    );
+  });
+});
+
+describe("kubernetesDashboardForPageTab — Edit as dashboard targets", () => {
+  it("maps every curated tab to a real dashboard, tab and variable set", async () => {
+    const docs = await build();
+    for (const section of kubernetesPage.sections) {
+      const target = kubernetesDashboardForPageTab(section.id);
+      const doc = docs[target.key];
+      expect(
+        doc.tabs.map((tab: any) => tab.tabId),
+        section.id,
+      ).toContain(target.tabId);
+      expect(doc.variables.list.map((entry: any) => entry.name)).toEqual([...target.variables]);
+    }
+  });
+
+  it("sends Nodes to Node, Workloads to Pod and the cluster tabs to the same Cluster tab", () => {
+    expect(kubernetesDashboardForPageTab("nodes")).toMatchObject({ key: "node", tabId: "nodes" });
+    expect(kubernetesDashboardForPageTab("workloads")).toMatchObject({ key: "pod", tabId: "pods" });
+    for (const tab of ["inventory", "health", "utilization"]) {
+      expect(kubernetesDashboardForPageTab(tab)).toMatchObject({ key: "cluster", tabId: tab });
+    }
+    expect(kubernetesDashboardForPageTab(null)).toMatchObject({
+      key: "cluster",
+      tabId: "inventory",
+    });
   });
 });
 

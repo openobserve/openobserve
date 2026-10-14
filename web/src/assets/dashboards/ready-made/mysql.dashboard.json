@@ -327,7 +327,7 @@
           "id": "mysql_rollbacks",
           "type": "line",
           "title": "Rollbacks/s",
-          "description": "Transaction rollback requests per second (Handler_rollback), per server.",
+          "description": "Transaction rollback requests per second (Handler_rollback), per server. Flat at 0 is healthy: nothing was rolled back.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -372,7 +372,7 @@
           "id": "mysql_lock_waits",
           "type": "line",
           "title": "Lock waits/s",
-          "description": "Table locks that had to wait and InnoDB row lock waits per second.",
+          "description": "Table locks that had to wait and InnoDB row lock waits per second. Flat at 0 is healthy: no query waited for a lock.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -438,7 +438,7 @@
           "id": "mysql_row_lock_time",
           "type": "line",
           "title": "Row lock wait time",
-          "description": "Time spent waiting for InnoDB row locks, per second of wall time.",
+          "description": "Time spent waiting for InnoDB row locks, per second of wall time. Flat at 0 is healthy: no query waited for a row lock.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -483,7 +483,7 @@
           "id": "mysql_tmp_disk_tables",
           "type": "line",
           "title": "Temporary tables on disk/s",
-          "description": "Internal temporary tables that spilled to disk per second; large sorts and GROUP BY queries usually cause them.",
+          "description": "Internal temporary tables that spilled to disk per second; large sorts and GROUP BY queries usually cause them. Flat at 0 is healthy: every temporary table fit in memory.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",

@@ -192,7 +192,7 @@
           "id": "pg_rollback_ratio",
           "type": "metric",
           "title": "Rollback ratio",
-          "description": "Rolled-back transactions as a share of all transactions, over 5 minutes.",
+          "description": "Rolled-back transactions as a share of all transactions, over 5 minutes. Near 0% on a healthy database.",
           "config": {
             "show_legends": false,
             "legends_position": "bottom",
@@ -327,7 +327,7 @@
           "id": "pg_rollbacks",
           "type": "line",
           "title": "Rollbacks/s by database",
-          "description": "Transactions rolled back per second, per database.",
+          "description": "Transactions rolled back per second, per database. Flat at 0 is healthy: nothing was rolled back.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -372,7 +372,7 @@
           "id": "pg_deadlocks",
           "type": "line",
           "title": "Deadlocks (per 5 min)",
-          "description": "Deadlocks detected in the previous 5 minutes, per database. Needs `postgresql.deadlocks` / `postgresql.blks_hit` + `postgresql.blks_read` enabled in your collector config (off by default).",
+          "description": "Deadlocks detected in the previous 5 minutes, per database. Flat at 0 is healthy: no deadlocks. Needs `postgresql.deadlocks` / `postgresql.blks_hit` + `postgresql.blks_read` enabled in your collector config (off by default).",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",

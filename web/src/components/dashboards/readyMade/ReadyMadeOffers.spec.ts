@@ -219,6 +219,10 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
       .find(`[data-test="dashboards-ready-made-dialog-check-${id}"] button[role="checkbox"]`)
       .attributes("aria-checked");
   const primary = () => wrapper.find('[data-test="o-dialog-primary-btn"]');
+  const destination = (id: string) =>
+    wrapper.find(`[data-test="dashboards-ready-made-dialog-destination-${id}"]`).text();
+  const declineNote = () =>
+    wrapper.find('[data-test="dashboards-ready-made-dialog-decline-note"]').text();
   const savedStates = () =>
     Object.fromEntries(
       Object.entries(storedSetting?.sources ?? {}).map(([id, entry]: [string, any]) => [
@@ -412,10 +416,80 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
       expect(dialog().exists()).toBe(true);
       expect(row("kubernetes").text()).toContain(t("dashboard.readyMade.contentsKubernetes"));
       expect(row("kubernetes").text()).toContain(t("dashboard.readyMade.dataFound"));
-      expect(
-        wrapper.find('[data-test="dashboards-ready-made-dialog-destination-kubernetes"]').text(),
-      ).toBe(t("dashboard.readyMade.destinationNew", { folder: "Kubernetes" }));
+      expect(destination("kubernetes")).toBe(
+        t("dashboard.readyMade.destinationNew", { folder: "Kubernetes" }),
+      );
+      expect(destination("redis")).toBe(
+        t("dashboard.readyMade.destinationExisting", { folder: "Redis" }),
+      );
       expect(primary().text()).toBe(t("dashboard.readyMade.addSelected", { count: 2 }));
+    });
+
+    it("reads the folders afresh, so a folder made since the list was cached reads as existing", async () => {
+      fakeBackend(["mysql", "redis"]);
+      wrapper = await mountOffers();
+      // The org's folder list is cached before the user makes their own MySQL folder elsewhere.
+      await click("dashboards-ready-made-banner-choose");
+      expect(destination("mysql")).toBe(
+        t("dashboard.readyMade.destinationNew", { folder: "MySQL" }),
+      );
+      await wrapper.find('[data-test="o-dialog-secondary-btn"]').trigger("click");
+      await settle();
+      folders.set("MySQL", { folderId: "mine", name: "MySQL" });
+      const reads = commonSvc.list_Folders.mock.calls.length;
+
+      await click("dashboards-ready-made-banner-choose");
+
+      expect(commonSvc.list_Folders.mock.calls.length).toBe(reads + 1);
+      expect(destination("mysql")).toBe(
+        t("dashboard.readyMade.destinationExisting", { folder: "MySQL" }),
+      );
+      expect(destination("redis")).toBe(
+        t("dashboard.readyMade.destinationNew", { folder: "Redis" }),
+      );
+    });
+
+    it("never claims new or existing when the folder list cannot be read", async () => {
+      fakeBackend(["mysql", "redis"]);
+      commonSvc.list_Folders.mockRejectedValue(new Error("down"));
+      wrapper = await mountOffers();
+      await click("dashboards-ready-made-banner-choose");
+      expect(destination("mysql")).toBe(
+        t("dashboard.readyMade.destinationUnknown", { folder: "MySQL" }),
+      );
+    });
+
+    it("says beside the button that unticked items won't be offered again, naming them", async () => {
+      fakeBackend(["postgresql", "redis"]);
+      wrapper = await mountOffers();
+      await click("dashboards-ready-made-banner-choose");
+      expect(declineNote()).toBe(t("dashboard.readyMade.declineRule"));
+      await toggleRow("redis");
+      expect(declineNote()).toBe(
+        (i18n.global as any).t("dashboard.readyMade.declineNamed", { list: "Redis" }, 1),
+      );
+      await toggleRow("postgresql");
+      expect(declineNote()).toBe(
+        (i18n.global as any).t(
+          "dashboard.readyMade.declineNamed",
+          { list: "PostgreSQL and Redis" },
+          2,
+        ),
+      );
+    });
+
+    it("after Add selected, says which were not added and where to find them", async () => {
+      fakeBackend(["postgresql", "redis"]);
+      wrapper = await mountOffers();
+      await click("dashboards-ready-made-banner-choose");
+      await toggleRow("redis");
+      await primary().trigger("click");
+      await settle();
+      const info = toastMock.mock.calls.map((call) => call[0]).filter((x) => x.variant === "info");
+      expect(info.map((x) => x.message)).toEqual([
+        (i18n.global as any).t("dashboard.readyMade.notAddedToast", { list: "Redis" }, 1),
+      ]);
+      expect(info[0].message).toContain("Import → Ready-made dashboards");
     });
 
     it("ticked are added, unticked are dismissed, one left ticked is opened", async () => {
@@ -449,7 +523,15 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
       );
       await settle();
       expect(router.push).not.toHaveBeenCalled();
-      expect(toastMock.mock.calls.at(-1)![0].variant).toBe("success");
+      // The added ones first, then the one left out.
+      expect(toastMock.mock.calls.map((call) => call[0].variant)).toEqual(["success", "info"]);
+      expect(toastMock.mock.calls[0][0].message).toBe(
+        t("dashboard.readyMade.addedMany", {
+          count: 2,
+          folderCount: 2,
+          list: "PostgreSQL, Redis",
+        }),
+      );
     });
 
     it("ticks and unticks from the cell and from the keyboard, once per activation", async () => {
@@ -557,6 +639,9 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
       wrapper = await mountOffers();
       await openImport();
       expect(checked("kubernetes")).toBe("true");
+      expect(destination("kubernetes")).toBe(
+        t("dashboard.readyMade.destinationExisting", { folder: "Kubernetes" }),
+      );
       await primary().trigger("click");
       await settle();
       expect(svc.create.mock.calls.map((call) => call[1].title)).toEqual([
@@ -564,6 +649,47 @@ describe("ReadyMadeOffers — banner + checklist dialog", () => {
         "Kubernetes / Pod",
         "Kubernetes / Workload",
       ]);
+      // A gap fill names what came back instead of claiming all four were added, and opens the first of them.
+      expect(toastMock.mock.calls.at(-1)![0].message).toBe(
+        (i18n.global as any).t(
+          "dashboard.readyMade.missingAdded",
+          {
+            list: "Kubernetes / Node, Kubernetes / Pod, and Kubernetes / Workload",
+            folder: "Kubernetes",
+          },
+          3,
+        ),
+      );
+      expect(router.push.mock.calls.at(-1)[0].query.dashboard).toBe("d1");
+    });
+
+    it("shows where an installed dashboard lives now, after it was moved", async () => {
+      fakeBackend(["postgresql"]);
+      seedInstalled("PostgreSQL / Overview", "ready-made:postgresql/overview:1", "PostgreSQL");
+      wrapper = await mountOffers();
+      await openImport();
+      expect(row("postgresql").text()).toContain(
+        t("dashboard.readyMade.addedIn", { folder: "PostgreSQL" }),
+      );
+      await wrapper.find('[data-test="o-dialog-secondary-btn"]').trigger("click");
+      await settle();
+      // Moved through the Dashboards list, which writes outside the ready-made lookups' cache.
+      Object.assign(rows[0], { folder_id: "f-Team", folder_name: "Team" });
+
+      await openImport();
+
+      expect(row("postgresql").text()).toContain(
+        t("dashboard.readyMade.addedIn", { folder: "Team" }),
+      );
+    });
+
+    it("never warns about unticking: in this list it remembers nothing", async () => {
+      fakeBackend(["redis", "postgresql"]);
+      wrapper = await mountOffers();
+      await openImport();
+      expect(wrapper.find('[data-test="dashboards-ready-made-dialog-decline-note"]').exists()).toBe(
+        false,
+      );
     });
 
     it("Set up opens the source's data-source page", async () => {

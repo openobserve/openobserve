@@ -54,48 +54,6 @@
           "markdownContent": "Ready-made by OpenObserve. Charts fill in within a few minutes of new data. Edit or delete anything, including this note."
         },
         {
-          "id": "otelcol_setup",
-          "type": "markdown",
-          "title": "Send the collector's own metrics",
-          "description": "",
-          "config": {
-            "show_legends": false,
-            "legends_position": null
-          },
-          "queryType": "sql",
-          "queries": [
-            {
-              "query": "",
-              "vrlFunctionQuery": "",
-              "customQuery": false,
-              "fields": {
-                "stream": "",
-                "stream_type": "logs",
-                "x": [],
-                "y": [],
-                "z": [],
-                "filter": {
-                  "filterType": "group",
-                  "logicalOperator": "AND",
-                  "conditions": []
-                }
-              },
-              "config": {
-                "promql_legend": ""
-              }
-            }
-          ],
-          "layout": {
-            "x": 0,
-            "y": 4,
-            "w": 96,
-            "h": 28,
-            "i": 1
-          },
-          "htmlContent": "",
-          "markdownContent": "**Needs the collector's own metrics (`otelcol_*`), which are off by default.** Add this under `service:` in the collector config, with the URL, org and token of your OpenObserve exporter, then restart the collector:\n\n```yaml\nservice:\n  telemetry:\n    metrics:\n      readers:\n        - periodic:\n            interval: 30000\n            exporter:\n              otlp:\n                protocol: http/protobuf\n                endpoint: <url>/api/<org>/v1/metrics\n                headers:\n                  Authorization: Basic <token>\n```\n\nChecked on collector 0.115.1. `headers` must be a map, not a `- name:` list; `endpoint` is the full `/api/<org>/v1/metrics` URL."
-        },
-        {
           "id": "otelcol_collectors",
           "type": "table",
           "title": "Collectors and uptime",
@@ -134,11 +92,11 @@
             }
           ],
           "layout": {
-            "x": 96,
+            "x": 0,
             "y": 4,
             "w": 96,
-            "h": 10,
-            "i": 2
+            "h": 18,
+            "i": 1
           }
         },
         {
@@ -180,17 +138,17 @@
           ],
           "layout": {
             "x": 96,
-            "y": 14,
+            "y": 4,
             "w": 48,
             "h": 9,
-            "i": 3
+            "i": 2
           }
         },
         {
           "id": "otelcol_refused_rate",
           "type": "metric",
           "title": "Refused/s",
-          "description": "Metric points the receivers could not push into the pipelines per second; 0 when none were reported.",
+          "description": "Metric points the receivers could not push into the pipelines per second; 0 when none were reported. 0 is healthy: nothing was refused.",
           "config": {
             "show_legends": false,
             "legends_position": "bottom",
@@ -225,17 +183,17 @@
           ],
           "layout": {
             "x": 144,
-            "y": 14,
+            "y": 4,
             "w": 48,
             "h": 9,
-            "i": 4
+            "i": 3
           }
         },
         {
           "id": "otelcol_send_failed_rate",
           "type": "metric",
           "title": "Failed/s",
-          "description": "Metric points the exporters failed to send per second; 0 when none were reported (newer collectors only report it after a failure).",
+          "description": "Metric points the exporters failed to send per second; 0 when none were reported (newer collectors only report it after a failure). 0 is healthy: every send succeeded.",
           "config": {
             "show_legends": false,
             "legends_position": "bottom",
@@ -270,17 +228,17 @@
           ],
           "layout": {
             "x": 96,
-            "y": 23,
+            "y": 13,
             "w": 48,
             "h": 9,
-            "i": 5
+            "i": 4
           }
         },
         {
           "id": "otelcol_queue_fill",
           "type": "metric",
           "title": "Queue fill",
-          "description": "The fullest exporter retry queue as a share of its capacity; data is dropped at 100%.",
+          "description": "The fullest exporter retry queue as a share of its capacity; data is dropped at 100%. Near 0% is healthy: the exporters keep up.",
           "config": {
             "show_legends": false,
             "legends_position": "bottom",
@@ -315,17 +273,17 @@
           ],
           "layout": {
             "x": 144,
-            "y": 23,
+            "y": 13,
             "w": 48,
             "h": 9,
-            "i": 6
+            "i": 5
           }
         },
         {
           "id": "otelcol_accepted_vs_refused",
           "type": "line",
           "title": "Accepted vs refused points/s",
-          "description": "Metric points the receivers accepted and refused per second. Refused points never reach the pipeline.",
+          "description": "Metric points the receivers accepted and refused per second. Refused at 0 is healthy. Refused points never reach the pipeline.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -381,17 +339,17 @@
           ],
           "layout": {
             "x": 0,
-            "y": 32,
+            "y": 22,
             "w": 96,
             "h": 16,
-            "i": 7
+            "i": 6
           }
         },
         {
           "id": "otelcol_sent_vs_failed",
           "type": "line",
           "title": "Sent vs send-failed points/s",
-          "description": "Metric points the exporters sent and failed to send per second. Newer collectors only report failures after the first one.",
+          "description": "Metric points the exporters sent and failed to send per second. Send-failed at 0 is healthy. Newer collectors only report failures after the first one.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -447,10 +405,10 @@
           ],
           "layout": {
             "x": 96,
-            "y": 32,
+            "y": 22,
             "w": 96,
             "h": 16,
-            "i": 8
+            "i": 7
           }
         },
         {
@@ -492,10 +450,10 @@
           ],
           "layout": {
             "x": 0,
-            "y": 48,
+            "y": 38,
             "w": 96,
             "h": 16,
-            "i": 9
+            "i": 8
           }
         },
         {
@@ -537,17 +495,17 @@
           ],
           "layout": {
             "x": 96,
-            "y": 48,
+            "y": 38,
             "w": 96,
             "h": 16,
-            "i": 10
+            "i": 9
           }
         },
         {
           "id": "otelcol_queue",
           "type": "line",
           "title": "Exporter queue size vs capacity",
-          "description": "Batches waiting in each exporter's retry queue against the queue's capacity. A full queue drops data.",
+          "description": "Batches waiting in each exporter's retry queue against the queue's capacity. A queue size near 0 is healthy. A full queue drops data.",
           "config": {
             "show_legends": true,
             "legends_position": "bottom",
@@ -603,10 +561,10 @@
           ],
           "layout": {
             "x": 0,
-            "y": 64,
+            "y": 54,
             "w": 96,
             "h": 16,
-            "i": 11
+            "i": 10
           }
         },
         {
@@ -648,10 +606,10 @@
           ],
           "layout": {
             "x": 96,
-            "y": 64,
+            "y": 54,
             "w": 96,
             "h": 16,
-            "i": 12
+            "i": 11
           }
         },
         {
@@ -693,10 +651,10 @@
           ],
           "layout": {
             "x": 0,
-            "y": 80,
+            "y": 70,
             "w": 96,
             "h": 16,
-            "i": 13
+            "i": 12
           }
         },
         {
@@ -738,11 +696,53 @@
           ],
           "layout": {
             "x": 96,
-            "y": 80,
+            "y": 70,
             "w": 96,
             "h": 16,
-            "i": 14
+            "i": 13
           }
+        },
+        {
+          "id": "otelcol_setup",
+          "type": "markdown",
+          "title": "Send the collector's own metrics",
+          "description": "",
+          "config": {
+            "show_legends": false,
+            "legends_position": null
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "",
+              "vrlFunctionQuery": "",
+              "customQuery": false,
+              "fields": {
+                "stream": "",
+                "stream_type": "logs",
+                "x": [],
+                "y": [],
+                "z": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 86,
+            "w": 192,
+            "h": 24,
+            "i": 14
+          },
+          "htmlContent": "",
+          "markdownContent": "**Needs the collector's own metrics (`otelcol_*`), which are off by default.** Add this under `service:` in the collector config, with the URL, org and token of your OpenObserve exporter, then restart the collector:\n\n```yaml\nservice:\n  telemetry:\n    metrics:\n      readers:\n        - periodic:\n            interval: 30000\n            exporter:\n              otlp:\n                protocol: http/protobuf\n                endpoint: <url>/api/<org>/v1/metrics\n                headers:\n                  Authorization: Basic <token>\n```\n\nChecked on collector 0.115.1. `headers` must be a map, not a `- name:` list; `endpoint` is the full `/api/<org>/v1/metrics` URL."
         }
       ]
     }

@@ -33,15 +33,17 @@ import {
   getReadyMadeSource,
   type ReadyMadeSourceId,
 } from "@/composables/readyMade/catalog";
+import { installReadyMade } from "@/composables/readyMade/installReadyMade";
 import {
-  installReadyMade,
-  type ReadyMadeInstallResult,
-} from "@/composables/readyMade/installReadyMade";
+  describeReadyMadeInstall,
+  isReadyMadeGapFill,
+  joinReadyMadeNames,
+  primaryReadyMadeDashboard,
+  type ReadyMadeInstallSuccess as InstallSuccess,
+} from "@/composables/readyMade/readyMadeMessages";
 import { useReadyMadeOffers } from "@/composables/readyMade/useReadyMadeOffers";
 import ReadyMadeDialog from "./ReadyMadeDialog.vue";
 import type { ReadyMadeDialogMode, ReadyMadeDialogRow } from "./readyMade.types";
-
-type InstallSuccess = Extract<ReadyMadeInstallResult, { status: "created" | "exists" }>;
 
 const emit = defineEmits<{
   /** Something was created or found; the list and folder rail may have changed. */
@@ -63,7 +65,7 @@ const dialogLoading = ref(false);
 
 const nameOf = (id: ReadyMadeSourceId) => getReadyMadeSource(id).name;
 const joinList = (names: string[], type: "conjunction" | "unit") =>
-  new Intl.ListFormat(locale.value, { style: "long", type }).format(names);
+  joinReadyMadeNames(names, locale.value, type);
 
 const offered = computed(() => offers.offered.value);
 const single = computed(() =>
@@ -124,18 +126,13 @@ const setUpSource = (id: ReadyMadeSourceId) => {
 // ── Install flow ────────────────────────────────────────────────────────────
 
 const toastSingle = (result: InstallSuccess, withOpen: boolean) => {
-  const count = result.dashboards.length;
-  const params = { name: nameOf(result.sourceId), folder: result.folderName, count };
   toast({
     variant: "success",
-    message:
-      result.status === "created"
-        ? t("dashboard.readyMade.addedOne", params, count)
-        : t("dashboard.readyMade.existsOne", params, count),
+    message: describeReadyMadeInstall(result, t, locale.value),
     action: withOpen
       ? {
           label: t("dashboard.readyMade.open"),
-          handler: () => void openDashboard(result.dashboards[0]),
+          handler: () => void openDashboard(primaryReadyMadeDashboard(result)),
         }
       : undefined,
   });
@@ -182,10 +179,14 @@ const reportOutcome = (ok: InstallSuccess[], failed: ReadyMadeSourceId[], openSi
   if (ok.length === 1) {
     const navigate = openSingle && failed.length === 0;
     toastSingle(ok[0], !navigate);
-    if (navigate) void openDashboard(ok[0].dashboards[0]);
+    if (navigate) void openDashboard(primaryReadyMadeDashboard(ok[0]));
     return;
   }
-  toastMany(ok);
+  // A folder count would hide which dashboards came back into a set that already existed, so those are named one by one.
+  const whole = ok.filter((result) => result.status === "created" && !isReadyMadeGapFill(result));
+  for (const result of ok) if (!whole.includes(result)) toastSingle(result, true);
+  if (whole.length === 1) toastSingle(whole[0], true);
+  else if (whole.length > 1) toastMany(whole);
 };
 
 /** Installs one source at a time; a 403 stops the run and dismisses what it could not add. */
@@ -241,10 +242,17 @@ const noThanks = () => {
 
 // ── Dialog ──────────────────────────────────────────────────────────────────
 
-const openChoose = () => {
+// Both checklists decide what gets created, so they open on the server's copy: a folder made or a dashboard moved elsewhere is not in this tab's cache.
+const openChoose = async () => {
   dialogMode.value = "choose";
   dialogSources.value = [...offered.value];
   dialogOpen.value = true;
+  dialogLoading.value = true;
+  try {
+    await offers.loadFolders({ force: true });
+  } finally {
+    dialogLoading.value = false;
+  }
 };
 
 /** Import ▾ → Ready-made dashboards: every source, regardless of earlier "No thanks". */
@@ -254,7 +262,7 @@ const openImport = async () => {
   dialogLoading.value = true;
   try {
     if (!offers.loaded.value) await offers.refresh();
-    await offers.loadAll();
+    await offers.loadAll({ force: true });
   } finally {
     dialogLoading.value = false;
   }
@@ -262,7 +270,9 @@ const openImport = async () => {
 
 const destinationOf = (id: ReadyMadeSourceId): I18nText => {
   const folder = getReadyMadeSource(id).folderName;
-  return offers.folderNames.value.has(folder)
+  const known = offers.folderNames.value;
+  if (!known) return t("dashboard.readyMade.destinationUnknown", { folder });
+  return known.has(folder)
     ? t("dashboard.readyMade.destinationExisting", { folder })
     : t("dashboard.readyMade.destinationNew", { folder });
 };
@@ -296,10 +306,21 @@ const dialogRows = computed<ReadyMadeDialogRow[]>(() => {
 
 const onConfirm = async (selected: ReadyMadeSourceId[], unselected: ReadyMadeSourceId[]) => {
   // Unticking in the Import list is just "not now"; only the banner's checklist remembers it.
-  if (dialogMode.value === "choose" && unselected.length > 0) {
-    void offers.remember(Object.fromEntries(unselected.map((id) => [id, "dismissed" as const])));
+  const declined = dialogMode.value === "choose" ? unselected : [];
+  if (declined.length > 0) {
+    void offers.remember(Object.fromEntries(declined.map((id) => [id, "dismissed" as const])));
   }
   await addSources(selected, { openSingle: true });
+  if (declined.length === 0) return;
+  toast({
+    variant: "info",
+    message: t(
+      "dashboard.readyMade.notAddedToast",
+      { list: joinList(declined.map(nameOf), "conjunction") },
+      declined.length,
+    ),
+    timeout: 10000,
+  });
 };
 
 onMounted(() => {

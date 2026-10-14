@@ -34,6 +34,8 @@ export interface ReadyMadeInstalledDashboard {
   dashboardId: string;
   folderId: string;
   folderName: string;
+  /** This call created it; false for a copy that was already in the org. */
+  created: boolean;
 }
 
 export type ReadyMadeInstallResult =
@@ -194,17 +196,20 @@ function resolveDashboards(
 ): ReadyMadeInstalledDashboard[] {
   return source.dashboards.map((ref) => {
     const copy = copies.find((candidate) => candidate.key === ref.key);
+    const mine = created.get(ref.key);
     if (copy) {
-      return { key: ref.key, title: ref.title, ...pickCopy(copy) };
+      // A fresh copy that lost a create race was deleted, so the survivor is not this call's.
+      const isMine = mine?.dashboardId === copy.dashboardId;
+      return { key: ref.key, title: ref.title, ...pickCopy(copy), created: isMine };
     }
     // The re-list may lag our own create; fall back to what the create returned.
-    const mine = created.get(ref.key)!;
     return {
       key: ref.key,
       title: ref.title,
-      dashboardId: mine.dashboardId,
-      folderId: mine.folderId,
+      dashboardId: mine!.dashboardId,
+      folderId: mine!.folderId,
       folderName: folder?.name ?? source.folderName,
+      created: true,
     };
   });
 }
@@ -251,7 +256,7 @@ async function runInstall(
     const dashboards = resolveDashboards(source, copies, created, folder);
     if (userId) await saveReadyMadeStates(orgId, userId, { [source.id]: "added" });
     return {
-      status: created.size > 0 ? "created" : "exists",
+      status: dashboards.some((dashboard) => dashboard.created) ? "created" : "exists",
       sourceId: source.id,
       folderId: dashboards[0].folderId,
       folderName: dashboards[0].folderName,

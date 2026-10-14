@@ -415,11 +415,58 @@ describe("ready-made redis dashboard: merged servers", () => {
   });
 });
 
+// A chart that sits at 0 on a healthy system reads as broken unless it says so.
+const HEALTHY_AT_ZERO: Array<[string, any, string[]]> = [
+  ["postgresql", postgresql, ["pg_rollback_ratio", "pg_rollbacks", "pg_deadlocks"]],
+  [
+    "mysql",
+    mysql,
+    ["mysql_rollbacks", "mysql_lock_waits", "mysql_row_lock_time", "mysql_tmp_disk_tables"],
+  ],
+  ["redis", redis, ["redis_rejected_connections", "redis_evicted_keys", "redis_clients_over_time"]],
+  [
+    "otelcol",
+    otelCollector,
+    [
+      "otelcol_refused_rate",
+      "otelcol_send_failed_rate",
+      "otelcol_queue_fill",
+      "otelcol_accepted_vs_refused",
+      "otelcol_sent_vs_failed",
+      "otelcol_queue",
+    ],
+  ],
+];
+const SAYS_ZERO_IS_HEALTHY = /\b0%?\b[^.]*\b(healthy|normal)\b/;
+
+describe.each(HEALTHY_AT_ZERO)("ready-made %s dashboard: zero is healthy", (_id, doc, ids) => {
+  it.each(ids)("%s says a flat 0 is healthy", (panelId) => {
+    const panel = dataPanels(doc).find((p) => p.id === panelId);
+    expect(panel, panelId).toBeDefined();
+    expect(panel.description).toMatch(SAYS_ZERO_IS_HEALTHY);
+  });
+
+  it("says it on no other chart", () => {
+    for (const p of dataPanels(doc).filter((x) => !ids.includes(x.id))) {
+      expect(p.description, p.id).not.toMatch(SAYS_ZERO_IS_HEALTHY);
+    }
+  });
+});
+
 describe("ready-made OTel Collector dashboard", () => {
-  const setup = panelsOf(otelCollector)[1];
+  const all = panelsOf(otelCollector);
+  const setup = all.find((p) => p.id === "otelcol_setup");
   const yaml = (setup.markdownContent.match(/```yaml\n([\s\S]*?)```/) ?? [])[1] ?? "";
 
-  it("explains in its second panel how to make the collector send its own metrics", () => {
+  it("keeps the note first and puts the setup instructions last, below every chart", () => {
+    expect(all[0].id).toBe("otelcol_note");
+    expect(all.at(-1)).toBe(setup);
+    const bottom = Math.max(...all.filter((p) => p !== setup).map((p) => p.layout.y + p.layout.h));
+    expect(setup.layout.y).toBe(bottom);
+    expect(setup.layout).toMatchObject({ x: 0, w: 192 });
+  });
+
+  it("explains in its last panel how to make the collector send its own metrics", () => {
     expect(setup.type).toBe("markdown");
     expect(setup.markdownContent).toContain("otelcol_*");
     expect(yaml).toContain("service:\n  telemetry:\n    metrics:\n      readers:\n        - periodic:");

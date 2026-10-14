@@ -5445,7 +5445,8 @@
       "openDashboard": "Open dashboard",
       "readyMadeOpenOne": "Open {name} dashboard",
       "readyMadeOpenKubernetes": "Open Kubernetes dashboards",
-      "readyMadeFailed": "Couldn't add the {name} dashboard. Try again. | Couldn't add the {name} dashboards. Try again."
+      "readyMadeFailed": "Couldn't add the {name} dashboard. Try again. | Couldn't add the {name} dashboards. Try again.",
+      "readyMadeAutoAdded": "We found {name} data and added {list} to the {folder} folder."
     },
     "instrumentBeforeImportTitle": "Instrument Before Importing The Client",
     "instrumentBeforeImportBody": "If your app runs but no spans arrive, instrumentation likely loaded after the client was imported. Re-order so the init runs first:",
@@ -6354,13 +6355,17 @@
       "dismissedToast": "You can add them any time from Import → Ready-made dashboards.",
       "addedOne": "{name} dashboard added to the {folder} folder. | {count} {name} dashboards added to the {folder} folder.",
       "existsOne": "{name} dashboard is in the {folder} folder. | {count} {name} dashboards are in the {folder} folder.",
+      "missingAdded": "{list} was missing and has been added to the {folder} folder. | {list} were missing and have been added to the {folder} folder.",
       "addedMany": "{count} dashboards added in {folderCount} folders: {list}.",
       "openFolder": "Open {folder}",
       "failed": "Couldn't add {list}.",
       "chooseTitle": "Add ready-made dashboards",
       "importTitle": "Ready-made dashboards",
-      "chooseIntro": "Untick what you don't want. We won't offer those again.",
+      "chooseIntro": "Tick what to add. Each goes in its own folder, and you can edit it.",
       "importIntro": "Tick what to add. Each goes in its own folder, and you can edit it.",
+      "declineRule": "Anything you untick won't be offered again. You can add it later from Import → Ready-made dashboards.",
+      "declineNamed": "{list} won't be offered again. You can add it later from Import → Ready-made dashboards. | {list} won't be offered again. You can add them later from Import → Ready-made dashboards.",
+      "notAddedToast": "{list} wasn't added and won't be offered again. Add it any time from Import → Ready-made dashboards. | {list} weren't added and won't be offered again. Add them any time from Import → Ready-made dashboards.",
       "addSelected": "Add selected ({count})",
       "dataFound": "Data found",
       "noData": "No data yet",
@@ -6369,8 +6374,10 @@
       "setUp": "Set up",
       "contentsOne": "1 dashboard",
       "contentsKubernetes": "4 dashboards: cluster, node, pod, workload",
-      "destinationNew": "→ {folder} folder",
-      "destinationExisting": "→ {folder} folder (existing)"
+      "destinationNew": "→ {folder} folder (new)",
+      "destinationExisting": "→ {folder} folder (existing)",
+      "destinationUnknown": "→ {folder} folder",
+      "emptyMeansHealthy": "No data here means nothing is failing."
     },
     "addDashboardFromGitHub": {
       "title": "Add Dashboard from Gallery",
