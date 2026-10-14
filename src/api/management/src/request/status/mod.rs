@@ -225,6 +225,7 @@ struct ConfigResponse<'a> {
     alert_preview_timerange_minutes: i64,
     incidents_enabled: bool,
     downtimes_enabled: bool,
+    alert_calibration_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
@@ -475,6 +476,7 @@ pub async fn zo_config(
     );
     let incidents_enabled = enterprise_value!(false, o2cfg.incidents.enabled);
     let downtimes_enabled = enterprise_value!(false, o2cfg.downtimes.enabled);
+    let alert_calibration_enabled = enterprise_value!(false, o2cfg.alert_calibration.enabled);
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
@@ -602,6 +604,7 @@ pub async fn zo_config(
         alert_preview_timerange_minutes: cfg.limit.alert_preview_timerange_minutes,
         incidents_enabled,
         downtimes_enabled,
+        alert_calibration_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,
