@@ -239,6 +239,30 @@ describe("SearchResult Component", () => {
       expect(wrapper.emitted()["expandlog"]).toEqual([[3]]);
     });
 
+    it("filters the (empty) breakdown row by NULL only for a numeric field", () => {
+      wrapper.vm.pinnedTooltip = { ...wrapper.vm.pinnedTooltip, field: "status" };
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
+        { name: "status", dataType: "Int64" },
+      ];
+
+      wrapper.vm.applyPinnedFilter("", "include");
+
+      expect(wrapper.vm.searchObj.data.stream.addToFilterMode).toBe("append");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("status is null");
+    });
+
+    it("filters the (empty) breakdown row by NULL and '' for a string field", () => {
+      wrapper.vm.pinnedTooltip = { ...wrapper.vm.pinnedTooltip, field: "level" };
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "level", dataType: "Utf8" }];
+
+      wrapper.vm.applyPinnedFilter("", "exclude");
+
+      expect(wrapper.vm.searchObj.data.stream.addToFilterMode).toBe("append");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
+        "(level is not null AND level != '')",
+      );
+    });
+
     it("should toggle error details", async () => {
       wrapper.vm.disableMoreErrorDetails = false;
 
