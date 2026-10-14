@@ -327,7 +327,10 @@ describe("AddTab", () => {
 
     it("should seed blank default-values into OForm in add mode", () => {
       wrapper = createWrapper();
-      expect(wrapper.findComponent({ name: "OForm" }).props("defaultValues")).toEqual({ name: "" });
+      expect(wrapper.findComponent({ name: "OForm" }).props("defaultValues")).toEqual({
+        name: "",
+        repeatVariable: null,
+      });
     });
 
     it("should expose primary (Save) and secondary (Cancel) buttons via ODialog", () => {
@@ -433,7 +436,7 @@ describe("AddTab", () => {
         name: "Tab 1",
         panels: [],
       });
-      expect(wrapper.vm.addTabDefaults).toEqual({ name: "Tab 1" });
+      expect(wrapper.vm.addTabDefaults).toEqual({ name: "Tab 1", repeatVariable: null });
     });
 
     it("should emit refresh event after successful edit", async () => {
@@ -629,6 +632,42 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.t).toBeDefined();
       expect(wrapper.vm.t("dashboard.nameRequired")).toBe("Name is required");
+    });
+  });
+
+  describe("Repeat for each value", () => {
+    const variables = [
+      { name: "host", type: "query_values", scope: "global", multiSelect: true },
+      { name: "region", type: "custom", multiSelect: true },
+      { name: "single", type: "custom", scope: "global", multiSelect: false },
+      { name: "tabOnly", type: "custom", scope: "tabs", multiSelect: true, tabs: ["tab1"] },
+    ];
+
+    beforeEach(() => {
+      mockGetDashboard.mockResolvedValue({
+        dashboardId: "test-dashboard-id",
+        variables: { list: variables },
+        tabs: [{ tabId: "tab1", name: "Tab 1", panels: [], repeat: { variable: "host" } }],
+      });
+    });
+
+    it("offers only global multi-select variables and preselects the saved one", async () => {
+      wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+      expect(wrapper.vm.repeatVariableOptions.map((o: any) => o.value)).toEqual(["host", "region"]);
+      expect(wrapper.vm.addTabDefaults.repeatVariable).toBe("host");
+    });
+
+    it("saves the chosen variable on the tab, and clears it when emptied", async () => {
+      wrapper = createWrapper({ editMode: true, tabId: "tab1", open: false });
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+      await wrapper.vm.onSubmit({ name: "Tab 1", repeatVariable: "region" });
+      expect(mockEditTab.mock.calls[0][4].repeat).toEqual({ variable: "region" });
+      await wrapper.vm.onSubmit({ name: "Tab 1", repeatVariable: null });
+      expect("repeat" in mockEditTab.mock.calls[1][4]).toBe(true);
+      expect(mockEditTab.mock.calls[1][4].repeat).toBeUndefined();
     });
   });
 });

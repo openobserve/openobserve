@@ -34,12 +34,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :default-values="addTabDefaults"
         @submit="onSubmit"
       >
-        <OFormInput
-          name="name"
-          :label="t('dashboard.name')"
-          required
-          data-test="dashboard-add-tab-name"
-        />
+        <div class="flex flex-col gap-5">
+          <OFormInput
+            name="name"
+            :label="t('dashboard.name')"
+            required
+            data-test="dashboard-add-tab-name"
+          />
+          <div
+            v-if="editMode"
+            class="flex flex-col gap-2.5"
+            data-test="dashboard-add-tab-repeat-section"
+          >
+            <div class="text-compact text-text-heading flex items-center gap-1 font-medium">
+              <OIcon name="repeat" size="sm" />
+              {{ t("dashboard.configSectionRepeat") }}
+            </div>
+            <p
+              v-if="!repeatVariableOptions.length"
+              class="text-text-secondary text-xs"
+              data-test="dashboard-add-tab-repeat-empty"
+            >
+              {{ t("dashboard.repeat.tabEmptyDescription") }}
+            </p>
+            <template v-else>
+              <OFormSelect
+                name="repeatVariable"
+                :options="repeatVariableOptions"
+                :label="t('dashboard.repeat.variable')"
+                :placeholder="t('dashboard.repeat.none')"
+                clearable
+                data-test="dashboard-add-tab-repeat-variable"
+              />
+              <p class="text-text-secondary text-xs" data-test="dashboard-add-tab-repeat-hint">
+                {{ t("dashboard.repeat.tabHint", { max: REPEAT_MAX_ITEMS }) }}
+              </p>
+              <p class="text-text-secondary text-xs">
+                {{ t("dashboard.repeat.tabNameHint", { example: raw("$variable") }) }}
+              </p>
+            </template>
+          </div>
+        </div>
       </OForm>
     </div>
   </ODialog>
@@ -47,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
@@ -56,11 +91,14 @@ import useNotifications from "@/composables/useNotifications";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { REPEAT_MAX_ITEMS, getRepeatableVariables } from "@/utils/dashboard/repeatByVariable";
 import { makeAddTabSchema, type AddTabForm } from "./AddTab.schema";
 
 export default defineComponent({
   name: "AddTab",
-  components: { ODialog, OForm, OFormInput },
+  components: { ODialog, OForm, OFormInput, OFormSelect, OIcon },
   props: {
     open: {
       type: Boolean,
@@ -106,12 +144,21 @@ export default defineComponent({
     // store/API (it carries the non-form fields tabId/panels) — NOT a mirror of
     // the form's `name` field. The OForm owns `name`; this only seeds it.
     const editingTab: any = ref(null);
+    const dashboardVariables = ref<any[]>([]);
+
+    // A tab repeats by a global variable only: a tab-scoped one would depend on the tab it creates.
+    const repeatVariableOptions = computed(() =>
+      getRepeatableVariables(
+        dashboardVariables.value.filter((v: any) => !v.scope || v.scope === "global"),
+      ).map((v: any) => ({ label: raw(`$${v.name}`), value: v.name })),
+    );
 
     // OForm reads `defaultValues` once at mount, and ODialog remounts the body on
     // open — so this computed seeds `name` each time the dialog opens (edit → the
     // tab's name, create → blank). No local model / no manual reset needed.
     const addTabDefaults = computed((): AddTabForm => ({
       name: props.editMode ? (editingTab.value?.name ?? "") : "",
+      repeatVariable: props.editMode ? (editingTab.value?.repeat?.variable ?? null) : null,
     }));
 
     // Edit data arrives ASYNC (getDashboard may hit the API) after the dialog has
@@ -128,7 +175,11 @@ export default defineComponent({
         editingTab.value = JSON.parse(
           JSON.stringify(dashboardData?.tabs?.find((tab: any) => tab.tabId === props.tabId)),
         );
-        addTabForm.value?.form.reset({ name: editingTab.value?.name ?? "" });
+        dashboardVariables.value = dashboardData?.variables?.list ?? [];
+        addTabForm.value?.form.reset({
+          name: editingTab.value?.name ?? "",
+          repeatVariable: editingTab.value?.repeat?.variable ?? null,
+        });
       }
     };
     watch(
@@ -151,7 +202,13 @@ export default defineComponent({
             props.dashboardId,
             props.folderId ?? route.query.folder ?? "default",
             editingTab.value?.tabId,
-            { ...editingTab.value, name: value.name },
+            {
+              ...editingTab.value,
+              name: value.name,
+              repeat: value.repeatVariable
+                ? { ...editingTab.value?.repeat, variable: value.repeatVariable }
+                : undefined,
+            },
           );
 
           // emit refresh to rerender
@@ -201,6 +258,9 @@ export default defineComponent({
 
     return {
       t,
+      raw,
+      REPEAT_MAX_ITEMS,
+      repeatVariableOptions,
       addTabSchema,
       addTabDefaults,
       editingTab,

@@ -1365,6 +1365,28 @@ describe("Commons Utility Functions", () => {
       expect(mockDashboard.tabs[0].name).toBe("Updated Tab Name");
       expect(result.name).toBe("Updated Tab Name");
     });
+
+    it("sets, keeps and clears a tab's repeat", async () => {
+      const dashboardId = "dashboard-repeat";
+      const mockDashboard: any = { tabs: [{ tabId: "tab-1", name: "Tab" }] };
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      await editTab(mockStore, dashboardId, "f", "tab-1", {
+        name: "Tab",
+        repeat: { variable: "host" },
+      });
+      expect(mockDashboard.tabs[0].repeat).toEqual({ variable: "host" });
+
+      await editTab(mockStore, dashboardId, "f", "tab-1", { name: "Renamed" });
+      expect(mockDashboard.tabs[0].repeat).toEqual({ variable: "host" });
+
+      await editTab(mockStore, dashboardId, "f", "tab-1", { name: "Renamed", repeat: undefined });
+      expect("repeat" in mockDashboard.tabs[0]).toBe(false);
+    });
   });
 
   describe("addTab", () => {
