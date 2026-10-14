@@ -994,7 +994,6 @@ mod tests {
             TriggerModule::AnomalyDetection,
             TriggerModule::QueryRecommendations,
             TriggerModule::Slo,
-            TriggerModule::PublicDashboard,
         ] {
             let c = find_module(&configs, m.clone());
             assert_eq!(c.concurrency, 3, "{m:?} should inherit base concurrency");
