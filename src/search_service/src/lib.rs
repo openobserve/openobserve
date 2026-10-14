@@ -815,6 +815,20 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     Ok(search::QueryStatusResponse { status })
 }
 
+/// Aborts this node's searches whose trace id starts with `prefix`; a no-op in OSS (no channel).
+pub async fn abort_trace_family(prefix: &str) {
+    #[cfg(feature = "enterprise")]
+    if let Some(cancelled) = SEARCH_SERVER.remove(prefix, true).await {
+        for (_, status) in cancelled {
+            for sender in status.abort_senders.into_iter().rev() {
+                let _ = sender.send(());
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = prefix;
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn cancel_query(
     _org_id: &str,
