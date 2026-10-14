@@ -22,8 +22,13 @@ export class LogsToolbarPinsPage {
     this.moreMenuButton = '[data-test="logs-search-bar-utilities-menu-btn"]';
     this.savedViewsMenuListButton = '[data-test="logs-search-bar-menu-list-saved-views-btn"]';
 
-    // Traces runs the same composable under its own scope, so cross-scope
-    // isolation is only observable with both pages visited in one session.
+    // Traces runs the same composable under its own scope. useToolbarPins keeps
+    // ONE module-level scopeStates map, which only actually gets shared while both
+    // scopes live in the same document — so the cross-scope tests move between
+    // Logs and Traces by nav-rail click (client-side routing), never page.goto,
+    // which would reload the SPA and rebuild the map per page.
+    this.logsNavLink = '[data-test="menu-link-\\/logs-item"]';
+    this.tracesNavLink = '[data-test="menu-link-\\/traces-item"]';
     this.tracesMoreMenuButton = '[data-test="traces-search-bar-more-menu-btn"]';
     this.tracesPinToggle = {
       histogram: '[data-test="traces-search-bar-menu-pin-metrics-btn"]',
@@ -115,11 +120,36 @@ export class LogsToolbarPinsPage {
     await this.expectToolbarReady();
   }
 
-  async navigateToTraces(orgIdentifier) {
-    await this.page.goto(
-      `${process.env.ZO_BASE_URL}/web/traces?org_identifier=${orgIdentifier}`,
-    );
+  /**
+   * Marks the current document so a later check can prove it was never reloaded.
+   * A full load wipes `window`, so the stamp surviving is proof that routing
+   * stayed client-side and the module-level scopeStates map was really shared.
+   */
+  async stampDocument() {
+    await this.page.evaluate(() => {
+      window.__pinDocStamp = 'logs-toolbar-pins';
+    });
+  }
+
+  async expectSameDocument() {
+    const stamp = await this.page.evaluate(() => window.__pinDocStamp);
+    expect(
+      stamp,
+      'the document was reloaded, so the two pin scopes never shared one scopeStates map',
+    ).toBe('logs-toolbar-pins');
+  }
+
+  /** Client-side route change via the nav rail — keeps the document alive. */
+  async gotoTracesViaNav() {
+    await this.page.locator(this.tracesNavLink).click();
     await expect(this.page.locator(this.tracesMoreMenuButton)).toBeVisible();
+    await this.expectSameDocument();
+  }
+
+  async gotoLogsViaNav() {
+    await this.page.locator(this.logsNavLink).click();
+    await this.expectToolbarReady();
+    await this.expectSameDocument();
   }
 
   async openTracesMoreMenu() {

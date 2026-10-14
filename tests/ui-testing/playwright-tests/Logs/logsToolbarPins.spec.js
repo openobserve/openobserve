@@ -143,20 +143,24 @@ test.describe('Logs toolbar pins', () => {
   test('logs pins do not leak into the traces toolbar scope', {
     tag: ['@toolbarPins', '@logs', '@traces', '@P1', '@all'],
   }, async () => {
-    // useToolbarPins keeps one module-level scopeStates map for both scopes, so
-    // the isolation only becomes observable once BOTH scopes are live in the same
-    // session. Visiting only Logs would leave traces storage null no matter what,
-    // which is already asserted by useToolbarPins.spec.ts — this test earns its
-    // place by driving the two pages in one session instead.
+    // useToolbarPins keeps ONE module-level scopeStates map for both scopes, and
+    // that map is only genuinely shared while both scopes are instantiated in the
+    // same document. So this test moves between Logs and Traces by nav-rail click
+    // (client-side routing) — a page.goto would reload the SPA and rebuild the map
+    // per page, leaving only storage-key isolation under test, which
+    // useToolbarPins.spec.ts already covers. gotoTracesViaNav/gotoLogsViaNav
+    // assert a document stamp survives, so the one-document premise is enforced
+    // rather than assumed.
     const pins = pm.logsToolbarPinsPage;
     await pins.seedPinStorage();
     await pins.navigateToLogs(getOrgIdentifier());
+    await pins.stampDocument();
 
     // quickMode is a logs-only key: it is not in the traces scope's key list.
     await pins.togglePin('quickMode');
     expect(await pins.readPins()).toContain('quickMode');
 
-    await pins.navigateToTraces(getOrgIdentifier());
+    await pins.gotoTracesViaNav();
     // The traces scope is really instantiated — its own default is pinned — so
     // the assertions below are about isolation, not about an absent scope.
     await pins.expectTracesPinState('savedViews', true);
@@ -171,12 +175,15 @@ test.describe('Logs toolbar pins', () => {
     expect(tracesPins).toContain('histogram');
     expect(tracesPins).not.toContain('quickMode');
 
-    // And the traces write left the logs scope alone.
-    await pins.navigateToLogs(getOrgIdentifier());
-    expect(await pins.readPins()).toContain('quickMode');
+    // Back on Logs in the SAME document, so the logs scope is read from the live
+    // shared map rather than re-read from storage: the traces write must have left
+    // both the in-memory state and the stored key alone.
+    await pins.gotoLogsViaNav();
     await pins.expectPinnedVisible('quickMode');
+    expect(await pins.readPins()).toContain('quickMode');
+    expect(await pins.readPins()).not.toContain('savedViews');
 
-    testLogger.info('Logs and traces pin scopes stayed isolated across both pages');
+    testLogger.info('Logs and traces pin scopes stayed isolated inside one document');
   });
 
   test('pinned controls render in canonical order, not click order', {
