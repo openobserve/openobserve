@@ -102,7 +102,7 @@ const router = createRouter({
 const PERSIST_REASON = "Run the query first: this action saves or shares what you ran";
 const UNRUN_NOTE = "Uses your query (not run yet)";
 const EDITED_NOTE = "Uses your edited query (not run yet)";
-const SHOWN_RESULTS_NOTE = "Downloads the shown results, not your edit";
+const SHOWN_RESULTS_NOTE = "Downloads every row of your last run, not your edit";
 const EXPECTED_NOTES: Record<string, string> = {
   "logs-search-bar-menu-create-saved-view-btn": EDITED_NOTE,
   "logs-search-bar-saved-views-menu-create": EDITED_NOTE,

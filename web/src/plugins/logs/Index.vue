@@ -4009,9 +4009,9 @@ export default defineComponent({
         id: "logsExport",
         handler: () => {
           if (autoRun.engine.isResultsStale()) return;
-          (searchBarRef.value as any)?.downloadLogs?.(
-            searchObj.data?.queryResults?.hits ?? [],
+          (searchBarRef.value as any)?.downloadAllResults?.(
             "csv",
+            (searchBarRef.value as any)?.downloadLogs,
           );
         },
       },
