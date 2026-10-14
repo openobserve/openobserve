@@ -285,6 +285,7 @@ import {
   isCaretInComment,
   isPredicatePosition,
   groupEntries,
+  isValueFunction,
   parseLogicalLeadContext,
   logicalLeadNames,
   buildLogicalLead,
@@ -1410,7 +1411,14 @@ export default defineComponent({
         const subquery = startsSubquery
           ? config.keywords().filter((raw) => String(raw?.name ?? "").toLowerCase() === "select")
           : [];
-        const fields = context.hasOpenQuote ? [] : [...allFields, ...subquery];
+        // A comparison operand can be an expression such as now() or CAST(…); `off` keeps today's flat list, where they would outrank values.
+        const functions =
+          groupsMenus(config) && (context.operator === "compare" || context.operator === "in")
+            ? [...config.keywords(), ...config.suggestions()]
+                .map(objectEntry)
+                .filter(isValueFunction)
+            : [];
+        const fields = context.hasOpenQuote ? [] : [...allFields, ...subquery, ...functions];
         const named = (name: string) =>
           allFields.find((f) => (f.name ?? f.label).toLowerCase() === name.toLowerCase());
         const resolver = config.resolveFieldValues();
@@ -1439,7 +1447,7 @@ export default defineComponent({
         )?.detail;
         const chosen = new Set(context.chosen);
         const offered = orderValues(outcome, fieldType).filter((value) => !chosen.has(value));
-        // Every value is already in the IN list, so the column is the only help left.
+        // Every value is already in the IN list, so columns and functions are the only help left.
         if (!offered.length) return fields;
         const values = buildValueEntries(offered, {
           hasOpenQuote: context.hasOpenQuote,
@@ -1566,19 +1574,25 @@ export default defineComponent({
           const entry = objectEntry(raw);
           return entry?.kind === "Value" || String(entry?.name ?? "").startsWith("\u0000");
         };
+        const inFunctions = (raw: any) => isValueFunction(objectEntry(raw));
         return groupEntries(
           [
             {
-              header: t("sqlEditor.completion.groupValues", {
-                minutes: FIELD_VALUES_LOOKBACK_MINUTES,
-              }),
+              header: t("sqlEditor.completion.groupValues"),
               name: t("sqlEditor.completion.groupValuesName"),
               entries: entries.filter(inValues).map(objectEntry),
             },
             {
               header: t("sqlEditor.completion.groupFields"),
               name: t("sqlEditor.completion.groupFields"),
-              entries: entries.filter((raw) => !inValues(raw)).map(objectEntry),
+              entries: entries
+                .filter((raw) => !inValues(raw) && !inFunctions(raw))
+                .map(objectEntry),
+            },
+            {
+              header: t("sqlEditor.completion.groupFunctions"),
+              name: t("sqlEditor.completion.groupFunctions"),
+              entries: entries.filter(inFunctions).map(objectEntry),
             },
           ],
           { typed, range, preselect },

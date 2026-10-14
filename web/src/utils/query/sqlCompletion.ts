@@ -71,6 +71,8 @@ export interface SqlCompletionEntry {
   sortText?: string;
   /** Still accepted by the backend, but rewritten to something else. */
   deprecated?: boolean;
+  /** The server reports an aggregate or window function, which a value position never offers. */
+  aggregate?: boolean;
   /**
    * Replacement range for THIS entry, overriding the one the provider computed.
    *

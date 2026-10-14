@@ -1968,12 +1968,13 @@ test.describe("Autocomplete group headers — never a target", () => {
     }
     const undoKey = (page) => page.evaluate(() => (/Macintosh/.test(navigator.userAgent) ? 'Meta' : 'Control'));
 
-    test("the value menu opens unhighlighted under its two headers", {
+    test("the value menu opens unhighlighted, values first and then fields", {
         tag: ['@all', '@autosuggestions', '@logs', '@headers']
     }, async ({ page }) => {
         const menu = await valueMenu(page);
         test.skip(!menu, 'fewer than two level values captured');
-        expect(menu.headers).toEqual(['Values · last 15 min', 'Fields']);
+        // Monaco renders only the rows in view, so the Functions header below the fields may not be in the DOM yet.
+        expect(menu.headers.slice(0, 2)).toEqual(['Values · recent', 'Fields']);
         expect(menu.focused).toBeNull();
     });
 
@@ -2080,8 +2081,31 @@ test.describe("Autocomplete group headers — never a target", () => {
         await page.keyboard.type(whole);
         const after = await waitForMenu(page, 5000);
         test.skip(after.headers.includes('Fields'), `a field also starts with ${whole}`);
-        expect(after.headers).toEqual(['Values · last 15 min']);
+        expect(after.headers).toEqual(['Values · recent']);
         expect(after.focused).toBe(menu.rows[0]);
+    });
+
+    test("a function name after = completes under Functions: CAS then Tab writes CAST(", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        await seedEditor(page, `${WHERE}level = `);
+        await page.keyboard.type('CAS');
+        await expect.poll(async () => (await menuState(page)).headers).toContain('Functions');
+        expect((await menuState(page)).focused).toBe('CAST');
+        await page.keyboard.press('Tab');
+        expect(await editorText(page)).toMatch(/level = CAST\(/);
+    });
+
+    test("_timestamp >= now offers now() under Functions", {
+        tag: ['@all', '@autosuggestions', '@logs', '@headers']
+    }, async ({ page }) => {
+        await seedEditor(page, `${WHERE}_timestamp >= `);
+        await page.keyboard.type('now');
+        await expect.poll(async () => (await menuState(page)).headers).toContain('Functions');
+        // A server function's row label carries its signature, e.g. `now ()`.
+        expect((await menuState(page)).focused).toMatch(/^now\b/);
+        await page.keyboard.press('Tab');
+        expect(await editorText(page)).toMatch(/_timestamp >= now\(\)/);
     });
 
     test("typed letters keep the Operators header while its group still has matches", {
