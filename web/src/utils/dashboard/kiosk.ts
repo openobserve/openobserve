@@ -38,7 +38,7 @@ export const KIOSK_DEFAULT_REFRESH_SECONDS = 300;
 export const KIOSK_REFRESH_CHOICES = [0, 30, 60, 300, 900, 1800, 3600] as const;
 
 const RETRY_BASE_MS = 5000;
-const RETRY_CAP_WITHOUT_INTERVAL_MS = 60000;
+const RETRY_CAP_MS = 60000;
 const HUNG_FLOOR_MS = 30000;
 const MIN_FIT_CELL_PX = 4;
 
@@ -128,9 +128,9 @@ export const summarizeVariables = (query: LocationQuery): string[] =>
       return `${key.slice(4)}=${text ?? ""}`;
     });
 
-/** Retry delay after `attempt` consecutive failed cycles; never longer than the refresh interval. */
+/** Retry delay after `attempt` consecutive failed cycles; never longer than the refresh interval or a minute. */
 export const retryDelayMs = (attempt: number, intervalSeconds: number): number => {
-  const cap = intervalSeconds > 0 ? intervalSeconds * 1000 : RETRY_CAP_WITHOUT_INTERVAL_MS;
+  const cap = intervalSeconds > 0 ? Math.min(intervalSeconds * 1000, RETRY_CAP_MS) : RETRY_CAP_MS;
   const delay = RETRY_BASE_MS * 2 ** Math.max(0, attempt - 1);
   return Math.min(delay, cap);
 };
@@ -162,4 +162,19 @@ export const formatRelativePeriod = (period: string | null | undefined, t: Trans
   if (!match) return null;
   const count = Number(match[1]);
   return t(PAST_PERIOD_KEYS[match[2]], { count }, count);
+};
+
+/** First meaningful line of a panel error, without the transport prefixes a TV viewer cannot act on. */
+export const summarizePanelError = (error: string): string => {
+  const line =
+    String(error ?? "")
+      .split("\n")
+      .find((part) => part.trim()) ?? "";
+  let text = line
+    .trim()
+    .replace(/^error#?\s*/i, "")
+    .replace(/^sql error:\s*/i, "");
+  const wrapped = /^\w+\("(.*)"\)$/.exec(text);
+  if (wrapped) text = wrapped[1];
+  return text.trim();
 };

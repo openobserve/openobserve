@@ -473,7 +473,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="error" size="sm" />
           {{ t("dashboard.kiosk.panelFailed") }}
         </span>
-        <code class="text-2xs line-clamp-4 font-mono break-words">{{ errorData }}</code>
+        <!-- At most three lines on a wall screen; the full server text stays one hover away. -->
+        <span class="min-w-0 break-words" data-test="dashboard-panel-kiosk-error-summary">
+          <OTruncatedText :lines="3" :tooltip="false">{{
+            t("dashboard.kiosk.queryError", { detail: kioskErrorSummary })
+          }}</OTruncatedText>
+          <OTooltip :content="kioskErrorFull" max-width="30rem" />
+        </span>
       </div>
 
       <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
@@ -542,6 +548,7 @@ import {
   inject,
 } from "vue";
 import { KIOSK_PANEL_HEALTH_KEY } from "@/composables/dashboard/useKioskRefresh";
+import { summarizePanelError } from "@/utils/dashboard/kiosk";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
@@ -1116,6 +1123,8 @@ export default defineComponent({
       }
     };
     const kioskFailed = computed(() => !!props.kiosk && !!errorData.value);
+    const kioskErrorSummary = computed(() => raw(summarizePanelError(errorData.value)));
+    const kioskErrorFull = computed(() => raw(errorData.value));
     const kioskStale = computed(() => !!props.kiosk && !!kioskHealth?.outage.value);
     const kioskSawLoading = ref(false);
     const kioskSettledTimeout = ref(false);
@@ -1283,6 +1292,8 @@ export default defineComponent({
       onError,
       errorData,
       kioskFailed,
+      kioskErrorSummary,
+      kioskErrorFull,
       kioskStale,
       kioskSettled,
       isPanelLoading,
