@@ -13818,6 +13818,14 @@
         "previewEmpty": "Selecciona un conjunto de datos para ver lo que se ejecutará.",
         "previewLoading": "Calculando espacios…",
         "previewSlots": "espacios a ejecutar",
+        "costEstimate": "~{cost} estimado (orden de magnitud)",
+        "costUnknown": "No se pudo estimar el costo",
+        "costLowerBound": "límite inferior, algunos modelos no tienen precio",
+        "costScoringOnly": "solo costo de puntuación",
+        "costConfirmTitle": "¿Ejecutar este experimento costoso?",
+        "costConfirmMessage": "Se estima que este experimento cuesta aproximadamente {cost}, por encima del umbral de advertencia de {threshold}. ¿Crearlo y ejecutarlo de todos modos?",
+        "costConfirmMessageUnpriced": "Este experimento se estima que costará más que el umbral de advertencia. ¿Crearlo y ejecutarlo de todos modos?",
+        "costConfirmOk": "Crear de todos modos",
         "skippedFully": "{count} filas omitidas por completo: cada evaluador seleccionado necesita una salida esperada. Las filas omitidas no cuestan nada al ejecutarse.",
         "skippedPartially": "{count} filas omitidas parcialmente: la tarea aún se ejecuta, pero los evaluadores basados en referencia no pueden puntuar filas sin una salida esperada.",
         "skippedNone": "Cada fila coincidente puede puntuarse en al menos una dimensión.",
@@ -14441,6 +14449,8 @@
       },
       "testPanel": {
         "title": "Probar conexión",
+        "storedCredentialsHint": "Prueba la versión publicada v{version} ({endpoint}) con sus credenciales almacenadas. Tus cambios sin guardar se prueban cuando publicas.",
+        "unpublishedSecretHint": "Esta tarea aún no se ha publicado, por lo que no hay una versión almacenada que probar. Publicar cambios prueba el borrador guardado con sus credenciales almacenadas y lo publica si la prueba pasa.",
         "sourceLabel": "Entrada de muestra",
         "sourceDataset": "De un conjunto de datos",
         "sourceManual": "Manual",
@@ -14462,7 +14472,15 @@
         "rawRequest": "Solicitud enviada",
         "rawResponse": "Respuesta recibida",
         "idle": "La solicitud y la respuesta aparecen aquí cuando ejecutes una prueba.",
-        "disabledHint": "Primero completa el nombre y el endpoint."
+        "disabledHint": "Primero completa el nombre y el endpoint.",
+        "failure": {
+          "transport": "No se pudo alcanzar el endpoint.",
+          "deadlineExceeded": "El endpoint no respondió a tiempo.",
+          "httpStatus": "El endpoint respondió con HTTP {status}.",
+          "badResponse": "No se pudo leer la respuesta con la ruta de respuesta.",
+          "outputTooLarge": "La respuesta es demasiado grande.",
+          "requestError": "No se pudo construir la solicitud a partir de la tarea."
+        }
       },
       "detail": {
         "backTo": "Tareas remotas",
@@ -14565,6 +14583,14 @@
         },
         "attemptsValue": "{count} de {max}",
         "resultsTitle": "Resultados"
+      },
+      "credentialsDialog": {
+        "open": "Reemplazar credenciales",
+        "title": "Reemplazar credenciales",
+        "body": "El nuevo valor reemplaza al almacenado en su lugar. La tarea conserva su versión y el valor almacenado nunca se muestra.",
+        "submit": "Reemplazar",
+        "success": "Credenciales reemplazadas",
+        "error": "No se pudieron reemplazar las credenciales"
       },
       "signingPanel": {
         "title": "Claves de firma",
@@ -16767,7 +16793,6 @@
         "previewLabel": "Pasos que ejecuta aquí",
         "openChild": "Abrir \"{name}\"",
         "noAccessRemedy": "Pida acceso de lectura a su carpeta, o elimine la referencia.",
-        "disabledTooltip": "Los subtests no están habilitados en esta implementación.",
         "loadFailed": "No se pudo cargar este subtest, así que sus pasos y el número de pasos son desconocidos.",
         "missing": "Este subtest ya no existe. Quita la referencia o elige otro test.",
         "noAccessBadge": "sin acceso",

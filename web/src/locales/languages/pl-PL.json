@@ -13818,6 +13818,14 @@
         "previewEmpty": "Wybierz zbiór danych, aby zobaczyć, co zostanie uruchomione.",
         "previewLoading": "Obliczanie slotów…",
         "previewSlots": "sloty do uruchomienia",
+        "costEstimate": "~{cost} szacunkowo (rząd wielkości)",
+        "costUnknown": "Nie udało się oszacować kosztu",
+        "costLowerBound": "dolna granica, niektóre modele nie mają ceny",
+        "costScoringOnly": "tylko koszt oceny",
+        "costConfirmTitle": "Uruchomić ten kosztowny eksperyment?",
+        "costConfirmMessage": "Szacowany koszt tego eksperymentu to około {cost}, powyżej progu ostrzegawczego {threshold}. Utworzyć i uruchomić go mimo to?",
+        "costConfirmMessageUnpriced": "Szacowany koszt tego eksperymentu przekracza próg ostrzeżenia. Utworzyć go i uruchomić mimo to?",
+        "costConfirmOk": "Utwórz mimo to",
         "skippedFully": "{count} wierszy całkowicie pominiętych — każdy wybrany oceniacz wymaga oczekiwanego wyniku. Pominięte wiersze nie kosztują nic do uruchomienia.",
         "skippedPartially": "{count} wierszy częściowo pominiętych — zadanie nadal działa, ale oceniacze oparte na wzorcach nie mogą oceniać wierszy bez oczekiwanego wyniku.",
         "skippedNone": "Każdy dopasowany wiersz może być oceniony w co najmniej jednym wymiarze.",
@@ -14441,6 +14449,8 @@
       },
       "testPanel": {
         "title": "Test połączenia",
+        "storedCredentialsHint": "Testuje opublikowaną wersję v{version} ({endpoint}) przy użyciu zapisanych poświadczeń. Twoje niezapisane zmiany są testowane podczas publikowania.",
+        "unpublishedSecretHint": "To zadanie nie zostało jeszcze opublikowane, więc nie ma zapisanej wersji do przetestowania. Opcja Opublikuj zmiany testuje zapisany szkic przy użyciu jego zapisanych poświadczeń i publikuje go, jeśli test zakończy się pomyślnie.",
         "sourceLabel": "Przykładowe dane wejściowe",
         "sourceDataset": "Z zestawu danych",
         "sourceManual": "Ręcznie",
@@ -14462,7 +14472,15 @@
         "rawRequest": "Wysłane żądanie",
         "rawResponse": "Otrzymana odpowiedź",
         "idle": "Żądanie i odpowiedź pojawią się tutaj po uruchomieniu testu.",
-        "disabledHint": "Najpierw podaj nazwę i punkt końcowy."
+        "disabledHint": "Najpierw podaj nazwę i punkt końcowy.",
+        "failure": {
+          "transport": "Nie udało się dotrzeć do punktu końcowego.",
+          "deadlineExceeded": "Punkt końcowy nie odpowiedział na czas.",
+          "httpStatus": "Punkt końcowy odpowiedział kodem HTTP {status}.",
+          "badResponse": "Nie udało się odczytać odpowiedzi za pomocą ścieżki odpowiedzi.",
+          "outputTooLarge": "Odpowiedź jest zbyt duża.",
+          "requestError": "Nie udało się zbudować żądania na podstawie zadania."
+        }
       },
       "detail": {
         "backTo": "Zadania zdalne",
@@ -14565,6 +14583,14 @@
         },
         "attemptsValue": "{count} z {max}",
         "resultsTitle": "Wyniki"
+      },
+      "credentialsDialog": {
+        "open": "Zastąp poświadczenia",
+        "title": "Zastąp poświadczenia",
+        "body": "Nowa wartość zastępuje zapisaną w tym samym miejscu. Zadanie zachowuje swoją wersję, a zapisana wartość nigdy nie jest pokazywana.",
+        "submit": "Zastąp",
+        "success": "Zastąpiono poświadczenia",
+        "error": "Nie udało się zastąpić poświadczeń"
       },
       "signingPanel": {
         "title": "Klucze podpisywania",
@@ -16767,7 +16793,6 @@
         "previewLabel": "Kroki wykonywane tutaj",
         "openChild": "Otwórz \"{name}\"",
         "noAccessRemedy": "Poproś o dostęp do odczytu jego folderu albo usuń odwołanie.",
-        "disabledTooltip": "Podtesty nie są włączone w tym wdrożeniu.",
         "loadFailed": "Nie udało się wczytać tego podtestu, więc jego kroki i ich liczba są nieznane.",
         "missing": "Ten podtest już nie istnieje. Usuń odwołanie lub wybierz inny test.",
         "noAccessBadge": "brak dostępu",

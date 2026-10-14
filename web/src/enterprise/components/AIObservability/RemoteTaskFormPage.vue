@@ -419,6 +419,13 @@
           :state="testState"
           :report="testReport"
           :error-message="testError"
+          :hint="
+            unpublishedSecret
+              ? t('aiObservability.remoteTasks.testPanel.unpublishedSecretHint')
+              : testsStoredVersion
+                ? t('aiObservability.remoteTasks.testPanel.storedCredentialsHint', storedTarget)
+                : null
+          "
           @run="runCandidateTest"
         />
       </div>
@@ -469,7 +476,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -494,6 +501,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { remoteTaskKeys } from "@/services/llm-experiments.querykeys";
 import remoteTasksService, {
   type RemoteTask,
+  type RemoteTaskTestRunRow,
   type RemoteTaskVerificationReport,
 } from "@/services/remote-tasks.service";
 import RemoteTaskTestPanel from "./RemoteTaskTestPanel.vue";
@@ -604,7 +612,20 @@ const testState = ref<"idle" | "running" | "passed" | "failed">("idle");
 const testReport = ref<RemoteTaskVerificationReport | null>(null);
 const testError = ref<I18nText | null>(null);
 
-const canRunTest = computed(() => Boolean(nameValue.value.trim() && endpointValue.value.trim()));
+const canRunTest = computed(
+  () => Boolean(nameValue.value.trim() && endpointValue.value.trim()) && !unpublishedSecret.value,
+);
+
+/**
+ * Whether the task being edited holds a write-only secret. The form can never
+ * repopulate one, so a candidate test would send it blank; such a task is
+ * tested through `test_run`, which uses the published version's stored secrets.
+ */
+const testsStoredVersion = ref(false);
+/** A secret-holding task that was never published: nothing to test until Publish. */
+const unpublishedSecret = ref(false);
+/** What a stored-version test calls, named in the hint so a pass is not read as one for the form. */
+const storedTarget = reactive({ version: 0, endpoint: "" });
 
 const signingKey = form.useStore((state: any) => String(state.values.signingKey ?? ""));
 const signingKeyCopied = ref(false);
@@ -724,6 +745,10 @@ async function runCandidateTest() {
   testReport.value = null;
 
   try {
+    if (testsStoredVersion.value) {
+      await runStoredVersionTest();
+      return;
+    }
     const values = form.state.values as RemoteTaskFormValues;
     const result = await remoteTasksService.testCandidate(orgId.value, {
       ...toCreatePayload(values),
@@ -738,6 +763,48 @@ async function runCandidateTest() {
     testState.value = "failed";
     testError.value =
       raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.form.testFailed");
+  }
+}
+
+async function runStoredVersionTest() {
+  const [row] = await remoteTasksService.testRun(orgId.value, routeEntityId.value, [
+    currentSample(),
+  ]);
+  testReport.value = row
+    ? {
+        rawRequest: row.rawRequest,
+        rawResponse: row.rawResponse,
+        statusCode: row.httpStatus,
+        parsedOutput: row.parsedOutput,
+        latencyMs: row.latencyMs,
+      }
+    : null;
+  // An explicit skip is a well-formed answer, which verification also counts as a pass.
+  testState.value = row && row.status !== "error" ? "passed" : "failed";
+  if (testState.value === "failed") {
+    testError.value = storedFailureMessage(row);
+  }
+}
+
+/** test_run reports a failure as a reason code; say it as a sentence. An unknown code shows as sent. */
+function storedFailureMessage(row?: RemoteTaskTestRunRow): I18nText {
+  switch (row?.error) {
+    case "transport":
+      return t("aiObservability.remoteTasks.testPanel.failure.transport");
+    case "deadline_exceeded":
+      return t("aiObservability.remoteTasks.testPanel.failure.deadlineExceeded");
+    case "http_status":
+      return t("aiObservability.remoteTasks.testPanel.failure.httpStatus", {
+        status: row.httpStatus ?? "?",
+      });
+    case "bad_response":
+      return t("aiObservability.remoteTasks.testPanel.failure.badResponse");
+    case "output_too_large":
+      return t("aiObservability.remoteTasks.testPanel.failure.outputTooLarge");
+    case "request_error":
+      return t("aiObservability.remoteTasks.testPanel.failure.requestError");
+    default:
+      return raw(row?.error) || t("aiObservability.remoteTasks.form.testFailed");
   }
 }
 
@@ -879,6 +946,14 @@ async function loadForEdit() {
       return;
     }
     draftFromVersion.value = task.isDraft ? undefined : task.version;
+    const holdsSecret =
+      task.auth.usesSecret ||
+      task.signing.usesSecret ||
+      task.customHeaders.some((header) => header.usesSecret);
+    // test_run tests the published version, and a task never published has none.
+    testsStoredVersion.value = holdsSecret && !task.isDraft;
+    Object.assign(storedTarget, { version: task.version, endpoint: task.endpoint });
+    unpublishedSecret.value = holdsSecret && task.isDraft;
     form.reset(remoteTaskToFormValues(task));
   } catch (error: any) {
     toast({

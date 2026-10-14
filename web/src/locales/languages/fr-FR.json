@@ -13818,6 +13818,14 @@
         "previewEmpty": "Sélectionnez un jeu de données pour voir ce qui sera exécuté.",
         "previewLoading": "Calcul des emplacements…",
         "previewSlots": "emplacements à exécuter",
+        "costEstimate": "~{cost} estimé (ordre de grandeur)",
+        "costUnknown": "Le coût n'a pas pu être estimé",
+        "costLowerBound": "borne inférieure, certains modèles n'ont pas de prix",
+        "costScoringOnly": "coût du scoring uniquement",
+        "costConfirmTitle": "Exécuter cette expérience coûteuse ?",
+        "costConfirmMessage": "Le coût de cette expérience est estimé à environ {cost}, au-dessus du seuil d'avertissement de {threshold}. La créer et l'exécuter quand même ?",
+        "costConfirmMessageUnpriced": "Le coût estimé de cette expérience dépasse le seuil d'avertissement. La créer et l'exécuter quand même ?",
+        "costConfirmOk": "Créer quand même",
         "skippedFully": "{count} lignes entièrement ignorées — chaque évaluateur sélectionné nécessite une sortie attendue. Les lignes ignorées ne coûtent rien à exécuter.",
         "skippedPartially": "{count} lignes partiellement ignorées — la tâche s'exécute toujours, mais les évaluateurs basés sur des références ne peuvent pas noter les lignes sans sortie attendue.",
         "skippedNone": "Chaque ligne correspondante peut être notée sur au moins une dimension.",
@@ -14441,6 +14449,8 @@
       },
       "testPanel": {
         "title": "Test de connexion",
+        "storedCredentialsHint": "Teste la version publiée v{version} ({endpoint}) avec ses identifiants enregistrés. Vos modifications non enregistrées sont testées lorsque vous publiez.",
+        "unpublishedSecretHint": "Cette tâche n'a pas encore été publiée, il n'existe donc aucune version enregistrée à tester. Publier les modifications teste le brouillon enregistré avec ses identifiants enregistrés et le publie si le test réussit.",
         "sourceLabel": "Exemple d'entrée",
         "sourceDataset": "À partir d'un jeu de données",
         "sourceManual": "Manuel",
@@ -14462,7 +14472,15 @@
         "rawRequest": "Requête envoyée",
         "rawResponse": "Réponse reçue",
         "idle": "La requête et la réponse apparaissent ici une fois que vous exécutez un test.",
-        "disabledHint": "Saisissez d'abord le nom et le point de terminaison."
+        "disabledHint": "Saisissez d'abord le nom et le point de terminaison.",
+        "failure": {
+          "transport": "Impossible d'atteindre le point de terminaison.",
+          "deadlineExceeded": "Le point de terminaison n'a pas répondu à temps.",
+          "httpStatus": "Le point de terminaison a répondu avec HTTP {status}.",
+          "badResponse": "La réponse n'a pas pu être lue avec le chemin de réponse.",
+          "outputTooLarge": "La réponse est trop volumineuse.",
+          "requestError": "La requête n'a pas pu être construite à partir de la tâche."
+        }
       },
       "detail": {
         "backTo": "Tâches distantes",
@@ -14565,6 +14583,14 @@
         },
         "attemptsValue": "{count} sur {max}",
         "resultsTitle": "Résultats"
+      },
+      "credentialsDialog": {
+        "open": "Remplacer les identifiants",
+        "title": "Remplacer les identifiants",
+        "body": "La nouvelle valeur remplace celle enregistrée sur place. La tâche conserve sa version et la valeur enregistrée n'est jamais affichée.",
+        "submit": "Remplacer",
+        "success": "Identifiants remplacés",
+        "error": "Impossible de remplacer les identifiants"
       },
       "signingPanel": {
         "title": "Clés de signature",
@@ -16767,7 +16793,6 @@
         "previewLabel": "Étapes exécutées ici",
         "openChild": "Ouvrir « {name} »",
         "noAccessRemedy": "Demandez l'accès en lecture à son dossier, ou supprimez la référence.",
-        "disabledTooltip": "Les sous-tests ne sont pas activés sur ce déploiement.",
         "loadFailed": "Impossible de charger ce sous-test : ses étapes et leur nombre sont inconnus.",
         "missing": "Ce sous-test n’existe plus. Supprimez la référence ou choisissez un autre test.",
         "noAccessBadge": "pas d'accès",

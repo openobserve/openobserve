@@ -15,7 +15,13 @@
 
 import { isCancelledError } from "@tanstack/vue-query";
 import { loadIdentityConfig } from "@/utils/identityConfig";
-import { clearSemanticGroupsCache, loadSemanticGroups } from "@/utils/semanticGroupsCache";
+import {
+  clearSemanticGroupsCache,
+  loadSemanticGroups,
+  SEMANTIC_GROUPS_CACHE_TTL_MS,
+} from "@/utils/semanticGroupsCache";
+import { queryClient } from "@/composables/query/queryClient";
+import { serviceStreamKeys } from "@/services/service_streams.querykeys";
 import config from "@/aws-exports";
 
 function isCorrelationAvailable(): boolean {
@@ -27,9 +33,15 @@ interface SemanticGroupsLookup {
   cancelled: boolean;
 }
 
+interface FieldNamesEntry {
+  fields: string[];
+  cachedAt: number;
+  sources: unknown[];
+}
+
 // ── Cache ────────────────────────────────────────────────────────────────────
 
-const fieldNamesCache = new Map<string, string[]>();
+const fieldNamesCache = new Map<string, FieldNamesEntry>();
 const pendingGroupsLookups = new Map<string, Promise<SemanticGroupsLookup>>();
 let lastSeenOrgId: string | null = null;
 
@@ -41,6 +53,22 @@ function evictOrgCacheIfSwitched(orgId: string): void {
     pendingGroupsLookups.delete(lastSeenOrgId);
   }
   lastSeenOrgId = orgId;
+}
+
+// Structural sharing keeps a reference across an unchanged refetch, so a new one means a settings save changed the input.
+function sourceData(orgId: string): unknown[] {
+  return [serviceStreamKeys.identityConfig(orgId), serviceStreamKeys.semanticGroups(orgId)].map(
+    (key) => {
+      const state = queryClient.getQueryState(key);
+      return state && !state.isInvalidated ? state.data : undefined;
+    },
+  );
+}
+
+function isEntryFresh(entry: FieldNamesEntry, orgId: string): boolean {
+  if (Date.now() - entry.cachedAt >= SEMANTIC_GROUPS_CACHE_TTL_MS) return false;
+  const current = sourceData(orgId);
+  return entry.sources.every((data, i) => data === current[i]);
 }
 
 // ── Field resolution ─────────────────────────────────────────────────────────
@@ -95,7 +123,8 @@ export async function getCorrelationFieldNames(
   if (!isCorrelationAvailable()) return [];
   evictOrgCacheIfSwitched(orgId);
   const key = `${orgId}/${streamType}/${streamName}`;
-  if (fieldNamesCache.has(key)) return fieldNamesCache.get(key)!;
+  const cached = fieldNamesCache.get(key);
+  if (cached && isEntryFresh(cached, orgId)) return cached.fields;
   // Query watchers sync before the schema loads; caching that empty match would block every later save for the stream.
   if (!streamSchemaFields.length) return [];
 
@@ -113,7 +142,9 @@ export async function getCorrelationFieldNames(
   if (cancelled) return [];
   const matched = matchTrackedFields(trackedIds, idToFields, streamSchemaFields);
   // A lookup that finishes after an org switch must not repopulate the evicted org's entries.
-  if (lastSeenOrgId === orgId) fieldNamesCache.set(key, matched);
+  if (lastSeenOrgId === orgId) {
+    fieldNamesCache.set(key, { fields: matched, cachedAt: Date.now(), sources: sourceData(orgId) });
+  }
   return matched;
 }
 
