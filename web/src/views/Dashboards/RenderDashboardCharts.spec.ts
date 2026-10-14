@@ -81,6 +81,9 @@ const mockGridStackInstance = {
   setAnimation: vi.fn(),
   setStatic: vi.fn(),
   load: vi.fn(),
+  getRow: vi.fn().mockReturnValue(60),
+  getCellHeight: vi.fn().mockReturnValue(17),
+  cellHeight: vi.fn(),
   engine: { nodes: [] as any[] },
 };
 
@@ -735,6 +738,66 @@ describe("RenderDashboardCharts", () => {
     it("stays in Refresh-to-apply mode when no Auto Run state is provided", () => {
       wrapper = mountWith();
       expect(wrapper.vm.getVariablesManager().isLiveMode.value).toBe(false);
+    });
+  });
+
+  describe("Kiosk", () => {
+    const kioskDashboard = () => ({
+      ...defaultProps.dashboardData,
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default Tab",
+          panels: [
+            {
+              id: "panel-1",
+              title: "Panel 1",
+              type: "line",
+              layout: { x: 0, y: 0, w: 96, h: 60, i: "panel-1" },
+              queries: [],
+            },
+          ],
+        },
+      ],
+    });
+
+    let clientHeight: PropertyDescriptor | undefined;
+    beforeEach(() => {
+      clientHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+        configurable: true,
+        get: () => 908,
+      });
+      mockGridStackInstance.cellHeight.mockClear();
+    });
+    afterEach(() => {
+      if (clientHeight) Object.defineProperty(HTMLElement.prototype, "clientHeight", clientHeight);
+    });
+
+    it("keeps the tab bar mounted but hidden on a wall screen", async () => {
+      wrapper = createWrapper({ showTabs: true, kiosk: true });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "TabList" }).classes()).toContain("hidden");
+    });
+
+    it("leaves the tab bar alone outside kiosk", async () => {
+      wrapper = createWrapper({ showTabs: true });
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "TabList" }).classes()).not.toContain("hidden");
+    });
+
+    it("scales the cell height so every row fits when fit is on", async () => {
+      wrapper = createWrapper({ dashboardData: kioskDashboard(), kiosk: true, fitToScreen: true });
+      await flushPromises();
+      expect(mockGridStackInstance.cellHeight).toHaveBeenCalledWith(15);
+      expect(wrapper.classes()).toContain("overflow-hidden");
+    });
+
+    it("never resizes cells on a normal dashboard", async () => {
+      wrapper = createWrapper({ dashboardData: kioskDashboard() });
+      await flushPromises();
+      expect(mockGridStackInstance.cellHeight).not.toHaveBeenCalled();
+      expect(wrapper.classes()).toContain("overflow-y-auto");
     });
   });
 
