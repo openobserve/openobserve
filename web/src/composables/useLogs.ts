@@ -277,10 +277,15 @@ const useLogs = (t: TranslateFn) => {
       } finally {
         stopWatchingSends();
       }
-      searchObj.loading = false;
+      const latest = autoRun.engine.currentGeneration("grid");
+      const userSearchInFlight =
+        latest?.kind === "explicit" &&
+        latest.id !== generationAtStart &&
+        searchObj.meta.pendingExecution?.generation === latest.id;
+      // A search the user sent meanwhile owns the loading state; its completion or cancel clears it.
+      if (!userSearchInFlight) searchObj.loading = false;
       if (searchObj.meta.jobId == "") {
         // A search the user sent while the stream metadata loaded, even one cancelled since, supersedes this landing run.
-        const latest = autoRun.engine.currentGeneration("grid");
         const userSearchSent =
           latest?.kind === "explicit" &&
           latest.id !== generationAtStart &&

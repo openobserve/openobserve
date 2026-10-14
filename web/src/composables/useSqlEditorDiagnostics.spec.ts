@@ -115,6 +115,31 @@ describe("useSqlEditorDiagnostics — markers from a run", () => {
     expect(markers.value).toEqual([]);
   });
 
+  it("clear a server marker for a query the user replaced before the error arrived", async () => {
+    const markers = ref<SqlErrorRange[]>([]);
+    const editorText = ref("missing = 'x'");
+    const committed = ref("missing = 'x'");
+    const externalErrors = ref<SqlErrorRange[]>([]);
+    const diag = useSqlEditorDiagnostics({
+      queryEditorRef: ref({
+        addErrorDiagnostics: (ranges: SqlErrorRange[]) => (markers.value = ranges),
+        getValue: () => editorText.value,
+      }),
+      sqlMode: ref(false),
+      query: committed,
+      streamName: ref("default"),
+      externalErrors,
+    });
+    editorText.value = "code = 200";
+    externalErrors.value = [SERVER_RANGE];
+    await nextTick();
+    committed.value = "code = 200";
+    diag.onQueryChange();
+    vi.advanceTimersByTime(500);
+    await nextTick();
+    expect(markers.value).toEqual([]);
+  });
+
   it("keep a server marker that equals an earlier blur marker when the editor gains focus", async () => {
     validateSql.mockResolvedValue(SERVER_RANGE);
     const { diag, markers, externalErrors } = setup("level =");
