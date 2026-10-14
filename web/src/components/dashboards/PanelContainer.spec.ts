@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import PanelContainer from "@/components/dashboards/PanelContainer.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -1573,6 +1574,175 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="panel-limit-number-of-series-warning"]').exists()).toBe(
         false,
       );
+    });
+  });
+
+  describe("notice chips with the real PanelErrorButtons", () => {
+    const VRL_ERROR = "function error: parse_json failed";
+    const RANGE_CLAMP = "Query duration is modified due to query range restriction of 24 hours";
+
+    const mountWithChips = (props = {}) =>
+      mount(PanelContainer, {
+        props: { ...defaultProps, ...props },
+        attachTo: document.body,
+        global: {
+          plugins: [i18n, store, router],
+          stubs: {
+            PanelSchemaRenderer: {
+              name: "PanelSchemaRenderer",
+              template: '<div data-test="panel-schema-renderer"></div>',
+            },
+            QueryInspector: {
+              name: "QueryInspector",
+              inheritAttrs: false,
+              props: ["open", "metaData", "data", "diagnostics", "seriesLimit"],
+              template: '<div data-test="query-inspector" :data-open="String(open)"></div>',
+            },
+            ShowLegendsPopup: { template: "<div></div>" },
+            SinglePanelMove: { template: "<div></div>" },
+            PanelErrorButtons,
+          },
+        },
+      });
+
+    const diagnosticsWith = (overrides = {}) => ({
+      queries: [],
+      serverPartial: false,
+      partialReasons: [],
+      functionErrors: [],
+      ...overrides,
+    });
+
+    it("renders the series count chip from the renderer's series-limit event", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.handleSeriesLimitUpdate({ shown: 100, total: 342, cap: 100 });
+      wrapper.vm.handleLimitNumberOfSeriesWarningMessageUpdate("Showing 100 of 342 series");
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-series-cap"]').text()).toBe(
+        "100/342 series",
+      );
+    });
+
+    it("opens the Query Inspector when a chip is clicked", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.metaDataValue({ queries: [{ query: "SELECT 1", variables: [] }] });
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ serverPartial: true }));
+      await flushPromises();
+      await wrapper.find('[data-test="panel-notice-chip-partial"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="query-inspector"]').attributes("data-open")).toBe("true");
+    });
+
+    it("moves a function error out of the range warning into its own chip", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.handleResultMetadataUpdate([[{ function_error: [VRL_ERROR] }]]);
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ functionErrors: [VRL_ERROR] }));
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-function-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
+    });
+
+    it("keeps a range clamp on the existing range warning", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.handleResultMetadataUpdate([[{ function_error: [VRL_ERROR, RANGE_CLAMP] }]]);
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ functionErrors: [VRL_ERROR] }));
+      await flushPromises();
+      expect(wrapper.vm.maxQueryRangeWarning).toBe(RANGE_CLAMP);
+    });
+
+    it("grants editor actions only outside view-only mode", async () => {
+      wrapper = mountWithChips();
+      expect(wrapper.vm.canEditFromNotice).toBe(true);
+      wrapper.unmount();
+      wrapper = mountWithChips({ viewOnly: true });
+      expect(wrapper.vm.canEditFromNotice).toBe(false);
+      expect(wrapper.vm.canRefreshFromNotice).toBe(true);
+    });
+
+    it("keeps the title on one line and lets the notice area shrink before the panel controls", async () => {
+      wrapper = mountWithChips();
+      const title = wrapper.find('[data-test="dashboard-panel-header"]');
+      expect(title.classes()).not.toContain("max-lg:line-clamp-2");
+      expect(title.classes()).toContain("truncate");
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ serverPartial: true }));
+      await flushPromises();
+      const notices = wrapper.find('[data-test="panel-notice-chips"]').element.parentElement!;
+      expect(notices.className).toContain("min-w-0");
+      expect(notices.className).toContain("overflow-x-clip");
+    });
+
+    it("keeps notice chips ahead of the hover-only controls on a narrow bar, at rest and on hover", async () => {
+      wrapper = mountWithChips();
+      const title = () => wrapper.find('[data-test="dashboard-panel-header"]');
+      const fullscreen = () => wrapper.find('[data-test="dashboard-panel-fullscreen-btn"]');
+      wrapper.vm.handlePanelDiagnosticsUpdate(diagnosticsWith({ serverPartial: true }));
+      await flushPromises();
+
+      expect(title().classes()).toContain("min-w-[min(10rem,40%)]!");
+      expect(fullscreen().classes()).toContain("@max-[28rem]/panelbar:hidden");
+      expect(fullscreen().classes()).toContain("invisible");
+
+      await wrapper.trigger("mouseover");
+      expect(fullscreen().classes()).toContain("@max-[28rem]/panelbar:hidden");
+      expect(fullscreen().classes()).not.toContain("invisible");
+      expect(title().classes()).toContain("min-w-[min(10rem,40%)]!");
+    });
+
+    it("leaves a panel without notices on the original hover and title rules", async () => {
+      wrapper = mountWithChips();
+      const title = wrapper.find('[data-test="dashboard-panel-header"]');
+      expect(title.classes()).not.toContain("min-w-[min(10rem,40%)]!");
+      expect(wrapper.vm.hoverRevealClass).toBe("invisible pointer-events-none");
+      await wrapper.trigger("mouseover");
+      expect(wrapper.vm.hoverRevealClass).toBe("");
+    });
+
+    it("keeps Refresh but not editor actions while the layout is being edited", async () => {
+      wrapper = mountWithChips({ layoutMode: "edit" });
+      expect(wrapper.vm.canEditFromNotice).toBe(false);
+      expect(wrapper.vm.canRefreshFromNotice).toBe(true);
+    });
+
+    it("passes the row cap through so the series chip reads as a lower bound", async () => {
+      wrapper = mountWithChips();
+      wrapper.vm.handleSeriesLimitUpdate({ shown: 100, total: 1000, cap: 100 });
+      wrapper.vm.handlePanelDiagnosticsUpdate(
+        diagnosticsWith({ serverPartial: true, rowsCapped: true }),
+      );
+      await flushPromises();
+      expect(wrapper.find('[data-test="panel-notice-chip-series-cap"]').text()).toBe(
+        "100/1,000+ series",
+      );
+    });
+
+    it("navigates to the panel editor from Use Top N", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper = mountWithChips();
+      wrapper.vm.handleSeriesLimitUpdate({ shown: 100, total: 342, cap: 100 });
+      await flushPromises();
+      wrapper.findComponent(PanelErrorButtons).vm.$emit("edit-panel", "use-top-n");
+      await flushPromises();
+      expect(routerPushSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ focus: "top-n" }),
+        }),
+      );
+      routerPushSpy.mockRestore();
+    });
+
+    it("deep-links Edit function to the VRL editor, and the menu's Edit panel to no focus", async () => {
+      const routerPushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      wrapper = mountWithChips();
+      wrapper.findComponent(PanelErrorButtons).vm.$emit("edit-panel", "edit-function");
+      await flushPromises();
+      expect(routerPushSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ focus: "vrl" }) }),
+      );
+      wrapper.vm.onEditPanel(wrapper.props("data"));
+      await flushPromises();
+      expect(routerPushSpy.mock.lastCall?.[0]).not.toHaveProperty("query.focus");
+      routerPushSpy.mockRestore();
     });
   });
 
