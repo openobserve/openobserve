@@ -149,6 +149,9 @@ const PipelineImportExportPage = require("./pipelinesPages/pipelineImportExportP
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 
+// ===== DOWNTIMES PAGE OBJECTS =====
+import { DowntimesPage } from "./alertsPages/downtimesPage.js";
+
 // ===== ONLINE EVALS PAGE OBJECTS =====
 import { LlmProvidersPage } from "./onlineEvalsPages/llmProvidersPage.js";
 
@@ -312,6 +315,9 @@ class PageManager {
 
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
+
+    // ===== DOWNTIMES PAGE OBJECTS =====
+    this.downtimesPage = new DowntimesPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
 
     // ===== ONLINE EVALS PAGE OBJECTS =====

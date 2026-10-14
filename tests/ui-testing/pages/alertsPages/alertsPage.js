@@ -4903,4 +4903,60 @@ export class AlertsPage {
     getAlertDeletedText() {
         return this.page.getByText(this.locators.alertDeletedMessage);
     }
+
+    // ===== DOWNTIMES: row mute, Muted chip and last outcome =====
+
+    /** Open the Alerts list on one folder (and optionally one type tab), as a reload after a mute needs. */
+    async gotoAlertListFolder(folderId, { tab = null } = {}) {
+        const org = process.env.ORGNAME || 'default';
+        const tabQuery = tab ? `&tab=${tab}` : '';
+        await this.page.goto(`/web/alerts?org_identifier=${org}&folder=${folderId}${tabQuery}`);
+        await expect(this.page.locator('[data-test="alert-list-table"]')).toBeVisible({ timeout: 30000 });
+    }
+
+    _alertRowByName(name) {
+        return this.page.locator('[data-test^="o2-table-row-"]').filter({ has: this.page.locator(`[data-test="alert-list-${name}-name-cell"]`) });
+    }
+
+    async muteAlertPreset(name, preset) {
+        await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
+        await this.page.locator(`[data-test="alert-list-${name}-mute-${preset}"]`).click();
+    }
+
+    async openMuteUntil(name) {
+        await this.page.locator(`[data-test="alert-list-${name}-more-options"]`).click();
+        await this.page.locator(`[data-test="alert-list-${name}-mute-until"]`).click();
+    }
+
+    async bulkMute(names, preset) {
+        for (const name of names) {
+            const box = this._alertRowByName(name).locator(this.locators.tableCheckbox);
+            await box.click();
+            await expect(box).toHaveAttribute('data-state', 'checked');
+        }
+        await this.page.locator('[data-test="alert-list-mute-alerts-btn"]').click();
+        await this.page.locator(`[data-test="alert-list-bulk-mute-${preset}"]`).click();
+    }
+
+    async expectMutedChip(name, visible = true, pattern = /^Muted · ends in /) {
+        const chip = this.page.locator(`[data-test="alert-list-${name}-muted"]`);
+        if (visible) await expect(chip).toHaveText(pattern, { timeout: 20000 });
+        else {
+            // Absence only means something once the row itself has rendered.
+            await expect(this.page.locator(`[data-test="alert-list-${name}-name-cell"]`)).toBeVisible({ timeout: 20000 });
+            await expect(chip).toHaveCount(0, { timeout: 20000 });
+        }
+    }
+
+    async expectLastOutcome(name, text) {
+        await expect(this.page.locator(`[data-test="alert-list-${name}-last-outcome"]`)).toHaveText(text, { timeout: 20000 });
+    }
+
+    /** True when the alert name text is clipped inside its cell. */
+    async isAlertNameClipped(name) {
+        return this.page.locator(`[data-test="alert-list-${name}-name-cell"]`).evaluate((cell, n) => {
+            const el = [...cell.querySelectorAll('*')].find((e) => e.textContent.trim() === n && [...e.children].every((c) => c.textContent.trim() !== n)) || cell;
+            return el.scrollWidth > el.clientWidth;
+        }, name);
+    }
 }
