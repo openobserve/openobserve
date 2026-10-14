@@ -883,6 +883,44 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(formatted).toContain("font-bold");
       expect(formatted).toContain("rca-ul");
     });
+
+    it("should build the TOC from standalone bold section lines", () => {
+      const content = [
+        "I've completed the investigation.",
+        "",
+        "---",
+        "",
+        "**Incident Details**",
+        "",
+        "| Attribute | Value |",
+        "|---|---|",
+        "| **Severity** | P2 |",
+        "",
+        "**Evidence**",
+        "",
+        "**1. `stream_no_events_10m`** — false positive.",
+        "",
+        "```json",
+        "**not a heading**",
+        "```",
+        "",
+        "**Executive Summary**",
+        "",
+        "Root cause: **three** miscalibrated alerts.",
+      ].join("\n");
+      const formatted = wrapper.vm.formatRcaContent(content);
+
+      expect(wrapper.vm.tableOfContents.map((item: any) => item.text)).toEqual([
+        "Incident Details",
+        "Evidence",
+        "Executive Summary",
+      ]);
+      // Rendered ids must match the TOC ids, or scroll-to-section finds nothing.
+      for (const item of wrapper.vm.tableOfContents) {
+        expect(formatted).toContain(`id="${item.id}"`);
+      }
+      expect(formatted).toContain("**not a heading**");
+    });
   });
 
   describe("Theme Support", () => {
