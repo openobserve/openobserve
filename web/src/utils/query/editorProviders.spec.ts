@@ -1127,6 +1127,12 @@ describe("isPredicatePosition — WHERE, HAVING and ON chain; nothing else does"
     expect(isPredicatePosition("SELECT a -- WHERE \nFROM t GROUP BY ")).toBe(false);
   });
 
+  it("a finished comment right after WHERE leaves the predicate slot open", () => {
+    expect(isPredicatePosition("SELECT * FROM t WHERE /* explain filter */ ")).toBe(true);
+    expect(isPredicatePosition("SELECT * FROM t WHERE -- note\n")).toBe(true);
+    expect(isPredicatePosition("SELECT * FROM t WHERE a = 1 AND /* x */ ")).toBe(true);
+  });
+
   it("never chains in SELECT, GROUP BY, ORDER BY or function arguments", () => {
     for (const text of [
       "SELECT ",

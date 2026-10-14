@@ -1958,12 +1958,13 @@ test.describe("Autocomplete group headers — never a target", () => {
         test.skip(mode === 'off', 'off keeps the flat menus');
     });
 
-    /** The value menu for level, opened by a typed space; null when no level value was captured. */
+    /** The value menu for level, opened by a typed space; null when fewer than two level values were captured. */
     async function valueMenu(page) {
         await seedEditor(page, `${WHERE}level =`);
         await page.keyboard.type(' ');
         const menu = await waitForMenu(page, 10000).catch(() => null);
-        return menu && menu.headers[0]?.startsWith('Values') && menu.rows.filter((r) => /^'/.test(r)).length >= 2 ? menu : null;
+        // Only the captured data decides a skip, so a menu that lost its headers fails the header assertions.
+        return menu && menu.rows.filter((r) => /^'/.test(r)).length >= 2 ? menu : null;
     }
     const undoKey = (page) => page.evaluate(() => (/Macintosh/.test(navigator.userAgent) ? 'Meta' : 'Control'));
 
