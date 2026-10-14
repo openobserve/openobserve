@@ -41,6 +41,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import StepPicker from "./StepPicker.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { PathFlow } from "@/utils/rum/productAnalyticsModel";
 
 type Hit = Record<string, unknown>;
@@ -78,6 +80,7 @@ const LOGIN_ENTRY: Hit[] = [
 ];
 let entryRows: Hit[] | "fail" = LOGIN_ENTRY;
 let branchPage: (() => Promise<unknown>) | null = null;
+let droppedRow = true;
 const respond = () =>
   vi.mocked(searchService.search).mockImplementation((async (args: {
     query: { query: { sql: string } };
@@ -94,7 +97,9 @@ const respond = () =>
     if (/hu AS/.test(sql)) {
       return {
         data: {
-          hits: [{ side: "dropped", units: 87, sessions: 104, with_error: 1, with_frustration: 0 }],
+          hits: droppedRow
+            ? [{ side: "dropped", units: 87, sessions: 104, with_error: 1, with_frustration: 0 }]
+            : [],
         },
       };
     }
@@ -218,6 +223,7 @@ describe("AnalyticsPaths", () => {
     branchTotal = 50;
     entryRows = LOGIN_ENTRY;
     branchPage = null;
+    droppedRow = true;
     respond();
   });
 
@@ -427,32 +433,217 @@ describe("AnalyticsPaths", () => {
     expect(wrapper!.find('[data-test="rum-analytics-paths-truncated"]').text()).toContain("100.0%");
   });
 
-  it("filters to a funnel's dropped sessions and names them from the drop-off counts (AC-25)", async () => {
+  const COHORT_DEF = (name?: string) => ({
+    anchor: null,
+    direction: "next" as const,
+    depth: 3,
+    include: "all" as const,
+    cohort: {
+      funnel: {
+        steps: [
+          { kind: "p" as const, key: "/a" },
+          { kind: "c" as const, key: "b" },
+        ],
+        unit: "sessions" as const,
+        window: "session" as const,
+        breakdown: null,
+      },
+      stepIndex: 1,
+      side: "dropped" as const,
+      ...(name ? { name } : {}),
+    },
+  });
+
+  const cohortChip = () => wrapper!.find('[data-test="rum-analytics-paths-session-filter"]');
+  // The popover portals to <body>, outside the wrapper's subtree.
+  const cohortPopover = () =>
+    document.body.querySelector('[data-test="rum-analytics-paths-cohort-popover"]');
+  const openCohortPopover = async () => {
+    await cohortChip().trigger("click");
+    await vi.waitFor(() => expect(cohortPopover()).not.toBeNull());
+  };
+  const popoverButton = (id: string) => {
+    const el = document.body.querySelector<HTMLElement>(`[data-test="${id}"]`);
+    expect(el).not.toBeNull();
+    return el!;
+  };
+
+  it("filters to a funnel's dropped sessions and names the chip after the step alone (AC-25)", async () => {
     await mountPaths(() => {
-      useProductAnalytics().paths.value = {
-        anchor: null,
-        direction: "next",
-        depth: 3,
-        include: "all",
-        cohort: {
-          funnel: {
-            steps: [
-              { kind: "p", key: "/a" },
-              { kind: "c", key: "b" },
-            ],
-            unit: "sessions",
-            window: "session",
-            breakdown: null,
-          },
-          stepIndex: 1,
-          side: "dropped",
-        },
-      };
+      useProductAnalytics().paths.value = COHORT_DEF();
     });
-    const chip = wrapper!.find('[data-test="rum-analytics-paths-session-filter"]');
-    expect(chip.text()).toContain("104");
-    expect(chip.text()).toContain("87");
+    expect(wrapper!.find('[data-test="rum-analytics-paths-cohort-word"]').text()).toBe(
+      "From drop-off after",
+    );
+    expect(cohortChip().text()).toMatch(/^step 1\s*\/a$/);
     expect(pathSqls().at(-1)).toContain("MAX(CASE WHEN t <= step_t THEN n END)");
+  });
+
+  it("the chip opens a popover that states the drop-off condition and its count", async () => {
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    expect(cohortPopover()).toBeNull();
+    await openCohortPopover();
+    const text = cohortPopover()!.textContent ?? "";
+    expect(text).toContain("Reached /a, then did not reach b.");
+    expect(text).toContain("104 sessions");
+  });
+
+  const cohortSource = () => wrapper!.find('[data-test="rum-analytics-paths-cohort-source"]');
+
+  it("in cohort mode the toolbar leads with a back button, a funnel icon, the funnel's name and a divider", async () => {
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF("Signup");
+    });
+    const source = cohortSource();
+    expect(source.find('[data-test="rum-analytics-paths-cohort-back-btn"]').exists()).toBe(true);
+    expect(source.find('[data-test="rum-analytics-paths-cohort-funnel"]').text()).toBe("Signup");
+    expect(source.findAllComponents(OIcon).map((i) => i.props("name"))).toContain("filter-alt");
+    expect(source.findComponent(OSeparator).props("vertical")).toBe(true);
+  });
+
+  it("names the funnel the cohort came from, not whichever funnel is open now", async () => {
+    await mountPaths(() => {
+      const pa = useProductAnalytics();
+      pa.openSavedFunnel(SAVED_SIGNUP);
+      pa.paths.value = COHORT_DEF("Checkout");
+    });
+    expect(cohortSource().find('[data-test="rum-analytics-paths-cohort-funnel"]').text()).toBe(
+      "Checkout",
+    );
+  });
+
+  it("a cohort from an unsaved funnel says so", async () => {
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    expect(cohortSource().find('[data-test="rum-analytics-paths-cohort-funnel"]').text()).toBe(
+      "Unsaved funnel",
+    );
+  });
+
+  it("outside cohort mode there is no back button or funnel name", async () => {
+    await mountPaths();
+    expect(cohortSource().exists()).toBe(false);
+  });
+
+  it("zero dropped sessions reads as 0, never as a pending count", async () => {
+    droppedRow = false;
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    await openCohortPopover();
+    expect(cohortPopover()!.textContent).toContain("0 sessions");
+  });
+
+  it("'Back to funnel' returns to the funnel builder and keeps the cohort", async () => {
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    await wrapper!.find('[data-test="rum-analytics-paths-cohort-back-btn"]').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.name).toBe("productAnalyticsFunnelBuilder");
+    expect(useProductAnalytics().paths.value.cohort).not.toBeNull();
+  });
+
+  it("'Back to funnel' reopens the cohort's own saved funnel even after another one was opened", async () => {
+    const row = api.seedFunnel("web", "Checkout", {
+      s: [
+        ["p", "/a"],
+        ["c", "b"],
+      ],
+      u: "sessions",
+      w: "session",
+    });
+    await mountPaths(() => {
+      const pa = useProductAnalytics();
+      pa.openSavedFunnel(SAVED_SIGNUP);
+      const base = COHORT_DEF("Checkout");
+      pa.paths.value = { ...base, cohort: { ...base.cohort, funnelId: row.id as string } };
+    });
+    await wrapper!.find('[data-test="rum-analytics-paths-cohort-back-btn"]').trigger("click");
+    await vi.waitFor(() =>
+      expect(router.currentRoute.value.name).toBe("productAnalyticsFunnelBuilder"),
+    );
+    expect(useProductAnalytics().openedFunnel.value?.id).toBe(row.id);
+  });
+
+  it("'Back to funnel' from an unsaved funnel's cohort rebuilds that funnel", async () => {
+    await mountPaths(() => {
+      const pa = useProductAnalytics();
+      pa.openSavedFunnel(SAVED_SIGNUP);
+      pa.paths.value = COHORT_DEF();
+    });
+    await wrapper!.find('[data-test="rum-analytics-paths-cohort-back-btn"]').trigger("click");
+    await vi.waitFor(() =>
+      expect(router.currentRoute.value.name).toBe("productAnalyticsFunnelBuilder"),
+    );
+    const pa = useProductAnalytics();
+    expect(pa.openedFunnel.value).toBeNull();
+    expect(pa.funnel.value.steps).toEqual([
+      { kind: "p", key: "/a" },
+      { kind: "c", key: "b" },
+    ]);
+  });
+
+  it("'Clear funnel scope' keeps the step as a plain anchor and restores the picker", async () => {
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    await openCohortPopover();
+    popoverButton("rum-analytics-paths-cohort-clear-btn").click();
+    await flushPromises();
+    expect(useProductAnalytics().paths.value.cohort).toBeNull();
+    expect(useProductAnalytics().paths.value.anchor).toEqual({ kind: "p", key: "/a" });
+    expect(cohortChip().exists()).toBe(false);
+    expect(wrapper!.find('[data-test="rum-analytics-paths-anchor-select"]').exists()).toBe(true);
+  });
+
+  it("the chip's remove control names what it does", async () => {
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    const remove = cohortChip().find("button");
+    expect(remove.attributes("aria-label")).toBe("Clear funnel scope");
+  });
+
+  it("an empty cohort says no sessions dropped and offers the way back, not a hidden picker", async () => {
+    pathRows = [];
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF();
+    });
+    const empty = wrapper!.find('[data-test="rum-analytics-paths-empty"]');
+    expect(empty.text()).toContain("No sessions dropped after /a in this range");
+    expect(empty.text()).not.toContain("pick another anchor");
+    expect(empty.find('[data-test="rum-analytics-paths-empty-back-btn"]').exists()).toBe(true);
+  });
+
+  const toolbarText = () =>
+    wrapper!.find('[data-test="rum-analytics-paths-toolbar"]').text().replace(/\s+/g, " ");
+
+  it("the toolbar reads as one sentence from the anchor to what counts as a step", async () => {
+    await mountPaths();
+    expect(toolbarText()).toMatch(
+      /^From.*show the.*next.*previous.*3 steps.*counting.*pages and clicks.*pages.*clicks/,
+    );
+  });
+
+  it("in cohort mode the toolbar sentence starts from the drop-off", async () => {
+    await mountPaths(() => {
+      useProductAnalytics().paths.value = COHORT_DEF("Signup");
+    });
+    expect(toolbarText()).toMatch(
+      /^Signup.*From drop-off after.*step 1.*\/a.*show the.*next.*counting/,
+    );
+  });
+
+  it("the depth select keeps its compact width instead of spanning the toolbar", async () => {
+    await mountPaths();
+    const depth = wrapper!
+      .findAllComponents(OSelect)
+      .find((c) => c.attributes("data-test") === "rum-analytics-paths-depth-select");
+    expect(depth?.props("width")).toBe("xs");
   });
 
   it("a Top paths row opens the branch drawer with the exact tuple and its count (AC-26, AC-59)", async () => {
@@ -477,7 +668,7 @@ describe("AnalyticsPaths", () => {
     expect(drawer.props("stepDepth")).toBe(1);
   });
 
-  it("the caption says a branch click opens its sessions", async () => {
+  it("the toolbar carries only controls, no methodology caption or click hint", async () => {
     await mountPaths(() => {
       useProductAnalytics().paths.value = {
         anchor: { kind: "p", key: "/" },
@@ -487,28 +678,10 @@ describe("AnalyticsPaths", () => {
         cohort: null,
       };
     });
-    expect(wrapper!.find('[data-test="rum-analytics-paths-click-hint"]').text()).toBe(
-      "Click a branch to see its sessions",
-    );
-  });
-
-  it("the click hint shows at every width, like the Retention hint (F13)", async () => {
-    await mountPaths(() => {
-      useProductAnalytics().paths.value = {
-        anchor: { kind: "p", key: "/" },
-        direction: "next",
-        depth: 3,
-        include: "all",
-        cohort: null,
-      };
-    });
-    const hint = wrapper!.find('[data-test="rum-analytics-paths-click-hint"]').element;
-    const hidden: string[] = [];
-    for (let el: Element | null = hint; el; el = el.parentElement) {
-      if ([...el.classList].some((c) => c.endsWith(":hidden") || c === "hidden"))
-        hidden.push(el.className);
-    }
-    expect(hidden).toEqual([]);
+    const text = toolbarText();
+    expect(text).not.toContain("Weighted by distinct sessions");
+    expect(text).not.toContain("Click a branch to see its sessions");
+    expect(wrapper!.find('[data-test="rum-analytics-paths-click-hint"]').exists()).toBe(false);
   });
 
   it("a flow node opens the drawer for that node", async () => {
