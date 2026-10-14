@@ -8,8 +8,15 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
-defineProps<{
-  chats: Array<{ id: number; title: string; timestamp: string }>;
+const props = defineProps<{
+  chats: Array<{
+    id: number;
+    title: string;
+    timestamp: string;
+    sessionId?: string;
+    serverBacked?: boolean;
+  }>;
+  shareEnabled?: boolean;
 }>();
 
 const searchTerm = defineModel<string>("searchTerm", { required: true });
@@ -17,12 +24,16 @@ const searchTerm = defineModel<string>("searchTerm", { required: true });
 const emit = defineEmits<{
   (e: "select", chatId: number): void;
   (e: "delete", chatId: number): void;
+  (e: "share", chatId: number): void;
   (e: "clear-all"): void;
 }>();
 
 const { t } = useI18nTyped();
 
 const formatTime = (timestamp: string) => new Date(timestamp).toLocaleString();
+
+const canShare = (chat: (typeof props.chats)[number]) =>
+  !!props.shareEnabled && !!chat.serverBacked && !!chat.sessionId;
 </script>
 
 <template>
@@ -49,9 +60,22 @@ const formatTime = (timestamp: string) => new Date(timestamp).toLocaleString();
             </div>
           </div>
           <OButton
+            v-if="canShare(chat)"
             variant="ghost"
             size="icon-xs-circle"
-            class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
+            class="opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+            :data-test="`o2-ai-chat-history-menu-share-${chat.id}`"
+            :aria-label="t('aiChatShare.share')"
+            @click.stop="emit('share', chat.id)"
+          >
+            <OIcon name="share" size="sm" />
+            <OTooltip :content="t('aiChatShare.share')" />
+          </OButton>
+          <OButton
+            variant="ghost"
+            size="icon-xs-circle"
+            class="delete-history-btn opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100 group-data-[highlighted]:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+            :aria-label="t('aiAssistant.deleteChatTooltip')"
             @click.stop="emit('delete', chat.id)"
           >
             <OIcon name="delete" size="sm" />
@@ -64,7 +88,6 @@ const formatTime = (timestamp: string) => new Date(timestamp).toLocaleString();
       </div>
     </div>
 
-    <!-- Clear all conversations button -->
     <div v-if="chats.length > 0" class="clear-all-container bg-surface-base shrink-0">
       <ODropdownSeparator />
       <OButton

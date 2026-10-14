@@ -255,6 +255,7 @@ jobs:
   ui_unit_tests:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_ui_changes == 'true'
+    timeout-minutes: 45
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -276,6 +277,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: web
+        timeout-minutes: 5
         run: npm ci
 
       - name: Run frontend unit tests with coverage and check thresholds

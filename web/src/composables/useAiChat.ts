@@ -1,6 +1,6 @@
 import store from "@/stores";
 import { contextRegistry, createDefaultContextProvider } from "@/composables/contextProviders";
-import { generateTraceContext } from "@/utils/zincutils";
+import { generateTraceContext, getUUIDv7 } from "@/utils/zincutils";
 import type { ImageAttachment } from "@/ts/interfaces/chat";
 import analytics from "@/services/product_analytics";
 
@@ -24,18 +24,6 @@ const useAiChat = () => {
     contextHandler = null;
   };
 
-  /**
-   * Get structured context from the context registry
-   *
-   * Example usage:
-   * ```typescript
-   * const structuredContext = await getStructuredContext();
-   * if (structuredContext) {
-   *   console.log('Page:', structuredContext.pageType);
-   *   console.log('Data:', structuredContext.data);
-   * }
-   * ```
-   */
   const getStructuredContext = async () => {
     try {
       return await contextRegistry.getActiveContext();
@@ -45,27 +33,7 @@ const useAiChat = () => {
     }
   };
 
-  /**
-   * Fetches AI chat response with streaming support and optional request cancellation
-   *
-   * @param messages - Array of chat messages to send to the AI
-   * @param model - AI model to use (optional, defaults to server-side config)
-   * @param org_id - Organization identifier for API routing
-   * @param abortSignal - Optional AbortController signal for request cancellation
-   * @param explicitContext - Optional explicit context to use (takes precedence over registered context)
-   * @param sessionId - Optional UUID v7 session ID for tracking all API calls in a chat session
-   * @param images - Optional array of image attachments for multimodal queries
-   * @returns Promise<Response> - Fetch response object with streaming capabilities
-   *
-   * Example usage:
-   * ```typescript
-   * const abortController = new AbortController();
-   * const response = await fetchAiChat(messages, 'gpt-4', 'org123', abortController.signal);
-   *
-   * // To cancel the request:
-   * abortController.abort();
-   * ```
-   */
+  /** POST a chat turn and return the streaming response, or `{ cancelled: true }` once aborted. */
   const fetchAiChat = async (
     messages: any[],
     model: string,
@@ -74,6 +42,7 @@ const useAiChat = () => {
     explicitContext?: any,
     sessionId?: string,
     images?: ImageAttachment[],
+    turnId: string = getUUIDv7(),
   ) => {
     let url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chat_stream`;
 
@@ -149,6 +118,8 @@ const useAiChat = () => {
       // Add session ID header if provided for linking API calls within a chat session
       if (sessionId) {
         headers["x-o2-assistant-session-id"] = sessionId;
+        // With server-side persistence a repeated turn id is recognized instead of running the model twice.
+        headers["x-o2-assistant-turn-id"] = turnId;
       }
 
       // Configure fetch options with abort signal for request cancellation
@@ -175,15 +146,7 @@ const useAiChat = () => {
     }
   };
 
-  /**
-   * Submit user feedback (thumbs up/down) for an AI response
-   *
-   * @param feedbackType - "thumbs_up" or "thumbs_down"
-   * @param org_id - Organization identifier
-   * @param sessionId - Session ID for linking feedback to conversation
-   * @param queryIndex - Index of the query in the session this feedback is for
-   * @param traceId - Trace ID from the workflow to link feedback to the same trace
-   */
+  /** Submit a thumbs up/down for an AI response; `traceId` links it to the workflow trace. */
   const submitFeedback = async (
     feedbackType: "thumbs_up" | "thumbs_down",
     org_id: string,
@@ -246,25 +209,111 @@ const useAiChat = () => {
     }
   };
 
-  /**
-   * Initialize default context provider as fallback
-   *
-   * @param router - Vue router instance
-   * @param store - Vuex store instance
-   *
-   * Example:
-   * ```typescript
-   * const { initializeDefaultContext } = useAiChat();
-   * initializeDefaultContext(router, store);
-   * ```
-   */
+  /** Register the default context provider as the registry's fallback. */
   const initializeDefaultContext = (router: any, storeInstance: any) => {
     const defaultProvider = createDefaultContextProvider(router, storeInstance);
     contextRegistry.register("default", defaultProvider);
   };
 
+  // The persisted turn outlives the browser's request, so only this stops it; keepalive lets a closing tab still send it.
+  const cancelAiChat = async (org_id: string, sessionId: string) => {
+    const url = `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats/${encodeURIComponent(sessionId)}/cancel`;
+    return fetch(url, {
+      method: "POST",
+      credentials: "include",
+      keepalive: true,
+      // A JSON content type is what a cross-site form post cannot send, so the server requires it.
+      headers: {
+        "Content-Type": "application/json",
+        "x-o2-assistant-session-id": sessionId,
+      },
+      body: "{}",
+    });
+  };
+
+  const chatsUrl = (org_id: string, sessionId?: string) =>
+    `${store.state.API_ENDPOINT}/api/${org_id}/ai/chats` +
+    (sessionId ? `/${encodeURIComponent(sessionId)}` : "");
+
+  const chatsRequest = async (url: string, init: RequestInit = {}) => {
+    const response = await fetch(url, {
+      credentials: "include",
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init.headers || {}) },
+    });
+    if (!response.ok) {
+      const error: Error & { status?: number } = new Error(
+        `Chat history request failed (${response.status})`,
+      );
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  };
+
+  /** One page of the caller's stored conversations, most recent first. */
+  const listServerChats = (org_id: string, limit = 100, cursor?: string) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) params.set("cursor", cursor);
+    return chatsRequest(`${chatsUrl(org_id)}?${params}`);
+  };
+
+  /** A stored conversation; `not_modified` when both `knownSeq` and `knownVersion` are current, only newer turns when stale. */
+  const getServerChat = (
+    org_id: string,
+    sessionId: string,
+    knownSeq?: number,
+    limit?: number,
+    knownVersion?: string,
+  ) => {
+    const params = new URLSearchParams();
+    if (knownSeq !== undefined) params.set("known_seq", String(knownSeq));
+    if (knownSeq !== undefined && knownVersion !== undefined) {
+      params.set("known_version", knownVersion);
+    }
+    if (limit !== undefined) params.set("limit", String(limit));
+    const query = params.toString();
+    return chatsRequest(`${chatsUrl(org_id, sessionId)}${query ? `?${query}` : ""}`);
+  };
+
+  const renameServerChat = (org_id: string, sessionId: string, title: string) =>
+    chatsRequest(chatsUrl(org_id, sessionId), {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    });
+
+  const deleteServerChat = (org_id: string, sessionId: string) =>
+    chatsRequest(chatsUrl(org_id, sessionId), { method: "DELETE" });
+
+  const deleteAllServerChats = (org_id: string) =>
+    chatsRequest(chatsUrl(org_id), { method: "DELETE" });
+
+  /** The server-side persistence backend for `useChatHistory`. */
+  const chatHistoryServer = () => ({
+    enabled: () =>
+      !!store.state.zoConfig?.ai_enabled && !!store.state.zoConfig?.ai_chat_persistence_enabled,
+    list: (orgId: string, limit: number) => listServerChats(orgId, limit),
+    get: (
+      orgId: string,
+      sessionId: string,
+      knownSeq?: number,
+      limit?: number,
+      knownVersion?: string,
+    ) => getServerChat(orgId, sessionId, knownSeq, limit, knownVersion),
+    rename: renameServerChat,
+    remove: deleteServerChat,
+    removeAll: deleteAllServerChats,
+  });
+
   return {
     fetchAiChat,
+    cancelAiChat,
+    chatHistoryServer,
+    listServerChats,
+    getServerChat,
+    renameServerChat,
+    deleteServerChat,
+    deleteAllServerChats,
     submitFeedback,
     registerAiChatHandler,
     removeAiChatHandler,
