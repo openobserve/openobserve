@@ -23829,10 +23829,14 @@
     "linkUnlinkFailed": "Slack could not be unlinked. Try again.",
     "confirmTitle": "Link your Slack account",
     "confirmBody": "Link the Slack account that opened this page to {email}.",
+    "confirmAccount": "Slack account: {account}",
+    "confirmAccountBoth": "{name} ({email})",
+    "confirmAccountUnnamed": "no name or email in Slack",
+    "confirmOtherEmail": "This Slack account's email is not {email}. Confirm only if you typed {command} in Slack yourself just now.",
     "confirmButton": "Confirm",
     "confirmGoMine": "Go to My on-call",
     "confirmRefusedTitle": "This link can't be used",
-    "confirmRefusedBody": "It may have expired, or this Slack account's confirmed email is not {email}. Get a new link with {command} in Slack."
+    "confirmRefusedBody": "It may have expired. Get a new link with {command} in Slack."
   },
   "oncallSlackApp": {
     "title": "Slack app",

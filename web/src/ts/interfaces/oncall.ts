@@ -1271,6 +1271,14 @@ export interface ChatLinkView {
   linked_at: number;
 }
 
+/** `POST /oncall/chat/slack/link/preview`: the Slack account a link token names, shown before Confirm (LN-6). */
+export interface SlackLinkPreview {
+  name?: string | null;
+  email?: string | null;
+  /** True only for a confirmed Slack email equal to the caller's, any case. */
+  same_email: boolean;
+}
+
 /** `GET /telephony`: the deployment's account is reported by presence and From number only, never its SID or token. */
 export interface TelephonyView {
   deployment_account_present: boolean;

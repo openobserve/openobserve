@@ -52,7 +52,7 @@ pub struct ExchangeSlackInstallRequest {
     pub state: String,
 }
 
-/// The link token from the linking URL's `?t=`, which the Confirm page posts back.
+/// The link token from a linking URL's `?t=`, as the confirm page posts it to preview and confirm.
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct ConfirmSlackLinkRequest {
     pub t: String,
@@ -338,7 +338,7 @@ pub async fn start_slack_link(
     }
 }
 
-/// Links the Slack account a linking URL names to the caller, if Slack confirms the same email.
+/// Links the Slack account a linking URL names to the caller's own email.
 #[utoipa::path(
     post,
     path = "/{org_id}/oncall/chat/slack/link",
@@ -368,6 +368,46 @@ pub async fn confirm_slack_link(
 
         match link_flow::confirm(&org_id, &user_email.user_id, &body.t).await {
             Ok(view) => MetaHttpResponse::json(view),
+            Err(e) => link_refusal(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// The Slack account a linking URL names, shown on the confirm page before Confirm; links nothing.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/chat/slack/link/preview",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "PreviewOnCallSlackLink",
+    summary = "Show the Slack account a link would link",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = ConfirmSlackLinkRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "The Slack account's name, email and whether that email is yours", content_type = "application/json", body = Object),
+        (status = 400, description = "This link can't be used", content_type = "application/json", body = Object),
+        (status = 403, description = "Not a member of the organization", content_type = "application/json", body = Object),
+        (status = 502, description = "Slack could not be reached", content_type = "application/json", body = Object),
+        (status = 503, description = "Slack is not set up", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn preview_slack_link(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    ValidatedJson(body): ValidatedJson<ConfirmSlackLinkRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::chat::link_flow;
+
+        match link_flow::preview(&org_id, &user_email.user_id, &body.t).await {
+            Ok(preview) => MetaHttpResponse::json(preview),
             Err(e) => link_refusal(e),
         }
     }

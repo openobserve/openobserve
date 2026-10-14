@@ -2175,6 +2175,10 @@ fn oncall_routes(router: Router) -> Router {
             post(oncall::chat::start_slack_link),
         )
         .route(
+            "/{org_id}/oncall/chat/slack/link/preview",
+            post(oncall::chat::preview_slack_link),
+        )
+        .route(
             "/{org_id}/oncall/chat/slack/link",
             post(oncall::chat::confirm_slack_link),
         )

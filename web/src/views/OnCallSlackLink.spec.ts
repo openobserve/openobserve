@@ -21,7 +21,9 @@ import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallSlackLink from "@/views/OnCallSlackLink.vue";
 
-vi.mock("@/services/oncall", () => ({ default: { confirmSlackLink: vi.fn() } }));
+vi.mock("@/services/oncall", () => ({
+  default: { confirmSlackLink: vi.fn(), previewSlackLink: vi.fn() },
+}));
 
 const push = vi.fn();
 const query: Record<string, string> = {};
@@ -34,6 +36,7 @@ const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot /></div>" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   OIcon: { name: "OIcon", template: "<i />" },
+  OBanner: { name: "OBanner", props: ["variant"], template: "<div><slot /></div>" },
   OButton: {
     name: "OButton",
     props: ["loading"],
@@ -51,18 +54,85 @@ function open(params: Record<string, string>) {
 const find = (w: ReturnType<typeof open>, id: string) =>
   w.find(`[data-test="oncall-slack-link-${id}"]`);
 
-describe("OnCallSlackLink", () => {
-  beforeEach(() => vi.clearAllMocks());
+const preview = (data: { name?: string; email?: string; same_email: boolean }) =>
+  service.previewSlackLink.mockResolvedValue({ data } as any);
 
-  it("asks for Confirm and links nothing until it is pressed", async () => {
+const REFUSED_BODY = "It may have expired. Get a new link with /oncall link in Slack.";
+
+describe("OnCallSlackLink", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    preview({ name: "Ann", email: EMAIL, same_email: true });
+  });
+
+  it("offers no Confirm until the preview answers", async () => {
+    service.previewSlackLink.mockReturnValue(new Promise(() => {}));
     const wrapper = open({ t: "tok", org_identifier: "acme" });
     await flushPromises();
 
+    expect(service.previewSlackLink).toHaveBeenCalledWith({ org_identifier: "acme", t: "tok" });
     expect(find(wrapper, "title").text()).toBe("Link your Slack account");
-    expect(find(wrapper, "body").text()).toBe(
-      `Link the Slack account that opened this page to ${EMAIL}.`,
-    );
+    expect(find(wrapper, "confirm").exists()).toBe(false);
+  });
+
+  it("names the Slack account with no warning when its confirmed email is the session's", async () => {
+    const wrapper = open({ t: "tok", org_identifier: "acme" });
+    await flushPromises();
+
+    expect(find(wrapper, "account").text()).toBe(`Slack account: Ann (${EMAIL})`);
+    expect(find(wrapper, "warning").exists()).toBe(false);
+    expect(find(wrapper, "confirm").exists()).toBe(true);
     expect(service.confirmSlackLink).not.toHaveBeenCalled();
+  });
+
+  it("warns when the Slack account's email is not the session's, and still offers Confirm", async () => {
+    preview({ name: "Bo", email: "bo@other.example", same_email: false });
+    const wrapper = open({ t: "tok", org_identifier: "acme" });
+    await flushPromises();
+
+    expect(find(wrapper, "warning").text()).toBe(
+      `This Slack account's email is not ${EMAIL}. Confirm only if you typed /oncall link in Slack yourself just now.`,
+    );
+    expect(find(wrapper, "confirm").exists()).toBe(true);
+  });
+
+  it.each([
+    [{ name: "Bo" }, "Slack account: Bo"],
+    [{ email: "bo@other.example" }, "Slack account: bo@other.example"],
+    [{}, "Slack account: no name or email in Slack"],
+  ])("names the account from whichever of name and email exist (%o)", async (fields, line) => {
+    preview({ ...fields, same_email: false });
+    const wrapper = open({ t: "tok", org_identifier: "acme" });
+    await flushPromises();
+
+    expect(find(wrapper, "account").text()).toBe(line);
+  });
+
+  it("shows the refusal when the preview answers 400, with no Confirm", async () => {
+    service.previewSlackLink.mockRejectedValue({
+      response: { status: 400, data: { code: 400, message: "This link can't be used." } },
+    });
+    const wrapper = open({ t: "tok", org_identifier: "acme" });
+    await flushPromises();
+
+    expect(find(wrapper, "title").text()).toBe("This link can't be used");
+    expect(find(wrapper, "body").text()).toBe(REFUSED_BODY);
+    expect(find(wrapper, "confirm").exists()).toBe(false);
+  });
+
+  it("shows passing trouble when the preview fails otherwise, with no Confirm", async () => {
+    service.previewSlackLink.mockRejectedValue({
+      response: {
+        status: 502,
+        data: { code: 502, message: "Slack could not be reached. Try again." },
+      },
+    });
+    const wrapper = open({ t: "tok", org_identifier: "acme" });
+    await flushPromises();
+
+    expect(find(wrapper, "error").text()).toBe("Slack could not be reached. Try again.");
+    expect(find(wrapper, "title").text()).toBe("Link your Slack account");
+    expect(find(wrapper, "confirm").exists()).toBe(false);
   });
 
   it("posts the token to the link's own org, then shows Linked as the answered email", async () => {
@@ -76,6 +146,7 @@ describe("OnCallSlackLink", () => {
       },
     } as any);
     const wrapper = open({ t: "tok", org_identifier: "acme" });
+    await flushPromises();
 
     await find(wrapper, "confirm").trigger("click");
     await flushPromises();
@@ -93,14 +164,13 @@ describe("OnCallSlackLink", () => {
       response: { status: 400, data: { code: 400, message: "This link can't be used." } },
     });
     const wrapper = open({ t: "tok", org_identifier: "acme" });
+    await flushPromises();
 
     await find(wrapper, "confirm").trigger("click");
     await flushPromises();
 
     expect(find(wrapper, "title").text()).toBe("This link can't be used");
-    expect(find(wrapper, "body").text()).toBe(
-      `It may have expired, or this Slack account's confirmed email is not ${EMAIL}. Get a new link with /oncall link in Slack.`,
-    );
+    expect(find(wrapper, "body").text()).toBe(REFUSED_BODY);
     expect(find(wrapper, "confirm").exists()).toBe(false);
   });
 
@@ -112,6 +182,7 @@ describe("OnCallSlackLink", () => {
       },
     });
     const wrapper = open({ t: "tok", org_identifier: "acme" });
+    await flushPromises();
 
     await find(wrapper, "confirm").trigger("click");
     await flushPromises();
@@ -128,6 +199,7 @@ describe("OnCallSlackLink", () => {
 
       expect(find(wrapper, "title").text()).toBe("This link can't be used");
       expect(find(wrapper, "confirm").exists()).toBe(false);
+      expect(service.previewSlackLink).not.toHaveBeenCalled();
       expect(service.confirmSlackLink).not.toHaveBeenCalled();
     },
   );

@@ -103,7 +103,10 @@ describe("OnCallSlackCard", () => {
   });
 
   it.each([
-    [404, `No Slack account uses ${EMAIL} in Acme Corp.`],
+    [
+      404,
+      `No Slack account uses ${EMAIL} in Acme Corp. Type /oncall link in Slack to link the account you use there.`,
+    ],
     [409, "Slack wouldn't deliver a direct message to you."],
   ])("shows a %s from Link Slack word for word and keeps the button", async (status, message) => {
     service.startSlackLink.mockRejectedValue(refusal(status, message));

@@ -48,6 +48,18 @@ describe("oncall service — the request shapes the server actually accepts", ()
     });
   });
 
+  /// The preview takes the same org from the link's URL, so it is escaped the same way.
+  describe("previewSlackLink", () => {
+    it("escapes the org rather than letting it walk the path", () => {
+      oncallService.previewSlackLink({ org_identifier: "x/../../other", t: "tok" });
+
+      expect(client.post).toHaveBeenCalledWith(
+        "/api/x%2F..%2F..%2Fother/oncall/chat/slack/link/preview",
+        { t: "tok" },
+      );
+    });
+  });
+
   /// This is a *service*-level test on purpose. Every screen mocks the service,
   /// so a component test cannot see that the request itself is malformed — and
   /// that is precisely how this shipped: `escalate` posted with no second

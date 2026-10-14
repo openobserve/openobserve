@@ -943,6 +943,13 @@ export const startSlackLinkMutation = (org: string) =>
     meta: { silentError: true },
   });
 
+/** Names the token's Slack account before Confirm; it writes nothing, so nothing expires. */
+export const previewSlackLinkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (t: string) => oncallService.previewSlackLink({ org_identifier: org, t }),
+    meta: { silentError: true },
+  });
+
 /** Confirms a link from the Slack DM's token, then re-reads the link. */
 export const confirmSlackLinkMutation = (org: string) =>
   mutationOptions({

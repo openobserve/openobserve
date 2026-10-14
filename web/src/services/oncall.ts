@@ -60,6 +60,7 @@ import type {
   OrgTelephonyView,
   ChatInstallView,
   ChatLinkView,
+  SlackLinkPreview,
   SlackManifestUrls,
   SetTeamChannelBody,
   TeamSlackTestResult,
@@ -910,6 +911,13 @@ const oncall = {
   /// DMs the caller a Confirm button; links nothing until that Confirm (LN-5).
   startSlackLink: ({ org_identifier }: { org_identifier: string }) =>
     http().post<{ sent: boolean }>(`/api/${org_identifier}/oncall/chat/slack/link/start`),
+
+  /// Names the Slack account the token links, without linking it; the org comes from the link's URL, so it is escaped.
+  previewSlackLink: ({ org_identifier, t }: { org_identifier: string; t: string }) =>
+    http().post<SlackLinkPreview>(
+      `/api/${encodeURIComponent(org_identifier)}/oncall/chat/slack/link/preview`,
+      { t },
+    ),
 
   /// Links the Slack account the token names to the caller; the org comes from the link's URL, so it is escaped.
   confirmSlackLink: ({ org_identifier, t }: { org_identifier: string; t: string }) =>
