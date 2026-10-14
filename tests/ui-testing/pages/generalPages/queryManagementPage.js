@@ -22,6 +22,10 @@ export class QueryManagementPage {
     // `visible !== false` items), so count 0 rather than merely hidden.
     this.queryManagementTab = page.locator('[data-test="query-management-tab"]');
     this.enterpriseLockedPage = page.locator('[data-test="enterprise-feature-locked"]');
+    this.queryTypeTabs = page.locator('[data-test="running-queries-query-type-tabs"]');
+    this.summaryList = page.locator('[data-test="running-queries-summary-list"]');
+    this.allQueriesList = page.locator('[data-test="running-queries-all-queries-list"]');
+    this.searchTypeFilter = this.allQueriesList.locator('[data-otoggle-value="dashboards"]');
   }
 
   baseUrl() {
@@ -53,5 +57,36 @@ export class QueryManagementPage {
   async expectEnterpriseLockedPage() {
     await expect(this.enterpriseLockedPage).toBeVisible({ timeout: 15000 });
     await expect(this.page).toHaveURL(/enterprise-locked\?feature=queryManagement/);
+  }
+
+  async stubRunningQueries(org, queries) {
+    await this.page.route(`**/api/${org}/query_manager/status`, (route) =>
+      route.fulfill({ json: { status: queries } })
+    );
+  }
+
+  async navigateToRunningQueries(org) {
+    await this.navigateToQueryManagement(org);
+    await expect(this.queryTypeTabs).toBeVisible({ timeout: 15000 });
+  }
+
+  queryTypeTab(value) {
+    return this.queryTypeTabs.locator(`[data-otoggle-value="${value}"]`);
+  }
+
+  async selectQueryTypeTab(value) {
+    await this.queryTypeTab(value).click();
+  }
+
+  async drillIntoUser(email) {
+    await this.summaryList.getByText(email, { exact: true }).first().click();
+  }
+
+  async expectAllQueriesViewFor(email) {
+    await expect(this.queryTypeTab('all')).toHaveAttribute('data-state', 'on');
+    await expect(this.allQueriesList).toBeVisible();
+    await expect(this.summaryList).toBeHidden();
+    await expect(this.searchTypeFilter).toBeVisible();
+    await expect(this.allQueriesList.getByText(email).first()).toBeVisible();
   }
 }

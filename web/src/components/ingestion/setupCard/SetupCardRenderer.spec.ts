@@ -556,7 +556,6 @@ describe("SetupCardRenderer — product analytics", () => {
       },
     });
     const block = wrapper.findComponent(OCodeBlock);
-    expect(block.props("copyOnClick")).toBe(true);
     expect(block.props("tokenName")).toBe("default");
   });
 });

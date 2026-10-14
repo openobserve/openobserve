@@ -19,4 +19,5 @@ import { orgKey } from "@/composables/query/keys";
 export const announcementKeys = {
   all: (org: string) => orgKey(org, "announcements"),
   active: (org: string) => orgKey(org, "announcements", "active"),
+  config: (org: string) => orgKey(org, "announcements", "config"),
 };

@@ -126,8 +126,8 @@ pub enum AlertError {
     #[error("Alert name cannot contain '/'")]
     AlertNameContainsForwardSlash,
 
-    #[error("Alert destination or workflows is required")]
-    AlertDestinationMissing,
+    #[error("Alerts cannot be defined on the internal stream '{0}'")]
+    ProtectedStream(String),
 
     /// The warning/critical pair is invalid for the chosen operator.
     /// "Less severe" is direction-dependent — see `level::validate_thresholds`.
@@ -736,6 +736,13 @@ async fn prepare_alert(
     if alert.name.contains('/') {
         return Err(AlertError::AlertNameContainsForwardSlash);
     }
+    // A realtime alert sees every ingested row, so one on chat history would exfiltrate it.
+    // Case-insensitive, so no spelling of the chat stream slips through.
+    if config::meta::self_reporting::ai_chat::is_protected_ai_chat_stream(
+        &alert.stream_name.trim().to_lowercase(),
+    ) {
+        return Err(AlertError::ProtectedStream(alert.stream_name.clone()));
+    }
 
     if let Some(vrl) = alert.query_condition.vrl_function.as_ref() {
         match base64::decode_url(vrl) {
@@ -767,25 +774,6 @@ async fn prepare_alert(
         });
     }
 
-    // Naming an on-call team IS naming somewhere for this to go. Paging is
-    // documented as additive to destinations, but the check only knew about
-    // destinations and workflows — so an alert whose whole purpose was to wake
-    // the owning team could not be saved without also nominating a webhook it
-    // did not want.
-    #[cfg(feature = "enterprise")]
-    let destination_missing = alert.destinations.is_empty()
-        && alert.workflows.is_empty()
-        && alert
-            .oncall_team
-            .as_deref()
-            .is_none_or(|t| t.trim().is_empty());
-    #[cfg(not(feature = "enterprise"))]
-    let destination_missing = alert.destinations.is_empty();
-
-    // before saving alert check alert destination
-    if destination_missing {
-        return Err(AlertError::AlertDestinationMissing);
-    }
     for dest in alert.destinations.iter() {
         match db::alerts::destinations::get(org_id, dest).await {
             Ok(d) => {
@@ -2260,6 +2248,17 @@ pub(crate) fn send_attempted(result: &Result<NotificationOutcome, AlertError>) -
     result.as_ref().map_or(true, |outcome| outcome.attempted)
 }
 
+/// Whether the alert names a destination, or (enterprise) a workflow or on-call team, to notify.
+pub(crate) fn has_delivery_target(alert: &Alert) -> bool {
+    !alert.destinations.is_empty()
+        || (cfg!(feature = "enterprise")
+            && (!alert.workflows.is_empty()
+                || alert
+                    .oncall_team
+                    .as_deref()
+                    .is_some_and(|team| !team.trim().is_empty())))
+}
+
 /// Triggers an alert.
 /// ExistingAlertRepeated is suppressed by design and notifies nobody, so treating it as
 /// "notified" would skip every destination and leave the trigger silent.
@@ -2649,6 +2648,12 @@ impl AlertExt for Alert {
         skip_destinations: &[String],
         episode_id: Option<String>,
     ) -> Result<NotificationOutcome, AlertError> {
+        // A deleted alert-level template must not fail a send that has nothing to dispatch.
+        if self.destinations.is_empty()
+            && (!cfg!(feature = "enterprise") || self.workflows.is_empty())
+        {
+            return Ok(NotificationOutcome::default());
+        }
         let mut outcome = NotificationOutcome::default();
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
@@ -4868,7 +4873,7 @@ mod send_path_tests {
     use super::incident_path_notified;
     use super::{
         Alert, AlertError, AlertExt, NotificationOutcome, all_workflows_failed, choose_template,
-        send_attempted, send_discord_with_attachment, send_http_notification,
+        has_delivery_target, send_attempted, send_discord_with_attachment, send_http_notification,
     };
     use crate::{
         alerts::notifications::platform::{Platform, send_resolve},
@@ -4894,6 +4899,24 @@ mod send_path_tests {
             ..Default::default()
         });
         assert!(send_attempted(&sent));
+    }
+
+    #[test]
+    fn only_a_destination_workflow_or_on_call_team_is_a_delivery_target() {
+        let with = |set: fn(&mut Alert)| {
+            let mut alert = Alert::default();
+            set(&mut alert);
+            has_delivery_target(&alert)
+        };
+        let enterprise = cfg!(feature = "enterprise");
+        assert!(!with(|_| {}));
+        assert!(!with(|a| a.oncall_team = Some("  ".to_string())));
+        assert!(with(|a| a.destinations = vec!["slack".to_string()]));
+        assert_eq!(with(|a| a.workflows = vec!["wf".to_string()]), enterprise);
+        assert_eq!(
+            with(|a| a.oncall_team = Some("sre".to_string())),
+            enterprise
+        );
     }
 
     #[tokio::test]
@@ -4922,6 +4945,17 @@ mod send_path_tests {
             .await
             .expect("every destination already delivered is not an error");
         assert!(!ledgered.attempted);
+    }
+
+    #[tokio::test]
+    async fn a_send_with_nowhere_to_go_ignores_a_deleted_alert_template() {
+        let mut alert = Alert::default();
+        alert.template = Some("deleted".to_string());
+        let outcome = alert
+            .send_notification("t", &[], 0, None, 0, None, None, None, &[], None)
+            .await
+            .expect("a template is only needed to render a send");
+        assert!(!outcome.attempted);
     }
 
     fn tpl(name: &str) -> Template {
@@ -5148,6 +5182,27 @@ mod tests {
         assert_eq!(
             with_incident_notify_error("wf err".to_string(), Some("slack: 500".to_string())),
             "slack: 500; wf err"
+        );
+    }
+
+    #[tokio::test]
+    async fn no_alert_can_watch_the_chat_history_stream() {
+        let mut alert = Alert::default();
+        alert.name = "exfiltrate".into();
+        alert.is_real_time = true;
+        let err = prepare_alert("org", "_o2_ai_chat_events", "", &mut alert, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(ref s) if s == "_o2_ai_chat_events"));
+        let mut upper = Alert::default();
+        upper.name = "exfiltrate-upper".into();
+        let err = prepare_alert("org", " _O2_AI_CHAT_EVENTS", "", &mut upper, true, false)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, AlertError::ProtectedStream(_)));
+        assert_eq!(
+            axum::response::Response::from(err).status(),
+            axum::http::StatusCode::BAD_REQUEST
         );
     }
 
@@ -6880,10 +6935,6 @@ mod tests {
             AlertError::AlertNameMissing.to_string(),
             "Alert name is required"
         );
-        assert_eq!(
-            AlertError::AlertDestinationMissing.to_string(),
-            "Alert destination or workflows is required"
-        );
         assert_eq!(AlertError::AlertNotFound.to_string(), "Alert not found");
         assert_eq!(
             AlertError::SqlMissingQuery.to_string(),
@@ -8271,6 +8322,20 @@ mod tests {
             .unwrap_err()
     }
 
+    /// Every check before the schema lookup passed; the lookup itself needs a database.
+    fn reached_the_schema_lookup(err: &AlertError) -> bool {
+        matches!(
+            err,
+            AlertError::StreamNotFound { .. } | AlertError::InfraError(_)
+        )
+    }
+
+    #[tokio::test]
+    async fn prepare_alert_saves_an_alert_with_nowhere_to_send() {
+        let err = prepare_schedule(|a| a.trigger_condition.frequency = 60).await;
+        assert!(reached_the_schema_lookup(&err), "{err:?}");
+    }
+
     #[tokio::test]
     async fn prepare_alert_rejects_an_out_of_range_frequency() {
         let err = prepare_schedule(|a| a.trigger_condition.frequency = i64::MAX).await;
@@ -8367,20 +8432,14 @@ mod tests {
             a.trigger_condition.tolerance_in_secs = Some(SCHEDULE_FIELD_MAX_SECS);
         })
         .await;
-        assert!(
-            matches!(err, AlertError::AlertDestinationMissing),
-            "{err:?}"
-        );
+        assert!(reached_the_schema_lookup(&err), "{err:?}");
         let err = prepare_schedule(|a| {
             a.tz_offset = 1439;
             a.trigger_condition.frequency_type = FrequencyType::Cron;
             a.trigger_condition.cron = "0 0 * * * *".to_string();
         })
         .await;
-        assert!(
-            matches!(err, AlertError::AlertDestinationMissing),
-            "{err:?}"
-        );
+        assert!(reached_the_schema_lookup(&err), "{err:?}");
     }
 }
 
