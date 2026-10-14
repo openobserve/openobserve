@@ -246,6 +246,7 @@ pub async fn search(
                             | search::SearchEventType::Other
                             | search::SearchEventType::Alerts
                             | search::SearchEventType::DerivedStream
+                            | search::SearchEventType::PublicDashboard
                     ) {
                         (false, None, None)
                     } else {
