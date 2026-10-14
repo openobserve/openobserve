@@ -37,6 +37,17 @@ describe("oncall service — the request shapes the server actually accepts", ()
     vi.clearAllMocks();
   });
 
+  /// The confirm page takes the org from the Slack link's URL, so a crafted org must stay one path segment.
+  describe("confirmSlackLink", () => {
+    it("escapes the org rather than letting it walk the path", () => {
+      oncallService.confirmSlackLink({ org_identifier: "x/../../other", t: "tok" });
+
+      expect(client.post).toHaveBeenCalledWith("/api/x%2F..%2F..%2Fother/oncall/chat/slack/link", {
+        t: "tok",
+      });
+    });
+  });
+
   /// This is a *service*-level test on purpose. Every screen mocks the service,
   /// so a component test cannot see that the request itself is malformed — and
   /// that is precisely how this shipped: `escalate` posted with no second

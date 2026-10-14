@@ -1260,6 +1260,17 @@ export interface SlackManifestUrls {
   redirect_url: string;
 }
 
+/** `GET /oncall/chat/identities/me` and a Confirm's answer: the caller's own Slack link (RB-6). */
+export interface ChatLinkView {
+  workspace_id: string;
+  workspace_name?: string | null;
+  /** False for a link kept from before a Disconnect; it works again on reconnect. */
+  connected: boolean;
+  slack_user_id: string;
+  email: string;
+  linked_at: number;
+}
+
 /** `GET /telephony`: the deployment's account is reported by presence and From number only, never its SID or token. */
 export interface TelephonyView {
   deployment_account_present: boolean;

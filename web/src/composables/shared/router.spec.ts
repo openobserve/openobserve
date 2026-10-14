@@ -432,6 +432,19 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("parentRoutes — Slack link confirm page", () => {
+    // LN-1: outside the logged-out exemptions, so the router guard stores the URL and returns to it after login.
+    it("exposes the confirm page at the linking URL's path", () => {
+      const { parentRoutes } = useRoutes();
+      const confirmRoute = parentRoutes.find((route: any) => route.path === "/oncall/slack/link");
+
+      expect(confirmRoute).toBeDefined();
+      expect(confirmRoute.name).toBe("onCallSlackLink");
+      expect(confirmRoute.component).toBeDefined();
+      expect(enTitle(confirmRoute.meta.titleKey)).toBe("Link Slack");
+    });
+  });
+
   // =========================================================================
   // 5. homeChildRoutes — home route
   // =========================================================================
@@ -2185,9 +2198,9 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 5 parentRoutes", () => {
+    it("should have exactly 6 parentRoutes", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(5);
+      expect(parentRoutes).toHaveLength(6);
     });
 
     it("should have unique paths in parentRoutes", () => {

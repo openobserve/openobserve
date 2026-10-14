@@ -29,6 +29,7 @@ const service = vi.mocked(oncallService);
 
 // The page's Refresh calls this through a template ref; the stub has to expose it or that call throws.
 const deliveriesRefresh = vi.fn().mockResolvedValue(undefined);
+const slackRefresh = vi.fn().mockResolvedValue(undefined);
 
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
@@ -48,6 +49,11 @@ const stubs = {
     name: "OnCallPhoneCard",
     template: "<div data-test='oncall-phone-card' />",
     methods: { refresh: vi.fn().mockResolvedValue(undefined) },
+  },
+  OnCallSlackCard: {
+    name: "OnCallSlackCard",
+    template: "<div data-test='oncall-slack-card' />",
+    methods: { refresh: slackRefresh },
   },
 };
 
@@ -89,7 +95,7 @@ describe("OnCallMine", () => {
     );
   });
 
-  it("forces both of its reads on Refresh", async () => {
+  it("forces every read on Refresh", async () => {
     const wrapper = render();
     await flushPromises();
     expect(service.myOnCall).toHaveBeenCalledTimes(1);
@@ -99,6 +105,32 @@ describe("OnCallMine", () => {
 
     expect(service.myOnCall).toHaveBeenCalledTimes(2);
     expect(deliveriesRefresh).toHaveBeenCalledTimes(1);
+    expect(slackRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  /// Mockup decision 9: the Slack card sits right under the phone, gone only when the deployment has Slack off.
+  it.each([
+    ["on", true],
+    ["needs_key", true],
+    [undefined, true],
+    ["off", false],
+  ])("with oncall_slack %s shows the Slack card: %s", async (slack, shown) => {
+    const before = store.state.zoConfig.oncall_slack;
+    store.state.zoConfig.oncall_slack = slack;
+    try {
+      const wrapper = render();
+      await flushPromises();
+
+      const html = wrapper.html();
+      const at = html.indexOf('data-test="oncall-slack-card"');
+      expect(at > -1).toBe(shown);
+      if (shown) {
+        expect(at).toBeGreaterThan(html.indexOf('data-test="oncall-phone-card"'));
+        expect(at).toBeLessThan(html.indexOf('data-test="oncall-mine-teams"'));
+      }
+    } finally {
+      store.state.zoConfig.oncall_slack = before;
+    }
   });
 
   /// A refresh that fails must not tell an on-call engineer they are off duty.

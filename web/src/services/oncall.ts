@@ -59,6 +59,7 @@ import type {
   TelephonyView,
   OrgTelephonyView,
   ChatInstallView,
+  ChatLinkView,
   SlackManifestUrls,
   SetTeamChannelBody,
   TeamSlackTestResult,
@@ -905,6 +906,24 @@ const oncall = {
   /// This deployment's Slack app manifest URLs; only the admin org is answered.
   getSlackManifestUrls: ({ org_identifier }: { org_identifier: string }) =>
     http().get<SlackManifestUrls>(`/api/${org_identifier}/oncall/chat/slack/manifest`),
+
+  /// DMs the caller a Confirm button; links nothing until that Confirm (LN-5).
+  startSlackLink: ({ org_identifier }: { org_identifier: string }) =>
+    http().post<{ sent: boolean }>(`/api/${org_identifier}/oncall/chat/slack/link/start`),
+
+  /// Links the Slack account the token names to the caller; the org comes from the link's URL, so it is escaped.
+  confirmSlackLink: ({ org_identifier, t }: { org_identifier: string; t: string }) =>
+    http().post<ChatLinkView>(`/api/${encodeURIComponent(org_identifier)}/oncall/chat/slack/link`, {
+      t,
+    }),
+
+  /// The caller's own Slack link, or null; never anybody else's.
+  getMySlackLink: ({ org_identifier }: { org_identifier: string }) =>
+    http().get<ChatLinkView | null>(`/api/${org_identifier}/oncall/chat/identities/me`),
+
+  /// Unlinks the caller's own Slack account.
+  unlinkMySlack: ({ org_identifier }: { org_identifier: string }) =>
+    http().delete<{ unlinked: boolean }>(`/api/${org_identifier}/oncall/chat/identities/me`),
 
   /// Somebody stands in for the rotation over a window. Outside it the
   /// rotation resolves as normal, which is what makes an override safe.

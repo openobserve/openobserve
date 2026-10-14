@@ -247,6 +247,15 @@ const useRoutes = () => {
         titleKey: "routeTitles.slackOAuthCallback",
       },
     },
+    {
+      // LN-1: the Slack DM's Confirm link; not a logged-out exemption, so login returns here.
+      path: "/oncall/slack/link",
+      name: "onCallSlackLink",
+      component: () => import("@/views/OnCallSlackLink.vue"),
+      meta: {
+        titleKey: "routeTitles.slackLink",
+      },
+    },
   ];
 
   const homeChildRoutes = [

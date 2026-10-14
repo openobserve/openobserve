@@ -16,9 +16,15 @@
 // The SSO callback lands on /web/cb#id_token=…&access_token=…, and RUM records
 // that URL verbatim, so the sign-in tokens end up in the RUM stream.
 const AUTH_PARAM = /([?#&](?:id_token|access_token|refresh_token|code)=)[^&#]*/g;
+// The Slack link confirm page carries a live link token as `t`; other pages use `t` for ordinary values.
+const SLACK_LINK_PAGE = /\/oncall\/slack\/link\/?$/;
+// The link token, matched only once the URL is known to be the confirm page.
+const SLACK_LINK_TOKEN = /([?&]t=)[^&#]*/g;
 
-/** Replace sign-in token values in a URL's query or hash with "redacted", keeping every other parameter. */
+/** Replace sign-in and Slack link token values in a URL's query or hash with "redacted", keeping every other parameter. */
 export function scrubAuthParams(url: string | undefined): string | undefined {
   if (!url) return url;
-  return url.replace(AUTH_PARAM, "$1redacted");
+  const scrubbed = url.replace(AUTH_PARAM, "$1redacted");
+  const path = scrubbed.split(/[?#]/, 1)[0];
+  return SLACK_LINK_PAGE.test(path) ? scrubbed.replace(SLACK_LINK_TOKEN, "$1redacted") : scrubbed;
 }

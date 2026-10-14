@@ -25,6 +25,7 @@ import {
 import type {
   CauseGroup,
   ChatInstallView,
+  ChatLinkView,
   Contact,
   SlackManifestUrls,
   CoverageGaps,
@@ -431,6 +432,15 @@ export const chatInstallsQuery = (org: string) =>
     queryFn: async (): Promise<ChatInstallView[]> =>
       (await oncallService.listChatInstalls({ org_identifier: org })).data ?? [],
     staleTime: NORMAL_STALE_TIME,
+  });
+
+/** The caller's own Slack link, or null; read on the same tier as their phone. */
+export const mySlackLinkQuery = (org: string) =>
+  queryOptions({
+    queryKey: oncallKeys.mySlackLink(org),
+    queryFn: async (): Promise<ChatLinkView | null> =>
+      (await oncallService.getMySlackLink({ org_identifier: org })).data ?? null,
+    staleTime: LIVE_STALE_TIME,
   });
 
 /** The deployment's Slack app manifest URLs; an admin-org settings read (IN-3). */
@@ -918,4 +928,31 @@ export const deleteChatInstallMutation = (org: string) =>
     mutationFn: (workspaceId: string) =>
       oncallService.deleteChatInstall({ org_identifier: org, workspace_id: workspaceId }),
     meta: { invalidates: [oncallKeys.chatInstalls(org)], silentError: true },
+  });
+
+/** A link changes the card and whether a Slack DM reaches the person on each team. */
+const slackLinkWriteScopes = (org: string) => [
+  oncallKeys.mySlackLink(org),
+  oncallKeys.teamsAll(org),
+];
+
+/** Sends the Confirm DM; nothing is linked yet, so nothing expires. */
+export const startSlackLinkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.startSlackLink({ org_identifier: org }),
+    meta: { silentError: true },
+  });
+
+/** Confirms a link from the Slack DM's token, then re-reads the link. */
+export const confirmSlackLinkMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (t: string) => oncallService.confirmSlackLink({ org_identifier: org, t }),
+    meta: { invalidates: slackLinkWriteScopes(org), silentError: true },
+  });
+
+/** Unlinks the caller's own Slack account, then re-reads the link. */
+export const unlinkSlackMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: () => oncallService.unlinkMySlack({ org_identifier: org }),
+    meta: { invalidates: slackLinkWriteScopes(org), silentError: true },
   });
