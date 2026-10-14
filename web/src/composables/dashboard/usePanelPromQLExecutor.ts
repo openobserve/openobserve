@@ -326,7 +326,7 @@ export const usePanelPromQLExecutor = (ctx: {
               });
               chunkProcessors[queryIndex] = chunkProcessor;
 
-              // loadData() aborts the old run's controller but never cancels its stream, so a superseded run keeps delivering frames that would overwrite the newer run's results — an empty first partition then strands the panel on "No Data".
+              // Frames already in flight still arrive after loadData() cancels a superseded run; they would overwrite the newer run's results and strand the panel on "No Data".
               const isSuperseded = () => !!abortControllerRef?.signal?.aborted;
 
               const handlePromQLResponse = (data: any, res: any) => {

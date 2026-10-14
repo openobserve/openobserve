@@ -103,6 +103,8 @@ pub struct ScanContext {
     /// `false` once an exact index selection has applied the matchers.
     pub keep_filters: bool,
     pub source: ScanSource,
+    /// Errors from nodes that were skipped, so the data read may be incomplete.
+    pub warnings: Vec<String>,
 }
 
 impl ScanContext {
@@ -119,7 +121,13 @@ impl ScanContext {
             scan_stats,
             keep_filters,
             source: ScanSource::Table,
+            warnings: vec![],
         }
+    }
+
+    pub fn with_warnings(mut self, warnings: Vec<String>) -> Self {
+        self.warnings = warnings;
+        self
     }
 }
 

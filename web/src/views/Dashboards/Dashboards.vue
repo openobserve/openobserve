@@ -120,9 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: dashboards table -->
       <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
-        <div class="bg-card-glass-bg h-full">
+        <div class="bg-card-glass-bg flex h-full flex-col">
+          <div
+            v-show="showFirstData"
+            class="shrink-0 px-5 pt-5 empty:hidden"
+            data-test="dashboards-first-data"
+          >
+            <FirstDataPanel v-if="showFirstData" signal="any" variant="compact" />
+          </div>
           <OTable
-            class="h-full w-full"
+            class="min-h-0 w-full flex-1"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -134,8 +141,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             show-index
             :global-filter="filterQuery"
             :show-global-filter="false"
-            :page-size="20"
+            :page-size="pageSize"
             :page-size-options="[20, 50, 100, 250, 500]"
+            @update:page-size="pageSize = $event"
+            :sort-by="sortBy"
+            :sort-order="sortOrder"
+            @update:sort-by="sortBy = $event"
+            @update:sort-order="sortOrder = $event"
             :current-page="currentPage"
             @update:current-page="onPageChange"
             selection="multiple"
@@ -551,6 +563,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import FirstDataPanel from "@/components/ingestion/FirstDataPanel.vue";
 import { useRoute, useRouter } from "vue-router";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
@@ -573,6 +586,7 @@ import useNotifications from "@/composables/useNotifications";
 import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
+import { useListViewState } from "@/composables/useListViewState";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
@@ -629,6 +643,7 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    FirstDataPanel,
     OTruncatedText,
     OUserCell,
     OTimeCell,
@@ -676,14 +691,35 @@ export default defineComponent({
     const isFolderEditMode = ref(false);
     const selectedFolderDelete = ref<string | null>(null);
     const selectedFolderToEdit = ref<string | null>(null);
-    const searchQuery = ref("");
+    const savedView = useListViewState("dashboards", {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      pageSize: 20,
+    });
+    const searchQuery = ref(savedView.searchQuery);
     const filteredResults = ref<DashboardSearchResult[]>([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
     const selectedDashboardToMove = ref<DashboardRow | null>(null);
     const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
-    const searchAcrossFolders = ref(false);
-    const filterQuery = ref("");
+    const searchAcrossFolders = ref(savedView.searchAcrossFolders);
+    const filterQuery = ref(savedView.filterQuery);
+    const sortBy = ref<string>(savedView.sortBy);
+    const sortOrder = ref<"asc" | "desc">(savedView.sortOrder);
+    const pageSize = ref<number>(savedView.pageSize);
+    watch([searchQuery, filterQuery, searchAcrossFolders, sortBy, sortOrder, pageSize], () => {
+      Object.assign(savedView, {
+        searchQuery: searchQuery.value,
+        filterQuery: filterQuery.value,
+        searchAcrossFolders: searchAcrossFolders.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+        pageSize: pageSize.value,
+      });
+    });
     const folderSearchQuery = ref("");
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
@@ -958,7 +994,7 @@ export default defineComponent({
             // A folder switched away from mid-flight must not stamp over the one now active.
             if (activeFolderId.value === FAVORITES_FOLDER_ID) stampFolders(favFolders);
           });
-          searchAcrossFolders.value = false;
+          if (switching) searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
             query: {
@@ -991,7 +1027,9 @@ export default defineComponent({
           }
         } finally {
           loading.value = false;
-          searchAcrossFolders.value = false;
+          // The landing run is the return-from-detail restore, which keeps the saved cross-folder search.
+          if (switching) searchAcrossFolders.value = false;
+          else if (searchAcrossFolders.value && searchQuery.value) void runAcrossFoldersSearch();
           router.push({
             path: "/dashboards",
             query: {
@@ -1019,6 +1057,25 @@ export default defineComponent({
       }
     });
 
+    const runAcrossFoldersSearch = async () => {
+      loading.value = true;
+      try {
+        // Cancel any in-flight search
+        if (currentSearchAbortController) {
+          currentSearchAbortController.abort();
+        }
+        currentSearchAbortController = new AbortController();
+        const searchResults = await fetchSearchResults.execute(searchQuery.value);
+        filteredResults.value = toRaw(searchResults);
+      } catch (error) {
+        if (asCaughtError(error).name !== "AbortError") {
+          filteredResults.value = [];
+        }
+      } finally {
+        loading.value = false;
+      }
+    };
+
     watch(searchAcrossFolders, async (newVal) => {
       if (newVal) {
         // If searching across folders, use searchQuery
@@ -1027,23 +1084,7 @@ export default defineComponent({
           filterQuery.value = "";
         }
         if (searchQuery.value) {
-          loading.value = true;
-          try {
-            // Cancel any in-flight search
-            if (currentSearchAbortController) {
-              currentSearchAbortController.abort();
-            }
-            currentSearchAbortController = new AbortController();
-            const searchResults = await fetchSearchResults.execute(searchQuery.value);
-            filteredResults.value = toRaw(searchResults);
-          } catch (error) {
-            if (asCaughtError(error).name !== "AbortError") {
-              filteredResults.value = [];
-              // Handle error state
-            }
-          } finally {
-            loading.value = false;
-          }
+          await runAcrossFoldersSearch();
         } else {
           // If no search query, clear filtered results
           filteredResults.value = [];
@@ -1381,6 +1422,14 @@ export default defineComponent({
         selectedIds.value = [];
       },
       { flush: "sync" },
+    );
+
+    // mounted only while it can show, so a list with dashboards or an org with data runs no hidden watcher
+    const showFirstData = computed(
+      () =>
+        !loading.value &&
+        !dashboards.value.length &&
+        store.state.organizationData?.isDataIngested === false,
     );
 
     const deleteDashboard = async () => {
@@ -1809,6 +1858,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      showFirstData,
       refreshing,
       lastUpdatedAt,
       forbidden,
@@ -1860,6 +1910,9 @@ export default defineComponent({
       selectedIds,
       currentPage,
       onPageChange,
+      pageSize,
+      sortBy,
+      sortOrder,
       multipleExportDashboard,
       moveMultipleDashboards,
       openBulkDeleteDialog,

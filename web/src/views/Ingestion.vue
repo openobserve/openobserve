@@ -38,7 +38,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <OSelect
         v-if="lgUp && !isRUMPage && tokenOptions.length > 0"
+        ref="tokenSelectRef"
         v-model="selectedTokenName"
+        data-test="ingestion-token-select"
         :options="tokenOptions"
         label-key="label"
         value-key="value"
@@ -88,7 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Below lg the token picker sits above the tabs so the title, search and token button share one row. -->
         <div v-if="!lgUp && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
           <OSelect
+            ref="tokenSelectRef"
             v-model="selectedTokenName"
+            data-test="ingestion-token-select"
             :options="tokenOptions"
             label-key="label"
             value-key="value"
@@ -194,19 +198,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="confirmRUMUpdate = false"
       v-model="confirmRUMUpdate"
     />
-    <!-- Empty-data warning banner -->
-    <OBanner
-      v-if="
-        store.state.zoConfig.hasOwnProperty('restricted_routes_on_empty_data') &&
-        store.state.zoConfig.restricted_routes_on_empty_data == true &&
-        store.state.organizationData.isDataIngested == false
-      "
-      variant="promo"
-      dense
-      class="mx-2.5 mt-1 font-bold"
-      :content="t('ingestion.redirectionIngestionMsg')"
-    />
-
     <div class="min-h-0 flex-1">
       <router-view
         :currOrgIdentifier="currentOrgIdentifier"
@@ -223,8 +214,6 @@ import { resetPasscodeMutation } from "@/services/organizations.queries";
 import { createRumTokenMutation, updateRumTokenMutation } from "@/services/api_keys.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
-import { ingestionTokensQuery } from "@/services/organizations.queries";
-import { orgPasscodeQuery } from "@/services/organizations.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { rumTokensQuery } from "@/services/api_keys.queries";
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
@@ -234,6 +223,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onMounted, onUpdated, watch, computed } from "vue";
+import { provide } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -244,11 +234,13 @@ import { getImageURL } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { OPEN_TOKEN_PICKER } from "@/composables/useCredentialSnippet";
+import { useOrgCredential, type PasscodeRead } from "@/composables/useOrgCredential";
+import { FIRST_EVENT_ASK_AI } from "@/components/ingestion/firstEventAskAi";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -260,9 +252,9 @@ export default defineComponent({
     OButton,
     OSearchInput,
     OSelect,
-    OBanner,
   },
-  setup() {
+  emits: ["sendToAiChat"],
+  setup(_props, { emit }) {
     const { isMobile, lgUp } = useBreakpoint();
     const { t } = useI18nTyped();
     const store = useStore();
@@ -275,35 +267,20 @@ export default defineComponent({
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
 
-    // latched from GET /{org}/passcode alone (null = unknown), so the concurrent tokens read cannot clear a 403
-    const passcodeReadForbidden = ref<boolean | null>(null);
-
-    // so a late 403 withdraws only a selector-published passcode, never one a successful read returned
-    const passcodeCameFromTokenSelector = ref(false);
-
-    // refuses once a 403 is latched: the credential was never this role's to see
-    const publishSelectedToken = (token: string) => {
-      if (passcodeReadForbidden.value === true) return false;
-      passcodeCameFromTokenSelector.value = true;
-      store.dispatch("setOrganizationPasscodeForbidden", false);
-      store.dispatch("setOrganizationPasscode", token);
-      return true;
-    };
-
-    const applyPasscodeForbidden = (forbidden: boolean) => {
-      passcodeReadForbidden.value = forbidden;
-      store.dispatch("setOrganizationPasscodeForbidden", forbidden);
-      if (forbidden) {
-        // the tokens request can resolve before this 403, so withdraw what it published
-        if (passcodeCameFromTokenSelector.value) {
-          store.dispatch("setOrganizationPasscode", "");
-        }
-      }
-      passcodeCameFromTokenSelector.value = false;
-    };
+    // the shared loader publishes only once both reads settled, so a late /passcode cannot replace the picked token
+    const credential = useOrgCredential();
 
     // Token selector — pick which ingestion token the curl examples use
-    const selectedTokenName = ref("");
+    const selectedTokenName = computed<string>({
+      get: () => credential.pickedName.value,
+      set: (name) => credential.pickToken(name),
+    });
+    const tokenSelectRef = ref<{ focus: () => void } | null>(null);
+    provide(OPEN_TOKEN_PICKER, () => tokenSelectRef.value?.focus());
+    // A guide nested under this router-view reaches MainLayout's AI chat only through this page's emit.
+    provide(FIRST_EVENT_ASK_AI, (query: string) =>
+      emit("sendToAiChat", { query, autoSend: false }),
+    );
     const tokenOptions = computed(() => {
       const tokens = store.state.organizationData.orgTokens || [];
       const enabled = tokens.filter((t: any) => t.enabled);
@@ -315,29 +292,8 @@ export default defineComponent({
         value: t.name,
       }));
     });
-    watch(
-      tokenOptions,
-      (opts) => {
-        if (
-          opts.length > 0 &&
-          !opts.find((o: { value: string }) => o.value === selectedTokenName.value)
-        ) {
-          selectedTokenName.value = opts[0].value;
-          const tokens = store.state.organizationData.orgTokens || [];
-          const token = tokens.find((t: any) => t.name === opts[0].value);
-          if (token?.token) {
-            publishSelectedToken(token.token);
-          }
-        }
-      },
-      { immediate: true },
-    );
     const onTokenSelected = (name: SelectModelValue) => {
-      const tokens = store.state.organizationData.orgTokens || [];
-      const token = tokens.find((t: any) => t.name === name);
-      if (token?.token) {
-        publishSelectedToken(token.token);
-      }
+      if (typeof name === "string") credential.pickToken(name);
     };
 
     const activeTab = ref("recommended");
@@ -372,8 +328,6 @@ export default defineComponent({
 
     onBeforeMount(() => {
       if (store.state.selectedOrganization.identifier != undefined) {
-        fetchOrgTokens();
-        // only this call establishes readability; a tokens 403 is not observable on enterprise
         getOrganizationPasscode();
         getRUMToken();
       }
@@ -412,16 +366,6 @@ export default defineComponent({
 
     watch(() => route.name, syncTabFromRoute);
 
-    // the latch is per-org, so the new org's passcode read must decide afresh
-    watch(
-      () => store.state.selectedOrganization.identifier,
-      (identifier, previous) => {
-        if (identifier === previous) return;
-        passcodeReadForbidden.value = null;
-        passcodeCameFromTokenSelector.value = false;
-      },
-    );
-
     onUpdated(() => {
       if (router.currentRoute.value.name === "ingestion") {
         router.push({
@@ -434,32 +378,19 @@ export default defineComponent({
       }
     });
 
-    const getOrganizationPasscode = () => {
-      // Returned so callers can await the load — it never was, which only
-      // worked while the fetch resolved in a single microtask.
-      return queryClient
-        .fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
-        .then((res: any) => {
-          if (res.data.passcode == "") {
-            toast({
-              variant: "error",
-              message: t("toastMessages.views.passcodeNotFound"),
-              timeout: 5000,
-            });
-          } else {
-            applyPasscodeForbidden(false);
-            store.dispatch("setOrganizationPasscode", res.data.passcode);
-            store.dispatch("setOrganizationPasscodeUser", res.data.user);
-            currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
-          }
-        })
-        .catch((e: any) => {
-          // other errors stay silent: the passcode is not critical for page render
-          if (e?.response?.status === 403) {
-            applyPasscodeForbidden(true);
-          }
-        });
-    };
+    // other failures stay silent: the passcode is not critical for page render
+    const getOrganizationPasscode = () =>
+      credential.load().then((read: PasscodeRead | undefined) => {
+        if (read?.kind === "empty") {
+          toast({
+            variant: "error",
+            message: t("toastMessages.views.passcodeNotFound"),
+            timeout: 5000,
+          });
+        } else if (read?.kind === "ok") {
+          currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
+        }
+      });
 
     // A read failure stays silent: the card falls back to its Generate action.
     const getRUMToken = () => {
@@ -487,9 +418,7 @@ export default defineComponent({
               message: t("toastMessages.views.tokenResetSuccessfully"),
               timeout: 5000,
             });
-            applyPasscodeForbidden(false);
-            store.dispatch("setOrganizationPasscode", res.data.data.passcode);
-            store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
+            credential.setUserPasscode(res.data.data.passcode, res.data.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
           }
         })
@@ -522,16 +451,7 @@ export default defineComponent({
       confirmRUMUpdate.value = true;
     };
 
-    const fetchOrgTokens = () => {
-      return queryClient
-        .fetchQuery(ingestionTokensQuery(store.state.selectedOrganization.identifier))
-        .then((res: any) => {
-          store.dispatch("setOrgTokens", res.data);
-        })
-        .catch(() => {
-          // Silently fail — settings page will retry on load
-        });
-    };
+    const fetchOrgTokens = () => credential.load();
 
     const navigateToIngestionTokens = () => {
       router.push({
@@ -740,6 +660,7 @@ export default defineComponent({
       updateRUMToken,
       globalSearchQuery,
       selectedTokenName,
+      tokenSelectRef,
       tokenOptions,
       onTokenSelected,
     };

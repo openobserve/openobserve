@@ -1,4 +1,4 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import Billing from "@/enterprise/components/billings/Billing.vue";
 import i18n from "@/locales";
@@ -66,6 +66,7 @@ vi.mock("@/services/billings", async (importOriginal) => {
 
 // Import after mocking
 import BillingService from "@/services/billings";
+import config from "@/aws-exports";
 
 describe("Billing Component", () => {
   let wrapper: any = null;
@@ -244,6 +245,122 @@ describe("Billing Component", () => {
 
       expect(mockRouter.push).not.toHaveBeenCalled();
       testWrapper.unmount();
+    });
+  });
+
+  describe("trial landing and strip", () => {
+    const DAY_US = 24 * 60 * 60 * 1_000_000;
+    let savedSettings: any;
+
+    const mountAt = async (routeName: string, provider: string, expiry?: number) => {
+      wrapper?.unmount();
+      wrapper = null;
+      mockRouter.push.mockClear();
+      mockRouter.currentRoute.value.name = routeName;
+      mockRouter.currentRoute.value.query = {};
+      store.state.organizationData.organizationSettings = {
+        ...savedSettings,
+        free_trial_expiry: expiry,
+      };
+      (BillingService.list_subscription as any).mockClear();
+      (BillingService.list_subscription as any).mockResolvedValue({ data: { provider } });
+      const testWrapper = mount(Billing, {
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            "router-view": true,
+            OIcon: true,
+            ConfirmDialog: true,
+            Usage: true,
+            AppTabs: { template: "<div></div>", props: ["tabs", "activeTab"] },
+          },
+        },
+      });
+      await flushPromises();
+      return testWrapper;
+    };
+
+    beforeEach(() => {
+      savedSettings = { ...store.state.organizationData.organizationSettings };
+    });
+
+    afterEach(() => {
+      store.state.organizationData.organizationSettings = savedSettings;
+    });
+
+    it("lands a trial org on Usage", async () => {
+      const w = await mountAt("billings", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("usage");
+      expect(mockRouter.push).toHaveBeenCalledTimes(1);
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/billings/usage" }),
+      );
+      w.unmount();
+    });
+
+    it("lands an org without free_trial_expiry on Plans exactly as today", async () => {
+      const w = await mountAt("billings", "stripe", undefined);
+
+      expect(w.vm.billingtab).toBe("plans");
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        path: "/billings/plans",
+        query: { org_identifier: store.state.selectedOrganization.identifier },
+      });
+      w.unmount();
+    });
+
+    it("lands an AWS-billed trial org on Plans", async () => {
+      const w = await mountAt("billings", "aws", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("plans");
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/billings/plans" }),
+      );
+      w.unmount();
+    });
+
+    it("keeps an explicit Plans route on Plans for a trial org", async () => {
+      const w = await mountAt("plans", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.vm.billingtab).toBe("plans");
+      w.unmount();
+    });
+
+    it("shows the trial strip on Usage with the provider it already loaded", async () => {
+      const w = await mountAt("usage", "stripe", Date.now() * 1000 + 9 * DAY_US);
+
+      const strip = w.find('[data-test="trial-period-container"]');
+      expect(strip.exists()).toBe(true);
+      expect(strip.attributes("data-tone")).toBe("info");
+      expect(w.find('[data-test="trial-period-compare-plans-btn"]').exists()).toBe(true);
+      expect(w.find('[data-test="trial-period-end-rule"]').exists()).toBe(true);
+      expect(BillingService.list_subscription).toHaveBeenCalledTimes(1);
+      w.unmount();
+    });
+
+    it("renders each billing tab id exactly once", async () => {
+      (config as { isCloud?: string }).isCloud = "true";
+      const w = await mountAt("usage", "stripe", undefined);
+
+      for (const id of [
+        "billing-tab-plans",
+        "billing-tab-usage",
+        "billing-tab-invoices",
+        "billing-tab-group",
+      ]) {
+        expect(w.findAll(`[data-test="${id}"]`)).toHaveLength(1);
+      }
+      w.unmount();
+      delete (config as { isCloud?: string }).isCloud;
+    });
+
+    it("hides the trial strip for an AWS-billed org", async () => {
+      const w = await mountAt("usage", "aws", Date.now() * 1000 + 9 * DAY_US);
+
+      expect(w.find('[data-test="trial-period-container"]').exists()).toBe(false);
+      w.unmount();
     });
   });
 

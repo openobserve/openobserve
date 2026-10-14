@@ -10,15 +10,14 @@ import type { I18nText } from "@/types/i18n";
 export type CodeBlockChrome = "terminal" | "editor";
 
 export interface CodeBlockProps {
-  /** Raw code to display and copy. Copy always uses this, never the masked or
-   *  highlighted variant. */
+  /** Raw code to display and copy; the Copy button always copies this. */
   code: string;
   /** Fence language (e.g. "bash", "python"). Auto-detected when omitted. */
   lang?: string;
   /**
    * Masked variant of `code` (e.g. a command with a secret hidden). When set,
-   * the block shows it by default and exposes a Reveal/Hide toggle; copy still
-   * copies the real `code`.
+   * the block shows it by default and exposes a Reveal/Hide toggle; the Copy
+   * button still copies the real `code`, a text selection copies what is shown.
    */
   codeMasked?: string;
   /**
@@ -58,16 +57,26 @@ export interface CodeBlockProps {
   lineNumbers?: boolean;
   /** Inset the code from the block's edge, for a block with no toolbar above it. */
   padded?: boolean;
+  inset?: boolean;
   /**
    * data-test prefix for the toolbar buttons, e.g. "ai-code" yields
    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
    */
   dataTest?: string;
+  /** Name of the credential inside `code`, shown as a toolbar link and in the copy toast. */
+  tokenName?: string;
+}
+
+/** `partial` is true for a copy of a text selection, false for a whole-block copy. */
+export interface CodeBlockCopyPayload {
+  partial: boolean;
 }
 
 export interface CodeBlockEmits {
-  /** Fired only after the raw code was copied to the clipboard successfully. */
-  (e: "copy"): void;
+  /** Fired only after the code was copied to the clipboard successfully. */
+  (e: "copy", payload: CodeBlockCopyPayload): void;
+  /** The toolbar token link was clicked (only rendered when `tokenName` is set). */
+  (e: "token-click"): void;
 }
 
 export interface CodeBlockSlots {

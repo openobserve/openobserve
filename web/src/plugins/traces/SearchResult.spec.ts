@@ -116,7 +116,10 @@ const mockSearchObj = reactive({
       // wrap binding start `undefined` and hid the reactivity problem below.
       wrapCells: false,
       navigation: {
-        currentRowIndex: 0,
+        currentRowIndex: 0 as number | null,
+        selectionActive: false,
+        pendingPageSelection: null as any,
+        lastOpenedId: null as string | null,
       },
     },
   },
@@ -414,6 +417,52 @@ describe("SearchResult", () => {
 
     it("should include TracesSearchResultList component", () => {
       expect(wrapper.vm.$options.components).toHaveProperty("TracesSearchResultList");
+    });
+  });
+
+  describe("J/K selection across pages (4a §3.4)", () => {
+    const navigation = () => mockSearchObj.meta.resultGrid.navigation;
+    const select = (index: number) => {
+      navigation().selectionActive = true;
+      navigation().currentRowIndex = index;
+    };
+
+    beforeEach(() => {
+      mockSearchObj.loading = false;
+      navigation().pendingPageSelection = null;
+    });
+
+    it("a paginator change clears the selection, so page 2 row 7 never inherits page 1's (AC6.4)", () => {
+      select(7);
+      wrapper.vm.changePage(2);
+      expect(navigation().selectionActive).toBe(false);
+      expect(navigation().currentRowIndex).toBeNull();
+      expect(mockSearchObj.data.resultGrid.currentPage).toBe(1);
+      expect(wrapper.emitted("update:scroll")).toBeTruthy();
+    });
+
+    it("a J/K crossing keeps its pending selection", () => {
+      select(9);
+      navigation().pendingPageSelection = { page: 2, position: "first", requestId: null };
+      wrapper.findComponent({ name: "TracesSearchResultList" }).vm.$emit("cross-page", 2);
+      expect(navigation().pendingPageSelection?.page).toBe(2);
+      expect(navigation().selectionActive).toBe(true);
+      expect(mockSearchObj.data.resultGrid.currentPage).toBe(1);
+    });
+
+    it("rows-per-page and sort changes clear the selection", () => {
+      select(3);
+      wrapper.vm.changeRowsPerPage(25);
+      expect(navigation().selectionActive).toBe(false);
+      select(3);
+      wrapper.vm.changeSortBy("duration", "asc");
+      expect(navigation().currentRowIndex).toBeNull();
+    });
+
+    it("remembers the opened trace for the Back restore", () => {
+      mockSearchObj.meta.searchMode = "traces";
+      wrapper.vm.expandRowDetail({ trace_id: "abc", trace_start_time: 1, trace_end_time: 2 });
+      expect(navigation().lastOpenedId).toBe("abc");
     });
   });
 });

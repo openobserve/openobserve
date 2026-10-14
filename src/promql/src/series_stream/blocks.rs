@@ -762,7 +762,7 @@ async fn load_entry(
     sidecar: &str,
     cached: Option<Arc<CachedIndex>>,
 ) -> Result<Arc<CachedIndex>> {
-    Ok(metrics_index::fetch_parsed_index(
+    metrics_index::fetch_parsed_index(
         &file.account,
         sidecar,
         parent.metadata(),
@@ -770,7 +770,7 @@ async fn load_entry(
         labels,
         cached,
     )
-    .await?)
+    .await
 }
 
 pub(crate) fn query_window(eval: &EvalContext, offset: i64, lookback: i64) -> Option<(i64, i64)> {
@@ -1247,7 +1247,7 @@ mod tests {
         .unwrap()
     }
     fn file(rows: &[Row]) -> (FileKey, Vec<u8>) {
-        file_batch(batch(rows), vec!["group".into()])
+        file_batch(batch(rows))
     }
 
     #[tokio::test]
@@ -1288,7 +1288,7 @@ mod tests {
         );
     }
 
-    fn file_batch(batch: RecordBatch, label_columns: Vec<String>) -> (FileKey, Vec<u8>) {
+    fn file_batch(batch: RecordBatch) -> (FileKey, Vec<u8>) {
         let records = batch.num_rows();
         let timestamps = batch
             .column_by_name("_timestamp")
@@ -1307,16 +1307,11 @@ mod tests {
             rows: records as u64,
             compressed_size: 123,
         };
-        let mut writer = BlockWriter::new(
-            Vec::new(),
-            batch.schema(),
-            label_columns,
-            parent.metadata(),
-            2,
-        )
-        .unwrap();
+        let mut writer = BlockWriter::new(Vec::new(), batch.schema(), 2).unwrap();
         writer.write(&batch).unwrap();
-        let bytes = writer.finish().unwrap();
+        let bytes = writer
+            .finish_for_vortex(parent.metadata(), batch.schema())
+            .unwrap();
         let mut file = FileKey::new(
             0,
             String::new(),
@@ -1953,10 +1948,7 @@ mod tests {
         fields.push(Arc::new(Field::new("env", DataType::Utf8, true)));
         let mut arrays = source.columns().to_vec();
         arrays.push(Arc::new(StringArray::from(vec!["prod", "prod"])));
-        let new = file_batch(
-            RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap(),
-            vec!["group".into(), "env".into()],
-        );
+        let new = file_batch(RecordBatch::try_new(Arc::new(Schema::new(fields)), arrays).unwrap());
         let fixture = Fixture::new(&[old.clone(), new.clone()], false).await;
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "env", "prod")]);
         let prepared = prepare(
@@ -2361,101 +2353,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn legacy_new_mixed_and_disabled_sources_preserve_same_series_fragments() {
-        use datafusion::arrow::{array::UInt32Array, ipc::writer::FileWriter};
-        let rows = [
-            (1, 10, 1.0, Some("x")),
-            (1, 20, -0.0, Some("x")),
-            (1, 30, 3.0, Some("x")),
-            (1, 40, 4.0, Some("x")),
-        ];
-        let legacy_schema = Arc::new(Schema::new(vec![
-            Field::new("__oo_midx_row_count", DataType::UInt32, false),
-            Field::new("group", DataType::Utf8, true),
-        ]));
-        let legacy_batch = RecordBatch::try_new(
-            Arc::clone(&legacy_schema),
-            vec![
-                Arc::new(UInt32Array::from(vec![2])),
-                Arc::new(StringArray::from(vec!["x"])),
-            ],
-        )
-        .unwrap();
-        let mut legacy = Vec::new();
-        let mut writer = FileWriter::try_new(&mut legacy, &legacy_schema).unwrap();
-        writer.write(&legacy_batch).unwrap();
-        writer.finish().unwrap();
-        for legacy_count in [0, 1, 2] {
-            for enabled in [false, true] {
-                let mut files = vec![file(&rows[..2]), file(&rows[2..])];
-                for source in files.iter_mut().take(legacy_count) {
-                    source.1 = legacy.clone();
-                }
-                let fixture = Fixture::new(&files, false).await;
-                let source = if enabled {
-                    ScanSource::Blocks(Arc::new(fixture.scan(files.iter().map(|v| v.0.clone()))))
-                } else {
-                    ScanSource::HashSorted
-                };
-                let ctx =
-                    SessionContext::new_with_config(SessionConfig::new().with_target_partitions(2));
-                let table = MemTable::try_new(schema(), vec![vec![batch(&rows)]])
-                    .unwrap()
-                    .with_sort_order(vec![vec![
-                        col("__hash__").sort(true, false),
-                        col("_timestamp").sort(true, false),
-                    ]]);
-                ctx.register_table("m", Arc::new(table)).unwrap();
-                let matchers = Matchers::empty();
-                let selector = StreamingSelector {
-                    table_name: "m",
-                    matchers: &matchers,
-                    offset: 0,
-                };
-                let result = execute_partitioned(
-                    &ctx,
-                    &source,
-                    &selector,
-                    LabelColumns::grouped(vec!["group".into()]),
-                    20,
-                    &EvalContext::new(10, 40, 10, "compatibility".into()),
-                )
-                .await;
-                if enabled && legacy_count > 0 {
-                    assert!(result.is_err());
-                    assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
-                    continue;
-                }
-                let sources = result.unwrap();
-                let mut actual = Vec::new();
-                for source in sources {
-                    let mut source = source.await.unwrap();
-                    assert_eq!(
-                        matches!(&source, SeriesSource::Block(_)),
-                        enabled && legacy_count == 0
-                    );
-                    while source.advance().await.unwrap().is_some() {
-                        let mut samples = Vec::new();
-                        source.consume(&mut samples).await.unwrap();
-                        actual.extend(samples.iter().map(|s| (s.timestamp, s.value.to_bits())));
-                    }
-                }
-                actual.sort_unstable();
-                assert_eq!(
-                    actual,
-                    rows.iter()
-                        .map(|r| (r.1, r.2.to_bits()))
-                        .collect::<Vec<_>>()
-                );
-                assert_eq!(
-                    fixture.calls.load(Ordering::SeqCst) > 0,
-                    enabled && legacy_count == 0
-                );
-            }
-        }
-    }
-
-    #[tokio::test]
     async fn schema_evolution_distinguishes_absent_null_and_empty_labels() {
         let original = batch(&[(1, 10, 1.0, None), (1, 20, 2.0, None)]);
         let absent = RecordBatch::try_new(
@@ -2463,7 +2360,7 @@ mod tests {
             original.columns()[..3].to_vec(),
         )
         .unwrap();
-        let absent = file_batch(absent, vec![]);
+        let absent = file_batch(absent);
         let null = file(&[(1, 30, 3.0, None), (1, 40, 4.0, None)]);
         let empty = file(&[(1, 30, 3.0, Some("")), (1, 40, 4.0, Some(""))]);
         let fixture = Fixture::new(&[absent.clone(), null.clone(), empty.clone()], false).await;
@@ -2681,7 +2578,7 @@ mod tests {
         assert!(cached.is_none());
         assert!(!complete);
         let partial = Arc::new(CachedIndex {
-            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            index: Arc::new(entry.index.project(&[]).unwrap()),
             binding: entry.binding.clone(),
         });
         cache.insert(key.clone(), partial, weight.total).unwrap();
@@ -2712,7 +2609,7 @@ mod tests {
         let cache = Mutex::new(cache);
         let (key, entry, weight) = cache_entry();
         let partial = Arc::new(CachedIndex {
-            index: Arc::new(entry.index.project(&[]).unwrap().for_cache()),
+            index: Arc::new(entry.index.project(&[]).unwrap()),
             binding: entry.binding.clone(),
         });
         let lookup = {

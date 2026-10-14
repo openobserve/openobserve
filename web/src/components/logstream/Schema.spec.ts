@@ -18,6 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 // @ts-ignore
 import store from "@/test/unit/helpers/store";
+import config from "@/aws-exports";
 
 const {
   mockToast,
@@ -172,7 +173,14 @@ describe("Schema Component Tests", () => {
 
   // Additional comprehensive tests for schema.vue functions from lines 697-1784
   describe("Comprehensive Schema Function Tests", () => {
+    const originalIsEnterprise = (config as any).isEnterprise;
+
     beforeEach(async () => {
+      // The SDR column/action is shown locked (not hidden) in builds that
+      // don't unlock it — these tests exercise the unlocked action itself,
+      // so they need an entitled build. `columns` reads this once at setup,
+      // so it must be set before mount, not inside an individual `it`.
+      (config as any).isEnterprise = "true";
       mockGetStream.mockResolvedValue({
         name: "test-stream",
         storage_type: "s3",
@@ -248,6 +256,10 @@ describe("Schema Component Tests", () => {
         },
       });
       await flushPromises();
+    });
+
+    afterEach(() => {
+      (config as any).isEnterprise = originalIsEnterprise;
     });
 
     // Test 1: Component initialization with default values
@@ -1446,8 +1458,14 @@ describe("Schema Component Tests", () => {
     });
 
     let w: any;
+    const originalIsEnterprise = (config as any).isEnterprise;
 
     beforeEach(async () => {
+      // The pattern-association drawer's trigger is shown locked (not
+      // hidden) in builds that don't unlock it — `columns` reads this once
+      // at setup, so it must be set before mount, not inside an individual
+      // `it`. These tests exercise opening the drawer itself.
+      (config as any).isEnterprise = "true";
       w = mount(LogStream, {
         props: buildProps(true),
         global: {
@@ -1462,6 +1480,7 @@ describe("Schema Component Tests", () => {
     afterEach(() => {
       w?.unmount();
       vi.clearAllMocks();
+      (config as any).isEnterprise = originalIsEnterprise;
     });
 
     it("should render both ODrawer instances (schema drawer + pattern association drawer)", () => {

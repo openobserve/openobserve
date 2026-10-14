@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import i18n from "@/locales";
+import config from "@/aws-exports";
 
 import { buildForecastAlertPromql } from "./forecastAlert";
 import { generateAlertSummary } from "./alertSummaryGenerator";
@@ -109,5 +110,32 @@ describe("generateAlertSummary: Compare-with-Past windows", () => {
     expect(generateAlertSummary(scheduledAlert("custom"), [], keyT)).not.toContain(
       "alerts.summary.timeRangeCount",
     );
+  });
+});
+
+describe("generateAlertSummary: where it sends", () => {
+  const noDestination = t("alerts.summary.noDestination");
+  // Workflows and on-call teams only count where they run: enterprise and cloud builds.
+  const isEnterprise = config.isEnterprise;
+  beforeEach(() => {
+    config.isEnterprise = "true";
+  });
+  afterEach(() => {
+    config.isEnterprise = isEnterprise;
+  });
+
+  // On-call routing can still page a team, so the summary claims no more than "no destination".
+  it("says an alert with nowhere to send has no destination", () => {
+    const text = summary(forecastForm());
+    expect(text).toContain(noDestination);
+    expect(text).not.toMatch(/nobody/i);
+  });
+
+  it.each([
+    ["a destination", { destinations: ["ops-slack"] }],
+    ["only a workflow", { workflows: ["wf-1"] }],
+    ["only an on-call team", { oncall_team: "sre" }],
+  ])("does not say so for %s", (_case, targets) => {
+    expect(summary({ ...forecastForm(), ...targets })).not.toContain(noDestination);
   });
 });

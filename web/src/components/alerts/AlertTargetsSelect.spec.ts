@@ -23,6 +23,7 @@ import { mount } from "@vue/test-utils";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import AlertTargetsSelect from "./AlertTargetsSelect.vue";
 
 const OSelectStub = {
@@ -117,6 +118,20 @@ describe("AlertTargetsSelect", () => {
         { label: "slack", value: "dest:slack" },
         { header: true, label: "Workflows" },
         { label: "Escalate", value: "wf:wf-1" },
+      ]);
+    });
+
+    it("locked: the Workflows header still shows with nothing selectable beneath it", () => {
+      const wrapper = createWrapper({
+        destinationOptions: ["slack"],
+        workflowOptions: [{ label: "Escalate", value: "wf-1" }],
+        workflowsEnabled: false,
+        workflowsLocked: true,
+      });
+      expect(select(wrapper).props("options")).toEqual([
+        { header: true, label: "Destinations" },
+        { label: "slack", value: "dest:slack" },
+        { header: true, label: "Workflows" },
       ]);
     });
 
@@ -332,6 +347,26 @@ describe("AlertTargetsSelect", () => {
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
       expect(wrapper.emitted("create-workflow")).toHaveLength(1);
+    });
+
+    // Discoverable instead of absent: the family supports workflow routing
+    // but this edition doesn't unlock it, so the button stays visible and
+    // clickable — clicking opens the upgrade dialog instead of creating one.
+    it("shows a clickable, locked Create Workflow button that opens the upgrade dialog", async () => {
+      const wrapper = createWrapper({
+        workflowsEnabled: false,
+        workflowsLocked: true,
+        workflowsLockMessage: "Upgrade to unlock workflows",
+      });
+      const btn = wrapper.find('[data-test="create-workflow-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(btn.attributes("disabled")).toBeUndefined();
+
+      const { isOpen, close } = useEnterpriseUpgradeDialog();
+      close();
+      await btn.trigger("click");
+      expect(isOpen.value).toBe(true);
+      expect(wrapper.emitted("create-workflow")).toBeUndefined();
     });
   });
 

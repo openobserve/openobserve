@@ -301,4 +301,88 @@ describe("ODrawer", () => {
       expect(wrapper.emitted("update:open")).toBeFalsy();
     });
   });
+  describe("close focus (returnFocusTo / after-close)", () => {
+    const closeEvent = () => new Event("closeAutoFocus", { cancelable: true });
+
+    function mountWith(returnFocusTo?: () => HTMLElement | null) {
+      return mount(ODrawer, {
+        attachTo: document.body,
+        props: { open: true, title: "Details", returnFocusTo },
+        slots: { default: "<p>Body</p>" },
+      });
+    }
+
+    it("focuses the returnFocusTo element on close and scrolls it into view", async () => {
+      const row = document.createElement("tr");
+      row.tabIndex = 0;
+      row.scrollIntoView = vi.fn();
+      document.body.appendChild(row);
+      const wrapper = mountWith(() => row);
+      const event = closeEvent();
+
+      await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(row);
+      expect(row.scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+      expect(wrapper.emitted("after-close")).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("keeps the default when the element is detached", async () => {
+      const detached = document.createElement("button");
+      detached.focus = vi.fn();
+      const wrapper = mountWith(() => detached);
+      const event = closeEvent();
+
+      await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(detached.focus).not.toHaveBeenCalled();
+      expect(wrapper.emitted("after-close")).toHaveLength(1);
+      wrapper.unmount();
+    });
+
+    it("keeps the default when returnFocusTo returns null or is absent", async () => {
+      for (const returnFocusTo of [() => null, undefined]) {
+        const wrapper = mountWith(returnFocusTo);
+        const event = closeEvent();
+        await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", event);
+        expect(event.defaultPrevented).toBe(false);
+        expect(wrapper.emitted("after-close")).toHaveLength(1);
+        wrapper.unmount();
+      }
+    });
+
+    it("resolves the target at close time, not at open time", async () => {
+      const first = document.createElement("button");
+      const second = document.createElement("button");
+      document.body.append(first, second);
+      second.scrollIntoView = vi.fn();
+      let current = first;
+      const wrapper = mountWith(() => current);
+      current = second;
+
+      await findDrawerPanel(wrapper).vm.$emit("closeAutoFocus", closeEvent());
+
+      expect(document.activeElement).toBe(second);
+      wrapper.unmount();
+    });
+
+    it("focuses the element when the real dialog closes", async () => {
+      const row = document.createElement("tr");
+      row.tabIndex = 0;
+      row.scrollIntoView = vi.fn();
+      document.body.appendChild(row);
+      const wrapper = mountWith(() => row);
+      await new Promise((resolve) => setTimeout(resolve));
+
+      await wrapper.setProps({ open: false });
+      await new Promise((resolve) => setTimeout(resolve));
+
+      expect(document.activeElement).toBe(row);
+      expect(wrapper.emitted("after-close")).toHaveLength(1);
+      wrapper.unmount();
+    });
+  });
 });

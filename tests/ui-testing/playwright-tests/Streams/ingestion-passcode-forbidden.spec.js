@@ -76,7 +76,7 @@ test.describe("Org Ingestion Token (Passcode) Access Control", () => {
     // and withholds any card embedding the token, so a mis-latch would blank this
     // for admins too. Rendering of the other ingestion routes is already covered by
     // Streams/ingestion-config.spec.js — not repeated here.
-    test("Legacy curl CopyContent renders normally for an allowed session", {
+    test("Legacy curl code block renders normally for an allowed session", {
         tag: ['@ingestion-passcode-forbidden', '@all', '@P1'],
     }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);

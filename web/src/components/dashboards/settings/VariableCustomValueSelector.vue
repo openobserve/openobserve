@@ -28,7 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
       :select-all="variableItem.multiSelect"
-      @update:model-value="emit('update:modelValue', $event)"
+      @update:model-value="onUpdateValue"
+      @close="onPopupHide"
     >
       <template #empty>{{ t("dashboard.variableCustomValueSelector.noDataFound") }}</template>
     </OSelect>
@@ -39,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { isEqual } from "lodash-es";
 
 export default defineComponent({
   name: "VariableCustomValueSelector",
@@ -57,14 +59,23 @@ export default defineComponent({
       { immediate: true },
     );
 
-    watch(selectedValue, () => {
+    const onUpdateValue = (val: any) => {
+      selectedValue.value = val;
+      if (!props.variableItem.multiSelect) emit("update:modelValue", val);
+    };
+
+    // Multi-select applies once on close, like the query selector, so each toggle is not a change.
+    const onPopupHide = () => {
+      if (!props.variableItem.multiSelect) return;
+      if (isEqual(selectedValue.value, props.variableItem.value)) return;
       emit("update:modelValue", selectedValue.value);
-    });
+    };
 
     return {
       t,
       selectedValue,
-      emit,
+      onUpdateValue,
+      onPopupHide,
     };
   },
 });

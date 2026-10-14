@@ -25,7 +25,10 @@ use config::{
     RwHashMap, RwHashSet, SQL_FULL_TEXT_SEARCH_FIELDS, SQL_SECONDARY_INDEX_SEARCH_FIELDS,
     TIMESTAMP_COL_NAME, get_config,
     ider::SnowflakeIdGenerator,
-    meta::stream::{PartitionTimeLevel, StreamSettings, StreamType},
+    meta::{
+        self_reporting::usage::INTERNAL_STREAM_NAMES,
+        stream::{PartitionTimeLevel, StreamSettings, StreamType},
+    },
     stats::MemorySize,
     utils::{
         json,
@@ -47,6 +50,7 @@ pub static STREAM_SCHEMAS: Lazy<RwAHashMap<String, Vec<(i64, Schema)>>> =
     Lazy::new(Default::default);
 pub static STREAM_SCHEMAS_LATEST: Lazy<RwAHashMap<String, SchemaCache>> =
     Lazy::new(Default::default);
+pub static ORG_USER_STREAMS: Lazy<RwHashMap<String, u32>> = Lazy::new(Default::default);
 static STREAM_SETTINGS: Lazy<RwAHashMap<String, Arc<StreamSettings>>> = Lazy::new(Default::default);
 /// Used for filtering records when a stream is configured to store original unflattened records
 /// use a RwHashMap instead of RwAHashMap because of high write ratio as
@@ -175,9 +179,36 @@ pub async fn get_cache(
     if let Some(schema) = write_guard.get(cache_key) {
         Ok(schema.clone())
     } else {
-        write_guard.insert(cache_key.to_string(), schema.clone());
+        insert_latest(&mut write_guard, cache_key.to_string(), schema.clone());
         Ok(schema)
     }
+}
+
+/// Inserts into the `STREAM_SCHEMAS_LATEST` map behind its write guard, keeping `ORG_USER_STREAMS`.
+pub fn insert_latest(
+    map: &mut hashbrown::HashMap<String, SchemaCache>,
+    key: String,
+    schema: SchemaCache,
+) {
+    insert_counted(map, &ORG_USER_STREAMS, key, schema);
+}
+
+/// Removes from the `STREAM_SCHEMAS_LATEST` map behind its write guard, keeping `ORG_USER_STREAMS`.
+pub fn remove_latest(map: &mut hashbrown::HashMap<String, SchemaCache>, key: &str) {
+    remove_counted(map, &ORG_USER_STREAMS, key);
+}
+
+/// Whether the org has a logs, metrics or traces stream outside the internal ones; O(1).
+pub fn org_has_user_stream(org_id: &str) -> bool {
+    ORG_USER_STREAMS.contains_key(org_id)
+}
+
+pub fn is_user_data_stream(stream_type: StreamType, stream_name: &str) -> bool {
+    matches!(
+        stream_type,
+        StreamType::Logs | StreamType::Metrics | StreamType::Traces
+    ) && !INTERNAL_STREAM_NAMES.contains(&stream_name)
+        && !stream_name.starts_with("_o2_")
 }
 
 pub async fn get_from_db(
@@ -1031,6 +1062,63 @@ pub fn is_widening_conversion(from: &DataType, to: &DataType) -> bool {
     allowed_type.contains(to)
 }
 
+fn insert_counted(
+    map: &mut hashbrown::HashMap<String, SchemaCache>,
+    index: &RwHashMap<String, u32>,
+    key: String,
+    schema: SchemaCache,
+) {
+    match map.entry(key) {
+        hashbrown::hash_map::Entry::Occupied(mut entry) => {
+            entry.insert(schema);
+        }
+        hashbrown::hash_map::Entry::Vacant(entry) => {
+            if let Some(org_id) = user_data_org(entry.key()) {
+                match index.get_mut(org_id) {
+                    Some(mut count) => *count += 1,
+                    None => {
+                        index.insert(org_id.to_string(), 1);
+                    }
+                }
+            }
+            entry.insert(schema);
+        }
+    }
+}
+
+fn remove_counted(
+    map: &mut hashbrown::HashMap<String, SchemaCache>,
+    index: &RwHashMap<String, u32>,
+    key: &str,
+) {
+    if map.remove(key).is_none() {
+        return;
+    }
+    let Some(org_id) = user_data_org(key) else {
+        return;
+    };
+    let emptied = index.get_mut(org_id).is_some_and(|mut count| {
+        *count = count.saturating_sub(1);
+        *count == 0
+    });
+    if emptied {
+        index.remove_if(org_id, |_, count| *count == 0);
+    }
+}
+
+/// The org of an `org/type/name` cache key when it names a user-data stream.
+fn user_data_org(key: &str) -> Option<&str> {
+    let mut parts = key.splitn(3, '/');
+    let (org_id, stream_type, stream_name) = (parts.next()?, parts.next()?, parts.next()?);
+    let stream_type = match stream_type {
+        "logs" => StreamType::Logs,
+        "metrics" => StreamType::Metrics,
+        "traces" => StreamType::Traces,
+        _ => return None,
+    };
+    is_user_data_stream(stream_type, stream_name).then_some(org_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1685,5 +1773,198 @@ mod tests {
         let schema = Schema::new(vec![Field::new("f1", DataType::Int32, false)]);
         let cache = SchemaCache::new(schema);
         assert_eq!(cache.schema().fields().len(), 1);
+    }
+
+    fn empty_cache() -> SchemaCache {
+        SchemaCache::new(Schema::empty())
+    }
+
+    fn recount(map: &hashbrown::HashMap<String, SchemaCache>) -> hashbrown::HashMap<String, u32> {
+        let mut counts = hashbrown::HashMap::new();
+        for key in map.keys() {
+            if let Some(org_id) = user_data_org(key) {
+                *counts.entry(org_id.to_string()).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+
+    #[test]
+    fn test_user_stream_index_counts_new_keys_once_and_drops_the_org_at_zero() {
+        let mut map = hashbrown::HashMap::new();
+        let index = RwHashMap::default();
+        insert_counted(&mut map, &index, "acme/logs/app".to_string(), empty_cache());
+        assert_eq!(index.get("acme").map(|c| *c), Some(1));
+        insert_counted(&mut map, &index, "acme/logs/app".to_string(), empty_cache());
+        assert_eq!(
+            index.get("acme").map(|c| *c),
+            Some(1),
+            "a re-insert is not new"
+        );
+        insert_counted(
+            &mut map,
+            &index,
+            "acme/traces/default".to_string(),
+            empty_cache(),
+        );
+        assert_eq!(index.get("acme").map(|c| *c), Some(2));
+
+        remove_counted(&mut map, &index, "acme/logs/app");
+        remove_counted(&mut map, &index, "acme/logs/app");
+        assert_eq!(
+            index.get("acme").map(|c| *c),
+            Some(1),
+            "a missing key lowers nothing"
+        );
+        remove_counted(&mut map, &index, "acme/traces/default");
+        assert!(!index.contains_key("acme"), "the org leaves at zero");
+    }
+
+    #[test]
+    fn test_internal_names_o2_prefix_and_non_user_types_never_count() {
+        let mut map = hashbrown::HashMap::new();
+        let index = RwHashMap::default();
+        let mut keys = INTERNAL_STREAM_NAMES
+            .iter()
+            .map(|name| format!("acme/logs/{name}"))
+            .collect::<Vec<_>>();
+        keys.extend([
+            "acme/logs/_o2_pipeline".to_string(),
+            "acme/metrics/_o2_x".to_string(),
+            "acme/enrichment_tables/lookup".to_string(),
+            "acme/metadata/meta".to_string(),
+            "acme/index/idx".to_string(),
+            "acme/filelist/dump".to_string(),
+            "acme/logs".to_string(),
+        ]);
+        for key in keys {
+            insert_counted(&mut map, &index, key, empty_cache());
+        }
+        assert!(index.is_empty());
+        assert!(is_user_data_stream(StreamType::Metrics, "cpu_usage"));
+        assert!(!is_user_data_stream(StreamType::Logs, "usage"));
+        assert!(!is_user_data_stream(StreamType::EnrichmentTables, "app"));
+        assert_eq!(user_data_org("acme/metrics/up/with/slash"), Some("acme"));
+    }
+
+    #[test]
+    fn test_user_stream_index_equals_a_recount_after_10k_random_inserts_and_removes() {
+        let mut map = hashbrown::HashMap::new();
+        let index = RwHashMap::default();
+        let types = ["logs", "metrics", "traces", "metadata"];
+        let names = ["app", "usage", "_o2_x", "default", "cpu"];
+        let mut seed: u64 = 0x5eed;
+        let mut next = || {
+            seed = seed
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (seed >> 33) as usize
+        };
+        for _ in 0..10_000 {
+            let key = format!(
+                "org{}/{}/{}",
+                next() % 20,
+                types[next() % types.len()],
+                names[next() % names.len()]
+            );
+            if next() % 3 == 0 {
+                remove_counted(&mut map, &index, &key);
+            } else {
+                insert_counted(&mut map, &index, key, empty_cache());
+            }
+        }
+        let indexed = index
+            .iter()
+            .map(|item| (item.key().clone(), *item.value()))
+            .collect::<hashbrown::HashMap<_, _>>();
+        assert_eq!(indexed, recount(&map));
+        assert!(index.iter().all(|item| *item.value() > 0));
+    }
+
+    #[test]
+    fn test_org_has_user_stream_reads_the_live_index() {
+        let org = "infra_schema_live_index_org";
+        let key = format!("{org}/logs/app");
+        let mut map = hashbrown::HashMap::new();
+        insert_latest(&mut map, key.clone(), empty_cache());
+        assert!(org_has_user_stream(org));
+        remove_latest(&mut map, &key);
+        assert!(!org_has_user_stream(org));
+    }
+
+    /// Fails on any non-test write of `STREAM_SCHEMAS_LATEST` that bypasses the user-stream index.
+    #[test]
+    fn test_every_latest_cache_write_keeps_the_user_stream_index() {
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let mut files = Vec::new();
+        collect_rust_files(&src, &mut files);
+        assert!(files.len() > 100, "scanned {} files", files.len());
+        let mut sites = 0;
+        let mut offenders = Vec::new();
+        for file in files {
+            let text = std::fs::read_to_string(&file).unwrap();
+            let code = text
+                .find("\n#[cfg(test)]\nmod tests")
+                .map_or(text.as_str(), |end| &text[..end]);
+            let lines = code.lines().collect::<Vec<_>>();
+            for (at, line) in lines.iter().enumerate() {
+                if !line.contains("STREAM_SCHEMAS_LATEST.write()") {
+                    continue;
+                }
+                sites += 1;
+                if !latest_write_keeps_index(&lines[at..lines.len().min(at + 12)]) {
+                    offenders.push(format!("{}:{}", file.display(), at + 1));
+                }
+            }
+        }
+        assert!(sites >= 9, "found {sites} write sites");
+        assert!(offenders.is_empty(), "bypass the index: {offenders:?}");
+    }
+
+    fn latest_write_keeps_index(window: &[&str]) -> bool {
+        let guard = window[0]
+            .split("let mut ")
+            .nth(1)
+            .and_then(|rest| rest.split_whitespace().next())
+            .unwrap_or("");
+        if guard.is_empty() {
+            return false;
+        }
+        let mut uses_index = false;
+        for line in window {
+            for method in [
+                "insert", "remove", "retain", "clear", "extend", "entry", "drain",
+            ] {
+                if line.contains(&format!("{guard}.{method}(")) {
+                    return false;
+                }
+            }
+            uses_index |= line.contains("insert_latest(") || line.contains("remove_latest(");
+            if line.contains(&format!("drop({guard})")) {
+                break;
+            }
+        }
+        uses_index
+    }
+
+    fn collect_rust_files(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if path.is_dir() {
+                if !matches!(name.as_str(), "target" | "tests" | "data" | "generated") {
+                    collect_rust_files(&path, files);
+                }
+            } else if name.ends_with(".rs")
+                && !name.starts_with("tests")
+                && !name.ends_with("_test.rs")
+                && !name.ends_with("_tests.rs")
+            {
+                files.push(path);
+            }
+        }
     }
 }

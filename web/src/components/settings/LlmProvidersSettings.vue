@@ -50,6 +50,7 @@
 
       <div v-else class="min-h-0 flex-1">
         <OTable
+          ref="oTableRef"
           data-test="llm-providers-table"
           :data="filteredProviders"
           :columns="columns"
@@ -63,8 +64,15 @@
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-llm-providers"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100]"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           width="100%"
           class="h-full w-full"
           @row-click="(row: any) => openEdit(row)"
@@ -206,13 +214,36 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 
 const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-const searchQuery = ref("");
+const viewState = useListViewState("llm-providers", {
+  searchQuery: "",
+  pageSize: 20,
+  currentPage: 1,
+  sortBy: "",
+  sortOrder: "asc" as "asc" | "desc",
+});
+const searchQuery = ref(viewState.searchQuery);
+const pageSize = ref(viewState.pageSize);
+const currentPage = ref(viewState.currentPage);
+const sortBy = ref(viewState.sortBy);
+const sortOrder = ref(viewState.sortOrder);
+const oTableRef = ref<any>(null);
+
+watch([searchQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+  Object.assign(viewState, {
+    searchQuery: searchQuery.value,
+    pageSize: pageSize.value,
+    currentPage: currentPage.value,
+    sortBy: sortBy.value,
+    sortOrder: sortOrder.value,
+  });
+});
 const formPage = ref<{ mode: "create" | "edit"; row: Provider | null } | null>(null);
 
 const confirmDeleteOpen = ref(false);
@@ -226,6 +257,15 @@ const providersList = useQuery(() =>
 );
 const providers = computed<Provider[]>(() => providersList.data.value ?? []);
 const isLoading = providersList.isPending;
+// setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+watch(
+  isLoading,
+  (v) => {
+    if (v) return;
+    setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+  },
+  { once: true, immediate: true },
+);
 const isFetching = providersList.isFetching;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {

@@ -23,11 +23,10 @@ import nvidiaDcgmCard, {
   DCGM_EXPORTER_IMAGE,
 } from "./nvidiaDcgm";
 import { getDataSourceCard } from "../registry";
-import { MASKED_TOKEN } from "../subs";
 import i18n from "@/locales";
 import enUS from "@/locales/languages/en-US.json";
 
-const SUBS = { url: "https://o2.example.com", org: "acme", token: "c2VjcmV0" };
+const SUBS = { url: "https://o2.example.com", org: "acme", token: "ZGV2QGFjbWUuaW86c2VjcmV0" };
 const card = () => nvidiaDcgmCard(SUBS, gt);
 const step = (id: string) => card().steps.find((s) => s.id === id)!;
 const variant = (stepId: string, id: string) => step(stepId).variants!.find((v) => v.id === id)!;
@@ -75,9 +74,9 @@ describe("nvidiaDcgmCard", () => {
   it("substitutes the org endpoint and token into the Docker collector, masked by default", () => {
     const code = variant("ship", "docker").code;
     expect(code.raw).toContain("endpoint: https://o2.example.com/api/acme");
-    expect(code.raw).toContain("Authorization: Basic c2VjcmV0");
-    expect(code.masked).not.toContain("c2VjcmV0");
-    expect(code.masked).toContain(MASKED_TOKEN);
+    expect(code.raw).toContain("Authorization: Basic ZGV2QGFjbWUuaW86c2VjcmV0");
+    expect(code.masked).not.toContain("ZGV2QGFjbWUuaW86c2VjcmV0");
+    expect(code.masked).toContain("Authorization: Basic ZGV2••••••••••••cmV0");
     expect(code.raw).not.toMatch(/\{(url|org|token)\}/);
   });
 

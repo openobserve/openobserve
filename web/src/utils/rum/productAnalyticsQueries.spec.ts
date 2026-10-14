@@ -152,6 +152,16 @@ const scope = (patch: Partial<AnalyticsScope> = {}): AnalyticsScope => ({
   ...patch,
 });
 
+const summaryColumns = (sql: string): Record<string, string> => {
+  const select = sql.slice("SELECT ".length, sql.indexOf(' FROM "_rumdata"'));
+  return Object.fromEntries(
+    select.split(/, (?=COUNT\(|MAX\(|0 AS )/).map((c) => {
+      const at = c.lastIndexOf(" AS ");
+      return [c.slice(at + 4), c.slice(0, at)];
+    }),
+  );
+};
+
 describe("page key (AC-4, AC-7)", () => {
   it.each(KEY_TABLE)("%s -> %s", (url, viewName, schema, expected) => {
     expect(jsPageKey(url, viewName, schema)).toBe(expected);
@@ -402,6 +412,32 @@ describe("scope-load builders (G2)", () => {
     expect(sql).toContain(
       `CASE WHEN _timestamp >= ${CS} AND session_type = 'synthetics' THEN session_id END) AS synthetic_sessions`,
     );
+  });
+
+  it("Q3 drops synthetics from every count except synthetic_sessions and data_through_us", () => {
+    const cols = summaryColumns(summarySql(s, CS));
+    const bot = "(session_type IS NULL OR session_type <> 'synthetics')";
+    for (const alias of [
+      "sessions",
+      "prev_sessions",
+      "views",
+      "va_rows",
+      "usr_email__values",
+      "usr_email__sessions",
+    ])
+      expect(cols[alias], alias).toContain(bot);
+    expect(cols.synthetic_sessions).not.toContain(bot);
+    expect(cols.data_through_us).not.toContain(bot);
+    expect(summarySql(s, CS)).toMatch(
+      /WHERE application_id = 'web' AND session_id IS NOT NULL LIMIT 1$/,
+    );
+  });
+
+  it("Q3 without session_type adds no synthetics clause to any column", () => {
+    const cols = summaryColumns(summarySql(scope({ schema: { usr_email: true } }), CS));
+    expect(Object.keys(cols)).toContain("usr_email__sessions");
+    for (const [alias, expr] of Object.entries(cols))
+      expect(expr, alias).not.toContain("session_type");
   });
 
   it("Q3 without session_type or candidates reports zero synthetics and no identity pairs", () => {

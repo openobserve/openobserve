@@ -124,7 +124,11 @@ impl PointLabels {
 
 /// A metric's data, as JSON records or as number data points not yet turned into records.
 enum MetricRecords<'a> {
-    Json(Vec<json::Value>),
+    /// Sample rows for the metric's streams and exemplar rows for its exemplar stream.
+    Json {
+        records: Vec<json::Value>,
+        exemplars: Vec<json::Value>,
+    },
     NumberPoints(&'a [NumberDataPoint]),
 }
 
@@ -132,7 +136,7 @@ impl MetricRecords<'_> {
     /// Whether the metric has nothing to write, in which case it gets no stream at all.
     fn is_empty(&self) -> bool {
         match self {
-            Self::Json(records) => records.is_empty(),
+            Self::Json { records, .. } => records.is_empty(),
             Self::NumberPoints(points) => !points
                 .iter()
                 .any(|point| number_point_value(point).is_some()),
@@ -142,7 +146,7 @@ impl MetricRecords<'_> {
     /// Whether every row the metric writes is a stale marker.
     fn only_stale(&self) -> bool {
         match self {
-            Self::Json(_) => false,
+            Self::Json { .. } => false,
             Self::NumberPoints(points) => !points
                 .iter()
                 .any(|point| matches!(number_point_value(point), Some(Some(_)))),
@@ -314,26 +318,24 @@ pub async fn handle_otlp_request(
                             prepare_sum(&mut rec, sum, metadata, &mut prom_meta);
                             MetricRecords::NumberPoints(&sum.data_points)
                         }
-                        Data::Histogram(hist) => MetricRecords::Json(process_histogram(
-                            &mut rec,
-                            hist,
-                            metadata,
-                            &mut prom_meta,
-                        )),
+                        Data::Histogram(hist) => {
+                            let (records, exemplars) =
+                                process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+                            MetricRecords::Json { records, exemplars }
+                        }
                         Data::ExponentialHistogram(exp_hist) => {
-                            MetricRecords::Json(process_exponential_histogram(
+                            let (records, exemplars) = process_exponential_histogram(
                                 &mut rec,
                                 exp_hist,
                                 metadata,
                                 &mut prom_meta,
-                            ))
+                            );
+                            MetricRecords::Json { records, exemplars }
                         }
-                        Data::Summary(summary) => MetricRecords::Json(process_summary(
-                            &rec,
-                            summary,
-                            metadata,
-                            &mut prom_meta,
-                        )),
+                        Data::Summary(summary) => MetricRecords::Json {
+                            records: process_summary(&rec, summary, metadata, &mut prom_meta),
+                            exemplars: vec![],
+                        },
                     },
                     None => {
                         // a flattened oneof that fails to deserialize turns into
@@ -344,7 +346,10 @@ pub async fn handle_otlp_request(
                         partial_success.rejected_data_points += 1;
                         partial_success.error_message =
                             format!("metric {metric_name} has no data points");
-                        MetricRecords::Json(vec![])
+                        MetricRecords::Json {
+                            records: vec![],
+                            exemplars: vec![],
+                        }
                     }
                 };
 
@@ -369,6 +374,13 @@ pub async fn handle_otlp_request(
                     && !ingest::has_value_column(metric_schema_map.get(&metric_name))
                 {
                     continue;
+                }
+                if !schema_exists.has_fields {
+                    crate::onboarding::on_user_stream_created(
+                        org_id,
+                        StreamType::Metrics,
+                        &metric_name,
+                    );
                 }
 
                 // get partition keys
@@ -428,9 +440,10 @@ pub async fn handle_otlp_request(
                     }
                 }
 
-                let records = match records {
-                    MetricRecords::Json(records) => records,
+                let (records, exemplars) = match records {
+                    MetricRecords::Json { records, exemplars } => (records, exemplars),
                     MetricRecords::NumberPoints(points) => {
+                        let exemplars = number_point_exemplar_records(&rec, points);
                         if !stream_executable_pipelines.contains_key(&metric_name) {
                             let stream_param =
                                 StreamParams::new(org_id, &metric_name, StreamType::Metrics);
@@ -453,20 +466,30 @@ pub async fn handle_otlp_request(
                                         &stream_partitioning_map,
                                     )
                                 });
-                        match columnar {
+                        let records = match columnar {
                             Some(columnar) => append_number_points(columnar, &rec, points),
                             None => number_point_records(&rec, points),
-                        }
+                        };
+                        (records, exemplars)
                     }
                 };
 
-                // process data points
-                for rec in records {
+                // process data points; exemplar rows land in the metric's exemplar stream
+                let exemplars_stream = exemplars_stream_name(&metric_name);
+                let routed = records.into_iter().map(|rec| (rec, None)).chain(
+                    exemplars
+                        .into_iter()
+                        .map(|rec| (rec, Some(&exemplars_stream))),
+                );
+                for (rec, exemplars_stream) in routed {
                     let mut rec = flatten_record(rec)?;
 
-                    let local_metric_name = format_stream_name(
-                        rec.get(NAME_LABEL).unwrap().as_str().unwrap().to_string(),
-                    );
+                    let local_metric_name = match exemplars_stream {
+                        Some(stream) => stream.clone(),
+                        None => format_stream_name(
+                            rec.get(NAME_LABEL).unwrap().as_str().unwrap().to_string(),
+                        ),
+                    };
 
                     if local_metric_name != metric_name {
                         // check for schema
@@ -796,6 +819,22 @@ fn number_point_records<'a>(
     records
 }
 
+/// Exemplar rows of the points that carry any, built from the point's record like a JSON row.
+fn number_point_exemplar_records(
+    rec: &json::Value,
+    data_points: &[NumberDataPoint],
+) -> Vec<serde_json::Value> {
+    let mut rows = vec![];
+    for data_point in data_points.iter().filter(|p| !p.exemplars.is_empty()) {
+        let mut dp_rec = rec.clone();
+        if !process_data_point(&mut dp_rec, data_point) {
+            continue;
+        }
+        rows.extend(exemplar_records(&dp_rec, &data_point.exemplars));
+    }
+    rows
+}
+
 /// Writes number data points straight to arrow, returning JSON records for those it cannot take.
 fn append_number_points(
     columnar: &mut ColumnarStream,
@@ -823,10 +862,7 @@ fn columnar_base_labels(rec: &json::Value) -> Option<Vec<(String, String)>> {
     rec.as_object()?
         .iter()
         .map(|(name, value)| match value {
-            // a resource or scope attribute named `exemplars` is dropped from every record
-            json::Value::String(value) if name.is_ascii() && name != EXEMPLARS_LABEL => {
-                Some((name.clone(), value.clone()))
-            }
+            json::Value::String(value) if name.is_ascii() => Some((name.clone(), value.clone())),
             _ => None,
         })
         .collect()
@@ -846,15 +882,12 @@ fn append_number_point(
     let Ok(timestamp) = i64::try_from(data_point.time_unix_nano / 1000) else {
         return false;
     };
-    if !data_point.exemplars.is_empty() {
-        return false;
-    }
 
     scratch.reset(base_labels);
     for attr in &data_point.attributes {
         let name = format_label_name_cow(&attr.key);
-        // `__name__` would move the record to another stream and `exemplars` is dropped from it
-        if !name.is_ascii() || name == NAME_LABEL || name == EXEMPLARS_LABEL {
+        // `__name__` would move the record to another stream
+        if !name.is_ascii() || name == NAME_LABEL {
             return false;
         }
         let value = match attr.value.as_ref().and_then(|v| v.value.as_ref()) {
@@ -900,7 +933,7 @@ fn process_histogram(
     hist: &Histogram,
     mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
-) -> Vec<serde_json::Value> {
+) -> (Vec<serde_json::Value>, Vec<serde_json::Value>) {
     // set metadata
     metadata.metric_type = MetricType::Histogram;
     prom_meta.insert(
@@ -909,17 +942,23 @@ fn process_histogram(
     );
 
     let mut records = vec![];
+    let mut exemplars = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     for data_point in &hist.data_points {
         let mut dp_rec = rec.clone();
-        for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
+        let bucket_recs = process_hist_data_point(&mut dp_rec, data_point);
+        if bucket_recs.is_empty() {
+            continue;
+        }
+        exemplars.extend(exemplar_records(&dp_rec, &data_point.exemplars));
+        for mut bucket_rec in bucket_recs {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
     }
-    records
+    (records, exemplars)
 }
 
 fn process_exponential_histogram(
@@ -927,7 +966,7 @@ fn process_exponential_histogram(
     hist: &ExponentialHistogram,
     mut metadata: Metadata,
     prom_meta: &mut HashMap<String, String>,
-) -> Vec<serde_json::Value> {
+) -> (Vec<serde_json::Value>, Vec<serde_json::Value>) {
     // set metadata
     metadata.metric_type = MetricType::ExponentialHistogram;
     prom_meta.insert(
@@ -935,18 +974,24 @@ fn process_exponential_histogram(
         json::to_string(&metadata).unwrap(),
     );
     let mut records = vec![];
+    let mut exemplars = vec![];
     process_aggregation_temporality(rec, hist.aggregation_temporality);
     let limits = native_histogram::ExpansionLimits::from_config(&config::get_config());
     for data_point in &hist.data_points {
         let mut dp_rec = rec.clone();
-        for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point, limits) {
+        let bucket_recs = process_exp_hist_data_point(&mut dp_rec, data_point, limits);
+        if bucket_recs.is_empty() {
+            continue;
+        }
+        exemplars.extend(exemplar_records(&dp_rec, &data_point.exemplars));
+        for mut bucket_rec in bucket_recs {
             let val_map = bucket_rec.as_object_mut().unwrap();
             let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
     }
-    records
+    (records, exemplars)
 }
 
 fn process_summary(
@@ -991,7 +1036,6 @@ fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bo
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = STORED_NUMBER_POINT_FLAG.into();
-    process_exemplars(rec, &data_point.exemplars);
     true
 }
 
@@ -1008,7 +1052,6 @@ fn process_hist_data_point(
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = data_point_flag(data_point.flags).into();
-    process_exemplars(rec, &data_point.exemplars);
     // add count record
     let mut count_rec = rec.clone();
     count_rec[VALUE_LABEL] = (data_point.count as f64).into();
@@ -1070,7 +1113,6 @@ fn process_exp_hist_data_point(
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = data_point_flag(data_point.flags).into();
-    process_exemplars(rec, &data_point.exemplars);
 
     // OTLP bucket `i` covers `(base^i, base^(i+1)]`, the native layout's bucket `i+1`
     let otlp_buckets = |b: &Option<exponential_histogram_data_point::Buckets>| -> Vec<(i64, f64)> {
@@ -1164,42 +1206,58 @@ fn process_summary_data_point(
     bucket_recs
 }
 
-fn process_exemplars(rec: &mut json::Value, exemplars: &Vec<Exemplar>) {
-    let mut exemplar_coll = vec![];
-    for exemplar in exemplars {
-        let mut exemplar_rec = json::json!({});
-        for attr in &exemplar.filtered_attributes {
-            exemplar_rec[attr.key.as_str()] = get_val(&attr.value.as_ref());
-        }
-        exemplar_rec[VALUE_LABEL] = get_exemplar_val(&exemplar.value);
-        exemplar_rec[TIMESTAMP_COL_NAME] = (exemplar.time_unix_nano / 1000).into();
-
-        match TraceId::from_bytes(exemplar.trace_id.as_slice().try_into().unwrap_or_default()) {
-            TraceId::INVALID => {}
-            _ => {
-                exemplar_rec["trace_id"] =
-                    TraceId::from_bytes(exemplar.trace_id.as_slice().try_into().unwrap())
-                        .to_string()
-                        .into();
+/// One row per exemplar for the metric's exemplar stream: the point's labels, the exemplar's
+/// own value and time, and the `exemplars` string the exemplar loader parses.
+fn exemplar_records(rec: &json::Value, exemplars: &[Exemplar]) -> Vec<json::Value> {
+    let Some(labels) = rec.as_object() else {
+        return vec![];
+    };
+    exemplars
+        .iter()
+        .filter_map(|exemplar| {
+            let entry = exemplar_entry(exemplar)?;
+            let mut row = labels.clone();
+            for key in [VALUE_LABEL, "start_time", "flag"] {
+                row.remove(key);
             }
-        };
+            row.insert(VALUE_LABEL.to_string(), entry[VALUE_LABEL].clone());
+            row.insert(
+                TIMESTAMP_COL_NAME.to_string(),
+                entry[TIMESTAMP_COL_NAME].clone(),
+            );
+            row.insert(
+                EXEMPLARS_LABEL.to_string(),
+                json::Value::String(json::Value::Array(vec![entry]).to_string()),
+            );
+            let hash = super::signature_without_labels(&row, METRICS_HASH_EXCLUDED_LABELS);
+            row.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
+            Some(json::Value::Object(row))
+        })
+        .collect()
+}
 
-        match SpanId::from_bytes(exemplar.span_id.as_slice().try_into().unwrap_or_default()) {
-            SpanId::INVALID => {}
-            _ => {
-                exemplar_rec["span_id"] =
-                    SpanId::from_bytes(exemplar.span_id.as_slice().try_into().unwrap())
-                        .to_string()
-                        .into();
-            }
-        };
+/// An exemplar as the exemplar loader reads it; `None` without a value, which nothing can plot.
+fn exemplar_entry(exemplar: &Exemplar) -> Option<json::Value> {
+    let value = get_exemplar_val(&exemplar.value);
+    if value.is_null() {
+        return None;
+    }
+    let mut entry = json::json!({});
+    for attr in &exemplar.filtered_attributes {
+        entry[attr.key.as_str()] = get_val(&attr.value.as_ref());
+    }
+    entry[VALUE_LABEL] = value;
+    entry[TIMESTAMP_COL_NAME] = (exemplar.time_unix_nano / 1000).into();
 
-        exemplar_coll.push(exemplar_rec)
-    }
-    // an empty list is dropped by flatten, so it is only worth writing over a same-named attribute
-    if !exemplar_coll.is_empty() || rec.get(EXEMPLARS_LABEL).is_some() {
-        rec[EXEMPLARS_LABEL] = exemplar_coll.into();
-    }
+    match TraceId::from_bytes(exemplar.trace_id.as_slice().try_into().unwrap_or_default()) {
+        TraceId::INVALID => {}
+        trace_id => entry["trace_id"] = trace_id.to_string().into(),
+    };
+    match SpanId::from_bytes(exemplar.span_id.as_slice().try_into().unwrap_or_default()) {
+        SpanId::INVALID => {}
+        span_id => entry["span_id"] = span_id.to_string().into(),
+    };
+    Some(entry)
 }
 
 /// Writes each attribute under its formatted name, a repeated name overwriting in place.
@@ -1551,7 +1609,7 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::Histogram(hist)) = &metric.data {
-            let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+            let (result, _) = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
@@ -1584,7 +1642,8 @@ mod tests {
         let mut prom_meta: HashMap<String, String> = HashMap::new();
 
         if let Some(Data::ExponentialHistogram(hist)) = &metric.data {
-            let result = process_exponential_histogram(&mut rec, hist, metadata, &mut prom_meta);
+            let (result, _) =
+                process_exponential_histogram(&mut rec, hist, metadata, &mut prom_meta);
 
             // Verify the processed data
             assert!(!result.is_empty());
@@ -1828,10 +1887,14 @@ mod tests {
     }
 
     #[test]
-    fn test_process_exemplars() {
-        let mut rec = json!({
+    fn test_exemplar_records_are_rows_of_the_exemplar_stream() {
+        let rec = json!({
             "__name__": "test_metric",
-            "__type__": "gauge"
+            "host": "a",
+            "value": 7.0,
+            "start_time": "1",
+            "flag": "0",
+            "_timestamp": 5
         });
         let exemplar = Exemplar {
             filtered_attributes: vec![],
@@ -1840,11 +1903,36 @@ mod tests {
             span_id: vec![],
             trace_id: vec![],
         };
+        let no_value = Exemplar {
+            value: None,
+            ..exemplar.clone()
+        };
 
-        process_exemplars(&mut rec, &vec![exemplar]);
+        let rows = exemplar_records(&rec, &[exemplar, no_value]);
 
-        // Verify exemplars were processed
-        assert!(rec.get("exemplars").is_some());
+        assert_eq!(rows.len(), 1);
+        let row = rows[0].as_object().unwrap();
+        assert_eq!(row["__name__"], "test_metric");
+        assert_eq!(row["host"], "a");
+        assert_eq!(row[VALUE_LABEL], 42.0);
+        assert_eq!(row[TIMESTAMP_COL_NAME], 1640995200000000i64);
+        assert!(row.get("start_time").is_none() && row.get("flag").is_none());
+        let stored: Vec<json::Value> =
+            json::from_str(row[EXEMPLARS_LABEL].as_str().unwrap()).unwrap();
+        assert_eq!(
+            stored,
+            vec![json!({"value": 42.0, "_timestamp": 1640995200000000i64})]
+        );
+        // the row hashes as the series the point belongs to
+        let mut series = rec.as_object().unwrap().clone();
+        series.remove(VALUE_LABEL);
+        assert_eq!(
+            row[HASH_LABEL],
+            json!(super::super::signature_without_labels(
+                &series,
+                METRICS_HASH_EXCLUDED_LABELS
+            ))
+        );
     }
 
     fn string_attr(key: &str, value: &str) -> KeyValue {
@@ -1978,8 +2066,9 @@ mod tests {
             flagged,
             as_int,
             number_point(vec![string_attr("host", "nan")], f64::NAN, 6),
-            // each of these must be left to the JSON path
+            // an exemplar rides in its own stream, so the point itself still goes to arrow
             with_exemplar,
+            // each of these must be left to the JSON path
             number_point(vec![typed_attr("kv", Some(nested))], 6.0, 7),
             number_point(vec![typed_attr("unset", None)], 7.0, 8),
             number_point(vec![string_attr("__name__", "elsewhere")], 8.0, 9),
@@ -2026,10 +2115,10 @@ mod tests {
         let written_size: usize = entries.iter().map(|entry| entry.data_size).sum();
         let written = batch_rows(entries);
 
-        assert_eq!(rejected, json_records[json_records.len() - 6..]);
-        let accepted = &json_records[..json_records.len() - 6];
+        assert_eq!(rejected, json_records[json_records.len() - 5..]);
+        let accepted = &json_records[..json_records.len() - 5];
         // the flagged point is a stale marker, written on both paths
-        assert_eq!(written.len(), 5);
+        assert_eq!(written.len(), 6);
         for (row, record) in written.iter().zip(accepted) {
             assert_eq!(row, record.as_object().unwrap());
         }
@@ -2038,65 +2127,51 @@ mod tests {
     }
 
     #[test]
-    fn test_append_number_points_leaves_a_base_exemplars_attribute_to_the_json_path() {
+    fn test_number_point_exemplar_records_come_from_the_point_record() {
         let mut rec = json!({});
-        insert_attributes(
-            &mut rec,
-            &[
-                string_attr("exemplars", "attr"),
-                string_attr("region", "eu"),
-            ],
-        );
+        insert_attributes(&mut rec, &[string_attr("region", "eu")]);
         rec[NAME_LABEL] = json!("requests");
-        let points = vec![number_point(vec![string_attr("host", "a")], 1.5, 0)];
+        let mut point = number_point(vec![string_attr("host", "a")], 1.5, 0);
+        point.exemplars = vec![Exemplar {
+            filtered_attributes: vec![],
+            time_unix_nano: point.time_unix_nano - 1_000_000_000,
+            value: Some(opentelemetry_proto::tonic::metrics::v1::exemplar::Value::AsInt(3)),
+            span_id: vec![2; 8],
+            trace_id: vec![1; 16],
+        }];
+        let plain = number_point(vec![string_attr("host", "b")], 2.5, 1);
 
-        let fields = vec![
-            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
-            Field::new("region", DataType::Utf8, true),
-            Field::new(NAME_LABEL, DataType::Utf8, true),
-            Field::new("host", DataType::Utf8, true),
-            Field::new("start_time", DataType::Utf8, true),
-            Field::new("flag", DataType::Utf8, true),
-            Field::new(VALUE_LABEL, DataType::Float64, true),
-            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
-            Field::new(HASH_LABEL, DataType::UInt64, true),
-        ];
-        let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
+        let rows = number_point_exemplar_records(&rec, &[plain, point.clone()]);
 
-        let rejected: Vec<json::Value> = append_number_points(&mut columnar, &rec, &points)
-            .into_iter()
-            .map(|record| flatten_record(record).unwrap())
-            .collect();
-        assert!(columnar.into_entries("org", "requests").unwrap().is_empty());
-        assert_eq!(rejected.len(), 1);
-        assert!(rejected[0].get(EXEMPLARS_LABEL).is_none());
-        assert_eq!(rejected[0]["region"], json!("eu"));
+        assert_eq!(rows.len(), 1);
+        let row = rows[0].as_object().unwrap();
+        assert_eq!(row["region"], "eu");
+        assert_eq!(row["host"], "a");
+        assert_eq!(row[VALUE_LABEL], 3.0);
+        assert_eq!(
+            row[TIMESTAMP_COL_NAME],
+            ((point.time_unix_nano - 1_000_000_000) / 1000) as i64
+        );
+        let sample = &number_point_records(&rec, &[point])[0];
+        assert_eq!(row[HASH_LABEL], sample[HASH_LABEL]);
     }
 
     #[test]
-    fn test_flatten_record_matches_flattening_with_an_empty_exemplar_list() {
+    fn test_flatten_record_matches_a_full_flatten() {
         let records = [
             json!({"__name__": "m", "host": "a", "value": 1.0, "_timestamp": 5}),
             json!({"__name__": "m", "host": null, "value": 1.0, "_timestamp": 5}),
             json!({"__name__": "m", "Host.Name": "a", "value": 1.0, "_timestamp": 5}),
             json!({"__name__": "m", "kv": {"Inner": "x", "gone": null}, "value": 1.0}),
             json!({"__name__": "m", "list": ["x", 1], "empty": null, "value": 1.0}),
-            // an attribute of that name was always written over and then flattened away
-            json!({"__name__": "m", "exemplars": "attr", "value": 1.0}),
         ];
         for record in records {
-            let mut with_empty = record.clone();
-            process_exemplars(&mut with_empty, &vec![]);
-            let mut expected = record.clone();
-            expected[EXEMPLARS_LABEL] = json!([]);
-
+            // an empty list makes flatten rebuild the record, which is what drops its nulls
+            let mut rebuilt = record.clone();
+            rebuilt["_rebuild"] = json!([]);
             assert_eq!(
-                with_empty.get(EXEMPLARS_LABEL).is_some(),
-                record.get(EXEMPLARS_LABEL).is_some()
-            );
-            assert_eq!(
-                flatten_record(with_empty).unwrap(),
-                flatten::flatten(expected).unwrap(),
+                flatten_record(record.clone()).unwrap(),
+                flatten::flatten(rebuilt).unwrap(),
                 "{record}"
             );
         }
@@ -2446,7 +2521,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+                let (result, _) = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should still have count, sum, min, max records
                 assert!(result.len() >= 4);
             }
@@ -2465,7 +2540,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+                let (result, _) = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should have count, sum, min, max, and 1 bucket
                 assert_eq!(result.len(), 5);
 
@@ -2492,7 +2567,7 @@ mod tests {
             let mut prom_meta = HashMap::new();
 
             if let Some(Data::Histogram(hist)) = &metric.data {
-                let result = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
+                let (result, _) = process_histogram(&mut rec, hist, metadata, &mut prom_meta);
                 // Should have count, sum, min, max, and 5 buckets
                 assert_eq!(result.len(), 9);
             }
@@ -2525,66 +2600,44 @@ mod tests {
 
         #[test]
         fn test_exemplar_with_trace_and_span_ids() {
-            let mut rec = json!({"__name__": "test_metric"});
-            let exemplar = create_test_exemplar_with_trace();
+            let entry = exemplar_entry(&create_test_exemplar_with_trace()).unwrap();
 
-            process_exemplars(&mut rec, &vec![exemplar]);
-
-            assert!(rec.get("exemplars").is_some());
-            let exemplars = rec["exemplars"].as_array().unwrap();
-            assert_eq!(exemplars.len(), 1);
-
-            let processed_exemplar = &exemplars[0];
-            assert!(processed_exemplar.get("trace_id").is_some());
-            assert!(processed_exemplar.get("span_id").is_some());
-            assert_eq!(processed_exemplar["value"], 42.0);
-            assert_eq!(processed_exemplar["service_name"], "test-service");
+            assert_eq!(entry["trace_id"], "01010101010101010101010101010101");
+            assert_eq!(entry["span_id"], "0202020202020202");
+            assert_eq!(entry["value"], 42.0);
+            assert_eq!(entry["service_name"], "test-service");
         }
 
         #[test]
         fn test_exemplar_with_invalid_trace_id() {
-            let mut rec = json!({"__name__": "test_metric"});
             let mut exemplar = create_test_exemplar_with_trace();
-            exemplar.trace_id = vec![0u8; 16]; // Invalid trace ID (all zeros)
+            exemplar.trace_id = vec![0u8; 16];
 
-            process_exemplars(&mut rec, &vec![exemplar]);
+            let entry = exemplar_entry(&exemplar).unwrap();
 
-            let exemplars = rec["exemplars"].as_array().unwrap();
-            let processed_exemplar = &exemplars[0];
-            // Should not have trace_id field for invalid trace
-            assert!(processed_exemplar.get("trace_id").is_none());
+            assert!(entry.get("trace_id").is_none());
+            assert!(entry.get("span_id").is_some());
         }
 
         #[test]
         fn test_exemplar_with_invalid_span_id() {
-            let mut rec = json!({"__name__": "test_metric"});
             let mut exemplar = create_test_exemplar_with_trace();
-            exemplar.span_id = vec![0u8; 8]; // Invalid span ID (all zeros)
+            exemplar.span_id = vec![0u8; 8];
 
-            process_exemplars(&mut rec, &vec![exemplar]);
+            let entry = exemplar_entry(&exemplar).unwrap();
 
-            let exemplars = rec["exemplars"].as_array().unwrap();
-            let processed_exemplar = &exemplars[0];
-            // Should not have span_id field for invalid span
-            assert!(processed_exemplar.get("span_id").is_none());
+            assert!(entry.get("span_id").is_none());
+            assert!(entry.get("trace_id").is_some());
         }
 
         #[test]
         fn test_exemplar_with_multiple_attributes() {
-            let mut rec = json!({"__name__": "test_metric"});
             let exemplar = Exemplar {
                 filtered_attributes: vec![
                     KeyValue {
                         key: "service".to_string(),
                         value: Some(AnyValue {
                             value: Some(any_value::Value::StringValue("web".to_string())),
-                        }),
-                        ..Default::default()
-                    },
-                    KeyValue {
-                        key: "version".to_string(),
-                        value: Some(AnyValue {
-                            value: Some(any_value::Value::StringValue("1.0.0".to_string())),
                         }),
                         ..Default::default()
                     },
@@ -2602,23 +2655,18 @@ mod tests {
                 trace_id: vec![],
             };
 
-            process_exemplars(&mut rec, &vec![exemplar]);
+            let entry = exemplar_entry(&exemplar).unwrap();
 
-            let exemplars = rec["exemplars"].as_array().unwrap();
-            let processed_exemplar = &exemplars[0];
-            assert_eq!(processed_exemplar["service"], "web");
-            assert_eq!(processed_exemplar["version"], "1.0.0");
-            // Integer values are often converted to strings in OTLP processing
-            if processed_exemplar["count"].is_string() {
-                assert_eq!(processed_exemplar["count"], "100");
-            } else {
-                assert_eq!(processed_exemplar["count"], 100);
-            }
+            assert_eq!(entry["service"], "web");
+            assert_eq!(
+                entry["count"],
+                get_val(&exemplar.filtered_attributes[1].value.as_ref())
+            );
         }
 
         #[test]
-        fn test_multiple_exemplars() {
-            let mut rec = json!({"__name__": "test_metric"});
+        fn test_multiple_exemplars_become_one_row_each() {
+            let rec = json!({"__name__": "test_metric", "_timestamp": 1});
             let exemplars = vec![
                 create_test_exemplar_with_trace(),
                 Exemplar {
@@ -2630,12 +2678,18 @@ mod tests {
                 },
             ];
 
-            process_exemplars(&mut rec, &exemplars);
+            let rows = exemplar_records(&rec, &exemplars);
 
-            let processed_exemplars = rec["exemplars"].as_array().unwrap();
-            assert_eq!(processed_exemplars.len(), 2);
-            assert_eq!(processed_exemplars[0]["value"], 42.0);
-            assert_eq!(processed_exemplars[1]["value"], 100.0);
+            assert_eq!(rows.len(), 2);
+            assert_eq!(rows[0]["value"], 42.0);
+            assert_eq!(rows[1]["value"], 100.0);
+            assert_eq!(rows[1][TIMESTAMP_COL_NAME], 1640995300000000i64);
+            for row in &rows {
+                assert_eq!(row["__name__"], "test_metric");
+                let stored: Vec<json::Value> =
+                    json::from_str(row[EXEMPLARS_LABEL].as_str().unwrap()).unwrap();
+                assert_eq!(stored.len(), 1);
+            }
         }
     }
 
@@ -3866,7 +3920,13 @@ mod tests {
 
             let points = [stale, number_dp(1.0, vec![])];
             assert!(!MetricRecords::NumberPoints(&points).only_stale());
-            assert!(!MetricRecords::Json(vec![json!({})]).only_stale());
+            assert!(
+                !MetricRecords::Json {
+                    records: vec![json!({})],
+                    exemplars: vec![]
+                }
+                .only_stale()
+            );
         }
 
         /// A flagged histogram would otherwise write zero `_count`/`_sum`/bucket rows, which

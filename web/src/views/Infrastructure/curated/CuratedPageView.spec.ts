@@ -1549,6 +1549,11 @@ describe("CuratedPageView", () => {
       (variables[0] as any).options = [{ label: "common-dev", value: "common-dev" }];
       (variables[0] as any).value = ["common-dev"];
       (variables[1] as any).value = ["argocd"];
+      // Tab-scoped, as buildVariable emits them.
+      for (const variable of variables as any[]) {
+        variable.scope = "tabs";
+        variable.tabs = ["workloads"];
+      }
       // The REAL chain edge buildVariable emits — the graph is built from this
       // `$cluster` reference, so a fixture without it resets no children.
       (variables[1] as any).query_data = {
@@ -1570,13 +1575,16 @@ describe("CuratedPageView", () => {
         .vm.$emit("variablesManagerReady", manager);
       await flushPromises();
 
-      manager.updateVariableValue("cluster", "global", undefined, undefined, []);
+      manager.updateVariableValue("cluster", "tabs", "workloads", undefined, []);
       manager.commitAll();
       await flushPromises();
 
-      expect(router.currentRoute.value.query["var-cluster"]).toBeUndefined();
+      const query = router.currentRoute.value.query;
+      expect(query["var-cluster"]).toBeUndefined();
+      expect(query["var-cluster.t.workloads"]).toBeUndefined();
       // The chain: a namespace picked under the cleared cluster must not keep filtering.
-      expect(router.currentRoute.value.query["var-namespace"]).toBeUndefined();
+      expect(query["var-namespace"]).toBeUndefined();
+      expect(query["var-namespace.t.workloads"]).toBeUndefined();
     });
 
     it("finding 23b: an omitted cluster picker with ONE resolvable value renders the name as static text", async () => {
@@ -1741,7 +1749,8 @@ describe("CuratedPageView", () => {
             label: "K8s Namespace",
             type: "query_values",
             multiSelect: true,
-            scope: "global",
+            scope: "tabs",
+            tabs: ["workloads"],
             value: [],
             options: [
               { label: "argocd", value: "argocd" },
@@ -1800,11 +1809,11 @@ describe("CuratedPageView", () => {
         .vm.$emit("variablesManagerReady", manager);
       await flushPromises();
 
-      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      manager.updateVariableValue("namespace", "tabs", "workloads", undefined, ["argocd"]);
       await flushPromises();
       const afterFirst = committedValue(manager, "namespace");
 
-      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      manager.updateVariableValue("namespace", "tabs", "workloads", undefined, ["argocd"]);
       await flushPromises();
 
       expect(committedValue(manager, "namespace")).toEqual(afterFirst);
@@ -1824,11 +1833,11 @@ describe("CuratedPageView", () => {
       expect(committedValue(manager, "namespace")).toEqual([]);
 
       // Exactly what VariablesValueSelector does on a user pick.
-      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      manager.updateVariableValue("namespace", "tabs", "workloads", undefined, ["argocd"]);
       await flushPromises();
 
       // Live state moved...
-      expect(manager.getVariable("namespace", "global")?.value).toEqual(["argocd"]);
+      expect(manager.getVariable("namespace", "tabs", "workloads")?.value).toEqual(["argocd"]);
       // ...and the page must have pushed it through to what panels read.
       expect(committedValue(manager, "namespace")).toEqual(["argocd"]);
     });
@@ -1848,7 +1857,8 @@ describe("CuratedPageView", () => {
               label: "Cluster",
               type: "query_values",
               multiSelect: false,
-              scope: "global",
+              scope: "tabs",
+              tabs: ["workloads"],
               value: "prod-eu",
               options: [
                 { label: "prod-eu", value: "prod-eu" },
@@ -1873,7 +1883,7 @@ describe("CuratedPageView", () => {
         .vm.$emit("variablesManagerReady", manager);
       await flushPromises();
 
-      manager.updateVariableValue("cluster", "global", undefined, undefined, "prod-us");
+      manager.updateVariableValue("cluster", "tabs", "workloads", undefined, "prod-us");
       await flushPromises();
 
       const render = wrapper.findComponent({ name: "RenderDashboardCharts" });
@@ -1882,7 +1892,7 @@ describe("CuratedPageView", () => {
       await flushPromises();
 
       expect(router.currentRoute.value.query.tab).toBe(dashboardData.tabs[1].tabId);
-      expect(manager.getVariable("cluster", "global")?.value).toBe("prod-us");
+      expect(manager.getVariable("cluster", "tabs", "workloads")?.value).toBe("prod-us");
     });
 
     it("a picker change does NOT re-resolve — only the selection moved", async () => {
@@ -1900,7 +1910,7 @@ describe("CuratedPageView", () => {
       refreshSpy.mockClear();
       const identityBefore = captured.dashboardData;
 
-      manager.updateVariableValue("namespace", "global", undefined, undefined, ["ziox"]);
+      manager.updateVariableValue("namespace", "tabs", "workloads", undefined, ["ziox"]);
       await flushPromises();
 
       expect(refreshSpy).not.toHaveBeenCalled();

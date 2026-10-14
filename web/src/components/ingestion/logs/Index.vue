@@ -18,18 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="250">
     <template #tabs>
-      <ORouteTab
-        name="curl"
-        data-test="ingestion-logs-tab-curl"
-        :to="{
-          name: 'curl',
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        }"
-        icon="data-object"
-        :label="t('ingestion.curl')"
+      <FirstSourcePickGroup
+        v-if="pickRoute === curlTab.name"
+        rail="logs"
+        :tab="curlTab"
+        :rest-label="t('ingestion.logsLabel')"
       />
+      <ORouteTab v-else v-bind="curlTab" data-test="ingestion-logs-tab-curl" />
       <ORouteTab
         name="filebeat"
         data-test="ingestion-logs-tab-filebeat"
@@ -176,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
+import FirstSourcePickGroup from "@/components/ingestion/FirstSourcePickGroup.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -186,10 +182,11 @@ import config from "../../../aws-exports";
 import analytics from "@/services/product_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
+import { firstSourcePickRoute } from "@/components/login/firstSourceOptions";
 
 export default defineComponent({
   name: "IngestLogs",
-  components: { ORouteTab, DataSourceSidebarLayout },
+  components: { ORouteTab, DataSourceSidebarLayout, FirstSourcePickGroup },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -272,6 +269,14 @@ export default defineComponent({
       confirmUpdate.value = true;
     };
 
+    const curlTab = {
+      name: "curl",
+      to: { name: "curl", query: { org_identifier: store.state.selectedOrganization.identifier } },
+      icon: "data-object",
+      label: t("ingestion.curl"),
+    };
+    const pickRoute = firstSourcePickRoute(store.state.selectedOrganization.identifier);
+
     const showCloudIngestionOptions = computed(() => {
       return config.isCloud === "true";
     });
@@ -292,6 +297,8 @@ export default defineComponent({
       ingestiontabs,
       showCloudIngestionOptions,
       ingestRoutes,
+      curlTab,
+      pickRoute,
     };
   },
 });

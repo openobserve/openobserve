@@ -550,7 +550,10 @@ const onVariablesManagerReady = (manager: VariablesManager) => {
   stopCommitWatch?.();
   // Values ONLY: options and loading flags churn per fetch and would re-run panels for an untouched picker.
   stopCommitWatch = watch(
-    () => manager.variablesData.global.map((variable) => variable.value),
+    () =>
+      Object.values(manager.variablesData.tabs).flatMap((variables) =>
+        variables.map((variable) => variable.value),
+      ),
     () => {
       manager.commitAll();
       syncPickerUrl(manager);
@@ -595,12 +598,16 @@ watch(
     const manager = variablesManager.value;
     if (!manager) return;
     // loadFromUrl only APPLIES the keys it finds, so a Back that drops var-cluster would strand the drilled-in value.
-    const cluster = manager.getVariable("cluster", "global");
-    if (cluster && query["var-cluster"] === undefined) {
+    for (const [tabId, variables] of Object.entries(manager.variablesData.tabs)) {
+      const cluster = variables.find((variable) => variable.name === "cluster");
+      if (!cluster) continue;
+      if (query["var-cluster"] !== undefined || query[`var-cluster.t.${tabId}`] !== undefined) {
+        continue;
+      }
       manager.updateVariableValue(
         "cluster",
-        "global",
-        undefined,
+        "tabs",
+        tabId,
         undefined,
         cluster.multiSelect ? [] : (cluster.options?.[0]?.value ?? null),
       );
