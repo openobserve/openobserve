@@ -89,6 +89,19 @@ export const usePanelEditorFocus = () => {
     pendingFocus.value = target;
   };
 
+  /** Opens the pane that owns the target, then asks it to focus; the editor's own notice actions use this in place. */
+  const focusInEditor = (
+    layout: { isConfigPanelOpen?: boolean; showQueryBar?: boolean; vrlFunctionToggle?: boolean },
+    target: PanelEditorFocusTarget,
+  ) => {
+    if (target === "top-n") layout.isConfigPanelOpen = true;
+    if (target === "vrl") {
+      layout.showQueryBar = true;
+      layout.vrlFunctionToggle = true;
+    }
+    requestFocus(target);
+  };
+
   /** Hands the pending request to its owner exactly once. */
   const takeFocus = (target: PanelEditorFocusTarget): boolean => {
     if (pendingFocus.value !== target) return false;
@@ -96,5 +109,5 @@ export const usePanelEditorFocus = () => {
     return true;
   };
 
-  return { pendingFocus, requestFocus, takeFocus };
+  return { pendingFocus, requestFocus, focusInEditor, takeFocus };
 };

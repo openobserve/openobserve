@@ -168,6 +168,11 @@
                     :error="errorMessage"
                     :maxQueryRangeWarning="maxQueryRangeWarning"
                     :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                    v-bind="noticeProps"
+                    :canEdit="canEditFromNotice"
+                    :canRefresh="true"
+                    @refresh-panel="refreshData"
+                    @edit-panel="onNoticeEditPanel"
                     :sparklineWarning="sparklineWarning"
                     :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
                     :isPartialData="isPartialData"
@@ -197,6 +202,8 @@
                   @update:initialVariableValues="onUpdateInitialVariableValues"
                   @last-triggered-at-update="handleLastTriggeredAtUpdate"
                   @result-metadata-update="handleResultMetadataUpdate"
+                  @panel-diagnostics-update="handlePanelDiagnosticsUpdate"
+                  @series-limit-update="handleSeriesLimitUpdate"
                   @limit-number-of-series-warning-message-update="
                     handleLimitNumberOfSeriesWarningMessage
                   "
@@ -244,7 +251,7 @@ import {
 
 import { useI18nTyped } from "@/types/i18n";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
@@ -259,7 +266,12 @@ import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalRep
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
 import { isEqual } from "lodash-es";
-import { processQueryMetadataErrors } from "@/utils/zincutils";
+import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
+import {
+  PANEL_EDITOR_FOCUS_PARAM,
+  type PanelEditorFocusTarget,
+} from "@/composables/dashboard/usePanelEditorFocus";
+import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
 import {
@@ -334,6 +346,11 @@ export default defineComponent({
     searchType: {
       default: null,
       type: String || null,
+    },
+    /** Read-only embedding: hides the notices' editor actions (Use Top N, Edit function). */
+    viewOnly: {
+      type: Boolean,
+      default: false,
     },
   },
   emits: ["closePanel", "update:initialVariableValues"],
@@ -418,7 +435,14 @@ export default defineComponent({
     };
 
     // Warning messages
-    const maxQueryRangeWarning = ref("");
+    // Function errors and partial reasons have their own header chips; the range warning keeps the rest.
+    const {
+      maxQueryRangeWarning,
+      noticeProps,
+      handleResultMetadataUpdate,
+      handlePanelDiagnosticsUpdate,
+      handleSeriesLimitUpdate,
+    } = usePanelNotices(() => store.state.timezone);
     const limitNumberOfSeriesWarningMessage = ref("");
     const sparklineWarning = ref("");
     const errorMessage = ref("");
@@ -794,8 +818,23 @@ export default defineComponent({
       sparklineWarning.value = message;
     };
 
-    const handleResultMetadataUpdate = (metadata: any) => {
-      maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
+    const router = useRouter();
+    // The fix lives in the editor: close this view and land there on the setting that resolves the notice.
+    const canEditFromNotice = computed(() => !props.viewOnly && !!route.query.dashboard);
+    const onNoticeEditPanel = (action: PanelNoticeActionId) => {
+      const focus: PanelEditorFocusTarget = action === "edit-function" ? "vrl" : "top-n";
+      emit("closePanel");
+      router.push({
+        path: "/dashboards/add_panel",
+        query: {
+          ...route.query,
+          dashboard: String(route.query.dashboard),
+          panelId: props.panelId,
+          folder: route.query.folder ?? "default",
+          tab: route.query.tab ?? currentTabId.value,
+          [PANEL_EDITOR_FOCUS_PARAM]: focus,
+        },
+      });
     };
 
     const getInitialVariablesData = () => {
@@ -953,6 +992,11 @@ export default defineComponent({
       toggleAutoRun,
       store,
       maxQueryRangeWarning,
+      noticeProps,
+      handlePanelDiagnosticsUpdate,
+      handleSeriesLimitUpdate,
+      canEditFromNotice,
+      onNoticeEditPanel,
       limitNumberOfSeriesWarningMessage,
       sparklineWarning,
       errorMessage,

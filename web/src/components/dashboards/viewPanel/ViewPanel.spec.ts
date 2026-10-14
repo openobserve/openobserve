@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import ViewPanel from "./ViewPanel.vue";
+import PanelErrorButtons from "@/components/dashboards/PanelErrorButtons.vue";
 
 // Mock vue-router
 const mockRoute = {
@@ -202,7 +203,7 @@ describe("ViewPanel", () => {
     searchType: "logs",
   };
 
-  const createWrapper = (props = {}) => {
+  const createWrapper = (props = {}, extraStubs: Record<string, unknown> = {}) => {
     return mount(ViewPanel, {
       props: {
         ...defaultProps,
@@ -349,6 +350,7 @@ describe("ViewPanel", () => {
             props: ["panelData", "open"],
             emits: ["update:open"],
           },
+          ...extraStubs,
         },
       },
     });
@@ -395,6 +397,68 @@ describe("ViewPanel", () => {
     if (wrapper) {
       wrapper.unmount();
     }
+  });
+
+  describe("notice chips with the real PanelErrorButtons", () => {
+    const VRL_ERROR = "error[E203]: syntax error";
+    it("feeds the renderer's diagnostics into the chips and drops VRL errors from the range warning", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      await flushPromises();
+      wrapper.vm.handleResultMetadataUpdate([[{ function_error: [VRL_ERROR] }]]);
+      wrapper.vm.handlePanelDiagnosticsUpdate({
+        queries: [],
+        serverPartial: false,
+        rowsCapped: false,
+        partialReasons: [],
+        functionErrors: [VRL_ERROR],
+      });
+      wrapper.vm.handleSeriesLimitUpdate({ shown: 100, total: 342, cap: 100 });
+      await flushPromises();
+
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+      expect(buttons.exists()).toBe(true);
+      expect(buttons.props("functionErrors")).toEqual([VRL_ERROR]);
+      expect(buttons.props("seriesLimit")).toEqual({ shown: 100, total: 342, cap: 100 });
+      expect(buttons.props("canEdit")).toBe(true);
+      expect(buttons.props("canRefresh")).toBe(true);
+      expect(buttons.props("canInspect")).toBe(false);
+      expect(wrapper.vm.maxQueryRangeWarning).toBe("");
+      expect(wrapper.find('[data-test="panel-max-duration-warning"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="panel-notice-chip-function-error"]').exists()).toBe(true);
+    });
+
+    it("closes the view and opens the editor on the fix for Edit function and Use Top N", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      await flushPromises();
+      const buttons = wrapper.findComponent(PanelErrorButtons);
+
+      buttons.vm.$emit("edit-panel", "edit-function");
+      expect(wrapper.emitted("closePanel")).toHaveLength(1);
+      expect(mockRouter.push).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          path: "/dashboards/add_panel",
+          query: expect.objectContaining({ panelId: "test-panel-id", focus: "vrl" }),
+        }),
+      );
+
+      buttons.vm.$emit("edit-panel", "use-top-n");
+      expect(mockRouter.push).toHaveBeenLastCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ focus: "top-n" }) }),
+      );
+    });
+
+    it("hides the editor actions in a view-only embedding", async () => {
+      wrapper = createWrapper({ viewOnly: true }, { PanelErrorButtons });
+      await flushPromises();
+      expect(wrapper.findComponent(PanelErrorButtons).props("canEdit")).toBe(false);
+    });
+
+    it("refreshes the view from a notice's Refresh", async () => {
+      wrapper = createWrapper({}, { PanelErrorButtons });
+      await flushPromises();
+      const listener = wrapper.findComponent(PanelErrorButtons).vm.$.vnode.props?.onRefreshPanel;
+      expect(listener).toBe(wrapper.vm.refreshData);
+    });
   });
 
   describe("Component Initialization", () => {

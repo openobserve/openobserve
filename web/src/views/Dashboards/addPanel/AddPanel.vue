@@ -223,6 +223,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @chartApiError="handleChartApiError"
       @dataZoom="onDataZoom"
       @metaDataUpdated="metaDataValue"
+      @applyRequested="runQuery()"
+      @openQueryInspector="showViewPanel = true"
     />
 
     <!-- Query Inspector Dialog -->
@@ -230,6 +232,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model:open="showViewPanel"
       :metaData="metaData"
       :data="panelTitle"
+      :diagnostics="panelEditorRef?.panelDiagnostics"
+      :seriesLimit="panelEditorRef?.seriesLimit"
       data-test="query-inspector-dialog"
     />
 
@@ -544,7 +548,7 @@ export default defineComponent({
     // this is used to again assign query params on discard or save
     let routeQueryParamsOnMount: any = {};
 
-    const { requestFocus: requestEditorFocus } = usePanelEditorFocus();
+    const { focusInEditor } = usePanelEditorFocus();
     // A notice's "Use Top N" / "Edit function" link lands here; the param is dropped once used.
     let focusParamUsed = false;
     const dropFocusParam = () => router.replace({ query: withoutFocusParam({ ...route.query }) });
@@ -562,12 +566,7 @@ export default defineComponent({
       if (!target) return;
       focusParamUsed = true;
       dropFocusParam();
-      if (target === "top-n") dashboardPanelData.layout.isConfigPanelOpen = true;
-      if (target === "vrl") {
-        dashboardPanelData.layout.showQueryBar = true;
-        dashboardPanelData.layout.vrlFunctionToggle = true;
-      }
-      requestEditorFocus(target);
+      focusInEditor(dashboardPanelData.layout, target);
     };
 
     // ======= [START] default variable values

@@ -231,11 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-          :seriesLimit="seriesLimit"
-          :serverPartial="panelDiagnostics?.serverPartial ?? false"
-          :rowsCapped="panelDiagnostics?.rowsCapped ?? false"
-          :serverPartialReasons="panelDiagnostics?.partialReasons ?? []"
-          :functionErrors="panelDiagnostics?.functionErrors ?? []"
+          v-bind="noticeProps"
           :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
@@ -519,7 +515,6 @@ import {
   watch,
   onBeforeUnmount,
   onMounted,
-  shallowRef,
 } from "vue";
 import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
@@ -530,7 +525,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
-import { getUUID, processQueryMetadataErrors, b64EncodeUnicode } from "@/utils/zincutils";
+import { getUUID, b64EncodeUnicode } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -564,11 +559,7 @@ import {
   type PanelEditorFocusTarget,
 } from "@/composables/dashboard/usePanelEditorFocus";
 import type { PanelNoticeActionId } from "@/utils/dashboard/panelNotices";
-import {
-  omitFunctionErrorMessages,
-  type PanelDiagnostics,
-  type SeriesLimitInfo,
-} from "@/utils/dashboard/panelDiagnostics";
+import { usePanelNotices } from "@/composables/dashboard/usePanelNotices";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -761,31 +752,16 @@ export default defineComponent({
 
     const limitNumberOfSeriesWarningMessage = ref("");
 
-    const resultMetadata = shallowRef<any>(null);
-    const handleResultMetadataUpdate = (metadata: any) => {
-      resultMetadata.value = metadata;
-    };
-
-    const panelDiagnostics = shallowRef<PanelDiagnostics | null>(null);
-    const handlePanelDiagnosticsUpdate = (diagnostics: PanelDiagnostics | null) => {
-      panelDiagnostics.value = diagnostics;
-    };
-
-    const seriesLimit = shallowRef<SeriesLimitInfo | null>(null);
-    const handleSeriesLimitUpdate = (limit: SeriesLimitInfo | null) => {
-      seriesLimit.value = limit;
-    };
-
     // Function errors and partial reasons have their own header chips; the range warning keeps the rest.
-    const maxQueryRangeWarning = computed(() =>
-      processQueryMetadataErrors(
-        omitFunctionErrorMessages(resultMetadata.value, [
-          ...(panelDiagnostics.value?.functionErrors ?? []),
-          ...(panelDiagnostics.value?.partialReasons ?? []),
-        ]),
-        store.state.timezone,
-      ),
-    );
+    const {
+      panelDiagnostics,
+      seriesLimit,
+      maxQueryRangeWarning,
+      noticeProps,
+      handleResultMetadataUpdate,
+      handlePanelDiagnosticsUpdate,
+      handleSeriesLimitUpdate,
+    } = usePanelNotices(() => store.state.timezone);
 
     // to store and show when the panel was last loaded
     const lastTriggeredAt = ref(null);
@@ -1305,6 +1281,7 @@ export default defineComponent({
       panelDiagnostics,
       handlePanelDiagnosticsUpdate,
       seriesLimit,
+      noticeProps,
       handleSeriesLimitUpdate,
       canEditFromNotice,
       canRefreshFromNotice,
