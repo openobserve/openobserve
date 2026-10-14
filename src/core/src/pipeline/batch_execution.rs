@@ -29,7 +29,7 @@ use config::meta::{destinations::Module, pipeline::components::WorkflowDestinati
 use config::{
     meta::{
         function::{Transform, VRLResultResolver},
-        pipeline::{Pipeline, PipelineKind, components::NodeData},
+        pipeline::{Pipeline, PipelineKind, components::NodeData, is_forbidden_destination},
         self_reporting::error::{ErrorData, ErrorSource, NodeErrors, PipelineError},
         stream::{StreamParams, StreamType},
     },
@@ -2552,6 +2552,27 @@ async fn process_branch_node(
     outcome
 }
 
+/// Hands a dropped record's error to the collector; true when the collector is gone.
+#[allow(clippy::type_complexity)]
+async fn report_leaf_error(
+    (pipeline_name, inv_id): (&str, &str),
+    node: &ExecutableNode,
+    error_sender: &Sender<(String, String, String, Option<String>, Option<Value>)>,
+    err_msg: String,
+    value: Option<Value>,
+) -> bool {
+    log::warn!("[Pipeline] {pipeline_name} [inv={inv_id}]: {err_msg}");
+    let sent = error_sender
+        .send((node.id.to_string(), node.node_type(), err_msg, None, value))
+        .await;
+    if let Err(send_err) = &sent {
+        log::error!(
+            "[Pipeline] {pipeline_name} [inv={inv_id}]: LeafNode failed sending errors for collection caused by: {send_err}",
+        );
+    }
+    sent.is_err()
+}
+
 async fn process_stream_node(
     stream_params: &StreamParams,
     metadata: ProcessMetadata,
@@ -2671,6 +2692,26 @@ async fn process_stream_node(
                         continue;
                     }
                 }
+            }
+
+            let written = [&destination_stream.stream_name, &stream_params.stream_name];
+            if let Some(internal) = written.into_iter().find(|name| {
+                is_forbidden_destination(&metadata.source_stream_name, name, is_cross_type)
+            }) {
+                let err_msg =
+                    format!("Destination {internal} is an internal stream. Record dropped");
+                if report_leaf_error(
+                    (&metadata.pipeline_name, &inv_id),
+                    node,
+                    &channels.error_sender,
+                    err_msg,
+                    value_copy,
+                )
+                .await
+                {
+                    break;
+                }
+                continue;
             }
 
             if is_cross_type {
@@ -5502,5 +5543,52 @@ mod tests {
         let (node_id, _, message, ..) = error_rx.try_recv().expect("a node error is expected");
         assert_eq!(node_id, "fn-1");
         assert!(message.contains("array"), "{message}");
+    }
+
+    #[tokio::test]
+    async fn test_leaf_node_refuses_dynamic_internal_destinations() {
+        let node = ExecutableNode {
+            id: "dest-1".to_string(),
+            node_data: NodeData::Stream(StreamParams::new("org-1", "{target}", StreamType::Logs)),
+            children: vec![],
+            is_disabled: false,
+        };
+        let (input_tx, input_rx) = channel(4);
+        let (result_tx, mut result_rx) = channel(4);
+        let (error_tx, mut error_rx) = channel(4);
+        let channels = ProcessChannels {
+            receiver: input_rx,
+            child_senders: vec![],
+            result_sender: Some(result_tx),
+            error_sender: error_tx,
+            inputs_sender: None,
+            outputs_sender: None,
+        };
+        send_records(
+            &input_tx,
+            vec![
+                json::json!({"target": "_o2_ai_chat_events"}),
+                json::json!({"target": "app"}),
+            ],
+        )
+        .await;
+        drop(input_tx);
+
+        let stream_params = StreamParams::new("org-1", "{target}", StreamType::Logs);
+        let mut busy = Duration::ZERO;
+        process_stream_node(
+            &stream_params,
+            dummy_metadata(1),
+            &node,
+            channels,
+            &mut busy,
+        )
+        .await;
+
+        let (_, written, _) = result_rx.try_recv().expect("the user stream is written");
+        assert_eq!(written.stream_name.as_str(), "app");
+        assert!(result_rx.try_recv().is_err());
+        let (_, _, err, ..) = error_rx.try_recv().expect("the internal write is reported");
+        assert!(err.contains("_o2_ai_chat_events"), "{err}");
     }
 }
