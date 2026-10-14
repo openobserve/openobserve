@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Lecture seule",
+    "viewOnlyTooltip": "Votre rôle ne peut pas modifier ceci. Demandez à un administrateur de l'organisation.",
+    "viewJsonReadOnly": "Voir le JSON du tableau de bord (lecture seule)",
+    "viewDashboardJson": "Voir le JSON du tableau de bord",
+    "viewPipelineReadOnly": "Voir le pipeline (lecture seule)",
+    "viewPipelineJson": "Voir le JSON du pipeline",
+    "viewPipelineJsonReadOnly": "Voir le JSON du pipeline (lecture seule)",
+    "viewFunction": "Voir la fonction",
+    "viewFunctionReadOnly": "Voir la fonction (lecture seule)",
+    "bulkDeletePartial": "Supprimer {count} sur {total} — {skipped} ignorés (pas d'autorisation)",
+    "skippedNames": "Ignorés : {names}",
+    "skippedNamesMore": "Ignorés : {names} +{count} de plus"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Aucun historique pour le moment",
@@ -12982,6 +12996,7 @@
     "fields": "Champs",
     "fieldsHint": "Afficher le lien uniquement lorsqu'au moins un champ est présent dans l'enregistrement",
     "fieldInputPlaceholder": "Entrez le nom du champ et appuyez sur Entrée ou cliquez sur +",
+    "emptyStateReadOnly": "Aucun lien croisé n'est configuré.",
     "emptyState": "Aucun lien croisé n'est configuré. Cliquez sur « {addLabel} » pour en créer un.",
     "update": "Mettre à jour",
     "add": "Ajouter",

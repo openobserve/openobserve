@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "閲覧のみ",
+    "viewOnlyTooltip": "このロールでは編集できません。組織の管理者に依頼してください。",
+    "viewJsonReadOnly": "ダッシュボード JSON を表示（読み取り専用）",
+    "viewDashboardJson": "ダッシュボード JSON を表示",
+    "viewPipelineReadOnly": "パイプラインを表示（読み取り専用）",
+    "viewPipelineJson": "パイプライン JSON を表示",
+    "viewPipelineJsonReadOnly": "パイプライン JSON を表示（読み取り専用）",
+    "viewFunction": "関数を表示",
+    "viewFunctionReadOnly": "関数を表示（読み取り専用）",
+    "bulkDeletePartial": "{total} 件中 {count} 件を削除 — {skipped} 件をスキップ（権限なし）",
+    "skippedNames": "スキップ: {names}",
+    "skippedNamesMore": "スキップ: {names} 他 {count} 件"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "履歴はまだありません",
@@ -12982,6 +12996,7 @@
     "fields": "フィールド",
     "fieldsHint": "レコードに少なくとも 1 つのフィールドが存在する場合にのみリンクを表示",
     "fieldInputPlaceholder": "フィールド名を入力して [Enter] を押すか、[+] をクリックします",
+    "emptyStateReadOnly": "クロスリンクは設定されていません。",
     "emptyState": "クロスリンクは設定されていません。「{addLabel}」をクリックして作成してください。",
     "update": "[更新]",
     "add": "追加",

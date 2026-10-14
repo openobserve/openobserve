@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Apenas visualização",
+    "viewOnlyTooltip": "A sua função não pode editar isto. Peça a um administrador da organização.",
+    "viewJsonReadOnly": "Ver JSON do painel (só de leitura)",
+    "viewDashboardJson": "Ver JSON do painel",
+    "viewPipelineReadOnly": "Ver pipeline (só de leitura)",
+    "viewPipelineJson": "Ver JSON do pipeline",
+    "viewPipelineJsonReadOnly": "Ver JSON do pipeline (só de leitura)",
+    "viewFunction": "Ver função",
+    "viewFunctionReadOnly": "Ver função (só de leitura)",
+    "bulkDeletePartial": "Eliminar {count} de {total} — {skipped} ignorados (sem permissão)",
+    "skippedNames": "Ignorados: {names}",
+    "skippedNamesMore": "Ignorados: {names} +{count} mais"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Sem histórico ainda",
@@ -12982,6 +12996,7 @@
     "fields": "Campos",
     "fieldsHint": "Mostrar link somente quando pelo menos um campo estiver presente no registro",
     "fieldInputPlaceholder": "Digite o nome do campo e pressione Enter ou clique em +",
+    "emptyStateReadOnly": "Nenhum link cruzado configurado.",
     "emptyState": "Nenhum link cruzado configurado. Clique em “{addLabel}” para criar um.",
     "update": "Atualizar",
     "add": "Adicionar",

@@ -10,6 +10,7 @@
           :debounceTime="300"
           v-model:query="jsonContent"
           language="json"
+          :read-only="readOnly"
           @update:query="handleEditorChange"
         />
       </div>
@@ -34,9 +35,10 @@
           size="sm-action"
           @click="$emit('close')"
           data-test="json-editor-cancel"
-          >{{ t("common.cancel") }}</OButton
+          >{{ readOnly ? t("common.close") : t("common.cancel") }}</OButton
         >
         <OButton
+          v-if="!readOnly"
           variant="primary"
           size="sm-action"
           @click="saveChanges"
@@ -102,6 +104,10 @@ export default defineComponent({
     isEditing: {
       type: Boolean,
       required: false,
+      default: false,
+    },
+    readOnly: {
+      type: Boolean,
       default: false,
     },
   },
@@ -212,6 +218,7 @@ export default defineComponent({
     //and then emit the saveJson event
 
     const saveChanges = () => {
+      if (props.readOnly) return;
       try {
         const parsedContent = JSON.parse(jsonContent.value);
         // Merge back the stored fields

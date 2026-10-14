@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "보기 전용",
+    "viewOnlyTooltip": "현재 역할로는 편집할 수 없습니다. 조직 관리자에게 요청하세요.",
+    "viewJsonReadOnly": "대시보드 JSON 보기(읽기 전용)",
+    "viewDashboardJson": "대시보드 JSON 보기",
+    "viewPipelineReadOnly": "파이프라인 보기(읽기 전용)",
+    "viewPipelineJson": "파이프라인 JSON 보기",
+    "viewPipelineJsonReadOnly": "파이프라인 JSON 보기(읽기 전용)",
+    "viewFunction": "함수 보기",
+    "viewFunctionReadOnly": "함수 보기(읽기 전용)",
+    "bulkDeletePartial": "{total}개 중 {count}개 삭제 — {skipped}개 건너뜀(권한 없음)",
+    "skippedNames": "건너뜀: {names}",
+    "skippedNamesMore": "건너뜀: {names} 외 {count}개"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "아직 기록이 없습니다",
@@ -12982,6 +12996,7 @@
     "fields": "필드",
     "fieldsHint": "레코드에 하나 이상의 필드가 있는 경우에만 링크 표시",
     "fieldInputPlaceholder": "필드 이름을 입력하고 Enter 키를 누르거나 +를 클릭합니다.",
+    "emptyStateReadOnly": "크로스링크가 구성되지 않았습니다.",
     "emptyState": "크로스링크가 구성되지 않았습니다.“{addLabel}”을 클릭하여 생성하십시오.",
     "update": "업데이트",
     "add": "추가",

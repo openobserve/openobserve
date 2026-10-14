@@ -30,6 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div data-test="dialog-box" class="text-left">
       <div class="para">{{ message }}</div>
+      <div v-if="detail" class="text-text-secondary mt-2 text-xs" data-test="confirm-dialog-detail">
+        {{ detail }}
+      </div>
       <div v-if="warningMessage && warningMessage.length > 0" class="mt-4 text-left">
         <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
@@ -51,6 +54,8 @@ export default defineComponent({
   props: {
     title: { type: String as unknown as PropType<I18nText> },
     message: { type: String as unknown as PropType<I18nText> },
+    /** Secondary line under the message, e.g. the items a partial bulk action skips. */
+    detail: { type: String as unknown as PropType<I18nText> },
     warningMessage: { type: String as unknown as PropType<I18nText> },
     modelValue: { type: Boolean, default: false },
     // No `default: ""` — an empty-string default would need a cast to I18nText,

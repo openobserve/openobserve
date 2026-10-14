@@ -141,6 +141,36 @@ const datasourceContentPlugin = {
   },
 };
 
+// Dev-only answer for POST /api/*/authz/check: VITE_AUTHZ_STUB=admin|editor|viewer, VITE_AUTHZ_STUB_OWN=id1,id2 (editor may delete these).
+const authzStubPlugin = (role: string, own: string) => ({
+  name: "authz-check-stub",
+  apply: "serve" as const,
+  configureServer(server: any) {
+    const ownIds = new Set(
+      own
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    );
+    server.middlewares.use((req: any, res: any, next: () => void) => {
+      if (req.method !== "POST" || !/^\/api\/[^/]+\/authz\/check/.test(req.url ?? ""))
+        return next();
+      let body = "";
+      req.on("data", (chunk: Buffer) => (body += chunk));
+      req.on("end", () => {
+        const items: { id: string; action: string }[] = JSON.parse(body || "{}").items ?? [];
+        const enforced = role !== "admin";
+        const results = items.map((item) => ({
+          allowed:
+            !enforced || (role === "editor" && (item.action === "edit" || ownIds.has(item.id))),
+        }));
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ enforced, results }));
+      });
+    });
+  },
+});
+
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_OPENOBSERVE_CLOUD === "true") {
 // const filePath = path.resolve(process.cwd(), "src/enterprise");
@@ -213,6 +243,9 @@ export default defineConfig(({ mode }) => {
           forceBuildInstrument: true,
         }),
       enterpriseResolverPlugin,
+      !isProd &&
+        process.env.VITE_AUTHZ_STUB &&
+        authzStubPlugin(process.env.VITE_AUTHZ_STUB, process.env.VITE_AUTHZ_STUB_OWN ?? ""),
       // Register the content fetcher for dev + builds, but NOT under vitest
       // (tests mock the content/manifest and must stay offline/deterministic).
       // `false` entries are dropped by the `.filter(Boolean)` at the end.

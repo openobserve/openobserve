@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "عرض فقط",
+    "viewOnlyTooltip": "لا يمكن لدورك تعديل هذا. اطلب من مسؤول المؤسسة.",
+    "viewJsonReadOnly": "عرض JSON للوحة المعلومات (للقراءة فقط)",
+    "viewDashboardJson": "عرض JSON للوحة المعلومات",
+    "viewPipelineReadOnly": "عرض خط المعالجة (للقراءة فقط)",
+    "viewPipelineJson": "عرض JSON لخط المعالجة",
+    "viewPipelineJsonReadOnly": "عرض JSON لخط المعالجة (للقراءة فقط)",
+    "viewFunction": "عرض الدالة",
+    "viewFunctionReadOnly": "عرض الدالة (للقراءة فقط)",
+    "bulkDeletePartial": "حذف {count} من {total} — تم تخطي {skipped} (لا يوجد إذن)",
+    "skippedNames": "تم التخطي: {names}",
+    "skippedNamesMore": "تم التخطي: {names} +{count} أخرى"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "لا يوجد سجل بعد",
@@ -12982,6 +12996,7 @@
     "fields": "الحقول",
     "fieldsHint": "عرض الرابط فقط عندما يكون هناك حقل واحد على الأقل موجود في السجل",
     "fieldInputPlaceholder": "أدخل اسم الحقل واضغط إدخالها أو اضغط +",
+    "emptyStateReadOnly": "لا توجد روابط متقاطعة مهيأة.",
     "emptyState": "لا توجد روابط متقاطعة مهيأة. انقر على \"{addLabel}\" لإنشاء واحدة.",
     "update": "تحديث",
     "add": "إضافة",

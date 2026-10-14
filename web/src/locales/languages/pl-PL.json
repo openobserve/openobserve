@@ -1,4 +1,18 @@
 {
+  "authz": {
+    "viewOnly": "Tylko podgląd",
+    "viewOnlyTooltip": "Twoja rola nie może tego edytować. Poproś administratora organizacji.",
+    "viewJsonReadOnly": "Wyświetl JSON pulpitu (tylko do odczytu)",
+    "viewDashboardJson": "Wyświetl JSON pulpitu",
+    "viewPipelineReadOnly": "Wyświetl potok (tylko do odczytu)",
+    "viewPipelineJson": "Wyświetl JSON potoku",
+    "viewPipelineJsonReadOnly": "Wyświetl JSON potoku (tylko do odczytu)",
+    "viewFunction": "Wyświetl funkcję",
+    "viewFunctionReadOnly": "Wyświetl funkcję (tylko do odczytu)",
+    "bulkDeletePartial": "Usuń {count} z {total} — pominięto {skipped} (brak uprawnień)",
+    "skippedNames": "Pominięto: {names}",
+    "skippedNamesMore": "Pominięto: {names} +{count} więcej"
+  },
   "emptyState": {
     "illustrations": {
       "noHistoryYet": "Brak historii",
@@ -12982,6 +12996,7 @@
     "fields": "Pola",
     "fieldsHint": "Pokaż link tylko gdy co najmniej jedno pole jest obecne w rekordzie",
     "fieldInputPlaceholder": "Wprowadź nazwę pola i naciśnij Enter lub kliknij +",
+    "emptyStateReadOnly": "Brak skonfigurowanych cross-linków.",
     "emptyState": "Brak skonfigurowanych cross-linków. Kliknij \"{addLabel}\", aby utworzyć.",
     "update": "Aktualizuj",
     "add": "Dodaj",
