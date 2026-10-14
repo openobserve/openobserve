@@ -869,36 +869,30 @@ pub async fn get_label_values(
     let stream_type = StreamType::Metrics;
 
     if label_name == NAME_LABEL {
-        // Lists stream names; no SQL needed, just filter the schema catalogue.
         let sel = selector.as_ref();
-        if let Some(s) = sel {
-            validate_name_label_values_selector(s)?;
+        if let Some(sel) = sel {
+            validate_name_label_values_selector(sel)?;
         }
 
         // Bare selectors store the metric in selector.name rather than in matchers.
-        let mut name_matchers: Vec<_> = sel
-            .map(|s| s.matchers.find_matchers(NAME_LABEL))
+        let metric_name = sel
+            .and_then(|sel| sel.name.as_deref())
+            .filter(|name| !name.is_empty());
+        let name_matchers = sel
+            .map(|sel| sel.matchers.matchers.as_slice())
             .unwrap_or_default();
-        if let Some(name) = sel
-            .and_then(|s| s.name.as_deref())
-            .filter(|n| !n.is_empty())
-        {
-            name_matchers.push(promql_parser::label::Matcher {
-                name: NAME_LABEL.to_string(),
-                op: MatchOp::Equal,
-                value: name.to_string(),
-            });
-        }
 
         let stream_schemas = db::schema::list(org_id, Some(stream_type), true)
             .await
             .unwrap_or_default();
         let mut label_values = Vec::with_capacity(stream_schemas.len());
-        'schema: for schema in stream_schemas {
-            for matcher in &name_matchers {
-                if !matcher.is_match(&schema.stream_name) {
-                    continue 'schema;
-                }
+        for schema in stream_schemas {
+            if metric_name.is_some_and(|name| name != schema.stream_name)
+                || !name_matchers
+                    .iter()
+                    .all(|matcher| matcher.is_match(&schema.stream_name))
+            {
+                continue;
             }
             let stats = family_stats(
                 org_id,
@@ -920,9 +914,6 @@ pub async fn get_label_values(
         .await
         // `db::schema::get` never fails, so it's safe to unwrap
         .unwrap();
-    if schema.fields().is_empty() {
-        return Ok(vec![]);
-    }
     if schema.field_with_name(&label_name).is_err() {
         return Ok(vec![]);
     }
