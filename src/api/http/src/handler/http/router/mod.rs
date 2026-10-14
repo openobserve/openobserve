@@ -23,7 +23,10 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
-use config::{get_config, meta::user::UserRole};
+use config::{
+    get_config,
+    meta::{feature::Feature, user::UserRole},
+};
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
@@ -54,9 +57,9 @@ use {
     o2_enterprise::enterprise::{
         common::{
             auditor::{AuditMessage, Protocol, ResponseMeta},
-            config::get_config as get_o2_config,
+            config::{get_config as get_o2_config, init_unmasked as o2_operator_config},
         },
-        license::features_enabled,
+        license::check_features,
     },
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
@@ -255,6 +258,32 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
+/// 403 naming the required features the license does not entitle.
+#[cfg(feature = "enterprise")]
+fn license_denial(required: &[Feature]) -> Option<Response> {
+    if check_features(required) {
+        return None;
+    }
+    let missing: Vec<&str> = required
+        .iter()
+        .filter(|f| !check_features(std::slice::from_ref(f)))
+        .map(|f| (*f).into())
+        .collect();
+    let err = infra::errors::ErrorCodes::LicenseFeatureNotEntitled(missing.join(", "));
+    Some(
+        (
+            StatusCode::FORBIDDEN,
+            axum::Json(MetaHttpResponse::error_code(err)),
+        )
+            .into_response(),
+    )
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn license_denial(_required: &[Feature]) -> Option<Response> {
+    None
+}
+
 /// Authentication middleware for API routes.
 ///
 /// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
@@ -283,18 +312,8 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     };
 
     // Outside oo_validator so the license gate holds with OpenFGA off and on bypass routes.
-    #[cfg(feature = "enterprise")]
-    if let Some(fs) = auth_info.feature
-        && !features_enabled(fs)
-    {
-        let missing: Vec<&str> = fs
-            .iter()
-            .filter(|f| !features_enabled(std::slice::from_ref(f)))
-            .map(|f| (*f).into())
-            .collect();
-        return MetaHttpResponse::forbidden(format!(
-            "features {missing:?} are not included in your license"
-        ));
+    if let Some(denied) = auth_info.feature.and_then(license_denial) {
+        return denied;
     }
 
     // Insert user_id into request headers for downstream handlers
@@ -319,6 +338,18 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     }
 
     next.run(Request::from_parts(parts, body)).await
+}
+
+/// License gate for routes that authenticate outside `auth_middleware`; layer it inside the auth.
+pub async fn require_features(
+    required: &'static [Feature],
+    request: Request,
+    next: Next,
+) -> Response {
+    match license_denial(required) {
+        Some(denied) => denied,
+        None => next.run(request).await,
+    }
 }
 
 /// Authentication middleware for AWS routes
@@ -726,12 +757,17 @@ pub fn basic_routes() -> Router {
     );
 
     // Static `/api/v2`: a param beside the router's `/api/{*path}` panics axum at startup.
+    // Registered on the operator's flag, not the license's, so a new license needs no restart.
     #[cfg(feature = "enterprise")]
-    if get_o2_config().oncall.enabled {
+    if o2_operator_config().oncall.enabled {
         // Unauthenticated HMAC link; GET only renders, so a gateway prefetch cannot ack a page.
         router = router.route(
             "/api/v2/{org_id}/oncall/ack",
-            get(oncall::ack_page).post(oncall::acknowledge),
+            get(oncall::ack_page)
+                .post(oncall::acknowledge)
+                .route_layer(middleware::from_fn(|req, next| {
+                    require_features(&[Feature::Oncall], req, next)
+                })),
         );
     }
 
@@ -1509,7 +1545,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
 
-        if get_o2_config().common.workflows_enabled {
+        if o2_operator_config().common.workflows_enabled {
             // workflows
             router = router
                 .route(
@@ -1685,7 +1721,7 @@ pub fn service_routes() -> Router {
     }
 
     #[cfg(feature = "enterprise")]
-    if get_o2_config().oncall.enabled {
+    if o2_operator_config().oncall.enabled {
         router = router
             .route(
                 "/{org_id}/oncall/teams",
@@ -2051,6 +2087,9 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_kinesis_firehose",
             post(logs::ingest::handle_kinesis_request),
         )
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Logs, Feature::KinesisFirehose], req, next)
+        }))
         .layer(middleware::from_fn(aws_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
@@ -2059,13 +2098,24 @@ pub fn other_service_routes() -> Router {
             "/{org_id}/{stream_name}/_sub",
             post(logs::ingest::handle_gcp_request),
         )
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Logs], req, next)
+        }))
         .layer(middleware::from_fn(gcp_auth_middleware))
         .layer(RequestDecompressionLayer::new());
 
     let rum_routes = Router::new()
         .route("/v1/{org_id}/logs", post(rum::ingest::log))
-        .route("/v1/{org_id}/replay", post(rum::ingest::sessionreplay))
+        .route(
+            "/v1/{org_id}/replay",
+            post(rum::ingest::sessionreplay).route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::SessionReplay], req, next)
+            })),
+        )
         .route("/v1/{org_id}/rum", post(rum::ingest::data))
+        .layer(middleware::from_fn(|req, next| {
+            require_features(&[Feature::Rum], req, next)
+        }))
         .layer(middleware::from_fn(RumExtraData::extractor_middleware))
         .layer(middleware::from_fn(rum_auth_middleware))
         .layer(RequestDecompressionLayer::new());
@@ -2092,6 +2142,9 @@ pub fn splunk_collector_routes() -> Router {
     // rather than both leaking as 401.
     let event_handler = || {
         post(hec_collector::collector_event)
+            .route_layer(middleware::from_fn(|req, next| {
+                require_features(&[Feature::Logs, Feature::SplunkHec], req, next)
+            }))
             .route_layer(middleware::from_fn(hec_collector::splunk_auth_middleware))
             .fallback(hec_collector::collector_method_not_allowed)
     };

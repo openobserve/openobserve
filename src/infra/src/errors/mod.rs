@@ -246,6 +246,8 @@ pub enum ErrorCodes {
     /// The o2-ai replica holding a conversation is unreachable; carries the
     /// session id. Recoverable — the UI restores it into a fresh session.
     AiSessionOwnerUnavailable(String),
+    /// The installed license does not entitle these features; carries the comma-joined keys.
+    LicenseFeatureNotEntitled(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -316,6 +318,7 @@ impl ErrorCodes {
             ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
             ErrorCodes::SearchTimeout(_) => 408,
             ErrorCodes::AiSessionOwnerUnavailable(_) => 409,
+            ErrorCodes::LicenseFeatureNotEntitled(_) => 403,
             ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
             ErrorCodes::InvalidParams(_)
             | ErrorCodes::SearchSQLExecuteError(_)
@@ -346,6 +349,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(_) => 20012,
             ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
             ErrorCodes::AiSessionOwnerUnavailable(_) => 30001,
+            ErrorCodes::LicenseFeatureNotEntitled(_) => 40001,
         }
     }
 
@@ -378,6 +382,9 @@ impl ErrorCodes {
             ErrorCodes::AiSessionOwnerUnavailable(_) => {
                 "The replica serving this conversation is unavailable".to_string()
             }
+            ErrorCodes::LicenseFeatureNotEntitled(features) => {
+                format!("Features not included in your license: {features}")
+            }
         }
     }
 
@@ -398,6 +405,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
+            ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
         }
     }
 
@@ -418,6 +426,7 @@ impl ErrorCodes {
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
             ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
+            ErrorCodes::LicenseFeatureNotEntitled(features) => features.to_owned(),
         }
     }
 
@@ -471,6 +480,7 @@ impl ErrorCodes {
             20012 => Ok(ErrorCodes::RatelimitExceeded(message)),
             20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
             30001 => Ok(ErrorCodes::AiSessionOwnerUnavailable(message)),
+            40001 => Ok(ErrorCodes::LicenseFeatureNotEntitled(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
@@ -539,6 +549,22 @@ mod tests {
             ErrorCodes::SearchHistogramNotAvailable("x".into()).get_code(),
             20013
         );
+    }
+
+    #[test]
+    fn test_license_feature_not_entitled() {
+        let err = ErrorCodes::LicenseFeatureNotEntitled("oncall, workflows".into());
+        assert_eq!(err.get_code(), 40001);
+        assert_eq!(err.http_status(), 403);
+        assert_eq!(err.get_error_detail(), "oncall, workflows");
+        assert_eq!(
+            err.get_message(),
+            "Features not included in your license: oncall, workflows"
+        );
+        match ErrorCodes::from_json(&err.to_json()).unwrap() {
+            ErrorCodes::LicenseFeatureNotEntitled(keys) => assert_eq!(keys, "oncall, workflows"),
+            other => panic!("round trip lost the variant: {other:?}"),
+        }
     }
 
     #[test]
