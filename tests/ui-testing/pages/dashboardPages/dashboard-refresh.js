@@ -1,4 +1,6 @@
 //Dahboard time refresh
+import { applyPickedTimeRange } from "./dashboard-time.js";
+
 // Methods: Set relative time selection, Set absolute time selection, Auto refresh interval, Refresh dashboard manual
 export default class DashboardTimeRefresh {
   constructor(page) {
@@ -14,7 +16,7 @@ export default class DashboardTimeRefresh {
     this.absolutetimeTime = page.locator(
       '[data-test="date-time-absolute-tab"]'
     );
-    this.applyBtn = page.locator('[data-test="date-time-apply-btn"]');
+    this.dateTimeMenu = page.locator("#date-time-menu").first();
     this.selectTime = page.locator('[data-test="date-time-relative-10-m-btn"]');
     this.refreshBtnManual = page.locator(
       '[data-test="logs-search-bar-refresh-interval-btn"]'
@@ -49,7 +51,7 @@ export default class DashboardTimeRefresh {
     await relBtn.waitFor({ state: "attached" });
     // Use JS click — the dropdown can extend outside the viewport in the new layout
     await relBtn.evaluate((el) => el.click());
-    await this.applyBtn.evaluate((el) => el.click());
+    await applyPickedTimeRange(this.page);
   }
 
   // Set absolute time selection with dynamic start and end days
@@ -131,19 +133,18 @@ export default class DashboardTimeRefresh {
     await endCell.waitFor({ state: "attached" });
     await endCell.evaluate((el) => el.click());
 
-    // Click the apply button to confirm the selection — JS click matches
-    // setRelative() and avoids viewport-clipped action errors.
-    await this.applyBtn.evaluate((el) => el.click());
+    // Apply the selection: Apply where the picker still has one, else close it and Refresh as needed.
+    await applyPickedTimeRange(this.page);
 
     // Wait for the date picker dropdown to fully close. If the dropdown
     // remains open it overlays the panel's primary buttons (e.g.
     // dashboard-apply) and downstream clicks time out.
     try {
-      await this.applyBtn.waitFor({ state: "hidden", timeout: 5000 });
+      await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
     } catch {
       // Fallback: press Escape to dismiss any lingering portal.
       await this.page.keyboard.press("Escape");
-      await this.applyBtn.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+      await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
     }
   }
 

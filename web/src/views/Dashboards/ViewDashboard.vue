@@ -89,10 +89,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ref="dateTimePicker"
             class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
             size="sm"
-            v-model="selectedDate"
+            :modelValue="pickedDate ?? selectedDate"
+            :auto-apply-dashboard="true"
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
-            @hide="setTimeForVariables"
+            @update:modelValue="timeGate.onPick"
+            @show="timeGate.onShow"
+            @hide="onTimePickerHide"
+            @timezone-change="timeGate.flush"
             data-test="dashboard-global-date-time-picker"
           />
           <AutoRefreshInterval
@@ -117,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               v-else
-              :variant="isVariablesChanged ? 'warning' : 'outline'"
+              :variant="isRefreshPending ? 'warning' : 'outline'"
               size="icon-toolbar"
               @click="refreshData()"
               :disabled="arePanelsLoading"
@@ -125,16 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="dashboard-refresh-btn"
               :icon-left="isAutoRunOn ? 'autorenew' : 'refresh'"
             >
-              <OTooltip
-                :content="
-                  isAutoRunOn
-                    ? t('dashboard.viewDashboard.autoRunDescription')
-                    : isVariablesChanged
-                      ? t('dashboard.viewDashboard.refreshToApplyVariables')
-                      : t('dashboard.viewDashboard.refresh')
-                "
-                shortcut-id="dashboardRefresh"
-              />
+              <OTooltip :content="refreshTooltip" shortcut-id="dashboardRefresh" />
             </OButton>
             <ODropdown align="end" side="bottom">
               <template #trigger>
@@ -380,7 +375,7 @@ import analytics from "@/services/product_analytics";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
-import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
+import { parseDuration, generateDurationLabel } from "../../utils/date";
 import { useRoute } from "vue-router";
 import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
@@ -397,6 +392,7 @@ import reports from "@/services/reports";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import { useDashboardTimeGate } from "@/composables/dashboard/useDashboardTimeGate";
 import {
   createDashboardFreshOnOpen,
   DASHBOARD_FRESH_ON_OPEN,
@@ -416,9 +412,12 @@ import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
 import { createDashboardsContextProvider, contextRegistry } from "@/composables/contextProviders";
 import {
+  arePickerValuesEqual,
   hasPanelTime,
   isEffectivePanelTimeRelative,
+  pickerValueToTimeObj,
   queryChangeAffectsPanelTimes,
+  toPickerSavedDate,
 } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
@@ -556,26 +555,23 @@ export default defineComponent({
       relativeTimePeriod: params.period ? params.period : "15m",
     });
 
-    const setTimeForVariables = () => {
-      if (selectedDate.value && dateTimePicker.value) {
-        const date = dateTimePicker.value?.getConsumableDateTime();
-        const startTime = new Date(date.startTime);
-        const endTime = new Date(date.endTime);
+    // Everything that loads data reads this, never the live picker: a range still waiting must not reach a panel.
+    const getAppliedGlobalTime = () => pickerValueToTimeObj(selectedDate.value);
 
+    const setTimeForVariables = () => {
+      const appliedTime = getAppliedGlobalTime();
+      if (appliedTime && dateTimePicker.value) {
         // Update only the variables time object
         currentTimeObjPerPanel.value = {
           ...currentTimeObjPerPanel.value,
-          __variables: {
-            start_time: startTime,
-            end_time: endTime,
-          },
+          __variables: appliedTime,
         };
       }
     };
 
     const dateTimePicker = ref(null); // holds a reference to the date time picker
 
-    // holds the date picker v-modal
+    // The applied range: what panels, the URL and the Share link use. The picker's own value is `pickedDate`.
     const selectedDate = ref(null);
 
     // holds the current time for the dashboard
@@ -625,6 +621,20 @@ export default defineComponent({
 
     const { isAutoRunAvailable, isAutoRunOn, toggleAutoRun } = useAutoRunToggle();
     provide("dashboardAutoRun", isAutoRunOn);
+
+    const showRangeInPicker = (value: any) =>
+      dateTimePicker.value?.setSavedDate(toPickerSavedDate(value, store.state.timezone));
+
+    const timeGate = useDashboardTimeGate({
+      applied: selectedDate,
+      isAutoRunOn: () => isAutoRunOn.value,
+      showInPicker: showRangeInPicker,
+    });
+
+    const onTimePickerHide = () => {
+      timeGate.onHide();
+      setTimeForVariables();
+    };
 
     const freshOnOpen = createDashboardFreshOnOpen({
       isAutoRunOn: () => isAutoRunOn.value,
@@ -719,6 +729,22 @@ export default defineComponent({
       const normalizedRefreshed = normalizeVariables(refreshedVariablesData);
 
       return !isEqual(normalizedCurrent, normalizedRefreshed);
+    });
+
+    const isRefreshPending = computed(
+      () => isVariablesChanged.value || timeGate.needsRefresh.value,
+    );
+
+    const refreshTooltip = computed(() => {
+      if (isAutoRunOn.value) return t("dashboard.viewDashboard.autoRunDescription");
+      if (timeGate.needsRefresh.value) {
+        return isVariablesChanged.value
+          ? t("dashboard.refreshToApplyTimeRangeAndVariables")
+          : t("dashboard.refreshToApplyTimeRange");
+      }
+      return isVariablesChanged.value
+        ? t("dashboard.viewDashboard.refreshToApplyVariables")
+        : t("dashboard.viewDashboard.refresh");
     });
     // ======= [START] default variable values
 
@@ -853,6 +879,8 @@ export default defineComponent({
         refreshedVariablesData.values = [];
       }
 
+      const previousAppliedDate = selectedDate.value;
+
       // check if route has time related query params
       // if not, take dashboard default time settings
       if (!((route.query.from && route.query.to) || route.query.period)) {
@@ -877,6 +905,18 @@ export default defineComponent({
         // take route time related query params
         selectedDate.value = getSelectedDateFromQueryParams(route.query);
       }
+
+      if (previousAppliedDate && !arePickerValuesEqual(previousAppliedDate, selectedDate.value)) {
+        showAppliedDateInPicker();
+      }
+    };
+
+    // The mounted picker reads its v-model only once, so a range applied by another dashboard's URL is pushed in.
+    const showAppliedDateInPicker = () => {
+      if (!dateTimePicker.value || !selectedDate.value) return;
+
+      timeGate.adopt();
+      showRangeInPicker(selectedDate.value);
     };
 
     // [START] cancel running queries
@@ -923,28 +963,6 @@ export default defineComponent({
 
     // ===== Panel Time Configuration =====
 
-    // Helper: Convert picker format to time object
-    const convertPickerToTimeObj = (pickerValue: any) => {
-      if (!pickerValue) return null;
-
-      if (pickerValue.valueType === "relative" && pickerValue.relativeTimePeriod) {
-        const result = getConsumableRelativeTime(pickerValue.relativeTimePeriod);
-        if (result) {
-          return {
-            start_time: new Date(result.startTime),
-            end_time: new Date(result.endTime),
-          };
-        }
-      } else if (pickerValue.valueType === "absolute") {
-        return {
-          start_time: new Date(pickerValue.startTime),
-          end_time: new Date(pickerValue.endTime),
-        };
-      }
-
-      return null;
-    };
-
     // Compute effective time for a specific panel
     // Priority: 1. URL params (highest) → 2. panel_time_range → 3. global time AS-IS
     const computePanelTime = (panel: any, globalTime: any) => {
@@ -954,14 +972,14 @@ export default defineComponent({
       // URL params always win, even if panel_time_range is null
       const urlPanelTime = getPanelTimeFromURL(panel.id, route.query);
       if (urlPanelTime) {
-        return convertPickerToTimeObj(urlPanelTime);
+        return pickerValueToTimeObj(urlPanelTime);
       }
 
       // Priority 2: Use panel's configured time range (if set)
       if (panel.config?.panel_time_range) {
         const pickerValue = convertPanelTimeRangeToPicker(panel.config.panel_time_range);
         if (pickerValue) {
-          return convertPickerToTimeObj(pickerValue);
+          return pickerValueToTimeObj(pickerValue);
         }
       }
 
@@ -985,14 +1003,10 @@ export default defineComponent({
         }
       }
 
-      if (!targetPanel) {
+      const globalTime = getAppliedGlobalTime();
+      if (!targetPanel || !globalTime) {
         return;
       }
-
-      const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
-      };
 
       // Check if panel has its own time configuration
       if (hasPanelTime(targetPanel)) {
@@ -1029,14 +1043,10 @@ export default defineComponent({
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
-      if (!currentDashboardData.data?.tabs || !dateTimePicker.value) {
+      const globalTime = getAppliedGlobalTime();
+      if (!currentDashboardData.data?.tabs || !dateTimePicker.value || !globalTime) {
         return;
       }
-
-      const globalTime = {
-        start_time: new Date(dateTimePicker.value.getConsumableDateTime().startTime),
-        end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
-      };
 
       // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
@@ -1096,19 +1106,15 @@ export default defineComponent({
       });
     };
 
-    // when the date changes from the picker, update the current time object for the dashboard
+    // when the applied range changes, update the current time object for the dashboard
     watch(selectedDate, async () => {
-      if (selectedDate.value && dateTimePicker.value) {
+      const appliedTime = getAppliedGlobalTime();
+      if (appliedTime && dateTimePicker.value) {
         // CRITICAL: Clear panelIdToBeRefreshed to ensure all panels refresh
         // When global date time changes, all panels should update
         panelIdToBeRefreshed.value = null;
 
-        const date = dateTimePicker.value?.getConsumableDateTime();
-
-        currentTimeObj.value = {
-          start_time: new Date(date.startTime),
-          end_time: new Date(date.endTime),
-        };
+        currentTimeObj.value = appliedTime;
 
         // DON'T reset currentTimeObjPerPanel here - let computeAllPanelTimes() handle it
         // This prevents losing panel-specific times during the update
@@ -1310,7 +1316,7 @@ export default defineComponent({
 
     const refreshOptionsVariant = computed(() => {
       if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
-      return isVariablesChanged.value ? "warning" : "outline";
+      return isRefreshPending.value ? "warning" : "outline";
     });
 
     const refreshData = async (withoutCache = false) => {
@@ -1339,15 +1345,15 @@ export default defineComponent({
         // Sync panel-level datetime pickers FIRST (updates URL)
         await renderDashboardChartsRef.value?.syncAllPanelDateTimePickers();
 
+        // Applied before the recompute below, which reads the applied range and not the picker.
+        timeGate.refresh();
+
         // Recompute all panel times after syncing
         // Pass forceRefresh=true to ensure ALL panels refresh (create new time objects)
         computeAllPanelTimes(true);
 
         // Commit all live variable changes to committed state
         renderDashboardChartsRef.value?.commitAllVariables();
-
-        // Refresh the dashboard (syncs global datetime picker)
-        dateTimePicker.value.refresh();
       }
     };
 
@@ -1369,8 +1375,9 @@ export default defineComponent({
       // set it as a absolute time
       dateTimePicker?.value?.setCustomDate("absolute", selectedDateObj);
 
-      // refresh dashboard
+      // The picker reports the zoomed range here; a zoom applies at once even while Auto Run is off.
       dateTimePicker.value.refresh();
+      timeGate.refresh();
     };
 
     // ------- work with query params ----------
@@ -1933,6 +1940,11 @@ export default defineComponent({
       toggleAutoRun,
       refreshOptionsVariant,
       isVariablesChanged,
+      isRefreshPending,
+      refreshTooltip,
+      timeGate,
+      pickedDate: timeGate.picked,
+      onTimePickerHide,
       refreshedVariablesDataUpdated,
       onDeletePanel,
       variablesData,

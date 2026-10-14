@@ -741,6 +741,42 @@ describe("PanelContainer", () => {
 
       expect(wrapper.vm.variablesDataUpdated).toBe(true);
     });
+
+    describe("a time range waiting in the panel's own picker", () => {
+      const refreshButton = () => wrapper.find('[data-test="dashboard-panel-refresh-panel-btn"]');
+      const refreshTooltip = () =>
+        refreshButton().findComponent({ name: "OTooltip" }).props("content");
+
+      it("marks the refresh icon with the variables warning look and says why", () => {
+        wrapper = createWrapper({ isTimeRangeWaiting: true });
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshTooltip()).toBe("Refresh to apply the time range");
+      });
+
+      it("names both when variables are waiting too", async () => {
+        wrapper = createWrapper({
+          isTimeRangeWaiting: true,
+          data: {
+            ...mockPanelData,
+            queries: [{ query: "SELECT * FROM test WHERE field = ${testVar}" }],
+          },
+          variablesData: { values: [{ name: "testVar", value: "a" }], isLoading: false },
+          currentVariablesData: { values: [{ name: "testVar", value: "b" }], isLoading: false },
+        });
+        await wrapper.vm.$nextTick();
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost-warning");
+        expect(refreshTooltip()).toBe("Refresh to apply the time range and variable changes");
+      });
+
+      it("keeps the plain refresh icon when nothing waits", () => {
+        wrapper = createWrapper({ isTimeRangeWaiting: false });
+
+        expect(refreshButton().attributes("data-o2-variant")).toBe("ghost");
+        expect(refreshTooltip()).toBe("Refresh");
+      });
+    });
   });
 
   describe("Delete Panel", () => {

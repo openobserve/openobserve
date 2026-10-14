@@ -6611,6 +6611,8 @@
     "exitAnnotationsMode": "Exit Annotations Mode",
     "addAnnotations": "Add Annotations",
     "refreshToApplyVariables": "Refresh to apply latest variable changes",
+    "refreshToApplyTimeRange": "Refresh to apply the time range",
+    "refreshToApplyTimeRangeAndVariables": "Refresh to apply the time range and variable changes",
     "moveToAnotherFolder": "Move {type} To Another Folder",
     "rawQueryBuilder": {
       "query": "Query",

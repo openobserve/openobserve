@@ -18,6 +18,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { installFakeIntersectionObserver } from "@/test/unit/helpers/intersectionObserverFake";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
+import DateTime from "@/components/DateTime.vue";
 import { LIVE_COMMIT_DEBOUNCE_MS } from "@/composables/dashboard/useVariablesManager";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -597,6 +598,222 @@ describe("RenderDashboardCharts", () => {
     it("stays in Refresh-to-apply mode when no Auto Run state is provided", () => {
       wrapper = mountWith();
       expect(wrapper.vm.getVariablesManager().isLiveMode.value).toBe(false);
+    });
+  });
+
+  describe("panel time pickers", () => {
+    let io: ReturnType<typeof installFakeIntersectionObserver>;
+    let autoRun: ReturnType<typeof ref<boolean>>;
+    let replaceSpy: any;
+
+    const PanelContainerStub = {
+      name: "PanelContainer",
+      props: ["data", "isTimeRangeWaiting"],
+      emits: ["refreshPanelRequest"],
+      template: '<div data-test="panel-container-stub"><slot name="panel-variables" /></div>',
+    };
+
+    const RELATIVE_HOUR = { type: "relative", relativeTimePeriod: "1h" };
+    const timedDashboard = (panelTimeRange: any = RELATIVE_HOUR) => ({
+      ...defaultProps.dashboardData,
+      tabs: [
+        {
+          tabId: "default",
+          name: "Default Tab",
+          panels: [
+            {
+              id: "P1",
+              title: "P1",
+              type: "line",
+              layout: { x: 0, y: 0, w: 6, h: 4, i: "P1" },
+              queries: [],
+              config: {
+                panel_time_enabled: true,
+                panel_time_range: panelTimeRange,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const mountWithPanelPicker = async (panelTimeRange?: any) => {
+      wrapper = shallowMount(RenderDashboardCharts, {
+        props: { ...defaultProps, dashboardData: timedDashboard(panelTimeRange) },
+        global: {
+          plugins: [i18n, store, router],
+          provide: { dashboardAutoRun: autoRun },
+          stubs: {
+            ODialog: ODialogStub,
+            PanelContainer: PanelContainerStub,
+            DateTimePickerDashboard: false,
+            DateTime: false,
+          },
+        },
+      });
+      await flushPromises();
+      await vi.waitFor(() => expect(wrapper.vm.shouldMountPanel("P1")).toBe(true));
+      await flushPromises();
+    };
+
+    const panel = () => wrapper.findComponent({ name: "PanelContainer" });
+    const dateTime = () => wrapper.findComponent({ name: "DateTimePickerDashboard" });
+    const pickPreset = async (unit: string, value: number) => {
+      dateTime().findComponent(DateTime).vm.setRelativeDate(unit, value);
+      await flushPromises();
+    };
+    const panelRefreshRequests = () =>
+      (wrapper.emitted("refreshPanelRequest") ?? []).filter((args: any[]) => args[0] === "P1");
+
+    beforeEach(() => {
+      io = installFakeIntersectionObserver({ autoVisible: true });
+      autoRun = ref(false);
+      store.state.timezone = "UTC";
+      replaceSpy = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
+    });
+
+    afterEach(() => {
+      replaceSpy.mockRestore();
+      io.restore();
+    });
+
+    it("renders the panel's own picker without an Apply button", async () => {
+      await mountWithPanelPicker();
+
+      expect(dateTime().props("autoApplyDashboard")).toBe(true);
+      expect(wrapper.vm.getPanelTimeGate("P1").applied.value.relativeTimePeriod).toBe("1h");
+    });
+
+    it("keeps a picked range waiting with Auto Run off and marks only that panel", async () => {
+      await mountWithPanelPicker();
+
+      await pickPreset("h", 6);
+
+      expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("6h");
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("1h");
+      expect(panel().props("isTimeRangeWaiting")).toBe(true);
+      expect(panelRefreshRequests()).toHaveLength(0);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("applies the waiting range when the panel's own refresh is clicked", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+
+      panel().vm.$emit("refreshPanelRequest", "P1", false);
+      await flushPromises();
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(replaceSpy).toHaveBeenCalledWith({
+        query: expect.objectContaining({ "pt-period.P1": "6h" }),
+      });
+      expect(panelRefreshRequests()).toEqual([["P1", false]]);
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+    });
+
+    it("applies the waiting range on the dashboard Refresh", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+
+      await wrapper.vm.syncAllPanelDateTimePickers();
+      await flushPromises();
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+    });
+
+    it("clears the marker without a reload when the applied range is picked again", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+
+      await pickPreset("h", 1);
+
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+      expect(panelRefreshRequests()).toHaveLength(0);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("applies a preset at once and refreshes only that panel when Auto Run is on", async () => {
+      autoRun.value = true;
+      await mountWithPanelPicker();
+
+      await pickPreset("h", 6);
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(panelRefreshRequests()).toEqual([["P1", false]]);
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+    });
+
+    it("applies a waiting range when Auto Run is turned on", async () => {
+      await mountWithPanelPicker();
+      await pickPreset("h", 6);
+
+      autoRun.value = true;
+      await flushPromises();
+
+      expect(wrapper.vm.panelTimeValues.P1.relativeTimePeriod).toBe("6h");
+      expect(panelRefreshRequests()).toEqual([["P1", false]]);
+    });
+
+    it.each([
+      ["off", false],
+      ["on", true],
+    ])(
+      "puts the panel picker back on the applied range when it closes on a broken range (Auto Run %s)",
+      async (_label, isOn) => {
+        autoRun.value = isOn;
+        await mountWithPanelPicker();
+        const realPicker = dateTime().findComponent(DateTime);
+
+        realPicker.vm.onMenuOpenChange(true);
+        realPicker.vm.selectedType = "absolute";
+        realPicker.vm.selectedDate = { from: "2026/10/13", to: "2026/10/13" };
+        realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
+        await flushPromises();
+        expect(realPicker.vm.getDisplayValue).toBe("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+
+        realPicker.vm.onMenuOpenChange(false);
+        await flushPromises();
+
+        expect(realPicker.vm.getDisplayValue).toBe("Past 1 Hour");
+        expect(wrapper.vm.getPanelTimeGate("P1").picked.value.relativeTimePeriod).toBe("1h");
+        expect(panel().props("isTimeRangeWaiting")).toBe(false);
+        expect(panelRefreshRequests()).toHaveLength(0);
+        expect(replaceSpy).not.toHaveBeenCalled();
+      },
+    );
+
+    it("puts an absolute panel range back in the picker when it closes on a broken one", async () => {
+      const start = Date.UTC(2026, 9, 13, 10, 0, 0) * 1000;
+      await mountWithPanelPicker({
+        type: "absolute",
+        startTime: start,
+        endTime: start + 30 * 60e6,
+      });
+      const realPicker = dateTime().findComponent(DateTime);
+      const appliedLabel = "2026/10/13 10:00:00 - 2026/10/13 10:30:00";
+      expect(realPicker.vm.getDisplayValue).toBe(appliedLabel);
+
+      realPicker.vm.onMenuOpenChange(true);
+      realPicker.vm.selectedTime = { startTime: "18:50:30", endTime: "18:25:22" };
+      await flushPromises();
+      expect(realPicker.vm.getDisplayValue).toBe("2026/10/13 18:50:30 - 2026/10/13 18:25:22");
+
+      realPicker.vm.onMenuOpenChange(false);
+      await flushPromises();
+
+      expect(realPicker.vm.getDisplayValue).toBe(appliedLabel);
+      expect(panel().props("isTimeRangeWaiting")).toBe(false);
+      expect(panelRefreshRequests()).toHaveLength(0);
+      expect(replaceSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not reload the panel when its picker reports its starting range", async () => {
+      autoRun.value = true;
+      await mountWithPanelPicker();
+
+      expect(panelRefreshRequests()).toHaveLength(0);
+      expect(replaceSpy).not.toHaveBeenCalled();
     });
   });
 
