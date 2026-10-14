@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :transform-type-options="transformTypeOptions"
         :hide-trans-type="!!forcedLanguage"
         :hide-chat="hideAiAssist"
+        :edit-status="editStatus"
         @test="onTestFunction"
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
@@ -94,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :languages="['vrl', 'javascript']"
                     :default-language="transType === '1' ? 'javascript' : 'vrl'"
                     :query="formData.function"
+                    :read-only="editStatus !== 'allowed'"
                     v-model:nlp-mode="functionEditorNlpMode"
                     :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
                     :disable-ai="!store.state.zoConfig.ai_enabled"
@@ -232,6 +234,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
+import { useCan } from "@/composables/useCan";
 export const defaultValue: any = () => {
   return {
     name: "",
@@ -380,6 +383,14 @@ export default defineComponent({
 
     const beingUpdated = computed(() => props.isUpdated);
 
+    const { status: canStatus } = useCan();
+    // Opening an existing function (row click or deep link) is read-only until edit is known to be allowed.
+    const editStatus = computed(() =>
+      props.isUpdated && props.modelValue?.name
+        ? canStatus("function", String(props.modelValue.name), "edit")
+        : "allowed",
+    );
+
     // Create vs update is the caller's decision; the cache consequence is not.
     const orgId = useOrgId();
     const saveFunction = useMutation(() =>
@@ -484,6 +495,7 @@ export default defineComponent({
     // `function`/`params` (Monaco body / hidden constant) come from formData.
     // Awaited so OForm's isSubmitting drives the Save spinner.
     const onSubmit = async (value: AddFunctionForm) => {
+      if (editStatus.value !== "allowed") return;
       // Defense in depth — the JS toggle option's own `disabled` already
       // blocks selecting it, but that attribute can be stripped via
       // devtools. The backend also rejects a JS function on a build that
@@ -673,6 +685,7 @@ export default defineComponent({
       emit,
       disableColor,
       beingUpdated,
+      editStatus,
       formData,
       store,
       compilationErr,

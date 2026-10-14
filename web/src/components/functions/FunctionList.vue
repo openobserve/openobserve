@@ -131,6 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-actions="{ row }">
               <div class="actions-container flex items-center">
                 <OButton
+                  v-if="fnStatus(row, 'edit') === 'allowed'"
                   variant="ghost"
                   size="icon-sm"
                   :title="t('function.updateTitle')"
@@ -139,6 +140,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="max-md:hidden"
                   @click="showAddUpdateFn({ row })"
                   icon-left="edit"
+                />
+                <OButton
+                  v-else-if="fnStatus(row, 'edit') === 'denied'"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('authz.viewFunctionReadOnly')"
+                  data-test="function-list-view-function-btn"
+                  class="max-md:hidden"
+                  @click="showAddUpdateFn({ row })"
+                  icon-left="visibility"
                 />
                 <OButton
                   variant="ghost"
@@ -160,6 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="exportFunction(row)"
                 />
                 <OButton
+                  v-if="fnStatus(row, 'delete') === 'allowed'"
                   variant="ghost-destructive"
                   size="icon-sm"
                   :title="t('function.delete')"
@@ -181,12 +193,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                   <ODropdownItem
+                    v-if="fnStatus(row, 'edit') === 'allowed'"
                     icon-left="edit"
                     class="md:hidden"
                     data-test="function-list-edit-function-btn-menu"
                     @select="showAddUpdateFn({ row })"
                   >
                     <span>{{ t("function.updateTitle") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    v-else-if="fnStatus(row, 'edit') === 'denied'"
+                    icon-left="visibility"
+                    class="md:hidden"
+                    data-test="function-list-view-function-btn-menu"
+                    @select="showAddUpdateFn({ row })"
+                  >
+                    <span>{{ t("authz.viewFunctionReadOnly") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
                     icon-left="account-tree"
@@ -205,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("common.export") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
+                    v-if="fnStatus(row, 'delete') === 'allowed'"
                     icon-left="delete"
                     variant="destructive"
                     class="md:hidden"
@@ -229,6 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("common.export") }}
               </OButton>
               <OButton
+                v-if="!bulkDeleteSplit.skipped.length || bulkDeleteSplit.allowed.length > 0"
                 data-test="function-list-delete-functions-btn"
                 variant="outline-destructive"
                 size="sm"
@@ -263,7 +287,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ConfirmDialog
       :title="t('function.deleteFunctionsDialogTitle')"
-      :message="t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })"
+      :message="
+        bulkDeleteSplit.skipped.length
+          ? t('authz.bulkDeletePartial', {
+              count: bulkDeleteSplit.allowed.length,
+              total: selectedFunctions.length,
+              skipped: bulkDeleteSplit.skipped.length,
+            })
+          : t('functions.confirmDeleteFunctions', { count: selectedFunctions.length })
+      "
+      :detail="bulkDeleteSkippedNames"
       @update:ok="bulkDeleteFunctions"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -327,6 +360,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { downloadFile } from "@/utils/dom";
+import { skippedNamesText, splitByPermission, useCan } from "@/composables/useCan";
+import type { AuthzAction, CanStatus } from "@/composables/useCan";
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   bulkDeleteFunctionsMutation,
@@ -549,6 +584,22 @@ export default defineComponent({
       showAddJSTransformDialog.value = true;
     };
 
+    const { status: canStatus, noteWriteDenied } = useCan();
+    const fnStatus = (row: any, action: AuthzAction): CanStatus =>
+      canStatus("function", row.name, action);
+    const bulkDeleteSplit = computed(() =>
+      splitByPermission(
+        selectedFunctions.value,
+        (row: any) => fnStatus(row, "delete") === "allowed",
+      ),
+    );
+    const bulkDeleteSkippedNames = computed(() =>
+      skippedNamesText(
+        t,
+        bulkDeleteSplit.value.skipped.map((row: any) => row.name),
+      ),
+    );
+
     const transformedPipelineList = computed(() => {
       return pipelineList.value.map((pipeline: any) => ({
         label: pipeline.name,
@@ -654,6 +705,7 @@ export default defineComponent({
             });
             return;
           }
+          noteWriteDenied(err, "function", selectedDelete.value.name, "delete");
           if (err.response.status != 403) {
             toast({
               variant: "error",
@@ -845,9 +897,8 @@ export default defineComponent({
           return;
         }
 
-        // Extract function names for the API call (BE supports names)
         const payload = {
-          ids: selectedFunctions.value.map((f: any) => f.name),
+          ids: bulkDeleteSplit.value.allowed.map((f: any) => f.name),
         };
 
         const response = await bulkDelete.mutateAsync(payload.ids);
@@ -946,6 +997,9 @@ export default defineComponent({
       },
     ]);
     return {
+      fnStatus,
+      bulkDeleteSplit,
+      bulkDeleteSkippedNames,
       t,
       raw,
       store,
