@@ -62,6 +62,7 @@ in **both** repos automatically — no more hand-syncing two workflow files.
 | `run_files`           | spec filenames run by this shard                                         |
 | `disabled`            | *(optional)* specs intentionally turned off — see below                 |
 | `quick_mode_enabled`  | *(optional)* `true` starts this shard's server with `ZO_QUICK_MODE_ENABLED` |
+| `synthetics_enabled`  | *(optional)* `true` starts this shard's server with `ZO_SYNTHETICS_ENABLED` |
 | `ingest_allowed_upto` | *(optional)* hours of backdated ingestion this shard's server accepts    |
 | `workers`             | *(optional)* pin `--workers=N` for this shard                            |
 

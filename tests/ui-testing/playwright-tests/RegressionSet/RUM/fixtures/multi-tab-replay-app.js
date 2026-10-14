@@ -6,8 +6,11 @@ const APP_DIR = path.resolve(__dirname, 'multi-tab-replay');
 const CDN = 'https://browsersdk.openobserve.ai';
 const SDK_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 const SDK_PATH_PATTERN = /^[A-Za-z0-9_-][A-Za-z0-9._-]*(\/[A-Za-z0-9_-][A-Za-z0-9._-]*)*\.js$/;
-const PAGES = new Set(['/orders.html', '/catalogue.html']);
-const STATIC = { '/rum-init.js': 'text/javascript; charset=utf-8', '/app.css': 'text/css; charset=utf-8' };
+const PAGES = { '/orders.html': 'orders.html', '/catalogue.html': 'catalogue.html' };
+const STATIC = {
+  '/rum-init.js': ['rum-init.js', 'text/javascript; charset=utf-8'],
+  '/app.css': ['app.css', 'text/css; charset=utf-8'],
+};
 const UPLOAD_TIMEOUT_MS = 20000;
 
 const SELECTORS = {
@@ -58,16 +61,18 @@ function startMultiTabReplayServer(opts) {
     insecureHTTP: opts.insecureHTTP !== false,
   };
   const cache = new Map();
+  // Files are read once here, so no part of a request URL ever reaches a filesystem path.
+  const routes = new Map([
+    ...Object.entries(PAGES).map(([url, file]) => [url, { type: 'text/html; charset=utf-8', body: pageWithConfig(file, cfg) }]),
+    ...Object.entries(STATIC).map(([url, [file, type]]) => [url, { type, body: fs.readFileSync(path.join(APP_DIR, file)) }]),
+  ]);
 
   const server = http.createServer(async (req, res) => {
     try {
       const urlPath = decodeURIComponent(req.url.split('?')[0]);
-      if (PAGES.has(urlPath)) {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(pageWithConfig(urlPath.slice(1), cfg));
-        return;
-      }
-      if (STATIC[urlPath]) {
-        res.writeHead(200, { 'Content-Type': STATIC[urlPath] }).end(fs.readFileSync(path.join(APP_DIR, urlPath.slice(1))));
+      const route = routes.get(urlPath);
+      if (route) {
+        res.writeHead(200, { 'Content-Type': route.type }).end(route.body);
         return;
       }
       const rel = urlPath.startsWith('/sdk/') ? urlPath.slice(5) : '';
