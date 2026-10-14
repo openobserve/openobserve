@@ -24,9 +24,6 @@ use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// The gRPC ingest metadata key an internal caller names its job with.
-pub const SYSTEM_JOB_TYPE_METADATA_KEY: &str = "system_job_type";
-
 /// System job types for backend ingestion processes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SystemJobType {
@@ -35,7 +32,6 @@ pub enum SystemJobType {
     SelfReporting,
     InternalGrpc,
     AnomalyDetection,
-    AlertCalibration,
 }
 
 impl SystemJobType {
@@ -47,14 +43,7 @@ impl SystemJobType {
             SystemJobType::SelfReporting => "self_reporting",
             SystemJobType::InternalGrpc => "internal_grpc",
             SystemJobType::AnomalyDetection => "anomaly_detection",
-            SystemJobType::AlertCalibration => "alert_calibration",
         }
-    }
-
-    /// Only jobs that write through gRPC ingest; every other job ingests in process.
-    pub fn from_ingest_metadata(name: &str) -> Option<Self> {
-        let job = SystemJobType::AlertCalibration;
-        (name == job.as_email_local()).then_some(job)
     }
 }
 

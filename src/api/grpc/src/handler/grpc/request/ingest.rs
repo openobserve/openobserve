@@ -20,7 +20,7 @@ use config::{
 };
 use http::StatusCode;
 use infra::errors::{Error, Result};
-use ingestion_common::{IngestUser, SYSTEM_JOB_TYPE_METADATA_KEY, SystemJobType};
+use ingestion_common::{IngestUser, SystemJobType};
 use proto::cluster_rpc::{
     IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
 };
@@ -36,11 +36,10 @@ fn caller_identity(
     user_id: Option<&str>,
     ingestion_type: Option<i32>,
     is_derived: bool,
-    job: Option<SystemJobType>,
 ) -> std::result::Result<(IngestUser, bool), Status> {
     match user_id {
         None => Ok((
-            IngestUser::SystemJob(job.unwrap_or(SystemJobType::InternalGrpc)),
+            IngestUser::SystemJob(SystemJobType::InternalGrpc),
             is_derived,
         )),
         // Usage marks platform self-reporting, which fail-closed redaction lets through unscanned.
@@ -108,13 +107,8 @@ impl Ingest for Ingester {
             })
             .unwrap_or(false);
 
-        let job = req
-            .metadata
-            .as_ref()
-            .and_then(|m| m.data.get(SYSTEM_JOB_TYPE_METADATA_KEY))
-            .and_then(|name| SystemJobType::from_ingest_metadata(name));
         let (internal_user, is_derived) =
-            caller_identity(user_id.as_deref(), req.ingestion_type, is_derived, job)?;
+            caller_identity(user_id.as_deref(), req.ingestion_type, is_derived)?;
 
         let mut metrics_reply: Option<IngestionResponse> = None;
         let resp = match stream_type {
@@ -339,27 +333,20 @@ mod tests {
     #[test]
     fn test_caller_identity_keeps_platform_identity_for_the_internal_token_only() {
         let usage = Some(IngestionType::Usage as i32);
-        let (user, derived) = caller_identity(None, usage, true, None).unwrap();
+        let (user, derived) = caller_identity(None, usage, true).unwrap();
         assert!(matches!(
             user,
             IngestUser::SystemJob(SystemJobType::InternalGrpc)
         ));
         assert!(derived);
 
-        let err = caller_identity(Some("a@b.c"), usage, false, None).unwrap_err();
+        let err = caller_identity(Some("a@b.c"), usage, false).unwrap_err();
         assert_eq!(err.code(), tonic::Code::PermissionDenied);
 
         let json = Some(IngestionType::Json as i32);
-        let calibration = Some(SystemJobType::AlertCalibration);
-        let (user, derived) = caller_identity(Some("a@b.c"), json, true, calibration).unwrap();
+        let (user, derived) = caller_identity(Some("a@b.c"), json, true).unwrap();
         assert!(matches!(user, IngestUser::User(ref email) if email == "a@b.c"));
         assert!(!derived, "a user cannot claim pipeline-derived routing");
-
-        let (user, _) = caller_identity(None, json, false, calibration).unwrap();
-        assert!(matches!(
-            user,
-            IngestUser::SystemJob(SystemJobType::AlertCalibration)
-        ));
     }
 
     #[test]

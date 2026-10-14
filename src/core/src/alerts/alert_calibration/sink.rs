@@ -15,10 +15,7 @@
 
 //! Writes digest records to the org's `_o2_alert_calibration_digests` stream.
 
-use std::collections::HashMap;
-
 use config::meta::stream::StreamType;
-use ingestion_common::{SYSTEM_JOB_TYPE_METADATA_KEY, SystemJobType};
 use proto::cluster_rpc;
 use serde_json::Value;
 
@@ -54,8 +51,15 @@ pub(crate) async fn write_digest_records(
 }
 
 async fn write_chunk(org_id: &str, data: Vec<u8>) -> Result<(), anyhow::Error> {
-    let response =
-        crate::ingestion::ingestion_service::ingest(ingest_request(org_id, data)).await?;
+    let request = cluster_rpc::IngestionRequest {
+        org_id: org_id.to_string(),
+        stream_type: StreamType::Logs.as_str().to_string(),
+        stream_name: DIGEST_STREAM.to_string(),
+        data: Some(cluster_rpc::IngestionData { data }),
+        ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
+        metadata: None,
+    };
+    let response = crate::ingestion::ingestion_service::ingest(request).await?;
     match classify(response.status_code) {
         ReplyClass::Ok => Ok(()),
         // Rows a pipeline refused leave the digest short, yet it would read as complete.
@@ -64,20 +68,6 @@ async fn write_chunk(org_id: &str, data: Vec<u8>) -> Result<(), anyhow::Error> {
             response.status_code,
             response.message
         ),
-    }
-}
-
-fn ingest_request(org_id: &str, data: Vec<u8>) -> cluster_rpc::IngestionRequest {
-    let job = SystemJobType::AlertCalibration.as_email_local().to_string();
-    cluster_rpc::IngestionRequest {
-        org_id: org_id.to_string(),
-        stream_type: StreamType::Logs.as_str().to_string(),
-        stream_name: DIGEST_STREAM.to_string(),
-        data: Some(cluster_rpc::IngestionData { data }),
-        ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
-        metadata: Some(cluster_rpc::IngestRequestMetadata {
-            data: HashMap::from([(SYSTEM_JOB_TYPE_METADATA_KEY.to_string(), job)]),
-        }),
     }
 }
 
@@ -98,21 +88,6 @@ async fn seed_retention(org_id: &str) {
     {
         log::warn!(
             "[alert_calibration] could not set the digest stream's retention for {org_id}: {e}"
-        );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_digest_chunk_names_its_job_in_the_ingest_metadata() {
-        let request = ingest_request("acme", b"[]".to_vec());
-        let job = request.metadata.unwrap().data[SYSTEM_JOB_TYPE_METADATA_KEY].clone();
-        assert_eq!(
-            SystemJobType::from_ingest_metadata(&job),
-            Some(SystemJobType::AlertCalibration)
         );
     }
 }
