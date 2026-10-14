@@ -103,6 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onChartClick"
           @contextmenu="onChartContextMenu"
           @domcontextmenu="onChartDomContextMenu"
+          :find-line-on-context-menu="hasSeveralVisibleQueries"
           @mouseover="exemplarInteraction.onMouseOver"
           @mouseout="exemplarInteraction.onMouseOut"
           @finished="onChartFinished"
@@ -1177,6 +1178,8 @@ export default defineComponent({
       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" }),
       alertSource,
     });
+    // Only a multi-query panel asks which query, so only it needs the clicked series' query resolved.
+    const hasSeveralVisibleQueries = computed(() => visibleQueryIndexes.value.length > 1);
     // SQL drops hidden queries' data but not their metadata, so a series' position counts the kept entries only.
     const sqlPanelQueryIndex = (position: number): number | undefined => {
       const kept = (Array.isArray(data.value) ? data.value : [])
@@ -1194,7 +1197,9 @@ export default defineComponent({
           ? panelData.value?.options?.series?.[event.seriesIndex]
           : undefined;
       const panelQueryIndex =
-        panelSchema.value?.queryType !== "promql" && typeof series?._queryIndex === "number"
+        hasSeveralVisibleQueries.value &&
+        panelSchema.value?.queryType !== "promql" &&
+        typeof series?._queryIndex === "number"
           ? sqlPanelQueryIndex(series._queryIndex)
           : series?._panelQueryIndex;
       openAlertContextMenu({
@@ -2279,6 +2284,7 @@ export default defineComponent({
       contextMenuData,
       onChartContextMenu,
       onChartDomContextMenu,
+      hasSeveralVisibleQueries,
       hideContextMenu,
       handleCreateAlert,
       cellDrawer,

@@ -263,12 +263,16 @@ export const buildPrefillFromPanel = (
   }
 
   const isPromql = input.queryType === "promql";
+  // Only a multi-query pick changes the prefill; a single-query panel keeps its established output.
+  const isQueryPick = (input.queryChoices?.length ?? 0) > 1;
   const sourceQuery = input.executedQuery || query?.query || "";
   const inputStreams = !isPromql
     ? []
     : isFormulaQuery(query)
       ? formulaInputStreams(input.queries ?? [], query.config.formula, input.metadataQueries)
-      : codeModeStreams(query, sourceQuery);
+      : isQueryPick
+        ? codeModeStreams(query, sourceQuery)
+        : [];
   // Raw text from a query that never ran may still hold dashboard variables the evaluator cannot fill.
   if (!input.executedQuery && /\$(\w|\{)/.test(sourceQuery)) {
     warnings.push(warn("unresolvedQuery", "blocking"));
@@ -326,8 +330,10 @@ export const buildPrefillFromPanel = (
     }
   } else {
     prefill.sql = sourceQuery;
-    // The threshold rides as a HAVING the consumer injects with its SQL parser; the form saves SQL, not the aggregation.
-    if (hasThreshold && input.yAxisColumn) {
+    // Raw-SQL panels get their threshold as a HAVING clause injected into the
+    // query text, which needs the SQL parser — the consumer applies this.
+    // A picked built query needs it too: the form saves the SQL, not the aggregation.
+    if (hasThreshold && (!aggregation || isQueryPick) && input.yAxisColumn) {
       prefill.meta = {
         ...prefill.meta,
         sqlHaving: {

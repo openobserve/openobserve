@@ -153,15 +153,10 @@ export default defineComponent({
       );
     });
 
-    // A unitless item shows the value to two decimals, so that is the threshold it writes.
-    const thresholdValue = computed(() =>
-      typeof props.value === "number" && !props.unit ? Number(props.value.toFixed(2)) : props.value,
-    );
-
     const handleMenuItemClick = (condition: "above" | "below" | "forecast") => {
       emit("select", {
         condition,
-        threshold: condition === "forecast" ? forecastValue.value : thresholdValue.value,
+        threshold: condition === "forecast" ? forecastValue.value : props.value,
         panelQueryIndex: props.panelQueryIndex,
         seriesRole: props.seriesRole,
       });

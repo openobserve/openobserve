@@ -2297,6 +2297,38 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
     });
 
+    it("leaves a series' own query untouched when only one query is visible", () => {
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([[], []]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({ queries: [{ panelQueryIndex: 0 }, { panelQueryIndex: 1 }] }),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      const query = defaultProps.panelSchema.queries[0];
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          queries: [{ ...query, config: { hide: true } }, query],
+        },
+      });
+      wrapper.vm.panelData = {
+        options: { series: [{ name: "b", _queryIndex: 0, _panelQueryIndex: 0 }] },
+      };
+
+      wrapper.vm.onChartDomContextMenu({ x: 1, y: 2, value: 3, seriesIndex: 0 });
+
+      expect(wrapper.vm.hasSeveralVisibleQueries).toBe(false);
+      expect(wrapper.vm.contextMenuData.panelQueryIndex).toBe(0);
+    });
+
     it("reads a forecast line's start and the clicked point's time, for the forecast alert", () => {
       wrapper = createWrapper({ allowAlertCreation: true });
       wrapper.vm.panelData = {

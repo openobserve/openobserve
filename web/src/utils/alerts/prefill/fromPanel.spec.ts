@@ -154,27 +154,43 @@ describe("buildPrefillFromPanel", () => {
     expect(p.meta?.sqlHaving).toEqual({ column: "cnt", operator: ">=", value: 42 });
   });
 
-  it("writes a built query's chart threshold into its SQL too, since the form saves the SQL", () => {
-    const p = buildPrefillFromPanel(
+  describe("a chart threshold on a built query", () => {
+    const builtQuery = {
+      query: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"',
+      customQuery: false,
+      fields: {
+        stream: "triggers",
+        stream_type: "logs",
+        y: [{ alias: "y_axis_1", aggregationFunction: "count" }],
+      },
+    };
+    const thresholdPanel = (overrides: Partial<PanelPrefillInput> = {}) =>
       sqlPanel({
         threshold: 4.42,
         condition: "above",
         yAxisColumn: "y_axis_1",
-        queries: [
-          {
-            query: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1"',
-            customQuery: false,
-            fields: {
-              stream: "triggers",
-              stream_type: "logs",
-              y: [{ alias: "y_axis_1", aggregationFunction: "count" }],
-            },
-          },
-        ],
-      }),
-      makeId,
-    );
-    expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
+        queries: [builtQuery, builtQuery],
+        ...overrides,
+      });
+
+    it("is written into the SQL too when the query was picked, since the form saves the SQL", () => {
+      const p = buildPrefillFromPanel(
+        thresholdPanel({
+          queryChoices: [
+            { index: 0, query: builtQuery.query },
+            { index: 1, query: builtQuery.query },
+          ],
+        }),
+        makeId,
+      );
+      expect(p.meta?.sqlHaving).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
+    });
+
+    it("stays in the aggregation alone on a single-query panel, as before", () => {
+      const p = buildPrefillFromPanel(thresholdPanel({ queries: [builtQuery] }), makeId);
+      expect(p.meta).toEqual({ panelId: undefined, panelType: "line" });
+      expect(p.aggregation?.having).toEqual({ column: "y_axis_1", operator: ">=", value: 4.42 });
+    });
   });
 
   it("maps list filters onto alert conditions", () => {
@@ -433,13 +449,40 @@ describe("buildPrefillFromPanel — unresolved dashboard variables", () => {
   });
 });
 
-describe("buildPrefillFromPanel — a code-mode PromQL query's stream", () => {
+describe("buildPrefillFromPanel — a picked code-mode PromQL query's stream", () => {
   const codeQuery = (query: string, stream: string) => ({
     query,
     customQuery: true,
     fields: { stream, stream_type: "metrics" },
   });
   const LEFTOVER = "traces_service_graph_request_server_failed_total";
+  const other = codeQuery("up", "up");
+  // The query was picked from a multi-query panel, which is the only case the text decides the stream.
+  const promqlPanel = (overrides: Partial<PanelPrefillInput> = {}): PanelPrefillInput => {
+    const queries = [...(overrides.queries ?? []), other];
+    return {
+      panelTitle: "Disk",
+      panelType: "line",
+      queryType: "promql",
+      ...overrides,
+      queries,
+      queryChoices: queries.map((query, index) => ({ index, query: query.query })),
+    };
+  };
+
+  it("keeps the leftover stream pick on a single-query panel, as before", () => {
+    const p = buildPrefillFromPanel(
+      {
+        panelTitle: "Disk",
+        queryType: "promql",
+        queries: [codeQuery("traces_service_graph_request_client_seconds_count", LEFTOVER)],
+        executedQuery: "traces_service_graph_request_client_seconds_count",
+      },
+      makeId,
+    );
+    expect(p.streamName).toBe(LEFTOVER);
+    expect(p.streamCandidates).toBeUndefined();
+  });
 
   it("takes the metric the query reads, not the editor's leftover stream pick", () => {
     const p = buildPrefillFromPanel(

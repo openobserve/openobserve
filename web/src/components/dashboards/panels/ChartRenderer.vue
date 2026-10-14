@@ -189,6 +189,11 @@ export default defineComponent({
       type: String,
       default: "100%",
     },
+    /** Name the line under a right-click that hit no symbol, so the alert can tell which query was meant. */
+    findLineOnContextMenu: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
@@ -461,7 +466,9 @@ export default defineComponent({
           // Emit domcontextmenu event for alert creation
           if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
             // A line hides its symbols until hovered, so a click on the line itself hits no series.
-            const hit = lineSeriesHit(pixelPoint as PixelPoint);
+            const hit = props.findLineOnContextMenu
+              ? lineSeriesHit(pixelPoint as PixelPoint)
+              : null;
             emit("domcontextmenu", {
               x: event.clientX,
               y: event.clientY,

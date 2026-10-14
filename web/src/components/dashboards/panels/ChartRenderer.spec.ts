@@ -595,53 +595,65 @@ describe("ChartRenderer", () => {
       });
     });
 
-    it("names the line under a right-click that hit no symbol, so the alert knows its query", async () => {
-      const echarts = await import("echarts/core");
-      const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
-      vi.mocked(mockChart.getOption).mockReturnValue({
-        series: [
-          {
-            type: "line",
-            data: [
-              [0, 1],
-              [1, 1],
-            ],
-          },
-          {
-            type: "line",
-            data: [
-              [0, 5],
-              [1, 9],
-            ],
-          },
-        ],
-      });
-      vi.mocked(mockChart.convertFromPixel).mockReturnValue([0, 6]);
-      // Pixel x is 100 per step and pixel y is 10 per unit, so series 1 runs from (0, 50) to (100, 90).
-      vi.mocked(mockChart.convertToPixel).mockImplementation(
-        (_finder: unknown, value: number[]) => [value[0] * 100, value[1] * 10],
-      );
+    describe("a right-click on a line between its symbols", () => {
+      const twoLines = async () => {
+        const echarts = await import("echarts/core");
+        const mockChart = vi.mocked(echarts.init).mock.results[0]?.value;
+        vi.mocked(mockChart.getOption).mockReturnValue({
+          series: [
+            {
+              type: "line",
+              data: [
+                [0, 1],
+                [1, 1],
+              ],
+            },
+            {
+              type: "line",
+              data: [
+                [0, 5],
+                [1, 9],
+              ],
+            },
+          ],
+        });
+        vi.mocked(mockChart.convertFromPixel).mockReturnValue([0, 6]);
+        // Pixel x is 100 per step and pixel y is 10 per unit, so series 1 runs from (0, 50) to (100, 90).
+        vi.mocked(mockChart.convertToPixel).mockImplementation(
+          (_finder: unknown, value: number[]) => [value[0] * 100, value[1] * 10],
+        );
+        return mockChart;
+      };
+      const rightClick = async (clientX: number, clientY: number) => {
+        await wrapper.find('[data-test="chart-renderer"]').trigger("contextmenu", {
+          clientX,
+          clientY,
+        });
+        await flushPromises();
+        return wrapper.emitted("domcontextmenu")?.at(-1)?.[0];
+      };
 
-      await wrapper.find('[data-test="chart-renderer"]').trigger("contextmenu", {
-        clientX: 75,
-        clientY: 81,
-      });
-      await flushPromises();
+      it("names the line when asked, so a multi-query alert knows its query", async () => {
+        await twoLines();
+        await wrapper.setProps({ findLineOnContextMenu: true });
 
-      expect(wrapper.emitted("domcontextmenu")?.at(-1)?.[0]).toEqual({
-        x: 75,
-        y: 81,
-        value: 6,
-        seriesIndex: 1,
-        dataIndex: 1,
+        expect(await rightClick(75, 81)).toEqual({
+          x: 75,
+          y: 81,
+          value: 6,
+          seriesIndex: 1,
+          dataIndex: 1,
+        });
+        expect(await rightClick(50, 300)).not.toHaveProperty("seriesIndex");
       });
 
-      await wrapper.find('[data-test="chart-renderer"]').trigger("contextmenu", {
-        clientX: 50,
-        clientY: 300,
+      it("emits only the cursor reading by default, and never looks for the line", async () => {
+        const mockChart = await twoLines();
+        vi.mocked(mockChart.convertToPixel).mockClear();
+
+        expect(await rightClick(75, 81)).toEqual({ x: 75, y: 81, value: 6 });
+        expect(mockChart.convertToPixel).not.toHaveBeenCalled();
       });
-      await flushPromises();
-      expect(wrapper.emitted("domcontextmenu")?.at(-1)?.[0]).not.toHaveProperty("seriesIndex");
     });
 
     it("leaves the tooltip alone on both right-click paths; only an opened alert menu hides it", async () => {

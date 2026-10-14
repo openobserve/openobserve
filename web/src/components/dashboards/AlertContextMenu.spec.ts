@@ -199,14 +199,6 @@ describe("AlertContextMenu Component", () => {
 
       expect(wrapper.emitted("select")[0][0].threshold).toBe(999);
     });
-
-    it("writes the threshold its item shows, not the cursor's raw reading", async () => {
-      wrapper = createWrapper({ value: 4.179104477611935 });
-      const item = wrapper.find('[data-test="alert-context-menu-above"]');
-      expect(item.text()).toBe("Alert when above 4.18");
-      await item.trigger("click");
-      expect(wrapper.emitted("select")[0][0].threshold).toBe(4.18);
-    });
   });
 
   describe("Hover State", () => {

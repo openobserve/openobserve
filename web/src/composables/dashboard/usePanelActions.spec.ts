@@ -215,6 +215,30 @@ describe("usePanelActions", () => {
       closeAlertCreationDialog();
     });
 
+    it("leaves a single builder query's right-clicked threshold in its aggregation, as before", () => {
+      const args = makeBase();
+      const built = args.panelSchema.value.queries[0] as any;
+      built.customQuery = false;
+      built.fields.y[0].aggregationFunction = "count";
+      const api = usePanelAlertCreation(args as any);
+
+      api.handleCreateAlert({
+        condition: "above",
+        threshold: 4.179104477611935,
+        panelQueryIndex: 0,
+      });
+
+      expect(args.router.push).toHaveBeenCalledTimes(1);
+      const stored = readAlertPrefill();
+      expect(stored?.queryChoices).toBeUndefined();
+      expect(stored?.meta?.sqlHaving).toBeUndefined();
+      expect(stored?.aggregation?.having).toEqual({
+        column: "errors",
+        operator: ">=",
+        value: 4.179104477611935,
+      });
+    });
+
     it("does nothing when query is missing", () => {
       const args = makeBase();
       args.panelSchema.value.queries = [];
