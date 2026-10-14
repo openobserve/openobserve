@@ -106,6 +106,15 @@
         "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
       }
     },
+    "ai-review-qa": {
+      "mode": "primary",
+      "model": "deepseek-review/deepseek-v4-pro",
+      "tools": {
+        "read": true, "glob": true, "grep": true,
+        "write": false, "edit": false, "bash": false, "patch": false, "apply_patch": false,
+        "webfetch": false, "websearch": false, "task": false, "todowrite": false, "skill": false
+      }
+    },
     "ai-review-coordinator": {
       "mode": "primary",
       "model": "deepseek-review/deepseek-v4-pro",

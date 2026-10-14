@@ -75,18 +75,21 @@ impl Display for Path<'_> {
 
 struct Validator<'a> {
     dictionary: &'a ProfilesDictionary,
+    compacted: bool,
 }
 
 impl Validator<'_> {
     fn dictionary(&self) -> Result<(), String> {
         let d = self.dictionary;
-        sentinel(&d.mapping_table, "mapping_table")?;
-        sentinel(&d.location_table, "location_table")?;
-        sentinel(&d.function_table, "function_table")?;
-        sentinel(&d.link_table, "link_table")?;
-        sentinel(&d.string_table, "string_table")?;
-        attribute_sentinel(&d.attribute_table)?;
-        sentinel(&d.stack_table, "stack_table")?;
+        if !self.compacted {
+            sentinel(&d.mapping_table, "mapping_table")?;
+            sentinel(&d.location_table, "location_table")?;
+            sentinel(&d.function_table, "function_table")?;
+            sentinel(&d.link_table, "link_table")?;
+            sentinel(&d.string_table, "string_table")?;
+            attribute_sentinel(&d.attribute_table)?;
+            sentinel(&d.stack_table, "stack_table")?;
+        }
         let root = Path::root("dictionary");
         for (i, mapping) in d.mapping_table.iter().enumerate() {
             let path = root.indexed("mapping_table", i);
@@ -211,9 +214,27 @@ impl Validator<'_> {
 }
 
 pub(super) fn validate(request: &ExportProfilesServiceRequest) -> Result<(), String> {
+    validate_request(request, false)
+}
+
+pub(super) fn validate_compacted(request: &ExportProfilesServiceRequest) -> Result<(), String> {
+    validate_request(request, true)
+}
+
+pub(super) fn is_zero_attribute(attribute: &KeyValueAndUnit) -> bool {
+    attribute.key_strindex == 0
+        && attribute.unit_strindex == 0
+        && attribute
+            .value
+            .as_ref()
+            .is_none_or(|value| value.value.is_none())
+}
+
+fn validate_request(request: &ExportProfilesServiceRequest, compacted: bool) -> Result<(), String> {
     let empty = ProfilesDictionary::default();
     let validator = Validator {
         dictionary: request.dictionary.as_ref().unwrap_or(&empty),
+        compacted,
     };
     validator.dictionary()?;
     let root = Path::root("resource_profiles");
@@ -240,14 +261,10 @@ pub(super) fn validate(request: &ExportProfilesServiceRequest) -> Result<(), Str
 }
 
 fn attribute_sentinel(table: &[KeyValueAndUnit]) -> Result<(), String> {
-    if table.first().is_some_and(|attribute| {
-        attribute.key_strindex != 0
-            || attribute.unit_strindex != 0
-            || attribute
-                .value
-                .as_ref()
-                .is_some_and(|value| value.value.is_some())
-    }) {
+    if table
+        .first()
+        .is_some_and(|attribute| !is_zero_attribute(attribute))
+    {
         return Err("dictionary.attribute_table[0] must be the zero value".into());
     }
     Ok(())

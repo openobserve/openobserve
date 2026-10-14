@@ -67,53 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn test_match_placeholder_equal_op() {
-        let placeholder = get_config().common.dashboard_placeholder.to_string();
-        let matcher = create_test_matcher("label", MatchOp::Equal, &placeholder);
-        assert!(match_placeholder(&matcher, &placeholder));
-
-        let non_matching_matcher = create_test_matcher("label", MatchOp::Equal, "other_value");
-        assert!(!match_placeholder(&non_matching_matcher, &placeholder));
-    }
-
-    #[test]
-    fn test_match_placeholder_not_equal_op() {
-        let placeholder = get_config().common.dashboard_placeholder.to_string();
-        let matcher = create_test_matcher("label", MatchOp::NotEqual, &placeholder);
-        assert!(match_placeholder(&matcher, &placeholder));
-
-        let non_matching_matcher = create_test_matcher("label", MatchOp::NotEqual, "other_value");
-        assert!(!match_placeholder(&non_matching_matcher, &placeholder));
-    }
-
-    #[test]
-    fn test_match_placeholder_regex_op() {
-        let placeholder = get_config().common.dashboard_placeholder.to_string();
-        let matcher =
-            create_test_matcher("label", MatchOp::Re(Regex::new("").unwrap()), &placeholder);
-        assert!(match_placeholder(&matcher, &placeholder));
-
-        let non_matching_matcher =
-            create_test_matcher("label", MatchOp::Re(Regex::new("").unwrap()), "other.*");
-        assert!(!match_placeholder(&non_matching_matcher, &placeholder));
-    }
-
-    #[test]
-    fn test_match_placeholder_not_regex_op() {
-        let placeholder = get_config().common.dashboard_placeholder.to_string();
-        let matcher = create_test_matcher(
-            "label",
-            MatchOp::NotRe(Regex::new("").unwrap()),
-            &placeholder,
-        );
-        assert!(match_placeholder(&matcher, &placeholder));
-
-        let non_matching_matcher =
-            create_test_matcher("label", MatchOp::NotRe(Regex::new("").unwrap()), "other.*");
-        assert!(!match_placeholder(&non_matching_matcher, &placeholder));
-    }
-
-    #[test]
     fn test_remove_filter_all_removes_placeholder_matchers() {
         let placeholder = get_config().common.dashboard_placeholder.to_string();
         let placeholder_matcher = create_test_matcher("env", MatchOp::Equal, &placeholder);

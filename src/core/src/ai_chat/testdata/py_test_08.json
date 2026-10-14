@@ -1,0 +1,126 @@
+{
+ "events": [
+  {
+   "id": "evt_0",
+   "aggregateID": "ses_T",
+   "seq": 0,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u1",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_1",
+   "aggregateID": "ses_T",
+   "seq": 1,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a1",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "error": {
+      "name": "APIError",
+      "data": {
+       "message": "rate limited"
+      }
+     },
+     "parentID": "msg_u1"
+    }
+   }
+  },
+  {
+   "id": "evt_2",
+   "aggregateID": "ses_T",
+   "seq": 2,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_u2",
+     "sessionID": "ses_T",
+     "role": "user",
+     "time": {
+      "created": 1
+     }
+    }
+   }
+  },
+  {
+   "id": "evt_3",
+   "aggregateID": "ses_T",
+   "seq": 3,
+   "type": "message.updated.1",
+   "data": {
+    "sessionID": "ses_T",
+    "info": {
+     "id": "msg_a2",
+     "sessionID": "ses_T",
+     "role": "assistant",
+     "time": {
+      "created": 1
+     },
+     "error": {
+      "name": "MessageAbortedError"
+     },
+     "parentID": "msg_u2"
+    }
+   }
+  }
+ ],
+ "expected": {
+  "turns": [
+   {
+    "user_message_id": "msg_u1",
+    "created": 1,
+    "user": {
+     "text": "",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "error",
+      "error": "rate limited",
+      "recoverable": false
+     },
+     {
+      "type": "complete"
+     }
+    ],
+    "error": "rate limited",
+    "first_seq": 0,
+    "last_seq": 1
+   },
+   {
+    "user_message_id": "msg_u2",
+    "created": 1,
+    "user": {
+     "text": "",
+     "images": []
+    },
+    "frames": [
+     {
+      "type": "cancelled"
+     }
+    ],
+    "error": null,
+    "first_seq": 2,
+    "last_seq": 3
+   }
+  ],
+  "title": null,
+  "last_seq": 3
+ }
+}
