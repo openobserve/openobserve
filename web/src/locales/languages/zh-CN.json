@@ -8315,6 +8315,7 @@
     "summaryActive": "活动",
     "summaryPaused": "已暂停",
     "summaryFailed": "失败",
+    "summaryFiring": "触发中",
     "summaryRecent": "触发 < 15分钟",
     "summaryTotal": "总计",
     "webhook": "Web Hook",

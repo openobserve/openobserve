@@ -8315,6 +8315,7 @@
     "summaryActive": "Hoạt động",
     "summaryPaused": "Tạm dừng",
     "summaryFailed": "Thất bại",
+    "summaryFiring": "Đang kích hoạt",
     "summaryRecent": "Đã kích hoạt < 15m",
     "summaryTotal": "Tổng",
     "webhook": "Web Hook",

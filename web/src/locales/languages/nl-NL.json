@@ -8315,6 +8315,7 @@
     "summaryActive": "Actief",
     "summaryPaused": "Gepauzeerd",
     "summaryFailed": "Mislukt",
+    "summaryFiring": "In alarm",
     "summaryRecent": "Geactiveerd < 15m",
     "summaryTotal": "Totaal",
     "webhook": "Webhook",
