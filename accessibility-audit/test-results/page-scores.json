@@ -1,0 +1,3096 @@
+[
+ {
+  "route": "/logs",
+  "score": 39,
+  "findings": [
+   "A11Y-01",
+   "A11Y-02",
+   "A11Y-05",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-17",
+   "A11Y-24",
+   "A11Y-25",
+   "A11Y-20",
+   "A11Y-22",
+   "A11Y-26"
+  ],
+  "instances": 20,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 8,
+   "Low": 3
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/evaluations",
+  "score": 36,
+  "findings": [
+   "A11Y-01",
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 15,
+  "dist": {
+   "Critical": 1,
+   "High": 3,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/rum/performance/overview",
+  "score": 35,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-10",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-20",
+   "A11Y-22",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 44,
+  "dist": {
+   "Critical": 1,
+   "High": 3,
+   "Medium": 3,
+   "Low": 4
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/rum/source-maps",
+  "score": 35,
+  "findings": [
+   "A11Y-01",
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 1,
+   "High": 3,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alerts/add",
+  "score": 32,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-20",
+   "A11Y-26"
+  ],
+  "instances": 28,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/dashboards",
+  "score": 32,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-13",
+   "A11Y-14",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26",
+   "A11Y-27"
+  ],
+  "instances": 24,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 7,
+   "Low": 3
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/ai-integrations/frameworks/langgraph",
+  "score": 32,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-21",
+   "A11Y-22",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 26,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 4
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/databases/postgres",
+  "score": 32,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-21",
+   "A11Y-22",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 20,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 4
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/metrics/editor",
+  "score": 32,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-20",
+   "A11Y-24",
+   "A11Y-26"
+  ],
+  "instances": 28,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/rum/errors",
+  "score": 32,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 22,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/discovery",
+  "score": 31,
+  "findings": [
+   "A11Y-01",
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 19,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/ai-integrations/popular/openai",
+  "score": 31,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-22",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 23,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 3
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/custom/traces/opentelemetry",
+  "score": 31,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-22",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 3
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/recommended/kubernetes",
+  "score": 31,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-22",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 20,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 3
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/pipeline/pipelines/backfill",
+  "score": 31,
+  "findings": [
+   "A11Y-01",
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 14,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/billings/usage",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-10",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 18,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/custom/logs/curl",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/devops/jenkins",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/languages/python",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/message-queues/kafka",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/networking/netflow",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/others/vercel",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/recommended/aws",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 26,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/security/okta",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/servers/nginx",
+  "score": 30,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 21,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alerts/history",
+  "score": 29,
+  "findings": [
+   "A11Y-01",
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/kubernetes-2",
+  "score": 29,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-19",
+   "A11Y-26"
+  ],
+  "instances": 15,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/traces",
+  "score": 29,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-17",
+   "A11Y-22",
+   "A11Y-26"
+  ],
+  "instances": 27,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 6,
+   "Low": 2
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/pipeline/pipelines",
+  "score": 28,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-22",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 21,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 3
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/",
+  "score": 27,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-10",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-15",
+   "A11Y-16",
+   "A11Y-26",
+   "A11Y-27"
+  ],
+  "instances": 18,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/agent-behavior",
+  "score": 27,
+  "findings": [
+   "A11Y-01",
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 15,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/dashboards/import",
+  "score": 27,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases/activity",
+  "score": 27,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 15,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases/blocking",
+  "score": 27,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 15,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases/deadlocks",
+  "score": 27,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 15,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases/metrics",
+  "score": 27,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-24",
+   "A11Y-26"
+  ],
+  "instances": 35,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/metrics",
+  "score": 27,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-10",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-17",
+   "A11Y-22",
+   "A11Y-26"
+  ],
+  "instances": 11,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/product-analytics/events",
+  "score": 27,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 19,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/product-analytics/funnels",
+  "score": 27,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 19,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/promql-builder",
+  "score": 27,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 1,
+   "High": 2,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/general",
+  "score": 27,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 82,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/playground",
+  "score": 26,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/pipeline/pipelines/history",
+  "score": 26,
+  "findings": [
+   "A11Y-01",
+   "A11Y-04",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 12,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/model_pricing",
+  "score": 26,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 18,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/synthetics",
+  "score": 26,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 18,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/product-analytics/funnels/build",
+  "score": 25,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 9,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/product-analytics/paths",
+  "score": 25,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/workflows/add",
+  "score": 25,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-20",
+   "A11Y-26"
+  ],
+  "instances": 12,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/workflows/edit",
+  "score": 25,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-20",
+   "A11Y-26"
+  ],
+  "instances": 12,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/experiments/new",
+  "score": 24,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 15,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/remote-tasks/new",
+  "score": 24,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alerts",
+  "score": 24,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-14",
+   "A11Y-16",
+   "A11Y-26",
+   "A11Y-27"
+  ],
+  "instances": 19,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 6,
+   "Low": 2
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/iam/organizations",
+  "score": 24,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 0,
+   "High": 3,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/agent-graph",
+  "score": 22,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/prompts/new",
+  "score": 22,
+  "findings": [
+   "A11Y-01",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/iam/users",
+  "score": 22,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 18,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases",
+  "score": 22,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 14,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases/queries",
+  "score": 22,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 14,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases/samples",
+  "score": 22,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 14,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases/table-health",
+  "score": 22,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 14,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/pipeline/enrichment-tables",
+  "score": 22,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 17,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/reports/create",
+  "score": 22,
+  "findings": [
+   "A11Y-01",
+   "A11Y-05",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 17,
+  "dist": {
+   "Critical": 1,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/rum/sessions",
+  "score": 22,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 20,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alert-destinations",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/downtimes",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/iam/ingestionTokens",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 14,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/iam/serviceAccounts",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 17,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/iam/syntheticsTokens",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 14,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/hosts",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-10",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-19",
+   "A11Y-26"
+  ],
+  "instances": 128,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/recommended/frontend-monitoring",
+  "score": 21,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-22",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 21,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 3
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/reports",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/cipher_keys",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 17,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/pipeline_destinations",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 17,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/regex_patterns",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 17,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/slos",
+  "score": 21,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/downtimes/add",
+  "score": 20,
+  "findings": [
+   "A11Y-01",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-20",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 1,
+   "High": 0,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ingestion/custom/metrics/prometheus",
+  "score": 20,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 12,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/pipeline/functions",
+  "score": 20,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/product-analytics/retention",
+  "score": 20,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/datasets",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 12,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/prompts",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/queues",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 12,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/remote-tasks",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 12,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alert-library",
+  "score": 19,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alert-templates",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 15,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alerts/anomaly/add",
+  "score": 19,
+  "findings": [
+   "A11Y-01",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 20,
+  "dist": {
+   "Critical": 1,
+   "High": 0,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/iam/groups",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/iam/mcpServer",
+  "score": 19,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/iam/roles",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/kubernetes",
+  "score": 19,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-10",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-24",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/logs/search-scheduler",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 11,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/oncall/policies",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/oncall/teams",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 11,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/model_pricing/edit",
+  "score": 19,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 9,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/slos/add",
+  "score": 19,
+  "findings": [
+   "A11Y-01",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 1,
+   "High": 0,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/workflows",
+  "score": 19,
+  "findings": [
+   "A11Y-04",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 11,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/profiles",
+  "score": 18,
+  "findings": [
+   "A11Y-01",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-22",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 1,
+   "High": 0,
+   "Medium": 3,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/streams",
+  "score": 18,
+  "findings": [
+   "A11Y-04",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-09",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 16,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 6,
+   "Low": 1
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/alerts/insights",
+  "score": 17,
+  "findings": [
+   "A11Y-05",
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 7,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/logs/search-history",
+  "score": 17,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 11,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/workflows/runs",
+  "score": 17,
+  "findings": [
+   "A11Y-04",
+   "A11Y-05",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 0,
+   "High": 2,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alert-sources",
+  "score": 16,
+  "findings": [
+   "A11Y-04",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 11,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/about",
+  "score": 15,
+  "findings": [
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-22",
+   "A11Y-26"
+  ],
+  "instances": 14,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/billings/invoice_history",
+  "score": 15,
+  "findings": [
+   "A11Y-04",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 13,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/billings/plans",
+  "score": 15,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/pipeline/pipelines/add",
+  "score": 15,
+  "findings": [
+   "A11Y-05",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/alerts/import-semantic-groups",
+  "score": 14,
+  "findings": [
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 7,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/enterprise-features",
+  "score": 14,
+  "findings": [
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 6,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/incidents",
+  "score": 14,
+  "findings": [
+   "A11Y-04",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/login",
+  "score": 14,
+  "findings": [
+   "A11Y-03",
+   "A11Y-13",
+   "A11Y-18"
+  ],
+  "instances": 3,
+  "dist": {
+   "Critical": 1,
+   "High": 0,
+   "Medium": 2,
+   "Low": 0
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/ai_toolsets",
+  "score": 14,
+  "findings": [
+   "A11Y-04",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-12",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/storage_settings",
+  "score": 14,
+  "findings": [
+   "A11Y-06",
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 10,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/pipeline/pipelines/import",
+  "score": 13,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 7,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/product-analytics/overview",
+  "score": 13,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 7,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/experiments",
+  "score": 12,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 6,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/llm-insights",
+  "score": 12,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 7,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/sessions",
+  "score": 12,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 7,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/pipeline/functions/import",
+  "score": 12,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 6,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/gen_ai_agent_mapping",
+  "score": 12,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 6,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/llm_providers",
+  "score": 12,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 6,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/settings/organization",
+  "score": 12,
+  "findings": [
+   "A11Y-06",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 6,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/synthetics/add",
+  "score": 11,
+  "findings": [
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 9,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 5,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/autoobserve",
+  "score": 10,
+  "findings": [
+   "A11Y-06",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 5,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 2,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/billings/billing_group",
+  "score": 10,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-13",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 8,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 4,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/ai/session-details",
+  "score": 9,
+  "findings": [
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 5,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/dashboards/view",
+  "score": 9,
+  "findings": [
+   "A11Y-10",
+   "A11Y-17",
+   "A11Y-25"
+  ],
+  "instances": 3,
+  "dist": {
+   "Critical": 0,
+   "High": 1,
+   "Medium": 2,
+   "Low": 0
+  },
+  "assessed": 28,
+  "denominator": 55
+ },
+ {
+  "route": "/logs/inspector",
+  "score": 9,
+  "findings": [
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 9,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/member_subscription",
+  "score": 9,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-21",
+   "A11Y-22",
+   "A11Y-26"
+  ],
+  "instances": 6,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 3
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/traces/session-details",
+  "score": 9,
+  "findings": [
+   "A11Y-07",
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 5,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 4,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/billings/paid_usage",
+  "score": 8,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 5,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/rum/upload-source-maps",
+  "score": 8,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-23",
+   "A11Y-26"
+  ],
+  "instances": 5,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 2
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/enterprise-locked",
+  "score": 7,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 4,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/infra/databases/query",
+  "score": 7,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 4,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/oncall/me",
+  "score": 7,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 4,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/oncall/responses",
+  "score": 7,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 4,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/oncall/routing",
+  "score": 7,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 4,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ },
+ {
+  "route": "/product-analytics/events/new",
+  "score": 7,
+  "findings": [
+   "A11Y-08",
+   "A11Y-11",
+   "A11Y-16",
+   "A11Y-26"
+  ],
+  "instances": 4,
+  "dist": {
+   "Critical": 0,
+   "High": 0,
+   "Medium": 3,
+   "Low": 1
+  },
+  "assessed": 14,
+  "denominator": 55
+ }
+]

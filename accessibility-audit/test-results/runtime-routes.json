@@ -1,0 +1,2272 @@
+[
+ {
+  "path": "/ingestion/custom/logs/curl",
+  "name": "curl",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/fluentbit",
+  "name": "fluentbit",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/fluentd",
+  "name": "fluentd",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/vector",
+  "name": "vector",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/kinesisfirehose",
+  "name": "kinesisfirehose",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/gcp",
+  "name": "gcpLogs",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/filebeat",
+  "name": "filebeat",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/otel",
+  "name": "ingestLogsFromOtel",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/logstash",
+  "name": "logstash",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/syslogng",
+  "name": "syslogNg",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/splunkhec",
+  "name": "splunkHec",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs/loongcollector",
+  "name": "loongcollector",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/metrics/prometheus",
+  "name": "prometheus",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/metrics/vmagent",
+  "name": "vmagent",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/metrics/nightingale",
+  "name": "nightingale",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/metrics/categraf",
+  "name": "categraf",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/metrics/otelcollector",
+  "name": "otelCollector",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/metrics/telegraf",
+  "name": "telegraf",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/metrics/cloudwatchMetrics",
+  "name": "cloudwatchMetrics",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/profiles/otelcollector",
+  "name": "profilesOtelCollector",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/traces/opentelemetry",
+  "name": "tracesOTLP",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/traces/otel",
+  "name": "ingestTracesFromOtel",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/openai",
+  "name": "ai-openai-python",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/anthropic",
+  "name": "ai-anthropic-python",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/gemini",
+  "name": "ai-google-gemini",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/claude-code",
+  "name": "ai-claude-code",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/codex",
+  "name": "ai-codex",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/cursor",
+  "name": "ai-cursor",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/opencode",
+  "name": "ai-opencode",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/github-copilot",
+  "name": "ai-github-copilot",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/claude-agent-sdk",
+  "name": "ai-claude-agent-sdk",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/langchain",
+  "name": "ai-langchain",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/crewai",
+  "name": "ai-crewai",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/google-adk",
+  "name": "ai-google-adk",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/openai-agents",
+  "name": "ai-openai-agents",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/openrouter",
+  "name": "ai-openrouter",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/popular/litellm",
+  "name": "ai-litellm-proxy",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/agno",
+  "name": "ai-agno",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/autogen",
+  "name": "ai-autogen",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/beeai",
+  "name": "ai-beeai",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/dspy",
+  "name": "ai-dspy",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/haystack",
+  "name": "ai-haystack",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/instructor",
+  "name": "ai-instructor",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/koog",
+  "name": "ai-koog",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/deepagents",
+  "name": "ai-deepagents",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/langgraph",
+  "name": "ai-langgraph",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/langserve",
+  "name": "ai-langserve",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/litellm-sdk",
+  "name": "ai-litellm-sdk",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/livekit",
+  "name": "ai-livekit",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/llamaindex",
+  "name": "ai-llamaindex",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/llamaindex-workflows",
+  "name": "ai-llamaindex-workflows",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/mastra",
+  "name": "ai-mastra",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/microsoft-agent-framework",
+  "name": "ai-microsoft-agent-framework",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/mirascope",
+  "name": "ai-mirascope",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/pipecat",
+  "name": "ai-pipecat",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/pydantic-ai",
+  "name": "ai-pydantic-ai",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/quarkus-langchain4j",
+  "name": "ai-quarkus-langchain4j",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/ragas",
+  "name": "ai-ragas",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/restate",
+  "name": "ai-restate",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/semantic-kernel",
+  "name": "ai-semantic-kernel",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/smolagents",
+  "name": "ai-smolagents",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/spring-ai",
+  "name": "ai-spring-ai",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/strands-agents",
+  "name": "ai-strands-agents",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/swiftide",
+  "name": "ai-swiftide",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/temporal",
+  "name": "ai-temporal",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/vercel-ai-sdk",
+  "name": "ai-vercel-ai-sdk",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/frameworks/voltagent",
+  "name": "ai-voltagent",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/amazon-bedrock",
+  "name": "ai-amazon-bedrock",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/anthropic-jsts",
+  "name": "ai-anthropic-jsts",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/byteplus",
+  "name": "ai-byteplus",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/cerebras",
+  "name": "ai-cerebras",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/cohere",
+  "name": "ai-cohere",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/cometapi",
+  "name": "ai-cometapi",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/databricks",
+  "name": "ai-databricks",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/deepseek",
+  "name": "ai-deepseek",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/fireworks",
+  "name": "ai-fireworks",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/groq",
+  "name": "ai-groq",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/huggingface",
+  "name": "ai-huggingface",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/mistral",
+  "name": "ai-mistral",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/novita",
+  "name": "ai-novita",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/ollama",
+  "name": "ai-ollama",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/openai-jsts",
+  "name": "ai-openai-jsts",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/openai-assistants",
+  "name": "ai-openai-assistants",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/together-ai",
+  "name": "ai-together-ai",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/vllm",
+  "name": "ai-vllm",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/model-providers/xai-grok",
+  "name": "ai-xai-grok",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/gateways/anannas",
+  "name": "ai-anannas",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/gateways/kong-gateway",
+  "name": "ai-kong-gateway",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/gateways/portkey",
+  "name": "ai-portkey",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/gateways/vercel-ai-gateway",
+  "name": "ai-vercel-ai-gateway",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/no-code/codename-goose",
+  "name": "ai-codename-goose",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/no-code/flowise",
+  "name": "ai-flowise",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/no-code/langflow",
+  "name": "ai-langflow",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/no-code/lobechat",
+  "name": "ai-lobechat",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/no-code/n8n",
+  "name": "ai-n8n",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/no-code/openwebui",
+  "name": "ai-openwebui",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/no-code/vapi",
+  "name": "ai-vapi",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/analytics/mixpanel",
+  "name": "ai-mixpanel",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/analytics/posthog",
+  "name": "ai-posthog",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/analytics/trubrics",
+  "name": "ai-trubrics",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/cognee",
+  "name": "ai-cognee",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/exa",
+  "name": "ai-exa",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/firecrawl",
+  "name": "ai-firecrawl",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/gradio",
+  "name": "ai-gradio",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/librechat",
+  "name": "ai-librechat",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/mcp-use",
+  "name": "ai-mcp-use",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/milvus",
+  "name": "ai-milvus",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/parallel",
+  "name": "ai-parallel",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/promptfoo",
+  "name": "ai-promptfoo",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations/tools/zapier",
+  "name": "ai-zapier",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/experiments/compare/:baselineId/:candidateId",
+  "name": "aiExperimentCompare",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts/anomaly/edit/:anomaly_id",
+  "name": "editAnomalyDetection",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/sessions/view/:id",
+  "name": "SessionViewer",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/errors/view/:id",
+  "name": "ErrorViewer",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/groups/edit/:group_name",
+  "name": "editGroup",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/roles/edit/:role_name",
+  "name": "editRole",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/synthetics/status-pages/edit/:id",
+  "name": "synthetics-status-page-edit",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/slack/oauth/callback",
+  "name": "slackOAuthCallback",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/marketplace/aws/setup",
+  "name": "awsMarketplaceSetup",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/marketplace/azure/register",
+  "name": "azureMarketplaceRegister",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases/metrics",
+  "name": "dbmMetrics",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases/queries",
+  "name": "dbmQueries",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases/samples",
+  "name": "dbmSamples",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases/activity",
+  "name": "dbmActivity",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases/deadlocks",
+  "name": "dbmDeadlocks",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases/blocking",
+  "name": "dbmBlocking",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases/table-health",
+  "name": "dbmTableHealth",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases/query",
+  "name": "dbmQueryDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/model_pricing/edit",
+  "name": "modelPricingEditor",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/announcements/edit",
+  "name": "announcementBannerEditor",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/functions/import",
+  "name": "importFunction",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/pipelines/edit",
+  "name": "pipelineEditor",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/pipelines/add",
+  "name": "createPipeline",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/pipelines/import",
+  "name": "importPipeline",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/pipelines/history",
+  "name": "pipelineHistory",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/pipelines/backfill",
+  "name": "pipelineBackfill",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts/anomaly/add",
+  "name": "addAnomalyDetection",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/performance/overview",
+  "name": "rumPerformanceSummary",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/performance/web-vitals",
+  "name": "rumPerformanceWebVitals",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/performance/errors",
+  "name": "rumPerformanceErrors",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/performance/apis",
+  "name": "rumPerformanceApis",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/product-analytics/funnels/build",
+  "name": "productAnalyticsFunnelBuilder",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/product-analytics/events/new",
+  "name": "productAnalyticsEventNew",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom/logs",
+  "name": "ingestLogs",
+  "redirect": false,
+  "children": 12
+ },
+ {
+  "path": "/ingestion/custom/metrics",
+  "name": "ingestMetrics",
+  "redirect": false,
+  "children": 7
+ },
+ {
+  "path": "/ingestion/custom/profiles",
+  "name": "ingestProfiles",
+  "redirect": false,
+  "children": 1
+ },
+ {
+  "path": "/ingestion/custom/traces",
+  "name": "ingestTraces",
+  "redirect": false,
+  "children": 2
+ },
+ {
+  "path": "/ingestion/recommended/kubernetes",
+  "name": "ingestFromKubernetes",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/windows",
+  "name": "ingestFromWindows",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/linux",
+  "name": "ingestFromLinux",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/macos",
+  "name": "ingestFromMacOS",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/gpu",
+  "name": "ingestFromGpu",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/aws",
+  "name": "AWSConfig",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/gcp",
+  "name": "GCPConfig",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/azure",
+  "name": "AzureConfig",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/traces",
+  "name": "ingestFromTraces",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/frontend-monitoring",
+  "name": "frontendMonitoring",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/recommended/mcp",
+  "name": "recommendedMcp",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/sqlserver",
+  "name": "sqlserver",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/postgres",
+  "name": "postgres",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/mongodb",
+  "name": "mongodb",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/redis",
+  "name": "redis",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/couchdb",
+  "name": "couchdb",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/elasticsearch",
+  "name": "elasticsearch",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/mysql",
+  "name": "mysql",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/mariadb",
+  "name": "mariadb",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/oracle",
+  "name": "oracle",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/saphana",
+  "name": "saphana",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/snowflake",
+  "name": "snowflake",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/zookeeper",
+  "name": "zookeeper",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/cassandra",
+  "name": "cassandra",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/aerospike",
+  "name": "aerospike",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/dynamodb",
+  "name": "dynamodb",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/databases/databricks",
+  "name": "databricks",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/security/falco",
+  "name": "falco",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/security/osquery",
+  "name": "osquery",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/security/okta",
+  "name": "okta",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/security/jumpcloud",
+  "name": "jumpcloud",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/security/openvpn",
+  "name": "openvpn",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/security/office365",
+  "name": "office365",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/security/google-workspace",
+  "name": "google-workspace",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/devops/jenkins",
+  "name": "jenkins",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/devops/ansible",
+  "name": "ansible",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/devops/terraform",
+  "name": "terraform",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/devops/github-actions",
+  "name": "github-actions",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/networking/netflow",
+  "name": "netflow",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/servers/nginx",
+  "name": "nginx",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/servers/apache",
+  "name": "apache",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/servers/iis",
+  "name": "iis",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/message-queues/rabbitmq",
+  "name": "rabbitmq",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/message-queues/kafka",
+  "name": "kafka",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/message-queues/nats",
+  "name": "nats",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/languages/python",
+  "name": "python",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/languages/dotnettracing",
+  "name": "dotnettracing",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/languages/dotnetlogs",
+  "name": "dotnetlogs",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/languages/nodejs",
+  "name": "nodejs",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/languages/java",
+  "name": "java",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/languages/go",
+  "name": "go",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/languages/rust",
+  "name": "rust",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/languages/fastapi",
+  "name": "fastapi",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/others/airflow",
+  "name": "airflow",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/others/airbyte",
+  "name": "airbyte",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/others/cribl",
+  "name": "cribl",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/others/vercel",
+  "name": "vercel",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/others/heroku",
+  "name": "heroku",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/prompts/new",
+  "name": "aiPromptCreate",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/experiments/new",
+  "name": "aiExperimentCreate",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/remote-tasks/new",
+  "name": "aiRemoteTaskCreate",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/prompts/:entityId/versions/new",
+  "name": "aiPromptVersionCreate",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/product-analytics/events/:id/edit",
+  "name": "productAnalyticsEventEdit",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/queues/:id/review",
+  "name": "aiQueueWorkbench",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/remote-tasks/:id/edit",
+  "name": "aiRemoteTaskEdit",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/oncall/teams/:teamId/:tab(overview|schedule|members|policy|escalation|ownership|routing)?",
+  "name": "onCallTeamDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/public/:token",
+  "name": "publicSharedChat",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/slos/edit/:slo_id",
+  "name": "editSlo",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts/detail/:alert_id",
+  "name": "alertDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts/edit/:alert_id",
+  "name": "editAlert",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/shared/:token",
+  "name": "sharedChat",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/synthetics/edit/:id",
+  "name": "synthetics-edit",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/synthetic/private-locations/:id",
+  "name": "synthetic-private-location",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/oncall/responses/:responseId",
+  "name": "onCallResponseDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/queues/:id",
+  "name": "aiQueueDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/datasets/:id",
+  "name": "aiDatasetDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/experiments/:id",
+  "name": "aiExperimentDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/remote-tasks/:id",
+  "name": "aiRemoteTaskDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/correlation/:tab?",
+  "name": "correlationSettings",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/logs/inspector",
+  "name": "searchJobInspector",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/logs/search-history",
+  "name": "searchHistory",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/logs/search-scheduler",
+  "name": "searchScheduler",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/metrics/editor",
+  "name": "metricsEditor",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/traces/service-graph",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/traces/services",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases",
+  "name": "dbmDatabases",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/databases",
+  "redirect": false,
+  "children": 9
+ },
+ {
+  "path": "/reports/create",
+  "name": "createReport",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/hosts",
+  "name": "infraHosts",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/kubernetes",
+  "name": "infraKubernetes",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/infra/kubernetes-2",
+  "name": "infraKubernetes2",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/traces/trace-details",
+  "name": "traceDetails",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/traces/session-details",
+  "name": "sessionDetails",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/streams/stream-explore",
+  "name": "streamExplorer",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/dashboards/view",
+  "name": "viewDashboard",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/dashboards/import",
+  "name": "importDashboard",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/dashboards/add_panel",
+  "name": "addPanel",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/general",
+  "name": "general",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/organization",
+  "name": "organizationSettings",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/alert_destinations",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/settings/templates",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/settings/alert_sources",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/settings/synthetics_locations",
+  "name": "syntheticsLocations",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/model_pricing",
+  "name": "modelPricing",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/llm_providers",
+  "name": "llmProviders",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/gen_ai_agent_mapping",
+  "name": "genAiAgentMapping",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/query_management",
+  "name": "query_management",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/cipher_keys",
+  "name": "cipherKeys",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/ai_toolsets",
+  "name": "aiToolsets",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/pipeline_destinations",
+  "name": "pipelineDestinations",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/storage_settings",
+  "name": "storageSettings",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/nodes",
+  "name": "nodes",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/domain_management",
+  "name": "domainManagement",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/regex_patterns",
+  "name": "regexPatterns",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/password_policy",
+  "name": "passwordPolicy",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/license",
+  "name": "license",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings/announcements",
+  "name": "announcementBanners",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/functions",
+  "name": "functionList",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/enrichment-tables",
+  "name": "enrichmentTables",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline/pipelines",
+  "name": "pipelines",
+  "redirect": false,
+  "children": 5
+ },
+ {
+  "path": "/slos/add",
+  "name": "addSlo",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/downtimes/add",
+  "name": "addDowntime",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts/add",
+  "name": "addAlert",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts/history",
+  "name": "alertHistory",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts/insights",
+  "name": "alertInsights",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts/import-semantic-groups",
+  "name": "importSemanticGroups",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/sessions",
+  "name": "Sessions",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/errors",
+  "name": "ErrorTracking",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/source-maps",
+  "name": "SourceMaps",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/upload-source-maps",
+  "name": "UploadSourceMaps",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum/performance",
+  "name": "RumPerformance",
+  "redirect": false,
+  "children": 4
+ },
+ {
+  "path": "/product-analytics/overview",
+  "name": "productAnalyticsOverview",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/product-analytics/funnels",
+  "name": "productAnalyticsFunnels",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/product-analytics/paths",
+  "name": "productAnalyticsPaths",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/product-analytics/retention",
+  "name": "productAnalyticsRetention",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/product-analytics/events",
+  "name": "productAnalyticsEvents",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/custom",
+  "name": "custom",
+  "redirect": false,
+  "children": 4
+ },
+ {
+  "path": "/ingestion/recommended",
+  "name": "recommended",
+  "redirect": false,
+  "children": 11
+ },
+ {
+  "path": "/ingestion/databases",
+  "name": "databases",
+  "redirect": false,
+  "children": 16
+ },
+ {
+  "path": "/ingestion/security",
+  "name": "security",
+  "redirect": false,
+  "children": 7
+ },
+ {
+  "path": "/ingestion/devops",
+  "name": "devops",
+  "redirect": false,
+  "children": 4
+ },
+ {
+  "path": "/ingestion/networking",
+  "name": "networking",
+  "redirect": false,
+  "children": 1
+ },
+ {
+  "path": "/ingestion/servers",
+  "name": "servers",
+  "redirect": false,
+  "children": 3
+ },
+ {
+  "path": "/ingestion/message-queues",
+  "name": "message-queues",
+  "redirect": false,
+  "children": 3
+ },
+ {
+  "path": "/ingestion/languages",
+  "name": "languages",
+  "redirect": false,
+  "children": 8
+ },
+ {
+  "path": "/ingestion/ai-integrations",
+  "name": "ai-integrations-default",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/ingestion/ai-integrations",
+  "name": "ai-integrations",
+  "redirect": false,
+  "children": 89
+ },
+ {
+  "path": "/ingestion/others",
+  "name": "others",
+  "redirect": false,
+  "children": 5
+ },
+ {
+  "path": "/iam/users",
+  "name": "users",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/ingestionTokens",
+  "name": "ingestionTokens",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/syntheticsTokens",
+  "name": "syntheticsTokens",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/serviceAccounts",
+  "name": "serviceAccounts",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/organizations",
+  "name": "organizations",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/mcpServer",
+  "name": "mcpServer",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/groups",
+  "name": "groups",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/roles",
+  "name": "roles",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/iam/quota",
+  "name": "quota",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/synthetics/add",
+  "name": "synthetics-add",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/oncall/responses",
+  "name": "onCallResponses",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/oncall/me",
+  "name": "onCallMine",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/oncall/teams",
+  "name": "onCallTeams",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/oncall/policies",
+  "name": "onCallPolicies",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/oncall/routing",
+  "name": "onCallRouting",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/workflows/add",
+  "name": "createWorkflow",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/workflows/edit",
+  "name": "workflowEditor",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/workflows/runs",
+  "name": "workflowRuns",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/llm-insights",
+  "name": "aiLLMInsights",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/sessions",
+  "name": "aiSessions",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/agent-graph",
+  "name": "aiAgentGraph",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/agent-behavior",
+  "name": "aiAgentBehavior",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/discovery",
+  "name": "aiDiscovery",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/queues",
+  "name": "aiQueues",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/datasets",
+  "name": "aiDatasets",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/prompts",
+  "name": "aiPrompts",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/playground",
+  "name": "aiPlayground",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/experiments",
+  "name": "aiExperiments",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/remote-tasks",
+  "name": "aiRemoteTasks",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/evaluations",
+  "name": "aiEvaluations",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/ai/session-details",
+  "name": "aiSessionDetails",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/billings/usage",
+  "name": "usage",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/billings/plans",
+  "name": "plans",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/billings/invoice_history",
+  "name": "invoice_history",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/billings/billing_group",
+  "name": "billing_group",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/billings/paid_usage",
+  "name": "paidUsage",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/traces/databases/:dbmPath(.*)*",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/synthetics/:id/results/run/:runId/:executionId",
+  "name": "synthetics-run-detail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/downtimes/:id/edit",
+  "name": "editDowntime",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/synthetics/:id/results",
+  "name": "synthetic-monitor-results",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/slos/:slo_id",
+  "name": "sloDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/downtimes/:id",
+  "name": "downtimeDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/short/:id",
+  "name": "shortUrl",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/incidents/:id",
+  "name": "incidentDetail",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/login",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/signup",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/logout",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/cb",
+  "name": "callback",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/",
+  "name": "home",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/logs",
+  "name": "logs",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/metrics",
+  "name": "metrics",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/promql-builder",
+  "name": "promqlBuilder",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/traces",
+  "name": "traces",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/profiles",
+  "name": "profiles",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/reports",
+  "name": "reports",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/service-graph",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/streams",
+  "name": "logstreams",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/about",
+  "name": "about",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/dashboards",
+  "name": "dashboards",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/member_subscription",
+  "name": "member_subscription",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/settings",
+  "name": "settings",
+  "redirect": true,
+  "children": 23
+ },
+ {
+  "path": "/enterprise-locked",
+  "name": "enterpriseFeatureLocked",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/enterprise-features",
+  "name": "enterpriseFeatures",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/pipeline",
+  "name": "pipeline",
+  "redirect": false,
+  "children": 4
+ },
+ {
+  "path": "/slos",
+  "name": "sloList",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alerts",
+  "name": "alertList",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alert-destinations",
+  "name": "alertDestinations",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alert-templates",
+  "name": "alertTemplates",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alert-library",
+  "name": "alertLibrary",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/alert-sources",
+  "name": "alertSources",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/downtimes",
+  "name": "downtimes",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/rum",
+  "name": "RUM",
+  "redirect": false,
+  "children": 7
+ },
+ {
+  "path": "/product-analytics",
+  "name": "productAnalytics",
+  "redirect": false,
+  "children": 6
+ },
+ {
+  "path": "/ingestion",
+  "name": "ingestion",
+  "redirect": false,
+  "children": 11
+ },
+ {
+  "path": "/iam",
+  "name": "iam",
+  "redirect": false,
+  "children": 11
+ },
+ {
+  "path": "/synthetics",
+  "name": "synthetics",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/incidents",
+  "name": "incidentList",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/autoobserve",
+  "name": "autoobserve",
+  "redirect": false,
+  "children": 0
+ },
+ {
+  "path": "/auto-observe-2",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/workflows",
+  "name": "workflows",
+  "redirect": false,
+  "children": 3
+ },
+ {
+  "path": "/ai",
+  "name": "aiObservability",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/ai",
+  "redirect": false,
+  "children": 24
+ },
+ {
+  "path": "/online-evals",
+  "redirect": true,
+  "children": 0
+ },
+ {
+  "path": "/billings",
+  "name": "billings",
+  "redirect": false,
+  "children": 5
+ },
+ {
+  "path": "/",
+  "redirect": false,
+  "children": 86
+ },
+ {
+  "path": "/:catchAll(.*)*",
+  "redirect": false,
+  "children": 0
+ }
+]

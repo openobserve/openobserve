@@ -1,0 +1,342 @@
+{
+ "login-sso-choice": {
+  "url": "https://<dev-env>/web/login",
+  "title": "OpenObserve - Login",
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "tags": [
+     "wcag2aa",
+     "wcag143"
+    ],
+    "nodes": [
+     {
+      "target": ".relative.w-full.items-center > span",
+      "html": "<span class=\"text-center\">Login with SSO</span>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.94 (foreground color: #ffffff, background color: #6b76e3, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+     },
+     {
+      "target": ".hover\\:text-text-secondary",
+      "html": "<a class=\"hover:text-text-secondary cursor-pointer py-3\" data-test=\"login-as-internal-user\" style=\"text-decoration: underline;\">Login as internal user</a>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.88 (foreground color: #6b76e3, background color: #fdfdff, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+     }
+    ]
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "help": "Images must have alternative text",
+    "tags": [
+     "wcag2a",
+     "wcag111"
+    ],
+    "nodes": [
+     {
+      "target": ".absolute",
+      "html": "<img class=\"absolute\" src=\"/web/src/assets/images/common/sso.svg\" style=\"width: 1.875rem; left: 1rem;\">",
+      "summary": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element's default semantics "
+     }
+    ]
+   }
+  ],
+  "incomplete": [
+   {
+    "id": "bypass",
+    "n": 1
+   }
+  ],
+  "tab": [
+   "A# [] name=\"\" outline=auto/1px/rgba(153, 153, 158, 0.65) shadow=none",
+   "BUTTON# [sso-login-btn] name=\"Login with SSO\" outline=none/0px/rgba(153, 153, 158, 0.65) shadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0",
+   "BODY# [] name=\"Login\nLogin with SSO\nLogin as internal u\" outline=none/0px/rgb(64, 64, 64) shadow=none",
+   "A# [] name=\"\" outline=auto/1px/rgba(153, 153, 158, 0.65) shadow=none"
+  ],
+  "headings": [],
+  "landmarks": [],
+  "logoAlt": [
+   "IMG alt=OpenObserve Logo aria-hidden=null role=null src=es/common/openobserve_latest_light_2.svg",
+   "IMG alt=null aria-hidden=null role=null src=/web/src/assets/images/common/sso.svg"
+  ]
+ },
+ "internalLinkKeyboard": {
+  "href": null,
+  "tabIndex": 0,
+  "role": null
+ },
+ "internalFormOpenedByKeyboard": false,
+ "login-internal-form": {
+  "url": "https://<dev-env>/web/login",
+  "title": "OpenObserve - Login",
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "tags": [
+     "wcag2aa",
+     "wcag143"
+    ],
+    "nodes": [
+     {
+      "target": ".relative.text-center.items-center > .text-center",
+      "html": "<span class=\"text-center\">Login with SSO</span>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.94 (foreground color: #ffffff, background color: #6b76e3, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+     }
+    ]
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "help": "Images must have alternative text",
+    "tags": [
+     "wcag2a",
+     "wcag111"
+    ],
+    "nodes": [
+     {
+      "target": ".absolute",
+      "html": "<img class=\"absolute\" src=\"/web/src/assets/images/common/sso.svg\" style=\"width: 1.875rem; left: 1rem;\">",
+      "summary": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element's default semantics "
+     }
+    ]
+   }
+  ],
+  "incomplete": [
+   {
+    "id": "bypass",
+    "n": 1
+   }
+  ],
+  "inputs": [
+   "BUTTON type=button id= name= labels= aria-label=null aria-labelledby=null ac=null req=undefined aria-req=null ph=undefined txt=Login with SSO dt=sso-login-btn",
+   "INPUT type=email id=v-7 name=name labels=User Email\n* aria-label=null aria-labelledby=null ac=null req=false aria-req=true ph=Email txt= dt=login-user-id-field",
+   "INPUT type=password id=v-8 name=password labels=Password\n* aria-label=null aria-labelledby=null ac=null req=false aria-req=true ph=Password txt= dt=login-password-field",
+   "BUTTON type=submit id= name= labels= aria-label=null aria-labelledby=null ac=null req=undefined aria-req=null ph=undefined txt=Login dt=login-sign-in"
+  ],
+  "tab": [
+   "A# [] name=\"\" outline=auto/1px/rgba(153, 153, 158, 0.65) shadow=none",
+   "BUTTON# [sso-login-btn] name=\"Login with SSO\" outline=none/0px/rgba(153, 153, 158, 0.65) shadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0",
+   "INPUT#v-7 [login-user-id-field] name=\"Email\" outline=none/0px/rgba(153, 153, 158, 0.65) shadow=none",
+   "INPUT#v-8 [login-password-field] name=\"Password\" outline=none/0px/rgba(153, 153, 158, 0.65) shadow=none",
+   "BUTTON# [login-sign-in] name=\"Login\" outline=none/0px/rgba(153, 153, 158, 0.65) shadow=rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0",
+   "BODY# [] name=\"Login\nLogin with SSO\nLogin as internal u\" outline=none/0px/rgb(64, 64, 64) shadow=none"
+  ]
+ },
+ "login-internal-empty-submit": {
+  "url": "https://<dev-env>/web/login",
+  "title": "OpenObserve - Login",
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "tags": [
+     "wcag2aa",
+     "wcag143"
+    ],
+    "nodes": [
+     {
+      "target": ".relative.text-center.justify-center > .text-center",
+      "html": "<span class=\"text-center\">Login with SSO</span>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.94 (foreground color: #ffffff, background color: #6b76e3, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+     },
+     {
+      "target": ".hover\\:text-text-secondary",
+      "html": "<a class=\"hover:text-text-secondary cursor-pointer py-3\" data-test=\"login-as-internal-user\" style=\"text-decoration: underline;\">Login as internal user</a>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.88 (foreground color: #6b76e3, background color: #fdfdff, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+     }
+    ]
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "help": "Images must have alternative text",
+    "tags": [
+     "wcag2a",
+     "wcag111"
+    ],
+    "nodes": [
+     {
+      "target": ".absolute",
+      "html": "<img class=\"absolute\" src=\"/web/src/assets/images/common/sso.svg\" style=\"width: 1.875rem; left: 1rem;\">",
+      "summary": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element's default semantics "
+     }
+    ]
+   }
+  ],
+  "incomplete": [
+   {
+    "id": "bypass",
+    "n": 1
+   }
+  ],
+  "afterSubmit": {
+   "active": "BUTTON#",
+   "invalid": 2,
+   "alerts": [
+    "alert/null:Email is required",
+    "alert/null:Password is required"
+   ],
+   "errText": [
+    "Email is required",
+    "Password is required"
+   ]
+  }
+ },
+ "login-internal-bad-creds": {
+  "url": "https://<dev-env>/web/login",
+  "title": "OpenObserve - Login",
+  "violations": [
+   {
+    "id": "aria-hidden-focus",
+    "impact": "serious",
+    "help": "ARIA hidden element must not be focusable or contain focusable elements",
+    "tags": [
+     "wcag2a",
+     "wcag412"
+    ],
+    "nodes": [
+     {
+      "target": "div[role=\"region\"] > span[aria-hidden=\"true\"]:nth-child(1)",
+      "html": "<span aria-hidden=\"true\" tabindex=\"0\" style=\"position: fixed; border: 0px; width: 1px; height: 1px; padding: 0px; margin: -1px; overflow: hidden; clip: rect(0px, 0px, 0px, 0px); clip-path: inset(50%);",
+      "summary": "Fix all of the following:\n  Focusable content should have tabindex=\"-1\" or be removed from the DOM"
+     },
+     {
+      "target": "span[aria-hidden=\"true\"]:nth-child(3)",
+      "html": "<span aria-hidden=\"true\" tabindex=\"0\" style=\"position: fixed; border: 0px; width: 1px; height: 1px; padding: 0px; margin: -1px; overflow: hidden; clip: rect(0px, 0px, 0px, 0px); clip-path: inset(50%);",
+      "summary": "Fix all of the following:\n  Focusable content should have tabindex=\"-1\" or be removed from the DOM"
+     }
+    ]
+   },
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "tags": [
+     "wcag2aa",
+     "wcag143"
+    ],
+    "nodes": [
+     {
+      "target": ".text-center.relative.justify-center > .text-center",
+      "html": "<span class=\"text-center\">Login with SSO</span>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.94 (foreground color: #ffffff, background color: #6b76e3, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+     },
+     {
+      "target": ".hover\\:text-text-secondary",
+      "html": "<a class=\"hover:text-text-secondary cursor-pointer py-3\" data-test=\"login-as-internal-user\" style=\"text-decoration: underline;\">Login as internal user</a>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.88 (foreground color: #6b76e3, background color: #fdfdff, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+     }
+    ]
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "help": "Images must have alternative text",
+    "tags": [
+     "wcag2a",
+     "wcag111"
+    ],
+    "nodes": [
+     {
+      "target": ".text-center.relative.justify-center > img",
+      "html": "<img class=\"absolute\" src=\"/web/src/assets/images/common/sso.svg\" style=\"width: 1.875rem; left: 1rem;\">",
+      "summary": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element's default semantics "
+     }
+    ]
+   },
+   {
+    "id": "list",
+    "impact": "serious",
+    "help": "<ul> and <ol> must only directly contain <li>, <script> or <template> elements",
+    "tags": [
+     "wcag2a",
+     "wcag131"
+    ],
+    "nodes": [
+     {
+      "target": "ol",
+      "html": "<ol tabindex=\"-1\" class=\"fixed bottom-4 left-1/2 -translate-x-1/2 flex flex-col-reverse gap-2 z-[9999]\">",
+      "summary": "Fix all of the following:\n  List element has direct children that are not allowed: [role=alert]"
+     }
+    ]
+   }
+  ],
+  "incomplete": [
+   {
+    "id": "bypass",
+    "n": 1
+   }
+  ],
+  "afterSubmit": {
+   "active": "INPUT#v-8",
+   "alerts": [
+    "alert/assertive:Notification Invalid username or passwordInvalid username or password",
+    "alert/null:Invalid username or password\nInvalid username or password"
+   ],
+   "url": "/web/login"
+  }
+ },
+ "reflow320": {
+  "sw": 320,
+  "cw": 320
+ },
+ "viewportMeta": "width=device-width, initial-scale=1.0",
+ "unknown-route-unauth": {
+  "url": "https://<dev-env>/web/login",
+  "title": "OpenObserve - Login",
+  "violations": [
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "tags": [
+     "wcag2aa",
+     "wcag143"
+    ],
+    "nodes": [
+     {
+      "target": ".relative.w-full.items-center > span",
+      "html": "<span class=\"text-center\">Login with SSO</span>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.94 (foreground color: #ffffff, background color: #6b76e3, font size: 10.5pt (14px), font weight: normal). Expected contrast ratio of 4.5:1"
+     },
+     {
+      "target": ".hover\\:text-text-secondary",
+      "html": "<a class=\"hover:text-text-secondary cursor-pointer py-3\" data-test=\"login-as-internal-user\" style=\"text-decoration: underline;\">Login as internal user</a>",
+      "summary": "Fix any of the following:\n  Element has insufficient color contrast of 3.88 (foreground color: #6b76e3, background color: #fdfdff, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+     }
+    ]
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "help": "Images must have alternative text",
+    "tags": [
+     "wcag2a",
+     "wcag111"
+    ],
+    "nodes": [
+     {
+      "target": ".absolute",
+      "html": "<img class=\"absolute\" src=\"/web/src/assets/images/common/sso.svg\" style=\"width: 1.875rem; left: 1rem;\">",
+      "summary": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist, references elements that do not exist or references elements that are empty\n  Element has no title attribute\n  Element's default semantics "
+     }
+    ]
+   }
+  ],
+  "incomplete": [
+   {
+    "id": "bypass",
+    "n": 1
+   }
+  ]
+ },
+ "consoleErrors": [
+  "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+  "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+  "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+  "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+ ]
+}

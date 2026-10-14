@@ -1,0 +1,2897 @@
+{
+ "homeInitialFocus": {
+  "tag": "DIV",
+  "role": null,
+  "name": "",
+  "dt": "",
+  "expanded": null,
+  "x": 456,
+  "y": 765,
+  "w": 848,
+  "h": 40,
+  "inView": true,
+  "obscured": false
+ },
+ "tab_home": [
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 448,
+   "y": 834,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 200,
+    "ratio": 0.103,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Auto Navigation",
+   "dt": "",
+   "expanded": null,
+   "x": 488,
+   "y": 833,
+   "w": 142,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 648,
+    "ratio": 0.092,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BODY"
+  },
+  {
+   "tag": "A",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 12,
+   "y": 4,
+   "w": 120,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 612,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Edition: Enterprise",
+   "dt": "upgrade-to-enterprise-btn",
+   "expanded": null,
+   "x": 859,
+   "y": 6,
+   "w": 147,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 656,
+    "ratio": 0.104,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "default",
+   "dt": "navbar-organizations-select-trigger",
+   "expanded": "false",
+   "x": 1014,
+   "y": 6,
+   "w": 224,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 964,
+    "ratio": 0.102,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "AI Assistant",
+   "dt": "menu-link-ai-item",
+   "expanded": null,
+   "x": 1246,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 207,
+    "ratio": 0.117,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Switch to Dark Mode",
+   "dt": "navbar-theme-toggle-btn",
+   "expanded": null,
+   "x": 1284,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Slack",
+   "dt": "menu-link-slack-item",
+   "expanded": null,
+   "x": 1322,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "svg",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 1327,
+   "y": 10,
+   "w": 20,
+   "h": 20,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 148,
+    "ratio": 0.145,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Help",
+   "dt": "menu-link-help-item",
+   "expanded": "false",
+   "x": 1360,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "root@example.com",
+   "dt": "header-my-account-profile-icon",
+   "expanded": "false",
+   "x": 1398,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 186,
+    "ratio": 0.105,
+    "visible": true
+   }
+  },
+  {
+   "tag": "A",
+   "role": null,
+   "name": "Home",
+   "dt": "menu-link-/-item",
+   "expanded": null,
+   "x": 4,
+   "y": 40,
+   "w": 80,
+   "h": 51,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 341,
+    "ratio": 0.059,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": "tab",
+   "name": "O2 Assistant",
+   "dt": "home-tab-ai",
+   "expanded": null,
+   "x": 104,
+   "y": 96,
+   "w": 102,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 349,
+    "ratio": 0.059,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "New chat",
+   "dt": "",
+   "expanded": null,
+   "x": 302,
+   "y": 148,
+   "w": 24,
+   "h": 24,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 136,
+    "ratio": 0.105,
+    "visible": true
+   }
+  },
+  {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search",
+   "dt": "",
+   "expanded": null,
+   "x": 133,
+   "y": 178,
+   "w": 191,
+   "h": 29,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 0,
+    "ratio": 0,
+    "visible": false
+   }
+  },
+  {
+   "tag": "DIV",
+   "role": "button",
+   "name": "Write a Query SQL for logs, traces, RUM,",
+   "dt": "",
+   "expanded": null,
+   "x": 462,
+   "y": 390,
+   "w": 199,
+   "h": 160,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 2063,
+    "ratio": 0.057,
+    "visible": true
+   }
+  },
+  {
+   "tag": "DIV",
+   "role": "button",
+   "name": "Investigate Incidents Root-cause across ",
+   "dt": "",
+   "expanded": null,
+   "x": 675,
+   "y": 390,
+   "w": 199,
+   "h": 160,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 2026,
+    "ratio": 0.056,
+    "visible": true
+   }
+  },
+  {
+   "tag": "DIV",
+   "role": "button",
+   "name": "Build a Dashboard From a topic — e.g. \"K",
+   "dt": "",
+   "expanded": null,
+   "x": 887,
+   "y": 390,
+   "w": 199,
+   "h": 160,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 2022,
+    "ratio": 0.056,
+    "visible": true
+   }
+  },
+  {
+   "tag": "DIV",
+   "role": "button",
+   "name": "Create an Alert Threshold or scheduled a",
+   "dt": "",
+   "expanded": null,
+   "x": 1100,
+   "y": 390,
+   "w": 199,
+   "h": 160,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 2057,
+    "ratio": 0.057,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Write VRL to parse JSON from my nginx lo",
+   "dt": "",
+   "expanded": null,
+   "x": 462,
+   "y": 602,
+   "w": 273,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1652,
+    "ratio": 0.111,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Generate a regex pattern to redact email",
+   "dt": "",
+   "expanded": null,
+   "x": 743,
+   "y": 602,
+   "w": 273,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1699,
+    "ratio": 0.115,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Map my \"default\" stream schema",
+   "dt": "",
+   "expanded": null,
+   "x": 1025,
+   "y": 602,
+   "w": 273,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1652,
+    "ratio": 0.111,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Write PromQL for pods using > 80% CPU",
+   "dt": "",
+   "expanded": null,
+   "x": 462,
+   "y": 650,
+   "w": 273,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1652,
+    "ratio": 0.111,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Convert this Datadog query to OpenObserv",
+   "dt": "",
+   "expanded": null,
+   "x": 743,
+   "y": 650,
+   "w": 273,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1699,
+    "ratio": 0.115,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Why was my last alert fired?",
+   "dt": "",
+   "expanded": null,
+   "x": 1025,
+   "y": 650,
+   "w": 273,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1652,
+    "ratio": 0.111,
+    "visible": true
+   }
+  },
+  {
+   "tag": "DIV",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 456,
+   "y": 765,
+   "w": 848,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 0,
+    "ratio": 0,
+    "visible": false
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 448,
+   "y": 834,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 200,
+    "ratio": 0.103,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Auto Navigation",
+   "dt": "",
+   "expanded": null,
+   "x": 488,
+   "y": 833,
+   "w": 142,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 648,
+    "ratio": 0.092,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BODY"
+  }
+ ],
+ "tab_logs": [
+  {
+   "tag": "A",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 12,
+   "y": 4,
+   "w": 120,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 612,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Edition: Enterprise",
+   "dt": "upgrade-to-enterprise-btn",
+   "expanded": null,
+   "x": 859,
+   "y": 6,
+   "w": 147,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 656,
+    "ratio": 0.104,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "default",
+   "dt": "navbar-organizations-select-trigger",
+   "expanded": "false",
+   "x": 1014,
+   "y": 6,
+   "w": 224,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 964,
+    "ratio": 0.102,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "AI Assistant",
+   "dt": "menu-link-ai-item",
+   "expanded": null,
+   "x": 1246,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 207,
+    "ratio": 0.117,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Switch to Dark Mode",
+   "dt": "navbar-theme-toggle-btn",
+   "expanded": null,
+   "x": 1284,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Slack",
+   "dt": "menu-link-slack-item",
+   "expanded": null,
+   "x": 1322,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "svg",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 1327,
+   "y": 10,
+   "w": 20,
+   "h": 20,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 148,
+    "ratio": 0.145,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Help",
+   "dt": "menu-link-help-item",
+   "expanded": "false",
+   "x": 1360,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "root@example.com",
+   "dt": "header-my-account-profile-icon",
+   "expanded": "false",
+   "x": 1398,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 186,
+    "ratio": 0.105,
+    "visible": true
+   }
+  },
+  {
+   "tag": "A",
+   "role": null,
+   "name": "Home",
+   "dt": "menu-link-/-item",
+   "expanded": null,
+   "x": 4,
+   "y": 40,
+   "w": 80,
+   "h": 51,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 346,
+    "ratio": 0.06,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Search",
+   "dt": "logs-logs-toggle",
+   "expanded": null,
+   "x": 98,
+   "y": 50,
+   "w": 84,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 380,
+    "ratio": 0.1,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Reset",
+   "dt": "logs-search-bar-reset-filters-btn",
+   "expanded": null,
+   "x": 474,
+   "y": 50,
+   "w": 77,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 376,
+    "ratio": 0.107,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "",
+   "dt": "logs-search-bar-histogram-btn",
+   "expanded": null,
+   "x": 555,
+   "y": 50,
+   "w": 72,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 316,
+    "ratio": 0.094,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": "switch",
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 566,
+   "y": 55,
+   "w": 28,
+   "h": 18,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 293,
+    "ratio": 0.244,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "More",
+   "dt": "logs-search-bar-utilities-menu-btn",
+   "expanded": "false",
+   "x": 635,
+   "y": 49,
+   "w": 61,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 316,
+    "ratio": 0.104,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "",
+   "dt": "logs-search-bar-more-options-btn",
+   "expanded": "false",
+   "x": 1395,
+   "y": 49,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 196,
+    "ratio": 0.111,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Share Link",
+   "dt": "logs-search-bar-share-link-btn",
+   "expanded": null,
+   "x": 1361,
+   "y": 49,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 196,
+    "ratio": 0.111,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Previous",
+   "dt": "date-time-prev-btn",
+   "expanded": null,
+   "x": 980,
+   "y": 50,
+   "w": 28,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 221,
+    "ratio": 0.138,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Past 15 Minutes",
+   "dt": "date-time-btn",
+   "expanded": "false",
+   "x": 1008,
+   "y": 50,
+   "w": 151,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 704,
+    "ratio": 0.108,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Run query",
+   "dt": "logs-search-bar-refresh-btn",
+   "expanded": null,
+   "x": 1196,
+   "y": 49,
+   "w": 94,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 444,
+    "ratio": 0.1,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "",
+   "dt": "logs-search-bar-refresh-cache-dropdown-trigger",
+   "expanded": "false",
+   "x": 1291,
+   "y": 49,
+   "w": 32,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 196,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "",
+   "dt": "logs-search-bar-refresh-interval-btn",
+   "expanded": "false",
+   "x": 1327,
+   "y": 49,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 196,
+    "ratio": 0.111,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "",
+   "dt": "logs-query-editor-full_screen-btn",
+   "expanded": null,
+   "x": 1397,
+   "y": 91,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 208,
+    "ratio": 0.118,
+    "visible": true
+   }
+  },
+  {
+   "tag": "TEXTAREA",
+   "role": "textbox",
+   "name": "Editor content",
+   "dt": "",
+   "expanded": null,
+   "x": 113,
+   "y": 91,
+   "w": 1296,
+   "h": 18,
+   "inView": true,
+   "obscured": true,
+   "focus": {
+    "measured": true,
+    "changedPx": 146,
+    "ratio": 0.004,
+    "visible": false
+   }
+  },
+  {
+   "tag": "TEXTAREA",
+   "role": "textbox",
+   "name": "Editor content",
+   "dt": "",
+   "expanded": null,
+   "x": 113,
+   "y": 91,
+   "w": 1296,
+   "h": 18,
+   "inView": true,
+   "obscured": true,
+   "focus": {
+    "measured": true,
+    "changedPx": 91,
+    "ratio": 0.002,
+    "visible": false
+   }
+  },
+  {
+   "tag": "TEXTAREA",
+   "role": "textbox",
+   "name": "Editor content",
+   "dt": "",
+   "expanded": null,
+   "x": 113,
+   "y": 91,
+   "w": 1296,
+   "h": 18,
+   "inView": true,
+   "obscured": true,
+   "focus": {
+    "measured": true,
+    "changedPx": 185,
+    "ratio": 0.005,
+    "visible": false
+   }
+  },
+  {
+   "tag": "TEXTAREA",
+   "role": "textbox",
+   "name": "Editor content",
+   "dt": "",
+   "expanded": null,
+   "x": 113,
+   "y": 91,
+   "w": 1296,
+   "h": 18,
+   "inView": true,
+   "obscured": true,
+   "focus": {
+    "measured": true,
+    "changedPx": 297,
+    "ratio": 0.008,
+    "visible": false
+   }
+  },
+  {
+   "tag": "TEXTAREA",
+   "role": "textbox",
+   "name": "Editor content",
+   "dt": "",
+   "expanded": null,
+   "x": 113,
+   "y": 91,
+   "w": 1296,
+   "h": 18,
+   "inView": true,
+   "obscured": true,
+   "focus": {
+    "measured": true,
+    "changedPx": 369,
+    "ratio": 0.009,
+    "visible": false
+   }
+  },
+  {
+   "tag": "TEXTAREA",
+   "role": "textbox",
+   "name": "Editor content",
+   "dt": "",
+   "expanded": null,
+   "x": 113,
+   "y": 91,
+   "w": 1296,
+   "h": 18,
+   "inView": true,
+   "obscured": true,
+   "focus": {
+    "measured": true,
+    "changedPx": 369,
+    "ratio": 0.009,
+    "visible": false
+   }
+  },
+  {
+   "tag": "TEXTAREA",
+   "role": "textbox",
+   "name": "Editor content",
+   "dt": "",
+   "expanded": null,
+   "x": 113,
+   "y": 91,
+   "w": 1296,
+   "h": 18,
+   "inView": true,
+   "obscured": true,
+   "focus": {
+    "measured": true,
+    "changedPx": 369,
+    "ratio": 0.009,
+    "visible": false
+   }
+  }
+ ],
+ "tab_alerts": [
+  {
+   "tag": "A",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 12,
+   "y": 4,
+   "w": 120,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 612,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Edition: Enterprise",
+   "dt": "upgrade-to-enterprise-btn",
+   "expanded": null,
+   "x": 859,
+   "y": 6,
+   "w": 147,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 656,
+    "ratio": 0.104,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "default",
+   "dt": "navbar-organizations-select-trigger",
+   "expanded": "false",
+   "x": 1014,
+   "y": 6,
+   "w": 224,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 964,
+    "ratio": 0.102,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "AI Assistant",
+   "dt": "menu-link-ai-item",
+   "expanded": null,
+   "x": 1246,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 207,
+    "ratio": 0.117,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Switch to Dark Mode",
+   "dt": "navbar-theme-toggle-btn",
+   "expanded": null,
+   "x": 1284,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Slack",
+   "dt": "menu-link-slack-item",
+   "expanded": null,
+   "x": 1322,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "svg",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 1327,
+   "y": 10,
+   "w": 20,
+   "h": 20,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 148,
+    "ratio": 0.145,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Help",
+   "dt": "menu-link-help-item",
+   "expanded": "false",
+   "x": 1360,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "root@example.com",
+   "dt": "header-my-account-profile-icon",
+   "expanded": "false",
+   "x": 1398,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 186,
+    "ratio": 0.105,
+    "visible": true
+   }
+  },
+  {
+   "tag": "A",
+   "role": null,
+   "name": "Home",
+   "dt": "menu-link-/-item",
+   "expanded": null,
+   "x": 4,
+   "y": 40,
+   "w": 80,
+   "h": 51,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 341,
+    "ratio": 0.059,
+    "visible": true
+   }
+  },
+  {
+   "tag": "A",
+   "role": null,
+   "name": "OpenObserve provider on the Terraform Re",
+   "dt": "alert-list-iac-registries-terraform",
+   "expanded": null,
+   "x": 988,
+   "y": 54,
+   "w": 113,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 544,
+    "ratio": 0.095,
+    "visible": true
+   }
+  },
+  {
+   "tag": "A",
+   "role": null,
+   "name": "OpenObserve provider on the OpenTofu Reg",
+   "dt": "alert-list-iac-registries-opentofu",
+   "expanded": null,
+   "x": 1109,
+   "y": 54,
+   "w": 113,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 548,
+    "ratio": 0.095,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Import",
+   "dt": "alert-import",
+   "expanded": null,
+   "x": 1231,
+   "y": 54,
+   "w": 93,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 464,
+    "ratio": 0.096,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "New alert",
+   "dt": "alert-list-add-alert-btn",
+   "expanded": null,
+   "x": 1332,
+   "y": 54,
+   "w": 87,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 428,
+    "ratio": 0.094,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": "tab",
+   "name": "All Alerts",
+   "dt": "alert-section-tab-alertList",
+   "expanded": null,
+   "x": 104,
+   "y": 96,
+   "w": 96,
+   "h": 40,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 337,
+    "ratio": 0.061,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Add Folder",
+   "dt": "dashboard-new-folder-btn",
+   "expanded": null,
+   "x": 288,
+   "y": 143,
+   "w": 24,
+   "h": 24,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 136,
+    "ratio": 0.105,
+    "visible": true
+   }
+  },
+  {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search Folder",
+   "dt": "folder-search-field",
+   "expanded": null,
+   "x": 120,
+   "y": 175,
+   "w": 191,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 836,
+    "ratio": 0.094,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": "tab",
+   "name": "default",
+   "dt": "dashboard-folder-tab-default",
+   "expanded": null,
+   "x": 99,
+   "y": 218,
+   "w": 209,
+   "h": 36,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 948,
+    "ratio": 0.089,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "All",
+   "dt": "alert-list-tab-all",
+   "expanded": null,
+   "x": 334,
+   "y": 148,
+   "w": 59,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 280,
+    "ratio": 0.1,
+    "visible": true
+   }
+  },
+  {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search Alert",
+   "dt": "alert-list-search-input-field",
+   "expanded": null,
+   "x": 823,
+   "y": 146,
+   "w": 253,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1060,
+    "ratio": 0.091,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "This folder",
+   "dt": "alert-list-search-scope-current",
+   "expanded": null,
+   "x": 1080,
+   "y": 152,
+   "w": 91,
+   "h": 20,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 376,
+    "ratio": 0.114,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Manage columns",
+   "dt": "o2-table-column-toggle-btn",
+   "expanded": null,
+   "x": 1284,
+   "y": 146,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 212,
+    "ratio": 0.11,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "just now",
+   "dt": "alert-list-refresh-btn",
+   "expanded": null,
+   "x": 1324,
+   "y": 146,
+   "w": 95,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 649,
+    "ratio": 0.138,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "— Failed",
+   "dt": "alert-summary-failed",
+   "expanded": null,
+   "x": 331,
+   "y": 194,
+   "w": 211,
+   "h": 46,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 476,
+    "ratio": 0.037,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "— Triggered < 15m",
+   "dt": "alert-summary-recent",
+   "expanded": null,
+   "x": 550,
+   "y": 194,
+   "w": 211,
+   "h": 46,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 476,
+    "ratio": 0.037,
+    "visible": true
+   }
+  }
+ ],
+ "tab_dashboards": [
+  {
+   "tag": "A",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 12,
+   "y": 4,
+   "w": 120,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 612,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Edition: Enterprise",
+   "dt": "upgrade-to-enterprise-btn",
+   "expanded": null,
+   "x": 859,
+   "y": 6,
+   "w": 147,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 656,
+    "ratio": 0.104,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "default",
+   "dt": "navbar-organizations-select-trigger",
+   "expanded": "false",
+   "x": 1014,
+   "y": 6,
+   "w": 224,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 964,
+    "ratio": 0.102,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "AI Assistant",
+   "dt": "menu-link-ai-item",
+   "expanded": null,
+   "x": 1246,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 207,
+    "ratio": 0.117,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Switch to Dark Mode",
+   "dt": "navbar-theme-toggle-btn",
+   "expanded": null,
+   "x": 1284,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Slack",
+   "dt": "menu-link-slack-item",
+   "expanded": null,
+   "x": 1322,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "svg",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 1327,
+   "y": 10,
+   "w": 20,
+   "h": 20,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 148,
+    "ratio": 0.145,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Help",
+   "dt": "menu-link-help-item",
+   "expanded": "false",
+   "x": 1360,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "root@example.com",
+   "dt": "header-my-account-profile-icon",
+   "expanded": "false",
+   "x": 1398,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 186,
+    "ratio": 0.105,
+    "visible": true
+   }
+  },
+  {
+   "tag": "A",
+   "role": null,
+   "name": "Home",
+   "dt": "menu-link-/-item",
+   "expanded": null,
+   "x": 4,
+   "y": 40,
+   "w": 80,
+   "h": 51,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 341,
+    "ratio": 0.059,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Import",
+   "dt": "dashboard-import",
+   "expanded": "false",
+   "x": 1167,
+   "y": 54,
+   "w": 117,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 560,
+    "ratio": 0.094,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "New dashboard",
+   "dt": "dashboard-new",
+   "expanded": null,
+   "x": 1292,
+   "y": 54,
+   "w": 127,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 588,
+    "ratio": 0.093,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Add Folder",
+   "dt": "dashboard-new-folder-btn",
+   "expanded": null,
+   "x": 288,
+   "y": 107,
+   "w": 24,
+   "h": 24,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 136,
+    "ratio": 0.105,
+    "visible": true
+   }
+  },
+  {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search Folder",
+   "dt": "folder-search-field",
+   "expanded": null,
+   "x": 120,
+   "y": 139,
+   "w": 191,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 836,
+    "ratio": 0.094,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": "tab",
+   "name": "Favorites",
+   "dt": "dashboard-folder-tab-__favorites__",
+   "expanded": null,
+   "x": 99,
+   "y": 182,
+   "w": 209,
+   "h": 36,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 948,
+    "ratio": 0.089,
+    "visible": true
+   }
+  },
+  {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search Dashboard",
+   "dt": "dashboard-search-field",
+   "expanded": null,
+   "x": 356,
+   "y": 110,
+   "w": 721,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 2928,
+    "ratio": 0.091,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "This folder",
+   "dt": "dashboard-search-scope-current",
+   "expanded": null,
+   "x": 1080,
+   "y": 116,
+   "w": 91,
+   "h": 20,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 376,
+    "ratio": 0.114,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Manage columns",
+   "dt": "o2-table-column-toggle-btn",
+   "expanded": null,
+   "x": 1284,
+   "y": 110,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 212,
+    "ratio": 0.11,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "8s ago",
+   "dt": "dashboard-list-refresh",
+   "expanded": null,
+   "x": 1324,
+   "y": 110,
+   "w": 95,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 464,
+    "ratio": 0.099,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": "checkbox",
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 333,
+   "y": 158,
+   "w": 14,
+   "h": 14,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 95,
+    "ratio": 0.141,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Name",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 427,
+   "y": 160,
+   "w": 144,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 559,
+    "ratio": 0.128,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Description",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 587,
+   "y": 160,
+   "w": 284,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1119,
+    "ratio": 0.135,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Folder",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 887,
+   "y": 160,
+   "w": 134,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 519,
+    "ratio": 0.127,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Owner",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 1037,
+   "y": 160,
+   "w": 204,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 801,
+    "ratio": 0.132,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Created",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 1257,
+   "y": 160,
+   "w": 184,
+   "h": 16,
+   "inView": true,
+   "obscured": true,
+   "focus": {
+    "measured": true,
+    "changedPx": 91,
+    "ratio": 0.017,
+    "visible": false
+   }
+  }
+ ],
+ "tab_streams": [
+  {
+   "tag": "A",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 12,
+   "y": 4,
+   "w": 120,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 612,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Edition: Enterprise",
+   "dt": "upgrade-to-enterprise-btn",
+   "expanded": null,
+   "x": 859,
+   "y": 6,
+   "w": 147,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 656,
+    "ratio": 0.104,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "default",
+   "dt": "navbar-organizations-select-trigger",
+   "expanded": "false",
+   "x": 1014,
+   "y": 6,
+   "w": 224,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 964,
+    "ratio": 0.102,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "AI Assistant",
+   "dt": "menu-link-ai-item",
+   "expanded": null,
+   "x": 1246,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 207,
+    "ratio": 0.117,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Switch to Dark Mode",
+   "dt": "navbar-theme-toggle-btn",
+   "expanded": null,
+   "x": 1284,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Slack",
+   "dt": "menu-link-slack-item",
+   "expanded": null,
+   "x": 1322,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "svg",
+   "role": null,
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 1327,
+   "y": 10,
+   "w": 20,
+   "h": 20,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 148,
+    "ratio": 0.145,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Help",
+   "dt": "menu-link-help-item",
+   "expanded": "false",
+   "x": 1360,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 187,
+    "ratio": 0.106,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "root@example.com",
+   "dt": "header-my-account-profile-icon",
+   "expanded": "false",
+   "x": 1398,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 186,
+    "ratio": 0.105,
+    "visible": true
+   }
+  },
+  {
+   "tag": "A",
+   "role": null,
+   "name": "Home",
+   "dt": "menu-link-/-item",
+   "expanded": null,
+   "x": 4,
+   "y": 40,
+   "w": 80,
+   "h": 51,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 341,
+    "ratio": 0.059,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "New stream",
+   "dt": "log-stream-add-stream-btn",
+   "expanded": null,
+   "x": 1316,
+   "y": 54,
+   "w": 103,
+   "h": 34,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 492,
+    "ratio": 0.093,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Logs",
+   "dt": "",
+   "expanded": null,
+   "x": 104,
+   "y": 171,
+   "w": 67,
+   "h": 28,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 312,
+    "ratio": 0.099,
+    "visible": true
+   }
+  },
+  {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search Stream",
+   "dt": "streams-search-stream-input-field",
+   "expanded": null,
+   "x": 460,
+   "y": 169,
+   "w": 815,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 3332,
+    "ratio": 0.092,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Manage columns",
+   "dt": "o2-table-column-toggle-btn",
+   "expanded": null,
+   "x": 1284,
+   "y": 169,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 212,
+    "ratio": 0.11,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "just now",
+   "dt": "log-stream-refresh-stats-btn",
+   "expanded": null,
+   "x": 1324,
+   "y": 169,
+   "w": 95,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 464,
+    "ratio": 0.099,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": "checkbox",
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 103,
+   "y": 217,
+   "w": 14,
+   "h": 14,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 95,
+    "ratio": 0.141,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Name",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 197,
+   "y": 219,
+   "w": 266,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 1047,
+    "ratio": 0.135,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Events",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 619,
+   "y": 219,
+   "w": 134,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 516,
+    "ratio": 0.126,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Ingested Data",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 769,
+   "y": 219,
+   "w": 114,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 436,
+    "ratio": 0.124,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Compressed Size",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 899,
+   "y": 219,
+   "w": 144,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 556,
+    "ratio": 0.127,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Index Size",
+   "dt": "o2-table-th-sort-trigger",
+   "expanded": null,
+   "x": 1189,
+   "y": 219,
+   "w": 114,
+   "h": 16,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 436,
+    "ratio": 0.124,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": "checkbox",
+   "name": "",
+   "dt": "",
+   "expanded": null,
+   "x": 103,
+   "y": 255,
+   "w": 14,
+   "h": 14,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 95,
+    "ratio": 0.141,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Explore",
+   "dt": "log-stream-explore-btn",
+   "expanded": null,
+   "x": 1320,
+   "y": 246,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 228,
+    "ratio": 0.118,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Stream Detail",
+   "dt": "log-stream-schema-btn",
+   "expanded": null,
+   "x": 1352,
+   "y": 246,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 228,
+    "ratio": 0.118,
+    "visible": true
+   }
+  },
+  {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Delete",
+   "dt": "log-stream-delete-btn",
+   "expanded": null,
+   "x": 1384,
+   "y": 246,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false,
+   "focus": {
+    "measured": true,
+    "changedPx": 228,
+    "ratio": 0.118,
+    "visible": true
+   }
+  }
+ ],
+ "sidebarKeys": [
+  {
+   "key": "ArrowDown",
+   "active": {
+    "tag": "A",
+    "role": null,
+    "name": "Logs",
+    "dt": "menu-link-/logs-item",
+    "expanded": null,
+    "x": 4,
+    "y": 95,
+    "w": 80,
+    "h": 51,
+    "inView": true,
+    "obscured": false
+   },
+   "url": "/",
+   "flyout": 0
+  },
+  {
+   "key": "ArrowDown",
+   "active": {
+    "tag": "A",
+    "role": null,
+    "name": "Metrics",
+    "dt": "menu-link-/metrics-item",
+    "expanded": null,
+    "x": 4,
+    "y": 150,
+    "w": 80,
+    "h": 51,
+    "inView": true,
+    "obscured": false
+   },
+   "url": "/",
+   "flyout": 0
+  },
+  {
+   "key": "ArrowDown",
+   "active": {
+    "tag": "A",
+    "role": null,
+    "name": "Traces",
+    "dt": "menu-link-/traces-item",
+    "expanded": "false",
+    "x": 4,
+    "y": 205,
+    "w": 80,
+    "h": 51,
+    "inView": true,
+    "obscured": false
+   },
+   "url": "/",
+   "flyout": 0
+  },
+  {
+   "key": "ArrowRight",
+   "active": {
+    "tag": "A",
+    "role": "menuitem",
+    "name": "Spans",
+    "dt": "nav-group-item-traces-spans",
+    "expanded": null,
+    "x": 97,
+    "y": 240,
+    "w": 198,
+    "h": 28,
+    "inView": true,
+    "obscured": false
+   },
+   "url": "/",
+   "flyout": 1
+  },
+  {
+   "key": "Enter",
+   "active": {
+    "tag": "A",
+    "role": null,
+    "name": "Traces",
+    "dt": "menu-link-/traces-item",
+    "expanded": "false",
+    "x": 4,
+    "y": 205,
+    "w": 80,
+    "h": 51,
+    "inView": true,
+    "obscured": false
+   },
+   "url": "/traces",
+   "flyout": 0
+  }
+ ],
+ "tracesFocusable": {
+  "tag": "A",
+  "role": null,
+  "name": "Traces",
+  "dt": "menu-link-/traces-item",
+  "expanded": "false",
+  "x": 4,
+  "y": 205,
+  "w": 80,
+  "h": 51,
+  "inView": true,
+  "obscured": false
+ },
+ "tracesEnter": {
+  "url": "/traces",
+  "flyoutVisible": 0,
+  "active": {
+   "tag": "A",
+   "role": null,
+   "name": "Traces",
+   "dt": "menu-link-/traces-item",
+   "expanded": "false",
+   "x": 4,
+   "y": 205,
+   "w": 80,
+   "h": 51,
+   "inView": true,
+   "obscured": false
+  }
+ },
+ "tracesAfterTab": {
+  "tag": "BUTTON",
+  "role": null,
+  "name": "Spans",
+  "dt": "traces-search-mode-spans-btn",
+  "expanded": null,
+  "x": 98,
+  "y": 50,
+  "w": 79,
+  "h": 28,
+  "inView": true,
+  "obscured": false
+ },
+ "menu_navbar-organizations-select-trigger": {
+  "afterEnter": {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search by name or ID",
+   "dt": "organization-search-input-field",
+   "expanded": null,
+   "x": 894,
+   "y": 77,
+   "w": 326,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "menus": [
+   "menu items=8"
+  ],
+  "expanded": "true",
+  "afterDown": {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search by name or ID",
+   "dt": "organization-search-input-field",
+   "expanded": null,
+   "x": 894,
+   "y": 77,
+   "w": 326,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "afterDown2": {
+   "tag": "INPUT",
+   "role": null,
+   "name": "Search by name or ID",
+   "dt": "organization-search-input-field",
+   "expanded": null,
+   "x": 894,
+   "y": 77,
+   "w": 326,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "afterEsc": {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "default",
+   "dt": "navbar-organizations-select-trigger",
+   "expanded": "false",
+   "x": 1014,
+   "y": 6,
+   "w": 224,
+   "h": 28,
+   "inView": true,
+   "obscured": false
+  },
+  "stillOpen": 0
+ },
+ "menu_menu-link-help-item": {
+  "afterEnter": {
+   "tag": "DIV",
+   "role": "menuitem",
+   "name": "OpenAPI",
+   "dt": "menu-link-openapi-item",
+   "expanded": null,
+   "x": 1135,
+   "y": 44,
+   "w": 250,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "menus": [
+   "menu items=4"
+  ],
+  "expanded": "true",
+  "afterDown": {
+   "tag": "DIV",
+   "role": "menuitem",
+   "name": "Docs",
+   "dt": "menu-link-docs-item",
+   "expanded": null,
+   "x": 1135,
+   "y": 85,
+   "w": 250,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "afterDown2": {
+   "tag": "DIV",
+   "role": "menuitem",
+   "name": "Keyboard Shortcuts ⇧?",
+   "dt": "menu-link-shortcuts-item",
+   "expanded": null,
+   "x": 1135,
+   "y": 126,
+   "w": 250,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "afterEsc": {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Help",
+   "dt": "menu-link-help-item",
+   "expanded": "false",
+   "x": 1360,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false
+  },
+  "stillOpen": 0
+ },
+ "menu_header-my-account-profile-icon": {
+  "afterEnter": {
+   "tag": "DIV",
+   "role": "menuitem",
+   "name": "Language English",
+   "dt": "header-language-submenu-trigger",
+   "expanded": "false",
+   "x": 1173,
+   "y": 89,
+   "w": 250,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "menus": [
+   "menu items=3"
+  ],
+  "expanded": "true",
+  "afterDown": {
+   "tag": "DIV",
+   "role": "menuitem",
+   "name": "Manage Theme",
+   "dt": "menu-link-predefined-themes-item",
+   "expanded": null,
+   "x": 1173,
+   "y": 130,
+   "w": 250,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "afterDown2": {
+   "tag": "DIV",
+   "role": "menuitem",
+   "name": "Sign Out",
+   "dt": "menu-link-logout-item",
+   "expanded": null,
+   "x": 1173,
+   "y": 171,
+   "w": 250,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "afterEsc": {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "root@example.com",
+   "dt": "header-my-account-profile-icon",
+   "expanded": "false",
+   "x": 1398,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false
+  },
+  "stillOpen": 0
+ },
+ "homeTabsArrow": {
+  "active": {
+   "tag": "BUTTON",
+   "role": "tab",
+   "name": "Overview",
+   "dt": "home-tab-overview",
+   "expanded": null,
+   "x": 206,
+   "y": 96,
+   "w": 80,
+   "h": 40,
+   "inView": true,
+   "obscured": false
+  },
+  "selected": [
+   "O2 Assistant:true:ti-1",
+   "Overview:false:ti0",
+   "Usage:false:ti-1"
+  ],
+  "panel": ""
+ },
+ "themeToggle": {
+  "before": "Switch to Dark Mode",
+  "after": "Switch to Light Mode",
+  "pressed": null,
+  "focusKept": "navbar-theme-toggle-btn"
+ }
+}

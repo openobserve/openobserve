@@ -1,0 +1,87 @@
+{
+ "dp": [
+  {
+   "tabsBeforeEsc": 0,
+   "focusAt": "date-time-relative-tab",
+   "openAfterEsc": 0,
+   "focusAfter": "date-time-btn"
+  },
+  {
+   "tabsBeforeEsc": 1,
+   "focusAt": "date-time-absolute-tab",
+   "openAfterEsc": 0,
+   "focusAfter": "date-time-btn"
+  },
+  {
+   "tabsBeforeEsc": 4,
+   "focusAt": "",
+   "openAfterEsc": 1,
+   "focusAfter": ""
+  }
+ ],
+ "tooltipTriggers": 33,
+ "mobileMenuBtn": {
+  "label": "Main navigation",
+  "expanded": null,
+  "controls": null
+ },
+ "mobileNav": {
+  "afterOpen": {
+   "tag": "DIV",
+   "role": "dialog",
+   "name": "Drawer Drawer Home Logs Metrics Traces A",
+   "dt": "main-layout-mobile-nav-drawer",
+   "expanded": null,
+   "x": 0,
+   "y": 0,
+   "w": 330,
+   "h": 740,
+   "inView": true,
+   "obscured": false
+  },
+  "dialog": [
+   {
+    "modal": null,
+    "lb": "reka-dialog-title-v-55",
+    "label": null
+   }
+  ],
+  "expandedNow": null,
+  "unnamed": 1,
+  "tab": [
+   "BUTTON:main-layout-mobile-n",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home",
+   "A:Home"
+  ],
+  "afterEsc": {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Main navigation",
+   "dt": "header-mobile-nav-toggle",
+   "expanded": null,
+   "x": 6,
+   "y": 5,
+   "w": 30,
+   "h": 30,
+   "inView": true,
+   "obscured": false
+  }
+ }
+}

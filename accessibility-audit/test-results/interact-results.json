@@ -1,0 +1,586 @@
+{
+ "monaco": {
+  "seq": [
+   "Tab -> TEXTAREA Editor content ",
+   "Tab -> TEXTAREA Editor content ",
+   "Shift+Tab -> TEXTAREA Editor content ",
+   "Escape -> TEXTAREA Editor content ",
+   "Tab -> TEXTAREA Editor content ",
+   "Control+m -> TEXTAREA Editor content ",
+   "Tab -> TEXTAREA Editor content ",
+   "Tab -> TEXTAREA Editor content "
+  ],
+  "ariaLabel": "Editor content",
+  "roledesc": "editor"
+ },
+ "datepicker": {
+  "afterEnter": {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Relative",
+   "dt": "date-time-relative-tab",
+   "expanded": null,
+   "x": 841,
+   "y": 95,
+   "w": 117,
+   "h": 34,
+   "inView": true,
+   "obscured": false
+  },
+  "dialog": {
+   "role": "dialog",
+   "modal": null,
+   "label": null,
+   "describedby": null,
+   "focusInside": true
+  },
+  "popovers": [
+   "wrap:Relative Absolute Seconds 1 5 10 15 30 45 Minutes 1 5 10 15 30 45 Hours 1 2 3 6 ",
+   "dialog:Relative Absolute Seconds 1 5 10 15 30 45 Minutes 1 5 10 15 30 45 Hours 1 2 3 6 "
+  ],
+  "axe": [
+   {
+    "id": "button-name",
+    "impact": "critical",
+    "n": 9,
+    "t": [
+     "button[data-test=\"logs-search-bar-histogram-btn\"]",
+     "#v-54",
+     "#reka-dropdown-menu-trigger-v-57",
+     "#reka-dropdown-menu-trigger-v-67"
+    ],
+    "html": [
+     "<button data-v-94604815=\"\" class=\"inline-flex items-center justify-center relative box-border whitespace-nowrap no-underline hover:no-underline font-medium tran",
+     "<button id=\"v-54\" type=\"button\" role=\"switch\" aria-checked=\"true\" data-state=\"checked\" class=\"relative inline-flex shrink-0 rounded-full items-center border-2 p"
+    ]
+   },
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 2,
+    "t": [
+     ".query-editor-placeholder-typewriter",
+     ".text-select-placeholder"
+    ],
+    "html": [
+     "<span data-v-94604815=\"\" class=\"query-editor-placeholder-typewriter\">Select a stream first</span>",
+     "<span class=\"text-start flex-1 truncate text-sm text-select-placeholder\">Select Stream</span>"
+    ]
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "n": 1,
+    "t": [
+     ".h-5"
+    ],
+    "html": [
+     "<img data-v-bf2c67e5=\"\" src=\"/web/src/assets/images/common/ai_icon_gradient.svg\" class=\"h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180"
+    ]
+   },
+   {
+    "id": "label",
+    "impact": "critical",
+    "n": 1,
+    "t": [
+     "#v-133"
+    ],
+    "html": [
+     "<input id=\"v-133\" type=\"number\" min=\"1\" step=\"1\" class=\"min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none text-input-text placeholder:text-input-plac"
+    ]
+   },
+   {
+    "id": "nested-interactive",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     "button[data-test=\"logs-search-bar-histogram-btn\"]"
+    ],
+    "html": [
+     "<button data-v-94604815=\"\" class=\"inline-flex items-center justify-center relative box-border whitespace-nowrap no-underline hover:no-underline font-medium tran"
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     "#v-54"
+    ],
+    "html": [
+     "<button id=\"v-54\" type=\"button\" role=\"switch\" aria-checked=\"true\" data-state=\"checked\" class=\"relative inline-flex shrink-0 rounded-full items-center border-2 p"
+    ]
+   }
+  ],
+  "tabs": [
+   "BUTTON null Absolute date-time-absolute-tab",
+   "BUTTON null Copy time range to clipboard date-time-copy-btn",
+   "BUTTON null Paste time range date-time-paste-btn",
+   "DIV tabpanel Seconds 1 5 10 15 30 45 Minutes 1 5 10 1 ",
+   "INPUT null Search... date-time-relative-search-field",
+   "BUTTON null 1 date-time-relative-1-s-btn"
+  ],
+  "afterEsc": {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "1",
+   "dt": "date-time-relative-1-s-btn",
+   "expanded": null,
+   "x": 922,
+   "y": 197,
+   "w": 32,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  }
+ },
+ "toast": {
+  "error": "TimeoutError: page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('[data-test=logs-search-bar-share-link-btn]')\n    - locator resolved to <button type=\"button\" data-o2-btn=\"\" data-"
+ },
+ "dlg_newDashboard": {
+  "dialog": {
+   "role": "dialog",
+   "modal": null,
+   "label": null,
+   "labelledby": "New dashboard",
+   "describedby": "New dashboard",
+   "focusInside": true
+  },
+  "initialFocus": {
+   "tag": "BUTTON",
+   "role": null,
+   "name": "Save",
+   "dt": "o-dialog-primary-btn",
+   "expanded": null,
+   "x": 947,
+   "y": 583,
+   "w": 80,
+   "h": 34,
+   "inView": true,
+   "obscured": false
+  },
+  "axe": [
+   {
+    "id": "button-name",
+    "impact": "critical",
+    "n": 2,
+    "t": [
+     "#reka-popover-trigger-v-2-4",
+     ".w-8\\!"
+    ],
+    "html": [
+     "<button type=\"button\" id=\"reka-popover-trigger-v-2-4\" role=\"combobox\" aria-expanded=\"false\" data-test=\"index-dropdown-stream_type-trigger\" data-test-selected-va",
+     "<button class=\"inline-flex items-center justify-center relative box-border whitespace-nowrap no-underline hover:no-underline font-medium transition-[color,backg"
+    ]
+   }
+  ],
+  "tabCycle": [
+   "BUTTON:Close dialog",
+   "INPUT:add-dashboard-name-field",
+   "INPUT:add-dashboard-description",
+   "BUTTON:default",
+   "BUTTON:dashboard-folder-move-new",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "INPUT:add-dashboard-name-field",
+   "INPUT:add-dashboard-description",
+   "BUTTON:default",
+   "BUTTON:dashboard-folder-move-new",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "INPUT:add-dashboard-name-field",
+   "INPUT:add-dashboard-description",
+   "BUTTON:default",
+   "BUTTON:dashboard-folder-move-new",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "INPUT:add-dashboard-name-field",
+   "INPUT:add-dashboard-description",
+   "BUTTON:default"
+  ],
+  "focusStillInDialog": true,
+  "afterEmptySubmit": {
+   "active": {
+    "tag": "BODY"
+   },
+   "invalid": [
+    "INPUT desc=v-2-1-error"
+   ],
+   "errors": [
+    "alert:Name is required"
+   ],
+   "dialogOpen": true
+  },
+  "afterEsc": {
+   "active": {
+    "tag": "BUTTON",
+    "role": null,
+    "name": "New dashboard",
+    "dt": "dashboard-new",
+    "expanded": null,
+    "x": 1292,
+    "y": 54,
+    "w": 127,
+    "h": 34,
+    "inView": true,
+    "obscured": false
+   },
+   "dialogOpen": false
+  }
+ },
+ "dlg_newFolder": {
+  "dialog": {
+   "role": "dialog",
+   "modal": null,
+   "label": null,
+   "labelledby": "Add Folder",
+   "describedby": "Add Folder",
+   "focusInside": true
+  },
+  "initialFocus": {
+   "tag": "INPUT",
+   "role": null,
+   "name": "",
+   "dt": "dashboard-folder-add-name-field",
+   "expanded": null,
+   "x": 540,
+   "y": 404,
+   "w": 406,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "axe": [],
+  "tabCycle": [
+   "INPUT:dashboard-folder-add-desc",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "BUTTON:Choose a folder icon",
+   "INPUT:dashboard-folder-add-name",
+   "INPUT:dashboard-folder-add-desc",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "BUTTON:Choose a folder icon",
+   "INPUT:dashboard-folder-add-name",
+   "INPUT:dashboard-folder-add-desc",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "BUTTON:Choose a folder icon",
+   "INPUT:dashboard-folder-add-name",
+   "INPUT:dashboard-folder-add-desc",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "BUTTON:Choose a folder icon",
+   "INPUT:dashboard-folder-add-name",
+   "INPUT:dashboard-folder-add-desc"
+  ],
+  "focusStillInDialog": true,
+  "afterEmptySubmit": {
+   "active": {
+    "tag": "BODY"
+   },
+   "invalid": [
+    "INPUT desc=v-104-error"
+   ],
+   "errors": [
+    "alert:Name is required"
+   ],
+   "dialogOpen": true
+  },
+  "afterEsc": {
+   "active": {
+    "tag": "BUTTON",
+    "role": null,
+    "name": "Add Folder",
+    "dt": "dashboard-new-folder-btn",
+    "expanded": null,
+    "x": 288,
+    "y": 107,
+    "w": 24,
+    "h": 24,
+    "inView": true,
+    "obscured": false
+   },
+   "dialogOpen": false
+  }
+ },
+ "dlg_newStream": {
+  "dialog": {
+   "role": "dialog",
+   "modal": null,
+   "label": null,
+   "labelledby": "New stream",
+   "describedby": "New stream",
+   "focusInside": true
+  },
+  "initialFocus": {
+   "tag": "INPUT",
+   "role": null,
+   "name": "",
+   "dt": "add-stream-name-input-field",
+   "expanded": null,
+   "x": 414,
+   "y": 338,
+   "w": 612,
+   "h": 32,
+   "inView": true,
+   "obscured": false
+  },
+  "axe": [
+   {
+    "id": "button-name",
+    "impact": "critical",
+    "n": 1,
+    "t": [
+     "#reka-popover-trigger-v-158"
+    ],
+    "html": [
+     "<button type=\"button\" id=\"reka-popover-trigger-v-158\" name=\"stream_type\" role=\"combobox\" aria-expanded=\"false\" data-test=\"add-stream-type-input-trigger\" data-te"
+    ]
+   }
+  ],
+  "tabCycle": [
+   "BUTTON:add-stream-type-input-tri",
+   "INPUT:add-stream-data-retention",
+   "BUTTON:Add Field",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "INPUT:add-stream-name-input-fie",
+   "BUTTON:add-stream-type-input-tri",
+   "INPUT:add-stream-data-retention",
+   "BUTTON:Add Field",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "INPUT:add-stream-name-input-fie",
+   "BUTTON:add-stream-type-input-tri",
+   "INPUT:add-stream-data-retention",
+   "BUTTON:Add Field",
+   "BUTTON:Cancel",
+   "BUTTON:Save",
+   "BUTTON:Close dialog",
+   "INPUT:add-stream-name-input-fie",
+   "BUTTON:add-stream-type-input-tri",
+   "INPUT:add-stream-data-retention",
+   "BUTTON:Add Field",
+   "BUTTON:Cancel"
+  ],
+  "focusStillInDialog": true,
+  "afterEmptySubmit": "skipped: dialog prefilled",
+  "afterEsc": {
+   "active": {
+    "tag": "BUTTON",
+    "role": null,
+    "name": "New stream",
+    "dt": "log-stream-add-stream-btn",
+    "expanded": null,
+    "x": 1316,
+    "y": 54,
+    "w": 103,
+    "h": 34,
+    "inView": true,
+    "obscured": false
+   },
+   "dialogOpen": false
+  }
+ },
+ "pop_manageColumns": {
+  "error": "Error: frame.evaluate: Error: No elements found for include in page Context\n    at validateContext (eval at evaluate (:291:30), <anonymous>:18811:15)\n    at new Context (eval at evaluate (:291:30), <a"
+ },
+ "dlg_addUser": {
+  "missingTrigger": "iam-users-add-user-btn",
+  "buttons": [
+   "add-basic-user"
+  ]
+ },
+ "alertAdd": {
+  "axe": [
+   {
+    "id": "button-name",
+    "impact": "critical",
+    "n": 10,
+    "t": [
+     "#reka-popover-trigger-v-41",
+     "#v-54",
+     "#reka-popover-trigger-v-57",
+     "#reka-popover-trigger-v-71"
+    ],
+    "html": [
+     "<button type=\"button\" id=\"reka-popover-trigger-v-41\" role=\"combobox\" aria-expanded=\"false\" data-test=\"inline-select-folder-dropdown-trigger\" data-test-selected-",
+     "<button id=\"v-54\" data-test=\"add-alert-stream-type-select-dropdown-trigger\" class=\"rounded-default relative flex w-full border ps-3 bg-select-bg border-select-b"
+    ]
+   },
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 6,
+    "t": [
+     ".text-base",
+     ".ms-3 > .contents > .font-bold.text-xs[data-o-tooltip-trigger=\"\"]",
+     ".enabled\\:hover\\:bg-button-ghost-primary-hover-bg.text-button-ghost-primary-text[data-o2-variant=\"ghost-primary\"]:nth-child(2) > .contents > .font-bold.text-xs[data-o-tooltip-trigger=\"\"]",
+     "button[data-test=\"alert-conditions-reorder-btn\"] > .contents > .font-bold.text-xs[data-o-tooltip-trigger=\"\"]"
+    ],
+    "html": [
+     "<span class=\"min-w-0 truncate text-base leading-[1.45] font-semibold tracking-[-0.02em] text-text-placeholder\" data-test=\"add-alert-name-input-value\" data-o-too",
+     "<span class=\"text-xs font-bold\" data-o-tooltip-trigger=\"\">Condition</span>"
+    ]
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "n": 1,
+    "t": [
+     ".w-5"
+    ],
+    "html": [
+     "<img data-v-bf2c67e5=\"\" src=\"/web/src/assets/images/common/ai_icon_gradient.svg\" class=\"h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180"
+    ]
+   },
+   {
+    "id": "label",
+    "impact": "critical",
+    "n": 6,
+    "t": [
+     "#v-74",
+     "#v-76",
+     "#v-82",
+     "#v-83"
+    ],
+    "html": [
+     "<input id=\"v-74\" data-test=\"alert-trigger-threshold-input-field\" type=\"number\" name=\"trigger_condition.threshold\" class=\"min-w-0 flex-1 rounded-[inherit] bg-tra",
+     "<input id=\"v-76\" type=\"number\" name=\"_ui.checkEvery\" class=\"min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none text-input-text placeholder:text-input-"
+    ]
+   },
+   {
+    "id": "target-size",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     "#reka-popover-trigger-v-41"
+    ],
+    "html": [
+     "<button type=\"button\" id=\"reka-popover-trigger-v-41\" role=\"combobox\" aria-expanded=\"false\" data-test=\"inline-select-folder-dropdown-trigger\" data-test-selected-"
+    ]
+   }
+  ],
+  "labels": [
+   "BUTTON role=combobox label=\"\" aria-label=null lb=null ph= dt=inline-select-folder-dropdown-trigger",
+   "BUTTON role=combobox label=\"\" aria-label=null lb=null ph= dt=add-alert-stream-type-select-dropdown-trigger",
+   "BUTTON role=combobox label=\"\" aria-label=null lb=null ph= dt=add-alert-stream-name-select-dropdown-trigger",
+   "BUTTON role=combobox label=\"\" aria-label=null lb=null ph= dt=",
+   "BUTTON role=combobox label=\"\" aria-label=null lb=null ph= dt=alert-trigger-operator-select-trigger",
+   "INPUT role=null label=\"\" aria-label=null lb=null ph= dt=alert-trigger-threshold-input-field",
+   "INPUT role=null label=\"\" aria-label=null lb=null ph= dt=",
+   "BUTTON role=combobox label=\"\" aria-label=null lb=null ph= dt=",
+   "INPUT role=null label=\"\" aria-label=null lb=null ph= dt=alert-settings-period-input-field",
+   "INPUT role=null label=\"\" aria-label=null lb=null ph= dt=alert-settings-silence-duration-input-field",
+   "INPUT role=null label=\"\" aria-label=null lb=null ph= dt=alert-settings-pending-period-input-field",
+   "BUTTON role=combobox label=\"\" aria-label=null lb=null ph= dt=alert-settings-pending-period-unit-trigger",
+   "BUTTON role=combobox label=\"\" aria-label=null lb=null ph= dt=alert-destinations-select-trigger",
+   "INPUT role=null label=\"\" aria-label=null lb=null ph= dt=alert-settings-keep-firing-for-input-field"
+  ],
+  "afterSave": {
+   "url": "/alerts/add",
+   "active": {
+    "tag": "BUTTON",
+    "role": null,
+    "name": "Alert Name",
+    "dt": "add-alert-name-input-trigger",
+    "expanded": null,
+    "x": 146,
+    "y": 48,
+    "w": 114,
+    "h": 27,
+    "inView": true,
+    "obscured": false
+   },
+   "invalid": 1,
+   "messages": [
+    "alert:Alert name is required.",
+    "alert:Stream name is required.",
+    "status:",
+    "alert:Notification Please fix the highlighted fields before saving.Please fix the high",
+    "alert:Please fix the highlighted fields before saving. Please fix the highlighted fiel"
+   ]
+  }
+ },
+ "tableSort": {
+  "before": [
+   ":null",
+   "#:null",
+   "Name:ascending",
+   "Last Ingested:null",
+   "Events:none",
+   "Ingested Data:none"
+  ],
+  "after": [
+   ":null",
+   "#:null",
+   "Name:descending",
+   "Last Ingested:null",
+   "Events:none",
+   "Ingested Data:none"
+  ],
+  "caption": [
+   "caption=false aria-label=null lb=null"
+  ],
+  "pagination": []
+ },
+ "tooltip": {
+  "onHover": [],
+  "btnName": {
+   "ariaLabel": null,
+   "describedby": null,
+   "labelledby": null,
+   "title": null
+  },
+  "afterEscape": [],
+  "onKeyboardFocus": []
+ },
+ "charts": [],
+ "chartsAxe": [
+  {
+   "id": "button-name",
+   "impact": "critical",
+   "n": 1,
+   "t": [
+    "button[data-test=\"refresh-button\"]"
+   ],
+   "html": [
+    "<button class=\"inline-flex items-center justify-center relative box-border whitespace-nowrap no-underline hover:no-underline font-medium transition-[color,backg"
+   ]
+  },
+  {
+   "id": "color-contrast",
+   "impact": "serious",
+   "n": 2,
+   "t": [
+    "#reka-tabs-v-39-trigger-overview > .o-tab__label.truncate[data-v-3d6af824=\"\"]",
+    ".text-text-link"
+   ],
+   "html": [
+    "<span data-v-3d6af824=\"\" class=\"o-tab__label truncate\">Overview</span>",
+    "<button class=\"text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:unde"
+   ]
+  },
+  {
+   "id": "image-alt",
+   "impact": "critical",
+   "n": 1,
+   "t": [
+    ".w-5"
+   ],
+   "html": [
+    "<img data-v-bf2c67e5=\"\" src=\"/web/src/assets/images/common/ai_icon_gradient.svg\" class=\"h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180"
+   ]
+  }
+ ]
+}

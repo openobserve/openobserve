@@ -1,0 +1,663 @@
+{
+ "monacoToggle": [
+  "Control+Shift+m -> TEXTAREA Editor content",
+  "Tab -> DIV Vertical splitter",
+  "Tab -> DIV Horizontal splitter"
+ ],
+ "monacoHint": true,
+ "settingsLinks": [],
+ "settings": {},
+ "toast": [
+  "DIV role=status live=polite atomic=true :: ",
+  "DIV role=null live=polite atomic=true :: ",
+  "SPAN role=alert live=assertive atomic=null :: Notification Date range copiedDate range copied",
+  "LI role=status live=null atomic=null :: Date range copied Date range copied",
+  "DIV role=alert live=null atomic=true :: ",
+  "DIV role=alert live=null atomic=true :: ",
+  "DIV role=null live=polite atomic=true :: ",
+  "DIV role=null live=polite atomic=true :: "
+ ],
+ "toastDismissMs": 1516,
+ "dashboardView": {
+  "url": "/dashboards/view",
+  "charts": [
+   "canvas 647w host=none nearestId=chart1",
+   "canvas 647w host=none nearestId=chart1",
+   "canvas 647w host=none nearestId=chart1",
+   "canvas 647w host=none nearestId=chart1",
+   "canvas 647w host=none nearestId=chart1"
+  ],
+  "dupIds": [
+   [
+    "chart1",
+    5
+   ]
+  ],
+  "axe": [
+   {
+    "id": "button-name",
+    "impact": "critical",
+    "n": 17,
+    "t": [
+     "button[data-test=\"dashboard-panel-add\"]",
+     "button[data-test=\"dashboard-cancel-btn\"]",
+     ".text-lg"
+    ],
+    "html": [
+     "<button class=\"inline-flex items-center justify-center relative box-border whitespace-nowrap no-underline hover:no-underline font-medium transition-[color,backg"
+    ],
+    "sum": "Fix any of the following:\n  Element does not have inner text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelled"
+   },
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     ".px-0\\.5"
+    ],
+    "html": [
+     "<span class=\"min-w-0 flex-1 overflow-hidden px-0.5 text-ellipsis whitespace-nowrap\" title=\"Default\" data-test=\"dashboard-tab-default-name\" data-test-tab-name=\"D"
+    ],
+    "sum": "Fix any of the following:\n  Element has insufficient color contrast of 3.94 (foreground color: #6b76e3, background color: #ffffff, font size: 10.5pt (14px), fon"
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "n": 1,
+    "t": [
+     ".\\[transition\\:transform_0\\.6s_ease\\]"
+    ],
+    "html": [
+     "<img data-v-bf2c67e5=\"\" src=\"/web/src/assets/images/common/ai_icon_gradient.svg\" class=\"h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180"
+    ],
+    "sum": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist,"
+   }
+  ],
+  "tab": [
+   "BUTTON:Back to Dashboards",
+   "BUTTON:dashboard-panel-add",
+   "BUTTON:Previous",
+   "BUTTON:Past 15 Minutes",
+   "BUTTON:Off",
+   "BUTTON:dashboard-refresh-btn",
+   "BUTTON:More refresh options",
+   "BUTTON:Edit layout",
+   "BUTTON:export-dashboard",
+   "BUTTON:Share Link",
+   "BUTTON:dashboard-setting-btn",
+   "BUTTON:dashboard-print-btn",
+   "BUTTON:dashboard-fullscreen-btn",
+   "BUTTON:view-dashboard-scheduled-repor",
+   "BUTTON:dashboard-json-edit-btn",
+   "BUTTON:dashboard-view-set-home-btn",
+   "BUTTON:dashboard-variable-adhoc-add-s",
+   "svg:",
+   "BUTTON:Default 7",
+   "BUTTON:dashboard-tab-add-btn",
+   "BUTTON:dashboard-show-legends-btn",
+   "BUTTON:panel-schema-renderer-annotati",
+   "BUTTON:dashboard-panel-fullscreen-btn",
+   "BUTTON:Refresh Panel",
+   "BUTTON:dashboard-edit-panel-Count of ",
+   "BUTTON:Refresh Panel",
+   "BUTTON:dashboard-edit-panel-Count of ",
+   "BUTTON:panel-max-duration-warning",
+   "BUTTON:Refresh Panel",
+   "BUTTON:dashboard-edit-panel-Default o"
+  ]
+ },
+ "alertDetail": {
+  "note": "no rows to open"
+ },
+ "roleEdit": {
+  "url": "/iam/roles",
+  "title": "OpenObserve - Roles",
+  "dialog": false,
+  "violations": [
+   "button-name:7",
+   "color-contrast:1",
+   "image-alt:1"
+  ],
+  "detail": [
+   {
+    "id": "button-name",
+    "impact": "critical",
+    "n": 7,
+    "t": [
+     "label[data-test=\"o2-table-select-all\"] > .rounded-checkbox.cursor-\\[inherit\\].size-3\\.5",
+     "label[data-test=\"o2-table-select-0\"] > .rounded-checkbox.cursor-\\[inherit\\].size-3\\.5",
+     "#v-52"
+    ],
+    "html": [
+     "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" class=\"rounded-checkbox shrink-0 cursor-[inherit] border size-3.5 bg-checkbox-"
+    ],
+    "sum": "Fix any of the following:\n  Element does not have inner text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelled"
+   },
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     "#reka-tabs-v-39-trigger-roles > .o-tab__label[data-test=\"o-truncated-text\"][data-o-tooltip-trigger=\"overflow\"]"
+    ],
+    "html": [
+     "<span class=\"min-w-0 truncate o-tab__label\" data-test=\"o-truncated-text\" data-o-tooltip-trigger=\"overflow\"><!----><span aria-hidden=\"true\" style=\"display: none;"
+    ],
+    "sum": "Fix any of the following:\n  Element has insufficient color contrast of 3.3 (foreground color: #6b76e3, background color: #e9eafb, font size: 10.5pt (14px), font"
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "n": 1,
+    "t": [
+     ".w-5"
+    ],
+    "html": [
+     "<img data-v-bf2c67e5=\"\" src=\"/web/src/assets/images/common/ai_icon_gradient.svg\" class=\"h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180"
+    ],
+    "sum": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist,"
+   }
+  ]
+ },
+ "incidentDetail": {
+  "note": "no rows to open"
+ },
+ "oncallTeam": {
+  "note": "no rows to open"
+ },
+ "sloDetail": {
+  "note": "no rows to open"
+ },
+ "syntheticsDetail": {
+  "note": "no rows to open"
+ },
+ "functionEdit": {
+  "url": "/pipeline/functions",
+  "title": "OpenObserve - Pipeline",
+  "dialog": false,
+  "violations": [
+   "button-name:9",
+   "color-contrast:1",
+   "image-alt:1"
+  ],
+  "detail": [
+   {
+    "id": "button-name",
+    "impact": "critical",
+    "n": 9,
+    "t": [
+     "label[data-test=\"o2-table-select-all\"] > .rounded-checkbox.cursor-\\[inherit\\].size-3\\.5",
+     "label[data-test=\"o2-table-select-0\"] > .rounded-checkbox.cursor-\\[inherit\\].size-3\\.5",
+     "label[data-test=\"o2-table-select-1\"] > .rounded-checkbox.cursor-\\[inherit\\].size-3\\.5"
+    ],
+    "html": [
+     "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" class=\"rounded-checkbox shrink-0 cursor-[inherit] border size-3.5 bg-checkbox-"
+    ],
+    "sum": "Fix any of the following:\n  Element does not have inner text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelled"
+   },
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     "#reka-tabs-v-41-trigger-functions > span:nth-child(2)"
+    ],
+    "html": [
+     "<span class=\"\">Functions</span>"
+    ],
+    "sum": "Fix any of the following:\n  Element has insufficient color contrast of 3.94 (foreground color: #6b76e3, background color: #ffffff, font size: 10.5pt (14px), fon"
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "n": 1,
+    "t": [
+     ".w-5"
+    ],
+    "html": [
+     "<img data-v-bf2c67e5=\"\" src=\"/web/src/assets/images/common/ai_icon_gradient.svg\" class=\"h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180"
+    ],
+    "sum": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist,"
+   }
+  ]
+ },
+ "groupEdit": {
+  "url": "/iam/groups",
+  "title": "OpenObserve - Groups",
+  "dialog": false,
+  "violations": [
+   "button-name:9",
+   "color-contrast:1",
+   "image-alt:1"
+  ],
+  "detail": [
+   {
+    "id": "button-name",
+    "impact": "critical",
+    "n": 9,
+    "t": [
+     "label[data-test=\"o2-table-select-all\"] > .rounded-checkbox.cursor-\\[inherit\\].size-3\\.5",
+     "label[data-test=\"o2-table-select-0\"] > .rounded-checkbox.cursor-\\[inherit\\].size-3\\.5",
+     "label[data-test=\"o2-table-select-1\"] > .rounded-checkbox.cursor-\\[inherit\\].size-3\\.5"
+    ],
+    "html": [
+     "<button type=\"button\" role=\"checkbox\" aria-checked=\"false\" data-state=\"unchecked\" class=\"rounded-checkbox shrink-0 cursor-[inherit] border size-3.5 bg-checkbox-"
+    ],
+    "sum": "Fix any of the following:\n  Element does not have inner text that is visible to screen readers\n  aria-label attribute does not exist or is empty\n  aria-labelled"
+   },
+   {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     "#reka-tabs-v-39-trigger-groups > .o-tab__label.truncate[data-test=\"o-truncated-text\"]"
+    ],
+    "html": [
+     "<span class=\"min-w-0 truncate o-tab__label\" data-test=\"o-truncated-text\" data-o-tooltip-trigger=\"overflow\"><!----><span aria-hidden=\"true\" style=\"display: none;"
+    ],
+    "sum": "Fix any of the following:\n  Element has insufficient color contrast of 3.3 (foreground color: #6b76e3, background color: #e9eafb, font size: 10.5pt (14px), font"
+   },
+   {
+    "id": "image-alt",
+    "impact": "critical",
+    "n": 1,
+    "t": [
+     ".w-5"
+    ],
+    "html": [
+     "<img data-v-bf2c67e5=\"\" src=\"/web/src/assets/images/common/ai_icon_gradient.svg\" class=\"h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180"
+    ],
+    "sum": "Fix any of the following:\n  Element does not have an alt attribute\n  aria-label attribute does not exist or is empty\n  aria-labelledby attribute does not exist,"
+   }
+  ]
+ },
+ "streamExplore": {
+  "url": "/logs",
+  "violations": [
+   "button-name:16",
+   "color-contrast:9",
+   "image-alt:1",
+   "nested-interactive:1",
+   "target-size:1"
+  ]
+ },
+ "reflow": {
+  "/@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 1,
+   "hScrollContainers": 0,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 0,
+   "hScrollContainers": 0,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 0,
+   "hScrollContainers": 0,
+   "mainWidth": 680,
+   "menuBtn": true
+  },
+  "/logs@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 1,
+   "hScrollContainers": 0,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/logs@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 0,
+   "hScrollContainers": 0,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/logs@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 0,
+   "hScrollContainers": 0,
+   "mainWidth": 680,
+   "menuBtn": true
+  },
+  "/alerts@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 8,
+   "hScrollContainers": 1,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/alerts@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 5,
+   "hScrollContainers": 1,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/alerts@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 7,
+   "hScrollContainers": 1,
+   "mainWidth": 680,
+   "menuBtn": true
+  },
+  "/dashboards@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 6,
+   "hScrollContainers": 1,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/dashboards@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 2,
+   "hScrollContainers": 1,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/dashboards@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 5,
+   "hScrollContainers": 1,
+   "mainWidth": 680,
+   "menuBtn": true
+  },
+  "/streams@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 5,
+   "hScrollContainers": 1,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/streams@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 2,
+   "hScrollContainers": 1,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/streams@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 2,
+   "hScrollContainers": 1,
+   "mainWidth": 680,
+   "menuBtn": true
+  },
+  "/iam/users@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 5,
+   "hScrollContainers": 1,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/iam/users@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 1,
+   "hScrollContainers": 1,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/iam/users@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 3,
+   "hScrollContainers": 1,
+   "mainWidth": 680,
+   "menuBtn": true
+  },
+  "/settings/general@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 1,
+   "hScrollContainers": 0,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/settings/general@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 0,
+   "hScrollContainers": 0,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/settings/general@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 0,
+   "hScrollContainers": 0,
+   "mainWidth": 680,
+   "menuBtn": true
+  },
+  "/traces@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 5,
+   "hScrollContainers": 2,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/traces@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 3,
+   "hScrollContainers": 2,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/traces@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 8,
+   "hScrollContainers": 1,
+   "mainWidth": 680,
+   "menuBtn": true
+  },
+  "/incidents@320": {
+   "docScrollW": 320,
+   "vw": 320,
+   "controlsOffscreenRight": 2,
+   "hScrollContainers": 1,
+   "mainWidth": 320,
+   "menuBtn": true
+  },
+  "/incidents@zoom200": {
+   "docScrollW": 720,
+   "vw": 720,
+   "controlsOffscreenRight": 1,
+   "hScrollContainers": 1,
+   "mainWidth": 720,
+   "menuBtn": true
+  },
+  "/incidents@tablet": {
+   "docScrollW": 768,
+   "vw": 768,
+   "controlsOffscreenRight": 1,
+   "hScrollContainers": 1,
+   "mainWidth": 680,
+   "menuBtn": true
+  }
+ },
+ "textSpacing": {
+  "/alerts": {
+   "clippedBefore": 0,
+   "clippedAfter": 0,
+   "sample": []
+  },
+  "/dashboards": {
+   "clippedBefore": 0,
+   "clippedAfter": 0,
+   "sample": []
+  },
+  "/settings/general": {
+   "clippedBefore": 0,
+   "clippedAfter": 0,
+   "sample": []
+  }
+ },
+ "dark": {
+  "/": {
+   "violations": [
+    "button-name:2",
+    "color-contrast:1",
+    "image-alt:1"
+   ],
+   "contrast": {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     ".py-\\[1\\.5em\\]"
+    ],
+    "html": [
+     "<div class=\"py-[1.5em] text-center text-[0.8125em] opacity-[0.45]\">No chat history</div>"
+    ],
+    "sum": "Fix any of the following:\n  Element has insufficient color contrast of 3.43 (foreground color: #67696c, background color: #0d1117, font size: 9.8pt (13px), font"
+   }
+  },
+  "/logs": {
+   "violations": [
+    "button-name:16",
+    "image-alt:1",
+    "nested-interactive:1",
+    "target-size:1"
+   ]
+  },
+  "/alerts": {
+   "violations": [
+    "aria-allowed-attr:1",
+    "button-name:6",
+    "image-alt:1"
+   ]
+  },
+  "/dashboards": {
+   "violations": [
+    "aria-allowed-attr:1",
+    "button-name:7",
+    "image-alt:1"
+   ]
+  },
+  "/streams": {
+   "violations": [
+    "aria-allowed-attr:1",
+    "button-name:19",
+    "image-alt:1"
+   ]
+  },
+  "/iam/users": {
+   "violations": [
+    "aria-allowed-attr:1",
+    "button-name:13",
+    "image-alt:1"
+   ]
+  },
+  "/settings/general": {
+   "violations": [
+    "color-contrast:2",
+    "image-alt:1",
+    "label:1"
+   ],
+   "contrast": {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 2,
+    "t": [
+     "div[data-test=\"theme-light-chip\"] > .chip-label.tracking-wider.opacity-50",
+     "div[data-test=\"theme-dark-chip\"] > .chip-label.tracking-wider.opacity-50"
+    ],
+    "html": [
+     "<span class=\"chip-label text-2xs font-semibold tracking-wider opacity-50\">Light</span>"
+    ],
+    "sum": "Fix any of the following:\n  Element has insufficient color contrast of 3.53 (foreground color: #818181, background color: #2d2d2d, font size: 8.3pt (11px), font"
+   }
+  },
+  "/traces": {
+   "violations": [
+    "button-name:9",
+    "color-contrast:1",
+    "image-alt:1"
+   ],
+   "contrast": {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     ".query-editor-placeholder-typewriter"
+    ],
+    "html": [
+     "<span class=\"query-editor-placeholder-typewriter\">str_match(service_name, 'value')</span>"
+    ],
+    "sum": "Fix any of the following:\n  Element has insufficient color contrast of 3.51 (foreground color: #737373, background color: #1e1e1e, font size: 10.5pt (14px), fon"
+   }
+  },
+  "/incidents": {
+   "violations": [
+    "aria-allowed-attr:1",
+    "button-name:5",
+    "image-alt:1"
+   ]
+  },
+  "/pipeline/pipelines": {
+   "violations": [
+    "aria-allowed-attr:1",
+    "button-name:7",
+    "image-alt:1"
+   ]
+  },
+  "/rum/performance/overview": {
+   "violations": [
+    "button-name:4",
+    "image-alt:1",
+    "target-size:1"
+   ]
+  },
+  "/ingestion/recommended/kubernetes": {
+   "violations": [
+    "button-name:4",
+    "color-contrast:1",
+    "image-alt:1"
+   ],
+   "contrast": {
+    "id": "color-contrast",
+    "impact": "serious",
+    "n": 1,
+    "t": [
+     "div[data-test=\"ai-step-install\"] > .pb-6.flex-1.flex-col > .mt-2.min-w-0 > div > .step-content-pad[data-v-71eecb24=\"\"] > .step-note > span[data-v-71eecb24=\"\"]:nth-child(2)"
+    ],
+    "html": [
+     "<span data-v-71eecb24=\"\">This installs cert-manager, the OpenTelemetry operator and the OpenObserve collector automatically. Prefer Helm, or need to pin version"
+    ],
+    "sum": "Fix any of the following:\n  Element has insufficient color contrast of 3.99 (foreground color: #737373, background color: #0d1117, font size: 9.0pt (12px), font"
+   }
+  }
+ },
+ "tooltip2": {
+  "onHover": [],
+  "btn": {
+   "ariaLabel": null,
+   "describedby": null
+  },
+  "onFocus": []
+ }
+}
