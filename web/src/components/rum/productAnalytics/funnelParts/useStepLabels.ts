@@ -37,6 +37,7 @@ const KIND_VARIANT: Record<StepKind, BadgeVariant> = {
 export default function useStepLabels(
   events: () => NamedEvent[],
   eventsStatus: () => NamedEventsStatus,
+  deletedNames: () => Readonly<Record<string, string>> = () => ({}),
 ) {
   const { t } = useI18nTyped();
 
@@ -44,7 +45,7 @@ export default function useStepLabels(
   const labelOf = (s: StepRef): I18nText =>
     s.kind === "e" && eventsStatus() !== "ready" && !events().some((e) => e.id === s.key)
       ? t("rum.analytics.events.unloadedStep")
-      : raw(stepLabel(s, events()));
+      : raw(stepLabel(s, events(), deletedNames()));
 
   const kindLabel = (s: StepRef) => t(KIND_LABEL[s.kind]);
 

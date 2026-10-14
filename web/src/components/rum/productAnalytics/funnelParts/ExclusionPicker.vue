@@ -231,6 +231,7 @@ const props = defineProps<{
   def: FunnelDef;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
+  deletedNames?: Readonly<Record<string, string>>;
   initial?: ExclusionStep;
 }>();
 const emit = defineEmits<{
@@ -241,6 +242,7 @@ const { t } = useI18nTyped();
 const { labelOf, kindLabel, kindVariant } = useStepLabels(
   () => props.events,
   () => props.eventsStatus,
+  () => props.deletedNames ?? {},
 );
 const { options, loading, failed, noCustom, load, onSearch } = useStepOptions({
   events: () => props.events,

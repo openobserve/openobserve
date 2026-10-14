@@ -38,11 +38,13 @@ const props = defineProps<{
   step: StepRef;
   events: NamedEvent[];
   eventsStatus: NamedEventsStatus;
+  deletedNames?: Readonly<Record<string, string>>;
 }>();
 const { t } = useI18nTyped();
 const { labelOf, kindLabel, kindVariant, filterChips } = useStepLabels(
   () => props.events,
   () => props.eventsStatus,
+  () => props.deletedNames ?? {},
 );
 
 const chips = computed(() => filterChips(props.step));
