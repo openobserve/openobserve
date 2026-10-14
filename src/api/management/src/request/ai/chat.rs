@@ -635,8 +635,6 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         let (tool_mcps, tool_clis, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
         let query_req = QueryRequest {
-            query: last_user_message,
-            context,
             model: if prompt_body.model.is_empty() {
                 None
             } else {
@@ -668,6 +666,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             known_seq: None,
             known_opencode_session_id: None,
             session_epoch: None,
+            ..QueryRequest::new(last_user_message, context)
         };
 
         // Without it every call lands on an arbitrary replica, which starts a new session.
@@ -1099,8 +1098,6 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         let (tool_mcps, tool_clis, tool_skills) =
             o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
         let query_req = QueryRequest {
-            query: last_user_message,
-            context,
             model: if prompt_body.model.is_empty() {
                 None
             } else {
@@ -1132,6 +1129,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             known_seq: None,
             known_opencode_session_id: None,
             session_epoch: None,
+            ..QueryRequest::new(last_user_message, context)
         };
 
         let headers_to_forward = if forward_headers.is_empty() {
