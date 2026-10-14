@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
+import { SQL_CLAUSE_KEYWORDS, SQL_KEYWORDS } from "@/utils/query/sqlCompletion";
 
 // Stable model instance. CodeQueryEditor's completion provider answers only for
 // its OWN model (`if (own && model !== own) return { suggestions: [] }`), so a
@@ -97,6 +98,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     setModelMarkers: vi.fn(),
     addCommand: vi.fn(() => ({ dispose: vi.fn() })),
     addKeybindingRule: vi.fn(() => ({ dispose: vi.fn() })),
+    addKeybindingRules: vi.fn(() => ({ dispose: vi.fn() })),
     registerCommand: vi.fn(() => ({ dispose: vi.fn() })),
     getEditors: vi.fn(() => []),
   },
@@ -114,6 +116,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
       Event: 10,
       Text: 18,
       Issue: 26,
+      Folder: 23,
       Snippet: 27,
     },
     CompletionItemInsertTextRule: { None: 0, KeepWhitespace: 1, InsertAsSnippet: 4 },
@@ -125,8 +128,22 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     registerSignatureHelpProvider: vi.fn(() => ({ dispose: vi.fn() })),
     registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
-  KeyMod: { CtrlCmd: 1 },
-  KeyCode: { Backspace: 1, Tab: 2, Enter: 13, Escape: 9, KeyZ: 56 },
+  KeyMod: { CtrlCmd: 2048, WinCtrl: 256 },
+  KeyCode: {
+    Backspace: 1,
+    Tab: 2,
+    Enter: 13,
+    Escape: 9,
+    Space: 10,
+    PageUp: 11,
+    PageDown: 12,
+    UpArrow: 16,
+    DownArrow: 18,
+    KeyI: 39,
+    KeyN: 44,
+    KeyP: 46,
+    KeyZ: 56,
+  },
   Range: class {
     constructor(...args: number[]) {
       Object.assign(this, { args });
@@ -206,6 +223,11 @@ vi.mock("@/composables/usePromqlSuggestions", async (importOriginal) => ({
 // Mounted ONCE in beforeAll. The suite's other async-mount tests (Ctrl+Enter,
 // setValue) are already load-flaky on main — they time out on ~1 run in 2 with
 // no source changes at all — so we do not add nine more waitFor mounts here.
+
+// A function row carries its signature in an object label, so tests compare by name.
+const nameOf = (s: any): string => (typeof s.label === "string" ? s.label : s.label.label);
+const isHeader = (s: any): boolean => s.kind === 23;
+const rowsOf = (result: any) => result.suggestions.filter((s: any) => !isHeader(s));
 
 describe("Phase 1 — the registered completion provider", () => {
   const providerStore = createStore({ state: { theme: "light" } });
@@ -332,7 +354,7 @@ describe("Phase 1 — the registered completion provider", () => {
   const invokeFallback = (t: string, w: string) => invokeWith(provideFallback, fallbackModel, t, w);
 
   const itemFor = (result: any, label: string) =>
-    result.suggestions.find((s: any) => s.label === label);
+    result.suggestions.find((s: any) => nameOf(s) === label);
 
   it("answers for its own model", async () => {
     expect(provideKw).toBeTypeOf("function");
@@ -375,12 +397,12 @@ describe("Phase 1 — the registered completion provider", () => {
   it("A2 — items are identical no matter how much of the word is typed", async () => {
     const a = itemFor(await invokeSug("SELECT a", "a"), "approx_topk");
     const appr = itemFor(await invokeSug("SELECT appr", "appr"), "approx_topk");
-    expect(a.label).toBe(appr.label);
+    expect(a.label).toEqual(appr.label);
     expect(a.insertText).toBe(appr.insertText);
   });
 
   it("N2 — the SQL fallback serves the shared catalog, aggregates included", async () => {
-    const labels = (await invokeFallback("SELECT ", "")).suggestions.map((s: any) => s.label);
+    const labels = (await invokeFallback("SELECT ", "")).suggestions.map(nameOf);
     // The component's old 7-entry local list had none of these.
     for (const agg of ["sum", "avg", "count", "max", "min", "histogram", "approx_topk"]) {
       expect(labels, `fallback missing ${agg}`).toContain(agg);
@@ -388,7 +410,7 @@ describe("Phase 1 — the registered completion provider", () => {
   });
 
   it("N2 — the SQL fallback also serves the array family", async () => {
-    const labels = (await invokeFallback("SELECT ", "")).suggestions.map((s: any) => s.label);
+    const labels = (await invokeFallback("SELECT ", "")).suggestions.map(nameOf);
     for (const fn of ["arrcount", "arrsort", "arrjoin", "arrzip", "spath"]) {
       expect(labels, `fallback missing ${fn}`).toContain(fn);
     }
@@ -396,7 +418,7 @@ describe("Phase 1 — the registered completion provider", () => {
 
   it("N2 — fallback items are Function-kinded and snippet-enabled", async () => {
     const sum = (await invokeFallback("SELECT ", "")).suggestions.find(
-      (s: any) => s.label === "sum",
+      (s: any) => nameOf(s) === "sum",
     );
     expect(sum).toBeDefined();
     expect(sum.kind).toBe(1);
@@ -426,7 +448,7 @@ describe("Phase 1 — the registered completion provider", () => {
 
   it("B3 — deprecated aliases carry monaco's Deprecated tag (strikethrough)", async () => {
     const raw = (await invokeFallback("SELECT ", "")).suggestions.find(
-      (s: any) => s.label === "match_all_raw",
+      (s: any) => nameOf(s) === "match_all_raw",
     );
     expect(raw).toBeDefined();
     expect(raw.tags).toEqual([1]); // CompletionItemTag.Deprecated
@@ -434,14 +456,14 @@ describe("Phase 1 — the registered completion provider", () => {
 
   it("B3 — match_all itself is not tagged deprecated", async () => {
     const ok = (await invokeFallback("SELECT ", "")).suggestions.find(
-      (s: any) => s.label === "match_all",
+      (s: any) => nameOf(s) === "match_all",
     );
     expect(ok.tags).toBeUndefined();
   });
 
   it("D1 — catalog items carry a compact detail and prose documentation", async () => {
     const topk = (await invokeFallback("SELECT ", "")).suggestions.find(
-      (s: any) => s.label === "approx_topk",
+      (s: any) => nameOf(s) === "approx_topk",
     );
     expect(topk.detail).toBe("(field, k)");
     expect(String((topk.documentation as any).value).length).toBeGreaterThan(15);
@@ -449,7 +471,7 @@ describe("Phase 1 — the registered completion provider", () => {
 
   it("A4 — legacy callables get monaco's word, not a space-split token", async () => {
     // Old code did textUntilPosition.trim().split(" ").pop() => "*\nFROM".
-    const labels = (await invokeSug("SELECT *\nFROM", "FROM")).suggestions.map((s: any) => s.label);
+    const labels = (await invokeSug("SELECT *\nFROM", "FROM")).suggestions.map(nameOf);
     expect(labels).toContain("legacy('FROM')");
     expect(labels.join("|")).not.toContain("\n");
   });
@@ -733,8 +755,9 @@ describe("Phase 3 — C4: the value lookup is awaited inside the provider", () =
 
       expect(fieldValueResolver, "the provider never asked for values").toHaveBeenCalledWith(
         "level",
+        expect.anything(),
       );
-      const labels = result.suggestions.map((s: any) => s.label);
+      const labels = result.suggestions.filter((s: any) => !isHeader(s)).map(nameOf);
       expect(labels, "values did not make the first result — they were not awaited").toEqual(
         expect.arrayContaining(["'error'", "'warn'"]),
       );
@@ -784,7 +807,7 @@ describe("Phase 3 — C4: the value lookup is awaited inside the provider", () =
         {},
         {},
       );
-      expect(result.suggestions.map((s: any) => s.label)).toContain("level");
+      expect(result.suggestions.filter((s: any) => !isHeader(s)).map(nameOf)).toContain("level");
       expect(
         fieldValueResolver,
         "resolver was called outside value context",
@@ -1101,7 +1124,10 @@ describe("completion results invite monaco to ask again", () => {
       fieldValueResolver: async () => ["error"],
     });
     const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-    expect(result.suggestions.map((s: any) => s.label)).toEqual(["'error'", "level"]);
+    expect(result.suggestions.filter((s: any) => !isHeader(s)).map(nameOf)).toEqual([
+      "'error'",
+      "level",
+    ]);
     expect(result.incomplete).toBe(true);
   });
 
@@ -1113,10 +1139,14 @@ describe("completion results invite monaco to ask again", () => {
       fieldValueResolver: async (f: string) => (f === "level" ? ["error", "warn"] : []),
     });
     const before = await ask(provide, model, "SELECT * FROM logs WHERE lev");
-    expect(before.suggestions.map((s: any) => s.label)).toContain("level");
+    expect(before.suggestions.filter((s: any) => !isHeader(s)).map(nameOf)).toContain("level");
 
     const after = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-    expect(after.suggestions.map((s: any) => s.label)).toEqual(["'error'", "'warn'", "level"]);
+    expect(after.suggestions.filter((s: any) => !isHeader(s)).map(nameOf)).toEqual([
+      "'error'",
+      "'warn'",
+      "level",
+    ]);
   });
 });
 
@@ -1252,9 +1282,15 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
       interval: 25,
     });
     const editor = createdEditors.at(-1)!;
+    const registration = registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1];
     return {
-      provide: registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1]
-        .provideCompletionItems,
+      provide: registration.provideCompletionItems,
+      // Monaco resolves a row as it gains focus; a row whose resolve never settles is one the key rules step over.
+      steppedOver: async (item: any) =>
+        !(await Promise.race([
+          Promise.resolve(registration.resolveCompletionItem(item)).then(() => true),
+          new Promise((r) => setTimeout(() => r(false), 30)),
+        ])),
       model: editor.getModel(),
       editor,
     };
@@ -1273,7 +1309,8 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
     model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
     return provide(model, { lineNumber: 1, column: text.length + 1 }, context, token);
   };
-  const labels = (r: any) => r.suggestions.map((s: any) => s.label);
+  // Group header rows are layout, not choices, so most assertions read the rows under them.
+  const labels = (r: any) => r.suggestions.filter((s: any) => !isHeader(s)).map(nameOf);
   const noLookup = () =>
     vi.fn(async () =>
       Promise.reject(Object.assign(new Error("no lookup"), { name: "NoValueLookup" })),
@@ -1301,16 +1338,17 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
   });
 
   it("in a highlighted menu a status row is never row 1", { timeout: 30000 }, async () => {
-    const { provide, model } = await mountWith(
+    const { provide, model, steppedOver } = await mountWith(
       "v-hl-empty",
       vi.fn(async () => []),
     );
     const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ", {}, CTRL_SPACE);
-    const sorted = [...result.suggestions].sort((a: any, b: any) =>
-      String(a.sortText).localeCompare(String(b.sortText)),
-    );
-    expect(JSON.stringify(sorted[0].label)).not.toContain("valuesEmpty");
-    expect(JSON.stringify(sorted.at(-1).label)).toContain("valuesEmpty");
+    const status = rowsOf(result).find((s: any) => nameOf(s).includes("valuesEmpty"));
+    expect(await steppedOver(status), "Tab and the arrows step over it").toBe(true);
+    expect(status.preselect).toBeUndefined();
+    const field = rowsOf(result).find((s: any) => nameOf(s) === "level");
+    expect(await steppedOver(field)).toBe(false);
+    expect(field.preselect, "the highlight starts on a real row").toBe(true);
   });
 
   it("in a highlighted menu a slow lookup shows no row at all", { timeout: 30000 }, async () => {
@@ -1332,15 +1370,17 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
     "a resolver slower than the budget gives one row that inserts nothing",
     { timeout: 30000 },
     async () => {
-      const { provide, model } = await mountWith("v-slow", delayed(2500, ["error"]));
+      const { provide, model, steppedOver } = await mountWith("v-slow", delayed(2500, ["error"]));
       const started = Date.now();
       const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
       expect(Date.now() - started).toBeLessThan(2000);
-      expect(result.suggestions).toHaveLength(1);
-      expect(result.suggestions[0].label.label).toContain("valuesLoading");
-      expect(result.suggestions[0].label.description).toContain("valuesLoadingHint");
-      expect(result.suggestions[0].kind).toBe(10);
-      expect(result.suggestions[0].insertText).toBe("");
+      const [row] = rowsOf(result);
+      expect(rowsOf(result)).toHaveLength(1);
+      expect(row.label.label).toContain("valuesLoading");
+      expect(row.label.description).toContain("valuesLoadingHint");
+      expect(row.kind).toBe(10);
+      expect(row.insertText).toBe("");
+      expect(await steppedOver(row)).toBe(true);
     },
   );
 
@@ -1350,8 +1390,8 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
       vi.fn(async () => []),
     );
     const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-    expect(result.suggestions[0].label).toContain("valuesEmpty");
-    expect(result.suggestions[0].insertText).toBe("");
+    expect(nameOf(rowsOf(result)[0])).toContain("valuesEmpty");
+    expect(rowsOf(result)[0].insertText).toBe("");
     expect(labels(result)).toContain("level");
   });
 
@@ -1361,7 +1401,7 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
       vi.fn(async () => Promise.reject(new Error("x"))),
     );
     const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-    expect(result.suggestions[0].label).toContain("valuesFailed");
+    expect(nameOf(rowsOf(result)[0])).toContain("valuesFailed");
   });
 
   it("drops a late answer after Esc", { timeout: 30000 }, async () => {
@@ -1404,19 +1444,18 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
     );
     const result = await ask(provide, model, "SELECT * FROM logs WHERE level ILIKE '");
     expect(labels(result)).toEqual(["'%warn%'"]);
-    expect(result.suggestions[0].insertText).toBe("%warn%'");
+    expect(rowsOf(result)[0].insertText).toBe("%warn%'");
   });
 
   it("a bare = 50 keeps value help", { timeout: 30000 }, async () => {
     const resolver = vi.fn(async () => ["500", "404"]);
     const { provide, model } = await mountWith("v-bare", resolver);
     const result = await ask(provide, model, "SELECT * FROM logs WHERE code = 50");
-    expect(resolver).toHaveBeenCalledWith("code");
-    expect(labels(result).slice(0, 2)).toEqual(["404", "500"]);
-    expect(result.suggestions[0].insertText).toBe("404");
-    expect(result.suggestions[0].range.startColumn).toBe(
-      "SELECT * FROM logs WHERE code = ".length + 1,
-    );
+    expect(resolver).toHaveBeenCalledWith("code", expect.anything());
+    // The provider filters by the typed token, so only values that start with it remain.
+    expect(labels(result)).toEqual(["500"]);
+    expect(rowsOf(result)[0].insertText).toBe("500");
+    expect(rowsOf(result)[0].range.startColumn).toBe("SELECT * FROM logs WHERE code = ".length + 1);
   });
 
   it("quotes by column type: a Utf8 200 is quoted", { timeout: 30000 }, async () => {
@@ -1425,7 +1464,7 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
       vi.fn(async () => ["200"]),
     );
     const result = await ask(provide, model, "SELECT * FROM logs WHERE status_text = ");
-    expect(result.suggestions[0].insertText).toBe("'200'");
+    expect(rowsOf(result)[0].insertText).toBe("'200'");
   });
 
   it("skips the lookup when the typed text is a column", { timeout: 30000 }, async () => {
@@ -1446,8 +1485,9 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
         vi.fn(async () => many),
       );
       const result = await ask(provide, model, "SELECT * FROM logs WHERE level = ");
-      const last = result.suggestions.at(-1);
-      expect(last.label).toContain("valuesCap");
+      const values = rowsOf(result).filter((s: any) => String(s.sortText).startsWith("0"));
+      const last = values.at(-1);
+      expect(nameOf(last)).toContain("valuesCap");
       expect(last.insertText).toBe("");
       expect(last.kind).toBe(26);
     },
@@ -1499,44 +1539,79 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
     },
   );
 
+  // A typed quote reopens its menu as an auto Invoke, which highlights the preselected first value.
+  const typeQuote = async (editor: any, model: any, text: string) => {
+    model.getValueInRange.mockReturnValue(text);
+    editor.getPosition.mockReturnValue({ lineNumber: 1, column: text.length + 1 });
+    editor.trigger.mockClear();
+    editor.onDidChangeModelContent.mock.calls.at(-1)![0]({ changes: [{ text: "''" }] });
+    await new Promise((r) => setTimeout(r, 20));
+    return editor.trigger.mock.calls.map((c: any[]) => [c[1], c[2]]);
+  };
+
   it(
-    "a menu opened by a quote highlights row 1, so Enter takes the value",
-    {
-      timeout: 30000,
-    },
+    "a typed quote in a value position reopens the menu so the first value is highlighted",
+    { timeout: 30000 },
     async () => {
-      const { provide, model, editor } = await mountWith(
+      const { model, editor } = await mountWith(
         "v-quote-enter",
         vi.fn(async () => ["error"]),
       );
-      editor.trigger.mockClear();
-      await ask(
-        provide,
-        model,
-        "SELECT * FROM logs WHERE level = '",
-        {},
-        {
-          triggerKind: 1,
-          triggerCharacter: "'",
-        },
-      );
-      await new Promise((r) => setTimeout(r, 200));
-      expect(editor.trigger.mock.calls.some((c: any[]) => c[1] === "focusSuggestion")).toBe(true);
+      expect(await typeQuote(editor, model, "SELECT * FROM logs WHERE level = '")).toEqual([
+        ["hideSuggestWidget", {}],
+        ["editor.action.triggerSuggest", { auto: true }],
+      ]);
     },
   );
 
   it(
-    "an edit made after the quote voids its highlight, so a later menu stays unhighlighted",
+    "a key typed after the quote voids the reopen, so a later menu never inherits its highlight",
     { timeout: 30000 },
     async () => {
-      const { provide, model, editor } = await mountWith(
-        "v-quote-stale",
+      const { model, editor } = await mountWith(
+        "v-quote-late",
         vi.fn(async () => ["error"]),
       );
       let version = 1;
       model.getVersionId = vi.fn(() => version);
+      model.getValueInRange.mockReturnValue("SELECT * FROM logs WHERE level = '");
+      editor.getPosition.mockReturnValue({ lineNumber: 1, column: 35 });
       editor.trigger.mockClear();
-      await ask(
+      editor.onDidChangeModelContent.mock.calls.at(-1)![0]({ changes: [{ text: "''" }] });
+      version = 2;
+      await new Promise((r) => setTimeout(r, 20));
+      expect(editor.trigger.mock.calls.map((c: any[]) => c[1])).not.toContain(
+        "editor.action.triggerSuggest",
+      );
+    },
+  );
+
+  it("a quote outside a value position reopens nothing", { timeout: 30000 }, async () => {
+    const { model, editor } = await mountWith(
+      "v-quote-none",
+      vi.fn(async () => ["error"]),
+    );
+    expect(await typeQuote(editor, model, "SELECT * FROM logs WHERE match_all('")).toEqual([]);
+  });
+
+  it(
+    "only real rows are preselected, and only in a menu no trigger character opened",
+    { timeout: 30000 },
+    async () => {
+      const { provide, model } = await mountWith(
+        "v-preselect",
+        vi.fn(async () => ["error"]),
+      );
+      const invoked = await ask(
+        provide,
+        model,
+        "SELECT * FROM logs WHERE level = '",
+        {},
+        CTRL_SPACE,
+      );
+      expect(rowsOf(invoked).every((s: any) => s.preselect)).toBe(true);
+      expect(invoked.suggestions.filter(isHeader).every((s: any) => !s.preselect)).toBe(true);
+      const typed = await ask(
         provide,
         model,
         "SELECT * FROM logs WHERE level = '",
@@ -1546,9 +1621,7 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
           triggerCharacter: "'",
         },
       );
-      version = 2;
-      await new Promise((r) => setTimeout(r, 200));
-      expect(editor.trigger.mock.calls.some((c: any[]) => c[1] === "focusSuggestion")).toBe(false);
+      expect(typed.suggestions.some((s: any) => s.preselect)).toBe(false);
     },
   );
 
@@ -1580,7 +1653,6 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
       ).toEqual([]);
     },
   );
-
   describe("an IN list continues after each comma", () => {
     const resolve = () => vi.fn(async () => ["checkout", "cart", "search"]);
 
@@ -1591,13 +1663,13 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
         const { provide, model } = await mountWith("v-in-letter", resolve());
         const text = "SELECT * FROM logs WHERE level IN ('checkout',c";
         const result = await ask(provide, model, text, {}, CTRL_SPACE);
-        const values = result.suggestions.filter((s: any) => String(s.label).startsWith("'"));
-        expect(values.map((s: any) => s.label)).toEqual(["'cart'", "'search'"]);
+        const values = result.suggestions.filter((s: any) => nameOf(s).startsWith("'"));
+        expect(values.map(nameOf)).toEqual(["'cart'"]);
         expect(values[0].range).toMatchObject({
           startColumn: text.length,
           endColumn: text.length + 1,
         });
-        expect(labels(result)).toEqual(expect.arrayContaining(["level", "code"]));
+        expect(labels(result)).toEqual(["'cart'", "code"]);
         expect(labels(result)).not.toContain("count");
       },
     );
@@ -1615,7 +1687,7 @@ describe("P0-4 — values awaited within a budget, guarded, never identifiers in
         vi.fn(async () => ["200", "404"]),
       );
       const result = await ask(provide, model, "SELECT * FROM logs WHERE code IN (200, ");
-      const values = result.suggestions.filter((s: any) => /^\d+$/.test(String(s.label)));
+      const values = result.suggestions.filter((s: any) => /^\d+$/.test(nameOf(s)));
       expect(values.map((s: any) => s.insertText)).toEqual(["404"]);
     });
 
@@ -1669,7 +1741,7 @@ describe("P0-4 — PromQL label values come from the provider", () => {
       model.getLineContent.mockReturnValue(`${text}"}`);
       model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 1, endColumn: 1 });
       const result = await provide(model, { lineNumber: 1, column: text.length + 1 }, {}, {});
-      expect(result.suggestions.map((s: any) => s.label)).toEqual([
+      expect(result.suggestions.filter((s: any) => !isHeader(s)).map(nameOf)).toEqual([
         '"api-gateway"',
         '"chat-service"',
       ]);
@@ -1695,4 +1767,500 @@ describe("P0-4 — PromQL label values come from the provider", () => {
       expect(noMenu.suggestions).toEqual([]);
     },
   );
+});
+
+describe("P0-2 / P0-3 / W0-B — the chain, the operator lane and comments", () => {
+  let spy: ReturnType<typeof vi.spyOn>;
+  afterAll(() => spy?.mockRestore());
+
+  const FIELDS = [
+    { name: "level", label: "level", kind: "Field", insertText: "level", detail: "Utf8" },
+    { name: "code", label: "code", kind: "Field", insertText: "code", detail: "Int64" },
+  ];
+
+  const mountIn = async (
+    editorId: string,
+    mode = "automatic",
+    extra: { keywords?: any[]; filterMode?: boolean } = {},
+  ) => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+    const before = createFn.mock.calls.length;
+    spy = vi
+      .spyOn(document, "getElementById")
+      .mockImplementation(() => document.createElement("div"));
+    const store = createStore({
+      state: { theme: "light", zoConfig: { editor_suggest_mode: mode } },
+    });
+    const wrapper = mount(CodeQueryEditor, {
+      props: {
+        editorId,
+        language: "sql",
+        query: "",
+        keywords: extra.keywords ?? FIELDS,
+        suggestions: [],
+        filterMode: extra.filterMode ?? false,
+      },
+      global: { plugins: [store] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+    const registration = registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1];
+    return { wrapper, registration, editor: createdEditors.at(-1)!, api };
+  };
+
+  const ask = async (
+    registration: any,
+    editor: any,
+    text: string,
+    word = "",
+    context: any = {},
+  ) => {
+    const model = editor.getModel();
+    model.getValueInRange.mockReturnValue(text);
+    model.getLineContent.mockReturnValue(text);
+    model.getWordUntilPosition.mockReturnValue({
+      word,
+      startColumn: text.length + 1 - word.length,
+      endColumn: text.length + 1,
+    });
+    return await registration.provideCompletionItems(
+      model,
+      { lineNumber: 1, column: text.length + 1 },
+      context,
+      {},
+    );
+  };
+  const item = (r: any, label: string) =>
+    r.suggestions.find((s: any) => !isHeader(s) && nameOf(s) === label);
+
+  // Monaco runs an accepted item's command; this runs it the same way and reports whether a space was typed.
+  const accept = (api: any, editor: any, suggestion: any): boolean => {
+    vi.mocked(api.editor.getEditors).mockReturnValue([editor] as any);
+    editor.hasTextFocus.mockReturnValue(true);
+    editor.trigger.mockClear();
+    const handler = (vi.mocked(api.editor.registerCommand).mock.calls as any[]).find(
+      (c) => c[0] === suggestion.command?.id,
+    )?.[1];
+    handler?.({}, ...(suggestion.command?.arguments ?? []));
+    vi.mocked(api.editor.getEditors).mockReturnValue([]);
+    return editor.trigger.mock.calls.some(
+      (c: any[]) => c[0] === "keyboard" && c[1] === "type" && c[2]?.text === " ",
+    );
+  };
+  const TYPED_SPACE = { triggerKind: 1, triggerCharacter: " " };
+
+  it(
+    "under off, typing = after a field opens nothing; otherwise it opens values",
+    {
+      timeout: 30000,
+    },
+    async () => {
+      const off = await mountIn("trigger-off", "off");
+      const eq = { triggerKind: 1, triggerCharacter: "=" };
+      expect(
+        (await ask(off.registration, off.editor, "SELECT * FROM t WHERE level=", "", eq))
+          .suggestions,
+      ).toEqual([]);
+      const on = await mountIn("trigger-on", "automatic");
+      const values = await ask(on.registration, on.editor, "SELECT * FROM t WHERE level=", "", eq);
+      expect(item(values, "level"), "a value position offers columns").toBeDefined();
+    },
+  );
+
+  it(
+    "accepting a field in WHERE types a space, and that menu leads with =",
+    {
+      timeout: 30000,
+    },
+    async () => {
+      const { registration, editor, api } = await mountIn("chain-where");
+      const field = item(
+        await ask(registration, editor, "SELECT * FROM t WHERE lev", "lev"),
+        "level",
+      );
+      expect(field.insertText).toBe("level");
+      expect(accept(api, editor, field)).toBe(true);
+      const next = await ask(registration, editor, "SELECT * FROM t WHERE level ", "", TYPED_SPACE);
+      const sorted = [...next.suggestions].sort((a: any, b: any) =>
+        String(a.sortText ?? a.label).localeCompare(String(b.sortText ?? b.label)),
+      );
+      expect(nameOf(sorted.find((s: any) => !isHeader(s)))).toBe("=");
+      expect(rowsOf(next).filter((s: any) => nameOf(s) === "=")).toHaveLength(1);
+      expect(item(next, "code"), "the catalog stays below the lane").toBeDefined();
+    },
+  );
+
+  it("accepting = types a space that opens the value position", { timeout: 30000 }, async () => {
+    const { registration, editor, api } = await mountIn("chain-op");
+    const result = await ask(registration, editor, "SELECT * FROM t WHERE level ", "", TYPED_SPACE);
+    const eq = item(result, "=");
+    expect(eq.insertText).toBe("=");
+    expect(accept(api, editor, eq)).toBe(true);
+  });
+
+  it(
+    "never chains in SELECT, GROUP BY, ORDER BY or function arguments",
+    {
+      timeout: 30000,
+    },
+    async () => {
+      const { registration, editor, api } = await mountIn("chain-nowhere");
+      for (const text of [
+        "SELECT lev",
+        "SELECT * FROM t GROUP BY lev",
+        "SELECT * FROM t ORDER BY lev",
+        "SELECT * FROM t WHERE str_match(lev",
+        "SELECT CASE WHEN a = 1 AND lev",
+        "SELECT NOT lev",
+        "SELECT * FROM t WHERE ts BETWEEN now() - 1 AND lev",
+      ]) {
+        const field = item(await ask(registration, editor, text, "lev"), "level");
+        expect(accept(api, editor, field), text).toBe(false);
+      }
+    },
+  );
+
+  it("typing mode never chains, and operators keep today's space", { timeout: 30000 }, async () => {
+    const { registration, editor, api } = await mountIn("chain-typing", "typing");
+    const field = item(
+      await ask(registration, editor, "SELECT * FROM t WHERE lev", "lev"),
+      "level",
+    );
+    expect(accept(api, editor, field)).toBe(false);
+    const eq = item(await ask(registration, editor, "SELECT * FROM t WHERE level "), "=");
+    expect(eq.insertText).toBe("= ");
+    expect(accept(api, editor, eq)).toBe(false);
+  });
+
+  it(
+    "an operator accepted with text already after it on the line does not chain",
+    {
+      timeout: 30000,
+    },
+    async () => {
+      const { registration, editor, api } = await mountIn("chain-midline");
+      const model = editor.getModel();
+      const text = "SELECT * FROM t WHERE level ";
+      model.getValueInRange.mockReturnValue(text);
+      model.getLineContent.mockReturnValue(`${text} AND code = 1`);
+      model.getWordUntilPosition.mockReturnValue({ word: "", startColumn: 29, endColumn: 29 });
+      const result = await registration.provideCompletionItems(
+        model,
+        { lineNumber: 1, column: text.length + 1 },
+        TYPED_SPACE,
+        {},
+      );
+      const eq = item(result, "=");
+      expect(eq.insertText).toBe("= ");
+      expect(accept(api, editor, eq)).toBe(false);
+    },
+  );
+
+  it("a bare filter chains its first field only in filter mode", { timeout: 30000 }, async () => {
+    const api = await import("monaco-editor/esm/vs/editor/editor.api");
+    const createFn = vi.mocked(api.editor.create);
+    const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+    const before = createFn.mock.calls.length;
+    const store = createStore({ state: { theme: "light", zoConfig: {} } });
+    mount(CodeQueryEditor, {
+      props: {
+        editorId: "chain-filter",
+        language: "sql",
+        query: "",
+        keywords: FIELDS,
+        suggestions: [],
+        filterMode: true,
+      },
+      global: { plugins: [store] },
+    });
+    await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+      timeout: 15000,
+      interval: 25,
+    });
+    const editor = createdEditors.at(-1)!;
+    const registration = registerFn.mock.calls.filter((c) => c[0] === "sql").at(-1)![1];
+    const inFilter = item(await ask(registration, editor, "lev", "lev"), "level");
+    expect(accept(api, editor, inFilter)).toBe(true);
+    const plain = await mountIn("chain-nofilter");
+    const inSql = item(await ask(plain.registration, plain.editor, "lev", "lev"), "level");
+    expect(accept(api, plain.editor, inSql)).toBe(false);
+  });
+
+  it(
+    "a non-query editor gets no counting command it could not run",
+    { timeout: 30000 },
+    async () => {
+      const api = await import("monaco-editor/esm/vs/editor/editor.api");
+      const createFn = vi.mocked(api.editor.create);
+      const registerFn = vi.mocked(api.languages.registerCompletionItemProvider);
+      const before = createFn.mock.calls.length;
+      mount(CodeQueryEditor, {
+        props: { editorId: "vrl-commands", language: "vrl", query: "", keywords: FIELDS },
+        global: { plugins: [createStore({ state: { theme: "light" } })] },
+      });
+      await vi.waitFor(() => expect(createFn.mock.calls.length).toBe(before + 1), {
+        timeout: 15000,
+        interval: 25,
+      });
+      const editor = createdEditors.at(-1)!;
+      const registration = registerFn.mock.calls.filter((c) => c[0] === "vrl").at(-1)![1];
+      const result = await ask(registration, editor, ".lev", "lev");
+      expect(result.suggestions.length).toBeGreaterThan(0);
+      expect(result.suggestions.every((s: any) => s.command === undefined)).toBe(true);
+    },
+  );
+
+  describe("a space typed right after the chain's own space", () => {
+    const press = (editor: any, browserEvent: Record<string, unknown> = {}) => {
+      const event = {
+        keyCode: 10,
+        browserEvent,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      };
+      editor.onKeyDown.mock.calls.at(-1)![0](event);
+      return event.preventDefault.mock.calls.length > 0;
+    };
+    const chainThenSpace = async (editorId: string) => {
+      const { registration, editor, api } = await mountIn(editorId);
+      const text = "SELECT * FROM t WHERE level";
+      const field = item(
+        await ask(registration, editor, "SELECT * FROM t WHERE lev", "lev"),
+        "level",
+      );
+      expect(accept(api, editor, field)).toBe(true);
+      editor.onDidChangeModelContent.mock.calls.at(-1)![0]({
+        changes: [{ text: " ", range: { startLineNumber: 1, startColumn: text.length + 1 } }],
+      });
+      editor.getPosition.mockReturnValue({ lineNumber: 1, column: text.length + 2 });
+      return editor;
+    };
+
+    it("is swallowed once, and the next one types", { timeout: 30000 }, async () => {
+      const editor = await chainThenSpace("swallow-once");
+      expect(press(editor)).toBe(true);
+      expect(press(editor)).toBe(false);
+    });
+
+    it("is left alone during IME composition", { timeout: 30000 }, async () => {
+      const editor = await chainThenSpace("swallow-ime");
+      expect(press(editor, { isComposing: true })).toBe(false);
+    });
+
+    it("is left alone once the caret has moved", { timeout: 30000 }, async () => {
+      const editor = await chainThenSpace("swallow-moved");
+      editor.getPosition.mockReturnValue({ lineNumber: 1, column: 3 });
+      expect(press(editor)).toBe(false);
+    });
+
+    it("never touches a space typed without a chain", { timeout: 30000 }, async () => {
+      const { editor } = await mountIn("swallow-none");
+      editor.onDidChangeModelContent.mock.calls.at(-1)![0]({
+        changes: [{ text: " ", range: { startLineNumber: 1, startColumn: 5 } }],
+      });
+      editor.getPosition.mockReturnValue({ lineNumber: 1, column: 6 });
+      expect(press(editor)).toBe(false);
+    });
+  });
+
+  describe("after a complete predicate, AND and OR lead", () => {
+    const CATALOG = [
+      ...FIELDS.map((f) => ({ ...f, sortText: `\u0000${f.name}` })),
+      ...SQL_KEYWORDS,
+      ...SQL_CLAUSE_KEYWORDS,
+    ];
+    const leading = (result: any, count: number) =>
+      [...result.suggestions]
+        .sort((a: any, b: any) => (String(a.sortText) < String(b.sortText) ? -1 : 1))
+        .slice(0, count)
+        .map((s: any) => (typeof s.label === "string" ? s.label : s.label.label));
+
+    it("in filter mode, after every predicate shape", { timeout: 30000 }, async () => {
+      const { registration, editor } = await mountIn("lead-filter", "automatic", {
+        keywords: CATALOG,
+        filterMode: true,
+      });
+      for (const text of [
+        "level = 'x' ",
+        "level IS NULL ",
+        "level IN ('a','b') ",
+        "code BETWEEN 1 AND 5 ",
+        "(code = 1) ",
+      ]) {
+        const result = await ask(registration, editor, text, "", TYPED_SPACE);
+        expect(leading(result, 2), text).toEqual(["AND", "OR"]);
+        expect(item(result, "level"), `${text}: fields stay`).toBeDefined();
+      }
+      const inGroup = await ask(registration, editor, "(code = 1 ", "", TYPED_SPACE);
+      expect(leading(inGroup, 3)).toEqual(["AND", "OR", ")"]);
+    });
+
+    it("in full SQL, the clauses that can follow come next", { timeout: 30000 }, async () => {
+      const { registration, editor } = await mountIn("lead-sql", "automatic", {
+        keywords: CATALOG,
+      });
+      const result = await ask(
+        registration,
+        editor,
+        "SELECT * FROM t WHERE level = 'x' ",
+        "",
+        TYPED_SPACE,
+      );
+      expect(leading(result, 5)).toEqual(["AND", "OR", "GROUP BY", "ORDER BY", "LIMIT"]);
+      const when = await ask(registration, editor, "SELECT CASE WHEN code = 1 ", "", TYPED_SPACE);
+      expect(leading(when, 3)).toEqual(["AND", "OR", "THEN"]);
+    });
+
+    it("AND chains into the field menu, which leads with fields", { timeout: 30000 }, async () => {
+      const { registration, editor, api } = await mountIn("lead-chain", "automatic", {
+        keywords: CATALOG,
+        filterMode: true,
+      });
+      const result = await ask(registration, editor, "level = 'x' ", "", TYPED_SPACE);
+      const and = item(result, "AND");
+      expect(and.insertText).toBe("AND");
+      expect(accept(api, editor, and)).toBe(true);
+      const next = await ask(registration, editor, "level = 'x' AND ", "", TYPED_SPACE);
+      expect(leading(next, 1)).toEqual(["code"]);
+      const field = item(await ask(registration, editor, "level = 'x' AND lev", "lev"), "level");
+      expect(accept(api, editor, field)).toBe(true);
+    });
+
+    it("typing mode ranks the same lead without chaining", { timeout: 30000 }, async () => {
+      const { registration, editor, api } = await mountIn("lead-typing", "typing", {
+        keywords: CATALOG,
+        filterMode: true,
+      });
+      const result = await ask(registration, editor, "level = 'x' ", "", TYPED_SPACE);
+      expect(leading(result, 2)).toEqual(["AND", "OR"]);
+      const and = item(result, "AND");
+      expect(and.insertText).toBe("AND ");
+      expect(accept(api, editor, and)).toBe(false);
+    });
+  });
+
+  it(
+    "the match functions sit under Functions and fields, described, and Operators holds the plain operators",
+    { timeout: 30000 },
+    async () => {
+      const { registration, editor } = await mountIn("op-groups");
+      const result = await ask(
+        registration,
+        editor,
+        "SELECT * FROM t WHERE level ",
+        "",
+        TYPED_SPACE,
+      );
+      const sorted = [...result.suggestions].sort((a: any, b: any) =>
+        a.sortText < b.sortText ? -1 : 1,
+      );
+      const groups: Record<string, string[]> = {};
+      let current = "";
+      for (const row of sorted) {
+        if (isHeader(row)) current = nameOf(row);
+        else (groups[current] ??= []).push(nameOf(row));
+      }
+      expect(groups["sqlEditor.completion.groupOperators"]).toEqual([
+        "=",
+        "!=",
+        "IN",
+        "LIKE",
+        "ILIKE",
+        "IS NULL",
+        "IS NOT NULL",
+        "NOT LIKE",
+      ]);
+      expect(groups["sqlEditor.completion.groupFunctionsAndFields"].slice(0, 3)).toEqual([
+        "str_match",
+        "re_match",
+        "re_not_match",
+      ]);
+      const described = (name: string) => item(result, name).label.description;
+      expect(described("str_match")).toBe("sqlEditor.completion.wrapStrMatch");
+      expect(described("re_not_match")).toBe("sqlEditor.completion.wrapReNotMatch");
+    },
+  );
+
+  it(
+    "an underscored prefix keeps the grouped menu: re_n gives Functions and fields with re_not_match",
+    { timeout: 30000 },
+    async () => {
+      const { registration, editor } = await mountIn("op-groups-underscore");
+      const result = await ask(registration, editor, "SELECT * FROM t WHERE level re_n", "re_n");
+      expect(result.suggestions.filter(isHeader).map(nameOf)).toEqual([
+        "sqlEditor.completion.groupFunctionsAndFields",
+      ]);
+      expect(rowsOf(result).map(nameOf)).toEqual(["re_not_match"]);
+    },
+  );
+
+  it(
+    "IS N offers only IS NULL and IS NOT NULL, over the whole prefix",
+    { timeout: 30000 },
+    async () => {
+      const { registration, editor } = await mountIn("op-groups-isn", "automatic", {
+        keywords: [...FIELDS, ...SQL_KEYWORDS, ...SQL_CLAUSE_KEYWORDS],
+      });
+      const text = "SELECT * FROM t WHERE level IS N";
+      const result = await ask(registration, editor, text, "N");
+      expect(rowsOf(result).map(nameOf)).toEqual(["IS NULL", "IS NOT NULL"]);
+      expect(rowsOf(result)[0].range.startColumn).toBe(text.length - "IS N".length + 1);
+    },
+  );
+
+  it(
+    "typed letters keep the header of every group that still has matches",
+    { timeout: 30000 },
+    async () => {
+      const { registration, editor } = await mountIn("op-groups-typed");
+      const result = await ask(registration, editor, "SELECT * FROM t WHERE level I", "I");
+      expect(result.suggestions.filter(isHeader).map(nameOf)).toContain(
+        "sqlEditor.completion.groupOperators",
+      );
+    },
+  );
+
+  it("a numeric field leads with >=", { timeout: 30000 }, async () => {
+    const { registration, editor } = await mountIn("chain-num");
+    const result = await ask(registration, editor, "SELECT * FROM t WHERE code ");
+    expect(nameOf(rowsOf(result)[0])).toBe(">=");
+  });
+
+  it(
+    "returns nothing inside a -- comment, even for a trigger character",
+    { timeout: 30000 },
+    async () => {
+      const { registration, editor } = await mountIn("chain-comment");
+      const result = await ask(registration, editor, "-- show me errors ", "", {
+        triggerKind: 1,
+        triggerCharacter: " ",
+      });
+      expect(result.suggestions).toEqual([]);
+    },
+  );
+
+  it("announces a chained menu to screen readers", { timeout: 30000 }, async () => {
+    const { wrapper, registration, editor, api } = await mountIn("chain-announce");
+    vi.mocked(api.editor.getEditors).mockReturnValue([editor] as any);
+    editor.hasTextFocus.mockReturnValue(true);
+    const chain = (vi.mocked(api.editor.registerCommand).mock.calls as any[]).find(
+      (c) => c[0] === "o2.suggest.chainSpace",
+    )[1];
+    chain({}, "field");
+    expect(editor.trigger).toHaveBeenCalledWith("keyboard", "type", { text: " " });
+    await ask(registration, editor, "SELECT * FROM t WHERE level ", "", {
+      triggerKind: 1,
+      triggerCharacter: " ",
+    });
+    await vi.waitFor(() =>
+      expect(wrapper.find('[data-test="query-editor-suggest-status"]').text()).toContain(
+        "sqlEditor.completion.chainedMenuAnnouncement",
+      ),
+    );
+    vi.mocked(api.editor.getEditors).mockReturnValue([]);
+  });
 });

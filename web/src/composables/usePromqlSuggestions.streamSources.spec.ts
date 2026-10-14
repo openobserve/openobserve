@@ -310,6 +310,7 @@ describe("label VALUES belong to the completion provider", () => {
     expect(requestFieldValues).toHaveBeenCalledWith(
       { org: "myorg", streamType: "metrics", streamName: "cpu_utilization_percent" },
       "region",
+      expect.anything(),
     );
   });
 

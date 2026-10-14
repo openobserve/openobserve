@@ -50,7 +50,8 @@ export type CompletionKindName =
   | "Snippet"
   | "Text"
   | "Event"
-  | "Issue";
+  | "Issue"
+  | "Folder";
 
 /** Names of monaco's CompletionItemInsertTextRule members. */
 export type InsertTextRuleName = "InsertAsSnippet" | "KeepWhitespace" | "None";
@@ -79,7 +80,17 @@ export interface SqlCompletionEntry {
   range?: Record<string, number>;
   /** What Monaco filters by when it is not the label, e.g. a value matched with its quote. */
   filterText?: string;
+  /** Run after the item is accepted: the chain's typed space, or the accept counter. */
+  command?: { id: string; title: string; arguments?: unknown[] };
   description?: string;
+  /** Shown right after the label, e.g. the arguments a wrap will fill in. */
+  labelDetail?: string;
+  /** Takes the initial highlight when the menu opens highlighted. */
+  preselect?: boolean;
+  /** An empty list keeps Monaco's 'smart' Enter treating an insert-nothing row as an accept, not a newline. */
+  additionalTextEdits?: unknown[];
+  /** A group header or status row: navigation and Tab step over it, and accepting it changes nothing. */
+  skipRow?: boolean;
 }
 
 /** An entry as it may arrive from the `suggestions` prop — callers outside this
@@ -98,6 +109,8 @@ const SNIPPET: InsertTextRuleName = "InsertAsSnippet";
  * then functions, then structural SQL.
  */
 export const SORT_LANE = {
+  // Only after a field in a predicate, where an operator is what comes next.
+  operator: "\u0000\u0000",
   field: "\u0000",
   function: "\u0001",
   predicate: "\u0002",
@@ -109,9 +122,9 @@ export const SORT_LANE = {
 export const SQL_KEYWORDS: SqlCompletionEntry[] = [
   {
     name: "and",
-    label: "and",
+    label: "AND",
     kind: "Keyword",
-    insertText: "and ",
+    insertText: "AND ",
     get detail() {
       return gt("sqlEditor.completion.andDetail");
     },
@@ -122,9 +135,9 @@ export const SQL_KEYWORDS: SqlCompletionEntry[] = [
   },
   {
     name: "or",
-    label: "or",
+    label: "OR",
     kind: "Keyword",
-    insertText: "or ",
+    insertText: "OR ",
     get detail() {
       return gt("sqlEditor.completion.orDetail");
     },
@@ -1163,6 +1176,12 @@ const normalizeEntry = (entry: unknown): LooseEntry | null => {
   return e.label === undefined || e.label === null || e.label === "" ? null : e;
 };
 
+// A signature in the right-hand column read as a column type, so `cast_to_arr  (field)` looked like a field.
+const signatureOf = (entry: LooseEntry): string | undefined =>
+  entry.kind === "Function" && typeof entry.detail === "string" && entry.detail.startsWith("(")
+    ? entry.detail
+    : undefined;
+
 const toMonacoItem = (
   entry: LooseEntry,
   word: string,
@@ -1178,8 +1197,12 @@ const toMonacoItem = (
       ? entry.insertText(word)
       : (entry.insertText ?? String(label));
 
+  const labelDetail = entry.labelDetail ?? signatureOf(entry);
   const item: Record<string, unknown> = {
-    label: entry.description ? { label, description: entry.description } : label,
+    label:
+      entry.description || labelDetail
+        ? { label, detail: labelDetail, description: entry.description }
+        : label,
     kind: kinds[entry.kind ?? "Text"],
     insertText,
     // An entry may widen its own range — a field value swallows monaco's
@@ -1203,6 +1226,10 @@ const toMonacoItem = (
   }
   if (entry.sortText !== undefined) item.sortText = entry.sortText;
   if (entry.filterText !== undefined) item.filterText = entry.filterText;
+  if (entry.command !== undefined) item.command = entry.command;
+  if (entry.preselect) item.preselect = true;
+  if (entry.additionalTextEdits !== undefined) item.additionalTextEdits = entry.additionalTextEdits;
+  if (entry.skipRow) item.o2skip = true;
 
   // Renders the label with a strikethrough. match_all_raw and friends are still
   // accepted (sql/rewriter rewrites them) but should not be reached for.

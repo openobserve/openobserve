@@ -1413,6 +1413,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :free-text-decorations="
                   searchObj.meta.sqlMode ? null : searchObj.data.freeTextDecorations
                 "
+                :filter-mode="!searchObj.meta.sqlMode"
                 editor-height="100%"
                 :style="editorWidthToggleFunction"
                 language="sql"
@@ -1868,6 +1869,7 @@ import { appendConjunct, looksLikeSqlStatement } from "@/utils/query/freeTextFil
 import { buildFilterContext, isFilterHeld } from "@/composables/useLogs/freeTextSearch";
 import { useFreeTextPreview } from "@/composables/useLogs/useFreeTextPreview";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import { setFieldTypeOf } from "@/utils/query/sqlDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
 import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -2306,10 +2308,19 @@ export default defineComponent({
       externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
     });
 
+    // A server type error names only types, so the squiggle needs the stream's column types to pick its operand.
+    const releaseFieldTypes = setFieldTypeOf(
+      (name) =>
+        (searchObj.data.stream.selectedStreamFields ?? []).find((f: any) => f.name === name)?.type,
+    );
+    onBeforeUnmount(releaseFieldTypes);
+
     const onQueryEditorFocus = () => {
       searchObj.meta.queryEditorPlaceholderFlag = false;
       _sqlOnFocus();
     };
+
+    const focusEditor = () => queryEditorRef.value?.focus?.();
 
     const handleQueryEditorBlur = async () => {
       searchObj.meta.queryEditorPlaceholderFlag = true;
@@ -5068,6 +5079,7 @@ export default defineComponent({
       fnEditorRef,
       searchObj,
       queryEditorRef,
+      focusEditor,
       syntaxGuideRef,
       confirmDialogVisible,
       confirmCallback,

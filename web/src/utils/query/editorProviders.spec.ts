@@ -22,7 +22,7 @@
 // entry for each surface.
 
 import { describe, it, expect } from "vitest";
-import { SQL_FUNCTIONS } from "./sqlCompletion";
+import { SQL_CLAUSE_KEYWORDS, SQL_FUNCTIONS, SQL_KEYWORDS } from "./sqlCompletion";
 import {
   parseCallContext,
   buildSignatureHelp,
@@ -42,8 +42,20 @@ import {
   literalStateAtEnd,
   takeValueGuardSnapshot,
   VALUE_WAIT_BUDGET_MS,
+  buildOperatorLane,
+  isCaretInComment,
+  isPredicatePosition,
+  parseOperatorContext,
+  parseLogicalLeadContext,
+  logicalLeadNames,
+  buildLogicalLead,
+  groupEntries,
+  matchesTyped,
+  type LogicalLeadContext,
+  OPERATORS_BY_TYPE,
 } from "./editorProviders";
 import { validateSql } from "./sqlDiagnostics";
+import { registerAcceptCommands, resetKeyContractForTests } from "./editorKeyContract";
 import { gt } from "@/types/i18n";
 
 const fn = (name: string) => SQL_FUNCTIONS.find((f) => f.name === name)!;
@@ -715,8 +727,6 @@ describe("buildValueEntries — inserting a value", () => {
   });
 });
 
-// P0-4 / P0-5: values without a quote, quoting by column type, the wait budget.
-
 describe("parseValueContext — never inside someone else's string", () => {
   it("does not treat `key=` inside a string literal as a comparison", () => {
     expect(parseValueContext("WHERE match_all('user=")).toBeNull();
@@ -1072,5 +1082,524 @@ describe("guard v2 — dropping a late value answer", () => {
 
   it("never drops an answer it cannot check", () => {
     expect(isValueAnswerStale(null, null, 3)).toBe(false);
+  });
+});
+
+describe("isPredicatePosition — WHERE, HAVING and ON chain; nothing else does", () => {
+  it("is a predicate right after WHERE, AND, OR, NOT, HAVING, ON and an open paren", () => {
+    for (const text of [
+      "SELECT * FROM t WHERE ",
+      "SELECT * FROM t WHERE a = 1 AND ",
+      "SELECT * FROM t WHERE a = 1 or ",
+      "SELECT * FROM t WHERE NOT ",
+      "SELECT k, count(*) FROM t GROUP BY k HAVING ",
+      "SELECT * FROM a JOIN b ON ",
+      "SELECT * FROM t WHERE (",
+      "SELECT * FROM t WHERE a = 1 AND (",
+      "SELECT * FROM a JOIN b ON a.",
+    ]) {
+      expect(isPredicatePosition(text), text).toBe(true);
+    }
+  });
+
+  it("treats the Logs filter fragment as one predicate, only in filter mode", () => {
+    expect(isPredicatePosition("", true)).toBe(true);
+    expect(isPredicatePosition("level = 'error' AND ", true)).toBe(true);
+    expect(isPredicatePosition("")).toBe(false);
+    expect(isPredicatePosition("level = 'error' AND ")).toBe(false);
+  });
+
+  it("never chains in boolean expressions inside SELECT, or after BETWEEN <expr> AND", () => {
+    for (const text of [
+      "SELECT CASE WHEN a = 1 AND ",
+      "SELECT NOT ",
+      "SELECT a FROM t WHERE ts BETWEEN now() - 1 AND ",
+      "SELECT a FROM t WHERE x = 1 AND (b) = CASE WHEN ",
+    ]) {
+      expect(isPredicatePosition(text), text).toBe(false);
+    }
+    expect(isPredicatePosition("SELECT a FROM t WHERE x BETWEEN 1 AND 2 AND ")).toBe(true);
+    expect(isPredicatePosition("SELECT a FROM t WHERE ts > now() - 1 AND ")).toBe(true);
+  });
+
+  it("a string or comment between does not confuse the clause", () => {
+    expect(isPredicatePosition("SELECT a FROM t WHERE s = 'SELECT x' AND ")).toBe(true);
+    expect(isPredicatePosition("SELECT a -- WHERE \nFROM t GROUP BY ")).toBe(false);
+  });
+
+  it("never chains in SELECT, GROUP BY, ORDER BY or function arguments", () => {
+    for (const text of [
+      "SELECT ",
+      "SELECT level, ",
+      "SELECT * FROM t GROUP BY ",
+      "SELECT * FROM t ORDER BY ",
+      "SELECT * FROM t WHERE count(",
+      "SELECT * FROM t WHERE str_match(",
+      "SELECT CASE WHEN ",
+      "SELECT * FROM t WHERE code BETWEEN 1 AND ",
+    ]) {
+      expect(isPredicatePosition(text), text).toBe(false);
+    }
+  });
+});
+
+describe("parseOperatorContext — the operator position", () => {
+  const FIELDS = ["level", "code", "trace_id"];
+
+  it("fires after a known field and whitespace in a predicate", () => {
+    expect(parseOperatorContext("SELECT * FROM t WHERE level ", FIELDS)).toEqual({
+      field: "level",
+      qualified: "level",
+      partial: "",
+      span: "level ",
+    });
+  });
+
+  it("keeps a qualifier with the field, so a wrap starts at the qualifier", () => {
+    expect(parseOperatorContext("SELECT * FROM t WHERE t.level ", FIELDS)).toEqual({
+      field: "level",
+      qualified: "t.level",
+      partial: "",
+      span: "t.level ",
+    });
+  });
+
+  it("keeps the lane while an operator is being typed", () => {
+    expect(parseOperatorContext("WHERE level I", FIELDS)?.partial).toBe("I");
+    expect(parseOperatorContext("WHERE level !", FIELDS)?.partial).toBe("!");
+    expect(parseOperatorContext("WHERE level is x", FIELDS)).toBeNull();
+  });
+
+  it("keeps the lane while a multi-word operator or an underscored name is typed", () => {
+    expect(parseOperatorContext("WHERE level IS N", FIELDS)).toMatchObject({
+      field: "level",
+      partial: "IS N",
+    });
+    expect(parseOperatorContext("WHERE level IS ", FIELDS)?.partial).toBe("IS ");
+    expect(parseOperatorContext("WHERE level IS NOT N", FIELDS)?.partial).toBe("IS NOT N");
+    expect(parseOperatorContext("WHERE level NOT L", FIELDS)?.partial).toBe("NOT L");
+    expect(parseOperatorContext("WHERE level re_n", FIELDS)?.partial).toBe("re_n");
+    expect(parseOperatorContext("WHERE level str_", FIELDS)?.partial).toBe("str_");
+    expect(parseOperatorContext("WHERE level AND code", FIELDS)).toBeNull();
+  });
+
+  it("an IS N prefix offers IS NULL and IS NOT NULL over the prefix, never ORDER BY's NULLS FIRST", () => {
+    const context = parseOperatorContext("WHERE level IS N", FIELDS)!;
+    const rows = buildOperatorLane({ context, fieldType: "Utf8", lineNumber: 1, column: 17 });
+    const matching = rows.filter((r) => String(r.label).toLowerCase().startsWith("is n"));
+    expect(matching.map((r) => r.label)).toEqual(["IS NULL", "IS NOT NULL"]);
+    expect(acceptIn("WHERE level ", { ...matching[0], insertText: "IS NULL" })).toBe(
+      "WHERE level IS NULL",
+    );
+    expect(matching[0].range).toMatchObject({ startColumn: 13, endColumn: 17 });
+  });
+
+  it("does not fire for an unknown word, a non-operator, or outside predicates", () => {
+    expect(parseOperatorContext("WHERE nope ", FIELDS)).toBeNull();
+    expect(parseOperatorContext("WHERE level AS", FIELDS)).toBeNull();
+    expect(parseOperatorContext("SELECT level ", FIELDS)).toBeNull();
+    expect(parseOperatorContext("SELECT * FROM t GROUP BY level ", FIELDS)).toBeNull();
+    expect(parseOperatorContext("SELECT * FROM t WHERE count(level ", FIELDS)).toBeNull();
+    expect(parseOperatorContext("SELECT CASE WHEN level ", FIELDS)).toBeNull();
+    expect(parseOperatorContext("WHERE x BETWEEN 1 AND code ", FIELDS)).toBeNull();
+  });
+
+  it("does not fire on the right-hand side of a comparison", () => {
+    expect(parseOperatorContext("WHERE a = level ", FIELDS)).toBeNull();
+  });
+});
+
+let menuReopened = false;
+
+// Accepts a row the way Monaco does: insert its text, then run its command against a one-line editor.
+const acceptIn = (line: string, entry: any, lineNumber = 1): string => {
+  resetKeyContractForTests();
+  menuReopened = false;
+  let text = line + String(entry.insertText ?? "");
+  const editor = {
+    hasTextFocus: () => true,
+    getPosition: () => ({ lineNumber, column: text.length + 1 }),
+    trigger: (_source: string, id: string, payload: any) => {
+      if (id === "type") text += payload.text;
+      if (id === "editor.action.triggerSuggest") menuReopened = true;
+    },
+    executeEdits: (_source: string, edits: any[]) => {
+      for (const { range, text: inserted } of edits) {
+        text = text.slice(0, range.startColumn - 1) + inserted + text.slice(range.endColumn - 1);
+      }
+    },
+    pushUndoStop: () => {},
+  };
+  const commands = new Map<string, (...args: any[]) => void>();
+  const monaco = {
+    editor: {
+      getEditors: () => [editor],
+      registerCommand: (id: string, run: (...args: any[]) => void) => {
+        commands.set(id, run);
+        return { dispose: () => {} };
+      },
+    },
+    Selection: class {},
+  };
+  registerAcceptCommands(monaco, () => {});
+  if (entry.command) commands.get(entry.command.id)?.({}, ...(entry.command.arguments ?? []));
+  resetKeyContractForTests();
+  return text;
+};
+
+describe("buildOperatorLane — operators by type, ranked, never filtered", () => {
+  const ctx = (field: string, partial = "", qualified = field) => ({
+    field,
+    qualified,
+    partial,
+    span: `${qualified} ${partial}`,
+  });
+  const CHAIN = { id: "o2.suggest.chainSpace", title: "", arguments: ["operator"] };
+  const lane = (field: string, fieldType: string | undefined, chainCommand?: any) =>
+    buildOperatorLane({ context: ctx(field), fieldType, lineNumber: 2, column: 20, chainCommand });
+
+  it("puts = first for text and >= first for numbers", () => {
+    expect(lane("level", "Utf8")[0].label).toBe("=");
+    expect(lane("code", "Int64")[0].label).toBe(">=");
+    expect(lane("ok", "Boolean").map((e) => e.label)).toEqual(["= true", "= false", "IS NULL"]);
+  });
+
+  it("uses one neutral order when the type is unknown", () => {
+    expect(lane("x", undefined).map((e) => e.label)).toEqual(OPERATORS_BY_TYPE.neutral);
+  });
+
+  it("keeps the text order fixed, match functions named alone with the field as their detail", () => {
+    const rows = lane("level", "Utf8");
+    expect(rows.map((e) => e.label)).toEqual([
+      "=",
+      "!=",
+      "IN",
+      "LIKE",
+      "ILIKE",
+      "str_match",
+      "re_match",
+      "IS NULL",
+      "IS NOT NULL",
+      "NOT LIKE",
+      "re_not_match",
+    ]);
+    expect(rows.find((e) => e.label === "str_match")!.labelDetail).toBe("(level, …)");
+  });
+
+  it("wraps a qualified field whole, from its qualifier", () => {
+    const rows = buildOperatorLane({
+      context: ctx("level", "", "t.level"),
+      fieldType: "Utf8",
+      lineNumber: 1,
+      column: 30,
+    });
+    const row = rows.find((e) => e.name === "str_match")!;
+    expect(row.labelDetail).toBe("(t.level, …)");
+    expect(acceptIn(`${"x".repeat(21)}t.level `, row)).toBe(
+      `${"x".repeat(21)}str_match(t.level, '')`,
+    );
+  });
+
+  it("only str_match opens values after its wrap, and only where the chain runs", () => {
+    const line = `${"x".repeat(13)}level `;
+    const opens = (rows: any[], name: string) => {
+      acceptIn(
+        line,
+        rows.find((e) => e.name === name),
+        2,
+      );
+      return menuReopened;
+    };
+    expect(opens(lane("level", "Utf8", CHAIN), "str_match")).toBe(true);
+    expect(opens(lane("level", "Utf8", CHAIN), "re_match")).toBe(false);
+    expect(opens(lane("level", "Utf8"), "str_match")).toBe(false);
+  });
+
+  it("in Automatic, accepting = or LIKE writes one space through the chain, and IS NULL or IN do not chain", () => {
+    const entries = lane("level", "Utf8", CHAIN);
+    const accept = (label: string) =>
+      acceptIn(
+        "level ",
+        entries.find((e) => e.label === label)!,
+      );
+    expect(accept("=")).toBe("level = ");
+    expect(accept("LIKE")).toBe("level LIKE ");
+    expect(accept("IS NULL")).toBe("level IS NULL");
+  });
+
+  it("without the chain, operators keep today's trailing space", () => {
+    const eq = lane("level", "Utf8").find((e) => e.label === "=")!;
+    expect(acceptIn("level ", eq)).toBe("level = ");
+  });
+
+  it("sorts above the field lane", () => {
+    expect(lane("level", "Utf8").every((e) => e.sortText! < "\u0000a")).toBe(true);
+  });
+
+  it("match functions filter like plain operators, so = keeps row 1, and still wrap the field", () => {
+    const rows = lane("level", "Utf8");
+    const row = rows.find((e) => e.name === "str_match")!;
+    expect(row.range).toEqual(rows.find((e) => e.name === "=")!.range);
+    expect(row.filterText).toBe("str_match");
+    expect(row.insertText).toBe("");
+    expect(row.sortText! > rows.find((e) => e.name === "=")!.sortText!).toBe(true);
+    // The lane was built for column 20 on line 2, with `level ` just before it.
+    expect(acceptIn(`${"x".repeat(13)}level `, row, 2)).toBe(
+      `${"x".repeat(13)}str_match(level, '')`,
+    );
+  });
+
+  it("replaces a partially typed operator", () => {
+    const [first] = buildOperatorLane({
+      context: ctx("level", "!"),
+      fieldType: "Utf8",
+      lineNumber: 1,
+      column: 30,
+    });
+    expect(first.range).toMatchObject({ startColumn: 29, endColumn: 30 });
+  });
+});
+
+describe("parseLogicalLeadContext — after a complete predicate", () => {
+  it("fires after each complete predicate shape and a space", () => {
+    for (const text of [
+      "service_name = 'openobserve' ",
+      "level IS NULL ",
+      "level IS NOT NULL ",
+      "level IN ('a','b') ",
+      "level NOT IN ('a','b') ",
+      "code BETWEEN 1 AND 5 ",
+      "(a = 1) ",
+      "str_match(level, 'x') ",
+      "lower(x) = 'a' ",
+      "NOT level = 'a' ",
+    ]) {
+      expect(parseLogicalLeadContext(text, true), text).not.toBeNull();
+    }
+  });
+
+  it("does not fire mid-predicate, inside a string, or outside a predicate", () => {
+    for (const text of [
+      "level ",
+      "level = ",
+      "level = 'x' AND ",
+      "code BETWEEN 1 ",
+      "code BETWEEN 1 AND ",
+      "lower(x) ",
+      "level = 'x ",
+      "level = 'x'",
+    ]) {
+      expect(parseLogicalLeadContext(text, true), text).toBeNull();
+    }
+    expect(parseLogicalLeadContext("SELECT a = 1 ")).toBeNull();
+    expect(parseLogicalLeadContext("SELECT * FROM t ORDER BY a ")).toBeNull();
+    expect(parseLogicalLeadContext("level = 'x' ")).toBeNull();
+  });
+
+  it("reports an open group, CASE WHEN and the clause", () => {
+    expect(parseLogicalLeadContext("a = 1 AND (b = 2 ", true)).toEqual({
+      openParen: true,
+      inCaseWhen: false,
+      clause: "",
+    });
+    expect(parseLogicalLeadContext("SELECT CASE WHEN level = 'x' ")?.inCaseWhen).toBe(true);
+    expect(parseLogicalLeadContext("SELECT * FROM t GROUP BY a HAVING count(*) > 5 ")?.clause).toBe(
+      "HAVING",
+    );
+    expect(parseLogicalLeadContext("SELECT * FROM t WHERE a BETWEEN lo AND hi ")?.clause).toBe(
+      "WHERE",
+    );
+  });
+});
+
+describe("logicalLeadNames and buildLogicalLead — AND and OR lead, nothing removed", () => {
+  const lead = (context: Partial<LogicalLeadContext>, filterMode = false) =>
+    logicalLeadNames(
+      { openParen: false, inCaseWhen: false, clause: "WHERE", ...context },
+      filterMode,
+    );
+
+  it("ranks AND, OR, then ) when a group is open, then the clauses that can follow", () => {
+    expect(lead({}, true)).toEqual(["and", "or"]);
+    expect(lead({ openParen: true }, true)).toEqual(["and", "or", ")"]);
+    expect(lead({})).toEqual(["and", "or", "group by", "order by", "limit"]);
+    expect(lead({ clause: "HAVING" })).toEqual(["and", "or", "order by", "limit"]);
+    expect(lead({ openParen: true })).toEqual(["and", "or", ")"]);
+    expect(lead({ inCaseWhen: true, clause: "" })).toEqual(["and", "or", "then"]);
+  });
+
+  it("puts the lead first by sortText and keeps every other entry", () => {
+    const catalog = [
+      { name: "level", label: "level", kind: "Field", sortText: "\u0000level" },
+      ...SQL_KEYWORDS,
+      ...SQL_CLAUSE_KEYWORDS,
+    ];
+    const out = buildLogicalLead(catalog, ["and", "or", ")", "group by"]) as any[];
+    const sorted = [...out].sort((a, b) => (a.sortText < b.sortText ? -1 : 1));
+    expect(sorted.slice(0, 4).map((e) => e.name)).toEqual(["and", "or", ")", "GROUP BY"]);
+    expect(out).toHaveLength(catalog.length + 1);
+  });
+
+  it("in Automatic AND and OR insert without their space and carry the chain", () => {
+    const CHAIN = { id: "o2.suggest.chainSpace", title: "", arguments: ["operator"] };
+    const out = buildLogicalLead([...SQL_KEYWORDS], ["and", "or"], CHAIN) as any[];
+    // Uppercase, like GROUP BY and ORDER BY beside them; the chain types the space.
+    expect(out.slice(0, 2).map((e) => e.label)).toEqual(["AND", "OR"]);
+    expect(acceptIn("level = 'x' ", out[0])).toBe("level = 'x' AND ");
+    expect(acceptIn("level = 'x' ", out[1])).toBe("level = 'x' OR ");
+    const plain = buildLogicalLead([...SQL_KEYWORDS], ["and"]) as any[];
+    expect(acceptIn("level = 'x' ", plain[0])).toBe("level = 'x' AND ");
+  });
+});
+
+describe("isCaretInComment — W0-B, no completion inside comments", () => {
+  it("falls back to scanning the text when no tokenizer is present", () => {
+    const model = {};
+    expect(isCaretInComment(model, { lineNumber: 1, column: 20 }, "-- show me errors ")).toBe(true);
+    expect(isCaretInComment(model, { lineNumber: 1, column: 9 }, "SELECT ")).toBe(false);
+    expect(isCaretInComment(model, { lineNumber: 1, column: 9 }, "SELECT /* a ")).toBe(true);
+  });
+
+  it("asks Monaco's tokenizer when there is one", () => {
+    // `level -- note`: offsets 6.. are the comment token.
+    const line = "level -- note";
+    const tokens = {
+      findTokenIndexAtOffset: (offset: number) => (offset >= 6 ? 1 : 0),
+      getStandardTokenType: (index: number) => (index === 1 ? 1 : 0),
+    };
+    const model = {
+      tokenization: { getLineTokens: () => tokens, forceTokenization: () => {} },
+      getLineLength: () => line.length,
+    };
+    expect(isCaretInComment(model, { lineNumber: 1, column: line.length + 1 }, line)).toBe(true);
+    expect(isCaretInComment(model, { lineNumber: 1, column: 6 }, "level")).toBe(false);
+    expect(isCaretInComment(model, { lineNumber: 1, column: 1 }, "")).toBe(false);
+  });
+});
+
+describe("groupEntries — header rows over provider-filtered groups", () => {
+  const range = { startLineNumber: 1, endLineNumber: 1, startColumn: 9, endColumn: 10 };
+  const value = (v: string) => ({ name: v, label: `'${v}'`, kind: "Value", insertText: `'${v}'` });
+  const field = (f: string, type = "Utf8") => ({
+    name: f,
+    label: f,
+    kind: "Field",
+    insertText: f,
+    detail: type,
+  });
+  const groups = (values: any[], fields: any[]) => [
+    { header: "Values · last 15 min", name: "Values", entries: values },
+    { header: "Fields", name: "Fields", entries: fields },
+  ];
+  const build = (typed: string, preselect = false, values = ["error", "warn", "fatal_error"]) =>
+    groupEntries(groups(values.map(value), [field("level"), field("error_code", "Int64")]), {
+      typed,
+      range,
+      preselect,
+    });
+  const names = (rows: any[]) => rows.map((r) => (r.kind === "Folder" ? `H:${r.label}` : r.label));
+
+  // What Monaco does on accept: replace the row's range with its insertText.
+  const accepted = (line: string, row: any) =>
+    line.slice(0, row.range.startColumn - 1) + row.insertText + line.slice(row.range.endColumn - 1);
+  const LINE = "level = e";
+
+  it("a header is a Folder row: accepting it changes nothing and reopens the same menu", () => {
+    const [header] = build("e");
+    expect(header.kind).toBe("Folder");
+    expect(header.label).toBe("Values · last 15 min");
+    expect(accepted(LINE, header)).toBe(LINE);
+    expect(
+      header.additionalTextEdits,
+      "so 'smart' Enter accepts rather than types a newline",
+    ).toEqual([]);
+    expect(header.command!.id).toBe("editor.action.triggerSuggest");
+    expect(header.preselect).toBeUndefined();
+  });
+
+  it("filters by prefix or `_` segment, and every row filters by the typed token so the scores tie", () => {
+    const rows = build("e");
+    expect(names(rows)).toEqual([
+      "H:Values · last 15 min",
+      "'error'",
+      "'fatal_error'",
+      "H:Fields",
+      "error_code",
+    ]);
+    expect(rows.every((r) => r.filterText === "e")).toBe(true);
+    expect(names(build("f"))).toEqual(["H:Values · last 15 min", "'fatal_error'"]);
+  });
+
+  it("drops a group whose rows all filter out, header included", () => {
+    expect(names(build("lev"))).toEqual(["H:Fields", "level"]);
+  });
+
+  it("orders by sortText: header, then its rows, group after group", () => {
+    const sorted = [...build("")].sort((a, b) => (a.sortText! < b.sortText! ? -1 : 1));
+    expect(names(sorted)).toEqual(names(build("")));
+    expect(build("").map((r) => r.sortText)).toEqual([
+      "0a",
+      "0b0000",
+      "0b0001",
+      "0b0002",
+      "1a",
+      "1b0000",
+      "1b0001",
+    ]);
+  });
+
+  it("preselects real rows only, and only when asked", () => {
+    expect(
+      build("", true)
+        .filter((r) => r.preselect)
+        .map((r) => r.label),
+    ).toEqual(["'error'", "'warn'", "'fatal_error'", "level", "error_code"]);
+    expect(build("", false).some((r) => r.preselect)).toBe(false);
+  });
+
+  it("puts the group name in a value row's description and keeps a field's column type", () => {
+    const rows = build("");
+    expect(rows.find((r) => r.label === "'error'")!.description).toBe("Values");
+    expect(rows.find((r) => r.label === "error_code")!.description).toBe("Int64");
+  });
+
+  it("keeps a status row inside its group, never filtered and never a target", () => {
+    const loading = {
+      name: "\u0000loading",
+      label: "Still loading",
+      kind: "Event",
+      insertText: "",
+    };
+    const rows = groupEntries(groups([loading], [field("level")]), {
+      typed: "x",
+      range,
+      preselect: true,
+    });
+    expect(names(rows)).toEqual(["H:Values · last 15 min", "Still loading"]);
+    expect(accepted("level = x", rows[1]), "accepting it changes nothing").toBe("level = x");
+    expect(rows[1].preselect).toBeUndefined();
+  });
+
+  it("shows the cap row after the values it counts, and not without them", () => {
+    const cap = { name: "\u0000cap", label: "10 values shown", kind: "Issue", insertText: "" };
+    const withValues = groupEntries(groups([value("error"), cap], []), {
+      typed: "",
+      range,
+      preselect: false,
+    });
+    expect(names(withValues)).toEqual(["H:Values · last 15 min", "'error'", "10 values shown"]);
+    const none = groupEntries(groups([value("error"), cap], [field("level")]), {
+      typed: "lev",
+      range,
+      preselect: false,
+    });
+    expect(names(none)).toEqual(["H:Fields", "level"]);
+  });
+
+  it("matches ignore quotes and LIKE wildcards", () => {
+    expect(matchesTyped({ name: "'error'", label: "'error'" } as any, "err")).toBe(true);
+    expect(matchesTyped({ name: "warn", label: "warn" } as any, "%wa")).toBe(true);
+    expect(matchesTyped({ name: "kubernetes_pod_name", label: "x" } as any, "pod")).toBe(true);
+    expect(matchesTyped({ name: "level", label: "level" } as any, "ev")).toBe(false);
   });
 });

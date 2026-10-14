@@ -4,6 +4,7 @@ import {
   fieldValuesUnavailable,
   getFieldValuesForSuggestion,
   requestFieldValues,
+  type ValueLookupOptions,
 } from "@/composables/fieldValueStore";
 import { nextTick, ref } from "vue";
 import { PROMQL_CATALOG } from "@/utils/query/promqlCompletion";
@@ -45,11 +46,12 @@ export const resolvePromqlLabelValues = async (
   org: string,
   metric: string,
   label: string,
+  options: ValueLookupOptions = {},
 ): Promise<string[]> => {
   const ctx = { org, streamType: "metrics", streamName: metric };
   const cached = await getFieldValuesForSuggestion(ctx, label).catch(() => [] as string[]);
   if (cached.length) return cached;
-  const fetched = await requestFieldValues(ctx, label);
+  const fetched = await requestFieldValues(ctx, label, options);
   if (!fetched.length && fieldValuesUnavailable(ctx, label)) {
     throw new Error("label values unavailable");
   }

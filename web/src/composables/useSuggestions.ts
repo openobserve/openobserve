@@ -8,6 +8,7 @@ import {
   noValueLookup,
   requestFieldValues,
   type StreamContext,
+  type ValueLookupOptions,
 } from "@/composables/fieldValueStore";
 import {
   SQL_KEYWORDS,
@@ -157,7 +158,10 @@ const useSqlSuggestions = () => {
    * inline instead of the parent debouncing, fetching, pushing the result down
    * as a prop and force-reopening the widget.
    */
-  const resolveFieldValues = async (fieldName: string): Promise<string[]> => {
+  const resolveFieldValues = async (
+    fieldName: string,
+    options: ValueLookupOptions = {},
+  ): Promise<string[]> => {
     const inSession = Array.from(
       autoCompleteData.value.fieldValues[fieldName] || new Set(),
     ) as string[];
@@ -178,7 +182,7 @@ const useSqlSuggestions = () => {
     const merged = [...new Set([...inSession, ...stored])];
     if (merged.length) return merged;
 
-    const fetched = await requestFieldValues(ctx, fieldName);
+    const fetched = await requestFieldValues(ctx, fieldName, options);
     if (!fetched.length && fieldValuesUnavailable(ctx, fieldName)) {
       throw new Error("field values unavailable");
     }
