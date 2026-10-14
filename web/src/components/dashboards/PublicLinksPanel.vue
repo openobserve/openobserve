@@ -51,6 +51,7 @@
         <span class="text-dialog-header-text truncate text-base font-semibold">
           {{ drawerTitle }}
         </span>
+        <BetaBadge class="shrink-0" />
       </div>
     </template>
     <!-- Listing and creating are separate grants, so a refused list doesn't mean a refused create. -->
@@ -75,8 +76,18 @@
       class="flex flex-col gap-4"
       data-test="dashboards-public-links-panel-created"
     >
-      <div class="text-text-heading text-base font-medium">
-        {{ t("dashboard.publicLinks.createdTitle") }}
+      <div class="flex items-center gap-2">
+        <span class="text-text-heading text-base font-medium">
+          {{ t("dashboard.publicLinks.createdTitle") }}
+        </span>
+        <OTag
+          type="publicLinkStatus"
+          :value="lifecycleStatus(createdLink)"
+          data-test="dashboards-public-links-panel-created-status"
+        />
+      </div>
+      <div class="text-text-secondary text-xs">
+        {{ t("dashboard.publicDashboard.linkHint") }}
       </div>
       <OInput
         :model-value="publicUrl(createdLink)"
@@ -103,10 +114,64 @@
         >
           {{ t("dashboard.publicLinks.openPublicPage") }}
         </OButton>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          icon-left="edit"
+          data-test="dashboards-public-links-panel-created-edit-btn"
+          @click="openForm(createdLink)"
+        >
+          {{ t("dashboard.publicLinks.editSettings") }}
+        </OButton>
       </div>
-      <div class="text-text-secondary text-xs">
-        {{ t("dashboard.publicDashboard.linkHint") }}
+      <div
+        class="text-text-secondary text-xs"
+        data-test="dashboards-public-links-panel-created-build-note"
+      >
+        {{ createdBuildNote }}
       </div>
+      <!-- Best effort: a failed status call shows no table rather than an error. -->
+      <OTable
+        v-if="!createdStatusFailed"
+        :data="createdRangeRows"
+        :columns="rangeStateColumns"
+        row-key="key"
+        :loading="createdStatusLoading"
+        pagination="none"
+        :show-global-filter="false"
+        :default-columns="false"
+        table-id="public-link-range-states"
+        data-test="dashboards-public-links-panel-created-states"
+      >
+        <template #toolbar-trailing>
+          <ORefreshButton
+            layout="inline"
+            variant="outline"
+            :last-run-at="createdStatusUpdatedAt || null"
+            :loading="createdStatusFetching"
+            data-test="dashboards-public-links-panel-created-states-refresh-btn"
+            @click="refetchCreatedStatus"
+          />
+        </template>
+        <template #cell-range="{ row }">
+          <span class="text-text-body text-sm">{{ longRange(row.range, t, timezone) }}</span>
+        </template>
+        <template #cell-state="{ row }">
+          <span class="inline-flex" :data-test="`dashboards-public-links-panel-state-${row.key}`">
+            <OTag type="publicLinkRangeState" :value="row.state" />
+            <OTooltip v-if="row.reason" side="bottom" :content="row.reason" />
+          </span>
+        </template>
+        <template #cell-built_at="{ row }">
+          <OTimeCell :value="row.builtAt" unit="us" :timezone="timezone" :now="now" />
+        </template>
+        <template #cell-panels="{ row }">
+          <span v-if="row.panels" class="text-text-body text-sm tabular-nums">{{
+            row.panels
+          }}</span>
+          <span v-else class="text-text-muted text-sm">{{ raw("—") }}</span>
+        </template>
+      </OTable>
     </div>
 
     <div
@@ -212,22 +277,31 @@
           :label="t('dashboard.publicDashboard.defaultRange')"
           data-test="dashboards-public-links-panel-default-select"
         />
-        <OFormSelect
-          v-if="ranges.some((r) => r.type === 'relative')"
-          name="rebuildSecs"
-          :options="refreshOptions"
-          required
-          :label="t('dashboard.publicDashboard.refreshEvery')"
-          data-test="dashboards-public-links-panel-rebuild-select"
-        >
-          <template #tooltip>
-            <OTooltip
-              side="right"
-              max-width="20rem"
-              :content="t('dashboard.publicLinks.refreshEveryHint')"
-            />
-          </template>
-        </OFormSelect>
+        <div v-if="ranges.some((r) => r.type === 'relative')" class="flex flex-col gap-1.5">
+          <OFormSelect
+            name="refreshSecs"
+            :options="refreshOptions"
+            required
+            :label="t('dashboard.publicDashboard.refreshEvery')"
+            data-test="dashboards-public-links-panel-refresh-select"
+          >
+            <template #tooltip>
+              <OTooltip
+                side="right"
+                max-width="20rem"
+                :content="t('dashboard.publicLinks.refreshEveryHint')"
+              />
+            </template>
+          </OFormSelect>
+          <span
+            v-for="hint in refreshFloorHints"
+            :key="hint.key"
+            class="text-input-help-text text-xs leading-snug"
+            :data-test="`dashboards-public-links-panel-refresh-floor-${hint.key}`"
+          >
+            {{ hint.text }}
+          </span>
+        </div>
         <OFormDate
           name="expires"
           clearable
@@ -289,6 +363,9 @@
             />
           </div>
         </template>
+      </div>
+      <div class="text-text-secondary text-xs" data-test="dashboards-public-links-panel-save-hint">
+        {{ editing ? t("dashboard.publicLinks.saveHint") : t("dashboard.publicLinks.createHint") }}
       </div>
     </div>
 
@@ -365,7 +442,10 @@
           </span>
         </template>
         <template #cell-status="{ row }">
-          <OTag type="publicLinkStatus" :value="row.status" />
+          <span class="inline-flex" :data-test="`dashboards-public-links-panel-${row.id}-status`">
+            <OTag type="publicLinkStatus" :value="displayStatus(row, linkReports[row.id])" />
+            <OTooltip v-if="attention[row.id]" side="bottom" :content="attention[row.id]" />
+          </span>
         </template>
         <template #cell-ranges="{ row }">
           <PublicLinkRangesCell :link="row" />
@@ -373,7 +453,7 @@
         <template #cell-refresh="{ row }">
           <span class="text-text-body text-sm">{{
             hasRelativeRange(row)
-              ? refreshLabel(row.rebuild_secs, t)
+              ? refreshLabel(row.refresh_secs, t)
               : t("dashboard.publicLinks.refreshOnce")
           }}</span>
         </template>
@@ -384,8 +464,14 @@
             :data-test="`dashboards-public-links-panel-${row.id}-expiry`"
           />
         </template>
-        <template #cell-updated="{ row }">
-          <OTimeCell :value="row.last_rebuilt_at" unit="us" :timezone="timezone" :now="now" />
+        <template #cell-last_viewed="{ row }">
+          <OTimeCell
+            :value="row.last_accessed_at"
+            unit="us"
+            :timezone="timezone"
+            :now="now"
+            :empty-label="t('dashboard.publicLinks.never')"
+          />
         </template>
         <template #cell-published_by="{ row }">
           <OUserCell :value="row.published_by" />
@@ -500,13 +586,13 @@
                 }}
               </ODropdownItem>
               <ODropdownItem
-                v-if="canRebuild(row)"
+                v-if="canRefresh(row)"
                 icon-left="refresh"
                 :disabled="busyRows.has(row.id)"
-                :data-test="`dashboards-public-links-panel-${row.id}-rebuild-menu`"
-                @select="rebuildLink(row)"
+                :data-test="`dashboards-public-links-panel-${row.id}-refresh-menu`"
+                @select="refreshLink(row)"
               >
-                {{ t("dashboard.publicLinks.rebuildNow") }}
+                {{ t("dashboard.publicLinks.refreshOnNextView") }}
               </ODropdownItem>
               <ODropdownItem
                 icon-left="delete"
@@ -555,6 +641,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import PublicLinkRangesCell from "./PublicLinkRangesCell.vue";
 import PublicLinkExpiresCell from "./PublicLinkExpiresCell.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -566,10 +654,17 @@ import {
 } from "@/composables/dashboard/useVariablesManager";
 import DateTime from "@/components/DateTime.vue";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import type { PublicLink, PublicLinkRange } from "@/services/public_dashboards_admin";
+import { durationFormatter } from "@/utils/formatters";
+import type {
+  PublicLink,
+  PublicLinkRange,
+  PublicLinkRangeState,
+} from "@/services/public_dashboards_admin";
 import {
+  publicLinkStatusQuery,
   publicLinksForDashboardQuery,
-  rebuildPublicLinkMutation,
+  publicLinksStatusBatchQuery,
+  refreshPublicLinkMutation,
   revokePublicLinkMutation,
   savePublicLinkMutation,
   setPublicLinkPausedMutation,
@@ -586,15 +681,22 @@ import {
   rangeError,
   rangeFromPicker,
   rangeKey,
+  slowerRanges,
+  sortRanges,
   todayIn,
   toPublicLinkConfig,
   type PickedTime,
   type PublicLinkForm,
 } from "./PublicLinkForm.schema";
 import {
+  attentionReason,
   canPause,
-  canRebuild,
+  canRefresh,
+  displayStatus,
   hasRelativeRange,
+  lifecycleStatus,
+  rangeAttentionReason,
+  unavailablePanels,
   longRange,
   publicLinkColumns,
   publicLinkSearchTerm,
@@ -606,7 +708,11 @@ import {
 
 type VariableValues = { values?: Array<{ name: string; value: unknown }> };
 type DashboardLayout = {
-  tabs?: Array<{ tabId: string; name?: string; panels?: Array<{ id: string; title?: string }> }>;
+  tabs?: Array<{
+    tabId: string;
+    name?: string;
+    panels?: Array<{ id: string; title?: string; type?: string }>;
+  }>;
   variables?: Record<string, unknown>;
 };
 /** The live dashboard's variables manager, read to seed a new link with what the author sees. */
@@ -628,7 +734,19 @@ interface RangeRow {
   range: PublicLinkRange;
 }
 
+/** One row of the created view's state table. */
+interface RangeStateRow {
+  key: string;
+  range: PublicLinkRange;
+  state: PublicLinkRangeState | "never_viewed";
+  reason: I18nText | null;
+  builtAt: number | null;
+  panels: I18nText | null;
+}
+
 const FORM_ID = "dashboards-public-links-panel-form";
+// Markdown and HTML panels carry their content in the layout, so no build counts them.
+const CONTENT_PANEL_TYPES = ["markdown", "html"];
 
 const props = withDefaults(
   defineProps<{
@@ -687,8 +805,25 @@ const forbidden = computed(
     (linksQuery.error.value as { response?: { status?: number } } | null)?.response?.status === 403,
 );
 const loadFailed = computed(() => !!linksQuery.error.value && !forbidden.value);
-const refetchLinks = () => linksQuery.refetch();
-const fetching = linksQuery.isFetching;
+const linkIds = computed(() => links.value.map((link) => link.id));
+const statusQuery = useQuery(() =>
+  Object.assign(publicLinksStatusBatchQuery(orgId.value, linkIds.value), {
+    enabled: open.value && !!orgId.value && linkIds.value.length > 0,
+  }),
+);
+// Best effort: without a report a row shows the state its link row gives.
+const linkReports = computed(() => statusQuery.data.value ?? {});
+const attention = computed<Record<string, I18nText>>(() =>
+  Object.fromEntries(
+    links.value.flatMap((link) => {
+      const reason = attentionReason(linkReports.value[link.id], t);
+      return reason ? [[link.id, reason]] : [];
+    }),
+  ),
+);
+const refetchLinks = () =>
+  Promise.all([linksQuery.refetch(), linkIds.value.length ? statusQuery.refetch() : null]);
+const fetching = computed(() => linksQuery.isFetching.value || statusQuery.isFetching.value);
 const lastUpdatedAt = linksQuery.dataUpdatedAt;
 const searchQuery = ref("");
 const filteredLinks = computed(() => {
@@ -702,7 +837,7 @@ const filteredLinks = computed(() => {
 const saveMutation = useMutation(() => savePublicLinkMutation(orgId.value));
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
 const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));
-const rebuildMutation = useMutation(() => rebuildPublicLinkMutation(orgId.value));
+const refreshMutation = useMutation(() => refreshPublicLinkMutation(orgId.value));
 
 const view = ref<PanelView>("list");
 const editing = ref<PublicLink | null>(null);
@@ -726,13 +861,95 @@ const formVarsReady = ref(false);
 const variablesPending = computed(
   () => !!props.variablesConfig?.list?.length && (!formVarsReady.value || formVars.isLoading.value),
 );
-// Rows with a pause, resume, rebuild or revoke in flight, so a second click can't send it again.
+// Rows with a pause, resume, refresh or revoke in flight, so a second click can't send it again.
 const busyRows = reactive(new Map<string, RowActionSource>());
 
 // A dashboard with no links opens straight on the create form.
 const currentView = computed<PanelView>(() =>
   view.value === "list" && linksQuery.isSuccess.value && !links.value.length ? "form" : view.value,
 );
+
+const createdStatus = useQuery(() =>
+  Object.assign(
+    publicLinkStatusQuery(orgId.value, props.dashboardId, createdLink.value?.id ?? ""),
+    { enabled: open.value && currentView.value === "created" && !!createdLink.value },
+  ),
+);
+const createdStatusFailed = createdStatus.isError;
+const createdStatusLoading = createdStatus.isPending;
+const createdStatusFetching = createdStatus.isFetching;
+const createdStatusUpdatedAt = createdStatus.dataUpdatedAt;
+const refetchCreatedStatus = () => createdStatus.refetch();
+
+const layoutPanelCount = computed(
+  () =>
+    (props.dashboardData?.tabs ?? [])
+      .flatMap((tab) => tab.panels ?? [])
+      .filter((panel) => !CONTENT_PANEL_TYPES.includes(panel.type ?? "")).length,
+);
+
+// Every offered range gets a row; one the querier has no file for reads as not cached.
+const createdRangeRows = computed<RangeStateRow[]>(() => {
+  const link = createdLink.value;
+  if (!link) return [];
+  const report = createdStatus.data.value;
+  const reported = new Map((report?.ranges ?? []).map((r) => [r.key, r]));
+  const neverViewed = !(report?.access_count ?? link.access_count);
+  const total = layoutPanelCount.value;
+  return sortRanges(link.time_range.ranges).map((range) => {
+    const key = rangeKey(range);
+    const status = reported.get(key);
+    const state = status?.state ?? "not_cached";
+    const builtAt = status?.built_at ?? null;
+    const shown = status ? total - unavailablePanels(status) : 0;
+    return {
+      key,
+      range,
+      state: state === "not_cached" && neverViewed ? "never_viewed" : state,
+      reason: status ? rangeAttentionReason(status, t) : null,
+      builtAt,
+      panels:
+        builtAt && total
+          ? t("dashboard.publicLinks.statePanelsOf", { shown: Math.max(shown, 0), total })
+          : null,
+    };
+  });
+});
+
+const rangeStateColumns: OTableColumnDef[] = [
+  {
+    id: "range",
+    header: t("dashboard.publicLinks.stateRange"),
+    size: 160,
+    meta: { align: "left", flex: true },
+  },
+  {
+    id: "state",
+    header: t("dashboard.publicLinks.stateState"),
+    size: 260,
+    meta: { align: "left" },
+  },
+  {
+    id: "built_at",
+    header: t("dashboard.publicLinks.stateLastBuilt"),
+    size: 120,
+    meta: { align: "left" },
+  },
+  {
+    id: "panels",
+    header: t("dashboard.publicLinks.statePanels"),
+    size: 90,
+    meta: { align: "left" },
+  },
+];
+
+const createdBuildNote = computed<I18nText>(() => {
+  const link = createdLink.value;
+  if (!link || !hasRelativeRange(link)) return t("dashboard.publicLinks.createdBuildNoteOnce");
+  return t("dashboard.publicLinks.createdBuildNote", {
+    interval: refreshLabel(link.refresh_secs, t),
+  });
+});
 
 const drawerTitle = computed<I18nText>(() =>
   props.dashboardTitle
@@ -758,6 +975,17 @@ const form = useOForm<PublicLinkForm>({
   onSubmit: (value) => submit(value),
 });
 const ranges = form.useStore((s) => s.values.ranges);
+const selectedRefreshSecs = form.useStore((s) => s.values.refreshSecs);
+// Nothing is refused at save; a range whose own floor is slower says what it really gets.
+const refreshFloorHints = computed(() =>
+  slowerRanges(ranges.value, selectedRefreshSecs.value).map(({ range, secs }) => ({
+    key: rangeKey(range),
+    text: t("dashboard.publicLinks.refreshFloorHint", {
+      range: longRange(range, t, timezone.value),
+      interval: raw(durationFormatter(secs)),
+    }),
+  })),
+);
 // A duplicate row is still in the list until it's fixed, but is one choice.
 const defaultOptions = computed<RangeOption[]>(() =>
   [...new Map(ranges.value.map((range) => [rangeKey(range), range])).entries()].map(
@@ -790,7 +1018,7 @@ const rowErrors = computed(() =>
 );
 // An edited link keeps an interval the list doesn't offer, so saving doesn't silently change it.
 const refreshOptions = computed<PresetOption[]>(() => {
-  const own = editing.value?.rebuild_secs;
+  const own = editing.value?.refresh_secs;
   const secs =
     own === undefined || REFRESH_SECONDS.includes(own)
       ? REFRESH_SECONDS
@@ -1013,10 +1241,10 @@ function setPaused(link: PublicLink, paused: boolean, source: RowActionSource) {
   });
 }
 
-function rebuildLink(link: PublicLink) {
+function refreshLink(link: PublicLink) {
   return runRowAction(link, "menu", async () => {
-    await rebuildMutation.mutateAsync(link);
-    showPositiveNotification(t("dashboard.publicLinks.rebuiltToast"));
+    await refreshMutation.mutateAsync(link);
+    showPositiveNotification(t("dashboard.publicLinks.refreshQueuedToast"));
   });
 }
 

@@ -117,6 +117,12 @@ describe("Dashboards.vue public links entry", () => {
     expect(router.currentRoute.value.query.org_identifier).toBe("test-org");
   });
 
+  it("tags the public links entry as beta", async () => {
+    wrapper = await mountAt(router, true);
+    const entry = wrapper.find('[data-test="dashboard-public-links"]');
+    expect(entry.findComponent({ name: "BetaBadge" }).exists()).toBe(true);
+  });
+
   it("hides the header button when the feature is off", async () => {
     wrapper = await mountAt(router, false);
 

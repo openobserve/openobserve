@@ -28,7 +28,9 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     update: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
-    rebuild: vi.fn(),
+    refresh: vi.fn(),
+    status: vi.fn(),
+    statusBatch: vi.fn(),
     revoke: vi.fn(),
   },
 }));
@@ -95,14 +97,14 @@ const link = (over: Partial<PublicLink> = {}): PublicLink => ({
     default: { type: "relative", secs: 3600 },
   },
   frozen_variables: {},
-  rebuild_secs: 600,
-  last_rebuilt_at: 1,
-  rebuild_state: 1,
+  refresh_secs: 600,
   expires_at: null,
   published_by: "a@b.c",
   updated_by: null,
   created_at: 1,
   updated_at: 1,
+  last_accessed_at: 1,
+  access_count: 4,
   ...over,
 });
 
@@ -120,12 +122,31 @@ const LINKS = [
   link({
     id: "l5",
     name: "Wall",
-    status: "needs_attention",
     time_range: {
       ranges: [{ type: "relative", secs: 86400 }],
       default: { type: "relative", secs: 86400 },
     },
   }),
+];
+
+// The owning querier's batch answer: l5's last build withheld a panel.
+const STATUS = [
+  {
+    link_id: "l5",
+    access_count: 4,
+    last_accessed_at: 1,
+    ranges: [
+      {
+        key: "r86400",
+        state: "needs_attention",
+        built_at: 1,
+        withheld_panels: [{ panel_id: "p1", reason: "unauthorized" }],
+        unavailable_count: 1,
+        incomplete_count: 0,
+        last_error: null,
+      },
+    ],
+  },
 ];
 
 const build = () =>
@@ -159,6 +180,7 @@ describe("PublicLinksTable", () => {
     vi.clearAllMocks();
     queryClient.clear();
     vi.mocked(admin.listOrg).mockResolvedValue({ data: { list: LINKS } } as never);
+    vi.mocked(admin.statusBatch).mockResolvedValue({ data: STATUS } as never);
   });
 
   it("opens on all links with their name, dashboard, folder and status", async () => {
@@ -174,17 +196,20 @@ describe("PublicLinksTable", () => {
     expect(w.text()).toContain("a@b.c");
   });
 
-  it("filters by the summary tiles and counts deleted dashboards as needing attention", async () => {
+  it("filters by the summary tiles, with needs attention from one batch status call", async () => {
     const w = build();
     await flushPromises();
-    expect(find(w, "dashboards-public-links-summary-attention").text()).toContain("2");
-
-    await selectTile(w, "attention");
-    expect(rows(w)).toHaveLength(2);
+    expect(admin.statusBatch).toHaveBeenCalledTimes(1);
+    expect(admin.statusBatch).toHaveBeenCalledWith("default", ["l1", "l2", "l3", "l4", "l5"]);
+    expect(find(w, "dashboards-public-links-summary-attention").text()).toContain("1");
     expect(find(w, "dashboards-public-links-l3-dashboard").text()).toBe(
       "Dashboard no longer exists",
     );
     expect(find(w, "dashboards-public-links-l3-status").text()).toBe("Dashboard deleted");
+
+    await selectTile(w, "attention");
+    expect(rows(w)).toHaveLength(1);
+    expect(find(w, "dashboards-public-links-l5-status").text()).toBe("Needs attention");
     expect(find(w, "dashboards-public-links-l5-ranges").text()).toBe("1d");
     expect(find(w, "dashboards-public-links-l5-ranges").find(".font-semibold").text()).toBe("1d");
 
@@ -287,7 +312,6 @@ describe("PublicLinksTable", () => {
   it("disables edit and pause and hides menu actions for a deleted dashboard but keeps revoke", async () => {
     const w = build();
     await flushPromises();
-    await selectTile(w, "attention");
     for (const id of ["edit-btn", "pause-btn"]) {
       expect(find(w, `dashboards-public-links-l3-${id}`).attributes("disabled")).toBeDefined();
     }
@@ -371,31 +395,32 @@ describe("PublicLinksTable", () => {
     expect(find(w, "dashboards-public-links-l1-menu-btn").attributes("aria-busy")).toBeUndefined();
   });
 
-  it("shows an absolute-only link as refreshed once and rebuilds it from the menu", async () => {
+  it("shows an absolute-only link as refreshed once and marks it for refresh on next view", async () => {
     const absolute = { type: "absolute" as const, start: 1_000_000, end: 86_401_000_000 };
     vi.mocked(admin.listOrg).mockResolvedValue({
       data: { list: [link({ time_range: { ranges: [absolute], default: absolute } })] },
     } as never);
-    vi.mocked(admin.rebuild).mockResolvedValue({ data: link() } as never);
+    vi.mocked(admin.refresh).mockResolvedValue({ data: link() } as never);
     const w = build();
     await flushPromises();
     expect(w.text()).toContain("Once");
-    await find(w, "dashboards-public-links-l1-rebuild-menu").trigger("click");
+    expect(find(w, "dashboards-public-links-l1-refresh-menu").text()).toBe("Refresh on next view");
+    await find(w, "dashboards-public-links-l1-refresh-menu").trigger("click");
     await flushPromises();
-    expect(admin.rebuild).toHaveBeenCalledWith("default", "dash-1", "l1");
-    expect(notify.positive).toHaveBeenCalledWith("Link rebuilt");
+    expect(admin.refresh).toHaveBeenCalledWith("default", "dash-1", "l1");
+    expect(notify.positive).toHaveBeenCalledWith("The link refreshes on its next view");
   });
 
-  it("offers Rebuild now on relative, paused and expired links, and shows the server's reason", async () => {
+  it("offers Refresh on next view on paused links too, and shows the server's reason", async () => {
     vi.mocked(admin.listOrg).mockResolvedValue({
       data: { list: [link({ status: "paused", enabled: false })] },
     } as never);
-    vi.mocked(admin.rebuild).mockRejectedValue({
+    vi.mocked(admin.refresh).mockRejectedValue({
       response: { status: 400, data: { message: "resume this link before rebuilding it" } },
     });
     const w = build();
     await flushPromises();
-    await find(w, "dashboards-public-links-l1-rebuild-menu").trigger("click");
+    await find(w, "dashboards-public-links-l1-refresh-menu").trigger("click");
     await flushPromises();
     expect(notify.error).toHaveBeenCalledWith("resume this link before rebuilding it");
   });
@@ -404,7 +429,6 @@ describe("PublicLinksTable", () => {
     vi.mocked(admin.revoke).mockResolvedValue({ data: {} } as never);
     const w = build();
     await flushPromises();
-    await selectTile(w, "attention");
 
     confirm.mockResolvedValueOnce(false);
     await find(w, "dashboards-public-links-l3-revoke-menu").trigger("click");
@@ -415,7 +439,10 @@ describe("PublicLinksTable", () => {
     await find(w, "dashboards-public-links-l3-revoke-menu").trigger("click");
     await flushPromises();
     expect(confirm).toHaveBeenLastCalledWith(
-      expect.objectContaining({ title: 'Revoke and delete "Orphan"?', confirmVariant: "destructive" }),
+      expect.objectContaining({
+        title: 'Revoke and delete "Orphan"?',
+        confirmVariant: "destructive",
+      }),
     );
     expect(admin.revoke).toHaveBeenCalledWith("default", "dash-1", "l3");
     expect(notify.positive).toHaveBeenCalledWith("Public link revoked and deleted");
@@ -430,13 +457,42 @@ describe("PublicLinksTable", () => {
     expect(notify.error).toHaveBeenCalledWith("no edit");
   });
 
-  it("refetches the list from the refresh button", async () => {
+  it("refetches the list and the batch status from the refresh button", async () => {
     const w = build();
     await flushPromises();
     expect(admin.listOrg).toHaveBeenCalledTimes(1);
+    expect(admin.statusBatch).toHaveBeenCalledTimes(1);
     await find(w, "dashboards-public-links-refresh-btn").trigger("click");
     await flushPromises();
     expect(admin.listOrg).toHaveBeenCalledTimes(2);
+    expect(admin.statusBatch).toHaveBeenCalledTimes(2);
+  });
+
+  it("omits needs attention and its tile when the batch status call fails", async () => {
+    vi.mocked(admin.statusBatch).mockRejectedValue({ response: { status: 400 } });
+    const w = build();
+    await flushPromises();
+    expect(find(w, "dashboards-public-links-summary-attention").exists()).toBe(false);
+    expect(find(w, "dashboards-public-links-l5-status").text()).toBe("Live");
+    expect(find(w, "dashboards-public-links-summary-live").exists()).toBe(true);
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
+  it("shows when a link was last viewed with its request count, and a never-viewed link as such", async () => {
+    vi.mocked(admin.listOrg).mockResolvedValue({
+      data: {
+        list: [
+          link({ access_count: 9120 }),
+          link({ id: "l2", access_count: 0, last_accessed_at: null }),
+        ],
+      },
+    } as never);
+    const w = build();
+    await flushPromises();
+    expect(find(w, "dashboards-public-links-l1-last-viewed").text()).toContain("9,120 requests");
+    expect(find(w, "dashboards-public-links-l2-last-viewed").text()).toBe("Never");
+    expect(find(w, "dashboards-public-links-l2-status").text()).toBe("Never viewed");
+    expect(w.text()).not.toContain("Preparing");
   });
 
   it("shows the forbidden state on a 403", async () => {

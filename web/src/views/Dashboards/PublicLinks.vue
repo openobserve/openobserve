@@ -26,6 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
+    <template #title>
+      <span class="inline-flex items-center gap-2">
+        {{ t("dashboard.publicLinks.pageTitle") }}
+        <BetaBadge />
+      </span>
+    </template>
     <PublicLinksTable class="min-h-0 w-full flex-1" />
   </OPageLayout>
 </template>
@@ -35,6 +41,7 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PublicLinksTable from "@/components/dashboards/PublicLinksTable.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();

@@ -306,7 +306,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="public"
               @click="showPublicLinksPanel = true"
             >
-              <OTooltip :content="t('dashboard.publicDashboard.shareTooltip')" />
+              <!-- An icon-only toolbar button has no room for the chip, so it rides in the tooltip. -->
+              <OTooltip>
+                <template #content>
+                  <span class="inline-flex items-center gap-1.5">
+                    {{ t("dashboard.publicDashboard.shareTooltip") }}
+                    <BetaBadge size="xs" />
+                  </span>
+                </template>
+              </OTooltip>
             </OButton>
             <PublicLinksPanel
               v-if="
@@ -628,6 +636,7 @@ import {
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -682,6 +691,7 @@ export default defineComponent({
   emits: ["onDeletePanel", "sendToAiChat"],
   components: {
     OBanner,
+    BetaBadge,
     OPageLayout,
     DateTimePickerDashboard,
     ShareButton,

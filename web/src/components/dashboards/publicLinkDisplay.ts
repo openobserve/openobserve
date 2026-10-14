@@ -16,7 +16,13 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import type { PublicLink, PublicLinkRange } from "@/services/public_dashboards_admin";
+import type {
+  PublicLink,
+  PublicLinkRange,
+  PublicLinkRangeStatus,
+  PublicLinkStatus,
+  PublicLinkStatusReport,
+} from "@/services/public_dashboards_admin";
 import { formatExactDuration } from "@/utils/formatters";
 import { getPath } from "@/utils/zincutils";
 import { rangeKey, todayIn } from "./PublicLinkForm.schema";
@@ -118,8 +124,57 @@ export function hasRelativeRange(link: PublicLink): boolean {
 }
 
 // Offered on every link with a dashboard; a paused or expired one gets the server's reason.
-export function canRebuild(link: PublicLink): boolean {
+export function canRefresh(link: PublicLink): boolean {
   return link.status !== "dashboard_deleted";
+}
+
+/** The state the link row itself gives: a live link nobody has opened yet is "never viewed". */
+export function lifecycleStatus(link: PublicLink): PublicLinkStatus {
+  return link.status === "live" && !link.access_count ? "not_viewed" : link.status;
+}
+
+function attentionRanges(report: PublicLinkStatusReport | undefined): PublicLinkRangeStatus[] {
+  return (report?.ranges ?? []).filter((r) => r.state === "needs_attention");
+}
+
+/** The lifecycle state, raised to "needs attention" when the owning querier reports a failed or withheld build. */
+export function displayStatus(
+  link: PublicLink,
+  report: PublicLinkStatusReport | undefined,
+): PublicLinkStatus {
+  const status = lifecycleStatus(link);
+  return status === "live" && attentionRanges(report).length ? "needs_attention" : status;
+}
+
+/** Panels a range can't show; the withheld list and the count can overlap, so the larger one counts. */
+export function unavailablePanels(range: PublicLinkRangeStatus): number {
+  return Math.max(range.unavailable_count ?? 0, range.withheld_panels?.length ?? 0);
+}
+
+/** Why one range needs attention: a failed build, else the panels it can't show. */
+export function rangeAttentionReason(
+  range: PublicLinkRangeStatus,
+  t: TranslateFn,
+): I18nText | null {
+  if (range.state !== "needs_attention") return null;
+  if (range.last_error) return t("dashboard.publicLinks.attentionBuildFailed");
+  const count = unavailablePanels(range);
+  return t("dashboard.publicLinks.attentionPanels", { count }, count);
+}
+
+/** Why a link needs attention, for the tooltip on its badge. */
+export function attentionReason(
+  report: PublicLinkStatusReport | undefined,
+  t: TranslateFn,
+): I18nText | null {
+  const ranges = attentionRanges(report);
+  if (!ranges.length) return null;
+  const failed = ranges.find((r) => r.last_error);
+  if (failed) return rangeAttentionReason(failed, t);
+  return rangeAttentionReason(
+    ranges.reduce((a, b) => (unavailablePanels(b) > unavailablePanels(a) ? b : a)),
+    t,
+  );
 }
 
 // Expired and orphaned links can't be resumed, so their pause toggle is disabled.
@@ -180,9 +235,14 @@ export function publicLinkColumns(
       : []),
     col("status", t("dashboard.publicLinks.status"), 110, "status"),
     col("ranges", t("dashboard.publicLinks.timeRanges"), 190),
-    col("refresh", t("dashboard.publicLinks.refresh"), 90, "rebuild_secs"),
+    col("refresh", t("dashboard.publicLinks.refresh"), 90, "refresh_secs"),
     col("expires", t("dashboard.publicLinks.expires"), 115, "expires_at"),
-    col("updated", t("dashboard.publicLinks.updated"), 120, "last_rebuilt_at"),
+    col(
+      "last_viewed",
+      t("dashboard.publicLinks.lastViewed"),
+      opts.withDashboard ? 170 : 120,
+      "last_accessed_at",
+    ),
     col("published_by", t("dashboard.publicLinks.publishedBy"), 150, "published_by"),
     {
       id: "actions",

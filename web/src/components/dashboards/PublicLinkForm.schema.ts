@@ -24,8 +24,12 @@ import type { I18nText, TranslateFn } from "@/types/i18n";
 import { parseDuration } from "@/utils/date";
 
 export const REFRESH_SECONDS = [
-  10, 15, 30, 60, 300, 900, 1800, 3600, 7200, 21600, 86400, 172800, 604800, 1209600, 2592000,
+  60, 300, 900, 1800, 3600, 7200, 21600, 86400, 172800, 604800, 1209600, 2592000,
 ];
+export const DEFAULT_REFRESH_SECS = 300;
+// The server's floors: the operator minimum by default, and at most 288 refreshes per window.
+const MIN_REFRESH_SECS = 60;
+const REFRESHES_PER_WINDOW = 288;
 
 export const MAX_RANGES = 10;
 const MIN_RANGE_SECS = 60;
@@ -84,6 +88,24 @@ export function pickerPeriod(secs: number): string {
   return `${secs / unit}${suffix}`;
 }
 
+/** How often the server refreshes a relative range: ceil_to_minute(max(selected, window ÷ 288, minimum)). */
+export function effectiveRefreshSecs(selected: number, windowSecs: number): number {
+  const floor = Math.max(selected, windowSecs / REFRESHES_PER_WINDOW, MIN_REFRESH_SECS);
+  return Math.ceil(floor / 60) * 60;
+}
+
+/** The relative ranges whose own floor is above the selected interval, with what they get instead. */
+export function slowerRanges(
+  ranges: PublicLinkRange[],
+  selected: number,
+): Array<{ range: PublicLinkRange; secs: number }> {
+  return sortRanges(ranges).flatMap((range) => {
+    if (range.type !== "relative") return [];
+    const secs = effectiveRefreshSecs(selected, range.secs);
+    return secs > selected ? [{ range, secs }] : [];
+  });
+}
+
 // Offered in order by Add, so a new row starts on a range the list doesn't have yet.
 const NEW_RANGE_SECS = [
   3600, 86_400, 604_800, 2_592_000, 900, 21_600, 43_200, 172_800, 1_209_600, 7_776_000,
@@ -136,7 +158,7 @@ export const makePublicLinkSchema = (
         .max(256, t("dashboard.publicLinks.nameTooLong")),
       ranges: z.array(rangeSchema),
       defaultKey: z.string(),
-      rebuildSecs: z.number(),
+      refreshSecs: z.number(),
       // YYYY-MM-DD strings compare correctly as text.
       expires: z
         .string()
@@ -184,7 +206,7 @@ export const publicLinkDefaults = (): PublicLinkForm => ({
     { type: "relative", secs: 86400 },
   ],
   defaultKey: "r3600",
-  rebuildSecs: 60,
+  refreshSecs: DEFAULT_REFRESH_SECS,
   expires: "",
 });
 
@@ -198,7 +220,7 @@ export const publicLinkFormFrom = (link: PublicLink, timezone: string): PublicLi
     name: link.name,
     ranges: sortRanges(link.time_range.ranges),
     defaultKey: rangeKey(link.time_range.default),
-    rebuildSecs: link.rebuild_secs,
+    refreshSecs: link.refresh_secs,
     expires: link.expires_at ? expiryDate(link.expires_at, timezone) : "",
   };
 };
@@ -234,7 +256,7 @@ export const toPublicLinkConfig = (
       default: ranges.find((r) => rangeKey(r) === value.defaultKey) ?? ranges[0],
     },
     frozen_variables: frozenVariables,
-    rebuild_secs: value.rebuildSecs,
+    refresh_secs: value.refreshSecs,
     expires_at: expiresAtFor(value.expires, timezone, storedExpiresAt),
   };
 };

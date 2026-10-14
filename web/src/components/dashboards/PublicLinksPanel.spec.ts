@@ -27,7 +27,9 @@ vi.mock("@/services/public_dashboards_admin", () => ({
     update: vi.fn(),
     pause: vi.fn(),
     resume: vi.fn(),
-    rebuild: vi.fn(),
+    refresh: vi.fn(),
+    status: vi.fn(),
+    statusBatch: vi.fn(),
     revoke: vi.fn(),
   },
 }));
@@ -120,14 +122,14 @@ const link = (over: Partial<PublicLink> = {}): PublicLink => ({
     default: { type: "relative", secs: 3600 },
   },
   frozen_variables: { env: "stage" },
-  rebuild_secs: 600,
-  last_rebuilt_at: 1,
-  rebuild_state: 1,
+  refresh_secs: 600,
   expires_at: null,
   published_by: "a@b.c",
   updated_by: null,
   created_at: 1,
   updated_at: 1,
+  last_accessed_at: 1,
+  access_count: 4,
   ...over,
 });
 
@@ -196,13 +198,16 @@ describe("PublicLinksPanel", () => {
         default: { type: "relative", secs: 3600 },
       },
       frozen_variables: { env: "prod" },
-      rebuild_secs: 60,
+      refresh_secs: 300,
       expires_at: null,
     });
     expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
     expect(
       w.find('[data-test="dashboards-public-links-panel-created-url"] input').element,
     ).toHaveProperty("value", `${window.location.origin}/web/public/dashboards/new-slug`);
+    expect(w.find('[data-test="dashboards-public-links-panel-created-build-note"]').text()).toBe(
+      "Opening the public page builds the first result. Viewers after that share it for 10 minutes.",
+    );
 
     await w.find('[data-test="dashboards-public-links-panel-back-btn"]').trigger("click");
     expect(has(w, "dashboards-public-links-panel-created")).toBe(false);
@@ -324,7 +329,10 @@ describe("PublicLinksPanel", () => {
     await revoke.trigger("click");
     await flushPromises();
     expect(confirm).toHaveBeenLastCalledWith(
-      expect.objectContaining({ title: 'Revoke and delete "NOC wall"?', confirmVariant: "destructive" }),
+      expect.objectContaining({
+        title: 'Revoke and delete "NOC wall"?',
+        confirmVariant: "destructive",
+      }),
     );
     expect(admin.revoke).toHaveBeenCalledWith("default", "dash-1", "l1");
     expect(notify.positive).toHaveBeenCalled();
@@ -341,7 +349,7 @@ describe("PublicLinksPanel", () => {
     const [, , linkId, cfg] = vi.mocked(admin.update).mock.calls[0];
     expect(linkId).toBe("l1");
     expect(cfg.frozen_variables).toEqual({ env: "stage" });
-    expect(cfg.rebuild_secs).toBe(600);
+    expect(cfg.refresh_secs).toBe(600);
   });
 
   it("shows and freezes tab- and panel-scoped variables per scope", async () => {
@@ -437,7 +445,7 @@ describe("PublicLinksPanel", () => {
     await w.find('[data-test="dashboards-public-links-panel-range-0-remove-btn"]').trigger("click");
     await flushPromises();
     expect(pickers()).toHaveLength(1);
-    expect(has(w, "dashboards-public-links-panel-rebuild-select")).toBe(false);
+    expect(has(w, "dashboards-public-links-panel-refresh-select")).toBe(false);
 
     await submit(w);
     const absolute = { type: "absolute", start: 1_000_000, end: 86_401_000_000 };
@@ -447,33 +455,24 @@ describe("PublicLinksPanel", () => {
     });
   });
 
-  it("rebuilds a link with an absolute range from its menu", async () => {
+  it("marks a link with an absolute range for refresh on its next view", async () => {
     const absolute = { type: "absolute" as const, start: 1_000_000, end: 86_401_000_000 };
     vi.mocked(admin.list).mockResolvedValue({
       data: { list: [link({ time_range: { ranges: [absolute], default: absolute } })] },
     } as never);
-    vi.mocked(admin.rebuild).mockResolvedValue({ data: link() } as never);
+    vi.mocked(admin.refresh).mockResolvedValue({ data: link() } as never);
     const w = build();
     await flushPromises();
     expect(w.text()).toContain("Once");
-    await w.find('[data-test="dashboards-public-links-panel-l1-rebuild-menu"]').trigger("click");
+    const item = w.find('[data-test="dashboards-public-links-panel-l1-refresh-menu"]');
+    expect(item.text()).toBe("Refresh on next view");
+    await item.trigger("click");
     await flushPromises();
-    expect(admin.rebuild).toHaveBeenCalledWith("default", "dash-1", "l1");
-    expect(notify.positive).toHaveBeenCalled();
+    expect(admin.refresh).toHaveBeenCalledWith("default", "dash-1", "l1");
+    expect(notify.positive).toHaveBeenCalledWith("The link refreshes on its next view");
   });
 
-  it("offers Rebuild now on a link of only relative ranges", async () => {
-    vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
-    vi.mocked(admin.rebuild).mockResolvedValue({ data: link() } as never);
-    const w = build();
-    await flushPromises();
-    await w.find('[data-test="dashboards-public-links-panel-l1-rebuild-menu"]').trigger("click");
-    await flushPromises();
-    expect(admin.rebuild).toHaveBeenCalledTimes(1);
-    expect(notify.positive).toHaveBeenCalledWith("Link rebuilt");
-  });
-
-  it("offers refresh intervals from 10 seconds and keeps the link's own", async () => {
+  it("offers refresh intervals from 1 minute and keeps the link's own", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     const w = build({ editLinkId: "l1" });
     await flushPromises();
@@ -484,7 +483,8 @@ describe("PublicLinksPanel", () => {
     ).refreshOptions;
     const byValue = (v: number) => options.find((o) => o.value === v);
 
-    expect(options[0].value).toBe(10);
+    expect(options[0].value).toBe(60);
+    expect(options.some((o) => o.value < 60)).toBe(false);
     expect(byValue(600)?.label).toBe("10 minutes");
     expect(byValue(2592000)?.label).toBe("1 month");
     expect(options.map((o) => o.value)).toEqual(
@@ -793,10 +793,154 @@ describe("PublicLinksPanel", () => {
     expect(options.map((o) => o.value)).toEqual(["r3600", "r86400"]);
   });
 
-  it("gives the Updated time a ticking clock", async () => {
+  it("gives the Last viewed time a ticking clock", async () => {
     vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
     const w = build();
     await flushPromises();
     expect(typeof w.findComponent({ name: "OTimeCell" }).props("now")).toBe("number");
+  });
+
+  describe("v2 build state", () => {
+    const DAY = 86_400;
+    const tenPanels = {
+      tabs: [
+        {
+          tabId: "t1",
+          name: "Overview",
+          panels: [
+            ...Array.from({ length: 10 }, (_, i) => ({ id: `p${i}`, title: `P${i}` })),
+            { id: "md", title: "Notes", type: "markdown" },
+          ],
+        },
+      ],
+    };
+    const threeRanges = {
+      ranges: [
+        { type: "relative" as const, secs: 3600 },
+        { type: "relative" as const, secs: DAY },
+        { type: "relative" as const, secs: 30 * DAY },
+      ],
+      default: { type: "relative" as const, secs: 3600 },
+    };
+    const rangeStatus = (key: string, over: Record<string, unknown> = {}) => ({
+      key,
+      state: "cached",
+      built_at: 1_760_000_000_000_000,
+      withheld_panels: [],
+      unavailable_count: 0,
+      incomplete_count: 0,
+      last_error: null,
+      ...over,
+    });
+    const createLink = async (status: () => Promise<unknown>, created = link()) => {
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+      vi.mocked(admin.create).mockResolvedValue({ data: created } as never);
+      vi.mocked(admin.status).mockImplementation(status as never);
+      const w = build({ variablesConfig: undefined, dashboardData: tenPanels });
+      await flushPromises();
+      (
+        w.vm as unknown as { form: { setFieldValue: (k: string, v: string) => void } }
+      ).form.setFieldValue("name", "Exec view");
+      await submit(w);
+      return w;
+    };
+    const stateText = (w: ReturnType<typeof build>, key: string) =>
+      w.find(`[data-test="dashboards-public-links-panel-state-${key}"]`).text();
+
+    it("shows each range's state from the status call, telling not cached from never viewed", async () => {
+      const w = await createLink(
+        async () => ({
+          data: {
+            link_id: "l1",
+            access_count: 2,
+            last_accessed_at: 1,
+            ranges: [
+              rangeStatus("r3600"),
+              rangeStatus(`r${30 * DAY}`, {
+                state: "needs_attention",
+                unavailable_count: 1,
+                withheld_panels: [{ panel_id: "p3", reason: "too_large" }],
+              }),
+            ],
+          },
+        }),
+        link({ time_range: threeRanges, access_count: 0 }),
+      );
+      expect(admin.status).toHaveBeenCalledWith("default", "dash-1", "l1");
+      expect(stateText(w, "r3600")).toBe("Ready");
+      expect(stateText(w, `r${DAY}`)).toBe("Not cached, builds on the next view");
+      expect(stateText(w, `r${30 * DAY}`)).toBe("Needs attention");
+      const states = w.find('[data-test="dashboards-public-links-panel-created-states"]').text();
+      expect(states).toContain("10 of 10");
+      expect(states).toContain("9 of 10");
+    });
+
+    it("says never viewed only for a link with no access history", async () => {
+      const w = await createLink(
+        async () => ({ data: { link_id: "l1", access_count: 0, ranges: [] } }),
+        link({ time_range: threeRanges, access_count: 0 }),
+      );
+      expect(stateText(w, "r3600")).toBe("Never viewed");
+    });
+
+    it("drops the state table quietly when the status call fails", async () => {
+      const w = await createLink(() => Promise.reject({ response: { status: 502 } }));
+      await flushPromises();
+      expect(has(w, "dashboards-public-links-panel-created")).toBe(true);
+      expect(has(w, "dashboards-public-links-panel-created-states")).toBe(false);
+      expect(notify.error).not.toHaveBeenCalled();
+    });
+
+    it("says create runs no query, and names a range whose floor is above the interval", async () => {
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [] } } as never);
+      const w = build({ variablesConfig: undefined });
+      await flushPromises();
+      expect(w.find('[data-test="dashboards-public-links-panel-save-hint"]').text()).toBe(
+        "Returns at once. Nothing is queried until someone opens the link.",
+      );
+      const form = (w.vm as unknown as { form: { setFieldValue: (k: string, v: unknown) => void } })
+        .form;
+      form.setFieldValue("ranges", threeRanges.ranges);
+      await flushPromises();
+      expect(
+        w.find(`[data-test="dashboards-public-links-panel-refresh-floor-r${30 * DAY}"]`).text(),
+      ).toBe("Past 1 month refreshes every 2h 30m, its minimum for a window that long.");
+      expect(has(w, `dashboards-public-links-panel-refresh-floor-r${DAY}`)).toBe(false);
+
+      form.setFieldValue("refreshSecs", 21_600);
+      await flushPromises();
+      expect(has(w, `dashboards-public-links-panel-refresh-floor-r${30 * DAY}`)).toBe(false);
+    });
+
+    it("marks a link needing attention from the batch status, with its reason", async () => {
+      vi.mocked(admin.list).mockResolvedValue({
+        data: { list: [link(), link({ id: "l2", name: "Quiet", last_accessed_at: null })] },
+      } as never);
+      vi.mocked(admin.statusBatch).mockResolvedValue({
+        data: [
+          {
+            link_id: "l1",
+            access_count: 4,
+            last_accessed_at: 1,
+            ranges: [rangeStatus("r3600", { state: "needs_attention", last_error: "timeout" })],
+          },
+        ],
+      } as never);
+      const w = build();
+      await flushPromises();
+      expect(admin.statusBatch).toHaveBeenCalledWith("default", ["l1", "l2"]);
+      expect(w.find('[data-test="dashboards-public-links-panel-l1-status"]').text()).toBe(
+        "Needs attention",
+      );
+      expect(w.find('[data-test="dashboards-public-links-panel-l2-status"]').text()).toBe("Live");
+      expect(w.text()).toContain("Never");
+    });
+
+    it("tags the drawer title as beta", async () => {
+      vi.mocked(admin.list).mockResolvedValue({ data: { list: [link()] } } as never);
+      const w = build();
+      await flushPromises();
+      expect(w.find('[data-test="beta-badge"]').text()).toBe("Beta");
+    });
   });
 });

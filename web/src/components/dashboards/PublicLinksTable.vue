@@ -105,11 +105,14 @@
         </span>
       </template>
       <template #cell-status="{ row }">
-        <OTag
-          type="publicLinkStatus"
-          :value="row.status"
-          :data-test="`dashboards-public-links-${row.id}-status`"
-        />
+        <span class="inline-flex">
+          <OTag
+            type="publicLinkStatus"
+            :value="statusOf(row)"
+            :data-test="`dashboards-public-links-${row.id}-status`"
+          />
+          <OTooltip v-if="attention[row.id]" side="bottom" :content="attention[row.id]" />
+        </span>
       </template>
       <template #cell-ranges="{ row }">
         <PublicLinkRangesCell :link="row" :data-test="`dashboards-public-links-${row.id}-ranges`" />
@@ -117,7 +120,7 @@
       <template #cell-refresh="{ row }">
         <span class="text-text-body text-sm">{{
           hasRelativeRange(row)
-            ? refreshLabel(row.rebuild_secs, t)
+            ? refreshLabel(row.refresh_secs, t)
             : t("dashboard.publicLinks.refreshOnce")
         }}</span>
       </template>
@@ -128,8 +131,29 @@
           :data-test="`dashboards-public-links-${row.id}-expires`"
         />
       </template>
-      <template #cell-updated="{ row }">
-        <OTimeCell :value="row.last_rebuilt_at" unit="us" :timezone="timezone" :now="now" />
+      <template #cell-last_viewed="{ row }">
+        <span
+          class="inline-flex min-w-0 items-baseline text-sm"
+          :data-test="`dashboards-public-links-${row.id}-last-viewed`"
+        >
+          <OTimeCell
+            :value="row.last_accessed_at"
+            unit="us"
+            :timezone="timezone"
+            :now="now"
+            :empty-label="t('dashboard.publicLinks.never')"
+          />
+          <span v-if="row.access_count" class="text-text-secondary whitespace-nowrap tabular-nums">
+            {{ raw(" · ")
+            }}{{
+              t(
+                "dashboard.publicLinks.requestCount",
+                { count: row.access_count.toLocaleString() },
+                row.access_count,
+              )
+            }}
+          </span>
+        </span>
       </template>
       <template #cell-published_by="{ row }">
         <OUserCell :value="row.published_by" />
@@ -263,13 +287,13 @@
               }}
             </ODropdownItem>
             <ODropdownItem
-              v-if="canRebuild(row)"
+              v-if="canRefresh(row)"
               icon-left="refresh"
               :disabled="busyRows.has(row.id)"
-              :data-test="`dashboards-public-links-${row.id}-rebuild-menu`"
-              @select="rebuildLink(row)"
+              :data-test="`dashboards-public-links-${row.id}-refresh-menu`"
+              @select="refreshLink(row)"
             >
-              {{ t("dashboard.publicLinks.rebuildNow") }}
+              {{ t("dashboard.publicLinks.refreshOnNextView") }}
             </ODropdownItem>
             <ODropdownItem
               icon-left="delete"
@@ -314,7 +338,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useMutation, useQuery } from "@tanstack/vue-query";
@@ -340,15 +364,19 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { PublicLink, PublicLinkStatus } from "@/services/public_dashboards_admin";
 import {
+  STATUS_BATCH_MAX,
   publicLinksListQuery,
-  rebuildPublicLinkMutation,
+  publicLinksStatusBatchQuery,
+  refreshPublicLinkMutation,
   revokePublicLinkMutation,
   setPublicLinkPausedMutation,
 } from "@/services/public_dashboards.queries";
 import PublicLinksPanel from "./PublicLinksPanel.vue";
 import {
+  attentionReason,
   canPause,
-  canRebuild,
+  canRefresh,
+  displayStatus,
   hasRelativeRange,
   publicLinkColumns,
   publicLinkSearchTerm,
@@ -365,9 +393,9 @@ type StatusFilter = "live" | "paused" | "attention" | "expired" | "all";
 type RowActionSource = "inline" | "menu";
 
 const FILTER_STATUSES: Record<Exclude<StatusFilter, "all">, PublicLinkStatus[]> = {
-  live: ["live"],
+  live: ["live", "not_viewed"],
   paused: ["paused"],
-  attention: ["needs_attention", "dashboard_deleted"],
+  attention: ["needs_attention"],
   expired: ["expired"],
 };
 
@@ -388,31 +416,56 @@ const linksQuery = useQuery(() =>
 );
 const links = computed(() => linksQuery.data.value ?? []);
 const loading = linksQuery.isPending;
-const fetching = linksQuery.isFetching;
 const lastUpdatedAt = linksQuery.dataUpdatedAt;
 const forbidden = computed(
   () =>
     (linksQuery.error.value as { response?: { status?: number } } | null)?.response?.status === 403,
 );
 const loadFailed = computed(() => !!linksQuery.error.value && !forbidden.value);
-const refreshLinks = () => linksQuery.refetch();
+
+// One batch call for the links on the page; "needs attention" exists only when it answers.
+const statusIds = computed(() => links.value.slice(0, STATUS_BATCH_MAX).map((link) => link.id));
+const statusQuery = useQuery(() =>
+  Object.assign(publicLinksStatusBatchQuery(orgId.value, statusIds.value), {
+    enabled: !!orgId.value && statusIds.value.length > 0,
+  }),
+);
+const attentionKnown = computed(() => statusQuery.isSuccess.value);
+const statusOf = (link: PublicLink): PublicLinkStatus =>
+  displayStatus(link, statusQuery.data.value?.[link.id]);
+const attention = computed<Record<string, I18nText>>(() =>
+  Object.fromEntries(
+    links.value.flatMap((link) => {
+      const reason = attentionReason(statusQuery.data.value?.[link.id], t);
+      return reason ? [[link.id, reason]] : [];
+    }),
+  ),
+);
+const fetching = computed(() => linksQuery.isFetching.value || statusQuery.isFetching.value);
+const refreshLinks = () =>
+  Promise.all([linksQuery.refetch(), statusIds.value.length ? statusQuery.refetch() : null]);
 
 const pauseMutation = useMutation(() => setPublicLinkPausedMutation(orgId.value));
 const revokeMutation = useMutation(() => revokePublicLinkMutation(orgId.value));
-const rebuildMutation = useMutation(() => rebuildPublicLinkMutation(orgId.value));
+const refreshMutation = useMutation(() => refreshPublicLinkMutation(orgId.value));
 
 const statusFilter = ref<StatusFilter>("all");
 const searchQuery = ref("");
 const editing = ref<PublicLink | null>(null);
 const panelOpen = ref(false);
-// Rows with a pause, resume, rebuild or revoke in flight, so a second click can't send it again.
+// Rows with a pause, resume, refresh or revoke in flight, so a second click can't send it again.
 const busyRows = reactive(new Map<string, RowActionSource>());
 
 const countOf = (filter: Exclude<StatusFilter, "all">) =>
-  links.value.filter((l) => FILTER_STATUSES[filter].includes(l.status)).length;
+  links.value.filter((l) => FILTER_STATUSES[filter].includes(statusOf(l))).length;
+
+// The tile goes with the batch call, so a filter on it can't outlive a failed call.
+watch(attentionKnown, (known) => {
+  if (!known && statusFilter.value === "attention") statusFilter.value = "all";
+});
 
 const summaryStats = computed<StatItem[]>(() => {
-  const attention = countOf("attention");
+  const needsAttention = countOf("attention");
   return [
     {
       key: "live",
@@ -430,14 +483,18 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "neutral",
       dataTest: "dashboards-public-links-summary-paused",
     },
-    {
-      key: "attention",
-      label: t("components.badge.publicLinkStatus.needsAttention"),
-      value: attention,
-      icon: "warning-amber",
-      tone: attention > 0 ? "warning" : "neutral",
-      dataTest: "dashboards-public-links-summary-attention",
-    },
+    ...(attentionKnown.value
+      ? ([
+          {
+            key: "attention",
+            label: t("components.badge.publicLinkStatus.needsAttention"),
+            value: needsAttention,
+            icon: "warning-amber",
+            tone: needsAttention > 0 ? "warning" : "neutral",
+            dataTest: "dashboards-public-links-summary-attention",
+          },
+        ] satisfies StatItem[])
+      : []),
     {
       key: "expired",
       label: t("components.badge.publicLinkStatus.expired"),
@@ -461,7 +518,7 @@ const visibleLinks = computed(() => {
   const q = publicLinkSearchTerm(searchQuery.value);
   const filter = statusFilter.value;
   return links.value.filter((link) => {
-    if (filter !== "all" && !FILTER_STATUSES[filter].includes(link.status)) return false;
+    if (filter !== "all" && !FILTER_STATUSES[filter].includes(statusOf(link))) return false;
     if (!q) return true;
     return [link.name, link.slug, link.dashboard_title, link.folder_name, link.published_by].some(
       (v) => (v ?? "").toLowerCase().includes(q),
@@ -550,10 +607,10 @@ function setPaused(link: PublicLink, paused: boolean, source: RowActionSource) {
   });
 }
 
-function rebuildLink(link: PublicLink) {
+function refreshLink(link: PublicLink) {
   return runRowAction(link, "menu", async () => {
-    await rebuildMutation.mutateAsync(link);
-    showPositiveNotification(t("dashboard.publicLinks.rebuiltToast"));
+    await refreshMutation.mutateAsync(link);
+    showPositiveNotification(t("dashboard.publicLinks.refreshQueuedToast"));
   });
 }
 

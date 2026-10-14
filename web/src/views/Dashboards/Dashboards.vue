@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="openPublicLinks"
       >
         {{ t("dashboard.publicLinks.pageTitle") }}
+        <BetaBadge size="xs" class="ms-1.5 max-md:hidden" />
       </OButton>
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
@@ -552,6 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -665,6 +667,7 @@ const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 export default defineComponent({
   name: "Dashboards",
   components: {
+    BetaBadge,
     FirstDataPanel,
     OTruncatedText,
     OUserCell,
