@@ -1,0 +1,90 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { raw, type I18nKey, type I18nText, type TranslateFn } from "@/types/i18n";
+import type { Confidence, CoverageVerdict, Severity } from "./digests";
+import type { EvidenceFormat } from "./rules";
+
+const MINUTES_PER_DAY = 1440;
+const MINUTES_PER_YEAR = 365 * MINUTES_PER_DAY;
+
+/** The largest whole unit, so a cadence reads "7 days" rather than "10080 minutes". */
+export function formatMinutes(t: TranslateFn, minutes: number): I18nText {
+  const count = (key: I18nKey, n: number) => t(key, { count: n }, n);
+  if (minutes > 0 && minutes % MINUTES_PER_YEAR === 0) {
+    return count("alertCalibration.duration.years", minutes / MINUTES_PER_YEAR);
+  }
+  if (minutes > 0 && minutes % MINUTES_PER_DAY === 0) {
+    return count("alertCalibration.duration.days", minutes / MINUTES_PER_DAY);
+  }
+  if (minutes > 0 && minutes % 60 === 0)
+    return count("alertCalibration.duration.hours", minutes / 60);
+  return count("alertCalibration.duration.minutes", minutes);
+}
+
+export function formatSeconds(t: TranslateFn, secs: number): I18nText {
+  const rounded = Math.round(secs);
+  if (rounded < 60) return t("alertCalibration.duration.seconds", { count: rounded }, rounded);
+  return formatMinutes(t, Math.round(rounded / 60));
+}
+
+export function formatEvidence(t: TranslateFn, value: unknown, format: EvidenceFormat): I18nText {
+  if (value === undefined || value === null || value === "") return raw("—");
+  if (format === "ratio") return raw(`${(Number(value) * 100).toFixed(1)}%`);
+  if (format === "seconds") return formatSeconds(t, Number(value));
+  if (format === "count") return raw(Number(value).toLocaleString());
+  if (format === "boolean") {
+    return value === true || value === "true"
+      ? t("alertCalibration.evidence.yes")
+      : t("alertCalibration.evidence.no");
+  }
+  return raw(String(value));
+}
+
+export const SEVERITY_BADGE: Record<
+  Severity,
+  "error-soft" | "warning-soft" | "primary-soft" | "default-soft"
+> = {
+  High: "error-soft",
+  Medium: "warning-soft",
+  Low: "primary-soft",
+  Info: "default-soft",
+};
+
+export const SEVERITY_LABEL: Record<Severity, I18nKey> = {
+  High: "alertCalibration.severity.high",
+  Medium: "alertCalibration.severity.medium",
+  Low: "alertCalibration.severity.low",
+  Info: "alertCalibration.severity.info",
+};
+
+export const CONFIDENCE_LABEL: Record<Confidence, I18nKey> = {
+  High: "alertCalibration.confidence.high",
+  Medium: "alertCalibration.confidence.medium",
+  Low: "alertCalibration.confidence.low",
+};
+
+export const COVERAGE_BADGE: Record<
+  CoverageVerdict,
+  {
+    labelKey: I18nKey;
+    variant: "success-soft" | "warning-soft" | "error-soft";
+    tone: "success" | "warning" | "error";
+  }
+> = {
+  full: { labelKey: "alertCalibration.coverage.full", variant: "success-soft", tone: "success" },
+  gap: { labelKey: "alertCalibration.coverage.gap", variant: "warning-soft", tone: "warning" },
+  none: { labelKey: "alertCalibration.coverage.none", variant: "error-soft", tone: "error" },
+};

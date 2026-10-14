@@ -306,6 +306,24 @@ const useManagementRoutes = () => {
       ],
     );
   }
+  if (config.isEnterprise == "true" || config.isCloud == "true") {
+    routes[0].children.push({
+      path: "alert_calibration",
+      name: "alertCalibrationSettings",
+      component: () => import("@/components/settings/AlertCalibrationSettings.vue"),
+      meta: { titleKey: "settings.alertCalibration" },
+      async beforeEnter(to: any, from: any, next: any) {
+        // Imported here, as no other settings route needs the store at module load.
+        const { default: store } = await import("@/stores");
+        // `=== false`, not falsy: a cold load with `/config` still in flight must not bounce.
+        if (store.state.zoConfig?.alert_calibration_enabled === false) {
+          next({ name: "general", query: to.query });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    });
+  }
   if (config.isCloud == "true") {
     routes[0].children.push(
       ...[
