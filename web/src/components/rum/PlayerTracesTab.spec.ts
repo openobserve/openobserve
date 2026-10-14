@@ -64,8 +64,13 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 // default stream and the pre-discovery tests keep their single-call shape;
 // individual tests override with per-id locations.
 const mockResolveTraceLocationsBulk = vi.fn().mockResolvedValue({});
+const mockFallbackTracesStream = vi.fn().mockResolvedValue("default");
 vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
-  default: () => ({ resolveTraceLocationsBulk: mockResolveTraceLocationsBulk, cancel: vi.fn() }),
+  default: () => ({
+    resolveTraceLocationsBulk: mockResolveTraceLocationsBulk,
+    fallbackTracesStream: mockFallbackTracesStream,
+    cancel: vi.fn(),
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -389,6 +394,38 @@ describe("PlayerTracesTab", () => {
       expect(traceDetails.exists()).toBe(true);
       expect(traceDetails.props("streamNameProp")).toBe("checkout_traces");
       expect(traceDetails.props("traceIdProp")).toBe(C1);
+    });
+
+    it("fetches nothing for an id found in no stream when the org has no default stream", async () => {
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks();
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
+    });
+
+    it("keeps the found traces when another id is in no stream and the org has no default", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff"; // → qms_uat
+      const U1 = "01a038ddccc770b9bba3b2df20c12415"; // in no stream
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "qms_uat" } });
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 }), createRumHit({ _trace_id: U1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const streamsQueried = mockFetchQueryDataWithHttpStream.mock.calls.map(
+        ([args]: any[]) => args.queryReq.stream_name,
+      );
+      expect(streamsQueried).toEqual(["qms_uat"]);
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(1);
+      expect(wrapper.text()).toContain("GET /api/products");
     });
 
     it("bounds the metadata query by the indexed ranges instead of the session window", async () => {
@@ -927,6 +964,27 @@ describe("PlayerTracesTab", () => {
 
       expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("/products");
+    });
+
+    it("still lists ids found in no stream when the metadata fetch errors", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      const U1 = "01a038ddccc770b9bba3b2df20c12415";
+      wrapper.unmount();
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "qms_uat" } });
+      mockFallbackTracesStream.mockResolvedValueOnce(null);
+      setupSuccessfulMocks([
+        createRumHit({ _trace_id: P1, _view_url: "https://example.com/orders" }),
+        createRumHit({ _trace_id: U1, _view_url: "https://example.com/audit" }),
+      ]);
+      mockFetchQueryDataWithHttpStream.mockImplementation((_queryReq: any, handlers: any) => {
+        handlers.error(null, new Error("Metadata fetch failed"));
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.findAll('[data-test^="table-row-"]')).toHaveLength(2);
+      expect(wrapper.text()).toContain("/audit");
     });
   });
 
