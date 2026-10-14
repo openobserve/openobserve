@@ -1,0 +1,470 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import type { SlackOAuthConnection } from "@/services/alert_destination";
+
+// Wire values of the snake_case enums in src/config/src/meta/slack.rs.
+
+export type SlackMode = "http" | "socket";
+
+export type SlackLinkMethod = "oidc" | "email" | "admin_bulk";
+
+export type SlackRevokedReason =
+  | "unlinked"
+  | "user_removed"
+  | "slack_user_deleted"
+  | "email_changed"
+  | "uninstalled"
+  | "bot_tokens_revoked"
+  | "org_deleted";
+
+export type SlackAnswerMode = "thread" | "private";
+
+export type SlackThreadKind = "question" | "link";
+
+export type SlackSetFrom = "settings" | "install" | "destination";
+
+export type SlackDisabledReason =
+  "edition" | "flag" | "allowlist" | "master_key" | "home_region_unset" | "other_region";
+
+export type SlackInstallationStatus = "pending" | "revoked" | "degraded" | "healthy";
+
+export type SlackAppTokenState = "not_applicable" | "missing" | "ok" | "revoked";
+
+export type SlackLinkingSource = "mapping" | "manual";
+
+export type SlackInstallSource = "destination_form" | "settings" | "upgrade_banner";
+
+export type SlackConnectionPurpose = "connect" | "test";
+
+export type SlackCheckStatus = "pass" | "fail" | "warn";
+
+/** The Slack fields of the org-scoped `GET /api/{org}/config` response (`zoConfig`). */
+export interface SlackOrgConfig {
+  slack_enabled?: boolean;
+  slack_disabled_reason?: SlackDisabledReason | null;
+  slack_home_region?: string | null;
+}
+
+/** O2's error body for every `/api/{org}/slack/*` refusal. */
+export interface SlackApiError {
+  code: number;
+  message: string;
+}
+
+export interface SlackThisOrgConnection {
+  connected_by: string;
+  created_at: number;
+  destination_count: number;
+}
+
+export interface SlackInstallationHealth {
+  sockets_up: number;
+  sockets_want: number;
+  nodes: number;
+  last_event_at: number | null;
+  as_of: number | null;
+}
+
+export interface InstallationView {
+  id: string;
+  app_id: string;
+  team_id: string;
+  team_name: string;
+  enterprise_id: string;
+  is_enterprise_install: boolean;
+  mode: SlackMode;
+  home_region: string;
+  status: SlackInstallationStatus;
+  credentials_readable: boolean;
+  has_config_refresh_token: boolean;
+  app_token_state: SlackAppTokenState;
+  this_org: SlackThisOrgConnection;
+  other_connected_orgs: number;
+  health: SlackInstallationHealth;
+  created_at: number;
+}
+
+export interface SlackLinkingSummary {
+  enabled: boolean;
+  source: SlackLinkingSource;
+  domains: string[];
+}
+
+/** Form-path install result: only what the "Link people automatically" banner needs. */
+export interface InstallationSummary {
+  id: string;
+  team_name: string;
+  status: SlackInstallationStatus;
+  linking: SlackLinkingSummary;
+}
+
+/** Counts cover only members of the calling org. */
+export interface LinkCounts {
+  email: number;
+  oidc: number;
+  admin_bulk: number;
+  matches_not_linked: number;
+  skipped_domain: number;
+}
+
+export interface LinkingView {
+  enabled: boolean;
+  source: SlackLinkingSource;
+  domains: string[];
+  counts: LinkCounts;
+}
+
+export interface SlackDestinationRef {
+  id: string;
+  name: string;
+}
+
+export interface SlackCreatedDestination {
+  id: string;
+  name: string;
+  channel: string;
+  channel_id: string;
+}
+
+export interface SlackInstallStartRequest {
+  source: SlackInstallSource;
+}
+
+export interface SlackInstallStartResponse {
+  authorization_url: string;
+}
+
+export interface SlackInstallExchangeRequest {
+  code: string;
+  state: string;
+}
+
+export interface SlackLinkAllResult {
+  linked: number;
+  complete: boolean;
+}
+
+/** `source: destination_form`: today's camelCase webhook fields, so `applyConnection` keeps working. */
+export interface SlackFormExchangeResponse extends SlackOAuthConnection {
+  installation: InstallationSummary;
+}
+
+/** `source: settings` or `upgrade_banner`: the server created the destination itself. */
+export interface SlackSettingsExchangeResponse {
+  installation: InstallationView;
+  destination: SlackCreatedDestination;
+  channel_default_set: boolean;
+  linking: LinkingView;
+  link_all: SlackLinkAllResult | null;
+}
+
+export interface SlackAlreadyInstalled {
+  installation_id: string;
+  team_name: string;
+  this_org_connected: false;
+}
+
+/** The team is installed and this org is not connected; the form path also carries the webhook fields. */
+export interface SlackAlreadyInstalledResponse extends Partial<SlackOAuthConnection> {
+  already_installed: SlackAlreadyInstalled;
+  connect_ticket: string;
+}
+
+export type SlackInstallExchangeResponse =
+  SlackFormExchangeResponse | SlackSettingsExchangeResponse | SlackAlreadyInstalledResponse;
+
+export type SlackPrerequisiteId =
+  "master_key" | "delegation_key" | "home_region" | "web_url" | "agent";
+
+export interface SlackPrerequisiteCheck {
+  id: SlackPrerequisiteId;
+  status: SlackCheckStatus;
+  detail: string;
+  variable: string | null;
+  fix: string | null;
+}
+
+export interface SlackPrerequisitesResponse {
+  checks: SlackPrerequisiteCheck[];
+}
+
+export interface SlackConnectivityRequest {
+  installation_id?: string;
+}
+
+export interface SlackConnectivityCheck {
+  host: string;
+  status: SlackCheckStatus;
+  detail: string;
+}
+
+export interface SlackConnectivityResponse {
+  checks: SlackConnectivityCheck[];
+  proxy: string | null;
+  ca_bundle: string | null;
+  socket_url_host: string | null;
+}
+
+export interface SlackManifestParams {
+  mode: SlackMode;
+  name?: string;
+  channel_history?: boolean;
+}
+
+/** The server-built manifest (section 8.2); only its outer shape is relied on. */
+export interface SlackServerManifest {
+  display_information?: { name?: string; [key: string]: unknown };
+  [key: string]: unknown;
+}
+
+export interface SlackCreateFromTokenRequest {
+  mode: SlackMode;
+  config_refresh_token: string;
+  app_name?: string;
+  channel_history?: boolean;
+}
+
+/** Set up manually; `signing_secret` is required for HTTP mode. */
+export interface SlackCreateManualRequest {
+  mode: SlackMode;
+  client_id: string;
+  client_secret: string;
+  signing_secret?: string;
+  app_token?: string;
+}
+
+export type SlackCreateInstallationRequest = SlackCreateFromTokenRequest | SlackCreateManualRequest;
+
+export interface SlackCreateInstallationResponse {
+  installation: InstallationView;
+  authorize_url: string;
+  app_settings_url: string;
+  manifest_page_url?: string;
+}
+
+export interface SlackInstallUrlResponse {
+  authorize_url: string;
+}
+
+/** `config_refresh_token: null` is Forget: it drops O2's copy only. */
+export interface SlackCredentialsRequest {
+  app_token?: string;
+  signing_secret?: string;
+  client_id?: string;
+  client_secret?: string;
+  config_refresh_token?: string | null;
+}
+
+export interface SlackAvailableInstallation {
+  installation_id: string;
+  team_name: string;
+}
+
+export interface SlackUpgradeCandidate {
+  team_id: string;
+  team_name: string;
+  destinations: SlackDestinationRef[];
+}
+
+export interface SlackInstallationsResponse {
+  installations: InstallationView[];
+  available?: SlackAvailableInstallation[];
+  upgrade_candidates?: SlackUpgradeCandidate[];
+}
+
+export interface SlackTestRequest {
+  channel_id?: string;
+}
+
+export type SlackTestCheckId = "auth_test" | "last_event" | "sockets" | "agent";
+
+export interface SlackTestCheck {
+  id: SlackTestCheckId;
+  status: SlackCheckStatus;
+  detail: string;
+}
+
+export interface SlackTestPost {
+  status: SlackCheckStatus;
+  detail: string;
+}
+
+export interface SlackTestResponse {
+  checks: SlackTestCheck[];
+  test_post: SlackTestPost | null;
+}
+
+export interface SlackLinkingUpdateRequest {
+  enabled: boolean;
+  domains?: string[];
+}
+
+export interface SlackLinkMatch {
+  slack_user_id: string;
+  name: string;
+  email: string;
+  o2_user: string;
+}
+
+export interface SlackLinkMatchesResponse {
+  members: SlackLinkMatch[];
+  next_cursor: string | null;
+}
+
+export interface SlackConnectionStartRequest {
+  purpose: SlackConnectionPurpose;
+}
+
+export interface SlackConnectionStartResponse {
+  url: string;
+}
+
+export interface SlackOidcCallbackRequest {
+  oidc_code: string;
+  oidc_state: string;
+}
+
+export type SlackConnectionConfirmResponse = { connected: true } | { test: "pass" };
+
+export interface SlackConnectRequest {
+  connect_ticket: string;
+}
+
+export interface SlackConnectResponse {
+  connected: true;
+  destination: SlackCreatedDestination | null;
+  channel_default_set: boolean;
+}
+
+export interface SlackDisconnectResponse {
+  stopped_destinations: SlackDestinationRef[];
+}
+
+export interface SlackUninstallAffected {
+  orgs: number;
+  destinations: SlackDestinationRef[];
+  links_revoked: number;
+}
+
+/** `delete_app_url` is self-hosted only; Cloud never calls `apps.uninstall`. */
+export interface SlackUninstallResponse {
+  revoked: true;
+  affected: SlackUninstallAffected;
+  delete_app_url?: string | null;
+}
+
+export interface SlackChannelsParams {
+  q?: string;
+  cursor?: string;
+}
+
+export interface SlackChannel {
+  id: string;
+  name: string;
+  is_private: boolean;
+  is_member: boolean;
+  is_shared: boolean;
+}
+
+export interface SlackChannelsResponse {
+  channels: SlackChannel[];
+  next_cursor: string | null;
+}
+
+export interface SlackChannelDefaultRow {
+  channel_id: string;
+  channel_name: string;
+  answer_mode: SlackAnswerMode;
+  set_from: SlackSetFrom;
+  set_by_this_org: boolean;
+}
+
+export interface SlackChannelDefaultsResponse {
+  defaults: SlackChannelDefaultRow[];
+}
+
+export interface SlackChannelDefaultRequest {
+  org_id: string;
+  answer_mode: SlackAnswerMode;
+}
+
+export interface SlackHelpContact {
+  help_contact: string | null;
+}
+
+export interface SlackSignedRequest {
+  sig: string;
+}
+
+export interface SlackLinkRequestPreview {
+  question_preview: string;
+  channel_name: string;
+  team_name: string;
+}
+
+export interface SlackLinkRequestStartResponse {
+  url: string;
+  request: SlackLinkRequestPreview;
+  help_contact: string | null;
+}
+
+export interface SlackLinkRequestConfirmResponse {
+  linked_as: string;
+  org_id: string;
+  orgs: string[];
+  return_url: string;
+}
+
+export interface SlackMyLink {
+  id: string;
+  team_name: string;
+  slack_display_name: string;
+  default_org_id: string;
+  link_method: SlackLinkMethod;
+  created_at: number;
+  last_used_at: number;
+}
+
+export interface SlackMyLinksResponse {
+  links: SlackMyLink[];
+}
+
+/** An `external_identity_links` row as the admin list returns it (`ExternalIdentityLink`). */
+export interface SlackLinkRow {
+  id: string;
+  provider: string;
+  installation_id: string;
+  external_enterprise_id: string;
+  external_team_id: string;
+  external_user_id: string;
+  user_email: string;
+  default_org_id: string;
+  link_method: SlackLinkMethod;
+  created_at: number;
+  last_used_at: number;
+  revoked_at: number | null;
+  revoked_reason: SlackRevokedReason | null;
+}
+
+export interface SlackLinksParams {
+  installation_id?: string;
+  cursor?: string;
+}
+
+export interface SlackLinksResponse {
+  links: SlackLinkRow[];
+  next_cursor: string | null;
+}
