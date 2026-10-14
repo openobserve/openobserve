@@ -237,6 +237,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import BaseImport from "../common/BaseImport.vue";
+import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { functionNameRegex } from "./AddFunction.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import jsTransformService from "@/services/jstransform";
@@ -275,6 +276,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const orgId = useOrgId();
+    const { open: openUpgradeDialog } = useEnterpriseUpgradeDialog();
 
     const baseImportRef = ref<any>(null);
     const isImporting = ref(false);
@@ -321,11 +323,13 @@ export default defineComponent({
         store.state.selectedOrganization?.identifier === "_meta",
     );
 
-    const transTypeOptions = computed(() => {
-      const options = [{ label: t("function.vrl"), value: "0" }];
-      if (isJsAllowed.value) options.push({ label: raw("JavaScript"), value: "1" });
-      return options;
-    });
+    // JavaScript always appears in the dropdown — selectable (not hidden,
+    // not disabled) in builds that don't unlock it, same as the Add form's
+    // toggle; picking it opens the upgrade dialog instead (see updateTransType).
+    const transTypeOptions = computed(() => [
+      { label: t("function.vrl"), value: "0" },
+      { label: raw("JavaScript"), value: "1" },
+    ]);
 
     // Set at each call site, so one declared mutation covers both create and override.
     const isOverride = ref(false);
@@ -447,6 +451,13 @@ export default defineComponent({
     };
 
     const updateTransType = (transType: string, index: number) => {
+      // OSelect is controlled (`:model-value`), so refusing to write here is
+      // what keeps the locked JS option from actually getting selected —
+      // picking it opens the upgrade dialog instead.
+      if (transType === "1" && !isJsAllowed.value) {
+        openUpgradeDialog();
+        return;
+      }
       userSelectedTransType.value[index] = transType;
       writeField(index, "transType", transType);
     };
@@ -704,6 +715,8 @@ export default defineComponent({
 
     return {
       t,
+      raw,
+      isJsAllowed,
       baseImportRef,
       isImporting,
       functionErrors,

@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { applyPickedTimeRange } from "./dashboard-time.js";
+import { applyPickedDateTime } from "./dashboard-time.js";
 
 /**
  * Page Object for Panel Time Range operations
@@ -97,7 +97,7 @@ export default class DashboardPanelTime {
 
   /** Apply the range picked in the open date-time picker (Apply, or close + Refresh on dashboards) */
   async clickDateTimeApplyBtn() {
-    await applyPickedTimeRange(this.page);
+    await applyPickedDateTime(this.page);
   }
 
   /** Click the panel discard button (swallows errors; does not accept the dialog) */
@@ -345,7 +345,7 @@ export default class DashboardPanelTime {
    * Change panel time in view mode (relative)
    * @param {string} panelId - Panel ID
    * @param {string} timeRange - e.g., "15-m", "1-h", "7-d"
-   * @param {boolean} clickApply - Whether to apply the pick (default: true); see applyPickedTimeRange
+   * @param {boolean} clickApply - Whether to apply the pick (default: true); see applyPickedDateTime
    * @param {number} [_attempt=1] - Internal recursion counter. Do NOT pass from call sites.
    */
   async changePanelTimeInView(panelId, timeRange, clickApply = true, _attempt = 1) {
@@ -379,7 +379,7 @@ export default class DashboardPanelTime {
       try {
         // Panel pickers have no Apply: with Auto Run on the preset already applied; with it
         // off the pick waits and the panel's own yellow refresh icon applies it.
-        await applyPickedTimeRange(this.page);
+        await applyPickedDateTime(this.page);
 
         // Wait for the dialog to close, then for the resulting panel data request
         // (triggered by the new time range) to complete.
@@ -509,7 +509,7 @@ export default class DashboardPanelTime {
     await timeOptionBtn.click();
 
     // Apply the pick: the dashboard picker has no Apply button
-    await applyPickedTimeRange(this.page);
+    await applyPickedDateTime(this.page);
 
     // Wait for dialog to close and network to settle
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
@@ -633,7 +633,7 @@ export default class DashboardPanelTime {
    * Apply the range picked in an open date time picker (Apply, or close + Refresh on dashboards)
    */
   async clickDateTimeApply() {
-    await applyPickedTimeRange(this.page);
+    await applyPickedDateTime(this.page);
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
@@ -704,7 +704,7 @@ export default class DashboardPanelTime {
     ).catch(() => {});
 
     await timeOptionBtn.click();
-    await applyPickedTimeRange(this.page);
+    await applyPickedDateTime(this.page);
     await this.dateTimeMenu.waitFor({ state: "hidden", timeout: 5000 });
     // Wait for the re-query response triggered by the time change
     await queryDone;

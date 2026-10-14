@@ -48,7 +48,8 @@ import {
 import { markDetectionSeen } from "./useFirstDataNotice";
 
 export type StreamSignal = UserDataStreamType;
-export type FirstEventState = "waiting" | "received" | "rejected" | "no-requests" | "stopped";
+export type FirstEventState =
+  "idle" | "waiting" | "received" | "rejected" | "no-requests" | "stopped";
 export type DiagnosisTrigger = "auto" | "troubleshoot";
 
 export interface FirstEventDiagnosis {
@@ -131,6 +132,8 @@ const fetchOrNull = async <T>(fn: () => Promise<T>): Promise<T | null> => {
 const newestFirst = (rows: StreamRow[]): StreamRow[] =>
   [...rows].sort((a, b) => Number(b.stats?.doc_time_max ?? 0) - Number(a.stats?.doc_time_max ?? 0));
 
+const hasRecords = (row: StreamRow): boolean => Number(row.stats?.doc_num ?? 0) > 0;
+
 const statsKey = (row: StreamRow): string =>
   `${Number(row.stats?.doc_num ?? 0)}/${Number(row.stats?.doc_time_max ?? 0)}`;
 
@@ -160,6 +163,8 @@ export function useFirstEventWatch(
   let lastRejectionsReadMs: number | undefined;
   // an org with data can never turn tracked again, so automatic reads stop until the watch restarts
   let untracked = false;
+  // traffic already flowing into the target is not the user's data, so counting it waits for a copy or Check now
+  let engaged = false;
   let diagnosisTrigger: DiagnosisTrigger | undefined;
   let snapshots: Partial<Record<StreamSignal, TypeSnapshot>> = {};
   let candidates: Partial<Record<StreamSignal, Map<string, StreamRow>>> = {};
@@ -380,7 +385,8 @@ export function useFirstEventWatch(
       const row = await findTarget(ctx, name);
       if (row === undefined || stale(ctx)) return;
       target.value = { existed: !!row };
-      if (row) await anchor(ctx, name);
+      if (row && !engaged && hasRecords(row)) holdForUser();
+      else if (row) await anchor(ctx, name);
       return;
     }
     if (t.existed) {
@@ -459,7 +465,8 @@ export function useFirstEventWatch(
         baselineTotal: found.total,
         matches: matches.map((s) => s.name),
       };
-      if (matches.length) await anchor(ctx, matches[0].name);
+      if (!engaged && matches.some(hasRecords)) holdForUser();
+      else if (matches.length) await anchor(ctx, matches[0].name);
       return;
     }
     const pending = candidates[ctx.type] ?? new Map<string, StreamRow>();
@@ -643,6 +650,11 @@ export function useFirstEventWatch(
     }
   }
 
+  function holdForUser() {
+    halt();
+    state.value = "idle";
+  }
+
   function finish() {
     halt();
     if (state.value !== "received") state.value = "stopped";
@@ -662,13 +674,16 @@ export function useFirstEventWatch(
     diagnosisTrigger = undefined;
     lastRejectionsReadMs = undefined;
     untracked = false;
+    // a new target is a new watch, so a copy for the previous one does not count its traffic
+    engaged = false;
     troubleshooting.value = false;
     state.value = "waiting";
   };
 
-  /** Starts the watch on page open, or restarts the fast cadence after a copy. */
-  const start = (reason: "copy" | "open") => {
+  /** Starts the watch on page open, or restarts the fast cadence after a copy; a copy or Check now also counts an existing target. */
+  const start = (reason: "copy" | "open" | "check") => {
     if (state.value === "received") return;
+    if (reason !== "open") engaged = true;
     if (running) {
       if (reason === "copy") {
         untracked = false;
@@ -684,7 +699,7 @@ export function useFirstEventWatch(
     lastRejectionsReadMs = undefined;
     untracked = false;
     diagnosisTrigger = undefined;
-    if (state.value === "stopped") {
+    if (state.value === "stopped" || state.value === "idle") {
       state.value = "waiting";
       diagnosis.value = undefined;
     }
@@ -697,6 +712,10 @@ export function useFirstEventWatch(
   const stop = () => halt();
 
   const probeNow = async () => {
+    if (state.value === "idle") {
+      start("check");
+      return;
+    }
     if (!running) return;
     await poll();
   };
@@ -711,11 +730,11 @@ export function useFirstEventWatch(
   watch(
     [org, () => signal?.value, targetName, filter, keywordMatch],
     () => {
-      const wasRunning = running;
+      const resume = running || state.value === "idle";
       generation++;
       halt();
       resetWatch();
-      if (wasRunning) start("open");
+      if (resume) start("open");
     },
     { flush: "sync" },
   );

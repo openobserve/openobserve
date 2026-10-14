@@ -165,6 +165,10 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useAutoRunToggle } from "@/composables/dashboard/useAutoRunToggle";
+import {
+  DASHBOARD_FRESH_PANEL_TIME,
+  freshTimeFromAppliedRange,
+} from "@/composables/dashboard/dashboardFreshPanelTime";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
@@ -357,6 +361,14 @@ export default defineComponent({
 
     // holds the date picker v-modal
     const selectedDate = ref(getSelectedDateFromQueryParams(route.query));
+
+    provide(
+      DASHBOARD_FRESH_PANEL_TIME,
+      freshTimeFromAppliedRange(
+        () => isAutoRunOn.value,
+        () => selectedDate.value,
+      ),
+    );
 
     // holds the current time for the dashboard
     const currentTimeObj = ref({});

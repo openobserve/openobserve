@@ -1,6 +1,6 @@
-//Dahboard time refresh
-import { applyPickedTimeRange } from "./dashboard-time.js";
+import { applyPickedDateTime } from "./dashboard-time.js";
 
+//Dahboard time refresh
 // Methods: Set relative time selection, Set absolute time selection, Auto refresh interval, Refresh dashboard manual
 export default class DashboardTimeRefresh {
   constructor(page) {
@@ -51,7 +51,7 @@ export default class DashboardTimeRefresh {
     await relBtn.waitFor({ state: "attached" });
     // Use JS click — the dropdown can extend outside the viewport in the new layout
     await relBtn.evaluate((el) => el.click());
-    await applyPickedTimeRange(this.page);
+    await applyPickedDateTime(this.page);
   }
 
   // Set absolute time selection with dynamic start and end days
@@ -133,8 +133,8 @@ export default class DashboardTimeRefresh {
     await endCell.waitFor({ state: "attached" });
     await endCell.evaluate((el) => el.click());
 
-    // Apply the selection: Apply where the picker still has one, else close it and Refresh as needed.
-    await applyPickedTimeRange(this.page);
+    // Apply the selection: Apply where the picker still has one, else close it and Apply or Refresh as needed.
+    await applyPickedDateTime(this.page);
 
     // Wait for the date picker dropdown to fully close. If the dropdown
     // remains open it overlays the panel's primary buttons (e.g.

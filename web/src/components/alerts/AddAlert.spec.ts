@@ -263,7 +263,7 @@ describe("AddAlert (OForm owner)", () => {
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
     });
 
-    it("blocks save when there are no destinations", async () => {
+    it("saves an alert with no destination", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
@@ -273,8 +273,15 @@ describe("AddAlert (OForm owner)", () => {
       await form.handleSubmit();
       await flushPromises();
 
-      expect(form.state.isValid).toBe(false);
-      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(form.state.isValid).toBe(true);
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      expect((alertsService.create_by_alert_id as any).mock.calls[0][1].destinations).toEqual([]);
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: i18n.global.t("alerts.messages.alertSavedNoDestination"),
+        }),
+      );
     });
   });
 
@@ -706,6 +713,102 @@ describe("AddAlert (OForm owner)", () => {
   });
 
   describe("update save path", () => {
+    it.each([1, 30, 240])(
+      "preserves a rule pending duration of %s seconds when editing",
+      async (seconds) => {
+        wrapper = mountAlert({
+          isUpdated: true,
+          modelValue: {
+            name: "pending_rule",
+            stream_type: "metrics",
+            stream_name: "up",
+            is_real_time: false,
+            pending_period_sec: seconds,
+            query_condition: {
+              type: "promql",
+              promql: "up",
+              promql_rule_mode: true,
+              promql_multi_alert: true,
+              promql_condition: null,
+              sql: "",
+              aggregation: null,
+              conditions: null,
+              vrl_function: "",
+              multi_time_range: [],
+            },
+            trigger_condition: {
+              period: 5,
+              operator: ">=",
+              frequency: 60,
+              threshold: 1,
+              silence: 0,
+              frequency_type: "minutes",
+              timezone: "UTC",
+            },
+            destinations: ["email"],
+            context_attributes: {},
+            description: "",
+            row_template: "",
+            row_template_type: "String",
+            enabled: true,
+          },
+          destinations: [{ name: "email" }],
+        });
+        await flushPromises();
+        expect(wrapper.vm.form.state.values.pending_period_sec).toBeCloseTo(seconds / 60);
+        const payload = wrapper.vm.getAlertPayload();
+        expect(payload.pending_period_sec).toBe(seconds);
+        expect(payload.query_condition.promql_multi_alert).toBe(true);
+      },
+    );
+
+    // RBAC lists only the destinations this user may read. One they cannot read must
+    // survive a list refresh (it shows as "Missing"), or saving would silently drop it.
+    it("keeps a saved destination that the refreshed destinations list does not include", async () => {
+      wrapper = mountAlert({
+        isUpdated: true,
+        modelValue: {
+          name: "rbac_alert",
+          stream_type: "metrics",
+          stream_name: "up",
+          is_real_time: false,
+          query_condition: {
+            type: "promql",
+            promql: "up",
+            promql_condition: null,
+            sql: "",
+            aggregation: null,
+            conditions: null,
+            vrl_function: "",
+            multi_time_range: [],
+          },
+          trigger_condition: {
+            period: 5,
+            operator: ">=",
+            frequency: 60,
+            threshold: 1,
+            silence: 0,
+            frequency_type: "minutes",
+            timezone: "UTC",
+          },
+          destinations: ["dest-a"],
+          context_attributes: {},
+          description: "",
+          row_template: "",
+          row_template_type: "String",
+          enabled: true,
+        },
+        destinations: [],
+      });
+      await flushPromises();
+
+      await wrapper.setProps({ destinations: [{ name: "dest-c" }] });
+      await flushPromises();
+
+      expect(wrapper.vm.form.state.values.destinations).toEqual(["dest-a"]);
+      expect(wrapper.vm.getAlertPayload().destinations).toEqual(["dest-a"]);
+    });
+
     it("updates an existing alert via update_by_alert_id (beingUpdated)", async () => {
       wrapper = mountAlert({
         isUpdated: true,
@@ -1463,7 +1566,7 @@ describe("AddAlert (OForm owner)", () => {
       await flushPromises();
       const form = wrapper.vm.form;
       seedEmptyBuilder(form, SQL);
-      form.setFieldValue("destinations", []);
+      form.setFieldValue("trigger_condition.silence", "");
 
       await clickSave();
 

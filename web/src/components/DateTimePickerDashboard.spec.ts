@@ -583,7 +583,7 @@ describe("DateTimePickerDashboard", () => {
       expect((wrapper.vm as any).gate.needsRefresh.value).toBe(false);
     });
 
-    it("keeps the Apply button where a page does not opt in, as the Add/Edit panel page", async () => {
+    it("keeps the Apply button on a page that does not opt in", async () => {
       wrapper = mount(Host, {
         props: { autoApply: false },
         attachTo: document.body,

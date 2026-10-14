@@ -31,12 +31,14 @@ use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, announcements, authz, dashboards, db_monitoring, folders, ingest_rejections, kv,
-    metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
+    alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, ingest_rejections,
+    kv, metrics_usage, model_pricing, organization, query_history, rum_analytics, service_accounts,
     short_url, slos, sourcemaps, status, status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
-use openobserve_api_search::{profiles as profiles_query, promql, search, traces};
+use openobserve_api_search::{
+    profiles as profiles_query, promql, rum as rum_query, search, traces,
+};
 use openobserve_core::auth::AuthExtractor;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
@@ -591,7 +593,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
                 protocol: Protocol::Http,
                 response_meta: ResponseMeta {
                     http_method: method,
-                    http_path: path,
+                    http_path: config::axum::middlewares::mask_share_tokens(&path),
                     http_body: body,
                     http_query_params: query_params,
                     http_response_code: response.status().as_u16(),
@@ -832,6 +834,15 @@ pub fn basic_routes() -> Router {
             .route("/status/{slug}", get(status_pages::public::page));
     }
 
+    // Unauthenticated like status pages: the share token is checked in the handler.
+    #[cfg(feature = "enterprise")]
+    if get_config().public_ai_chat.enabled {
+        router = router.route(
+            "/api/public/ai_chats/{token}",
+            get(openobserve_api_management::request::ai::shares::get_public),
+        );
+    }
+
     router
 }
 
@@ -863,6 +874,44 @@ pub fn config_routes() -> Router {
 }
 
 /// Create main API service routes
+/// The AI assistant's chat, chat history and chat sharing routes.
+#[cfg(feature = "enterprise")]
+fn ai_chat_routes(router: Router) -> Router {
+    router
+        .route("/{org_id}/ai/chat", post(ai::chat::chat))
+        .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
+        .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
+        .route(
+            "/{org_id}/ai/confirm/{session_id}",
+            post(ai::chat::confirm_action),
+        )
+        .route(
+            "/{org_id}/ai/chats",
+            get(ai::chats::list).delete(ai::chats::delete_all),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}",
+            get(ai::chats::get)
+                .patch(ai::chats::rename)
+                .delete(ai::chats::delete),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/cancel",
+            post(ai::chat::cancel),
+        )
+        .route(
+            "/{org_id}/ai/chats/{session_id}/shares",
+            get(ai::shares::list_for_chat).post(ai::shares::create),
+        )
+        .route("/{org_id}/ai/shares", get(ai::shares::list_mine))
+        .route(
+            "/{org_id}/ai/shares/{share_id}",
+            patch(ai::shares::update).delete(ai::shares::revoke),
+        )
+        .route("/{org_id}/ai/shared/{token}", get(ai::shares::get_shared))
+        .route("/{org_id}/ai/shared/{token}/fork", post(ai::shares::fork))
+}
+
 pub fn service_routes() -> Router {
     let cfg = get_config();
 
@@ -876,7 +925,8 @@ pub fn service_routes() -> Router {
     #[cfg(not(feature = "enterprise"))]
     let server = cfg.common.instance_name_short.to_string();
 
-    let mut router = Router::new();
+    // Downtimes live in their own table to keep this function under the line limit.
+    let mut router = Router::new().merge(downtime_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
@@ -1275,6 +1325,9 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/sourcemaps/values",get(sourcemaps::list_values))
         .route("/{org_id}/sourcemaps/stacktrace",post(sourcemaps::translate_stacktrace))
 
+        // RUM trace lookup
+        .route("/{org_id}/rum/lookup", post(rum_query::lookup::lookup))
+
         // RUM Product Analytics
         .route("/{org_id}/rum/analytics/named_events", get(rum_analytics::list_named_events).post(rum_analytics::create_named_event))
         .route("/{org_id}/rum/analytics/named_events/deleted_names", get(rum_analytics::deleted_event_names))
@@ -1518,10 +1571,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/ratelimit/update", put(ratelimit::update_ratelimit))
 
             // AI
-            .route("/{org_id}/ai/chat", post(ai::chat::chat))
-            .route("/{org_id}/ai/chat_stream", post(ai::chat::chat_stream))
-            .route("/{org_id}/ai/feedback", post(ai::chat::feedback))
-            .route("/{org_id}/ai/confirm/{session_id}", post(ai::chat::confirm_action))
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).delete(ai::toolsets::delete))
 
@@ -1556,6 +1605,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
+        router = ai_chat_routes(router);
 
         if get_o2_config().common.workflows_enabled {
             // workflows
@@ -2091,6 +2141,20 @@ pub fn service_routes() -> Router {
                 response
             }
         }))
+}
+
+/// Downtimes routes; the literal segments stay before the {downtime_id} catch-all.
+#[rustfmt::skip]
+pub fn downtime_routes() -> Router {
+    Router::new()
+        .route("/v2/{org_id}/downtimes", get(downtimes::list_downtimes).post(downtimes::create_downtime))
+        .route("/v2/{org_id}/downtimes/preview", post(downtimes::preview_downtime))
+        .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
+        .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
+        .route("/v2/{org_id}/downtimes/move", patch(downtimes::move_downtimes))
+        .route("/v2/{org_id}/downtimes/{downtime_id}", get(downtimes::get_downtime).put(downtimes::update_downtime).delete(downtimes::delete_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/cancel", post(downtimes::cancel_downtime))
+        .route("/v2/{org_id}/downtimes/{downtime_id}/extend", post(downtimes::extend_downtime))
 }
 
 /// Create other service routes (AWS, GCP, RUM)

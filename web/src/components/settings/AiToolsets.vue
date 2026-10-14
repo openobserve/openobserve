@@ -38,14 +38,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Table -->
       <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
         <OTable
+          ref="oTableRef"
           :forbidden="forbidden"
           :frame="false"
           :data="visibleRows"
           :columns="columns"
           row-key="id"
           pagination="client"
-          :page-size="20"
+          :page-size="pageSize"
           :page-size-options="[20, 50, 100]"
+          :current-page="currentPage"
+          :sort-by="sortBy"
+          :sort-order="sortOrder"
+          @update:page-size="pageSize = $event"
+          @update:current-page="currentPage = $event"
+          @update:sort-by="sortBy = $event"
+          @update:sort-order="sortOrder = $event"
           sorting="client"
           :default-columns="false"
           show-index
@@ -181,6 +189,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import { useListViewState } from "@/composables/useListViewState";
 import aiToolsetsService from "@/services/ai_toolsets";
 
 export default defineComponent({
@@ -229,7 +238,38 @@ export default defineComponent({
       const e: any = toolsetsList.error.value;
       return e?.status === 403 || e?.response?.status === 403;
     });
-    const filterQuery = ref("");
+    const viewState = useListViewState("ai-toolsets", {
+      filterQuery: "",
+      pageSize: 20,
+      currentPage: 1,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+    });
+    const filterQuery = ref(viewState.filterQuery);
+    const pageSize = ref(viewState.pageSize);
+    const currentPage = ref(viewState.currentPage);
+    const sortBy = ref(viewState.sortBy);
+    const sortOrder = ref(viewState.sortOrder);
+    const oTableRef = ref<any>(null);
+
+    watch([filterQuery, pageSize, currentPage, sortBy, sortOrder], () => {
+      Object.assign(viewState, {
+        filterQuery: filterQuery.value,
+        pageSize: pageSize.value,
+        currentPage: currentPage.value,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
+      });
+    });
+    // setTimeout(0) runs after TanStack's deferred auto-reset-on-data-change, so the restored page wins.
+    watch(
+      loading,
+      (v) => {
+        if (v) return;
+        setTimeout(() => oTableRef.value?.restorePage?.(currentPage.value), 0);
+      },
+      { once: true, immediate: true },
+    );
 
     const columns: OTableColumnDef[] = [
       {
@@ -463,6 +503,11 @@ export default defineComponent({
       showAddDialog,
       resultTotal,
       filterQuery,
+      pageSize,
+      currentPage,
+      sortBy,
+      sortOrder,
+      oTableRef,
       visibleRows,
       confirmDelete,
       addToolset,

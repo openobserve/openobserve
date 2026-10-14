@@ -21,6 +21,7 @@ vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }))
 import analytics from "@/services/product_analytics";
 import dashboardService from "@/services/dashboards";
 import { deleteDashboardById } from "@/utils/commons";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 
 vi.mock("@/utils/commons", () => ({
   deleteDashboardById: vi.fn().mockResolvedValue({}),
@@ -943,6 +944,74 @@ describe("Dashboards.vue", () => {
         [],
         "ui",
       );
+    });
+  });
+
+  describe("List view state persistence", () => {
+    const defaults = {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      sortBy: "",
+      sortOrder: "asc" as "asc" | "desc",
+      pageSize: 20,
+    };
+
+    beforeEach(() => resetListViewState());
+    afterEach(() => resetListViewState());
+
+    const settle = async () => {
+      await nextTick();
+      await nextTick();
+      await nextTick();
+    };
+    const mountSettled = async () => {
+      await router.push({ path: "/dashboards", query: { folder: "default" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(createMockStore(), router, i18n),
+      });
+      await settle();
+      await flushPromises();
+      await settle();
+    };
+
+    it("seeds the search text, sort and page size from the saved view", async () => {
+      Object.assign(useListViewState("dashboards", defaults), {
+        filterQuery: "cpu",
+        sortBy: "title",
+        sortOrder: "desc",
+        pageSize: 50,
+      });
+      await mountSettled();
+
+      expect(wrapper.vm.filterQuery).toBe("cpu");
+      expect(wrapper.vm.sortBy).toBe("title");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+      expect(wrapper.vm.pageSize).toBe(50);
+    });
+
+    it("keeps a saved cross-folder search through the landing run", async () => {
+      Object.assign(useListViewState("dashboards", defaults), {
+        searchAcrossFolders: true,
+        searchQuery: "cpu",
+      });
+      await mountSettled();
+
+      expect(wrapper.vm.searchAcrossFolders).toBe(true);
+      expect(wrapper.vm.searchQuery).toBe("cpu");
+    });
+
+    it("saves search and sort changes into the view state", async () => {
+      await mountSettled();
+
+      wrapper.vm.filterQuery = "mem";
+      wrapper.vm.sortBy = "created";
+      await flushPromises();
+
+      expect(useListViewState("dashboards", defaults)).toMatchObject({
+        filterQuery: "mem",
+        sortBy: "created",
+      });
     });
   });
 

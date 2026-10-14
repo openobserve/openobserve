@@ -39,6 +39,7 @@ vi.mock("vue-router", () => ({
     options: { history: { state: { back: null } } },
   }),
   onBeforeRouteLeave: vi.fn(),
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 const mockState: Record<string, any> = reactive({
@@ -300,6 +301,23 @@ describe("ViewDashboard time range gate", () => {
       expect(refreshButton().props("variant")).toBe("outline");
       expect(routerReplace).not.toHaveBeenCalled();
     });
+  });
+
+  it("keeps the yellow Refresh and applies a waiting range in layout edit mode", async () => {
+    await mountDashboard();
+    wrapper.vm.enterLayoutEdit();
+    await flushPromises();
+    expect(wrapper.vm.isEditingLayout).toBe(true);
+
+    await pick(relative("1h"));
+    expect(refreshButton().props("variant")).toBe("warning");
+
+    refreshButton().vm.$emit("click");
+    await flushPromises();
+
+    expect(wrapper.vm.selectedDate.relativeTimePeriod).toBe("1h");
+    expect(refreshButton().props("variant")).toBe("outline");
+    expect(wrapper.vm.isEditingLayout).toBe(true);
   });
 
   it("names both the time range and variables when both wait", async () => {

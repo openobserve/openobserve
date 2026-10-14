@@ -114,3 +114,31 @@ export default function useViewTraceAction(t: TranslateFn, searchObj: SearchObje
     filterStreamFn,
   };
 }
+
+export function traceDetailsLocation(
+  log: Record<string, any>,
+  state: {
+    zoConfig: { timestamp_column: string };
+    selectedOrganization: { identifier: string };
+    organizationData: {
+      organizationSettings: { trace_id_field_name: string; span_id_field_name: string };
+    };
+  },
+  traceStream: string,
+) {
+  const timestamp = log[state.zoConfig.timestamp_column];
+  const settings = state.organizationData.organizationSettings;
+  return {
+    name: "traceDetails",
+    query: {
+      stream: traceStream,
+      from: timestamp - 900000000,
+      to: timestamp + 900000000,
+      refresh: 0,
+      org_identifier: state.selectedOrganization.identifier,
+      trace_id: log[settings.trace_id_field_name],
+      reload: "true",
+    },
+    span_id: log[settings.span_id_field_name],
+  };
+}

@@ -13,9 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, watch, reactive, toRefs, onMounted, onUnmounted, toRaw, markRaw } from "vue";
+import {
+  ref,
+  watch,
+  reactive,
+  toRefs,
+  onMounted,
+  onUnmounted,
+  toRaw,
+  markRaw,
+  inject,
+  hasInjectionContext,
+} from "vue";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 
 import { usePanelCache } from "./usePanelCache";
 import { usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
@@ -30,6 +42,7 @@ import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
+import { DASHBOARD_FRESH_PANEL_TIME } from "./dashboardFreshPanelTime";
 import { parseSearchError } from "@/utils/query/searchError";
 import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
 
@@ -67,6 +80,12 @@ export const usePanelDataLoader = (
     }
   };
   let runCount = 0;
+
+  const resolveFreshPanelTime = hasInjectionContext()
+    ? inject(DASHBOARD_FRESH_PANEL_TIME, undefined)
+    : undefined;
+  // A variable change reloads without a new time prop, so that reload resolves its own.
+  let isVariablesTriggeredLoad = false;
 
   const store = useStore();
 
@@ -361,6 +380,25 @@ export const usePanelDataLoader = (
     if (!keptRestoredResult) saveCurrentStateToCache();
   };
 
+  // Aborting the controller only stops the client; the superseded searches keep running server-side until cancelled.
+  const cancelSupersededSearches = () => {
+    const traceIds = state.searchRequestTraceIds ?? [];
+    if (!traceIds.length) return;
+    const orgId = store?.state?.selectedOrganization?.identifier;
+    state.searchRequestTraceIds = [];
+    try {
+      traceIds.forEach((traceId: string) => {
+        cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId });
+      });
+      // The query manager cancel route exists only in enterprise and cloud builds; OSS answers 404.
+      if (config.isEnterprise == "true" || config.isCloud == "true") {
+        queryService.delete_running_queries(orgId, traceIds)?.catch?.(() => {});
+      }
+    } catch (error) {
+      console.error("Error cancelling superseded searches:", error);
+    }
+  };
+
   const loadData = async () => {
     const loadCall = ++latestLoadCall;
     log("[usePanelDataLoader] " + panelSchema?.value?.title + ": loadData() PROCEEDING");
@@ -378,6 +416,7 @@ export const usePanelDataLoader = (
       // Check and abort the previous call if necessary
       if (abortController) {
         log("loadData: aborting previous function call (if any)");
+        cancelSupersededSearches();
         abortController.abort();
       }
 
@@ -452,7 +491,10 @@ export const usePanelDataLoader = (
 
       log("loadData: good to go... starting query executions...");
 
-      const timestamps = selectedTimeObj.value;
+      const timestamps =
+        (isVariablesTriggeredLoad && resolveFreshPanelTime?.(panelSchema.value.id)) ||
+        selectedTimeObj.value;
+      isVariablesTriggeredLoad = false;
 
       let startISOTimestamp: any;
       let endISOTimestamp: any;
@@ -718,6 +760,7 @@ export const usePanelDataLoader = (
       }
 
       if (variablesDataUpdated()) {
+        isVariablesTriggeredLoad = true;
         loadData();
       }
     },

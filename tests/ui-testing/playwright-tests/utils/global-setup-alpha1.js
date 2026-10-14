@@ -125,12 +125,7 @@ async function globalSetup() {
     } catch (error) {
       lastError = error;
 
-      const debugDir = path.join(__dirname, '..', '..', 'test-results');
-      if (!fs.existsSync(debugDir)) {
-        fs.mkdirSync(debugDir, { recursive: true });
-      }
-      const screenshotPath = path.join(debugDir, `debug-alpha1-login-attempt${attempt}.png`);
-      await page.screenshot({ path: screenshotPath }).catch(() => {});
+      await saveSetupDebug(page, attempt, error);
 
       if (attempt < maxAttempts) {
         testLogger.warn(`[alpha1] Attempt ${attempt} failed: ${error.message}. Retrying...`);
@@ -149,6 +144,25 @@ async function globalSetup() {
   }
 
   throw lastError;
+}
+
+/**
+ * Save screenshot + DOM + URL for a failed setup attempt to setup-debug/ (outside
+ * test-results/, which Playwright wipes per invocation). Uploaded by the CI workflow.
+ */
+async function saveSetupDebug(page, attempt, error) {
+  const debugDir = path.join(__dirname, '..', '..', 'setup-debug');
+  const base = path.join(debugDir, `${process.env.ORGNAME || 'default'}-user${USER_INDEX}-attempt${attempt}`);
+  try {
+    fs.mkdirSync(debugDir, { recursive: true });
+    await page.screenshot({ path: `${base}.png`, fullPage: true }).catch(() => {});
+    const html = await page.content().catch(() => '');
+    fs.writeFileSync(`${base}.html`, html);
+    fs.writeFileSync(`${base}.txt`, `url: ${page.url()}\ntime: ${new Date().toISOString()}\nerror: ${error && error.message}\n`);
+    testLogger.info(`[alpha1] Setup debug saved: ${base}.{png,html,txt}`);
+  } catch (e) {
+    testLogger.warn(`[alpha1] Could not save setup debug: ${e.message}`);
+  }
 }
 
 /**

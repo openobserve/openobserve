@@ -22,6 +22,7 @@ import destinationService from "@/services/alert_destination";
 import incidentsService from "@/services/incidents";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
+import { resetListViewState, useListViewState } from "@/composables/useListViewState";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
 
 vi.mock("@/services/oncall", () => ({
@@ -122,8 +123,16 @@ const stubs = {
       "columnVisibility",
       "rowSection",
       "sectionOrder",
+      "currentPage",
+      "pageSize",
     ],
-    emits: ["update:selectedIds"],
+    emits: [
+      "update:selectedIds",
+      "update:currentPage",
+      "update:pageSize",
+      "update:sortBy",
+      "update:sortOrder",
+    ],
     // Sections are resolved the way the real component resolves them, so these
     // tests exercise the view's own `rowSection` rather than a stub's guess.
     computed: {
@@ -246,6 +255,9 @@ const team = {
   created_at: 0,
   updated_at: 0,
 };
+
+// File-level so every describe starts from an empty saved view.
+beforeEach(() => resetListViewState());
 
 function render() {
   return mountTracked(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
@@ -1000,6 +1012,71 @@ describe("OnCallResponses", () => {
         params: { teamId: "team_1" },
       }),
     );
+  });
+
+  describe("list view state", () => {
+    const seed = () =>
+      useListViewState("oncall-responses", {
+        search: "",
+        teamFilter: "all",
+        priorityFilter: "all",
+        mineOnly: false,
+        grouped: true,
+        activeFilter: "all",
+        causeFilter: "",
+        currentPage: 1,
+        pageSize: 20,
+        sortBy: "last_alert_at",
+        sortOrder: "desc",
+      }) as Record<string, unknown>;
+
+    const tabs = (w: VueWrapper) =>
+      w
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((c) => c.attributes("data-test") === "oncall-responses-filter-tabs")!;
+
+    it("restores the filter tab, page, page size and sort", async () => {
+      Object.assign(seed(), {
+        activeFilter: "ringing",
+        teamFilter: "team_1",
+        grouped: false,
+        currentPage: 2,
+        pageSize: 50,
+        sortBy: "priority",
+        sortOrder: "asc",
+      });
+      const wrapper = await withPages([page({ id: "a" })]);
+
+      expect(tabs(wrapper).props("modelValue")).toBe("ringing");
+      const table = wrapper.findComponent({ name: "OTable" });
+      expect(table.props("currentPage")).toBe(2);
+      expect(table.props("pageSize")).toBe(50);
+      expect(table.props("sortBy")).toBe("priority");
+      expect(table.props("sortOrder")).toBe("asc");
+    });
+
+    it("saves tab and table changes and resets the page on a filter change", async () => {
+      const wrapper = await withPages([page({ id: "a" })]);
+      const table = wrapper.findComponent({ name: "OTable" });
+      table.vm.$emit("update:currentPage", 3);
+      table.vm.$emit("update:sortBy", "priority");
+      await flushPromises();
+
+      tabs(wrapper).vm.$emit("update:modelValue", "handled");
+      await flushPromises();
+
+      const saved = seed();
+      expect(saved.sortBy).toBe("priority");
+      expect(saved.activeFilter).toBe("handled");
+      expect(saved.currentPage).toBe(1);
+    });
+
+    it("lets ?mine=1 override a saved mine=false", async () => {
+      Object.assign(seed(), { mineOnly: false });
+      routeQuery.mine = "1";
+      await withPages([page({ id: "a" })]);
+      expect(seed().mineOnly).toBe(true);
+    });
   });
 
   /// "My on-call" narrows THIS list. It used to navigate, which threw away

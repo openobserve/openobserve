@@ -27,7 +27,7 @@ export const semanticGroupsQuery = (org: string) =>
   queryOptions({
     queryKey: serviceStreamKeys.semanticGroups(org),
     queryFn: async (): Promise<FieldAlias[]> =>
-      (await serviceStreamsApi.getSemanticGroups(org)).data,
+      (await serviceStreamsApi.getSemanticGroups(org)).data ?? [],
     staleTime: MEDIUM_STALE_TIME,
     retry: false,
   });

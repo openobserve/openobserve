@@ -15,19 +15,23 @@ const WAITING_REFRESH_BUTTONS = [
 
 /**
  * Applies the range just picked in the open date-time picker, with or without Auto Run.
- * Pickers that still have Apply (the Add/Edit panel page) get it clicked. Dashboard, panel and
- * View Panel pickers have none: closing the picker applies with Auto Run on; with Auto Run off
- * the picked range waits and the Refresh it marked yellow applies it.
+ * A picker that still has Apply gets it clicked. Otherwise the picker is closed (which applies with
+ * Auto Run on), then the panel editor's Apply runs it, or on a dashboard the Refresh it marked yellow.
  */
-export async function applyPickedTimeRange(page) {
-  const applyBtn = page.locator('[data-test="date-time-apply-btn"]');
-  if (await applyBtn.count()) {
-    await applyBtn.first().evaluate((el) => el.click());
+export async function applyPickedDateTime(page) {
+  const pickerApply = page.locator('[data-test="date-time-apply-btn"]');
+  if (await pickerApply.count()) {
+    await pickerApply.first().evaluate((el) => el.click());
     return;
   }
-
   await page.keyboard.press("Escape");
   await page.locator("#date-time-menu").first().waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
+
+  const panelApply = page.locator('[data-test="dashboard-apply"]').first();
+  if (await panelApply.count()) {
+    await panelApply.click({ timeout: 10000 }).catch(() => panelApply.evaluate((el) => el.click()));
+    return;
+  }
 
   for (const selector of WAITING_REFRESH_BUTTONS) {
     const refreshBtn = page.locator(selector).first();
@@ -60,6 +64,6 @@ export default class DateTimeHelper {
 
     // Use JS click — the dropdown can extend outside the viewport in the new layout
     await relBtn.evaluate((el) => el.click());
-    await applyPickedTimeRange(this.page);
+    await applyPickedDateTime(this.page);
   }
 }
