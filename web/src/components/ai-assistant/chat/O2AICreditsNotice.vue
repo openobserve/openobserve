@@ -42,9 +42,10 @@
         </div>
       </template>
     </div>
+    <!-- While credits remain it is a quiet link: Plans is where an org subscribes or, where allowed, turns on paid usage. -->
     <OButton
-      v-if="exhausted && !usage!.requires_additional_credits"
-      variant="primary"
+      v-if="!usage!.requires_additional_credits"
+      :variant="exhausted ? 'primary' : 'ghost'"
       size="xs"
       data-test="o2-ai-credits-plans"
       @click="openPlans"
@@ -59,15 +60,6 @@
       @click="contactSales"
     >
       {{ t("billing.contactLabel") }}
-    </OButton>
-    <OButton
-      v-if="!exhausted"
-      variant="ghost"
-      size="xs"
-      data-test="o2-ai-credits-paid-usage"
-      @click="openPaidUsage"
-    >
-      {{ t("paidUsage.managePaidUsage") }}
     </OButton>
     <OButton
       v-if="exhausted"
@@ -118,11 +110,6 @@ async function refresh() {
 }
 
 function openPlans() {
-  void router.push({ name: "plans", query: { org_identifier: orgId.value } });
-}
-
-// Opting in before the last credit is how an org avoids a mid-task consent prompt.
-function openPaidUsage() {
   void router.push({ name: "plans", query: { org_identifier: orgId.value } });
 }
 

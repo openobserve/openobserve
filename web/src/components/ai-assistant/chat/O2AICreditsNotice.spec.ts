@@ -79,6 +79,15 @@ describe("O2AICreditsNotice", () => {
     expect(w.text()).toBe("");
   });
 
+  it("offers Plans from the warning, without promising a paid-usage switch", async () => {
+    mockGetAiUsage.mockResolvedValue(usage({ credits_used: 4, credits_remaining: 1 }));
+    const w = await mountNotice();
+    expect(w.text()).not.toContain("Turn on paid usage");
+
+    await w.find('[data-test="o2-ai-credits-plans"]').trigger("click");
+    expect(mockPush).toHaveBeenCalledWith({ name: "plans", query: { org_identifier: "org1" } });
+  });
+
   it("names a member's payer by its name, not its identifier", async () => {
     mockGetAiUsage.mockResolvedValue(
       usage({
