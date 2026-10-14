@@ -24,10 +24,18 @@ const client = () =>
     baseURL: store.state.API_ENDPOINT || "",
   });
 
+// 304 answers a matching If-None-Match and 202 a build still running; both are normal replies, not errors.
+const acceptsNotModified = (status: number) => (status >= 200 && status < 300) || status === 304;
+
 const public_dashboards = {
   getConfig: (slug: string) => client().get(`/api/public_dashboards/${slug}`),
-  getData: (slug: string, rangeKey: string) =>
-    client().get(`/api/public_dashboards/${slug}/data`, { params: { range: rangeKey } }),
+  /** `rev` is the body already on screen; the server answers 304 while it is still current. */
+  getData: (slug: string, rangeKey: string, rev?: string) =>
+    client().get(`/api/public_dashboards/${slug}/data`, {
+      params: { range: rangeKey },
+      headers: rev ? { "If-None-Match": `"${rev}"` } : undefined,
+      validateStatus: acceptsNotModified,
+    }),
 };
 
 export default public_dashboards;

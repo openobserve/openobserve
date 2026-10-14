@@ -16,29 +16,30 @@
  Unauthenticated standalone viewer — no app shell, no store user, no OPageLayout
  (deliberate: this page renders for anonymous visitors outside the authed app).
  Panels render through the authed dashboard's own grid (RenderDashboardCharts,
- view-only) fed with pre-built snapshots, so no query ever runs from here.
+ view-only) fed with the server's materialized result, so no query ever runs from here.
 -->
 <template>
   <div class="bg-surface-base flex h-screen flex-col">
     <div
-      v-if="state === 'loading' || state === 'preparing'"
-      class="flex min-h-[60vh] flex-col items-center justify-center gap-3"
-      data-test="dashboards-public-dashboard-loading"
-    >
-      <OSpinner variant="dots" size="lg" />
-      <div v-if="state === 'preparing'" class="text-text-secondary text-sm">
-        {{ t("dashboard.publicDashboard.preparing") }}
-      </div>
-    </div>
-
-    <div
-      v-else-if="errorMessage"
+      v-if="errorMessage"
       class="flex min-h-[60vh] flex-col items-center justify-center px-4"
       data-test="dashboards-public-dashboard-error"
     >
       <OEmptyState size="hero" :illustration="errorIllustration" :title="errorMessage" />
     </div>
 
+    <div
+      v-else-if="!configLoaded"
+      class="flex min-h-[60vh] flex-col items-center justify-center gap-3"
+      data-test="dashboards-public-dashboard-loading"
+    >
+      <OSpinner variant="dots" size="lg" />
+      <div class="text-text-secondary text-sm">
+        {{ t("dashboard.publicDashboard.loading") }}
+      </div>
+    </div>
+
+    <!-- A range that is loading or cooling down keeps the header, so the viewer can still switch range. -->
     <template v-else>
       <OPageHeader
         :title="raw(config.title)"
@@ -62,9 +63,17 @@
           <div class="flex h-8 self-center max-md:hidden">
             <OSeparator vertical />
           </div>
+          <OTag
+            v-if="updatedLabel"
+            :variant="body?.refreshing ? 'warning-soft' : 'default-soft'"
+            class="whitespace-nowrap tabular-nums"
+            data-test="dashboards-public-dashboard-updated"
+          >
+            {{ updatedLabel }}
+          </OTag>
           <span
             v-if="nextRefreshLabel"
-            class="text-text-secondary text-sm whitespace-nowrap tabular-nums"
+            class="text-text-secondary text-sm whitespace-nowrap tabular-nums max-md:hidden"
             data-test="dashboards-public-dashboard-next-refresh"
           >
             {{ nextRefreshLabel }}
@@ -95,7 +104,37 @@
         </template>
       </OPageHeader>
 
+      <div v-if="failureNote" class="px-page-edge pt-2">
+        <OBanner
+          variant="warning"
+          icon="warning"
+          dense
+          :content="failureNote"
+          data-test="dashboards-public-dashboard-refresh-failed"
+        />
+      </div>
+
+      <div
+        v-if="state === 'loading' || state === 'building'"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3"
+        data-test="dashboards-public-dashboard-loading"
+      >
+        <OSpinner variant="dots" size="lg" />
+        <div class="text-text-secondary text-sm">
+          {{ t("dashboard.publicDashboard.loading") }}
+        </div>
+      </div>
+
+      <div
+        v-else-if="state === 'cooldown'"
+        class="flex min-h-0 flex-1 flex-col items-center justify-center px-4"
+        data-test="dashboards-public-dashboard-cooldown"
+      >
+        <OEmptyState size="hero" illustration="schedule" :title="cooldownMessage" />
+      </div>
+
       <RenderDashboardCharts
+        v-else
         class="min-h-0 flex-1"
         :frame="false"
         :view-only="true"
@@ -137,9 +176,11 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import PoweredByOpenObserve from "@/components/common/PoweredByOpenObserve.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { IllustrationName } from "@/lib/core/EmptyState/illustrations";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -151,51 +192,100 @@ import { durationFormatter, formatExactDuration } from "@/utils/formatters";
 import type { PublicLinkRange } from "@/services/public_dashboards_admin";
 import { sortRanges } from "@/components/dashboards/PublicLinkForm.schema";
 import { longRange } from "@/components/dashboards/publicLinkDisplay";
+import {
+  clockOffsetMs,
+  createPoller,
+  retryAfterMs,
+  toLocalMs,
+  type PollOutcome,
+} from "./publicDashboardPolling";
 
-/** A range as the public config lists it, with the key its snapshot is read by. */
+/** A range as the public config lists it, with the key its result is read by. */
 type KeyedRange = PublicLinkRange & { key: string };
+
+/** A panel's entry in the data body (4.4). */
+interface PanelResult {
+  state?: {
+    state?: string;
+    reason?: string;
+    retained?: boolean;
+    partial?: boolean;
+    truncated?: boolean;
+  };
+  intent?: string;
+  built_at?: number;
+  data?: unknown[];
+  metadata?: unknown;
+  resultMetaData?: unknown[];
+}
+
+/** The 200 body of /data (4.4); times are server UTC micros. */
+interface DataBody {
+  rev?: string;
+  built_at?: number | null;
+  window?: { start: number; end: number } | null;
+  refresh_secs?: number;
+  fresh_until?: number | null;
+  stale?: boolean;
+  stale_reason?: string | null;
+  refreshing?: boolean;
+  next_retry_at?: number | null;
+  last_error_at?: number | null;
+  dashboard_updated_at?: number;
+  link_rev?: number;
+  settings_rev?: number;
+  variables?: PublicVariable[];
+  panels?: Record<string, PanelResult>;
+}
+
+/** A frozen value as the public config lists it; scoped ones name their tab or panel. */
+type PublicVariable = { label: string; value: unknown; tab_id?: string; panel_id?: string };
+
+type ViewState =
+  | "loading"
+  | "building"
+  | "ready"
+  | "cooldown"
+  | "notfound"
+  | "expired"
+  | "unavailable"
+  | "ratelimited"
+  | "offline";
 
 const route = useRoute();
 const store = useStore();
 const { t } = useI18nTyped();
 const slug = String(route.params.slug || "");
 
-type ViewState =
-  | "loading"
-  | "ready"
-  | "preparing"
-  | "notfound"
-  | "expired"
-  | "unavailable"
-  | "ratelimited"
-  | "offline";
 const state = ref<ViewState>("loading");
-// Temporary failures in a row; while non-zero the page retries with backoff.
-const failures = ref(0);
 const config = ref<Record<string, any>>({});
-const snapshot = ref<Record<string, any>>({});
+// The body on screen and the range it belongs to; its rev is sent back as If-None-Match.
+const body = ref<DataBody | null>(null);
+const bodyKey = ref<string | null>(null);
 const selectedKey = ref<string | null>(null);
+// Server clock minus local clock, from the last response's Date header.
+const clockOffset = ref(0);
+// Local time a 503 cooldown ends, for its countdown.
+const cooldownUntil = ref<number | null>(null);
 // Anonymous viewers have no saved timezone, so dates read in the browser's.
 const viewerTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 // RenderDashboardCharts and TabList read and switch the active tab through this.
 const selectedTabId = ref<string>("");
 provide("selectedTabId", selectedTabId);
 
+// Date.now() isn't reactive, so countdowns read this ticking copy.
+const nowMs = ref(Date.now());
+
 const tabs = computed<any[]>(() => (Array.isArray(config.value.layout) ? config.value.layout : []));
 const ranges = computed<KeyedRange[]>(() =>
   Array.isArray(config.value?.ranges) ? config.value.ranges : [],
 );
-// Only ranges with a built snapshot can be shown.
-const rangeOptions = computed<KeyedRange[]>(() => {
-  const available: string[] = config.value?.available_keys ?? [];
-  return sortRanges(ranges.value.filter((r) => available.includes(r.key)));
-});
+// Every offered range is selectable at once; a cold one builds when it is read.
+const rangeOptions = computed<KeyedRange[]>(() => sortRanges(ranges.value));
 const selectedRange = computed<KeyedRange | null>(
   () => ranges.value.find((r) => r.key === selectedKey.value) ?? null,
 );
-const builtAt = computed<number | null>(
-  () => snapshot.value?.built_at ?? config.value?.built_at ?? null,
-);
+const intents = computed<Record<string, string>>(() => config.value?.intents ?? {});
 
 // Missing values are filled with the live default before the build, so empty means the picker had nothing.
 const variableValue = (value: unknown): string => {
@@ -205,14 +295,11 @@ const variableValue = (value: unknown): string => {
   return Array.isArray(value) ? value.join(", ") : String(value);
 };
 
-/** A frozen value as the public config lists it; scoped ones name their tab or panel. */
-type PublicVariable = { label: string; value: unknown; tab_id?: string; panel_id?: string };
-
 // Constants are read-only and query nothing, and the grid places each by scope as the live page does.
 const frozenVariables = computed(() => {
-  // The snapshot lists the values its data was built with, including defaults the link never froze.
-  const all: PublicVariable[] = Array.isArray(snapshot.value?.variables)
-    ? snapshot.value.variables
+  // The body lists the values its data was built with, including defaults the link never froze.
+  const all: PublicVariable[] = Array.isArray(body.value?.variables)
+    ? body.value.variables
     : Array.isArray(config.value?.variables)
       ? config.value.variables
       : [];
@@ -236,22 +323,34 @@ const dashboardData = computed(() => ({
   variables: { list: frozenVariables.value },
 }));
 
-// An absolute range's window is fixed; a relative one ends when its snapshot was built.
+// The window the body was built for, as the server reports it.
 const shownWindow = computed<{ startMs: number; endMs: number } | null>(() => {
-  const range = selectedRange.value;
-  if (!range) return null;
-  if (range.type === "absolute") return { startMs: range.start / 1000, endMs: range.end / 1000 };
-  if (!builtAt.value) return null;
-  const endMs = builtAt.value / 1000;
-  return { startMs: endMs - range.secs * 1000, endMs };
+  const w = body.value?.window;
+  return w ? { startMs: w.start / 1000, endMs: w.end / 1000 } : null;
 });
 
-// The window the snapshot was built for, so any time-aware chrome matches the data.
+// Any time-aware chrome matches the data.
 const currentTimeObj = computed(() => {
   const endMs = shownWindow.value?.endMs ?? Date.now();
   const startMs = shownWindow.value?.startMs ?? endMs;
   return { __global: { start_time: new Date(startMs), end_time: new Date(endMs) } };
 });
+
+const clockTime = (micros: number): string =>
+  new Date(micros / 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+
+// Under an hour reads m:ss; longer waits read as hours and minutes.
+const countdown = (ms: number): string => {
+  const secs = Math.max(0, Math.ceil(ms / 1000));
+  if (secs >= 3600) return durationFormatter(secs);
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+};
+
+// A server time as milliseconds left on the server's own clock.
+const msUntil = (micros: number | null | undefined): number | null => {
+  const at = toLocalMs(micros, clockOffset.value);
+  return at === null ? null : at - nowMs.value;
+};
 
 const emptyPanelData = () => ({ data: [], metadata: { queries: [] }, resultMetaData: [] });
 
@@ -261,8 +360,23 @@ const panelNotice = (message: I18nText) => ({
   errorDetail: { message, code: "403" },
 });
 
-// Markdown and HTML carry their content in the layout, so they need no snapshot.
+// Markdown and HTML carry their content in the layout, so they need no result.
 const CONTENT_PANEL_TYPES = ["markdown", "html"];
+
+const rowCount = (data: unknown[] | undefined): number =>
+  Math.max(0, ...(data ?? []).map((rows) => (Array.isArray(rows) ? rows.length : 0)));
+
+// A truncated panel says how many rows it kept; a retained one shows its own build time, dimmed.
+const panelBadge = (result: PanelResult): I18nText | undefined => {
+  if (result.state?.retained && result.built_at) {
+    return t("dashboard.publicDashboard.panelFrom", { time: raw(clockTime(result.built_at)) });
+  }
+  const rows = rowCount(result.data);
+  if (result.state?.truncated && rows > 0) {
+    return t("dashboard.publicDashboard.panelTruncated", { count: rows.toLocaleString() }, rows);
+  }
+  return undefined;
+};
 
 const panelEntry = (panel: { id: string; type?: string }) => {
   if (CONTENT_PANEL_TYPES.includes(panel.type ?? "")) return emptyPanelData();
@@ -270,20 +384,31 @@ const panelEntry = (panel: { id: string; type?: string }) => {
   if (panel.type === "custom_chart") {
     return panelNotice(t("dashboard.publicDashboard.panelNotAvailable"));
   }
-  const snap = snapshot.value?.panels?.[panel.id];
-  // A panel added since the last build has no entry until the next rebuild.
-  if (!snap) return panelNotice(t("dashboard.publicDashboard.panelPreparing"));
-  if (snap.state?.state !== "ok") {
-    return panelNotice(t("dashboard.publicDashboard.panelNotAvailable"));
+  const result = body.value?.panels?.[panel.id];
+  // A panel added since the last build has no entry until the next one.
+  if (!result) return panelNotice(t("dashboard.publicDashboard.panelPreparing"));
+  if (result.state?.state !== "ok") {
+    return panelNotice(
+      result.state?.reason === "changed"
+        ? t("dashboard.publicDashboard.panelPreparing")
+        : t("dashboard.publicDashboard.panelNotAvailable"),
+    );
+  }
+  // The server masks a changed query too; this keeps a layout and a result of different intents apart.
+  if (result.intent !== intents.value[panel.id]) {
+    return panelNotice(t("dashboard.publicDashboard.panelPreparing"));
   }
   return {
-    data: snap.data ?? [],
-    metadata: snap.metadata ?? { queries: [] },
-    resultMetaData: snap.resultMetaData ?? [],
+    data: result.data ?? [],
+    metadata: result.metadata ?? { queries: [] },
+    resultMetaData: result.resultMetaData ?? [],
+    isPartialData: !!result.state?.partial,
+    dimmed: !!result.state?.retained,
+    notice: panelBadge(result),
   };
 };
 
-// Each panel renders its snapshot instead of querying.
+// Each panel renders the materialized result instead of querying.
 const injectedPanelData = computed(() => {
   const out: Record<string, unknown> = {};
   for (const tab of tabs.value) {
@@ -301,7 +426,7 @@ function rangeLabel(range: PublicLinkRange): I18nText {
   return longRange(range, t, viewerTimezone);
 }
 
-// Start → end of the window the shown snapshot covers; spans of a day or more show the date too.
+// Start → end of the window the shown body covers; spans of a day or more show the date too.
 const windowLabel = computed<I18nText | "">(() => {
   if (!shownWindow.value) return "";
   const { startMs, endMs } = shownWindow.value;
@@ -313,20 +438,47 @@ const windowLabel = computed<I18nText | "">(() => {
   return t("dashboard.publicDashboard.window", { start: fmt(startMs), end: fmt(endMs) });
 });
 
-const selectRange = async (key: string) => {
-  selectedKey.value = key;
-  await loadData();
-  scheduleRefresh();
-};
+const updatedLabel = computed<I18nText | "">(() => {
+  const builtAt = body.value?.built_at;
+  if (!builtAt) return "";
+  const time = raw(clockTime(builtAt));
+  return body.value?.refreshing
+    ? t("dashboard.publicDashboard.updatedRefreshing", { time })
+    : t("dashboard.publicDashboard.updatedAt", { time });
+});
 
-const pickDefaultRange = (): string | null => {
-  const def: string | undefined = config.value?.default_key;
-  if (def && rangeOptions.value.some((r) => r.key === def)) return def;
-  return rangeOptions.value[0]?.key ?? null;
-};
+// Counts down to fresh_until on the server's clock; an absolute range has none.
+const nextRefreshLabel = computed<I18nText | "">(() => {
+  if (!body.value || body.value.refreshing) return "";
+  const left = msUntil(body.value.fresh_until);
+  if (left === null || left <= 0) return "";
+  return t("dashboard.publicDashboard.nextRefreshIn", { time: raw(countdown(left)) });
+});
 
-const TRANSIENT_STATES: ViewState[] = ["unavailable", "ratelimited", "offline"];
-const RETRY_DELAYS_MS = [5_000, 10_000, 30_000, 60_000];
+const failureNote = computed<I18nText | null>(() => {
+  const failedAt = body.value?.last_error_at;
+  if (!failedAt) return null;
+  const time = raw(clockTime(failedAt));
+  const left = msUntil(body.value?.next_retry_at);
+  return left !== null && left > 0
+    ? t("dashboard.publicDashboard.refreshFailed", { time, next: raw(countdown(left)) })
+    : t("dashboard.publicDashboard.refreshFailedNoRetry", { time });
+});
+
+const refreshSecs = computed(() => Number(body.value?.refresh_secs) || 0);
+const footerNote = computed<I18nText>(() =>
+  refreshSecs.value > 0 && selectedRange.value?.type === "relative"
+    ? t("dashboard.publicDashboard.footerNoteRefresh", {
+        interval: formatExactDuration(refreshSecs.value),
+      })
+    : t("dashboard.publicDashboard.footerNote"),
+);
+
+const cooldownMessage = computed<I18nText>(() =>
+  t("dashboard.publicDashboard.cooldown", {
+    time: raw(countdown((cooldownUntil.value ?? nowMs.value) - nowMs.value)),
+  }),
+);
 
 const ERROR_MESSAGES: Partial<Record<ViewState, () => I18nText>> = {
   notfound: () => t("dashboard.publicDashboard.notAvailable"),
@@ -347,52 +499,10 @@ const errorIllustration = computed<IllustrationName>(
   () => ERROR_ILLUSTRATIONS[state.value] ?? "broken-panel",
 );
 
-// Only 404 and 410 are final; a paused link, a rate limit or a network error can clear up.
-const errorState = (e: unknown): ViewState => {
-  const status = (e as { response?: { status?: number } })?.response?.status;
-  if (status === 410) return "expired";
-  if (status === 503) return "unavailable";
-  if (status === 429) return "ratelimited";
-  if (status === undefined || status >= 500) return "offline";
-  return "notfound";
-};
-
-const mapError = (e: unknown) => {
-  const next = errorState(e);
-  if (!TRANSIENT_STATES.includes(next)) {
-    failures.value = 0;
-    state.value = next;
-    return;
-  }
-  failures.value += 1;
-  // A hiccup keeps the last data on screen; a paused link must stop showing it.
-  if (state.value !== "ready" || next === "unavailable") state.value = next;
-};
-
-// Each read takes the next id, so a slower reply for a range switched away from is dropped.
-let dataRequestId = 0;
-
-const loadData = async () => {
-  const requestId = ++dataRequestId;
-  // No preset resolved yet means no snapshot has been built, so show "preparing" instead of a spinner.
-  if (selectedKey.value === null) {
-    state.value = "preparing";
-    return;
-  }
-  try {
-    const res = await publicDashboardsService.getData(slug, selectedKey.value);
-    if (requestId !== dataRequestId) return;
-    if (res.status === 202) {
-      failures.value = 0;
-      state.value = "preparing";
-      return;
-    }
-    snapshot.value = res.data ?? {};
-    failures.value = 0;
-    state.value = "ready";
-  } catch (e: unknown) {
-    if (requestId === dataRequestId) mapError(e);
-  }
+const pickDefaultRange = (): string | null => {
+  const def: string | undefined = config.value?.default_key;
+  if (def && rangeOptions.value.some((r) => r.key === def)) return def;
+  return rangeOptions.value[0]?.key ?? null;
 };
 
 // Anonymous viewers only get the minimal /config bootstrap, which lacks the timestamp column the renderer needs.
@@ -416,91 +526,157 @@ const applyConfig = (next: Record<string, any>) => {
   }
 };
 
-const load = async () => {
-  try {
-    const res = await publicDashboardsService.getConfig(slug);
-    applyConfig(res.data ?? {});
+const STALE_CONFIG_REASONS = ["dashboard", "link", "settings"];
+// One config read per body rev at most, so a body that stays behind can't repeat it every poll.
+let configSyncedRev: string | undefined;
+
+const configBehind = (b: DataBody): boolean => {
+  if (b.rev !== undefined && b.rev === configSyncedRev) return false;
+  const newer = (field: "dashboard_updated_at" | "link_rev" | "settings_rev") =>
+    (b[field] ?? 0) > (config.value?.[field] ?? 0);
+  return (
+    newer("dashboard_updated_at") ||
+    newer("link_rev") ||
+    newer("settings_rev") ||
+    STALE_CONFIG_REASONS.includes(b.stale_reason ?? "")
+  );
+};
+
+const configLoaded = ref(false);
+
+const loadConfig = async () => {
+  const res = await publicDashboardsService.getConfig(slug);
+  applyConfig(res.data ?? {});
+  configLoaded.value = true;
+  if (!ranges.value.some((r) => r.key === selectedKey.value)) {
     selectedKey.value = pickDefaultRange();
-    await loadData();
-  } catch (e: unknown) {
-    mapError(e);
   }
 };
 
-let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-const refreshSecs = computed(() => Number(config.value?.refresh_secs) || 0);
-const hasRelative = computed(() => ranges.value.some((r) => r.type === "relative"));
-// An absolute range's data never changes, so it shows no countdown and is not aimed at rebuilds.
-const rebuildsSelection = computed(
-  () => refreshSecs.value > 0 && selectedRange.value?.type !== "absolute",
-);
-const footerNote = computed<I18nText>(() =>
-  refreshSecs.value > 0 && hasRelative.value
-    ? t("dashboard.publicDashboard.footerNoteRefresh", {
-        interval: formatExactDuration(refreshSecs.value),
-      })
-    : t("dashboard.publicDashboard.footerNote"),
-);
+const responseOf = (e: unknown) =>
+  (e as { response?: { status?: number; headers?: Record<string, unknown>; data?: any } })
+    ?.response;
 
-// Config is re-read before data so every read also sees a paused, revoked, expired or edited link.
-const refresh = async () => {
+// Each read takes the next id, so a slower reply for a range switched away from is dropped.
+let dataRequestId = 0;
+
+const bodyOutcome = (b: DataBody, hintMs: number | null): PollOutcome => {
+  const due = [b.fresh_until, b.next_retry_at]
+    .map((at) => toLocalMs(at, clockOffset.value))
+    .filter((at): at is number => at !== null && at > Date.now());
+  return {
+    kind: "body",
+    refreshing: !!b.refreshing,
+    hintMs,
+    dueAtMs: due.length ? Math.min(...due) : null,
+  };
+};
+
+// A failed read keeps what is on screen, except a paused link, which must stop showing it.
+const failedRead = (e: unknown, shown: boolean): PollOutcome => {
+  const res = responseOf(e);
+  const localNow = Date.now();
+  if (res?.headers) clockOffset.value = clockOffsetMs(res.headers, localNow);
+  const hint = retryAfterMs(res?.headers, clockOffset.value, localNow);
+  const status = res?.status;
+  if (status === 410 || (status !== undefined && status < 500 && status !== 429)) {
+    state.value = status === 410 ? "expired" : "notfound";
+    return { kind: "final" };
+  }
+  if (status === 429) {
+    if (!shown) state.value = "ratelimited";
+    return { kind: "wait", retryAfterMs: hint, client: true };
+  }
+  if (status === 503 && res?.data?.state === "cooldown") {
+    const until = hint ?? msUntil(res.data.next_retry_at);
+    cooldownUntil.value = until === null ? null : localNow + until;
+    if (!shown) state.value = "cooldown";
+    return { kind: "wait", retryAfterMs: hint };
+  }
+  if (status === 503) {
+    body.value = null;
+    state.value = "unavailable";
+    return { kind: "wait", retryAfterMs: hint };
+  }
+  if (!shown) state.value = "offline";
+  return { kind: "error" };
+};
+
+// One read of /data, with the config read first on the first load and whenever the body is newer.
+const check = async (): Promise<PollOutcome> => {
+  const requestId = ++dataRequestId;
+  const shown = () =>
+    state.value === "ready" && !!body.value && bodyKey.value === selectedKey.value;
   try {
-    const res = await publicDashboardsService.getConfig(slug);
-    applyConfig(res.data ?? {});
-    // The author may have removed the viewer's range, whose snapshot then never arrives.
-    if (!rangeOptions.value.some((r) => r.key === selectedKey.value)) {
-      selectedKey.value = pickDefaultRange();
+    if (!configLoaded.value) await loadConfig();
+    const key = selectedKey.value;
+    if (!key) {
+      state.value = "notfound";
+      return { kind: "final" };
     }
-    await loadData();
+    const current = shown() ? body.value : null;
+    const res = await publicDashboardsService.getData(slug, key, current?.rev);
+    if (requestId !== dataRequestId) return { kind: "error" };
+    const localNow = Date.now();
+    clockOffset.value = clockOffsetMs(res.headers, localNow);
+    const hint = retryAfterMs(res.headers, clockOffset.value, localNow);
+    if (res.status === 202) {
+      if (!current) state.value = "building";
+      return { kind: "wait", retryAfterMs: hint };
+    }
+    // 304 keeps the body on screen.
+    if (res.status !== 304 || !current) {
+      body.value = res.data ?? {};
+      bodyKey.value = key;
+    }
+    state.value = "ready";
+    const next = body.value as DataBody;
+    if (configBehind(next)) {
+      configSyncedRev = next.rev;
+      await loadConfig();
+      // The author removed this range; the default's result replaces it.
+      if (selectedKey.value !== key) {
+        showRange(selectedKey.value);
+        return { kind: "error" };
+      }
+    }
+    return bodyOutcome(next, hint);
   } catch (e: unknown) {
-    mapError(e);
+    if (requestId !== dataRequestId) return { kind: "error" };
+    // An edit can drop the range on screen; the config says whether the link itself is gone.
+    if (responseOf(e)?.status === 404 && configLoaded.value) {
+      const key = selectedKey.value;
+      try {
+        await loadConfig();
+      } catch (configError: unknown) {
+        return failedRead(configError, false);
+      }
+      if (selectedKey.value !== key) {
+        showRange(selectedKey.value);
+        return { kind: "error" };
+      }
+    }
+    return failedRead(e, shown());
   }
 };
 
-// Grace past the rebuild's due time so the read lands after the new snapshot is written.
-const REBUILD_GRACE_MS = 2000;
-// The first snapshot lands within seconds of publishing, so waiting a whole cadence would strand the page.
-const PREPARING_POLL_MS = 5000;
-// A late rebuild is re-checked this often, so the countdown doesn't sit at "Refreshing" for a whole cadence.
-const OVERDUE_POLL_MS = 15000;
-// A pause, revoke, expiry or edit must reach every open page this soon, whatever the cadence or range.
-const STATUS_CHECK_MS = 60000;
-const FINAL_STATES: ViewState[] = ["notfound", "expired"];
+const poller = createPoller({ check, isHidden: () => document.hidden });
 
-// Date.now() isn't reactive, so the countdown reads this ticking copy.
-const nowMs = ref(Date.now());
-let clockTimer: ReturnType<typeof setInterval> | null = null;
-const nextRefreshLabel = computed<I18nText | "">(() => {
-  if (!builtAt.value || !rebuildsSelection.value) return "";
-  const left = Math.ceil((builtAt.value / 1000 + refreshSecs.value * 1000 - nowMs.value) / 1000);
-  return left > 0
-    ? t("dashboard.publicDashboard.nextRefreshIn", { time: raw(durationFormatter(left)) })
-    : t("dashboard.publicDashboard.refreshingNow");
-});
+// The result on screen belongs to the range left behind, so it goes with it.
+function showRange(key: string | null) {
+  selectedKey.value = key;
+  body.value = null;
+  bodyKey.value = null;
+  state.value = "loading";
+  poller.start();
+}
 
-// Aim the next read just after the next rebuild is due, never later than the status check; overdue re-checks sooner, failed backs off.
-const nextRefreshDelay = (): number => {
-  if (failures.value > 0) {
-    return RETRY_DELAYS_MS[Math.min(failures.value, RETRY_DELAYS_MS.length) - 1];
-  }
-  if (state.value === "preparing") return PREPARING_POLL_MS;
-  if (!rebuildsSelection.value || !builtAt.value) return STATUS_CHECK_MS;
-  const cadenceMs = refreshSecs.value * 1000;
-  const due = builtAt.value / 1000 + cadenceMs + REBUILD_GRACE_MS - Date.now();
-  if (due <= 0) return Math.min(cadenceMs, OVERDUE_POLL_MS);
-  // Also keeps a month-long cadence under setTimeout's ~24.8-day limit, past which it fires at once.
-  return Math.min(due, STATUS_CHECK_MS);
+const selectRange = (key: string) => {
+  if (key !== selectedKey.value) showRange(key);
 };
 
-const scheduleRefresh = () => {
-  if (refreshTimer) clearTimeout(refreshTimer);
-  if (FINAL_STATES.includes(state.value)) return;
-  refreshTimer = setTimeout(async () => {
-    // Paused while the tab is hidden, so a background tab never polls.
-    if (!document.hidden) await refresh();
-    scheduleRefresh();
-  }, nextRefreshDelay());
-};
+// Polling pauses while hidden and checks at once on return, so pause, revoke and edits still arrive.
+const onVisibilityChange = () => (document.hidden ? poller.hidden() : poller.visible());
 
 // The slug is a bearer secret: keep the page out of search indexes and outgoing Referer headers.
 const PRIVACY_META: Array<[string, string]> = [
@@ -508,8 +684,9 @@ const PRIVACY_META: Array<[string, string]> = [
   ["referrer", "no-referrer"],
 ];
 const addedMeta: HTMLMetaElement[] = [];
+let clockTimer: ReturnType<typeof setInterval> | null = null;
 
-onMounted(async () => {
+onMounted(() => {
   for (const [name, content] of PRIVACY_META) {
     const meta = document.createElement("meta");
     meta.name = name;
@@ -518,13 +695,14 @@ onMounted(async () => {
     addedMeta.push(meta);
   }
   clockTimer = setInterval(() => (nowMs.value = Date.now()), 1000);
-  await load();
-  scheduleRefresh();
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  poller.start();
 });
 
 onBeforeUnmount(() => {
-  if (refreshTimer) clearTimeout(refreshTimer);
+  poller.stop();
   if (clockTimer) clearInterval(clockTimer);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
   addedMeta.forEach((meta) => meta.remove());
 });
 </script>

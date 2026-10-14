@@ -2283,6 +2283,23 @@ describe("PanelContainer", () => {
       expect(body.attributes("data-curated-stale")).toBe("true");
     });
 
+    it("shows an injected result's own note and dims it only when it asks to be", () => {
+      wrapper = createWrapper({
+        viewOnly: true,
+        injectedPanelData: { data: [], dimmed: true, notice: "from 12:04" },
+      });
+      expect(wrapper.find('[data-test="dashboard-panel-injected-notice"]').text()).toBe(
+        "from 12:04",
+      );
+      expect(wrapper.find('[data-test="dashboard-panel-body"]').classes()).toContain("opacity-60");
+
+      wrapper = createWrapper({ viewOnly: true, injectedPanelData: { data: [] } });
+      expect(wrapper.find('[data-test="dashboard-panel-injected-notice"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-panel-body"]').classes()).not.toContain(
+        "opacity-60",
+      );
+    });
+
     it("renders NO badge and NO dimming when config.curated_badge is absent", () => {
       // Stored dashboards never carry the key, so the change must be invisible
       // outside curated pages — asserted both ways so a blanket dim can't ship.
