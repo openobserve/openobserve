@@ -281,6 +281,10 @@ macro_rules! _get_variables {
                     if qd.stream.starts_with("$") {
                         continue;
                     }
+                    // "query" variables run their own query and may leave stream/field empty
+                    if v.type_field == "query" || qd.stream.is_empty() || qd.field.is_empty() {
+                        continue;
+                    }
                     $map.entry((qd.stream.clone(), qd.stream_type))
                         .or_default()
                         .push(qd.field.clone());
@@ -1296,5 +1300,32 @@ mod tests {
         let v = serde_json::json!("not-an-object");
         assert_eq!(home_pin_move_target(&v, "abc", "A"), None);
         assert!(!home_pin_should_clear(&v, "abc"));
+    }
+
+    #[test]
+    fn get_query_variables_skips_query_type_and_empty_stream() {
+        let dash: v8::Dashboard = serde_json::from_value(serde_json::json!({
+            "version": 8,
+            "title": "t",
+            "description": "",
+            "variables": {"list": [
+                {"type": "query_values", "name": "a", "label": "a",
+                 "query_data": {"stream_type": "logs", "stream": "default", "field": "host"}},
+                {"type": "query", "name": "b", "label": "b",
+                 "query_data": {"stream_type": "logs", "stream": "", "field": "",
+                                "query_type": "sql", "query": "SELECT 1 AS v", "value_field": "v"}},
+                {"type": "query", "name": "c", "label": "c",
+                 "query_data": {"stream_type": "logs", "stream": "default", "field": "pod",
+                                "query_type": "promql", "query": "label_values(up, pod)"}}
+            ]}
+        }))
+        .unwrap();
+        let dashboard: Dashboard = dash.into();
+        let map = get_query_variables(Some(&dashboard));
+        assert_eq!(map.len(), 1);
+        assert_eq!(
+            map.get(&("default".to_string(), StreamType::Logs)),
+            Some(&vec!["host".to_string()])
+        );
     }
 }
