@@ -34,6 +34,7 @@ use config::{
         cluster::{NodeStatus, Role, RoleGroup},
         function::ZoFunction,
         search::{HashFileRequest, HashFileResponse},
+        slack::DisabledReason,
         user::UserRole,
     },
     stats::{CacheStats, CacheStatsAsync},
@@ -233,6 +234,11 @@ struct ConfigResponse<'a> {
     composite_alerts_available: bool,
     synthetics_enabled: bool,
     oncall_enabled: bool,
+    slack_enabled: bool,
+    /// Why Slack is off for this org (`edition`, `flag`, `allowlist`, ...); null when on.
+    slack_disabled_reason: Option<DisabledReason>,
+    /// The region that runs Slack; set only with super cluster on.
+    slack_home_region: Option<String>,
     /// Enterprise-only private locations; the UI gates their views on this flag.
     synthetics_private_locations_enabled: bool,
     /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
@@ -490,6 +496,12 @@ pub async fn zo_config(
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
     let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
     let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
+    let slack_disabled_reason = enterprise_value!(
+        Some(DisabledReason::Edition),
+        o2_enterprise::enterprise::slack::disabled_reason(&org_id)
+    );
+    let slack_home_region =
+        enterprise_value!(None, o2_enterprise::enterprise::slack::home_region());
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -612,6 +624,9 @@ pub async fn zo_config(
         composite_alerts_available,
         synthetics_enabled,
         oncall_enabled,
+        slack_enabled: slack_disabled_reason.is_none(),
+        slack_disabled_reason,
+        slack_home_region,
         synthetics_private_locations_enabled,
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
@@ -2496,5 +2511,24 @@ mod tests {
             json["ingest_allowed_in_future"],
             cfg.limit.ingest_allowed_in_future
         );
+    }
+
+    #[tokio::test]
+    async fn test_zo_config_reports_slack_per_org() {
+        let response = zo_config(Path("default".to_string()), None)
+            .await
+            .into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let reason = if cfg!(feature = "enterprise") {
+            "flag"
+        } else {
+            "edition"
+        };
+        assert_eq!(json["slack_enabled"], false, "{json}");
+        assert_eq!(json["slack_disabled_reason"], reason, "{json}");
+        assert!(json["slack_home_region"].is_null(), "{json}");
     }
 }
