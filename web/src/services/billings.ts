@@ -23,6 +23,7 @@ export interface AiUsage {
   mode: string;
   requires_additional_credits: boolean;
   payer_org_id?: string | null;
+  payer_org_name?: string | null;
   costs: AiCreditCounts;
   used_by_feature?: AiCreditCounts | null;
 }

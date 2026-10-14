@@ -13,6 +13,8 @@ export type PaidOverageBillingStatus =
 
 export interface PaidOverageOrganizationStatus {
   org_id: string;
+  /** Display name; the server sends it for the payer. */
+  name?: string | null;
   enabled: boolean;
   can_manage: boolean;
 }

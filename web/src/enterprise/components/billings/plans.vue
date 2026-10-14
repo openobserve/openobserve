@@ -68,7 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               aiUsage.requires_additional_credits
                 ? t("billing.aiContractExhaustedMessage")
                 : aiUsage.payer_org_id
-                  ? t("billing.aiPayerSubscribeMessage", { payer: aiUsage.payer_org_id })
+                  ? t("billing.aiPayerSubscribeMessage", {
+                      payer: aiUsage.payer_org_name ?? aiUsage.payer_org_id,
+                    })
                   : t("billing.aiExhaustedMessage")
             }}
             <OButton

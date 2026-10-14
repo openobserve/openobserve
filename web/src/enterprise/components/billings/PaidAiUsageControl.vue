@@ -53,7 +53,7 @@ const hint = computed(() => {
   const s = status.value!;
   if (!s.organization.can_manage) return t("paidUsage.adminsOnly");
   if (s.organization.enabled && !s.effective && s.payer) {
-    return t("paidUsage.waitingForPayer", { payer: s.payer.org_id });
+    return t("paidUsage.waitingForPayer", { payer: s.payer.name ?? s.payer.org_id });
   }
   if (s.effective) {
     return s.payer ? t("paidUsage.payerBillingCycle") : t("paidUsage.organizationBillingCycle");

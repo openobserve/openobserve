@@ -240,6 +240,7 @@ pub(crate) fn ai_authorization_error_response(
             message,
             remedy,
             payer_org_id,
+            payer_org_name,
         } => (
             StatusCode::PAYMENT_REQUIRED,
             Json(serde_json::json!({
@@ -248,6 +249,7 @@ pub(crate) fn ai_authorization_error_response(
                 "error_type": "ai_credits_exhausted",
                 "remedy": remedy,
                 "payer_org_id": payer_org_id,
+                "payer_org_name": payer_org_name,
             })),
         )
             .into_response(),
@@ -274,6 +276,7 @@ fn ai_post_upstream_authorization_error_response(
                 message: "AI credit limit was reached while the request was running.".to_string(),
                 remedy: openobserve_core::trial_quota::PaymentRemedy::Retry,
                 payer_org_id: None,
+                payer_org_name: None,
             })
         }
         error => ai_authorization_error_response(error),
@@ -1724,11 +1727,13 @@ mod tests {
                 feature: "ai_credits".to_string(),
                 organization: PaidOverageOrganizationStatus {
                     org_id: "member".to_string(),
+                    name: None,
                     enabled: false,
                     can_manage: true,
                 },
                 payer: Some(PaidOverageOrganizationStatus {
                     org_id: "payer".to_string(),
+                    name: Some("Payer Org".to_string()),
                     enabled: false,
                     can_manage: false,
                 }),
@@ -1746,6 +1751,9 @@ mod tests {
         assert_eq!(body["consent"]["feature"], "ai_credits");
         assert_eq!(body["consent"]["organization"]["org_id"], "member");
         assert_eq!(body["consent"]["payer"]["org_id"], "payer");
+        assert_eq!(body["consent"]["payer"]["name"], "Payer Org");
+        // An unknown name is left out, so the UI falls back to the identifier.
+        assert!(body["consent"]["organization"].get("name").is_none());
         let serialized = body.to_string();
         assert!(!serialized.contains("ai_chat"));
         assert!(!serialized.contains("new_incident"));
@@ -1770,6 +1778,7 @@ mod tests {
                     message: "out".to_string(),
                     remedy,
                     payer_org_id: Some("payer".to_string()),
+                    payer_org_name: Some("Payer Org".to_string()),
                 });
             assert_eq!(response.status(), StatusCode::PAYMENT_REQUIRED);
             let body = axum::body::to_bytes(response.into_body(), usize::MAX)
@@ -1780,6 +1789,7 @@ mod tests {
             assert_eq!(body["remedy"], expected);
             assert_eq!(body["message"], "out");
             assert_eq!(body["payer_org_id"], "payer");
+            assert_eq!(body["payer_org_name"], "Payer Org");
         }
     }
 

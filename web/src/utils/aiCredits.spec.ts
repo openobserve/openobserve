@@ -42,6 +42,12 @@ describe("aiCredits", () => {
     expect(aiCreditsRemedy(body({ remedy: "subscribe", payer_org_id: "acme" }), gt)).toContain(
       "managed by acme",
     );
+    expect(
+      aiCreditsRemedy(
+        body({ remedy: "subscribe", payer_org_id: "3Kg0acme", payer_org_name: "Acme Payer" }),
+        gt,
+      ),
+    ).toContain("managed by Acme Payer. Ask an admin of Acme Payer");
     expect(aiCreditsRemedy(body({ remedy: "contact_account_manager" }), gt)).toBe(
       "Contact your account manager to add more AI credits",
     );
