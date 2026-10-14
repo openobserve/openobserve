@@ -18,7 +18,7 @@
 use config::meta::oncall::{ChatIdentity, ChatPlatform};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
-    QueryFilter, TransactionTrait,
+    QueryFilter, QueryOrder, TransactionTrait,
 };
 
 use super::entity::oncall_chat_identities::{Column, Entity, Model};
@@ -70,6 +70,15 @@ pub async fn list_linked(
     workspace_id: &str,
 ) -> Result<Vec<ChatIdentity>, errors::Error> {
     list_linked_in(get_orm_client_rw().await, org_id, platform, workspace_id).await
+}
+
+/// The linked rows of an email in every workspace of an org, newest change first. [strong]
+pub async fn list_linked_for_email(
+    org_id: &str,
+    platform: ChatPlatform,
+    user_email: &str,
+) -> Result<Vec<ChatIdentity>, errors::Error> {
+    list_linked_for_email_in(get_orm_client_rw().await, org_id, platform, user_email).await
 }
 
 /// Removes the link; false means there was none. [strong]
@@ -212,6 +221,26 @@ async fn list_linked_in<C: ConnectionTrait>(
         .collect()
 }
 
+/// [`list_linked_for_email`] against a caller-supplied connection.
+async fn list_linked_for_email_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    platform: ChatPlatform,
+    user_email: &str,
+) -> Result<Vec<ChatIdentity>, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Platform.eq(platform.to_i32()))
+        .filter(Column::UserEmail.eq(user_email))
+        .filter(Column::UnlinkedAt.is_null())
+        .order_by_desc(Column::ChangedAt)
+        .all(conn)
+        .await?
+        .into_iter()
+        .map(to_identity)
+        .collect()
+}
+
 /// [`delete`] against a caller-supplied connection.
 async fn delete_in<C: ConnectionTrait>(conn: &C, id: &str) -> Result<bool, errors::Error> {
     let deleted = Entity::delete_by_id(id).exec(conn).await?.rows_affected;
@@ -293,6 +322,35 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(linked, vec![ana]);
+    }
+
+    /// RB-6: an email's linked rows in every workspace of its org, newest change first.
+    #[tokio::test]
+    async fn test_list_linked_for_email_spans_workspaces_newest_first() {
+        let db = db().await;
+        let t1 = identity("l1", "U1", "ana@o2.ai");
+        let t2 = ChatIdentity {
+            workspace_id: "T2".into(),
+            changed_at: 300,
+            ..identity("l2", "U2", "ana@o2.ai")
+        };
+        let unlinked = ChatIdentity {
+            workspace_id: "T3".into(),
+            unlinked_at: Some(200),
+            ..identity("l3", "U3", "ana@o2.ai")
+        };
+        let other_org = ChatIdentity {
+            org_id: "other".into(),
+            ..identity("l4", "U4", "ana@o2.ai")
+        };
+        let bo = identity("l5", "U5", "bo@o2.ai");
+        for row in [&t1, &t2, &unlinked, &other_org, &bo] {
+            put_in(&db, row).await.unwrap();
+        }
+        let linked = list_linked_for_email_in(&db, "acme", ChatPlatform::Slack, "ana@o2.ai")
+            .await
+            .unwrap();
+        assert_eq!(linked, vec![t2, t1]);
     }
 
     #[tokio::test]

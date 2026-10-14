@@ -2170,6 +2170,18 @@ fn oncall_routes(router: Router) -> Router {
             "/{org_id}/oncall/teams/{team_id}/slack/test",
             post(oncall::chat::test_team_slack_channel),
         )
+        .route(
+            "/{org_id}/oncall/chat/slack/link/start",
+            post(oncall::chat::start_slack_link),
+        )
+        .route(
+            "/{org_id}/oncall/chat/slack/link",
+            post(oncall::chat::confirm_slack_link),
+        )
+        .route(
+            "/{org_id}/oncall/chat/identities/me",
+            get(oncall::chat::get_my_chat_identity).delete(oncall::chat::delete_my_chat_identity),
+        )
 }
 
 /// Slack's signed inbound requests, with their own body cap so no other route's limit applies.

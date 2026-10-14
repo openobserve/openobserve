@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Native Slack for on-call: connecting, showing and disconnecting the org's workspace, the
-//! deployment's app manifest URLs, and button presses.
+//! deployment's app manifest URLs, people linking their own Slack account, and button presses.
 
 use axum::{body::Bytes, extract::Path, http::HeaderMap, response::Response};
 use common::meta::http::HttpResponse as MetaHttpResponse;
@@ -48,6 +48,12 @@ const SLACK_TIMESTAMP_HEADER: &str = "x-slack-request-timestamp";
 pub struct ExchangeSlackInstallRequest {
     pub code: String,
     pub state: String,
+}
+
+/// The link token from the linking URL's `?t=`, which the Confirm page posts back.
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct ConfirmSlackLinkRequest {
+    pub t: String,
 }
 
 /// The URL to open in a popup for the admin to approve the Slack app.
@@ -290,6 +296,156 @@ pub async fn test_team_slack_channel(
     }
 }
 
+/// Finds the caller in Slack by their own email and DMs them a Confirm button; nothing is linked.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/chat/slack/link/start",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "StartOnCallSlackLink",
+    summary = "Send yourself a Slack DM to link your Slack account",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "DM sent", content_type = "application/json", body = Object),
+        (status = 400, description = "Slack is not connected", content_type = "application/json", body = Object),
+        (status = 403, description = "Not a member of the organization", content_type = "application/json", body = Object),
+        (status = 404, description = "No Slack account uses your email", content_type = "application/json", body = Object),
+        (status = 409, description = "Slack would not deliver a direct message to you", content_type = "application/json", body = Object),
+        (status = 502, description = "Slack could not be reached", content_type = "application/json", body = Object),
+        (status = 503, description = "Slack is not set up", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn start_slack_link(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::chat::link_flow;
+
+        match link_flow::start(&org_id, &user_email.user_id).await {
+            Ok(()) => MetaHttpResponse::json(serde_json::json!({ "sent": true })),
+            Err(e) => link_refusal(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Links the Slack account a linking URL names to the caller, if Slack confirms the same email.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/chat/slack/link",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ConfirmOnCallSlackLink",
+    summary = "Confirm linking your Slack account",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = ConfirmSlackLinkRequest, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Linked", content_type = "application/json", body = Object),
+        (status = 400, description = "This link can't be used", content_type = "application/json", body = Object),
+        (status = 403, description = "Not a member of the organization", content_type = "application/json", body = Object),
+        (status = 502, description = "Slack could not be reached", content_type = "application/json", body = Object),
+        (status = 503, description = "Slack is not set up", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn confirm_slack_link(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    ValidatedJson(body): ValidatedJson<ConfirmSlackLinkRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::chat::link_flow;
+
+        match link_flow::confirm(&org_id, &user_email.user_id, &body.t).await {
+            Ok(view) => MetaHttpResponse::json(view),
+            Err(e) => link_refusal(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// The caller's own Slack link, or null, and whether its workspace is connected; never another's.
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/chat/identities/me",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetMyOnCallChatIdentity",
+    summary = "Show your own Slack link",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Your link, or null", content_type = "application/json", body = Object),
+        (status = 403, description = "Not a member of the organization", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn get_my_chat_identity(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::chat::link_flow;
+
+        match link_flow::mine(&org_id, &user_email.user_id).await {
+            Ok(view) => MetaHttpResponse::json(view),
+            Err(e) => link_refusal(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+/// Unlinks the caller's own Slack account; nobody else's can be named.
+#[utoipa::path(
+    delete,
+    path = "/{org_id}/oncall/chat/identities/me",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "DeleteMyOnCallChatIdentity",
+    summary = "Unlink your own Slack account",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Whether a link was removed", content_type = "application/json", body = Object),
+        (status = 403, description = "Not a member of the organization", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn delete_my_chat_identity(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::chat::link_flow;
+
+        match link_flow::unlink(&org_id, &user_email.user_id).await {
+            Ok(unlinked) => MetaHttpResponse::json(serde_json::json!({ "unlinked": unlinked })),
+            Err(e) => link_refusal(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 /// Slack's button presses: verified, answered at once with an empty 200, then worked (CL-1, CL-3).
 #[utoipa::path(
     post,
@@ -361,6 +517,18 @@ fn refusal(e: o2_enterprise::enterprise::oncall::chat::install_flow::InstallFlow
     MetaHttpResponse::error(e.http_status(), e.to_string()).into_response()
 }
 
+/// Like [`refusal`], for linking a Slack account.
+#[cfg(feature = "enterprise")]
+fn link_refusal(e: o2_enterprise::enterprise::oncall::chat::link_flow::LinkFlowError) -> Response {
+    use axum::response::IntoResponse;
+    use o2_enterprise::enterprise::oncall::chat::link_flow::LinkFlowError;
+
+    if let LinkFlowError::Storage(cause) = &e {
+        return super::internal_error("slack link", cause);
+    }
+    MetaHttpResponse::error(e.http_status(), e.to_string()).into_response()
+}
+
 /// Answers one press as the linked person, then posts any private reply (CL-5 to CL-7).
 #[cfg(feature = "enterprise")]
 async fn press_worker(click: Click) {
@@ -424,6 +592,16 @@ mod tests {
                 "slack interact",
                 Box::pin(slack_interact(HeaderMap::new(), Bytes::new())),
             ),
+            ("link start", Box::pin(start_slack_link(org()))),
+            (
+                "link confirm",
+                Box::pin(confirm_slack_link(
+                    org(),
+                    ValidatedJson(ConfirmSlackLinkRequest { t: "t".to_string() }),
+                )),
+            ),
+            ("my link", Box::pin(get_my_chat_identity(org()))),
+            ("unlink", Box::pin(delete_my_chat_identity(org()))),
         ];
         for (name, handler) in cases {
             let resp = handler.await;
