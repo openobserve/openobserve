@@ -203,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
                             :title="t('alerts.searchThisFolderTooltip')"
-                            ><span class="@max-[34rem]/alert-toolbar:hidden max-md:hidden">{{
+                            ><span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
                               t("alerts.searchThisFolder")
                             }}</span></OToggleGroupItem
                           >
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
                             :title="t('alerts.searchAllFoldersTooltip')"
-                            ><span class="@max-[34rem]/alert-toolbar:hidden max-md:hidden">{{
+                            ><span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
                               t("alerts.searchAllFolders")
                             }}</span></OToggleGroupItem
                           >
@@ -269,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`alert-list-composite-badge-${row.alert_id}`"
                     />
                     <span
-                      class="text-text-secondary whitespace-nowrap text-xs"
+                      class="text-text-secondary text-xs whitespace-nowrap"
                       :data-test="`alert-list-child-count-${row.alert_id}`"
                     >
                       {{ t("alerts.composite.childrenCount", { count: row.child_count }) }}
@@ -1429,7 +1429,7 @@ export default defineComponent({
     const isMutedFiring = (row: { active_downtime?: unknown; last_outcome?: unknown }): boolean =>
       !!row.active_downtime && isFiringOutcome(row.last_outcome);
 
-    // Same rule as the Last outcome badge, so the Firing tile counts exactly the rows showing it.
+    // Counts muted firings too: a downtime silences the notification, not the firing state.
     const isFiringRow = (row: any): boolean =>
       showRunOutcome(row) && isFiringOutcome(row?.last_outcome);
 
@@ -1530,9 +1530,7 @@ export default defineComponent({
       const hasData = c.total > 0;
       const v = (n: number): string | number => (hasData ? n : "—");
       const share = hasData ? c.total : undefined;
-      // Severity-descending so what needs attention sits on the left (matches the
-      // Incidents / Eval Jobs strips): failed (error) → firing (error) → recent (warning) → active
-      // (healthy) → paused (inert) → Total last.
+      // Severity-descending, matching the Incidents / Eval Jobs strips; Total stays last.
       return [
         {
           key: "failed",
