@@ -675,3 +675,85 @@ describe("$__percentile_interval", () => {
     }
   });
 });
+
+describe("query variable 'All'", () => {
+  const makeWithVariable = (variable: any, query = "SELECT * FROM t WHERE svc IN ($svc)") => {
+    const variablesData = makeVariablesData([
+      { name: "svc", multiSelect: true, isVariablePartialLoaded: true, ...variable },
+    ]);
+    const inst = usePanelVariableSubstitution({
+      panelSchema: makePanelSchema([{ query }]),
+      variablesData,
+      chartPanelRef: makeChartPanelRef(),
+      store: makeStore(),
+      log,
+    });
+    return { inst, variablesData };
+  };
+  const options = [
+    { label: "Checkout", value: "checkout" },
+    { label: "Payments", value: "payments" },
+  ];
+
+  it("sends the listed option values instead of the placeholder", () => {
+    const { inst } = makeWithVariable({ type: "query", value: ["_o2_all_"], options });
+    expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(
+      "SELECT * FROM t WHERE svc IN ('checkout','payments')",
+    );
+    expect(inst.replaceQueryValue('up{svc=~"$svc"}', 0, 1, "promql").query).toBe(
+      'up{svc=~"checkout|payments"}',
+    );
+  });
+
+  it("filters to nothing, never to everything, when the loaded list is empty", () => {
+    const { inst } = makeWithVariable({ type: "query", value: ["_o2_all_"], options: [] });
+    expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(
+      "SELECT * FROM t WHERE svc IN ('_o2_no_values_')",
+    );
+    expect(inst.replaceQueryValue('up{svc=~"$svc"}', 0, 1, "promql").query).toBe(
+      'up{svc=~"_o2_no_values_"}',
+    );
+  });
+
+  it("re-runs the panel when an empty list behind 'All' fills in", () => {
+    const { inst, variablesData } = makeWithVariable({
+      type: "query",
+      value: ["_o2_all_"],
+      options: [],
+    });
+    expect(inst.variablesDataUpdated()).toBe(false);
+    variablesData.value.values[0].options = options;
+    expect(inst.variablesDataUpdated()).toBe(true);
+  });
+
+  it("keeps the placeholder for query_values variables", () => {
+    const { inst } = makeWithVariable({ type: "query_values", value: ["_o2_all_"], options });
+    expect(inst.replaceQueryValue("SELECT * FROM t WHERE svc IN ($svc)", 0, 1, "sql").query).toBe(
+      "SELECT * FROM t WHERE svc IN ('_o2_all_')",
+    );
+  });
+
+  it("holds the panel until the options behind 'All' have loaded", () => {
+    const { inst, variablesData } = makeWithVariable({
+      type: "query",
+      value: ["_o2_all_"],
+      options: [],
+      isVariablePartialLoaded: false,
+    });
+    expect(inst.ifPanelVariablesCompletedLoading()).toBe(false);
+    variablesData.value.values[0].isVariablePartialLoaded = true;
+    variablesData.value.values[0].options = options;
+    expect(inst.ifPanelVariablesCompletedLoading()).toBe(true);
+  });
+
+  it("re-runs the panel when the options behind 'All' change", () => {
+    const { inst, variablesData } = makeWithVariable({
+      type: "query",
+      value: ["_o2_all_"],
+      options,
+    });
+    expect(inst.variablesDataUpdated()).toBe(false);
+    variablesData.value.values[0].options = [options[0]];
+    expect(inst.variablesDataUpdated()).toBe(true);
+  });
+});

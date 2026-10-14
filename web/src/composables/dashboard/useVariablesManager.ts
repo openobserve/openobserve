@@ -23,13 +23,17 @@ import {
   type ScopedDependencyGraph,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import {
+  isQueryBackedVariable,
+  isQueryVariable,
+} from "@/utils/dashboard/variables/queryVariableUtils";
 
 export const LIVE_COMMIT_DEBOUNCE_MS = 300;
 
 export interface VariableConfig {
   name: string;
   label?: I18nText;
-  type: "query_values" | "custom" | "constant" | "textbox" | "dynamic_filters";
+  type: "query_values" | "query" | "custom" | "constant" | "textbox" | "dynamic_filters";
   scope: "global" | "tabs" | "panels";
   tabs?: string[];
   panels?: string[];
@@ -38,8 +42,12 @@ export interface VariableConfig {
   query_data?: {
     stream_type?: string;
     stream?: string;
-    field: string;
+    field?: string;
     max_record_size?: number;
+    query_type?: "sql" | "promql";
+    query?: string;
+    value_field?: string;
+    label_field?: string;
     filter?: Array<{
       name?: string;
       operator?: string;
@@ -89,6 +97,23 @@ export const getVariableKey = (
   }
 };
 
+// A query variable's "All" stands for the options its query lists, so that default still has to fetch.
+const fetchesForDefault = (variable: VariableConfig): boolean =>
+  variable.loadOptionsWithAllDefault === true ||
+  (isQueryVariable(variable) && variable.selectAllValueForMultiSelect === "all");
+
+// Labels and "All" options of a query variable only come from its query, so a value set without a fetch still needs one.
+const needsQueryOptions = (variable: VariableRuntimeState): boolean =>
+  isQueryVariable(variable) &&
+  !variable.isLoading &&
+  !variable.isVariableLoadingPending &&
+  !((variable as any).options?.length > 0);
+
+const holdsSelectAll = (variable: VariableRuntimeState): boolean =>
+  Array.isArray(variable.value)
+    ? variable.value.includes(SELECT_ALL_VALUE)
+    : variable.value === SELECT_ALL_VALUE;
+
 // Helper to expand variables for scopes
 const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeState[] => {
   const expanded: VariableRuntimeState[] = [];
@@ -100,8 +125,8 @@ const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeS
       return variable.value;
     }
 
-    // For query_values with custom or "all" configuration, set the appropriate default
-    if (variable.type === "query_values") {
+    // For query-backed variables with custom or "all" configuration, set the appropriate default
+    if (isQueryBackedVariable(variable)) {
       if (
         variable.selectAllValueForMultiSelect === "custom" &&
         (variable as any).customMultiSelectValue?.length > 0
@@ -141,43 +166,49 @@ const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeS
 
     // Check if variable has custom or "all" default - mark as partially loaded immediately
     const hasCustomOrAllDefault =
-      variable.type === "query_values" &&
+      isQueryBackedVariable(variable) &&
       (variable.selectAllValueForMultiSelect === "custom" ||
-        variable.selectAllValueForMultiSelect === "all");
+        variable.selectAllValueForMultiSelect === "all") &&
+      !(isQueryVariable(variable) && variable.selectAllValueForMultiSelect === "all");
+    // Saved options of a query variable are form leftovers; its options always come from the query.
+    const runtimeOverrides = isQueryVariable(variable) ? { options: [] } : {};
 
     if (scope === "global") {
       expanded.push({
         ...variable,
+        ...runtimeOverrides,
         scope: "global",
         value: initialValue,
         isVariableLoadingPending: false,
         isLoading: false,
         // Non-query types are immediately ready
         // Custom and "all" variables are also immediately ready (no API call needed)
-        isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
+        isVariablePartialLoaded: !isQueryBackedVariable(variable) || hasCustomOrAllDefault,
       });
     } else if (scope === "tabs" && variable.tabs && variable.tabs.length > 0) {
       variable.tabs.forEach((tabId) => {
         expanded.push({
           ...variable,
+          ...runtimeOverrides,
           scope: "tabs",
           tabId,
           value: initialValue,
           isVariableLoadingPending: false,
           isLoading: false,
-          isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
+          isVariablePartialLoaded: !isQueryBackedVariable(variable) || hasCustomOrAllDefault,
         });
       });
     } else if (scope === "panels" && variable.panels && variable.panels.length > 0) {
       variable.panels.forEach((panelId) => {
         expanded.push({
           ...variable,
+          ...runtimeOverrides,
           scope: "panels",
           panelId,
           value: initialValue,
           isVariableLoadingPending: false,
           isLoading: false,
-          isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
+          isVariablePartialLoaded: !isQueryBackedVariable(variable) || hasCustomOrAllDefault,
         });
       });
     }
@@ -226,7 +257,7 @@ export const useVariablesManager = (t: TranslateFn) => {
 
     // Helper to determine if a specific variable is still in its initial loading phase
     const isVarLoading = (v: VariableRuntimeState) => {
-      if (v.type !== "query_values") return false;
+      if (!isQueryBackedVariable(v)) return false;
       return v.isLoading || v.isVariableLoadingPending || !v.isVariablePartialLoaded;
     };
 
@@ -395,7 +426,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     path: Set<string> = new Set(),
   ): boolean => {
     if (v.isLoading) return true;
-    if (v.type !== "query_values") return false;
+    if (!isQueryBackedVariable(v)) return false;
     if (v.isVariableLoadingPending !== true && v.isVariablePartialLoaded === true) return false;
     const nextPath = new Set(path).add(key);
     return (dependencyGraph.value[key]?.parents || []).every((parentKey) => {
@@ -521,7 +552,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     recordLoadedAgainst(
       expandedVars.filter(
         (v) =>
-          v.type === "query_values" &&
+          isQueryBackedVariable(v) &&
           v.isVariablePartialLoaded &&
           v.loadOptionsWithAllDefault !== true,
       ),
@@ -548,11 +579,11 @@ export const useVariablesManager = (t: TranslateFn) => {
     independentGlobalVars.forEach((v) => {
       // Mark as pending so selector will load them
       // Non-API types (custom, constant, textbox) need to load to notify manager
-      // query_values types without custom/all need API calls
+      // query-backed types without custom/all need API calls
       if (v.type === "custom" || v.type === "constant" || v.type === "textbox") {
         // Non-API types still need to load to set values and notify manager
         v.isVariableLoadingPending = true;
-      } else if (v.type === "query_values") {
+      } else if (isQueryBackedVariable(v)) {
         const hasCustomOrAllDefault =
           v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
@@ -560,7 +591,7 @@ export const useVariablesManager = (t: TranslateFn) => {
         // OPTION list empty, so the picker renders its select-all label over
         // nothing until the user's own interaction refetches it. Opt-in, because
         // every saved dashboard uses the "first" default and never hits this.
-        if (!hasCustomOrAllDefault || v.loadOptionsWithAllDefault === true) {
+        if (!hasCustomOrAllDefault || fetchesForDefault(v)) {
           v.isVariableLoadingPending = true;
         }
       }
@@ -575,7 +606,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     });
 
     dependentGlobalVars.forEach((v) => {
-      if (v.type === "query_values") {
+      if (isQueryBackedVariable(v)) {
         const key = getVariableKey(v.name, v.scope);
         const parentKeys = dependencyGraph.value[key]?.parents || [];
 
@@ -593,7 +624,7 @@ export const useVariablesManager = (t: TranslateFn) => {
 
           // Parent is non-API type if:
           // - It's a custom type variable (custom, constant, textbox, dynamic_filters)
-          // - OR it's a query_values with custom/all default (no API call needed)
+          // - OR it's a query-backed variable with custom/all default (no API call needed)
           // loadOptionsWithAllDefault makes an "all" parent genuinely fetch, so it
           // is NOT synchronous: pre-marking its child races the parent's response
           // and ships the child's filter with the parent placeholder unsubstituted.
@@ -602,8 +633,8 @@ export const useVariablesManager = (t: TranslateFn) => {
             parentVar.type === "constant" ||
             parentVar.type === "textbox" ||
             parentVar.type === "dynamic_filters" ||
-            (parentVar.type === "query_values" &&
-              parentVar.loadOptionsWithAllDefault !== true &&
+            (isQueryBackedVariable(parentVar) &&
+              !fetchesForDefault(parentVar) &&
               (parentVar.selectAllValueForMultiSelect === "custom" ||
                 parentVar.selectAllValueForMultiSelect === "all"));
 
@@ -797,7 +828,7 @@ export const useVariablesManager = (t: TranslateFn) => {
           if (canVariableLoad(childVar)) {
             // Reset child state to ensure it reloads with the new parent value
             // This is critical for scoped variables that need fresh data
-            if (childVar.type === "query_values") {
+            if (isQueryBackedVariable(childVar)) {
               // Only reset if not already loading/pending
               const keepsLoadedChild = valueUnchanged && childVar.isVariablePartialLoaded;
               if (!childVar.isLoading && !childVar.isVariableLoadingPending && !keepsLoadedChild) {
@@ -811,6 +842,8 @@ export const useVariablesManager = (t: TranslateFn) => {
                 }
                 childVar.options = [];
                 // Mark as pending to trigger load
+                childVar.isVariableLoadingPending = true;
+              } else if (keepsLoadedChild && needsQueryOptions(childVar)) {
                 childVar.isVariableLoadingPending = true;
               }
             } else {
@@ -912,14 +945,16 @@ export const useVariablesManager = (t: TranslateFn) => {
       // (i.e. all their parents are already ready)
       const tabVars = variablesData.tabs[tabId] || [];
       tabVars.forEach((v) => {
-        if (v.type === "query_values" && !v.isVariablePartialLoaded) {
+        if (isQueryBackedVariable(v) && !v.isVariablePartialLoaded) {
           // Skip custom and "all" variables - they don't need API calls on visibility change
           const hasCustomOrAllDefault =
             v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
-          if (canVariableLoad(v) && !hasCustomOrAllDefault) {
+          if (canVariableLoad(v) && (!hasCustomOrAllDefault || fetchesForDefault(v))) {
             v.isVariableLoadingPending = true;
           }
+        } else if (needsQueryOptions(v) && canVariableLoad(v)) {
+          v.isVariableLoadingPending = true;
         }
       });
     }
@@ -934,14 +969,16 @@ export const useVariablesManager = (t: TranslateFn) => {
       const panelVars = variablesData.panels[panelId] || [];
 
       panelVars.forEach((v) => {
-        if (v.type === "query_values" && !v.isVariablePartialLoaded) {
+        if (isQueryBackedVariable(v) && !v.isVariablePartialLoaded) {
           // Skip custom and "all" variables - they don't need API calls on visibility change
           const hasCustomOrAllDefault =
             v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
-          if (canVariableLoad(v) && !hasCustomOrAllDefault) {
+          if (canVariableLoad(v) && (!hasCustomOrAllDefault || fetchesForDefault(v))) {
             v.isVariableLoadingPending = true;
           }
+        } else if (needsQueryOptions(v) && canVariableLoad(v)) {
+          v.isVariableLoadingPending = true;
         }
       });
     }
@@ -1029,7 +1066,7 @@ export const useVariablesManager = (t: TranslateFn) => {
         // The URL carried this child too, so its value stands and a fetch would overwrite it.
         if (restored.has(childKey)) return;
         const childVar = findVariableByKey(childKey, allVars);
-        if (!childVar || childVar.type !== "query_values") return;
+        if (!childVar || !isQueryBackedVariable(childVar)) return;
         if (childVar.isVariablePartialLoaded || childVar.isVariableLoadingPending) return;
         if (!canVariableLoad(childVar)) return;
         childVar.isVariableLoadingPending = true;
@@ -1109,7 +1146,24 @@ export const useVariablesManager = (t: TranslateFn) => {
 
     const allVars = getAllVariablesFlat();
     recordLoadedAgainst(restoredKeys.map((key) => findVariableByKey(key, allVars)));
+    hydrateRestoredQueryVariables(restoredKeys, allVars);
     scheduleChildrenOfRestored(restoredKeys);
+  };
+
+  // A restored "All" holds panels until its options load; any restored query variable fetches for its labels.
+  const hydrateRestoredQueryVariables = (
+    restoredKeys: string[],
+    allVars: VariableRuntimeState[],
+  ) => {
+    const restored = restoredKeys
+      .map((key) => findVariableByKey(key, allVars))
+      .filter((v): v is VariableRuntimeState => !!v && isQueryVariable(v));
+    restored.forEach((v) => {
+      if (holdsSelectAll(v)) v.isVariablePartialLoaded = false;
+    });
+    restored.forEach((v) => {
+      if (needsQueryOptions(v) && canVariableLoad(v)) v.isVariableLoadingPending = true;
+    });
   };
 
   interface ParsedUrlKey {

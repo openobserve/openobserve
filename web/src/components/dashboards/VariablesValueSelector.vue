@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`dashboard-variable-${item.name}-container`"
     >
       <div
-        v-if="item.type == 'query_values'"
+        v-if="isQueryBackedVariable(item)"
         class="max-w-[40rem] min-w-37.5"
         v-show="!isVariableOmitted(item)"
       >
@@ -48,6 +48,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               parent: item.curatedNarrowBy || item.label || item.name,
             })
           }}
+        </div>
+        <div
+          v-else-if="isQueryVariable(item) && item.queryCapped && !item.queryError"
+          class="text-text-secondary text-xs"
+          :data-test="`variable-query-capped-${item.name}`"
+        >
+          {{ t("dashboard.queryVariable.cappedHint", { count: getQueryVariableMaxRecords(item) }) }}
+        </div>
+        <div
+          v-if="isQueryVariable(item) && item.queryError"
+          class="text-status-error-text me-4 flex w-0 min-w-full items-center gap-1 text-xs"
+          :data-test="`variable-query-error-${item.name}`"
+        >
+          <OIcon name="error-outline" size="xs" class="shrink-0" />
+          <OTruncatedText class="min-w-0 flex-1">{{
+            t("dashboard.queryVariable.loadFailedReason", { reason: item.queryError })
+          }}</OTruncatedText>
         </div>
       </div>
       <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
@@ -123,12 +140,15 @@ import {
   reactive,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { isEqual } from "lodash-es";
+import { raw, useI18nTyped } from "@/types/i18n";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
@@ -137,6 +157,24 @@ import {
   normalizeVariableSyntax,
   replaceVariablePlaceholders,
 } from "@/utils/dashboard/variables/variablesUtils";
+import {
+  getQueryVariableLanguage,
+  getQueryVariableMaxRecords,
+  isExplicitQuerySelection,
+  isQueryBackedVariable,
+  isQueryVariable,
+  reconcileQueryVariableValue,
+  resolveQueryVariableValue,
+  substituteQueryVariables,
+  type QueryVariableOption,
+} from "@/utils/dashboard/variables/queryVariableUtils";
+import {
+  getQueryVariableErrorMessage,
+  loadQueryVariableValues,
+  QueryVariableCancelledError,
+  runSqlVariableQueryOnStream,
+  type SqlVariableQueryRequest,
+} from "@/utils/dashboard/variables/queryVariableLoader";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import {
@@ -198,6 +236,8 @@ export default defineComponent({
     VariableCustomValueSelector,
     OButton,
     OInput,
+    OIcon,
+    OTruncatedText,
   },
   setup(props: any, { emit }) {
     const store = useStore();
@@ -572,53 +612,7 @@ export default defineComponent({
             const originalValue = JSON.parse(JSON.stringify(variableObject.value));
 
             if (isFirstResponse) {
-              // Update options and handle first response
-              if (oldVariablesData[variableObject.name] !== undefined) {
-                variableLog(
-                  variableObject.name,
-                  `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
-                );
-
-                const oldValues = Array.isArray(oldVariablesData[variableObject.name])
-                  ? oldVariablesData[variableObject.name]
-                  : [oldVariablesData[variableObject.name]];
-
-                handleQueryValuesLogic(variableObject, oldValues);
-              } else {
-                // Don't auto-set value to first option if dropdown was just opened
-                // Only set default value during initial load or when explicitly needed
-                variableLog(
-                  variableObject.name,
-                  `Old values not found - keeping existing value if set`,
-                );
-
-                // Only set to first option if current value is null/undefined/empty
-                if (
-                  variableObject.value === null ||
-                  variableObject.value === undefined ||
-                  (Array.isArray(variableObject.value) && variableObject.value.length === 0)
-                ) {
-                  // Don't auto-select a blank option as default. Find the first non-blank option.
-                  if (variableObject.options.length) {
-                    // Find the first non-blank option
-                    const firstNonBlankOption = variableObject.options.find(
-                      (opt: any) => opt.value !== "" && opt.label !== "<blank>",
-                    );
-
-                    if (firstNonBlankOption) {
-                      // For multi-select, wrap in array; for single-select, use the value directly
-                      variableObject.value = variableObject.multiSelect
-                        ? [firstNonBlankOption.value]
-                        : firstNonBlankOption.value;
-                    } else {
-                      // All options are blank - keep value unset
-                      variableObject.value = variableObject.multiSelect ? [] : null;
-                    }
-                  } else {
-                    variableObject.value = variableObject.multiSelect ? [] : null;
-                  }
-                }
-              }
+              selectValueForLoadedOptions(variableObject);
 
               const hasValueChanged =
                 Array.isArray(originalValue) && Array.isArray(variableObject.value)
@@ -776,6 +770,217 @@ export default defineComponent({
 
     // ------------- End WebSocket Implementation -------------
 
+    // Latest load per query variable; a response that lands after a newer request is dropped.
+    const queryVariableRequestIds: Record<string, number> = {};
+
+    const getVariablesForSubstitution = () =>
+      useManager && manager
+        ? manager.getAllVisibleVariables(props.tabId, props.panelId) || variablesData.values
+        : variablesData.values;
+
+    const runSqlForVariable = (variableObject: any) => (request: SqlVariableQueryRequest) => {
+      const { traceId } = generateTraceContext();
+      addTraceId(variableObject.name, traceId);
+      return runSqlVariableQueryOnStream(fetchQueryDataWithHttpStream, {
+        ...request,
+        orgId: store.state.selectedOrganization.identifier,
+        traceId,
+      }).finally(() => removeTraceId(variableObject.name, traceId));
+    };
+
+    // The user's own pick per query variable, kept while a time range drops some of it so a later range can restore it.
+    const pinnedQuerySelections: Record<string, any> = {};
+
+    const reconcileForTimeRange = (variableObject: any, options: QueryVariableOption[]) => {
+      const { name } = variableObject;
+      const intended = pinnedQuerySelections[name] ?? variableObject.value;
+      const reconciled = reconcileQueryVariableValue(
+        { ...variableObject, value: intended },
+        options,
+      );
+      if (isExplicitQuerySelection(intended) && !isEqual(reconciled, intended))
+        pinnedQuerySelections[name] = intended;
+      else delete pinnedQuerySelections[name];
+      return reconciled;
+    };
+
+    const applyQueryVariableOptions = (
+      variableObject: any,
+      options: QueryVariableOption[],
+      pruneStale: boolean,
+    ) => {
+      const newOptions = options.map((option) => ({ ...option }));
+      const originalValue = JSON.parse(JSON.stringify(variableObject.value ?? null));
+      const originalResolved = resolveQueryVariableValue(variableObject);
+      // A pick that arrives before any options (URL, reload) is checked like a time-range change, so both paths agree.
+      const reconciles =
+        pruneStale ||
+        (!(variableObject.options?.length > 0) && isExplicitQuerySelection(variableObject.value));
+      if (reconciles) {
+        variableObject.options = newOptions;
+        variableObject.value = reconcileForTimeRange(variableObject, newOptions);
+      } else {
+        delete pinnedQuerySelections[variableObject.name];
+        const selected = Array.isArray(variableObject.value)
+          ? variableObject.value
+          : variableObject.value !== null && variableObject.value !== undefined
+            ? [variableObject.value]
+            : [];
+        selected.forEach((value: any) => {
+          if (value === SELECT_ALL_VALUE || newOptions.some((option) => option.value === value))
+            return;
+          newOptions.push({ label: value, value });
+        });
+        variableObject.options = newOptions;
+        selectValueForLoadedOptions(variableObject);
+      }
+      const hasValueChanged =
+        JSON.stringify(originalValue) !== JSON.stringify(variableObject.value ?? null);
+
+      variableObject.isVariablePartialLoaded = true;
+      if (useManager && manager) {
+        if (hasValueChanged) oldVariablesData[variableObject.name] = variableObject.value;
+        manager.onVariablePartiallyLoaded(
+          getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          ),
+        );
+      } else {
+        void finalizePartialVariableLoading(variableObject, true, hasValueChanged);
+      }
+      finalizeVariableLoading(variableObject, true);
+      // Panels may already have run with the old value, so a dropped value or a new "All" list has to reach them too.
+      const hasResolvedChanged =
+        hasValueChanged || !isEqual(originalResolved, resolveQueryVariableValue(variableObject));
+      if (reconciles && hasResolvedChanged && useManager && manager?.commitWhenSettled) {
+        manager.commitWhenSettled([
+          getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          ),
+        ]);
+      }
+      emitVariablesData();
+    };
+
+    // A failed load keeps the last good options and still counts as finished, so panels are never held.
+    const endFailedQueryVariableLoad = (variableObject: any) => {
+      currentlyExecutingPromises[variableObject.name] = null;
+      variableObject.isLoading = false;
+      variableObject.isVariableLoadingPending = false;
+      if (!variableObject.isVariablePartialLoaded) {
+        variableObject.isVariablePartialLoaded = true;
+        if (useManager && manager) {
+          manager.onVariablePartiallyLoaded(
+            getVariableKey(
+              variableObject.name,
+              variableObject.scope || "global",
+              variableObject.tabId,
+              variableObject.panelId,
+            ),
+          );
+        }
+      }
+      emitVariablesData();
+    };
+
+    const fetchQueryVariableOptions = async (
+      variableObject: any,
+      { pruneStale = false, onSettled }: { pruneStale?: boolean; onSettled?: () => void } = {},
+    ) => {
+      const { name } = variableObject;
+      const startTime = props.selectedTimeDate?.start_time?.getTime();
+      const endTime = props.selectedTimeDate?.end_time?.getTime();
+      if (!startTime || !endTime || (!pruneStale && currentlyExecutingPromises[name] === null)) {
+        markLoadEnded(variableObject);
+        onSettled?.();
+        return;
+      }
+
+      const requestId = (queryVariableRequestIds[name] ?? 0) + 1;
+      queryVariableRequestIds[name] = requestId;
+      const isStale = () => isUnmounted || queryVariableRequestIds[name] !== requestId;
+      variableObject.isLoading = true;
+      variableObject.isVariableLoadingPending = true;
+
+      const language = getQueryVariableLanguage(variableObject);
+      try {
+        const result = await loadQueryVariableValues({
+          query: substituteQueryVariables(
+            variableObject.query_data?.query ?? "",
+            getVariablesForSubstitution(),
+            language,
+          ),
+          language,
+          streamType: variableObject.query_data?.stream_type,
+          valueField: variableObject.query_data?.value_field,
+          labelField: variableObject.query_data?.label_field,
+          maxRecords: getQueryVariableMaxRecords(variableObject),
+          startTime,
+          endTime,
+          orgId: store.state.selectedOrganization.identifier,
+          runSql: runSqlForVariable(variableObject),
+        });
+        if (isStale()) return;
+        variableObject.queryError = undefined;
+        variableObject.queryCapped = result.capped;
+        applyQueryVariableOptions(variableObject, result.options, pruneStale);
+        onSettled?.();
+      } catch (error) {
+        if (isStale()) return;
+        if (!(error instanceof QueryVariableCancelledError)) {
+          variableObject.queryError = getQueryVariableErrorMessage(error);
+          variableLog(name, `Query variable failed: ${variableObject.queryError}`);
+        }
+        endFailedQueryVariableLoad(variableObject);
+        onSettled?.();
+      }
+    };
+
+    // A new time range reloads query variables like a fresh load, parents before the children that read them.
+    const reloadQueryVariablesForTimeRange = () => {
+      if (!useManager || !manager || isUnmounted) return;
+      const inFlight = variablesData.values.filter((v: any) => isQueryVariable(v) && v.isLoading);
+      inFlight.forEach((v: any) => void fetchQueryVariableOptions(v));
+
+      const targets = variablesData.values.filter(
+        (v: any) => isQueryVariable(v) && v.isVariablePartialLoaded && !v.isVariableLoadingPending,
+      );
+      const pending = new Set<string>(targets.map((v: any) => v.name));
+      const parentsOf = (v: any): string[] =>
+        variablesDependencyGraph[v.name]?.parentVariables ?? [];
+      const startReady = () => {
+        targets.forEach((v: any) => {
+          if (!pending.has(v.name) || parentsOf(v).some((parent) => pending.has(parent))) return;
+          pending.delete(v.name);
+          // The manager already reloads a child whose parent value changed.
+          if (v.isVariableLoadingPending || !v.isVariablePartialLoaded) {
+            startReady();
+            return;
+          }
+          void fetchQueryVariableOptions(v, { pruneStale: true, onSettled: startReady });
+        });
+      };
+      startReady();
+    };
+
+    watch(
+      () => [
+        props.selectedTimeDate?.start_time?.getTime?.(),
+        props.selectedTimeDate?.end_time?.getTime?.(),
+      ],
+      ([start, end], [prevStart, prevEnd]) => {
+        if (!start || !end || !prevStart || !prevEnd) return;
+        if (start === prevStart && end === prevEnd) return;
+        reloadQueryVariablesForTimeRange();
+      },
+    );
+
     // reset variables data
     // it will executed once on mount
     const resetVariablesData = () => {
@@ -824,8 +1029,8 @@ export default defineComponent({
           // if parent variable is not loaded or it's value is changed, isVariableLoadingPending will be true
           isVariableLoadingPending: false,
           isVariablePartialLoaded: true,
-          // Initialize options array for all variables
-          options: item.options || [],
+          // Initialize options array for all variables; a query variable's come only from its query
+          options: isQueryVariable(item) ? [] : item.options || [],
         };
 
         variableLog(
@@ -835,7 +1040,7 @@ export default defineComponent({
 
         // Set custom values immediately if they exist and no URL value is present
         if (
-          item.type === "query_values" &&
+          isQueryBackedVariable(item) &&
           item.selectAllValueForMultiSelect === "custom" &&
           item.customMultiSelectValue?.length > 0 &&
           ((Array.isArray(initialValue) && initialValue.length === 0) || !initialValue) // Only set custom value if no URL value exists
@@ -844,7 +1049,7 @@ export default defineComponent({
             ? item.customMultiSelectValue
             : item.customMultiSelectValue[0];
         } else if (
-          item.type === "query_values" &&
+          isQueryBackedVariable(item) &&
           item.selectAllValueForMultiSelect === "all" &&
           ((Array.isArray(initialValue) && initialValue.length === 0) || !initialValue)
         ) {
@@ -1484,6 +1689,37 @@ export default defineComponent({
      * Resets the state of the given variable.
      * @param {object} variableObject - The variable object to reset.
      */
+    // Restores the previous selection once options arrive, else picks the first non-blank option.
+    const selectValueForLoadedOptions = (variableObject: any) => {
+      const previous = oldVariablesData[variableObject.name];
+      if (previous !== undefined) {
+        variableLog(
+          variableObject.name,
+          `Old values before processing: ${JSON.stringify(previous)}`,
+        );
+        handleQueryValuesLogic(variableObject, Array.isArray(previous) ? previous : [previous]);
+        return;
+      }
+
+      variableLog(variableObject.name, `Old values not found - keeping existing value if set`);
+      const isEmpty =
+        variableObject.value === null ||
+        variableObject.value === undefined ||
+        (Array.isArray(variableObject.value) && variableObject.value.length === 0);
+      if (!isEmpty) return;
+
+      const firstNonBlankOption = (variableObject.options ?? []).find(
+        (opt: any) => opt.value !== "" && opt.label !== "<blank>",
+      );
+      if (firstNonBlankOption) {
+        variableObject.value = variableObject.multiSelect
+          ? [firstNonBlankOption.value]
+          : firstNonBlankOption.value;
+      } else {
+        variableObject.value = variableObject.multiSelect ? [] : null;
+      }
+    };
+
     const resetVariableState = (variableObject: any) => {
       // Reset the value of the variable to either an empty array if multiSelect is true, or null if not.
       variableObject.value = variableObject.multiSelect ? [] : null;
@@ -1556,8 +1792,8 @@ export default defineComponent({
           const hasParentVariables = variablesDependencyGraph[name]?.parentVariables;
           const areDatesValid =
             !isInvalidDate(props.selectedTimeDate?.start_time) &&
-            !isInvalidDate(props.selectedTimeDate?.end_time); // Check dates for all query_values type
-          if (variableObject.type === "query_values") {
+            !isInvalidDate(props.selectedTimeDate?.end_time); // Check dates for every query-backed type
+          if (isQueryBackedVariable(variableObject)) {
             if (!areDatesValid) {
               variableObject.isLoading = false;
               variableObject.isVariableLoadingPending = false;
@@ -1704,7 +1940,8 @@ export default defineComponent({
         `Handling variable type: ${variableObject.type},  ${isInitialLoad}`,
       );
       switch (variableObject.type) {
-        case "query_values": {
+        case "query_values":
+        case "query": {
           // Check if variable has custom or "all" default selection
           // If so, skip API call during initial load as the value is already set from settings
           const hasCustomOrAllDefault =
@@ -1758,7 +1995,10 @@ export default defineComponent({
               `Initial load check for variable: ${variableObject.name}, hasCustomOrAllDefault: ${hasCustomOrAllDefault}, value: ${JSON.stringify(variableObject.value)}`,
             );
 
-            if (hasCustomOrAllDefault) {
+            const allNeedsOptions =
+              isQueryVariable(variableObject) &&
+              variableObject.selectAllValueForMultiSelect === "all";
+            if (hasCustomOrAllDefault && !allNeedsOptions) {
               variableLog(
                 variableObject.name,
                 `Variable has custom or "all" default - skipping API call on initial load`,
@@ -1810,6 +2050,11 @@ export default defineComponent({
               return true;
             }
             // If has value but no options (e.g., from URL), continue to load options below
+          }
+
+          if (isQueryVariable(variableObject)) {
+            void fetchQueryVariableOptions(variableObject);
+            return true;
           }
 
           try {
@@ -1872,9 +2117,9 @@ export default defineComponent({
       if (!useManager) return;
 
       variablesData.values.forEach((variable: any, index: number) => {
-        // Only load query_values type that are marked as pending and not currently loading
+        // Only load query-backed types that are marked as pending and not currently loading
         if (
-          variable.type === "query_values" &&
+          isQueryBackedVariable(variable) &&
           variable.isVariableLoadingPending === true &&
           variable.isLoading !== true
         ) {
@@ -2136,7 +2381,7 @@ export default defineComponent({
       variablesData.values.forEach((variable: any) => {
         // Check if variable has custom or "all" default selection
         const hasCustomOrAllDefault =
-          variable.type === "query_values" &&
+          isQueryBackedVariable(variable) &&
           (variable.selectAllValueForMultiSelect === "custom" ||
             variable.selectAllValueForMultiSelect === "all");
 
@@ -2197,6 +2442,7 @@ export default defineComponent({
       if (useManager && manager) {
         try {
           oldVariablesData[currentVariable.name] = currentVariable.value;
+          delete pinnedQuerySelections[currentVariable.name];
           await manager.updateVariableValue(
             currentVariable.name,
             currentVariable.scope || "global",
@@ -2412,8 +2658,12 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       props,
       textboxDebounce,
+      isQueryBackedVariable,
+      isQueryVariable,
+      getQueryVariableMaxRecords,
       isVariableCapped,
       isVariableOmitted,
       isVariableOffTab,

@@ -932,21 +932,26 @@ describe("VariableQueryValueSelector", () => {
       wrapper = createWrapper();
     });
 
-    it("should display single value correctly", () => {
+    it("should display the selected option's label", () => {
       wrapper.vm.selectedValue = "us-east-1";
-      expect(wrapper.vm.displayValue).toBe("us-east-1");
+      expect(wrapper.vm.displayValue).toBe("US East");
+    });
+
+    it("should fall back to the value when no option carries it", () => {
+      wrapper.vm.selectedValue = "ap-south-1";
+      expect(wrapper.vm.displayValue).toBe("ap-south-1");
     });
 
     it("should display multiple values (≤2 items)", () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
       wrapper.vm.selectedValue = ["us-east-1", "us-west-1"];
-      expect(wrapper.vm.displayValue).toBe("us-east-1, us-west-1");
+      expect(wrapper.vm.displayValue).toBe("US East, US West");
     });
 
     it("should display multiple values with overflow (>2 items)", () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
       wrapper.vm.selectedValue = ["us-east-1", "us-west-1", "eu-west-1"];
-      expect(wrapper.vm.displayValue).toBe("us-east-1, us-west-1 ...+1 more");
+      expect(wrapper.vm.displayValue).toBe("US East, US West ...+1 more");
     });
 
     it("should display blank value as '<blank>'", () => {
@@ -962,6 +967,25 @@ describe("VariableQueryValueSelector", () => {
 
     it("should display SELECT_ALL_VALUE as '<ALL>'", () => {
       wrapper.vm.selectedValue = "_o2_all_";
+      expect(wrapper.vm.displayValue).toBe("<ALL>");
+    });
+
+    it("shows the no-values state for 'All' on a query variable with an empty list", () => {
+      wrapper = createWrapper({
+        variableItem: { ...multiSelectVariableItem, type: "query", options: [] },
+      });
+      wrapper.vm.selectedValue = ["_o2_all_"];
+      expect(wrapper.vm.displayValue).toBe("(No Data Found)");
+    });
+
+    it("keeps '<ALL>' while the query variable is loading or lists values", () => {
+      wrapper = createWrapper({
+        variableItem: { ...multiSelectVariableItem, type: "query", options: [], isLoading: true },
+      });
+      wrapper.vm.selectedValue = ["_o2_all_"];
+      expect(wrapper.vm.displayValue).toBe("<ALL>");
+      wrapper = createWrapper({ variableItem: { ...multiSelectVariableItem, type: "query" } });
+      wrapper.vm.selectedValue = ["_o2_all_"];
       expect(wrapper.vm.displayValue).toBe("<ALL>");
     });
 
