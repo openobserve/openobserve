@@ -159,6 +159,7 @@ pub struct AuthValidationResult {
     pub is_internal_user: bool,
     /// Name of the org ingestion token the request authenticated with.
     pub token_name: Option<String>,
+    pub delegation: Option<super::delegation::DelegatedCaller>,
 }
 
 /// What a password comparison decided, once the lockout policy has had its say.
@@ -250,6 +251,7 @@ pub async fn validator(
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
                         token_name: None,
+                        delegation: None,
                     });
                 }
 
@@ -271,6 +273,7 @@ pub async fn validator(
                         user_role: res.user_role,
                         is_internal_user: res.is_internal_user,
                         token_name,
+                        delegation: None,
                     })
                 } else {
                     Err(AuthError::Forbidden("Unauthorized Access".to_string()))
@@ -1114,6 +1117,7 @@ pub async fn validator_aws(req_data: &RequestData) -> Result<AuthValidationResul
                                 user_role: res.user_role,
                                 is_internal_user: res.is_internal_user,
                                 token_name: None,
+                                delegation: None,
                             })
                         } else {
                             Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1162,6 +1166,7 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
                             user_role: res.user_role,
                             is_internal_user: res.is_internal_user,
                             token_name: None,
+                            delegation: None,
                         })
                     } else {
                         Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -1244,6 +1249,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_role: Some(user.role),
                         is_internal_user: !user.is_external,
                         token_name: None,
+                        delegation: None,
                     })
                 } else {
                     Ok(AuthValidationResult {
@@ -1251,6 +1257,7 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
                         user_role: None,
                         is_internal_user: false,
                         token_name: None,
+                        delegation: None,
                     })
                 }
             }

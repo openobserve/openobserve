@@ -47,6 +47,7 @@ pub mod service_graph;
 pub mod service_streams;
 pub mod session;
 pub mod short_url;
+pub mod slack;
 pub mod slo;
 pub mod sql;
 pub mod status_pages;

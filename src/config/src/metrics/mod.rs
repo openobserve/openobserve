@@ -16,6 +16,7 @@
 mod base;
 pub mod oncall;
 pub mod promql;
+pub mod slack;
 
 use std::collections::HashMap;
 
