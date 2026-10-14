@@ -9450,6 +9450,9 @@
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
     "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
+    "builtinBadge": "System",
+    "builtinBadgeHint": "Ein integrierter Alarm: Sie können ihn deaktivieren oder bearbeiten, aber nicht löschen oder umbenennen.",
+    "builtinDeleteDisabled": "Integrierter Alarm, kann nicht gelöscht werden",
     "seconds": "Sekunden",
     "downtimes": {
       "newTitle": "Neues Wartungsfenster",
